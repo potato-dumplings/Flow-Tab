@@ -1,8 +1,9 @@
 import SwiftUI
 import AppKit
+import ApplicationServices
 
 @main
-struct FlowTabApp: App {
+struct FlowTabAppApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
     var body: some Scene {
@@ -28,6 +29,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             panelController?.handleGlobalHotkey(isBackward: isBackward)
         }
         self.hotkeyMonitor = hotkeyMonitor
+
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        _ = AXIsProcessTrustedWithOptions(options)
     }
 
     func applicationWillTerminate(_ notification: Notification) {

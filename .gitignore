@@ -9,3 +9,6 @@ build/
 # SwiftPM artifacts
 .swiftpm/
 FlowTabCore/.build/
+
+# Local release exports
+release/

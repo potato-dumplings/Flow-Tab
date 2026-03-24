@@ -9,6 +9,9 @@
 /* Begin PBXBuildFile section */
 		4A6DAE6E2F727AF500B0D737 /* FlowTabAppApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6DAE6D2F727AF500B0D737 /* FlowTabAppApp.swift */; };
 		4A6DAE702F727AF500B0D737 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6DAE6F2F727AF500B0D737 /* ContentView.swift */; };
+		A1B2C3D42F73000100B0D737 /* OptionTabHotkeyMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D12F73000100B0D737 /* OptionTabHotkeyMonitor.swift */; };
+		A1B2C3D52F73000100B0D737 /* RuntimeBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D22F73000100B0D737 /* RuntimeBridge.swift */; };
+		A1B2C3D62F73000100B0D737 /* SwitcherPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D32F73000100B0D737 /* SwitcherPanel.swift */; };
 		4A6DAE722F727AF500B0D737 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4A6DAE712F727AF500B0D737 /* Assets.xcassets */; };
 		4A6DAE752F727AF500B0D737 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4A6DAE742F727AF500B0D737 /* Preview Assets.xcassets */; };
 		4A6DAE802F727AF600B0D737 /* FlowTabAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6DAE7F2F727AF600B0D737 /* FlowTabAppTests.swift */; };
@@ -38,6 +41,9 @@
 		4A6DAE6A2F727AF500B0D737 /* FlowTabApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FlowTabApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4A6DAE6D2F727AF500B0D737 /* FlowTabAppApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTabAppApp.swift; sourceTree = "<group>"; };
 		4A6DAE6F2F727AF500B0D737 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A1B2C3D12F73000100B0D737 /* OptionTabHotkeyMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OptionTabHotkeyMonitor.swift; sourceTree = "<group>"; };
+		A1B2C3D22F73000100B0D737 /* RuntimeBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeBridge.swift; sourceTree = "<group>"; };
+		A1B2C3D32F73000100B0D737 /* SwitcherPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherPanel.swift; sourceTree = "<group>"; };
 		4A6DAE712F727AF500B0D737 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		4A6DAE742F727AF500B0D737 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		4A6DAE762F727AF500B0D737 /* FlowTabApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FlowTabApp.entitlements; sourceTree = "<group>"; };
@@ -100,6 +106,9 @@
 			children = (
 				4A6DAE6D2F727AF500B0D737 /* FlowTabAppApp.swift */,
 				4A6DAE6F2F727AF500B0D737 /* ContentView.swift */,
+				A1B2C3D12F73000100B0D737 /* OptionTabHotkeyMonitor.swift */,
+				A1B2C3D22F73000100B0D737 /* RuntimeBridge.swift */,
+				A1B2C3D32F73000100B0D737 /* SwitcherPanel.swift */,
 				4A6DAE712F727AF500B0D737 /* Assets.xcassets */,
 				4A6DAE762F727AF500B0D737 /* FlowTabApp.entitlements */,
 				4A6DAE732F727AF500B0D737 /* Preview Content */,
@@ -275,6 +284,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1B2C3D42F73000100B0D737 /* OptionTabHotkeyMonitor.swift in Sources */,
+				A1B2C3D52F73000100B0D737 /* RuntimeBridge.swift in Sources */,
+				A1B2C3D62F73000100B0D737 /* SwitcherPanel.swift in Sources */,
 				4A6DAE702F727AF500B0D737 /* ContentView.swift in Sources */,
 				4A6DAE6E2F727AF500B0D737 /* FlowTabAppApp.swift in Sources */,
 			);
