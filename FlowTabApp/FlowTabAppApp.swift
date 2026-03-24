@@ -1,17 +1,36 @@
-//
-//  FlowTabAppApp.swift
-//  FlowTabApp
-//
-//  Created by lk on 3/24/26.
-//
-
 import SwiftUI
+import AppKit
 
 @main
-struct FlowTabAppApp: App {
+struct FlowTabApp: App {
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+
     var body: some Scene {
-        WindowGroup {
-            ContentView()
+        Settings {
+            EmptyView()
         }
+    }
+}
+
+@MainActor
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    private var panelController: SwitcherPanelController?
+    private var hotkeyMonitor: OptionTabHotkeyMonitor?
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        NSApp.setActivationPolicy(.accessory)
+
+        let panelController = SwitcherPanelController()
+        self.panelController = panelController
+
+        let hotkeyMonitor = OptionTabHotkeyMonitor()
+        hotkeyMonitor.onHotkeyPressed = { [weak panelController] isBackward in
+            panelController?.handleGlobalHotkey(isBackward: isBackward)
+        }
+        self.hotkeyMonitor = hotkeyMonitor
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        hotkeyMonitor?.stop()
     }
 }

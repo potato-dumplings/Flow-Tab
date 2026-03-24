@@ -1,0 +1,11 @@
+.DS_Store
+
+# Xcode user and build artifacts
+DerivedData/
+build/
+*.xcuserstate
+**/xcuserdata/
+
+# SwiftPM artifacts
+.swiftpm/
+FlowTabCore/.build/

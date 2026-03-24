@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 60;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -14,6 +14,7 @@
 		4A6DAE802F727AF600B0D737 /* FlowTabAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6DAE7F2F727AF600B0D737 /* FlowTabAppTests.swift */; };
 		4A6DAE8A2F727AF600B0D737 /* FlowTabAppUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6DAE892F727AF600B0D737 /* FlowTabAppUITests.swift */; };
 		4A6DAE8C2F727AF600B0D737 /* FlowTabAppUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6DAE8B2F727AF600B0D737 /* FlowTabAppUITestsLaunchTests.swift */; };
+		4A6DAE9D2F727C0900B0D737 /* FlowTabCore in Frameworks */ = {isa = PBXBuildFile; productRef = 4A6DAE9C2F727C0900B0D737 /* FlowTabCore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -52,6 +53,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4A6DAE9D2F727C0900B0D737 /* FlowTabCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -79,6 +81,7 @@
 				4A6DAE7E2F727AF600B0D737 /* FlowTabAppTests */,
 				4A6DAE882F727AF600B0D737 /* FlowTabAppUITests */,
 				4A6DAE6B2F727AF500B0D737 /* Products */,
+				4A6DAE992F727BEA00B0D737 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -129,6 +132,13 @@
 			path = FlowTabAppUITests;
 			sourceTree = "<group>";
 		};
+		4A6DAE992F727BEA00B0D737 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -145,6 +155,9 @@
 			dependencies = (
 			);
 			name = FlowTabApp;
+			packageProductDependencies = (
+				4A6DAE9C2F727C0900B0D737 /* FlowTabCore */,
+			);
 			productName = FlowTabApp;
 			productReference = 4A6DAE6A2F727AF500B0D737 /* FlowTabApp.app */;
 			productType = "com.apple.product-type.application";
@@ -217,6 +230,9 @@
 				Base,
 			);
 			mainGroup = 4A6DAE612F727AF500B0D737;
+			packageReferences = (
+				4A6DAE982F727B1900B0D737 /* XCLocalSwiftPackageReference "FlowTabCore" */,
+			);
 			productRefGroup = 4A6DAE6B2F727AF500B0D737 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -573,6 +589,21 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		4A6DAE982F727B1900B0D737 /* XCLocalSwiftPackageReference "FlowTabCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = FlowTabCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		4A6DAE9C2F727C0900B0D737 /* FlowTabCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4A6DAE982F727B1900B0D737 /* XCLocalSwiftPackageReference "FlowTabCore" */;
+			productName = FlowTabCore;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 4A6DAE622F727AF500B0D737 /* Project object */;
 }
