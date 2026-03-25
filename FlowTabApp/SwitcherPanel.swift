@@ -32,8 +32,9 @@ final class SwitcherPanelController {
 
     func handleGlobalHotkey(isBackward: Bool) {
         if panel.isVisible {
-            // While panel is visible, key navigation is handled by local keyDown monitor.
-            // Ignoring global hotkey callbacks here avoids double-advancing the selection.
+            // Main switch hotkey is registered globally, so repeated key presses should keep
+            // advancing while the panel is visible.
+            advance(isBackward ? .tabBackward : .tabForward)
             return
         }
         let direction: CycleDirection = isBackward ? .backward : .forward
@@ -141,6 +142,9 @@ final class SwitcherPanelController {
     private func handleKeyDown(_ event: NSEvent) -> Bool {
         switch event.keyCode {
         case 48:
+            if shouldSwallowLocalTabEvent(event) {
+                return true
+            }
             advance(event.modifierFlags.contains(.shift) ? .tabBackward : .tabForward)
             return true
         case 123:
@@ -162,13 +166,17 @@ final class SwitcherPanelController {
             cancelSelection()
             return true
         default:
+            if isTerminateSelectedAppShortcut(event) {
+                terminateSelectedApp()
+                return true
+            }
             return false
         }
     }
 
     private func handleFlagsChanged(_ event: NSEvent) {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        if !flags.contains(.option) {
+        if !flags.contains(activePrimaryModifierFlag()) {
             finishSelection()
         }
     }
@@ -176,7 +184,7 @@ final class SwitcherPanelController {
     private func finishIfPrimaryModifierReleased() {
         guard panel.isVisible else { return }
         let flags = NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        if !flags.contains(.option) {
+        if !flags.contains(activePrimaryModifierFlag()) {
             finishSelection()
         }
     }
@@ -212,10 +220,71 @@ final class SwitcherPanelController {
         RunLoop.main.add(timer, forMode: .common)
         delayedWindowLayerTimer = timer
     }
+
+    private func terminateSelectedApp() {
+        switch model.terminateSelectedApp() {
+        case .notHandled:
+            RuntimeLog.info("Session", "terminate selected app ignored")
+            NSSound.beep()
+        case .updatedSession:
+            RuntimeLog.info("Session", "terminate selected app \(self.model.debugSelectionSummary())")
+            updatePanelSize()
+            scheduleDelayedWindowLayerEntryIfNeeded()
+        case .sessionEnded:
+            RuntimeLog.info("Session", "terminate selected app ended session")
+            removeEventMonitors()
+            panel.orderOut(nil)
+        }
+    }
+
+    private func activePrimaryModifierFlag() -> NSEvent.ModifierFlags {
+        SwitcherHotkeyPreferencesStore.load().primaryModifier.eventModifierFlag
+    }
+
+    private func shouldSwallowLocalTabEvent(_ event: NSEvent) -> Bool {
+        let hotkeyConfiguration = SwitcherHotkeyPreferencesStore.load()
+        guard hotkeyConfiguration.mainKey == .tab else { return false }
+
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        guard flags.contains(hotkeyConfiguration.primaryModifier.eventModifierFlag) else { return false }
+
+        switch hotkeyConfiguration.primaryModifier {
+        case .option:
+            return !flags.contains(.command) && !flags.contains(.control)
+        case .control:
+            return !flags.contains(.command) && !flags.contains(.option)
+        case .command:
+            return !flags.contains(.control) && !flags.contains(.option)
+        }
+    }
+
+    private func isTerminateSelectedAppShortcut(_ event: NSEvent) -> Bool {
+        let hotkeyConfiguration = SwitcherHotkeyPreferencesStore.load()
+        guard event.keyCode == hotkeyConfiguration.quitKeyCode else { return false }
+
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        guard flags.contains(hotkeyConfiguration.primaryModifier.eventModifierFlag) else { return false }
+        guard !flags.contains(.shift) else { return false }
+
+        switch hotkeyConfiguration.primaryModifier {
+        case .option:
+            return !flags.contains(.command) && !flags.contains(.control)
+        case .control:
+            return !flags.contains(.command) && !flags.contains(.option)
+        case .command:
+            return !flags.contains(.control) && !flags.contains(.option)
+        }
+    }
 }
 
 @MainActor
 final class LiveSwitcherModel: ObservableObject {
+    enum TerminateSelectedAppResult {
+        case notHandled
+        case updatedSession
+        case sessionEnded
+    }
+
     @Published private(set) var session: SwitcherSession?
 
     private let snapshotProvider = RuntimeSnapshotProvider()
@@ -326,23 +395,74 @@ final class LiveSwitcherModel: ObservableObject {
     }
 
     func startSession(triggerDirection: CycleDirection) -> Bool {
+        loadSnapshot(triggerDirection: triggerDirection, preferredSelectedAppID: nil)
+    }
+
+    func terminateSelectedApp() -> TerminateSelectedAppResult {
+        guard let currentSession = session else { return .notHandled }
+
+        let selectedApp = currentSession.selectedApp
+        guard let context = runtimeContextsByID[selectedApp.id] else { return .notHandled }
+
+        let preferredSelectedAppID = preferredAppIDAfterRemovingSelectedApp(from: currentSession)
+        let sent = context.runningApp.terminate()
+        RuntimeLog.info(
+            "Session",
+            "terminate request app=\(selectedApp.displayName) appID=\(selectedApp.id) sent=\(sent)"
+        )
+        guard sent else { return .notHandled }
+
+        if loadSnapshot(triggerDirection: .forward, preferredSelectedAppID: preferredSelectedAppID) {
+            return .updatedSession
+        }
+        return .sessionEnded
+    }
+
+    private func loadSnapshot(
+        triggerDirection: CycleDirection,
+        preferredSelectedAppID: String?
+    ) -> Bool {
         let snapshot = snapshotProvider.snapshot()
         guard !snapshot.apps.isEmpty else {
             session = nil
             runtimeContextsByID = [:]
+            previewCaptureAttemptedKeys = []
+            autoEnterSuppressedAppID = nil
             return false
         }
 
         runtimeContextsByID = snapshot.contextsByID
         previewCaptureAttemptedKeys = []
         autoEnterSuppressedAppID = nil
-        session = SwitcherSession(
+        var rebuiltSession = SwitcherSession(
             apps: snapshot.apps,
             preferences: preferences,
             triggerDirection: triggerDirection,
             rememberedWindowIDByAppID: rememberedWindowIDByAppID
         )
+
+        if
+            let preferredSelectedAppID,
+            rebuiltSession.apps.contains(where: { $0.id == preferredSelectedAppID })
+        {
+            for _ in 0..<rebuiltSession.apps.count {
+                if rebuiltSession.selectedApp.id == preferredSelectedAppID {
+                    break
+                }
+                rebuiltSession.handle(.tabForward)
+            }
+        }
+
+        session = rebuiltSession
         return true
+    }
+
+    private func preferredAppIDAfterRemovingSelectedApp(from session: SwitcherSession) -> String? {
+        guard session.apps.count > 1 else { return nil }
+        let remainingAppIDs = session.apps.map(\.id).filter { $0 != session.selectedApp.id }
+        guard !remainingAppIDs.isEmpty else { return nil }
+        let preferredIndex = min(session.selectedAppIndex, remainingAppIDs.count - 1)
+        return remainingAppIDs[preferredIndex]
     }
 
     func handle(_ keyInput: KeyInput) {
@@ -498,6 +618,12 @@ private struct CommandTabOverlay: View {
     let windowPreviewItems: [WindowPreviewItem]
     let selectedApp: AppSwitchCandidate?
     let iconForApp: (AppSwitchCandidate) -> NSImage?
+    @AppStorage(AppPreferenceKeys.hotkeyPrimaryModifier)
+    private var hotkeyPrimaryModifierRaw = SwitcherHotkeyPreferencesStore.defaultPrimaryModifier.rawValue
+    @AppStorage(AppPreferenceKeys.hotkeyMainKey)
+    private var hotkeyMainKeyRaw = SwitcherHotkeyPreferencesStore.defaultMainKey.rawValue
+    @AppStorage(AppPreferenceKeys.hotkeyQuitKey)
+    private var hotkeyQuitKeyRaw = SwitcherHotkeyPreferencesStore.defaultQuitKey.rawValue
 
     private var isFirstLayer: Bool {
         if case .appCycle = session.mode {
@@ -527,6 +653,14 @@ private struct CommandTabOverlay: View {
         case .windowCycle:
             return "窗口层"
         }
+    }
+
+    private var hotkeyConfiguration: SwitcherHotkeyConfiguration {
+        SwitcherHotkeyPreferencesStore.resolve(
+            primaryModifierRaw: hotkeyPrimaryModifierRaw,
+            mainKeyRaw: hotkeyMainKeyRaw,
+            quitKeyRaw: hotkeyQuitKeyRaw
+        )
     }
 
     private func previewCardWidth(availableWidth: CGFloat, itemCount: Int) -> CGFloat {
@@ -628,7 +762,11 @@ private struct CommandTabOverlay: View {
             }
 
             if showShortcutHint {
-                Text("Tab / Shift+Tab / ← / → 切换，↑ 分组（窗口层返回应用层）；若刚从窗口层返回，本次需按 ↓ 才会再次进入窗口层，松开 Option 确认")
+                Text(
+                    "Tab / Shift+Tab / ← / → 切换，↑ 分组（窗口层返回应用层）；"
+                        + "\(hotkeyConfiguration.quitShortcutText) 结束当前应用；"
+                        + "若刚从窗口层返回，本次需按 ↓ 才会再次进入窗口层，松开 \(hotkeyConfiguration.primaryModifier.displayName) 确认"
+                )
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }

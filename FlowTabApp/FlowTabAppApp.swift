@@ -5,6 +5,9 @@ import ApplicationServices
 enum AppPreferenceKeys {
     static let showShortcutHint = "showShortcutHint"
     static let hasPromptedAccessibilityPermission = "hasPromptedAccessibilityPermission"
+    static let hotkeyPrimaryModifier = "hotkeyPrimaryModifier"
+    static let hotkeyMainKey = "hotkeyMainKey"
+    static let hotkeyQuitKey = "hotkeyQuitKey"
 }
 
 extension Notification.Name {
@@ -106,32 +109,154 @@ private struct HomeRootView: View {
     @ObservedObject private var tabState = HomeTabState.shared
 
     var body: some View {
-        TabView(selection: $tabState.selectedTab) {
-            HomeLandingView()
-                .tabItem {
-                    Label("首页", systemImage: "house.fill")
-                }
-                .tag(HomeTab.home)
+        HStack(spacing: 0) {
+            HomeSidebar(selectedTab: $tabState.selectedTab)
 
-            AppSettingsView()
-                .tabItem {
-                    Label("监控页面", systemImage: "waveform.path.ecg")
-                }
-                .tag(HomeTab.monitor)
+            Divider()
+                .overlay(Color.white.opacity(0.08))
 
-            PreviewLogView()
-                .tabItem {
-                    Label("预览日志", systemImage: "photo.stack")
+            Group {
+                switch tabState.selectedTab {
+                case .home:
+                    HomeLandingView()
+                case .monitor:
+                    AppSettingsView()
+                case .previewLogs:
+                    PreviewLogView()
                 }
-                .tag(HomeTab.previewLogs)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+private struct HomeSidebar: View {
+    @Binding var selectedTab: HomeTab
+    private let textColumnWidth: CGFloat = 120
+
+    private let items: [(tab: HomeTab, title: String, icon: String)] = [
+        (.home, "首页", "house.fill"),
+        (.monitor, "监控页面", "waveform.path.ecg"),
+        (.previewLogs, "预览日志", "photo.stack")
+    ]
+
+    var body: some View {
+        ZStack {
+            LinearGradient(
+                colors: [
+                    Color(nsColor: .windowBackgroundColor).opacity(0.98),
+                    Color(nsColor: .underPageBackgroundColor).opacity(0.85)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            VStack(alignment: .center, spacing: 22) {
+                HStack(alignment: .center, spacing: 10) {
+                    Image(nsImage: NSApp.applicationIconImage)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 28, height: 28)
+                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("FlowTab")
+                            .font(.system(size: 22, weight: .bold))
+                            .lineLimit(1)
+
+                        Text("工作台")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.horizontal, 12)
+
+                VStack(alignment: .center, spacing: 14) {
+                    ForEach(items, id: \.tab) { item in
+                        sidebarButton(
+                            tab: item.tab,
+                            title: item.title,
+                            icon: item.icon,
+                            isSelected: item.tab == selectedTab
+                        )
+                    }
+                }
+                .frame(maxWidth: .infinity)
+
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 16)
+        }
+        .frame(width: 240)
+    }
+
+    @ViewBuilder
+    private func sidebarButton(
+        tab: HomeTab,
+        title: String,
+        icon: String,
+        isSelected: Bool
+    ) -> some View {
+        Button {
+            selectedTab = tab
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.system(size: 16, weight: .semibold))
+                    .frame(width: 22)
+
+                Text(title)
+                    .font(.system(size: 18, weight: .semibold))
+                    .lineLimit(1)
+                    .frame(width: textColumnWidth, alignment: .leading)
+            }
+            .foregroundStyle(isSelected ? Color.white : Color.primary.opacity(0.92))
+            .padding(.vertical, 12)
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity, minHeight: 52, alignment: .center)
+            .background(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(
+                        isSelected
+                            ? Color.accentColor.opacity(0.52)
+                            : Color.white.opacity(0.001)
+                    )
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(
+                        isSelected ? Color.accentColor.opacity(0.9) : Color.white.opacity(0.06),
+                        lineWidth: isSelected ? 1.1 : 0.8
+                    )
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity)
     }
 }
 
 private struct HomeLandingView: View {
     @ObservedObject private var diagnostics = RuntimeDiagnostics.shared
+    @AppStorage(AppPreferenceKeys.hotkeyPrimaryModifier)
+    private var hotkeyPrimaryModifierRaw = SwitcherHotkeyPreferencesStore.defaultPrimaryModifier.rawValue
+    @AppStorage(AppPreferenceKeys.hotkeyMainKey)
+    private var hotkeyMainKeyRaw = SwitcherHotkeyPreferencesStore.defaultMainKey.rawValue
+    @AppStorage(AppPreferenceKeys.hotkeyQuitKey)
+    private var hotkeyQuitKeyRaw = SwitcherHotkeyPreferencesStore.defaultQuitKey.rawValue
     @State private var snapshot = RuntimeSnapshot(apps: [], contextsByID: [:])
     @State private var selectedAppID: String?
+
+    private var hotkeyConfiguration: SwitcherHotkeyConfiguration {
+        SwitcherHotkeyPreferencesStore.resolve(
+            primaryModifierRaw: hotkeyPrimaryModifierRaw,
+            mainKeyRaw: hotkeyMainKeyRaw,
+            quitKeyRaw: hotkeyQuitKeyRaw
+        )
+    }
 
     var body: some View {
         ZStack {
@@ -166,7 +291,7 @@ private struct HomeLandingView: View {
                 Text("FlowTab")
                     .font(.system(size: 22, weight: .semibold))
 
-                Text("Option + Tab 快速切换")
+                Text("\(hotkeyConfiguration.mainShortcutText) 快速切换，\(hotkeyConfiguration.quitShortcutText) 结束所选应用")
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
@@ -202,7 +327,7 @@ private struct HomeLandingView: View {
             if snapshot.apps.isEmpty {
                 HomeLayerRowView(
                     title: "无可切换应用",
-                    subtitle: "先触发一次 Option + Tab",
+                    subtitle: "先触发一次 \(hotkeyConfiguration.mainShortcutText)",
                     trailing: "0w",
                     isSelected: false
                 )
@@ -287,7 +412,7 @@ private struct HomeLandingView: View {
 
     private var lastActionLine: String {
         guard let last = diagnostics.entries.last else {
-            return "等待触发 Option + Tab"
+            return "等待触发 \(hotkeyConfiguration.mainShortcutText)"
         }
         return "[\(last.category)] \(last.message)"
     }
@@ -336,7 +461,6 @@ private struct HomeBackdropView: View {
                 endPoint: .bottomTrailing
             )
         }
-        .ignoresSafeArea()
     }
 }
 
@@ -433,6 +557,12 @@ private struct HomeLayerRowView: View {
 
 private struct AppSettingsView: View {
     @AppStorage(AppPreferenceKeys.showShortcutHint) private var showShortcutHint = true
+    @AppStorage(AppPreferenceKeys.hotkeyPrimaryModifier)
+    private var hotkeyPrimaryModifierRaw = SwitcherHotkeyPreferencesStore.defaultPrimaryModifier.rawValue
+    @AppStorage(AppPreferenceKeys.hotkeyMainKey)
+    private var hotkeyMainKeyRaw = SwitcherHotkeyPreferencesStore.defaultMainKey.rawValue
+    @AppStorage(AppPreferenceKeys.hotkeyQuitKey)
+    private var hotkeyQuitKeyRaw = SwitcherHotkeyPreferencesStore.defaultQuitKey.rawValue
     @ObservedObject private var diagnostics = RuntimeDiagnostics.shared
     @State private var accessibilityTrusted = AXIsProcessTrusted()
     @State private var screenCaptureTrusted = ScreenCapturePermissionChecker.hasScreenCapturePermission
@@ -445,6 +575,14 @@ private struct AppSettingsView: View {
 
     private var bundlePath: String {
         Bundle.main.bundlePath
+    }
+
+    private var hotkeyConfiguration: SwitcherHotkeyConfiguration {
+        SwitcherHotkeyPreferencesStore.resolve(
+            primaryModifierRaw: hotkeyPrimaryModifierRaw,
+            mainKeyRaw: hotkeyMainKeyRaw,
+            quitKeyRaw: hotkeyQuitKeyRaw
+        )
     }
 
     var body: some View {
@@ -461,10 +599,64 @@ private struct AppSettingsView: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    HomeSectionCard(title: "偏好", subtitle: "基础显示设置") {
-                        Toggle("显示快捷键提示", isOn: $showShortcutHint)
-                            .toggleStyle(.switch)
-                            .font(.system(size: 13))
+                    HomeSectionCard(title: "偏好", subtitle: "基础显示设置与快捷键") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Toggle("显示快捷键提示", isOn: $showShortcutHint)
+                                .toggleStyle(.switch)
+                                .font(.system(size: 13))
+
+                            Divider()
+
+                            HStack(spacing: 10) {
+                                Text("主修饰键")
+                                    .font(.system(size: 13))
+                                Spacer()
+                                Picker("主修饰键", selection: $hotkeyPrimaryModifierRaw) {
+                                    ForEach(SwitcherPrimaryModifier.allCases) { modifier in
+                                        Text(modifier.displayName).tag(modifier.rawValue)
+                                    }
+                                }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                                .frame(width: 160)
+                            }
+
+                            HStack(spacing: 10) {
+                                Text("主切换按键")
+                                    .font(.system(size: 13))
+                                Spacer()
+                                Picker("主切换按键", selection: $hotkeyMainKeyRaw) {
+                                    ForEach(SwitcherHotkeyKey.allCases) { key in
+                                        Text(key.displayName).tag(key.rawValue)
+                                    }
+                                }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                                .frame(width: 160)
+                            }
+
+                            HStack(spacing: 10) {
+                                Text("结束应用按键")
+                                    .font(.system(size: 13))
+                                Spacer()
+                                Picker("结束应用按键", selection: $hotkeyQuitKeyRaw) {
+                                    ForEach(SwitcherHotkeyKey.allCases) { key in
+                                        Text(key.displayName).tag(key.rawValue)
+                                    }
+                                }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                                .frame(width: 160)
+                            }
+
+                            Text(
+                                "当前：\(hotkeyConfiguration.mainShortcutText)"
+                                    + "（反向：\(hotkeyConfiguration.backwardShortcutText)）"
+                                    + "，结束应用：\(hotkeyConfiguration.quitShortcutText)"
+                            )
+                            .font(.system(size: 12))
+                            .foregroundStyle(.secondary)
+                        }
                     }
 
                     HomeSectionCard(title: "运行与权限", subtitle: "辅助功能、屏幕录制、快照与日志") {
@@ -547,7 +739,7 @@ private struct AppSettingsView: View {
                             ScrollView {
                                 LazyVStack(alignment: .leading, spacing: 4) {
                                     if diagnostics.entries.isEmpty {
-                                        Text("暂无日志。触发 Option + Tab 后再回来看。")
+                                        Text("暂无日志。触发 \(hotkeyConfiguration.mainShortcutText) 后再回来看。")
                                             .font(.system(size: 12))
                                             .foregroundStyle(.secondary)
                                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -579,8 +771,21 @@ private struct AppSettingsView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onAppear {
+            enforceHotkeyConsistency()
             refreshAccessibilityStatus()
             refreshScreenCaptureStatus()
+        }
+        .onChange(of: hotkeyPrimaryModifierRaw) { _ in
+            enforceHotkeyConsistency()
+            notifyHotkeyConfigChanged()
+        }
+        .onChange(of: hotkeyMainKeyRaw) { _ in
+            enforceHotkeyConsistency()
+            notifyHotkeyConfigChanged()
+        }
+        .onChange(of: hotkeyQuitKeyRaw) { _ in
+            enforceHotkeyConsistency()
+            notifyHotkeyConfigChanged()
         }
         .onDisappear {
             accessibilityPermissionPollTask?.cancel()
@@ -680,6 +885,21 @@ private struct AppSettingsView: View {
 
     private func refreshScreenCaptureStatus() {
         screenCaptureTrusted = ScreenCapturePermissionChecker.hasScreenCapturePermission
+    }
+
+    private func enforceHotkeyConsistency() {
+        let resolved = hotkeyConfiguration
+        if hotkeyQuitKeyRaw != resolved.quitKey.rawValue {
+            hotkeyQuitKeyRaw = resolved.quitKey.rawValue
+        }
+    }
+
+    private func notifyHotkeyConfigChanged() {
+        RuntimeLog.info(
+            "HotKey",
+            "updated main=\(hotkeyConfiguration.mainShortcutText) backward=\(hotkeyConfiguration.backwardShortcutText) quit=\(hotkeyConfiguration.quitShortcutText)"
+        )
+        NotificationCenter.default.post(name: .flowTabReRegisterHotkeys, object: nil)
     }
 
     private func startAccessibilityPermissionPolling() {
@@ -880,7 +1100,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupHotkeyMonitor() {
         hotkeyMonitor?.stop()
 
-        let monitor = OptionTabHotkeyMonitor()
+        let hotkeyConfiguration = SwitcherHotkeyPreferencesStore.load()
+        let monitor = OptionTabHotkeyMonitor(configuration: hotkeyConfiguration)
         monitor.onHotkeyPressed = { [weak panelController] isBackward in
             panelController?.handleGlobalHotkey(isBackward: isBackward)
             RuntimeLog.info(
@@ -888,6 +1109,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 isBackward ? "HotKey Backward" : "HotKey Forward"
             )
         }
+        RuntimeLog.info(
+            "HotKey",
+            "register main=\(hotkeyConfiguration.mainShortcutText) backward=\(hotkeyConfiguration.backwardShortcutText) quit=\(hotkeyConfiguration.quitShortcutText)"
+        )
         hotkeyMonitor = monitor
     }
 

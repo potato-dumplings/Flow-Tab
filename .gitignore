@@ -12,3 +12,7 @@ FlowTabCore/.build/
 
 # Local release exports
 release/
+
+# Local workspace artifacts
+.build-local/
+local/
