@@ -23,6 +23,7 @@ public struct Hotkey: Equatable, Hashable, Sendable {
     }
 
     public static let commandTab = Hotkey(key: "tab", modifiers: [.command])
+    public static let optionTab = Hotkey(key: "tab", modifiers: [.option])
 }
 
 public enum ThemeMode: String, Equatable, Sendable, CaseIterable {
@@ -34,7 +35,6 @@ public enum ThemeMode: String, Equatable, Sendable, CaseIterable {
 public enum WindowSwitchingStrategy: String, Equatable, Sendable, CaseIterable {
     case recentActiveWindow
     case rememberLastSelectedWindow
-    case autoEnterWindowLayer
 }
 
 public struct SwitcherPreferences: Equatable, Sendable {
@@ -63,7 +63,7 @@ public struct SwitcherPreferences: Equatable, Sendable {
 
     public static let `default` = SwitcherPreferences(
         autoRestoreMinimizedWindowOnSwitch: true,
-        mainSwitcherHotkey: .commandTab,
+        mainSwitcherHotkey: .optionTab,
         allowOverrideCommandTab: true,
         windowSwitchingStrategy: .recentActiveWindow,
         groupNavigationWraps: true,

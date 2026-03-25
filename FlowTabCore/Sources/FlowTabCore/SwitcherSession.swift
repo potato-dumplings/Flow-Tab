@@ -11,8 +11,6 @@ public struct SwitcherSession: Sendable {
     public let apps: [AppSwitchCandidate]
     public let groups: [AppGroup]
 
-    private var modeBeforeWindowLayer: SessionMode
-
     public init(
         apps: [AppSwitchCandidate],
         preferences: SwitcherPreferences = .default,
@@ -23,7 +21,6 @@ public struct SwitcherSession: Sendable {
         self.apps = apps
         self.groups = Grouping.buildGroups(from: apps)
         self.mode = .appCycle
-        self.modeBeforeWindowLayer = .appCycle
         self.selectedAppIndex = 0
         self.selectedGroupIndex = 0
         self.rememberedWindowIDByAppID = rememberedWindowIDByAppID
@@ -41,7 +38,6 @@ public struct SwitcherSession: Sendable {
         if !apps.isEmpty {
             selectedAppIndex = Self.initialAppIndex(count: apps.count, direction: triggerDirection)
             selectedGroupIndex = Grouping.groupIndex(containing: selectedApp.id, groups: groups)
-            applyAutoWindowLayerIfNeeded()
         }
     }
 
@@ -104,12 +100,14 @@ public struct SwitcherSession: Sendable {
             moveApp(by: +1)
         case .tabBackward:
             moveApp(by: -1)
+        case .leftArrow:
+            moveApp(by: -1)
+        case .rightArrow:
+            moveApp(by: +1)
         case .upArrow:
             enterGroupCycle()
         case .downArrow:
             enterWindowCycleIfPossible()
-        case .leftArrow, .rightArrow:
-            break
         }
     }
 
@@ -124,7 +122,7 @@ public struct SwitcherSession: Sendable {
         case .rightArrow:
             moveGroup(by: +1)
         case .downArrow:
-            enterWindowCycleIfPossible()
+            break
         case .upArrow:
             break
         }
@@ -137,7 +135,7 @@ public struct SwitcherSession: Sendable {
         case .tabBackward:
             moveWindow(appID: appID, by: -1)
         case .upArrow:
-            mode = modeBeforeWindowLayer
+            mode = .appCycle
         case .downArrow, .leftArrow, .rightArrow:
             break
         }
@@ -151,7 +149,6 @@ public struct SwitcherSession: Sendable {
             wraps: preferences.groupNavigationWraps
         )
         selectedGroupIndex = Grouping.groupIndex(containing: selectedApp.id, groups: groups)
-        applyAutoWindowLayerIfNeeded()
     }
 
     private mutating func enterGroupCycle() {
@@ -187,10 +184,9 @@ public struct SwitcherSession: Sendable {
         selectApp(withID: group.apps[nextLocalIndex].id)
     }
 
-    private mutating func enterWindowCycleIfPossible() {
+    public mutating func enterWindowCycleIfPossible() {
         let app = selectedApp
         guard app.windows.count >= 2 else { return }
-        modeBeforeWindowLayer = mode
         mode = .windowCycle(appID: app.id)
     }
 
@@ -213,16 +209,10 @@ public struct SwitcherSession: Sendable {
         }
     }
 
-    private mutating func applyAutoWindowLayerIfNeeded() {
-        guard preferences.windowSwitchingStrategy == .autoEnterWindowLayer else { return }
-        guard mode == .appCycle else { return }
-        enterWindowCycleIfPossible()
-    }
-
     private func preferredWindow(for app: AppSwitchCandidate) -> WindowCandidate? {
         guard !app.windows.isEmpty else { return nil }
         switch preferences.windowSwitchingStrategy {
-        case .recentActiveWindow, .autoEnterWindowLayer:
+        case .recentActiveWindow:
             return app.windows.max(by: { $0.lastActiveAt < $1.lastActiveAt })
         case .rememberLastSelectedWindow:
             if

@@ -11,6 +11,18 @@ final class SwitcherSessionTests: XCTestCase {
         XCTAssertEqual(session.selectedApp.id, "com.apple.Terminal")
     }
 
+    func testLeftRightCyclesAppsInAppCycle() {
+        var session = SwitcherSession(apps: sampleApps())
+
+        XCTAssertEqual(session.selectedApp.id, "com.apple.Terminal")
+
+        session.handle(.rightArrow)
+        XCTAssertEqual(session.selectedApp.id, "com.apple.Finder")
+
+        session.handle(.leftArrow)
+        XCTAssertEqual(session.selectedApp.id, "com.apple.Terminal")
+    }
+
     func testUpThenLeftRightNavigatesGroups() {
         var session = SwitcherSession(apps: sampleApps())
 
@@ -24,15 +36,61 @@ final class SwitcherSessionTests: XCTestCase {
         XCTAssertEqual(session.selectedApp.id, "com.apple.Terminal")
     }
 
-    func testDownEntersWindowLayerAndTabCyclesWindows() {
+    func testEnterWindowLayerAndTabCyclesWindows() {
         var session = SwitcherSession(apps: sampleApps())
 
-        session.handle(.downArrow)
+        session.enterWindowCycleIfPossible()
         XCTAssertEqual(session.mode, .windowCycle(appID: "com.apple.Terminal"))
         XCTAssertEqual(session.selectedWindow?.id, "term-2")
 
         session.handle(.tabForward)
         XCTAssertEqual(session.selectedWindow?.id, "term-1")
+    }
+
+    func testEnterWindowLayerRequiresAtLeastTwoWindows() {
+        var session = SwitcherSession(apps: sampleApps(), triggerDirection: .backward)
+
+        XCTAssertEqual(session.selectedApp.id, "com.apple.Finder")
+        XCTAssertEqual(session.mode, .appCycle)
+
+        session.enterWindowCycleIfPossible()
+        XCTAssertEqual(session.mode, .appCycle)
+        XCTAssertNil(session.selectedWindow)
+    }
+
+    func testUpInWindowLayerReturnsToAppCycle() {
+        var session = SwitcherSession(apps: sampleApps())
+
+        session.handle(.upArrow)
+        XCTAssertEqual(session.mode, .groupCycle)
+
+        session.enterWindowCycleIfPossible()
+        XCTAssertEqual(session.mode, .windowCycle(appID: "com.apple.Terminal"))
+
+        session.handle(.upArrow)
+        XCTAssertEqual(session.mode, .appCycle)
+    }
+
+    func testDownInAppCycleEntersWindowLayerWhenPossible() {
+        var session = SwitcherSession(apps: sampleApps())
+
+        XCTAssertEqual(session.mode, .appCycle)
+        XCTAssertEqual(session.selectedApp.id, "com.apple.Terminal")
+
+        session.handle(.downArrow)
+
+        XCTAssertEqual(session.mode, .windowCycle(appID: "com.apple.Terminal"))
+    }
+
+    func testDownInAppCycleDoesNotEnterWindowLayerWhenSingleWindow() {
+        var session = SwitcherSession(apps: sampleApps(), triggerDirection: .backward)
+
+        XCTAssertEqual(session.selectedApp.id, "com.apple.Finder")
+        XCTAssertEqual(session.mode, .appCycle)
+
+        session.handle(.downArrow)
+
+        XCTAssertEqual(session.mode, .appCycle)
     }
 
     func testCommitDoesNotRestoreMinimizedWindowWhenDisabled() {
@@ -55,7 +113,7 @@ final class SwitcherSessionTests: XCTestCase {
         preferences.windowSwitchingStrategy = .rememberLastSelectedWindow
 
         var firstSession = SwitcherSession(apps: sampleApps(), preferences: preferences)
-        firstSession.handle(.downArrow)
+        firstSession.enterWindowCycleIfPossible()
         firstSession.handle(.tabForward)
         _ = firstSession.commitSelection()
 
@@ -73,14 +131,6 @@ final class SwitcherSessionTests: XCTestCase {
                 restoreIfMinimized: true
             )
         )
-    }
-
-    func testAutoEnterWindowLayerStrategy() {
-        var preferences = SwitcherPreferences.default
-        preferences.windowSwitchingStrategy = .autoEnterWindowLayer
-
-        let session = SwitcherSession(apps: sampleApps(), preferences: preferences)
-        XCTAssertEqual(session.mode, .windowCycle(appID: "com.apple.Terminal"))
     }
 
     private func sampleApps() -> [AppSwitchCandidate] {
