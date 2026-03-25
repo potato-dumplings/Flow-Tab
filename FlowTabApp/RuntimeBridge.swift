@@ -48,27 +48,23 @@ final class RuntimeSnapshotProvider {
             return RuntimeSnapshot(apps: [], contextsByID: [:])
         }
 
-        let appIDDuplicateCounts = Dictionary(
-            runningApps.map { (Self.baseAppID(for: $0), 1) },
-            uniquingKeysWith: +
-        )
-
         RuntimeLog.info("Snapshot", "runningApps=\(runningApps.count)")
         let windowData = collectWindowData(for: runningApps)
+        let selectedApps = selectPrimaryApps(
+            from: runningApps,
+            windowsByPID: windowData.windowsByPID,
+            rankByPID: windowData.rankByPID
+        )
+        RuntimeLog.info("Snapshot", "selectedApps=\(selectedApps.count)")
         let now = Date.timeIntervalSinceReferenceDate
 
         var rows: [(candidate: AppSwitchCandidate, context: RuntimeAppContext)] = []
-        rows.reserveCapacity(runningApps.count)
+        rows.reserveCapacity(selectedApps.count)
 
-        for (index, app) in runningApps.enumerated() {
+        for (index, app) in selectedApps.enumerated() {
             let pid = app.processIdentifier
             let baseAppID = Self.baseAppID(for: app)
-            let duplicateCount = appIDDuplicateCounts[baseAppID, default: 1]
-            let appID = Self.resolvedAppID(
-                baseAppID: baseAppID,
-                pid: pid,
-                duplicateCount: duplicateCount
-            )
+            let appID = baseAppID
             let displayName = app.localizedName ?? baseAppID
 
             let windows = windowData.windowsByPID[pid] ?? []
@@ -299,18 +295,65 @@ final class RuntimeSnapshotProvider {
         return "apps"
     }
 
+    private func selectPrimaryApps(
+        from runningApps: [NSRunningApplication],
+        windowsByPID: [pid_t: [WindowListEntry]],
+        rankByPID: [pid_t: Int]
+    ) -> [NSRunningApplication] {
+        let grouped = Dictionary(grouping: runningApps, by: Self.baseAppID(for:))
+        var selected: [NSRunningApplication] = []
+        selected.reserveCapacity(grouped.count)
+
+        for (baseAppID, apps) in grouped {
+            guard apps.count > 1 else {
+                if let app = apps.first {
+                    selected.append(app)
+                }
+                continue
+            }
+
+            let sorted = apps.sorted { lhs, rhs in
+                score(
+                    for: lhs,
+                    windowsByPID: windowsByPID,
+                    rankByPID: rankByPID
+                ) > score(
+                    for: rhs,
+                    windowsByPID: windowsByPID,
+                    rankByPID: rankByPID
+                )
+            }
+
+            guard let primary = sorted.first else { continue }
+            selected.append(primary)
+
+            let droppedPIDs = sorted.dropFirst().map(\.processIdentifier)
+            RuntimeLog.info(
+                "Snapshot",
+                "dedupe baseAppID=\(baseAppID) keepPID=\(primary.processIdentifier) dropPIDs=\(droppedPIDs)"
+            )
+        }
+
+        return selected
+    }
+
+    private func score(
+        for app: NSRunningApplication,
+        windowsByPID: [pid_t: [WindowListEntry]],
+        rankByPID: [pid_t: Int]
+    ) -> Int {
+        let pid = app.processIdentifier
+        let windowCount = windowsByPID[pid]?.count ?? 0
+        let hasWindowsScore = windowCount > 0 ? 1_000_000 : 0
+        let windowCountScore = min(windowCount, 9_999) * 100
+        let rankScore = 10_000 - min(rankByPID[pid] ?? 10_000, 10_000)
+        let launchScore = Int(app.launchDate?.timeIntervalSince1970 ?? 0) % 10_000
+        return hasWindowsScore + windowCountScore + rankScore + launchScore
+    }
+
     private static func baseAppID(for app: NSRunningApplication) -> String {
         let pid = app.processIdentifier
         return app.bundleIdentifier ?? "pid:\(pid)"
-    }
-
-    private static func resolvedAppID(
-        baseAppID: String,
-        pid: pid_t,
-        duplicateCount: Int
-    ) -> String {
-        guard duplicateCount > 1 else { return baseAppID }
-        return "\(baseAppID)#\(pid)"
     }
 }
 
