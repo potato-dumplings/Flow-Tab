@@ -585,6 +585,15 @@ private struct AppSettingsView: View {
         )
     }
 
+    private var diagnosticsLogText: String {
+        diagnostics.entries
+            .map { entry in
+                "[\(entry.timestamp.formatted(date: .omitted, time: .standard))] "
+                    + "[\(entry.category)] \(entry.message)"
+            }
+            .joined(separator: "\n")
+    }
+
     var body: some View {
         ZStack {
             HomeBackdropView()
@@ -737,23 +746,18 @@ private struct AppSettingsView: View {
                             }
 
                             ScrollView {
-                                LazyVStack(alignment: .leading, spacing: 4) {
+                                Group {
                                     if diagnostics.entries.isEmpty {
                                         Text("暂无日志。触发 \(hotkeyConfiguration.mainShortcutText) 后再回来看。")
                                             .font(.system(size: 12))
                                             .foregroundStyle(.secondary)
                                             .frame(maxWidth: .infinity, alignment: .leading)
                                     } else {
-                                        ForEach(diagnostics.entries) { entry in
-                                            Text(
-                                                "[\(entry.timestamp.formatted(date: .omitted, time: .standard))] "
-                                                    + "[\(entry.category)] \(entry.message)"
-                                            )
+                                        Text(diagnosticsLogText)
                                             .font(.system(size: 11, design: .monospaced))
                                             .foregroundStyle(.secondary)
                                             .frame(maxWidth: .infinity, alignment: .leading)
                                             .textSelection(.enabled)
-                                        }
                                     }
                                 }
                                 .padding(8)
@@ -957,6 +961,15 @@ private struct PreviewLogView: View {
         }
     }
 
+    private var previewLogText: String {
+        previewEntries
+            .map { entry in
+                "[\(entry.timestamp.formatted(date: .omitted, time: .standard))] "
+                    + "[\(entry.category)] \(entry.message)"
+            }
+            .joined(separator: "\n")
+    }
+
     var body: some View {
         ZStack {
             HomeBackdropView()
@@ -1017,23 +1030,18 @@ private struct PreviewLogView: View {
 
                 HomeSectionCard(title: "预览日志流", subtitle: "仅显示 Preview 分类，最近 \(previewEntries.count) 条") {
                     ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 4) {
+                        Group {
                             if previewEntries.isEmpty {
                                 Text("暂无预览日志。进入窗口层后会在这里显示抓图链路信息。")
                                     .font(.system(size: 12))
                                     .foregroundStyle(.secondary)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             } else {
-                                ForEach(previewEntries) { entry in
-                                    Text(
-                                        "[\(entry.timestamp.formatted(date: .omitted, time: .standard))] "
-                                            + "[\(entry.category)] \(entry.message)"
-                                    )
+                                Text(previewLogText)
                                     .font(.system(size: 11, design: .monospaced))
                                     .foregroundStyle(.secondary)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .textSelection(.enabled)
-                                }
                             }
                         }
                         .padding(8)
@@ -1234,7 +1242,13 @@ final class RuntimeDiagnostics: ObservableObject {
 
 enum RuntimeLog {
     static func info(_ category: String, _ message: @autoclosure @escaping () -> String) {
-        DispatchQueue.main.async {
+        if Thread.isMainThread {
+            MainActor.assumeIsolated {
+                RuntimeDiagnostics.shared.log(category: category, message: message())
+            }
+            return
+        }
+        Task { @MainActor in
             RuntimeDiagnostics.shared.log(category: category, message: message())
         }
     }

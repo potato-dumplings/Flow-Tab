@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 import SwiftUI
 import FlowTabCore
 
@@ -10,24 +11,39 @@ final class SwitcherPanelController {
     private var keyDownMonitor: Any?
     private var localFlagsChangedMonitor: Any?
     private var globalFlagsChangedMonitor: Any?
-    private var optionReleaseTimer: Timer?
+    private var pendingModifierReleaseConfirmationTask: Task<Void, Never>?
     private var delayedWindowLayerTimer: Timer?
     private let windowLayerPresentationDelay: TimeInterval = 0.22
+    private let modifierReleaseConfirmationSampleIntervalNs: UInt64 = 40_000_000
+    private let modifierReleaseConfirmationSampleCount: Int = 3
+    private let panelScreenMargin: CGFloat = 80
+    private let appLayerMinimumWidth: CGFloat = 440
+    private let overlayHorizontalInset: CGFloat = 64
+    private let appLayerStaticHeight: CGFloat = 56
+    private let minimumPanelHeight: CGFloat = 140
+    private let previewLayerAppTileSize: CGFloat = 68
+    private let appLayerMaxAdaptiveTileSize: CGFloat = 90
+    private let maxAppTileSpacing: CGFloat = 10
+    private let minAppTileSize: CGFloat = 1
 
     init() {
         panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: 880, height: 290),
-            styleMask: [.borderless],
+            styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
         panel.isOpaque = false
         panel.backgroundColor = .clear
+        panel.hasShadow = false
         panel.level = .statusBar
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle, .transient]
         panel.hidesOnDeactivate = false
         panel.ignoresMouseEvents = true
-        panel.contentView = NSHostingView(rootView: SwitcherPanelRootView(model: model))
+        let hostingView = NSHostingView(rootView: SwitcherPanelRootView(model: model))
+        hostingView.wantsLayer = true
+        hostingView.layer?.backgroundColor = NSColor.clear.cgColor
+        panel.contentView = hostingView
     }
 
     func handleGlobalHotkey(isBackward: Bool) {
@@ -50,13 +66,20 @@ final class SwitcherPanelController {
         RuntimeLog.info("Session", "start direction=\(direction.debugName) \(self.model.debugSelectionSummary())")
 
         updatePanelSize()
-        installEventMonitors()
 
         panel.center()
-        NSApp.activate(ignoringOtherApps: true)
+        hideNonPanelWindows()
+        NSRunningApplication.current.activate(options: [.activateIgnoringOtherApps])
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
+        installEventMonitors()
         scheduleDelayedWindowLayerEntryIfNeeded()
+    }
+
+    private func hideNonPanelWindows() {
+        for window in NSApp.windows where !(window is NSPanel) {
+            window.orderOut(nil)
+        }
     }
 
     private func finishSelection() {
@@ -74,16 +97,93 @@ final class SwitcherPanelController {
     }
 
     private func updatePanelSize() {
-        let baseWidth = min(max(440, CGFloat(model.appCount) * 84 + 160), 1180)
-        let width = model.isPreviewLayerMode ? max(820, baseWidth) : baseWidth
-        let height: CGFloat = model.isPreviewLayerMode ? 520 : 240
+        let visibleFrame = panel.screen?.visibleFrame
+            ?? NSScreen.main?.visibleFrame
+            ?? CGRect(x: 0, y: 0, width: 1440, height: 900)
+        let maxWidth = max(appLayerMinimumWidth, visibleFrame.width - panelScreenMargin)
+        let maxHeight = max(minimumPanelHeight, visibleFrame.height - panelScreenMargin)
+        let width = maxWidth
+        let height: CGFloat
+
+        if model.isPreviewLayerMode {
+            let gridLayout = resolveAppGridLayout(
+                appCount: model.appCount,
+                availableWidth: max(1, width - overlayHorizontalInset),
+                maxTileSize: previewLayerAppTileSize
+            )
+            height = min(maxHeight, 520)
+            model.updateAppGridLayout(
+                tileSize: gridLayout.tileSize,
+                spacing: gridLayout.spacing
+            )
+        } else {
+            let gridLayout = resolveAppGridLayout(
+                appCount: model.appCount,
+                availableWidth: max(1, width - overlayHorizontalInset),
+                maxTileSize: appLayerMaxAdaptiveTileSize
+            )
+            let desiredHeight = appLayerStaticHeight + gridLayout.gridHeight
+
+            height = min(maxHeight, max(minimumPanelHeight, desiredHeight))
+            model.updateAppGridLayout(
+                tileSize: gridLayout.tileSize,
+                spacing: gridLayout.spacing
+            )
+        }
+
         let targetSize = NSSize(width: width, height: height)
         if panel.contentRect(forFrameRect: panel.frame).size != targetSize {
             panel.setContentSize(targetSize)
         }
     }
 
+    private struct AppGridLayout {
+        let tileSize: CGFloat
+        let spacing: CGFloat
+        let columns: Int
+        let rows: Int
+
+        var gridWidth: CGFloat {
+            CGFloat(columns) * tileSize + CGFloat(max(columns - 1, 0)) * spacing
+        }
+
+        var gridHeight: CGFloat {
+            CGFloat(rows) * tileSize + CGFloat(max(rows - 1, 0)) * spacing
+        }
+    }
+
+    private func resolveAppGridLayout(
+        appCount: Int,
+        availableWidth: CGFloat,
+        maxTileSize: CGFloat
+    ) -> AppGridLayout {
+        let count = max(appCount, 1)
+        let safeWidth = max(1, availableWidth)
+        let baselineSpacing = maxAppTileSpacing
+        let tileByBaselineSpacing = (
+            safeWidth - CGFloat(max(count - 1, 0)) * baselineSpacing
+        ) / CGFloat(count)
+        let tileSize = max(minAppTileSize, min(maxTileSize, tileByBaselineSpacing))
+        let spacing: CGFloat
+        if count <= 1 {
+            spacing = 0
+        } else {
+            let fillSpacing = (
+                safeWidth - CGFloat(count) * tileSize
+            ) / CGFloat(count - 1)
+            spacing = max(0, fillSpacing)
+        }
+
+        return AppGridLayout(
+            tileSize: tileSize,
+            spacing: spacing,
+            columns: count,
+            rows: 1
+        )
+    }
+
     private func advance(_ keyInput: KeyInput) {
+        cancelPendingModifierReleaseConfirmation()
         model.handle(keyInput)
         RuntimeLog.info("Session", "advance key=\(keyInput.debugName) \(self.model.debugSelectionSummary())")
         updatePanelSize()
@@ -106,17 +206,10 @@ final class SwitcherPanelController {
         globalFlagsChangedMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
             self?.handleFlagsChanged(event)
         }
-
-        let timer = Timer(timeInterval: 0.05, repeats: true) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.finishIfPrimaryModifierReleased()
-            }
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        optionReleaseTimer = timer
     }
 
     private func removeEventMonitors() {
+        cancelPendingModifierReleaseConfirmation()
         if let keyDownMonitor {
             NSEvent.removeMonitor(keyDownMonitor)
             self.keyDownMonitor = nil
@@ -128,10 +221,6 @@ final class SwitcherPanelController {
         if let globalFlagsChangedMonitor {
             NSEvent.removeMonitor(globalFlagsChangedMonitor)
             self.globalFlagsChangedMonitor = nil
-        }
-        if let optionReleaseTimer {
-            optionReleaseTimer.invalidate()
-            self.optionReleaseTimer = nil
         }
         if let delayedWindowLayerTimer {
             delayedWindowLayerTimer.invalidate()
@@ -176,16 +265,74 @@ final class SwitcherPanelController {
 
     private func handleFlagsChanged(_ event: NSEvent) {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        if !flags.contains(activePrimaryModifierFlag()) {
-            finishSelection()
+        let isPrimaryEvent = isPrimaryModifierFlagsEvent(event)
+        guard isPrimaryEvent else { return }
+
+        guard !flags.contains(activePrimaryModifierFlag()) else {
+            cancelPendingModifierReleaseConfirmation()
+            return
+        }
+        guard !isPrimaryModifierPressedInHardwareState() else {
+            cancelPendingModifierReleaseConfirmation()
+            return
+        }
+        scheduleModifierReleaseConfirmation()
+    }
+
+    private func scheduleModifierReleaseConfirmation() {
+        cancelPendingModifierReleaseConfirmation()
+
+        pendingModifierReleaseConfirmationTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+
+            for _ in 0..<self.modifierReleaseConfirmationSampleCount {
+                try? await Task.sleep(nanoseconds: self.modifierReleaseConfirmationSampleIntervalNs)
+                guard !Task.isCancelled else { return }
+                guard self.panel.isVisible else {
+                    self.pendingModifierReleaseConfirmationTask = nil
+                    return
+                }
+
+                let liveFlags = NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask)
+                if liveFlags.contains(self.activePrimaryModifierFlag()) || self.isPrimaryModifierPressedInHardwareState() {
+                    self.pendingModifierReleaseConfirmationTask = nil
+                    return
+                }
+            }
+
+            self.pendingModifierReleaseConfirmationTask = nil
+            self.finishSelection()
         }
     }
 
-    private func finishIfPrimaryModifierReleased() {
-        guard panel.isVisible else { return }
-        let flags = NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        if !flags.contains(activePrimaryModifierFlag()) {
-            finishSelection()
+    private func cancelPendingModifierReleaseConfirmation() {
+        guard let pendingModifierReleaseConfirmationTask else { return }
+        pendingModifierReleaseConfirmationTask.cancel()
+        self.pendingModifierReleaseConfirmationTask = nil
+    }
+
+    private func isPrimaryModifierFlagsEvent(_ event: NSEvent) -> Bool {
+        switch SwitcherHotkeyPreferencesStore.load().primaryModifier {
+        case .option:
+            return event.keyCode == UInt16(kVK_Option) || event.keyCode == UInt16(kVK_RightOption)
+        case .control:
+            return event.keyCode == UInt16(kVK_Control) || event.keyCode == UInt16(kVK_RightControl)
+        case .command:
+            return event.keyCode == UInt16(kVK_Command) || event.keyCode == UInt16(kVK_RightCommand)
+        }
+    }
+
+    private func isPrimaryModifierPressedInHardwareState() -> Bool {
+        switch SwitcherHotkeyPreferencesStore.load().primaryModifier {
+        case .option:
+            return CGEventSource.keyState(.combinedSessionState, key: CGKeyCode(kVK_Option))
+                || CGEventSource.keyState(.combinedSessionState, key: CGKeyCode(kVK_RightOption))
+        case .control:
+            return CGEventSource.keyState(.combinedSessionState, key: CGKeyCode(kVK_Control))
+                || CGEventSource.keyState(.combinedSessionState, key: CGKeyCode(kVK_RightControl))
+        case .command:
+            return CGEventSource.keyState(.combinedSessionState, key: CGKeyCode(kVK_Command))
+                || CGEventSource.keyState(.combinedSessionState, key: CGKeyCode(kVK_RightCommand))
         }
     }
 
@@ -286,6 +433,8 @@ final class LiveSwitcherModel: ObservableObject {
     }
 
     @Published private(set) var session: SwitcherSession?
+    @Published private(set) var appGridTileSize: CGFloat = 68
+    @Published private(set) var appGridSpacing: CGFloat = 10
 
     private let snapshotProvider = RuntimeSnapshotProvider()
     private let activator = RuntimeActivator()
@@ -303,6 +452,16 @@ final class LiveSwitcherModel: ObservableObject {
 
     var appCount: Int {
         session?.apps.count ?? 0
+    }
+
+    func updateAppGridLayout(tileSize: CGFloat, spacing: CGFloat) {
+        let normalizedTileSize = max(1, min(90, tileSize))
+        let normalizedSpacing = max(0, spacing)
+        guard appGridTileSize != normalizedTileSize || appGridSpacing != normalizedSpacing else {
+            return
+        }
+        appGridTileSize = normalizedTileSize
+        appGridSpacing = normalizedSpacing
     }
 
     var isPreviewLayerMode: Bool {
@@ -599,6 +758,8 @@ private struct SwitcherPanelRootView: View {
                     isPreviewLayer: model.isPreviewLayerMode,
                     windowPreviewItems: model.windowPreviewItems(),
                     selectedApp: model.selectedApp,
+                    appTileSize: model.appGridTileSize,
+                    appTileSpacing: model.appGridSpacing,
                     iconForApp: { app in
                         model.icon(for: app)
                     }
@@ -617,6 +778,8 @@ private struct CommandTabOverlay: View {
     let isPreviewLayer: Bool
     let windowPreviewItems: [WindowPreviewItem]
     let selectedApp: AppSwitchCandidate?
+    let appTileSize: CGFloat
+    let appTileSpacing: CGFloat
     let iconForApp: (AppSwitchCandidate) -> NSImage?
     @AppStorage(AppPreferenceKeys.hotkeyPrimaryModifier)
     private var hotkeyPrimaryModifierRaw = SwitcherHotkeyPreferencesStore.defaultPrimaryModifier.rawValue
@@ -624,36 +787,6 @@ private struct CommandTabOverlay: View {
     private var hotkeyMainKeyRaw = SwitcherHotkeyPreferencesStore.defaultMainKey.rawValue
     @AppStorage(AppPreferenceKeys.hotkeyQuitKey)
     private var hotkeyQuitKeyRaw = SwitcherHotkeyPreferencesStore.defaultQuitKey.rawValue
-
-    private var isFirstLayer: Bool {
-        if case .appCycle = session.mode {
-            return true
-        }
-        return false
-    }
-
-    private var appCycleSortedWindows: [WindowCandidate] {
-        guard isFirstLayer else { return [] }
-        let windows = session.selectedApp.windows
-        guard windows.count > 1 else { return [] }
-        return windows.sorted { lhs, rhs in
-            if lhs.lastActiveAt == rhs.lastActiveAt {
-                return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
-            }
-            return lhs.lastActiveAt > rhs.lastActiveAt
-        }
-    }
-
-    private var modeText: String {
-        switch session.mode {
-        case .appCycle:
-            return "应用层"
-        case .groupCycle:
-            return "分组层"
-        case .windowCycle:
-            return "窗口层"
-        }
-    }
 
     private var hotkeyConfiguration: SwitcherHotkeyConfiguration {
         SwitcherHotkeyPreferencesStore.resolve(
@@ -675,51 +808,45 @@ private struct CommandTabOverlay: View {
         max(130, min(220, cardWidth * 0.62))
     }
 
-    private var appLayerWindowPillsHeight: CGFloat {
-        28
+    private var selectedWindowPreviewID: String? {
+        windowPreviewItems.first(where: \.isSelected)?.id
+    }
+
+    private var appGridColumns: [GridItem] {
+        let count = max(session.apps.count, 1)
+        return Array(
+            repeating: GridItem(
+                .fixed(appTileSize),
+                spacing: appTileSpacing,
+                alignment: .leading
+            ),
+            count: count
+        )
+    }
+
+    private func scrollToSelectedPreview(using proxy: ScrollViewProxy) {
+        guard let selectedWindowPreviewID else { return }
+        proxy.scrollTo(selectedWindowPreviewID, anchor: .center)
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 10) {
+            LazyVGrid(
+                columns: appGridColumns,
+                alignment: .leading,
+                spacing: appTileSpacing
+            ) {
                 ForEach(Array(session.apps.enumerated()), id: \.element.id) { index, app in
                     AppTileView(
                         app: app,
                         isSelected: index == session.selectedAppIndex,
+                        size: appTileSize,
                         icon: iconForApp(app)
                     )
                 }
             }
-
-            if isFirstLayer {
-                Group {
-                    if !appCycleSortedWindows.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ForEach(Array(appCycleSortedWindows.enumerated()), id: \.element.id) { index, window in
-                                    let isTopCandidate = index == 0
-                                    Text(window.title)
-                                        .lineLimit(1)
-                                        .font(.system(size: 11, weight: isTopCandidate ? .semibold : .regular))
-                                        .foregroundStyle(isTopCandidate ? .primary : .secondary)
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 5)
-                                        .background(
-                                            isTopCandidate
-                                                ? Color.accentColor.opacity(0.16)
-                                                : Color.primary.opacity(0.04),
-                                            in: Capsule()
-                                        )
-                                }
-                            }
-                            .padding(.horizontal, 2)
-                        }
-                    } else {
-                        Color.clear
-                    }
-                }
-                .frame(maxWidth: 520, minHeight: appLayerWindowPillsHeight, maxHeight: appLayerWindowPillsHeight)
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 2)
 
             if isPreviewLayer {
                 GeometryReader { proxy in
@@ -729,36 +856,33 @@ private struct CommandTabOverlay: View {
                     )
                     let cardHeight = previewCardHeight(for: cardWidth)
 
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            ForEach(windowPreviewItems) { preview in
-                                WindowPreviewCard(
-                                    image: preview.image,
-                                    title: preview.title,
-                                    appIcon: selectedApp.flatMap(iconForApp),
-                                    isSelected: preview.isSelected,
-                                    width: cardWidth,
-                                    height: cardHeight
-                                )
+                    ScrollViewReader { scrollProxy in
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 12) {
+                                ForEach(windowPreviewItems) { preview in
+                                    WindowPreviewCard(
+                                        image: preview.image,
+                                        title: preview.title,
+                                        appIcon: selectedApp.flatMap(iconForApp),
+                                        isSelected: preview.isSelected,
+                                        width: cardWidth,
+                                        height: cardHeight
+                                    )
+                                    .id(preview.id)
+                                }
                             }
+                            .padding(.horizontal, 2)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        .padding(.horizontal, 2)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .onAppear {
+                            scrollToSelectedPreview(using: scrollProxy)
+                        }
+                        .onChange(of: selectedWindowPreviewID) { _ in
+                            scrollToSelectedPreview(using: scrollProxy)
+                        }
                     }
                 }
                 .frame(height: 220)
-            }
-
-            HStack(spacing: 8) {
-                Text(modeText)
-                    .font(.system(size: 11, weight: .semibold))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color.accentColor.opacity(0.16), in: Capsule())
-                Text(session.selectedApp.displayName)
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
             }
 
             if showShortcutHint {
@@ -771,6 +895,7 @@ private struct CommandTabOverlay: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
         .background(
@@ -853,14 +978,20 @@ private struct WindowPreviewCard: View {
 private struct AppTileView: View {
     let app: AppSwitchCandidate
     let isSelected: Bool
+    let size: CGFloat
     let icon: NSImage?
 
     var body: some View {
+        let cornerRadius = max(1, min(16, size * 0.18))
+        let iconSize = max(1, min(56, size * 0.58))
+        let fallbackFontSize = max(1, min(28, size * 0.32))
+        let fallbackDotSize = max(1, size * 0.38)
+
         ZStack {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                 .fill(isSelected ? Color.accentColor.opacity(0.16) : Color.primary.opacity(0.05))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                         .stroke(
                             isSelected ? Color.accentColor.opacity(0.45) : Color.primary.opacity(0.1),
                             lineWidth: 1
@@ -871,14 +1002,20 @@ private struct AppTileView: View {
                 Image(nsImage: icon)
                     .resizable()
                     .interpolation(.high)
-                    .frame(width: 40, height: 40)
+                    .frame(width: iconSize, height: iconSize)
             } else {
-                Text(app.displayName.prefix(1).uppercased())
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(.primary)
+                if size >= 11 {
+                    Text(app.displayName.prefix(1).uppercased())
+                        .font(.system(size: fallbackFontSize, weight: .semibold))
+                        .foregroundStyle(.primary)
+                } else {
+                    Circle()
+                        .fill(Color.primary.opacity(0.35))
+                        .frame(width: fallbackDotSize, height: fallbackDotSize)
+                }
             }
         }
-        .frame(width: 68, height: 68)
+        .frame(width: size, height: size)
         .scaleEffect(isSelected ? 1.02 : 0.98)
         .opacity(isSelected ? 1 : 0.88)
         .animation(.easeInOut(duration: 0.16), value: isSelected)
