@@ -243,6 +243,7 @@ enum SwitcherHotkeyPreferencesStore {
 
 final class OptionTabHotkeyMonitor {
     var onHotkeyPressed: ((Bool) -> Void)?
+    var onHotkeyReleased: ((Bool) -> Void)?
 
     private var eventHandlerRef: EventHandlerRef?
     private var hotkeyRefs: [UInt32: EventHotKeyRef] = [:]
@@ -275,23 +276,32 @@ final class OptionTabHotkeyMonitor {
     }
 
     private func installHandler() {
-        var eventType = EventTypeSpec(
-            eventClass: OSType(kEventClassKeyboard),
-            eventKind: UInt32(kEventHotKeyPressed)
-        )
+        var eventTypes: [EventTypeSpec] = [
+            EventTypeSpec(
+                eventClass: OSType(kEventClassKeyboard),
+                eventKind: UInt32(kEventHotKeyPressed)
+            ),
+            EventTypeSpec(
+                eventClass: OSType(kEventClassKeyboard),
+                eventKind: UInt32(kEventHotKeyReleased)
+            )
+        ]
 
-        let status = InstallEventHandler(
-            GetApplicationEventTarget(),
-            { _, event, userData in
-                guard let event, let userData else { return noErr }
-                let monitor = Unmanaged<OptionTabHotkeyMonitor>.fromOpaque(userData).takeUnretainedValue()
-                return monitor.handleHotkeyEvent(event)
-            },
-            1,
-            &eventType,
-            UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque()),
-            &eventHandlerRef
-        )
+        let status: OSStatus = eventTypes.withUnsafeMutableBufferPointer { buffer in
+            guard let baseAddress = buffer.baseAddress else { return OSStatus(paramErr) }
+            return InstallEventHandler(
+                GetApplicationEventTarget(),
+                { _, event, userData in
+                    guard let event, let userData else { return noErr }
+                    let monitor = Unmanaged<OptionTabHotkeyMonitor>.fromOpaque(userData).takeUnretainedValue()
+                    return monitor.handleHotkeyEvent(event)
+                },
+                buffer.count,
+                baseAddress,
+                UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque()),
+                &eventHandlerRef
+            )
+        }
 
         if status != noErr {
             eventHandlerRef = nil
@@ -330,6 +340,13 @@ final class OptionTabHotkeyMonitor {
     }
 
     private func handleHotkeyEvent(_ event: EventRef) -> OSStatus {
+        let eventKind = GetEventKind(event)
+        let isPressedEvent = eventKind == UInt32(kEventHotKeyPressed)
+        let isReleasedEvent = eventKind == UInt32(kEventHotKeyReleased)
+        guard isPressedEvent || isReleasedEvent else {
+            return noErr
+        }
+
         var hotkeyID = EventHotKeyID()
         let status = GetEventParameter(
             event,
@@ -347,9 +364,17 @@ final class OptionTabHotkeyMonitor {
 
         switch hotkeyID.id {
         case forwardHotkeyID:
-            onHotkeyPressed?(false)
+            if isPressedEvent {
+                onHotkeyPressed?(false)
+            } else {
+                onHotkeyReleased?(false)
+            }
         case backwardHotkeyID:
-            onHotkeyPressed?(true)
+            if isPressedEvent {
+                onHotkeyPressed?(true)
+            } else {
+                onHotkeyReleased?(true)
+            }
         default:
             break
         }

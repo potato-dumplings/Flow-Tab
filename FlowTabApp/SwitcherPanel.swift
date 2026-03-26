@@ -13,9 +13,14 @@ final class SwitcherPanelController {
     private var globalFlagsChangedMonitor: Any?
     private var pendingModifierReleaseConfirmationTask: Task<Void, Never>?
     private var delayedWindowLayerTimer: Timer?
+    private var lastCommittedTabAdvanceTimestamp: TimeInterval?
+    private var ignoreHotkeyPressesUntil: TimeInterval = 0
     private let windowLayerPresentationDelay: TimeInterval = 0.22
-    private let modifierReleaseConfirmationSampleIntervalNs: UInt64 = 40_000_000
-    private let modifierReleaseConfirmationSampleCount: Int = 3
+    private let modifierReleaseConfirmationSampleIntervalNs: UInt64 = 25_000_000
+    private let modifierReleaseConfirmationSampleCount: Int = 2
+    private let postFinishHotkeyIgnoreWindow: TimeInterval = 0.02
+    private let autoEnterWindowLayerEnabled = false
+    private let tabAdvanceMinimumInterval: TimeInterval = 0.016
     private let panelScreenMargin: CGFloat = 80
     private let appLayerMinimumWidth: CGFloat = 440
     private let overlayHorizontalInset: CGFloat = 64
@@ -46,15 +51,62 @@ final class SwitcherPanelController {
         panel.contentView = hostingView
     }
 
+    private func monotonicMilliseconds() -> Double {
+        ProcessInfo.processInfo.systemUptime * 1_000
+    }
+
+    private func formatMilliseconds(_ value: Double) -> String {
+        String(format: "%.3f", value)
+    }
+
+    private func logInputTrace(_ message: String) {
+        RuntimeLog.info("InputTrace", message)
+    }
+
     func handleGlobalHotkey(isBackward: Bool) {
+        let now = ProcessInfo.processInfo.systemUptime
+        let nowMs = monotonicMilliseconds()
+        let directionText = isBackward ? "backward" : "forward"
+        if now < ignoreHotkeyPressesUntil {
+            logInputTrace(
+                "hotkeyPressed dir=\(directionText) dropped=postFinishWindow nowMs=\(formatMilliseconds(nowMs)) ignoreUntilMs=\(formatMilliseconds(ignoreHotkeyPressesUntil * 1_000))"
+            )
+            return
+        }
         if panel.isVisible {
+            guard isPrimaryModifierLikelyPressed() else {
+                logInputTrace(
+                    "hotkeyPressed dir=\(directionText) panelVisible=1 modifierPressed=0 action=scheduleReleaseConfirm nowMs=\(formatMilliseconds(nowMs))"
+                )
+                scheduleModifierReleaseConfirmation(trigger: "pressed_without_modifier")
+                return
+            }
+            logInputTrace(
+                "hotkeyPressed dir=\(directionText) panelVisible=1 modifierPressed=1 action=advance nowMs=\(formatMilliseconds(nowMs))"
+            )
             // Main switch hotkey is registered globally, so repeated key presses should keep
             // advancing while the panel is visible.
             advance(isBackward ? .tabBackward : .tabForward)
             return
         }
+        logInputTrace(
+            "hotkeyPressed dir=\(directionText) panelVisible=0 action=show nowMs=\(formatMilliseconds(nowMs))"
+        )
         let direction: CycleDirection = isBackward ? .backward : .forward
         show(direction: direction)
+    }
+
+    func handleGlobalHotkeyReleased() {
+        guard panel.isVisible else { return }
+        // Carbon hotkey "released" also fires when the main key (for example Tab) is released
+        // while the modifier is still held. Ignore those events to avoid repeatedly spinning up
+        // release-confirmation work during rapid cycling.
+        guard !isPrimaryModifierPressedInHardwareState() else { return }
+        let nowMs = monotonicMilliseconds()
+        logInputTrace(
+            "hotkeyReleased panelVisible=1 action=scheduleReleaseConfirm nowMs=\(formatMilliseconds(nowMs))"
+        )
+        scheduleModifierReleaseConfirmation(trigger: "hotkey_released")
     }
 
     private func show(direction: CycleDirection) {
@@ -63,6 +115,7 @@ final class SwitcherPanelController {
             NSSound.beep()
             return
         }
+        lastCommittedTabAdvanceTimestamp = nil
         RuntimeLog.info("Session", "start direction=\(direction.debugName) \(self.model.debugSelectionSummary())")
 
         updatePanelSize()
@@ -86,6 +139,11 @@ final class SwitcherPanelController {
         guard panel.isVisible else { return }
         removeEventMonitors()
         panel.orderOut(nil)
+        lastCommittedTabAdvanceTimestamp = nil
+        ignoreHotkeyPressesUntil = ProcessInfo.processInfo.systemUptime + postFinishHotkeyIgnoreWindow
+        logInputTrace(
+            "finishSelection nowMs=\(formatMilliseconds(monotonicMilliseconds())) ignoreUntilMs=\(formatMilliseconds(ignoreHotkeyPressesUntil * 1_000))"
+        )
         model.commitSelection()
     }
 
@@ -93,6 +151,11 @@ final class SwitcherPanelController {
         guard panel.isVisible else { return }
         removeEventMonitors()
         panel.orderOut(nil)
+        lastCommittedTabAdvanceTimestamp = nil
+        ignoreHotkeyPressesUntil = ProcessInfo.processInfo.systemUptime + postFinishHotkeyIgnoreWindow
+        logInputTrace(
+            "cancelSelection nowMs=\(formatMilliseconds(monotonicMilliseconds())) ignoreUntilMs=\(formatMilliseconds(ignoreHotkeyPressesUntil * 1_000))"
+        )
         model.cancelSelection()
     }
 
@@ -183,6 +246,31 @@ final class SwitcherPanelController {
     }
 
     private func advance(_ keyInput: KeyInput) {
+        if keyInput == .tabForward || keyInput == .tabBackward {
+            guard isPrimaryModifierLikelyPressed() else {
+                logInputTrace(
+                    "advance key=\(keyInput.debugName) dropped=modifierNotPressed action=scheduleReleaseConfirm nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
+                )
+                scheduleModifierReleaseConfirmation(trigger: "advance_without_modifier")
+                return
+            }
+            let now = ProcessInfo.processInfo.systemUptime
+            let nowMs = now * 1_000
+            if
+                let lastCommittedTabAdvanceTimestamp,
+                now - lastCommittedTabAdvanceTimestamp < tabAdvanceMinimumInterval
+            {
+                logInputTrace(
+                    "advance key=\(keyInput.debugName) dropped=throttle nowMs=\(formatMilliseconds(nowMs)) deltaMs=\(formatMilliseconds((now - lastCommittedTabAdvanceTimestamp) * 1_000)) thresholdMs=\(formatMilliseconds(tabAdvanceMinimumInterval * 1_000))"
+                )
+                return
+            }
+            self.lastCommittedTabAdvanceTimestamp = now
+            logInputTrace(
+                "advance key=\(keyInput.debugName) accepted nowMs=\(formatMilliseconds(nowMs))"
+            )
+        }
+
         cancelPendingModifierReleaseConfirmation()
         model.handle(keyInput)
         RuntimeLog.info("Session", "advance key=\(keyInput.debugName) \(self.model.debugSelectionSummary())")
@@ -231,7 +319,7 @@ final class SwitcherPanelController {
     private func handleKeyDown(_ event: NSEvent) -> Bool {
         switch event.keyCode {
         case 48:
-            if shouldSwallowLocalTabEvent(event) {
+            if SwitcherHotkeyPreferencesStore.load().mainKey == .tab {
                 return true
             }
             advance(event.modifierFlags.contains(.shift) ? .tabBackward : .tabForward)
@@ -264,49 +352,73 @@ final class SwitcherPanelController {
     }
 
     private func handleFlagsChanged(_ event: NSEvent) {
-        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
         let isPrimaryEvent = isPrimaryModifierFlagsEvent(event)
         guard isPrimaryEvent else { return }
-
-        guard !flags.contains(activePrimaryModifierFlag()) else {
-            cancelPendingModifierReleaseConfirmation()
-            return
-        }
-        guard !isPrimaryModifierPressedInHardwareState() else {
-            cancelPendingModifierReleaseConfirmation()
-            return
-        }
-        scheduleModifierReleaseConfirmation()
+        guard panel.isVisible else { return }
+        logInputTrace(
+            "flagsChanged keyCode=\(event.keyCode) action=scheduleReleaseConfirm nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
+        )
+        scheduleModifierReleaseConfirmation(trigger: "flags_changed")
     }
 
-    private func scheduleModifierReleaseConfirmation() {
-        cancelPendingModifierReleaseConfirmation()
+    private func scheduleModifierReleaseConfirmation(trigger: String) {
+        if pendingModifierReleaseConfirmationTask != nil {
+            logInputTrace(
+                "releaseConfirm alreadyRunning trigger=\(trigger) nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
+            )
+            return
+        }
+        logInputTrace(
+            "releaseConfirm start trigger=\(trigger) nowMs=\(formatMilliseconds(monotonicMilliseconds())) intervalMs=\(formatMilliseconds(Double(modifierReleaseConfirmationSampleIntervalNs) / 1_000_000)) samples=\(modifierReleaseConfirmationSampleCount)"
+        )
 
         pendingModifierReleaseConfirmationTask = Task { @MainActor [weak self] in
             guard let self else { return }
+            var releasedSampleCount = 0
 
-            for _ in 0..<self.modifierReleaseConfirmationSampleCount {
+            while true {
                 try? await Task.sleep(nanoseconds: self.modifierReleaseConfirmationSampleIntervalNs)
                 guard !Task.isCancelled else { return }
                 guard self.panel.isVisible else {
+                    self.logInputTrace(
+                        "releaseConfirm stop trigger=\(trigger) reason=panelHidden nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
+                    )
                     self.pendingModifierReleaseConfirmationTask = nil
                     return
                 }
 
-                let liveFlags = NSEvent.modifierFlags.intersection(.deviceIndependentFlagsMask)
-                if liveFlags.contains(self.activePrimaryModifierFlag()) || self.isPrimaryModifierPressedInHardwareState() {
-                    self.pendingModifierReleaseConfirmationTask = nil
-                    return
+                if self.isPrimaryModifierLikelyPressed() {
+                    if releasedSampleCount > 0 {
+                        self.logInputTrace(
+                            "releaseConfirm reset trigger=\(trigger) releasedSamples=\(releasedSampleCount) nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
+                        )
+                    }
+                    releasedSampleCount = 0
+                    continue
                 }
+                releasedSampleCount += 1
+                self.logInputTrace(
+                    "releaseConfirm sample trigger=\(trigger) releasedSamples=\(releasedSampleCount)/\(self.modifierReleaseConfirmationSampleCount) nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
+                )
+                if releasedSampleCount < self.modifierReleaseConfirmationSampleCount {
+                    continue
+                }
+
+                self.pendingModifierReleaseConfirmationTask = nil
+                self.logInputTrace(
+                    "releaseConfirm confirmed trigger=\(trigger) action=finishSelection nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
+                )
+                self.finishSelection()
+                return
             }
-
-            self.pendingModifierReleaseConfirmationTask = nil
-            self.finishSelection()
         }
     }
 
     private func cancelPendingModifierReleaseConfirmation() {
         guard let pendingModifierReleaseConfirmationTask else { return }
+        logInputTrace(
+            "releaseConfirm canceled nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
+        )
         pendingModifierReleaseConfirmationTask.cancel()
         self.pendingModifierReleaseConfirmationTask = nil
     }
@@ -336,11 +448,21 @@ final class SwitcherPanelController {
         }
     }
 
+    private func isPrimaryModifierLikelyPressed(event: NSEvent? = nil) -> Bool {
+        if isPrimaryModifierPressedInHardwareState() {
+            return true
+        }
+        guard let event else { return false }
+        let eventFlags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        return eventFlags.contains(activePrimaryModifierFlag())
+    }
+
     private func scheduleDelayedWindowLayerEntryIfNeeded() {
         if let delayedWindowLayerTimer {
             delayedWindowLayerTimer.invalidate()
             self.delayedWindowLayerTimer = nil
         }
+        guard autoEnterWindowLayerEnabled else { return }
 
         guard panel.isVisible else {
             RuntimeLog.info("AutoEnter", "skip panelHidden")
@@ -386,23 +508,6 @@ final class SwitcherPanelController {
 
     private func activePrimaryModifierFlag() -> NSEvent.ModifierFlags {
         SwitcherHotkeyPreferencesStore.load().primaryModifier.eventModifierFlag
-    }
-
-    private func shouldSwallowLocalTabEvent(_ event: NSEvent) -> Bool {
-        let hotkeyConfiguration = SwitcherHotkeyPreferencesStore.load()
-        guard hotkeyConfiguration.mainKey == .tab else { return false }
-
-        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        guard flags.contains(hotkeyConfiguration.primaryModifier.eventModifierFlag) else { return false }
-
-        switch hotkeyConfiguration.primaryModifier {
-        case .option:
-            return !flags.contains(.command) && !flags.contains(.control)
-        case .control:
-            return !flags.contains(.command) && !flags.contains(.option)
-        case .command:
-            return !flags.contains(.control) && !flags.contains(.option)
-        }
     }
 
     private func isTerminateSelectedAppShortcut(_ event: NSEvent) -> Bool {
@@ -969,9 +1074,6 @@ private struct WindowPreviewCard: View {
                 )
         )
         .shadow(color: .black.opacity(isSelected ? 0.16 : 0.12), radius: isSelected ? 12 : 10, y: 5)
-        .scaleEffect(isSelected ? 1 : 0.97)
-        .opacity(isSelected ? 1 : 0.92)
-        .animation(.easeInOut(duration: 0.14), value: isSelected)
     }
 }
 
@@ -989,12 +1091,12 @@ private struct AppTileView: View {
 
         ZStack {
             RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .fill(isSelected ? Color.accentColor.opacity(0.16) : Color.primary.opacity(0.05))
+                .fill(isSelected ? Color.accentColor.opacity(0.22) : Color.primary.opacity(0.05))
                 .overlay(
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                         .stroke(
                             isSelected ? Color.accentColor.opacity(0.45) : Color.primary.opacity(0.1),
-                            lineWidth: 1
+                            lineWidth: isSelected ? 2 : 1
                         )
                 )
 
@@ -1016,8 +1118,5 @@ private struct AppTileView: View {
             }
         }
         .frame(width: size, height: size)
-        .scaleEffect(isSelected ? 1.02 : 0.98)
-        .opacity(isSelected ? 1 : 0.88)
-        .animation(.easeInOut(duration: 0.16), value: isSelected)
     }
 }
