@@ -10,6 +10,8 @@ enum AppPreferenceKeys {
     static let hotkeyMainKey = "hotkeyMainKey"
     static let hotkeyQuitKey = "hotkeyQuitKey"
     static let windowLayerAutoEnterDelay = "windowLayerAutoEnterDelay"
+    static let autoRestoreMinimizedWindowOnSwitch = "autoRestoreMinimizedWindowOnSwitch"
+    static let hideMinimizedAppsFromAppLayer = "hideMinimizedAppsFromAppLayer"
     static let enableVerboseDiagnostics = "enableVerboseDiagnostics"
     static let themeMode = "themeMode"
 }
@@ -94,6 +96,37 @@ enum WindowLayerPreferencesStore {
         let stepCount = ((clamped - minAutoEnterDelay) / autoEnterDelayStep).rounded()
         let quantized = minAutoEnterDelay + stepCount * autoEnterDelayStep
         return (quantized * 100).rounded() / 100
+    }
+}
+
+enum SwitcherBehaviorPreferencesStore {
+    static let defaultAutoRestoreMinimizedWindowOnSwitch = false
+    static let defaultHideMinimizedAppsFromAppLayer = false
+
+    static func loadAutoRestoreMinimizedWindowOnSwitch(
+        userDefaults: UserDefaults = .standard
+    ) -> Bool {
+        guard userDefaults.object(forKey: AppPreferenceKeys.autoRestoreMinimizedWindowOnSwitch) != nil else {
+            return defaultAutoRestoreMinimizedWindowOnSwitch
+        }
+        return userDefaults.bool(forKey: AppPreferenceKeys.autoRestoreMinimizedWindowOnSwitch)
+    }
+
+    static func loadHideMinimizedAppsFromAppLayer(
+        userDefaults: UserDefaults = .standard
+    ) -> Bool {
+        guard userDefaults.object(forKey: AppPreferenceKeys.hideMinimizedAppsFromAppLayer) != nil else {
+            return defaultHideMinimizedAppsFromAppLayer
+        }
+        return userDefaults.bool(forKey: AppPreferenceKeys.hideMinimizedAppsFromAppLayer)
+    }
+
+    static func loadSwitcherPreferences(userDefaults: UserDefaults = .standard) -> SwitcherPreferences {
+        var preferences = SwitcherPreferences.default
+        preferences.autoRestoreMinimizedWindowOnSwitch = loadAutoRestoreMinimizedWindowOnSwitch(
+            userDefaults: userDefaults
+        )
+        return preferences
     }
 }
 
@@ -705,6 +738,12 @@ private struct AppSettingsView: View {
     @AppStorage(AppPreferenceKeys.showShortcutHint) private var showShortcutHint = true
     @AppStorage(AppPreferenceKeys.enableVerboseDiagnostics) private var enableVerboseDiagnostics = false
     @AppStorage(AppPreferenceKeys.themeMode) private var themeModeRaw = ThemePreferencesStore.defaultMode.rawValue
+    @AppStorage(AppPreferenceKeys.autoRestoreMinimizedWindowOnSwitch)
+    private var autoRestoreMinimizedWindowOnSwitch =
+        SwitcherBehaviorPreferencesStore.defaultAutoRestoreMinimizedWindowOnSwitch
+    @AppStorage(AppPreferenceKeys.hideMinimizedAppsFromAppLayer)
+    private var hideMinimizedAppsFromAppLayer =
+        SwitcherBehaviorPreferencesStore.defaultHideMinimizedAppsFromAppLayer
     @AppStorage(AppPreferenceKeys.hotkeyPrimaryModifier)
     private var hotkeyPrimaryModifierRaw = SwitcherHotkeyPreferencesStore.defaultPrimaryModifier.rawValue
     @AppStorage(AppPreferenceKeys.hotkeyMainKey)
@@ -818,7 +857,7 @@ private struct AppSettingsView: View {
                     }
 
                     if page == .settings {
-                        HomeSectionCard(title: "偏好", subtitle: "基础显示设置与快捷键") {
+                        HomeSectionCard(title: "外观", subtitle: "显示与主题") {
                             VStack(alignment: .leading, spacing: 10) {
                                 Toggle("显示快捷键提示", isOn: $showShortcutHint)
                                     .toggleStyle(.switch)
@@ -830,7 +869,11 @@ private struct AppSettingsView: View {
                                     Spacer()
                                     themeModeCapsuleSelector
                                 }
+                            }
+                        }
 
+                        HomeSectionCard(title: "窗口行为", subtitle: "窗口层进入与最小化处理") {
+                            VStack(alignment: .leading, spacing: 10) {
                                 HStack(spacing: 10) {
                                     Text("窗口层自动进入延迟")
                                         .font(.system(size: 13))
@@ -854,8 +897,22 @@ private struct AppSettingsView: View {
                                     }
                                 }
 
-                                Divider()
+                                Toggle("切换到最小化窗口时自动恢复打开", isOn: $autoRestoreMinimizedWindowOnSwitch)
+                                    .toggleStyle(.switch)
+                                    .font(.system(size: 13))
 
+                                Toggle("应用层隐藏仅最小化应用", isOn: $hideMinimizedAppsFromAppLayer)
+                                    .toggleStyle(.switch)
+                                    .font(.system(size: 13))
+
+                                Text("说明：该过滤依赖辅助功能权限。未授权时无法判断最小化状态，不会过滤应用层。")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
+                        HomeSectionCard(title: "快捷键", subtitle: "主切换与结束应用按键") {
+                            VStack(alignment: .leading, spacing: 10) {
                                 HStack(spacing: 10) {
                                     Text("主修饰键")
                                         .font(.system(size: 13))

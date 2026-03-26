@@ -549,7 +549,6 @@ final class LiveSwitcherModel: ObservableObject {
 
     private let snapshotProvider = RuntimeSnapshotProvider()
     private let activator = RuntimeActivator()
-    private let preferences: SwitcherPreferences
     private let iconProvider = AppIconProvider()
 
     private var runtimeContextsByID: [String: RuntimeAppContext] = [:]
@@ -557,9 +556,7 @@ final class LiveSwitcherModel: ObservableObject {
     private var previewCaptureAttemptedKeys: Set<String> = []
     private var autoEnterSuppressedAppID: String?
 
-    init(preferences: SwitcherPreferences = .default) {
-        self.preferences = preferences
-    }
+    init() {}
 
     var appCount: Int {
         session?.apps.count ?? 0
@@ -704,6 +701,7 @@ final class LiveSwitcherModel: ObservableObject {
         runtimeContextsByID = snapshot.contextsByID
         previewCaptureAttemptedKeys = []
         autoEnterSuppressedAppID = nil
+        let preferences = SwitcherBehaviorPreferencesStore.loadSwitcherPreferences()
         var rebuiltSession = SwitcherSession(
             apps: snapshot.apps,
             preferences: preferences,

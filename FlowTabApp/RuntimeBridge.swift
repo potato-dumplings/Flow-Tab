@@ -55,13 +55,27 @@ final class RuntimeSnapshotProvider {
             windowsByPID: windowData.windowsByPID,
             rankByPID: windowData.rankByPID
         )
-        RuntimeLog.info("Snapshot", "selectedApps=\(selectedApps.count)")
+        let hideMinimizedAppsFromAppLayer =
+            SwitcherBehaviorPreferencesStore.loadHideMinimizedAppsFromAppLayer()
+        let appLayerCandidates = filterAppsForAppLayer(
+            selectedApps,
+            windowsByPID: windowData.windowsByPID,
+            hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
+        )
+        RuntimeLog.info(
+            "Snapshot",
+            "selectedApps=\(selectedApps.count) appLayerCandidates=\(appLayerCandidates.count) hideMinimized=\(hideMinimizedAppsFromAppLayer)"
+        )
+
+        guard !appLayerCandidates.isEmpty else {
+            return RuntimeSnapshot(apps: [], contextsByID: [:])
+        }
         let now = Date.timeIntervalSinceReferenceDate
 
         var rows: [(candidate: AppSwitchCandidate, context: RuntimeAppContext)] = []
-        rows.reserveCapacity(selectedApps.count)
+        rows.reserveCapacity(appLayerCandidates.count)
 
-        for (index, app) in selectedApps.enumerated() {
+        for (index, app) in appLayerCandidates.enumerated() {
             let pid = app.processIdentifier
             let baseAppID = Self.baseAppID(for: app)
             let appID = baseAppID
@@ -134,6 +148,25 @@ final class RuntimeSnapshotProvider {
             apps: rows.map(\.candidate),
             contextsByID: contextsByID
         )
+    }
+
+    private func filterAppsForAppLayer(
+        _ apps: [NSRunningApplication],
+        windowsByPID: [pid_t: [WindowListEntry]],
+        hideMinimizedAppsFromAppLayer: Bool
+    ) -> [NSRunningApplication] {
+        guard hideMinimizedAppsFromAppLayer else { return apps }
+
+        return apps.filter { app in
+            let windows = windowsByPID[app.processIdentifier] ?? []
+            guard !windows.isEmpty else { return true }
+            let hasVisibleWindow = windows.contains(where: { !$0.isMinimized })
+            if !hasVisibleWindow {
+                let appName = app.localizedName ?? app.bundleIdentifier ?? "pid:\(app.processIdentifier)"
+                RuntimeLog.info("Snapshot", "skip minimized-only app=\(appName) pid=\(app.processIdentifier)")
+            }
+            return hasVisibleWindow
+        }
     }
 
     private func collectWindowData(for runningApps: [NSRunningApplication]) -> (
