@@ -8,6 +8,7 @@ enum AppPreferenceKeys {
     static let hotkeyPrimaryModifier = "hotkeyPrimaryModifier"
     static let hotkeyMainKey = "hotkeyMainKey"
     static let hotkeyQuitKey = "hotkeyQuitKey"
+    static let enableVerboseDiagnostics = "enableVerboseDiagnostics"
 }
 
 extension Notification.Name {
@@ -557,6 +558,7 @@ private struct HomeLayerRowView: View {
 
 private struct AppSettingsView: View {
     @AppStorage(AppPreferenceKeys.showShortcutHint) private var showShortcutHint = true
+    @AppStorage(AppPreferenceKeys.enableVerboseDiagnostics) private var enableVerboseDiagnostics = false
     @AppStorage(AppPreferenceKeys.hotkeyPrimaryModifier)
     private var hotkeyPrimaryModifierRaw = SwitcherHotkeyPreferencesStore.defaultPrimaryModifier.rawValue
     @AppStorage(AppPreferenceKeys.hotkeyMainKey)
@@ -585,13 +587,8 @@ private struct AppSettingsView: View {
         )
     }
 
-    private var diagnosticsLogText: String {
-        diagnostics.entries
-            .map { entry in
-                "[\(entry.timestamp.formatted(date: .omitted, time: .standard))] "
-                    + "[\(entry.category)] \(entry.message)"
-            }
-            .joined(separator: "\n")
+    private var diagnosticsEntriesForDisplay: [RuntimeDiagnostics.Entry] {
+        Array(diagnostics.entries.suffix(300))
     }
 
     var body: some View {
@@ -745,19 +742,32 @@ private struct AppSettingsView: View {
                                     .foregroundStyle(.orange)
                             }
 
+                            Toggle("启用详细运行日志（高频，可能影响性能）", isOn: $enableVerboseDiagnostics)
+                                .toggleStyle(.switch)
+                                .font(.system(size: 12))
+                            Text("本地日志目录：\(RuntimeDiagnostics.logsDirectoryPath)")
+                                .font(.system(size: 11, design: .monospaced))
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                                .lineLimit(2)
+
                             ScrollView {
                                 Group {
-                                    if diagnostics.entries.isEmpty {
+                                    if diagnosticsEntriesForDisplay.isEmpty {
                                         Text("暂无日志。触发 \(hotkeyConfiguration.mainShortcutText) 后再回来看。")
                                             .font(.system(size: 12))
                                             .foregroundStyle(.secondary)
                                             .frame(maxWidth: .infinity, alignment: .leading)
                                     } else {
-                                        Text(diagnosticsLogText)
-                                            .font(.system(size: 11, design: .monospaced))
-                                            .foregroundStyle(.secondary)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                            .textSelection(.enabled)
+                                        LazyVStack(alignment: .leading, spacing: 2) {
+                                            ForEach(diagnosticsEntriesForDisplay) { entry in
+                                                Text(entry.displayLine)
+                                                    .font(.system(size: 11, design: .monospaced))
+                                                    .foregroundStyle(.secondary)
+                                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                            }
+                                        }
+                                        .textSelection(.enabled)
                                     }
                                 }
                                 .padding(8)
@@ -956,18 +966,10 @@ private struct PreviewLogView: View {
     @State private var screenCaptureTrusted = ScreenCapturePermissionChecker.hasScreenCapturePermission
 
     private var previewEntries: [RuntimeDiagnostics.Entry] {
-        diagnostics.entries.filter { entry in
+        let filtered = diagnostics.entries.filter { entry in
             entry.category.caseInsensitiveCompare("Preview") == .orderedSame
         }
-    }
-
-    private var previewLogText: String {
-        previewEntries
-            .map { entry in
-                "[\(entry.timestamp.formatted(date: .omitted, time: .standard))] "
-                    + "[\(entry.category)] \(entry.message)"
-            }
-            .joined(separator: "\n")
+        return Array(filtered.suffix(300))
     }
 
     var body: some View {
@@ -1037,11 +1039,15 @@ private struct PreviewLogView: View {
                                     .foregroundStyle(.secondary)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             } else {
-                                Text(previewLogText)
-                                    .font(.system(size: 11, design: .monospaced))
-                                    .foregroundStyle(.secondary)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .textSelection(.enabled)
+                                LazyVStack(alignment: .leading, spacing: 2) {
+                                    ForEach(previewEntries) { entry in
+                                        Text(entry.displayLine)
+                                            .font(.system(size: 11, design: .monospaced))
+                                            .foregroundStyle(.secondary)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                    }
+                                }
+                                .textSelection(.enabled)
                             }
                         }
                         .padding(8)
@@ -1115,6 +1121,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             RuntimeLog.info(
                 "HotKey",
                 isBackward ? "HotKey Backward" : "HotKey Forward"
+            )
+        }
+        monitor.onHotkeyReleased = { [weak panelController] isBackward in
+            panelController?.handleGlobalHotkeyReleased()
+            RuntimeLog.info(
+                "HotKey",
+                isBackward ? "HotKey Backward Released" : "HotKey Forward Released"
             )
         }
         RuntimeLog.info(
@@ -1212,23 +1225,68 @@ final class RuntimeDiagnostics: ObservableObject {
         let timestamp: Date
         let category: String
         let message: String
+        let displayLine: String
     }
 
     static let shared = RuntimeDiagnostics()
+    private static let timestampFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "HH:mm:ss.SSS"
+        return formatter
+    }()
 
     @Published private(set) var entries: [Entry] = []
-    private let maxEntries = 800
+    private let maxEntries = 200
+    private let flushIntervalNs: UInt64 = 50_000_000
+    private let immediateFlushThreshold = 120
+    private var pendingEntries: [Entry] = []
+    private var flushTask: Task<Void, Never>?
+    private let fileStore = RuntimeLogFileStore.shared
 
     private init() {}
 
+    static func formattedTimestamp(_ date: Date) -> String {
+        timestampFormatter.string(from: date)
+    }
+
+    static var logsDirectoryPath: String {
+        RuntimeLogFileStore.shared.logsDirectoryPath
+    }
+
     func log(category: String, message: String) {
-        entries.append(
-            Entry(
-                timestamp: Date(),
-                category: category,
-                message: message
-            )
+        let timestamp = Date()
+        let entry = Entry(
+            timestamp: timestamp,
+            category: category,
+            message: message,
+            displayLine: "[\(Self.formattedTimestamp(timestamp))] [\(category)] \(message)"
         )
+        pendingEntries.append(entry)
+        fileStore.append(entry.displayLine)
+
+        if pendingEntries.count >= immediateFlushThreshold {
+            flushPendingEntries()
+            return
+        }
+        scheduleFlushIfNeeded()
+    }
+
+    private func scheduleFlushIfNeeded() {
+        guard flushTask == nil else { return }
+        flushTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(nanoseconds: self.flushIntervalNs)
+            guard !Task.isCancelled else { return }
+            self.flushTask = nil
+            self.flushPendingEntries()
+        }
+    }
+
+    private func flushPendingEntries() {
+        guard !pendingEntries.isEmpty else { return }
+        entries.append(contentsOf: pendingEntries)
+        pendingEntries.removeAll(keepingCapacity: true)
 
         if entries.count > maxEntries {
             entries.removeFirst(entries.count - maxEntries)
@@ -1236,12 +1294,183 @@ final class RuntimeDiagnostics: ObservableObject {
     }
 
     func clear() {
+        flushTask?.cancel()
+        flushTask = nil
+        pendingEntries.removeAll(keepingCapacity: false)
         entries.removeAll()
+        fileStore.clear()
+    }
+}
+
+final class RuntimeLogFileStore {
+    static let shared = RuntimeLogFileStore()
+
+    private let queue = DispatchQueue(label: "FlowTab.RuntimeLogFileStore", qos: .utility)
+    private let fileManager = FileManager.default
+    private let maxFileSizeBytes = 1_000_000
+    private let maxArchiveFiles = 4
+    private let flushDelay: TimeInterval = 0.05
+    private let immediateFlushThreshold = 120
+    private let logsDirectoryURL: URL
+    private let activeLogURL: URL
+    private var pendingLines: [String] = []
+    private var flushWorkItem: DispatchWorkItem?
+
+    var logsDirectoryPath: String {
+        logsDirectoryURL.path
+    }
+
+    private init() {
+        let fallbackURL = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        let baseURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ?? fallbackURL
+        logsDirectoryURL = baseURL.appendingPathComponent("FlowTabApp/logs", isDirectory: true)
+        activeLogURL = logsDirectoryURL.appendingPathComponent("runtime.log", isDirectory: false)
+    }
+
+    func append(_ line: String) {
+        queue.async {
+            self.pendingLines.append(line)
+            if self.pendingLines.count >= self.immediateFlushThreshold {
+                self.flushWorkItem?.cancel()
+                self.flushWorkItem = nil
+                self.flushLocked()
+                return
+            }
+            self.scheduleFlushLocked()
+        }
+    }
+
+    func clear() {
+        queue.async {
+            self.flushWorkItem?.cancel()
+            self.flushWorkItem = nil
+            self.pendingLines.removeAll(keepingCapacity: false)
+            self.clearFilesLocked()
+        }
+    }
+
+    private func scheduleFlushLocked() {
+        guard flushWorkItem == nil else { return }
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.flushWorkItem = nil
+            self.flushLocked()
+        }
+        flushWorkItem = workItem
+        queue.asyncAfter(deadline: .now() + flushDelay, execute: workItem)
+    }
+
+    private func flushLocked() {
+        guard !pendingLines.isEmpty else { return }
+        let block = pendingLines.joined(separator: "\n") + "\n"
+        pendingLines.removeAll(keepingCapacity: true)
+
+        do {
+            try ensureLogsDirectoryLocked()
+            try rotateIfNeededLocked(appendingByteCount: block.utf8.count)
+            try appendToFileLocked(block)
+        } catch {}
+    }
+
+    private func ensureLogsDirectoryLocked() throws {
+        if fileManager.fileExists(atPath: logsDirectoryURL.path) {
+            return
+        }
+        try fileManager.createDirectory(
+            at: logsDirectoryURL,
+            withIntermediateDirectories: true
+        )
+    }
+
+    private func appendToFileLocked(_ block: String) throws {
+        if !fileManager.fileExists(atPath: activeLogURL.path) {
+            try block.write(to: activeLogURL, atomically: true, encoding: .utf8)
+            return
+        }
+
+        let handle = try FileHandle(forWritingTo: activeLogURL)
+        defer { try? handle.close() }
+        try handle.seekToEnd()
+        try handle.write(contentsOf: Data(block.utf8))
+    }
+
+    private func rotateIfNeededLocked(appendingByteCount: Int) throws {
+        let currentSize = fileSizeLocked(for: activeLogURL)
+        if currentSize + appendingByteCount <= maxFileSizeBytes {
+            return
+        }
+
+        let oldestURL = archiveLogURL(index: maxArchiveFiles)
+        if fileManager.fileExists(atPath: oldestURL.path) {
+            try fileManager.removeItem(at: oldestURL)
+        }
+
+        if maxArchiveFiles > 1 {
+            for index in stride(from: maxArchiveFiles - 1, through: 1, by: -1) {
+                let sourceURL = archiveLogURL(index: index)
+                let destinationURL = archiveLogURL(index: index + 1)
+                if fileManager.fileExists(atPath: sourceURL.path) {
+                    try fileManager.moveItem(at: sourceURL, to: destinationURL)
+                }
+            }
+        }
+
+        if fileManager.fileExists(atPath: activeLogURL.path) {
+            try fileManager.moveItem(at: activeLogURL, to: archiveLogURL(index: 1))
+        }
+    }
+
+    private func archiveLogURL(index: Int) -> URL {
+        logsDirectoryURL.appendingPathComponent("runtime.\(index).log", isDirectory: false)
+    }
+
+    private func fileSizeLocked(for url: URL) -> Int {
+        guard
+            let attributes = try? fileManager.attributesOfItem(atPath: url.path),
+            let size = attributes[.size] as? NSNumber
+        else {
+            return 0
+        }
+        return size.intValue
+    }
+
+    private func clearFilesLocked() {
+        if fileManager.fileExists(atPath: activeLogURL.path) {
+            try? fileManager.removeItem(at: activeLogURL)
+        }
+        for index in 1...maxArchiveFiles {
+            let archiveURL = archiveLogURL(index: index)
+            if fileManager.fileExists(atPath: archiveURL.path) {
+                try? fileManager.removeItem(at: archiveURL)
+            }
+        }
     }
 }
 
 enum RuntimeLog {
+    private static let noisyCategories: Set<String> = [
+        "InputTrace",
+        "AX",
+        "Snapshot",
+        "HotKey",
+        "Session",
+        "AutoEnter",
+        "Manual"
+    ]
+
+    private static var isVerboseEnabled: Bool {
+        UserDefaults.standard.bool(forKey: AppPreferenceKeys.enableVerboseDiagnostics)
+    }
+
+    private static func shouldRecord(_ category: String) -> Bool {
+        if noisyCategories.contains(category) {
+            return isVerboseEnabled
+        }
+        return true
+    }
+
     static func info(_ category: String, _ message: @autoclosure @escaping () -> String) {
+        guard shouldRecord(category) else { return }
         if Thread.isMainThread {
             MainActor.assumeIsolated {
                 RuntimeDiagnostics.shared.log(category: category, message: message())
