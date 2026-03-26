@@ -852,7 +852,18 @@ private extension CycleDirection {
 
 private struct SwitcherPanelRootView: View {
     @ObservedObject var model: LiveSwitcherModel
+    @ObservedObject private var systemTheme = SystemThemeState.shared
     @AppStorage(AppPreferenceKeys.showShortcutHint) private var showShortcutHint = true
+    @AppStorage(AppPreferenceKeys.themeMode)
+    private var themeModeRaw = ThemePreferencesStore.defaultMode.rawValue
+
+    private var themeMode: ThemeMode {
+        ThemePreferencesStore.resolve(rawValue: themeModeRaw)
+    }
+
+    private var resolvedColorScheme: ColorScheme {
+        themeMode.resolvedColorScheme(systemColorScheme: systemTheme.colorScheme)
+    }
 
     var body: some View {
         ZStack {
@@ -874,6 +885,8 @@ private struct SwitcherPanelRootView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.clear)
+        .preferredColorScheme(resolvedColorScheme)
+        .animation(.none, value: resolvedColorScheme)
     }
 }
 
@@ -886,6 +899,7 @@ private struct CommandTabOverlay: View {
     let appTileSize: CGFloat
     let appTileSpacing: CGFloat
     let iconForApp: (AppSwitchCandidate) -> NSImage?
+    @Environment(\.colorScheme) private var colorScheme
     @AppStorage(AppPreferenceKeys.hotkeyPrimaryModifier)
     private var hotkeyPrimaryModifierRaw = SwitcherHotkeyPreferencesStore.defaultPrimaryModifier.rawValue
     @AppStorage(AppPreferenceKeys.hotkeyMainKey)
@@ -1005,7 +1019,7 @@ private struct CommandTabOverlay: View {
         .padding(.vertical, 14)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(.regularMaterial)
+                .fill(colorScheme == .dark ? Color.black : Color.white)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -1029,6 +1043,7 @@ private struct WindowPreviewCard: View {
     let isSelected: Bool
     let width: CGFloat
     let height: CGFloat
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         ZStack {
@@ -1038,14 +1053,7 @@ private struct WindowPreviewCard: View {
                     .interpolation(.high)
                     .scaledToFill()
             } else {
-                LinearGradient(
-                    colors: [
-                        Color(nsColor: .underPageBackgroundColor),
-                        Color(nsColor: .windowBackgroundColor)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
+                (colorScheme == .dark ? Color.black : Color.white)
 
                 if let appIcon {
                     Image(nsImage: appIcon)

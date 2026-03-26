@@ -1,6 +1,7 @@
 import SwiftUI
 import AppKit
 import ApplicationServices
+import FlowTabCore
 
 enum AppPreferenceKeys {
     static let showShortcutHint = "showShortcutHint"
@@ -9,10 +10,90 @@ enum AppPreferenceKeys {
     static let hotkeyMainKey = "hotkeyMainKey"
     static let hotkeyQuitKey = "hotkeyQuitKey"
     static let enableVerboseDiagnostics = "enableVerboseDiagnostics"
+    static let themeMode = "themeMode"
 }
 
 extension Notification.Name {
     static let flowTabReRegisterHotkeys = Notification.Name("FlowTab.ReRegisterHotkeys")
+}
+
+@MainActor
+final class SystemThemeState: ObservableObject {
+    static let shared = SystemThemeState()
+
+    @Published private(set) var colorScheme: ColorScheme = .light
+
+    private var appearanceObserver: NSObjectProtocol?
+    private var appActivationObserver: NSObjectProtocol?
+
+    private init() {
+        refreshColorScheme()
+
+        appearanceObserver = DistributedNotificationCenter.default().addObserver(
+            forName: Notification.Name("AppleInterfaceThemeChangedNotification"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.refreshColorScheme()
+        }
+
+        appActivationObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.refreshColorScheme()
+        }
+    }
+
+    deinit {
+        if let appearanceObserver {
+            DistributedNotificationCenter.default.removeObserver(appearanceObserver)
+        }
+        if let appActivationObserver {
+            NotificationCenter.default.removeObserver(appActivationObserver)
+        }
+    }
+
+    private func refreshColorScheme() {
+        let isDark = UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark"
+        let nextColorScheme: ColorScheme = isDark ? .dark : .light
+        if colorScheme != nextColorScheme {
+            colorScheme = nextColorScheme
+        }
+    }
+}
+
+enum ThemePreferencesStore {
+    static let defaultMode: ThemeMode = .followSystem
+
+    static func resolve(rawValue: String) -> ThemeMode {
+        ThemeMode(rawValue: rawValue) ?? defaultMode
+    }
+}
+
+extension ThemeMode {
+    var displayName: String {
+        switch self {
+        case .followSystem:
+            return "跟随系统"
+        case .light:
+            return "纯白（白天）"
+        case .dark:
+            return "纯黑（黑色）"
+        }
+    }
+
+    func resolvedColorScheme(systemColorScheme: ColorScheme) -> ColorScheme {
+        switch self {
+        case .followSystem:
+            return systemColorScheme
+        case .light:
+            return .light
+        case .dark:
+            return .dark
+        }
+    }
 }
 
 enum HomeTab: Hashable {
@@ -108,13 +189,28 @@ struct FlowTabAppApp: App {
 
 private struct HomeRootView: View {
     @ObservedObject private var tabState = HomeTabState.shared
+    @ObservedObject private var systemTheme = SystemThemeState.shared
+    @AppStorage(AppPreferenceKeys.themeMode)
+    private var themeModeRaw = ThemePreferencesStore.defaultMode.rawValue
+
+    private var themeMode: ThemeMode {
+        ThemePreferencesStore.resolve(rawValue: themeModeRaw)
+    }
+
+    private var dividerColor: Color {
+        resolvedColorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.12)
+    }
+
+    private var resolvedColorScheme: ColorScheme {
+        themeMode.resolvedColorScheme(systemColorScheme: systemTheme.colorScheme)
+    }
 
     var body: some View {
         HStack(spacing: 0) {
             HomeSidebar(selectedTab: $tabState.selectedTab)
 
             Divider()
-                .overlay(Color.white.opacity(0.08))
+                .overlay(dividerColor)
 
             Group {
                 switch tabState.selectedTab {
@@ -129,12 +225,22 @@ private struct HomeRootView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .preferredColorScheme(resolvedColorScheme)
+        .animation(.none, value: resolvedColorScheme)
     }
 }
 
 private struct HomeSidebar: View {
     @Binding var selectedTab: HomeTab
+    @ObservedObject private var systemTheme = SystemThemeState.shared
+    @AppStorage(AppPreferenceKeys.themeMode)
+    private var themeModeRaw = ThemePreferencesStore.defaultMode.rawValue
     private let textColumnWidth: CGFloat = 120
+
+    private var colorScheme: ColorScheme {
+        ThemePreferencesStore.resolve(rawValue: themeModeRaw)
+            .resolvedColorScheme(systemColorScheme: systemTheme.colorScheme)
+    }
 
     private let items: [(tab: HomeTab, title: String, icon: String)] = [
         (.home, "首页", "house.fill"),
@@ -144,14 +250,7 @@ private struct HomeSidebar: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [
-                    Color(nsColor: .windowBackgroundColor).opacity(0.98),
-                    Color(nsColor: .underPageBackgroundColor).opacity(0.85)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            (colorScheme == .dark ? Color.black : Color.white)
 
             VStack(alignment: .center, spacing: 22) {
                 HStack(alignment: .center, spacing: 10) {
@@ -223,13 +322,17 @@ private struct HomeSidebar: View {
                     .fill(
                         isSelected
                             ? Color.accentColor.opacity(0.52)
-                            : Color.white.opacity(0.001)
+                            : Color.clear
                     )
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .stroke(
-                        isSelected ? Color.accentColor.opacity(0.9) : Color.white.opacity(0.06),
+                        isSelected
+                            ? Color.accentColor.opacity(0.9)
+                            : (colorScheme == .dark
+                                ? Color.white.opacity(0.08)
+                                : Color.black.opacity(0.08)),
                         lineWidth: isSelected ? 1.1 : 0.8
                     )
             )
@@ -448,20 +551,18 @@ private struct HomeLandingView: View {
 }
 
 private struct HomeBackdropView: View {
-    var body: some View {
-        ZStack {
-            Color(nsColor: .windowBackgroundColor)
+    @ObservedObject private var systemTheme = SystemThemeState.shared
+    @AppStorage(AppPreferenceKeys.themeMode)
+    private var themeModeRaw = ThemePreferencesStore.defaultMode.rawValue
 
-            LinearGradient(
-                colors: [
-                    Color.accentColor.opacity(0.09),
-                    Color.clear,
-                    Color(nsColor: .underPageBackgroundColor).opacity(0.55)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-        }
+    private var colorScheme: ColorScheme {
+        ThemePreferencesStore.resolve(rawValue: themeModeRaw)
+            .resolvedColorScheme(systemColorScheme: systemTheme.colorScheme)
+    }
+
+    var body: some View {
+        (colorScheme == .dark ? Color.black : Color.white)
+            .ignoresSafeArea()
     }
 }
 
@@ -559,6 +660,7 @@ private struct HomeLayerRowView: View {
 private struct AppSettingsView: View {
     @AppStorage(AppPreferenceKeys.showShortcutHint) private var showShortcutHint = true
     @AppStorage(AppPreferenceKeys.enableVerboseDiagnostics) private var enableVerboseDiagnostics = false
+    @AppStorage(AppPreferenceKeys.themeMode) private var themeModeRaw = ThemePreferencesStore.defaultMode.rawValue
     @AppStorage(AppPreferenceKeys.hotkeyPrimaryModifier)
     private var hotkeyPrimaryModifierRaw = SwitcherHotkeyPreferencesStore.defaultPrimaryModifier.rawValue
     @AppStorage(AppPreferenceKeys.hotkeyMainKey)
@@ -610,6 +712,20 @@ private struct AppSettingsView: View {
                             Toggle("显示快捷键提示", isOn: $showShortcutHint)
                                 .toggleStyle(.switch)
                                 .font(.system(size: 13))
+
+                            HStack(spacing: 10) {
+                                Text("主题模式")
+                                    .font(.system(size: 13))
+                                Spacer()
+                                Picker("主题模式", selection: $themeModeRaw) {
+                                    ForEach(ThemeMode.allCases, id: \.rawValue) { mode in
+                                        Text(mode.displayName).tag(mode.rawValue)
+                                    }
+                                }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                                .frame(width: 160)
+                            }
 
                             Divider()
 
@@ -785,9 +901,13 @@ private struct AppSettingsView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onAppear {
+            enforceThemeModeConsistency()
             enforceHotkeyConsistency()
             refreshAccessibilityStatus()
             refreshScreenCaptureStatus()
+        }
+        .onChange(of: themeModeRaw) { _ in
+            enforceThemeModeConsistency()
         }
         .onChange(of: hotkeyPrimaryModifierRaw) { _ in
             enforceHotkeyConsistency()
@@ -905,6 +1025,13 @@ private struct AppSettingsView: View {
         let resolved = hotkeyConfiguration
         if hotkeyQuitKeyRaw != resolved.quitKey.rawValue {
             hotkeyQuitKeyRaw = resolved.quitKey.rawValue
+        }
+    }
+
+    private func enforceThemeModeConsistency() {
+        let resolved = ThemePreferencesStore.resolve(rawValue: themeModeRaw)
+        if themeModeRaw != resolved.rawValue {
+            themeModeRaw = resolved.rawValue
         }
     }
 
