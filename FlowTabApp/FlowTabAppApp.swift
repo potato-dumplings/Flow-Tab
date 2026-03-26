@@ -239,11 +239,32 @@ private struct HomeSidebar: View {
     @ObservedObject private var systemTheme = SystemThemeState.shared
     @AppStorage(AppPreferenceKeys.themeMode)
     private var themeModeRaw = ThemePreferencesStore.defaultMode.rawValue
-    private let textColumnWidth: CGFloat = 120
+    private let navIconColumnWidth: CGFloat = 26
+    private let navItemSpacing: CGFloat = 18
 
     private var colorScheme: ColorScheme {
         ThemePreferencesStore.resolve(rawValue: themeModeRaw)
             .resolvedColorScheme(systemColorScheme: systemTheme.colorScheme)
+    }
+
+    private var sidebarBackgroundColor: Color {
+        colorScheme == .dark
+            ? Color(red: 0.10, green: 0.10, blue: 0.11)
+            : Color(red: 0.95, green: 0.95, blue: 0.96)
+    }
+
+    private var selectedItemBackgroundColor: Color {
+        colorScheme == .dark
+            ? Color.accentColor.opacity(0.38)
+            : Color(red: 0.76, green: 0.83, blue: 0.95)
+    }
+
+    private var normalItemForegroundColor: Color {
+        colorScheme == .dark ? Color.white.opacity(0.90) : Color.primary.opacity(0.90)
+    }
+
+    private var selectedItemForegroundColor: Color {
+        colorScheme == .dark ? Color.white : Color.black.opacity(0.86)
     }
 
     private let items: [(tab: HomeTab, title: String, icon: String)] = [
@@ -254,19 +275,19 @@ private struct HomeSidebar: View {
 
     var body: some View {
         ZStack {
-            (colorScheme == .dark ? Color.black : Color.white)
+            sidebarBackgroundColor
 
-            VStack(alignment: .center, spacing: 22) {
+            VStack(alignment: .leading, spacing: 20) {
                 HStack(alignment: .center, spacing: 10) {
                     Image(nsImage: NSApp.applicationIconImage)
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 28, height: 28)
+                        .frame(width: 32, height: 32)
                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text("FlowTab")
-                            .font(.system(size: 22, weight: .bold))
+                            .font(.system(size: 21, weight: .bold))
                             .lineLimit(1)
 
                         Text("工作台")
@@ -274,10 +295,10 @@ private struct HomeSidebar: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.horizontal, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 10)
 
-                VStack(alignment: .center, spacing: 14) {
+                VStack(alignment: .leading, spacing: 8) {
                     ForEach(items, id: \.tab) { item in
                         sidebarButton(
                             tab: item.tab,
@@ -291,10 +312,10 @@ private struct HomeSidebar: View {
 
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 16)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 18)
         }
-        .frame(width: 240)
+        .frame(width: 220)
     }
 
     @ViewBuilder
@@ -307,38 +328,25 @@ private struct HomeSidebar: View {
         Button {
             selectedTab = tab
         } label: {
-            HStack(spacing: 12) {
+            HStack(spacing: navItemSpacing) {
                 Image(systemName: icon)
-                    .font(.system(size: 16, weight: .semibold))
-                    .frame(width: 22)
+                    .font(.system(size: 18, weight: .semibold))
+                    .frame(width: navIconColumnWidth)
 
                 Text(title)
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 16, weight: .semibold))
+                    .tracking(4)
                     .lineLimit(1)
-                    .frame(width: textColumnWidth, alignment: .leading)
+
+                Spacer(minLength: 0)
             }
-            .foregroundStyle(isSelected ? Color.white : Color.primary.opacity(0.92))
+            .foregroundStyle(isSelected ? selectedItemForegroundColor : normalItemForegroundColor)
             .padding(.vertical, 12)
-            .padding(.horizontal, 14)
-            .frame(maxWidth: .infinity, minHeight: 52, alignment: .center)
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(
-                        isSelected
-                            ? Color.accentColor.opacity(0.52)
-                            : Color.clear
-                    )
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .stroke(
-                        isSelected
-                            ? Color.accentColor.opacity(0.9)
-                            : (colorScheme == .dark
-                                ? Color.white.opacity(0.08)
-                                : Color.black.opacity(0.08)),
-                        lineWidth: isSelected ? 1.1 : 0.8
-                    )
+                    .fill(isSelected ? selectedItemBackgroundColor : Color.clear)
             )
             .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
@@ -716,9 +724,9 @@ private struct AppSettingsView: View {
     private var pageSubtitle: String {
         switch page {
         case .logs:
-            return "运行监控与权限诊断"
+            return "运行日志查看与清理"
         case .settings:
-            return "基础显示设置与快捷键"
+            return "基础显示设置、快捷键与权限"
         }
     }
 
@@ -810,73 +818,44 @@ private struct AppSettingsView: View {
                                 .foregroundStyle(.secondary)
                             }
                         }
-                    }
 
-                    if page == .logs {
-                        HomeSectionCard(title: "运行与权限", subtitle: "辅助功能、屏幕录制、快照与日志") {
+                        HomeSectionCard(title: "权限", subtitle: "辅助功能与屏幕录制") {
                             VStack(alignment: .leading, spacing: 10) {
-                                Text(accessibilityTrusted ? "辅助功能权限：已授权" : "辅助功能权限：未授权")
-                                    .font(.system(size: 11, weight: .medium))
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(
-                                        Capsule()
-                                            .fill(
-                                                accessibilityTrusted
-                                                    ? Color.green.opacity(0.14)
-                                                    : Color.orange.opacity(0.16)
-                                            )
-                                    )
-                                    .foregroundStyle(accessibilityTrusted ? .green : .orange)
-
-                                Text(screenCaptureTrusted ? "屏幕录制权限：已授权" : "屏幕录制权限：未授权")
-                                    .font(.system(size: 11, weight: .medium))
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(
-                                        Capsule()
-                                            .fill(
-                                                screenCaptureTrusted
-                                                    ? Color.green.opacity(0.14)
-                                                    : Color.orange.opacity(0.16)
-                                            )
-                                    )
-                                    .foregroundStyle(screenCaptureTrusted ? .green : .orange)
-
                                 ViewThatFits(in: .horizontal) {
                                     HStack(spacing: 8) {
-                                        openAccessibilityButton
-                                        requestAccessibilityPermissionButton
-                                        openScreenCaptureButton
-                                        requestScreenCaptureButton
-                                        captureSnapshotButton
-                                        clearLogsButton
+                                        permissionStatusBadge(
+                                            text: accessibilityTrusted ? "辅助功能权限：已授权" : "辅助功能权限：未授权",
+                                            isGranted: accessibilityTrusted
+                                        )
+                                        permissionStatusBadge(
+                                            text: screenCaptureTrusted ? "屏幕录制权限：已授权" : "屏幕录制权限：未授权",
+                                            isGranted: screenCaptureTrusted
+                                        )
+                                        Spacer(minLength: 0)
                                     }
+
                                     VStack(alignment: .leading, spacing: 8) {
-                                        HStack(spacing: 8) {
-                                            openAccessibilityButton
-                                            requestAccessibilityPermissionButton
-                                        }
-                                        HStack(spacing: 8) {
-                                            openScreenCaptureButton
-                                            requestScreenCaptureButton
-                                        }
-                                        HStack(spacing: 8) {
-                                            captureSnapshotButton
-                                            clearLogsButton
-                                        }
+                                        permissionStatusBadge(
+                                            text: accessibilityTrusted ? "辅助功能权限：已授权" : "辅助功能权限：未授权",
+                                            isGranted: accessibilityTrusted
+                                        )
+                                        permissionStatusBadge(
+                                            text: screenCaptureTrusted ? "屏幕录制权限：已授权" : "屏幕录制权限：未授权",
+                                            isGranted: screenCaptureTrusted
+                                        )
                                     }
                                 }
 
-                                Text("当前实例 bundle: \(bundleIdentifier)")
-                                    .font(.system(size: 11, design: .monospaced))
-                                    .foregroundStyle(.secondary)
-
-                                Text("当前实例路径: \(bundlePath)")
-                                    .font(.system(size: 11, design: .monospaced))
-                                    .foregroundStyle(.secondary)
-                                    .textSelection(.enabled)
-                                    .lineLimit(2)
+                                ViewThatFits(in: .horizontal) {
+                                    HStack(spacing: 8) {
+                                        requestAccessibilityPermissionButton
+                                        requestScreenCapturePermissionButton
+                                    }
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        requestAccessibilityPermissionButton
+                                        requestScreenCapturePermissionButton
+                                    }
+                                }
 
                                 if !accessibilityTrusted {
                                     Text("提示：授权后请完全退出并重启 FlowTabApp，权限状态才会稳定刷新。")
@@ -889,7 +868,13 @@ private struct AppSettingsView: View {
                                         .font(.system(size: 12))
                                         .foregroundStyle(.orange)
                                 }
+                            }
+                        }
+                    }
 
+                    if page == .logs {
+                        HomeSectionCard(title: "日志", subtitle: "仅日志相关信息") {
+                            VStack(alignment: .leading, spacing: 10) {
                                 Toggle("启用详细运行日志（高频，可能影响性能）", isOn: $enableVerboseDiagnostics)
                                     .toggleStyle(.switch)
                                     .font(.system(size: 12))
@@ -898,6 +883,8 @@ private struct AppSettingsView: View {
                                     .foregroundStyle(.secondary)
                                     .textSelection(.enabled)
                                     .lineLimit(2)
+
+                                clearLogsButton
 
                                 ScrollView {
                                     Group {
@@ -960,19 +947,6 @@ private struct AppSettingsView: View {
         }
     }
 
-    private var openAccessibilityButton: some View {
-        Button("打开辅助功能设置") {
-            guard
-                let url = URL(
-                    string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
-                )
-            else { return }
-            NSWorkspace.shared.open(url)
-        }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
-    }
-
     private var requestAccessibilityPermissionButton: some View {
         Button("请求辅助功能权限") {
             let options = [
@@ -993,20 +967,7 @@ private struct AppSettingsView: View {
         .controlSize(.small)
     }
 
-    private var openScreenCaptureButton: some View {
-        Button("打开屏幕录制设置") {
-            guard
-                let url = URL(
-                    string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
-                )
-            else { return }
-            NSWorkspace.shared.open(url)
-        }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
-    }
-
-    private var requestScreenCaptureButton: some View {
+    private var requestScreenCapturePermissionButton: some View {
         Button("请求屏幕录制权限") {
             screenCapturePollTask?.cancel()
             let trusted = ScreenCapturePermissionChecker.requestScreenCapturePermission()
@@ -1023,27 +984,25 @@ private struct AppSettingsView: View {
         .controlSize(.small)
     }
 
-    private var captureSnapshotButton: some View {
-        Button("采集当前快照") {
-            let snapshot = RuntimeSnapshotProvider().snapshot()
-            RuntimeLog.info("Manual", "snapshot apps=\(snapshot.apps.count)")
-            for app in snapshot.apps.prefix(16) {
-                RuntimeLog.info(
-                    "Manual",
-                    "\(app.displayName) windows=\(app.windows.count)"
-                )
-            }
-        }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
-    }
-
     private var clearLogsButton: some View {
         Button("清空日志") {
             diagnostics.clear()
         }
         .buttonStyle(.bordered)
         .controlSize(.small)
+    }
+
+    @ViewBuilder
+    private func permissionStatusBadge(text: String, isGranted: Bool) -> some View {
+        Text(text)
+            .font(.system(size: 11, weight: .medium))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                Capsule()
+                    .fill(isGranted ? Color.green.opacity(0.14) : Color.orange.opacity(0.16))
+            )
+            .foregroundStyle(isGranted ? .green : .orange)
     }
 
     private func refreshAccessibilityStatus() {

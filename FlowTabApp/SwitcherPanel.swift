@@ -857,7 +857,6 @@ private extension CycleDirection {
 private struct SwitcherPanelRootView: View {
     @ObservedObject var model: LiveSwitcherModel
     @ObservedObject private var systemTheme = SystemThemeState.shared
-    @AppStorage(AppPreferenceKeys.showShortcutHint) private var showShortcutHint = true
     @AppStorage(AppPreferenceKeys.themeMode)
     private var themeModeRaw = ThemePreferencesStore.defaultMode.rawValue
 
@@ -874,7 +873,6 @@ private struct SwitcherPanelRootView: View {
             if let session = model.session {
                 CommandTabOverlay(
                     session: session,
-                    showShortcutHint: showShortcutHint,
                     isPreviewLayer: model.isPreviewLayerMode,
                     windowPreviewItems: model.windowPreviewItems(),
                     selectedApp: model.selectedApp,
@@ -896,7 +894,6 @@ private struct SwitcherPanelRootView: View {
 
 private struct CommandTabOverlay: View {
     let session: SwitcherSession
-    let showShortcutHint: Bool
     let isPreviewLayer: Bool
     let windowPreviewItems: [WindowPreviewItem]
     let selectedApp: AppSwitchCandidate?
@@ -904,21 +901,6 @@ private struct CommandTabOverlay: View {
     let appTileSpacing: CGFloat
     let iconForApp: (AppSwitchCandidate) -> NSImage?
     @Environment(\.colorScheme) private var colorScheme
-    @AppStorage(AppPreferenceKeys.hotkeyPrimaryModifier)
-    private var hotkeyPrimaryModifierRaw = SwitcherHotkeyPreferencesStore.defaultPrimaryModifier.rawValue
-    @AppStorage(AppPreferenceKeys.hotkeyMainKey)
-    private var hotkeyMainKeyRaw = SwitcherHotkeyPreferencesStore.defaultMainKey.rawValue
-    @AppStorage(AppPreferenceKeys.hotkeyQuitKey)
-    private var hotkeyQuitKeyRaw = SwitcherHotkeyPreferencesStore.defaultQuitKey.rawValue
-
-    private var hotkeyConfiguration: SwitcherHotkeyConfiguration {
-        SwitcherHotkeyPreferencesStore.resolve(
-            primaryModifierRaw: hotkeyPrimaryModifierRaw,
-            mainKeyRaw: hotkeyMainKeyRaw,
-            quitKeyRaw: hotkeyQuitKeyRaw
-        )
-    }
-
     private func previewCardWidth(availableWidth: CGFloat, itemCount: Int) -> CGFloat {
         let count = max(itemCount, 1)
         let spacing: CGFloat = 12
@@ -1008,15 +990,6 @@ private struct CommandTabOverlay: View {
                 .frame(height: 220)
             }
 
-            if showShortcutHint {
-                Text(
-                    "Tab / Shift+Tab / ← / → 切换，↑ 分组（窗口层返回应用层）；"
-                        + "\(hotkeyConfiguration.quitShortcutText) 结束当前应用；"
-                        + "若刚从窗口层返回，本次需按 ↓ 才会再次进入窗口层，松开 \(hotkeyConfiguration.primaryModifier.displayName) 确认"
-                )
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16)
