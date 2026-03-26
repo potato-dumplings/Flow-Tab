@@ -1388,6 +1388,28 @@ private struct WindowPreviewCard: View {
     private var previewAreaHeight: CGFloat {
         max(84, height - titleAreaHeight)
     }
+    private var previewBorderColor: Color {
+        if isSelected {
+            return colorScheme == .dark ? Color.accentColor.opacity(0.95) : Color.accentColor.opacity(0.72)
+        }
+        return colorScheme == .dark ? Color.white.opacity(0.20) : Color.primary.opacity(0.12)
+    }
+    private var previewBorderWidth: CGFloat {
+        if isSelected {
+            return colorScheme == .dark ? 2.6 : 2.1
+        }
+        return 1
+    }
+    private var previewGlowColor: Color {
+        guard isSelected else { return .clear }
+        return colorScheme == .dark ? Color.accentColor.opacity(0.42) : Color.accentColor.opacity(0.18)
+    }
+    private var titleForegroundColor: Color {
+        if colorScheme == .dark {
+            return isSelected ? Color.white.opacity(0.98) : Color.white.opacity(0.80)
+        }
+        return isSelected ? Color.primary : Color.primary.opacity(0.86)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -1412,18 +1434,26 @@ private struct WindowPreviewCard: View {
             .frame(width: width, height: previewAreaHeight)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(
-                        isSelected ? Color.accentColor.opacity(0.6) : Color.primary.opacity(0.12),
-                        lineWidth: isSelected ? 2 : 1
-                    )
+                ZStack {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(previewBorderColor, lineWidth: previewBorderWidth)
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .inset(by: 1)
+                            .stroke(
+                                colorScheme == .dark ? Color.white.opacity(0.24) : Color.white.opacity(0.16),
+                                lineWidth: 0.8
+                            )
+                    }
+                }
             )
+            .shadow(color: previewGlowColor, radius: isSelected ? 14 : 0, y: 0)
             .shadow(color: .black.opacity(isSelected ? 0.16 : 0.12), radius: isSelected ? 12 : 10, y: 5)
 
             Text(title)
                 .lineLimit(1)
                 .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.primary)
+                .foregroundStyle(titleForegroundColor)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity, alignment: .center)
                 .padding(.horizontal, 4)
