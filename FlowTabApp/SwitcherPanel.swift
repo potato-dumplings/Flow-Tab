@@ -15,11 +15,13 @@ final class SwitcherPanelController {
     private var delayedWindowLayerTimer: Timer?
     private var lastCommittedTabAdvanceTimestamp: TimeInterval?
     private var ignoreHotkeyPressesUntil: TimeInterval = 0
-    private let windowLayerPresentationDelay: TimeInterval = 0.22
+    private var windowLayerPresentationDelay: TimeInterval {
+        WindowLayerPreferencesStore.loadAutoEnterDelay()
+    }
     private let modifierReleaseConfirmationSampleIntervalNs: UInt64 = 25_000_000
     private let modifierReleaseConfirmationSampleCount: Int = 2
     private let postFinishHotkeyIgnoreWindow: TimeInterval = 0.02
-    private let autoEnterWindowLayerEnabled = false
+    private let autoEnterWindowLayerEnabled = true
     private let tabAdvanceMinimumInterval: TimeInterval = 0.016
     private let panelScreenMargin: CGFloat = 80
     private let appLayerMinimumWidth: CGFloat = 440

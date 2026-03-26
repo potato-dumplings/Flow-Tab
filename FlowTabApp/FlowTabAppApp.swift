@@ -9,6 +9,7 @@ enum AppPreferenceKeys {
     static let hotkeyPrimaryModifier = "hotkeyPrimaryModifier"
     static let hotkeyMainKey = "hotkeyMainKey"
     static let hotkeyQuitKey = "hotkeyQuitKey"
+    static let windowLayerAutoEnterDelay = "windowLayerAutoEnterDelay"
     static let enableVerboseDiagnostics = "enableVerboseDiagnostics"
     static let themeMode = "themeMode"
 }
@@ -69,6 +70,30 @@ enum ThemePreferencesStore {
 
     static func resolve(rawValue: String) -> ThemeMode {
         ThemeMode(rawValue: rawValue) ?? defaultMode
+    }
+}
+
+enum WindowLayerPreferencesStore {
+    static let defaultAutoEnterDelay: Double = 0.35
+    static let minAutoEnterDelay: Double = 0.10
+    static let maxAutoEnterDelay: Double = 1.20
+    static let autoEnterDelayStep: Double = 0.05
+
+    static func loadAutoEnterDelay(userDefaults: UserDefaults = .standard) -> TimeInterval {
+        guard userDefaults.object(forKey: AppPreferenceKeys.windowLayerAutoEnterDelay) != nil else {
+            return defaultAutoEnterDelay
+        }
+        return normalizedAutoEnterDelay(
+            userDefaults.double(forKey: AppPreferenceKeys.windowLayerAutoEnterDelay)
+        )
+    }
+
+    static func normalizedAutoEnterDelay(_ rawValue: Double) -> Double {
+        guard rawValue.isFinite else { return defaultAutoEnterDelay }
+        let clamped = min(max(rawValue, minAutoEnterDelay), maxAutoEnterDelay)
+        let stepCount = ((clamped - minAutoEnterDelay) / autoEnterDelayStep).rounded()
+        let quantized = minAutoEnterDelay + stepCount * autoEnterDelayStep
+        return (quantized * 100).rounded() / 100
     }
 }
 
@@ -686,11 +711,15 @@ private struct AppSettingsView: View {
     private var hotkeyMainKeyRaw = SwitcherHotkeyPreferencesStore.defaultMainKey.rawValue
     @AppStorage(AppPreferenceKeys.hotkeyQuitKey)
     private var hotkeyQuitKeyRaw = SwitcherHotkeyPreferencesStore.defaultQuitKey.rawValue
+    @AppStorage(AppPreferenceKeys.windowLayerAutoEnterDelay)
+    private var windowLayerAutoEnterDelayRaw = WindowLayerPreferencesStore.defaultAutoEnterDelay
     @ObservedObject private var diagnostics = RuntimeDiagnostics.shared
     @State private var accessibilityTrusted = AXIsProcessTrusted()
     @State private var screenCaptureTrusted = ScreenCapturePermissionChecker.hasScreenCapturePermission
     @State private var accessibilityPermissionPollTask: Task<Void, Never>?
     @State private var screenCapturePollTask: Task<Void, Never>?
+    @State private var windowLayerAutoEnterDelayText = ""
+    @FocusState private var isWindowLayerDelayFieldFocused: Bool
 
     private var bundleIdentifier: String {
         Bundle.main.bundleIdentifier ?? "unknown"
@@ -706,6 +735,10 @@ private struct AppSettingsView: View {
             mainKeyRaw: hotkeyMainKeyRaw,
             quitKeyRaw: hotkeyQuitKeyRaw
         )
+    }
+
+    private var windowLayerAutoEnterDelay: Double {
+        WindowLayerPreferencesStore.normalizedAutoEnterDelay(windowLayerAutoEnterDelayRaw)
     }
 
     private var diagnosticsEntriesForDisplay: [RuntimeDiagnostics.Entry] {
@@ -728,6 +761,46 @@ private struct AppSettingsView: View {
         case .settings:
             return "基础显示设置、快捷键与权限"
         }
+    }
+
+    private var themeModeCapsuleSelector: some View {
+        let modes = ThemeMode.allCases
+        return HStack(spacing: 0) {
+            ForEach(Array(modes.enumerated()), id: \.element.rawValue) { index, mode in
+                let isSelected = themeModeRaw == mode.rawValue
+                Button {
+                    themeModeRaw = mode.rawValue
+                } label: {
+                    Text(mode.displayName)
+                        .font(.system(size: 12, weight: .medium))
+                        .lineLimit(1)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
+                        .background(
+                            Capsule()
+                                .fill(isSelected ? Color.accentColor.opacity(0.18) : Color.clear)
+                        )
+                }
+                .buttonStyle(.plain)
+
+                if index < modes.count - 1 {
+                    Rectangle()
+                        .fill(Color.primary.opacity(0.12))
+                        .frame(width: 1, height: 14)
+                        .padding(.horizontal, 2)
+                }
+            }
+        }
+        .padding(2)
+        .background(
+            Capsule()
+                .fill(Color.primary.opacity(0.05))
+        )
+        .overlay(
+            Capsule()
+                .stroke(Color.primary.opacity(0.12), lineWidth: 1)
+        )
     }
 
     var body: some View {
@@ -755,14 +828,30 @@ private struct AppSettingsView: View {
                                     Text("主题模式")
                                         .font(.system(size: 13))
                                     Spacer()
-                                    Picker("主题模式", selection: $themeModeRaw) {
-                                        ForEach(ThemeMode.allCases, id: \.rawValue) { mode in
-                                            Text(mode.displayName).tag(mode.rawValue)
-                                        }
+                                    themeModeCapsuleSelector
+                                }
+
+                                HStack(spacing: 10) {
+                                    Text("窗口层自动进入延迟")
+                                        .font(.system(size: 13))
+                                    Spacer()
+                                    HStack(spacing: 8) {
+                                        TextField("0.35", text: $windowLayerAutoEnterDelayText)
+                                            .textFieldStyle(.roundedBorder)
+                                            .font(.system(size: 12, design: .monospaced))
+                                            .multilineTextAlignment(.trailing)
+                                            .frame(width: 80)
+                                            .focused($isWindowLayerDelayFieldFocused)
+                                            .onChange(of: windowLayerAutoEnterDelayText) { newValue in
+                                                applyWindowLayerAutoEnterDelayText(newValue)
+                                            }
+                                            .onSubmit {
+                                                commitWindowLayerAutoEnterDelayText()
+                                            }
+                                        Text("秒")
+                                            .font(.system(size: 12, design: .monospaced))
+                                            .foregroundStyle(.secondary)
                                     }
-                                    .labelsHidden()
-                                    .pickerStyle(.menu)
-                                    .frame(width: 160)
                                 }
 
                                 Divider()
@@ -923,6 +1012,8 @@ private struct AppSettingsView: View {
         .onAppear {
             enforceThemeModeConsistency()
             enforceHotkeyConsistency()
+            enforceWindowLayerPreferencesConsistency()
+            syncWindowLayerAutoEnterDelayText()
             refreshAccessibilityStatus()
             refreshScreenCaptureStatus()
         }
@@ -940,6 +1031,16 @@ private struct AppSettingsView: View {
         .onChange(of: hotkeyQuitKeyRaw) { _ in
             enforceHotkeyConsistency()
             notifyHotkeyConfigChanged()
+        }
+        .onChange(of: isWindowLayerDelayFieldFocused) { isFocused in
+            guard !isFocused else { return }
+            commitWindowLayerAutoEnterDelayText()
+        }
+        .onChange(of: windowLayerAutoEnterDelayRaw) { _ in
+            enforceWindowLayerPreferencesConsistency()
+            if !isWindowLayerDelayFieldFocused {
+                syncWindowLayerAutoEnterDelayText()
+            }
         }
         .onDisappear {
             accessibilityPermissionPollTask?.cancel()
@@ -1025,6 +1126,76 @@ private struct AppSettingsView: View {
         if themeModeRaw != resolved.rawValue {
             themeModeRaw = resolved.rawValue
         }
+    }
+
+    private func enforceWindowLayerPreferencesConsistency() {
+        let resolved = WindowLayerPreferencesStore.normalizedAutoEnterDelay(
+            windowLayerAutoEnterDelayRaw
+        )
+        if abs(windowLayerAutoEnterDelayRaw - resolved) > 0.0001 {
+            windowLayerAutoEnterDelayRaw = resolved
+        }
+    }
+
+    private func syncWindowLayerAutoEnterDelayText() {
+        let formatted = String(format: "%.2f", windowLayerAutoEnterDelay)
+        if windowLayerAutoEnterDelayText != formatted {
+            windowLayerAutoEnterDelayText = formatted
+        }
+    }
+
+    private func applyWindowLayerAutoEnterDelayText(_ rawText: String) {
+        let sanitized = sanitizeWindowLayerAutoEnterDelayText(rawText)
+        if sanitized != rawText {
+            windowLayerAutoEnterDelayText = sanitized
+            return
+        }
+        guard !sanitized.isEmpty else { return }
+        guard sanitized != "." else { return }
+        guard let parsedValue = Double(sanitized) else { return }
+        let normalizedValue = WindowLayerPreferencesStore.normalizedAutoEnterDelay(parsedValue)
+        if abs(windowLayerAutoEnterDelayRaw - normalizedValue) > 0.0001 {
+            windowLayerAutoEnterDelayRaw = normalizedValue
+        }
+    }
+
+    private func commitWindowLayerAutoEnterDelayText() {
+        let sanitized = sanitizeWindowLayerAutoEnterDelayText(windowLayerAutoEnterDelayText)
+        if windowLayerAutoEnterDelayText != sanitized {
+            windowLayerAutoEnterDelayText = sanitized
+        }
+        if let parsedValue = Double(sanitized) {
+            windowLayerAutoEnterDelayRaw = WindowLayerPreferencesStore.normalizedAutoEnterDelay(
+                parsedValue
+            )
+        }
+        syncWindowLayerAutoEnterDelayText()
+    }
+
+    private func sanitizeWindowLayerAutoEnterDelayText(_ rawText: String) -> String {
+        var sanitized = ""
+        var hasDecimalSeparator = false
+        var fractionalDigitCount = 0
+
+        for character in rawText {
+            if character.isNumber {
+                if hasDecimalSeparator {
+                    guard fractionalDigitCount < 2 else { continue }
+                    fractionalDigitCount += 1
+                }
+                sanitized.append(character)
+                continue
+            }
+            if character == ".", !hasDecimalSeparator {
+                hasDecimalSeparator = true
+                if sanitized.isEmpty {
+                    sanitized = "0"
+                }
+                sanitized.append(".")
+            }
+        }
+
+        return sanitized
     }
 
     private func notifyHotkeyConfigChanged() {
