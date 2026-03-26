@@ -740,16 +740,23 @@ final class LiveSwitcherModel: ObservableObject {
         overlayStyle == .windowOnly
     }
 
-    private func previewImage(for appID: String, window: WindowCandidate) -> NSImage? {
-        guard var appContext = runtimeContextsByID[appID] else { return nil }
-        guard var windowContext = appContext.windowsByID[window.id] else { return nil }
+    private func previewData(
+        for appID: String,
+        window: WindowCandidate
+    ) -> (image: NSImage?, titleBarStyle: WindowTitleBarStyleGuess?) {
+        guard var appContext = runtimeContextsByID[appID] else {
+            return (image: nil, titleBarStyle: nil)
+        }
+        guard var windowContext = appContext.windowsByID[window.id] else {
+            return (image: nil, titleBarStyle: nil)
+        }
         if let cached = windowContext.previewImage {
-            return cached
+            return (image: cached, titleBarStyle: windowContext.inferredTitleBarStyle)
         }
 
         let attemptKey = "\(appID)#\(window.id)"
         if previewCaptureAttemptedKeys.contains(attemptKey) {
-            return nil
+            return (image: nil, titleBarStyle: windowContext.inferredTitleBarStyle)
         }
         previewCaptureAttemptedKeys.insert(attemptKey)
 
@@ -765,11 +772,12 @@ final class LiveSwitcherModel: ObservableObject {
             )
         else {
             RuntimeLog.info("Preview", "attempt failed appID=\(appID) windowID=\(window.id)")
-            return nil
+            return (image: nil, titleBarStyle: windowContext.inferredTitleBarStyle)
         }
 
         windowContext.cgWindowID = capture.resolvedWindowID
         windowContext.previewImage = capture.image
+        windowContext.inferredTitleBarStyle = capture.titleBarStyle
         var windowsByID = appContext.windowsByID
         windowsByID[window.id] = windowContext
         appContext = RuntimeAppContext(
@@ -780,9 +788,9 @@ final class LiveSwitcherModel: ObservableObject {
         runtimeContextsByID[appID] = appContext
         RuntimeLog.info(
             "Preview",
-            "attempt success appID=\(appID) windowID=\(window.id) resolvedCG=\(capture.resolvedWindowID)"
+            "attempt success appID=\(appID) windowID=\(window.id) resolvedCG=\(capture.resolvedWindowID) titleBarStyle=\(capture.titleBarStyle?.rawValue ?? "nil")"
         )
-        return capture.image
+        return (image: capture.image, titleBarStyle: capture.titleBarStyle)
     }
 
     fileprivate func windowPreviewItems() -> [WindowPreviewItem] {
@@ -796,10 +804,12 @@ final class LiveSwitcherModel: ObservableObject {
             let fallbackTitle = overlayStyle == .windowOnly
                 ? "Window \(index + 1)"
                 : app.displayName
+            let preview = previewData(for: appID, window: window)
             return WindowPreviewItem(
                 id: window.id,
                 title: title.isEmpty ? fallbackTitle : title,
-                image: previewImage(for: appID, window: window),
+                image: preview.image,
+                titleBarStyle: preview.titleBarStyle,
                 isSelected: index == selectedIndex
             )
         }
@@ -1344,6 +1354,7 @@ private struct CommandTabOverlay: View {
                         WindowOnlyPreviewCard(
                             image: preview.image,
                             title: preview.title,
+                            titleBarStyle: preview.titleBarStyle,
                             isSelected: preview.isSelected,
                             width: layout.cardWidth,
                             height: layout.cardHeight
@@ -1372,6 +1383,7 @@ private struct WindowPreviewItem: Identifiable {
     let id: String
     let title: String
     let image: NSImage?
+    let titleBarStyle: WindowTitleBarStyleGuess?
     let isSelected: Bool
 }
 
@@ -1465,6 +1477,7 @@ private struct WindowPreviewCard: View {
 private struct WindowOnlyPreviewCard: View {
     let image: NSImage?
     let title: String
+    let titleBarStyle: WindowTitleBarStyleGuess?
     let isSelected: Bool
     let width: CGFloat
     let height: CGFloat
@@ -1474,20 +1487,26 @@ private struct WindowOnlyPreviewCard: View {
     private var previewAreaHeight: CGFloat {
         max(1, height - titleAreaHeight)
     }
+    private var usesDarkTitleBar: Bool {
+        if let titleBarStyle {
+            return titleBarStyle == .dark
+        }
+        return colorScheme == .dark
+    }
     private var titleForegroundColor: Color {
-        if colorScheme == .dark {
+        if usesDarkTitleBar {
             return Color.white.opacity(isSelected ? 0.98 : 0.92)
         }
         return Color.black.opacity(isSelected ? 0.84 : 0.74)
     }
     private var titleBarBackgroundColor: Color {
-        if colorScheme == .dark {
+        if usesDarkTitleBar {
             return Color(nsColor: NSColor(calibratedWhite: 0.12, alpha: 1.0))
         }
         return Color(nsColor: NSColor(calibratedWhite: 0.97, alpha: 1.0))
     }
     private var titleBarDividerColor: Color {
-        if colorScheme == .dark {
+        if usesDarkTitleBar {
             return Color.white.opacity(0.14)
         }
         return Color.black.opacity(0.12)
@@ -1519,7 +1538,7 @@ private struct WindowOnlyPreviewCard: View {
                         .scaledToFill()
                 } else {
                     LinearGradient(
-                        colors: colorScheme == .dark
+                        colors: usesDarkTitleBar
                             ? [Color.white.opacity(0.08), Color.white.opacity(0.03)]
                             : [Color.black.opacity(0.06), Color.black.opacity(0.03)],
                         startPoint: .top,
@@ -1534,7 +1553,7 @@ private struct WindowOnlyPreviewCard: View {
             .clipped()
         }
         .frame(width: width, height: height, alignment: .top)
-        .background(Color.black.opacity(colorScheme == .dark ? 0.20 : 0.10))
+        .background(Color.black.opacity(usesDarkTitleBar ? 0.20 : 0.10))
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 14, style: .continuous)
