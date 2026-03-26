@@ -98,7 +98,8 @@ extension ThemeMode {
 
 enum HomeTab: Hashable {
     case home
-    case monitor
+    case logs
+    case settings
 }
 
 @MainActor
@@ -119,10 +120,19 @@ enum AppWindowCoordinator {
         }
     }
 
-    static func openMonitor() {
+    static func openLogs() {
         Task { @MainActor in
-            if HomeTabState.shared.selectedTab != .monitor {
-                HomeTabState.shared.selectedTab = .monitor
+            if HomeTabState.shared.selectedTab != .logs {
+                HomeTabState.shared.selectedTab = .logs
+            }
+            activateMainWindowOrOpenHomeScene()
+        }
+    }
+
+    static func openSettings() {
+        Task { @MainActor in
+            if HomeTabState.shared.selectedTab != .settings {
+                HomeTabState.shared.selectedTab = .settings
             }
             activateMainWindowOrOpenHomeScene()
         }
@@ -157,17 +167,24 @@ struct FlowTabAppApp: App {
 
         .commands {
             CommandGroup(replacing: .appSettings) {
-                SettingsLink {
-                    Text("打开应用首页")
+                Button("设置") {
+                    AppWindowCoordinator.openSettings()
+                }
+                .keyboardShortcut(",", modifiers: [.command])
+            }
+
+            CommandMenu("日志") {
+                Button("打开日志") {
+                    AppWindowCoordinator.openLogs()
                 }
             }
 
-            CommandMenu("FlowTab") {
+            CommandMenu("设置") {
+                Button("打开设置") {
+                    AppWindowCoordinator.openSettings()
+                }
                 Button("打开应用首页") {
                     AppWindowCoordinator.openHome()
-                }
-                Button("查看日志监控") {
-                    AppWindowCoordinator.openMonitor()
                 }
             }
         }
@@ -203,8 +220,10 @@ private struct HomeRootView: View {
                 switch tabState.selectedTab {
                 case .home:
                     HomeLandingView()
-                case .monitor:
-                    AppSettingsView()
+                case .logs:
+                    AppSettingsView(page: .logs)
+                case .settings:
+                    AppSettingsView(page: .settings)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -229,7 +248,8 @@ private struct HomeSidebar: View {
 
     private let items: [(tab: HomeTab, title: String, icon: String)] = [
         (.home, "首页", "house.fill"),
-        (.monitor, "监控页面", "waveform.path.ecg")
+        (.logs, "日志", "text.alignleft"),
+        (.settings, "设置", "gearshape")
     ]
 
     var body: some View {
@@ -293,7 +313,7 @@ private struct HomeSidebar: View {
                     .frame(width: 22)
 
                 Text(title)
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.system(size: 15, weight: .semibold))
                     .lineLimit(1)
                     .frame(width: textColumnWidth, alignment: .leading)
             }
@@ -641,7 +661,14 @@ private struct HomeLayerRowView: View {
     }
 }
 
+private enum SettingsPage {
+    case logs
+    case settings
+}
+
 private struct AppSettingsView: View {
+    let page: SettingsPage
+
     @AppStorage(AppPreferenceKeys.showShortcutHint) private var showShortcutHint = true
     @AppStorage(AppPreferenceKeys.enableVerboseDiagnostics) private var enableVerboseDiagnostics = false
     @AppStorage(AppPreferenceKeys.themeMode) private var themeModeRaw = ThemePreferencesStore.defaultMode.rawValue
@@ -677,6 +704,24 @@ private struct AppSettingsView: View {
         Array(diagnostics.entries.suffix(300))
     }
 
+    private var pageTitle: String {
+        switch page {
+        case .logs:
+            return "日志"
+        case .settings:
+            return "设置"
+        }
+    }
+
+    private var pageSubtitle: String {
+        switch page {
+        case .logs:
+            return "运行监控与权限诊断"
+        case .settings:
+            return "基础显示设置与快捷键"
+        }
+    }
+
     var body: some View {
         ZStack {
             HomeBackdropView()
@@ -684,199 +729,203 @@ private struct AppSettingsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("监控页面")
+                        Text(pageTitle)
                             .font(.system(size: 22, weight: .semibold))
-                        Text("统一视觉风格下的运行诊断面板")
+                        Text(pageSubtitle)
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                     }
 
-                    HomeSectionCard(title: "偏好", subtitle: "基础显示设置与快捷键") {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Toggle("显示快捷键提示", isOn: $showShortcutHint)
-                                .toggleStyle(.switch)
-                                .font(.system(size: 13))
-
-                            HStack(spacing: 10) {
-                                Text("主题模式")
+                    if page == .settings {
+                        HomeSectionCard(title: "偏好", subtitle: "基础显示设置与快捷键") {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Toggle("显示快捷键提示", isOn: $showShortcutHint)
+                                    .toggleStyle(.switch)
                                     .font(.system(size: 13))
-                                Spacer()
-                                Picker("主题模式", selection: $themeModeRaw) {
-                                    ForEach(ThemeMode.allCases, id: \.rawValue) { mode in
-                                        Text(mode.displayName).tag(mode.rawValue)
+
+                                HStack(spacing: 10) {
+                                    Text("主题模式")
+                                        .font(.system(size: 13))
+                                    Spacer()
+                                    Picker("主题模式", selection: $themeModeRaw) {
+                                        ForEach(ThemeMode.allCases, id: \.rawValue) { mode in
+                                            Text(mode.displayName).tag(mode.rawValue)
+                                        }
                                     }
+                                    .labelsHidden()
+                                    .pickerStyle(.menu)
+                                    .frame(width: 160)
                                 }
-                                .labelsHidden()
-                                .pickerStyle(.menu)
-                                .frame(width: 160)
-                            }
 
-                            Divider()
+                                Divider()
 
-                            HStack(spacing: 10) {
-                                Text("主修饰键")
-                                    .font(.system(size: 13))
-                                Spacer()
-                                Picker("主修饰键", selection: $hotkeyPrimaryModifierRaw) {
-                                    ForEach(SwitcherPrimaryModifier.allCases) { modifier in
-                                        Text(modifier.displayName).tag(modifier.rawValue)
+                                HStack(spacing: 10) {
+                                    Text("主修饰键")
+                                        .font(.system(size: 13))
+                                    Spacer()
+                                    Picker("主修饰键", selection: $hotkeyPrimaryModifierRaw) {
+                                        ForEach(SwitcherPrimaryModifier.allCases) { modifier in
+                                            Text(modifier.displayName).tag(modifier.rawValue)
+                                        }
                                     }
+                                    .labelsHidden()
+                                    .pickerStyle(.menu)
+                                    .frame(width: 160)
                                 }
-                                .labelsHidden()
-                                .pickerStyle(.menu)
-                                .frame(width: 160)
-                            }
 
-                            HStack(spacing: 10) {
-                                Text("主切换按键")
-                                    .font(.system(size: 13))
-                                Spacer()
-                                Picker("主切换按键", selection: $hotkeyMainKeyRaw) {
-                                    ForEach(SwitcherHotkeyKey.allCases) { key in
-                                        Text(key.displayName).tag(key.rawValue)
+                                HStack(spacing: 10) {
+                                    Text("主切换按键")
+                                        .font(.system(size: 13))
+                                    Spacer()
+                                    Picker("主切换按键", selection: $hotkeyMainKeyRaw) {
+                                        ForEach(SwitcherHotkeyKey.allCases) { key in
+                                            Text(key.displayName).tag(key.rawValue)
+                                        }
                                     }
+                                    .labelsHidden()
+                                    .pickerStyle(.menu)
+                                    .frame(width: 160)
                                 }
-                                .labelsHidden()
-                                .pickerStyle(.menu)
-                                .frame(width: 160)
-                            }
 
-                            HStack(spacing: 10) {
-                                Text("结束应用按键")
-                                    .font(.system(size: 13))
-                                Spacer()
-                                Picker("结束应用按键", selection: $hotkeyQuitKeyRaw) {
-                                    ForEach(SwitcherHotkeyKey.allCases) { key in
-                                        Text(key.displayName).tag(key.rawValue)
+                                HStack(spacing: 10) {
+                                    Text("结束应用按键")
+                                        .font(.system(size: 13))
+                                    Spacer()
+                                    Picker("结束应用按键", selection: $hotkeyQuitKeyRaw) {
+                                        ForEach(SwitcherHotkeyKey.allCases) { key in
+                                            Text(key.displayName).tag(key.rawValue)
+                                        }
                                     }
+                                    .labelsHidden()
+                                    .pickerStyle(.menu)
+                                    .frame(width: 160)
                                 }
-                                .labelsHidden()
-                                .pickerStyle(.menu)
-                                .frame(width: 160)
-                            }
 
-                            Text(
-                                "当前：\(hotkeyConfiguration.mainShortcutText)"
-                                    + "（反向：\(hotkeyConfiguration.backwardShortcutText)）"
-                                    + "，结束应用：\(hotkeyConfiguration.quitShortcutText)"
-                            )
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
+                                Text(
+                                    "当前：\(hotkeyConfiguration.mainShortcutText)"
+                                        + "（反向：\(hotkeyConfiguration.backwardShortcutText)）"
+                                        + "，结束应用：\(hotkeyConfiguration.quitShortcutText)"
+                                )
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+                            }
                         }
                     }
 
-                    HomeSectionCard(title: "运行与权限", subtitle: "辅助功能、屏幕录制、快照与日志") {
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text(accessibilityTrusted ? "辅助功能权限：已授权" : "辅助功能权限：未授权")
-                                .font(.system(size: 11, weight: .medium))
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(
-                                    Capsule()
-                                        .fill(
-                                            accessibilityTrusted
-                                                ? Color.green.opacity(0.14)
-                                                : Color.orange.opacity(0.16)
-                                        )
-                                )
-                                .foregroundStyle(accessibilityTrusted ? .green : .orange)
+                    if page == .logs {
+                        HomeSectionCard(title: "运行与权限", subtitle: "辅助功能、屏幕录制、快照与日志") {
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text(accessibilityTrusted ? "辅助功能权限：已授权" : "辅助功能权限：未授权")
+                                    .font(.system(size: 11, weight: .medium))
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(
+                                        Capsule()
+                                            .fill(
+                                                accessibilityTrusted
+                                                    ? Color.green.opacity(0.14)
+                                                    : Color.orange.opacity(0.16)
+                                            )
+                                    )
+                                    .foregroundStyle(accessibilityTrusted ? .green : .orange)
 
-                            Text(screenCaptureTrusted ? "屏幕录制权限：已授权" : "屏幕录制权限：未授权")
-                                .font(.system(size: 11, weight: .medium))
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(
-                                    Capsule()
-                                        .fill(
-                                            screenCaptureTrusted
-                                                ? Color.green.opacity(0.14)
-                                                : Color.orange.opacity(0.16)
-                                        )
-                                )
-                                .foregroundStyle(screenCaptureTrusted ? .green : .orange)
+                                Text(screenCaptureTrusted ? "屏幕录制权限：已授权" : "屏幕录制权限：未授权")
+                                    .font(.system(size: 11, weight: .medium))
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(
+                                        Capsule()
+                                            .fill(
+                                                screenCaptureTrusted
+                                                    ? Color.green.opacity(0.14)
+                                                    : Color.orange.opacity(0.16)
+                                            )
+                                    )
+                                    .foregroundStyle(screenCaptureTrusted ? .green : .orange)
 
-                            ViewThatFits(in: .horizontal) {
-                                HStack(spacing: 8) {
-                                    openAccessibilityButton
-                                    requestAccessibilityPermissionButton
-                                    openScreenCaptureButton
-                                    requestScreenCaptureButton
-                                    captureSnapshotButton
-                                    clearLogsButton
-                                }
-                                VStack(alignment: .leading, spacing: 8) {
+                                ViewThatFits(in: .horizontal) {
                                     HStack(spacing: 8) {
                                         openAccessibilityButton
                                         requestAccessibilityPermissionButton
-                                    }
-                                    HStack(spacing: 8) {
                                         openScreenCaptureButton
                                         requestScreenCaptureButton
-                                    }
-                                    HStack(spacing: 8) {
                                         captureSnapshotButton
                                         clearLogsButton
                                     }
-                                }
-                            }
-
-                            Text("当前实例 bundle: \(bundleIdentifier)")
-                                .font(.system(size: 11, design: .monospaced))
-                                .foregroundStyle(.secondary)
-
-                            Text("当前实例路径: \(bundlePath)")
-                                .font(.system(size: 11, design: .monospaced))
-                                .foregroundStyle(.secondary)
-                                .textSelection(.enabled)
-                                .lineLimit(2)
-
-                            if !accessibilityTrusted {
-                                Text("提示：授权后请完全退出并重启 FlowTabApp，权限状态才会稳定刷新。")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(.orange)
-                            }
-
-                            if !screenCaptureTrusted {
-                                Text("提示：未授权屏幕录制时，窗口层将只显示兜底预览，无法显示真实窗口画面。")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(.orange)
-                            }
-
-                            Toggle("启用详细运行日志（高频，可能影响性能）", isOn: $enableVerboseDiagnostics)
-                                .toggleStyle(.switch)
-                                .font(.system(size: 12))
-                            Text("本地日志目录：\(RuntimeDiagnostics.logsDirectoryPath)")
-                                .font(.system(size: 11, design: .monospaced))
-                                .foregroundStyle(.secondary)
-                                .textSelection(.enabled)
-                                .lineLimit(2)
-
-                            ScrollView {
-                                Group {
-                                    if diagnosticsEntriesForDisplay.isEmpty {
-                                        Text("暂无日志。触发 \(hotkeyConfiguration.mainShortcutText) 后再回来看。")
-                                            .font(.system(size: 12))
-                                            .foregroundStyle(.secondary)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                    } else {
-                                        LazyVStack(alignment: .leading, spacing: 2) {
-                                            ForEach(diagnosticsEntriesForDisplay) { entry in
-                                                Text(entry.displayLine)
-                                                    .font(.system(size: 11, design: .monospaced))
-                                                    .foregroundStyle(.secondary)
-                                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                            }
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        HStack(spacing: 8) {
+                                            openAccessibilityButton
+                                            requestAccessibilityPermissionButton
                                         }
-                                        .textSelection(.enabled)
+                                        HStack(spacing: 8) {
+                                            openScreenCaptureButton
+                                            requestScreenCaptureButton
+                                        }
+                                        HStack(spacing: 8) {
+                                            captureSnapshotButton
+                                            clearLogsButton
+                                        }
                                     }
                                 }
-                                .padding(8)
+
+                                Text("当前实例 bundle: \(bundleIdentifier)")
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+
+                                Text("当前实例路径: \(bundlePath)")
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                                    .textSelection(.enabled)
+                                    .lineLimit(2)
+
+                                if !accessibilityTrusted {
+                                    Text("提示：授权后请完全退出并重启 FlowTabApp，权限状态才会稳定刷新。")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(.orange)
+                                }
+
+                                if !screenCaptureTrusted {
+                                    Text("提示：未授权屏幕录制时，窗口层将只显示兜底预览，无法显示真实窗口画面。")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(.orange)
+                                }
+
+                                Toggle("启用详细运行日志（高频，可能影响性能）", isOn: $enableVerboseDiagnostics)
+                                    .toggleStyle(.switch)
+                                    .font(.system(size: 12))
+                                Text("本地日志目录：\(RuntimeDiagnostics.logsDirectoryPath)")
+                                    .font(.system(size: 11, design: .monospaced))
+                                    .foregroundStyle(.secondary)
+                                    .textSelection(.enabled)
+                                    .lineLimit(2)
+
+                                ScrollView {
+                                    Group {
+                                        if diagnosticsEntriesForDisplay.isEmpty {
+                                            Text("暂无日志。触发 \(hotkeyConfiguration.mainShortcutText) 后再回来看。")
+                                                .font(.system(size: 12))
+                                                .foregroundStyle(.secondary)
+                                                .frame(maxWidth: .infinity, alignment: .leading)
+                                        } else {
+                                            LazyVStack(alignment: .leading, spacing: 2) {
+                                                ForEach(diagnosticsEntriesForDisplay) { entry in
+                                                    Text(entry.displayLine)
+                                                        .font(.system(size: 11, design: .monospaced))
+                                                        .foregroundStyle(.secondary)
+                                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                                }
+                                            }
+                                            .textSelection(.enabled)
+                                        }
+                                    }
+                                    .padding(8)
+                                }
+                                .frame(minHeight: 240, maxHeight: 320)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                        .fill(Color.primary.opacity(0.04))
+                                )
                             }
-                            .frame(minHeight: 240, maxHeight: 320)
-                            .background(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(Color.primary.opacity(0.04))
-                            )
                         }
                     }
                 }
@@ -1166,13 +1215,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         openHomeItem.target = self
         menu.addItem(openHomeItem)
 
-        let openMonitorItem = NSMenuItem(
-            title: "查看日志监控",
-            action: #selector(openMonitorFromMenu),
+        let openLogsItem = NSMenuItem(
+            title: "日志",
+            action: #selector(openLogsFromMenu),
             keyEquivalent: ""
         )
-        openMonitorItem.target = self
-        menu.addItem(openMonitorItem)
+        openLogsItem.target = self
+        menu.addItem(openLogsItem)
+
+        let openSettingsItem = NSMenuItem(
+            title: "设置",
+            action: #selector(openSettingsFromMenu),
+            keyEquivalent: ""
+        )
+        openSettingsItem.target = self
+        menu.addItem(openSettingsItem)
 
         menu.addItem(.separator())
 
@@ -1190,13 +1247,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc
-    private func openHomeFromMenu() {
-        AppWindowCoordinator.openHome()
+    private func openSettingsFromMenu() {
+        AppWindowCoordinator.openSettings()
     }
 
     @objc
-    private func openMonitorFromMenu() {
-        AppWindowCoordinator.openMonitor()
+    private func openLogsFromMenu() {
+        AppWindowCoordinator.openLogs()
+    }
+
+    @objc
+    private func openHomeFromMenu() {
+        AppWindowCoordinator.openHome()
     }
 
     @objc
