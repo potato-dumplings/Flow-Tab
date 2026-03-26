@@ -99,7 +99,6 @@ extension ThemeMode {
 enum HomeTab: Hashable {
     case home
     case monitor
-    case previewLogs
 }
 
 @MainActor
@@ -124,15 +123,6 @@ enum AppWindowCoordinator {
         Task { @MainActor in
             if HomeTabState.shared.selectedTab != .monitor {
                 HomeTabState.shared.selectedTab = .monitor
-            }
-            activateMainWindowOrOpenHomeScene()
-        }
-    }
-
-    static func openPreviewLogs() {
-        Task { @MainActor in
-            if HomeTabState.shared.selectedTab != .previewLogs {
-                HomeTabState.shared.selectedTab = .previewLogs
             }
             activateMainWindowOrOpenHomeScene()
         }
@@ -179,9 +169,6 @@ struct FlowTabAppApp: App {
                 Button("查看日志监控") {
                     AppWindowCoordinator.openMonitor()
                 }
-                Button("查看预览日志") {
-                    AppWindowCoordinator.openPreviewLogs()
-                }
             }
         }
     }
@@ -218,8 +205,6 @@ private struct HomeRootView: View {
                     HomeLandingView()
                 case .monitor:
                     AppSettingsView()
-                case .previewLogs:
-                    PreviewLogView()
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -244,8 +229,7 @@ private struct HomeSidebar: View {
 
     private let items: [(tab: HomeTab, title: String, icon: String)] = [
         (.home, "首页", "house.fill"),
-        (.monitor, "监控页面", "waveform.path.ecg"),
-        (.previewLogs, "预览日志", "photo.stack")
+        (.monitor, "监控页面", "waveform.path.ecg")
     ]
 
     var body: some View {
@@ -1088,117 +1072,6 @@ private struct AppSettingsView: View {
     }
 }
 
-private struct PreviewLogView: View {
-    @ObservedObject private var diagnostics = RuntimeDiagnostics.shared
-    @State private var screenCaptureTrusted = ScreenCapturePermissionChecker.hasScreenCapturePermission
-
-    private var previewEntries: [RuntimeDiagnostics.Entry] {
-        let filtered = diagnostics.entries.filter { entry in
-            entry.category.caseInsensitiveCompare("Preview") == .orderedSame
-        }
-        return Array(filtered.suffix(300))
-    }
-
-    var body: some View {
-        ZStack {
-            HomeBackdropView()
-
-            VStack(alignment: .leading, spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("预览日志")
-                        .font(.system(size: 22, weight: .semibold))
-                    Text("窗口预览链路专用日志（权限、窗口匹配、抓图结果）")
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                }
-
-                HomeSectionCard(title: "屏幕录制权限", subtitle: "预览功能依赖该权限") {
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text(screenCaptureTrusted ? "屏幕录制权限：已授权" : "屏幕录制权限：未授权")
-                            .font(.system(size: 11, weight: .medium))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(
-                                Capsule()
-                                    .fill(
-                                        screenCaptureTrusted
-                                            ? Color.green.opacity(0.14)
-                                            : Color.orange.opacity(0.16)
-                                    )
-                            )
-                            .foregroundStyle(screenCaptureTrusted ? .green : .orange)
-
-                        HStack(spacing: 8) {
-                            Button("打开屏幕录制设置") {
-                                guard
-                                    let url = URL(
-                                        string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture"
-                                    )
-                                else { return }
-                                NSWorkspace.shared.open(url)
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-
-                            Button("请求屏幕录制权限") {
-                                let trusted = ScreenCapturePermissionChecker.requestScreenCapturePermission()
-                                RuntimeLog.info("Preview", "screenCapture prompt requested immediateTrusted=\(trusted)")
-                                refreshScreenCaptureStatus()
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-
-                            Button("清空全部日志") {
-                                diagnostics.clear()
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                        }
-                    }
-                }
-
-                HomeSectionCard(title: "预览日志流", subtitle: "仅显示 Preview 分类，最近 \(previewEntries.count) 条") {
-                    ScrollView {
-                        Group {
-                            if previewEntries.isEmpty {
-                                Text("暂无预览日志。进入窗口层后会在这里显示抓图链路信息。")
-                                    .font(.system(size: 12))
-                                    .foregroundStyle(.secondary)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            } else {
-                                LazyVStack(alignment: .leading, spacing: 2) {
-                                    ForEach(previewEntries) { entry in
-                                        Text(entry.displayLine)
-                                            .font(.system(size: 11, design: .monospaced))
-                                            .foregroundStyle(.secondary)
-                                            .frame(maxWidth: .infinity, alignment: .leading)
-                                    }
-                                }
-                                .textSelection(.enabled)
-                            }
-                        }
-                        .padding(8)
-                    }
-                    .frame(minHeight: 360)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10, style: .continuous)
-                            .fill(Color.primary.opacity(0.04))
-                    )
-                }
-            }
-            .padding(24)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .onAppear {
-            refreshScreenCaptureStatus()
-        }
-    }
-
-    private func refreshScreenCaptureStatus() {
-        screenCaptureTrusted = ScreenCapturePermissionChecker.hasScreenCapturePermission
-    }
-}
-
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var panelController: SwitcherPanelController?
@@ -1301,14 +1174,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         openMonitorItem.target = self
         menu.addItem(openMonitorItem)
 
-        let openPreviewLogsItem = NSMenuItem(
-            title: "查看预览日志",
-            action: #selector(openPreviewLogsFromMenu),
-            keyEquivalent: ""
-        )
-        openPreviewLogsItem.target = self
-        menu.addItem(openPreviewLogsItem)
-
         menu.addItem(.separator())
 
         let quitItem = NSMenuItem(
@@ -1332,11 +1197,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc
     private func openMonitorFromMenu() {
         AppWindowCoordinator.openMonitor()
-    }
-
-    @objc
-    private func openPreviewLogsFromMenu() {
-        AppWindowCoordinator.openPreviewLogs()
     }
 
     @objc

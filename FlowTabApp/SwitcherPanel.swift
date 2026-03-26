@@ -130,7 +130,11 @@ final class SwitcherPanelController {
     }
 
     private func hideNonPanelWindows() {
-        for window in NSApp.windows where !(window is NSPanel) {
+        for window in NSApp.windows {
+            guard !(window is NSPanel) else { continue }
+            guard window.isVisible else { continue }
+            // Keep menu-bar status-item windows visible; only hide regular app windows.
+            guard window.level == .normal else { continue }
             window.orderOut(nil)
         }
     }
