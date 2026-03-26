@@ -38,6 +38,16 @@ FlowTab 使用三层会话模型：
 - 这是“正常结束”，不是强制结束。
 - 若目标应用拒绝退出或已退出，会忽略并保留当前会话。
 
+### 4) 窗口标题样式猜测（窗口层卡片）
+
+为避免“深色标题条 + 浅色窗口”或“浅色标题条 + 深色窗口”的违和，FlowTab 在窗口层会做标题样式猜测，并仅在以下条件同时满足时执行：
+
+- 通过“应用内窗口切换热键”进入窗口会话（当前为 `Control + Tab` / `Control + Shift + Tab`；若与主切换热键冲突则该热键会被禁用）
+- 已授予屏幕录制权限
+- 目标窗口截图成功
+
+不满足任一条件时，不执行猜测，标题样式回退为跟随 FlowTab 当前主题。
+
 ## 快捷键
 
 | 场景 | 快捷键 | 行为 |
@@ -76,7 +86,7 @@ FlowTab 使用三层会话模型：
 - `SwitcherPanelController` + `LiveSwitcherModel`：面板交互、按键处理、会话推进、面板内结束应用快捷键
 - `RuntimeSnapshotProvider`：运行中应用与窗口快照
 - `RuntimeActivator`：应用/窗口激活
-- `RuntimeWindowPreviewProvider`：窗口预览抓图（`CGWindowListCreateImage`）
+- `RuntimeWindowPreviewProvider`：窗口预览抓图（`ScreenCaptureKit`）与窗口标题样式猜测
 - `FlowTabAppApp`：应用生命周期、首页、监控页、预览日志页、状态栏菜单
 
 ## 环境要求
@@ -144,11 +154,12 @@ chmod +x scripts/release-install.sh
 
 用途：
 - 窗口层卡片真实截图
+- 窗口标题样式猜测（深色/浅色）
 
 系统路径：
 - `系统设置 -> 隐私与安全性 -> 屏幕录制`
 
-未授予屏幕录制权限时，不影响切换功能，但预览会回退为兜底样式。
+未授予屏幕录制权限时，不影响切换功能，但预览会回退为兜底样式，且不会执行标题样式猜测。
 
 ## 常见问题
 
