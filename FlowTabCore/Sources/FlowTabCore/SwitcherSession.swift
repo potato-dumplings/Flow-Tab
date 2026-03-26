@@ -185,9 +185,18 @@ public struct SwitcherSession: Sendable {
     }
 
     public mutating func enterWindowCycleIfPossible() {
+        _ = enterWindowCycle(allowSingleWindow: false)
+    }
+
+    @discardableResult
+    public mutating func enterWindowCycle(allowSingleWindow: Bool) -> Bool {
         let app = selectedApp
-        guard app.windows.count >= 2 else { return }
+        guard !app.windows.isEmpty else { return false }
+        if !allowSingleWindow, app.windows.count < 2 {
+            return false
+        }
         mode = .windowCycle(appID: app.id)
+        return true
     }
 
     private mutating func moveWindow(appID: String, by delta: Int) {

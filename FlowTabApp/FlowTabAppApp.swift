@@ -1312,6 +1312,7 @@ private struct AppSettingsView: View {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var panelController: SwitcherPanelController?
     private var hotkeyMonitor: OptionTabHotkeyMonitor?
+    private var inAppWindowHotkeyMonitor: OptionTabHotkeyMonitor?
     private var statusItem: NSStatusItem?
     private var hotkeyObserver: NSObjectProtocol?
 
@@ -1322,6 +1323,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.panelController = panelController
 
         setupHotkeyMonitor()
+        setupInAppWindowHotkeyMonitor()
         installHotkeyObserver()
 
         installStatusItem()
@@ -1345,6 +1347,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.hotkeyObserver = nil
         }
         hotkeyMonitor?.stop()
+        inAppWindowHotkeyMonitor?.stop()
     }
 
     private func setupHotkeyMonitor() {
@@ -1373,6 +1376,45 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotkeyMonitor = monitor
     }
 
+    private func setupInAppWindowHotkeyMonitor() {
+        inAppWindowHotkeyMonitor?.stop()
+
+        let configuredHotkey = SwitcherHotkeyPreferencesStore.load()
+        if configuredHotkey.primaryModifier == .control, configuredHotkey.mainKey == .tab {
+            RuntimeLog.info("HotKey", "skip register in-app window hotkey due conflict with main shortcut")
+            inAppWindowHotkeyMonitor = nil
+            return
+        }
+
+        let inAppConfiguration = SwitcherHotkeyConfiguration(
+            primaryModifier: .control,
+            mainKey: .tab,
+            quitKey: .q
+        )
+        let monitor = OptionTabHotkeyMonitor(
+            configuration: inAppConfiguration,
+            signature: 0x4654574E, // "FTWN"
+            forwardHotkeyID: 101,
+            backwardHotkeyID: 102
+        )
+        monitor.onHotkeyPressed = { [weak panelController] isBackward in
+            panelController?.handleInAppWindowHotkey(isBackward: isBackward)
+            RuntimeLog.info(
+                "HotKey",
+                isBackward ? "InApp Window Backward" : "InApp Window Forward"
+            )
+        }
+        monitor.onHotkeyReleased = { [weak panelController] _ in
+            panelController?.handleInAppWindowHotkeyReleased()
+            RuntimeLog.info("HotKey", "InApp Window Released")
+        }
+        RuntimeLog.info(
+            "HotKey",
+            "register in-app main=\(inAppConfiguration.mainShortcutText) backward=\(inAppConfiguration.backwardShortcutText)"
+        )
+        inAppWindowHotkeyMonitor = monitor
+    }
+
     private func installHotkeyObserver() {
         if let hotkeyObserver {
             NotificationCenter.default.removeObserver(hotkeyObserver)
@@ -1384,6 +1426,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.setupHotkeyMonitor()
+                self?.setupInAppWindowHotkeyMonitor()
             }
         }
     }

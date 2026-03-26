@@ -248,13 +248,21 @@ final class OptionTabHotkeyMonitor {
     private var eventHandlerRef: EventHandlerRef?
     private var hotkeyRefs: [UInt32: EventHotKeyRef] = [:]
 
-    private let signature: OSType = 0x46544142 // "FTAB"
-    private let forwardHotkeyID: UInt32 = 1
-    private let backwardHotkeyID: UInt32 = 2
+    private let signature: OSType
+    private let forwardHotkeyID: UInt32
+    private let backwardHotkeyID: UInt32
     private let hotkeyConfiguration: SwitcherHotkeyConfiguration
 
-    init(configuration: SwitcherHotkeyConfiguration = SwitcherHotkeyPreferencesStore.load()) {
+    init(
+        configuration: SwitcherHotkeyConfiguration = SwitcherHotkeyPreferencesStore.load(),
+        signature: OSType = 0x46544142, // "FTAB"
+        forwardHotkeyID: UInt32 = 1,
+        backwardHotkeyID: UInt32 = 2
+    ) {
         self.hotkeyConfiguration = configuration
+        self.signature = signature
+        self.forwardHotkeyID = forwardHotkeyID
+        self.backwardHotkeyID = backwardHotkeyID
         installHandler()
         registerHotkeys()
     }
@@ -336,15 +344,25 @@ final class OptionTabHotkeyMonitor {
 
         if status == noErr, let hotkeyRef {
             hotkeyRefs[id] = hotkeyRef
+            RuntimeLog.info(
+                "HotKey",
+                "register ok signature=\(self.signature) id=\(id) keyCode=\(keyCode) modifiers=\(modifiers)"
+            )
+        } else {
+            RuntimeLog.info(
+                "HotKey",
+                "register failed signature=\(self.signature) id=\(id) keyCode=\(keyCode) modifiers=\(modifiers) status=\(status)"
+            )
         }
     }
 
     private func handleHotkeyEvent(_ event: EventRef) -> OSStatus {
+        let passThroughStatus = OSStatus(eventNotHandledErr)
         let eventKind = GetEventKind(event)
         let isPressedEvent = eventKind == UInt32(kEventHotKeyPressed)
         let isReleasedEvent = eventKind == UInt32(kEventHotKeyReleased)
         guard isPressedEvent || isReleasedEvent else {
-            return noErr
+            return passThroughStatus
         }
 
         var hotkeyID = EventHotKeyID()
@@ -359,7 +377,9 @@ final class OptionTabHotkeyMonitor {
         )
 
         guard status == noErr, hotkeyID.signature == signature else {
-            return noErr
+            // Multiple hotkey monitors may be installed in the same process.
+            // Pass through unrelated events so the owning monitor can handle them.
+            return passThroughStatus
         }
 
         switch hotkeyID.id {
@@ -376,7 +396,7 @@ final class OptionTabHotkeyMonitor {
                 onHotkeyReleased?(true)
             }
         default:
-            break
+            return passThroughStatus
         }
         return noErr
     }

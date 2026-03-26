@@ -58,6 +58,19 @@ final class SwitcherSessionTests: XCTestCase {
         XCTAssertNil(session.selectedWindow)
     }
 
+    func testForceEnterWindowLayerAllowsSingleWindow() {
+        var session = SwitcherSession(apps: sampleApps(), triggerDirection: .backward)
+
+        XCTAssertEqual(session.selectedApp.id, "com.apple.Finder")
+        XCTAssertEqual(session.mode, .appCycle)
+
+        let entered = session.enterWindowCycle(allowSingleWindow: true)
+
+        XCTAssertTrue(entered)
+        XCTAssertEqual(session.mode, .windowCycle(appID: "com.apple.Finder"))
+        XCTAssertEqual(session.selectedWindow?.id, "find-1")
+    }
+
     func testUpInWindowLayerReturnsToAppCycle() {
         var session = SwitcherSession(apps: sampleApps())
 
