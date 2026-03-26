@@ -1022,43 +1022,50 @@ private struct WindowPreviewCard: View {
     let height: CGFloat
     @Environment(\.colorScheme) private var colorScheme
 
-    var body: some View {
-        ZStack {
-            if let image {
-                Image(nsImage: image)
-                    .resizable()
-                    .interpolation(.high)
-                    .scaledToFill()
-            } else {
-                (colorScheme == .dark ? Color.black : Color.white)
+    private let titleAreaHeight: CGFloat = 26
+    private var previewAreaHeight: CGFloat {
+        max(84, height - titleAreaHeight)
+    }
 
-                if let appIcon {
-                    Image(nsImage: appIcon)
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ZStack {
+                if let image {
+                    Image(nsImage: image)
                         .resizable()
                         .interpolation(.high)
-                        .frame(width: 84, height: 84)
-                        .shadow(color: .black.opacity(0.1), radius: 6, y: 2)
+                        .scaledToFill()
+                } else {
+                    (colorScheme == .dark ? Color.black : Color.white)
+
+                    if let appIcon {
+                        Image(nsImage: appIcon)
+                            .resizable()
+                            .interpolation(.high)
+                            .frame(width: 84, height: 84)
+                            .shadow(color: .black.opacity(0.1), radius: 6, y: 2)
+                    }
                 }
             }
+            .frame(width: width, height: previewAreaHeight)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(
+                        isSelected ? Color.accentColor.opacity(0.6) : Color.primary.opacity(0.12),
+                        lineWidth: isSelected ? 2 : 1
+                    )
+            )
+            .shadow(color: .black.opacity(isSelected ? 0.16 : 0.12), radius: isSelected ? 12 : 10, y: 5)
 
             Text(title)
                 .lineLimit(1)
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.primary)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 2)
         }
-        .frame(width: width, height: height)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .stroke(
-                    isSelected ? Color.accentColor.opacity(0.6) : Color.primary.opacity(0.12),
-                    lineWidth: isSelected ? 2 : 1
-                )
-        )
-        .shadow(color: .black.opacity(isSelected ? 0.16 : 0.12), radius: isSelected ? 12 : 10, y: 5)
+        .frame(width: width, height: height, alignment: .top)
     }
 }
 
