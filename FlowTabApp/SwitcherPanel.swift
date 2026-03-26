@@ -698,6 +698,7 @@ final class LiveSwitcherModel: ObservableObject {
     private var rememberedWindowIDByAppID: [String: String] = [:]
     private var previewCaptureAttemptedKeys: Set<String> = []
     private var autoEnterSuppressedAppID: String?
+    private var titleBarStyleInferenceEnabled = false
 
     init() {}
 
@@ -751,12 +752,18 @@ final class LiveSwitcherModel: ObservableObject {
             return (image: nil, titleBarStyle: nil)
         }
         if let cached = windowContext.previewImage {
-            return (image: cached, titleBarStyle: windowContext.inferredTitleBarStyle)
+            return (
+                image: cached,
+                titleBarStyle: titleBarStyleInferenceEnabled ? windowContext.inferredTitleBarStyle : nil
+            )
         }
 
         let attemptKey = "\(appID)#\(window.id)"
         if previewCaptureAttemptedKeys.contains(attemptKey) {
-            return (image: nil, titleBarStyle: windowContext.inferredTitleBarStyle)
+            return (
+                image: nil,
+                titleBarStyle: titleBarStyleInferenceEnabled ? windowContext.inferredTitleBarStyle : nil
+            )
         }
         previewCaptureAttemptedKeys.insert(attemptKey)
 
@@ -768,11 +775,15 @@ final class LiveSwitcherModel: ObservableObject {
             let capture = RuntimeWindowPreviewProvider.captureWindowPreview(
                 preferredWindowID: windowContext.cgWindowID,
                 ownerPID: appContext.runningApp.processIdentifier,
-                preferredTitle: windowContext.title
+                preferredTitle: windowContext.title,
+                inferTitleBarStyle: titleBarStyleInferenceEnabled
             )
         else {
             RuntimeLog.info("Preview", "attempt failed appID=\(appID) windowID=\(window.id)")
-            return (image: nil, titleBarStyle: windowContext.inferredTitleBarStyle)
+            return (
+                image: nil,
+                titleBarStyle: titleBarStyleInferenceEnabled ? windowContext.inferredTitleBarStyle : nil
+            )
         }
 
         windowContext.cgWindowID = capture.resolvedWindowID
@@ -790,7 +801,10 @@ final class LiveSwitcherModel: ObservableObject {
             "Preview",
             "attempt success appID=\(appID) windowID=\(window.id) resolvedCG=\(capture.resolvedWindowID) titleBarStyle=\(capture.titleBarStyle?.rawValue ?? "nil")"
         )
-        return (image: capture.image, titleBarStyle: capture.titleBarStyle)
+        return (
+            image: capture.image,
+            titleBarStyle: titleBarStyleInferenceEnabled ? capture.titleBarStyle : nil
+        )
     }
 
     fileprivate func windowPreviewItems() -> [WindowPreviewItem] {
@@ -836,11 +850,13 @@ final class LiveSwitcherModel: ObservableObject {
 
     func startSession(triggerDirection: CycleDirection) -> Bool {
         overlayStyle = .appAndWindow
+        titleBarStyleInferenceEnabled = false
         return loadSnapshot(triggerDirection: triggerDirection, preferredSelectedAppID: nil)
     }
 
     func startFocusedAppWindowSession(triggerDirection: CycleDirection) -> Bool {
         overlayStyle = .windowOnly
+        titleBarStyleInferenceEnabled = true
         guard let frontmostApp = NSWorkspace.shared.frontmostApplication else {
             resetSessionState()
             return false
@@ -1027,6 +1043,7 @@ final class LiveSwitcherModel: ObservableObject {
         runtimeContextsByID = [:]
         previewCaptureAttemptedKeys = []
         autoEnterSuppressedAppID = nil
+        titleBarStyleInferenceEnabled = false
     }
 }
 

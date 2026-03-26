@@ -2,6 +2,7 @@ import AppKit
 import ApplicationServices
 import Foundation
 import FlowTabCore
+import ScreenCaptureKit
 
 enum WindowTitleBarStyleGuess: String {
     case dark
@@ -572,11 +573,14 @@ enum RuntimeWindowPreviewProvider {
     }
 
     private static var hasLoggedScreenCapturePermissionWarning = false
+    private static let shareableContentLookupTimeout: TimeInterval = 1.0
+    private static let screenshotCaptureTimeout: TimeInterval = 1.0
 
     static func captureWindowPreview(
         preferredWindowID: CGWindowID?,
         ownerPID: pid_t,
-        preferredTitle: String?
+        preferredTitle: String?,
+        inferTitleBarStyle: Bool
     ) -> (image: NSImage, resolvedWindowID: CGWindowID, titleBarStyle: WindowTitleBarStyleGuess?)? {
         guard ScreenCapturePermissionChecker.hasScreenCapturePermission else {
             if !hasLoggedScreenCapturePermissionWarning {
@@ -599,9 +603,11 @@ enum RuntimeWindowPreviewProvider {
             return nil
         }
 
+        let shareableWindowsByID = fetchShareableWindowsByID()
         for candidateID in candidateIDs {
-            guard let cgImage = captureWindow(windowID: candidateID) else { continue }
-            let titleBarStyle = estimateTitleBarStyle(from: cgImage)
+            guard let shareableWindow = shareableWindowsByID[candidateID] else { continue }
+            guard let cgImage = captureWindow(shareableWindow: shareableWindow) else { continue }
+            let titleBarStyle = inferTitleBarStyle ? estimateTitleBarStyle(from: cgImage) : nil
             let image = NSImage(
                 cgImage: cgImage,
                 size: NSSize(width: cgImage.width, height: cgImage.height)
@@ -688,13 +694,66 @@ enum RuntimeWindowPreviewProvider {
         return windows
     }
 
-    private static func captureWindow(windowID: CGWindowID) -> CGImage? {
-        CGWindowListCreateImage(
-            .null,
-            [.optionIncludingWindow, .excludeDesktopElements],
-            windowID,
-            [.boundsIgnoreFraming, .bestResolution]
-        )
+    private static func fetchShareableWindowsByID() -> [CGWindowID: SCWindow] {
+        var shareableContent: SCShareableContent?
+        var capturedError: Error?
+        let semaphore = DispatchSemaphore(value: 0)
+        SCShareableContent.getExcludingDesktopWindows(true, onScreenWindowsOnly: true) { content, error in
+            shareableContent = content
+            capturedError = error
+            semaphore.signal()
+        }
+
+        let timeoutDate = DispatchTime.now() + shareableContentLookupTimeout
+        guard semaphore.wait(timeout: timeoutDate) == .success else {
+            RuntimeLog.info("Preview", "shareable-content lookup timed out")
+            return [:]
+        }
+        if let capturedError {
+            RuntimeLog.info("Preview", "shareable-content lookup failed error=\(capturedError.localizedDescription)")
+            return [:]
+        }
+        guard let shareableContent else { return [:] }
+
+        var windowsByID: [CGWindowID: SCWindow] = [:]
+        windowsByID.reserveCapacity(shareableContent.windows.count)
+        for window in shareableContent.windows {
+            windowsByID[window.windowID] = window
+        }
+        return windowsByID
+    }
+
+    private static func captureWindow(shareableWindow: SCWindow) -> CGImage? {
+        let filter = SCContentFilter(desktopIndependentWindow: shareableWindow)
+        let configuration = SCStreamConfiguration()
+        let width = max(1, Int(ceil(shareableWindow.frame.width)))
+        let height = max(1, Int(ceil(shareableWindow.frame.height)))
+        configuration.width = width
+        configuration.height = height
+        configuration.showsCursor = false
+        configuration.ignoreShadowsSingleWindow = true
+
+        var capturedImage: CGImage?
+        var capturedError: Error?
+        let semaphore = DispatchSemaphore(value: 0)
+        SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration) { image, error in
+            capturedImage = image
+            capturedError = error
+            semaphore.signal()
+        }
+
+        let timeoutDate = DispatchTime.now() + screenshotCaptureTimeout
+        guard semaphore.wait(timeout: timeoutDate) == .success else {
+            RuntimeLog.info("Preview", "screenshot capture timed out windowID=\(shareableWindow.windowID)")
+            return nil
+        }
+        if let capturedError {
+            RuntimeLog.info(
+                "Preview",
+                "screenshot capture failed windowID=\(shareableWindow.windowID) error=\(capturedError.localizedDescription)"
+            )
+        }
+        return capturedImage
     }
 
     private static func estimateTitleBarStyle(from image: CGImage) -> WindowTitleBarStyleGuess? {
