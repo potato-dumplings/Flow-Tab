@@ -6,6 +6,7 @@ import FlowTabCore
 enum AppPreferenceKeys {
     static let showShortcutHint = "showShortcutHint"
     static let showInCommandTab = "showInCommandTab"
+    static let showPermissionReminder = "showPermissionReminder"
     static let hasPromptedAccessibilityPermission = "hasPromptedAccessibilityPermission"
     static let hotkeyPrimaryModifier = "hotkeyPrimaryModifier"
     static let hotkeyMainKey = "hotkeyMainKey"
@@ -277,12 +278,13 @@ struct FlowTabAppApp: App {
     var body: some Scene {
         WindowGroup("FlowTab") {
             HomeRootView()
+                .frame(minWidth: 1120, minHeight: 760)
         }
-        .defaultSize(width: 960, height: 720)
+        .defaultSize(width: 1280, height: 840)
 
         Settings {
             HomeRootView()
-                .frame(minWidth: 960, minHeight: 720)
+                .frame(minWidth: 1120, minHeight: 760)
         }
 
         .commands {
@@ -800,6 +802,7 @@ private struct AppSettingsView: View {
     @AppStorage(AppPreferenceKeys.showShortcutHint) private var showShortcutHint = true
     @AppStorage(AppPreferenceKeys.showInCommandTab)
     private var showInCommandTab = AppVisibilityPreferencesStore.defaultShowInCommandTab
+    @AppStorage(AppPreferenceKeys.showPermissionReminder) private var showPermissionReminder = true
     @AppStorage(AppPreferenceKeys.enableVerboseDiagnostics) private var enableVerboseDiagnostics = false
     @AppStorage(AppPreferenceKeys.themeMode) private var themeModeRaw = ThemePreferencesStore.defaultMode.rawValue
     @AppStorage(AppPreferenceKeys.autoRestoreMinimizedWindowOnSwitch)
@@ -830,6 +833,7 @@ private struct AppSettingsView: View {
     @State private var screenCapturePollTask: Task<Void, Never>?
     @State private var windowLayerAutoEnterDelayText = ""
     @FocusState private var isWindowLayerDelayFieldFocused: Bool
+    private let permissionRequestButtonWidth: CGFloat = 166
 
     private var bundleIdentifier: String {
         Bundle.main.bundleIdentifier ?? "unknown"
@@ -953,6 +957,238 @@ private struct AppSettingsView: View {
         )
     }
 
+    private var settingsColumns: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 12) {
+                settingsLeftColumn
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                settingsRightColumn
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+            }
+
+            VStack(alignment: .leading, spacing: 12) {
+                settingsLeftColumn
+                settingsRightColumn
+            }
+        }
+    }
+
+    private var settingsLeftColumn: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            appearanceSettingsCard
+            windowBehaviorSettingsCard
+            permissionSettingsCard
+        }
+    }
+
+    private var settingsRightColumn: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            hotkeySettingsCard
+            shortcutBlankFillCard
+        }
+    }
+
+    @ViewBuilder
+    private func settingsControlRow<Control: View>(
+        _ title: String,
+        @ViewBuilder control: () -> Control
+    ) -> some View {
+        HStack(spacing: 10) {
+            Text(title)
+                .font(.system(size: 13))
+            Spacer(minLength: 8)
+            control()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func settingsToggleRow(
+        _ title: String,
+        isOn: Binding<Bool>
+    ) -> some View {
+        settingsControlRow(title) {
+            Toggle(title, isOn: isOn)
+                .labelsHidden()
+                .toggleStyle(.switch)
+        }
+    }
+
+    private var shortcutBlankFillCard: some View {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+            .fill(.regularMaterial)
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+            )
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: 176)
+    }
+
+    private var appearanceSettingsCard: some View {
+        HomeSectionCard(title: "外观", subtitle: "显示与主题") {
+            VStack(alignment: .leading, spacing: 10) {
+                settingsToggleRow("显示快捷键提示", isOn: $showShortcutHint)
+
+                settingsToggleRow("显示应用窗口", isOn: $showInCommandTab)
+
+                Text("关闭后 当前应用 将仅作为菜单栏辅助应用运行。")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+
+                settingsControlRow("主题模式") {
+                    themeModeCapsuleSelector
+                }
+            }
+        }
+    }
+
+    private var windowBehaviorSettingsCard: some View {
+        HomeSectionCard(title: "窗口行为", subtitle: "窗口层进入与最小化处理") {
+            VStack(alignment: .leading, spacing: 10) {
+                settingsControlRow("窗口层自动进入延迟") {
+                    HStack(spacing: 8) {
+                        TextField("0.35", text: $windowLayerAutoEnterDelayText)
+                            .textFieldStyle(.roundedBorder)
+                            .font(.system(size: 12, design: .monospaced))
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 80)
+                            .focused($isWindowLayerDelayFieldFocused)
+                            .onChange(of: windowLayerAutoEnterDelayText) { newValue in
+                                applyWindowLayerAutoEnterDelayText(newValue)
+                            }
+                            .onSubmit {
+                                commitWindowLayerAutoEnterDelayText()
+                            }
+                        Text("秒")
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                settingsToggleRow("切换到最小化窗口时自动恢复打开", isOn: $autoRestoreMinimizedWindowOnSwitch)
+
+                settingsToggleRow("应用层隐藏仅最小化应用", isOn: $hideMinimizedAppsFromAppLayer)
+
+                Text("说明：该过滤依赖辅助功能权限。未授权时无法判断最小化状态，不会过滤应用层。")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private var hotkeySettingsCard: some View {
+        HomeSectionCard(title: "快捷键", subtitle: "主切换与结束应用按键") {
+            VStack(alignment: .leading, spacing: 10) {
+                settingsControlRow("主修饰键") {
+                    Picker("主修饰键", selection: $hotkeyPrimaryModifierRaw) {
+                        ForEach(SwitcherPrimaryModifier.allCases) { modifier in
+                            Text(modifier.displayName).tag(modifier.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 160)
+                }
+
+                settingsControlRow("主切换按键") {
+                    Picker("主切换按键", selection: $hotkeyMainKeyRaw) {
+                        ForEach(SwitcherHotkeyKey.allCases) { key in
+                            Text(key.displayName).tag(key.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 160)
+                }
+
+                settingsControlRow("结束应用按键") {
+                    Picker("结束应用按键", selection: $hotkeyQuitKeyRaw) {
+                        ForEach(SwitcherHotkeyKey.allCases) { key in
+                            Text(key.displayName).tag(key.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 160)
+                }
+
+                Text(
+                    "当前：\(hotkeyConfiguration.mainShortcutText)"
+                        + "（反向：\(hotkeyConfiguration.backwardShortcutText)）"
+                        + "，结束应用：\(hotkeyConfiguration.quitShortcutText)"
+                )
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+
+                if mainUsesCommandTab {
+                    commandTabTakeoverStatusView
+                }
+
+                Divider()
+                    .padding(.vertical, 4)
+
+                Group {
+                    settingsControlRow("应用内窗口修饰键") {
+                        Picker("应用内窗口修饰键", selection: $inAppWindowHotkeyPrimaryModifierRaw) {
+                            ForEach(inAppWindowPrimaryModifierOptions) { modifier in
+                                Text(modifier.displayName).tag(modifier.rawValue)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .frame(width: 160)
+                    }
+
+                    settingsControlRow("应用内窗口按键") {
+                        Picker("应用内窗口按键", selection: $inAppWindowHotkeyMainKeyRaw) {
+                            ForEach(SwitcherHotkeyKey.allCases) { key in
+                                Text(key.displayName).tag(key.rawValue)
+                            }
+                        }
+                        .labelsHidden()
+                        .pickerStyle(.menu)
+                        .frame(width: 160)
+                    }
+                }
+                .disabled(!accessibilityTrusted)
+
+                Text(
+                    "应用内窗口：\(inAppWindowHotkeyConfiguration.mainShortcutText)"
+                        + "（反向：\(inAppWindowHotkeyConfiguration.backwardShortcutText)）"
+                )
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+
+                if inAppUsesCommandTab {
+                    commandTabTakeoverStatusView
+                }
+            }
+        }
+    }
+
+    private var permissionSettingsCard: some View {
+        HomeSectionCard(title: "权限", subtitle: "辅助功能与屏幕录制") {
+            VStack(alignment: .leading, spacing: 10) {
+                settingsToggleRow("提示获取用户权限", isOn: $showPermissionReminder)
+
+                permissionStatusActionRow(
+                    text: accessibilityTrusted ? "辅助功能权限：已授权" : "辅助功能权限：未授权",
+                    isGranted: accessibilityTrusted
+                ) {
+                    requestAccessibilityPermissionButton
+                }
+
+                permissionStatusActionRow(
+                    text: screenCaptureTrusted ? "屏幕录制权限：已授权" : "屏幕录制权限：未授权",
+                    isGranted: screenCaptureTrusted
+                ) {
+                    requestScreenCapturePermissionButton
+                }
+            }
+        }
+    }
+
     var body: some View {
         ZStack {
             HomeBackdropView()
@@ -968,228 +1204,7 @@ private struct AppSettingsView: View {
                     }
 
                     if page == .settings {
-                        HomeSectionCard(title: "外观", subtitle: "显示与主题") {
-                            VStack(alignment: .leading, spacing: 10) {
-                                Toggle("显示快捷键提示", isOn: $showShortcutHint)
-                                    .toggleStyle(.switch)
-                                    .font(.system(size: 13))
-
-                                Toggle("显示应用窗口", isOn: $showInCommandTab)
-                                    .toggleStyle(.switch)
-                                    .font(.system(size: 13))
-
-                                Text("关闭后 当前应用 将仅作为菜单栏辅助应用运行。")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(.secondary)
-
-                                HStack(spacing: 10) {
-                                    Text("主题模式")
-                                        .font(.system(size: 13))
-                                    Spacer()
-                                    themeModeCapsuleSelector
-                                }
-                            }
-                        }
-
-                        HomeSectionCard(title: "窗口行为", subtitle: "窗口层进入与最小化处理") {
-                            VStack(alignment: .leading, spacing: 10) {
-                                HStack(spacing: 10) {
-                                    Text("窗口层自动进入延迟")
-                                        .font(.system(size: 13))
-                                    Spacer()
-                                    HStack(spacing: 8) {
-                                        TextField("0.35", text: $windowLayerAutoEnterDelayText)
-                                            .textFieldStyle(.roundedBorder)
-                                            .font(.system(size: 12, design: .monospaced))
-                                            .multilineTextAlignment(.trailing)
-                                            .frame(width: 80)
-                                            .focused($isWindowLayerDelayFieldFocused)
-                                            .onChange(of: windowLayerAutoEnterDelayText) { newValue in
-                                                applyWindowLayerAutoEnterDelayText(newValue)
-                                            }
-                                            .onSubmit {
-                                                commitWindowLayerAutoEnterDelayText()
-                                            }
-                                        Text("秒")
-                                            .font(.system(size: 12, design: .monospaced))
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
-
-                                Toggle("切换到最小化窗口时自动恢复打开", isOn: $autoRestoreMinimizedWindowOnSwitch)
-                                    .toggleStyle(.switch)
-                                    .font(.system(size: 13))
-
-                                Toggle("应用层隐藏仅最小化应用", isOn: $hideMinimizedAppsFromAppLayer)
-                                    .toggleStyle(.switch)
-                                    .font(.system(size: 13))
-
-                                Text("说明：该过滤依赖辅助功能权限。未授权时无法判断最小化状态，不会过滤应用层。")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-
-                        HomeSectionCard(title: "快捷键", subtitle: "主切换与结束应用按键") {
-                            VStack(alignment: .leading, spacing: 10) {
-                                HStack(spacing: 10) {
-                                    Text("主修饰键")
-                                        .font(.system(size: 13))
-                                    Spacer()
-                                    Picker("主修饰键", selection: $hotkeyPrimaryModifierRaw) {
-                                        ForEach(SwitcherPrimaryModifier.allCases) { modifier in
-                                            Text(modifier.displayName).tag(modifier.rawValue)
-                                        }
-                                    }
-                                    .labelsHidden()
-                                    .pickerStyle(.menu)
-                                    .frame(width: 160)
-                                }
-
-                                HStack(spacing: 10) {
-                                    Text("主切换按键")
-                                        .font(.system(size: 13))
-                                    Spacer()
-                                    Picker("主切换按键", selection: $hotkeyMainKeyRaw) {
-                                        ForEach(SwitcherHotkeyKey.allCases) { key in
-                                            Text(key.displayName).tag(key.rawValue)
-                                        }
-                                    }
-                                    .labelsHidden()
-                                    .pickerStyle(.menu)
-                                    .frame(width: 160)
-                                }
-
-                                HStack(spacing: 10) {
-                                    Text("结束应用按键")
-                                        .font(.system(size: 13))
-                                    Spacer()
-                                    Picker("结束应用按键", selection: $hotkeyQuitKeyRaw) {
-                                        ForEach(SwitcherHotkeyKey.allCases) { key in
-                                            Text(key.displayName).tag(key.rawValue)
-                                        }
-                                    }
-                                    .labelsHidden()
-                                    .pickerStyle(.menu)
-                                    .frame(width: 160)
-                                }
-
-                                Text(
-                                    "当前：\(hotkeyConfiguration.mainShortcutText)"
-                                        + "（反向：\(hotkeyConfiguration.backwardShortcutText)）"
-                                        + "，结束应用：\(hotkeyConfiguration.quitShortcutText)"
-                                )
-                                .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
-
-                                if mainUsesCommandTab {
-                                    commandTabTakeoverStatusView
-                                }
-
-                                Divider()
-                                    .padding(.vertical, 4)
-
-                                Group {
-                                    HStack(spacing: 10) {
-                                        Text("应用内窗口修饰键")
-                                            .font(.system(size: 13))
-                                        Spacer()
-                                        Picker("应用内窗口修饰键", selection: $inAppWindowHotkeyPrimaryModifierRaw) {
-                                            ForEach(inAppWindowPrimaryModifierOptions) { modifier in
-                                                Text(modifier.displayName).tag(modifier.rawValue)
-                                            }
-                                        }
-                                        .labelsHidden()
-                                        .pickerStyle(.menu)
-                                        .frame(width: 160)
-                                    }
-
-                                    HStack(spacing: 10) {
-                                        Text("应用内窗口按键")
-                                            .font(.system(size: 13))
-                                        Spacer()
-                                        Picker("应用内窗口按键", selection: $inAppWindowHotkeyMainKeyRaw) {
-                                            ForEach(SwitcherHotkeyKey.allCases) { key in
-                                                Text(key.displayName).tag(key.rawValue)
-                                            }
-                                        }
-                                        .labelsHidden()
-                                        .pickerStyle(.menu)
-                                        .frame(width: 160)
-                                    }
-                                }
-                                .disabled(!accessibilityTrusted)
-
-                                Text(
-                                    "应用内窗口：\(inAppWindowHotkeyConfiguration.mainShortcutText)"
-                                        + "（反向：\(inAppWindowHotkeyConfiguration.backwardShortcutText)）"
-                                )
-                                .font(.system(size: 12))
-                                .foregroundStyle(.secondary)
-
-                                if !accessibilityTrusted {
-                                    Text("需先授权辅助功能权限后，才能设置应用内窗口快捷键。")
-                                        .font(.system(size: 12))
-                                        .foregroundStyle(.orange)
-                                }
-
-                                if inAppUsesCommandTab {
-                                    commandTabTakeoverStatusView
-                                }
-                            }
-                        }
-
-                        HomeSectionCard(title: "权限", subtitle: "辅助功能与屏幕录制") {
-                            VStack(alignment: .leading, spacing: 10) {
-                                ViewThatFits(in: .horizontal) {
-                                    HStack(spacing: 8) {
-                                        permissionStatusBadge(
-                                            text: accessibilityTrusted ? "辅助功能权限：已授权" : "辅助功能权限：未授权",
-                                            isGranted: accessibilityTrusted
-                                        )
-                                        permissionStatusBadge(
-                                            text: screenCaptureTrusted ? "屏幕录制权限：已授权" : "屏幕录制权限：未授权",
-                                            isGranted: screenCaptureTrusted
-                                        )
-                                        Spacer(minLength: 0)
-                                    }
-
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        permissionStatusBadge(
-                                            text: accessibilityTrusted ? "辅助功能权限：已授权" : "辅助功能权限：未授权",
-                                            isGranted: accessibilityTrusted
-                                        )
-                                        permissionStatusBadge(
-                                            text: screenCaptureTrusted ? "屏幕录制权限：已授权" : "屏幕录制权限：未授权",
-                                            isGranted: screenCaptureTrusted
-                                        )
-                                    }
-                                }
-
-                                ViewThatFits(in: .horizontal) {
-                                    HStack(spacing: 8) {
-                                        requestAccessibilityPermissionButton
-                                        requestScreenCapturePermissionButton
-                                    }
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        requestAccessibilityPermissionButton
-                                        requestScreenCapturePermissionButton
-                                    }
-                                }
-
-                                if !accessibilityTrusted {
-                                    Text("提示：授权后请完全退出并重启 FlowTabApp，权限状态才会稳定刷新。")
-                                        .font(.system(size: 12))
-                                        .foregroundStyle(.orange)
-                                }
-
-                                if !screenCaptureTrusted {
-                                    Text("提示：未授权屏幕录制时，窗口层将只显示兜底预览，无法显示真实窗口画面。")
-                                        .font(.system(size: 12))
-                                        .foregroundStyle(.orange)
-                                }
-                            }
-                        }
+                        settingsColumns
                     }
 
                     if page == .logs {
@@ -1296,22 +1311,10 @@ private struct AppSettingsView: View {
     private var requestAccessibilityPermissionButton: some View {
         permissionRequestButton(
             title: "请求辅助功能权限",
-            systemImage: "figure.wave",
+            systemImage: nil,
             tint: accessibilityTrusted ? .green : .orange
         ) {
-            let options = [
-                kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true
-            ] as CFDictionary
-            accessibilityPermissionPollTask?.cancel()
-            let trusted = AXIsProcessTrustedWithOptions(options)
-            RuntimeLog.info(
-                "Permission",
-                "prompt requested immediateTrusted=\(trusted) bundle=\(bundleIdentifier) path=\(bundlePath)"
-            )
-            refreshAccessibilityStatus()
-            if !trusted {
-                startAccessibilityPermissionPolling()
-            }
+            requestAccessibilityPermission()
         }
     }
 
@@ -1321,16 +1324,36 @@ private struct AppSettingsView: View {
             systemImage: "display.badge.person.crop",
             tint: screenCaptureTrusted ? .green : .blue
         ) {
-            screenCapturePollTask?.cancel()
-            let trusted = ScreenCapturePermissionChecker.requestScreenCapturePermission()
-            RuntimeLog.info(
-                "Preview",
-                "screenCapture prompt requested immediateTrusted=\(trusted) bundle=\(bundleIdentifier) path=\(bundlePath)"
-            )
-            refreshScreenCaptureStatus()
-            if !trusted {
-                startScreenCapturePermissionPolling()
-            }
+            requestScreenCapturePermission()
+        }
+    }
+
+    private func requestAccessibilityPermission() {
+        let options = [
+            kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true
+        ] as CFDictionary
+        accessibilityPermissionPollTask?.cancel()
+        let trusted = AXIsProcessTrustedWithOptions(options)
+        RuntimeLog.info(
+            "Permission",
+            "prompt requested immediateTrusted=\(trusted) bundle=\(bundleIdentifier) path=\(bundlePath)"
+        )
+        refreshAccessibilityStatus()
+        if !trusted {
+            startAccessibilityPermissionPolling()
+        }
+    }
+
+    private func requestScreenCapturePermission() {
+        screenCapturePollTask?.cancel()
+        let trusted = ScreenCapturePermissionChecker.requestScreenCapturePermission()
+        RuntimeLog.info(
+            "Preview",
+            "screenCapture prompt requested immediateTrusted=\(trusted) bundle=\(bundleIdentifier) path=\(bundlePath)"
+        )
+        refreshScreenCaptureStatus()
+        if !trusted {
+            startScreenCapturePermissionPolling()
         }
     }
 
@@ -1343,48 +1366,58 @@ private struct AppSettingsView: View {
     }
 
     @ViewBuilder
-    private func permissionStatusBadge(text: String, isGranted: Bool) -> some View {
-        Text(text)
-            .font(.system(size: 11, weight: .medium))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 4)
-            .background(
-                Capsule()
-                    .fill(isGranted ? Color.green.opacity(0.14) : Color.orange.opacity(0.16))
-            )
-            .foregroundStyle(isGranted ? .green : .orange)
+    private func permissionStatusActionRow<Button: View>(
+        text: String,
+        isGranted: Bool,
+        @ViewBuilder actionButton: () -> Button
+    ) -> some View {
+        HStack(spacing: 10) {
+            Text(text)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(isGranted ? .green : .orange)
+            Spacer(minLength: 8)
+            actionButton()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
     private func permissionRequestButton(
         title: String,
-        systemImage: String,
+        systemImage: String?,
         tint: Color,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            Label(title, systemImage: systemImage)
-                .font(.system(size: 12, weight: .semibold))
-                .lineLimit(1)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .frame(minHeight: 30)
-                .foregroundStyle(tint)
-                .background(
-                    Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [tint.opacity(0.24), tint.opacity(0.14)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
+            Group {
+                if let systemImage {
+                    Label(title, systemImage: systemImage)
+                } else {
+                    Text(title)
+                }
+            }
+            .font(.system(size: 12, weight: .semibold))
+            .lineLimit(1)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .frame(minHeight: 30)
+            .frame(width: permissionRequestButtonWidth)
+            .foregroundStyle(tint)
+            .background(
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: [tint.opacity(0.24), tint.opacity(0.14)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
                         )
-                )
-                .overlay(
-                    Capsule()
-                        .stroke(tint.opacity(0.42), lineWidth: 1)
-                )
-                .shadow(color: tint.opacity(0.16), radius: 6, y: 2)
+                    )
+            )
+            .overlay(
+                Capsule()
+                    .stroke(tint.opacity(0.42), lineWidth: 1)
+            )
+            .shadow(color: tint.opacity(0.16), radius: 6, y: 2)
         }
         .buttonStyle(.plain)
     }
@@ -1588,13 +1621,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func requestAccessibilityPermissionIfNeeded() {
+        let userDefaults = UserDefaults.standard
+        let shouldPromptPermissionReminder = userDefaults.object(forKey: AppPreferenceKeys.showPermissionReminder) == nil
+            ? true
+            : userDefaults.bool(forKey: AppPreferenceKeys.showPermissionReminder)
+        guard shouldPromptPermissionReminder else { return }
         guard !AXIsProcessTrusted() else { return }
-        guard !UserDefaults.standard.bool(forKey: AppPreferenceKeys.hasPromptedAccessibilityPermission)
+        guard !userDefaults.bool(forKey: AppPreferenceKeys.hasPromptedAccessibilityPermission)
         else { return }
 
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(options)
-        UserDefaults.standard.set(true, forKey: AppPreferenceKeys.hasPromptedAccessibilityPermission)
+        userDefaults.set(true, forKey: AppPreferenceKeys.hasPromptedAccessibilityPermission)
     }
 
     func applicationWillTerminate(_ notification: Notification) {
