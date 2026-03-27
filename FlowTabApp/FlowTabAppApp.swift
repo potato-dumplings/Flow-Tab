@@ -562,17 +562,13 @@ private struct HomeLandingView: View {
 
             Spacer(minLength: 0)
 
-            Button("前往设置") {
+            FlowActionButton(title: "前往设置", tone: .blueDominant) {
                 openSettings()
             }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.small)
 
-            Button("不再提示") {
+            FlowActionButton(title: "不再提示", tone: .grayDominant) {
                 showPermissionReminder = false
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
@@ -741,6 +737,211 @@ private struct HomeSectionCard<Content: View>: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .stroke(Color.primary.opacity(0.08), lineWidth: 1)
         )
+    }
+}
+
+private enum FlowActionButtonTone: Equatable {
+    case grayDominant
+    case blueDominant
+}
+
+private struct FlowActionButton: View {
+    let title: String
+    let systemImage: String?
+    let tone: FlowActionButtonTone
+    let width: CGFloat?
+    let action: () -> Void
+
+    init(
+        title: String,
+        systemImage: String? = nil,
+        tone: FlowActionButtonTone = .grayDominant,
+        width: CGFloat? = nil,
+        action: @escaping () -> Void
+    ) {
+        self.title = title
+        self.systemImage = systemImage
+        self.tone = tone
+        self.width = width
+        self.action = action
+    }
+
+    private var foregroundColor: Color {
+        tone == .blueDominant ? .white : .primary.opacity(0.78)
+    }
+
+    private var backgroundFill: LinearGradient {
+        switch tone {
+        case .grayDominant:
+            return LinearGradient(
+                stops: [
+                    .init(color: Color.primary.opacity(0.12), location: 0.0),
+                    .init(color: Color.primary.opacity(0.09), location: 0.75),
+                    .init(color: Color.accentColor.opacity(0.26), location: 1.0)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        case .blueDominant:
+            return LinearGradient(
+                stops: [
+                    .init(color: Color.accentColor.opacity(0.94), location: 0.0),
+                    .init(color: Color.accentColor.opacity(0.76), location: 0.75),
+                    .init(color: Color.primary.opacity(0.18), location: 1.0)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        }
+    }
+
+    private var borderFill: LinearGradient {
+        switch tone {
+        case .grayDominant:
+            return LinearGradient(
+                stops: [
+                    .init(color: Color.primary.opacity(0.24), location: 0.0),
+                    .init(color: Color.primary.opacity(0.19), location: 0.75),
+                    .init(color: Color.accentColor.opacity(0.36), location: 1.0)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        case .blueDominant:
+            return LinearGradient(
+                stops: [
+                    .init(color: Color.accentColor.opacity(0.55), location: 0.0),
+                    .init(color: Color.accentColor.opacity(0.44), location: 0.75),
+                    .init(color: Color.primary.opacity(0.28), location: 1.0)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        }
+    }
+
+    private var shadowColor: Color {
+        tone == .blueDominant ? Color.accentColor.opacity(0.20) : Color.primary.opacity(0.08)
+    }
+
+    var body: some View {
+        Button(action: action) {
+            Group {
+                if let systemImage {
+                    Label(title, systemImage: systemImage)
+                } else {
+                    Text(title)
+                }
+            }
+            .font(.system(size: 12, weight: .semibold))
+            .lineLimit(1)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            .frame(minHeight: 30)
+            .frame(width: width)
+            .foregroundStyle(foregroundColor)
+            .background(
+                Capsule()
+                    .fill(backgroundFill)
+            )
+            .overlay(
+                Capsule()
+                    .stroke(borderFill, lineWidth: 1)
+            )
+            .shadow(color: shadowColor, radius: 6, y: 2)
+        }
+        .buttonStyle(.plain)
+        .animation(.easeInOut(duration: 0.28), value: tone)
+    }
+}
+
+private struct FlowGradientSwitchToggleStyle: ToggleStyle {
+    private let trackWidth: CGFloat = 46
+    private let trackHeight: CGFloat = 24
+
+    func makeBody(configuration: Configuration) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.24)) {
+                configuration.isOn.toggle()
+            }
+        } label: {
+            ZStack(alignment: configuration.isOn ? .trailing : .leading) {
+                Capsule()
+                    .fill(trackFill(isOn: configuration.isOn))
+
+                Capsule()
+                    .stroke(trackBorder(isOn: configuration.isOn), lineWidth: configuration.isOn ? 1.1 : 1)
+
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.97), Color.white.opacity(0.86)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .overlay(
+                        Circle()
+                            .stroke(Color.primary.opacity(0.12), lineWidth: 1)
+                    )
+                    .shadow(color: Color.black.opacity(0.07), radius: 1.4, y: 0.7)
+                    .padding(2)
+            }
+            .frame(width: trackWidth, height: trackHeight)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func trackFill(isOn: Bool) -> LinearGradient {
+        if isOn {
+            // Use a misty, blue-tinted lead-in instead of a hard neutral gray so the
+            // enabled state feels like one continuous surface behind the thumb.
+            return LinearGradient(
+                stops: [
+                    .init(color: Color.white.opacity(0.34), location: 0.0),
+                    .init(color: Color.accentColor.opacity(0.10), location: 0.05),
+                    .init(color: Color.accentColor.opacity(0.76), location: 0.18),
+                    .init(color: Color.accentColor.opacity(0.94), location: 1.0)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        } else {
+            return LinearGradient(
+                stops: [
+                    .init(color: Color.primary.opacity(0.12), location: 0.0),
+                    .init(color: Color.primary.opacity(0.09), location: 0.75),
+                    .init(color: Color.accentColor.opacity(0.26), location: 1.0)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        }
+    }
+
+    private func trackBorder(isOn: Bool) -> LinearGradient {
+        if isOn {
+            return LinearGradient(
+                stops: [
+                    .init(color: Color.primary.opacity(0.30), location: 0.0),
+                    .init(color: Color.accentColor.opacity(0.28), location: 0.05),
+                    .init(color: Color.accentColor.opacity(0.44), location: 0.18),
+                    .init(color: Color.accentColor.opacity(0.55), location: 1.0)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        } else {
+            return LinearGradient(
+                stops: [
+                    .init(color: Color.primary.opacity(0.24), location: 0.0),
+                    .init(color: Color.primary.opacity(0.19), location: 0.75),
+                    .init(color: Color.accentColor.opacity(0.36), location: 1.0)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        }
     }
 }
 
@@ -1001,7 +1202,7 @@ private struct AppSettingsView: View {
         settingsControlRow(title) {
             Toggle(title, isOn: isOn)
                 .labelsHidden()
-                .toggleStyle(.switch)
+                .toggleStyle(FlowGradientSwitchToggleStyle())
         }
     }
 
@@ -1204,7 +1405,7 @@ private struct AppSettingsView: View {
                         HomeSectionCard(title: "日志", subtitle: "仅日志相关信息") {
                             VStack(alignment: .leading, spacing: 10) {
                                 Toggle("启用详细运行日志（高频，可能影响性能）", isOn: $enableVerboseDiagnostics)
-                                    .toggleStyle(.switch)
+                                    .toggleStyle(FlowGradientSwitchToggleStyle())
                                     .font(.system(size: 12))
                                 Text("本地日志目录：\(RuntimeDiagnostics.logsDirectoryPath)")
                                     .font(.system(size: 11, design: .monospaced))
@@ -1303,10 +1504,11 @@ private struct AppSettingsView: View {
 
     private var requestAccessibilityPermissionButton: some View {
         let isGranted = accessibilityTrusted
-        return permissionRequestButton(
+        return FlowActionButton(
             title: isGranted ? "关闭辅助功能权限" : "请求辅助功能权限",
             systemImage: nil,
-            style: isGranted ? .blueDominant : .grayDominant
+            tone: isGranted ? .blueDominant : .grayDominant,
+            width: permissionRequestButtonWidth
         ) {
             if isGranted {
                 openAccessibilityPrivacySettings()
@@ -1314,14 +1516,16 @@ private struct AppSettingsView: View {
                 requestAccessibilityPermission()
             }
         }
+        .animation(.easeInOut(duration: 0.28), value: isGranted)
     }
 
     private var requestScreenCapturePermissionButton: some View {
         let isGranted = screenCaptureTrusted
-        return permissionRequestButton(
+        return FlowActionButton(
             title: isGranted ? "关闭屏幕录制权限" : "请求屏幕录制权限",
             systemImage: "display.badge.person.crop",
-            style: isGranted ? .blueDominant : .grayDominant
+            tone: isGranted ? .blueDominant : .grayDominant,
+            width: permissionRequestButtonWidth
         ) {
             if isGranted {
                 openScreenCapturePrivacySettings()
@@ -1329,6 +1533,7 @@ private struct AppSettingsView: View {
                 requestScreenCapturePermission()
             }
         }
+        .animation(.easeInOut(duration: 0.28), value: isGranted)
     }
 
     private func requestAccessibilityPermission() {
@@ -1382,11 +1587,9 @@ private struct AppSettingsView: View {
     }
 
     private var clearLogsButton: some View {
-        Button("清空日志") {
+        FlowActionButton(title: "清空日志", tone: .grayDominant) {
             diagnostics.clear()
         }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
     }
 
     @ViewBuilder
@@ -1410,98 +1613,6 @@ private struct AppSettingsView: View {
             actionButton()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    @ViewBuilder
-    private func permissionRequestButton(
-        title: String,
-        systemImage: String?,
-        style: PermissionButtonStyle,
-        action: @escaping () -> Void
-    ) -> some View {
-        let foregroundColor: Color = style == .blueDominant ? .white : .primary.opacity(0.78)
-        let backgroundFill: LinearGradient = {
-            switch style {
-            case .grayDominant:
-                return LinearGradient(
-                    stops: [
-                        .init(color: Color.primary.opacity(0.12), location: 0.0),
-                        .init(color: Color.primary.opacity(0.09), location: 0.75),
-                        .init(color: Color.accentColor.opacity(0.26), location: 1.0)
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            case .blueDominant:
-                return LinearGradient(
-                    stops: [
-                        .init(color: Color.accentColor.opacity(0.94), location: 0.0),
-                        .init(color: Color.accentColor.opacity(0.76), location: 0.75),
-                        .init(color: Color.primary.opacity(0.18), location: 1.0)
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            }
-        }()
-        let borderFill: LinearGradient = {
-            switch style {
-            case .grayDominant:
-                return LinearGradient(
-                    stops: [
-                        .init(color: Color.primary.opacity(0.24), location: 0.0),
-                        .init(color: Color.primary.opacity(0.19), location: 0.75),
-                        .init(color: Color.accentColor.opacity(0.36), location: 1.0)
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            case .blueDominant:
-                return LinearGradient(
-                    stops: [
-                        .init(color: Color.accentColor.opacity(0.55), location: 0.0),
-                        .init(color: Color.accentColor.opacity(0.44), location: 0.75),
-                        .init(color: Color.primary.opacity(0.28), location: 1.0)
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            }
-        }()
-        let shadowColor: Color = style == .blueDominant ? Color.accentColor.opacity(0.20) : Color.primary.opacity(0.08)
-
-        Button(action: action) {
-            Group {
-                if let systemImage {
-                    Label(title, systemImage: systemImage)
-                } else {
-                    Text(title)
-                }
-            }
-            .font(.system(size: 12, weight: .semibold))
-            .lineLimit(1)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .frame(minHeight: 30)
-            .frame(width: permissionRequestButtonWidth)
-            .foregroundStyle(foregroundColor)
-            .background(
-                Capsule()
-                    .fill(backgroundFill)
-            )
-            .overlay(
-                Capsule()
-                    .stroke(borderFill, lineWidth: 1)
-            )
-            .shadow(color: shadowColor, radius: 6, y: 2)
-        }
-        .buttonStyle(.plain)
-        .animation(.easeInOut(duration: 0.28), value: style)
-    }
-
-    private enum PermissionButtonStyle: Equatable {
-        case grayDominant
-        case blueDominant
     }
 
     private func refreshAccessibilityStatus() {
