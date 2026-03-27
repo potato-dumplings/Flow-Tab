@@ -185,7 +185,7 @@ final class SwitcherPanelController {
 
         updatePanelSize()
 
-        panel.center()
+        centerPanelOnActiveScreen()
         hideNonPanelWindows()
         NSRunningApplication.current.activate(options: [.activateIgnoringOtherApps])
         panel.makeKeyAndOrderFront(nil)
@@ -206,13 +206,32 @@ final class SwitcherPanelController {
 
         updatePanelSize()
 
-        panel.center()
+        centerPanelOnActiveScreen()
         hideNonPanelWindows()
         NSRunningApplication.current.activate(options: [.activateIgnoringOtherApps])
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
         installEventMonitors()
         scheduleDelayedWindowLayerEntryIfNeeded()
+    }
+
+    private func centerPanelOnActiveScreen() {
+        let mouseLocation = NSEvent.mouseLocation
+        let targetScreen = NSScreen.screens.first { NSMouseInRect(mouseLocation, $0.frame, false) }
+            ?? NSScreen.main
+            ?? panel.screen
+        guard let targetScreen else {
+            panel.center()
+            return
+        }
+
+        let frame = targetScreen.frame
+        let panelSize = panel.frame.size
+        let origin = NSPoint(
+            x: frame.midX - panelSize.width / 2,
+            y: frame.midY - panelSize.height / 2
+        )
+        panel.setFrameOrigin(origin)
     }
 
     private func hideNonPanelWindows() {

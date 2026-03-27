@@ -45,10 +45,11 @@ final class RuntimeSnapshotProvider {
 
     func snapshot() -> RuntimeSnapshot {
         let currentPID = ProcessInfo.processInfo.processIdentifier
+        let includeCurrentProcessInAppLayer = AppVisibilityPreferencesStore.loadShowInCommandTab()
         let runningApps = NSWorkspace.shared.runningApplications.filter {
             $0.activationPolicy == .regular
                 && !$0.isTerminated
-                && $0.processIdentifier != currentPID
+                && (includeCurrentProcessInAppLayer || $0.processIdentifier != currentPID)
         }
 
         guard !runningApps.isEmpty else {

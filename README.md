@@ -32,11 +32,21 @@ FlowTab 使用三层会话模型：
   - 主修饰键（`Option` / `Control` / `Command`）
   - 主切换按键（Tab / Space / `\`` / A-Z）
   - 结束应用按键（Tab / Space / `\`` / A-Z）
+- 默认情况下，`Command + Tab` 会回退为 `Option + Tab`，避免与系统 App Switcher 冲突。
+- 可在设置中开启“接管系统 Command + Tab（私有实现）”，让 FlowTab 直接接管 `Command + Tab` / `Command + Shift + Tab`。
 - 修改后会自动重注册全局主切换热键，无需重启应用。
 - 主切换反向快捷键固定为“主修饰键 + Shift + 主切换按键”。
 - 在切换面板可见且按住主修饰键时，按“结束应用按键”会对当前高亮应用发送正常退出请求（`terminate()`）。
 - 这是“正常结束”，不是强制结束。
 - 若目标应用拒绝退出或已退出，会忽略并保留当前会话。
+
+### 3.1) 系统快捷键接管（无需 Input Monitoring）
+
+如果你不准备上架，可以在 FlowTab 设置里开启“接管系统 Command + Tab（私有实现）”：
+
+- FlowTab 会在运行期间禁用系统 `Command + Tab` / `Command + Shift + Tab`，并注册同名全局热键给自身使用。
+- 正常退出时会自动恢复系统快捷键。
+- 若异常退出，下次启动会先尝试自动恢复，再根据当前设置决定是否重新接管。
 
 ### 4) 窗口标题样式猜测（窗口层卡片）
 
