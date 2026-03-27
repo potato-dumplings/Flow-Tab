@@ -1,6 +1,7 @@
 import AppKit
 import Carbon
 import Foundation
+import Darwin
 
 enum SwitcherPrimaryModifier: String, CaseIterable, Identifiable {
     case option
@@ -206,6 +207,12 @@ enum SwitcherHotkeyPreferencesStore {
             quitKeyRaw: quitKeyRaw
         )
 
+        if primaryModifierRaw != configuration.primaryModifier.rawValue {
+            userDefaults.set(configuration.primaryModifier.rawValue, forKey: AppPreferenceKeys.hotkeyPrimaryModifier)
+        }
+        if mainKeyRaw != configuration.mainKey.rawValue {
+            userDefaults.set(configuration.mainKey.rawValue, forKey: AppPreferenceKeys.hotkeyMainKey)
+        }
         if quitKeyRaw != configuration.quitKey.rawValue {
             userDefaults.set(configuration.quitKey.rawValue, forKey: AppPreferenceKeys.hotkeyQuitKey)
         }
@@ -238,6 +245,137 @@ enum SwitcherHotkeyPreferencesStore {
             return .q
         }
         return .w
+    }
+}
+
+final class CommandTabTakeoverController {
+    private enum SymbolicHotKey: Int32, CaseIterable {
+        case commandTab = 1
+        case commandShiftTab = 2
+    }
+
+    static let takeoverMarkerKey = "commandTabTakeoverPendingRestore"
+
+    private typealias SetSymbolicHotKeyEnabledFn = @convention(c) (Int32, Bool) -> Int32
+
+    private let userDefaults: UserDefaults
+    private var frameworkHandle: UnsafeMutableRawPointer?
+    private var setSymbolicHotKeyEnabled: SetSymbolicHotKeyEnabledFn?
+    private var hasRecoveredAtLaunch = false
+    private var isTakeoverActive = false
+
+    init(userDefaults: UserDefaults = .standard) {
+        self.userDefaults = userDefaults
+    }
+
+    deinit {
+        if let frameworkHandle {
+            dlclose(frameworkHandle)
+        }
+    }
+
+    func reconcileIfNeeded(with configuration: SwitcherHotkeyConfiguration) -> Bool {
+        recoverFromAbnormalExitIfNeeded()
+
+        let shouldTakeOver = configuration.primaryModifier == .command
+            && configuration.mainKey == .tab
+
+        if shouldTakeOver {
+            return activateTakeoverIfNeeded()
+        }
+
+        restoreSystemShortcutsIfNeeded()
+        return true
+    }
+
+    func restoreSystemShortcutsIfNeeded() {
+        guard isTakeoverActive || userDefaults.bool(forKey: Self.takeoverMarkerKey) else { return }
+        let success = setSystemCommandTabEnabled(true)
+        if success {
+            RuntimeLog.info("HotKey", "system Command+Tab shortcuts restored")
+            isTakeoverActive = false
+            userDefaults.set(false, forKey: Self.takeoverMarkerKey)
+        } else {
+            RuntimeLog.info("HotKey", "failed to restore system Command+Tab shortcuts")
+        }
+    }
+
+    private func recoverFromAbnormalExitIfNeeded() {
+        guard !hasRecoveredAtLaunch else { return }
+        hasRecoveredAtLaunch = true
+        guard userDefaults.bool(forKey: Self.takeoverMarkerKey) else { return }
+
+        let success = setSystemCommandTabEnabled(true)
+        if success {
+            RuntimeLog.info("HotKey", "recovered system Command+Tab shortcuts from previous abnormal exit")
+            userDefaults.set(false, forKey: Self.takeoverMarkerKey)
+        } else {
+            RuntimeLog.info("HotKey", "failed to recover system Command+Tab shortcuts after abnormal exit")
+        }
+    }
+
+    private func activateTakeoverIfNeeded() -> Bool {
+        guard !isTakeoverActive else { return true }
+
+        let success = setSystemCommandTabEnabled(false)
+        if success {
+            RuntimeLog.info("HotKey", "system Command+Tab shortcuts disabled for FlowTab takeover")
+            isTakeoverActive = true
+            userDefaults.set(true, forKey: Self.takeoverMarkerKey)
+            return true
+        }
+
+        // Partial failures can leave system hotkeys in an unknown state.
+        // Try to roll back immediately before falling back to non-takeover mode.
+        _ = setSystemCommandTabEnabled(true)
+        RuntimeLog.info("HotKey", "failed to disable system Command+Tab shortcuts; takeover unavailable")
+        isTakeoverActive = false
+        userDefaults.set(false, forKey: Self.takeoverMarkerKey)
+        return false
+    }
+
+    private func setSystemCommandTabEnabled(_ isEnabled: Bool) -> Bool {
+        guard let setSymbolicHotKeyEnabled = resolveSetSymbolicHotKeyEnabled() else { return false }
+        var hasFailure = false
+
+        for hotKey in SymbolicHotKey.allCases {
+            let status = setSymbolicHotKeyEnabled(hotKey.rawValue, isEnabled)
+            if status != noErr {
+                hasFailure = true
+                RuntimeLog.info(
+                    "HotKey",
+                    "set symbolic hotkey failed id=\(hotKey.rawValue) enabled=\(isEnabled) status=\(status)"
+                )
+            }
+        }
+
+        return !hasFailure
+    }
+
+    private func resolveSetSymbolicHotKeyEnabled() -> SetSymbolicHotKeyEnabledFn? {
+        if let setSymbolicHotKeyEnabled {
+            return setSymbolicHotKeyEnabled
+        }
+
+        let frameworkCandidates = [
+            "/System/Library/Frameworks/ApplicationServices.framework/ApplicationServices",
+            "/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics",
+            "/System/Library/PrivateFrameworks/SkyLight.framework/SkyLight"
+        ]
+
+        for path in frameworkCandidates {
+            guard let handle = dlopen(path, RTLD_NOW) else { continue }
+            if let symbol = dlsym(handle, "CGSSetSymbolicHotKeyEnabled") {
+                frameworkHandle = handle
+                let function = unsafeBitCast(symbol, to: SetSymbolicHotKeyEnabledFn.self)
+                setSymbolicHotKeyEnabled = function
+                return function
+            }
+            dlclose(handle)
+        }
+
+        RuntimeLog.info("HotKey", "CGSSetSymbolicHotKeyEnabled symbol not found")
+        return nil
     }
 }
 

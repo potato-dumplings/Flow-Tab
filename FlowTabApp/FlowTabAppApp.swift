@@ -5,10 +5,13 @@ import FlowTabCore
 
 enum AppPreferenceKeys {
     static let showShortcutHint = "showShortcutHint"
+    static let showInCommandTab = "showInCommandTab"
     static let hasPromptedAccessibilityPermission = "hasPromptedAccessibilityPermission"
     static let hotkeyPrimaryModifier = "hotkeyPrimaryModifier"
     static let hotkeyMainKey = "hotkeyMainKey"
     static let hotkeyQuitKey = "hotkeyQuitKey"
+    static let inAppWindowHotkeyPrimaryModifier = "inAppWindowHotkeyPrimaryModifier"
+    static let inAppWindowHotkeyMainKey = "inAppWindowHotkeyMainKey"
     static let windowLayerAutoEnterDelay = "windowLayerAutoEnterDelay"
     static let autoRestoreMinimizedWindowOnSwitch = "autoRestoreMinimizedWindowOnSwitch"
     static let hideMinimizedAppsFromAppLayer = "hideMinimizedAppsFromAppLayer"
@@ -18,6 +21,9 @@ enum AppPreferenceKeys {
 
 extension Notification.Name {
     static let flowTabReRegisterHotkeys = Notification.Name("FlowTab.ReRegisterHotkeys")
+    static let flowTabAppVisibilityPreferenceChanged = Notification.Name(
+        "FlowTab.AppVisibilityPreferenceChanged"
+    )
 }
 
 @MainActor
@@ -75,6 +81,17 @@ enum ThemePreferencesStore {
     }
 }
 
+enum AppVisibilityPreferencesStore {
+    static let defaultShowInCommandTab = true
+
+    static func loadShowInCommandTab(userDefaults: UserDefaults = .standard) -> Bool {
+        guard userDefaults.object(forKey: AppPreferenceKeys.showInCommandTab) != nil else {
+            return defaultShowInCommandTab
+        }
+        return userDefaults.bool(forKey: AppPreferenceKeys.showInCommandTab)
+    }
+}
+
 enum WindowLayerPreferencesStore {
     static let defaultAutoEnterDelay: Double = 0.35
     static let minAutoEnterDelay: Double = 0.10
@@ -127,6 +144,71 @@ enum SwitcherBehaviorPreferencesStore {
             userDefaults: userDefaults
         )
         return preferences
+    }
+}
+
+enum InAppWindowHotkeyPreferencesStore {
+    static let defaultPrimaryModifier: SwitcherPrimaryModifier = .control
+    static let defaultMainKey: SwitcherHotkeyKey = .tab
+
+    static func load(
+        userDefaults: UserDefaults = .standard,
+        excludingPrimaryModifier: SwitcherPrimaryModifier = SwitcherHotkeyPreferencesStore.defaultPrimaryModifier
+    ) -> SwitcherHotkeyConfiguration {
+        let primaryModifierRaw = userDefaults.string(forKey: AppPreferenceKeys.inAppWindowHotkeyPrimaryModifier)
+            ?? defaultPrimaryModifier.rawValue
+        let mainKeyRaw = userDefaults.string(forKey: AppPreferenceKeys.inAppWindowHotkeyMainKey)
+            ?? defaultMainKey.rawValue
+
+        let resolved = resolve(
+            primaryModifierRaw: primaryModifierRaw,
+            mainKeyRaw: mainKeyRaw,
+            excludingPrimaryModifier: excludingPrimaryModifier
+        )
+
+        if primaryModifierRaw != resolved.primaryModifier.rawValue {
+            userDefaults.set(
+                resolved.primaryModifier.rawValue,
+                forKey: AppPreferenceKeys.inAppWindowHotkeyPrimaryModifier
+            )
+        }
+        if mainKeyRaw != resolved.mainKey.rawValue {
+            userDefaults.set(
+                resolved.mainKey.rawValue,
+                forKey: AppPreferenceKeys.inAppWindowHotkeyMainKey
+            )
+        }
+
+        return SwitcherHotkeyConfiguration(
+            primaryModifier: resolved.primaryModifier,
+            mainKey: resolved.mainKey,
+            quitKey: .q
+        )
+    }
+
+    static func resolve(
+        primaryModifierRaw: String,
+        mainKeyRaw: String,
+        excludingPrimaryModifier: SwitcherPrimaryModifier
+    ) -> (primaryModifier: SwitcherPrimaryModifier, mainKey: SwitcherHotkeyKey) {
+        var primaryModifier = SwitcherPrimaryModifier(rawValue: primaryModifierRaw) ?? defaultPrimaryModifier
+        let mainKey = SwitcherHotkeyKey(rawValue: mainKeyRaw) ?? defaultMainKey
+        if primaryModifier == excludingPrimaryModifier {
+            primaryModifier = defaultPrimaryModifier(excluding: excludingPrimaryModifier)
+        }
+        return (primaryModifier, mainKey)
+    }
+
+    private static func defaultPrimaryModifier(
+        excluding modifier: SwitcherPrimaryModifier
+    ) -> SwitcherPrimaryModifier {
+        if modifier != .control {
+            return .control
+        }
+        if modifier != .option {
+            return .option
+        }
+        return .command
     }
 }
 
@@ -736,6 +818,8 @@ private struct AppSettingsView: View {
     let page: SettingsPage
 
     @AppStorage(AppPreferenceKeys.showShortcutHint) private var showShortcutHint = true
+    @AppStorage(AppPreferenceKeys.showInCommandTab)
+    private var showInCommandTab = AppVisibilityPreferencesStore.defaultShowInCommandTab
     @AppStorage(AppPreferenceKeys.enableVerboseDiagnostics) private var enableVerboseDiagnostics = false
     @AppStorage(AppPreferenceKeys.themeMode) private var themeModeRaw = ThemePreferencesStore.defaultMode.rawValue
     @AppStorage(AppPreferenceKeys.autoRestoreMinimizedWindowOnSwitch)
@@ -750,6 +834,13 @@ private struct AppSettingsView: View {
     private var hotkeyMainKeyRaw = SwitcherHotkeyPreferencesStore.defaultMainKey.rawValue
     @AppStorage(AppPreferenceKeys.hotkeyQuitKey)
     private var hotkeyQuitKeyRaw = SwitcherHotkeyPreferencesStore.defaultQuitKey.rawValue
+    @AppStorage(CommandTabTakeoverController.takeoverMarkerKey)
+    private var commandTabTakeoverActive = false
+    @AppStorage(AppPreferenceKeys.inAppWindowHotkeyPrimaryModifier)
+    private var inAppWindowHotkeyPrimaryModifierRaw =
+        InAppWindowHotkeyPreferencesStore.defaultPrimaryModifier.rawValue
+    @AppStorage(AppPreferenceKeys.inAppWindowHotkeyMainKey)
+    private var inAppWindowHotkeyMainKeyRaw = InAppWindowHotkeyPreferencesStore.defaultMainKey.rawValue
     @AppStorage(AppPreferenceKeys.windowLayerAutoEnterDelay)
     private var windowLayerAutoEnterDelayRaw = WindowLayerPreferencesStore.defaultAutoEnterDelay
     @ObservedObject private var diagnostics = RuntimeDiagnostics.shared
@@ -774,6 +865,23 @@ private struct AppSettingsView: View {
             mainKeyRaw: hotkeyMainKeyRaw,
             quitKeyRaw: hotkeyQuitKeyRaw
         )
+    }
+
+    private var inAppWindowHotkeyConfiguration: SwitcherHotkeyConfiguration {
+        let resolved = InAppWindowHotkeyPreferencesStore.resolve(
+            primaryModifierRaw: inAppWindowHotkeyPrimaryModifierRaw,
+            mainKeyRaw: inAppWindowHotkeyMainKeyRaw,
+            excludingPrimaryModifier: hotkeyConfiguration.primaryModifier
+        )
+        return SwitcherHotkeyConfiguration(
+            primaryModifier: resolved.primaryModifier,
+            mainKey: resolved.mainKey,
+            quitKey: .q
+        )
+    }
+
+    private var inAppWindowPrimaryModifierOptions: [SwitcherPrimaryModifier] {
+        SwitcherPrimaryModifier.allCases.filter { $0 != hotkeyConfiguration.primaryModifier }
     }
 
     private var windowLayerAutoEnterDelay: Double {
@@ -862,6 +970,14 @@ private struct AppSettingsView: View {
                                 Toggle("显示快捷键提示", isOn: $showShortcutHint)
                                     .toggleStyle(.switch)
                                     .font(.system(size: 13))
+
+                                Toggle("显示应用窗口", isOn: $showInCommandTab)
+                                    .toggleStyle(.switch)
+                                    .font(.system(size: 13))
+
+                                Text("关闭后 当前应用 将仅作为菜单栏辅助应用运行。")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(.secondary)
 
                                 HStack(spacing: 10) {
                                     Text("主题模式")
@@ -959,6 +1075,56 @@ private struct AppSettingsView: View {
                                     "当前：\(hotkeyConfiguration.mainShortcutText)"
                                         + "（反向：\(hotkeyConfiguration.backwardShortcutText)）"
                                         + "，结束应用：\(hotkeyConfiguration.quitShortcutText)"
+                                )
+                                .font(.system(size: 12))
+                                .foregroundStyle(.secondary)
+
+                                if hotkeyPrimaryModifierRaw == SwitcherPrimaryModifier.command.rawValue
+                                    && hotkeyMainKeyRaw == SwitcherHotkeyKey.tab.rawValue
+                                {
+                                    Text(
+                                        commandTabTakeoverActive
+                                            ? "已接管系统 Command + Tab / Command + Shift + Tab，退出 FlowTab 后会自动恢复。"
+                                            : "检测到 Command + Tab 组合：FlowTab 会自动尝试接管系统 Command + Tab / Command + Shift + Tab。"
+                                    )
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(.orange)
+                                }
+
+                                Divider()
+                                    .padding(.vertical, 4)
+
+                                HStack(spacing: 10) {
+                                    Text("应用内窗口修饰键")
+                                        .font(.system(size: 13))
+                                    Spacer()
+                                    Picker("应用内窗口修饰键", selection: $inAppWindowHotkeyPrimaryModifierRaw) {
+                                        ForEach(inAppWindowPrimaryModifierOptions) { modifier in
+                                            Text(modifier.displayName).tag(modifier.rawValue)
+                                        }
+                                    }
+                                    .labelsHidden()
+                                    .pickerStyle(.menu)
+                                    .frame(width: 160)
+                                }
+
+                                HStack(spacing: 10) {
+                                    Text("应用内窗口按键")
+                                        .font(.system(size: 13))
+                                    Spacer()
+                                    Picker("应用内窗口按键", selection: $inAppWindowHotkeyMainKeyRaw) {
+                                        ForEach(SwitcherHotkeyKey.allCases) { key in
+                                            Text(key.displayName).tag(key.rawValue)
+                                        }
+                                    }
+                                    .labelsHidden()
+                                    .pickerStyle(.menu)
+                                    .frame(width: 160)
+                                }
+
+                                Text(
+                                    "应用内窗口：\(inAppWindowHotkeyConfiguration.mainShortcutText)"
+                                        + "（反向：\(inAppWindowHotkeyConfiguration.backwardShortcutText)）"
                                 )
                                 .font(.system(size: 12))
                                 .foregroundStyle(.secondary)
@@ -1069,6 +1235,7 @@ private struct AppSettingsView: View {
         .onAppear {
             enforceThemeModeConsistency()
             enforceHotkeyConsistency()
+            enforceInAppWindowHotkeyConsistency()
             enforceWindowLayerPreferencesConsistency()
             syncWindowLayerAutoEnterDelayText()
             refreshAccessibilityStatus()
@@ -1077,16 +1244,29 @@ private struct AppSettingsView: View {
         .onChange(of: themeModeRaw) { _ in
             enforceThemeModeConsistency()
         }
+        .onChange(of: showInCommandTab) { _ in
+            notifyAppVisibilityPreferenceChanged()
+        }
         .onChange(of: hotkeyPrimaryModifierRaw) { _ in
             enforceHotkeyConsistency()
+            enforceInAppWindowHotkeyConsistency()
             notifyHotkeyConfigChanged()
         }
         .onChange(of: hotkeyMainKeyRaw) { _ in
             enforceHotkeyConsistency()
+            enforceInAppWindowHotkeyConsistency()
             notifyHotkeyConfigChanged()
         }
         .onChange(of: hotkeyQuitKeyRaw) { _ in
             enforceHotkeyConsistency()
+            notifyHotkeyConfigChanged()
+        }
+        .onChange(of: inAppWindowHotkeyPrimaryModifierRaw) { _ in
+            enforceInAppWindowHotkeyConsistency()
+            notifyHotkeyConfigChanged()
+        }
+        .onChange(of: inAppWindowHotkeyMainKeyRaw) { _ in
+            enforceInAppWindowHotkeyConsistency()
             notifyHotkeyConfigChanged()
         }
         .onChange(of: isWindowLayerDelayFieldFocused) { isFocused in
@@ -1106,7 +1286,11 @@ private struct AppSettingsView: View {
     }
 
     private var requestAccessibilityPermissionButton: some View {
-        Button("请求辅助功能权限") {
+        permissionRequestButton(
+            title: "请求辅助功能权限",
+            systemImage: "figure.wave",
+            tint: accessibilityTrusted ? .green : .orange
+        ) {
             let options = [
                 kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true
             ] as CFDictionary
@@ -1121,12 +1305,14 @@ private struct AppSettingsView: View {
                 startAccessibilityPermissionPolling()
             }
         }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
     }
 
     private var requestScreenCapturePermissionButton: some View {
-        Button("请求屏幕录制权限") {
+        permissionRequestButton(
+            title: "请求屏幕录制权限",
+            systemImage: "display.badge.person.crop",
+            tint: screenCaptureTrusted ? .green : .blue
+        ) {
             screenCapturePollTask?.cancel()
             let trusted = ScreenCapturePermissionChecker.requestScreenCapturePermission()
             RuntimeLog.info(
@@ -1138,8 +1324,6 @@ private struct AppSettingsView: View {
                 startScreenCapturePermissionPolling()
             }
         }
-        .buttonStyle(.bordered)
-        .controlSize(.small)
     }
 
     private var clearLogsButton: some View {
@@ -1163,6 +1347,40 @@ private struct AppSettingsView: View {
             .foregroundStyle(isGranted ? .green : .orange)
     }
 
+    @ViewBuilder
+    private func permissionRequestButton(
+        title: String,
+        systemImage: String,
+        tint: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .font(.system(size: 12, weight: .semibold))
+                .lineLimit(1)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .frame(minHeight: 30)
+                .foregroundStyle(tint)
+                .background(
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [tint.opacity(0.24), tint.opacity(0.14)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                )
+                .overlay(
+                    Capsule()
+                        .stroke(tint.opacity(0.42), lineWidth: 1)
+                )
+                .shadow(color: tint.opacity(0.16), radius: 6, y: 2)
+        }
+        .buttonStyle(.plain)
+    }
+
     private func refreshAccessibilityStatus() {
         accessibilityTrusted = AXIsProcessTrusted()
     }
@@ -1173,8 +1391,28 @@ private struct AppSettingsView: View {
 
     private func enforceHotkeyConsistency() {
         let resolved = hotkeyConfiguration
+        if hotkeyPrimaryModifierRaw != resolved.primaryModifier.rawValue {
+            hotkeyPrimaryModifierRaw = resolved.primaryModifier.rawValue
+        }
+        if hotkeyMainKeyRaw != resolved.mainKey.rawValue {
+            hotkeyMainKeyRaw = resolved.mainKey.rawValue
+        }
         if hotkeyQuitKeyRaw != resolved.quitKey.rawValue {
             hotkeyQuitKeyRaw = resolved.quitKey.rawValue
+        }
+    }
+
+    private func enforceInAppWindowHotkeyConsistency() {
+        let resolved = InAppWindowHotkeyPreferencesStore.resolve(
+            primaryModifierRaw: inAppWindowHotkeyPrimaryModifierRaw,
+            mainKeyRaw: inAppWindowHotkeyMainKeyRaw,
+            excludingPrimaryModifier: hotkeyConfiguration.primaryModifier
+        )
+        if inAppWindowHotkeyPrimaryModifierRaw != resolved.primaryModifier.rawValue {
+            inAppWindowHotkeyPrimaryModifierRaw = resolved.primaryModifier.rawValue
+        }
+        if inAppWindowHotkeyMainKeyRaw != resolved.mainKey.rawValue {
+            inAppWindowHotkeyMainKeyRaw = resolved.mainKey.rawValue
         }
     }
 
@@ -1258,9 +1496,17 @@ private struct AppSettingsView: View {
     private func notifyHotkeyConfigChanged() {
         RuntimeLog.info(
             "HotKey",
-            "updated main=\(hotkeyConfiguration.mainShortcutText) backward=\(hotkeyConfiguration.backwardShortcutText) quit=\(hotkeyConfiguration.quitShortcutText)"
+            "updated main=\(hotkeyConfiguration.mainShortcutText) backward=\(hotkeyConfiguration.backwardShortcutText) quit=\(hotkeyConfiguration.quitShortcutText) inApp=\(inAppWindowHotkeyConfiguration.mainShortcutText) inAppBackward=\(inAppWindowHotkeyConfiguration.backwardShortcutText)"
         )
         NotificationCenter.default.post(name: .flowTabReRegisterHotkeys, object: nil)
+    }
+
+    private func notifyAppVisibilityPreferenceChanged() {
+        RuntimeLog.info(
+            "App",
+            "showInCommandTab=\(showInCommandTab)"
+        )
+        NotificationCenter.default.post(name: .flowTabAppVisibilityPreferenceChanged, object: nil)
     }
 
     private func startAccessibilityPermissionPolling() {
@@ -1313,11 +1559,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var panelController: SwitcherPanelController?
     private var hotkeyMonitor: OptionTabHotkeyMonitor?
     private var inAppWindowHotkeyMonitor: OptionTabHotkeyMonitor?
+    private let commandTabTakeoverController = CommandTabTakeoverController()
     private var statusItem: NSStatusItem?
     private var hotkeyObserver: NSObjectProtocol?
+    private var appVisibilityObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        NSApp.setActivationPolicy(.accessory)
+        applyActivationPolicyFromPreferences()
 
         let panelController = SwitcherPanelController()
         self.panelController = panelController
@@ -1325,6 +1573,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setupHotkeyMonitor()
         setupInAppWindowHotkeyMonitor()
         installHotkeyObserver()
+        installAppVisibilityObserver()
 
         installStatusItem()
         requestAccessibilityPermissionIfNeeded()
@@ -1346,14 +1595,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NotificationCenter.default.removeObserver(hotkeyObserver)
             self.hotkeyObserver = nil
         }
+        if let appVisibilityObserver {
+            NotificationCenter.default.removeObserver(appVisibilityObserver)
+            self.appVisibilityObserver = nil
+        }
         hotkeyMonitor?.stop()
         inAppWindowHotkeyMonitor?.stop()
+        commandTabTakeoverController.restoreSystemShortcutsIfNeeded()
     }
 
     private func setupHotkeyMonitor() {
         hotkeyMonitor?.stop()
 
-        let hotkeyConfiguration = SwitcherHotkeyPreferencesStore.load()
+        var hotkeyConfiguration = SwitcherHotkeyPreferencesStore.load()
+        let requestedCommandTabTakeover =
+            hotkeyConfiguration.primaryModifier == .command && hotkeyConfiguration.mainKey == .tab
+        let takeoverReady = commandTabTakeoverController.reconcileIfNeeded(with: hotkeyConfiguration)
+        if requestedCommandTabTakeover, !takeoverReady {
+            hotkeyConfiguration = SwitcherHotkeyConfiguration(
+                primaryModifier: .option,
+                mainKey: hotkeyConfiguration.mainKey,
+                quitKey: hotkeyConfiguration.quitKey
+            )
+            RuntimeLog.info("HotKey", "fallback to Option+Tab because Command+Tab takeover failed")
+        }
+
         let monitor = OptionTabHotkeyMonitor(configuration: hotkeyConfiguration)
         monitor.onHotkeyPressed = { [weak panelController] isBackward in
             panelController?.handleGlobalHotkey(isBackward: isBackward)
@@ -1379,18 +1645,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupInAppWindowHotkeyMonitor() {
         inAppWindowHotkeyMonitor?.stop()
 
-        let configuredHotkey = SwitcherHotkeyPreferencesStore.load()
-        if configuredHotkey.primaryModifier == .control, configuredHotkey.mainKey == .tab {
-            RuntimeLog.info("HotKey", "skip register in-app window hotkey due conflict with main shortcut")
+        let mainConfiguration = SwitcherHotkeyPreferencesStore.load()
+        let inAppConfiguration = InAppWindowHotkeyPreferencesStore.load(
+            excludingPrimaryModifier: mainConfiguration.primaryModifier
+        )
+        if mainConfiguration.primaryModifier == inAppConfiguration.primaryModifier {
+            RuntimeLog.info("HotKey", "skip register in-app window hotkey due conflict with main modifier")
             inAppWindowHotkeyMonitor = nil
             return
         }
 
-        let inAppConfiguration = SwitcherHotkeyConfiguration(
-            primaryModifier: .control,
-            mainKey: .tab,
-            quitKey: .q
-        )
         let monitor = OptionTabHotkeyMonitor(
             configuration: inAppConfiguration,
             signature: 0x4654574E, // "FTWN"
@@ -1429,6 +1693,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.setupInAppWindowHotkeyMonitor()
             }
         }
+    }
+
+    private func installAppVisibilityObserver() {
+        if let appVisibilityObserver {
+            NotificationCenter.default.removeObserver(appVisibilityObserver)
+        }
+        appVisibilityObserver = NotificationCenter.default.addObserver(
+            forName: .flowTabAppVisibilityPreferenceChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.applyActivationPolicyFromPreferences()
+            }
+        }
+    }
+
+    private func applyActivationPolicyFromPreferences() {
+        let showInCommandTab = AppVisibilityPreferencesStore.loadShowInCommandTab()
+        let targetPolicy: NSApplication.ActivationPolicy = showInCommandTab ? .regular : .accessory
+        guard NSApp.activationPolicy() != targetPolicy else { return }
+
+        NSApp.setActivationPolicy(targetPolicy)
+        RuntimeLog.info(
+            "App",
+            "activationPolicy=\(showInCommandTab ? "regular" : "accessory")"
+        )
     }
 
     private func installStatusItem() {
