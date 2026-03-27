@@ -1370,6 +1370,7 @@ private struct CommandTabOverlay: View {
                 availableSize: proxy.size,
                 itemCount: windowPreviewItems.count
             )
+            let selectedAppIcon = selectedApp.flatMap(iconForApp)
             let columns = Array(
                 repeating: GridItem(
                     .fixed(layout.cardWidth),
@@ -1390,6 +1391,7 @@ private struct CommandTabOverlay: View {
                         WindowOnlyPreviewCard(
                             image: preview.image,
                             title: preview.title,
+                            appIcon: selectedAppIcon,
                             titleBarStyle: preview.titleBarStyle,
                             isSelected: preview.isSelected,
                             width: layout.cardWidth,
@@ -1513,6 +1515,7 @@ private struct WindowPreviewCard: View {
 private struct WindowOnlyPreviewCard: View {
     let image: NSImage?
     let title: String
+    let appIcon: NSImage?
     let titleBarStyle: WindowTitleBarStyleGuess?
     let isSelected: Bool
     let width: CGFloat
@@ -1522,6 +1525,9 @@ private struct WindowOnlyPreviewCard: View {
     private let titleAreaHeight: CGFloat = 30
     private var previewAreaHeight: CGFloat {
         max(1, height - titleAreaHeight)
+    }
+    private var fallbackAppIconSize: CGFloat {
+        max(42, min(96, min(width, previewAreaHeight) * 0.24))
     }
     private var usesDarkTitleBar: Bool {
         if let titleBarStyle {
@@ -1573,16 +1579,26 @@ private struct WindowOnlyPreviewCard: View {
                         .interpolation(.high)
                         .scaledToFill()
                 } else {
-                    LinearGradient(
-                        colors: usesDarkTitleBar
-                            ? [Color.white.opacity(0.08), Color.white.opacity(0.03)]
-                            : [Color.black.opacity(0.06), Color.black.opacity(0.03)],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    Image(systemName: "macwindow")
-                        .font(.system(size: 52, weight: .medium))
-                        .foregroundStyle(.secondary)
+                    if colorScheme == .dark {
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.08), Color.white.opacity(0.03)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    } else {
+                        Color.white
+                    }
+                    if let appIcon {
+                        Image(nsImage: appIcon)
+                            .resizable()
+                            .interpolation(.high)
+                            .frame(width: fallbackAppIconSize, height: fallbackAppIconSize)
+                            .shadow(color: .black.opacity(0.16), radius: 8, y: 2)
+                    } else {
+                        Image(systemName: "macwindow")
+                            .font(.system(size: 52, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
             .frame(width: width, height: previewAreaHeight)
