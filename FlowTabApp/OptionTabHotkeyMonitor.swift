@@ -274,11 +274,8 @@ final class CommandTabTakeoverController {
         }
     }
 
-    func reconcileIfNeeded(with configuration: SwitcherHotkeyConfiguration) -> Bool {
+    func reconcileIfNeeded(shouldTakeOver: Bool) -> Bool {
         recoverFromAbnormalExitIfNeeded()
-
-        let shouldTakeOver = configuration.primaryModifier == .command
-            && configuration.mainKey == .tab
 
         if shouldTakeOver {
             return activateTakeoverIfNeeded()

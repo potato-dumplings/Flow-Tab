@@ -151,10 +151,7 @@ enum InAppWindowHotkeyPreferencesStore {
     static let defaultPrimaryModifier: SwitcherPrimaryModifier = .control
     static let defaultMainKey: SwitcherHotkeyKey = .tab
 
-    static func load(
-        userDefaults: UserDefaults = .standard,
-        excludingPrimaryModifier: SwitcherPrimaryModifier = SwitcherHotkeyPreferencesStore.defaultPrimaryModifier
-    ) -> SwitcherHotkeyConfiguration {
+    static func load(userDefaults: UserDefaults = .standard) -> SwitcherHotkeyConfiguration {
         let primaryModifierRaw = userDefaults.string(forKey: AppPreferenceKeys.inAppWindowHotkeyPrimaryModifier)
             ?? defaultPrimaryModifier.rawValue
         let mainKeyRaw = userDefaults.string(forKey: AppPreferenceKeys.inAppWindowHotkeyMainKey)
@@ -162,8 +159,7 @@ enum InAppWindowHotkeyPreferencesStore {
 
         let resolved = resolve(
             primaryModifierRaw: primaryModifierRaw,
-            mainKeyRaw: mainKeyRaw,
-            excludingPrimaryModifier: excludingPrimaryModifier
+            mainKeyRaw: mainKeyRaw
         )
 
         if primaryModifierRaw != resolved.primaryModifier.rawValue {
@@ -188,27 +184,11 @@ enum InAppWindowHotkeyPreferencesStore {
 
     static func resolve(
         primaryModifierRaw: String,
-        mainKeyRaw: String,
-        excludingPrimaryModifier: SwitcherPrimaryModifier
+        mainKeyRaw: String
     ) -> (primaryModifier: SwitcherPrimaryModifier, mainKey: SwitcherHotkeyKey) {
-        var primaryModifier = SwitcherPrimaryModifier(rawValue: primaryModifierRaw) ?? defaultPrimaryModifier
+        let primaryModifier = SwitcherPrimaryModifier(rawValue: primaryModifierRaw) ?? defaultPrimaryModifier
         let mainKey = SwitcherHotkeyKey(rawValue: mainKeyRaw) ?? defaultMainKey
-        if primaryModifier == excludingPrimaryModifier {
-            primaryModifier = defaultPrimaryModifier(excluding: excludingPrimaryModifier)
-        }
         return (primaryModifier, mainKey)
-    }
-
-    private static func defaultPrimaryModifier(
-        excluding modifier: SwitcherPrimaryModifier
-    ) -> SwitcherPrimaryModifier {
-        if modifier != .control {
-            return .control
-        }
-        if modifier != .option {
-            return .option
-        }
-        return .command
     }
 }
 
@@ -870,8 +850,7 @@ private struct AppSettingsView: View {
     private var inAppWindowHotkeyConfiguration: SwitcherHotkeyConfiguration {
         let resolved = InAppWindowHotkeyPreferencesStore.resolve(
             primaryModifierRaw: inAppWindowHotkeyPrimaryModifierRaw,
-            mainKeyRaw: inAppWindowHotkeyMainKeyRaw,
-            excludingPrimaryModifier: hotkeyConfiguration.primaryModifier
+            mainKeyRaw: inAppWindowHotkeyMainKeyRaw
         )
         return SwitcherHotkeyConfiguration(
             primaryModifier: resolved.primaryModifier,
@@ -881,7 +860,31 @@ private struct AppSettingsView: View {
     }
 
     private var inAppWindowPrimaryModifierOptions: [SwitcherPrimaryModifier] {
-        SwitcherPrimaryModifier.allCases.filter { $0 != hotkeyConfiguration.primaryModifier }
+        SwitcherPrimaryModifier.allCases
+    }
+
+    private var mainUsesCommandTab: Bool {
+        hotkeyConfiguration.primaryModifier == .command && hotkeyConfiguration.mainKey == .tab
+    }
+
+    private var inAppUsesCommandTab: Bool {
+        inAppWindowHotkeyConfiguration.primaryModifier == .command
+            && inAppWindowHotkeyConfiguration.mainKey == .tab
+    }
+
+    private var commandTabTakeoverStatusText: String {
+        commandTabTakeoverActive
+            ? "已接管系统 Command + Tab / Command + Shift + Tab，退出 FlowTab 后会自动恢复。"
+            : "检测到 Command + Tab 组合：FlowTab 会自动尝试接管系统 Command + Tab / Command + Shift + Tab。"
+    }
+
+    @ViewBuilder
+    private var commandTabTakeoverStatusView: some View {
+        Text(commandTabTakeoverStatusText)
+            .font(.system(size: 12))
+            .foregroundStyle(commandTabTakeoverActive ? .green : .red)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.top, 4)
     }
 
     private var windowLayerAutoEnterDelay: Double {
@@ -1079,48 +1082,43 @@ private struct AppSettingsView: View {
                                 .font(.system(size: 12))
                                 .foregroundStyle(.secondary)
 
-                                if hotkeyPrimaryModifierRaw == SwitcherPrimaryModifier.command.rawValue
-                                    && hotkeyMainKeyRaw == SwitcherHotkeyKey.tab.rawValue
-                                {
-                                    Text(
-                                        commandTabTakeoverActive
-                                            ? "已接管系统 Command + Tab / Command + Shift + Tab，退出 FlowTab 后会自动恢复。"
-                                            : "检测到 Command + Tab 组合：FlowTab 会自动尝试接管系统 Command + Tab / Command + Shift + Tab。"
-                                    )
-                                        .font(.system(size: 12))
-                                        .foregroundStyle(.orange)
+                                if mainUsesCommandTab {
+                                    commandTabTakeoverStatusView
                                 }
 
                                 Divider()
                                     .padding(.vertical, 4)
 
-                                HStack(spacing: 10) {
-                                    Text("应用内窗口修饰键")
-                                        .font(.system(size: 13))
-                                    Spacer()
-                                    Picker("应用内窗口修饰键", selection: $inAppWindowHotkeyPrimaryModifierRaw) {
-                                        ForEach(inAppWindowPrimaryModifierOptions) { modifier in
-                                            Text(modifier.displayName).tag(modifier.rawValue)
+                                Group {
+                                    HStack(spacing: 10) {
+                                        Text("应用内窗口修饰键")
+                                            .font(.system(size: 13))
+                                        Spacer()
+                                        Picker("应用内窗口修饰键", selection: $inAppWindowHotkeyPrimaryModifierRaw) {
+                                            ForEach(inAppWindowPrimaryModifierOptions) { modifier in
+                                                Text(modifier.displayName).tag(modifier.rawValue)
+                                            }
                                         }
+                                        .labelsHidden()
+                                        .pickerStyle(.menu)
+                                        .frame(width: 160)
                                     }
-                                    .labelsHidden()
-                                    .pickerStyle(.menu)
-                                    .frame(width: 160)
-                                }
 
-                                HStack(spacing: 10) {
-                                    Text("应用内窗口按键")
-                                        .font(.system(size: 13))
-                                    Spacer()
-                                    Picker("应用内窗口按键", selection: $inAppWindowHotkeyMainKeyRaw) {
-                                        ForEach(SwitcherHotkeyKey.allCases) { key in
-                                            Text(key.displayName).tag(key.rawValue)
+                                    HStack(spacing: 10) {
+                                        Text("应用内窗口按键")
+                                            .font(.system(size: 13))
+                                        Spacer()
+                                        Picker("应用内窗口按键", selection: $inAppWindowHotkeyMainKeyRaw) {
+                                            ForEach(SwitcherHotkeyKey.allCases) { key in
+                                                Text(key.displayName).tag(key.rawValue)
+                                            }
                                         }
+                                        .labelsHidden()
+                                        .pickerStyle(.menu)
+                                        .frame(width: 160)
                                     }
-                                    .labelsHidden()
-                                    .pickerStyle(.menu)
-                                    .frame(width: 160)
                                 }
+                                .disabled(!accessibilityTrusted)
 
                                 Text(
                                     "应用内窗口：\(inAppWindowHotkeyConfiguration.mainShortcutText)"
@@ -1128,6 +1126,16 @@ private struct AppSettingsView: View {
                                 )
                                 .font(.system(size: 12))
                                 .foregroundStyle(.secondary)
+
+                                if !accessibilityTrusted {
+                                    Text("需先授权辅助功能权限后，才能设置应用内窗口快捷键。")
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(.orange)
+                                }
+
+                                if inAppUsesCommandTab {
+                                    commandTabTakeoverStatusView
+                                }
                             }
                         }
 
@@ -1405,8 +1413,7 @@ private struct AppSettingsView: View {
     private func enforceInAppWindowHotkeyConsistency() {
         let resolved = InAppWindowHotkeyPreferencesStore.resolve(
             primaryModifierRaw: inAppWindowHotkeyPrimaryModifierRaw,
-            mainKeyRaw: inAppWindowHotkeyMainKeyRaw,
-            excludingPrimaryModifier: hotkeyConfiguration.primaryModifier
+            mainKeyRaw: inAppWindowHotkeyMainKeyRaw
         )
         if inAppWindowHotkeyPrimaryModifierRaw != resolved.primaryModifier.rawValue {
             inAppWindowHotkeyPrimaryModifierRaw = resolved.primaryModifier.rawValue
@@ -1608,10 +1615,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotkeyMonitor?.stop()
 
         var hotkeyConfiguration = SwitcherHotkeyPreferencesStore.load()
-        let requestedCommandTabTakeover =
+        let inAppHotkeyConfiguration = InAppWindowHotkeyPreferencesStore.load()
+        let mainUsesCommandTab =
             hotkeyConfiguration.primaryModifier == .command && hotkeyConfiguration.mainKey == .tab
-        let takeoverReady = commandTabTakeoverController.reconcileIfNeeded(with: hotkeyConfiguration)
-        if requestedCommandTabTakeover, !takeoverReady {
+        let inAppUsesCommandTab =
+            inAppHotkeyConfiguration.primaryModifier == .command && inAppHotkeyConfiguration.mainKey == .tab
+        let takeoverReady = commandTabTakeoverController.reconcileIfNeeded(
+            shouldTakeOver: mainUsesCommandTab || inAppUsesCommandTab
+        )
+        if mainUsesCommandTab, !takeoverReady {
             hotkeyConfiguration = SwitcherHotkeyConfiguration(
                 primaryModifier: .option,
                 mainKey: hotkeyConfiguration.mainKey,
@@ -1646,11 +1658,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         inAppWindowHotkeyMonitor?.stop()
 
         let mainConfiguration = SwitcherHotkeyPreferencesStore.load()
-        let inAppConfiguration = InAppWindowHotkeyPreferencesStore.load(
-            excludingPrimaryModifier: mainConfiguration.primaryModifier
-        )
-        if mainConfiguration.primaryModifier == inAppConfiguration.primaryModifier {
-            RuntimeLog.info("HotKey", "skip register in-app window hotkey due conflict with main modifier")
+        let inAppConfiguration = InAppWindowHotkeyPreferencesStore.load()
+        if
+            mainConfiguration.primaryModifier == inAppConfiguration.primaryModifier
+                && mainConfiguration.mainKey == inAppConfiguration.mainKey
+        {
+            RuntimeLog.info("HotKey", "skip register in-app window hotkey due conflict with main shortcut")
             inAppWindowHotkeyMonitor = nil
             return
         }
