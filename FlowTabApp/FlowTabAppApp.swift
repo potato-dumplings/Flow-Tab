@@ -341,7 +341,9 @@ private struct HomeRootView: View {
             Group {
                 switch tabState.selectedTab {
                 case .home:
-                    HomeLandingView()
+                    HomeLandingView {
+                        tabState.selectedTab = .settings
+                    }
                 case .logs:
                     AppSettingsView(page: .logs)
                 case .settings:
@@ -477,14 +479,20 @@ private struct HomeSidebar: View {
     }
 }
 
+@MainActor
 private struct HomeLandingView: View {
-    @ObservedObject private var diagnostics = RuntimeDiagnostics.shared
+    let openSettings: () -> Void
+
+    @AppStorage(AppPreferenceKeys.showPermissionReminder)
+    private var showPermissionReminder = true
     @AppStorage(AppPreferenceKeys.hotkeyPrimaryModifier)
     private var hotkeyPrimaryModifierRaw = SwitcherHotkeyPreferencesStore.defaultPrimaryModifier.rawValue
     @AppStorage(AppPreferenceKeys.hotkeyMainKey)
     private var hotkeyMainKeyRaw = SwitcherHotkeyPreferencesStore.defaultMainKey.rawValue
     @AppStorage(AppPreferenceKeys.hotkeyQuitKey)
     private var hotkeyQuitKeyRaw = SwitcherHotkeyPreferencesStore.defaultQuitKey.rawValue
+    @State private var accessibilityTrusted = AXIsProcessTrusted()
+    @State private var screenCaptureTrusted = ScreenCapturePermissionChecker.hasScreenCapturePermission
     @State private var snapshot = RuntimeSnapshot(apps: [], contextsByID: [:])
     @State private var selectedAppID: String?
 
@@ -496,13 +504,31 @@ private struct HomeLandingView: View {
         )
     }
 
+    private var shouldShowPermissionGuide: Bool {
+        showPermissionReminder && (!accessibilityTrusted || !screenCaptureTrusted)
+    }
+
+    private var permissionGuideMessage: String {
+        if !accessibilityTrusted && !screenCaptureTrusted {
+            return "请开启辅助功能和屏幕录制权限，部分功能才能正常使用。"
+        }
+        if !accessibilityTrusted {
+            return "请开启辅助功能权限，应用切换与窗口功能才能正常使用。"
+        }
+        if !screenCaptureTrusted {
+            return "请开启屏幕录制权限，窗口预览功能才能正常使用。"
+        }
+        return "权限已开启。"
+    }
+
     var body: some View {
         ZStack {
             HomeBackdropView()
 
-            VStack(alignment: .leading, spacing: 14) {
-                header
-                statusCard
+            VStack(alignment: .leading, spacing: 12) {
+                if shouldShowPermissionGuide {
+                    permissionGuideBanner
+                }
 
                 HStack(alignment: .top, spacing: 12) {
                     appLayerCard
@@ -523,40 +549,41 @@ private struct HomeLandingView: View {
         }
     }
 
-    private var header: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("FlowTab")
-                    .font(.system(size: 22, weight: .semibold))
+    private var permissionGuideBanner: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "info.circle.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.orange)
 
-                Text("\(hotkeyConfiguration.mainShortcutText) 快速切换，\(hotkeyConfiguration.quitShortcutText) 结束所选应用")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.secondary)
+            Text(permissionGuideMessage)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.primary)
+                .multilineTextAlignment(.leading)
+
+            Spacer(minLength: 0)
+
+            Button("前往设置") {
+                openSettings()
             }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
 
-            Spacer()
-
-            Button("重新注册快捷键") {
-                NotificationCenter.default.post(name: .flowTabReRegisterHotkeys, object: nil)
-                RuntimeLog.info("HotKey", "manual re-register requested")
-                refreshSnapshot()
+            Button("不再提示") {
+                showPermissionReminder = false
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
         }
-    }
-
-    private var statusCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HomeStatusRow(label: "状态", value: statusLine, emphasizes: hasFailure)
-            HomeStatusRow(label: "最近动作", value: lastActionLine, emphasizes: false)
-        }
-        .padding(14)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.orange.opacity(0.10))
+        )
         .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(Color.orange.opacity(0.35), lineWidth: 1)
         )
     }
 
@@ -637,24 +664,6 @@ private struct HomeLandingView: View {
         return snapshot.apps.first?.id
     }
 
-    private var hasFailure: Bool {
-        diagnostics.entries.last(where: { $0.message.localizedCaseInsensitiveContains("failed") }) != nil
-    }
-
-    private var statusLine: String {
-        if let failed = diagnostics.entries.last(where: { $0.message.localizedCaseInsensitiveContains("failed") }) {
-            return failed.message
-        }
-        return "运行正常"
-    }
-
-    private var lastActionLine: String {
-        guard let last = diagnostics.entries.last else {
-            return "等待触发 \(hotkeyConfiguration.mainShortcutText)"
-        }
-        return "[\(last.category)] \(last.message)"
-    }
-
     private func windowTitle(_ title: String, index: Int) -> String {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty {
@@ -668,6 +677,8 @@ private struct HomeLandingView: View {
     }
 
     private func refreshSnapshot() {
+        accessibilityTrusted = AXIsProcessTrusted()
+        screenCaptureTrusted = ScreenCapturePermissionChecker.hasScreenCapturePermission
         snapshot = RuntimeSnapshotProvider().snapshot()
         syncSelectedApp()
     }
@@ -730,26 +741,6 @@ private struct HomeSectionCard<Content: View>: View {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .stroke(Color.primary.opacity(0.08), lineWidth: 1)
         )
-    }
-}
-
-private struct HomeStatusRow: View {
-    let label: String
-    let value: String
-    let emphasizes: Bool
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text(label)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.secondary)
-                .frame(width: 52, alignment: .leading)
-
-            Text(value)
-                .font(.system(size: 12, weight: emphasizes ? .semibold : .regular))
-                .foregroundStyle(emphasizes ? .red : .primary)
-                .lineLimit(1)
-        }
     }
 }
 
@@ -1174,6 +1165,7 @@ private struct AppSettingsView: View {
 
                 permissionStatusActionRow(
                     text: accessibilityTrusted ? "辅助功能权限：已授权" : "辅助功能权限：未授权",
+                    detail: "用于应用切换、应用内窗口切换和最小化窗口处理。",
                     isGranted: accessibilityTrusted
                 ) {
                     requestAccessibilityPermissionButton
@@ -1181,6 +1173,7 @@ private struct AppSettingsView: View {
 
                 permissionStatusActionRow(
                     text: screenCaptureTrusted ? "屏幕录制权限：已授权" : "屏幕录制权限：未授权",
+                    detail: "用于显示窗口真实预览画面；未授权时仅显示兜底信息。",
                     isGranted: screenCaptureTrusted
                 ) {
                     requestScreenCapturePermissionButton
@@ -1309,22 +1302,32 @@ private struct AppSettingsView: View {
     }
 
     private var requestAccessibilityPermissionButton: some View {
-        permissionRequestButton(
-            title: "请求辅助功能权限",
+        let isGranted = accessibilityTrusted
+        return permissionRequestButton(
+            title: isGranted ? "关闭辅助功能权限" : "请求辅助功能权限",
             systemImage: nil,
-            tint: accessibilityTrusted ? .green : .orange
+            style: isGranted ? .blueDominant : .grayDominant
         ) {
-            requestAccessibilityPermission()
+            if isGranted {
+                openAccessibilityPrivacySettings()
+            } else {
+                requestAccessibilityPermission()
+            }
         }
     }
 
     private var requestScreenCapturePermissionButton: some View {
-        permissionRequestButton(
-            title: "请求屏幕录制权限",
+        let isGranted = screenCaptureTrusted
+        return permissionRequestButton(
+            title: isGranted ? "关闭屏幕录制权限" : "请求屏幕录制权限",
             systemImage: "display.badge.person.crop",
-            tint: screenCaptureTrusted ? .green : .blue
+            style: isGranted ? .blueDominant : .grayDominant
         ) {
-            requestScreenCapturePermission()
+            if isGranted {
+                openScreenCapturePrivacySettings()
+            } else {
+                requestScreenCapturePermission()
+            }
         }
     }
 
@@ -1357,6 +1360,27 @@ private struct AppSettingsView: View {
         }
     }
 
+    private func openAccessibilityPrivacySettings() {
+        openPrivacySettings(anchor: "Privacy_Accessibility")
+    }
+
+    private func openScreenCapturePrivacySettings() {
+        openPrivacySettings(anchor: "Privacy_ScreenCapture")
+    }
+
+    private func openPrivacySettings(anchor: String) {
+        let candidates = [
+            "x-apple.systempreferences:com.apple.preference.security?\(anchor)",
+            "x-apple.systempreferences:com.apple.preference.security"
+        ]
+        for rawURL in candidates {
+            if let url = URL(string: rawURL), NSWorkspace.shared.open(url) {
+                return
+            }
+        }
+        NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/System Settings.app"))
+    }
+
     private var clearLogsButton: some View {
         Button("清空日志") {
             diagnostics.clear()
@@ -1368,13 +1392,20 @@ private struct AppSettingsView: View {
     @ViewBuilder
     private func permissionStatusActionRow<Button: View>(
         text: String,
+        detail: String,
         isGranted: Bool,
         @ViewBuilder actionButton: () -> Button
     ) -> some View {
         HStack(spacing: 10) {
-            Text(text)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(isGranted ? .green : .orange)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(text)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(isGranted ? .green : .orange)
+                Text(detail)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
             Spacer(minLength: 8)
             actionButton()
         }
@@ -1385,9 +1416,60 @@ private struct AppSettingsView: View {
     private func permissionRequestButton(
         title: String,
         systemImage: String?,
-        tint: Color,
+        style: PermissionButtonStyle,
         action: @escaping () -> Void
     ) -> some View {
+        let foregroundColor: Color = style == .blueDominant ? .white : .primary.opacity(0.78)
+        let backgroundFill: LinearGradient = {
+            switch style {
+            case .grayDominant:
+                return LinearGradient(
+                    stops: [
+                        .init(color: Color.primary.opacity(0.12), location: 0.0),
+                        .init(color: Color.primary.opacity(0.09), location: 0.75),
+                        .init(color: Color.accentColor.opacity(0.26), location: 1.0)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            case .blueDominant:
+                return LinearGradient(
+                    stops: [
+                        .init(color: Color.accentColor.opacity(0.94), location: 0.0),
+                        .init(color: Color.accentColor.opacity(0.76), location: 0.75),
+                        .init(color: Color.primary.opacity(0.18), location: 1.0)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            }
+        }()
+        let borderFill: LinearGradient = {
+            switch style {
+            case .grayDominant:
+                return LinearGradient(
+                    stops: [
+                        .init(color: Color.primary.opacity(0.24), location: 0.0),
+                        .init(color: Color.primary.opacity(0.19), location: 0.75),
+                        .init(color: Color.accentColor.opacity(0.36), location: 1.0)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            case .blueDominant:
+                return LinearGradient(
+                    stops: [
+                        .init(color: Color.accentColor.opacity(0.55), location: 0.0),
+                        .init(color: Color.accentColor.opacity(0.44), location: 0.75),
+                        .init(color: Color.primary.opacity(0.28), location: 1.0)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            }
+        }()
+        let shadowColor: Color = style == .blueDominant ? Color.accentColor.opacity(0.20) : Color.primary.opacity(0.08)
+
         Button(action: action) {
             Group {
                 if let systemImage {
@@ -1402,24 +1484,24 @@ private struct AppSettingsView: View {
             .padding(.vertical, 7)
             .frame(minHeight: 30)
             .frame(width: permissionRequestButtonWidth)
-            .foregroundStyle(tint)
+            .foregroundStyle(foregroundColor)
             .background(
                 Capsule()
-                    .fill(
-                        LinearGradient(
-                            colors: [tint.opacity(0.24), tint.opacity(0.14)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                    .fill(backgroundFill)
             )
             .overlay(
                 Capsule()
-                    .stroke(tint.opacity(0.42), lineWidth: 1)
+                    .stroke(borderFill, lineWidth: 1)
             )
-            .shadow(color: tint.opacity(0.16), radius: 6, y: 2)
+            .shadow(color: shadowColor, radius: 6, y: 2)
         }
         .buttonStyle(.plain)
+        .animation(.easeInOut(duration: 0.28), value: style)
+    }
+
+    private enum PermissionButtonStyle: Equatable {
+        case grayDominant
+        case blueDominant
     }
 
     private func refreshAccessibilityStatus() {
