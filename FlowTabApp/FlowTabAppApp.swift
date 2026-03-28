@@ -1637,13 +1637,13 @@ private struct AppSettingsView: View {
         VStack(alignment: .leading, spacing: 12) {
             appearanceSettingsCard
             windowBehaviorSettingsCard
-            searchSettingsCard
             permissionSettingsCard
         }
     }
 
     private var settingsRightColumn: some View {
         VStack(alignment: .leading, spacing: 12) {
+            searchSettingsCard
             hotkeySettingsCard
         }
     }
@@ -1834,7 +1834,7 @@ private struct AppSettingsView: View {
                 .disabled(!searchEnabled)
                 .opacity(searchEnabled ? 1 : 0.5)
 
-                Text(searchEnabled ? "面板默认从应用层开始；按 Enter 进入搜索。" : "已关闭搜索：面板仅显示应用层与窗口层。")
+                Text(searchEnabled ? "面板默认从应用层开始；按 Enter 或 ↑ 进入搜索。" : "已关闭搜索：面板仅显示应用层与窗口层。")
                     .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }

@@ -52,7 +52,7 @@ final class SwitcherPanelController {
     private let searchWindowRowHeight: CGFloat = 44
     private let searchWindowVisibleRowLimit: Int = 8
     private let searchHeaderHeight: CGFloat = 74
-    private let searchAppResultExtraHeight: CGFloat = 32
+    private let searchAppResultExtraHeight: CGFloat = 8
     private var activeHotkeySessionKind: HotkeySessionKind?
 
     private var searchFeatureEnabled: Bool {
@@ -527,11 +527,7 @@ final class SwitcherPanelController {
         case 49:
             return true
         case 36, 76:
-            if searchFeatureEnabled, model.enterSearchMode() {
-                cancelPendingModifierReleaseConfirmation()
-                updatePanelSize()
-                RuntimeLog.info("Session", "enter search mode")
-            } else {
+            if !enterSearchModeIfPossible() {
                 finishSelection()
             }
             return true
@@ -554,7 +550,9 @@ final class SwitcherPanelController {
             advance(.downArrow)
             return true
         case 126:
-            advance(.upArrow)
+            if !enterSearchModeIfPossible() {
+                advance(.upArrow)
+            }
             return true
         case 53:
             if model.shouldClearSearchOnEscape {
@@ -571,6 +569,16 @@ final class SwitcherPanelController {
             }
             return false
         }
+    }
+
+    @discardableResult
+    private func enterSearchModeIfPossible() -> Bool {
+        guard searchFeatureEnabled else { return false }
+        guard model.enterSearchMode() else { return false }
+        cancelPendingModifierReleaseConfirmation()
+        updatePanelSize()
+        RuntimeLog.info("Session", "enter search mode")
+        return true
     }
 
     private func handleSearchModeKeyDown(_ event: NSEvent) -> Bool {
@@ -604,7 +612,12 @@ final class SwitcherPanelController {
             finishSelection()
             return true
         case 53:
-            cancelSelection()
+            if model.shouldClearSearchOnEscape {
+                _ = model.handleSearchEscape()
+                updatePanelSize()
+            } else {
+                cancelSelection()
+            }
             return true
         case 51:
             if model.deleteSearchQueryBackward() {
@@ -1624,7 +1637,7 @@ private struct CommandTabOverlay: View {
                     query: "",
                     scope: searchDefaultScope,
                     isInputFocused: false,
-                    hintText: "Enter 进入搜索"
+                    hintText: "Enter / ↑ 进入搜索"
                 )
             }
 
@@ -1717,23 +1730,12 @@ private struct CommandTabOverlay: View {
                         spacing: appTileSpacing
                     ) {
                         ForEach(searchAppItems) { item in
-                            VStack(spacing: 8) {
-                                AppTileView(
-                                    app: item.app,
-                                    isSelected: item.isSelected,
-                                    size: appTileSize,
-                                    icon: iconForApp(item.app)
-                                )
-                                Text(item.app.displayName)
-                                    .lineLimit(1)
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(
-                                        item.isSelected
-                                            ? Color.primary
-                                            : Color.primary.opacity(0.76)
-                                    )
-                                    .frame(width: max(72, appTileSize + 14))
-                            }
+                            AppTileView(
+                                app: item.app,
+                                isSelected: item.isSelected,
+                                size: appTileSize,
+                                icon: iconForApp(item.app)
+                            )
                             .id(item.id)
                         }
                     }
