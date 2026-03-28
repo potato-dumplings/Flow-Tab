@@ -25,7 +25,6 @@ struct RuntimeWindowContext {
     let title: String
     let isMinimized: Bool
     var cgWindowID: CGWindowID?
-    var previewImage: NSImage?
     var inferredTitleBarStyle: WindowTitleBarStyleGuess?
 }
 
@@ -137,7 +136,6 @@ final class RuntimeSnapshotProvider {
                             title: $0.title,
                             isMinimized: $0.isMinimized,
                             cgWindowID: $0.cgWindowID,
-                            previewImage: nil,
                             inferredTitleBarStyle: nil
                         )
                     )
@@ -287,7 +285,6 @@ final class RuntimeSnapshotProvider {
                         title: $0.title,
                         isMinimized: $0.isMinimized,
                         cgWindowID: $0.cgWindowID,
-                        previewImage: nil,
                         inferredTitleBarStyle: nil
                     )
                 )
@@ -902,6 +899,7 @@ enum RuntimeWindowPreviewProvider {
     private static var hasLoggedScreenCapturePermissionWarning = false
     private static let shareableContentLookupTimeout: TimeInterval = 1.0
     private static let screenshotCaptureTimeout: TimeInterval = 1.0
+    private static let maxPreviewCaptureDimension: CGFloat = 1_200
 
     static func captureWindowPreview(
         preferredWindowID: CGWindowID?,
@@ -1053,8 +1051,11 @@ enum RuntimeWindowPreviewProvider {
     private static func captureWindow(shareableWindow: SCWindow) -> CGImage? {
         let filter = SCContentFilter(desktopIndependentWindow: shareableWindow)
         let configuration = SCStreamConfiguration()
-        let width = max(1, Int(ceil(shareableWindow.frame.width)))
-        let height = max(1, Int(ceil(shareableWindow.frame.height)))
+        let sourceWidth = max(1, shareableWindow.frame.width)
+        let sourceHeight = max(1, shareableWindow.frame.height)
+        let scale = min(1, maxPreviewCaptureDimension / max(sourceWidth, sourceHeight))
+        let width = max(1, Int(ceil(sourceWidth * scale)))
+        let height = max(1, Int(ceil(sourceHeight * scale)))
         configuration.width = width
         configuration.height = height
         configuration.showsCursor = false
@@ -1250,16 +1251,55 @@ enum ScreenCapturePermissionChecker {
     }
 }
 
+final class BoundedImageCache {
+    private let storage = NSCache<NSString, NSImage>()
+
+    init(countLimit: Int, totalCostLimit: Int) {
+        storage.countLimit = countLimit
+        storage.totalCostLimit = totalCostLimit
+    }
+
+    func image(forKey key: String) -> NSImage? {
+        storage.object(forKey: key as NSString)
+    }
+
+    func insert(_ image: NSImage, forKey key: String) {
+        storage.setObject(
+            image,
+            forKey: key as NSString,
+            cost: image.estimatedByteCost
+        )
+    }
+
+    func removeAll() {
+        storage.removeAllObjects()
+    }
+}
+
+private extension NSImage {
+    var estimatedByteCost: Int {
+        if let bitmap = representations.first(where: { $0.pixelsWide > 0 && $0.pixelsHigh > 0 }) {
+            return bitmap.pixelsWide * bitmap.pixelsHigh * 4
+        }
+        let width = max(1, Int(ceil(size.width)))
+        let height = max(1, Int(ceil(size.height)))
+        return width * height * 4
+    }
+}
+
 final class AppIconProvider {
-    private var cache: [String: NSImage] = [:]
+    private let cache = BoundedImageCache(
+        countLimit: 256,
+        totalCostLimit: 64 * 1_024 * 1_024
+    )
 
     func icon(for app: AppSwitchCandidate, context: RuntimeAppContext?) -> NSImage? {
-        if let cached = cache[app.id] {
+        if let cached = cache.image(forKey: app.id) {
             return cached
         }
 
         if let runtimeIcon = context?.runningApp.icon {
-            cache[app.id] = runtimeIcon
+            cache.insert(runtimeIcon, forKey: app.id)
             return runtimeIcon
         }
 
@@ -1268,7 +1308,7 @@ final class AppIconProvider {
         }
 
         let icon = NSWorkspace.shared.icon(forFile: url.path)
-        cache[app.id] = icon
+        cache.insert(icon, forKey: app.id)
         return icon
     }
 }

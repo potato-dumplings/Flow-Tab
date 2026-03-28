@@ -712,6 +712,10 @@ final class LiveSwitcherModel: ObservableObject {
     private let snapshotProvider = RuntimeSnapshotProvider()
     private let activator = RuntimeActivator()
     private let iconProvider = AppIconProvider()
+    private let previewImageCache = BoundedImageCache(
+        countLimit: 64,
+        totalCostLimit: 160 * 1_024 * 1_024
+    )
 
     private var runtimeContextsByID: [String: RuntimeAppContext] = [:]
     private var rememberedWindowIDByAppID: [String: String] = [:]
@@ -770,21 +774,21 @@ final class LiveSwitcherModel: ObservableObject {
         guard var windowContext = appContext.windowsByID[window.id] else {
             return (image: nil, titleBarStyle: nil)
         }
-        if let cached = windowContext.previewImage {
+        let previewCacheKey = "\(appID)#\(window.id)"
+        if let cached = previewImageCache.image(forKey: previewCacheKey) {
             return (
                 image: cached,
                 titleBarStyle: titleBarStyleInferenceEnabled ? windowContext.inferredTitleBarStyle : nil
             )
         }
 
-        let attemptKey = "\(appID)#\(window.id)"
-        if previewCaptureAttemptedKeys.contains(attemptKey) {
+        if previewCaptureAttemptedKeys.contains(previewCacheKey) {
             return (
                 image: nil,
                 titleBarStyle: titleBarStyleInferenceEnabled ? windowContext.inferredTitleBarStyle : nil
             )
         }
-        previewCaptureAttemptedKeys.insert(attemptKey)
+        previewCaptureAttemptedKeys.insert(previewCacheKey)
 
         RuntimeLog.info(
             "Preview",
@@ -806,8 +810,8 @@ final class LiveSwitcherModel: ObservableObject {
         }
 
         windowContext.cgWindowID = capture.resolvedWindowID
-        windowContext.previewImage = capture.image
         windowContext.inferredTitleBarStyle = capture.titleBarStyle
+        previewImageCache.insert(capture.image, forKey: previewCacheKey)
         var windowsByID = appContext.windowsByID
         windowsByID[window.id] = windowContext
         appContext = RuntimeAppContext(
@@ -897,6 +901,7 @@ final class LiveSwitcherModel: ObservableObject {
         }
 
         runtimeContextsByID = [frontmostAppID: context]
+        previewImageCache.removeAll()
         previewCaptureAttemptedKeys = []
         autoEnterSuppressedAppID = nil
         let preferences = SwitcherBehaviorPreferencesStore.loadSwitcherPreferences()
@@ -946,6 +951,7 @@ final class LiveSwitcherModel: ObservableObject {
         }
 
         runtimeContextsByID = snapshot.contextsByID
+        previewImageCache.removeAll()
         previewCaptureAttemptedKeys = []
         autoEnterSuppressedAppID = nil
         let preferences = SwitcherBehaviorPreferencesStore.loadSwitcherPreferences()
@@ -1060,6 +1066,7 @@ final class LiveSwitcherModel: ObservableObject {
 
     private func resetRuntimeState() {
         runtimeContextsByID = [:]
+        previewImageCache.removeAll()
         previewCaptureAttemptedKeys = []
         autoEnterSuppressedAppID = nil
         titleBarStyleInferenceEnabled = false
