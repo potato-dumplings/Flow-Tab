@@ -17,7 +17,55 @@ enum AppPreferenceKeys {
     static let autoRestoreMinimizedWindowOnSwitch = "autoRestoreMinimizedWindowOnSwitch"
     static let hideMinimizedAppsFromAppLayer = "hideMinimizedAppsFromAppLayer"
     static let enableVerboseDiagnostics = "enableVerboseDiagnostics"
+    static let runtimeLogLevel = "runtimeLogLevel"
     static let themeMode = "themeMode"
+}
+
+enum RuntimeLogLevel: String, CaseIterable, Comparable, Identifiable {
+    case debug = "DEBUG"
+    case info = "INFO"
+    case warning = "WARN"
+    case error = "ERROR"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        rawValue
+    }
+
+    private var priority: Int {
+        switch self {
+        case .debug:
+            return 0
+        case .info:
+            return 1
+        case .warning:
+            return 2
+        case .error:
+            return 3
+        }
+    }
+
+    static func < (lhs: RuntimeLogLevel, rhs: RuntimeLogLevel) -> Bool {
+        lhs.priority < rhs.priority
+    }
+}
+
+enum RuntimeLogPreferencesStore {
+    static let defaultLevel: RuntimeLogLevel = .error
+
+    static func resolve(rawValue: String) -> RuntimeLogLevel {
+        RuntimeLogLevel(rawValue: rawValue) ?? defaultLevel
+    }
+
+    static func loadMinimumLevel(userDefaults: UserDefaults = .standard) -> RuntimeLogLevel {
+        let rawValue = userDefaults.string(forKey: AppPreferenceKeys.runtimeLogLevel) ?? defaultLevel.rawValue
+        let resolved = resolve(rawValue: rawValue)
+        if rawValue != resolved.rawValue {
+            userDefaults.set(resolved.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
+        }
+        return resolved
+    }
 }
 
 extension Notification.Name {
@@ -1372,6 +1420,8 @@ private struct AppLogsView: View {
     let isActive: Bool
 
     @AppStorage(AppPreferenceKeys.enableVerboseDiagnostics) private var enableVerboseDiagnostics = false
+    @AppStorage(AppPreferenceKeys.runtimeLogLevel)
+    private var runtimeLogLevelRaw = RuntimeLogPreferencesStore.defaultLevel.rawValue
     @AppStorage(AppPreferenceKeys.hotkeyPrimaryModifier)
     private var hotkeyPrimaryModifierRaw = SwitcherHotkeyPreferencesStore.defaultPrimaryModifier.rawValue
     @AppStorage(AppPreferenceKeys.hotkeyMainKey)
@@ -1404,6 +1454,7 @@ private struct AppLogsView: View {
                     if isActive {
                         RuntimeLogsSection(
                             enableVerboseDiagnostics: $enableVerboseDiagnostics,
+                            runtimeLogLevelRaw: $runtimeLogLevelRaw,
                             hotkeyShortcutText: hotkeyConfiguration.mainShortcutText
                         )
                     }
@@ -2131,14 +2182,108 @@ private struct AppSettingsView: View {
     }
 }
 
+@MainActor
+private final class RuntimeLogLinesViewModel: ObservableObject {
+    @Published private(set) var lines: [String] = []
+
+    private let lineLimit = 300
+    private let refreshIntervalNs: UInt64 = 1_000_000_000
+    private var refreshTask: Task<Void, Never>?
+    private var clearSnapshot: RuntimeLogFileStore.ReadSnapshot?
+
+    func start(minimumLevel: RuntimeLogLevel, resetSnapshot: Bool = false) {
+        if resetSnapshot {
+            clearSnapshot = nil
+        }
+        stop()
+        refreshTask = Task { [weak self] in
+            guard let self else { return }
+            await self.reload(minimumLevel: minimumLevel)
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: refreshIntervalNs)
+                await self.reload(minimumLevel: minimumLevel)
+            }
+        }
+    }
+
+    func clearDisplayedOutput(minimumLevel: RuntimeLogLevel) {
+        stop()
+        lines = []
+        refreshTask = Task { [weak self] in
+            guard let self else { return }
+            let snapshot = await RuntimeDiagnostics.shared.makeReadSnapshot()
+            guard !Task.isCancelled else { return }
+            self.clearSnapshot = snapshot
+            await self.reload(minimumLevel: minimumLevel)
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: refreshIntervalNs)
+                await self.reload(minimumLevel: minimumLevel)
+            }
+        }
+    }
+
+    func stop() {
+        refreshTask?.cancel()
+        refreshTask = nil
+    }
+
+    deinit {
+        refreshTask?.cancel()
+    }
+
+    private func reload(minimumLevel: RuntimeLogLevel) async {
+        let nextLines = await RuntimeDiagnostics.shared.readRecentLines(
+            limit: lineLimit,
+            minimumLevel: minimumLevel,
+            since: clearSnapshot
+        )
+        guard !Task.isCancelled else { return }
+        lines = nextLines
+    }
+}
+
 private struct RuntimeLogsSection: View {
     @Binding var enableVerboseDiagnostics: Bool
+    @Binding var runtimeLogLevelRaw: String
     let hotkeyShortcutText: String
 
-    @ObservedObject private var diagnostics = RuntimeDiagnostics.shared
+    @StateObject private var logsViewModel = RuntimeLogLinesViewModel()
 
-    private var diagnosticsEntriesForDisplay: [RuntimeDiagnostics.Entry] {
-        Array(diagnostics.entries.suffix(300))
+    private var selectedLogLevel: RuntimeLogLevel {
+        RuntimeLogPreferencesStore.resolve(rawValue: runtimeLogLevelRaw)
+    }
+
+    private func synchronizeLogLevelIfNeeded() {
+        let resolved = RuntimeLogPreferencesStore.resolve(rawValue: runtimeLogLevelRaw)
+        if resolved.rawValue != runtimeLogLevelRaw {
+            runtimeLogLevelRaw = resolved.rawValue
+        }
+    }
+
+    private func openLogsDirectory() {
+        let logsURL = URL(fileURLWithPath: RuntimeDiagnostics.logsDirectoryPath, isDirectory: true)
+        _ = NSWorkspace.shared.open(logsURL)
+    }
+
+    private var logsActionButtonTint: Color {
+        Color(.sRGB, red: 58 / 255, green: 128 / 255, blue: 247 / 255, opacity: 1)
+    }
+
+    private struct LogsActionButtonStyle: ButtonStyle {
+        let tint: Color
+
+        func makeBody(configuration: Configuration) -> some View {
+            configuration.label
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 10)
+                .frame(height: 28)
+                .background(
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(tint.opacity(configuration.isPressed ? 0.85 : 1))
+                )
+                .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+        }
     }
 
     var body: some View {
@@ -2148,43 +2293,82 @@ private struct RuntimeLogsSection: View {
                     .toggleStyle(.switch)
                     .font(.system(size: 12))
 
+                HStack(spacing: 10) {
+                    Text("日志等级")
+                        .font(.system(size: 12))
+                    Picker("日志等级", selection: $runtimeLogLevelRaw) {
+                        ForEach(RuntimeLogLevel.allCases) { level in
+                            Text(level.displayName).tag(level.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 120)
+                }
+
                 Text("本地日志目录：\(RuntimeDiagnostics.logsDirectoryPath)")
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
                     .lineLimit(2)
 
-                FlowActionButton(title: "清空日志", tone: .grayDominant) {
-                    diagnostics.clear()
+                HStack(spacing: 8) {
+                    Button("打开目录") {
+                        openLogsDirectory()
+                    }
+                    .buttonStyle(LogsActionButtonStyle(tint: logsActionButtonTint))
+
+                    Button("清空日志") {
+                        logsViewModel.clearDisplayedOutput(minimumLevel: selectedLogLevel)
+                    }
+                    .buttonStyle(LogsActionButtonStyle(tint: logsActionButtonTint))
                 }
 
                 ScrollView {
                     Group {
-                        if diagnosticsEntriesForDisplay.isEmpty {
+                        if logsViewModel.lines.isEmpty {
                             Text("暂无日志。触发 \(hotkeyShortcutText) 后再回来看。")
                                 .font(.system(size: 12))
                                 .foregroundStyle(.secondary)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         } else {
                             LazyVStack(alignment: .leading, spacing: 2) {
-                                ForEach(diagnosticsEntriesForDisplay) { entry in
-                                    Text(entry.displayLine)
+                                ForEach(Array(logsViewModel.lines.enumerated()), id: \.offset) { _, line in
+                                    Text(line)
                                         .font(.system(size: 11, design: .monospaced))
                                         .foregroundStyle(.secondary)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .lineLimit(1)
+                                        .truncationMode(.middle)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 4)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
                                 }
                             }
-                            .textSelection(.enabled)
                         }
                     }
                     .padding(8)
                 }
-                .frame(minHeight: 240, maxHeight: 320)
+                .frame(minHeight: 320, maxHeight: 440)
                 .background(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .fill(Color.primary.opacity(0.04))
                 )
             }
+        }
+        .onAppear {
+            synchronizeLogLevelIfNeeded()
+            logsViewModel.start(minimumLevel: selectedLogLevel, resetSnapshot: true)
+        }
+        .onChange(of: runtimeLogLevelRaw) { _, newValue in
+            let resolved = RuntimeLogPreferencesStore.resolve(rawValue: newValue)
+            if newValue != resolved.rawValue {
+                runtimeLogLevelRaw = resolved.rawValue
+                return
+            }
+            logsViewModel.start(minimumLevel: resolved)
+        }
+        .onDisappear {
+            logsViewModel.stop()
         }
     }
 }
@@ -2434,16 +2618,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-@MainActor
-final class RuntimeDiagnostics: ObservableObject {
-    struct Entry: Identifiable {
-        let id = UUID()
-        let timestamp: Date
-        let category: String
-        let message: String
-        let displayLine: String
-    }
-
+final class RuntimeDiagnostics {
     static let shared = RuntimeDiagnostics()
     private static let timestampFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -2452,12 +2627,6 @@ final class RuntimeDiagnostics: ObservableObject {
         return formatter
     }()
 
-    @Published private(set) var entries: [Entry] = []
-    private let maxEntries = 200
-    private let flushIntervalNs: UInt64 = 50_000_000
-    private let immediateFlushThreshold = 120
-    private var pendingEntries: [Entry] = []
-    private var flushTask: Task<Void, Never>?
     private let fileStore = RuntimeLogFileStore.shared
 
     private init() {}
@@ -2470,50 +2639,25 @@ final class RuntimeDiagnostics: ObservableObject {
         RuntimeLogFileStore.shared.logsDirectoryPath
     }
 
-    func log(category: String, message: String) {
+    func log(level: RuntimeLogLevel, category: String, message: String) {
         let timestamp = Date()
-        let entry = Entry(
-            timestamp: timestamp,
-            category: category,
-            message: message,
-            displayLine: "[\(Self.formattedTimestamp(timestamp))] [\(category)] \(message)"
-        )
-        pendingEntries.append(entry)
-        fileStore.append(entry.displayLine)
-
-        if pendingEntries.count >= immediateFlushThreshold {
-            flushPendingEntries()
-            return
-        }
-        scheduleFlushIfNeeded()
+        let displayLine = "[\(Self.formattedTimestamp(timestamp))] [\(level.rawValue)] [\(category)] \(message)"
+        fileStore.append(displayLine)
     }
 
-    private func scheduleFlushIfNeeded() {
-        guard flushTask == nil else { return }
-        flushTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            try? await Task.sleep(nanoseconds: self.flushIntervalNs)
-            guard !Task.isCancelled else { return }
-            self.flushTask = nil
-            self.flushPendingEntries()
-        }
+    func makeReadSnapshot() async -> RuntimeLogFileStore.ReadSnapshot {
+        await fileStore.makeReadSnapshot()
     }
 
-    private func flushPendingEntries() {
-        guard !pendingEntries.isEmpty else { return }
-        entries.append(contentsOf: pendingEntries)
-        pendingEntries.removeAll(keepingCapacity: true)
-
-        if entries.count > maxEntries {
-            entries.removeFirst(entries.count - maxEntries)
-        }
+    func readRecentLines(
+        limit: Int,
+        minimumLevel: RuntimeLogLevel,
+        since snapshot: RuntimeLogFileStore.ReadSnapshot? = nil
+    ) async -> [String] {
+        await fileStore.readRecentLines(limit: limit, minimumLevel: minimumLevel, since: snapshot)
     }
 
     func clear() {
-        flushTask?.cancel()
-        flushTask = nil
-        pendingEntries.removeAll(keepingCapacity: false)
-        entries.removeAll()
         fileStore.clear()
     }
 }
@@ -2521,14 +2665,38 @@ final class RuntimeDiagnostics: ObservableObject {
 final class RuntimeLogFileStore {
     static let shared = RuntimeLogFileStore()
 
+    struct ReadSnapshot {
+        let fileSizesByPath: [String: Int]
+    }
+
+    private static let fileNameTimestampFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyyMMdd_HHmmss"
+        return formatter
+    }()
+    private static let logFilePrefix: String = {
+        let displayName = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
+        let bundleName = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String
+        let rawName = (displayName?.isEmpty == false ? displayName : bundleName) ?? "FlowTabApp"
+        let sanitized = rawName
+            .replacingOccurrences(
+                of: #"[^A-Za-z0-9_-]"#,
+                with: "_",
+                options: .regularExpression
+            )
+        return "\(sanitized)_"
+    }()
+    private static let logFileExtension = ".log"
+
     private let queue = DispatchQueue(label: "FlowTab.RuntimeLogFileStore", qos: .utility)
     private let fileManager = FileManager.default
     private let maxFileSizeBytes = 1_000_000
-    private let maxArchiveFiles = 4
+    private let maxLogFiles = 5
     private let flushDelay: TimeInterval = 0.05
     private let immediateFlushThreshold = 120
     private let logsDirectoryURL: URL
-    private let activeLogURL: URL
+    private var activeLogURL: URL?
     private var pendingLines: [String] = []
     private var flushWorkItem: DispatchWorkItem?
 
@@ -2540,7 +2708,7 @@ final class RuntimeLogFileStore {
         let fallbackURL = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
         let baseURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ?? fallbackURL
         logsDirectoryURL = baseURL.appendingPathComponent("FlowTabApp/logs", isDirectory: true)
-        activeLogURL = logsDirectoryURL.appendingPathComponent("runtime.log", isDirectory: false)
+        activeLogURL = nil
     }
 
     func append(_ line: String) {
@@ -2565,6 +2733,42 @@ final class RuntimeLogFileStore {
         }
     }
 
+    func makeReadSnapshot() async -> ReadSnapshot {
+        await withCheckedContinuation { continuation in
+            queue.async {
+                self.flushWorkItem?.cancel()
+                self.flushWorkItem = nil
+                self.flushLocked()
+                continuation.resume(returning: self.makeReadSnapshotLocked())
+            }
+        }
+    }
+
+    func readRecentLines(
+        limit: Int,
+        minimumLevel: RuntimeLogLevel,
+        since snapshot: ReadSnapshot? = nil
+    ) async -> [String] {
+        await withCheckedContinuation { continuation in
+            queue.async {
+                self.flushWorkItem?.cancel()
+                self.flushWorkItem = nil
+                self.flushLocked()
+                let lines: [String]
+                if let snapshot {
+                    lines = self.readRecentLinesSinceSnapshotLocked(
+                        limit: limit,
+                        minimumLevel: minimumLevel,
+                        snapshot: snapshot
+                    )
+                } else {
+                    lines = self.readRecentLinesLocked(limit: limit, minimumLevel: minimumLevel)
+                }
+                continuation.resume(returning: lines)
+            }
+        }
+    }
+
     private func scheduleFlushLocked() {
         guard flushWorkItem == nil else { return }
         let workItem = DispatchWorkItem { [weak self] in
@@ -2583,8 +2787,9 @@ final class RuntimeLogFileStore {
 
         do {
             try ensureLogsDirectoryLocked()
-            try rotateIfNeededLocked(appendingByteCount: block.utf8.count)
-            try appendToFileLocked(block)
+            let targetLogURL = try targetLogURLLocked(appendingByteCount: block.utf8.count)
+            try appendToFileLocked(block, to: targetLogURL)
+            try enforceMaxLogFilesLocked()
         } catch {}
     }
 
@@ -2598,46 +2803,66 @@ final class RuntimeLogFileStore {
         )
     }
 
-    private func appendToFileLocked(_ block: String) throws {
-        if !fileManager.fileExists(atPath: activeLogURL.path) {
-            try block.write(to: activeLogURL, atomically: true, encoding: .utf8)
+    private func appendToFileLocked(_ block: String, to url: URL) throws {
+        if !fileManager.fileExists(atPath: url.path) {
+            try block.write(to: url, atomically: true, encoding: .utf8)
             return
         }
 
-        let handle = try FileHandle(forWritingTo: activeLogURL)
+        let handle = try FileHandle(forWritingTo: url)
         defer { try? handle.close() }
         try handle.seekToEnd()
         try handle.write(contentsOf: Data(block.utf8))
     }
 
-    private func rotateIfNeededLocked(appendingByteCount: Int) throws {
-        let currentSize = fileSizeLocked(for: activeLogURL)
+    private func targetLogURLLocked(appendingByteCount: Int) throws -> URL {
+        let currentURL = try ensureActiveLogFileLocked()
+        let currentSize = fileSizeLocked(for: currentURL)
         if currentSize + appendingByteCount <= maxFileSizeBytes {
-            return
+            return currentURL
         }
-
-        let oldestURL = archiveLogURL(index: maxArchiveFiles)
-        if fileManager.fileExists(atPath: oldestURL.path) {
-            try fileManager.removeItem(at: oldestURL)
-        }
-
-        if maxArchiveFiles > 1 {
-            for index in stride(from: maxArchiveFiles - 1, through: 1, by: -1) {
-                let sourceURL = archiveLogURL(index: index)
-                let destinationURL = archiveLogURL(index: index + 1)
-                if fileManager.fileExists(atPath: sourceURL.path) {
-                    try fileManager.moveItem(at: sourceURL, to: destinationURL)
-                }
-            }
-        }
-
-        if fileManager.fileExists(atPath: activeLogURL.path) {
-            try fileManager.moveItem(at: activeLogURL, to: archiveLogURL(index: 1))
-        }
+        return try createNewActiveLogFileLocked()
     }
 
-    private func archiveLogURL(index: Int) -> URL {
-        logsDirectoryURL.appendingPathComponent("runtime.\(index).log", isDirectory: false)
+    private func ensureActiveLogFileLocked() throws -> URL {
+        if let activeLogURL, fileManager.fileExists(atPath: activeLogURL.path) {
+            return activeLogURL
+        }
+        return try createNewActiveLogFileLocked()
+    }
+
+    private func createNewActiveLogFileLocked() throws -> URL {
+        let timestamp = Self.fileNameTimestampFormatter.string(from: Date())
+        var candidateName = "\(Self.logFilePrefix)\(timestamp)\(Self.logFileExtension)"
+        var candidateURL = logsDirectoryURL.appendingPathComponent(candidateName, isDirectory: false)
+        var suffix = 1
+
+        while fileManager.fileExists(atPath: candidateURL.path) {
+            candidateName = "\(Self.logFilePrefix)\(timestamp)-\(suffix)\(Self.logFileExtension)"
+            candidateURL = logsDirectoryURL.appendingPathComponent(candidateName, isDirectory: false)
+            suffix += 1
+        }
+
+        try Data().write(to: candidateURL)
+        activeLogURL = candidateURL
+        return candidateURL
+    }
+
+    private func enforceMaxLogFilesLocked() throws {
+        let fileURLs = orderedLogFileURLsOldestFirstLocked()
+        var existingCount = fileURLs.count
+        guard existingCount > maxLogFiles else { return }
+
+        for url in fileURLs {
+            if existingCount <= maxLogFiles {
+                break
+            }
+            if url == activeLogURL {
+                continue
+            }
+            try fileManager.removeItem(at: url)
+            existingCount -= 1
+        }
     }
 
     private func fileSizeLocked(for url: URL) -> Int {
@@ -2651,15 +2876,208 @@ final class RuntimeLogFileStore {
     }
 
     private func clearFilesLocked() {
-        if fileManager.fileExists(atPath: activeLogURL.path) {
-            try? fileManager.removeItem(at: activeLogURL)
-        }
-        for index in 1...maxArchiveFiles {
-            let archiveURL = archiveLogURL(index: index)
-            if fileManager.fileExists(atPath: archiveURL.path) {
-                try? fileManager.removeItem(at: archiveURL)
+        for logURL in allManagedLogFileURLsLocked() {
+            if fileManager.fileExists(atPath: logURL.path) {
+                try? fileManager.removeItem(at: logURL)
             }
         }
+        activeLogURL = nil
+    }
+
+    private func makeReadSnapshotLocked() -> ReadSnapshot {
+        var fileSizesByPath: [String: Int] = [:]
+        for url in allManagedLogFileURLsLocked() {
+            fileSizesByPath[url.path] = fileSizeLocked(for: url)
+        }
+        return ReadSnapshot(fileSizesByPath: fileSizesByPath)
+    }
+
+    private func allManagedLogFileURLsLocked() -> [URL] {
+        guard fileManager.fileExists(atPath: logsDirectoryURL.path) else { return [] }
+        guard let urls = try? fileManager.contentsOfDirectory(
+            at: logsDirectoryURL,
+            includingPropertiesForKeys: [.contentModificationDateKey, .creationDateKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return []
+        }
+        return urls.filter { isManagedLogFileNameLocked($0.lastPathComponent) }
+    }
+
+    private func isManagedLogFileNameLocked(_ fileName: String) -> Bool {
+        fileName.hasPrefix(Self.logFilePrefix) && fileName.hasSuffix(Self.logFileExtension)
+    }
+
+    private func orderedLogFileURLsOldestFirstLocked() -> [URL] {
+        Array(orderedLogFileURLsNewestFirstLocked().reversed())
+    }
+
+    private func readRecentLinesLocked(limit: Int, minimumLevel: RuntimeLogLevel) -> [String] {
+        guard limit > 0 else { return [] }
+
+        var recentLinesNewestFirst: [String] = []
+        let targetCount = limit * 2
+        let tailBytesPerFile = min(maxFileSizeBytes, max(64_000, limit * 1_024))
+
+        for url in orderedLogFileURLsNewestFirstLocked() {
+            let fileTailLines = readTailLinesLocked(from: url, maximumBytes: tailBytesPerFile)
+            guard !fileTailLines.isEmpty else { continue }
+
+            for line in fileTailLines.reversed() {
+                if parsedLogLevelLocked(from: line) >= minimumLevel {
+                    recentLinesNewestFirst.append(line)
+                }
+                if recentLinesNewestFirst.count >= targetCount {
+                    break
+                }
+            }
+
+            if recentLinesNewestFirst.count >= targetCount {
+                break
+            }
+        }
+
+        let limitedNewestFirst = Array(recentLinesNewestFirst.prefix(limit))
+        return Array(limitedNewestFirst.reversed())
+    }
+
+    private func readRecentLinesSinceSnapshotLocked(
+        limit: Int,
+        minimumLevel: RuntimeLogLevel,
+        snapshot: ReadSnapshot
+    ) -> [String] {
+        guard limit > 0 else { return [] }
+
+        var recentLinesNewestFirst: [String] = []
+        let targetCount = limit * 2
+        let tailBytesPerFile = min(maxFileSizeBytes, max(64_000, limit * 1_024))
+
+        for url in orderedLogFileURLsNewestFirstLocked() {
+            let currentSize = fileSizeLocked(for: url)
+            guard currentSize > 0 else { continue }
+
+            let originalStartOffset = min(snapshot.fileSizesByPath[url.path] ?? 0, currentSize)
+            guard originalStartOffset < currentSize else { continue }
+
+            let boundedStartOffset = max(originalStartOffset, currentSize - tailBytesPerFile)
+            let shouldDropLeadingPartialLine = boundedStartOffset > originalStartOffset
+            let appendedLines = readLinesLocked(
+                from: url,
+                startOffset: boundedStartOffset,
+                dropLeadingPartialLine: shouldDropLeadingPartialLine
+            )
+            guard !appendedLines.isEmpty else { continue }
+
+            for line in appendedLines.reversed() {
+                if parsedLogLevelLocked(from: line) >= minimumLevel {
+                    recentLinesNewestFirst.append(line)
+                }
+                if recentLinesNewestFirst.count >= targetCount {
+                    break
+                }
+            }
+
+            if recentLinesNewestFirst.count >= targetCount {
+                break
+            }
+        }
+
+        let limitedNewestFirst = Array(recentLinesNewestFirst.prefix(limit))
+        return Array(limitedNewestFirst.reversed())
+    }
+
+    private func orderedLogFileURLsNewestFirstLocked() -> [URL] {
+        allManagedLogFileURLsLocked().sorted { leftURL, rightURL in
+            let leftDate = modifiedDateLocked(for: leftURL) ?? Date.distantPast
+            let rightDate = modifiedDateLocked(for: rightURL) ?? Date.distantPast
+            if leftDate != rightDate {
+                return leftDate > rightDate
+            }
+            return leftURL.lastPathComponent > rightURL.lastPathComponent
+        }
+    }
+
+    private func modifiedDateLocked(for url: URL) -> Date? {
+        guard let values = try? url.resourceValues(forKeys: [.contentModificationDateKey, .creationDateKey]) else {
+            return nil
+        }
+        return values.contentModificationDate ?? values.creationDate
+    }
+
+    private func readTailLinesLocked(from url: URL, maximumBytes: Int) -> [String] {
+        guard maximumBytes > 0 else { return [] }
+        guard
+            let attributes = try? fileManager.attributesOfItem(atPath: url.path),
+            let sizeValue = attributes[.size] as? NSNumber
+        else {
+            return []
+        }
+
+        let fileSize = sizeValue.intValue
+        guard fileSize > 0 else { return [] }
+
+        let readSize = min(fileSize, maximumBytes)
+        let offset = max(0, fileSize - readSize)
+
+        do {
+            let handle = try FileHandle(forReadingFrom: url)
+            defer { try? handle.close() }
+            try handle.seek(toOffset: UInt64(offset))
+            guard let data = try handle.readToEnd(), !data.isEmpty else {
+                return []
+            }
+            guard let text = String(data: data, encoding: .utf8), !text.isEmpty else {
+                return []
+            }
+
+            var lines = text
+                .split(whereSeparator: \.isNewline)
+                .map(String.init)
+
+            if offset > 0, !lines.isEmpty {
+                lines.removeFirst()
+            }
+            return lines
+        } catch {
+            return []
+        }
+    }
+
+    private func readLinesLocked(from url: URL, startOffset: Int, dropLeadingPartialLine: Bool) -> [String] {
+        guard startOffset >= 0 else { return [] }
+
+        do {
+            let handle = try FileHandle(forReadingFrom: url)
+            defer { try? handle.close() }
+            try handle.seek(toOffset: UInt64(startOffset))
+            guard let data = try handle.readToEnd(), !data.isEmpty else {
+                return []
+            }
+            guard let text = String(data: data, encoding: .utf8), !text.isEmpty else {
+                return []
+            }
+
+            var lines = text
+                .split(whereSeparator: \.isNewline)
+                .map(String.init)
+
+            if dropLeadingPartialLine, !lines.isEmpty {
+                lines.removeFirst()
+            }
+
+            return lines
+        } catch {
+            return []
+        }
+    }
+
+    private func parsedLogLevelLocked(from line: String) -> RuntimeLogLevel {
+        let segments = line.split(separator: "]", omittingEmptySubsequences: false)
+        guard segments.count >= 2 else { return .info }
+        let levelToken = segments[1].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard levelToken.hasPrefix("[") else { return .info }
+        let rawValue = String(levelToken.dropFirst())
+        return RuntimeLogLevel(rawValue: rawValue) ?? .info
     }
 }
 
@@ -2678,23 +3096,36 @@ enum RuntimeLog {
         UserDefaults.standard.bool(forKey: AppPreferenceKeys.enableVerboseDiagnostics)
     }
 
-    private static func shouldRecord(_ category: String) -> Bool {
-        if noisyCategories.contains(category) {
-            return isVerboseEnabled
+    private static var minimumLevel: RuntimeLogLevel {
+        RuntimeLogPreferencesStore.loadMinimumLevel()
+    }
+
+    private static func shouldRecord(level: RuntimeLogLevel, category: String) -> Bool {
+        guard level >= minimumLevel else { return false }
+        if noisyCategories.contains(category), !isVerboseEnabled {
+            return level >= .warning
         }
         return true
     }
 
-    static func info(_ category: String, _ message: @autoclosure @escaping () -> String) {
-        guard shouldRecord(category) else { return }
-        if Thread.isMainThread {
-            MainActor.assumeIsolated {
-                RuntimeDiagnostics.shared.log(category: category, message: message())
-            }
-            return
-        }
-        Task { @MainActor in
-            RuntimeDiagnostics.shared.log(category: category, message: message())
-        }
+    private static func emit(
+        level: RuntimeLogLevel,
+        category: String,
+        message: @autoclosure () -> String
+    ) {
+        guard shouldRecord(level: level, category: category) else { return }
+        RuntimeDiagnostics.shared.log(level: level, category: category, message: message())
+    }
+
+    static func info(_ category: String, _ message: @autoclosure () -> String) {
+        emit(level: .info, category: category, message: message())
+    }
+
+    static func warning(_ category: String, _ message: @autoclosure () -> String) {
+        emit(level: .warning, category: category, message: message())
+    }
+
+    static func error(_ category: String, _ message: @autoclosure () -> String) {
+        emit(level: .error, category: category, message: message())
     }
 }
