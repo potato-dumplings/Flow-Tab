@@ -165,7 +165,7 @@ public struct SwitcherSession: Sendable {
             wraps: preferences.groupNavigationWraps
         )
         if let appID = groups[selectedGroupIndex].apps.first?.id {
-            selectApp(withID: appID)
+            selectAppInternally(withID: appID)
         }
     }
 
@@ -181,7 +181,7 @@ public struct SwitcherSession: Sendable {
             delta: delta,
             wraps: preferences.groupNavigationWraps
         )
-        selectApp(withID: group.apps[nextLocalIndex].id)
+        selectAppInternally(withID: group.apps[nextLocalIndex].id)
     }
 
     public mutating func enterWindowCycleIfPossible() {
@@ -212,7 +212,29 @@ public struct SwitcherSession: Sendable {
         )
     }
 
-    private mutating func selectApp(withID appID: String) {
+    @discardableResult
+    public mutating func selectApp(withID appID: String) -> Bool {
+        guard !apps.isEmpty else { return false }
+        guard let appIndex = apps.firstIndex(where: { $0.id == appID }) else { return false }
+        selectedAppIndex = appIndex
+        selectedGroupIndex = Grouping.groupIndex(containing: appID, groups: groups)
+        mode = .appCycle
+        return true
+    }
+
+    @discardableResult
+    public mutating func selectWindow(appID: String, windowID: String) -> Bool {
+        guard let appIndex = apps.firstIndex(where: { $0.id == appID }) else { return false }
+        let app = apps[appIndex]
+        guard let windowIndex = app.windows.firstIndex(where: { $0.id == windowID }) else { return false }
+        selectedAppIndex = appIndex
+        selectedGroupIndex = Grouping.groupIndex(containing: appID, groups: groups)
+        selectedWindowIndexByAppID[appID] = windowIndex
+        mode = .windowCycle(appID: appID)
+        return true
+    }
+
+    private mutating func selectAppInternally(withID appID: String) {
         if let appIndex = apps.firstIndex(where: { $0.id == appID }) {
             selectedAppIndex = appIndex
         }
