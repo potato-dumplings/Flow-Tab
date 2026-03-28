@@ -203,9 +203,9 @@ extension ThemeMode {
         case .followSystem:
             return "跟随系统"
         case .light:
-            return "纯白（白天）"
+            return "浅色"
         case .dark:
-            return "纯黑（黑色）"
+            return "深色"
         }
     }
 
@@ -278,17 +278,19 @@ enum AppWindowCoordinator {
 @main
 struct FlowTabAppApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    private let appWindowWidth: CGFloat = 1120
+    private let appWindowHeight: CGFloat = 760
 
     var body: some Scene {
         WindowGroup("FlowTab") {
             HomeRootView()
-                .frame(minWidth: 1120, minHeight: 760)
+                .frame(minWidth: appWindowWidth, minHeight: appWindowHeight)
         }
-        .defaultSize(width: 1280, height: 840)
+        .defaultSize(width: appWindowWidth, height: appWindowHeight)
 
         Settings {
             HomeRootView()
-                .frame(minWidth: 1120, minHeight: 760)
+                .frame(minWidth: appWindowWidth, minHeight: appWindowHeight)
         }
 
         .commands {
@@ -1165,7 +1167,21 @@ private struct HomeSectionCard<Content: View>: View {
         if colorScheme == .dark {
             return Color(red: 0.13, green: 0.13, blue: 0.15).opacity(0.96)
         }
-        return Color.white.opacity(0.92)
+        return Color(red: 0.965, green: 0.97, blue: 0.978)
+    }
+
+    private var cardBorderColor: Color {
+        if colorScheme == .dark {
+            return Color.primary.opacity(0.1)
+        }
+        return Color.black.opacity(0.14)
+    }
+
+    private var cardShadowColor: Color {
+        if colorScheme == .dark {
+            return .clear
+        }
+        return Color.black.opacity(0.05)
     }
 
     init(title: String, subtitle: String, @ViewBuilder content: () -> Content) {
@@ -1191,10 +1207,11 @@ private struct HomeSectionCard<Content: View>: View {
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(cardBackgroundColor)
+                .shadow(color: cardShadowColor, radius: 6, x: 0, y: 2)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                .stroke(cardBorderColor, lineWidth: 1)
         )
     }
 }
@@ -1497,9 +1514,8 @@ private struct AppSettingsView: View {
     }
 
     private var themeModeCapsuleSelector: some View {
-        let modes = ThemeMode.allCases
-        return HStack(spacing: 0) {
-            ForEach(Array(modes.enumerated()), id: \.element.rawValue) { index, mode in
+        HStack(spacing: 4) {
+            ForEach(ThemeMode.allCases, id: \.rawValue) { mode in
                 let isSelected = themeModeRaw == mode.rawValue
                 Button {
                     themeModeRaw = mode.rawValue
@@ -1507,31 +1523,25 @@ private struct AppSettingsView: View {
                     Text(mode.displayName)
                         .font(.system(size: 12, weight: .medium))
                         .lineLimit(1)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
-                        .background(
-                            Capsule()
-                                .fill(isSelected ? Color.accentColor.opacity(0.18) : Color.clear)
-                        )
+                        .frame(maxWidth: .infinity, minHeight: 28)
+                        .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                 }
                 .buttonStyle(.plain)
-
-                if index < modes.count - 1 {
-                    Rectangle()
-                        .fill(Color.primary.opacity(0.12))
-                        .frame(width: 1, height: 14)
-                        .padding(.horizontal, 2)
-                }
+                .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
+                .background(
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .fill(isSelected ? Color.accentColor.opacity(0.18) : Color.clear)
+                )
             }
         }
         .padding(2)
+        .frame(width: 300)
         .background(
-            Capsule()
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(Color.primary.opacity(0.05))
         )
         .overlay(
-            Capsule()
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .stroke(Color.primary.opacity(0.12), lineWidth: 1)
         )
     }
@@ -1556,7 +1566,6 @@ private struct AppSettingsView: View {
     private var settingsRightColumn: some View {
         VStack(alignment: .leading, spacing: 12) {
             hotkeySettingsCard
-            shortcutBlankFillCard
         }
     }
 
@@ -1584,17 +1593,6 @@ private struct AppSettingsView: View {
                 .labelsHidden()
                 .toggleStyle(.switch)
         }
-    }
-
-    private var shortcutBlankFillCard: some View {
-        RoundedRectangle(cornerRadius: 12, style: .continuous)
-            .fill(Color.primary.opacity(0.03))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-            )
-            .frame(maxWidth: .infinity)
-            .frame(minHeight: 176)
     }
 
     private var appearanceSettingsCard: some View {
