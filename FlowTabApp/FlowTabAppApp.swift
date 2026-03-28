@@ -264,7 +264,7 @@ enum AppWindowCoordinator {
     }
 
     @MainActor
-    private static func activateMainWindowOrOpenHomeScene() {
+    static func activateMainWindowOrOpenHomeScene() {
         NSApp.activate(ignoringOtherApps: true)
         if let window = NSApp.windows.first(where: { !($0 is NSPanel) }) {
             window.makeKeyAndOrderFront(nil)

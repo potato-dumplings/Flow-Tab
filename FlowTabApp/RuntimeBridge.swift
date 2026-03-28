@@ -417,6 +417,9 @@ final class RuntimeActivator {
 
     private func activateApp(appID: String, contextsByID: [String: RuntimeAppContext]) {
         guard let context = contextsByID[appID] else { return }
+        if activateCurrentAppIfNeeded(context.runningApp) {
+            return
+        }
         context.runningApp.activate(options: [.activateAllWindows])
     }
 
@@ -427,6 +430,9 @@ final class RuntimeActivator {
         contextsByID: [String: RuntimeAppContext]
     ) {
         guard let context = contextsByID[appID] else { return }
+        if activateCurrentAppIfNeeded(context.runningApp) {
+            return
+        }
         context.runningApp.activate(options: [.activateAllWindows])
         guard let windowContext = context.windowsByID[windowID] else { return }
         focusWindow(
@@ -465,6 +471,15 @@ final class RuntimeActivator {
             focus(window: window, restoreIfMinimized: restoreIfMinimized)
             return
         }
+    }
+
+    @discardableResult
+    private func activateCurrentAppIfNeeded(_ app: NSRunningApplication) -> Bool {
+        guard app.processIdentifier == ProcessInfo.processInfo.processIdentifier else {
+            return false
+        }
+        AppWindowCoordinator.activateMainWindowOrOpenHomeScene()
+        return true
     }
 
     private func focus(window: AXUIElement, restoreIfMinimized: Bool) {
