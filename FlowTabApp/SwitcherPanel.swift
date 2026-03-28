@@ -33,6 +33,7 @@ final class SwitcherPanelController {
     private let appLayerMinimumWidth: CGFloat = 440
     private let overlayHorizontalInset: CGFloat = 64
     private let appLayerStaticHeight: CGFloat = 56
+    private let appLayerSearchHeaderExtraHeight: CGFloat = 68
     private let standardOverlayOuterPadding: CGFloat = 16
     private let standardOverlayInnerVerticalPadding: CGFloat = 14
     private let standardOverlaySectionSpacing: CGFloat = 12
@@ -48,7 +49,15 @@ final class SwitcherPanelController {
     private let appLayerMaxAdaptiveTileSize: CGFloat = 90
     private let maxAppTileSpacing: CGFloat = 10
     private let minAppTileSize: CGFloat = 1
+    private let searchWindowRowHeight: CGFloat = 44
+    private let searchWindowVisibleRowLimit: Int = 8
+    private let searchHeaderHeight: CGFloat = 74
+    private let searchAppResultExtraHeight: CGFloat = 32
     private var activeHotkeySessionKind: HotkeySessionKind?
+
+    private var searchFeatureEnabled: Bool {
+        SearchInteractionPreferencesStore.loadIsEnabled()
+    }
 
     init() {
         panel = NSPanel(
@@ -94,6 +103,12 @@ final class SwitcherPanelController {
         }
         if panel.isVisible {
             guard activeHotkeySessionKind == .globalAppSwitcher else { return }
+            guard !model.isSearchActive else {
+                logInputTrace(
+                    "hotkeyPressed dir=\(directionText) panelVisible=1 action=ignoredSearchMode nowMs=\(formatMilliseconds(nowMs))"
+                )
+                return
+            }
             guard isPrimaryModifierLikelyPressed() else {
                 logInputTrace(
                     "hotkeyPressed dir=\(directionText) panelVisible=1 modifierPressed=0 action=scheduleReleaseConfirm nowMs=\(formatMilliseconds(nowMs))"
@@ -119,6 +134,7 @@ final class SwitcherPanelController {
     func handleGlobalHotkeyReleased() {
         guard panel.isVisible else { return }
         guard activeHotkeySessionKind == .globalAppSwitcher else { return }
+        guard !model.isSearchActive else { return }
         // Carbon hotkey "released" also fires when the main key (for example Tab) is released
         // while the modifier is still held. Ignore those events to avoid repeatedly spinning up
         // release-confirmation work during rapid cycling.
@@ -292,6 +308,31 @@ final class SwitcherPanelController {
         let width = maxWidth
         let height: CGFloat
 
+        if model.isSearchActive {
+            if model.searchScope == .window {
+                let visibleRows = max(1, min(model.searchResultCount, searchWindowVisibleRowLimit))
+                let desiredHeight = searchHeaderHeight + CGFloat(visibleRows) * searchWindowRowHeight + 72
+                height = min(maxHeight, max(minimumPanelHeight, desiredHeight))
+            } else {
+                let gridLayout = resolveAppGridLayout(
+                    appCount: max(1, model.searchResultCount),
+                    availableWidth: max(1, width - overlayHorizontalInset),
+                    maxTileSize: previewLayerAppTileSize
+                )
+                model.updateAppGridLayout(
+                    tileSize: gridLayout.tileSize,
+                    spacing: gridLayout.spacing
+                )
+                let desiredHeight = searchHeaderHeight + gridLayout.gridHeight + searchAppResultExtraHeight + 66
+                height = min(maxHeight, max(minimumPanelHeight, desiredHeight))
+            }
+            let targetSize = NSSize(width: width, height: height)
+            if panel.contentRect(forFrameRect: panel.frame).size != targetSize {
+                panel.setContentSize(targetSize)
+            }
+            return
+        }
+
         if model.isPreviewLayerMode {
             let gridLayout = resolveAppGridLayout(
                 appCount: model.appCount,
@@ -320,7 +361,8 @@ final class SwitcherPanelController {
                 availableWidth: max(1, width - overlayHorizontalInset),
                 maxTileSize: appLayerMaxAdaptiveTileSize
             )
-            let desiredHeight = appLayerStaticHeight + gridLayout.gridHeight
+            let searchHeaderHeight = searchFeatureEnabled ? appLayerSearchHeaderExtraHeight : 0
+            let desiredHeight = appLayerStaticHeight + searchHeaderHeight + gridLayout.gridHeight
 
             height = min(maxHeight, max(minimumPanelHeight, desiredHeight))
             model.updateAppGridLayout(
@@ -400,6 +442,12 @@ final class SwitcherPanelController {
     }
 
     private func advance(_ keyInput: KeyInput) {
+        guard !model.isSearchActive else {
+            logInputTrace(
+                "advance key=\(keyInput.debugName) dropped=searchActive nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
+            )
+            return
+        }
         if keyInput == .tabForward || keyInput == .tabBackward {
             guard isPrimaryModifierLikelyPressed() else {
                 logInputTrace(
@@ -471,7 +519,22 @@ final class SwitcherPanelController {
     }
 
     private func handleKeyDown(_ event: NSEvent) -> Bool {
+        if model.isSearchActive {
+            return handleSearchModeKeyDown(event)
+        }
+
         switch event.keyCode {
+        case 49:
+            return true
+        case 36, 76:
+            if searchFeatureEnabled, model.enterSearchMode() {
+                cancelPendingModifierReleaseConfirmation()
+                updatePanelSize()
+                RuntimeLog.info("Session", "enter search mode")
+            } else {
+                finishSelection()
+            }
+            return true
         case 48:
             if activeHotkeySessionKind == .inAppWindowSwitcher {
                 return true
@@ -493,11 +556,13 @@ final class SwitcherPanelController {
         case 126:
             advance(.upArrow)
             return true
-        case 36, 76:
-            finishSelection()
-            return true
         case 53:
-            cancelSelection()
+            if model.shouldClearSearchOnEscape {
+                _ = model.handleSearchEscape()
+                updatePanelSize()
+            } else {
+                cancelSelection()
+            }
             return true
         default:
             if isTerminateSelectedAppShortcut(event) {
@@ -508,10 +573,72 @@ final class SwitcherPanelController {
         }
     }
 
+    private func handleSearchModeKeyDown(_ event: NSEvent) -> Bool {
+        switch event.keyCode {
+        case 48:
+            if model.toggleSearchScope() {
+                updatePanelSize()
+            }
+            return true
+        case 125:
+            if !model.focusSearchResults() {
+                _ = model.moveSearchSelection(by: +1)
+            }
+            return true
+        case 126:
+            if !model.focusSearchInput() {
+                _ = model.moveSearchSelection(by: -1)
+            }
+            return true
+        case 123:
+            _ = model.moveSearchSelection(by: -1)
+            return true
+        case 124:
+            _ = model.moveSearchSelection(by: +1)
+            return true
+        case 36, 76:
+            guard model.applySelectedSearchResultToSession() else {
+                NSSound.beep()
+                return true
+            }
+            finishSelection()
+            return true
+        case 53:
+            cancelSelection()
+            return true
+        case 51:
+            if model.deleteSearchQueryBackward() {
+                updatePanelSize()
+            }
+            return true
+        default:
+            if let text = searchInputText(from: event), model.appendSearchQuery(text) {
+                updatePanelSize()
+            }
+            return true
+        }
+    }
+
+    private func searchInputText(from event: NSEvent) -> String? {
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if flags.contains(.command) || flags.contains(.control) || flags.contains(.option) {
+            return nil
+        }
+        guard let characters = event.characters else { return nil }
+        let scalarView = String.UnicodeScalarView(
+            characters.unicodeScalars.filter { scalar in
+                !CharacterSet.controlCharacters.contains(scalar)
+            }
+        )
+        let result = String(scalarView)
+        return result.isEmpty ? nil : result
+    }
+
     private func handleFlagsChanged(_ event: NSEvent) {
         let isPrimaryEvent = isPrimaryModifierFlagsEvent(event)
         guard isPrimaryEvent else { return }
         guard panel.isVisible else { return }
+        guard !model.isSearchActive else { return }
         logInputTrace(
             "flagsChanged keyCode=\(event.keyCode) action=scheduleReleaseConfirm nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
         )
@@ -539,6 +666,13 @@ final class SwitcherPanelController {
                 guard self.panel.isVisible else {
                     self.logInputTrace(
                         "releaseConfirm stop trigger=\(trigger) reason=panelHidden nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
+                    )
+                    self.pendingModifierReleaseConfirmationTask = nil
+                    return
+                }
+                guard !self.model.isSearchActive else {
+                    self.logInputTrace(
+                        "releaseConfirm stop trigger=\(trigger) reason=searchActive nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
                     )
                     self.pendingModifierReleaseConfirmationTask = nil
                     return
@@ -620,6 +754,10 @@ final class SwitcherPanelController {
             self.delayedWindowLayerTimer = nil
         }
         guard autoEnterWindowLayerEnabled else { return }
+        guard !model.isSearchActive else {
+            RuntimeLog.info("AutoEnter", "skip searchActive")
+            return
+        }
 
         guard panel.isVisible else {
             RuntimeLog.info("AutoEnter", "skip panelHidden")
@@ -708,10 +846,12 @@ final class LiveSwitcherModel: ObservableObject {
     @Published private(set) var appGridSpacing: CGFloat = 10
     @Published private(set) var previewSectionHeight: CGFloat = 220
     @Published private(set) var overlayStyle: SwitcherOverlayStyle = .appAndWindow
+    @Published private(set) var searchViewState: SwitcherSearchViewState = .inactive
 
     private let snapshotProvider = RuntimeSnapshotProvider()
     private let activator = RuntimeActivator()
     private let iconProvider = AppIconProvider()
+    private let searchCoordinator = SwitcherSearchCoordinator()
     private let previewImageCache = BoundedImageCache(
         countLimit: 64,
         totalCostLimit: 160 * 1_024 * 1_024
@@ -762,6 +902,26 @@ final class LiveSwitcherModel: ObservableObject {
 
     var isWindowOnlyOverlay: Bool {
         overlayStyle == .windowOnly
+    }
+
+    var isSearchActive: Bool {
+        searchViewState.isActive
+    }
+
+    var isSearchInputFocused: Bool {
+        searchViewState.isInputFocused
+    }
+
+    var searchScope: SwitcherSearchScope {
+        searchViewState.scope
+    }
+
+    var searchResultCount: Int {
+        searchViewState.results.count
+    }
+
+    var shouldClearSearchOnEscape: Bool {
+        searchViewState.isInputFocused && !searchViewState.query.isEmpty
     }
 
     private func previewData(
@@ -858,6 +1018,7 @@ final class LiveSwitcherModel: ObservableObject {
 
     var canAutoEnterWindowLayer: Bool {
         guard let session else { return false }
+        guard !searchViewState.isActive else { return false }
         if case .windowCycle = session.mode {
             return false
         }
@@ -869,6 +1030,122 @@ final class LiveSwitcherModel: ObservableObject {
 
     func icon(for app: AppSwitchCandidate) -> NSImage? {
         iconProvider.icon(for: app, context: runtimeContextsByID[app.id])
+    }
+
+    fileprivate func searchAppItems() -> [SearchAppResultItem] {
+        guard let session else { return [] }
+        guard searchViewState.isActive, searchViewState.scope == .app else { return [] }
+
+        let showsSelection = !searchViewState.isInputFocused
+        let appByID = Dictionary(uniqueKeysWithValues: session.apps.map { ($0.id, $0) })
+        return searchViewState.results.enumerated().compactMap { index, result in
+            guard case .app(let appID) = result.kind else { return nil }
+            guard let app = appByID[appID] else { return nil }
+            return SearchAppResultItem(
+                id: result.id,
+                app: app,
+                isSelected: showsSelection && index == searchViewState.selectedResultIndex
+            )
+        }
+    }
+
+    fileprivate func searchWindowItems() -> [SearchWindowResultItem] {
+        guard let session else { return [] }
+        guard searchViewState.isActive, searchViewState.scope == .window else { return [] }
+
+        let showsSelection = !searchViewState.isInputFocused
+        let appByID = Dictionary(uniqueKeysWithValues: session.apps.map { ($0.id, $0) })
+        return searchViewState.results.enumerated().compactMap { index, result in
+            guard case .window(let appID, _) = result.kind else { return nil }
+            let app = appByID[appID]
+            let appName = app?.displayName ?? result.secondaryText ?? ""
+            return SearchWindowResultItem(
+                id: result.id,
+                title: result.primaryText,
+                appName: appName,
+                icon: app.flatMap { icon(for: $0) },
+                isSelected: showsSelection && index == searchViewState.selectedResultIndex
+            )
+        }
+    }
+
+    @discardableResult
+    func enterSearchMode() -> Bool {
+        guard SearchInteractionPreferencesStore.loadIsEnabled() else { return false }
+        guard overlayStyle == .appAndWindow else { return false }
+        guard let session, case .appCycle = session.mode else { return false }
+        searchCoordinator.rebuildIndex(with: session.apps)
+        let defaultScope = SearchInteractionPreferencesStore.loadDefaultScope()
+        let changed = searchCoordinator.activate(defaultScope: defaultScope)
+        publishSearchStateIfNeeded()
+        return changed
+    }
+
+    @discardableResult
+    func toggleSearchScope() -> Bool {
+        let changed = searchCoordinator.toggleScope()
+        publishSearchStateIfNeeded()
+        return changed
+    }
+
+    @discardableResult
+    func focusSearchResults() -> Bool {
+        let changed = searchCoordinator.focusResults()
+        publishSearchStateIfNeeded()
+        return changed
+    }
+
+    @discardableResult
+    func focusSearchInput() -> Bool {
+        let changed = searchCoordinator.focusInput()
+        publishSearchStateIfNeeded()
+        return changed
+    }
+
+    @discardableResult
+    func moveSearchSelection(by delta: Int) -> Bool {
+        let changed = searchCoordinator.moveSelection(by: delta)
+        publishSearchStateIfNeeded()
+        return changed
+    }
+
+    @discardableResult
+    func appendSearchQuery(_ value: String) -> Bool {
+        let changed = searchCoordinator.appendQueryText(value)
+        publishSearchStateIfNeeded()
+        return changed
+    }
+
+    @discardableResult
+    func deleteSearchQueryBackward() -> Bool {
+        let changed = searchCoordinator.deleteBackwardInQuery()
+        publishSearchStateIfNeeded()
+        return changed
+    }
+
+    func handleSearchEscape() -> SwitcherSearchEscapeAction {
+        let action = searchCoordinator.handleEscape()
+        publishSearchStateIfNeeded()
+        return action
+    }
+
+    @discardableResult
+    func applySelectedSearchResultToSession() -> Bool {
+        guard var session else { return false }
+        guard let selected = searchViewState.selectedResult else { return false }
+
+        switch selected.kind {
+        case .app(let appID):
+            guard session.selectApp(withID: appID) else { return false }
+        case .window(let appID, let windowID):
+            guard session.selectWindow(appID: appID, windowID: windowID) else { return false }
+        }
+
+        autoEnterSuppressedAppID = nil
+        self.session = session
+        _ = searchCoordinator.exit()
+        publishSearchStateIfNeeded()
+        return true
     }
 
     func startSession(triggerDirection: CycleDirection) -> Bool {
@@ -917,6 +1194,8 @@ final class LiveSwitcherModel: ObservableObject {
         }
 
         session = rebuiltSession
+        searchCoordinator.rebuildIndex(with: rebuiltSession.apps)
+        publishSearchStateIfNeeded()
         return true
     }
 
@@ -975,6 +1254,8 @@ final class LiveSwitcherModel: ObservableObject {
         }
 
         session = rebuiltSession
+        searchCoordinator.rebuildIndex(with: rebuiltSession.apps)
+        publishSearchStateIfNeeded()
         return true
     }
 
@@ -987,6 +1268,7 @@ final class LiveSwitcherModel: ObservableObject {
     }
 
     func handle(_ keyInput: KeyInput) {
+        guard !searchViewState.isActive else { return }
         guard var session else { return }
         let previousMode = session.mode
         let previousAppID = session.selectedApp.id
@@ -1043,6 +1325,8 @@ final class LiveSwitcherModel: ObservableObject {
         let target = session.commitSelection()
         rememberedWindowIDByAppID = session.rememberedWindowIDByAppID
         self.session = nil
+        _ = searchCoordinator.exit()
+        publishSearchStateIfNeeded()
 
         guard let target else {
             overlayStyle = .appAndWindow
@@ -1061,6 +1345,8 @@ final class LiveSwitcherModel: ObservableObject {
     private func resetSessionState() {
         session = nil
         overlayStyle = .appAndWindow
+        searchCoordinator.rebuildIndex(with: [])
+        publishSearchStateIfNeeded()
         resetRuntimeState()
     }
 
@@ -1070,6 +1356,12 @@ final class LiveSwitcherModel: ObservableObject {
         previewCaptureAttemptedKeys = []
         autoEnterSuppressedAppID = nil
         titleBarStyleInferenceEnabled = false
+    }
+
+    private func publishSearchStateIfNeeded() {
+        let newState = searchCoordinator.state
+        guard searchViewState != newState else { return }
+        searchViewState = newState
     }
 }
 
@@ -1126,6 +1418,10 @@ private struct SwitcherPanelRootView: View {
     @ObservedObject private var systemTheme = SystemThemeState.shared
     @AppStorage(AppPreferenceKeys.themeMode)
     private var themeModeRaw = ThemePreferencesStore.defaultMode.rawValue
+    @AppStorage(AppPreferenceKeys.searchEnabled)
+    private var searchEnabled = SearchInteractionPreferencesStore.defaultIsEnabled
+    @AppStorage(AppPreferenceKeys.searchDefaultScope)
+    private var searchDefaultScopeRaw = SearchInteractionPreferencesStore.defaultScope.rawValue
 
     private var themeMode: ThemeMode {
         ThemePreferencesStore.resolve(rawValue: themeModeRaw)
@@ -1133,6 +1429,10 @@ private struct SwitcherPanelRootView: View {
 
     private var resolvedColorScheme: ColorScheme {
         themeMode.resolvedColorScheme(systemColorScheme: systemTheme.colorScheme)
+    }
+
+    private var searchDefaultScope: SwitcherSearchScope {
+        SwitcherSearchScope(rawValue: searchDefaultScopeRaw) ?? SearchInteractionPreferencesStore.defaultScope
     }
 
     var body: some View {
@@ -1144,6 +1444,11 @@ private struct SwitcherPanelRootView: View {
                     isPreviewLayer: model.isPreviewLayerMode,
                     previewSectionHeight: model.previewSectionHeight,
                     windowPreviewItems: model.windowPreviewItems(),
+                    searchState: model.searchViewState,
+                    searchAppItems: model.searchAppItems(),
+                    searchWindowItems: model.searchWindowItems(),
+                    searchFeatureEnabled: searchEnabled,
+                    searchDefaultScope: searchDefaultScope,
                     selectedApp: model.selectedApp,
                     appTileSize: model.appGridTileSize,
                     appTileSpacing: model.appGridSpacing,
@@ -1167,6 +1472,11 @@ private struct CommandTabOverlay: View {
     let isPreviewLayer: Bool
     let previewSectionHeight: CGFloat
     let windowPreviewItems: [WindowPreviewItem]
+    let searchState: SwitcherSearchViewState
+    let searchAppItems: [SearchAppResultItem]
+    let searchWindowItems: [SearchWindowResultItem]
+    let searchFeatureEnabled: Bool
+    let searchDefaultScope: SwitcherSearchScope
     let selectedApp: AppSwitchCandidate?
     let appTileSize: CGFloat
     let appTileSpacing: CGFloat
@@ -1179,6 +1489,14 @@ private struct CommandTabOverlay: View {
 
     private var showsAppStrip: Bool {
         overlayStyle == .appAndWindow
+    }
+
+    private var isSearchMode: Bool {
+        searchState.isActive
+    }
+
+    private var showsSearchHeaderInStandardOverlay: Bool {
+        searchFeatureEnabled && !isPreviewLayer
     }
 
     private func previewCardWidth(availableWidth: CGFloat, itemCount: Int) -> CGFloat {
@@ -1281,8 +1599,8 @@ private struct CommandTabOverlay: View {
         windowPreviewItems.first(where: \.isSelected)?.id
     }
 
-    private var appGridColumns: [GridItem] {
-        let count = max(session.apps.count, 1)
+    private func appGridColumns(for itemCount: Int) -> [GridItem] {
+        let count = max(itemCount, 1)
         return Array(
             repeating: GridItem(
                 .fixed(appTileSize),
@@ -1301,8 +1619,17 @@ private struct CommandTabOverlay: View {
     @ViewBuilder
     private var standardOverlayBody: some View {
         VStack(alignment: .leading, spacing: 12) {
+            if showsSearchHeaderInStandardOverlay {
+                SearchInputHeader(
+                    query: "",
+                    scope: searchDefaultScope,
+                    isInputFocused: false,
+                    hintText: "Enter 进入搜索"
+                )
+            }
+
             LazyVGrid(
-                columns: appGridColumns,
+                columns: appGridColumns(for: session.apps.count),
                 alignment: .leading,
                 spacing: appTileSpacing
             ) {
@@ -1371,6 +1698,80 @@ private struct CommandTabOverlay: View {
     }
 
     @ViewBuilder
+    private var searchOverlayBody: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SearchInputHeader(
+                query: searchState.query,
+                scope: searchState.scope,
+                isInputFocused: searchState.isInputFocused,
+                hintText: "Tab 切换范围 · ↓ 进入结果 · Enter 激活 · Esc 清空/关闭"
+            )
+
+            if searchState.scope == .app {
+                if searchAppItems.isEmpty {
+                    SearchEmptyState(scope: .app)
+                } else {
+                    LazyVGrid(
+                        columns: appGridColumns(for: searchAppItems.count),
+                        alignment: .leading,
+                        spacing: appTileSpacing
+                    ) {
+                        ForEach(searchAppItems) { item in
+                            VStack(spacing: 8) {
+                                AppTileView(
+                                    app: item.app,
+                                    isSelected: item.isSelected,
+                                    size: appTileSize,
+                                    icon: iconForApp(item.app)
+                                )
+                                Text(item.app.displayName)
+                                    .lineLimit(1)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundStyle(
+                                        item.isSelected
+                                            ? Color.primary
+                                            : Color.primary.opacity(0.76)
+                                    )
+                                    .frame(width: max(72, appTileSize + 14))
+                            }
+                            .id(item.id)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 2)
+                }
+            } else {
+                if searchWindowItems.isEmpty {
+                    SearchEmptyState(scope: .window)
+                } else {
+                    ScrollView(.vertical, showsIndicators: true) {
+                        LazyVStack(alignment: .leading, spacing: 8) {
+                            ForEach(searchWindowItems) { item in
+                                SearchWindowRow(item: item)
+                            }
+                        }
+                        .padding(.horizontal, 2)
+                        .padding(.vertical, 2)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(colorScheme == .dark ? Color.black : Color.white)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.primary.opacity(0.1), lineWidth: 1)
+        )
+        .shadow(color: .black.opacity(0.12), radius: 12, y: 6)
+    }
+
+    @ViewBuilder
     private var windowOnlyOverlayBody: some View {
         GeometryReader { proxy in
             let layout = windowOnlyGridLayout(
@@ -1418,6 +1819,8 @@ private struct CommandTabOverlay: View {
     var body: some View {
         if isWindowOnlyMode {
             windowOnlyOverlayBody
+        } else if isSearchMode {
+            searchOverlayBody
         } else {
             standardOverlayBody
         }
@@ -1430,6 +1833,159 @@ private struct WindowPreviewItem: Identifiable {
     let image: NSImage?
     let titleBarStyle: WindowTitleBarStyleGuess?
     let isSelected: Bool
+}
+
+private struct SearchAppResultItem: Identifiable {
+    let id: String
+    let app: AppSwitchCandidate
+    let isSelected: Bool
+}
+
+private struct SearchWindowResultItem: Identifiable {
+    let id: String
+    let title: String
+    let appName: String
+    let icon: NSImage?
+    let isSelected: Bool
+}
+
+private struct SearchInputHeader: View {
+    let query: String
+    let scope: SwitcherSearchScope
+    let isInputFocused: Bool
+    let hintText: String
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.secondary)
+
+                Group {
+                    if query.isEmpty {
+                        Text("输入关键词搜索")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text(query)
+                            .foregroundStyle(.primary)
+                    }
+                }
+                .lineLimit(1)
+                .font(.system(size: 13, weight: .medium))
+
+                Spacer(minLength: 8)
+
+                Text(scope.label)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(Color.primary.opacity(colorScheme == .dark ? 0.20 : 0.08))
+                    )
+            }
+
+            Text(hintText)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary.opacity(isInputFocused ? 0.95 : 0.78))
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(
+                    isInputFocused
+                        ? Color.accentColor.opacity(colorScheme == .dark ? 0.78 : 0.58)
+                        : Color.primary.opacity(colorScheme == .dark ? 0.20 : 0.10),
+                    lineWidth: isInputFocused ? 1.6 : 1
+                )
+        )
+    }
+}
+
+private struct SearchEmptyState: View {
+    let scope: SwitcherSearchScope
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: scope == .app ? "app.badge" : "macwindow.on.rectangle")
+                .font(.system(size: 24, weight: .medium))
+                .foregroundStyle(.secondary)
+            Text("没有匹配结果")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+    }
+}
+
+private struct SearchWindowRow: View {
+    let item: SearchWindowResultItem
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Group {
+                if let icon = item.icon {
+                    Image(nsImage: icon)
+                        .resizable()
+                        .interpolation(.high)
+                } else {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(Color.primary.opacity(0.14))
+                        .overlay(
+                            Image(systemName: "app")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                        )
+                }
+            }
+            .frame(width: 20, height: 20)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(item.title)
+                    .lineLimit(1)
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(
+                        item.isSelected
+                            ? Color.primary
+                            : Color.primary.opacity(0.88)
+                    )
+                Text(item.appName)
+                    .lineLimit(1)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(
+                    item.isSelected
+                        ? Color.accentColor.opacity(colorScheme == .dark ? 0.22 : 0.16)
+                        : Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.04)
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(
+                    item.isSelected
+                        ? Color.accentColor.opacity(colorScheme == .dark ? 0.64 : 0.45)
+                        : Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.08),
+                    lineWidth: item.isSelected ? 1.4 : 1
+                )
+        )
+    }
 }
 
 private struct WindowPreviewCard: View {

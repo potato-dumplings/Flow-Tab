@@ -16,6 +16,8 @@ enum AppPreferenceKeys {
     static let windowLayerAutoEnterDelay = "windowLayerAutoEnterDelay"
     static let autoRestoreMinimizedWindowOnSwitch = "autoRestoreMinimizedWindowOnSwitch"
     static let hideMinimizedAppsFromAppLayer = "hideMinimizedAppsFromAppLayer"
+    static let searchEnabled = "searchEnabled"
+    static let searchDefaultScope = "searchDefaultScope"
     static let enableVerboseDiagnostics = "enableVerboseDiagnostics"
     static let runtimeLogLevel = "runtimeLogLevel"
     static let themeMode = "themeMode"
@@ -197,6 +199,27 @@ enum SwitcherBehaviorPreferencesStore {
             userDefaults: userDefaults
         )
         return preferences
+    }
+}
+
+enum SearchInteractionPreferencesStore {
+    static let defaultIsEnabled = true
+    static let defaultScope: SwitcherSearchScope = .app
+
+    static func loadIsEnabled(userDefaults: UserDefaults = .standard) -> Bool {
+        guard userDefaults.object(forKey: AppPreferenceKeys.searchEnabled) != nil else {
+            return defaultIsEnabled
+        }
+        return userDefaults.bool(forKey: AppPreferenceKeys.searchEnabled)
+    }
+
+    static func loadDefaultScope(userDefaults: UserDefaults = .standard) -> SwitcherSearchScope {
+        let rawValue = userDefaults.string(forKey: AppPreferenceKeys.searchDefaultScope) ?? defaultScope.rawValue
+        let resolved = SwitcherSearchScope(rawValue: rawValue) ?? defaultScope
+        if rawValue != resolved.rawValue {
+            userDefaults.set(resolved.rawValue, forKey: AppPreferenceKeys.searchDefaultScope)
+        }
+        return resolved
     }
 }
 
@@ -1480,6 +1503,10 @@ private struct AppSettingsView: View {
     @AppStorage(AppPreferenceKeys.hideMinimizedAppsFromAppLayer)
     private var hideMinimizedAppsFromAppLayer =
         SwitcherBehaviorPreferencesStore.defaultHideMinimizedAppsFromAppLayer
+    @AppStorage(AppPreferenceKeys.searchEnabled)
+    private var searchEnabled = SearchInteractionPreferencesStore.defaultIsEnabled
+    @AppStorage(AppPreferenceKeys.searchDefaultScope)
+    private var searchDefaultScopeRaw = SearchInteractionPreferencesStore.defaultScope.rawValue
     @AppStorage(AppPreferenceKeys.hotkeyPrimaryModifier)
     private var hotkeyPrimaryModifierRaw = SwitcherHotkeyPreferencesStore.defaultPrimaryModifier.rawValue
     @AppStorage(AppPreferenceKeys.hotkeyMainKey)
@@ -1610,6 +1637,7 @@ private struct AppSettingsView: View {
         VStack(alignment: .leading, spacing: 12) {
             appearanceSettingsCard
             windowBehaviorSettingsCard
+            searchSettingsCard
             permissionSettingsCard
         }
     }
@@ -1788,6 +1816,31 @@ private struct AppSettingsView: View {
         }
     }
 
+    private var searchSettingsCard: some View {
+        HomeSectionCard(title: "搜索", subtitle: "搜索开关、范围与交互说明") {
+            VStack(alignment: .leading, spacing: 10) {
+                settingsToggleRow("启用搜索功能", isOn: $searchEnabled)
+
+                settingsControlRow("默认搜索范围") {
+                    Picker("默认搜索范围", selection: $searchDefaultScopeRaw) {
+                        ForEach(SwitcherSearchScope.allCases, id: \.rawValue) { scope in
+                            Text(scope.label).tag(scope.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(width: 160)
+                }
+                .disabled(!searchEnabled)
+                .opacity(searchEnabled ? 1 : 0.5)
+
+                Text(searchEnabled ? "面板默认从应用层开始；按 Enter 进入搜索。" : "已关闭搜索：面板仅显示应用层与窗口层。")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
     private var permissionSettingsCard: some View {
         HomeSectionCard(title: "权限", subtitle: "辅助功能与屏幕录制") {
             VStack(alignment: .leading, spacing: 10) {
@@ -1876,6 +1929,9 @@ private struct AppSettingsView: View {
                 syncWindowLayerAutoEnterDelayText()
             }
         }
+        .onChange(of: searchDefaultScopeRaw) {
+            enforceSearchPreferencesConsistency()
+        }
         .onDisappear {
             cancelPermissionPolling()
         }
@@ -1891,6 +1947,7 @@ private struct AppSettingsView: View {
             enforceHotkeyConsistency()
             enforceInAppWindowHotkeyConsistency()
             enforceWindowLayerPreferencesConsistency()
+            enforceSearchPreferencesConsistency()
             syncWindowLayerAutoEnterDelayText()
             didInitialize = true
         }
@@ -2048,6 +2105,13 @@ private struct AppSettingsView: View {
         let resolved = ThemePreferencesStore.resolve(rawValue: themeModeRaw)
         if themeModeRaw != resolved.rawValue {
             themeModeRaw = resolved.rawValue
+        }
+    }
+
+    private func enforceSearchPreferencesConsistency() {
+        let resolved = SearchInteractionPreferencesStore.loadDefaultScope()
+        if searchDefaultScopeRaw != resolved.rawValue {
+            searchDefaultScopeRaw = resolved.rawValue
         }
     }
 
