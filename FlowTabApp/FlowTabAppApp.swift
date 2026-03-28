@@ -859,96 +859,6 @@ private struct FlowActionButton: View {
     }
 }
 
-private struct FlowGradientSwitchToggleStyle: ToggleStyle {
-    private let trackWidth: CGFloat = 46
-    private let trackHeight: CGFloat = 24
-
-    func makeBody(configuration: Configuration) -> some View {
-        Button {
-            withAnimation(.easeInOut(duration: 0.24)) {
-                configuration.isOn.toggle()
-            }
-        } label: {
-            ZStack(alignment: configuration.isOn ? .trailing : .leading) {
-                Capsule()
-                    .fill(trackFill(isOn: configuration.isOn))
-
-                Capsule()
-                    .stroke(trackBorder(isOn: configuration.isOn), lineWidth: configuration.isOn ? 1.1 : 1)
-
-                Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [Color.white.opacity(0.97), Color.white.opacity(0.86)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .overlay(
-                        Circle()
-                            .stroke(Color.primary.opacity(0.12), lineWidth: 1)
-                    )
-                    .shadow(color: Color.black.opacity(0.07), radius: 1.4, y: 0.7)
-                    .padding(2)
-            }
-            .frame(width: trackWidth, height: trackHeight)
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func trackFill(isOn: Bool) -> LinearGradient {
-        if isOn {
-            // Use a misty, blue-tinted lead-in instead of a hard neutral gray so the
-            // enabled state feels like one continuous surface behind the thumb.
-            return LinearGradient(
-                stops: [
-                    .init(color: Color.white.opacity(0.34), location: 0.0),
-                    .init(color: Color.accentColor.opacity(0.10), location: 0.05),
-                    .init(color: Color.accentColor.opacity(0.76), location: 0.18),
-                    .init(color: Color.accentColor.opacity(0.94), location: 1.0)
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-        } else {
-            return LinearGradient(
-                stops: [
-                    .init(color: Color.primary.opacity(0.12), location: 0.0),
-                    .init(color: Color.primary.opacity(0.09), location: 0.75),
-                    .init(color: Color.accentColor.opacity(0.26), location: 1.0)
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-        }
-    }
-
-    private func trackBorder(isOn: Bool) -> LinearGradient {
-        if isOn {
-            return LinearGradient(
-                stops: [
-                    .init(color: Color.primary.opacity(0.30), location: 0.0),
-                    .init(color: Color.accentColor.opacity(0.28), location: 0.05),
-                    .init(color: Color.accentColor.opacity(0.44), location: 0.18),
-                    .init(color: Color.accentColor.opacity(0.55), location: 1.0)
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-        } else {
-            return LinearGradient(
-                stops: [
-                    .init(color: Color.primary.opacity(0.24), location: 0.0),
-                    .init(color: Color.primary.opacity(0.19), location: 0.75),
-                    .init(color: Color.accentColor.opacity(0.36), location: 1.0)
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-        }
-    }
-}
-
 private struct HomeLayerRowView: View {
     let title: String
     let subtitle: String
@@ -1206,7 +1116,7 @@ private struct AppSettingsView: View {
         settingsControlRow(title) {
             Toggle(title, isOn: isOn)
                 .labelsHidden()
-                .toggleStyle(FlowGradientSwitchToggleStyle())
+                .toggleStyle(.switch)
         }
     }
 
@@ -1366,7 +1276,7 @@ private struct AppSettingsView: View {
     private var permissionSettingsCard: some View {
         HomeSectionCard(title: "权限", subtitle: "辅助功能与屏幕录制") {
             VStack(alignment: .leading, spacing: 10) {
-                settingsToggleRow("提示获取用户权限", isOn: $showPermissionReminder)
+                settingsToggleRow("无权限时是否在在首页提示获取权限", isOn: $showPermissionReminder)
 
                 permissionStatusActionRow(
                     text: accessibilityTrusted ? "辅助功能权限：已授权" : "辅助功能权限：未授权",
@@ -1409,7 +1319,7 @@ private struct AppSettingsView: View {
                         HomeSectionCard(title: "日志", subtitle: "仅日志相关信息") {
                             VStack(alignment: .leading, spacing: 10) {
                                 Toggle("启用详细运行日志（高频，可能影响性能）", isOn: $enableVerboseDiagnostics)
-                                    .toggleStyle(FlowGradientSwitchToggleStyle())
+                                    .toggleStyle(.switch)
                                     .font(.system(size: 12))
                                 Text("本地日志目录：\(RuntimeDiagnostics.logsDirectoryPath)")
                                     .font(.system(size: 11, design: .monospaced))
