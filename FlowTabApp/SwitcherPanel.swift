@@ -859,7 +859,18 @@ final class LiveSwitcherModel: ObservableObject {
         case sessionEnded
     }
 
-    @Published private(set) var session: SwitcherSession?
+    @Published private(set) var session: SwitcherSession? {
+        didSet {
+            guard let session else {
+                sessionAppsByID = [:]
+                return
+            }
+            guard searchViewState.isActive else {
+                return
+            }
+            sessionAppsByID = Dictionary(uniqueKeysWithValues: session.apps.map { ($0.id, $0) })
+        }
+    }
     @Published private(set) var appGridTileSize: CGFloat = 68
     @Published private(set) var appGridSpacing: CGFloat = 10
     @Published private(set) var previewSectionHeight: CGFloat = 220
@@ -875,6 +886,7 @@ final class LiveSwitcherModel: ObservableObject {
         totalCostLimit: 160 * 1_024 * 1_024
     )
 
+    private var sessionAppsByID: [String: AppSwitchCandidate] = [:]
     private var runtimeContextsByID: [String: RuntimeAppContext] = [:]
     private var rememberedWindowIDByAppID: [String: String] = [:]
     private var previewCaptureAttemptedKeys: Set<String> = []
@@ -1051,14 +1063,13 @@ final class LiveSwitcherModel: ObservableObject {
     }
 
     fileprivate func searchAppItems() -> [SearchAppResultItem] {
-        guard let session else { return [] }
+        guard session != nil else { return [] }
         guard searchViewState.isActive, searchViewState.scope == .app else { return [] }
 
         let showsSelection = !searchViewState.isInputFocused
-        let appByID = Dictionary(uniqueKeysWithValues: session.apps.map { ($0.id, $0) })
         return searchViewState.results.enumerated().compactMap { index, result in
             guard case .app(let appID) = result.kind else { return nil }
-            guard let app = appByID[appID] else { return nil }
+            guard let app = sessionAppsByID[appID] else { return nil }
             return SearchAppResultItem(
                 id: result.id,
                 app: app,
@@ -1068,20 +1079,35 @@ final class LiveSwitcherModel: ObservableObject {
     }
 
     fileprivate func searchWindowItems() -> [SearchWindowResultItem] {
-        guard let session else { return [] }
+        guard session != nil else { return [] }
         guard searchViewState.isActive, searchViewState.scope == .window else { return [] }
 
         let showsSelection = !searchViewState.isInputFocused
-        let appByID = Dictionary(uniqueKeysWithValues: session.apps.map { ($0.id, $0) })
+        var iconByAppID: [String: NSImage] = [:]
+        var missingIconAppIDs: Set<String> = []
         return searchViewState.results.enumerated().compactMap { index, result in
             guard case .window(let appID, _) = result.kind else { return nil }
-            let app = appByID[appID]
+            let app = sessionAppsByID[appID]
             let appName = app?.displayName ?? result.secondaryText ?? ""
+            let resolvedIcon: NSImage?
+            if let cached = iconByAppID[appID] {
+                resolvedIcon = cached
+            } else if missingIconAppIDs.contains(appID) {
+                resolvedIcon = nil
+            } else {
+                let fetched = app.flatMap { icon(for: $0) }
+                if let fetched {
+                    iconByAppID[appID] = fetched
+                } else {
+                    missingIconAppIDs.insert(appID)
+                }
+                resolvedIcon = fetched
+            }
             return SearchWindowResultItem(
                 id: result.id,
                 title: result.primaryText,
                 appName: appName,
-                icon: app.flatMap { icon(for: $0) },
+                icon: resolvedIcon,
                 isSelected: showsSelection && index == searchViewState.selectedResultIndex
             )
         }
@@ -1092,6 +1118,7 @@ final class LiveSwitcherModel: ObservableObject {
         guard SearchInteractionPreferencesStore.loadIsEnabled() else { return false }
         guard overlayStyle == .appAndWindow else { return false }
         guard let session, case .appCycle = session.mode else { return false }
+        sessionAppsByID = Dictionary(uniqueKeysWithValues: session.apps.map { ($0.id, $0) })
         searchCoordinator.rebuildIndex(with: session.apps)
         let defaultScope = SearchInteractionPreferencesStore.loadDefaultScope()
         let changed = searchCoordinator.activate(defaultScope: defaultScope)

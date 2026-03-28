@@ -96,10 +96,17 @@ final class SwitcherSearchCoordinator {
         let order: Int
     }
 
+    private struct ScopeMatchCache {
+        let query: String
+        let matchedIndexes: [Int]
+    }
+
     private(set) var state: SwitcherSearchViewState = .inactive
 
     private var appEntries: [AppEntry] = []
     private var windowEntries: [WindowEntry] = []
+    private var appMatchCache: ScopeMatchCache?
+    private var windowMatchCache: ScopeMatchCache?
     private static let ignoredBundleIDTokens: Set<String> = ["com", "org", "net", "io", "app", "www"]
 
     // Search happens on every key press, so we pre-normalize source text once per session.
@@ -137,6 +144,8 @@ final class SwitcherSearchCoordinator {
             }
         }
         windowEntries = windows
+        appMatchCache = nil
+        windowMatchCache = nil
         state = .inactive
     }
 
@@ -239,6 +248,7 @@ final class SwitcherSearchCoordinator {
         switch state.scope {
         case .app:
             if query.normalized.isEmpty {
+                appMatchCache = nil
                 rebuilt = appEntries.map { app in
                     SwitcherSearchResult(
                         id: "app:\(app.appID)",
@@ -248,10 +258,25 @@ final class SwitcherSearchCoordinator {
                     )
                 }
             } else {
-                let ranked = appEntries.enumerated().compactMap { order, app -> RankedResult? in
+                let candidateIndexes: [Int]
+                if
+                    let cache = appMatchCache,
+                    !cache.query.isEmpty,
+                    query.normalized.hasPrefix(cache.query)
+                {
+                    candidateIndexes = cache.matchedIndexes
+                } else {
+                    candidateIndexes = Array(appEntries.indices)
+                }
+
+                var matchedIndexes: [Int] = []
+                matchedIndexes.reserveCapacity(candidateIndexes.count)
+                let ranked = candidateIndexes.compactMap { index -> RankedResult? in
+                    let app = appEntries[index]
                     guard let score = Self.matchScore(query: query, in: app.searchIndex) else {
                         return nil
                     }
+                    matchedIndexes.append(index)
                     return RankedResult(
                         result: SwitcherSearchResult(
                             id: "app:\(app.appID)",
@@ -260,13 +285,15 @@ final class SwitcherSearchCoordinator {
                             secondaryText: nil
                         ),
                         score: score,
-                        order: order
+                        order: index
                     )
                 }
+                appMatchCache = ScopeMatchCache(query: query.normalized, matchedIndexes: matchedIndexes)
                 rebuilt = Self.sortedResults(from: ranked)
             }
         case .window:
             if query.normalized.isEmpty {
+                windowMatchCache = nil
                 rebuilt = windowEntries.map { window in
                     let resolvedTitle = window.windowTitle.isEmpty ? "Untitled Window" : window.windowTitle
                     return SwitcherSearchResult(
@@ -277,12 +304,27 @@ final class SwitcherSearchCoordinator {
                     )
                 }
             } else {
-                let ranked = windowEntries.enumerated().compactMap { order, window -> RankedResult? in
+                let candidateIndexes: [Int]
+                if
+                    let cache = windowMatchCache,
+                    !cache.query.isEmpty,
+                    query.normalized.hasPrefix(cache.query)
+                {
+                    candidateIndexes = cache.matchedIndexes
+                } else {
+                    candidateIndexes = Array(windowEntries.indices)
+                }
+
+                var matchedIndexes: [Int] = []
+                matchedIndexes.reserveCapacity(candidateIndexes.count)
+                let ranked = candidateIndexes.compactMap { index -> RankedResult? in
+                    let window = windowEntries[index]
                     let titleScore = Self.matchScore(query: query, in: window.windowSearchIndex)
                     let appScore = Self.matchScore(query: query, in: window.appSearchIndex).map { $0 + 35 }
                     guard let score = Self.bestScore(titleScore, appScore) else {
                         return nil
                     }
+                    matchedIndexes.append(index)
                     let resolvedTitle = window.windowTitle.isEmpty ? "Untitled Window" : window.windowTitle
                     return RankedResult(
                         result: SwitcherSearchResult(
@@ -292,9 +334,10 @@ final class SwitcherSearchCoordinator {
                             secondaryText: window.appDisplayName
                         ),
                         score: score,
-                        order: order
+                        order: index
                     )
                 }
+                windowMatchCache = ScopeMatchCache(query: query.normalized, matchedIndexes: matchedIndexes)
                 rebuilt = Self.sortedResults(from: ranked)
             }
         }

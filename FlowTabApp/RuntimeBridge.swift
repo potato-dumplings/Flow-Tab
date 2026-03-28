@@ -1292,10 +1292,14 @@ final class AppIconProvider {
         countLimit: 256,
         totalCostLimit: 64 * 1_024 * 1_024
     )
+    private var missingAppIDs: Set<String> = []
 
     func icon(for app: AppSwitchCandidate, context: RuntimeAppContext?) -> NSImage? {
         if let cached = cache.image(forKey: app.id) {
             return cached
+        }
+        if missingAppIDs.contains(app.id) {
+            return nil
         }
 
         if let runtimeIcon = context?.runningApp.icon {
@@ -1304,6 +1308,7 @@ final class AppIconProvider {
         }
 
         guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: app.id) else {
+            missingAppIDs.insert(app.id)
             return nil
         }
 
