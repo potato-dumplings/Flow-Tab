@@ -44,7 +44,9 @@ final class SystemThemeState: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.refreshColorScheme()
+            Task { @MainActor [weak self] in
+                self?.refreshColorScheme()
+            }
         }
 
         appActivationObserver = NotificationCenter.default.addObserver(
@@ -52,7 +54,9 @@ final class SystemThemeState: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            self?.refreshColorScheme()
+            Task { @MainActor [weak self] in
+                self?.refreshColorScheme()
+            }
         }
     }
 
@@ -1246,7 +1250,7 @@ private struct AppSettingsView: View {
                             .multilineTextAlignment(.trailing)
                             .frame(width: 80)
                             .focused($isWindowLayerDelayFieldFocused)
-                            .onChange(of: windowLayerAutoEnterDelayText) { newValue in
+                            .onChange(of: windowLayerAutoEnterDelayText) { _, newValue in
                                 applyWindowLayerAutoEnterDelayText(newValue)
                             }
                             .onSubmit {
@@ -1458,39 +1462,39 @@ private struct AppSettingsView: View {
             refreshAccessibilityStatus()
             refreshScreenCaptureStatus()
         }
-        .onChange(of: themeModeRaw) { _ in
+        .onChange(of: themeModeRaw) {
             enforceThemeModeConsistency()
         }
-        .onChange(of: showInCommandTab) { _ in
+        .onChange(of: showInCommandTab) {
             notifyAppVisibilityPreferenceChanged()
         }
-        .onChange(of: hotkeyPrimaryModifierRaw) { _ in
+        .onChange(of: hotkeyPrimaryModifierRaw) {
             enforceHotkeyConsistency()
             enforceInAppWindowHotkeyConsistency()
             notifyHotkeyConfigChanged()
         }
-        .onChange(of: hotkeyMainKeyRaw) { _ in
+        .onChange(of: hotkeyMainKeyRaw) {
             enforceHotkeyConsistency()
             enforceInAppWindowHotkeyConsistency()
             notifyHotkeyConfigChanged()
         }
-        .onChange(of: hotkeyQuitKeyRaw) { _ in
+        .onChange(of: hotkeyQuitKeyRaw) {
             enforceHotkeyConsistency()
             notifyHotkeyConfigChanged()
         }
-        .onChange(of: inAppWindowHotkeyPrimaryModifierRaw) { _ in
+        .onChange(of: inAppWindowHotkeyPrimaryModifierRaw) {
             enforceInAppWindowHotkeyConsistency()
             notifyHotkeyConfigChanged()
         }
-        .onChange(of: inAppWindowHotkeyMainKeyRaw) { _ in
+        .onChange(of: inAppWindowHotkeyMainKeyRaw) {
             enforceInAppWindowHotkeyConsistency()
             notifyHotkeyConfigChanged()
         }
-        .onChange(of: isWindowLayerDelayFieldFocused) { isFocused in
+        .onChange(of: isWindowLayerDelayFieldFocused) { _, isFocused in
             guard !isFocused else { return }
             commitWindowLayerAutoEnterDelayText()
         }
-        .onChange(of: windowLayerAutoEnterDelayRaw) { _ in
+        .onChange(of: windowLayerAutoEnterDelayRaw) {
             enforceWindowLayerPreferencesConsistency()
             if !isWindowLayerDelayFieldFocused {
                 syncWindowLayerAutoEnterDelayText()
