@@ -627,6 +627,11 @@ final class SwitcherPanelController {
         default:
             if let text = searchInputText(from: event), model.appendSearchQuery(text) {
                 updatePanelSize()
+                return true
+            }
+            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            if flags.contains(.command) || flags.contains(.control) || flags.contains(.option) {
+                return false
             }
             return true
         }
