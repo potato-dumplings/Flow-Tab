@@ -1,7 +1,7 @@
 import Foundation
 import FlowTabCore
 
-enum SwitcherSearchScope: String, CaseIterable, Equatable {
+enum SwitcherSearchScope: String, CaseIterable, Equatable, Sendable {
     case app
     case window
 
@@ -15,19 +15,19 @@ enum SwitcherSearchScope: String, CaseIterable, Equatable {
     }
 }
 
-enum SwitcherSearchResultKind: Equatable {
+enum SwitcherSearchResultKind: Equatable, Sendable {
     case app(appID: String)
     case window(appID: String, windowID: String)
 }
 
-struct SwitcherSearchResult: Identifiable, Equatable {
+struct SwitcherSearchResult: Identifiable, Equatable, Sendable {
     let id: String
     let kind: SwitcherSearchResultKind
     let primaryText: String
     let secondaryText: String?
 }
 
-struct SwitcherSearchViewState: Equatable {
+struct SwitcherSearchViewState: Equatable, Sendable {
     var isActive: Bool
     var isInputFocused: Bool
     var scope: SwitcherSearchScope
@@ -50,20 +50,20 @@ struct SwitcherSearchViewState: Equatable {
     }
 }
 
-enum SwitcherSearchEscapeAction {
+enum SwitcherSearchEscapeAction: Sendable {
     case clearQuery
     case exitSearch
     case ignored
 }
 
 final class SwitcherSearchCoordinator {
-    private struct SearchKey {
+    struct SearchKey: Sendable {
         let normalized: String
         let compact: String
         let terms: [String]
     }
 
-    private struct SearchIndex {
+    struct SearchIndex: Sendable {
         let normalized: String
         let compact: String
         let terms: [String]
@@ -75,13 +75,13 @@ final class SwitcherSearchCoordinator {
         let identifierTerms: [String]
     }
 
-    private struct AppEntry {
+    struct AppEntry: Sendable {
         let appID: String
         let appDisplayName: String
         let searchIndex: SearchIndex
     }
 
-    private struct WindowEntry {
+    struct WindowEntry: Sendable {
         let appID: String
         let appDisplayName: String
         let windowID: String
@@ -90,15 +90,35 @@ final class SwitcherSearchCoordinator {
         let appSearchIndex: SearchIndex
     }
 
-    private struct RankedResult {
+    struct RankedResult: Sendable {
         let result: SwitcherSearchResult
         let score: Int
         let order: Int
     }
 
-    private struct ScopeMatchCache {
+    struct ScopeMatchCache: Sendable {
         let query: String
         let matchedIndexes: [Int]
+    }
+
+    struct ComputationInput: Sendable {
+        let query: String
+        let scope: SwitcherSearchScope
+        let selectedResultIndex: Int
+        let resetSelection: Bool
+        fileprivate let appEntries: [AppEntry]
+        fileprivate let windowEntries: [WindowEntry]
+        fileprivate let appMatchCache: ScopeMatchCache?
+        fileprivate let windowMatchCache: ScopeMatchCache?
+    }
+
+    struct ComputationOutput: Sendable {
+        let query: String
+        let scope: SwitcherSearchScope
+        let results: [SwitcherSearchResult]
+        let selectedResultIndex: Int
+        fileprivate let appMatchCache: ScopeMatchCache?
+        fileprivate let windowMatchCache: ScopeMatchCache?
     }
 
     private(set) var state: SwitcherSearchViewState = .inactive
@@ -107,6 +127,8 @@ final class SwitcherSearchCoordinator {
     private var windowEntries: [WindowEntry] = []
     private var appMatchCache: ScopeMatchCache?
     private var windowMatchCache: ScopeMatchCache?
+    private static let appTopResultLimit: Int = 300
+    private static let windowTopResultLimit: Int = 400
     private static let ignoredBundleIDTokens: Set<String> = ["com", "org", "net", "io", "app", "www"]
 
     // Search happens on every key press, so we pre-normalize source text once per session.
@@ -172,10 +194,16 @@ final class SwitcherSearchCoordinator {
 
     @discardableResult
     func toggleScope() -> Bool {
+        guard toggleScopeWithoutRebuild() else { return false }
+        rebuildResults(resetSelection: true)
+        return true
+    }
+
+    @discardableResult
+    func toggleScopeWithoutRebuild() -> Bool {
         guard state.isActive else { return false }
         state.scope = state.scope == .app ? .window : .app
         state.selectedResultIndex = 0
-        rebuildResults(resetSelection: true)
         return true
     }
 
@@ -211,21 +239,33 @@ final class SwitcherSearchCoordinator {
 
     @discardableResult
     func appendQueryText(_ value: String) -> Bool {
-        guard state.isActive else { return false }
-        guard !value.isEmpty else { return false }
-        state.query.append(value)
-        state.selectedResultIndex = 0
+        guard appendQueryTextWithoutRebuild(value) else { return false }
         rebuildResults(resetSelection: true)
         return true
     }
 
     @discardableResult
+    func appendQueryTextWithoutRebuild(_ value: String) -> Bool {
+        guard state.isActive else { return false }
+        guard !value.isEmpty else { return false }
+        state.query.append(value)
+        state.selectedResultIndex = 0
+        return true
+    }
+
+    @discardableResult
     func deleteBackwardInQuery() -> Bool {
+        guard deleteBackwardInQueryWithoutRebuild() else { return false }
+        rebuildResults(resetSelection: true)
+        return true
+    }
+
+    @discardableResult
+    func deleteBackwardInQueryWithoutRebuild() -> Bool {
         guard state.isActive else { return false }
         guard !state.query.isEmpty else { return false }
         state.query.removeLast()
         state.selectedResultIndex = 0
-        rebuildResults(resetSelection: true)
         return true
     }
 
@@ -242,14 +282,50 @@ final class SwitcherSearchCoordinator {
     }
 
     private func rebuildResults(resetSelection: Bool) {
-        let query = Self.buildSearchKey(from: state.query)
-        let rebuilt: [SwitcherSearchResult]
+        guard let input = makeComputationInput(resetSelection: resetSelection) else { return }
+        let output = Self.computeOutput(from: input)
+        _ = applyComputationOutput(output)
+    }
 
-        switch state.scope {
+    func makeComputationInput(resetSelection: Bool) -> ComputationInput? {
+        guard state.isActive else { return nil }
+        return ComputationInput(
+            query: state.query,
+            scope: state.scope,
+            selectedResultIndex: state.selectedResultIndex,
+            resetSelection: resetSelection,
+            appEntries: appEntries,
+            windowEntries: windowEntries,
+            appMatchCache: appMatchCache,
+            windowMatchCache: windowMatchCache
+        )
+    }
+
+    @discardableResult
+    func applyComputationOutput(_ output: ComputationOutput) -> Bool {
+        guard state.isActive else { return false }
+        guard state.query == output.query else { return false }
+        guard state.scope == output.scope else { return false }
+
+        let oldState = state
+        appMatchCache = output.appMatchCache
+        windowMatchCache = output.windowMatchCache
+        state.results = output.results
+        state.selectedResultIndex = output.selectedResultIndex
+        return state != oldState
+    }
+
+    static func computeOutput(from input: ComputationInput) -> ComputationOutput {
+        let query = buildSearchKey(from: input.query)
+        let rebuilt: [SwitcherSearchResult]
+        var appCache = input.appMatchCache
+        var windowCache = input.windowMatchCache
+
+        switch input.scope {
         case .app:
             if query.normalized.isEmpty {
-                appMatchCache = nil
-                rebuilt = appEntries.map { app in
+                appCache = nil
+                rebuilt = input.appEntries.map { app in
                     SwitcherSearchResult(
                         id: "app:\(app.appID)",
                         kind: .app(appID: app.appID),
@@ -258,26 +334,22 @@ final class SwitcherSearchCoordinator {
                     )
                 }
             } else {
-                let candidateIndexes: [Int]
-                if
-                    let cache = appMatchCache,
-                    !cache.query.isEmpty,
-                    query.normalized.hasPrefix(cache.query)
-                {
-                    candidateIndexes = cache.matchedIndexes
-                } else {
-                    candidateIndexes = Array(appEntries.indices)
-                }
-
+                let candidateIndexes = candidateIndexes(
+                    query: query.normalized,
+                    cache: appCache,
+                    totalCount: input.appEntries.count
+                )
                 var matchedIndexes: [Int] = []
                 matchedIndexes.reserveCapacity(candidateIndexes.count)
-                let ranked = candidateIndexes.compactMap { index -> RankedResult? in
-                    let app = appEntries[index]
+                var topRanked: [RankedResult] = []
+                topRanked.reserveCapacity(min(Self.appTopResultLimit, candidateIndexes.count))
+                for index in candidateIndexes {
+                    let app = input.appEntries[index]
                     guard let score = Self.matchScore(query: query, in: app.searchIndex) else {
-                        return nil
+                        continue
                     }
                     matchedIndexes.append(index)
-                    return RankedResult(
+                    let ranked = RankedResult(
                         result: SwitcherSearchResult(
                             id: "app:\(app.appID)",
                             kind: .app(appID: app.appID),
@@ -287,14 +359,15 @@ final class SwitcherSearchCoordinator {
                         score: score,
                         order: index
                     )
+                    insertTopRankedResult(ranked, into: &topRanked, limit: Self.appTopResultLimit)
                 }
-                appMatchCache = ScopeMatchCache(query: query.normalized, matchedIndexes: matchedIndexes)
-                rebuilt = Self.sortedResults(from: ranked)
+                appCache = ScopeMatchCache(query: query.normalized, matchedIndexes: matchedIndexes)
+                rebuilt = topRanked.map(\.result)
             }
         case .window:
             if query.normalized.isEmpty {
-                windowMatchCache = nil
-                rebuilt = windowEntries.map { window in
+                windowCache = nil
+                rebuilt = input.windowEntries.map { window in
                     let resolvedTitle = window.windowTitle.isEmpty ? "Untitled Window" : window.windowTitle
                     return SwitcherSearchResult(
                         id: "window:\(window.appID)#\(window.windowID)",
@@ -304,29 +377,25 @@ final class SwitcherSearchCoordinator {
                     )
                 }
             } else {
-                let candidateIndexes: [Int]
-                if
-                    let cache = windowMatchCache,
-                    !cache.query.isEmpty,
-                    query.normalized.hasPrefix(cache.query)
-                {
-                    candidateIndexes = cache.matchedIndexes
-                } else {
-                    candidateIndexes = Array(windowEntries.indices)
-                }
-
+                let candidateIndexes = candidateIndexes(
+                    query: query.normalized,
+                    cache: windowCache,
+                    totalCount: input.windowEntries.count
+                )
                 var matchedIndexes: [Int] = []
                 matchedIndexes.reserveCapacity(candidateIndexes.count)
-                let ranked = candidateIndexes.compactMap { index -> RankedResult? in
-                    let window = windowEntries[index]
+                var topRanked: [RankedResult] = []
+                topRanked.reserveCapacity(min(Self.windowTopResultLimit, candidateIndexes.count))
+                for index in candidateIndexes {
+                    let window = input.windowEntries[index]
                     let titleScore = Self.matchScore(query: query, in: window.windowSearchIndex)
                     let appScore = Self.matchScore(query: query, in: window.appSearchIndex).map { $0 + 35 }
                     guard let score = Self.bestScore(titleScore, appScore) else {
-                        return nil
+                        continue
                     }
                     matchedIndexes.append(index)
                     let resolvedTitle = window.windowTitle.isEmpty ? "Untitled Window" : window.windowTitle
-                    return RankedResult(
+                    let ranked = RankedResult(
                         result: SwitcherSearchResult(
                             id: "window:\(window.appID)#\(window.windowID)",
                             kind: .window(appID: window.appID, windowID: window.windowID),
@@ -336,35 +405,90 @@ final class SwitcherSearchCoordinator {
                         score: score,
                         order: index
                     )
+                    insertTopRankedResult(ranked, into: &topRanked, limit: Self.windowTopResultLimit)
                 }
-                windowMatchCache = ScopeMatchCache(query: query.normalized, matchedIndexes: matchedIndexes)
-                rebuilt = Self.sortedResults(from: ranked)
+                windowCache = ScopeMatchCache(query: query.normalized, matchedIndexes: matchedIndexes)
+                rebuilt = topRanked.map(\.result)
             }
         }
 
-        state.results = rebuilt
-        if rebuilt.isEmpty {
-            state.selectedResultIndex = 0
-            return
+        return ComputationOutput(
+            query: input.query,
+            scope: input.scope,
+            results: rebuilt,
+            selectedResultIndex: resolvedSelectedResultIndex(
+                previous: input.selectedResultIndex,
+                resultCount: rebuilt.count,
+                resetSelection: input.resetSelection
+            ),
+            appMatchCache: appCache,
+            windowMatchCache: windowCache
+        )
+    }
+
+    private static func candidateIndexes(
+        query: String,
+        cache: ScopeMatchCache?,
+        totalCount: Int
+    ) -> [Int] {
+        if
+            let cache,
+            !cache.query.isEmpty,
+            query.hasPrefix(cache.query)
+        {
+            return cache.matchedIndexes
         }
-        if resetSelection {
-            state.selectedResultIndex = 0
-            return
+        return Array(0..<totalCount)
+    }
+
+    private static func isBetter(_ lhs: RankedResult, than rhs: RankedResult) -> Bool {
+        if lhs.score != rhs.score {
+            return lhs.score < rhs.score
         }
-        if state.selectedResultIndex >= rebuilt.count {
-            state.selectedResultIndex = rebuilt.count - 1
+        return lhs.order < rhs.order
+    }
+
+    private static func insertTopRankedResult(
+        _ result: RankedResult,
+        into topRanked: inout [RankedResult],
+        limit: Int
+    ) {
+        guard limit > 0 else { return }
+
+        var lower = 0
+        var upper = topRanked.count
+        while lower < upper {
+            let middle = (lower + upper) / 2
+            if isBetter(topRanked[middle], than: result) {
+                lower = middle + 1
+            } else {
+                upper = middle
+            }
+        }
+        topRanked.insert(result, at: lower)
+        if topRanked.count > limit {
+            topRanked.removeLast()
         }
     }
 
-    private static func sortedResults(from rankedResults: [RankedResult]) -> [SwitcherSearchResult] {
-        rankedResults
-            .sorted { lhs, rhs in
-                if lhs.score != rhs.score {
-                    return lhs.score < rhs.score
-                }
-                return lhs.order < rhs.order
-            }
-            .map(\.result)
+    private static func resolvedSelectedResultIndex(
+        previous: Int,
+        resultCount: Int,
+        resetSelection: Bool
+    ) -> Int {
+        if resultCount == 0 {
+            return 0
+        }
+        if resetSelection {
+            return 0
+        }
+        if previous >= resultCount {
+            return resultCount - 1
+        }
+        if previous < 0 {
+            return 0
+        }
+        return previous
     }
 
     private static func bestScore(_ lhs: Int?, _ rhs: Int?) -> Int? {
@@ -382,30 +506,42 @@ final class SwitcherSearchCoordinator {
 
     private static func matchScore(query: SearchKey, in index: SearchIndex) -> Int? {
         guard !query.normalized.isEmpty else { return 0 }
-        var best: Int?
 
-        func consider(_ candidate: Int?) {
-            guard let candidate else { return }
-            if let currentBest = best {
-                if candidate < currentBest {
-                    best = candidate
-                }
-            } else {
-                best = candidate
-            }
+        guard let fastScore = fastMatchScore(query: query, in: index) else {
+            guard query.compact.count <= 2 else { return nil }
+            return matchInitialsSubsequenceScore(query.compact, in: index.initials, base: 16)
+                ?? matchInitialsSubsequenceScore(query.compact, in: index.uppercaseAbbreviation, base: 15)
         }
 
-        consider(matchPositionScore(query.normalized, in: index.normalized, prefixBase: 0, containsBase: 20))
-        consider(matchPositionScore(query.compact, in: index.compact, prefixBase: 4, containsBase: 30))
-        consider(matchPositionScore(query.normalized, in: index.latinNormalized, prefixBase: 10, containsBase: 36))
-        consider(matchPositionScore(query.compact, in: index.latinCompact, prefixBase: 14, containsBase: 40))
-        consider(matchTokenPrefixScore(query.terms, in: index.terms, base: 18))
-        consider(matchTokenPrefixScore(query.terms, in: index.latinTerms, base: 24))
-        consider(matchInitialsScore(query.compact, in: index.initials, base: 16))
-        consider(matchInitialsScore(query.compact, in: index.uppercaseAbbreviation, base: 15))
-        consider(matchIdentifierScore(query.compact, in: index.identifierTerms, base: 22))
-
+        var best: Int? = fastScore
+        consider(&best, matchInitialsSubsequenceScore(query.compact, in: index.initials, base: 16))
+        consider(&best, matchInitialsSubsequenceScore(query.compact, in: index.uppercaseAbbreviation, base: 15))
         return best
+    }
+
+    private static func fastMatchScore(query: SearchKey, in index: SearchIndex) -> Int? {
+        var best: Int?
+        consider(&best, matchPositionScore(query.normalized, in: index.normalized, prefixBase: 0, containsBase: 20))
+        consider(&best, matchPositionScore(query.compact, in: index.compact, prefixBase: 4, containsBase: 30))
+        consider(&best, matchPositionScore(query.normalized, in: index.latinNormalized, prefixBase: 10, containsBase: 36))
+        consider(&best, matchPositionScore(query.compact, in: index.latinCompact, prefixBase: 14, containsBase: 40))
+        consider(&best, matchTokenPrefixScore(query.terms, in: index.terms, base: 18))
+        consider(&best, matchTokenPrefixScore(query.terms, in: index.latinTerms, base: 24))
+        consider(&best, matchInitialsPrefixOrContainsScore(query.compact, in: index.initials, base: 16))
+        consider(&best, matchInitialsPrefixOrContainsScore(query.compact, in: index.uppercaseAbbreviation, base: 15))
+        consider(&best, matchIdentifierScore(query.compact, in: index.identifierTerms, base: 22))
+        return best
+    }
+
+    private static func consider(_ best: inout Int?, _ candidate: Int?) {
+        guard let candidate else { return }
+        if let currentBest = best {
+            if candidate < currentBest {
+                best = candidate
+            }
+        } else {
+            best = candidate
+        }
     }
 
     private static func matchIdentifierScore(
@@ -484,7 +620,7 @@ final class SwitcherSearchCoordinator {
         return base + totalPenalty
     }
 
-    private static func matchInitialsScore(
+    private static func matchInitialsPrefixOrContainsScore(
         _ query: String,
         in initials: String,
         base: Int
@@ -500,7 +636,16 @@ final class SwitcherSearchCoordinator {
             let distance = initials.distance(from: initials.startIndex, to: range.lowerBound)
             return base + 10 + distance
         }
+        return nil
+    }
 
+    private static func matchInitialsSubsequenceScore(
+        _ query: String,
+        in initials: String,
+        base: Int
+    ) -> Int? {
+        guard !query.isEmpty else { return nil }
+        guard !initials.isEmpty else { return nil }
         guard let gapPenalty = subsequenceGap(query: query, in: initials) else { return nil }
         return base + 20 + gapPenalty
     }

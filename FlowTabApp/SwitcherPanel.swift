@@ -77,6 +77,11 @@ final class SwitcherPanelController {
         hostingView.wantsLayer = true
         hostingView.layer?.backgroundColor = NSColor.clear.cgColor
         panel.contentView = hostingView
+        model.onSearchStateChanged = { [weak self] in
+            guard let self else { return }
+            guard self.panel.isVisible else { return }
+            self.updatePanelSize()
+        }
     }
 
     private func monotonicMilliseconds() -> Double {
@@ -886,12 +891,17 @@ final class LiveSwitcherModel: ObservableObject {
         totalCostLimit: 160 * 1_024 * 1_024
     )
 
+    var onSearchStateChanged: (() -> Void)?
+
     private var sessionAppsByID: [String: AppSwitchCandidate] = [:]
     private var runtimeContextsByID: [String: RuntimeAppContext] = [:]
     private var rememberedWindowIDByAppID: [String: String] = [:]
     private var previewCaptureAttemptedKeys: Set<String> = []
     private var autoEnterSuppressedAppID: String?
     private var titleBarStyleInferenceEnabled = false
+    private var pendingSearchComputationTask: Task<Void, Never>?
+    private var searchComputationRevision: UInt64 = 0
+    private var searchDebounceNanoseconds: UInt64 = 20_000_000
 
     init() {}
 
@@ -1118,6 +1128,7 @@ final class LiveSwitcherModel: ObservableObject {
         guard SearchInteractionPreferencesStore.loadIsEnabled() else { return false }
         guard overlayStyle == .appAndWindow else { return false }
         guard let session, case .appCycle = session.mode else { return false }
+        cancelPendingSearchComputation()
         sessionAppsByID = Dictionary(uniqueKeysWithValues: session.apps.map { ($0.id, $0) })
         searchCoordinator.rebuildIndex(with: session.apps)
         let defaultScope = SearchInteractionPreferencesStore.loadDefaultScope()
@@ -1128,9 +1139,12 @@ final class LiveSwitcherModel: ObservableObject {
 
     @discardableResult
     func toggleSearchScope() -> Bool {
-        let changed = searchCoordinator.toggleScope()
+        cancelPendingSearchComputation()
+        let changed = searchCoordinator.toggleScopeWithoutRebuild()
+        guard changed else { return false }
         publishSearchStateIfNeeded()
-        return changed
+        scheduleSearchComputation(resetSelection: true, debounced: false)
+        return true
     }
 
     @discardableResult
@@ -1156,19 +1170,24 @@ final class LiveSwitcherModel: ObservableObject {
 
     @discardableResult
     func appendSearchQuery(_ value: String) -> Bool {
-        let changed = searchCoordinator.appendQueryText(value)
+        let changed = searchCoordinator.appendQueryTextWithoutRebuild(value)
+        guard changed else { return false }
         publishSearchStateIfNeeded()
-        return changed
+        scheduleSearchComputation(resetSelection: true, debounced: true)
+        return true
     }
 
     @discardableResult
     func deleteSearchQueryBackward() -> Bool {
-        let changed = searchCoordinator.deleteBackwardInQuery()
+        let changed = searchCoordinator.deleteBackwardInQueryWithoutRebuild()
+        guard changed else { return false }
         publishSearchStateIfNeeded()
-        return changed
+        scheduleSearchComputation(resetSelection: true, debounced: true)
+        return true
     }
 
     func handleSearchEscape() -> SwitcherSearchEscapeAction {
+        cancelPendingSearchComputation()
         let action = searchCoordinator.handleEscape()
         publishSearchStateIfNeeded()
         return action
@@ -1187,6 +1206,7 @@ final class LiveSwitcherModel: ObservableObject {
         }
 
         autoEnterSuppressedAppID = nil
+        cancelPendingSearchComputation()
         self.session = session
         _ = searchCoordinator.exit()
         publishSearchStateIfNeeded()
@@ -1369,6 +1389,7 @@ final class LiveSwitcherModel: ObservableObject {
         guard var session else { return }
         let target = session.commitSelection()
         rememberedWindowIDByAppID = session.rememberedWindowIDByAppID
+        cancelPendingSearchComputation()
         self.session = nil
         _ = searchCoordinator.exit()
         publishSearchStateIfNeeded()
@@ -1388,6 +1409,7 @@ final class LiveSwitcherModel: ObservableObject {
     }
 
     private func resetSessionState() {
+        cancelPendingSearchComputation()
         session = nil
         overlayStyle = .appAndWindow
         searchCoordinator.rebuildIndex(with: [])
@@ -1401,6 +1423,60 @@ final class LiveSwitcherModel: ObservableObject {
         previewCaptureAttemptedKeys = []
         autoEnterSuppressedAppID = nil
         titleBarStyleInferenceEnabled = false
+    }
+
+    private func cancelPendingSearchComputation() {
+        pendingSearchComputationTask?.cancel()
+        pendingSearchComputationTask = nil
+        searchComputationRevision &+= 1
+    }
+
+    private func scheduleSearchComputation(resetSelection: Bool, debounced: Bool) {
+        guard searchViewState.isActive else { return }
+        pendingSearchComputationTask?.cancel()
+        searchComputationRevision &+= 1
+        let revision = searchComputationRevision
+        guard let input = searchCoordinator.makeComputationInput(resetSelection: resetSelection) else {
+            return
+        }
+        let debounceDelay = debounced ? searchDebounceNanoseconds : 0
+
+        pendingSearchComputationTask = Task { [weak self] in
+            guard let self else { return }
+            if debounceDelay > 0 {
+                try? await Task.sleep(nanoseconds: debounceDelay)
+            }
+            guard !Task.isCancelled else { return }
+
+            let startedAt = DispatchTime.now().uptimeNanoseconds
+            let output = await Task.detached(priority: .userInitiated) {
+                SwitcherSearchCoordinator.computeOutput(from: input)
+            }.value
+            let elapsed = DispatchTime.now().uptimeNanoseconds - startedAt
+
+            await MainActor.run {
+                guard revision == self.searchComputationRevision else { return }
+                self.pendingSearchComputationTask = nil
+                if self.searchCoordinator.applyComputationOutput(output) {
+                    self.publishSearchStateIfNeeded()
+                    self.onSearchStateChanged?()
+                }
+                self.updateSearchDebounceWindow(lastComputationNanoseconds: elapsed)
+            }
+        }
+    }
+
+    private func updateSearchDebounceWindow(lastComputationNanoseconds: UInt64) {
+        let elapsedMilliseconds = Double(lastComputationNanoseconds) / 1_000_000
+        if elapsedMilliseconds > 16 {
+            searchDebounceNanoseconds = 45_000_000
+        } else if elapsedMilliseconds > 10 {
+            searchDebounceNanoseconds = 35_000_000
+        } else if elapsedMilliseconds > 6 {
+            searchDebounceNanoseconds = 25_000_000
+        } else {
+            searchDebounceNanoseconds = 14_000_000
+        }
     }
 
     private func publishSearchStateIfNeeded() {
