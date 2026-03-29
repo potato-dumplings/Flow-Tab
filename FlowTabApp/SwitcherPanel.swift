@@ -16,6 +16,7 @@ final class SwitcherPanelController {
     private var keyDownMonitor: Any?
     private var localFlagsChangedMonitor: Any?
     private var globalFlagsChangedMonitor: Any?
+    private var globalMouseDownMonitor: Any?
     private var pendingModifierReleaseConfirmationTask: Task<Void, Never>?
     private var delayedWindowLayerTimer: Timer?
     private var lastCommittedTabAdvanceTimestamp: TimeInterval?
@@ -49,10 +50,9 @@ final class SwitcherPanelController {
     private let appLayerMaxAdaptiveTileSize: CGFloat = 90
     private let maxAppTileSpacing: CGFloat = 10
     private let minAppTileSize: CGFloat = 1
-    private let searchWindowRowHeight: CGFloat = 44
-    private let searchWindowVisibleRowLimit: Int = 8
-    private let searchHeaderHeight: CGFloat = 74
-    private let searchAppResultExtraHeight: CGFloat = 8
+    private let searchResultRowHeight: CGFloat = 40
+    private let searchResultVisibleRowLimit: Int = 8
+    private let searchHeaderHeight: CGFloat = 62
     private var activeHotkeySessionKind: HotkeySessionKind?
 
     private var searchFeatureEnabled: Bool {
@@ -70,9 +70,9 @@ final class SwitcherPanelController {
         panel.backgroundColor = .clear
         panel.hasShadow = false
         panel.level = .statusBar
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle, .transient]
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle, .stationary]
         panel.hidesOnDeactivate = false
-        panel.ignoresMouseEvents = true
+        panel.ignoresMouseEvents = false
         let hostingView = NSHostingView(rootView: SwitcherPanelRootView(model: model))
         hostingView.wantsLayer = true
         hostingView.layer?.backgroundColor = NSColor.clear.cgColor
@@ -314,23 +314,9 @@ final class SwitcherPanelController {
         let height: CGFloat
 
         if model.isSearchActive {
-            if model.searchScope == .window {
-                let visibleRows = max(1, min(model.searchResultCount, searchWindowVisibleRowLimit))
-                let desiredHeight = searchHeaderHeight + CGFloat(visibleRows) * searchWindowRowHeight + 72
-                height = min(maxHeight, max(minimumPanelHeight, desiredHeight))
-            } else {
-                let gridLayout = resolveAppGridLayout(
-                    appCount: max(1, model.searchResultCount),
-                    availableWidth: max(1, width - overlayHorizontalInset),
-                    maxTileSize: previewLayerAppTileSize
-                )
-                model.updateAppGridLayout(
-                    tileSize: gridLayout.tileSize,
-                    spacing: gridLayout.spacing
-                )
-                let desiredHeight = searchHeaderHeight + gridLayout.gridHeight + searchAppResultExtraHeight + 66
-                height = min(maxHeight, max(minimumPanelHeight, desiredHeight))
-            }
+            let visibleRows = max(1, min(model.searchResultCount, searchResultVisibleRowLimit))
+            let desiredHeight = searchHeaderHeight + CGFloat(visibleRows) * searchResultRowHeight + 58
+            height = min(maxHeight, max(minimumPanelHeight, desiredHeight))
             let targetSize = NSSize(width: width, height: height)
             if panel.contentRect(forFrameRect: panel.frame).size != targetSize {
                 panel.setContentSize(targetSize)
@@ -501,6 +487,14 @@ final class SwitcherPanelController {
         globalFlagsChangedMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
             self?.handleFlagsChanged(event)
         }
+
+        globalMouseDownMonitor = NSEvent.addGlobalMonitorForEvents(
+            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        ) { [weak self] event in
+            Task { @MainActor [weak self] in
+                self?.handleGlobalMouseDown(event)
+            }
+        }
     }
 
     private func removeEventMonitors() {
@@ -516,6 +510,10 @@ final class SwitcherPanelController {
         if let globalFlagsChangedMonitor {
             NSEvent.removeMonitor(globalFlagsChangedMonitor)
             self.globalFlagsChangedMonitor = nil
+        }
+        if let globalMouseDownMonitor {
+            NSEvent.removeMonitor(globalMouseDownMonitor)
+            self.globalMouseDownMonitor = nil
         }
         if let delayedWindowLayerTimer {
             delayedWindowLayerTimer.invalidate()
@@ -625,11 +623,14 @@ final class SwitcherPanelController {
             finishSelection()
             return true
         case 53:
-            if model.shouldClearSearchOnEscape {
-                _ = model.handleSearchEscape()
+            if !model.isSearchInputFocused {
+                if model.focusSearchInput() {
+                    updatePanelSize()
+                }
+                return true
+            }
+            if model.handleSearchEscape() != .ignored {
                 updatePanelSize()
-            } else {
-                cancelSelection()
             }
             return true
         case 51:
@@ -674,6 +675,16 @@ final class SwitcherPanelController {
             "flagsChanged keyCode=\(event.keyCode) action=scheduleReleaseConfirm nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
         )
         scheduleModifierReleaseConfirmation(trigger: "flags_changed")
+    }
+
+    private func handleGlobalMouseDown(_ event: NSEvent) {
+        guard panel.isVisible else { return }
+        guard model.isSearchActive else { return }
+        guard !panel.frame.contains(event.locationInWindow) else { return }
+        logInputTrace(
+            "globalMouseDownOutsidePanel action=cancelSelection nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
+        )
+        cancelSelection()
     }
 
     private func scheduleModifierReleaseConfirmation(trigger: String) {
@@ -1735,6 +1746,34 @@ private struct CommandTabOverlay: View {
         windowPreviewItems.first(where: \.isSelected)?.id
     }
 
+    private var selectedSearchResultID: String? {
+        guard !searchState.results.isEmpty else { return nil }
+        let index = min(max(searchState.selectedResultIndex, 0), searchState.results.count - 1)
+        return searchState.results[index].id
+    }
+
+    private var searchHeaderHighlightItem: SearchHeaderHighlightItem? {
+        guard isSearchMode else { return nil }
+        switch searchState.scope {
+        case .app:
+            guard !searchAppItems.isEmpty else { return nil }
+            let index = min(max(searchState.selectedResultIndex, 0), searchAppItems.count - 1)
+            let item = searchAppItems[index]
+            return SearchHeaderHighlightItem(
+                title: item.app.displayName,
+                icon: iconForApp(item.app)
+            )
+        case .window:
+            guard !searchWindowItems.isEmpty else { return nil }
+            let index = min(max(searchState.selectedResultIndex, 0), searchWindowItems.count - 1)
+            let item = searchWindowItems[index]
+            return SearchHeaderHighlightItem(
+                title: item.appName,
+                icon: item.icon
+            )
+        }
+    }
+
     private func appGridColumns(for itemCount: Int) -> [GridItem] {
         let count = max(itemCount, 1)
         return Array(
@@ -1749,7 +1788,21 @@ private struct CommandTabOverlay: View {
 
     private func scrollToSelectedPreview(using proxy: ScrollViewProxy) {
         guard let selectedWindowPreviewID else { return }
-        proxy.scrollTo(selectedWindowPreviewID, anchor: .center)
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            proxy.scrollTo(selectedWindowPreviewID, anchor: .center)
+        }
+    }
+
+    private func scrollToSelectedSearchResult(using proxy: ScrollViewProxy) {
+        guard !searchState.isInputFocused else { return }
+        guard let selectedSearchResultID else { return }
+        var transaction = Transaction(animation: nil)
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            proxy.scrollTo(selectedSearchResultID, anchor: .center)
+        }
     }
 
     @ViewBuilder
@@ -1811,7 +1864,7 @@ private struct CommandTabOverlay: View {
                         .onAppear {
                             scrollToSelectedPreview(using: scrollProxy)
                         }
-                        .onChange(of: selectedWindowPreviewID) { _ in
+                        .onChange(of: selectedWindowPreviewID) {
                             scrollToSelectedPreview(using: scrollProxy)
                         }
                     }
@@ -1842,45 +1895,67 @@ private struct CommandTabOverlay: View {
                 cursorPosition: searchState.queryCursorPosition,
                 scope: searchState.scope,
                 isInputFocused: searchState.isInputFocused,
-                hintText: "Tab 切换范围 · ←/→ 移动光标 · ↓ 进入结果 · Enter 激活 · Esc 清空/关闭"
+                hintText: "Tab 切换范围 · ←/→ 移动光标 · ↓ 进入结果 · Enter 激活 · Esc 清空/关闭",
+                highlightedItem: searchHeaderHighlightItem,
+                isSearchPresentation: true
             )
 
             if searchState.scope == .app {
                 if searchAppItems.isEmpty {
                     SearchEmptyState(scope: .app)
                 } else {
-                    LazyVGrid(
-                        columns: appGridColumns(for: searchAppItems.count),
-                        alignment: .leading,
-                        spacing: appTileSpacing
-                    ) {
-                        ForEach(searchAppItems) { item in
-                            AppTileView(
-                                app: item.app,
-                                isSelected: item.isSelected,
-                                size: appTileSize,
-                                icon: iconForApp(item.app)
-                            )
-                            .id(item.id)
+                    ScrollViewReader { scrollProxy in
+                        ScrollView(.vertical, showsIndicators: true) {
+                            LazyVStack(alignment: .leading, spacing: 8) {
+                                ForEach(searchAppItems) { item in
+                                    SearchAppRow(
+                                        item: item,
+                                        icon: iconForApp(item.app)
+                                    )
+                                    .id(item.id)
+                                }
+                            }
+                            .padding(.horizontal, 2)
+                            .padding(.vertical, 2)
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .onAppear {
+                            scrollToSelectedSearchResult(using: scrollProxy)
+                        }
+                        .onChange(of: selectedSearchResultID) {
+                            scrollToSelectedSearchResult(using: scrollProxy)
+                        }
+                        .onChange(of: searchState.isInputFocused) {
+                            scrollToSelectedSearchResult(using: scrollProxy)
                         }
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 2)
                 }
             } else {
                 if searchWindowItems.isEmpty {
                     SearchEmptyState(scope: .window)
                 } else {
-                    ScrollView(.vertical, showsIndicators: true) {
-                        LazyVStack(alignment: .leading, spacing: 8) {
-                            ForEach(searchWindowItems) { item in
-                                SearchWindowRow(item: item)
+                    ScrollViewReader { scrollProxy in
+                        ScrollView(.vertical, showsIndicators: true) {
+                            LazyVStack(alignment: .leading, spacing: 8) {
+                                ForEach(searchWindowItems) { item in
+                                    SearchWindowRow(item: item)
+                                        .id(item.id)
+                                }
                             }
+                            .padding(.horizontal, 2)
+                            .padding(.vertical, 2)
                         }
-                        .padding(.horizontal, 2)
-                        .padding(.vertical, 2)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                        .onAppear {
+                            scrollToSelectedSearchResult(using: scrollProxy)
+                        }
+                        .onChange(of: selectedSearchResultID) {
+                            scrollToSelectedSearchResult(using: scrollProxy)
+                        }
+                        .onChange(of: searchState.isInputFocused) {
+                            scrollToSelectedSearchResult(using: scrollProxy)
+                        }
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 }
             }
         }
@@ -1976,15 +2051,40 @@ private struct SearchWindowResultItem: Identifiable {
     let isSelected: Bool
 }
 
+private struct SearchHeaderHighlightItem {
+    let title: String
+    let icon: NSImage?
+}
+
 private struct SearchInputHeader: View {
     let query: String
     let cursorPosition: Int
     let scope: SwitcherSearchScope
     let isInputFocused: Bool
     let hintText: String
+    let highlightedItem: SearchHeaderHighlightItem?
+    let isSearchPresentation: Bool
     @Environment(\.colorScheme) private var colorScheme
 
-    private var queryText: String {
+    init(
+        query: String,
+        cursorPosition: Int,
+        scope: SwitcherSearchScope,
+        isInputFocused: Bool,
+        hintText: String,
+        highlightedItem: SearchHeaderHighlightItem? = nil,
+        isSearchPresentation: Bool = false
+    ) {
+        self.query = query
+        self.cursorPosition = cursorPosition
+        self.scope = scope
+        self.isInputFocused = isInputFocused
+        self.hintText = hintText
+        self.highlightedItem = highlightedItem
+        self.isSearchPresentation = isSearchPresentation
+    }
+
+    private var queryTextWithCursor: String {
         if query.isEmpty && !isInputFocused {
             return "输入关键词搜索"
         }
@@ -1996,50 +2096,127 @@ private struct SearchInputHeader: View {
         return String(query[..<splitIndex]) + "│" + String(query[splitIndex...])
     }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.secondary)
-
-                Text(queryText)
-                    .foregroundStyle(query.isEmpty && !isInputFocused ? .secondary : .primary)
-                .lineLimit(1)
-                .font(.system(size: 13, weight: .medium))
-
-                Spacer(minLength: 8)
-
-                Text(scope.label)
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(
-                        Capsule(style: .continuous)
-                            .fill(Color.primary.opacity(colorScheme == .dark ? 0.20 : 0.08))
-                    )
-            }
-
-            Text(hintText)
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary.opacity(isInputFocused ? 0.95 : 0.78))
+    private var searchModeQueryText: String {
+        if query.isEmpty {
+            return isInputFocused ? "│" : "搜索"
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.05))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(
-                    isInputFocused
-                        ? Color.accentColor.opacity(colorScheme == .dark ? 0.78 : 0.58)
-                        : Color.primary.opacity(colorScheme == .dark ? 0.20 : 0.10),
-                    lineWidth: isInputFocused ? 1.6 : 1
+        let clampedCursorPosition = min(max(cursorPosition, 0), query.count)
+        if isInputFocused {
+            let splitIndex = query.index(query.startIndex, offsetBy: clampedCursorPosition)
+            return String(query[..<splitIndex]) + "│" + String(query[splitIndex...])
+        }
+        return query
+    }
+
+    var body: some View {
+        Group {
+            if isSearchPresentation {
+                HStack(spacing: 12) {
+                    Text(searchModeQueryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+                        .font(.system(size: 20, weight: .regular))
+                        .foregroundStyle(query.isEmpty && !isInputFocused ? .secondary : .primary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    if let highlightedItem {
+                        HStack(spacing: 8) {
+                            Text("—")
+                                .font(.system(size: 16, weight: .regular))
+                                .foregroundStyle(.secondary)
+                            Text(highlightedItem.title)
+                                .lineLimit(1)
+                                .font(.system(size: 14, weight: .regular))
+                                .foregroundStyle(.primary)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                                .fill(Color.accentColor.opacity(colorScheme == .dark ? 0.30 : 0.20))
+                        )
+                    }
+
+                    Group {
+                        if let icon = highlightedItem?.icon {
+                            Image(nsImage: icon)
+                                .resizable()
+                                .interpolation(.high)
+                        } else {
+                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                .fill(Color.primary.opacity(0.13))
+                                .overlay(
+                                    Image(systemName: scope == .app ? "app.badge.fill" : "macwindow")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(.secondary)
+                                )
+                        }
+                    }
+                    .frame(width: 26, height: 26)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .shadow(color: .black.opacity(colorScheme == .dark ? 0.22 : 0.10), radius: 3, y: 1)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.05))
                 )
-        )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(
+                            isInputFocused
+                                ? Color.accentColor.opacity(colorScheme == .dark ? 0.76 : 0.54)
+                                : Color.primary.opacity(colorScheme == .dark ? 0.20 : 0.10),
+                            lineWidth: isInputFocused ? 1.6 : 1
+                        )
+                )
+            } else {
+                VStack(alignment: .leading, spacing: 7) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.secondary)
+
+                        Text(queryTextWithCursor)
+                            .foregroundStyle(query.isEmpty && !isInputFocused ? .secondary : .primary)
+                            .lineLimit(1)
+                            .font(.system(size: 13, weight: .medium))
+
+                        Spacer(minLength: 8)
+
+                        Text(scope.label)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(
+                                Capsule(style: .continuous)
+                                    .fill(Color.primary.opacity(colorScheme == .dark ? 0.20 : 0.08))
+                            )
+                    }
+
+                    Text(hintText)
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary.opacity(isInputFocused ? 0.95 : 0.78))
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.05))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(
+                            isInputFocused
+                                ? Color.accentColor.opacity(colorScheme == .dark ? 0.78 : 0.58)
+                                : Color.primary.opacity(colorScheme == .dark ? 0.20 : 0.10),
+                            lineWidth: isInputFocused ? 1.6 : 1
+                        )
+                )
+            }
+        }
     }
 }
 
@@ -2059,12 +2236,70 @@ private struct SearchEmptyState: View {
     }
 }
 
+private struct SearchAppRow: View {
+    let item: SearchAppResultItem
+    let icon: NSImage?
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Group {
+                if let icon {
+                    Image(nsImage: icon)
+                        .resizable()
+                        .interpolation(.high)
+                } else {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color.primary.opacity(0.14))
+                        .overlay(
+                            Text(item.app.displayName.prefix(1).uppercased())
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                        )
+                }
+            }
+            .frame(width: 28, height: 28)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+
+            Text(item.app.displayName)
+                .lineLimit(1)
+                .font(.system(size: 16, weight: .regular))
+                .foregroundStyle(
+                    item.isSelected
+                        ? Color.primary
+                        : Color.primary.opacity(0.92)
+                )
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(
+                    item.isSelected
+                        ? Color.accentColor.opacity(colorScheme == .dark ? 0.24 : 0.16)
+                        : Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.04)
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(
+                    item.isSelected
+                        ? Color.accentColor.opacity(colorScheme == .dark ? 0.64 : 0.45)
+                        : Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.08),
+                    lineWidth: item.isSelected ? 1.4 : 1
+                )
+        )
+    }
+}
+
 private struct SearchWindowRow: View {
     let item: SearchWindowResultItem
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             Group {
                 if let icon = item.icon {
                     Image(nsImage: icon)
@@ -2075,42 +2310,43 @@ private struct SearchWindowRow: View {
                         .fill(Color.primary.opacity(0.14))
                         .overlay(
                             Image(systemName: "app")
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(.system(size: 13, weight: .semibold))
                                 .foregroundStyle(.secondary)
                         )
                 }
             }
-            .frame(width: 20, height: 20)
+            .frame(width: 28, height: 28)
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.title)
                     .lineLimit(1)
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.system(size: 14, weight: .regular))
                     .foregroundStyle(
                         item.isSelected
                             ? Color.primary
-                            : Color.primary.opacity(0.88)
+                            : Color.primary.opacity(0.92)
                     )
                 Text(item.appName)
                     .lineLimit(1)
-                    .font(.system(size: 11))
+                    .font(.system(size: 10, weight: .regular))
                     .foregroundStyle(.secondary)
             }
 
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
         .background(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(
                     item.isSelected
-                        ? Color.accentColor.opacity(colorScheme == .dark ? 0.22 : 0.16)
+                        ? Color.accentColor.opacity(colorScheme == .dark ? 0.24 : 0.16)
                         : Color.primary.opacity(colorScheme == .dark ? 0.10 : 0.04)
                 )
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .stroke(
                     item.isSelected
                         ? Color.accentColor.opacity(colorScheme == .dark ? 0.64 : 0.45)
@@ -2315,7 +2551,6 @@ private struct WindowOnlyPreviewCard: View {
             radius: isSelected ? 14 : 9,
             y: isSelected ? 8 : 5
         )
-        .animation(.easeOut(duration: 0.12), value: isSelected)
     }
 }
 
