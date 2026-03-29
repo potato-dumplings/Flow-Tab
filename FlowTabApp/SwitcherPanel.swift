@@ -15,8 +15,15 @@ final class SwitcherPanelController {
 
     private var keyDownMonitor: Any?
     private var localFlagsChangedMonitor: Any?
+    private var globalKeyDownMonitor: Any?
     private var globalFlagsChangedMonitor: Any?
     private var globalMouseDownMonitor: Any?
+    private var appDidResignActiveObserver: NSObjectProtocol?
+    private var activeSpaceDidChangeObserver: NSObjectProtocol?
+    private var panelOcclusionObserver: NSObjectProtocol?
+    private var panelDidResignKeyObserver: NSObjectProtocol?
+    private var suppressHotkeyReplayUntilRelease = false
+    private var suppressHotkeyReplayTask: Task<Void, Never>?
     private var pendingModifierReleaseConfirmationTask: Task<Void, Never>?
     private var delayedWindowLayerTimer: Timer?
     private var lastCommittedTabAdvanceTimestamp: TimeInterval?
@@ -82,6 +89,60 @@ final class SwitcherPanelController {
             guard self.panel.isVisible else { return }
             self.updatePanelSize()
         }
+
+        appDidResignActiveObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didResignActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.handleApplicationDidResignActive()
+            }
+        }
+        activeSpaceDidChangeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.activeSpaceDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.handleActiveSpaceDidChange()
+            }
+        }
+        panelOcclusionObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didChangeOcclusionStateNotification,
+            object: panel,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.handlePanelOcclusionStateDidChange()
+            }
+        }
+        panelDidResignKeyObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didResignKeyNotification,
+            object: panel,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.handlePanelDidResignKey()
+            }
+        }
+    }
+
+    deinit {
+        suppressHotkeyReplayTask?.cancel()
+        suppressHotkeyReplayTask = nil
+        if let appDidResignActiveObserver {
+            NotificationCenter.default.removeObserver(appDidResignActiveObserver)
+        }
+        if let activeSpaceDidChangeObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(activeSpaceDidChangeObserver)
+        }
+        if let panelOcclusionObserver {
+            NotificationCenter.default.removeObserver(panelOcclusionObserver)
+        }
+        if let panelDidResignKeyObserver {
+            NotificationCenter.default.removeObserver(panelDidResignKeyObserver)
+        }
     }
 
     private func monotonicMilliseconds() -> Double {
@@ -103,6 +164,12 @@ final class SwitcherPanelController {
         if now < ignoreHotkeyPressesUntil {
             logInputTrace(
                 "hotkeyPressed dir=\(directionText) dropped=postFinishWindow nowMs=\(formatMilliseconds(nowMs)) ignoreUntilMs=\(formatMilliseconds(ignoreHotkeyPressesUntil * 1_000))"
+            )
+            return
+        }
+        if suppressHotkeyReplayUntilRelease {
+            logInputTrace(
+                "hotkeyPressed dir=\(directionText) dropped=awaitingHotkeyRelease nowMs=\(formatMilliseconds(nowMs))"
             )
             return
         }
@@ -158,6 +225,12 @@ final class SwitcherPanelController {
         if now < ignoreHotkeyPressesUntil {
             logInputTrace(
                 "inAppHotkeyPressed dir=\(directionText) dropped=postFinishWindow nowMs=\(formatMilliseconds(nowMs)) ignoreUntilMs=\(formatMilliseconds(ignoreHotkeyPressesUntil * 1_000))"
+            )
+            return
+        }
+        if suppressHotkeyReplayUntilRelease {
+            logInputTrace(
+                "inAppHotkeyPressed dir=\(directionText) dropped=awaitingHotkeyRelease nowMs=\(formatMilliseconds(nowMs))"
             )
             return
         }
@@ -484,6 +557,12 @@ final class SwitcherPanelController {
             return nil
         }
 
+        globalKeyDownMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            Task { @MainActor [weak self] in
+                self?.handleGlobalKeyDown(event)
+            }
+        }
+
         globalFlagsChangedMonitor = NSEvent.addGlobalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
             self?.handleFlagsChanged(event)
         }
@@ -506,6 +585,10 @@ final class SwitcherPanelController {
         if let localFlagsChangedMonitor {
             NSEvent.removeMonitor(localFlagsChangedMonitor)
             self.localFlagsChangedMonitor = nil
+        }
+        if let globalKeyDownMonitor {
+            NSEvent.removeMonitor(globalKeyDownMonitor)
+            self.globalKeyDownMonitor = nil
         }
         if let globalFlagsChangedMonitor {
             NSEvent.removeMonitor(globalFlagsChangedMonitor)
@@ -687,6 +770,79 @@ final class SwitcherPanelController {
         cancelSelection()
     }
 
+    private func handleGlobalKeyDown(_ event: NSEvent) {
+        guard panel.isVisible else { return }
+        guard !NSApp.isActive else { return }
+        guard event.keyCode == 53 else { return }
+        logInputTrace(
+            "globalEscWhileAppInactive action=cancelSelection nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
+        )
+        cancelSelection()
+    }
+
+    private func handleApplicationDidResignActive() {
+        guard panel.isVisible else { return }
+        cancelSelectionForSystemInterruption(trigger: "applicationDidResignActive")
+    }
+
+    private func handleActiveSpaceDidChange() {
+        guard panel.isVisible else { return }
+        cancelSelectionForSystemInterruption(trigger: "activeSpaceDidChange")
+    }
+
+    private func handlePanelOcclusionStateDidChange() {
+        guard panel.isVisible else { return }
+        guard !panel.occlusionState.contains(.visible) else { return }
+        cancelSelectionForSystemInterruption(trigger: "panelOccluded")
+    }
+
+    private func handlePanelDidResignKey() {
+        guard panel.isVisible else { return }
+        guard !NSApp.isActive else { return }
+        cancelSelectionForSystemInterruption(trigger: "panelDidResignKey")
+    }
+
+    private func cancelSelectionForSystemInterruption(trigger: String) {
+        guard panel.isVisible else { return }
+        let sessionKind = activeHotkeySessionKind
+        logInputTrace(
+            "\(trigger) action=cancelSelection nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
+        )
+        cancelSelection()
+        if let sessionKind {
+            beginHotkeyReplaySuppressionUntilRelease(for: sessionKind, trigger: trigger)
+        }
+    }
+
+    private func beginHotkeyReplaySuppressionUntilRelease(
+        for sessionKind: HotkeySessionKind,
+        trigger: String
+    ) {
+        suppressHotkeyReplayTask?.cancel()
+        suppressHotkeyReplayUntilRelease = true
+        logInputTrace(
+            "hotkeyReplaySuppression start trigger=\(trigger) nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
+        )
+        suppressHotkeyReplayTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            while true {
+                try? await Task.sleep(nanoseconds: self.modifierReleaseConfirmationSampleIntervalNs)
+                guard !Task.isCancelled else { return }
+                let modifierPressed = self.isPrimaryModifierPressedInHardwareState(for: sessionKind)
+                let mainKeyPressed = self.isSessionMainKeyPressedInHardwareState(for: sessionKind)
+                if modifierPressed || mainKeyPressed {
+                    continue
+                }
+                self.suppressHotkeyReplayUntilRelease = false
+                self.suppressHotkeyReplayTask = nil
+                self.logInputTrace(
+                    "hotkeyReplaySuppression end trigger=\(trigger) nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
+                )
+                return
+            }
+        }
+    }
+
     private func scheduleModifierReleaseConfirmation(trigger: String) {
         if pendingModifierReleaseConfirmationTask != nil {
             logInputTrace(
@@ -768,7 +924,11 @@ final class SwitcherPanelController {
     }
 
     private func isPrimaryModifierPressedInHardwareState() -> Bool {
-        switch activePrimaryModifier() {
+        isPrimaryModifierPressedInHardwareState(for: activeHotkeySessionKind ?? .globalAppSwitcher)
+    }
+
+    private func isPrimaryModifierPressedInHardwareState(for sessionKind: HotkeySessionKind) -> Bool {
+        switch primaryModifier(for: sessionKind) {
         case .option:
             return CGEventSource.keyState(.combinedSessionState, key: CGKeyCode(kVK_Option))
                 || CGEventSource.keyState(.combinedSessionState, key: CGKeyCode(kVK_RightOption))
@@ -779,6 +939,17 @@ final class SwitcherPanelController {
             return CGEventSource.keyState(.combinedSessionState, key: CGKeyCode(kVK_Command))
                 || CGEventSource.keyState(.combinedSessionState, key: CGKeyCode(kVK_RightCommand))
         }
+    }
+
+    private func isSessionMainKeyPressedInHardwareState(for sessionKind: HotkeySessionKind) -> Bool {
+        let keyCode: CGKeyCode
+        switch sessionKind {
+        case .globalAppSwitcher:
+            keyCode = CGKeyCode(SwitcherHotkeyPreferencesStore.load().mainKey.keyCode)
+        case .inAppWindowSwitcher:
+            keyCode = CGKeyCode(InAppWindowHotkeyPreferencesStore.load().mainKey.keyCode)
+        }
+        return CGEventSource.keyState(.combinedSessionState, key: keyCode)
     }
 
     private func isPrimaryModifierLikelyPressed(event: NSEvent? = nil) -> Bool {
@@ -845,7 +1016,11 @@ final class SwitcherPanelController {
     }
 
     private func activePrimaryModifier() -> SwitcherPrimaryModifier {
-        if activeHotkeySessionKind == .inAppWindowSwitcher {
+        primaryModifier(for: activeHotkeySessionKind ?? .globalAppSwitcher)
+    }
+
+    private func primaryModifier(for sessionKind: HotkeySessionKind) -> SwitcherPrimaryModifier {
+        if sessionKind == .inAppWindowSwitcher {
             return .control
         }
         return SwitcherHotkeyPreferencesStore.load().primaryModifier
