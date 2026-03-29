@@ -96,9 +96,16 @@ final class SwitcherSearchCoordinator {
         let order: Int
     }
 
-    struct ScopeMatchCache: Sendable {
-        let query: String
+    struct QueryCacheEntry: Sendable {
         let matchedIndexes: [Int]
+        let topResults: [SwitcherSearchResult]
+    }
+
+    struct ScopeMatchCache: Sendable {
+        let latestQuery: String
+        let latestMatchedIndexes: [Int]
+        let entries: [String: QueryCacheEntry]
+        let lruOrder: [String]
     }
 
     struct ComputationInput: Sendable {
@@ -127,6 +134,7 @@ final class SwitcherSearchCoordinator {
     private var windowEntries: [WindowEntry] = []
     private var appMatchCache: ScopeMatchCache?
     private var windowMatchCache: ScopeMatchCache?
+    private static let scopeMatchCacheEntryLimit: Int = 32
     private static let appTopResultLimit: Int = 300
     private static let windowTopResultLimit: Int = 400
     private static let ignoredBundleIDTokens: Set<String> = ["com", "org", "net", "io", "app", "www"]
@@ -333,6 +341,16 @@ final class SwitcherSearchCoordinator {
                         secondaryText: nil
                     )
                 }
+            } else if
+                let cache = appCache,
+                let cachedEntry = cache.entries[query.normalized]
+            {
+                appCache = touchedCache(
+                    cache,
+                    query: query.normalized,
+                    latestMatchedIndexes: cachedEntry.matchedIndexes
+                )
+                rebuilt = cachedEntry.topResults
             } else {
                 let candidateIndexes = candidateIndexes(
                     query: query.normalized,
@@ -361,8 +379,15 @@ final class SwitcherSearchCoordinator {
                     )
                     insertTopRankedResult(ranked, into: &topRanked, limit: Self.appTopResultLimit)
                 }
-                appCache = ScopeMatchCache(query: query.normalized, matchedIndexes: matchedIndexes)
-                rebuilt = topRanked.map(\.result)
+                let topResults = topRanked.map(\.result)
+                appCache = updatedCache(
+                    appCache,
+                    query: query.normalized,
+                    matchedIndexes: matchedIndexes,
+                    topResults: topResults,
+                    limit: Self.scopeMatchCacheEntryLimit
+                )
+                rebuilt = topResults
             }
         case .window:
             if query.normalized.isEmpty {
@@ -376,6 +401,16 @@ final class SwitcherSearchCoordinator {
                         secondaryText: window.appDisplayName
                     )
                 }
+            } else if
+                let cache = windowCache,
+                let cachedEntry = cache.entries[query.normalized]
+            {
+                windowCache = touchedCache(
+                    cache,
+                    query: query.normalized,
+                    latestMatchedIndexes: cachedEntry.matchedIndexes
+                )
+                rebuilt = cachedEntry.topResults
             } else {
                 let candidateIndexes = candidateIndexes(
                     query: query.normalized,
@@ -407,8 +442,15 @@ final class SwitcherSearchCoordinator {
                     )
                     insertTopRankedResult(ranked, into: &topRanked, limit: Self.windowTopResultLimit)
                 }
-                windowCache = ScopeMatchCache(query: query.normalized, matchedIndexes: matchedIndexes)
-                rebuilt = topRanked.map(\.result)
+                let topResults = topRanked.map(\.result)
+                windowCache = updatedCache(
+                    windowCache,
+                    query: query.normalized,
+                    matchedIndexes: matchedIndexes,
+                    topResults: topResults,
+                    limit: Self.scopeMatchCacheEntryLimit
+                )
+                rebuilt = topResults
             }
         }
 
@@ -431,14 +473,73 @@ final class SwitcherSearchCoordinator {
         cache: ScopeMatchCache?,
         totalCount: Int
     ) -> [Int] {
-        if
-            let cache,
-            !cache.query.isEmpty,
-            query.hasPrefix(cache.query)
-        {
-            return cache.matchedIndexes
+        guard let cache else {
+            return Array(0..<totalCount)
+        }
+
+        if !cache.latestQuery.isEmpty, query.hasPrefix(cache.latestQuery) {
+            return cache.latestMatchedIndexes
+        }
+        if let exactEntry = cache.entries[query] {
+            return exactEntry.matchedIndexes
+        }
+
+        var prefix = query
+        while !prefix.isEmpty {
+            prefix.removeLast()
+            if let entry = cache.entries[prefix] {
+                return entry.matchedIndexes
+            }
         }
         return Array(0..<totalCount)
+    }
+
+    private static func touchedCache(
+        _ cache: ScopeMatchCache,
+        query: String,
+        latestMatchedIndexes: [Int]
+    ) -> ScopeMatchCache {
+        var lruOrder = cache.lruOrder
+        lruOrder.removeAll { $0 == query }
+        lruOrder.append(query)
+        return ScopeMatchCache(
+            latestQuery: query,
+            latestMatchedIndexes: latestMatchedIndexes,
+            entries: cache.entries,
+            lruOrder: lruOrder
+        )
+    }
+
+    private static func updatedCache(
+        _ existing: ScopeMatchCache?,
+        query: String,
+        matchedIndexes: [Int],
+        topResults: [SwitcherSearchResult],
+        limit: Int
+    ) -> ScopeMatchCache {
+        var entries = existing?.entries ?? [:]
+        var lruOrder = existing?.lruOrder ?? []
+
+        entries[query] = QueryCacheEntry(matchedIndexes: matchedIndexes, topResults: topResults)
+        lruOrder.removeAll { $0 == query }
+        lruOrder.append(query)
+
+        if limit > 0 {
+            while lruOrder.count > limit {
+                let removed = lruOrder.removeFirst()
+                entries.removeValue(forKey: removed)
+            }
+        } else {
+            lruOrder.removeAll(keepingCapacity: false)
+            entries.removeAll(keepingCapacity: false)
+        }
+
+        return ScopeMatchCache(
+            latestQuery: query,
+            latestMatchedIndexes: matchedIndexes,
+            entries: entries,
+            lruOrder: lruOrder
+        )
     }
 
     private static func isBetter(_ lhs: RankedResult, than rhs: RankedResult) -> Bool {
