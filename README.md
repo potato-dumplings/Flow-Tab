@@ -289,3 +289,31 @@ chmod +x scripts/release-install.sh
 判定原则：
 - 不接受“无解释的持续 CPU 回归”
 - 不接受“热身后仍持续单调上涨”的 RSS 走势（疑似内存泄漏）
+
+### 最近一次快速基线（A-only）
+
+执行时间：`2026-03-29`
+
+执行命令：
+```bash
+xcodebuild \
+  -project FlowTabApp.xcodeproj \
+  -scheme FlowTabApp \
+  -destination 'platform=macOS' \
+  -only-testing:FlowTabAppTests/FlowTabAppTests/testSearchPerformanceWindowScope \
+  -only-testing:FlowTabAppTests/FlowTabAppTests/testSearchPressureWindowScopeUnified \
+  test
+```
+
+数据集（两条用例一致）：
+- `400 apps x 25 windows = 10,000 windows`
+- `rounds = 3`
+- `queries = 120`
+
+结果：
+- `testSearchPerformanceWindowScope`：`build=844.84ms`，`query=1630.67ms`，`throughput=73.59 qps`，用例总耗时 `3.334s`
+- `testSearchPressureWindowScopeUnified`：`build=828.06ms`，`query=1618.97ms`，`throughput=74.12 qps`，用例总耗时 `3.289s`
+
+说明：
+- 该基线用于快速回归检查（算法路径与吞吐）。
+- 完整发布前压测仍需按上文要求补齐 `30s` 的 `%CPU/RSS` 采样与 `avg/p95/max` 对比。
