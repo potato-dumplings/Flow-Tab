@@ -73,6 +73,7 @@ final class FlowTabAppTests: XCTestCase {
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
         XCTAssertTrue(coordinator.appendQueryText("fari"))
+        drainPendingSearchRebuild(on: coordinator)
         XCTAssertEqual(coordinator.state.results.map(\.primaryText), ["Safari"])
     }
 
@@ -82,10 +83,12 @@ final class FlowTabAppTests: XCTestCase {
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
         XCTAssertTrue(coordinator.appendQueryText("wx"))
+        drainPendingSearchRebuild(on: coordinator)
         XCTAssertEqual(coordinator.state.results.map(\.primaryText), ["微信"])
 
         _ = coordinator.handleEscape()
         XCTAssertTrue(coordinator.appendQueryText("weixin"))
+        drainPendingSearchRebuild(on: coordinator)
         XCTAssertEqual(coordinator.state.results.map(\.primaryText), ["微信"])
     }
 
@@ -95,6 +98,7 @@ final class FlowTabAppTests: XCTestCase {
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
         XCTAssertTrue(coordinator.appendQueryText("vsc"))
+        drainPendingSearchRebuild(on: coordinator)
         XCTAssertEqual(coordinator.state.results.map(\.primaryText), ["Visual Studio Code"])
     }
 
@@ -104,10 +108,12 @@ final class FlowTabAppTests: XCTestCase {
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
         XCTAssertTrue(coordinator.appendQueryText("wechat"))
+        drainPendingSearchRebuild(on: coordinator)
         XCTAssertEqual(coordinator.state.results.map(\.primaryText), ["微信"])
 
         _ = coordinator.handleEscape()
         XCTAssertTrue(coordinator.appendQueryText("com"))
+        drainPendingSearchRebuild(on: coordinator)
         XCTAssertTrue(coordinator.state.results.isEmpty)
     }
 
@@ -117,7 +123,86 @@ final class FlowTabAppTests: XCTestCase {
         XCTAssertTrue(coordinator.activate(defaultScope: .window))
 
         XCTAssertTrue(coordinator.appendQueryText("wx"))
+        drainPendingSearchRebuild(on: coordinator)
         XCTAssertEqual(coordinator.state.results.map(\.secondaryText), ["微信", "微信"])
+    }
+
+    func testSearchPerformanceWindowScope() {
+        let apps = makeBenchmarkApps(appCount: 400, windowsPerApp: 25)
+        let queries = benchmarkQueries()
+
+        let buildNanos = measureNanos {
+            let coordinator = SwitcherSearchCoordinator()
+            coordinator.rebuildIndex(with: apps)
+            _ = coordinator.activate(defaultScope: .window)
+        }
+
+        let rounds = 3
+        let queryNanos = measureNanos {
+            let coordinator = SwitcherSearchCoordinator()
+            coordinator.rebuildIndex(with: apps)
+            _ = coordinator.activate(defaultScope: .window)
+            runBaselineQueries(queries, on: coordinator, rounds: rounds)
+        }
+        let buildMs = nanosToMilliseconds(buildNanos)
+        let queryMs = nanosToMilliseconds(queryNanos)
+        let queryCount = queries.count * rounds
+        let qps = Double(queryCount) / max(0.001, queryMs / 1000.0)
+
+        print(
+            String(
+                format: "[SearchPerformanceWindowScope] dataset=%d apps / %d windows, rounds=%d, build=%.2fms, query=%.2fms, queries=%d, throughput=%.2f qps",
+                apps.count,
+                apps.reduce(0) { $0 + $1.windows.count },
+                rounds,
+                buildMs,
+                queryMs,
+                queryCount,
+                qps
+            )
+        )
+
+        let probe = runBaselineProbe(query: "weixin", apps: apps, scope: .window)
+        XCTAssertFalse(probe.isEmpty)
+    }
+
+    func testSearchPressureWindowScopeUnified() {
+        let apps = makeBenchmarkApps(appCount: 400, windowsPerApp: 25)
+        let queries = benchmarkQueries()
+        let rounds = 3
+
+        let buildNanos = measureNanos {
+            let coordinator = SwitcherSearchCoordinator()
+            coordinator.rebuildIndex(with: apps)
+        }
+
+        let queryNanos = measureNanos {
+            let coordinator = SwitcherSearchCoordinator()
+            coordinator.rebuildIndex(with: apps)
+            _ = coordinator.activate(defaultScope: .window)
+            runBaselineQueries(queries, on: coordinator, rounds: rounds)
+        }
+
+        let buildMs = nanosToMilliseconds(buildNanos)
+        let queryMs = nanosToMilliseconds(queryNanos)
+        let queryCount = queries.count * rounds
+        let qps = Double(queryCount) / max(0.001, queryMs / 1000.0)
+
+        print(
+            String(
+                format: "[SearchPressureUnified] dataset=%d apps / %d windows, rounds=%d, build=%.2fms, query=%.2fms, queries=%d, throughput=%.2f qps",
+                apps.count,
+                apps.reduce(0) { $0 + $1.windows.count },
+                rounds,
+                buildMs,
+                queryMs,
+                queryCount,
+                qps
+            )
+        )
+
+        let probe = runBaselineProbe(query: "weixin", apps: apps, scope: .window)
+        XCTAssertFalse(probe.isEmpty)
     }
 
     private func searchSampleApps() -> [AppSwitchCandidate] {
@@ -156,5 +241,136 @@ final class FlowTabAppTests: XCTestCase {
                 ]
             )
         ]
+    }
+
+    private func makeBenchmarkApps(appCount: Int, windowsPerApp: Int) -> [AppSwitchCandidate] {
+        precondition(appCount > 0)
+        precondition(windowsPerApp > 0)
+
+        let windowTopics = ["dashboard", "meeting", "design", "review", "bugfix", "roadmap", "notes"]
+        var apps: [AppSwitchCandidate] = []
+        apps.reserveCapacity(appCount)
+
+        for appIndex in 0..<appCount {
+            let app: (name: String, bundleID: String)
+            switch appIndex % 5 {
+            case 0:
+                app = ("微信\(appIndex)", "com.tencent.xinWeChat\(appIndex)")
+            case 1:
+                app = ("Visual Studio Code \(appIndex)", "com.microsoft.VSCode\(appIndex)")
+            case 2:
+                app = ("Safari \(appIndex)", "com.apple.Safari\(appIndex)")
+            case 3:
+                app = ("Chrome \(appIndex)", "com.google.Chrome\(appIndex)")
+            default:
+                app = ("Notion \(appIndex)", "notion.id.\(appIndex)")
+            }
+
+            var windows: [WindowCandidate] = []
+            windows.reserveCapacity(windowsPerApp)
+            for windowIndex in 0..<windowsPerApp {
+                let topic = windowTopics[(appIndex + windowIndex) % windowTopics.count]
+                let title = "\(app.name) - \(topic) - w\(windowIndex)"
+                windows.append(
+                    WindowCandidate(
+                        id: "w-\(appIndex)-\(windowIndex)",
+                        title: title,
+                        isMinimized: false,
+                        lastActiveAt: TimeInterval(appCount * windowsPerApp - appIndex * windowsPerApp - windowIndex)
+                    )
+                )
+            }
+
+            apps.append(
+                AppSwitchCandidate(
+                    id: app.bundleID,
+                    displayName: app.name,
+                    groupID: "bench-\(appIndex % 12)",
+                    lastActiveAt: TimeInterval(appCount - appIndex),
+                    windows: windows
+                )
+            )
+        }
+        return apps
+    }
+
+    private func benchmarkQueries() -> [String] {
+        [
+            "w", "wx", "we", "wei", "weix", "weixi", "weixin", "weixi", "wei", "we",
+            "vs", "vsc", "vscode", "vscode 1", "vscode",
+            "sa", "saf", "safa", "safari", "safari 2",
+            "de", "des", "desi", "design", "design w2",
+            "com", "tencent", "chrome", "road", "review",
+            "wx9", "wx", "not", "notion", "meeting",
+            "bug", "bugf", "bugfix", "notes", ""
+        ]
+    }
+
+    private func runBaselineQueries(
+        _ queries: [String],
+        on coordinator: SwitcherSearchCoordinator,
+        rounds: Int
+    ) {
+        var currentQuery = ""
+        for _ in 0..<rounds {
+            for query in queries {
+                let prefixLength = commonPrefixLength(currentQuery, query)
+                let deletes = currentQuery.count - prefixLength
+                if deletes > 0 {
+                    for _ in 0..<deletes {
+                        _ = coordinator.deleteBackwardInQuery()
+                    }
+                }
+
+                let suffix = String(query.dropFirst(prefixLength))
+                if !suffix.isEmpty {
+                    _ = coordinator.appendQueryText(suffix)
+                } else if query.isEmpty && !coordinator.state.query.isEmpty {
+                    while coordinator.deleteBackwardInQuery() {}
+                }
+                drainPendingSearchRebuild(on: coordinator)
+
+                currentQuery = query
+            }
+        }
+    }
+
+    private func runBaselineProbe(
+        query: String,
+        apps: [AppSwitchCandidate],
+        scope: SwitcherSearchScope
+    ) -> [String] {
+        let coordinator = SwitcherSearchCoordinator()
+        coordinator.rebuildIndex(with: apps)
+        _ = coordinator.activate(defaultScope: scope)
+        _ = coordinator.appendQueryText(query)
+        drainPendingSearchRebuild(on: coordinator)
+        return coordinator.state.results.prefix(10).map(\.id)
+    }
+
+    private func commonPrefixLength(_ lhs: String, _ rhs: String) -> Int {
+        var count = 0
+        for (left, right) in zip(lhs, rhs) {
+            if left == right {
+                count += 1
+            } else {
+                break
+            }
+        }
+        return count
+    }
+
+    private func measureNanos(_ block: () -> Void) -> UInt64 {
+        let start = DispatchTime.now().uptimeNanoseconds
+        block()
+        return DispatchTime.now().uptimeNanoseconds - start
+    }
+
+    private func nanosToMilliseconds(_ nanos: UInt64) -> Double {
+        Double(nanos) / 1_000_000.0
+    }
+
+    private func drainPendingSearchRebuild(on coordinator: SwitcherSearchCoordinator) {
+        coordinator.flushPendingRebuild()
     }
 }
