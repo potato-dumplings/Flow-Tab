@@ -32,6 +32,7 @@ struct SwitcherSearchViewState: Equatable, Sendable {
     var isInputFocused: Bool
     var scope: SwitcherSearchScope
     var query: String
+    var queryCursorPosition: Int
     var results: [SwitcherSearchResult]
     var selectedResultIndex: Int
 
@@ -40,6 +41,7 @@ struct SwitcherSearchViewState: Equatable, Sendable {
         isInputFocused: false,
         scope: .app,
         query: "",
+        queryCursorPosition: 0,
         results: [],
         selectedResultIndex: 0
     )
@@ -230,6 +232,7 @@ final class SwitcherSearchCoordinator {
         state.isInputFocused = true
         state.scope = defaultScope
         state.query = ""
+        state.queryCursorPosition = 0
         state.selectedResultIndex = 0
         rebuildResults(resetSelection: true)
         return true
@@ -299,7 +302,15 @@ final class SwitcherSearchCoordinator {
     func appendQueryTextWithoutRebuild(_ value: String) -> Bool {
         guard state.isActive else { return false }
         guard !value.isEmpty else { return false }
-        state.query.append(value)
+        let cursorPosition: Int
+        if state.isInputFocused {
+            cursorPosition = Self.clampedCursorPosition(state.queryCursorPosition, in: state.query)
+        } else {
+            cursorPosition = state.query.count
+        }
+        let insertionIndex = Self.stringIndex(in: state.query, characterOffset: cursorPosition)
+        state.query.insert(contentsOf: value, at: insertionIndex)
+        state.queryCursorPosition = cursorPosition + value.count
         state.selectedResultIndex = 0
         return true
     }
@@ -314,8 +325,30 @@ final class SwitcherSearchCoordinator {
     @discardableResult
     func deleteBackwardInQueryWithoutRebuild() -> Bool {
         guard state.isActive else { return false }
-        guard !state.query.isEmpty else { return false }
-        state.query.removeLast()
+        let cursorPosition: Int
+        if state.isInputFocused {
+            cursorPosition = Self.clampedCursorPosition(state.queryCursorPosition, in: state.query)
+        } else {
+            cursorPosition = state.query.count
+        }
+        guard cursorPosition > 0 else { return false }
+        let upperBound = Self.stringIndex(in: state.query, characterOffset: cursorPosition)
+        let lowerBound = state.query.index(before: upperBound)
+        state.query.removeSubrange(lowerBound..<upperBound)
+        state.queryCursorPosition = cursorPosition - 1
+        state.selectedResultIndex = 0
+        return true
+    }
+
+    @discardableResult
+    func moveQueryCursor(by delta: Int) -> Bool {
+        guard state.isActive else { return false }
+        guard state.isInputFocused else { return false }
+        guard delta != 0 else { return false }
+        let current = Self.clampedCursorPosition(state.queryCursorPosition, in: state.query)
+        let resolved = min(max(current + delta, 0), state.query.count)
+        guard resolved != current else { return false }
+        state.queryCursorPosition = resolved
         state.selectedResultIndex = 0
         return true
     }
@@ -325,6 +358,7 @@ final class SwitcherSearchCoordinator {
         cancelPendingRebuild()
         if !state.query.isEmpty {
             state.query = ""
+            state.queryCursorPosition = 0
             state.selectedResultIndex = 0
             rebuildResults(resetSelection: true)
             return .clearQuery
@@ -405,6 +439,12 @@ final class SwitcherSearchCoordinator {
                     query: query.normalized,
                     latestMatchedIndexes: cachedEntry.matchedIndexes
                 )
+                if cachedEntry.topResults.isEmpty {
+                    RuntimeLog.warning(
+                        "Search",
+                        "scope=app query=\"\(query.normalized)\" source=cache matched=\(cachedEntry.matchedIndexes.count) topResults=0"
+                    )
+                }
                 rebuilt = cachedEntry.topResults
             } else {
                 let candidateIndexes = candidateIndexes(
@@ -418,20 +458,28 @@ final class SwitcherSearchCoordinator {
                     scope: .app,
                     query: query
                 )
-                var matchedIndexes: [Int] = []
-                matchedIndexes.reserveCapacity(boundedCandidateIndexes.count)
-                var topRanked: [RankedResult] = []
-                topRanked.reserveCapacity(min(Self.appTopResultLimit, boundedCandidateIndexes.count))
-                for index in boundedCandidateIndexes {
-                    let app = input.appEntries[index]
-                    guard let score = Self.matchScore(query: query, in: app.searchIndex) else {
-                        continue
+                var ranked = rankAppMatches(
+                    query: query,
+                    entries: input.appEntries,
+                    candidateIndexes: boundedCandidateIndexes,
+                    topResultLimit: Self.appTopResultLimit
+                )
+                if ranked.topRanked.isEmpty, boundedCandidateIndexes.count < input.appEntries.count {
+                    ranked = rankAppMatches(
+                        query: query,
+                        entries: input.appEntries,
+                        candidateIndexes: Array(input.appEntries.indices),
+                        topResultLimit: Self.appTopResultLimit
+                    )
+                    if !ranked.topRanked.isEmpty {
+                        RuntimeLog.warning(
+                            "Search",
+                            "scope=app query=\"\(query.normalized)\" recallFallback=fullScan initialCandidates=\(boundedCandidateIndexes.count) totalEntries=\(input.appEntries.count) recoveredResults=\(ranked.topRanked.count)"
+                        )
                     }
-                    matchedIndexes.append(index)
-                    let ranked = RankedResult(score: score, order: index)
-                    insertTopRankedResult(ranked, into: &topRanked, limit: Self.appTopResultLimit)
                 }
-                let topResults = topRanked.map { ranked in
+                let matchedIndexes = ranked.matchedIndexes
+                let topResults = ranked.topRanked.map { ranked in
                     let app = input.appEntries[ranked.order]
                     return SwitcherSearchResult(
                         id: "app:\(app.appID)",
@@ -452,6 +500,20 @@ final class SwitcherSearchCoordinator {
                     limit: cachePolicy.entryLimit,
                     persistEntry: cachePolicy.persistEntry
                 )
+                if topResults.isEmpty {
+                    logEmptySearchDiagnostics(
+                        scope: .app,
+                        query: query,
+                        coarseCandidateCount: coarseFilter(query: query, invertedIndex: input.appInvertedIndex).count,
+                        candidateCount: candidateIndexes.count,
+                        boundedCandidateCount: boundedCandidateIndexes.count,
+                        matchedCount: matchedIndexes.count,
+                        topResultCount: topResults.count,
+                        rawIdentifierContainsCount: input.appEntries.filter {
+                            $0.appID.localizedCaseInsensitiveContains(query.compact)
+                        }.count
+                    )
+                }
                 rebuilt = topResults
             }
         case .window:
@@ -475,6 +537,12 @@ final class SwitcherSearchCoordinator {
                     query: query.normalized,
                     latestMatchedIndexes: cachedEntry.matchedIndexes
                 )
+                if cachedEntry.topResults.isEmpty {
+                    RuntimeLog.warning(
+                        "Search",
+                        "scope=window query=\"\(query.normalized)\" source=cache matched=\(cachedEntry.matchedIndexes.count) topResults=0"
+                    )
+                }
                 rebuilt = cachedEntry.topResults
             } else {
                 let candidateIndexes = candidateIndexes(
@@ -488,36 +556,28 @@ final class SwitcherSearchCoordinator {
                     scope: .window,
                     query: query
                 )
-                var matchedIndexes: [Int] = []
-                matchedIndexes.reserveCapacity(boundedCandidateIndexes.count)
-                var topRanked: [RankedResult] = []
-                topRanked.reserveCapacity(min(Self.windowTopResultLimit, boundedCandidateIndexes.count))
-                var appScoreCache: [String: Int] = [:]
-                var appScoreMisses: Set<String> = []
-                for index in boundedCandidateIndexes {
-                    let window = input.windowEntries[index]
-                    let titleScore = Self.matchScore(query: query, in: window.windowSearchIndex)
-                    let appScore: Int?
-                    if let cached = appScoreCache[window.appID] {
-                        appScore = cached
-                    } else if appScoreMisses.contains(window.appID) {
-                        appScore = nil
-                    } else if let score = Self.matchScore(query: query, in: window.appSearchIndex) {
-                        let adjusted = score + 8
-                        appScoreCache[window.appID] = adjusted
-                        appScore = adjusted
-                    } else {
-                        appScoreMisses.insert(window.appID)
-                        appScore = nil
+                var ranked = rankWindowMatches(
+                    query: query,
+                    entries: input.windowEntries,
+                    candidateIndexes: boundedCandidateIndexes,
+                    topResultLimit: Self.windowTopResultLimit
+                )
+                if ranked.topRanked.isEmpty, boundedCandidateIndexes.count < input.windowEntries.count {
+                    ranked = rankWindowMatches(
+                        query: query,
+                        entries: input.windowEntries,
+                        candidateIndexes: Array(input.windowEntries.indices),
+                        topResultLimit: Self.windowTopResultLimit
+                    )
+                    if !ranked.topRanked.isEmpty {
+                        RuntimeLog.warning(
+                            "Search",
+                            "scope=window query=\"\(query.normalized)\" recallFallback=fullScan initialCandidates=\(boundedCandidateIndexes.count) totalEntries=\(input.windowEntries.count) recoveredResults=\(ranked.topRanked.count)"
+                        )
                     }
-                    guard let score = Self.bestScore(titleScore, appScore) else {
-                        continue
-                    }
-                    matchedIndexes.append(index)
-                    let ranked = RankedResult(score: score, order: index)
-                    insertTopRankedResult(ranked, into: &topRanked, limit: Self.windowTopResultLimit)
                 }
-                let topResults = topRanked.map { ranked in
+                let matchedIndexes = ranked.matchedIndexes
+                let topResults = ranked.topRanked.map { ranked in
                     let window = input.windowEntries[ranked.order]
                     let resolvedTitle = window.windowTitle.isEmpty ? "Untitled Window" : window.windowTitle
                     return SwitcherSearchResult(
@@ -539,6 +599,20 @@ final class SwitcherSearchCoordinator {
                     limit: cachePolicy.entryLimit,
                     persistEntry: cachePolicy.persistEntry
                 )
+                if topResults.isEmpty {
+                    logEmptySearchDiagnostics(
+                        scope: .window,
+                        query: query,
+                        coarseCandidateCount: coarseFilter(query: query, invertedIndex: input.windowInvertedIndex).count,
+                        candidateCount: candidateIndexes.count,
+                        boundedCandidateCount: boundedCandidateIndexes.count,
+                        matchedCount: matchedIndexes.count,
+                        topResultCount: topResults.count,
+                        rawIdentifierContainsCount: input.windowEntries.filter {
+                            $0.appID.localizedCaseInsensitiveContains(query.compact)
+                        }.count
+                    )
+                }
                 rebuilt = topResults
             }
         }
@@ -564,7 +638,10 @@ final class SwitcherSearchCoordinator {
         totalCount: Int
     ) -> [Int] {
         if let cache {
-            if !cache.latestQuery.isEmpty, query.normalized.hasPrefix(cache.latestQuery) {
+            if
+                !cache.latestQuery.isEmpty,
+                query.normalized.hasPrefix(cache.latestQuery)
+            {
                 return cache.latestMatchedIndexes
             }
             if let exactEntry = cache.entries[query.normalized] {
@@ -631,6 +708,22 @@ final class SwitcherSearchCoordinator {
             entryLimit: scopeMatchCacheEntryLimit,
             matchedIndexesLimit: longQueryMatchedIndexesLimit,
             persistEntry: true
+        )
+    }
+
+    private static func logEmptySearchDiagnostics(
+        scope: SwitcherSearchScope,
+        query: SearchKey,
+        coarseCandidateCount: Int,
+        candidateCount: Int,
+        boundedCandidateCount: Int,
+        matchedCount: Int,
+        topResultCount: Int,
+        rawIdentifierContainsCount: Int
+    ) {
+        RuntimeLog.warning(
+            "Search",
+            "scope=\(scope.rawValue) query=\"\(query.normalized)\" compact=\"\(query.compact)\" terms=\(query.terms) coarseCandidates=\(coarseCandidateCount) candidateIndexes=\(candidateCount) boundedCandidates=\(boundedCandidateCount) matched=\(matchedCount) topResults=\(topResultCount) rawIdentifierContains=\(rawIdentifierContainsCount)"
         )
     }
 
@@ -721,7 +814,10 @@ final class SwitcherSearchCoordinator {
         var lruOrder = existing?.lruOrder ?? []
 
         if persistEntry {
-            entries[query] = QueryCacheEntry(matchedIndexes: matchedIndexes, topResults: topResults)
+            entries[query] = QueryCacheEntry(
+                matchedIndexes: matchedIndexes,
+                topResults: topResults
+            )
             lruOrder.removeAll { $0 == query }
             lruOrder.append(query)
 
@@ -808,6 +904,68 @@ final class SwitcherSearchCoordinator {
         case (nil, nil):
             return nil
         }
+    }
+
+    private static func rankAppMatches(
+        query: SearchKey,
+        entries: [AppEntry],
+        candidateIndexes: [Int],
+        topResultLimit: Int
+    ) -> (matchedIndexes: [Int], topRanked: [RankedResult]) {
+        var matchedIndexes: [Int] = []
+        matchedIndexes.reserveCapacity(candidateIndexes.count)
+        var topRanked: [RankedResult] = []
+        topRanked.reserveCapacity(min(topResultLimit, candidateIndexes.count))
+
+        for index in candidateIndexes {
+            let app = entries[index]
+            guard let score = matchScore(query: query, in: app.searchIndex) else {
+                continue
+            }
+            matchedIndexes.append(index)
+            let ranked = RankedResult(score: score, order: index)
+            insertTopRankedResult(ranked, into: &topRanked, limit: topResultLimit)
+        }
+        return (matchedIndexes, topRanked)
+    }
+
+    private static func rankWindowMatches(
+        query: SearchKey,
+        entries: [WindowEntry],
+        candidateIndexes: [Int],
+        topResultLimit: Int
+    ) -> (matchedIndexes: [Int], topRanked: [RankedResult]) {
+        var matchedIndexes: [Int] = []
+        matchedIndexes.reserveCapacity(candidateIndexes.count)
+        var topRanked: [RankedResult] = []
+        topRanked.reserveCapacity(min(topResultLimit, candidateIndexes.count))
+        var appScoreCache: [String: Int] = [:]
+        var appScoreMisses: Set<String> = []
+
+        for index in candidateIndexes {
+            let window = entries[index]
+            let titleScore = matchScore(query: query, in: window.windowSearchIndex)
+            let appScore: Int?
+            if let cached = appScoreCache[window.appID] {
+                appScore = cached
+            } else if appScoreMisses.contains(window.appID) {
+                appScore = nil
+            } else if let score = matchScore(query: query, in: window.appSearchIndex) {
+                let adjusted = score + 8
+                appScoreCache[window.appID] = adjusted
+                appScore = adjusted
+            } else {
+                appScoreMisses.insert(window.appID)
+                appScore = nil
+            }
+            guard let score = bestScore(titleScore, appScore) else {
+                continue
+            }
+            matchedIndexes.append(index)
+            let ranked = RankedResult(score: score, order: index)
+            insertTopRankedResult(ranked, into: &topRanked, limit: topResultLimit)
+        }
+        return (matchedIndexes, topRanked)
     }
 
     private static func matchScore(query: SearchKey, in index: SearchIndex) -> Int? {
@@ -1063,6 +1221,15 @@ final class SwitcherSearchCoordinator {
         guard count > 0 else { return 0 }
         let raw = (current + delta) % count
         return raw >= 0 ? raw : raw + count
+    }
+
+    private static func clampedCursorPosition(_ cursorPosition: Int, in query: String) -> Int {
+        min(max(cursorPosition, 0), query.count)
+    }
+
+    private static func stringIndex(in value: String, characterOffset: Int) -> String.Index {
+        let offset = min(max(characterOffset, 0), value.count)
+        return value.index(value.startIndex, offsetBy: offset)
     }
 
     private func cancelPendingRebuild() {

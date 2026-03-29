@@ -77,6 +77,60 @@ final class FlowTabAppTests: XCTestCase {
         XCTAssertEqual(coordinator.state.results.map(\.primaryText), ["Safari"])
     }
 
+    func testSearchQuerySupportsMiddleInsertionViaCursorMovement() {
+        let coordinator = SwitcherSearchCoordinator()
+        coordinator.rebuildIndex(with: searchSampleApps())
+        XCTAssertTrue(coordinator.activate(defaultScope: .app))
+
+        XCTAssertTrue(coordinator.appendQueryTextWithoutRebuild("abcd"))
+        XCTAssertTrue(coordinator.moveQueryCursor(by: -1))
+        XCTAssertTrue(coordinator.appendQueryTextWithoutRebuild("e"))
+
+        XCTAssertEqual(coordinator.state.query, "abced")
+        XCTAssertEqual(coordinator.state.queryCursorPosition, 4)
+    }
+
+    func testSearchDeleteBackwardRespectsCursorPosition() {
+        let coordinator = SwitcherSearchCoordinator()
+        coordinator.rebuildIndex(with: searchSampleApps())
+        XCTAssertTrue(coordinator.activate(defaultScope: .app))
+
+        XCTAssertTrue(coordinator.appendQueryTextWithoutRebuild("abced"))
+        XCTAssertTrue(coordinator.moveQueryCursor(by: -2))
+        XCTAssertTrue(coordinator.deleteBackwardInQueryWithoutRebuild())
+
+        XCTAssertEqual(coordinator.state.query, "abed")
+        XCTAssertEqual(coordinator.state.queryCursorPosition, 2)
+    }
+
+    func testSearchAppendWhileResultsFocusedUsesQueryTail() {
+        let coordinator = SwitcherSearchCoordinator()
+        coordinator.rebuildIndex(with: searchSampleApps())
+        XCTAssertTrue(coordinator.activate(defaultScope: .app))
+
+        XCTAssertTrue(coordinator.appendQueryTextWithoutRebuild("abcd"))
+        XCTAssertTrue(coordinator.moveQueryCursor(by: -2))
+        XCTAssertTrue(coordinator.focusResults())
+        XCTAssertTrue(coordinator.appendQueryTextWithoutRebuild("e"))
+
+        XCTAssertEqual(coordinator.state.query, "abcde")
+        XCTAssertEqual(coordinator.state.queryCursorPosition, 5)
+    }
+
+    func testSearchDeleteWhileResultsFocusedUsesQueryTail() {
+        let coordinator = SwitcherSearchCoordinator()
+        coordinator.rebuildIndex(with: searchSampleApps())
+        XCTAssertTrue(coordinator.activate(defaultScope: .app))
+
+        XCTAssertTrue(coordinator.appendQueryTextWithoutRebuild("abcd"))
+        XCTAssertTrue(coordinator.moveQueryCursor(by: -2))
+        XCTAssertTrue(coordinator.focusResults())
+        XCTAssertTrue(coordinator.deleteBackwardInQueryWithoutRebuild())
+
+        XCTAssertEqual(coordinator.state.query, "abc")
+        XCTAssertEqual(coordinator.state.queryCursorPosition, 3)
+    }
+
     func testSearchMatchesChineseAppByPinyinInitialsAndFullSpelling() {
         let coordinator = SwitcherSearchCoordinator()
         coordinator.rebuildIndex(with: searchSampleApps())
@@ -115,6 +169,23 @@ final class FlowTabAppTests: XCTestCase {
         XCTAssertTrue(coordinator.appendQueryText("com"))
         drainPendingSearchRebuild(on: coordinator)
         XCTAssertTrue(coordinator.state.results.isEmpty)
+    }
+
+    func testSearchRecoversResultsWhenIncrementalCandidateCacheMisses() {
+        let coordinator = SwitcherSearchCoordinator()
+        coordinator.rebuildIndex(with: searchCacheMissSampleApps())
+        XCTAssertTrue(coordinator.activate(defaultScope: .app))
+
+        XCTAssertTrue(coordinator.appendQueryText("t"))
+        drainPendingSearchRebuild(on: coordinator)
+        XCTAssertEqual(coordinator.state.results.map(\.primaryText), ["Tool"])
+
+        XCTAssertTrue(coordinator.appendQueryText("e"))
+        drainPendingSearchRebuild(on: coordinator)
+        XCTAssertTrue(
+            coordinator.state.results.map(\.primaryText).contains("终端"),
+            "Expected te to recover 终端 via full-scan fallback, got \(coordinator.state.results.map(\.primaryText))"
+        )
     }
 
     func testWindowSearchCanMatchByAppNamePinyinInitials() {
@@ -304,6 +375,43 @@ final class FlowTabAppTests: XCTestCase {
             "wx9", "wx", "not", "notion", "meeting",
             "bug", "bugf", "bugfix", "notes", ""
         ]
+    }
+
+    private func searchCacheMissSampleApps() -> [AppSwitchCandidate] {
+        var apps: [AppSwitchCandidate] = []
+        apps.reserveCapacity(1_105)
+        apps.append(
+            AppSwitchCandidate(
+                id: "com.sample.tool",
+                displayName: "Tool",
+                groupID: "cache-miss",
+                lastActiveAt: 2_000,
+                windows: []
+            )
+        )
+
+        for index in 1...1_103 {
+            apps.append(
+                AppSwitchCandidate(
+                    id: "com.sample.app\(index)",
+                    displayName: "应用\(index)",
+                    groupID: "cache-miss",
+                    lastActiveAt: TimeInterval(2_000 - index),
+                    windows: []
+                )
+            )
+        }
+
+        apps.append(
+            AppSwitchCandidate(
+                id: "com.apple.Terminal",
+                displayName: "终端",
+                groupID: "cache-miss",
+                lastActiveAt: 1,
+                windows: []
+            )
+        )
+        return apps
     }
 
     private func runBaselineQueries(

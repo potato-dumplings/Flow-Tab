@@ -604,10 +604,18 @@ final class SwitcherPanelController {
             }
             return true
         case 123:
-            _ = model.moveSearchSelection(by: -1)
+            if model.isSearchInputFocused {
+                _ = model.moveSearchQueryCursor(by: -1)
+            } else {
+                _ = model.moveSearchSelection(by: -1)
+            }
             return true
         case 124:
-            _ = model.moveSearchSelection(by: +1)
+            if model.isSearchInputFocused {
+                _ = model.moveSearchQueryCursor(by: +1)
+            } else {
+                _ = model.moveSearchSelection(by: +1)
+            }
             return true
         case 36, 76:
             guard model.applySelectedSearchResultToSession() else {
@@ -1164,6 +1172,13 @@ final class LiveSwitcherModel: ObservableObject {
     @discardableResult
     func moveSearchSelection(by delta: Int) -> Bool {
         let changed = searchCoordinator.moveSelection(by: delta)
+        publishSearchStateIfNeeded()
+        return changed
+    }
+
+    @discardableResult
+    func moveSearchQueryCursor(by delta: Int) -> Bool {
+        let changed = searchCoordinator.moveQueryCursor(by: delta)
         publishSearchStateIfNeeded()
         return changed
     }
@@ -1743,6 +1758,7 @@ private struct CommandTabOverlay: View {
             if showsSearchHeaderInStandardOverlay {
                 SearchInputHeader(
                     query: "",
+                    cursorPosition: 0,
                     scope: searchDefaultScope,
                     isInputFocused: false,
                     hintText: "Enter / ↑ 进入搜索"
@@ -1823,9 +1839,10 @@ private struct CommandTabOverlay: View {
         VStack(alignment: .leading, spacing: 12) {
             SearchInputHeader(
                 query: searchState.query,
+                cursorPosition: searchState.queryCursorPosition,
                 scope: searchState.scope,
                 isInputFocused: searchState.isInputFocused,
-                hintText: "Tab 切换范围 · ↓ 进入结果 · Enter 激活 · Esc 清空/关闭"
+                hintText: "Tab 切换范围 · ←/→ 移动光标 · ↓ 进入结果 · Enter 激活 · Esc 清空/关闭"
             )
 
             if searchState.scope == .app {
@@ -1961,10 +1978,23 @@ private struct SearchWindowResultItem: Identifiable {
 
 private struct SearchInputHeader: View {
     let query: String
+    let cursorPosition: Int
     let scope: SwitcherSearchScope
     let isInputFocused: Bool
     let hintText: String
     @Environment(\.colorScheme) private var colorScheme
+
+    private var queryText: String {
+        if query.isEmpty && !isInputFocused {
+            return "输入关键词搜索"
+        }
+        guard isInputFocused else {
+            return query
+        }
+        let clampedCursorPosition = min(max(cursorPosition, 0), query.count)
+        let splitIndex = query.index(query.startIndex, offsetBy: clampedCursorPosition)
+        return String(query[..<splitIndex]) + "│" + String(query[splitIndex...])
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
@@ -1973,15 +2003,8 @@ private struct SearchInputHeader: View {
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.secondary)
 
-                Group {
-                    if query.isEmpty {
-                        Text("输入关键词搜索")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Text(query)
-                            .foregroundStyle(.primary)
-                    }
-                }
+                Text(queryText)
+                    .foregroundStyle(query.isEmpty && !isInputFocused ? .secondary : .primary)
                 .lineLimit(1)
                 .font(.system(size: 13, weight: .medium))
 
