@@ -73,6 +73,8 @@ final class SystemAppMRUTracker {
 
         let runningPIDs = Set(runningApps.map(\.processIdentifier))
         let trackedOrder = trackedMRUOrder(for: runningPIDs)
+        let currentPID = ProcessInfo.processInfo.processIdentifier
+        let launchRankByPID = Self.launchRankByPID(for: runningApps)
 
         var rankByPID: [pid_t: Int] = [:]
         rankByPID.reserveCapacity(runningApps.count)
@@ -87,8 +89,18 @@ final class SystemAppMRUTracker {
             .map(\.processIdentifier)
             .filter { rankByPID[$0] == nil }
             .sorted { lhs, rhs in
-                let lhsRank = fallbackRankByPID[lhs] ?? Int.max
-                let rhsRank = fallbackRankByPID[rhs] ?? Int.max
+                let lhsRank = fallbackRank(
+                    for: lhs,
+                    currentPID: currentPID,
+                    launchRankByPID: launchRankByPID,
+                    fallbackRankByPID: fallbackRankByPID
+                )
+                let rhsRank = fallbackRank(
+                    for: rhs,
+                    currentPID: currentPID,
+                    launchRankByPID: launchRankByPID,
+                    fallbackRankByPID: fallbackRankByPID
+                )
                 if lhsRank != rhsRank {
                     return lhsRank < rhsRank
                 }
@@ -153,6 +165,7 @@ final class SystemAppMRUTracker {
     }
 
     private func recordActivation(of pid: pid_t) {
+        guard pid != ProcessInfo.processInfo.processIdentifier else { return }
         lock.lock()
         defer { lock.unlock() }
         mruPIDs.removeAll { $0 == pid }
@@ -170,6 +183,36 @@ final class SystemAppMRUTracker {
         defer { lock.unlock() }
         mruPIDs.removeAll { !runningPIDs.contains($0) }
         return mruPIDs
+    }
+
+    private func fallbackRank(
+        for pid: pid_t,
+        currentPID: pid_t,
+        launchRankByPID: [pid_t: Int],
+        fallbackRankByPID: [pid_t: Int]
+    ) -> Int {
+        if pid == currentPID {
+            return launchRankByPID[pid] ?? Int.max
+        }
+        return fallbackRankByPID[pid] ?? Int.max
+    }
+
+    private static func launchRankByPID(for runningApps: [NSRunningApplication]) -> [pid_t: Int] {
+        let sorted = runningApps.sorted { lhs, rhs in
+            let lhsLaunchDate = lhs.launchDate ?? Date.distantPast
+            let rhsLaunchDate = rhs.launchDate ?? Date.distantPast
+            if lhsLaunchDate != rhsLaunchDate {
+                return lhsLaunchDate > rhsLaunchDate
+            }
+            return lhs.processIdentifier < rhs.processIdentifier
+        }
+
+        var rankByPID: [pid_t: Int] = [:]
+        rankByPID.reserveCapacity(sorted.count)
+        for (rank, app) in sorted.enumerated() {
+            rankByPID[app.processIdentifier] = rank
+        }
+        return rankByPID
     }
 }
 
