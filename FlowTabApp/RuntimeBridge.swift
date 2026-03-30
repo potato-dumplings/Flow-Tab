@@ -45,6 +45,134 @@ struct RuntimeHomeAppSnapshot {
     let context: RuntimeAppContext
 }
 
+final class SystemAppMRUTracker {
+    static let shared = SystemAppMRUTracker()
+
+    private let lock = NSLock()
+    private var hasStarted = false
+    private var observers: [NSObjectProtocol] = []
+    private var mruPIDs: [pid_t] = []
+
+    private init() {}
+
+    func startIfNeeded() {
+        if Thread.isMainThread {
+            startOnMainThreadIfNeeded()
+            return
+        }
+        DispatchQueue.main.async { [weak self] in
+            self?.startOnMainThreadIfNeeded()
+        }
+    }
+
+    func rankByPID(
+        for runningApps: [NSRunningApplication],
+        fallbackRankByPID: [pid_t: Int]
+    ) -> [pid_t: Int] {
+        startIfNeeded()
+
+        let runningPIDs = Set(runningApps.map(\.processIdentifier))
+        let trackedOrder = trackedMRUOrder(for: runningPIDs)
+
+        var rankByPID: [pid_t: Int] = [:]
+        rankByPID.reserveCapacity(runningApps.count)
+
+        var nextRank = 0
+        for pid in trackedOrder where rankByPID[pid] == nil {
+            rankByPID[pid] = nextRank
+            nextRank += 1
+        }
+
+        let fallbackPIDs = runningApps
+            .map(\.processIdentifier)
+            .filter { rankByPID[$0] == nil }
+            .sorted { lhs, rhs in
+                let lhsRank = fallbackRankByPID[lhs] ?? Int.max
+                let rhsRank = fallbackRankByPID[rhs] ?? Int.max
+                if lhsRank != rhsRank {
+                    return lhsRank < rhsRank
+                }
+                return lhs < rhs
+            }
+
+        for pid in fallbackPIDs {
+            rankByPID[pid] = nextRank
+            nextRank += 1
+        }
+
+        return rankByPID
+    }
+
+    private func startOnMainThreadIfNeeded() {
+        lock.lock()
+        if hasStarted {
+            lock.unlock()
+            return
+        }
+        hasStarted = true
+        lock.unlock()
+
+        let workspaceNotificationCenter = NSWorkspace.shared.notificationCenter
+
+        let didActivateObserver = workspaceNotificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            queue: nil
+        ) { [weak self] notification in
+            self?.handleApplicationNotification(notification, removeOnly: false)
+        }
+
+        let didTerminateObserver = workspaceNotificationCenter.addObserver(
+            forName: NSWorkspace.didTerminateApplicationNotification,
+            object: nil,
+            queue: nil
+        ) { [weak self] notification in
+            self?.handleApplicationNotification(notification, removeOnly: true)
+        }
+
+        lock.lock()
+        observers.append(contentsOf: [didActivateObserver, didTerminateObserver])
+        lock.unlock()
+
+        if let frontmost = NSWorkspace.shared.frontmostApplication {
+            recordActivation(of: frontmost.processIdentifier)
+        }
+    }
+
+    private func handleApplicationNotification(_ notification: Notification, removeOnly: Bool) {
+        guard
+            let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+        else {
+            return
+        }
+        if removeOnly {
+            remove(pid: app.processIdentifier)
+            return
+        }
+        recordActivation(of: app.processIdentifier)
+    }
+
+    private func recordActivation(of pid: pid_t) {
+        lock.lock()
+        defer { lock.unlock() }
+        mruPIDs.removeAll { $0 == pid }
+        mruPIDs.insert(pid, at: 0)
+    }
+
+    private func remove(pid: pid_t) {
+        lock.lock()
+        defer { lock.unlock() }
+        mruPIDs.removeAll { $0 == pid }
+    }
+
+    private func trackedMRUOrder(for runningPIDs: Set<pid_t>) -> [pid_t] {
+        lock.lock()
+        defer { lock.unlock() }
+        mruPIDs.removeAll { !runningPIDs.contains($0) }
+        return mruPIDs
+    }
+}
+
 final class RuntimeSnapshotProvider {
     private struct WindowListEntry {
         let windowID: String
@@ -176,7 +304,7 @@ final class RuntimeSnapshotProvider {
         let runningApps = filteredRunningApplications()
         guard !runningApps.isEmpty else { return [] }
 
-        let rankByPID = collectAppRankByPID()
+        let rankByPID = collectAppRankByPID(for: runningApps)
         let windowStatsByPID = collectAXWindowStats(for: runningApps)
         let windowCountByPID = Dictionary(
             uniqueKeysWithValues: windowStatsByPID.map { ($0.key, $0.value.windowCount) }
@@ -231,7 +359,7 @@ final class RuntimeSnapshotProvider {
         let matchingApps = runningApps.filter { Self.baseAppID(for: $0) == appID }
         guard !matchingApps.isEmpty else { return nil }
 
-        let rankByPID = collectAppRankByPID()
+        let rankByPID = collectAppRankByPID(for: runningApps)
         let cgWindowsByPID = collectCGWindowsByPID()
         let windowsByPID = collectAXWindowData(for: matchingApps, cgWindowsByPID: cgWindowsByPID)
         let windowCountByPID = Dictionary(
@@ -315,7 +443,7 @@ final class RuntimeSnapshotProvider {
         let matchingApps = runningApps.filter { Self.baseAppID(for: $0) == appID }
         guard !matchingApps.isEmpty else { return nil }
 
-        let rankByPID = collectAppRankByPID()
+        let rankByPID = collectAppRankByPID(for: runningApps)
         let windowStatsByPID = collectAXWindowStats(for: matchingApps)
         let windowCountByPID = Dictionary(
             uniqueKeysWithValues: windowStatsByPID.map { ($0.key, $0.value.windowCount) }
@@ -409,7 +537,7 @@ final class RuntimeSnapshotProvider {
         // Keep a single source of truth for window counting and selection: AX window list.
         return (
             windowsByPID: collectAXWindowData(for: runningApps, cgWindowsByPID: cgWindowsByPID),
-            rankByPID: collectAppRankByPID()
+            rankByPID: collectAppRankByPID(for: runningApps)
         )
     }
 
@@ -555,7 +683,15 @@ final class RuntimeSnapshotProvider {
         return cgWindows[firstUnmatchedIndex].id
     }
 
-    private func collectAppRankByPID() -> [pid_t: Int] {
+    private func collectAppRankByPID(for runningApps: [NSRunningApplication]) -> [pid_t: Int] {
+        let fallbackRankByPID = collectWindowStackRankByPID()
+        return SystemAppMRUTracker.shared.rankByPID(
+            for: runningApps,
+            fallbackRankByPID: fallbackRankByPID
+        )
+    }
+
+    private func collectWindowStackRankByPID() -> [pid_t: Int] {
         let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
         guard
             let rawList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]]

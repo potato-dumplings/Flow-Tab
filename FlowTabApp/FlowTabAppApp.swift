@@ -352,6 +352,10 @@ struct FlowTabAppApp: App {
     private let appWindowWidth: CGFloat = 1120
     private let appWindowHeight: CGFloat = 760
 
+    init() {
+        SystemAppMRUTracker.shared.startIfNeeded()
+    }
+
     var body: some Scene {
         WindowGroup("FlowTab") {
             HomeRootView()
