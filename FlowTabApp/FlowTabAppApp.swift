@@ -458,6 +458,19 @@ private struct HomeRootView: View {
         themeMode.resolvedColorScheme(systemColorScheme: systemTheme.colorScheme)
     }
 
+    @ViewBuilder
+    private func tabContainer<Content: View>(
+        isSelected: Bool,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        content()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .opacity(isSelected ? 1 : 0)
+            .allowsHitTesting(isSelected)
+            .accessibilityHidden(!isSelected)
+            .zIndex(isSelected ? 1 : 0)
+    }
+
     var body: some View {
         HStack(spacing: 0) {
             HomeSidebar(selectedTab: $tabState.selectedTab)
@@ -465,16 +478,17 @@ private struct HomeRootView: View {
             Divider()
                 .overlay(dividerColor)
 
-            Group {
-                switch tabState.selectedTab {
-                case .home:
-                    HomeLandingView(isActive: true) {
+            ZStack {
+                tabContainer(isSelected: tabState.selectedTab == .home) {
+                    HomeLandingView(isActive: tabState.selectedTab == .home) {
                         tabState.selectedTab = .settings
                     }
-                case .logs:
-                    AppLogsView(isActive: true)
-                case .settings:
-                    AppSettingsView(isActive: true)
+                }
+                tabContainer(isSelected: tabState.selectedTab == .logs) {
+                    AppLogsView(isActive: tabState.selectedTab == .logs)
+                }
+                tabContainer(isSelected: tabState.selectedTab == .settings) {
+                    AppSettingsView(isActive: tabState.selectedTab == .settings)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -706,7 +720,9 @@ private struct HomeLandingView: View {
             handleVisibilityChanged(isActive)
         }
         .onChange(of: isActive) { _, active in
-            handleVisibilityChanged(active)
+            if active {
+                handleVisibilityChanged(true)
+            }
         }
         .onReceive(NSWorkspace.shared.notificationCenter.publisher(
             for: NSWorkspace.didLaunchApplicationNotification
@@ -866,10 +882,7 @@ private struct HomeLandingView: View {
     }
 
     private func handleVisibilityChanged(_ active: Bool) {
-        guard active else {
-            teardownActiveState()
-            return
-        }
+        guard active else { return }
 
         restoreCachedStateIfNeeded()
         setupWindowMonitorIfNeeded()
@@ -1537,13 +1550,11 @@ private struct AppLogsView: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    if isActive {
-                        RuntimeLogsSection(
-                            enableVerboseDiagnostics: $enableVerboseDiagnostics,
-                            runtimeLogLevelRaw: $runtimeLogLevelRaw,
-                            hotkeyShortcutText: hotkeyConfiguration.mainShortcutText
-                        )
-                    }
+                    RuntimeLogsSection(
+                        enableVerboseDiagnostics: $enableVerboseDiagnostics,
+                        runtimeLogLevelRaw: $runtimeLogLevelRaw,
+                        hotkeyShortcutText: hotkeyConfiguration.mainShortcutText
+                    )
                 }
                 .padding(24)
             }
