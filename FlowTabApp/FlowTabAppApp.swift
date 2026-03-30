@@ -1477,6 +1477,1321 @@ private struct FlowActionButton: View {
     }
 }
 
+private struct AppKitHotkeySettingsCardContent: NSViewRepresentable {
+    @Binding var hotkeyPrimaryModifierRaw: String
+    @Binding var hotkeyMainKeyRaw: String
+    @Binding var hotkeyQuitKeyRaw: String
+    @Binding var inAppWindowHotkeyPrimaryModifierRaw: String
+    @Binding var inAppWindowHotkeyMainKeyRaw: String
+    let commandTabTakeoverActive: Bool
+    let accessibilityTrusted: Bool
+
+    final class Coordinator {
+        var hotkeyPrimaryModifierRaw: Binding<String>
+        var hotkeyMainKeyRaw: Binding<String>
+        var hotkeyQuitKeyRaw: Binding<String>
+        var inAppWindowHotkeyPrimaryModifierRaw: Binding<String>
+        var inAppWindowHotkeyMainKeyRaw: Binding<String>
+
+        init(
+            hotkeyPrimaryModifierRaw: Binding<String>,
+            hotkeyMainKeyRaw: Binding<String>,
+            hotkeyQuitKeyRaw: Binding<String>,
+            inAppWindowHotkeyPrimaryModifierRaw: Binding<String>,
+            inAppWindowHotkeyMainKeyRaw: Binding<String>
+        ) {
+            self.hotkeyPrimaryModifierRaw = hotkeyPrimaryModifierRaw
+            self.hotkeyMainKeyRaw = hotkeyMainKeyRaw
+            self.hotkeyQuitKeyRaw = hotkeyQuitKeyRaw
+            self.inAppWindowHotkeyPrimaryModifierRaw = inAppWindowHotkeyPrimaryModifierRaw
+            self.inAppWindowHotkeyMainKeyRaw = inAppWindowHotkeyMainKeyRaw
+        }
+
+        func update(
+            hotkeyPrimaryModifierRaw: Binding<String>,
+            hotkeyMainKeyRaw: Binding<String>,
+            hotkeyQuitKeyRaw: Binding<String>,
+            inAppWindowHotkeyPrimaryModifierRaw: Binding<String>,
+            inAppWindowHotkeyMainKeyRaw: Binding<String>
+        ) {
+            self.hotkeyPrimaryModifierRaw = hotkeyPrimaryModifierRaw
+            self.hotkeyMainKeyRaw = hotkeyMainKeyRaw
+            self.hotkeyQuitKeyRaw = hotkeyQuitKeyRaw
+            self.inAppWindowHotkeyPrimaryModifierRaw = inAppWindowHotkeyPrimaryModifierRaw
+            self.inAppWindowHotkeyMainKeyRaw = inAppWindowHotkeyMainKeyRaw
+        }
+
+        func setHotkeyPrimaryModifier(_ rawValue: String) {
+            hotkeyPrimaryModifierRaw.wrappedValue = rawValue
+        }
+
+        func setHotkeyMainKey(_ rawValue: String) {
+            hotkeyMainKeyRaw.wrappedValue = rawValue
+        }
+
+        func setHotkeyQuitKey(_ rawValue: String) {
+            hotkeyQuitKeyRaw.wrappedValue = rawValue
+        }
+
+        func setInAppWindowPrimaryModifier(_ rawValue: String) {
+            inAppWindowHotkeyPrimaryModifierRaw.wrappedValue = rawValue
+        }
+
+        func setInAppWindowMainKey(_ rawValue: String) {
+            inAppWindowHotkeyMainKeyRaw.wrappedValue = rawValue
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(
+            hotkeyPrimaryModifierRaw: $hotkeyPrimaryModifierRaw,
+            hotkeyMainKeyRaw: $hotkeyMainKeyRaw,
+            hotkeyQuitKeyRaw: $hotkeyQuitKeyRaw,
+            inAppWindowHotkeyPrimaryModifierRaw: $inAppWindowHotkeyPrimaryModifierRaw,
+            inAppWindowHotkeyMainKeyRaw: $inAppWindowHotkeyMainKeyRaw
+        )
+    }
+
+    func makeNSView(context: Context) -> HotkeySettingsCardAppKitView {
+        let view = HotkeySettingsCardAppKitView()
+        connect(view, coordinator: context.coordinator)
+        return view
+    }
+
+    func updateNSView(_ nsView: HotkeySettingsCardAppKitView, context: Context) {
+        context.coordinator.update(
+            hotkeyPrimaryModifierRaw: $hotkeyPrimaryModifierRaw,
+            hotkeyMainKeyRaw: $hotkeyMainKeyRaw,
+            hotkeyQuitKeyRaw: $hotkeyQuitKeyRaw,
+            inAppWindowHotkeyPrimaryModifierRaw: $inAppWindowHotkeyPrimaryModifierRaw,
+            inAppWindowHotkeyMainKeyRaw: $inAppWindowHotkeyMainKeyRaw
+        )
+        connect(nsView, coordinator: context.coordinator)
+        nsView.update(
+            with: HotkeySettingsCardState(
+                hotkeyPrimaryModifierRaw: hotkeyPrimaryModifierRaw,
+                hotkeyMainKeyRaw: hotkeyMainKeyRaw,
+                hotkeyQuitKeyRaw: hotkeyQuitKeyRaw,
+                inAppWindowHotkeyPrimaryModifierRaw: inAppWindowHotkeyPrimaryModifierRaw,
+                inAppWindowHotkeyMainKeyRaw: inAppWindowHotkeyMainKeyRaw,
+                commandTabTakeoverActive: commandTabTakeoverActive,
+                accessibilityTrusted: accessibilityTrusted
+            )
+        )
+    }
+
+    private func connect(_ view: HotkeySettingsCardAppKitView, coordinator: Coordinator) {
+        view.onHotkeyPrimaryModifierChanged = { coordinator.setHotkeyPrimaryModifier($0) }
+        view.onHotkeyMainKeyChanged = { coordinator.setHotkeyMainKey($0) }
+        view.onHotkeyQuitKeyChanged = { coordinator.setHotkeyQuitKey($0) }
+        view.onInAppWindowPrimaryModifierChanged = { coordinator.setInAppWindowPrimaryModifier($0) }
+        view.onInAppWindowMainKeyChanged = { coordinator.setInAppWindowMainKey($0) }
+    }
+}
+
+private struct HotkeySettingsCardState: Equatable {
+    let hotkeyPrimaryModifierRaw: String
+    let hotkeyMainKeyRaw: String
+    let hotkeyQuitKeyRaw: String
+    let inAppWindowHotkeyPrimaryModifierRaw: String
+    let inAppWindowHotkeyMainKeyRaw: String
+    let commandTabTakeoverActive: Bool
+    let accessibilityTrusted: Bool
+
+    var hotkeyConfiguration: SwitcherHotkeyConfiguration {
+        SwitcherHotkeyPreferencesStore.resolve(
+            primaryModifierRaw: hotkeyPrimaryModifierRaw,
+            mainKeyRaw: hotkeyMainKeyRaw,
+            quitKeyRaw: hotkeyQuitKeyRaw
+        )
+    }
+
+    var inAppWindowHotkeyConfiguration: SwitcherHotkeyConfiguration {
+        let resolved = InAppWindowHotkeyPreferencesStore.resolve(
+            primaryModifierRaw: inAppWindowHotkeyPrimaryModifierRaw,
+            mainKeyRaw: inAppWindowHotkeyMainKeyRaw
+        )
+        return SwitcherHotkeyConfiguration(
+            primaryModifier: resolved.primaryModifier,
+            mainKey: resolved.mainKey,
+            quitKey: .q
+        )
+    }
+
+    var mainUsesCommandTab: Bool {
+        hotkeyConfiguration.primaryModifier == .command && hotkeyConfiguration.mainKey == .tab
+    }
+
+    var inAppUsesCommandTab: Bool {
+        inAppWindowHotkeyConfiguration.primaryModifier == .command
+            && inAppWindowHotkeyConfiguration.mainKey == .tab
+    }
+
+    var commandTabTakeoverStatusText: String {
+        commandTabTakeoverActive
+            ? "已接管系统 Command + Tab / Command + Shift + Tab，退出 FlowTab 后会自动恢复。"
+            : "检测到 Command + Tab 组合：FlowTab 会自动尝试接管系统 Command + Tab / Command + Shift + Tab。"
+    }
+
+    var mainSummaryText: String {
+        "当前：\(hotkeyConfiguration.mainShortcutText)"
+            + "（反向：\(hotkeyConfiguration.backwardShortcutText)）"
+            + "，结束应用：\(hotkeyConfiguration.quitShortcutText)"
+    }
+
+    var inAppSummaryText: String {
+        "应用内窗口：\(inAppWindowHotkeyConfiguration.mainShortcutText)"
+            + "（反向：\(inAppWindowHotkeyConfiguration.backwardShortcutText)）"
+    }
+}
+
+private final class HotkeySettingsCardAppKitView: NSView {
+    var onHotkeyPrimaryModifierChanged: ((String) -> Void)?
+    var onHotkeyMainKeyChanged: ((String) -> Void)?
+    var onHotkeyQuitKeyChanged: ((String) -> Void)?
+    var onInAppWindowPrimaryModifierChanged: ((String) -> Void)?
+    var onInAppWindowMainKeyChanged: ((String) -> Void)?
+
+    private let stackView = NSStackView()
+    private let mainPrimaryModifierPopUp = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let mainKeyPopUp = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let quitKeyPopUp = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let inAppPrimaryModifierPopUp = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let inAppMainKeyPopUp = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let mainSummaryLabel = HotkeySettingsCardAppKitView.makeSecondaryLabel()
+    private let mainTakeoverStatusLabel = HotkeySettingsCardAppKitView.makeStatusLabel()
+    private let divider = NSBox()
+    private let inAppRowsContainer = NSStackView()
+    private let inAppSummaryLabel = HotkeySettingsCardAppKitView.makeSecondaryLabel()
+    private let inAppTakeoverStatusLabel = HotkeySettingsCardAppKitView.makeStatusLabel()
+    private var isApplyingState = false
+    private var currentState: HotkeySettingsCardState?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        buildViewHierarchy()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        buildViewHierarchy()
+    }
+
+    override var intrinsicContentSize: NSSize {
+        layoutSubtreeIfNeeded()
+        return NSSize(width: NSView.noIntrinsicMetric, height: stackView.fittingSize.height)
+    }
+
+    func update(with state: HotkeySettingsCardState) {
+        guard currentState != state else { return }
+        currentState = state
+
+        isApplyingState = true
+        selectItem(in: mainPrimaryModifierPopUp, rawValue: state.hotkeyConfiguration.primaryModifier.rawValue)
+        selectItem(in: mainKeyPopUp, rawValue: state.hotkeyConfiguration.mainKey.rawValue)
+        selectItem(in: quitKeyPopUp, rawValue: state.hotkeyConfiguration.quitKey.rawValue)
+        selectItem(
+            in: inAppPrimaryModifierPopUp,
+            rawValue: state.inAppWindowHotkeyConfiguration.primaryModifier.rawValue
+        )
+        selectItem(
+            in: inAppMainKeyPopUp,
+            rawValue: state.inAppWindowHotkeyConfiguration.mainKey.rawValue
+        )
+        isApplyingState = false
+
+        mainSummaryLabel.stringValue = state.mainSummaryText
+        mainTakeoverStatusLabel.stringValue = state.commandTabTakeoverStatusText
+        mainTakeoverStatusLabel.textColor = state.commandTabTakeoverActive ? .systemGreen : .systemRed
+        mainTakeoverStatusLabel.isHidden = !state.mainUsesCommandTab
+
+        inAppRowsContainer.alphaValue = state.accessibilityTrusted ? 1 : 0.55
+        inAppPrimaryModifierPopUp.isEnabled = state.accessibilityTrusted
+        inAppMainKeyPopUp.isEnabled = state.accessibilityTrusted
+        inAppSummaryLabel.stringValue = state.inAppSummaryText
+        inAppTakeoverStatusLabel.stringValue = state.commandTabTakeoverStatusText
+        inAppTakeoverStatusLabel.textColor = state.commandTabTakeoverActive ? .systemGreen : .systemRed
+        inAppTakeoverStatusLabel.isHidden = !state.inAppUsesCommandTab
+
+        invalidateIntrinsicContentSize()
+    }
+
+    private func buildViewHierarchy() {
+        translatesAutoresizingMaskIntoConstraints = false
+
+        stackView.orientation = .vertical
+        stackView.alignment = .leading
+        stackView.spacing = 10
+        stackView.detachesHiddenViews = true
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stackView)
+
+        NSLayoutConstraint.activate([
+            stackView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            stackView.topAnchor.constraint(equalTo: topAnchor),
+            stackView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            stackView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
+
+        configure(
+            popUp: mainPrimaryModifierPopUp,
+            options: SwitcherPrimaryModifier.allCases.map { (id: $0.rawValue, title: $0.displayName) },
+            action: #selector(handleMainPrimaryModifierChanged)
+        )
+        configure(
+            popUp: mainKeyPopUp,
+            options: SwitcherHotkeyKey.allCases.map { (id: $0.rawValue, title: $0.displayName) },
+            action: #selector(handleMainKeyChanged)
+        )
+        configure(
+            popUp: quitKeyPopUp,
+            options: SwitcherHotkeyKey.allCases.map { (id: $0.rawValue, title: $0.displayName) },
+            action: #selector(handleQuitKeyChanged)
+        )
+        configure(
+            popUp: inAppPrimaryModifierPopUp,
+            options: SwitcherPrimaryModifier.allCases.map { (id: $0.rawValue, title: $0.displayName) },
+            action: #selector(handleInAppPrimaryModifierChanged)
+        )
+        configure(
+            popUp: inAppMainKeyPopUp,
+            options: SwitcherHotkeyKey.allCases.map { (id: $0.rawValue, title: $0.displayName) },
+            action: #selector(handleInAppMainKeyChanged)
+        )
+
+        let mainPrimaryRow = makeControlRow(title: "主修饰键", control: mainPrimaryModifierPopUp)
+        let mainKeyRow = makeControlRow(title: "主切换按键", control: mainKeyPopUp)
+        let quitKeyRow = makeControlRow(title: "结束应用按键", control: quitKeyPopUp)
+        stackView.addArrangedSubview(mainPrimaryRow)
+        stackView.addArrangedSubview(mainKeyRow)
+        stackView.addArrangedSubview(quitKeyRow)
+        mainPrimaryRow.widthAnchor.constraint(equalTo: stackView.widthAnchor).isActive = true
+        mainKeyRow.widthAnchor.constraint(equalTo: stackView.widthAnchor).isActive = true
+        quitKeyRow.widthAnchor.constraint(equalTo: stackView.widthAnchor).isActive = true
+        stackView.addArrangedSubview(mainSummaryLabel)
+        stackView.addArrangedSubview(mainTakeoverStatusLabel)
+
+        divider.boxType = .separator
+        divider.translatesAutoresizingMaskIntoConstraints = false
+        stackView.addArrangedSubview(divider)
+        divider.widthAnchor.constraint(equalTo: stackView.widthAnchor).isActive = true
+
+        inAppRowsContainer.orientation = .vertical
+        inAppRowsContainer.alignment = .leading
+        inAppRowsContainer.spacing = 10
+        inAppRowsContainer.detachesHiddenViews = true
+        inAppRowsContainer.translatesAutoresizingMaskIntoConstraints = false
+        let inAppPrimaryRow = makeControlRow(title: "应用内窗口修饰键", control: inAppPrimaryModifierPopUp)
+        let inAppMainKeyRow = makeControlRow(title: "应用内窗口按键", control: inAppMainKeyPopUp)
+        inAppRowsContainer.addArrangedSubview(inAppPrimaryRow)
+        inAppRowsContainer.addArrangedSubview(inAppMainKeyRow)
+        inAppPrimaryRow.widthAnchor.constraint(equalTo: inAppRowsContainer.widthAnchor).isActive = true
+        inAppMainKeyRow.widthAnchor.constraint(equalTo: inAppRowsContainer.widthAnchor).isActive = true
+
+        stackView.addArrangedSubview(inAppRowsContainer)
+        stackView.addArrangedSubview(inAppSummaryLabel)
+        stackView.addArrangedSubview(inAppTakeoverStatusLabel)
+    }
+
+    private func makeControlRow(title: String, control: NSPopUpButton) -> NSStackView {
+        let titleLabel = NSTextField(labelWithString: title)
+        titleLabel.font = .systemFont(ofSize: 13)
+        titleLabel.lineBreakMode = .byTruncatingTail
+        titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        let spacer = NSView()
+        spacer.translatesAutoresizingMaskIntoConstraints = false
+        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        spacer.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        let row = NSStackView(views: [titleLabel, spacer, control])
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.spacing = 10
+        row.translatesAutoresizingMaskIntoConstraints = false
+        row.detachesHiddenViews = true
+        return row
+    }
+
+    private func configure(
+        popUp: NSPopUpButton,
+        options: [(id: String, title: String)],
+        action: Selector
+    ) {
+        popUp.target = self
+        popUp.action = action
+        popUp.controlSize = .regular
+        popUp.font = .systemFont(ofSize: 13)
+        popUp.translatesAutoresizingMaskIntoConstraints = false
+        popUp.menu = NSMenu()
+
+        for option in options {
+            let item = NSMenuItem(title: option.title, action: nil, keyEquivalent: "")
+            item.representedObject = option.id
+            popUp.menu?.addItem(item)
+        }
+
+        popUp.widthAnchor.constraint(equalToConstant: 160).isActive = true
+    }
+
+    private func selectItem(in popUp: NSPopUpButton, rawValue: String) {
+        guard let item = popUp.itemArray.first(where: { ($0.representedObject as? String) == rawValue }) else {
+            return
+        }
+        popUp.select(item)
+    }
+
+    @objc private func handleMainPrimaryModifierChanged(_ sender: NSPopUpButton) {
+        guard !isApplyingState else { return }
+        guard let rawValue = sender.selectedItem?.representedObject as? String else { return }
+        onHotkeyPrimaryModifierChanged?(rawValue)
+    }
+
+    @objc private func handleMainKeyChanged(_ sender: NSPopUpButton) {
+        guard !isApplyingState else { return }
+        guard let rawValue = sender.selectedItem?.representedObject as? String else { return }
+        onHotkeyMainKeyChanged?(rawValue)
+    }
+
+    @objc private func handleQuitKeyChanged(_ sender: NSPopUpButton) {
+        guard !isApplyingState else { return }
+        guard let rawValue = sender.selectedItem?.representedObject as? String else { return }
+        onHotkeyQuitKeyChanged?(rawValue)
+    }
+
+    @objc private func handleInAppPrimaryModifierChanged(_ sender: NSPopUpButton) {
+        guard !isApplyingState else { return }
+        guard let rawValue = sender.selectedItem?.representedObject as? String else { return }
+        onInAppWindowPrimaryModifierChanged?(rawValue)
+    }
+
+    @objc private func handleInAppMainKeyChanged(_ sender: NSPopUpButton) {
+        guard !isApplyingState else { return }
+        guard let rawValue = sender.selectedItem?.representedObject as? String else { return }
+        onInAppWindowMainKeyChanged?(rawValue)
+    }
+
+    private static func makeSecondaryLabel() -> NSTextField {
+        let label = NSTextField(wrappingLabelWithString: "")
+        label.font = .systemFont(ofSize: 12)
+        label.textColor = .secondaryLabelColor
+        label.lineBreakMode = .byWordWrapping
+        label.maximumNumberOfLines = 0
+        return label
+    }
+
+    private static func makeStatusLabel() -> NSTextField {
+        let label = NSTextField(wrappingLabelWithString: "")
+        label.font = .systemFont(ofSize: 12)
+        label.lineBreakMode = .byWordWrapping
+        label.maximumNumberOfLines = 0
+        label.isHidden = true
+        return label
+    }
+}
+
+private class AppKitSettingsCardBaseView: NSView {
+    let stackView = NSStackView()
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        configureRootStack()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        configureRootStack()
+    }
+
+    override var intrinsicContentSize: NSSize {
+        layoutSubtreeIfNeeded()
+        return NSSize(width: NSView.noIntrinsicMetric, height: stackView.fittingSize.height)
+    }
+
+    func addFullWidthArrangedSubview(_ view: NSView) {
+        view.translatesAutoresizingMaskIntoConstraints = false
+        stackView.addArrangedSubview(view)
+        view.widthAnchor.constraint(equalTo: stackView.widthAnchor).isActive = true
+    }
+
+    private func configureRootStack() {
+        translatesAutoresizingMaskIntoConstraints = false
+        stackView.orientation = .vertical
+        stackView.alignment = .leading
+        stackView.spacing = 10
+        stackView.detachesHiddenViews = true
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stackView)
+
+        NSLayoutConstraint.activate([
+            stackView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            stackView.topAnchor.constraint(equalTo: topAnchor),
+            stackView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            stackView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
+    }
+
+    static func makeControlRow(title: String, control: NSView) -> NSStackView {
+        let titleLabel = NSTextField(labelWithString: title)
+        titleLabel.font = .systemFont(ofSize: 13)
+        titleLabel.lineBreakMode = .byTruncatingTail
+        titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        let spacer = NSView()
+        spacer.translatesAutoresizingMaskIntoConstraints = false
+        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        spacer.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        let row = NSStackView(views: [titleLabel, spacer, control])
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.spacing = 10
+        row.detachesHiddenViews = true
+        row.translatesAutoresizingMaskIntoConstraints = false
+        return row
+    }
+
+    static func makeBodyLabel(fontSize: CGFloat = 11) -> NSTextField {
+        let label = NSTextField(wrappingLabelWithString: "")
+        label.font = .systemFont(ofSize: fontSize)
+        label.textColor = .secondaryLabelColor
+        label.lineBreakMode = .byWordWrapping
+        label.maximumNumberOfLines = 0
+        return label
+    }
+
+    static func makeStatusLabel(fontSize: CGFloat = 12) -> NSTextField {
+        let label = NSTextField(wrappingLabelWithString: "")
+        label.font = .systemFont(ofSize: fontSize)
+        label.lineBreakMode = .byWordWrapping
+        label.maximumNumberOfLines = 0
+        return label
+    }
+
+    static func configure(
+        popUp: NSPopUpButton,
+        options: [(id: String, title: String)],
+        target: AnyObject,
+        action: Selector
+    ) {
+        popUp.target = target
+        popUp.action = action
+        popUp.controlSize = .regular
+        popUp.font = .systemFont(ofSize: 13)
+        popUp.translatesAutoresizingMaskIntoConstraints = false
+        popUp.menu = NSMenu()
+
+        for option in options {
+            let item = NSMenuItem(title: option.title, action: nil, keyEquivalent: "")
+            item.representedObject = option.id
+            popUp.menu?.addItem(item)
+        }
+
+        popUp.widthAnchor.constraint(equalToConstant: 160).isActive = true
+    }
+
+    static func selectItem(in popUp: NSPopUpButton, rawValue: String) {
+        guard let item = popUp.itemArray.first(where: { ($0.representedObject as? String) == rawValue }) else {
+            return
+        }
+        popUp.select(item)
+    }
+
+    static func makeActionButton(width: CGFloat = 166, target: AnyObject, action: Selector) -> NSButton {
+        let button = NSButton(title: "", target: target, action: action)
+        button.bezelStyle = .rounded
+        button.font = .systemFont(ofSize: 12, weight: .semibold)
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.widthAnchor.constraint(equalToConstant: width).isActive = true
+        return button
+    }
+}
+
+private struct AppKitAppearanceSettingsCardContent: NSViewRepresentable {
+    @Binding var showShortcutHint: Bool
+    @Binding var showInCommandTab: Bool
+    @Binding var themeModeRaw: String
+
+    final class Coordinator {
+        var showShortcutHint: Binding<Bool>
+        var showInCommandTab: Binding<Bool>
+        var themeModeRaw: Binding<String>
+
+        init(
+            showShortcutHint: Binding<Bool>,
+            showInCommandTab: Binding<Bool>,
+            themeModeRaw: Binding<String>
+        ) {
+            self.showShortcutHint = showShortcutHint
+            self.showInCommandTab = showInCommandTab
+            self.themeModeRaw = themeModeRaw
+        }
+
+        func update(
+            showShortcutHint: Binding<Bool>,
+            showInCommandTab: Binding<Bool>,
+            themeModeRaw: Binding<String>
+        ) {
+            self.showShortcutHint = showShortcutHint
+            self.showInCommandTab = showInCommandTab
+            self.themeModeRaw = themeModeRaw
+        }
+
+        func setShowShortcutHint(_ value: Bool) {
+            showShortcutHint.wrappedValue = value
+        }
+
+        func setShowInCommandTab(_ value: Bool) {
+            showInCommandTab.wrappedValue = value
+        }
+
+        func setThemeMode(rawValue: String) {
+            themeModeRaw.wrappedValue = rawValue
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(
+            showShortcutHint: $showShortcutHint,
+            showInCommandTab: $showInCommandTab,
+            themeModeRaw: $themeModeRaw
+        )
+    }
+
+    func makeNSView(context: Context) -> AppearanceSettingsCardAppKitView {
+        let view = AppearanceSettingsCardAppKitView()
+        connect(view, coordinator: context.coordinator)
+        return view
+    }
+
+    func updateNSView(_ nsView: AppearanceSettingsCardAppKitView, context: Context) {
+        context.coordinator.update(
+            showShortcutHint: $showShortcutHint,
+            showInCommandTab: $showInCommandTab,
+            themeModeRaw: $themeModeRaw
+        )
+        connect(nsView, coordinator: context.coordinator)
+        nsView.update(
+            with: AppearanceSettingsCardState(
+                showShortcutHint: showShortcutHint,
+                showInCommandTab: showInCommandTab,
+                themeModeRaw: themeModeRaw
+            )
+        )
+    }
+
+    private func connect(_ view: AppearanceSettingsCardAppKitView, coordinator: Coordinator) {
+        view.onShowShortcutHintChanged = { coordinator.setShowShortcutHint($0) }
+        view.onShowInCommandTabChanged = { coordinator.setShowInCommandTab($0) }
+        view.onThemeModeChanged = { coordinator.setThemeMode(rawValue: $0) }
+    }
+}
+
+private struct AppearanceSettingsCardState: Equatable {
+    let showShortcutHint: Bool
+    let showInCommandTab: Bool
+    let themeModeRaw: String
+
+    var resolvedThemeMode: ThemeMode {
+        ThemePreferencesStore.resolve(rawValue: themeModeRaw)
+    }
+}
+
+private final class AppearanceSettingsCardAppKitView: AppKitSettingsCardBaseView {
+    var onShowShortcutHintChanged: ((Bool) -> Void)?
+    var onShowInCommandTabChanged: ((Bool) -> Void)?
+    var onThemeModeChanged: ((String) -> Void)?
+
+    private let showShortcutHintSwitch = NSSwitch()
+    private let showInCommandTabSwitch = NSSwitch()
+    private let themeModeControl = NSSegmentedControl(
+        labels: ThemeMode.allCases.map(\.displayName),
+        trackingMode: .selectOne,
+        target: nil,
+        action: nil
+    )
+    private let descriptionLabel = AppKitSettingsCardBaseView.makeBodyLabel()
+    private var isApplyingState = false
+    private var currentState: AppearanceSettingsCardState?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        buildViewHierarchy()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        buildViewHierarchy()
+    }
+
+    func update(with state: AppearanceSettingsCardState) {
+        guard currentState != state else { return }
+        currentState = state
+
+        isApplyingState = true
+        showShortcutHintSwitch.state = state.showShortcutHint ? .on : .off
+        showInCommandTabSwitch.state = state.showInCommandTab ? .on : .off
+        themeModeControl.selectedSegment = ThemeMode.allCases.firstIndex(of: state.resolvedThemeMode) ?? 0
+        isApplyingState = false
+
+        descriptionLabel.stringValue = "关闭后 当前应用 将仅作为菜单栏辅助应用运行。"
+        invalidateIntrinsicContentSize()
+    }
+
+    private func buildViewHierarchy() {
+        showShortcutHintSwitch.target = self
+        showShortcutHintSwitch.action = #selector(handleShowShortcutHintChanged)
+        showInCommandTabSwitch.target = self
+        showInCommandTabSwitch.action = #selector(handleShowInCommandTabChanged)
+        themeModeControl.segmentStyle = .rounded
+        themeModeControl.target = self
+        themeModeControl.action = #selector(handleThemeModeChanged)
+        themeModeControl.translatesAutoresizingMaskIntoConstraints = false
+        themeModeControl.widthAnchor.constraint(equalToConstant: 300).isActive = true
+
+        addFullWidthArrangedSubview(
+            AppKitSettingsCardBaseView.makeControlRow(title: "显示快捷键提示", control: showShortcutHintSwitch)
+        )
+        addFullWidthArrangedSubview(
+            AppKitSettingsCardBaseView.makeControlRow(title: "显示应用窗口", control: showInCommandTabSwitch)
+        )
+        addFullWidthArrangedSubview(descriptionLabel)
+        addFullWidthArrangedSubview(
+            AppKitSettingsCardBaseView.makeControlRow(title: "主题模式", control: themeModeControl)
+        )
+    }
+
+    @objc private func handleShowShortcutHintChanged(_ sender: NSSwitch) {
+        guard !isApplyingState else { return }
+        onShowShortcutHintChanged?(sender.state == .on)
+    }
+
+    @objc private func handleShowInCommandTabChanged(_ sender: NSSwitch) {
+        guard !isApplyingState else { return }
+        onShowInCommandTabChanged?(sender.state == .on)
+    }
+
+    @objc private func handleThemeModeChanged(_ sender: NSSegmentedControl) {
+        guard !isApplyingState else { return }
+        guard ThemeMode.allCases.indices.contains(sender.selectedSegment) else { return }
+        onThemeModeChanged?(ThemeMode.allCases[sender.selectedSegment].rawValue)
+    }
+}
+
+private struct AppKitWindowBehaviorSettingsCardContent: NSViewRepresentable {
+    let windowLayerAutoEnterDelayText: String
+    @Binding var autoRestoreMinimizedWindowOnSwitch: Bool
+    @Binding var hideMinimizedAppsFromAppLayer: Bool
+    let onWindowLayerAutoEnterDelayTextChanged: (String) -> Void
+    let onWindowLayerAutoEnterDelayTextCommitted: () -> Void
+
+    final class Coordinator {
+        var autoRestoreMinimizedWindowOnSwitch: Binding<Bool>
+        var hideMinimizedAppsFromAppLayer: Binding<Bool>
+        var onWindowLayerAutoEnterDelayTextChanged: (String) -> Void
+        var onWindowLayerAutoEnterDelayTextCommitted: () -> Void
+
+        init(
+            autoRestoreMinimizedWindowOnSwitch: Binding<Bool>,
+            hideMinimizedAppsFromAppLayer: Binding<Bool>,
+            onWindowLayerAutoEnterDelayTextChanged: @escaping (String) -> Void,
+            onWindowLayerAutoEnterDelayTextCommitted: @escaping () -> Void
+        ) {
+            self.autoRestoreMinimizedWindowOnSwitch = autoRestoreMinimizedWindowOnSwitch
+            self.hideMinimizedAppsFromAppLayer = hideMinimizedAppsFromAppLayer
+            self.onWindowLayerAutoEnterDelayTextChanged = onWindowLayerAutoEnterDelayTextChanged
+            self.onWindowLayerAutoEnterDelayTextCommitted = onWindowLayerAutoEnterDelayTextCommitted
+        }
+
+        func update(
+            autoRestoreMinimizedWindowOnSwitch: Binding<Bool>,
+            hideMinimizedAppsFromAppLayer: Binding<Bool>,
+            onWindowLayerAutoEnterDelayTextChanged: @escaping (String) -> Void,
+            onWindowLayerAutoEnterDelayTextCommitted: @escaping () -> Void
+        ) {
+            self.autoRestoreMinimizedWindowOnSwitch = autoRestoreMinimizedWindowOnSwitch
+            self.hideMinimizedAppsFromAppLayer = hideMinimizedAppsFromAppLayer
+            self.onWindowLayerAutoEnterDelayTextChanged = onWindowLayerAutoEnterDelayTextChanged
+            self.onWindowLayerAutoEnterDelayTextCommitted = onWindowLayerAutoEnterDelayTextCommitted
+        }
+
+        func setAutoRestoreMinimizedWindowOnSwitch(_ value: Bool) {
+            autoRestoreMinimizedWindowOnSwitch.wrappedValue = value
+        }
+
+        func setHideMinimizedAppsFromAppLayer(_ value: Bool) {
+            hideMinimizedAppsFromAppLayer.wrappedValue = value
+        }
+
+        func changeDelayText(_ value: String) {
+            onWindowLayerAutoEnterDelayTextChanged(value)
+        }
+
+        func commitDelayText() {
+            onWindowLayerAutoEnterDelayTextCommitted()
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(
+            autoRestoreMinimizedWindowOnSwitch: $autoRestoreMinimizedWindowOnSwitch,
+            hideMinimizedAppsFromAppLayer: $hideMinimizedAppsFromAppLayer,
+            onWindowLayerAutoEnterDelayTextChanged: onWindowLayerAutoEnterDelayTextChanged,
+            onWindowLayerAutoEnterDelayTextCommitted: onWindowLayerAutoEnterDelayTextCommitted
+        )
+    }
+
+    func makeNSView(context: Context) -> WindowBehaviorSettingsCardAppKitView {
+        let view = WindowBehaviorSettingsCardAppKitView()
+        connect(view, coordinator: context.coordinator)
+        return view
+    }
+
+    func updateNSView(_ nsView: WindowBehaviorSettingsCardAppKitView, context: Context) {
+        context.coordinator.update(
+            autoRestoreMinimizedWindowOnSwitch: $autoRestoreMinimizedWindowOnSwitch,
+            hideMinimizedAppsFromAppLayer: $hideMinimizedAppsFromAppLayer,
+            onWindowLayerAutoEnterDelayTextChanged: onWindowLayerAutoEnterDelayTextChanged,
+            onWindowLayerAutoEnterDelayTextCommitted: onWindowLayerAutoEnterDelayTextCommitted
+        )
+        connect(nsView, coordinator: context.coordinator)
+        nsView.update(
+            with: WindowBehaviorSettingsCardState(
+                windowLayerAutoEnterDelayText: windowLayerAutoEnterDelayText,
+                autoRestoreMinimizedWindowOnSwitch: autoRestoreMinimizedWindowOnSwitch,
+                hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
+            )
+        )
+    }
+
+    private func connect(_ view: WindowBehaviorSettingsCardAppKitView, coordinator: Coordinator) {
+        view.onWindowLayerAutoEnterDelayTextChanged = { coordinator.changeDelayText($0) }
+        view.onWindowLayerAutoEnterDelayTextCommitted = { coordinator.commitDelayText() }
+        view.onAutoRestoreMinimizedWindowOnSwitchChanged = {
+            coordinator.setAutoRestoreMinimizedWindowOnSwitch($0)
+        }
+        view.onHideMinimizedAppsFromAppLayerChanged = {
+            coordinator.setHideMinimizedAppsFromAppLayer($0)
+        }
+    }
+}
+
+private struct WindowBehaviorSettingsCardState: Equatable {
+    let windowLayerAutoEnterDelayText: String
+    let autoRestoreMinimizedWindowOnSwitch: Bool
+    let hideMinimizedAppsFromAppLayer: Bool
+}
+
+private final class WindowBehaviorSettingsCardAppKitView: AppKitSettingsCardBaseView, NSTextFieldDelegate {
+    var onWindowLayerAutoEnterDelayTextChanged: ((String) -> Void)?
+    var onWindowLayerAutoEnterDelayTextCommitted: (() -> Void)?
+    var onAutoRestoreMinimizedWindowOnSwitchChanged: ((Bool) -> Void)?
+    var onHideMinimizedAppsFromAppLayerChanged: ((Bool) -> Void)?
+
+    private let delayTextField = NSTextField(string: "")
+    private let autoRestoreMinimizedWindowSwitch = NSSwitch()
+    private let hideMinimizedAppsSwitch = NSSwitch()
+    private let noteLabel = AppKitSettingsCardBaseView.makeBodyLabel()
+    private var isApplyingState = false
+    private var currentState: WindowBehaviorSettingsCardState?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        buildViewHierarchy()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        buildViewHierarchy()
+    }
+
+    func update(with state: WindowBehaviorSettingsCardState) {
+        guard currentState != state else { return }
+        currentState = state
+
+        isApplyingState = true
+        if delayTextField.stringValue != state.windowLayerAutoEnterDelayText {
+            delayTextField.stringValue = state.windowLayerAutoEnterDelayText
+        }
+        autoRestoreMinimizedWindowSwitch.state = state.autoRestoreMinimizedWindowOnSwitch ? .on : .off
+        hideMinimizedAppsSwitch.state = state.hideMinimizedAppsFromAppLayer ? .on : .off
+        isApplyingState = false
+
+        noteLabel.stringValue = "说明：该过滤依赖辅助功能权限。未授权时无法判断最小化状态，不会过滤应用层。"
+        invalidateIntrinsicContentSize()
+    }
+
+    private func buildViewHierarchy() {
+        delayTextField.delegate = self
+        delayTextField.placeholderString = "0.35"
+        delayTextField.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        delayTextField.alignment = .right
+        delayTextField.translatesAutoresizingMaskIntoConstraints = false
+        delayTextField.widthAnchor.constraint(equalToConstant: 80).isActive = true
+
+        let delayUnitLabel = NSTextField(labelWithString: "秒")
+        delayUnitLabel.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        delayUnitLabel.textColor = .secondaryLabelColor
+
+        let delayControl = NSStackView(views: [delayTextField, delayUnitLabel])
+        delayControl.orientation = .horizontal
+        delayControl.alignment = .centerY
+        delayControl.spacing = 8
+        delayControl.translatesAutoresizingMaskIntoConstraints = false
+
+        autoRestoreMinimizedWindowSwitch.target = self
+        autoRestoreMinimizedWindowSwitch.action = #selector(handleAutoRestoreMinimizedWindowSwitchChanged)
+        hideMinimizedAppsSwitch.target = self
+        hideMinimizedAppsSwitch.action = #selector(handleHideMinimizedAppsSwitchChanged)
+
+        addFullWidthArrangedSubview(
+            AppKitSettingsCardBaseView.makeControlRow(title: "窗口层自动进入延迟", control: delayControl)
+        )
+        addFullWidthArrangedSubview(
+            AppKitSettingsCardBaseView.makeControlRow(
+                title: "切换到最小化窗口时自动恢复打开",
+                control: autoRestoreMinimizedWindowSwitch
+            )
+        )
+        addFullWidthArrangedSubview(
+            AppKitSettingsCardBaseView.makeControlRow(
+                title: "应用层隐藏仅最小化应用",
+                control: hideMinimizedAppsSwitch
+            )
+        )
+        addFullWidthArrangedSubview(noteLabel)
+    }
+
+    func controlTextDidChange(_ notification: Notification) {
+        guard !isApplyingState else { return }
+        guard notification.object as? NSTextField === delayTextField else { return }
+        onWindowLayerAutoEnterDelayTextChanged?(delayTextField.stringValue)
+    }
+
+    func controlTextDidEndEditing(_ notification: Notification) {
+        guard notification.object as? NSTextField === delayTextField else { return }
+        onWindowLayerAutoEnterDelayTextCommitted?()
+    }
+
+    @objc private func handleAutoRestoreMinimizedWindowSwitchChanged(_ sender: NSSwitch) {
+        guard !isApplyingState else { return }
+        onAutoRestoreMinimizedWindowOnSwitchChanged?(sender.state == .on)
+    }
+
+    @objc private func handleHideMinimizedAppsSwitchChanged(_ sender: NSSwitch) {
+        guard !isApplyingState else { return }
+        onHideMinimizedAppsFromAppLayerChanged?(sender.state == .on)
+    }
+}
+
+private struct AppKitSearchSettingsCardContent: NSViewRepresentable {
+    @Binding var searchEnabled: Bool
+    @Binding var searchDefaultScopeRaw: String
+
+    final class Coordinator {
+        var searchEnabled: Binding<Bool>
+        var searchDefaultScopeRaw: Binding<String>
+
+        init(searchEnabled: Binding<Bool>, searchDefaultScopeRaw: Binding<String>) {
+            self.searchEnabled = searchEnabled
+            self.searchDefaultScopeRaw = searchDefaultScopeRaw
+        }
+
+        func update(searchEnabled: Binding<Bool>, searchDefaultScopeRaw: Binding<String>) {
+            self.searchEnabled = searchEnabled
+            self.searchDefaultScopeRaw = searchDefaultScopeRaw
+        }
+
+        func setSearchEnabled(_ value: Bool) {
+            searchEnabled.wrappedValue = value
+        }
+
+        func setSearchDefaultScope(rawValue: String) {
+            searchDefaultScopeRaw.wrappedValue = rawValue
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(searchEnabled: $searchEnabled, searchDefaultScopeRaw: $searchDefaultScopeRaw)
+    }
+
+    func makeNSView(context: Context) -> SearchSettingsCardAppKitView {
+        let view = SearchSettingsCardAppKitView()
+        connect(view, coordinator: context.coordinator)
+        return view
+    }
+
+    func updateNSView(_ nsView: SearchSettingsCardAppKitView, context: Context) {
+        context.coordinator.update(searchEnabled: $searchEnabled, searchDefaultScopeRaw: $searchDefaultScopeRaw)
+        connect(nsView, coordinator: context.coordinator)
+        nsView.update(
+            with: SearchSettingsCardState(
+                searchEnabled: searchEnabled,
+                searchDefaultScopeRaw: searchDefaultScopeRaw
+            )
+        )
+    }
+
+    private func connect(_ view: SearchSettingsCardAppKitView, coordinator: Coordinator) {
+        view.onSearchEnabledChanged = { coordinator.setSearchEnabled($0) }
+        view.onSearchDefaultScopeChanged = { coordinator.setSearchDefaultScope(rawValue: $0) }
+    }
+}
+
+private struct SearchSettingsCardState: Equatable {
+    let searchEnabled: Bool
+    let searchDefaultScopeRaw: String
+
+    var resolvedScope: SwitcherSearchScope {
+        SwitcherSearchScope(rawValue: searchDefaultScopeRaw) ?? SearchInteractionPreferencesStore.defaultScope
+    }
+
+    var summaryText: String {
+        searchEnabled
+            ? "面板默认从应用层开始；按 Enter 或 ↑ 进入搜索。"
+            : "已关闭搜索：面板仅显示应用层与窗口层。"
+    }
+}
+
+private final class SearchSettingsCardAppKitView: AppKitSettingsCardBaseView {
+    var onSearchEnabledChanged: ((Bool) -> Void)?
+    var onSearchDefaultScopeChanged: ((String) -> Void)?
+
+    private let searchEnabledSwitch = NSSwitch()
+    private let searchDefaultScopePopUp = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let scopeRowContainer = NSStackView()
+    private let summaryLabel = AppKitSettingsCardBaseView.makeBodyLabel()
+    private var isApplyingState = false
+    private var currentState: SearchSettingsCardState?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        buildViewHierarchy()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        buildViewHierarchy()
+    }
+
+    func update(with state: SearchSettingsCardState) {
+        guard currentState != state else { return }
+        currentState = state
+
+        isApplyingState = true
+        searchEnabledSwitch.state = state.searchEnabled ? .on : .off
+        AppKitSettingsCardBaseView.selectItem(
+            in: searchDefaultScopePopUp,
+            rawValue: state.resolvedScope.rawValue
+        )
+        isApplyingState = false
+
+        searchDefaultScopePopUp.isEnabled = state.searchEnabled
+        scopeRowContainer.alphaValue = state.searchEnabled ? 1 : 0.5
+        summaryLabel.stringValue = state.summaryText
+        invalidateIntrinsicContentSize()
+    }
+
+    private func buildViewHierarchy() {
+        searchEnabledSwitch.target = self
+        searchEnabledSwitch.action = #selector(handleSearchEnabledChanged)
+        AppKitSettingsCardBaseView.configure(
+            popUp: searchDefaultScopePopUp,
+            options: SwitcherSearchScope.allCases.map { (id: $0.rawValue, title: $0.label) },
+            target: self,
+            action: #selector(handleSearchDefaultScopeChanged)
+        )
+
+        let searchEnabledRow = AppKitSettingsCardBaseView.makeControlRow(
+            title: "启用搜索功能",
+            control: searchEnabledSwitch
+        )
+        scopeRowContainer.orientation = .vertical
+        scopeRowContainer.alignment = .leading
+        scopeRowContainer.spacing = 0
+        scopeRowContainer.detachesHiddenViews = true
+        scopeRowContainer.translatesAutoresizingMaskIntoConstraints = false
+        scopeRowContainer.addArrangedSubview(
+            AppKitSettingsCardBaseView.makeControlRow(
+                title: "默认搜索范围",
+                control: searchDefaultScopePopUp
+            )
+        )
+        if let scopeRow = scopeRowContainer.arrangedSubviews.first {
+            scopeRow.widthAnchor.constraint(equalTo: scopeRowContainer.widthAnchor).isActive = true
+        }
+
+        addFullWidthArrangedSubview(searchEnabledRow)
+        addFullWidthArrangedSubview(scopeRowContainer)
+        addFullWidthArrangedSubview(summaryLabel)
+    }
+
+    @objc private func handleSearchEnabledChanged(_ sender: NSSwitch) {
+        guard !isApplyingState else { return }
+        onSearchEnabledChanged?(sender.state == .on)
+    }
+
+    @objc private func handleSearchDefaultScopeChanged(_ sender: NSPopUpButton) {
+        guard !isApplyingState else { return }
+        guard let rawValue = sender.selectedItem?.representedObject as? String else { return }
+        onSearchDefaultScopeChanged?(rawValue)
+    }
+}
+
+private struct AppKitPermissionSettingsCardContent: NSViewRepresentable {
+    @Binding var showPermissionReminder: Bool
+    let accessibilityTrusted: Bool
+    let screenCaptureTrusted: Bool
+    let onAccessibilityAction: () -> Void
+    let onScreenCaptureAction: () -> Void
+
+    final class Coordinator {
+        var showPermissionReminder: Binding<Bool>
+        var onAccessibilityAction: () -> Void
+        var onScreenCaptureAction: () -> Void
+
+        init(
+            showPermissionReminder: Binding<Bool>,
+            onAccessibilityAction: @escaping () -> Void,
+            onScreenCaptureAction: @escaping () -> Void
+        ) {
+            self.showPermissionReminder = showPermissionReminder
+            self.onAccessibilityAction = onAccessibilityAction
+            self.onScreenCaptureAction = onScreenCaptureAction
+        }
+
+        func update(
+            showPermissionReminder: Binding<Bool>,
+            onAccessibilityAction: @escaping () -> Void,
+            onScreenCaptureAction: @escaping () -> Void
+        ) {
+            self.showPermissionReminder = showPermissionReminder
+            self.onAccessibilityAction = onAccessibilityAction
+            self.onScreenCaptureAction = onScreenCaptureAction
+        }
+
+        func setShowPermissionReminder(_ value: Bool) {
+            showPermissionReminder.wrappedValue = value
+        }
+
+        func triggerAccessibilityAction() {
+            onAccessibilityAction()
+        }
+
+        func triggerScreenCaptureAction() {
+            onScreenCaptureAction()
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(
+            showPermissionReminder: $showPermissionReminder,
+            onAccessibilityAction: onAccessibilityAction,
+            onScreenCaptureAction: onScreenCaptureAction
+        )
+    }
+
+    func makeNSView(context: Context) -> PermissionSettingsCardAppKitView {
+        let view = PermissionSettingsCardAppKitView()
+        connect(view, coordinator: context.coordinator)
+        return view
+    }
+
+    func updateNSView(_ nsView: PermissionSettingsCardAppKitView, context: Context) {
+        context.coordinator.update(
+            showPermissionReminder: $showPermissionReminder,
+            onAccessibilityAction: onAccessibilityAction,
+            onScreenCaptureAction: onScreenCaptureAction
+        )
+        connect(nsView, coordinator: context.coordinator)
+        nsView.update(
+            with: PermissionSettingsCardState(
+                showPermissionReminder: showPermissionReminder,
+                accessibilityTrusted: accessibilityTrusted,
+                screenCaptureTrusted: screenCaptureTrusted
+            )
+        )
+    }
+
+    private func connect(_ view: PermissionSettingsCardAppKitView, coordinator: Coordinator) {
+        view.onShowPermissionReminderChanged = { coordinator.setShowPermissionReminder($0) }
+        view.onAccessibilityAction = { coordinator.triggerAccessibilityAction() }
+        view.onScreenCaptureAction = { coordinator.triggerScreenCaptureAction() }
+    }
+}
+
+private struct PermissionSettingsCardState: Equatable {
+    let showPermissionReminder: Bool
+    let accessibilityTrusted: Bool
+    let screenCaptureTrusted: Bool
+
+    var accessibilityStatusText: String {
+        accessibilityTrusted ? "辅助功能权限：已授权" : "辅助功能权限：未授权"
+    }
+
+    var accessibilityButtonTitle: String {
+        accessibilityTrusted ? "关闭辅助功能权限" : "请求辅助功能权限"
+    }
+
+    var screenCaptureStatusText: String {
+        screenCaptureTrusted ? "屏幕录制权限：已授权" : "屏幕录制权限：未授权"
+    }
+
+    var screenCaptureButtonTitle: String {
+        screenCaptureTrusted ? "关闭屏幕录制权限" : "请求屏幕录制权限"
+    }
+}
+
+private final class PermissionStatusActionRowView: NSView {
+    let titleLabel = AppKitSettingsCardBaseView.makeStatusLabel()
+    let detailLabel = AppKitSettingsCardBaseView.makeBodyLabel()
+    let actionButton: NSButton
+    private let stackView = NSStackView()
+    private let textStack = NSStackView()
+
+    override init(frame frameRect: NSRect) {
+        actionButton = NSButton(title: "", target: nil, action: nil)
+        super.init(frame: .zero)
+        buildViewHierarchy()
+    }
+
+    required init?(coder: NSCoder) {
+        actionButton = NSButton(title: "", target: nil, action: nil)
+        super.init(coder: coder)
+        buildViewHierarchy()
+    }
+
+    private func buildViewHierarchy() {
+        translatesAutoresizingMaskIntoConstraints = false
+
+        textStack.orientation = .vertical
+        textStack.alignment = .leading
+        textStack.spacing = 2
+        textStack.detachesHiddenViews = true
+        textStack.translatesAutoresizingMaskIntoConstraints = false
+        textStack.addArrangedSubview(titleLabel)
+        textStack.addArrangedSubview(detailLabel)
+
+        let spacer = NSView()
+        spacer.translatesAutoresizingMaskIntoConstraints = false
+        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        spacer.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        stackView.orientation = .horizontal
+        stackView.alignment = .centerY
+        stackView.spacing = 10
+        stackView.detachesHiddenViews = true
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stackView)
+        stackView.addArrangedSubview(textStack)
+        stackView.addArrangedSubview(spacer)
+        stackView.addArrangedSubview(actionButton)
+        actionButton.bezelStyle = .rounded
+        actionButton.font = .systemFont(ofSize: 12, weight: .semibold)
+        actionButton.translatesAutoresizingMaskIntoConstraints = false
+        actionButton.widthAnchor.constraint(equalToConstant: 166).isActive = true
+
+        NSLayoutConstraint.activate([
+            stackView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            stackView.topAnchor.constraint(equalTo: topAnchor),
+            stackView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            stackView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
+    }
+
+    func update(text: String, detail: String, isGranted: Bool, buttonTitle: String) {
+        titleLabel.stringValue = text
+        titleLabel.textColor = isGranted ? .systemGreen : .systemOrange
+        detailLabel.stringValue = detail
+        actionButton.title = buttonTitle
+        actionButton.contentTintColor = isGranted ? .systemBlue : nil
+    }
+}
+
+private final class PermissionSettingsCardAppKitView: AppKitSettingsCardBaseView {
+    var onShowPermissionReminderChanged: ((Bool) -> Void)?
+    var onAccessibilityAction: (() -> Void)?
+    var onScreenCaptureAction: (() -> Void)?
+
+    private let showPermissionReminderSwitch = NSSwitch()
+    private let accessibilityRow: PermissionStatusActionRowView
+    private let screenCaptureRow: PermissionStatusActionRowView
+    private var isApplyingState = false
+    private var currentState: PermissionSettingsCardState?
+
+    override init(frame frameRect: NSRect) {
+        accessibilityRow = PermissionStatusActionRowView()
+        screenCaptureRow = PermissionStatusActionRowView()
+        super.init(frame: frameRect)
+        accessibilityRow.actionButton.target = self
+        accessibilityRow.actionButton.action = #selector(handleAccessibilityAction)
+        screenCaptureRow.actionButton.target = self
+        screenCaptureRow.actionButton.action = #selector(handleScreenCaptureAction)
+        buildViewHierarchy()
+    }
+
+    required init?(coder: NSCoder) {
+        accessibilityRow = PermissionStatusActionRowView()
+        screenCaptureRow = PermissionStatusActionRowView()
+        super.init(coder: coder)
+        accessibilityRow.actionButton.target = self
+        accessibilityRow.actionButton.action = #selector(handleAccessibilityAction)
+        screenCaptureRow.actionButton.target = self
+        screenCaptureRow.actionButton.action = #selector(handleScreenCaptureAction)
+        buildViewHierarchy()
+    }
+
+    func update(with state: PermissionSettingsCardState) {
+        guard currentState != state else { return }
+        currentState = state
+
+        isApplyingState = true
+        showPermissionReminderSwitch.state = state.showPermissionReminder ? .on : .off
+        isApplyingState = false
+
+        accessibilityRow.update(
+            text: state.accessibilityStatusText,
+            detail: "用于应用切换、应用内窗口切换和最小化窗口处理。",
+            isGranted: state.accessibilityTrusted,
+            buttonTitle: state.accessibilityButtonTitle
+        )
+        screenCaptureRow.update(
+            text: state.screenCaptureStatusText,
+            detail: "用于显示窗口真实预览画面；未授权时仅显示兜底信息。",
+            isGranted: state.screenCaptureTrusted,
+            buttonTitle: state.screenCaptureButtonTitle
+        )
+        invalidateIntrinsicContentSize()
+    }
+
+    private func buildViewHierarchy() {
+        showPermissionReminderSwitch.target = self
+        showPermissionReminderSwitch.action = #selector(handleShowPermissionReminderChanged)
+
+        addFullWidthArrangedSubview(
+            AppKitSettingsCardBaseView.makeControlRow(
+                title: "无权限时是否在在首页提示获取权限",
+                control: showPermissionReminderSwitch
+            )
+        )
+        addFullWidthArrangedSubview(accessibilityRow)
+        addFullWidthArrangedSubview(screenCaptureRow)
+    }
+
+    @objc private func handleShowPermissionReminderChanged(_ sender: NSSwitch) {
+        guard !isApplyingState else { return }
+        onShowPermissionReminderChanged?(sender.state == .on)
+    }
+
+    @objc private func handleAccessibilityAction() {
+        onAccessibilityAction?()
+    }
+
+    @objc private func handleScreenCaptureAction() {
+        onScreenCaptureAction?()
+    }
+}
+
 private struct HomeLayerRowView: View {
     let title: String
     let subtitle: String
@@ -1634,34 +2949,6 @@ private struct AppSettingsView: View {
         )
     }
 
-    private var inAppWindowPrimaryModifierOptions: [SwitcherPrimaryModifier] {
-        SwitcherPrimaryModifier.allCases
-    }
-
-    private var mainUsesCommandTab: Bool {
-        hotkeyConfiguration.primaryModifier == .command && hotkeyConfiguration.mainKey == .tab
-    }
-
-    private var inAppUsesCommandTab: Bool {
-        inAppWindowHotkeyConfiguration.primaryModifier == .command
-            && inAppWindowHotkeyConfiguration.mainKey == .tab
-    }
-
-    private var commandTabTakeoverStatusText: String {
-        commandTabTakeoverActive
-            ? "已接管系统 Command + Tab / Command + Shift + Tab，退出 FlowTab 后会自动恢复。"
-            : "检测到 Command + Tab 组合：FlowTab 会自动尝试接管系统 Command + Tab / Command + Shift + Tab。"
-    }
-
-    @ViewBuilder
-    private var commandTabTakeoverStatusView: some View {
-        Text(commandTabTakeoverStatusText)
-            .font(.system(size: 12))
-            .foregroundStyle(commandTabTakeoverActive ? .green : .red)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.top, 4)
-    }
-
     private var windowLayerAutoEnterDelay: Double {
         WindowLayerPreferencesStore.normalizedAutoEnterDelay(windowLayerAutoEnterDelayRaw)
     }
@@ -1751,192 +3038,75 @@ private struct AppSettingsView: View {
 
     private var appearanceSettingsCard: some View {
         HomeSectionCard(title: "外观", subtitle: "显示与主题") {
-            VStack(alignment: .leading, spacing: 10) {
-                settingsToggleRow("显示快捷键提示", isOn: $showShortcutHint)
-
-                settingsToggleRow("显示应用窗口", isOn: $showInCommandTab)
-
-                Text("关闭后 当前应用 将仅作为菜单栏辅助应用运行。")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-
-                settingsControlRow("主题模式") {
-                    themeModeCapsuleSelector
-                }
-            }
+            AppKitAppearanceSettingsCardContent(
+                showShortcutHint: $showShortcutHint,
+                showInCommandTab: $showInCommandTab,
+                themeModeRaw: $themeModeRaw
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
     private var windowBehaviorSettingsCard: some View {
         HomeSectionCard(title: "窗口行为", subtitle: "窗口层进入与最小化处理") {
-            VStack(alignment: .leading, spacing: 10) {
-                settingsControlRow("窗口层自动进入延迟") {
-                    HStack(spacing: 8) {
-                        TextField("0.35", text: $windowLayerAutoEnterDelayText)
-                            .textFieldStyle(.roundedBorder)
-                            .font(.system(size: 12, design: .monospaced))
-                            .multilineTextAlignment(.trailing)
-                            .frame(width: 80)
-                            .focused($isWindowLayerDelayFieldFocused)
-                            .onChange(of: windowLayerAutoEnterDelayText) { _, newValue in
-                                applyWindowLayerAutoEnterDelayText(newValue)
-                            }
-                            .onSubmit {
-                                commitWindowLayerAutoEnterDelayText()
-                            }
-                        Text("秒")
-                            .font(.system(size: 12, design: .monospaced))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                settingsToggleRow("切换到最小化窗口时自动恢复打开", isOn: $autoRestoreMinimizedWindowOnSwitch)
-
-                settingsToggleRow("应用层隐藏仅最小化应用", isOn: $hideMinimizedAppsFromAppLayer)
-
-                Text("说明：该过滤依赖辅助功能权限。未授权时无法判断最小化状态，不会过滤应用层。")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-            }
+            AppKitWindowBehaviorSettingsCardContent(
+                windowLayerAutoEnterDelayText: windowLayerAutoEnterDelayText,
+                autoRestoreMinimizedWindowOnSwitch: $autoRestoreMinimizedWindowOnSwitch,
+                hideMinimizedAppsFromAppLayer: $hideMinimizedAppsFromAppLayer,
+                onWindowLayerAutoEnterDelayTextChanged: applyWindowLayerAutoEnterDelayText,
+                onWindowLayerAutoEnterDelayTextCommitted: commitWindowLayerAutoEnterDelayText
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
     private var hotkeySettingsCard: some View {
         HomeSectionCard(title: "快捷键", subtitle: "主切换与结束应用按键") {
-            VStack(alignment: .leading, spacing: 10) {
-                settingsControlRow("主修饰键") {
-                    Picker("主修饰键", selection: $hotkeyPrimaryModifierRaw) {
-                        ForEach(SwitcherPrimaryModifier.allCases) { modifier in
-                            Text(modifier.displayName).tag(modifier.rawValue)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(width: 160)
-                }
-
-                settingsControlRow("主切换按键") {
-                    Picker("主切换按键", selection: $hotkeyMainKeyRaw) {
-                        ForEach(SwitcherHotkeyKey.allCases) { key in
-                            Text(key.displayName).tag(key.rawValue)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(width: 160)
-                }
-
-                settingsControlRow("结束应用按键") {
-                    Picker("结束应用按键", selection: $hotkeyQuitKeyRaw) {
-                        ForEach(SwitcherHotkeyKey.allCases) { key in
-                            Text(key.displayName).tag(key.rawValue)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(width: 160)
-                }
-
-                Text(
-                    "当前：\(hotkeyConfiguration.mainShortcutText)"
-                        + "（反向：\(hotkeyConfiguration.backwardShortcutText)）"
-                        + "，结束应用：\(hotkeyConfiguration.quitShortcutText)"
-                )
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-
-                if mainUsesCommandTab {
-                    commandTabTakeoverStatusView
-                }
-
-                Divider()
-                    .padding(.vertical, 4)
-
-                Group {
-                    settingsControlRow("应用内窗口修饰键") {
-                        Picker("应用内窗口修饰键", selection: $inAppWindowHotkeyPrimaryModifierRaw) {
-                            ForEach(inAppWindowPrimaryModifierOptions) { modifier in
-                                Text(modifier.displayName).tag(modifier.rawValue)
-                            }
-                        }
-                        .labelsHidden()
-                        .pickerStyle(.menu)
-                        .frame(width: 160)
-                    }
-
-                    settingsControlRow("应用内窗口按键") {
-                        Picker("应用内窗口按键", selection: $inAppWindowHotkeyMainKeyRaw) {
-                            ForEach(SwitcherHotkeyKey.allCases) { key in
-                                Text(key.displayName).tag(key.rawValue)
-                            }
-                        }
-                        .labelsHidden()
-                        .pickerStyle(.menu)
-                        .frame(width: 160)
-                    }
-                }
-                .disabled(!accessibilityTrusted)
-
-                Text(
-                    "应用内窗口：\(inAppWindowHotkeyConfiguration.mainShortcutText)"
-                        + "（反向：\(inAppWindowHotkeyConfiguration.backwardShortcutText)）"
-                )
-                .font(.system(size: 12))
-                .foregroundStyle(.secondary)
-
-                if inAppUsesCommandTab {
-                    commandTabTakeoverStatusView
-                }
-            }
+            AppKitHotkeySettingsCardContent(
+                hotkeyPrimaryModifierRaw: $hotkeyPrimaryModifierRaw,
+                hotkeyMainKeyRaw: $hotkeyMainKeyRaw,
+                hotkeyQuitKeyRaw: $hotkeyQuitKeyRaw,
+                inAppWindowHotkeyPrimaryModifierRaw: $inAppWindowHotkeyPrimaryModifierRaw,
+                inAppWindowHotkeyMainKeyRaw: $inAppWindowHotkeyMainKeyRaw,
+                commandTabTakeoverActive: commandTabTakeoverActive,
+                accessibilityTrusted: accessibilityTrusted
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
     private var searchSettingsCard: some View {
         HomeSectionCard(title: "搜索", subtitle: "搜索开关、范围与交互说明") {
-            VStack(alignment: .leading, spacing: 10) {
-                settingsToggleRow("启用搜索功能", isOn: $searchEnabled)
-
-                settingsControlRow("默认搜索范围") {
-                    Picker("默认搜索范围", selection: $searchDefaultScopeRaw) {
-                        ForEach(SwitcherSearchScope.allCases, id: \.rawValue) { scope in
-                            Text(scope.label).tag(scope.rawValue)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(width: 160)
-                }
-                .disabled(!searchEnabled)
-                .opacity(searchEnabled ? 1 : 0.5)
-
-                Text(searchEnabled ? "面板默认从应用层开始；按 Enter 或 ↑ 进入搜索。" : "已关闭搜索：面板仅显示应用层与窗口层。")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-            }
+            AppKitSearchSettingsCardContent(
+                searchEnabled: $searchEnabled,
+                searchDefaultScopeRaw: $searchDefaultScopeRaw
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
     private var permissionSettingsCard: some View {
         HomeSectionCard(title: "权限", subtitle: "辅助功能与屏幕录制") {
-            VStack(alignment: .leading, spacing: 10) {
-                settingsToggleRow("无权限时是否在在首页提示获取权限", isOn: $showPermissionReminder)
-
-                permissionStatusActionRow(
-                    text: accessibilityTrusted ? "辅助功能权限：已授权" : "辅助功能权限：未授权",
-                    detail: "用于应用切换、应用内窗口切换和最小化窗口处理。",
-                    isGranted: accessibilityTrusted
-                ) {
-                    requestAccessibilityPermissionButton
+            AppKitPermissionSettingsCardContent(
+                showPermissionReminder: $showPermissionReminder,
+                accessibilityTrusted: accessibilityTrusted,
+                screenCaptureTrusted: screenCaptureTrusted,
+                onAccessibilityAction: {
+                    if accessibilityTrusted {
+                        openAccessibilityPrivacySettings()
+                    } else {
+                        requestAccessibilityPermission()
+                    }
+                },
+                onScreenCaptureAction: {
+                    if screenCaptureTrusted {
+                        openScreenCapturePrivacySettings()
+                    } else {
+                        requestScreenCapturePermission()
+                    }
                 }
-
-                permissionStatusActionRow(
-                    text: screenCaptureTrusted ? "屏幕录制权限：已授权" : "屏幕录制权限：未授权",
-                    detail: "用于显示窗口真实预览画面；未授权时仅显示兜底信息。",
-                    isGranted: screenCaptureTrusted
-                ) {
-                    requestScreenCapturePermissionButton
-                }
-            }
+            )
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
