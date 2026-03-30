@@ -198,6 +198,25 @@ cd FlowTabCore
 swift test
 ```
 
+### 性能压测（必跑）
+
+涉及以下范围的修改时，提交前必须执行一次 tab 切换压测并记录结果（至少包含 `CPU avg/peak`、`RSS avg/peak`）：
+- 左侧 tab 切换相关逻辑或 UI 结构（home / logs / settings）
+- 页面生命周期相关状态管理（如 `onAppear` / `onDisappear` / `@StateObject` 保活策略）
+- 日志页展示逻辑（含“清空展示但保留文件”的边界行为）
+
+压测命令（参数分别为：持续秒数、切换间隔毫秒、采样间隔秒）：
+
+```bash
+./scripts/tab-switch-stress.sh 20 20 0.5
+```
+
+建议同时补一组较低频切换对照数据：
+
+```bash
+./scripts/tab-switch-stress.sh 20 50 0.5
+```
+
 ## Release 安装到 /Applications
 
 ```bash

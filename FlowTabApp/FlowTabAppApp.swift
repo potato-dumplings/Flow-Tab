@@ -306,6 +306,52 @@ final class HomeTabState: ObservableObject {
     private init() {}
 }
 
+@MainActor
+private final class TabSwitchStressRunner {
+    static let shared = TabSwitchStressRunner()
+
+    private var task: Task<Void, Never>?
+
+    private init() {}
+
+    func startIfNeeded() {
+        guard task == nil else { return }
+        let arguments = ProcessInfo.processInfo.arguments
+        guard arguments.contains("--flowtab-tab-stress") else { return }
+
+        let durationSeconds = max(
+            1,
+            Double(argumentValue(after: "--flowtab-tab-stress-duration", in: arguments) ?? "") ?? 30
+        )
+        let intervalMilliseconds = max(
+            1,
+            Double(argumentValue(after: "--flowtab-tab-stress-interval-ms", in: arguments) ?? "") ?? 20
+        )
+        let sleepNanoseconds = UInt64(intervalMilliseconds * 1_000_000)
+        let endTime = Date().addingTimeInterval(durationSeconds)
+
+        task = Task { @MainActor in
+            defer { self.task = nil }
+
+            let cycle: [HomeTab] = [.home, .logs, .settings]
+            var index = 0
+            while Date() < endTime {
+                HomeTabState.shared.selectedTab = cycle[index % cycle.count]
+                index += 1
+                try? await Task.sleep(nanoseconds: sleepNanoseconds)
+            }
+            NSApp.terminate(nil)
+        }
+    }
+
+    private func argumentValue(after flag: String, in arguments: [String]) -> String? {
+        guard let index = arguments.firstIndex(of: flag) else { return nil }
+        let nextIndex = arguments.index(after: index)
+        guard nextIndex < arguments.endIndex else { return nil }
+        return arguments[nextIndex]
+    }
+}
+
 enum AppWindowCoordinator {
     static func openHome() {
         Task { @MainActor in
@@ -478,6 +524,17 @@ private struct HomeSidebar: View {
         (.settings, "设置", "gearshape")
     ]
 
+    private func sidebarButtonIdentifier(for tab: HomeTab) -> String {
+        switch tab {
+        case .home:
+            return "flowtab.sidebar.tab.home"
+        case .logs:
+            return "flowtab.sidebar.tab.logs"
+        case .settings:
+            return "flowtab.sidebar.tab.settings"
+        }
+    }
+
     var body: some View {
         ZStack {
             sidebarBackgroundColor
@@ -557,6 +614,7 @@ private struct HomeSidebar: View {
         }
         .buttonStyle(.plain)
         .frame(maxWidth: .infinity)
+        .accessibilityIdentifier(sidebarButtonIdentifier(for: tab))
     }
 }
 
@@ -672,6 +730,7 @@ private struct HomeLandingView: View {
         .onDisappear {
             teardownActiveState()
         }
+        .accessibilityIdentifier("flowtab.tab.home.content")
     }
 
     private var permissionGuideBanner: some View {
@@ -1490,6 +1549,7 @@ private struct AppLogsView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .accessibilityIdentifier("flowtab.tab.logs.content")
     }
 }
 
@@ -1939,6 +1999,7 @@ private struct AppSettingsView: View {
         .onDisappear {
             cancelPermissionPolling()
         }
+        .accessibilityIdentifier("flowtab.tab.settings.content")
     }
 
     private func handleVisibilityChanged(_ active: Bool) {
@@ -2254,15 +2315,18 @@ private struct AppSettingsView: View {
 private final class RuntimeLogLinesViewModel: ObservableObject {
     @Published private(set) var lines: [String] = []
 
+    private static var persistedClearSnapshot: RuntimeLogFileStore.ReadSnapshot?
+
     private let lineLimit = 300
     private let refreshIntervalNs: UInt64 = 1_000_000_000
     private var refreshTask: Task<Void, Never>?
-    private var clearSnapshot: RuntimeLogFileStore.ReadSnapshot?
 
-    func start(minimumLevel: RuntimeLogLevel, resetSnapshot: Bool = false) {
-        if resetSnapshot {
-            clearSnapshot = nil
-        }
+    private var clearSnapshot: RuntimeLogFileStore.ReadSnapshot? {
+        get { Self.persistedClearSnapshot }
+        set { Self.persistedClearSnapshot = newValue }
+    }
+
+    func start(minimumLevel: RuntimeLogLevel) {
         stop()
         refreshTask = Task { [weak self] in
             guard let self else { return }
@@ -2425,7 +2489,7 @@ private struct RuntimeLogsSection: View {
         }
         .onAppear {
             synchronizeLogLevelIfNeeded()
-            logsViewModel.start(minimumLevel: selectedLogLevel, resetSnapshot: true)
+            logsViewModel.start(minimumLevel: selectedLogLevel)
         }
         .onChange(of: runtimeLogLevelRaw) { _, newValue in
             let resolved = RuntimeLogPreferencesStore.resolve(rawValue: newValue)
@@ -2465,6 +2529,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         installStatusItem()
         requestAccessibilityPermissionIfNeeded()
         AppWindowCoordinator.openHome()
+        TabSwitchStressRunner.shared.startIfNeeded()
     }
 
     private func requestAccessibilityPermissionIfNeeded() {

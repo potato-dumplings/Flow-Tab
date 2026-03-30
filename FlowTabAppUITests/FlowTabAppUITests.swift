@@ -8,26 +8,25 @@
 import XCTest
 
 final class FlowTabAppUITests: XCTestCase {
+    private enum Identifier {
+        static let homeTabButton = "flowtab.sidebar.tab.home"
+        static let logsTabButton = "flowtab.sidebar.tab.logs"
+        static let settingsTabButton = "flowtab.sidebar.tab.settings"
+        static let homeTabContent = "flowtab.tab.home.content"
+        static let logsTabContent = "flowtab.tab.logs.content"
+        static let settingsTabContent = "flowtab.tab.settings.content"
+    }
 
     override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
-
-        // In UI tests it is usually best to stop immediately when a failure occurs.
         continueAfterFailure = false
-
-        // In UI tests it’s important to set the initial state - such as interface orientation - required for your tests before they run. The setUp method is a good place to do this.
     }
 
     override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
     }
 
     func testExample() throws {
-        // UI tests must launch the application that they test.
         let app = XCUIApplication()
         app.launch()
-
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
     }
 
     func testLaunchPerformance() throws {
@@ -37,5 +36,75 @@ final class FlowTabAppUITests: XCTestCase {
                 XCUIApplication().launch()
             }
         }
+    }
+
+    func testTabSwitchStressCPUAndMemory() throws {
+        let app = XCUIApplication()
+        app.launchArguments += [
+            "-showPermissionReminder",
+            "NO"
+        ]
+        app.launch()
+
+        let homeButton = sidebarButton(
+            app: app,
+            identifier: Identifier.homeTabButton,
+            fallbackLabelContains: "首页"
+        )
+        let logsButton = sidebarButton(
+            app: app,
+            identifier: Identifier.logsTabButton,
+            fallbackLabelContains: "日志"
+        )
+        let settingsButton = sidebarButton(
+            app: app,
+            identifier: Identifier.settingsTabButton,
+            fallbackLabelContains: "设置"
+        )
+        let homeContent = app.staticTexts["应用层"]
+        let logsContent = app.staticTexts["运行日志查看与清理"]
+        let settingsContent = app.staticTexts["基础显示设置、快捷键与权限"]
+
+        XCTAssertTrue(homeContent.waitForExistence(timeout: 5))
+
+        for _ in 0..<20 {
+            switchToTab(button: logsButton, content: logsContent)
+            switchToTab(button: settingsButton, content: settingsContent)
+            switchToTab(button: homeButton, content: homeContent)
+        }
+
+        let options = XCTMeasureOptions()
+        options.iterationCount = 5
+
+        measure(metrics: [XCTClockMetric(), XCTCPUMetric(), XCTMemoryMetric()], options: options) {
+            for _ in 0..<60 {
+                switchToTab(button: logsButton, content: logsContent)
+                switchToTab(button: settingsButton, content: settingsContent)
+                switchToTab(button: homeButton, content: homeContent)
+            }
+        }
+    }
+
+    private func switchToTab(button: XCUIElement, content: XCUIElement) {
+        button.tap()
+        XCTAssertTrue(content.waitForExistence(timeout: 1.5))
+    }
+
+    private func sidebarButton(
+        app: XCUIApplication,
+        identifier: String,
+        fallbackLabelContains labelPart: String
+    ) -> XCUIElement {
+        let byIdentifier = app.buttons[identifier]
+        if byIdentifier.waitForExistence(timeout: 5) {
+            return byIdentifier
+        }
+
+        let byLabel = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", labelPart)).firstMatch
+        XCTAssertTrue(
+            byLabel.waitForExistence(timeout: 5),
+            "Unable to locate sidebar tab button for \(labelPart)"
+        )
+        return byLabel
     }
 }
