@@ -366,7 +366,6 @@ final class RuntimeSnapshotProvider {
         )
         guard !appLayerCandidates.isEmpty else { return [] }
 
-        let now = Date.timeIntervalSinceReferenceDate
         var summaries: [RuntimeHomeAppSummary] = []
         summaries.reserveCapacity(appLayerCandidates.count)
         for (index, app) in appLayerCandidates.enumerated() {
@@ -379,7 +378,7 @@ final class RuntimeSnapshotProvider {
                     appID: appID,
                     displayName: displayName,
                     groupID: Self.groupID(for: app.bundleIdentifier, fallbackName: displayName),
-                    lastActiveAt: now - Double(rank),
+                    lastActiveAt: Self.stableLastActiveValue(forRank: rank),
                     windowCount: windowStatsByPID[pid]?.windowCount ?? 0,
                     pid: pid
                 )
@@ -470,7 +469,7 @@ final class RuntimeSnapshotProvider {
             appID: appID,
             displayName: displayName,
             groupID: Self.groupID(for: app.bundleIdentifier, fallbackName: displayName),
-            lastActiveAt: now - Double(rank),
+            lastActiveAt: Self.stableLastActiveValue(forRank: rank),
             windowCount: windows.count,
             pid: app.processIdentifier
         )
@@ -513,14 +512,13 @@ final class RuntimeSnapshotProvider {
             return nil
         }
 
-        let now = Date.timeIntervalSinceReferenceDate
         let displayName = app.localizedName ?? appID
         let rank = rankByPID[app.processIdentifier] ?? 10_000
         return RuntimeHomeAppSummary(
             appID: appID,
             displayName: displayName,
             groupID: Self.groupID(for: app.bundleIdentifier, fallbackName: displayName),
-            lastActiveAt: now - Double(rank),
+            lastActiveAt: Self.stableLastActiveValue(forRank: rank),
             windowCount: windowStatsByPID[app.processIdentifier]?.windowCount ?? 0,
             pid: app.processIdentifier
         )
@@ -883,6 +881,10 @@ final class RuntimeSnapshotProvider {
     private static func baseAppID(for app: NSRunningApplication) -> String {
         let pid = app.processIdentifier
         return app.bundleIdentifier ?? "pid:\(pid)"
+    }
+
+    private static func stableLastActiveValue(forRank rank: Int) -> TimeInterval {
+        -Double(max(rank, 0))
     }
 }
 
