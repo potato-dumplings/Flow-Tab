@@ -1,5 +1,6 @@
 import AppKit
 import Carbon
+import CoreGraphics
 import SwiftUI
 import FlowTabCore
 
@@ -71,6 +72,7 @@ final class SwitcherPanelController {
     private let searchResultVisibleRowLimit: Int = 8
     private let searchHeaderHeight: CGFloat = 62
     private var activeHotkeySessionKind: HotkeySessionKind?
+    private var activePresentationScreen: NSScreen?
 
     private var searchFeatureEnabled: Bool {
         SearchInteractionPreferencesStore.loadIsEnabled()
@@ -287,9 +289,11 @@ final class SwitcherPanelController {
         lastCommittedTabAdvanceTimestamp = nil
         RuntimeLog.info("Session", "start direction=\(direction.debugName) \(self.model.debugSelectionSummary())")
 
-        updatePanelSize()
-
-        centerPanelOnActiveScreen()
+        let targetScreen = resolveActivePresentationScreen()
+        activePresentationScreen = targetScreen
+        logPanelPresentationScreen(targetScreen, trigger: "global_show")
+        updatePanelSize(for: targetScreen)
+        centerPanelOnActiveScreen(preferredScreen: targetScreen)
         hideNonPanelWindows()
         NSRunningApplication.current.activate(options: [.activateIgnoringOtherApps])
         panel.makeKeyAndOrderFront(nil)
@@ -308,9 +312,11 @@ final class SwitcherPanelController {
         lastCommittedTabAdvanceTimestamp = nil
         RuntimeLog.info("Session", "start in-app direction=\(direction.debugName) \(self.model.debugSelectionSummary())")
 
-        updatePanelSize()
-
-        centerPanelOnActiveScreen()
+        let targetScreen = resolveActivePresentationScreen()
+        activePresentationScreen = targetScreen
+        logPanelPresentationScreen(targetScreen, trigger: "in_app_show")
+        updatePanelSize(for: targetScreen)
+        centerPanelOnActiveScreen(preferredScreen: targetScreen)
         hideNonPanelWindows()
         NSRunningApplication.current.activate(options: [.activateIgnoringOtherApps])
         panel.makeKeyAndOrderFront(nil)
@@ -319,11 +325,14 @@ final class SwitcherPanelController {
         scheduleDelayedWindowLayerEntryIfNeeded()
     }
 
-    private func centerPanelOnActiveScreen() {
-        let mouseLocation = NSEvent.mouseLocation
-        let targetScreen = NSScreen.screens.first { NSMouseInRect(mouseLocation, $0.frame, false) }
-            ?? NSScreen.main
+    private func centerPanelOnActiveScreen(preferredScreen: NSScreen? = nil) {
+        let targetScreen = preferredScreen
+            ?? resolveActivePresentationScreen()
+            ?? activePresentationScreen
             ?? panel.screen
+            ?? NSScreen.main
+            ?? NSScreen.screens.first
+        activePresentationScreen = targetScreen
         guard let targetScreen else {
             panel.center()
             return
@@ -336,6 +345,63 @@ final class SwitcherPanelController {
             y: frame.midY - panelSize.height / 2
         )
         panel.setFrameOrigin(origin)
+    }
+
+    private func resolveActivePresentationScreen() -> NSScreen? {
+        let mouseLocation = NSEvent.mouseLocation
+        if let mouseScreen = NSScreen.screens.first(where: { NSMouseInRect(mouseLocation, $0.frame, false) }) {
+            return mouseScreen
+        }
+        return panel.screen
+            ?? activePresentationScreen
+            ?? NSScreen.main
+            ?? NSScreen.screens.first
+    }
+
+    private func resolveSizingScreen(preferredScreen: NSScreen? = nil) -> NSScreen? {
+        preferredScreen
+            ?? activePresentationScreen
+            ?? panel.screen
+            ?? NSScreen.main
+            ?? NSScreen.screens.first
+    }
+
+    private func displayID(for screen: NSScreen) -> CGDirectDisplayID? {
+        guard
+            let screenNumber = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
+        else {
+            return nil
+        }
+        return CGDirectDisplayID(screenNumber.uint32Value)
+    }
+
+    private func formatRect(_ rect: CGRect) -> String {
+        String(
+            format: "(x:%.1f y:%.1f w:%.1f h:%.1f)",
+            rect.origin.x,
+            rect.origin.y,
+            rect.size.width,
+            rect.size.height
+        )
+    }
+
+    private func logPanelPresentationScreen(_ screen: NSScreen?, trigger: String) {
+        guard let screen else {
+            RuntimeLog.info("PanelLayout", "presentationScreen trigger=\(trigger) unavailable")
+            return
+        }
+        var displayIDText = "displayID=unknown"
+        var displayTypeText = "displayType=unknown"
+        var pixelSizeText = "pixelSize=unknown"
+        if let displayID = displayID(for: screen) {
+            displayIDText = "displayID=\(displayID)"
+            displayTypeText = "displayType=\(CGDisplayIsBuiltin(displayID) != 0 ? "builtIn" : "external")"
+            pixelSizeText = "pixelSize=\(CGDisplayPixelsWide(displayID))x\(CGDisplayPixelsHigh(displayID))"
+        }
+        RuntimeLog.info(
+            "PanelLayout",
+            "presentationScreen trigger=\(trigger) \(displayIDText) \(displayTypeText) frame=\(formatRect(screen.frame)) visibleFrame=\(formatRect(screen.visibleFrame)) scale=\(String(format: "%.2f", screen.backingScaleFactor)) \(pixelSizeText)"
+        )
     }
 
     private func hideNonPanelWindows() {
@@ -353,6 +419,7 @@ final class SwitcherPanelController {
         removeEventMonitors()
         panel.orderOut(nil)
         activeHotkeySessionKind = nil
+        activePresentationScreen = nil
         lastCommittedTabAdvanceTimestamp = nil
         ignoreHotkeyPressesUntil = ProcessInfo.processInfo.systemUptime + postFinishHotkeyIgnoreWindow
         logInputTrace(
@@ -366,6 +433,7 @@ final class SwitcherPanelController {
         removeEventMonitors()
         panel.orderOut(nil)
         activeHotkeySessionKind = nil
+        activePresentationScreen = nil
         lastCommittedTabAdvanceTimestamp = nil
         ignoreHotkeyPressesUntil = ProcessInfo.processInfo.systemUptime + postFinishHotkeyIgnoreWindow
         logInputTrace(
@@ -374,9 +442,8 @@ final class SwitcherPanelController {
         model.cancelSelection()
     }
 
-    private func updatePanelSize() {
-        let visibleFrame = panel.screen?.visibleFrame
-            ?? NSScreen.main?.visibleFrame
+    private func updatePanelSize(for preferredScreen: NSScreen? = nil) {
+        let visibleFrame = resolveSizingScreen(preferredScreen: preferredScreen)?.visibleFrame
             ?? CGRect(x: 0, y: 0, width: 1440, height: 900)
         if model.isWindowOnlyOverlay {
             let width = max(640, visibleFrame.width - windowOnlyOverlayScreenMargin)
@@ -1001,6 +1068,7 @@ final class SwitcherPanelController {
             removeEventMonitors()
             panel.orderOut(nil)
             activeHotkeySessionKind = nil
+            activePresentationScreen = nil
         }
     }
 
