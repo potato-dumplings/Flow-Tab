@@ -334,6 +334,55 @@ final class FlowTabTests: XCTestCase {
         XCTAssertTrue(customPreferences.autoRestoreMinimizedWindowOnSwitch)
     }
 
+    @MainActor
+    func testStatusItemOpenActionUnhidesAndRestoresFirstRegularWindow() {
+        let panelWindow = TestAppWindow(isPanelWindow: true, isMiniaturized: true)
+        let mainWindow = TestAppWindow(isPanelWindow: false, isMiniaturized: true)
+        let application = TestAppWindowApplication(
+            isHidden: true,
+            appWindows: [panelWindow, mainWindow]
+        )
+
+        let delegate = AppDelegate()
+        delegate.handleStatusItemOpenAction(application: application)
+
+        XCTAssertEqual(application.activateCallCount, 1)
+        XCTAssertEqual(application.lastActivateIgnoringOtherApps, true)
+        XCTAssertEqual(application.unhideCallCount, 1)
+        XCTAssertEqual(application.showSettingsWindowActionCount, 0)
+        XCTAssertFalse(application.isHidden)
+
+        XCTAssertEqual(panelWindow.deminiaturizeCallCount, 0)
+        XCTAssertEqual(panelWindow.makeKeyAndOrderFrontCallCount, 0)
+        XCTAssertEqual(panelWindow.orderFrontRegardlessCallCount, 0)
+
+        XCTAssertEqual(mainWindow.deminiaturizeCallCount, 1)
+        XCTAssertEqual(mainWindow.makeKeyAndOrderFrontCallCount, 1)
+        XCTAssertEqual(mainWindow.orderFrontRegardlessCallCount, 1)
+        XCTAssertFalse(mainWindow.isMiniaturized)
+    }
+
+    @MainActor
+    func testStatusItemOpenActionOpensHomeSceneWhenNoRegularWindowExists() {
+        let panelWindow = TestAppWindow(isPanelWindow: true, isMiniaturized: false)
+        let application = TestAppWindowApplication(
+            isHidden: false,
+            appWindows: [panelWindow]
+        )
+
+        let delegate = AppDelegate()
+        delegate.handleStatusItemOpenAction(application: application)
+
+        XCTAssertEqual(application.activateCallCount, 1)
+        XCTAssertEqual(application.lastActivateIgnoringOtherApps, true)
+        XCTAssertEqual(application.unhideCallCount, 0)
+        XCTAssertEqual(application.showSettingsWindowActionCount, 1)
+
+        XCTAssertEqual(panelWindow.deminiaturizeCallCount, 0)
+        XCTAssertEqual(panelWindow.makeKeyAndOrderFrontCallCount, 0)
+        XCTAssertEqual(panelWindow.orderFrontRegardlessCallCount, 0)
+    }
+
     func testRuntimeDiagnosticsReadRecentLinesAppliesMinimumLevelFilter() async {
         await resetRuntimeLogsForTest()
 
@@ -918,5 +967,62 @@ final class FlowTabTests: XCTestCase {
     private func resetRuntimeLogsForTest() async {
         RuntimeDiagnostics.shared.clear()
         _ = await RuntimeDiagnostics.shared.makeReadSnapshot()
+    }
+}
+
+private final class TestAppWindow: AppWindowOpeningWindow {
+    let isPanelWindow: Bool
+    var isMiniaturized: Bool
+
+    private(set) var deminiaturizeCallCount = 0
+    private(set) var makeKeyAndOrderFrontCallCount = 0
+    private(set) var orderFrontRegardlessCallCount = 0
+
+    init(isPanelWindow: Bool, isMiniaturized: Bool) {
+        self.isPanelWindow = isPanelWindow
+        self.isMiniaturized = isMiniaturized
+    }
+
+    func deminiaturize(_ sender: Any?) {
+        deminiaturizeCallCount += 1
+        isMiniaturized = false
+    }
+
+    func makeKeyAndOrderFront(_ sender: Any?) {
+        makeKeyAndOrderFrontCallCount += 1
+    }
+
+    func orderFrontRegardless() {
+        orderFrontRegardlessCallCount += 1
+    }
+}
+
+private final class TestAppWindowApplication: AppWindowOpeningApplication {
+    var isHidden: Bool
+    let appWindows: [any AppWindowOpeningWindow]
+
+    private(set) var activateCallCount = 0
+    private(set) var lastActivateIgnoringOtherApps: Bool?
+    private(set) var unhideCallCount = 0
+    private(set) var showSettingsWindowActionCount = 0
+
+    init(isHidden: Bool, appWindows: [any AppWindowOpeningWindow]) {
+        self.isHidden = isHidden
+        self.appWindows = appWindows
+    }
+
+    func activate(ignoringOtherApps flag: Bool) {
+        activateCallCount += 1
+        lastActivateIgnoringOtherApps = flag
+    }
+
+    func unhide(_ sender: Any?) {
+        unhideCallCount += 1
+        isHidden = false
+    }
+
+    func sendShowSettingsWindowAction() -> Bool {
+        showSettingsWindowActionCount += 1
+        return true
     }
 }

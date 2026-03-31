@@ -81,6 +81,40 @@ extension Notification.Name {
     )
 }
 
+protocol AppWindowOpeningWindow: AnyObject {
+    var isPanelWindow: Bool { get }
+    var isMiniaturized: Bool { get }
+
+    func deminiaturize(_ sender: Any?)
+    func makeKeyAndOrderFront(_ sender: Any?)
+    func orderFrontRegardless()
+}
+
+protocol AppWindowOpeningApplication: AnyObject {
+    var isHidden: Bool { get }
+    var appWindows: [any AppWindowOpeningWindow] { get }
+
+    func activate(ignoringOtherApps flag: Bool)
+    func unhide(_ sender: Any?)
+    func sendShowSettingsWindowAction() -> Bool
+}
+
+extension NSWindow: AppWindowOpeningWindow {
+    var isPanelWindow: Bool {
+        self is NSPanel
+    }
+}
+
+extension NSApplication: AppWindowOpeningApplication {
+    var appWindows: [any AppWindowOpeningWindow] {
+        windows.map { $0 }
+    }
+
+    func sendShowSettingsWindowAction() -> Bool {
+        sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+    }
+}
+
 @MainActor
 final class SystemThemeState: ObservableObject {
     static let shared = SystemThemeState()
@@ -413,13 +447,24 @@ enum AppWindowCoordinator {
 
     @MainActor
     static func activateMainWindowOrOpenHomeScene() {
-        NSApp.activate(ignoringOtherApps: true)
-        if let window = NSApp.windows.first(where: { !($0 is NSPanel) }) {
+        activateMainWindowOrOpenHomeScene(application: NSApp)
+    }
+
+    @MainActor
+    static func activateMainWindowOrOpenHomeScene(application: any AppWindowOpeningApplication) {
+        application.activate(ignoringOtherApps: true)
+        if application.isHidden {
+            application.unhide(nil)
+        }
+        if let window = application.appWindows.first(where: { !$0.isPanelWindow }) {
+            if window.isMiniaturized {
+                window.deminiaturize(nil)
+            }
             window.makeKeyAndOrderFront(nil)
             window.orderFrontRegardless()
             return
         }
-        _ = NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        _ = application.sendShowSettingsWindowAction()
     }
 }
 
@@ -4991,13 +5036,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc
     private func openAppFromStatusItem() {
-        NSApp.activate(ignoringOtherApps: true)
-        if NSApp.isHidden {
-            NSApp.unhide(nil)
-        }
-        if let mainWindow = NSApp.windows.first(where: { !($0 is NSPanel) }), mainWindow.isMiniaturized {
-            mainWindow.deminiaturize(nil)
-        }
+        handleStatusItemOpenAction(application: NSApp)
+    }
+
+    func handleStatusItemOpenAction(application: any AppWindowOpeningApplication) {
+        AppWindowCoordinator.activateMainWindowOrOpenHomeScene(application: application)
     }
 }
 
