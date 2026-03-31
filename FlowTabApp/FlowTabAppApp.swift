@@ -4007,6 +4007,7 @@ private struct AppSettingsView: View {
     private var windowLayerAutoEnterDelayRaw = WindowLayerPreferencesStore.defaultAutoEnterDelay
     @State private var accessibilityTrusted = AXIsProcessTrusted()
     @State private var screenCaptureTrusted = ScreenCapturePermissionChecker.hasScreenCapturePermission
+    @State private var hasAttemptedScreenCapturePermissionRequest = false
     @State private var accessibilityPermissionPollTask: Task<Void, Never>?
     @State private var screenCapturePollTask: Task<Void, Never>?
     @State private var windowLayerAutoEnterDelayText = ""
@@ -4190,7 +4191,27 @@ private struct AppSettingsView: View {
         )
         refreshScreenCaptureStatus()
         if !trusted {
+            // Screen capture prompts are often one-shot after denial; keep first click as request, then route later clicks.
+            if hasAttemptedScreenCapturePermissionRequest {
+                presentScreenCapturePermissionReminder()
+            } else {
+                hasAttemptedScreenCapturePermissionRequest = true
+            }
             startScreenCapturePermissionPolling()
+        } else {
+            hasAttemptedScreenCapturePermissionRequest = false
+        }
+    }
+
+    private func presentScreenCapturePermissionReminder() {
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = "屏幕录制权限已被拒绝"
+        alert.informativeText = "macOS 不会再次弹出授权窗口。请前往系统设置的“隐私与安全性-屏幕录制”中手动开启权限。"
+        alert.addButton(withTitle: "打开系统设置")
+        alert.addButton(withTitle: "稍后")
+        if alert.runModal() == .alertFirstButtonReturn {
+            openScreenCapturePrivacySettings()
         }
     }
 
@@ -4220,7 +4241,11 @@ private struct AppSettingsView: View {
     }
 
     private func refreshScreenCaptureStatus() {
-        screenCaptureTrusted = ScreenCapturePermissionChecker.hasScreenCapturePermission
+        let trusted = ScreenCapturePermissionChecker.hasScreenCapturePermission
+        screenCaptureTrusted = trusted
+        if trusted {
+            hasAttemptedScreenCapturePermissionRequest = false
+        }
     }
 
     private func enforceHotkeyConsistency() {
