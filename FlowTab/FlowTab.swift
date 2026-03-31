@@ -2643,7 +2643,7 @@ private final class FlowFormSelectMenuViewController: NSViewController {
     }
 }
 
-private final class FlowFormSelectControl: NSView {
+private final class FlowFormSelectControl: NSView, NSPopoverDelegate {
     var onSelectionChanged: ((String) -> Void)?
 
     var isEnabled = true {
@@ -2760,6 +2760,7 @@ private final class FlowFormSelectControl: NSView {
         setContentHuggingPriority(.required, for: .vertical)
         setContentCompressionResistancePriority(.required, for: .vertical)
         heightAnchor.constraint(equalToConstant: 32).isActive = true
+        popover.delegate = self
 
         titleLabel.font = .systemFont(ofSize: 13)
         titleLabel.lineBreakMode = .byTruncatingTail
@@ -2795,6 +2796,10 @@ private final class FlowFormSelectControl: NSView {
         if hasChanged {
             onSelectionChanged?(id)
         }
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        updateAppearance()
     }
 
     private func updateDisplayTitle() {
