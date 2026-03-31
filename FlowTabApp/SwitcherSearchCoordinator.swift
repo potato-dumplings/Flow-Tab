@@ -8,9 +8,9 @@ enum SwitcherSearchScope: String, CaseIterable, Equatable, Sendable {
     var label: String {
         switch self {
         case .app:
-            return "应用"
+            return AppStrings.text(.searchScopeApp)
         case .window:
-            return "窗口"
+            return AppStrings.text(.searchScopeWindow)
         }
     }
 }

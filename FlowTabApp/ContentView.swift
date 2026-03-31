@@ -12,6 +12,8 @@ struct ContentView: View {
     private var hotkeyMainKeyRaw = SwitcherHotkeyPreferencesStore.defaultMainKey.rawValue
     @AppStorage(AppPreferenceKeys.hotkeyQuitKey)
     private var hotkeyQuitKeyRaw = SwitcherHotkeyPreferencesStore.defaultQuitKey.rawValue
+    @AppStorage(AppPreferenceKeys.appLanguage)
+    private var appLanguageRaw = AppLanguagePreferencesStore.defaultLanguage.rawValue
 
     private var themeMode: ThemeMode {
         ThemePreferencesStore.resolve(rawValue: themeModeRaw)
@@ -38,8 +40,13 @@ struct ContentView: View {
                 Text("FlowTab")
                     .font(.system(size: 28, weight: .semibold, design: .rounded))
                 Text(
-                    "应用在后台运行，按 \(hotkeyConfiguration.mainShortcutText) 呼出切换面板，"
-                        + "按住 \(hotkeyConfiguration.quitShortcutText) 结束当前所选应用"
+                    AppStrings.text(
+                        .contentViewHint,
+                        replacements: [
+                            "mainHotkey": hotkeyConfiguration.mainShortcutText,
+                            "quitHotkey": hotkeyConfiguration.quitShortcutText
+                        ]
+                    )
                 )
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
@@ -48,5 +55,6 @@ struct ContentView: View {
         .frame(minWidth: 420, minHeight: 240)
         .preferredColorScheme(resolvedColorScheme)
         .animation(.none, value: resolvedColorScheme)
+        .id(appLanguageRaw)
     }
 }

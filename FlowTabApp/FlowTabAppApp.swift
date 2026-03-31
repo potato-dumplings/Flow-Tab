@@ -21,6 +21,7 @@ enum AppPreferenceKeys {
     static let enableVerboseDiagnostics = "enableVerboseDiagnostics"
     static let runtimeLogLevel = "runtimeLogLevel"
     static let themeMode = "themeMode"
+    static let appLanguage = "appLanguage"
 }
 
 enum RuntimeLogLevel: String, CaseIterable, Comparable, Identifiable {
@@ -74,6 +75,9 @@ extension Notification.Name {
     static let flowTabReRegisterHotkeys = Notification.Name("FlowTab.ReRegisterHotkeys")
     static let flowTabAppVisibilityPreferenceChanged = Notification.Name(
         "FlowTab.AppVisibilityPreferenceChanged"
+    )
+    static let flowTabLanguagePreferenceChanged = Notification.Name(
+        "FlowTab.LanguagePreferenceChanged"
     )
 }
 
@@ -299,11 +303,11 @@ extension ThemeMode {
     var displayName: String {
         switch self {
         case .followSystem:
-            return "跟随系统"
+            return AppStrings.text(.themeFollowSystem)
         case .light:
-            return "浅色"
+            return AppStrings.text(.themeLight)
         case .dark:
-            return "深色"
+            return AppStrings.text(.themeDark)
         }
     }
 
@@ -424,6 +428,12 @@ struct FlowTabAppApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     private let appWindowWidth: CGFloat = 1120
     private let appWindowHeight: CGFloat = 760
+    @AppStorage(AppPreferenceKeys.appLanguage)
+    private var appLanguageRaw = AppLanguagePreferencesStore.defaultLanguage.rawValue
+
+    private var appLanguage: AppLanguage {
+        AppLanguagePreferencesStore.resolve(rawValue: appLanguageRaw)
+    }
 
     init() {
         SystemAppMRUTracker.shared.startIfNeeded()
@@ -433,33 +443,35 @@ struct FlowTabAppApp: App {
         WindowGroup("FlowTab") {
             HomeRootView()
                 .frame(minWidth: appWindowWidth, minHeight: appWindowHeight)
+                .id(appLanguageRaw)
         }
         .defaultSize(width: appWindowWidth, height: appWindowHeight)
 
         Settings {
             HomeRootView()
                 .frame(minWidth: appWindowWidth, minHeight: appWindowHeight)
+                .id(appLanguageRaw)
         }
 
         .commands {
             CommandGroup(replacing: .appSettings) {
-                Button("设置") {
+                Button(AppStrings.text(.menuSettings, language: appLanguage)) {
                     AppWindowCoordinator.openSettings()
                 }
                 .keyboardShortcut(",", modifiers: [.command])
             }
 
-            CommandMenu("日志") {
-                Button("打开日志") {
+            CommandMenu(AppStrings.text(.menuLogs, language: appLanguage)) {
+                Button(AppStrings.text(.menuOpenLogs, language: appLanguage)) {
                     AppWindowCoordinator.openLogs()
                 }
             }
 
-            CommandMenu("设置") {
-                Button("打开设置") {
+            CommandMenu(AppStrings.text(.menuSettings, language: appLanguage)) {
+                Button(AppStrings.text(.menuOpenSettings, language: appLanguage)) {
                     AppWindowCoordinator.openSettings()
                 }
-                Button("打开应用首页") {
+                Button(AppStrings.text(.menuOpenHome, language: appLanguage)) {
                     AppWindowCoordinator.openHome()
                 }
             }
@@ -472,6 +484,8 @@ private struct HomeRootView: View {
     @ObservedObject private var systemTheme = SystemThemeState.shared
     @AppStorage(AppPreferenceKeys.themeMode)
     private var themeModeRaw = ThemePreferencesStore.defaultMode.rawValue
+    @AppStorage(AppPreferenceKeys.appLanguage)
+    private var appLanguageRaw = AppLanguagePreferencesStore.defaultLanguage.rawValue
 
     private var themeMode: ThemeMode {
         ThemePreferencesStore.resolve(rawValue: themeModeRaw)
@@ -523,6 +537,7 @@ private struct HomeRootView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .preferredColorScheme(resolvedColorScheme)
         .animation(.none, value: resolvedColorScheme)
+        .id(appLanguageRaw)
     }
 }
 
@@ -531,6 +546,8 @@ private struct HomeSidebar: View {
     @ObservedObject private var systemTheme = SystemThemeState.shared
     @AppStorage(AppPreferenceKeys.themeMode)
     private var themeModeRaw = ThemePreferencesStore.defaultMode.rawValue
+    @AppStorage(AppPreferenceKeys.appLanguage)
+    private var appLanguageRaw = AppLanguagePreferencesStore.defaultLanguage.rawValue
     private let navIconColumnWidth: CGFloat = 26
     private let navItemSpacing: CGFloat = 18
 
@@ -559,11 +576,17 @@ private struct HomeSidebar: View {
         colorScheme == .dark ? Color.white : Color.black.opacity(0.86)
     }
 
-    private let items: [(tab: HomeTab, title: String, icon: String)] = [
-        (.home, "首页", "house.fill"),
-        (.logs, "日志", "text.alignleft"),
-        (.settings, "设置", "gearshape")
-    ]
+    private var appLanguage: AppLanguage {
+        AppLanguagePreferencesStore.resolve(rawValue: appLanguageRaw)
+    }
+
+    private var items: [(tab: HomeTab, title: String, icon: String)] {
+        [
+            (.home, AppStrings.text(.tabHome, language: appLanguage), "house.fill"),
+            (.logs, AppStrings.text(.tabLogs, language: appLanguage), "text.alignleft"),
+            (.settings, AppStrings.text(.tabSettings, language: appLanguage), "gearshape")
+        ]
+    }
 
     private func sidebarButtonIdentifier(for tab: HomeTab) -> String {
         switch tab {
@@ -593,7 +616,7 @@ private struct HomeSidebar: View {
                             .font(.system(size: 21, weight: .bold))
                             .lineLimit(1)
 
-                        Text("工作台")
+                        Text(AppStrings.text(.sidebarWorkbench, language: appLanguage))
                             .font(.system(size: 12, weight: .medium))
                             .foregroundStyle(.secondary)
                     }
@@ -683,6 +706,8 @@ private struct HomeLandingView: View {
     private var hotkeyMainKeyRaw = SwitcherHotkeyPreferencesStore.defaultMainKey.rawValue
     @AppStorage(AppPreferenceKeys.hotkeyQuitKey)
     private var hotkeyQuitKeyRaw = SwitcherHotkeyPreferencesStore.defaultQuitKey.rawValue
+    @AppStorage(AppPreferenceKeys.appLanguage)
+    private var appLanguageRaw = AppLanguagePreferencesStore.defaultLanguage.rawValue
     @State private var accessibilityTrusted = AXIsProcessTrusted()
     @State private var screenCaptureTrusted = ScreenCapturePermissionChecker.hasScreenCapturePermission
     @State private var appSummaries: [RuntimeHomeAppSummary] = []
@@ -710,17 +735,21 @@ private struct HomeLandingView: View {
         showPermissionReminder && (!accessibilityTrusted || !screenCaptureTrusted)
     }
 
+    private var appLanguage: AppLanguage {
+        AppLanguagePreferencesStore.resolve(rawValue: appLanguageRaw)
+    }
+
     private var permissionGuideMessage: String {
         if !accessibilityTrusted && !screenCaptureTrusted {
-            return "请开启辅助功能和屏幕录制权限，部分功能才能正常使用。"
+            return AppStrings.text(.permissionGuideAll, language: appLanguage)
         }
         if !accessibilityTrusted {
-            return "请开启辅助功能权限，应用切换与窗口功能才能正常使用。"
+            return AppStrings.text(.permissionGuideAccessibility, language: appLanguage)
         }
         if !screenCaptureTrusted {
-            return "请开启屏幕录制权限，窗口预览功能才能正常使用。"
+            return AppStrings.text(.permissionGuideScreenCapture, language: appLanguage)
         }
-        return "权限已开启。"
+        return AppStrings.text(.permissionGuideReady, language: appLanguage)
     }
 
     var body: some View {
@@ -789,11 +818,14 @@ private struct HomeLandingView: View {
 
             Spacer(minLength: 0)
 
-            FlowActionButton(title: "前往设置", tone: .blueDominant) {
+            FlowActionButton(title: AppStrings.text(.actionGoToSettings, language: appLanguage), tone: .blueDominant) {
                 openSettings()
             }
 
-            FlowActionButton(title: "不再提示", tone: .grayDominant) {
+            FlowActionButton(
+                title: AppStrings.text(.actionDontRemindAgain, language: appLanguage),
+                tone: .grayDominant
+            ) {
                 showPermissionReminder = false
             }
         }
@@ -811,11 +843,18 @@ private struct HomeLandingView: View {
     }
 
     private var appLayerCard: some View {
-        HomeSectionCard(title: "应用层", subtitle: "当前可切换应用") {
+        HomeSectionCard(
+            title: AppStrings.text(.homeAppLayerTitle, language: appLanguage),
+            subtitle: AppStrings.text(.homeAppLayerSubtitle, language: appLanguage)
+        ) {
             if appSummaries.isEmpty {
                 HomeLayerRowView(
-                    title: "无可切换应用",
-                    subtitle: "先触发一次 \(hotkeyConfiguration.mainShortcutText)",
+                    title: AppStrings.text(.homeNoSwitchableApps, language: appLanguage),
+                    subtitle: AppStrings.text(
+                        .homeTriggerHotkeyFirst,
+                        replacements: ["hotkey": hotkeyConfiguration.mainShortcutText],
+                        language: appLanguage
+                    ),
                     trailing: "0w",
                     isSelected: false
                 )
@@ -847,13 +886,23 @@ private struct HomeLandingView: View {
         let activeWindows = activeApp.flatMap { windowsByAppID[$0.appID] } ?? []
 
         return HomeSectionCard(
-            title: "窗口层",
-            subtitle: activeApp.map { "\($0.displayName) 的窗口" } ?? "当前应用窗口"
+            title: AppStrings.text(.homeWindowLayerTitle, language: appLanguage),
+            subtitle: activeApp.map {
+                AppStrings.text(
+                    .homeAppWindowsOf,
+                    replacements: ["app": $0.displayName],
+                    language: appLanguage
+                )
+            } ?? AppStrings.text(.homeCurrentAppWindows, language: appLanguage)
         ) {
             if let activeApp, windowsByAppID[activeApp.appID] == nil {
                 HomeLayerRowView(
-                    title: "窗口数据加载中",
-                    subtitle: "正在读取 \(activeApp.displayName) 的窗口",
+                    title: AppStrings.text(.homeWindowDataLoading, language: appLanguage),
+                    subtitle: AppStrings.text(
+                        .homeReadingWindowsOf,
+                        replacements: ["app": activeApp.displayName],
+                        language: appLanguage
+                    ),
                     trailing: "--",
                     isSelected: false
                 )
@@ -873,15 +922,15 @@ private struct HomeLandingView: View {
                 .frame(minHeight: 180, maxHeight: 500)
             } else if activeApp != nil {
                 HomeLayerRowView(
-                    title: "当前应用无可切换窗口",
-                    subtitle: "请确认辅助功能权限已授权",
+                    title: AppStrings.text(.homeNoSwitchableWindows, language: appLanguage),
+                    subtitle: AppStrings.text(.homeConfirmAccessibility, language: appLanguage),
                     trailing: "0w",
                     isSelected: false
                 )
             } else {
                 HomeLayerRowView(
-                    title: "暂无窗口数据",
-                    subtitle: "等待缓存更新",
+                    title: AppStrings.text(.homeNoWindowData, language: appLanguage),
+                    subtitle: AppStrings.text(.homeWaitCacheUpdate, language: appLanguage),
                     trailing: "--",
                     isSelected: false
                 )
@@ -1664,19 +1713,33 @@ private struct HotkeySettingsCardState: Equatable {
 
     var commandTabTakeoverStatusText: String {
         commandTabTakeoverActive
-            ? "已接管系统 Command + Tab / Command + Shift + Tab，退出 FlowTab 后会自动恢复。"
-            : "检测到 Command + Tab 组合：FlowTab 会自动尝试接管系统 Command + Tab / Command + Shift + Tab。"
+            ? AppStrings.text(.hotkeyCommandTabTakeoverActive)
+            : AppStrings.text(.hotkeyCommandTabTakeoverInactive)
     }
 
     var mainSummaryText: String {
-        "当前：\(hotkeyConfiguration.mainShortcutText)"
-            + "（反向：\(hotkeyConfiguration.backwardShortcutText)）"
-            + "，结束应用：\(hotkeyConfiguration.quitShortcutText)"
+        AppStrings.text(
+            .hotkeyMainSummary,
+            replacements: [
+                "main": hotkeyConfiguration.mainShortcutText,
+                "reverseLabel": AppStrings.text(.hotkeySummaryReverseLabel),
+                "reverse": hotkeyConfiguration.backwardShortcutText,
+                "quitLabel": AppStrings.text(.hotkeySummaryQuitLabel),
+                "quit": hotkeyConfiguration.quitShortcutText
+            ]
+        )
     }
 
     var inAppSummaryText: String {
-        "应用内窗口：\(inAppWindowHotkeyConfiguration.mainShortcutText)"
-            + "（反向：\(inAppWindowHotkeyConfiguration.backwardShortcutText)）"
+        AppStrings.text(
+            .hotkeyInAppSummary,
+            replacements: [
+                "inAppLabel": AppStrings.text(.hotkeySummaryInAppLabel),
+                "main": inAppWindowHotkeyConfiguration.mainShortcutText,
+                "reverseLabel": AppStrings.text(.hotkeySummaryReverseLabel),
+                "reverse": inAppWindowHotkeyConfiguration.backwardShortcutText
+            ]
+        )
     }
 }
 
@@ -1798,9 +1861,9 @@ private final class HotkeySettingsCardAppKitView: NSView {
             action: #selector(handleInAppMainKeyChanged)
         )
 
-        let mainPrimaryRow = makeControlRow(title: "主修饰键", control: mainPrimaryModifierPopUp)
-        let mainKeyRow = makeControlRow(title: "主切换按键", control: mainKeyPopUp)
-        let quitKeyRow = makeControlRow(title: "结束应用按键", control: quitKeyPopUp)
+        let mainPrimaryRow = makeControlRow(title: AppStrings.text(.hotkeyRowMainModifier), control: mainPrimaryModifierPopUp)
+        let mainKeyRow = makeControlRow(title: AppStrings.text(.hotkeyRowMainKey), control: mainKeyPopUp)
+        let quitKeyRow = makeControlRow(title: AppStrings.text(.hotkeyRowQuitKey), control: quitKeyPopUp)
         stackView.addArrangedSubview(mainPrimaryRow)
         stackView.addArrangedSubview(mainKeyRow)
         stackView.addArrangedSubview(quitKeyRow)
@@ -1822,8 +1885,8 @@ private final class HotkeySettingsCardAppKitView: NSView {
         inAppRowsContainer.translatesAutoresizingMaskIntoConstraints = false
         inAppRowsContainer.setContentHuggingPriority(.required, for: .vertical)
         inAppRowsContainer.setContentCompressionResistancePriority(.required, for: .vertical)
-        let inAppPrimaryRow = makeControlRow(title: "应用内窗口修饰键", control: inAppPrimaryModifierPopUp)
-        let inAppMainKeyRow = makeControlRow(title: "应用内窗口按键", control: inAppMainKeyPopUp)
+        let inAppPrimaryRow = makeControlRow(title: AppStrings.text(.hotkeyRowInAppModifier), control: inAppPrimaryModifierPopUp)
+        let inAppMainKeyRow = makeControlRow(title: AppStrings.text(.hotkeyRowInAppKey), control: inAppMainKeyPopUp)
         inAppRowsContainer.addArrangedSubview(inAppPrimaryRow)
         inAppRowsContainer.addArrangedSubview(inAppMainKeyRow)
         inAppPrimaryRow.widthAnchor.constraint(equalTo: inAppRowsContainer.widthAnchor).isActive = true
@@ -2375,7 +2438,8 @@ private class AppKitSettingsCardBaseView: NSView {
         popUp: NSPopUpButton,
         options: [(id: String, title: String)],
         target: AnyObject,
-        action: Selector
+        action: Selector,
+        width: CGFloat = 160
     ) {
         popUp.target = target
         popUp.action = action
@@ -2390,7 +2454,7 @@ private class AppKitSettingsCardBaseView: NSView {
             popUp.menu?.addItem(item)
         }
 
-        popUp.widthAnchor.constraint(equalToConstant: 160).isActive = true
+        popUp.widthAnchor.constraint(equalToConstant: width).isActive = true
     }
 
     static func selectItem(in popUp: NSPopUpButton, rawValue: String) {
@@ -2514,6 +2578,7 @@ private struct AppKitSettingsPageState: Equatable {
     let showShortcutHint: Bool
     let showInCommandTab: Bool
     let themeModeRaw: String
+    let appLanguageRaw: String
     let windowLayerAutoEnterDelayText: String
     let autoRestoreMinimizedWindowOnSwitch: Bool
     let hideMinimizedAppsFromAppLayer: Bool
@@ -2643,6 +2708,7 @@ private struct AppKitSettingsPageContent: NSViewRepresentable {
     @Binding var showShortcutHint: Bool
     @Binding var showInCommandTab: Bool
     @Binding var themeModeRaw: String
+    @Binding var appLanguageRaw: String
     let windowLayerAutoEnterDelayText: String
     @Binding var autoRestoreMinimizedWindowOnSwitch: Bool
     @Binding var hideMinimizedAppsFromAppLayer: Bool
@@ -2671,6 +2737,7 @@ private struct AppKitSettingsPageContent: NSViewRepresentable {
         let showShortcutHint = $showShortcutHint
         let showInCommandTab = $showInCommandTab
         let themeModeRaw = $themeModeRaw
+        let appLanguageRaw = $appLanguageRaw
         let autoRestoreMinimizedWindowOnSwitch = $autoRestoreMinimizedWindowOnSwitch
         let hideMinimizedAppsFromAppLayer = $hideMinimizedAppsFromAppLayer
         let showPermissionReminder = $showPermissionReminder
@@ -2686,6 +2753,7 @@ private struct AppKitSettingsPageContent: NSViewRepresentable {
         pageView.onShowShortcutHintChanged = { showShortcutHint.wrappedValue = $0 }
         pageView.onShowInCommandTabChanged = { showInCommandTab.wrappedValue = $0 }
         pageView.onThemeModeChanged = { themeModeRaw.wrappedValue = $0 }
+        pageView.onAppLanguageChanged = { appLanguageRaw.wrappedValue = $0 }
         pageView.onWindowLayerAutoEnterDelayTextChanged = onWindowLayerAutoEnterDelayTextChanged
         pageView.onWindowLayerAutoEnterDelayTextCommitted = onWindowLayerAutoEnterDelayTextCommitted
         pageView.onWindowLayerAutoEnterDelayEditingChanged = onWindowLayerAutoEnterDelayEditingChanged
@@ -2714,6 +2782,7 @@ private struct AppKitSettingsPageContent: NSViewRepresentable {
                 showShortcutHint: showShortcutHint.wrappedValue,
                 showInCommandTab: showInCommandTab.wrappedValue,
                 themeModeRaw: themeModeRaw.wrappedValue,
+                appLanguageRaw: appLanguageRaw.wrappedValue,
                 windowLayerAutoEnterDelayText: windowLayerAutoEnterDelayText,
                 autoRestoreMinimizedWindowOnSwitch: autoRestoreMinimizedWindowOnSwitch.wrappedValue,
                 hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer.wrappedValue,
@@ -2738,6 +2807,7 @@ private final class AppKitSettingsPageView: NSView {
     var onShowShortcutHintChanged: ((Bool) -> Void)?
     var onShowInCommandTabChanged: ((Bool) -> Void)?
     var onThemeModeChanged: ((String) -> Void)?
+    var onAppLanguageChanged: ((String) -> Void)?
     var onWindowLayerAutoEnterDelayTextChanged: ((String) -> Void)?
     var onWindowLayerAutoEnterDelayTextCommitted: (() -> Void)?
     var onWindowLayerAutoEnterDelayEditingChanged: ((Bool) -> Void)?
@@ -2756,8 +2826,8 @@ private final class AppKitSettingsPageView: NSView {
 
     private let contentStack = NSStackView()
     private let headerStack = NSStackView()
-    private let titleLabel = NSTextField(labelWithString: "设置")
-    private let subtitleLabel = NSTextField(labelWithString: "基础显示设置、快捷键与权限")
+    private let titleLabel = NSTextField(labelWithString: AppStrings.text(.settingsPageTitle))
+    private let subtitleLabel = NSTextField(labelWithString: AppStrings.text(.settingsPageSubtitle))
     private let columnsStack = NSStackView()
     private let leftColumn = NSStackView()
     private let rightColumn = NSStackView()
@@ -2770,28 +2840,28 @@ private final class AppKitSettingsPageView: NSView {
     private let hotkeyContent = HotkeySettingsCardAppKitView()
 
     private lazy var appearanceCard = AppKitSectionCardView(
-        title: "外观",
-        subtitle: "显示与主题",
+        title: AppStrings.text(.settingsCardAppearanceTitle),
+        subtitle: AppStrings.text(.settingsCardAppearanceSubtitle),
         contentView: appearanceContent
     )
     private lazy var windowBehaviorCard = AppKitSectionCardView(
-        title: "窗口行为",
-        subtitle: "窗口层进入与最小化处理",
+        title: AppStrings.text(.settingsCardWindowBehaviorTitle),
+        subtitle: AppStrings.text(.settingsCardWindowBehaviorSubtitle),
         contentView: windowBehaviorContent
     )
     private lazy var permissionCard = AppKitSectionCardView(
-        title: "权限",
-        subtitle: "辅助功能与屏幕录制",
+        title: AppStrings.text(.settingsCardPermissionTitle),
+        subtitle: AppStrings.text(.settingsCardPermissionSubtitle),
         contentView: permissionContent
     )
     private lazy var searchCard = AppKitSectionCardView(
-        title: "搜索",
-        subtitle: "搜索开关、范围与交互说明",
+        title: AppStrings.text(.settingsCardSearchTitle),
+        subtitle: AppStrings.text(.settingsCardSearchSubtitle),
         contentView: searchContent
     )
     private lazy var hotkeyCard = AppKitSectionCardView(
-        title: "快捷键",
-        subtitle: "主切换与结束应用按键",
+        title: AppStrings.text(.settingsCardHotkeyTitle),
+        subtitle: AppStrings.text(.settingsCardHotkeySubtitle),
         contentView: hotkeyContent
     )
 
@@ -2822,7 +2892,8 @@ private final class AppKitSettingsPageView: NSView {
             with: AppearanceSettingsCardState(
                 showShortcutHint: state.showShortcutHint,
                 showInCommandTab: state.showInCommandTab,
-                themeModeRaw: state.themeModeRaw
+                themeModeRaw: state.themeModeRaw,
+                appLanguageRaw: state.appLanguageRaw
             )
         )
         windowBehaviorContent.update(
@@ -2948,6 +3019,9 @@ private final class AppKitSettingsPageView: NSView {
         appearanceContent.onThemeModeChanged = { [weak self] in
             self?.onThemeModeChanged?($0)
         }
+        appearanceContent.onAppLanguageChanged = { [weak self] in
+            self?.onAppLanguageChanged?($0)
+        }
 
         windowBehaviorContent.onWindowLayerAutoEnterDelayTextChanged = { [weak self] in
             self?.onWindowLayerAutoEnterDelayTextChanged?($0)
@@ -3023,30 +3097,36 @@ private struct AppKitAppearanceSettingsCardContent: NSViewRepresentable {
     @Binding var showShortcutHint: Bool
     @Binding var showInCommandTab: Bool
     @Binding var themeModeRaw: String
+    @Binding var appLanguageRaw: String
 
     final class Coordinator {
         var showShortcutHint: Binding<Bool>
         var showInCommandTab: Binding<Bool>
         var themeModeRaw: Binding<String>
+        var appLanguageRaw: Binding<String>
 
         init(
             showShortcutHint: Binding<Bool>,
             showInCommandTab: Binding<Bool>,
-            themeModeRaw: Binding<String>
+            themeModeRaw: Binding<String>,
+            appLanguageRaw: Binding<String>
         ) {
             self.showShortcutHint = showShortcutHint
             self.showInCommandTab = showInCommandTab
             self.themeModeRaw = themeModeRaw
+            self.appLanguageRaw = appLanguageRaw
         }
 
         func update(
             showShortcutHint: Binding<Bool>,
             showInCommandTab: Binding<Bool>,
-            themeModeRaw: Binding<String>
+            themeModeRaw: Binding<String>,
+            appLanguageRaw: Binding<String>
         ) {
             self.showShortcutHint = showShortcutHint
             self.showInCommandTab = showInCommandTab
             self.themeModeRaw = themeModeRaw
+            self.appLanguageRaw = appLanguageRaw
         }
 
         func setShowShortcutHint(_ value: Bool) {
@@ -3060,13 +3140,18 @@ private struct AppKitAppearanceSettingsCardContent: NSViewRepresentable {
         func setThemeMode(rawValue: String) {
             themeModeRaw.wrappedValue = rawValue
         }
+
+        func setAppLanguage(rawValue: String) {
+            appLanguageRaw.wrappedValue = rawValue
+        }
     }
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
             showShortcutHint: $showShortcutHint,
             showInCommandTab: $showInCommandTab,
-            themeModeRaw: $themeModeRaw
+            themeModeRaw: $themeModeRaw,
+            appLanguageRaw: $appLanguageRaw
         )
     }
 
@@ -3088,14 +3173,16 @@ private struct AppKitAppearanceSettingsCardContent: NSViewRepresentable {
         context.coordinator.update(
             showShortcutHint: $showShortcutHint,
             showInCommandTab: $showInCommandTab,
-            themeModeRaw: $themeModeRaw
+            themeModeRaw: $themeModeRaw,
+            appLanguageRaw: $appLanguageRaw
         )
         connect(nsView, coordinator: context.coordinator)
         nsView.update(
             with: AppearanceSettingsCardState(
                 showShortcutHint: showShortcutHint,
                 showInCommandTab: showInCommandTab,
-                themeModeRaw: themeModeRaw
+                themeModeRaw: themeModeRaw,
+                appLanguageRaw: appLanguageRaw
             )
         )
     }
@@ -3104,6 +3191,7 @@ private struct AppKitAppearanceSettingsCardContent: NSViewRepresentable {
         view.onShowShortcutHintChanged = { coordinator.setShowShortcutHint($0) }
         view.onShowInCommandTabChanged = { coordinator.setShowInCommandTab($0) }
         view.onThemeModeChanged = { coordinator.setThemeMode(rawValue: $0) }
+        view.onAppLanguageChanged = { coordinator.setAppLanguage(rawValue: $0) }
     }
 }
 
@@ -3111,9 +3199,14 @@ private struct AppearanceSettingsCardState: Equatable {
     let showShortcutHint: Bool
     let showInCommandTab: Bool
     let themeModeRaw: String
+    let appLanguageRaw: String
 
     var resolvedThemeMode: ThemeMode {
         ThemePreferencesStore.resolve(rawValue: themeModeRaw)
+    }
+
+    var resolvedAppLanguage: AppLanguage {
+        AppLanguagePreferencesStore.resolve(rawValue: appLanguageRaw)
     }
 }
 
@@ -3121,15 +3214,25 @@ private final class AppearanceSettingsCardAppKitView: AppKitSettingsCardBaseView
     var onShowShortcutHintChanged: ((Bool) -> Void)?
     var onShowInCommandTabChanged: ((Bool) -> Void)?
     var onThemeModeChanged: ((String) -> Void)?
+    var onAppLanguageChanged: ((String) -> Void)?
 
     private let showShortcutHintSwitch = NSSwitch()
     private let showInCommandTabSwitch = NSSwitch()
     private let themeModeControl = FlowCapsuleSegmentedControl(
-        options: ThemeMode.allCases.map { (id: $0.rawValue, title: $0.displayName) }
+        options: AppearanceSettingsCardAppKitView.themeOptions()
     )
+    private let appLanguagePopUp = NSPopUpButton(frame: .zero, pullsDown: false)
     private let descriptionLabel = AppKitSettingsCardBaseView.makeBodyLabel()
     private var isApplyingState = false
     private var currentState: AppearanceSettingsCardState?
+
+    private static func themeOptions() -> [(id: String, title: String)] {
+        ThemeMode.allCases.map { (id: $0.rawValue, title: $0.displayName) }
+    }
+
+    private static func languageOptions() -> [(id: String, title: String)] {
+        AppLanguage.allCases.map { (id: $0.rawValue, title: $0.displayName) }
+    }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -3149,9 +3252,13 @@ private final class AppearanceSettingsCardAppKitView: AppKitSettingsCardBaseView
         showShortcutHintSwitch.state = state.showShortcutHint ? .on : .off
         showInCommandTabSwitch.state = state.showInCommandTab ? .on : .off
         themeModeControl.updateSelection(id: state.resolvedThemeMode.rawValue)
+        AppKitSettingsCardBaseView.selectItem(
+            in: appLanguagePopUp,
+            rawValue: state.resolvedAppLanguage.rawValue
+        )
         isApplyingState = false
 
-        descriptionLabel.stringValue = "关闭后 当前应用 将仅作为菜单栏辅助应用运行。"
+        descriptionLabel.stringValue = AppStrings.text(.appearanceDescription)
         invalidateIntrinsicContentSize()
     }
 
@@ -3165,16 +3272,38 @@ private final class AppearanceSettingsCardAppKitView: AppKitSettingsCardBaseView
             self?.handleThemeModeChanged(rawValue)
         }
         themeModeControl.widthAnchor.constraint(equalToConstant: 300).isActive = true
+        AppKitSettingsCardBaseView.configure(
+            popUp: appLanguagePopUp,
+            options: Self.languageOptions(),
+            target: self,
+            action: #selector(handleAppLanguageChanged(_:)),
+            width: 180
+        )
 
         addFullWidthArrangedSubview(
-            AppKitSettingsCardBaseView.makeControlRow(title: "显示快捷键提示", control: showShortcutHintSwitch)
+            AppKitSettingsCardBaseView.makeControlRow(
+                title: AppStrings.text(.appearanceShowShortcutHint),
+                control: showShortcutHintSwitch
+            )
         )
         addFullWidthArrangedSubview(
-            AppKitSettingsCardBaseView.makeControlRow(title: "显示应用窗口", control: showInCommandTabSwitch)
+            AppKitSettingsCardBaseView.makeControlRow(
+                title: AppStrings.text(.appearanceShowAppWindow),
+                control: showInCommandTabSwitch
+            )
         )
         addFullWidthArrangedSubview(descriptionLabel)
         addFullWidthArrangedSubview(
-            AppKitSettingsCardBaseView.makeControlRow(title: "主题模式", control: themeModeControl)
+            AppKitSettingsCardBaseView.makeControlRow(
+                title: AppStrings.text(.appearanceThemeMode),
+                control: themeModeControl
+            )
+        )
+        addFullWidthArrangedSubview(
+            AppKitSettingsCardBaseView.makeControlRow(
+                title: AppStrings.text(.appearanceLanguage),
+                control: appLanguagePopUp
+            )
         )
     }
 
@@ -3191,6 +3320,12 @@ private final class AppearanceSettingsCardAppKitView: AppKitSettingsCardBaseView
     private func handleThemeModeChanged(_ rawValue: String) {
         guard !isApplyingState else { return }
         onThemeModeChanged?(rawValue)
+    }
+
+    @objc private func handleAppLanguageChanged(_ sender: NSPopUpButton) {
+        guard !isApplyingState else { return }
+        guard let rawValue = sender.selectedItem?.representedObject as? String else { return }
+        onAppLanguageChanged?(rawValue)
     }
 }
 
@@ -3374,7 +3509,7 @@ private final class WindowBehaviorSettingsCardAppKitView: AppKitSettingsCardBase
         hideMinimizedAppsSwitch.state = state.hideMinimizedAppsFromAppLayer ? .on : .off
         isApplyingState = false
 
-        noteLabel.stringValue = "说明：该过滤依赖辅助功能权限。未授权时无法判断最小化状态，不会过滤应用层。"
+        noteLabel.stringValue = AppStrings.text(.windowBehaviorNote)
         invalidateIntrinsicContentSize()
     }
 
@@ -3382,7 +3517,7 @@ private final class WindowBehaviorSettingsCardAppKitView: AppKitSettingsCardBase
         let delayTextField = delayInputField.textField
         delayTextField.delegate = self
 
-        let delayUnitLabel = NSTextField(labelWithString: "秒")
+        let delayUnitLabel = NSTextField(labelWithString: AppStrings.text(.windowBehaviorSecondUnit))
         delayUnitLabel.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
         delayUnitLabel.textColor = .secondaryLabelColor
 
@@ -3400,17 +3535,20 @@ private final class WindowBehaviorSettingsCardAppKitView: AppKitSettingsCardBase
         hideMinimizedAppsSwitch.action = #selector(handleHideMinimizedAppsSwitchChanged)
 
         addFullWidthArrangedSubview(
-            AppKitSettingsCardBaseView.makeControlRow(title: "窗口层自动进入延迟", control: delayControl)
+            AppKitSettingsCardBaseView.makeControlRow(
+                title: AppStrings.text(.windowBehaviorAutoEnterDelay),
+                control: delayControl
+            )
         )
         addFullWidthArrangedSubview(
             AppKitSettingsCardBaseView.makeControlRow(
-                title: "切换到最小化窗口时自动恢复打开",
+                title: AppStrings.text(.windowBehaviorAutoRestoreMinimized),
                 control: autoRestoreMinimizedWindowSwitch
             )
         )
         addFullWidthArrangedSubview(
             AppKitSettingsCardBaseView.makeControlRow(
-                title: "应用层隐藏仅最小化应用",
+                title: AppStrings.text(.windowBehaviorHideMinimizedApps),
                 control: hideMinimizedAppsSwitch
             )
         )
@@ -3526,8 +3664,8 @@ private struct SearchSettingsCardState: Equatable {
 
     var summaryText: String {
         searchEnabled
-            ? "面板默认从应用层开始；按 Enter 或 ↑ 进入搜索。"
-            : "已关闭搜索：面板仅显示应用层与窗口层。"
+            ? AppStrings.text(.searchSummaryEnabled)
+            : AppStrings.text(.searchSummaryDisabled)
     }
 }
 
@@ -3581,7 +3719,7 @@ private final class SearchSettingsCardAppKitView: AppKitSettingsCardBaseView {
         )
 
         let searchEnabledRow = AppKitSettingsCardBaseView.makeControlRow(
-            title: "启用搜索功能",
+            title: AppStrings.text(.searchEnable),
             control: searchEnabledSwitch
         )
         scopeRowContainer.orientation = .vertical
@@ -3593,7 +3731,7 @@ private final class SearchSettingsCardAppKitView: AppKitSettingsCardBaseView {
         scopeRowContainer.setContentCompressionResistancePriority(.required, for: .vertical)
         scopeRowContainer.addArrangedSubview(
             AppKitSettingsCardBaseView.makeControlRow(
-                title: "默认搜索范围",
+                title: AppStrings.text(.searchDefaultScope),
                 control: searchDefaultScopePopUp
             )
         )
@@ -3714,19 +3852,27 @@ private struct PermissionSettingsCardState: Equatable {
     let screenCaptureTrusted: Bool
 
     var accessibilityStatusText: String {
-        accessibilityTrusted ? "辅助功能权限：已授权" : "辅助功能权限：未授权"
+        accessibilityTrusted
+            ? AppStrings.text(.permissionAccessibilityGranted)
+            : AppStrings.text(.permissionAccessibilityDenied)
     }
 
     var accessibilityButtonTitle: String {
-        accessibilityTrusted ? "关闭辅助功能权限" : "请求辅助功能权限"
+        accessibilityTrusted
+            ? AppStrings.text(.permissionAccessibilityClose)
+            : AppStrings.text(.permissionAccessibilityRequest)
     }
 
     var screenCaptureStatusText: String {
-        screenCaptureTrusted ? "屏幕录制权限：已授权" : "屏幕录制权限：未授权"
+        screenCaptureTrusted
+            ? AppStrings.text(.permissionScreenGranted)
+            : AppStrings.text(.permissionScreenDenied)
     }
 
     var screenCaptureButtonTitle: String {
-        screenCaptureTrusted ? "关闭屏幕录制权限" : "请求屏幕录制权限"
+        screenCaptureTrusted
+            ? AppStrings.text(.permissionScreenClose)
+            : AppStrings.text(.permissionScreenRequest)
     }
 }
 
@@ -3844,13 +3990,13 @@ private final class PermissionSettingsCardAppKitView: AppKitSettingsCardBaseView
 
         accessibilityRow.update(
             text: state.accessibilityStatusText,
-            detail: "用于应用切换、应用内窗口切换和最小化窗口处理。",
+            detail: AppStrings.text(.permissionAccessibilityDetail),
             isGranted: state.accessibilityTrusted,
             buttonTitle: state.accessibilityButtonTitle
         )
         screenCaptureRow.update(
             text: state.screenCaptureStatusText,
-            detail: "用于显示窗口真实预览画面；未授权时仅显示兜底信息。",
+            detail: AppStrings.text(.permissionScreenDetail),
             isGranted: state.screenCaptureTrusted,
             buttonTitle: state.screenCaptureButtonTitle
         )
@@ -3863,7 +4009,7 @@ private final class PermissionSettingsCardAppKitView: AppKitSettingsCardBaseView
 
         addFullWidthArrangedSubview(
             AppKitSettingsCardBaseView.makeControlRow(
-                title: "无权限时是否在在首页提示获取权限",
+                title: AppStrings.text(.permissionHomeReminderToggle),
                 control: showPermissionReminderSwitch
             )
         )
@@ -3951,9 +4097,9 @@ private struct AppLogsView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("日志")
+                        Text(AppStrings.text(.logsPageTitle))
                             .font(.system(size: 22, weight: .semibold))
-                        Text("运行日志查看与清理")
+                        Text(AppStrings.text(.logsPageSubtitle))
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                     }
@@ -3980,6 +4126,8 @@ private struct AppSettingsView: View {
     private var showInCommandTab = AppVisibilityPreferencesStore.defaultShowInCommandTab
     @AppStorage(AppPreferenceKeys.showPermissionReminder) private var showPermissionReminder = true
     @AppStorage(AppPreferenceKeys.themeMode) private var themeModeRaw = ThemePreferencesStore.defaultMode.rawValue
+    @AppStorage(AppPreferenceKeys.appLanguage)
+    private var appLanguageRaw = AppLanguagePreferencesStore.defaultLanguage.rawValue
     @AppStorage(AppPreferenceKeys.autoRestoreMinimizedWindowOnSwitch)
     private var autoRestoreMinimizedWindowOnSwitch =
         SwitcherBehaviorPreferencesStore.defaultAutoRestoreMinimizedWindowOnSwitch
@@ -4055,6 +4203,7 @@ private struct AppSettingsView: View {
                 showShortcutHint: $showShortcutHint,
                 showInCommandTab: $showInCommandTab,
                 themeModeRaw: $themeModeRaw,
+                appLanguageRaw: $appLanguageRaw,
                 windowLayerAutoEnterDelayText: windowLayerAutoEnterDelayText,
                 autoRestoreMinimizedWindowOnSwitch: $autoRestoreMinimizedWindowOnSwitch,
                 hideMinimizedAppsFromAppLayer: $hideMinimizedAppsFromAppLayer,
@@ -4089,6 +4238,7 @@ private struct AppSettingsView: View {
                     }
                 }
             )
+            .id(appLanguageRaw)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -4100,6 +4250,10 @@ private struct AppSettingsView: View {
         }
         .onChange(of: themeModeRaw) {
             enforceThemeModeConsistency()
+        }
+        .onChange(of: appLanguageRaw) {
+            enforceLanguageConsistency()
+            notifyLanguagePreferenceChanged()
         }
         .onChange(of: showInCommandTab) {
             notifyAppVisibilityPreferenceChanged()
@@ -4148,6 +4302,7 @@ private struct AppSettingsView: View {
         }
         if !didInitialize {
             enforceThemeModeConsistency()
+            enforceLanguageConsistency()
             enforceHotkeyConsistency()
             enforceInAppWindowHotkeyConsistency()
             enforceWindowLayerPreferencesConsistency()
@@ -4206,10 +4361,10 @@ private struct AppSettingsView: View {
     private func presentScreenCapturePermissionReminder() {
         let alert = NSAlert()
         alert.alertStyle = .informational
-        alert.messageText = "屏幕录制权限已被拒绝"
-        alert.informativeText = "macOS 不会再次弹出授权窗口。请前往系统设置的“隐私与安全性-屏幕录制”中手动开启权限。"
-        alert.addButton(withTitle: "打开系统设置")
-        alert.addButton(withTitle: "稍后")
+        alert.messageText = AppStrings.text(.alertScreenDeniedTitle)
+        alert.informativeText = AppStrings.text(.alertScreenDeniedMessage)
+        alert.addButton(withTitle: AppStrings.text(.alertOpenSystemSettings))
+        alert.addButton(withTitle: AppStrings.text(.alertLater))
         if alert.runModal() == .alertFirstButtonReturn {
             openScreenCapturePrivacySettings()
         }
@@ -4281,6 +4436,13 @@ private struct AppSettingsView: View {
         }
     }
 
+    private func enforceLanguageConsistency() {
+        let resolved = AppLanguagePreferencesStore.resolve(rawValue: appLanguageRaw)
+        if appLanguageRaw != resolved.rawValue {
+            appLanguageRaw = resolved.rawValue
+        }
+    }
+
     private func enforceSearchPreferencesConsistency() {
         let resolved = SearchInteractionPreferencesStore.loadDefaultScope()
         if searchDefaultScopeRaw != resolved.rawValue {
@@ -4347,6 +4509,11 @@ private struct AppSettingsView: View {
             "showInCommandTab=\(showInCommandTab)"
         )
         NotificationCenter.default.post(name: .flowTabAppVisibilityPreferenceChanged, object: nil)
+    }
+
+    private func notifyLanguagePreferenceChanged() {
+        RuntimeLog.info("App", "language=\(appLanguageRaw)")
+        NotificationCenter.default.post(name: .flowTabLanguagePreferenceChanged, object: nil)
     }
 
     private func startAccessibilityPermissionPolling() {
@@ -4502,16 +4669,19 @@ private struct RuntimeLogsSection: View {
     }
 
     var body: some View {
-        HomeSectionCard(title: "日志", subtitle: "仅日志相关信息") {
+        HomeSectionCard(
+            title: AppStrings.text(.logsSectionTitle),
+            subtitle: AppStrings.text(.logsSectionSubtitle)
+        ) {
             VStack(alignment: .leading, spacing: 10) {
-                Toggle("启用详细运行日志（高频，可能影响性能）", isOn: $enableVerboseDiagnostics)
+                Toggle(AppStrings.text(.logsEnableVerbose), isOn: $enableVerboseDiagnostics)
                     .toggleStyle(.switch)
                     .font(.system(size: 12))
 
                 HStack(spacing: 10) {
-                    Text("日志等级")
+                    Text(AppStrings.text(.logsLevel))
                         .font(.system(size: 12))
-                    Picker("日志等级", selection: $runtimeLogLevelRaw) {
+                    Picker(AppStrings.text(.logsLevel), selection: $runtimeLogLevelRaw) {
                         ForEach(RuntimeLogLevel.allCases) { level in
                             Text(level.displayName).tag(level.rawValue)
                         }
@@ -4521,19 +4691,24 @@ private struct RuntimeLogsSection: View {
                     .frame(width: 120)
                 }
 
-                Text("本地日志目录：\(RuntimeDiagnostics.logsDirectoryPath)")
+                Text(
+                    AppStrings.text(
+                        .logsDirectory,
+                        replacements: ["path": RuntimeDiagnostics.logsDirectoryPath]
+                    )
+                )
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
                     .lineLimit(2)
 
                 HStack(spacing: 8) {
-                    Button("打开目录") {
+                    Button(AppStrings.text(.logsOpenDirectory)) {
                         openLogsDirectory()
                     }
                     .buttonStyle(LogsActionButtonStyle(tint: logsActionButtonTint))
 
-                    Button("清空日志") {
+                    Button(AppStrings.text(.logsClear)) {
                         logsViewModel.clearDisplayedOutput(minimumLevel: selectedLogLevel)
                     }
                     .buttonStyle(LogsActionButtonStyle(tint: logsActionButtonTint))
@@ -4542,7 +4717,12 @@ private struct RuntimeLogsSection: View {
                 ScrollView {
                     Group {
                         if logsViewModel.lines.isEmpty {
-                            Text("暂无日志。触发 \(hotkeyShortcutText) 后再回来看。")
+                            Text(
+                                AppStrings.text(
+                                    .logsEmptyHint,
+                                    replacements: ["hotkey": hotkeyShortcutText]
+                                )
+                            )
                                 .font(.system(size: 12))
                                 .foregroundStyle(.secondary)
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -4597,6 +4777,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var hotkeyObserver: NSObjectProtocol?
     private var appVisibilityObserver: NSObjectProtocol?
+    private var languageObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         applyActivationPolicyFromPreferences()
@@ -4608,6 +4789,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setupInAppWindowHotkeyMonitor()
         installHotkeyObserver()
         installAppVisibilityObserver()
+        installLanguageObserver()
 
         installStatusItem()
         requestAccessibilityPermissionIfNeeded()
@@ -4638,6 +4820,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let appVisibilityObserver {
             NotificationCenter.default.removeObserver(appVisibilityObserver)
             self.appVisibilityObserver = nil
+        }
+        if let languageObserver {
+            NotificationCenter.default.removeObserver(languageObserver)
+            self.languageObserver = nil
         }
         hotkeyMonitor?.stop()
         inAppWindowHotkeyMonitor?.stop()
@@ -4756,6 +4942,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func installLanguageObserver() {
+        if let languageObserver {
+            NotificationCenter.default.removeObserver(languageObserver)
+        }
+        languageObserver = NotificationCenter.default.addObserver(
+            forName: .flowTabLanguagePreferenceChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.installStatusItem()
+            }
+        }
+    }
+
     private func applyActivationPolicyFromPreferences() {
         let showInCommandTab = AppVisibilityPreferencesStore.loadShowInCommandTab()
         let targetPolicy: NSApplication.ActivationPolicy = showInCommandTab ? .regular : .accessory
@@ -4769,13 +4970,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func installStatusItem() {
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        let item = statusItem ?? NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.title = "FlowTab"
 
         let menu = NSMenu()
 
         let openHomeItem = NSMenuItem(
-            title: "打开应用首页",
+            title: AppStrings.text(.menuOpenHome),
             action: #selector(openHomeFromMenu),
             keyEquivalent: ""
         )
@@ -4783,7 +4984,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(openHomeItem)
 
         let openLogsItem = NSMenuItem(
-            title: "日志",
+            title: AppStrings.text(.menuLogs),
             action: #selector(openLogsFromMenu),
             keyEquivalent: ""
         )
@@ -4791,7 +4992,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(openLogsItem)
 
         let openSettingsItem = NSMenuItem(
-            title: "设置",
+            title: AppStrings.text(.menuSettings),
             action: #selector(openSettingsFromMenu),
             keyEquivalent: ""
         )
@@ -4801,7 +5002,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(.separator())
 
         let quitItem = NSMenuItem(
-            title: "退出 FlowTab",
+            title: AppStrings.text(.menuQuitFlowTab),
             action: #selector(quitFromMenu),
             keyEquivalent: "q"
         )

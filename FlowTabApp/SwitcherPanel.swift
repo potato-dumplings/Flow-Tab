@@ -1758,6 +1758,8 @@ private struct SwitcherPanelRootView: View {
     private var searchEnabled = SearchInteractionPreferencesStore.defaultIsEnabled
     @AppStorage(AppPreferenceKeys.searchDefaultScope)
     private var searchDefaultScopeRaw = SearchInteractionPreferencesStore.defaultScope.rawValue
+    @AppStorage(AppPreferenceKeys.appLanguage)
+    private var appLanguageRaw = AppLanguagePreferencesStore.defaultLanguage.rawValue
 
     private var themeMode: ThemeMode {
         ThemePreferencesStore.resolve(rawValue: themeModeRaw)
@@ -1805,6 +1807,7 @@ private struct SwitcherPanelRootView: View {
         .background(Color.clear)
         .preferredColorScheme(resolvedColorScheme)
         .animation(.none, value: resolvedColorScheme)
+        .id(appLanguageRaw)
     }
 }
 
@@ -2011,7 +2014,7 @@ private struct CommandTabOverlay: View {
                     cursorPosition: 0,
                     scope: searchDefaultScope,
                     isInputFocused: false,
-                    hintText: "Enter / ↑ 进入搜索"
+                    hintText: AppStrings.text(.panelHintEnterToSearch)
                 )
             }
 
@@ -2092,7 +2095,7 @@ private struct CommandTabOverlay: View {
                 cursorPosition: searchState.queryCursorPosition,
                 scope: searchState.scope,
                 isInputFocused: searchState.isInputFocused,
-                hintText: "Tab 切换范围 · ←/→ 移动光标 · ↓ 进入结果 · Enter 激活 · Esc 清空/关闭",
+                hintText: AppStrings.text(.panelHintSearchMode),
                 highlightedItem: searchHeaderHighlightItem,
                 isSearchPresentation: true
             )
@@ -2504,7 +2507,7 @@ private struct SearchInputHeader: View {
 
     private var queryTextWithCursor: String {
         if query.isEmpty && !isInputFocused {
-            return "输入关键词搜索"
+            return AppStrings.text(.panelInputPlaceholder)
         }
         guard isInputFocused else {
             return query
@@ -2516,7 +2519,7 @@ private struct SearchInputHeader: View {
 
     private var searchModeQueryText: String {
         if query.isEmpty {
-            return isInputFocused ? "│" : "搜索"
+            return isInputFocused ? "│" : AppStrings.text(.panelSearchLabel)
         }
         let clampedCursorPosition = min(max(cursorPosition, 0), query.count)
         if isInputFocused {
@@ -2646,7 +2649,7 @@ private struct SearchEmptyState: View {
             Image(systemName: scope == .app ? "app.badge" : "macwindow.on.rectangle")
                 .font(.system(size: 24, weight: .medium))
                 .foregroundStyle(.secondary)
-            Text("没有匹配结果")
+            Text(AppStrings.text(.panelNoResult))
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.secondary)
         }

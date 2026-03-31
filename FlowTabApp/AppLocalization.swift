@@ -1,0 +1,377 @@
+import Foundation
+
+enum AppLanguage: String, CaseIterable, Equatable, Sendable, Identifiable {
+    case simplifiedChinese = "zh-Hans"
+    case english = "en"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .simplifiedChinese:
+            return "中文"
+        case .english:
+            return "English"
+        }
+    }
+}
+
+enum AppLanguagePreferencesStore {
+    static let defaultLanguage: AppLanguage = .simplifiedChinese
+
+    static func resolve(rawValue: String) -> AppLanguage {
+        AppLanguage(rawValue: rawValue) ?? defaultLanguage
+    }
+
+    static func load(userDefaults: UserDefaults = .standard) -> AppLanguage {
+        let rawValue = userDefaults.string(forKey: AppPreferenceKeys.appLanguage) ?? defaultLanguage.rawValue
+        let resolved = resolve(rawValue: rawValue)
+        if rawValue != resolved.rawValue {
+            userDefaults.set(resolved.rawValue, forKey: AppPreferenceKeys.appLanguage)
+        }
+        return resolved
+    }
+}
+
+enum AppStringKey: String {
+    case themeFollowSystem
+    case themeLight
+    case themeDark
+    case menuSettings
+    case menuLogs
+    case menuOpenLogs
+    case menuOpenSettings
+    case menuOpenHome
+    case menuQuitFlowTab
+    case tabHome
+    case tabLogs
+    case tabSettings
+    case sidebarWorkbench
+    case permissionGuideAll
+    case permissionGuideAccessibility
+    case permissionGuideScreenCapture
+    case permissionGuideReady
+    case actionGoToSettings
+    case actionDontRemindAgain
+    case homeAppLayerTitle
+    case homeAppLayerSubtitle
+    case homeNoSwitchableApps
+    case homeTriggerHotkeyFirst
+    case homeWindowLayerTitle
+    case homeCurrentAppWindows
+    case homeAppWindowsOf
+    case homeWindowDataLoading
+    case homeReadingWindowsOf
+    case homeNoSwitchableWindows
+    case homeConfirmAccessibility
+    case homeNoWindowData
+    case homeWaitCacheUpdate
+    case hotkeyCommandTabTakeoverActive
+    case hotkeyCommandTabTakeoverInactive
+    case hotkeyMainSummary
+    case hotkeyInAppSummary
+    case hotkeySummaryReverseLabel
+    case hotkeySummaryQuitLabel
+    case hotkeySummaryInAppLabel
+    case hotkeyRowMainModifier
+    case hotkeyRowMainKey
+    case hotkeyRowQuitKey
+    case hotkeyRowInAppModifier
+    case hotkeyRowInAppKey
+    case settingsPageTitle
+    case settingsPageSubtitle
+    case settingsCardAppearanceTitle
+    case settingsCardAppearanceSubtitle
+    case settingsCardWindowBehaviorTitle
+    case settingsCardWindowBehaviorSubtitle
+    case settingsCardPermissionTitle
+    case settingsCardPermissionSubtitle
+    case settingsCardSearchTitle
+    case settingsCardSearchSubtitle
+    case settingsCardHotkeyTitle
+    case settingsCardHotkeySubtitle
+    case appearanceDescription
+    case appearanceShowShortcutHint
+    case appearanceShowAppWindow
+    case appearanceThemeMode
+    case appearanceLanguage
+    case languageSimplifiedChinese
+    case languageEnglish
+    case windowBehaviorNote
+    case windowBehaviorSecondUnit
+    case windowBehaviorAutoEnterDelay
+    case windowBehaviorAutoRestoreMinimized
+    case windowBehaviorHideMinimizedApps
+    case searchSummaryEnabled
+    case searchSummaryDisabled
+    case searchEnable
+    case searchDefaultScope
+    case searchScopeApp
+    case searchScopeWindow
+    case permissionAccessibilityGranted
+    case permissionAccessibilityDenied
+    case permissionAccessibilityClose
+    case permissionAccessibilityRequest
+    case permissionScreenGranted
+    case permissionScreenDenied
+    case permissionScreenClose
+    case permissionScreenRequest
+    case permissionAccessibilityDetail
+    case permissionScreenDetail
+    case permissionHomeReminderToggle
+    case logsPageTitle
+    case logsPageSubtitle
+    case logsSectionTitle
+    case logsSectionSubtitle
+    case logsEnableVerbose
+    case logsLevel
+    case logsDirectory
+    case logsOpenDirectory
+    case logsClear
+    case logsEmptyHint
+    case alertScreenDeniedTitle
+    case alertScreenDeniedMessage
+    case alertOpenSystemSettings
+    case alertLater
+    case contentViewHint
+    case panelHintEnterToSearch
+    case panelHintSearchMode
+    case panelInputPlaceholder
+    case panelSearchLabel
+    case panelNoResult
+}
+
+enum AppStrings {
+    private static let fallbackLanguage: AppLanguage = .simplifiedChinese
+
+    private static let translations: [AppLanguage: [AppStringKey: String]] = [
+        .simplifiedChinese: [
+            .themeFollowSystem: "跟随系统",
+            .themeLight: "浅色",
+            .themeDark: "深色",
+            .menuSettings: "设置",
+            .menuLogs: "日志",
+            .menuOpenLogs: "打开日志",
+            .menuOpenSettings: "打开设置",
+            .menuOpenHome: "打开应用首页",
+            .menuQuitFlowTab: "退出 FlowTab",
+            .tabHome: "首页",
+            .tabLogs: "日志",
+            .tabSettings: "设置",
+            .sidebarWorkbench: "工作台",
+            .permissionGuideAll: "请开启辅助功能和屏幕录制权限，部分功能才能正常使用。",
+            .permissionGuideAccessibility: "请开启辅助功能权限，应用切换与窗口功能才能正常使用。",
+            .permissionGuideScreenCapture: "请开启屏幕录制权限，窗口预览功能才能正常使用。",
+            .permissionGuideReady: "权限已开启。",
+            .actionGoToSettings: "前往设置",
+            .actionDontRemindAgain: "不再提示",
+            .homeAppLayerTitle: "应用层",
+            .homeAppLayerSubtitle: "当前可切换应用",
+            .homeNoSwitchableApps: "无可切换应用",
+            .homeTriggerHotkeyFirst: "先触发一次 {hotkey}",
+            .homeWindowLayerTitle: "窗口层",
+            .homeCurrentAppWindows: "当前应用窗口",
+            .homeAppWindowsOf: "{app} 的窗口",
+            .homeWindowDataLoading: "窗口数据加载中",
+            .homeReadingWindowsOf: "正在读取 {app} 的窗口",
+            .homeNoSwitchableWindows: "当前应用无可切换窗口",
+            .homeConfirmAccessibility: "请确认辅助功能权限已授权",
+            .homeNoWindowData: "暂无窗口数据",
+            .homeWaitCacheUpdate: "等待缓存更新",
+            .hotkeyCommandTabTakeoverActive: "已接管系统 Command + Tab / Command + Shift + Tab，退出 FlowTab 后会自动恢复。",
+            .hotkeyCommandTabTakeoverInactive: "检测到 Command + Tab 组合：FlowTab 会自动尝试接管系统 Command + Tab / Command + Shift + Tab。",
+            .hotkeyMainSummary: "当前：{main}（{reverseLabel}：{reverse}），{quitLabel}：{quit}",
+            .hotkeyInAppSummary: "{inAppLabel}：{main}（{reverseLabel}：{reverse}）",
+            .hotkeySummaryReverseLabel: "反向",
+            .hotkeySummaryQuitLabel: "结束应用",
+            .hotkeySummaryInAppLabel: "应用内窗口",
+            .hotkeyRowMainModifier: "主修饰键",
+            .hotkeyRowMainKey: "主切换按键",
+            .hotkeyRowQuitKey: "结束应用按键",
+            .hotkeyRowInAppModifier: "应用内窗口修饰键",
+            .hotkeyRowInAppKey: "应用内窗口按键",
+            .settingsPageTitle: "设置",
+            .settingsPageSubtitle: "基础显示设置、快捷键与权限",
+            .settingsCardAppearanceTitle: "外观",
+            .settingsCardAppearanceSubtitle: "显示与主题",
+            .settingsCardWindowBehaviorTitle: "窗口行为",
+            .settingsCardWindowBehaviorSubtitle: "窗口层进入与最小化处理",
+            .settingsCardPermissionTitle: "权限",
+            .settingsCardPermissionSubtitle: "辅助功能与屏幕录制",
+            .settingsCardSearchTitle: "搜索",
+            .settingsCardSearchSubtitle: "搜索开关、范围与交互说明",
+            .settingsCardHotkeyTitle: "快捷键",
+            .settingsCardHotkeySubtitle: "主切换与结束应用按键",
+            .appearanceDescription: "关闭后 当前应用 将仅作为菜单栏辅助应用运行。",
+            .appearanceShowShortcutHint: "显示快捷键提示",
+            .appearanceShowAppWindow: "显示应用窗口",
+            .appearanceThemeMode: "主题模式",
+            .appearanceLanguage: "语言",
+            .languageSimplifiedChinese: "简体中文",
+            .languageEnglish: "English",
+            .windowBehaviorNote: "说明：该过滤依赖辅助功能权限。未授权时无法判断最小化状态，不会过滤应用层。",
+            .windowBehaviorSecondUnit: "秒",
+            .windowBehaviorAutoEnterDelay: "窗口层自动进入延迟",
+            .windowBehaviorAutoRestoreMinimized: "切换到最小化窗口时自动恢复打开",
+            .windowBehaviorHideMinimizedApps: "应用层隐藏仅最小化应用",
+            .searchSummaryEnabled: "面板默认从应用层开始；按 Enter 或 ↑ 进入搜索。",
+            .searchSummaryDisabled: "已关闭搜索：面板仅显示应用层与窗口层。",
+            .searchEnable: "启用搜索功能",
+            .searchDefaultScope: "默认搜索范围",
+            .searchScopeApp: "应用",
+            .searchScopeWindow: "窗口",
+            .permissionAccessibilityGranted: "辅助功能权限：已授权",
+            .permissionAccessibilityDenied: "辅助功能权限：未授权",
+            .permissionAccessibilityClose: "关闭辅助功能权限",
+            .permissionAccessibilityRequest: "请求辅助功能权限",
+            .permissionScreenGranted: "屏幕录制权限：已授权",
+            .permissionScreenDenied: "屏幕录制权限：未授权",
+            .permissionScreenClose: "关闭屏幕录制权限",
+            .permissionScreenRequest: "请求屏幕录制权限",
+            .permissionAccessibilityDetail: "用于应用切换、应用内窗口切换和最小化窗口处理。",
+            .permissionScreenDetail: "用于显示窗口真实预览画面；未授权时仅显示兜底信息。",
+            .permissionHomeReminderToggle: "无权限时是否在首页提示获取权限",
+            .logsPageTitle: "日志",
+            .logsPageSubtitle: "运行日志查看与清理",
+            .logsSectionTitle: "日志",
+            .logsSectionSubtitle: "仅日志相关信息",
+            .logsEnableVerbose: "启用详细运行日志（高频，可能影响性能）",
+            .logsLevel: "日志等级",
+            .logsDirectory: "本地日志目录：{path}",
+            .logsOpenDirectory: "打开目录",
+            .logsClear: "清空日志",
+            .logsEmptyHint: "暂无日志。触发 {hotkey} 后再回来看。",
+            .alertScreenDeniedTitle: "屏幕录制权限已被拒绝",
+            .alertScreenDeniedMessage: "macOS 不会再次弹出授权窗口。请前往系统设置的“隐私与安全性-屏幕录制”中手动开启权限。",
+            .alertOpenSystemSettings: "打开系统设置",
+            .alertLater: "稍后",
+            .contentViewHint: "应用在后台运行，按 {mainHotkey} 呼出切换面板，按住 {quitHotkey} 结束当前所选应用",
+            .panelHintEnterToSearch: "Enter / ↑ 进入搜索",
+            .panelHintSearchMode: "Tab 切换范围 · ←/→ 移动光标 · ↓ 进入结果 · Enter 激活 · Esc 清空/关闭",
+            .panelInputPlaceholder: "输入关键词搜索",
+            .panelSearchLabel: "搜索",
+            .panelNoResult: "没有匹配结果"
+        ],
+        .english: [
+            .themeFollowSystem: "Follow System",
+            .themeLight: "Light",
+            .themeDark: "Dark",
+            .menuSettings: "Settings",
+            .menuLogs: "Logs",
+            .menuOpenLogs: "Open Logs",
+            .menuOpenSettings: "Open Settings",
+            .menuOpenHome: "Open Home",
+            .menuQuitFlowTab: "Quit FlowTab",
+            .tabHome: "Home",
+            .tabLogs: "Logs",
+            .tabSettings: "Settings",
+            .sidebarWorkbench: "Workspace",
+            .permissionGuideAll: "Please enable both Accessibility and Screen Recording permissions for full functionality.",
+            .permissionGuideAccessibility: "Please enable Accessibility permission for app switching and window features.",
+            .permissionGuideScreenCapture: "Please enable Screen Recording permission for window previews.",
+            .permissionGuideReady: "Permissions granted.",
+            .actionGoToSettings: "Go to Settings",
+            .actionDontRemindAgain: "Don't remind again",
+            .homeAppLayerTitle: "App Layer",
+            .homeAppLayerSubtitle: "Switchable apps",
+            .homeNoSwitchableApps: "No switchable apps",
+            .homeTriggerHotkeyFirst: "Trigger {hotkey} once first",
+            .homeWindowLayerTitle: "Window Layer",
+            .homeCurrentAppWindows: "Current app windows",
+            .homeAppWindowsOf: "{app} windows",
+            .homeWindowDataLoading: "Loading window data",
+            .homeReadingWindowsOf: "Reading {app} windows",
+            .homeNoSwitchableWindows: "No switchable windows in current app",
+            .homeConfirmAccessibility: "Please confirm Accessibility permission is granted",
+            .homeNoWindowData: "No window data",
+            .homeWaitCacheUpdate: "Waiting for cache update",
+            .hotkeyCommandTabTakeoverActive: "System Command + Tab / Command + Shift + Tab is now taken over and will be restored after FlowTab exits.",
+            .hotkeyCommandTabTakeoverInactive: "Command + Tab combination detected: FlowTab will try to take over system Command + Tab / Command + Shift + Tab.",
+            .hotkeyMainSummary: "Current: {main} ({reverseLabel}: {reverse}), {quitLabel}: {quit}",
+            .hotkeyInAppSummary: "{inAppLabel}: {main} ({reverseLabel}: {reverse})",
+            .hotkeySummaryReverseLabel: "Reverse",
+            .hotkeySummaryQuitLabel: "Quit app",
+            .hotkeySummaryInAppLabel: "In-app windows",
+            .hotkeyRowMainModifier: "Main modifier",
+            .hotkeyRowMainKey: "Main switch key",
+            .hotkeyRowQuitKey: "Quit app key",
+            .hotkeyRowInAppModifier: "In-app window modifier",
+            .hotkeyRowInAppKey: "In-app window key",
+            .settingsPageTitle: "Settings",
+            .settingsPageSubtitle: "Display, hotkeys, and permissions",
+            .settingsCardAppearanceTitle: "Appearance",
+            .settingsCardAppearanceSubtitle: "Display and theme",
+            .settingsCardWindowBehaviorTitle: "Window Behavior",
+            .settingsCardWindowBehaviorSubtitle: "Window layer entry and minimized handling",
+            .settingsCardPermissionTitle: "Permissions",
+            .settingsCardPermissionSubtitle: "Accessibility and Screen Recording",
+            .settingsCardSearchTitle: "Search",
+            .settingsCardSearchSubtitle: "Search switch, scope, and interaction",
+            .settingsCardHotkeyTitle: "Hotkeys",
+            .settingsCardHotkeySubtitle: "Main switch and quit app keys",
+            .appearanceDescription: "When disabled, the app runs only as a menu bar helper.",
+            .appearanceShowShortcutHint: "Show shortcut hint",
+            .appearanceShowAppWindow: "Show app window",
+            .appearanceThemeMode: "Theme mode",
+            .appearanceLanguage: "Language",
+            .languageSimplifiedChinese: "Simplified Chinese",
+            .languageEnglish: "English",
+            .windowBehaviorNote: "Note: This filter depends on Accessibility permission. Without it, minimized state cannot be detected, so app-layer filtering is skipped.",
+            .windowBehaviorSecondUnit: "sec",
+            .windowBehaviorAutoEnterDelay: "Window layer auto-enter delay",
+            .windowBehaviorAutoRestoreMinimized: "Auto-restore minimized windows when switching",
+            .windowBehaviorHideMinimizedApps: "Hide minimized-only apps in app layer",
+            .searchSummaryEnabled: "Panel starts from app layer by default; press Enter or ↑ to start search.",
+            .searchSummaryDisabled: "Search is disabled: panel only shows app and window layers.",
+            .searchEnable: "Enable search",
+            .searchDefaultScope: "Default search scope",
+            .searchScopeApp: "App",
+            .searchScopeWindow: "Window",
+            .permissionAccessibilityGranted: "Accessibility: Granted",
+            .permissionAccessibilityDenied: "Accessibility: Not granted",
+            .permissionAccessibilityClose: "Disable Accessibility permission",
+            .permissionAccessibilityRequest: "Request Accessibility permission",
+            .permissionScreenGranted: "Screen Recording: Granted",
+            .permissionScreenDenied: "Screen Recording: Not granted",
+            .permissionScreenClose: "Disable Screen Recording permission",
+            .permissionScreenRequest: "Request Screen Recording permission",
+            .permissionAccessibilityDetail: "Used for app switching, in-app window switching, and minimized-window handling.",
+            .permissionScreenDetail: "Used for real window previews; fallback info is shown when not granted.",
+            .permissionHomeReminderToggle: "Show Home reminder when permissions are missing",
+            .logsPageTitle: "Logs",
+            .logsPageSubtitle: "View and clean runtime logs",
+            .logsSectionTitle: "Logs",
+            .logsSectionSubtitle: "Runtime log tools",
+            .logsEnableVerbose: "Enable verbose runtime logs (high-frequency, may impact performance)",
+            .logsLevel: "Log level",
+            .logsDirectory: "Local logs directory: {path}",
+            .logsOpenDirectory: "Open Directory",
+            .logsClear: "Clear Logs",
+            .logsEmptyHint: "No logs yet. Trigger {hotkey} and check again.",
+            .alertScreenDeniedTitle: "Screen Recording permission was denied",
+            .alertScreenDeniedMessage: "macOS will not show the authorization prompt again. Please manually enable it in System Settings > Privacy & Security > Screen Recording.",
+            .alertOpenSystemSettings: "Open System Settings",
+            .alertLater: "Later",
+            .contentViewHint: "The app runs in the background. Press {mainHotkey} to open the switcher panel, then hold {quitHotkey} to quit the selected app.",
+            .panelHintEnterToSearch: "Enter / ↑ to search",
+            .panelHintSearchMode: "Tab switch scope · ←/→ move cursor · ↓ to results · Enter activate · Esc clear/close",
+            .panelInputPlaceholder: "Type to search",
+            .panelSearchLabel: "Search",
+            .panelNoResult: "No matches"
+        ]
+    ]
+
+    static func text(
+        _ key: AppStringKey,
+        replacements: [String: String] = [:],
+        language: AppLanguage = AppLanguagePreferencesStore.load()
+    ) -> String {
+        let languageTable = translations[language] ?? translations[fallbackLanguage] ?? [:]
+        let fallbackTable = translations[fallbackLanguage] ?? [:]
+        var resolved = languageTable[key] ?? fallbackTable[key] ?? key.rawValue
+        for (token, value) in replacements {
+            resolved = resolved.replacingOccurrences(of: "{\(token)}", with: value)
+        }
+        return resolved
+    }
+}
