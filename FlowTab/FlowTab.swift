@@ -2392,6 +2392,458 @@ private final class FlowSoftTextField: NSView {
     }
 }
 
+private final class FlowFormSelectOptionButton: NSButton {
+    var isOptionSelected = false {
+        didSet { updateAppearance() }
+    }
+
+    private var optionTitle = ""
+    private var isHovering = false
+    private var hoverTrackingArea: NSTrackingArea?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        buildViewHierarchy()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        buildViewHierarchy()
+    }
+
+    override var isEnabled: Bool {
+        didSet {
+            if !isEnabled {
+                isHovering = false
+            }
+            updateAppearance()
+        }
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateAppearance()
+    }
+
+    override func updateTrackingAreas() {
+        super.updateTrackingAreas()
+        if let hoverTrackingArea {
+            removeTrackingArea(hoverTrackingArea)
+        }
+
+        let trackingArea = NSTrackingArea(
+            rect: bounds,
+            options: [.activeInKeyWindow, .mouseEnteredAndExited, .inVisibleRect],
+            owner: self,
+            userInfo: nil
+        )
+        addTrackingArea(trackingArea)
+        hoverTrackingArea = trackingArea
+    }
+
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        if isEnabled {
+            addCursorRect(bounds, cursor: .pointingHand)
+        }
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        super.mouseEntered(with: event)
+        guard isEnabled else { return }
+        isHovering = true
+        updateAppearance()
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        super.mouseExited(with: event)
+        isHovering = false
+        updateAppearance()
+    }
+
+    func update(title: String, isSelected: Bool) {
+        optionTitle = title
+        self.title = title
+        isOptionSelected = isSelected
+        updateAppearance()
+    }
+
+    private func buildViewHierarchy() {
+        wantsLayer = true
+        isBordered = false
+        focusRingType = .none
+        alignment = .center
+        imagePosition = .noImage
+        setButtonType(.momentaryChange)
+        translatesAutoresizingMaskIntoConstraints = false
+        setContentHuggingPriority(.required, for: .vertical)
+        setContentCompressionResistancePriority(.required, for: .vertical)
+        heightAnchor.constraint(equalToConstant: 30).isActive = true
+        layer?.cornerRadius = 0
+        updateAppearance()
+    }
+
+    private func updateAppearance() {
+        guard let layer else { return }
+        let isDark = effectiveAppearance.isFlowTabDarkInterface
+        let hoverColor = NSColor.controlAccentColor.withAlphaComponent(isDark ? 0.18 : 0.10)
+        layer.backgroundColor = (!isOptionSelected && isHovering && isEnabled) ? hoverColor.cgColor : NSColor.clear.cgColor
+        layer.borderWidth = 0
+        layer.borderColor = NSColor.clear.cgColor
+
+        let titleColor: NSColor
+        if !isEnabled {
+            titleColor = NSColor.secondaryLabelColor.withAlphaComponent(0.65)
+        } else if isOptionSelected {
+            titleColor = .controlAccentColor
+        } else {
+            titleColor = NSColor.labelColor.withAlphaComponent(isDark ? 0.92 : 0.78)
+        }
+
+        attributedTitle = NSAttributedString(
+            string: optionTitle,
+            attributes: [
+                .paragraphStyle: {
+                    let style = NSMutableParagraphStyle()
+                    style.alignment = .center
+                    return style
+                }(),
+                .font: NSFont.systemFont(ofSize: 12.5, weight: isOptionSelected ? .semibold : .regular),
+                .foregroundColor: titleColor
+            ]
+        )
+    }
+}
+
+private final class FlowFormSelectMenuView: NSView {
+    var onSelectionChanged: ((String) -> Void)?
+
+    private let stackView = NSStackView()
+    private var widthConstraint: NSLayoutConstraint?
+    private var selectedID: String?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        buildViewHierarchy()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        buildViewHierarchy()
+    }
+
+    override var intrinsicContentSize: NSSize {
+        layoutSubtreeIfNeeded()
+        return NSSize(
+            width: widthConstraint?.constant ?? 120,
+            height: stackView.fittingSize.height + 12
+        )
+    }
+
+    override func layout() {
+        super.layout()
+        updateAppearance()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateAppearance()
+    }
+
+    func update(options: [(id: String, title: String)], selectedID: String?, preferredWidth: CGFloat) {
+        self.selectedID = selectedID
+
+        stackView.arrangedSubviews.forEach { view in
+            stackView.removeArrangedSubview(view)
+            view.removeFromSuperview()
+        }
+
+        for option in options {
+            let button = FlowFormSelectOptionButton(frame: .zero)
+            button.identifier = NSUserInterfaceItemIdentifier(option.id)
+            button.target = self
+            button.action = #selector(handleOptionPressed(_:))
+            button.update(title: option.title, isSelected: option.id == selectedID)
+            stackView.addArrangedSubview(button)
+            button.widthAnchor.constraint(equalTo: stackView.widthAnchor).isActive = true
+        }
+
+        widthConstraint?.constant = max(preferredWidth, 68)
+        invalidateIntrinsicContentSize()
+        needsLayout = true
+        layoutSubtreeIfNeeded()
+        updateAppearance()
+    }
+
+    private func buildViewHierarchy() {
+        wantsLayer = true
+        stackView.orientation = .vertical
+        stackView.alignment = .leading
+        stackView.distribution = .fillEqually
+        stackView.spacing = 4
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stackView)
+
+        widthConstraint = widthAnchor.constraint(equalToConstant: 120)
+        widthConstraint?.isActive = true
+
+        NSLayoutConstraint.activate([
+            stackView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            stackView.topAnchor.constraint(equalTo: topAnchor),
+            stackView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            stackView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
+
+        updateAppearance()
+    }
+
+    @objc private func handleOptionPressed(_ sender: NSButton) {
+        guard let id = sender.identifier?.rawValue else { return }
+        onSelectionChanged?(id)
+    }
+
+    private func updateAppearance() {
+        guard let layer else { return }
+        if effectiveAppearance.isFlowTabDarkInterface {
+            layer.backgroundColor = NSColor(
+                red: 0.16,
+                green: 0.16,
+                blue: 0.18,
+                alpha: 0.98
+            ).cgColor
+            layer.borderColor = NSColor.white.withAlphaComponent(0.14).cgColor
+            layer.shadowOpacity = 0
+        } else {
+            layer.backgroundColor = NSColor.white.withAlphaComponent(0.99).cgColor
+            layer.borderColor = NSColor.black.withAlphaComponent(0.12).cgColor
+            layer.shadowColor = NSColor.black.withAlphaComponent(0.10).cgColor
+            layer.shadowOpacity = 1
+            layer.shadowRadius = 8
+            layer.shadowOffset = CGSize(width: 0, height: 4)
+        }
+        layer.cornerRadius = 0
+        layer.borderWidth = 1
+    }
+}
+
+private final class FlowFormSelectMenuViewController: NSViewController {
+    let menuView = FlowFormSelectMenuView(frame: .zero)
+
+    var onSelectionChanged: ((String) -> Void)? {
+        didSet { menuView.onSelectionChanged = onSelectionChanged }
+    }
+
+    override func loadView() {
+        view = menuView
+    }
+
+    func update(options: [(id: String, title: String)], selectedID: String?, preferredWidth: CGFloat) {
+        menuView.update(options: options, selectedID: selectedID, preferredWidth: preferredWidth)
+        preferredContentSize = menuView.intrinsicContentSize
+    }
+}
+
+private final class FlowFormSelectControl: NSView {
+    var onSelectionChanged: ((String) -> Void)?
+
+    var isEnabled = true {
+        didSet {
+            if !isEnabled {
+                popover.performClose(nil)
+            }
+            updateAppearance()
+        }
+    }
+
+    private let titleLabel = NSTextField(labelWithString: "")
+    private let chevronImageView = NSImageView()
+    private let popover = NSPopover()
+    private let menuViewController = FlowFormSelectMenuViewController()
+    private let chevronSymbolConfiguration = NSImage.SymbolConfiguration(pointSize: 10, weight: .semibold)
+    private var options: [(id: String, title: String)] = []
+    private var selectedID: String?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        buildViewHierarchy()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        buildViewHierarchy()
+    }
+
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: 120, height: 32)
+    }
+
+    override func layout() {
+        super.layout()
+        updateAppearance()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateAppearance()
+    }
+
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        if newWindow == nil {
+            popover.performClose(nil)
+        }
+        super.viewWillMove(toWindow: newWindow)
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        guard isEnabled else { return }
+        if popover.isShown {
+            popover.performClose(nil)
+            updateAppearance()
+            return
+        }
+
+        menuViewController.onSelectionChanged = { [weak self] id in
+            self?.handleSelectionChanged(id)
+        }
+        menuViewController.update(
+            options: options,
+            selectedID: selectedID,
+            preferredWidth: max(bounds.width, 68)
+        )
+        popover.behavior = .transient
+        popover.animates = true
+        popover.appearance = effectiveAppearance
+        popover.contentViewController = menuViewController
+        popover.show(relativeTo: bounds, of: self, preferredEdge: .maxY)
+        updateAppearance()
+    }
+
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        if isEnabled {
+            addCursorRect(bounds, cursor: .pointingHand)
+        }
+    }
+
+    func configure(options: [(id: String, title: String)]) {
+        self.options = options
+        if options.contains(where: { $0.id == selectedID }) == false {
+            selectedID = options.first?.id
+        }
+        updateDisplayTitle()
+        menuViewController.update(
+            options: options,
+            selectedID: selectedID,
+            preferredWidth: max(bounds.width, intrinsicContentSize.width)
+        )
+    }
+
+    func updateSelection(id: String) {
+        guard options.contains(where: { $0.id == id }) else { return }
+        guard selectedID != id else {
+            updateAppearance()
+            return
+        }
+        selectedID = id
+        updateDisplayTitle()
+        menuViewController.update(
+            options: options,
+            selectedID: selectedID,
+            preferredWidth: max(bounds.width, intrinsicContentSize.width)
+        )
+        updateAppearance()
+    }
+
+    private func buildViewHierarchy() {
+        wantsLayer = true
+        translatesAutoresizingMaskIntoConstraints = false
+        setContentHuggingPriority(.required, for: .vertical)
+        setContentCompressionResistancePriority(.required, for: .vertical)
+        heightAnchor.constraint(equalToConstant: 32).isActive = true
+
+        titleLabel.font = .systemFont(ofSize: 13)
+        titleLabel.lineBreakMode = .byTruncatingTail
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        addSubview(titleLabel)
+
+        chevronImageView.imageScaling = .scaleProportionallyDown
+        chevronImageView.translatesAutoresizingMaskIntoConstraints = false
+        chevronImageView.setContentCompressionResistancePriority(.required, for: .horizontal)
+        addSubview(chevronImageView)
+
+        NSLayoutConstraint.activate([
+            titleLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
+            titleLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
+            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: chevronImageView.leadingAnchor, constant: -8),
+            chevronImageView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
+            chevronImageView.centerYAnchor.constraint(equalTo: centerYAnchor),
+            chevronImageView.widthAnchor.constraint(equalToConstant: 10),
+            chevronImageView.heightAnchor.constraint(equalToConstant: 10)
+        ])
+
+        updateAppearance()
+    }
+
+    private func handleSelectionChanged(_ id: String) {
+        let hasChanged = selectedID != id
+        selectedID = id
+        updateDisplayTitle()
+        popover.performClose(nil)
+        updateAppearance()
+
+        if hasChanged {
+            onSelectionChanged?(id)
+        }
+    }
+
+    private func updateDisplayTitle() {
+        titleLabel.stringValue = options.first(where: { $0.id == selectedID })?.title ?? ""
+    }
+
+    private func updateAppearance() {
+        guard let layer else { return }
+
+        let isDark = effectiveAppearance.isFlowTabDarkInterface
+        let isExpanded = popover.isShown
+        let borderColor: NSColor
+        let backgroundColor: NSColor
+
+        if isDark {
+            borderColor = isExpanded
+                ? .controlAccentColor.withAlphaComponent(0.45)
+                : NSColor.white.withAlphaComponent(isEnabled ? 0.14 : 0.08)
+            backgroundColor = NSColor.white.withAlphaComponent(isEnabled ? (isExpanded ? 0.12 : 0.08) : 0.05)
+            layer.shadowOpacity = 0
+        } else {
+            borderColor = isExpanded
+                ? .controlAccentColor.withAlphaComponent(0.28)
+                : NSColor.black.withAlphaComponent(isEnabled ? 0.14 : 0.08)
+            backgroundColor = NSColor.white.withAlphaComponent(isEnabled ? 0.99 : 0.92)
+            layer.shadowColor = NSColor.black.withAlphaComponent(isExpanded ? 0.08 : 0.04).cgColor
+            layer.shadowOpacity = 1
+            layer.shadowRadius = isExpanded ? 6 : 4
+            layer.shadowOffset = CGSize(width: 0, height: 1)
+        }
+
+        layer.cornerRadius = 10
+        layer.borderWidth = 1
+        layer.borderColor = borderColor.cgColor
+        layer.backgroundColor = backgroundColor.cgColor
+
+        titleLabel.textColor = isEnabled
+            ? NSColor.labelColor.withAlphaComponent(isDark ? 0.92 : 0.78)
+            : NSColor.secondaryLabelColor.withAlphaComponent(0.65)
+        chevronImageView.contentTintColor = isEnabled
+            ? NSColor.secondaryLabelColor.withAlphaComponent(isDark ? 0.92 : 0.75)
+            : NSColor.secondaryLabelColor.withAlphaComponent(0.55)
+        chevronImageView.image = NSImage(
+            systemSymbolName: isExpanded ? "chevron.up" : "chevron.down",
+            accessibilityDescription: nil
+        )?.withSymbolConfiguration(chevronSymbolConfiguration)
+    }
+}
+
 private class AppKitSettingsCardBaseView: NSView {
     let stackView = NSStackView()
 
@@ -2477,34 +2929,16 @@ private class AppKitSettingsCardBaseView: NSView {
     }
 
     static func configure(
-        popUp: NSPopUpButton,
+        selectControl: FlowFormSelectControl,
         options: [(id: String, title: String)],
-        target: AnyObject,
-        action: Selector,
-        width: CGFloat = 160
+        width: CGFloat
     ) {
-        popUp.target = target
-        popUp.action = action
-        popUp.controlSize = .regular
-        popUp.font = .systemFont(ofSize: 13)
-        popUp.alignment = .right
-        popUp.translatesAutoresizingMaskIntoConstraints = false
-        popUp.menu = NSMenu()
-
-        for option in options {
-            let item = NSMenuItem(title: option.title, action: nil, keyEquivalent: "")
-            item.representedObject = option.id
-            popUp.menu?.addItem(item)
-        }
-
-        popUp.widthAnchor.constraint(equalToConstant: width).isActive = true
+        selectControl.configure(options: options)
+        selectControl.widthAnchor.constraint(equalToConstant: width).isActive = true
     }
 
-    static func selectItem(in popUp: NSPopUpButton, rawValue: String) {
-        guard let item = popUp.itemArray.first(where: { ($0.representedObject as? String) == rawValue }) else {
-            return
-        }
-        popUp.select(item)
+    static func selectItem(in selectControl: FlowFormSelectControl, rawValue: String) {
+        selectControl.updateSelection(id: rawValue)
     }
 
 }
@@ -3264,7 +3698,7 @@ private final class AppearanceSettingsCardAppKitView: AppKitSettingsCardBaseView
     private let themeModeControl = FlowCapsuleSegmentedControl(
         options: AppearanceSettingsCardAppKitView.themeOptions()
     )
-    private let appLanguagePopUp = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let appLanguageSelect = FlowFormSelectControl(frame: .zero)
     private let descriptionLabel = AppKitSettingsCardBaseView.makeBodyLabel()
     private var isApplyingState = false
     private var currentState: AppearanceSettingsCardState?
@@ -3295,10 +3729,7 @@ private final class AppearanceSettingsCardAppKitView: AppKitSettingsCardBaseView
         showShortcutHintSwitch.state = state.showShortcutHint ? .on : .off
         showInCommandTabSwitch.state = state.showInCommandTab ? .on : .off
         themeModeControl.updateSelection(id: state.resolvedThemeMode.rawValue)
-        AppKitSettingsCardBaseView.selectItem(
-            in: appLanguagePopUp,
-            rawValue: state.resolvedAppLanguage.rawValue
-        )
+        AppKitSettingsCardBaseView.selectItem(in: appLanguageSelect, rawValue: state.resolvedAppLanguage.rawValue)
         isApplyingState = false
 
         descriptionLabel.stringValue = AppStrings.text(.appearanceDescription)
@@ -3315,12 +3746,13 @@ private final class AppearanceSettingsCardAppKitView: AppKitSettingsCardBaseView
             self?.handleThemeModeChanged(rawValue)
         }
         themeModeControl.widthAnchor.constraint(equalToConstant: 300).isActive = true
+        appLanguageSelect.onSelectionChanged = { [weak self] rawValue in
+            self?.handleAppLanguageChanged(rawValue)
+        }
         AppKitSettingsCardBaseView.configure(
-            popUp: appLanguagePopUp,
+            selectControl: appLanguageSelect,
             options: Self.languageOptions(),
-            target: self,
-            action: #selector(handleAppLanguageChanged(_:)),
-            width: 180
+            width: 96
         )
 
         addFullWidthArrangedSubview(
@@ -3345,7 +3777,7 @@ private final class AppearanceSettingsCardAppKitView: AppKitSettingsCardBaseView
         addFullWidthArrangedSubview(
             AppKitSettingsCardBaseView.makeControlRow(
                 title: AppStrings.text(.appearanceLanguage),
-                control: appLanguagePopUp
+                control: appLanguageSelect
             )
         )
     }
@@ -3365,9 +3797,8 @@ private final class AppearanceSettingsCardAppKitView: AppKitSettingsCardBaseView
         onThemeModeChanged?(rawValue)
     }
 
-    @objc private func handleAppLanguageChanged(_ sender: NSPopUpButton) {
+    private func handleAppLanguageChanged(_ rawValue: String) {
         guard !isApplyingState else { return }
-        guard let rawValue = sender.selectedItem?.representedObject as? String else { return }
         onAppLanguageChanged?(rawValue)
     }
 }
@@ -3717,7 +4148,7 @@ private final class SearchSettingsCardAppKitView: AppKitSettingsCardBaseView {
     var onSearchDefaultScopeChanged: ((String) -> Void)?
 
     private let searchEnabledSwitch = NSSwitch()
-    private let searchDefaultScopePopUp = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let searchDefaultScopeSelect = FlowFormSelectControl(frame: .zero)
     private let scopeRowContainer = NSStackView()
     private let summaryLabel = AppKitSettingsCardBaseView.makeBodyLabel()
     private var isApplyingState = false
@@ -3739,13 +4170,10 @@ private final class SearchSettingsCardAppKitView: AppKitSettingsCardBaseView {
 
         isApplyingState = true
         searchEnabledSwitch.state = state.searchEnabled ? .on : .off
-        AppKitSettingsCardBaseView.selectItem(
-            in: searchDefaultScopePopUp,
-            rawValue: state.resolvedScope.rawValue
-        )
+        AppKitSettingsCardBaseView.selectItem(in: searchDefaultScopeSelect, rawValue: state.resolvedScope.rawValue)
         isApplyingState = false
 
-        searchDefaultScopePopUp.isEnabled = state.searchEnabled
+        searchDefaultScopeSelect.isEnabled = state.searchEnabled
         scopeRowContainer.alphaValue = state.searchEnabled ? 1 : 0.5
         summaryLabel.stringValue = state.summaryText
         invalidateIntrinsicContentSize()
@@ -3754,11 +4182,13 @@ private final class SearchSettingsCardAppKitView: AppKitSettingsCardBaseView {
     private func buildViewHierarchy() {
         searchEnabledSwitch.target = self
         searchEnabledSwitch.action = #selector(handleSearchEnabledChanged)
+        searchDefaultScopeSelect.onSelectionChanged = { [weak self] rawValue in
+            self?.handleSearchDefaultScopeChanged(rawValue)
+        }
         AppKitSettingsCardBaseView.configure(
-            popUp: searchDefaultScopePopUp,
+            selectControl: searchDefaultScopeSelect,
             options: SwitcherSearchScope.allCases.map { (id: $0.rawValue, title: $0.label) },
-            target: self,
-            action: #selector(handleSearchDefaultScopeChanged)
+            width: 68
         )
 
         let searchEnabledRow = AppKitSettingsCardBaseView.makeControlRow(
@@ -3775,7 +4205,7 @@ private final class SearchSettingsCardAppKitView: AppKitSettingsCardBaseView {
         scopeRowContainer.addArrangedSubview(
             AppKitSettingsCardBaseView.makeControlRow(
                 title: AppStrings.text(.searchDefaultScope),
-                control: searchDefaultScopePopUp
+                control: searchDefaultScopeSelect
             )
         )
         if let scopeRow = scopeRowContainer.arrangedSubviews.first {
@@ -3792,9 +4222,8 @@ private final class SearchSettingsCardAppKitView: AppKitSettingsCardBaseView {
         onSearchEnabledChanged?(sender.state == .on)
     }
 
-    @objc private func handleSearchDefaultScopeChanged(_ sender: NSPopUpButton) {
+    private func handleSearchDefaultScopeChanged(_ rawValue: String) {
         guard !isApplyingState else { return }
-        guard let rawValue = sender.selectedItem?.representedObject as? String else { return }
         onSearchDefaultScopeChanged?(rawValue)
     }
 }
