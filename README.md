@@ -198,6 +198,10 @@ cd FlowTabCore
 swift test
 ```
 
+## 应用内 tab 切换压测
+
+本节按“必跑要求 -> 定位结论 -> 优化落地”组织，三部分是同一条性能治理链路。
+
 ### 性能压测（必跑）
 
 涉及以下范围的修改时，提交前必须执行一次 tab 切换压测并记录结果（至少包含 `CPU avg/peak`、`RSS avg/peak`）：
@@ -217,15 +221,17 @@ swift test
 ./scripts/tab-switch-stress.sh 20 50 0.5
 ```
 
-## 压测定位结论（2026-03-30）
+### 压测定位结论（2026-03-30）
 
 说明：以下数据为 `Debug` 构建下的诊断性单轮压测，统一使用 `20s / 20ms / 0.5s sample` 口径，主要用于定位热点来源，不替代上方“性能压测（必跑）”中的正式验收要求。
+
+定义说明：本节中的“全真实页面基线”特指 `Home / Logs / Settings` 三个 tab 都使用真实 SwiftUI 页面实现（非占位视图、非 AppKit 化版本）。
 
 代表性结果如下：
 
 | 实验 | CPU(avg/peak) | RSS(avg/peak) | 结论 |
 | --- | --- | --- | --- |
-| 全真实页面基线 | 69.61% / 79.40% | 83.05MB / 102.31MB | 当前 tab 压测高 CPU 的直接观测值 |
+| 全 SwiftUI 实现的真实页面基线 | 69.61% / 79.40% | 83.05MB / 102.31MB | 当前 tab 压测高 CPU 的直接观测值 |
 | 关闭 window restoration | 69.50% / 75.10% | 85.87MB / 90.20MB | 几乎无改善，不是主因 |
 | 绕过 Home / Logs / Settings 激活副作用 | 69.85% / 95.90% | 93.53MB / 103.44MB | 几乎无改善，不是主因 |
 | 三个 tab 全换极简占位视图 | 26.57% / 62.10% | 56.81MB / 61.05MB | 高 CPU 不是“纯切页框架成本” |
@@ -261,7 +267,7 @@ swift test
 - 后续优化应优先聚焦 `Settings` 页内容拆分，而不是继续尝试整页 keep-alive / unmount，或单纯隔离 `selectedTab` 传递路径。
 - 最优先的收敛方向是：把 `Settings` 从“整页 live form”改成“摘要页 + 按需编辑器”或更小的按需挂载单元，再单独处理“快捷键”卡这类最重区域。
 
-## Settings 页 AppKit 化（2026-03-31）
+### Settings 页 AppKit 化（2026-03-31）
 
 本轮把 `Settings` 页整体切换为 AppKit 容器与 AppKit 卡片实现，不再保留“SwiftUI 外层页面 + 多个 AppKit representable 内容岛”的混合结构。
 
