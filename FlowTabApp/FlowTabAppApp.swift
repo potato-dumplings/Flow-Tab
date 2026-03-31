@@ -149,9 +149,8 @@ enum AppVisibilityPreferencesStore {
 
 enum WindowLayerPreferencesStore {
     static let defaultAutoEnterDelay: Double = 0.35
-    static let minAutoEnterDelay: Double = 0.10
-    static let maxAutoEnterDelay: Double = 1.20
-    static let autoEnterDelayStep: Double = 0.05
+    static let minAutoEnterDelay: Double = 0.0
+    static let maxAutoEnterDelay: Double = 999.99
 
     static func loadAutoEnterDelay(userDefaults: UserDefaults = .standard) -> TimeInterval {
         guard userDefaults.object(forKey: AppPreferenceKeys.windowLayerAutoEnterDelay) != nil else {
@@ -165,9 +164,37 @@ enum WindowLayerPreferencesStore {
     static func normalizedAutoEnterDelay(_ rawValue: Double) -> Double {
         guard rawValue.isFinite else { return defaultAutoEnterDelay }
         let clamped = min(max(rawValue, minAutoEnterDelay), maxAutoEnterDelay)
-        let stepCount = ((clamped - minAutoEnterDelay) / autoEnterDelayStep).rounded()
-        let quantized = minAutoEnterDelay + stepCount * autoEnterDelayStep
-        return (quantized * 100).rounded() / 100
+        return (clamped * 100).rounded() / 100
+    }
+
+    static func sanitizeAutoEnterDelayText(_ rawText: String) -> String {
+        var sanitized = ""
+        var hasDecimalSeparator = false
+        var fractionalDigitCount = 0
+
+        for character in rawText {
+            if character.isNumber {
+                if hasDecimalSeparator {
+                    guard fractionalDigitCount < 2 else { continue }
+                    fractionalDigitCount += 1
+                }
+                sanitized.append(character)
+                continue
+            }
+            if character == ".", !hasDecimalSeparator {
+                hasDecimalSeparator = true
+                if sanitized.isEmpty {
+                    sanitized = "0"
+                }
+                sanitized.append(".")
+            }
+        }
+
+        if let parsedValue = Double(sanitized), parsedValue > maxAutoEnterDelay {
+            return String(format: "%.2f", maxAutoEnterDelay)
+        }
+
+        return sanitized
     }
 }
 
@@ -3393,7 +3420,14 @@ private final class WindowBehaviorSettingsCardAppKitView: AppKitSettingsCardBase
     func controlTextDidChange(_ notification: Notification) {
         guard !isApplyingState else { return }
         guard notification.object as? NSTextField === delayInputField.textField else { return }
-        onWindowLayerAutoEnterDelayTextChanged?(delayInputField.textField.stringValue)
+        let rawText = delayInputField.textField.stringValue
+        let sanitizedText = WindowLayerPreferencesStore.sanitizeAutoEnterDelayText(rawText)
+        if sanitizedText != rawText {
+            isApplyingState = true
+            delayInputField.textField.stringValue = sanitizedText
+            isApplyingState = false
+        }
+        onWindowLayerAutoEnterDelayTextChanged?(sanitizedText)
     }
 
     func controlTextDidBeginEditing(_ notification: Notification) {
@@ -4246,10 +4280,9 @@ private struct AppSettingsView: View {
     }
 
     private func applyWindowLayerAutoEnterDelayText(_ rawText: String) {
-        let sanitized = sanitizeWindowLayerAutoEnterDelayText(rawText)
-        if sanitized != rawText {
+        let sanitized = WindowLayerPreferencesStore.sanitizeAutoEnterDelayText(rawText)
+        if windowLayerAutoEnterDelayText != sanitized {
             windowLayerAutoEnterDelayText = sanitized
-            return
         }
         guard !sanitized.isEmpty else { return }
         guard sanitized != "." else { return }
@@ -4261,7 +4294,9 @@ private struct AppSettingsView: View {
     }
 
     private func commitWindowLayerAutoEnterDelayText() {
-        let sanitized = sanitizeWindowLayerAutoEnterDelayText(windowLayerAutoEnterDelayText)
+        let sanitized = WindowLayerPreferencesStore.sanitizeAutoEnterDelayText(
+            windowLayerAutoEnterDelayText
+        )
         if windowLayerAutoEnterDelayText != sanitized {
             windowLayerAutoEnterDelayText = sanitized
         }
@@ -4271,32 +4306,6 @@ private struct AppSettingsView: View {
             )
         }
         syncWindowLayerAutoEnterDelayText()
-    }
-
-    private func sanitizeWindowLayerAutoEnterDelayText(_ rawText: String) -> String {
-        var sanitized = ""
-        var hasDecimalSeparator = false
-        var fractionalDigitCount = 0
-
-        for character in rawText {
-            if character.isNumber {
-                if hasDecimalSeparator {
-                    guard fractionalDigitCount < 2 else { continue }
-                    fractionalDigitCount += 1
-                }
-                sanitized.append(character)
-                continue
-            }
-            if character == ".", !hasDecimalSeparator {
-                hasDecimalSeparator = true
-                if sanitized.isEmpty {
-                    sanitized = "0"
-                }
-                sanitized.append(".")
-            }
-        }
-
-        return sanitized
     }
 
     private func notifyHotkeyConfigChanged() {
