@@ -1,6 +1,6 @@
-# FlowTabApp
+# FlowTab
 
-FlowTabApp 是一个 macOS 应用切换器，目标是在接近系统 `Command + Tab` 手感的前提下，提供更可控的多窗口切换体验。
+FlowTab 是一个 macOS 应用切换器，目标是在接近系统 `Command + Tab` 手感的前提下，提供更可控的多窗口切换体验。
 
 它当前已支持：
 - 全局主切换快捷键自定义（默认 `Option + Tab` / `Option + Shift + Tab`）
@@ -151,9 +151,9 @@ FlowTab 使用三层会话模型：
 
 ## 仓库结构
 
-- `FlowTabApp/`：macOS App 层（热键、面板、运行时桥接、首页与监控 UI）
+- `FlowTab/`：macOS App 层（热键、面板、运行时桥接、首页与监控 UI）
 - `FlowTabCore/`：核心状态机与模型（可单测）
-- `FlowTabAppTests/`、`FlowTabAppUITests/`：测试目标
+- `FlowTabTests/`、`FlowTabUITests/`：测试目标
 - `scripts/`：构建与安装脚本
 
 ## 技术架构
@@ -164,14 +164,14 @@ FlowTab 使用三层会话模型：
 - `Grouping`：应用分组逻辑
 - `SwitcherSession`：切换状态机与目标决策
 
-### App（FlowTabApp）
+### App（FlowTab）
 
 - `OptionTabHotkeyMonitor`：按用户偏好注册全局主切换热键
 - `SwitcherPanelController` + `LiveSwitcherModel`：面板交互、按键处理、会话推进、面板内结束应用快捷键
 - `RuntimeSnapshotProvider`：运行中应用与窗口快照
 - `RuntimeActivator`：应用/窗口激活
 - `RuntimeWindowPreviewProvider`：窗口预览抓图（`ScreenCaptureKit`）与窗口标题样式猜测
-- `FlowTabAppApp`：应用生命周期、首页、监控页、预览日志页、状态栏菜单
+- `FlowTabApp`：应用生命周期、首页、监控页、预览日志页、状态栏菜单
 
 ## 环境要求
 
@@ -183,16 +183,16 @@ FlowTab 使用三层会话模型：
 
 ### Xcode
 
-1. 打开 `FlowTabApp.xcodeproj`
-2. 选择 `FlowTabApp` Scheme
+1. 打开 `FlowTab.xcodeproj`
+2. 选择 `FlowTab` Scheme
 3. `Command + R` 运行
 
 ### 命令行构建（Debug）
 
 ```bash
 xcodebuild \
-  -project FlowTabApp.xcodeproj \
-  -scheme FlowTabApp \
+  -project FlowTab.xcodeproj \
+  -scheme FlowTab \
   -configuration Debug \
   -derivedDataPath ./.build-local \
   build
@@ -307,10 +307,10 @@ chmod +x scripts/release-install.sh
 ```
 
 该脚本会执行：
-1. 退出正在运行的 `FlowTabApp`
+1. 退出正在运行的 `FlowTab`
 2. 重置该应用的辅助功能与屏幕录制授权记录
 3. 构建 Release
-4. 替换 `/Applications/FlowTabApp.app`
+4. 替换 `/Applications/FlowTab.app`
 5. 启动新版本
 
 注意：
@@ -344,7 +344,7 @@ chmod +x scripts/release-install.sh
 ### 1) 看不到可切换窗口，日志里 `windows=0`
 
 通常是辅助功能权限未生效，或者当前运行实例路径与授权路径不一致。
-建议安装到固定路径 `/Applications/FlowTabApp.app` 后重新授权。
+建议安装到固定路径 `/Applications/FlowTab.app` 后重新授权。
 
 ### 2) 窗口预览没有真实画面
 
@@ -433,11 +433,11 @@ chmod +x scripts/release-install.sh
 执行命令：
 ```bash
 xcodebuild \
-  -project FlowTabApp.xcodeproj \
-  -scheme FlowTabApp \
+  -project FlowTab.xcodeproj \
+  -scheme FlowTab \
   -destination 'platform=macOS' \
-  -only-testing:FlowTabAppTests/FlowTabAppTests/testSearchPerformanceWindowScope \
-  -only-testing:FlowTabAppTests/FlowTabAppTests/testSearchPressureWindowScopeUnified \
+  -only-testing:FlowTabTests/FlowTabTests/testSearchPerformanceWindowScope \
+  -only-testing:FlowTabTests/FlowTabTests/testSearchPressureWindowScopeUnified \
   test
 ```
 

@@ -3,9 +3,9 @@ set -euo pipefail
 
 PROJECT_DIR="{user-home}/Projeck-Works/Personal/FlowTabApp"
 DERIVED_DATA_PATH="${PROJECT_DIR}/.build-local"
-RELEASE_APP_PATH="${DERIVED_DATA_PATH}/Build/Products/Release/FlowTabApp.app"
-INSTALL_PATH="/Applications/FlowTabApp.app"
-BUNDLE_ID="com.pd.FlowTabApp"
+RELEASE_APP_PATH="${DERIVED_DATA_PATH}/Build/Products/Release/FlowTab.app"
+INSTALL_PATH="/Applications/FlowTab.app"
+BUNDLE_ID="io.github.potato-dumplings.flowtab"
 
 for arg in "$@"; do
   case "${arg}" in
@@ -43,9 +43,9 @@ reset_tcc_permission() {
   fi
 }
 
-echo "[${STEP}/${TOTAL_STEPS}] Quit running FlowTabApp"
-osascript -e 'quit app "FlowTabApp"' >/dev/null 2>&1 || true
-pkill -x FlowTabApp >/dev/null 2>&1 || true
+echo "[${STEP}/${TOTAL_STEPS}] Quit running FlowTab"
+osascript -e 'quit app "FlowTab"' >/dev/null 2>&1 || true
+pkill -x FlowTab >/dev/null 2>&1 || true
 sleep 1
 
 STEP=$((STEP + 1))
@@ -57,8 +57,8 @@ STEP=$((STEP + 1))
 echo "[${STEP}/${TOTAL_STEPS}] Build Release"
 cd "${PROJECT_DIR}"
 xcodebuild \
-  -project FlowTabApp.xcodeproj \
-  -scheme FlowTabApp \
+  -project FlowTab.xcodeproj \
+  -scheme FlowTab \
   -configuration Release \
   -derivedDataPath "${DERIVED_DATA_PATH}" \
   build

@@ -1,13 +1,13 @@
 //
-//  FlowTabAppUITests.swift
-//  FlowTabAppUITests
+//  FlowTabUITests.swift
+//  FlowTabUITests
 //
 //  Created by lk on 3/24/26.
 //
 
 import XCTest
 
-final class FlowTabAppUITests: XCTestCase {
+final class FlowTabUITests: XCTestCase {
     private enum Identifier {
         static let homeTabButton = "flowtab.sidebar.tab.home"
         static let logsTabButton = "flowtab.sidebar.tab.logs"

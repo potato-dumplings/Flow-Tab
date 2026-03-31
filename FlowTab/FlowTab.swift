@@ -424,7 +424,7 @@ enum AppWindowCoordinator {
 }
 
 @main
-struct FlowTabAppApp: App {
+struct FlowTabApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     private let appWindowWidth: CGFloat = 1120
     private let appWindowHeight: CGFloat = 760
@@ -5053,7 +5053,7 @@ final class RuntimeLogFileStore {
     private static let logFilePrefix: String = {
         let displayName = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String
         let bundleName = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String
-        let rawName = (displayName?.isEmpty == false ? displayName : bundleName) ?? "FlowTabApp"
+        let rawName = (displayName?.isEmpty == false ? displayName : bundleName) ?? "FlowTab"
         let sanitized = rawName
             .replacingOccurrences(
                 of: #"[^A-Za-z0-9_-]"#,
@@ -5082,7 +5082,7 @@ final class RuntimeLogFileStore {
     private init() {
         let fallbackURL = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
         let baseURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ?? fallbackURL
-        logsDirectoryURL = baseURL.appendingPathComponent("FlowTabApp/logs", isDirectory: true)
+        logsDirectoryURL = baseURL.appendingPathComponent("FlowTab/logs", isDirectory: true)
         activeLogURL = nil
     }
 

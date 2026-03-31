@@ -1,13 +1,13 @@
 //
-//  FlowTabAppUITestsLaunchTests.swift
-//  FlowTabAppUITests
+//  FlowTabUITestsLaunchTests.swift
+//  FlowTabUITests
 //
 //  Created by lk on 3/24/26.
 //
 
 import XCTest
 
-final class FlowTabAppUITestsLaunchTests: XCTestCase {
+final class FlowTabUITestsLaunchTests: XCTestCase {
 
     override class var runsForEachTargetApplicationUIConfiguration: Bool {
         true

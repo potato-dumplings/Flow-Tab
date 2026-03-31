@@ -1,8 +1,8 @@
 import XCTest
-@testable import FlowTabApp
+@testable import FlowTab
 import FlowTabCore
 
-final class FlowTabAppTests: XCTestCase {
+final class FlowTabTests: XCTestCase {
     func testResolveKeepsCommandWhenMainShortcutIsCommandTab() {
         let configuration = SwitcherHotkeyPreferencesStore.resolve(
             primaryModifierRaw: SwitcherPrimaryModifier.command.rawValue,
@@ -27,7 +27,7 @@ final class FlowTabAppTests: XCTestCase {
     }
 
     func testLoadPersistsNormalizedHotkeyValues() {
-        let suiteName = "FlowTabAppTests.\(UUID().uuidString)"
+        let suiteName = "FlowTabTests.\(UUID().uuidString)"
         guard let userDefaults = UserDefaults(suiteName: suiteName) else {
             XCTFail("Failed to create isolated user defaults suite")
             return
@@ -307,7 +307,7 @@ final class FlowTabAppTests: XCTestCase {
                 windows: [
                     WindowCandidate(
                         id: "vscode-1",
-                        title: "FlowTabApp - SwitcherSearchCoordinator.swift",
+                        title: "FlowTab - SwitcherSearchCoordinator.swift",
                         isMinimized: false,
                         lastActiveAt: 300
                     )

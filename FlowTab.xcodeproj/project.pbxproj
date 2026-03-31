@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-			4A6DAE6E2F727AF500B0D737 /* FlowTabAppApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6DAE6D2F727AF500B0D737 /* FlowTabAppApp.swift */; };
+			4A6DAE6E2F727AF500B0D737 /* FlowTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6DAE6D2F727AF500B0D737 /* FlowTab.swift */; };
 			4A6DAE702F727AF500B0D737 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6DAE6F2F727AF500B0D737 /* ContentView.swift */; };
 			B1C2D3E42F74000100B0D737 /* AppLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E32F74000100B0D737 /* AppLocalization.swift */; };
 			A1B2C3D42F73000100B0D737 /* OptionTabHotkeyMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D12F73000100B0D737 /* OptionTabHotkeyMonitor.swift */; };
@@ -16,9 +16,9 @@
 		A1B2C3D72F73000100B0D737 /* SwitcherSearchCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D82F73000100B0D737 /* SwitcherSearchCoordinator.swift */; };
 		4A6DAE722F727AF500B0D737 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4A6DAE712F727AF500B0D737 /* Assets.xcassets */; };
 		4A6DAE752F727AF500B0D737 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 4A6DAE742F727AF500B0D737 /* Preview Assets.xcassets */; };
-		4A6DAE802F727AF600B0D737 /* FlowTabAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6DAE7F2F727AF600B0D737 /* FlowTabAppTests.swift */; };
-		4A6DAE8A2F727AF600B0D737 /* FlowTabAppUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6DAE892F727AF600B0D737 /* FlowTabAppUITests.swift */; };
-		4A6DAE8C2F727AF600B0D737 /* FlowTabAppUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6DAE8B2F727AF600B0D737 /* FlowTabAppUITestsLaunchTests.swift */; };
+		4A6DAE802F727AF600B0D737 /* FlowTabTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6DAE7F2F727AF600B0D737 /* FlowTabTests.swift */; };
+		4A6DAE8A2F727AF600B0D737 /* FlowTabUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6DAE892F727AF600B0D737 /* FlowTabUITests.swift */; };
+		4A6DAE8C2F727AF600B0D737 /* FlowTabUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6DAE8B2F727AF600B0D737 /* FlowTabUITestsLaunchTests.swift */; };
 		4A6DAE9D2F727C0900B0D737 /* FlowTabCore in Frameworks */ = {isa = PBXBuildFile; productRef = 4A6DAE9C2F727C0900B0D737 /* FlowTabCore */; };
 /* End PBXBuildFile section */
 
@@ -28,20 +28,20 @@
 			containerPortal = 4A6DAE622F727AF500B0D737 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 4A6DAE692F727AF500B0D737;
-			remoteInfo = FlowTabApp;
+			remoteInfo = FlowTab;
 		};
 		4A6DAE862F727AF600B0D737 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 4A6DAE622F727AF500B0D737 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 4A6DAE692F727AF500B0D737;
-			remoteInfo = FlowTabApp;
+			remoteInfo = FlowTab;
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-			4A6DAE6A2F727AF500B0D737 /* FlowTabApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FlowTabApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
-			4A6DAE6D2F727AF500B0D737 /* FlowTabAppApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTabAppApp.swift; sourceTree = "<group>"; };
+			4A6DAE6A2F727AF500B0D737 /* FlowTab.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FlowTab.app; sourceTree = BUILT_PRODUCTS_DIR; };
+			4A6DAE6D2F727AF500B0D737 /* FlowTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTab.swift; sourceTree = "<group>"; };
 			4A6DAE6F2F727AF500B0D737 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 			B1C2D3E32F74000100B0D737 /* AppLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLocalization.swift; sourceTree = "<group>"; };
 			A1B2C3D12F73000100B0D737 /* OptionTabHotkeyMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OptionTabHotkeyMonitor.swift; sourceTree = "<group>"; };
@@ -50,12 +50,12 @@
 		A1B2C3D82F73000100B0D737 /* SwitcherSearchCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherSearchCoordinator.swift; sourceTree = "<group>"; };
 		4A6DAE712F727AF500B0D737 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		4A6DAE742F727AF500B0D737 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
-		4A6DAE762F727AF500B0D737 /* FlowTabApp.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FlowTabApp.entitlements; sourceTree = "<group>"; };
-		4A6DAE7B2F727AF600B0D737 /* FlowTabAppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FlowTabAppTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		4A6DAE7F2F727AF600B0D737 /* FlowTabAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTabAppTests.swift; sourceTree = "<group>"; };
-		4A6DAE852F727AF600B0D737 /* FlowTabAppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FlowTabAppUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		4A6DAE892F727AF600B0D737 /* FlowTabAppUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTabAppUITests.swift; sourceTree = "<group>"; };
-		4A6DAE8B2F727AF600B0D737 /* FlowTabAppUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTabAppUITestsLaunchTests.swift; sourceTree = "<group>"; };
+		4A6DAE762F727AF500B0D737 /* FlowTab.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = FlowTab.entitlements; sourceTree = "<group>"; };
+		4A6DAE7B2F727AF600B0D737 /* FlowTabTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FlowTabTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		4A6DAE7F2F727AF600B0D737 /* FlowTabTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTabTests.swift; sourceTree = "<group>"; };
+		4A6DAE852F727AF600B0D737 /* FlowTabUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FlowTabUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		4A6DAE892F727AF600B0D737 /* FlowTabUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTabUITests.swift; sourceTree = "<group>"; };
+		4A6DAE8B2F727AF600B0D737 /* FlowTabUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTabUITestsLaunchTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -87,9 +87,9 @@
 		4A6DAE612F727AF500B0D737 = {
 			isa = PBXGroup;
 			children = (
-				4A6DAE6C2F727AF500B0D737 /* FlowTabApp */,
-				4A6DAE7E2F727AF600B0D737 /* FlowTabAppTests */,
-				4A6DAE882F727AF600B0D737 /* FlowTabAppUITests */,
+				4A6DAE6C2F727AF500B0D737 /* FlowTab */,
+				4A6DAE7E2F727AF600B0D737 /* FlowTabTests */,
+				4A6DAE882F727AF600B0D737 /* FlowTabUITests */,
 				4A6DAE6B2F727AF500B0D737 /* Products */,
 				4A6DAE992F727BEA00B0D737 /* Frameworks */,
 			);
@@ -98,17 +98,17 @@
 		4A6DAE6B2F727AF500B0D737 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				4A6DAE6A2F727AF500B0D737 /* FlowTabApp.app */,
-				4A6DAE7B2F727AF600B0D737 /* FlowTabAppTests.xctest */,
-				4A6DAE852F727AF600B0D737 /* FlowTabAppUITests.xctest */,
+				4A6DAE6A2F727AF500B0D737 /* FlowTab.app */,
+				4A6DAE7B2F727AF600B0D737 /* FlowTabTests.xctest */,
+				4A6DAE852F727AF600B0D737 /* FlowTabUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
-		4A6DAE6C2F727AF500B0D737 /* FlowTabApp */ = {
+		4A6DAE6C2F727AF500B0D737 /* FlowTab */ = {
 			isa = PBXGroup;
 				children = (
-					4A6DAE6D2F727AF500B0D737 /* FlowTabAppApp.swift */,
+					4A6DAE6D2F727AF500B0D737 /* FlowTab.swift */,
 					4A6DAE6F2F727AF500B0D737 /* ContentView.swift */,
 					B1C2D3E32F74000100B0D737 /* AppLocalization.swift */,
 					A1B2C3D12F73000100B0D737 /* OptionTabHotkeyMonitor.swift */,
@@ -116,10 +116,10 @@
 				A1B2C3D32F73000100B0D737 /* SwitcherPanel.swift */,
 				A1B2C3D82F73000100B0D737 /* SwitcherSearchCoordinator.swift */,
 				4A6DAE712F727AF500B0D737 /* Assets.xcassets */,
-				4A6DAE762F727AF500B0D737 /* FlowTabApp.entitlements */,
+				4A6DAE762F727AF500B0D737 /* FlowTab.entitlements */,
 				4A6DAE732F727AF500B0D737 /* Preview Content */,
 			);
-			path = FlowTabApp;
+			path = FlowTab;
 			sourceTree = "<group>";
 		};
 		4A6DAE732F727AF500B0D737 /* Preview Content */ = {
@@ -130,21 +130,21 @@
 			path = "Preview Content";
 			sourceTree = "<group>";
 		};
-		4A6DAE7E2F727AF600B0D737 /* FlowTabAppTests */ = {
+		4A6DAE7E2F727AF600B0D737 /* FlowTabTests */ = {
 			isa = PBXGroup;
 			children = (
-				4A6DAE7F2F727AF600B0D737 /* FlowTabAppTests.swift */,
+				4A6DAE7F2F727AF600B0D737 /* FlowTabTests.swift */,
 			);
-			path = FlowTabAppTests;
+			path = FlowTabTests;
 			sourceTree = "<group>";
 		};
-		4A6DAE882F727AF600B0D737 /* FlowTabAppUITests */ = {
+		4A6DAE882F727AF600B0D737 /* FlowTabUITests */ = {
 			isa = PBXGroup;
 			children = (
-				4A6DAE892F727AF600B0D737 /* FlowTabAppUITests.swift */,
-				4A6DAE8B2F727AF600B0D737 /* FlowTabAppUITestsLaunchTests.swift */,
+				4A6DAE892F727AF600B0D737 /* FlowTabUITests.swift */,
+				4A6DAE8B2F727AF600B0D737 /* FlowTabUITestsLaunchTests.swift */,
 			);
-			path = FlowTabAppUITests;
+			path = FlowTabUITests;
 			sourceTree = "<group>";
 		};
 		4A6DAE992F727BEA00B0D737 /* Frameworks */ = {
@@ -157,9 +157,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		4A6DAE692F727AF500B0D737 /* FlowTabApp */ = {
+		4A6DAE692F727AF500B0D737 /* FlowTab */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 4A6DAE8F2F727AF600B0D737 /* Build configuration list for PBXNativeTarget "FlowTabApp" */;
+			buildConfigurationList = 4A6DAE8F2F727AF600B0D737 /* Build configuration list for PBXNativeTarget "FlowTab" */;
 			buildPhases = (
 				4A6DAE662F727AF500B0D737 /* Sources */,
 				4A6DAE672F727AF500B0D737 /* Frameworks */,
@@ -169,17 +169,17 @@
 			);
 			dependencies = (
 			);
-			name = FlowTabApp;
+			name = FlowTab;
 			packageProductDependencies = (
 				4A6DAE9C2F727C0900B0D737 /* FlowTabCore */,
 			);
-			productName = FlowTabApp;
-			productReference = 4A6DAE6A2F727AF500B0D737 /* FlowTabApp.app */;
+			productName = FlowTab;
+			productReference = 4A6DAE6A2F727AF500B0D737 /* FlowTab.app */;
 			productType = "com.apple.product-type.application";
 		};
-		4A6DAE7A2F727AF600B0D737 /* FlowTabAppTests */ = {
+		4A6DAE7A2F727AF600B0D737 /* FlowTabTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 4A6DAE922F727AF600B0D737 /* Build configuration list for PBXNativeTarget "FlowTabAppTests" */;
+			buildConfigurationList = 4A6DAE922F727AF600B0D737 /* Build configuration list for PBXNativeTarget "FlowTabTests" */;
 			buildPhases = (
 				4A6DAE772F727AF600B0D737 /* Sources */,
 				4A6DAE782F727AF600B0D737 /* Frameworks */,
@@ -190,14 +190,14 @@
 			dependencies = (
 				4A6DAE7D2F727AF600B0D737 /* PBXTargetDependency */,
 			);
-			name = FlowTabAppTests;
-			productName = FlowTabAppTests;
-			productReference = 4A6DAE7B2F727AF600B0D737 /* FlowTabAppTests.xctest */;
+			name = FlowTabTests;
+			productName = FlowTabTests;
+			productReference = 4A6DAE7B2F727AF600B0D737 /* FlowTabTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		4A6DAE842F727AF600B0D737 /* FlowTabAppUITests */ = {
+		4A6DAE842F727AF600B0D737 /* FlowTabUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 4A6DAE952F727AF600B0D737 /* Build configuration list for PBXNativeTarget "FlowTabAppUITests" */;
+			buildConfigurationList = 4A6DAE952F727AF600B0D737 /* Build configuration list for PBXNativeTarget "FlowTabUITests" */;
 			buildPhases = (
 				4A6DAE812F727AF600B0D737 /* Sources */,
 				4A6DAE822F727AF600B0D737 /* Frameworks */,
@@ -208,9 +208,9 @@
 			dependencies = (
 				4A6DAE872F727AF600B0D737 /* PBXTargetDependency */,
 			);
-			name = FlowTabAppUITests;
-			productName = FlowTabAppUITests;
-			productReference = 4A6DAE852F727AF600B0D737 /* FlowTabAppUITests.xctest */;
+			name = FlowTabUITests;
+			productName = FlowTabUITests;
+			productReference = 4A6DAE852F727AF600B0D737 /* FlowTabUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
@@ -236,7 +236,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 4A6DAE652F727AF500B0D737 /* Build configuration list for PBXProject "FlowTabApp" */;
+			buildConfigurationList = 4A6DAE652F727AF500B0D737 /* Build configuration list for PBXProject "FlowTab" */;
 			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
@@ -252,9 +252,9 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				4A6DAE692F727AF500B0D737 /* FlowTabApp */,
-				4A6DAE7A2F727AF600B0D737 /* FlowTabAppTests */,
-				4A6DAE842F727AF600B0D737 /* FlowTabAppUITests */,
+				4A6DAE692F727AF500B0D737 /* FlowTab */,
+				4A6DAE7A2F727AF600B0D737 /* FlowTabTests */,
+				4A6DAE842F727AF600B0D737 /* FlowTabUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -296,7 +296,7 @@
 				A1B2C3D62F73000100B0D737 /* SwitcherPanel.swift in Sources */,
 				A1B2C3D72F73000100B0D737 /* SwitcherSearchCoordinator.swift in Sources */,
 				4A6DAE702F727AF500B0D737 /* ContentView.swift in Sources */,
-				4A6DAE6E2F727AF500B0D737 /* FlowTabAppApp.swift in Sources */,
+				4A6DAE6E2F727AF500B0D737 /* FlowTab.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -304,7 +304,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				4A6DAE802F727AF600B0D737 /* FlowTabAppTests.swift in Sources */,
+				4A6DAE802F727AF600B0D737 /* FlowTabTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -312,8 +312,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				4A6DAE8C2F727AF600B0D737 /* FlowTabAppUITestsLaunchTests.swift in Sources */,
-				4A6DAE8A2F727AF600B0D737 /* FlowTabAppUITests.swift in Sources */,
+				4A6DAE8C2F727AF600B0D737 /* FlowTabUITestsLaunchTests.swift in Sources */,
+				4A6DAE8A2F727AF600B0D737 /* FlowTabUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -322,12 +322,12 @@
 /* Begin PBXTargetDependency section */
 		4A6DAE7D2F727AF600B0D737 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 4A6DAE692F727AF500B0D737 /* FlowTabApp */;
+			target = 4A6DAE692F727AF500B0D737 /* FlowTab */;
 			targetProxy = 4A6DAE7C2F727AF600B0D737 /* PBXContainerItemProxy */;
 		};
 		4A6DAE872F727AF600B0D737 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 4A6DAE692F727AF500B0D737 /* FlowTabApp */;
+			target = 4A6DAE692F727AF500B0D737 /* FlowTab */;
 			targetProxy = 4A6DAE862F727AF600B0D737 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -456,11 +456,11 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = FlowTabApp/FlowTabApp.entitlements;
+				CODE_SIGN_ENTITLEMENTS = FlowTab/FlowTab.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"FlowTabApp/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"FlowTab/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -469,8 +469,8 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.pd.FlowTabApp;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.potato-dumplings.flowtab;
+				PRODUCT_NAME = FlowTab;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 			};
@@ -481,11 +481,11 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_ENTITLEMENTS = FlowTabApp/FlowTabApp.entitlements;
+				CODE_SIGN_ENTITLEMENTS = FlowTab/FlowTab.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_ASSET_PATHS = "\"FlowTabApp/Preview Content\"";
+				DEVELOPMENT_ASSET_PATHS = "\"FlowTab/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
@@ -494,8 +494,8 @@
 					"@executable_path/../Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.pd.FlowTabApp;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.potato-dumplings.flowtab;
+				PRODUCT_NAME = FlowTab;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 			};
@@ -511,11 +511,11 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.5;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.pd.FlowTabAppTests;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.potato-dumplings.flowtab.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FlowTabApp.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/FlowTabApp";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FlowTab.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/FlowTab";
 			};
 			name = Debug;
 		};
@@ -529,11 +529,11 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 14.5;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.pd.FlowTabAppTests;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.potato-dumplings.flowtab.tests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FlowTabApp.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/FlowTabApp";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FlowTab.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/FlowTab";
 			};
 			name = Release;
 		};
@@ -545,11 +545,11 @@
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.pd.FlowTabAppUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.potato-dumplings.flowtab.uitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TEST_TARGET_NAME = FlowTabApp;
+				TEST_TARGET_NAME = FlowTab;
 			};
 			name = Debug;
 		};
@@ -561,18 +561,18 @@
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.pd.FlowTabAppUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.potato-dumplings.flowtab.uitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-				TEST_TARGET_NAME = FlowTabApp;
+				TEST_TARGET_NAME = FlowTab;
 			};
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		4A6DAE652F727AF500B0D737 /* Build configuration list for PBXProject "FlowTabApp" */ = {
+		4A6DAE652F727AF500B0D737 /* Build configuration list for PBXProject "FlowTab" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				4A6DAE8D2F727AF600B0D737 /* Debug */,
@@ -581,7 +581,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		4A6DAE8F2F727AF600B0D737 /* Build configuration list for PBXNativeTarget "FlowTabApp" */ = {
+		4A6DAE8F2F727AF600B0D737 /* Build configuration list for PBXNativeTarget "FlowTab" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				4A6DAE902F727AF600B0D737 /* Debug */,
@@ -590,7 +590,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		4A6DAE922F727AF600B0D737 /* Build configuration list for PBXNativeTarget "FlowTabAppTests" */ = {
+		4A6DAE922F727AF600B0D737 /* Build configuration list for PBXNativeTarget "FlowTabTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				4A6DAE932F727AF600B0D737 /* Debug */,
@@ -599,7 +599,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		4A6DAE952F727AF600B0D737 /* Build configuration list for PBXNativeTarget "FlowTabAppUITests" */ = {
+		4A6DAE952F727AF600B0D737 /* Build configuration list for PBXNativeTarget "FlowTabUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				4A6DAE962F727AF600B0D737 /* Debug */,
