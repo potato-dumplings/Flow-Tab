@@ -1558,6 +1558,14 @@ private struct AppKitHotkeySettingsCardContent: NSViewRepresentable {
         return view
     }
 
+    func sizeThatFits(
+        _ proposal: ProposedViewSize,
+        nsView: HotkeySettingsCardAppKitView,
+        context: Context
+    ) -> CGSize? {
+        nsView.preferredFittingSize(forWidth: proposal.width)
+    }
+
     func updateNSView(_ nsView: HotkeySettingsCardAppKitView, context: Context) {
         context.coordinator.update(
             hotkeyPrimaryModifierRaw: $hotkeyPrimaryModifierRaw,
@@ -1718,19 +1726,23 @@ private final class HotkeySettingsCardAppKitView: NSView {
 
     private func buildViewHierarchy() {
         translatesAutoresizingMaskIntoConstraints = false
+        setContentHuggingPriority(.required, for: .vertical)
+        setContentCompressionResistancePriority(.required, for: .vertical)
 
         stackView.orientation = .vertical
         stackView.alignment = .leading
         stackView.spacing = 10
         stackView.detachesHiddenViews = true
         stackView.translatesAutoresizingMaskIntoConstraints = false
+        stackView.setContentHuggingPriority(.required, for: .vertical)
+        stackView.setContentCompressionResistancePriority(.required, for: .vertical)
         addSubview(stackView)
 
         NSLayoutConstraint.activate([
             stackView.leadingAnchor.constraint(equalTo: leadingAnchor),
             stackView.topAnchor.constraint(equalTo: topAnchor),
             stackView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            stackView.bottomAnchor.constraint(equalTo: bottomAnchor)
+            stackView.bottomAnchor.constraint(lessThanOrEqualTo: bottomAnchor)
         ])
 
         configure(
@@ -1781,6 +1793,8 @@ private final class HotkeySettingsCardAppKitView: NSView {
         inAppRowsContainer.spacing = 10
         inAppRowsContainer.detachesHiddenViews = true
         inAppRowsContainer.translatesAutoresizingMaskIntoConstraints = false
+        inAppRowsContainer.setContentHuggingPriority(.required, for: .vertical)
+        inAppRowsContainer.setContentCompressionResistancePriority(.required, for: .vertical)
         let inAppPrimaryRow = makeControlRow(title: "应用内窗口修饰键", control: inAppPrimaryModifierPopUp)
         let inAppMainKeyRow = makeControlRow(title: "应用内窗口按键", control: inAppMainKeyPopUp)
         inAppRowsContainer.addArrangedSubview(inAppPrimaryRow)
@@ -1890,6 +1904,362 @@ private final class HotkeySettingsCardAppKitView: NSView {
     }
 }
 
+private extension NSView {
+    func preferredFittingSize(forWidth width: CGFloat?) -> CGSize {
+        let widthConstraint: NSLayoutConstraint?
+        let normalizedWidth = width.flatMap { proposedWidth -> CGFloat? in
+            guard proposedWidth.isFinite, proposedWidth > 0 else { return nil }
+            return proposedWidth
+        }
+
+        if let normalizedWidth {
+            // SwiftUI may pass `.infinity`/`nan` during measurement; AppKit crashes if that becomes a constraint constant.
+            widthConstraint = widthAnchor.constraint(equalToConstant: normalizedWidth)
+            widthConstraint?.priority = .defaultHigh
+            widthConstraint?.isActive = true
+        } else {
+            widthConstraint = nil
+        }
+
+        layoutSubtreeIfNeeded()
+        let fitted = fittingSize
+        widthConstraint?.isActive = false
+        return fitted
+    }
+}
+
+private final class FlowCapsuleSegmentedControl: NSView {
+    var onSelectionChanged: ((String) -> Void)?
+
+    private let options: [(id: String, title: String)]
+    private let stackView = NSStackView()
+    private var buttonsByID: [String: NSButton] = [:]
+    private var selectedID: String?
+
+    init(options: [(id: String, title: String)]) {
+        self.options = options
+        super.init(frame: .zero)
+        buildViewHierarchy()
+    }
+
+    required init?(coder: NSCoder) {
+        self.options = []
+        super.init(coder: coder)
+        buildViewHierarchy()
+    }
+
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: 300, height: 32)
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateAppearance()
+    }
+
+    func updateSelection(id: String) {
+        guard selectedID != id else { return }
+        selectedID = id
+        updateAppearance()
+    }
+
+    private func buildViewHierarchy() {
+        wantsLayer = true
+        translatesAutoresizingMaskIntoConstraints = false
+        setContentHuggingPriority(.required, for: .vertical)
+        setContentCompressionResistancePriority(.required, for: .vertical)
+
+        stackView.orientation = .horizontal
+        stackView.alignment = .centerY
+        stackView.distribution = .fillEqually
+        stackView.spacing = 4
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stackView)
+
+        NSLayoutConstraint.activate([
+            heightAnchor.constraint(equalToConstant: 32),
+            stackView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 2),
+            stackView.topAnchor.constraint(equalTo: topAnchor, constant: 2),
+            stackView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -2),
+            stackView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -2)
+        ])
+
+        for option in options {
+            let button = NSButton(title: option.title, target: self, action: #selector(handleButtonPressed(_:)))
+            button.identifier = NSUserInterfaceItemIdentifier(option.id)
+            button.setButtonType(.momentaryChange)
+            button.isBordered = false
+            button.focusRingType = .none
+            button.translatesAutoresizingMaskIntoConstraints = false
+            button.wantsLayer = true
+            button.layer?.cornerRadius = 9
+            button.layer?.masksToBounds = true
+            button.heightAnchor.constraint(equalToConstant: 28).isActive = true
+            stackView.addArrangedSubview(button)
+            buttonsByID[option.id] = button
+        }
+
+        updateAppearance()
+    }
+
+    @objc private func handleButtonPressed(_ sender: NSButton) {
+        guard let id = sender.identifier?.rawValue else { return }
+        selectedID = id
+        updateAppearance()
+        onSelectionChanged?(id)
+    }
+
+    private func updateAppearance() {
+        guard let layer else { return }
+        layer.backgroundColor = NSColor.labelColor.withAlphaComponent(0.05).cgColor
+        layer.cornerRadius = 12
+        layer.borderWidth = 1
+        layer.borderColor = NSColor.labelColor.withAlphaComponent(0.12).cgColor
+
+        for (id, button) in buttonsByID {
+            let isSelected = id == selectedID
+            button.layer?.backgroundColor = isSelected ? NSColor.controlAccentColor.withAlphaComponent(0.18).cgColor : NSColor.clear.cgColor
+            let titleColor = isSelected ? NSColor.controlAccentColor : NSColor.labelColor
+            button.attributedTitle = NSAttributedString(
+                string: button.title,
+                attributes: [
+                    .font: NSFont.systemFont(ofSize: 12, weight: .medium),
+                    .foregroundColor: titleColor
+                ]
+            )
+        }
+    }
+}
+
+private final class FlowGradientActionButton: NSButton {
+    var tone: FlowActionButtonTone = .grayDominant {
+        didSet { updateAppearance() }
+    }
+
+    private let gradientLayer = CAGradientLayer()
+    private let borderLayer = CAShapeLayer()
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        buildViewHierarchy()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        buildViewHierarchy()
+    }
+
+    override func layout() {
+        super.layout()
+        updateAppearance()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateAppearance()
+    }
+
+    func update(title: String, symbolName: String? = nil, tone: FlowActionButtonTone) {
+        self.title = title
+        self.tone = tone
+        if let symbolName {
+            image = NSImage(systemSymbolName: symbolName, accessibilityDescription: title)
+        } else {
+            image = nil
+        }
+        updateAppearance()
+    }
+
+    private func buildViewHierarchy() {
+        wantsLayer = true
+        isBordered = false
+        focusRingType = .none
+        setButtonType(.momentaryPushIn)
+        imagePosition = .imageLeading
+        imageScaling = .scaleProportionallyDown
+        translatesAutoresizingMaskIntoConstraints = false
+        setContentHuggingPriority(.required, for: .vertical)
+        setContentCompressionResistancePriority(.required, for: .vertical)
+        heightAnchor.constraint(greaterThanOrEqualToConstant: 30).isActive = true
+
+        gradientLayer.startPoint = CGPoint(x: 0, y: 0.5)
+        gradientLayer.endPoint = CGPoint(x: 1, y: 0.5)
+        layer?.addSublayer(gradientLayer)
+        layer?.addSublayer(borderLayer)
+        updateAppearance()
+    }
+
+    private func updateAppearance() {
+        wantsLayer = true
+        let cornerRadius = bounds.height / 2
+        gradientLayer.frame = bounds
+        gradientLayer.cornerRadius = cornerRadius
+        gradientLayer.colors = gradientColors(for: tone)
+
+        borderLayer.frame = bounds
+        borderLayer.path = CGPath(
+            roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5),
+            cornerWidth: cornerRadius,
+            cornerHeight: cornerRadius,
+            transform: nil
+        )
+        borderLayer.fillColor = NSColor.clear.cgColor
+        borderLayer.lineWidth = 1
+        borderLayer.strokeColor = borderColor(for: tone)
+
+        layer?.cornerRadius = cornerRadius
+        layer?.shadowColor = shadowColor(for: tone)
+        layer?.shadowOpacity = 1
+        layer?.shadowRadius = 6
+        layer?.shadowOffset = CGSize(width: 0, height: 2)
+
+        let titleColor = tone == .blueDominant
+            ? NSColor.white
+            : NSColor.labelColor.withAlphaComponent(0.78)
+        attributedTitle = NSAttributedString(
+            string: title,
+            attributes: [
+                .font: NSFont.systemFont(ofSize: 12, weight: .semibold),
+                .foregroundColor: titleColor
+            ]
+        )
+        contentTintColor = titleColor
+    }
+
+    private func gradientColors(for tone: FlowActionButtonTone) -> [CGColor] {
+        switch tone {
+        case .grayDominant:
+            return [
+                NSColor.labelColor.withAlphaComponent(0.12).cgColor,
+                NSColor.labelColor.withAlphaComponent(0.09).cgColor,
+                NSColor.controlAccentColor.withAlphaComponent(0.26).cgColor
+            ]
+        case .blueDominant:
+            return [
+                NSColor.controlAccentColor.withAlphaComponent(0.94).cgColor,
+                NSColor.controlAccentColor.withAlphaComponent(0.76).cgColor,
+                NSColor.labelColor.withAlphaComponent(0.18).cgColor
+            ]
+        }
+    }
+
+    private func borderColor(for tone: FlowActionButtonTone) -> CGColor {
+        switch tone {
+        case .grayDominant:
+            return NSColor.labelColor.withAlphaComponent(0.24).cgColor
+        case .blueDominant:
+            return NSColor.controlAccentColor.withAlphaComponent(0.55).cgColor
+        }
+    }
+
+    private func shadowColor(for tone: FlowActionButtonTone) -> CGColor {
+        switch tone {
+        case .grayDominant:
+            return NSColor.labelColor.withAlphaComponent(0.08).cgColor
+        case .blueDominant:
+            return NSColor.controlAccentColor.withAlphaComponent(0.20).cgColor
+        }
+    }
+}
+
+private final class FlowSoftTextField: NSView {
+    let textField = NSTextField(string: "")
+
+    private var isEditing = false
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        buildViewHierarchy()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        buildViewHierarchy()
+    }
+
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: 72, height: 28)
+    }
+
+    override func layout() {
+        super.layout()
+        updateAppearance()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateAppearance()
+    }
+
+    func setEditing(_ editing: Bool) {
+        guard isEditing != editing else { return }
+        isEditing = editing
+        updateAppearance()
+    }
+
+    private func buildViewHierarchy() {
+        wantsLayer = true
+        translatesAutoresizingMaskIntoConstraints = false
+        setContentHuggingPriority(.required, for: .vertical)
+        setContentCompressionResistancePriority(.required, for: .vertical)
+        widthAnchor.constraint(equalToConstant: 72).isActive = true
+        heightAnchor.constraint(equalToConstant: 28).isActive = true
+
+        textField.translatesAutoresizingMaskIntoConstraints = false
+        textField.isBezeled = false
+        textField.isBordered = false
+        textField.drawsBackground = false
+        textField.focusRingType = .none
+        textField.placeholderString = "0.35"
+        textField.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        textField.alignment = .center
+        textField.setContentHuggingPriority(.required, for: .vertical)
+        textField.setContentCompressionResistancePriority(.required, for: .vertical)
+        addSubview(textField)
+
+        NSLayoutConstraint.activate([
+            textField.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
+            textField.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
+            textField.centerYAnchor.constraint(equalTo: centerYAnchor),
+            textField.heightAnchor.constraint(equalToConstant: 16)
+        ])
+
+        updateAppearance()
+    }
+
+    private func updateAppearance() {
+        guard let layer else { return }
+
+        let isDark = effectiveAppearance.isFlowTabDarkInterface
+        let borderColor: NSColor
+        let backgroundColor: NSColor
+
+        if isEditing {
+            borderColor = .controlAccentColor.withAlphaComponent(isDark ? 0.55 : 0.35)
+            backgroundColor = isDark
+                ? NSColor.white.withAlphaComponent(0.10)
+                : NSColor.white.withAlphaComponent(0.98)
+            layer.shadowColor = NSColor.controlAccentColor.withAlphaComponent(0.14).cgColor
+            layer.shadowOpacity = 1
+            layer.shadowRadius = 5
+            layer.shadowOffset = .zero
+        } else {
+            borderColor = isDark
+                ? NSColor.white.withAlphaComponent(0.10)
+                : NSColor.black.withAlphaComponent(0.08)
+            backgroundColor = isDark
+                ? NSColor.white.withAlphaComponent(0.05)
+                : NSColor.white.withAlphaComponent(0.84)
+            layer.shadowOpacity = 0
+        }
+
+        layer.cornerRadius = 9
+        layer.borderWidth = 1
+        layer.borderColor = borderColor.cgColor
+        layer.backgroundColor = backgroundColor.cgColor
+    }
+}
+
 private class AppKitSettingsCardBaseView: NSView {
     let stackView = NSStackView()
 
@@ -1910,24 +2280,30 @@ private class AppKitSettingsCardBaseView: NSView {
 
     func addFullWidthArrangedSubview(_ view: NSView) {
         view.translatesAutoresizingMaskIntoConstraints = false
+        view.setContentHuggingPriority(.required, for: .vertical)
+        view.setContentCompressionResistancePriority(.required, for: .vertical)
         stackView.addArrangedSubview(view)
         view.widthAnchor.constraint(equalTo: stackView.widthAnchor).isActive = true
     }
 
     private func configureRootStack() {
         translatesAutoresizingMaskIntoConstraints = false
+        setContentHuggingPriority(.required, for: .vertical)
+        setContentCompressionResistancePriority(.required, for: .vertical)
         stackView.orientation = .vertical
         stackView.alignment = .leading
         stackView.spacing = 10
         stackView.detachesHiddenViews = true
         stackView.translatesAutoresizingMaskIntoConstraints = false
+        stackView.setContentHuggingPriority(.required, for: .vertical)
+        stackView.setContentCompressionResistancePriority(.required, for: .vertical)
         addSubview(stackView)
 
         NSLayoutConstraint.activate([
             stackView.leadingAnchor.constraint(equalTo: leadingAnchor),
             stackView.topAnchor.constraint(equalTo: topAnchor),
             stackView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            stackView.bottomAnchor.constraint(equalTo: bottomAnchor)
+            stackView.bottomAnchor.constraint(lessThanOrEqualTo: bottomAnchor)
         ])
     }
 
@@ -1997,13 +2373,622 @@ private class AppKitSettingsCardBaseView: NSView {
         popUp.select(item)
     }
 
-    static func makeActionButton(width: CGFloat = 166, target: AnyObject, action: Selector) -> NSButton {
-        let button = NSButton(title: "", target: target, action: action)
-        button.bezelStyle = .rounded
-        button.font = .systemFont(ofSize: 12, weight: .semibold)
-        button.translatesAutoresizingMaskIntoConstraints = false
-        button.widthAnchor.constraint(equalToConstant: width).isActive = true
-        return button
+}
+
+private extension NSAppearance {
+    var isFlowTabDarkInterface: Bool {
+        bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+    }
+}
+
+private final class AppKitSectionCardView: NSView {
+    private let stackView = NSStackView()
+    private let titleLabel: NSTextField
+    private let subtitleLabel: NSTextField
+    private let verticalInset: CGFloat = 14
+
+    init(title: String, subtitle: String, contentView: NSView) {
+        titleLabel = NSTextField(labelWithString: title)
+        subtitleLabel = NSTextField(labelWithString: subtitle)
+        super.init(frame: .zero)
+        buildViewHierarchy(contentView: contentView)
+    }
+
+    required init?(coder: NSCoder) {
+        titleLabel = NSTextField(labelWithString: "")
+        subtitleLabel = NSTextField(labelWithString: "")
+        super.init(coder: coder)
+        buildViewHierarchy(contentView: NSView())
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateAppearance()
+    }
+
+    override func layout() {
+        super.layout()
+        updateAppearance()
+    }
+
+    override var intrinsicContentSize: NSSize {
+        layoutSubtreeIfNeeded()
+        return NSSize(
+            width: NSView.noIntrinsicMetric,
+            height: stackView.fittingSize.height + verticalInset * 2
+        )
+    }
+
+    private func buildViewHierarchy(contentView: NSView) {
+        wantsLayer = true
+        translatesAutoresizingMaskIntoConstraints = false
+        setContentHuggingPriority(.required, for: .vertical)
+        setContentCompressionResistancePriority(.required, for: .vertical)
+
+        titleLabel.font = .systemFont(ofSize: 15, weight: .semibold)
+        subtitleLabel.font = .systemFont(ofSize: 11)
+        subtitleLabel.textColor = .secondaryLabelColor
+
+        stackView.orientation = .vertical
+        stackView.alignment = .leading
+        stackView.spacing = 10
+        stackView.detachesHiddenViews = true
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stackView)
+
+        stackView.addArrangedSubview(titleLabel)
+        stackView.addArrangedSubview(subtitleLabel)
+        stackView.addArrangedSubview(contentView)
+        contentView.translatesAutoresizingMaskIntoConstraints = false
+        contentView.setContentHuggingPriority(.required, for: .vertical)
+        contentView.setContentCompressionResistancePriority(.required, for: .vertical)
+        contentView.widthAnchor.constraint(equalTo: stackView.widthAnchor).isActive = true
+
+        NSLayoutConstraint.activate([
+            stackView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
+            stackView.topAnchor.constraint(equalTo: topAnchor, constant: verticalInset),
+            stackView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -14),
+            stackView.bottomAnchor.constraint(lessThanOrEqualTo: bottomAnchor, constant: -verticalInset)
+        ])
+
+        updateAppearance()
+    }
+
+    private func updateAppearance() {
+        guard let layer else { return }
+        if effectiveAppearance.isFlowTabDarkInterface {
+            layer.backgroundColor = NSColor(
+                red: 0.13,
+                green: 0.13,
+                blue: 0.15,
+                alpha: 0.96
+            ).cgColor
+            layer.borderColor = NSColor.labelColor.withAlphaComponent(0.10).cgColor
+            layer.shadowOpacity = 0
+        } else {
+            layer.backgroundColor = NSColor(
+                red: 0.965,
+                green: 0.97,
+                blue: 0.978,
+                alpha: 1
+            ).cgColor
+            layer.borderColor = NSColor.black.withAlphaComponent(0.14).cgColor
+            layer.shadowColor = NSColor.black.withAlphaComponent(0.05).cgColor
+            layer.shadowOpacity = 1
+            layer.shadowRadius = 6
+            layer.shadowOffset = CGSize(width: 0, height: 2)
+        }
+        layer.cornerRadius = 12
+        layer.borderWidth = 1
+    }
+}
+
+private struct AppKitSettingsPageState: Equatable {
+    let showShortcutHint: Bool
+    let showInCommandTab: Bool
+    let themeModeRaw: String
+    let windowLayerAutoEnterDelayText: String
+    let autoRestoreMinimizedWindowOnSwitch: Bool
+    let hideMinimizedAppsFromAppLayer: Bool
+    let showPermissionReminder: Bool
+    let searchEnabled: Bool
+    let searchDefaultScopeRaw: String
+    let hotkeyPrimaryModifierRaw: String
+    let hotkeyMainKeyRaw: String
+    let hotkeyQuitKeyRaw: String
+    let inAppWindowHotkeyPrimaryModifierRaw: String
+    let inAppWindowHotkeyMainKeyRaw: String
+    let commandTabTakeoverActive: Bool
+    let accessibilityTrusted: Bool
+    let screenCaptureTrusted: Bool
+}
+
+private final class AppKitFlippedDocumentView: NSView {
+    override var isFlipped: Bool { true }
+}
+
+private final class AppKitSettingsPageContainerView: NSView {
+    let pageView = AppKitSettingsPageView()
+
+    private let scrollView = NSScrollView()
+    private let documentView = AppKitFlippedDocumentView()
+    private let contentInset: CGFloat = 24
+    private var wasActive = false
+    private var pendingInitialFocusClear = false
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        buildViewHierarchy()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        buildViewHierarchy()
+    }
+
+    func update(with state: AppKitSettingsPageState, isActive: Bool) {
+        pageView.update(with: state)
+        if isActive && !wasActive {
+            clearInitialFirstResponderIfNeeded()
+        }
+        wasActive = isActive
+        needsLayout = true
+    }
+
+    override func layout() {
+        super.layout()
+
+        let viewportWidth = scrollView.contentView.bounds.width
+        guard viewportWidth > 0 else { return }
+
+        let pageWidth = max(viewportWidth - contentInset * 2, 320)
+        let fittedSize = pageView.preferredFittingSize(forWidth: pageWidth)
+        let documentHeight = fittedSize.height + contentInset * 2
+
+        documentView.frame = NSRect(
+            x: 0,
+            y: 0,
+            width: viewportWidth,
+            height: documentHeight
+        )
+        pageView.frame = NSRect(
+            x: contentInset,
+            y: contentInset,
+            width: pageWidth,
+            height: fittedSize.height
+        )
+    }
+
+    private func buildViewHierarchy() {
+        translatesAutoresizingMaskIntoConstraints = false
+
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.drawsBackground = false
+        scrollView.borderType = .noBorder
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
+        scrollView.autohidesScrollers = true
+
+        pageView.translatesAutoresizingMaskIntoConstraints = true
+        documentView.translatesAutoresizingMaskIntoConstraints = true
+        documentView.addSubview(pageView)
+        scrollView.documentView = documentView
+
+        addSubview(scrollView)
+        NSLayoutConstraint.activate([
+            scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            scrollView.topAnchor.constraint(equalTo: topAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
+    }
+
+    private func clearInitialFirstResponderIfNeeded() {
+        guard !pendingInitialFocusClear else { return }
+        pendingInitialFocusClear = true
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.pendingInitialFocusClear = false
+            self.resignPageFirstResponderIfNeeded()
+        }
+    }
+
+    private func resignPageFirstResponderIfNeeded() {
+        guard let window else { return }
+
+        if let view = window.firstResponder as? NSView, view.isDescendant(of: pageView) {
+            window.makeFirstResponder(nil)
+            return
+        }
+
+        if let editor = window.firstResponder as? NSTextView,
+            let editedView = editor.delegate as? NSView,
+            editedView.isDescendant(of: pageView)
+        {
+            window.makeFirstResponder(nil)
+        }
+    }
+}
+
+private struct AppKitSettingsPageContent: NSViewRepresentable {
+    let isActive: Bool
+    @Binding var showShortcutHint: Bool
+    @Binding var showInCommandTab: Bool
+    @Binding var themeModeRaw: String
+    let windowLayerAutoEnterDelayText: String
+    @Binding var autoRestoreMinimizedWindowOnSwitch: Bool
+    @Binding var hideMinimizedAppsFromAppLayer: Bool
+    @Binding var showPermissionReminder: Bool
+    @Binding var searchEnabled: Bool
+    @Binding var searchDefaultScopeRaw: String
+    @Binding var hotkeyPrimaryModifierRaw: String
+    @Binding var hotkeyMainKeyRaw: String
+    @Binding var hotkeyQuitKeyRaw: String
+    @Binding var inAppWindowHotkeyPrimaryModifierRaw: String
+    @Binding var inAppWindowHotkeyMainKeyRaw: String
+    let commandTabTakeoverActive: Bool
+    let accessibilityTrusted: Bool
+    let screenCaptureTrusted: Bool
+    let onWindowLayerAutoEnterDelayTextChanged: (String) -> Void
+    let onWindowLayerAutoEnterDelayTextCommitted: () -> Void
+    let onWindowLayerAutoEnterDelayEditingChanged: (Bool) -> Void
+    let onAccessibilityAction: () -> Void
+    let onScreenCaptureAction: () -> Void
+
+    func makeNSView(context: Context) -> AppKitSettingsPageContainerView {
+        AppKitSettingsPageContainerView()
+    }
+
+    func updateNSView(_ nsView: AppKitSettingsPageContainerView, context: Context) {
+        let showShortcutHint = $showShortcutHint
+        let showInCommandTab = $showInCommandTab
+        let themeModeRaw = $themeModeRaw
+        let autoRestoreMinimizedWindowOnSwitch = $autoRestoreMinimizedWindowOnSwitch
+        let hideMinimizedAppsFromAppLayer = $hideMinimizedAppsFromAppLayer
+        let showPermissionReminder = $showPermissionReminder
+        let searchEnabled = $searchEnabled
+        let searchDefaultScopeRaw = $searchDefaultScopeRaw
+        let hotkeyPrimaryModifierRaw = $hotkeyPrimaryModifierRaw
+        let hotkeyMainKeyRaw = $hotkeyMainKeyRaw
+        let hotkeyQuitKeyRaw = $hotkeyQuitKeyRaw
+        let inAppWindowHotkeyPrimaryModifierRaw = $inAppWindowHotkeyPrimaryModifierRaw
+        let inAppWindowHotkeyMainKeyRaw = $inAppWindowHotkeyMainKeyRaw
+        let pageView = nsView.pageView
+
+        pageView.onShowShortcutHintChanged = { showShortcutHint.wrappedValue = $0 }
+        pageView.onShowInCommandTabChanged = { showInCommandTab.wrappedValue = $0 }
+        pageView.onThemeModeChanged = { themeModeRaw.wrappedValue = $0 }
+        pageView.onWindowLayerAutoEnterDelayTextChanged = onWindowLayerAutoEnterDelayTextChanged
+        pageView.onWindowLayerAutoEnterDelayTextCommitted = onWindowLayerAutoEnterDelayTextCommitted
+        pageView.onWindowLayerAutoEnterDelayEditingChanged = onWindowLayerAutoEnterDelayEditingChanged
+        pageView.onAutoRestoreMinimizedWindowOnSwitchChanged = {
+            autoRestoreMinimizedWindowOnSwitch.wrappedValue = $0
+        }
+        pageView.onHideMinimizedAppsFromAppLayerChanged = {
+            hideMinimizedAppsFromAppLayer.wrappedValue = $0
+        }
+        pageView.onSearchEnabledChanged = { searchEnabled.wrappedValue = $0 }
+        pageView.onSearchDefaultScopeChanged = { searchDefaultScopeRaw.wrappedValue = $0 }
+        pageView.onHotkeyPrimaryModifierChanged = { hotkeyPrimaryModifierRaw.wrappedValue = $0 }
+        pageView.onHotkeyMainKeyChanged = { hotkeyMainKeyRaw.wrappedValue = $0 }
+        pageView.onHotkeyQuitKeyChanged = { hotkeyQuitKeyRaw.wrappedValue = $0 }
+        pageView.onInAppWindowPrimaryModifierChanged = {
+            inAppWindowHotkeyPrimaryModifierRaw.wrappedValue = $0
+        }
+        pageView.onInAppWindowMainKeyChanged = {
+            inAppWindowHotkeyMainKeyRaw.wrappedValue = $0
+        }
+        pageView.onShowPermissionReminderChanged = { showPermissionReminder.wrappedValue = $0 }
+        pageView.onAccessibilityAction = onAccessibilityAction
+        pageView.onScreenCaptureAction = onScreenCaptureAction
+        nsView.update(
+            with: AppKitSettingsPageState(
+                showShortcutHint: showShortcutHint.wrappedValue,
+                showInCommandTab: showInCommandTab.wrappedValue,
+                themeModeRaw: themeModeRaw.wrappedValue,
+                windowLayerAutoEnterDelayText: windowLayerAutoEnterDelayText,
+                autoRestoreMinimizedWindowOnSwitch: autoRestoreMinimizedWindowOnSwitch.wrappedValue,
+                hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer.wrappedValue,
+                showPermissionReminder: showPermissionReminder.wrappedValue,
+                searchEnabled: searchEnabled.wrappedValue,
+                searchDefaultScopeRaw: searchDefaultScopeRaw.wrappedValue,
+                hotkeyPrimaryModifierRaw: hotkeyPrimaryModifierRaw.wrappedValue,
+                hotkeyMainKeyRaw: hotkeyMainKeyRaw.wrappedValue,
+                hotkeyQuitKeyRaw: hotkeyQuitKeyRaw.wrappedValue,
+                inAppWindowHotkeyPrimaryModifierRaw: inAppWindowHotkeyPrimaryModifierRaw.wrappedValue,
+                inAppWindowHotkeyMainKeyRaw: inAppWindowHotkeyMainKeyRaw.wrappedValue,
+                commandTabTakeoverActive: commandTabTakeoverActive,
+                accessibilityTrusted: accessibilityTrusted,
+                screenCaptureTrusted: screenCaptureTrusted
+            ),
+            isActive: isActive
+        )
+    }
+}
+
+private final class AppKitSettingsPageView: NSView {
+    var onShowShortcutHintChanged: ((Bool) -> Void)?
+    var onShowInCommandTabChanged: ((Bool) -> Void)?
+    var onThemeModeChanged: ((String) -> Void)?
+    var onWindowLayerAutoEnterDelayTextChanged: ((String) -> Void)?
+    var onWindowLayerAutoEnterDelayTextCommitted: (() -> Void)?
+    var onWindowLayerAutoEnterDelayEditingChanged: ((Bool) -> Void)?
+    var onAutoRestoreMinimizedWindowOnSwitchChanged: ((Bool) -> Void)?
+    var onHideMinimizedAppsFromAppLayerChanged: ((Bool) -> Void)?
+    var onSearchEnabledChanged: ((Bool) -> Void)?
+    var onSearchDefaultScopeChanged: ((String) -> Void)?
+    var onHotkeyPrimaryModifierChanged: ((String) -> Void)?
+    var onHotkeyMainKeyChanged: ((String) -> Void)?
+    var onHotkeyQuitKeyChanged: ((String) -> Void)?
+    var onInAppWindowPrimaryModifierChanged: ((String) -> Void)?
+    var onInAppWindowMainKeyChanged: ((String) -> Void)?
+    var onShowPermissionReminderChanged: ((Bool) -> Void)?
+    var onAccessibilityAction: (() -> Void)?
+    var onScreenCaptureAction: (() -> Void)?
+
+    private let contentStack = NSStackView()
+    private let headerStack = NSStackView()
+    private let titleLabel = NSTextField(labelWithString: "设置")
+    private let subtitleLabel = NSTextField(labelWithString: "基础显示设置、快捷键与权限")
+    private let columnsStack = NSStackView()
+    private let leftColumn = NSStackView()
+    private let rightColumn = NSStackView()
+    private let dismissEditingClickRecognizer = NSClickGestureRecognizer()
+
+    private let appearanceContent = AppearanceSettingsCardAppKitView()
+    private let windowBehaviorContent = WindowBehaviorSettingsCardAppKitView()
+    private let permissionContent = PermissionSettingsCardAppKitView()
+    private let searchContent = SearchSettingsCardAppKitView()
+    private let hotkeyContent = HotkeySettingsCardAppKitView()
+
+    private lazy var appearanceCard = AppKitSectionCardView(
+        title: "外观",
+        subtitle: "显示与主题",
+        contentView: appearanceContent
+    )
+    private lazy var windowBehaviorCard = AppKitSectionCardView(
+        title: "窗口行为",
+        subtitle: "窗口层进入与最小化处理",
+        contentView: windowBehaviorContent
+    )
+    private lazy var permissionCard = AppKitSectionCardView(
+        title: "权限",
+        subtitle: "辅助功能与屏幕录制",
+        contentView: permissionContent
+    )
+    private lazy var searchCard = AppKitSectionCardView(
+        title: "搜索",
+        subtitle: "搜索开关、范围与交互说明",
+        contentView: searchContent
+    )
+    private lazy var hotkeyCard = AppKitSectionCardView(
+        title: "快捷键",
+        subtitle: "主切换与结束应用按键",
+        contentView: hotkeyContent
+    )
+
+    private var currentState: AppKitSettingsPageState?
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        buildViewHierarchy()
+        wireCallbacks()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        buildViewHierarchy()
+        wireCallbacks()
+    }
+
+    override var intrinsicContentSize: NSSize {
+        layoutSubtreeIfNeeded()
+        return NSSize(width: NSView.noIntrinsicMetric, height: contentStack.fittingSize.height)
+    }
+
+    func update(with state: AppKitSettingsPageState) {
+        guard currentState != state else { return }
+        currentState = state
+
+        appearanceContent.update(
+            with: AppearanceSettingsCardState(
+                showShortcutHint: state.showShortcutHint,
+                showInCommandTab: state.showInCommandTab,
+                themeModeRaw: state.themeModeRaw
+            )
+        )
+        windowBehaviorContent.update(
+            with: WindowBehaviorSettingsCardState(
+                windowLayerAutoEnterDelayText: state.windowLayerAutoEnterDelayText,
+                autoRestoreMinimizedWindowOnSwitch: state.autoRestoreMinimizedWindowOnSwitch,
+                hideMinimizedAppsFromAppLayer: state.hideMinimizedAppsFromAppLayer
+            )
+        )
+        searchContent.update(
+            with: SearchSettingsCardState(
+                searchEnabled: state.searchEnabled,
+                searchDefaultScopeRaw: state.searchDefaultScopeRaw
+            )
+        )
+        hotkeyContent.update(
+            with: HotkeySettingsCardState(
+                hotkeyPrimaryModifierRaw: state.hotkeyPrimaryModifierRaw,
+                hotkeyMainKeyRaw: state.hotkeyMainKeyRaw,
+                hotkeyQuitKeyRaw: state.hotkeyQuitKeyRaw,
+                inAppWindowHotkeyPrimaryModifierRaw: state.inAppWindowHotkeyPrimaryModifierRaw,
+                inAppWindowHotkeyMainKeyRaw: state.inAppWindowHotkeyMainKeyRaw,
+                commandTabTakeoverActive: state.commandTabTakeoverActive,
+                accessibilityTrusted: state.accessibilityTrusted
+            )
+        )
+        permissionContent.update(
+            with: PermissionSettingsCardState(
+                showPermissionReminder: state.showPermissionReminder,
+                accessibilityTrusted: state.accessibilityTrusted,
+                screenCaptureTrusted: state.screenCaptureTrusted
+            )
+        )
+        appearanceCard.invalidateIntrinsicContentSize()
+        windowBehaviorCard.invalidateIntrinsicContentSize()
+        permissionCard.invalidateIntrinsicContentSize()
+        searchCard.invalidateIntrinsicContentSize()
+        hotkeyCard.invalidateIntrinsicContentSize()
+        invalidateIntrinsicContentSize()
+    }
+
+    private func buildViewHierarchy() {
+        translatesAutoresizingMaskIntoConstraints = false
+        setContentHuggingPriority(.required, for: .vertical)
+        setContentCompressionResistancePriority(.required, for: .vertical)
+
+        dismissEditingClickRecognizer.target = self
+        dismissEditingClickRecognizer.action = #selector(handlePageClickToDismissEditing(_:))
+        dismissEditingClickRecognizer.delaysPrimaryMouseButtonEvents = false
+        addGestureRecognizer(dismissEditingClickRecognizer)
+
+        titleLabel.font = .systemFont(ofSize: 22, weight: .semibold)
+        subtitleLabel.font = .systemFont(ofSize: 12)
+        subtitleLabel.textColor = .secondaryLabelColor
+
+        headerStack.orientation = .vertical
+        headerStack.alignment = .leading
+        headerStack.spacing = 2
+        headerStack.detachesHiddenViews = true
+        headerStack.translatesAutoresizingMaskIntoConstraints = false
+        headerStack.addArrangedSubview(titleLabel)
+        headerStack.addArrangedSubview(subtitleLabel)
+
+        contentStack.orientation = .vertical
+        contentStack.alignment = .leading
+        contentStack.spacing = 12
+        contentStack.detachesHiddenViews = true
+        contentStack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(contentStack)
+
+        columnsStack.orientation = .horizontal
+        columnsStack.alignment = .top
+        columnsStack.distribution = .fillEqually
+        columnsStack.spacing = 12
+        columnsStack.translatesAutoresizingMaskIntoConstraints = false
+        columnsStack.setContentHuggingPriority(.required, for: .vertical)
+        columnsStack.setContentCompressionResistancePriority(.required, for: .vertical)
+
+        leftColumn.orientation = .vertical
+        leftColumn.alignment = .leading
+        leftColumn.spacing = 12
+        leftColumn.detachesHiddenViews = true
+        leftColumn.translatesAutoresizingMaskIntoConstraints = false
+        leftColumn.setContentHuggingPriority(.required, for: .vertical)
+        leftColumn.setContentCompressionResistancePriority(.required, for: .vertical)
+
+        rightColumn.orientation = .vertical
+        rightColumn.alignment = .leading
+        rightColumn.spacing = 12
+        rightColumn.detachesHiddenViews = true
+        rightColumn.translatesAutoresizingMaskIntoConstraints = false
+        rightColumn.setContentHuggingPriority(.required, for: .vertical)
+        rightColumn.setContentCompressionResistancePriority(.required, for: .vertical)
+
+        contentStack.addArrangedSubview(headerStack)
+        contentStack.addArrangedSubview(columnsStack)
+        headerStack.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
+        columnsStack.widthAnchor.constraint(equalTo: contentStack.widthAnchor).isActive = true
+        columnsStack.addArrangedSubview(leftColumn)
+        columnsStack.addArrangedSubview(rightColumn)
+
+        addCard(appearanceCard, to: leftColumn)
+        addCard(windowBehaviorCard, to: leftColumn)
+        addCard(permissionCard, to: leftColumn)
+        addCard(searchCard, to: rightColumn)
+        addCard(hotkeyCard, to: rightColumn)
+
+        NSLayoutConstraint.activate([
+            contentStack.leadingAnchor.constraint(equalTo: leadingAnchor),
+            contentStack.topAnchor.constraint(equalTo: topAnchor),
+            contentStack.trailingAnchor.constraint(equalTo: trailingAnchor),
+            contentStack.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
+    }
+
+    private func wireCallbacks() {
+        appearanceContent.onShowShortcutHintChanged = { [weak self] in
+            self?.onShowShortcutHintChanged?($0)
+        }
+        appearanceContent.onShowInCommandTabChanged = { [weak self] in
+            self?.onShowInCommandTabChanged?($0)
+        }
+        appearanceContent.onThemeModeChanged = { [weak self] in
+            self?.onThemeModeChanged?($0)
+        }
+
+        windowBehaviorContent.onWindowLayerAutoEnterDelayTextChanged = { [weak self] in
+            self?.onWindowLayerAutoEnterDelayTextChanged?($0)
+        }
+        windowBehaviorContent.onWindowLayerAutoEnterDelayTextCommitted = { [weak self] in
+            self?.onWindowLayerAutoEnterDelayTextCommitted?()
+        }
+        windowBehaviorContent.onWindowLayerAutoEnterDelayEditingChanged = { [weak self] in
+            self?.onWindowLayerAutoEnterDelayEditingChanged?($0)
+        }
+        windowBehaviorContent.onAutoRestoreMinimizedWindowOnSwitchChanged = { [weak self] in
+            self?.onAutoRestoreMinimizedWindowOnSwitchChanged?($0)
+        }
+        windowBehaviorContent.onHideMinimizedAppsFromAppLayerChanged = { [weak self] in
+            self?.onHideMinimizedAppsFromAppLayerChanged?($0)
+        }
+
+        searchContent.onSearchEnabledChanged = { [weak self] in
+            self?.onSearchEnabledChanged?($0)
+        }
+        searchContent.onSearchDefaultScopeChanged = { [weak self] in
+            self?.onSearchDefaultScopeChanged?($0)
+        }
+
+        hotkeyContent.onHotkeyPrimaryModifierChanged = { [weak self] in
+            self?.onHotkeyPrimaryModifierChanged?($0)
+        }
+        hotkeyContent.onHotkeyMainKeyChanged = { [weak self] in
+            self?.onHotkeyMainKeyChanged?($0)
+        }
+        hotkeyContent.onHotkeyQuitKeyChanged = { [weak self] in
+            self?.onHotkeyQuitKeyChanged?($0)
+        }
+        hotkeyContent.onInAppWindowPrimaryModifierChanged = { [weak self] in
+            self?.onInAppWindowPrimaryModifierChanged?($0)
+        }
+        hotkeyContent.onInAppWindowMainKeyChanged = { [weak self] in
+            self?.onInAppWindowMainKeyChanged?($0)
+        }
+
+        permissionContent.onShowPermissionReminderChanged = { [weak self] in
+            self?.onShowPermissionReminderChanged?($0)
+        }
+        permissionContent.onAccessibilityAction = { [weak self] in
+            self?.onAccessibilityAction?()
+        }
+        permissionContent.onScreenCaptureAction = { [weak self] in
+            self?.onScreenCaptureAction?()
+        }
+    }
+
+    @objc private func handlePageClickToDismissEditing(_ recognizer: NSClickGestureRecognizer) {
+        guard recognizer.state == .ended else { return }
+
+        let location = recognizer.location(in: self)
+        let hitView = hitTest(location)
+        guard !windowBehaviorContent.containsDelayInputDescendant(hitView) else { return }
+        guard windowBehaviorContent.ownsDelayInputFirstResponder(window?.firstResponder) else { return }
+
+        DispatchQueue.main.async { [weak self] in
+            self?.window?.makeFirstResponder(nil)
+        }
+    }
+
+    private func addCard(_ card: NSView, to column: NSStackView) {
+        column.addArrangedSubview(card)
+        card.translatesAutoresizingMaskIntoConstraints = false
+        card.widthAnchor.constraint(equalTo: column.widthAnchor).isActive = true
     }
 }
 
@@ -2064,6 +3049,14 @@ private struct AppKitAppearanceSettingsCardContent: NSViewRepresentable {
         return view
     }
 
+    func sizeThatFits(
+        _ proposal: ProposedViewSize,
+        nsView: AppearanceSettingsCardAppKitView,
+        context: Context
+    ) -> CGSize? {
+        nsView.preferredFittingSize(forWidth: proposal.width)
+    }
+
     func updateNSView(_ nsView: AppearanceSettingsCardAppKitView, context: Context) {
         context.coordinator.update(
             showShortcutHint: $showShortcutHint,
@@ -2104,11 +3097,8 @@ private final class AppearanceSettingsCardAppKitView: AppKitSettingsCardBaseView
 
     private let showShortcutHintSwitch = NSSwitch()
     private let showInCommandTabSwitch = NSSwitch()
-    private let themeModeControl = NSSegmentedControl(
-        labels: ThemeMode.allCases.map(\.displayName),
-        trackingMode: .selectOne,
-        target: nil,
-        action: nil
+    private let themeModeControl = FlowCapsuleSegmentedControl(
+        options: ThemeMode.allCases.map { (id: $0.rawValue, title: $0.displayName) }
     )
     private let descriptionLabel = AppKitSettingsCardBaseView.makeBodyLabel()
     private var isApplyingState = false
@@ -2131,7 +3121,7 @@ private final class AppearanceSettingsCardAppKitView: AppKitSettingsCardBaseView
         isApplyingState = true
         showShortcutHintSwitch.state = state.showShortcutHint ? .on : .off
         showInCommandTabSwitch.state = state.showInCommandTab ? .on : .off
-        themeModeControl.selectedSegment = ThemeMode.allCases.firstIndex(of: state.resolvedThemeMode) ?? 0
+        themeModeControl.updateSelection(id: state.resolvedThemeMode.rawValue)
         isApplyingState = false
 
         descriptionLabel.stringValue = "关闭后 当前应用 将仅作为菜单栏辅助应用运行。"
@@ -2143,10 +3133,10 @@ private final class AppearanceSettingsCardAppKitView: AppKitSettingsCardBaseView
         showShortcutHintSwitch.action = #selector(handleShowShortcutHintChanged)
         showInCommandTabSwitch.target = self
         showInCommandTabSwitch.action = #selector(handleShowInCommandTabChanged)
-        themeModeControl.segmentStyle = .rounded
-        themeModeControl.target = self
-        themeModeControl.action = #selector(handleThemeModeChanged)
         themeModeControl.translatesAutoresizingMaskIntoConstraints = false
+        themeModeControl.onSelectionChanged = { [weak self] rawValue in
+            self?.handleThemeModeChanged(rawValue)
+        }
         themeModeControl.widthAnchor.constraint(equalToConstant: 300).isActive = true
 
         addFullWidthArrangedSubview(
@@ -2171,10 +3161,9 @@ private final class AppearanceSettingsCardAppKitView: AppKitSettingsCardBaseView
         onShowInCommandTabChanged?(sender.state == .on)
     }
 
-    @objc private func handleThemeModeChanged(_ sender: NSSegmentedControl) {
+    private func handleThemeModeChanged(_ rawValue: String) {
         guard !isApplyingState else { return }
-        guard ThemeMode.allCases.indices.contains(sender.selectedSegment) else { return }
-        onThemeModeChanged?(ThemeMode.allCases[sender.selectedSegment].rawValue)
+        onThemeModeChanged?(rawValue)
     }
 }
 
@@ -2184,35 +3173,41 @@ private struct AppKitWindowBehaviorSettingsCardContent: NSViewRepresentable {
     @Binding var hideMinimizedAppsFromAppLayer: Bool
     let onWindowLayerAutoEnterDelayTextChanged: (String) -> Void
     let onWindowLayerAutoEnterDelayTextCommitted: () -> Void
+    let onWindowLayerAutoEnterDelayEditingChanged: (Bool) -> Void
 
     final class Coordinator {
         var autoRestoreMinimizedWindowOnSwitch: Binding<Bool>
         var hideMinimizedAppsFromAppLayer: Binding<Bool>
         var onWindowLayerAutoEnterDelayTextChanged: (String) -> Void
         var onWindowLayerAutoEnterDelayTextCommitted: () -> Void
+        var onWindowLayerAutoEnterDelayEditingChanged: (Bool) -> Void
 
         init(
             autoRestoreMinimizedWindowOnSwitch: Binding<Bool>,
             hideMinimizedAppsFromAppLayer: Binding<Bool>,
             onWindowLayerAutoEnterDelayTextChanged: @escaping (String) -> Void,
-            onWindowLayerAutoEnterDelayTextCommitted: @escaping () -> Void
+            onWindowLayerAutoEnterDelayTextCommitted: @escaping () -> Void,
+            onWindowLayerAutoEnterDelayEditingChanged: @escaping (Bool) -> Void
         ) {
             self.autoRestoreMinimizedWindowOnSwitch = autoRestoreMinimizedWindowOnSwitch
             self.hideMinimizedAppsFromAppLayer = hideMinimizedAppsFromAppLayer
             self.onWindowLayerAutoEnterDelayTextChanged = onWindowLayerAutoEnterDelayTextChanged
             self.onWindowLayerAutoEnterDelayTextCommitted = onWindowLayerAutoEnterDelayTextCommitted
+            self.onWindowLayerAutoEnterDelayEditingChanged = onWindowLayerAutoEnterDelayEditingChanged
         }
 
         func update(
             autoRestoreMinimizedWindowOnSwitch: Binding<Bool>,
             hideMinimizedAppsFromAppLayer: Binding<Bool>,
             onWindowLayerAutoEnterDelayTextChanged: @escaping (String) -> Void,
-            onWindowLayerAutoEnterDelayTextCommitted: @escaping () -> Void
+            onWindowLayerAutoEnterDelayTextCommitted: @escaping () -> Void,
+            onWindowLayerAutoEnterDelayEditingChanged: @escaping (Bool) -> Void
         ) {
             self.autoRestoreMinimizedWindowOnSwitch = autoRestoreMinimizedWindowOnSwitch
             self.hideMinimizedAppsFromAppLayer = hideMinimizedAppsFromAppLayer
             self.onWindowLayerAutoEnterDelayTextChanged = onWindowLayerAutoEnterDelayTextChanged
             self.onWindowLayerAutoEnterDelayTextCommitted = onWindowLayerAutoEnterDelayTextCommitted
+            self.onWindowLayerAutoEnterDelayEditingChanged = onWindowLayerAutoEnterDelayEditingChanged
         }
 
         func setAutoRestoreMinimizedWindowOnSwitch(_ value: Bool) {
@@ -2230,6 +3225,10 @@ private struct AppKitWindowBehaviorSettingsCardContent: NSViewRepresentable {
         func commitDelayText() {
             onWindowLayerAutoEnterDelayTextCommitted()
         }
+
+        func setDelayEditing(_ isEditing: Bool) {
+            onWindowLayerAutoEnterDelayEditingChanged(isEditing)
+        }
     }
 
     func makeCoordinator() -> Coordinator {
@@ -2237,7 +3236,8 @@ private struct AppKitWindowBehaviorSettingsCardContent: NSViewRepresentable {
             autoRestoreMinimizedWindowOnSwitch: $autoRestoreMinimizedWindowOnSwitch,
             hideMinimizedAppsFromAppLayer: $hideMinimizedAppsFromAppLayer,
             onWindowLayerAutoEnterDelayTextChanged: onWindowLayerAutoEnterDelayTextChanged,
-            onWindowLayerAutoEnterDelayTextCommitted: onWindowLayerAutoEnterDelayTextCommitted
+            onWindowLayerAutoEnterDelayTextCommitted: onWindowLayerAutoEnterDelayTextCommitted,
+            onWindowLayerAutoEnterDelayEditingChanged: onWindowLayerAutoEnterDelayEditingChanged
         )
     }
 
@@ -2247,12 +3247,21 @@ private struct AppKitWindowBehaviorSettingsCardContent: NSViewRepresentable {
         return view
     }
 
+    func sizeThatFits(
+        _ proposal: ProposedViewSize,
+        nsView: WindowBehaviorSettingsCardAppKitView,
+        context: Context
+    ) -> CGSize? {
+        nsView.preferredFittingSize(forWidth: proposal.width)
+    }
+
     func updateNSView(_ nsView: WindowBehaviorSettingsCardAppKitView, context: Context) {
         context.coordinator.update(
             autoRestoreMinimizedWindowOnSwitch: $autoRestoreMinimizedWindowOnSwitch,
             hideMinimizedAppsFromAppLayer: $hideMinimizedAppsFromAppLayer,
             onWindowLayerAutoEnterDelayTextChanged: onWindowLayerAutoEnterDelayTextChanged,
-            onWindowLayerAutoEnterDelayTextCommitted: onWindowLayerAutoEnterDelayTextCommitted
+            onWindowLayerAutoEnterDelayTextCommitted: onWindowLayerAutoEnterDelayTextCommitted,
+            onWindowLayerAutoEnterDelayEditingChanged: onWindowLayerAutoEnterDelayEditingChanged
         )
         connect(nsView, coordinator: context.coordinator)
         nsView.update(
@@ -2267,6 +3276,7 @@ private struct AppKitWindowBehaviorSettingsCardContent: NSViewRepresentable {
     private func connect(_ view: WindowBehaviorSettingsCardAppKitView, coordinator: Coordinator) {
         view.onWindowLayerAutoEnterDelayTextChanged = { coordinator.changeDelayText($0) }
         view.onWindowLayerAutoEnterDelayTextCommitted = { coordinator.commitDelayText() }
+        view.onWindowLayerAutoEnterDelayEditingChanged = { coordinator.setDelayEditing($0) }
         view.onAutoRestoreMinimizedWindowOnSwitchChanged = {
             coordinator.setAutoRestoreMinimizedWindowOnSwitch($0)
         }
@@ -2285,10 +3295,11 @@ private struct WindowBehaviorSettingsCardState: Equatable {
 private final class WindowBehaviorSettingsCardAppKitView: AppKitSettingsCardBaseView, NSTextFieldDelegate {
     var onWindowLayerAutoEnterDelayTextChanged: ((String) -> Void)?
     var onWindowLayerAutoEnterDelayTextCommitted: (() -> Void)?
+    var onWindowLayerAutoEnterDelayEditingChanged: ((Bool) -> Void)?
     var onAutoRestoreMinimizedWindowOnSwitchChanged: ((Bool) -> Void)?
     var onHideMinimizedAppsFromAppLayerChanged: ((Bool) -> Void)?
 
-    private let delayTextField = NSTextField(string: "")
+    private let delayInputField = FlowSoftTextField()
     private let autoRestoreMinimizedWindowSwitch = NSSwitch()
     private let hideMinimizedAppsSwitch = NSSwitch()
     private let noteLabel = AppKitSettingsCardBaseView.makeBodyLabel()
@@ -2305,13 +3316,32 @@ private final class WindowBehaviorSettingsCardAppKitView: AppKitSettingsCardBase
         buildViewHierarchy()
     }
 
+    func containsDelayInputDescendant(_ view: NSView?) -> Bool {
+        guard let view else { return false }
+        return view.isDescendant(of: delayInputField)
+    }
+
+    func ownsDelayInputFirstResponder(_ responder: NSResponder?) -> Bool {
+        if let view = responder as? NSView {
+            return view.isDescendant(of: delayInputField)
+        }
+
+        if let editor = responder as? NSTextView,
+            let editedView = editor.delegate as? NSView
+        {
+            return editedView.isDescendant(of: delayInputField)
+        }
+
+        return false
+    }
+
     func update(with state: WindowBehaviorSettingsCardState) {
         guard currentState != state else { return }
         currentState = state
 
         isApplyingState = true
-        if delayTextField.stringValue != state.windowLayerAutoEnterDelayText {
-            delayTextField.stringValue = state.windowLayerAutoEnterDelayText
+        if delayInputField.textField.stringValue != state.windowLayerAutoEnterDelayText {
+            delayInputField.textField.stringValue = state.windowLayerAutoEnterDelayText
         }
         autoRestoreMinimizedWindowSwitch.state = state.autoRestoreMinimizedWindowOnSwitch ? .on : .off
         hideMinimizedAppsSwitch.state = state.hideMinimizedAppsFromAppLayer ? .on : .off
@@ -2322,22 +3352,20 @@ private final class WindowBehaviorSettingsCardAppKitView: AppKitSettingsCardBase
     }
 
     private func buildViewHierarchy() {
+        let delayTextField = delayInputField.textField
         delayTextField.delegate = self
-        delayTextField.placeholderString = "0.35"
-        delayTextField.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
-        delayTextField.alignment = .right
-        delayTextField.translatesAutoresizingMaskIntoConstraints = false
-        delayTextField.widthAnchor.constraint(equalToConstant: 80).isActive = true
 
         let delayUnitLabel = NSTextField(labelWithString: "秒")
         delayUnitLabel.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
         delayUnitLabel.textColor = .secondaryLabelColor
 
-        let delayControl = NSStackView(views: [delayTextField, delayUnitLabel])
+        let delayControl = NSStackView(views: [delayInputField, delayUnitLabel])
         delayControl.orientation = .horizontal
         delayControl.alignment = .centerY
         delayControl.spacing = 8
         delayControl.translatesAutoresizingMaskIntoConstraints = false
+        delayControl.setContentHuggingPriority(.required, for: .vertical)
+        delayControl.setContentCompressionResistancePriority(.required, for: .vertical)
 
         autoRestoreMinimizedWindowSwitch.target = self
         autoRestoreMinimizedWindowSwitch.action = #selector(handleAutoRestoreMinimizedWindowSwitchChanged)
@@ -2364,12 +3392,20 @@ private final class WindowBehaviorSettingsCardAppKitView: AppKitSettingsCardBase
 
     func controlTextDidChange(_ notification: Notification) {
         guard !isApplyingState else { return }
-        guard notification.object as? NSTextField === delayTextField else { return }
-        onWindowLayerAutoEnterDelayTextChanged?(delayTextField.stringValue)
+        guard notification.object as? NSTextField === delayInputField.textField else { return }
+        onWindowLayerAutoEnterDelayTextChanged?(delayInputField.textField.stringValue)
+    }
+
+    func controlTextDidBeginEditing(_ notification: Notification) {
+        guard notification.object as? NSTextField === delayInputField.textField else { return }
+        delayInputField.setEditing(true)
+        onWindowLayerAutoEnterDelayEditingChanged?(true)
     }
 
     func controlTextDidEndEditing(_ notification: Notification) {
-        guard notification.object as? NSTextField === delayTextField else { return }
+        guard notification.object as? NSTextField === delayInputField.textField else { return }
+        delayInputField.setEditing(false)
+        onWindowLayerAutoEnterDelayEditingChanged?(false)
         onWindowLayerAutoEnterDelayTextCommitted?()
     }
 
@@ -2419,6 +3455,14 @@ private struct AppKitSearchSettingsCardContent: NSViewRepresentable {
         let view = SearchSettingsCardAppKitView()
         connect(view, coordinator: context.coordinator)
         return view
+    }
+
+    func sizeThatFits(
+        _ proposal: ProposedViewSize,
+        nsView: SearchSettingsCardAppKitView,
+        context: Context
+    ) -> CGSize? {
+        nsView.preferredFittingSize(forWidth: proposal.width)
     }
 
     func updateNSView(_ nsView: SearchSettingsCardAppKitView, context: Context) {
@@ -2511,6 +3555,8 @@ private final class SearchSettingsCardAppKitView: AppKitSettingsCardBaseView {
         scopeRowContainer.spacing = 0
         scopeRowContainer.detachesHiddenViews = true
         scopeRowContainer.translatesAutoresizingMaskIntoConstraints = false
+        scopeRowContainer.setContentHuggingPriority(.required, for: .vertical)
+        scopeRowContainer.setContentCompressionResistancePriority(.required, for: .vertical)
         scopeRowContainer.addArrangedSubview(
             AppKitSettingsCardBaseView.makeControlRow(
                 title: "默认搜索范围",
@@ -2597,6 +3643,14 @@ private struct AppKitPermissionSettingsCardContent: NSViewRepresentable {
         return view
     }
 
+    func sizeThatFits(
+        _ proposal: ProposedViewSize,
+        nsView: PermissionSettingsCardAppKitView,
+        context: Context
+    ) -> CGSize? {
+        nsView.preferredFittingSize(forWidth: proposal.width)
+    }
+
     func updateNSView(_ nsView: PermissionSettingsCardAppKitView, context: Context) {
         context.coordinator.update(
             showPermissionReminder: $showPermissionReminder,
@@ -2645,30 +3699,34 @@ private struct PermissionSettingsCardState: Equatable {
 private final class PermissionStatusActionRowView: NSView {
     let titleLabel = AppKitSettingsCardBaseView.makeStatusLabel()
     let detailLabel = AppKitSettingsCardBaseView.makeBodyLabel()
-    let actionButton: NSButton
+    let actionButton: FlowGradientActionButton
     private let stackView = NSStackView()
     private let textStack = NSStackView()
 
     override init(frame frameRect: NSRect) {
-        actionButton = NSButton(title: "", target: nil, action: nil)
+        actionButton = FlowGradientActionButton()
         super.init(frame: .zero)
         buildViewHierarchy()
     }
 
     required init?(coder: NSCoder) {
-        actionButton = NSButton(title: "", target: nil, action: nil)
+        actionButton = FlowGradientActionButton()
         super.init(coder: coder)
         buildViewHierarchy()
     }
 
     private func buildViewHierarchy() {
         translatesAutoresizingMaskIntoConstraints = false
+        setContentHuggingPriority(.required, for: .vertical)
+        setContentCompressionResistancePriority(.required, for: .vertical)
 
         textStack.orientation = .vertical
         textStack.alignment = .leading
         textStack.spacing = 2
         textStack.detachesHiddenViews = true
         textStack.translatesAutoresizingMaskIntoConstraints = false
+        textStack.setContentHuggingPriority(.required, for: .vertical)
+        textStack.setContentCompressionResistancePriority(.required, for: .vertical)
         textStack.addArrangedSubview(titleLabel)
         textStack.addArrangedSubview(detailLabel)
 
@@ -2682,20 +3740,19 @@ private final class PermissionStatusActionRowView: NSView {
         stackView.spacing = 10
         stackView.detachesHiddenViews = true
         stackView.translatesAutoresizingMaskIntoConstraints = false
+        stackView.setContentHuggingPriority(.required, for: .vertical)
+        stackView.setContentCompressionResistancePriority(.required, for: .vertical)
         addSubview(stackView)
         stackView.addArrangedSubview(textStack)
         stackView.addArrangedSubview(spacer)
         stackView.addArrangedSubview(actionButton)
-        actionButton.bezelStyle = .rounded
-        actionButton.font = .systemFont(ofSize: 12, weight: .semibold)
-        actionButton.translatesAutoresizingMaskIntoConstraints = false
         actionButton.widthAnchor.constraint(equalToConstant: 166).isActive = true
 
         NSLayoutConstraint.activate([
             stackView.leadingAnchor.constraint(equalTo: leadingAnchor),
             stackView.topAnchor.constraint(equalTo: topAnchor),
             stackView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            stackView.bottomAnchor.constraint(equalTo: bottomAnchor)
+            stackView.bottomAnchor.constraint(lessThanOrEqualTo: bottomAnchor)
         ])
     }
 
@@ -2703,8 +3760,10 @@ private final class PermissionStatusActionRowView: NSView {
         titleLabel.stringValue = text
         titleLabel.textColor = isGranted ? .systemGreen : .systemOrange
         detailLabel.stringValue = detail
-        actionButton.title = buttonTitle
-        actionButton.contentTintColor = isGranted ? .systemBlue : nil
+        actionButton.update(
+            title: buttonTitle,
+            tone: isGranted ? .blueDominant : .grayDominant
+        )
     }
 }
 
@@ -2918,8 +3977,7 @@ private struct AppSettingsView: View {
     @State private var screenCapturePollTask: Task<Void, Never>?
     @State private var windowLayerAutoEnterDelayText = ""
     @State private var didInitialize = false
-    @FocusState private var isWindowLayerDelayFieldFocused: Bool
-    private let permissionRequestButtonWidth: CGFloat = 166
+    @State private var isWindowLayerAutoEnterDelayEditing = false
 
     private var bundleIdentifier: String {
         Bundle.main.bundleIdentifier ?? "unknown"
@@ -2953,144 +4011,34 @@ private struct AppSettingsView: View {
         WindowLayerPreferencesStore.normalizedAutoEnterDelay(windowLayerAutoEnterDelayRaw)
     }
 
-    private var themeModeCapsuleSelector: some View {
-        HStack(spacing: 4) {
-            ForEach(ThemeMode.allCases, id: \.rawValue) { mode in
-                let isSelected = themeModeRaw == mode.rawValue
-                Button {
-                    themeModeRaw = mode.rawValue
-                } label: {
-                    Text(mode.displayName)
-                        .font(.system(size: 12, weight: .medium))
-                        .lineLimit(1)
-                        .frame(maxWidth: .infinity, minHeight: 28)
-                        .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
-                .background(
-                    RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        .fill(isSelected ? Color.accentColor.opacity(0.18) : Color.clear)
-                )
-            }
-        }
-        .padding(2)
-        .frame(width: 300)
-        .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.primary.opacity(0.05))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(Color.primary.opacity(0.12), lineWidth: 1)
-        )
-    }
+    var body: some View {
+        ZStack {
+            HomeBackdropView()
 
-    private var settingsColumns: some View {
-        HStack(alignment: .top, spacing: 12) {
-            settingsLeftColumn
-                .frame(maxWidth: .infinity, alignment: .topLeading)
-            settingsRightColumn
-                .frame(maxWidth: .infinity, alignment: .topLeading)
-        }
-    }
-
-    private var settingsLeftColumn: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            appearanceSettingsCard
-            windowBehaviorSettingsCard
-            permissionSettingsCard
-        }
-    }
-
-    private var settingsRightColumn: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            searchSettingsCard
-            hotkeySettingsCard
-        }
-    }
-
-    @ViewBuilder
-    private func settingsControlRow<Control: View>(
-        _ title: String,
-        @ViewBuilder control: () -> Control
-    ) -> some View {
-        HStack(spacing: 10) {
-            Text(title)
-                .font(.system(size: 13))
-            Spacer(minLength: 8)
-            control()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
-    @ViewBuilder
-    private func settingsToggleRow(
-        _ title: String,
-        isOn: Binding<Bool>
-    ) -> some View {
-        settingsControlRow(title) {
-            Toggle(title, isOn: isOn)
-                .labelsHidden()
-                .toggleStyle(.switch)
-        }
-    }
-
-    private var appearanceSettingsCard: some View {
-        HomeSectionCard(title: "外观", subtitle: "显示与主题") {
-            AppKitAppearanceSettingsCardContent(
+            AppKitSettingsPageContent(
+                isActive: isActive,
                 showShortcutHint: $showShortcutHint,
                 showInCommandTab: $showInCommandTab,
-                themeModeRaw: $themeModeRaw
-            )
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    private var windowBehaviorSettingsCard: some View {
-        HomeSectionCard(title: "窗口行为", subtitle: "窗口层进入与最小化处理") {
-            AppKitWindowBehaviorSettingsCardContent(
+                themeModeRaw: $themeModeRaw,
                 windowLayerAutoEnterDelayText: windowLayerAutoEnterDelayText,
                 autoRestoreMinimizedWindowOnSwitch: $autoRestoreMinimizedWindowOnSwitch,
                 hideMinimizedAppsFromAppLayer: $hideMinimizedAppsFromAppLayer,
-                onWindowLayerAutoEnterDelayTextChanged: applyWindowLayerAutoEnterDelayText,
-                onWindowLayerAutoEnterDelayTextCommitted: commitWindowLayerAutoEnterDelayText
-            )
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    private var hotkeySettingsCard: some View {
-        HomeSectionCard(title: "快捷键", subtitle: "主切换与结束应用按键") {
-            AppKitHotkeySettingsCardContent(
+                showPermissionReminder: $showPermissionReminder,
+                searchEnabled: $searchEnabled,
+                searchDefaultScopeRaw: $searchDefaultScopeRaw,
                 hotkeyPrimaryModifierRaw: $hotkeyPrimaryModifierRaw,
                 hotkeyMainKeyRaw: $hotkeyMainKeyRaw,
                 hotkeyQuitKeyRaw: $hotkeyQuitKeyRaw,
                 inAppWindowHotkeyPrimaryModifierRaw: $inAppWindowHotkeyPrimaryModifierRaw,
                 inAppWindowHotkeyMainKeyRaw: $inAppWindowHotkeyMainKeyRaw,
                 commandTabTakeoverActive: commandTabTakeoverActive,
-                accessibilityTrusted: accessibilityTrusted
-            )
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    private var searchSettingsCard: some View {
-        HomeSectionCard(title: "搜索", subtitle: "搜索开关、范围与交互说明") {
-            AppKitSearchSettingsCardContent(
-                searchEnabled: $searchEnabled,
-                searchDefaultScopeRaw: $searchDefaultScopeRaw
-            )
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    private var permissionSettingsCard: some View {
-        HomeSectionCard(title: "权限", subtitle: "辅助功能与屏幕录制") {
-            AppKitPermissionSettingsCardContent(
-                showPermissionReminder: $showPermissionReminder,
                 accessibilityTrusted: accessibilityTrusted,
                 screenCaptureTrusted: screenCaptureTrusted,
+                onWindowLayerAutoEnterDelayTextChanged: applyWindowLayerAutoEnterDelayText,
+                onWindowLayerAutoEnterDelayTextCommitted: commitWindowLayerAutoEnterDelayText,
+                onWindowLayerAutoEnterDelayEditingChanged: {
+                    isWindowLayerAutoEnterDelayEditing = $0
+                },
                 onAccessibilityAction: {
                     if accessibilityTrusted {
                         openAccessibilityPrivacySettings()
@@ -3106,28 +4054,7 @@ private struct AppSettingsView: View {
                     }
                 }
             )
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-
-    var body: some View {
-        ZStack {
-            HomeBackdropView()
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("设置")
-                            .font(.system(size: 22, weight: .semibold))
-                        Text("基础显示设置、快捷键与权限")
-                            .font(.system(size: 12))
-                            .foregroundStyle(.secondary)
-                    }
-
-                    settingsColumns
-                }
-                .padding(24)
-            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onAppear {
@@ -3164,13 +4091,9 @@ private struct AppSettingsView: View {
             enforceInAppWindowHotkeyConsistency()
             notifyHotkeyConfigChanged()
         }
-        .onChange(of: isWindowLayerDelayFieldFocused) { _, isFocused in
-            guard !isFocused else { return }
-            commitWindowLayerAutoEnterDelayText()
-        }
         .onChange(of: windowLayerAutoEnterDelayRaw) {
             enforceWindowLayerPreferencesConsistency()
-            if !isWindowLayerDelayFieldFocused {
+            if !isWindowLayerAutoEnterDelayEditing {
                 syncWindowLayerAutoEnterDelayText()
             }
         }
@@ -3206,38 +4129,6 @@ private struct AppSettingsView: View {
         accessibilityPermissionPollTask = nil
         screenCapturePollTask?.cancel()
         screenCapturePollTask = nil
-    }
-
-    private var requestAccessibilityPermissionButton: some View {
-        let isGranted = accessibilityTrusted
-        return FlowActionButton(
-            title: isGranted ? "关闭辅助功能权限" : "请求辅助功能权限",
-            systemImage: nil,
-            tone: isGranted ? .blueDominant : .grayDominant,
-            width: permissionRequestButtonWidth
-        ) {
-            if isGranted {
-                openAccessibilityPrivacySettings()
-            } else {
-                requestAccessibilityPermission()
-            }
-        }
-    }
-
-    private var requestScreenCapturePermissionButton: some View {
-        let isGranted = screenCaptureTrusted
-        return FlowActionButton(
-            title: isGranted ? "关闭屏幕录制权限" : "请求屏幕录制权限",
-            systemImage: "display.badge.person.crop",
-            tone: isGranted ? .blueDominant : .grayDominant,
-            width: permissionRequestButtonWidth
-        ) {
-            if isGranted {
-                openScreenCapturePrivacySettings()
-            } else {
-                requestScreenCapturePermission()
-            }
-        }
     }
 
     private func requestAccessibilityPermission() {
@@ -3288,29 +4179,6 @@ private struct AppSettingsView: View {
             }
         }
         NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/System Settings.app"))
-    }
-
-    @ViewBuilder
-    private func permissionStatusActionRow<Button: View>(
-        text: String,
-        detail: String,
-        isGranted: Bool,
-        @ViewBuilder actionButton: () -> Button
-    ) -> some View {
-        HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(text)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(isGranted ? .green : .orange)
-                Text(detail)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
-            Spacer(minLength: 8)
-            actionButton()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func refreshAccessibilityStatus() {
