@@ -611,14 +611,10 @@ private struct HomeSidebar: View {
                         .frame(width: 32, height: 32)
                         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
 
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: 0) {
                         Text("FlowTab")
                             .font(.system(size: 21, weight: .bold))
                             .lineLimit(1)
-
-                        Text(AppStrings.text(.sidebarWorkbench, language: appLanguage))
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(.secondary)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -4972,12 +4968,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func installStatusItem() {
-        let item = statusItem ?? NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        let item = statusItem ?? NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        item.length = NSStatusItem.squareLength
         item.menu = nil
-        item.button?.title = "FlowTab"
-        item.button?.target = self
-        item.button?.action = #selector(openAppFromStatusItem)
-        item.button?.sendAction(on: [.leftMouseUp])
+        if let button = item.button {
+            let icon = (NSImage(named: "MenuBarIcon")?.copy() as? NSImage)
+                ?? (NSApp.applicationIconImage.copy() as? NSImage)
+                ?? NSImage(named: NSImage.applicationIconName)
+                ?? NSImage()
+            icon.size = NSSize(width: 18, height: 18)
+            icon.isTemplate = true
+            button.title = ""
+            button.image = icon
+            button.imagePosition = .imageOnly
+            button.setAccessibilityLabel("FlowTab")
+            button.target = self
+            button.action = #selector(openAppFromStatusItem)
+            button.sendAction(on: [.leftMouseUp])
+        }
         statusItem = item
     }
 
