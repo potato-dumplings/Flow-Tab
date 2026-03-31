@@ -131,6 +131,17 @@ final class FlowTabAppTests: XCTestCase {
         XCTAssertEqual(coordinator.state.queryCursorPosition, 3)
     }
 
+    func testSearchReplaceQueryWithoutRebuildUpdatesQueryAndCursor() {
+        let coordinator = SwitcherSearchCoordinator()
+        coordinator.rebuildIndex(with: searchSampleApps())
+        XCTAssertTrue(coordinator.activate(defaultScope: .app))
+
+        XCTAssertTrue(coordinator.replaceQueryWithoutRebuild("微信", cursorPosition: 1))
+
+        XCTAssertEqual(coordinator.state.query, "微信")
+        XCTAssertEqual(coordinator.state.queryCursorPosition, 1)
+    }
+
     func testSearchMatchesChineseAppByPinyinInitialsAndFullSpelling() {
         let coordinator = SwitcherSearchCoordinator()
         coordinator.rebuildIndex(with: searchSampleApps())

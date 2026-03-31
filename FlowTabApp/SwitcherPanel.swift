@@ -3,6 +3,16 @@ import Carbon
 import SwiftUI
 import FlowTabCore
 
+private final class SwitcherOverlayPanel: NSPanel {
+    override var canBecomeKey: Bool {
+        true
+    }
+
+    override var canBecomeMain: Bool {
+        false
+    }
+}
+
 @MainActor
 final class SwitcherPanelController {
     private enum HotkeySessionKind {
@@ -67,9 +77,9 @@ final class SwitcherPanelController {
     }
 
     init() {
-        panel = NSPanel(
+        panel = SwitcherOverlayPanel(
             contentRect: NSRect(x: 0, y: 0, width: 880, height: 290),
-            styleMask: [.borderless, .nonactivatingPanel],
+            styleMask: [.borderless],
             backing: .buffered,
             defer: false
         )
@@ -668,37 +678,38 @@ final class SwitcherPanelController {
     }
 
     private func handleSearchModeKeyDown(_ event: NSEvent) -> Bool {
+        let isComposingMarkedText = model.hasMarkedSearchText
         switch event.keyCode {
         case 48:
+            guard !isComposingMarkedText else { return false }
             if model.toggleSearchScope() {
                 updatePanelSize()
             }
             return true
         case 125:
+            guard !isComposingMarkedText else { return false }
             if !model.focusSearchResults() {
                 _ = model.moveSearchSelection(by: +1)
             }
             return true
         case 126:
+            guard !isComposingMarkedText else { return false }
             if !model.focusSearchInput() {
                 _ = model.moveSearchSelection(by: -1)
             }
             return true
         case 123:
-            if model.isSearchInputFocused {
-                _ = model.moveSearchQueryCursor(by: -1)
-            } else {
-                _ = model.moveSearchSelection(by: -1)
-            }
+            guard !isComposingMarkedText else { return false }
+            guard !model.isSearchInputFocused else { return false }
+            _ = model.moveSearchSelection(by: -1)
             return true
         case 124:
-            if model.isSearchInputFocused {
-                _ = model.moveSearchQueryCursor(by: +1)
-            } else {
-                _ = model.moveSearchSelection(by: +1)
-            }
+            guard !isComposingMarkedText else { return false }
+            guard !model.isSearchInputFocused else { return false }
+            _ = model.moveSearchSelection(by: +1)
             return true
         case 36, 76:
+            guard !isComposingMarkedText else { return false }
             guard model.applySelectedSearchResultToSession() else {
                 NSSound.beep()
                 return true
@@ -706,6 +717,7 @@ final class SwitcherPanelController {
             finishSelection()
             return true
         case 53:
+            guard !isComposingMarkedText else { return false }
             if !model.isSearchInputFocused {
                 if model.focusSearchInput() {
                     updatePanelSize()
@@ -717,36 +729,13 @@ final class SwitcherPanelController {
             }
             return true
         case 51:
-            if model.deleteSearchQueryBackward() {
-                updatePanelSize()
-            }
-            return true
-        default:
-            if let text = searchInputText(from: event), model.appendSearchQuery(text) {
-                updatePanelSize()
+            if model.searchViewState.query.isEmpty {
                 return true
             }
-            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-            if flags.contains(.command) || flags.contains(.control) || flags.contains(.option) {
-                return false
-            }
-            return true
+            return false
+        default:
+            return false
         }
-    }
-
-    private func searchInputText(from event: NSEvent) -> String? {
-        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        if flags.contains(.command) || flags.contains(.control) || flags.contains(.option) {
-            return nil
-        }
-        guard let characters = event.characters else { return nil }
-        let scalarView = String.UnicodeScalarView(
-            characters.unicodeScalars.filter { scalar in
-                !CharacterSet.controlCharacters.contains(scalar)
-            }
-        )
-        let result = String(scalarView)
-        return result.isEmpty ? nil : result
     }
 
     private func handleFlagsChanged(_ event: NSEvent) {
@@ -1093,6 +1082,7 @@ final class LiveSwitcherModel: ObservableObject {
     private var previewCaptureAttemptedKeys: Set<String> = []
     private var autoEnterSuppressedAppID: String?
     private var titleBarStyleInferenceEnabled = false
+    private var searchInputHasMarkedText = false
     private var pendingSearchComputationTask: Task<Void, Never>?
     private var searchComputationRevision: UInt64 = 0
     private var searchDebounceNanoseconds: UInt64 = 20_000_000
@@ -1144,6 +1134,10 @@ final class LiveSwitcherModel: ObservableObject {
 
     var isSearchInputFocused: Bool {
         searchViewState.isInputFocused
+    }
+
+    var hasMarkedSearchText: Bool {
+        searchInputHasMarkedText
     }
 
     var searchScope: SwitcherSearchScope {
@@ -1367,6 +1361,23 @@ final class LiveSwitcherModel: ObservableObject {
         let changed = searchCoordinator.moveQueryCursor(by: delta)
         publishSearchStateIfNeeded()
         return changed
+    }
+
+    func synchronizeSearchInput(query: String, cursorPosition: Int) {
+        guard searchViewState.isActive else { return }
+        let previousQuery = searchCoordinator.state.query
+        let changed = searchCoordinator.replaceQueryWithoutRebuild(
+            query,
+            cursorPosition: cursorPosition
+        )
+        guard changed else { return }
+        publishSearchStateIfNeeded()
+        guard previousQuery != searchCoordinator.state.query else { return }
+        scheduleSearchComputation(resetSelection: true, debounced: true)
+    }
+
+    func updateSearchInputMarkedTextState(_ hasMarkedText: Bool) {
+        searchInputHasMarkedText = searchViewState.isActive ? hasMarkedText : false
     }
 
     @discardableResult
@@ -1682,6 +1693,9 @@ final class LiveSwitcherModel: ObservableObject {
 
     private func publishSearchStateIfNeeded() {
         let newState = searchCoordinator.state
+        if !newState.isActive {
+            searchInputHasMarkedText = false
+        }
         guard searchViewState != newState else { return }
         searchViewState = newState
     }
@@ -1769,6 +1783,12 @@ private struct SwitcherPanelRootView: View {
                     searchState: model.searchViewState,
                     searchAppItems: model.searchAppItems(),
                     searchWindowItems: model.searchWindowItems(),
+                    onSearchInputChanged: { query, cursorPosition in
+                        model.synchronizeSearchInput(query: query, cursorPosition: cursorPosition)
+                    },
+                    onSearchMarkedTextChanged: { hasMarkedText in
+                        model.updateSearchInputMarkedTextState(hasMarkedText)
+                    },
                     searchFeatureEnabled: searchEnabled,
                     searchDefaultScope: searchDefaultScope,
                     selectedApp: model.selectedApp,
@@ -1797,6 +1817,8 @@ private struct CommandTabOverlay: View {
     let searchState: SwitcherSearchViewState
     let searchAppItems: [SearchAppResultItem]
     let searchWindowItems: [SearchWindowResultItem]
+    let onSearchInputChanged: (String, Int) -> Void
+    let onSearchMarkedTextChanged: (Bool) -> Void
     let searchFeatureEnabled: Bool
     let searchDefaultScope: SwitcherSearchScope
     let selectedApp: AppSwitchCandidate?
@@ -2074,6 +2096,17 @@ private struct CommandTabOverlay: View {
                 highlightedItem: searchHeaderHighlightItem,
                 isSearchPresentation: true
             )
+            .background(
+                SearchSystemTextInputBridge(
+                    query: searchState.query,
+                    cursorPosition: searchState.queryCursorPosition,
+                    isSearchActive: searchState.isActive,
+                    onInputChanged: onSearchInputChanged,
+                    onMarkedTextChanged: onSearchMarkedTextChanged
+                )
+                .opacity(0.01)
+                .allowsHitTesting(false)
+            )
 
             if searchState.scope == .app {
                 if searchAppItems.isEmpty {
@@ -2229,6 +2262,216 @@ private struct SearchWindowResultItem: Identifiable {
 private struct SearchHeaderHighlightItem {
     let title: String
     let icon: NSImage?
+}
+
+private struct SearchSystemTextInputBridge: NSViewRepresentable {
+    let query: String
+    let cursorPosition: Int
+    let isSearchActive: Bool
+    let onInputChanged: (String, Int) -> Void
+    let onMarkedTextChanged: (Bool) -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(
+            onInputChanged: onInputChanged,
+            onMarkedTextChanged: onMarkedTextChanged
+        )
+    }
+
+    func makeNSView(context: Context) -> SearchSystemTextInputContainerView {
+        let view = SearchSystemTextInputContainerView()
+        view.textView.delegate = context.coordinator
+        context.coordinator.attach(textView: view.textView)
+        return view
+    }
+
+    func updateNSView(_ nsView: SearchSystemTextInputContainerView, context: Context) {
+        context.coordinator.updateCallbacks(
+            onInputChanged: onInputChanged,
+            onMarkedTextChanged: onMarkedTextChanged
+        )
+        context.coordinator.synchronize(
+            textView: nsView.textView,
+            query: query,
+            cursorPosition: cursorPosition,
+            isSearchActive: isSearchActive
+        )
+    }
+
+    static func dismantleNSView(
+        _ nsView: SearchSystemTextInputContainerView,
+        coordinator: Coordinator
+    ) {
+        coordinator.detach(textView: nsView.textView)
+    }
+
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        private var onInputChanged: (String, Int) -> Void
+        private var onMarkedTextChanged: (Bool) -> Void
+        private var isApplyingViewState = false
+        private weak var trackedTextView: NSTextView?
+
+        init(
+            onInputChanged: @escaping (String, Int) -> Void,
+            onMarkedTextChanged: @escaping (Bool) -> Void
+        ) {
+            self.onInputChanged = onInputChanged
+            self.onMarkedTextChanged = onMarkedTextChanged
+        }
+
+        func attach(textView: NSTextView) {
+            trackedTextView = textView
+        }
+
+        func detach(textView: NSTextView) {
+            guard trackedTextView === textView else { return }
+            trackedTextView = nil
+            onMarkedTextChanged(false)
+        }
+
+        func updateCallbacks(
+            onInputChanged: @escaping (String, Int) -> Void,
+            onMarkedTextChanged: @escaping (Bool) -> Void
+        ) {
+            self.onInputChanged = onInputChanged
+            self.onMarkedTextChanged = onMarkedTextChanged
+        }
+
+        func synchronize(
+            textView: NSTextView,
+            query: String,
+            cursorPosition: Int,
+            isSearchActive: Bool
+        ) {
+            let resolvedCursorPosition = min(max(cursorPosition, 0), query.count)
+            let selectedRange = NSRange(location: resolvedCursorPosition, length: 0)
+            isApplyingViewState = true
+            if textView.string != query {
+                textView.string = query
+            }
+            if textView.selectedRange() != selectedRange {
+                textView.setSelectedRange(selectedRange)
+            }
+            isApplyingViewState = false
+
+            synchronizeFirstResponder(for: textView, isSearchActive: isSearchActive)
+            publishMarkedTextState(for: textView)
+        }
+
+        func textDidChange(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else { return }
+            guard trackedTextView === textView else { return }
+            guard !isApplyingViewState else {
+                publishMarkedTextState(for: textView)
+                return
+            }
+            publishInputState(for: textView)
+        }
+
+        func textViewDidChangeSelection(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else { return }
+            guard trackedTextView === textView else { return }
+            guard !isApplyingViewState else {
+                publishMarkedTextState(for: textView)
+                return
+            }
+            publishInputState(for: textView)
+        }
+
+        private func publishInputState(for textView: NSTextView) {
+            onInputChanged(textView.string, textView.selectedRange().location)
+            publishMarkedTextState(for: textView)
+        }
+
+        private func publishMarkedTextState(for textView: NSTextView) {
+            onMarkedTextChanged(textView.hasMarkedText())
+        }
+
+        private func synchronizeFirstResponder(for textView: NSTextView, isSearchActive: Bool) {
+            if isSearchActive {
+                DispatchQueue.main.async { [weak textView] in
+                    guard let textView else { return }
+                    guard let window = textView.window else { return }
+                    guard window.firstResponder !== textView else { return }
+                    _ = window.makeFirstResponder(textView)
+                }
+            } else {
+                DispatchQueue.main.async { [weak textView] in
+                    guard let textView else { return }
+                    guard let window = textView.window else { return }
+                    guard window.firstResponder === textView else { return }
+                    _ = window.makeFirstResponder(nil)
+                }
+            }
+        }
+    }
+}
+
+private final class SearchSystemTextInputContainerView: NSView {
+    let textView: SearchSystemTextView
+
+    override init(frame frameRect: NSRect) {
+        let textStorage = NSTextStorage()
+        let layoutManager = NSLayoutManager()
+        let textContainer = NSTextContainer(size: .zero)
+        textContainer.widthTracksTextView = true
+        textContainer.heightTracksTextView = true
+        textContainer.lineFragmentPadding = 0
+        textStorage.addLayoutManager(layoutManager)
+        layoutManager.addTextContainer(textContainer)
+
+        textView = SearchSystemTextView(frame: .zero, textContainer: textContainer)
+        super.init(frame: frameRect)
+
+        textView.translatesAutoresizingMaskIntoConstraints = false
+        textView.drawsBackground = false
+        textView.backgroundColor = .clear
+        textView.textColor = .clear
+        textView.insertionPointColor = .clear
+        textView.font = .systemFont(ofSize: 20, weight: .regular)
+        textView.isEditable = true
+        textView.isSelectable = true
+        textView.isRichText = false
+        textView.importsGraphics = false
+        textView.allowsUndo = false
+        textView.isAutomaticQuoteSubstitutionEnabled = false
+        textView.isAutomaticDataDetectionEnabled = false
+        textView.isAutomaticDashSubstitutionEnabled = false
+        textView.isAutomaticLinkDetectionEnabled = false
+        textView.isAutomaticSpellingCorrectionEnabled = false
+        textView.isAutomaticTextReplacementEnabled = false
+        textView.isContinuousSpellCheckingEnabled = false
+        textView.isGrammarCheckingEnabled = false
+        textView.textContainerInset = .zero
+        textView.minSize = .zero
+        textView.maxSize = NSSize(
+            width: CGFloat.greatestFiniteMagnitude,
+            height: CGFloat.greatestFiniteMagnitude
+        )
+        textView.isHorizontallyResizable = false
+        textView.isVerticallyResizable = false
+        textView.textContainer?.widthTracksTextView = true
+        textView.textContainer?.heightTracksTextView = true
+
+        addSubview(textView)
+        NSLayoutConstraint.activate([
+            textView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            textView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            textView.topAnchor.constraint(equalTo: topAnchor),
+            textView.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+}
+
+private final class SearchSystemTextView: NSTextView {
+    override var acceptsFirstResponder: Bool {
+        true
+    }
 }
 
 private struct SearchInputHeader: View {

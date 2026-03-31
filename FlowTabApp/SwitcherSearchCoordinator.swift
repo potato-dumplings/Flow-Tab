@@ -316,6 +316,19 @@ final class SwitcherSearchCoordinator {
     }
 
     @discardableResult
+    func replaceQueryWithoutRebuild(_ value: String, cursorPosition: Int) -> Bool {
+        guard state.isActive else { return false }
+        let resolvedCursorPosition = Self.clampedCursorPosition(cursorPosition, in: value)
+        guard state.query != value || state.queryCursorPosition != resolvedCursorPosition else {
+            return false
+        }
+        state.query = value
+        state.queryCursorPosition = resolvedCursorPosition
+        state.selectedResultIndex = 0
+        return true
+    }
+
+    @discardableResult
     func deleteBackwardInQuery() -> Bool {
         guard deleteBackwardInQueryWithoutRebuild() else { return false }
         scheduleRebuild(resetSelection: true, debounced: true)
