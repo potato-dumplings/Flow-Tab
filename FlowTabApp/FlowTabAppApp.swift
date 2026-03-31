@@ -661,7 +661,7 @@ private struct HomeSidebar: View {
 
                 Text(title)
                     .font(.system(size: 16, weight: .semibold))
-                    .tracking(4)
+                    .tracking(appLanguage == .english ? 0 : 4)
                     .lineLimit(1)
 
                 Spacer(minLength: 0)
@@ -1926,6 +1926,7 @@ private final class HotkeySettingsCardAppKitView: NSView {
         popUp.action = action
         popUp.controlSize = .regular
         popUp.font = .systemFont(ofSize: 13)
+        popUp.alignment = .right
         popUp.translatesAutoresizingMaskIntoConstraints = false
         popUp.menu = NSMenu()
 
@@ -2445,6 +2446,7 @@ private class AppKitSettingsCardBaseView: NSView {
         popUp.action = action
         popUp.controlSize = .regular
         popUp.font = .systemFont(ofSize: 13)
+        popUp.alignment = .right
         popUp.translatesAutoresizingMaskIntoConstraints = false
         popUp.menu = NSMenu()
 
@@ -4971,67 +4973,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func installStatusItem() {
         let item = statusItem ?? NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        item.menu = nil
         item.button?.title = "FlowTab"
-
-        let menu = NSMenu()
-
-        let openHomeItem = NSMenuItem(
-            title: AppStrings.text(.menuOpenHome),
-            action: #selector(openHomeFromMenu),
-            keyEquivalent: ""
-        )
-        openHomeItem.target = self
-        menu.addItem(openHomeItem)
-
-        let openLogsItem = NSMenuItem(
-            title: AppStrings.text(.menuLogs),
-            action: #selector(openLogsFromMenu),
-            keyEquivalent: ""
-        )
-        openLogsItem.target = self
-        menu.addItem(openLogsItem)
-
-        let openSettingsItem = NSMenuItem(
-            title: AppStrings.text(.menuSettings),
-            action: #selector(openSettingsFromMenu),
-            keyEquivalent: ""
-        )
-        openSettingsItem.target = self
-        menu.addItem(openSettingsItem)
-
-        menu.addItem(.separator())
-
-        let quitItem = NSMenuItem(
-            title: AppStrings.text(.menuQuitFlowTab),
-            action: #selector(quitFromMenu),
-            keyEquivalent: "q"
-        )
-        quitItem.keyEquivalentModifierMask = [.command]
-        quitItem.target = self
-        menu.addItem(quitItem)
-
-        item.menu = menu
+        item.button?.target = self
+        item.button?.action = #selector(openAppFromStatusItem)
+        item.button?.sendAction(on: [.leftMouseUp])
         statusItem = item
     }
 
     @objc
-    private func openSettingsFromMenu() {
-        AppWindowCoordinator.openSettings()
-    }
-
-    @objc
-    private func openLogsFromMenu() {
-        AppWindowCoordinator.openLogs()
-    }
-
-    @objc
-    private func openHomeFromMenu() {
-        AppWindowCoordinator.openHome()
-    }
-
-    @objc
-    private func quitFromMenu() {
-        NSApp.terminate(nil)
+    private func openAppFromStatusItem() {
+        NSApp.activate(ignoringOtherApps: true)
+        if NSApp.isHidden {
+            NSApp.unhide(nil)
+        }
+        if let mainWindow = NSApp.windows.first(where: { !($0 is NSPanel) }), mainWindow.isMiniaturized {
+            mainWindow.deminiaturize(nil)
+        }
     }
 }
 
