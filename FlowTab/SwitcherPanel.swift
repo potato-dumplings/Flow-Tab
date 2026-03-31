@@ -14,6 +14,153 @@ private final class SwitcherOverlayPanel: NSPanel {
     }
 }
 
+enum SwitcherPanelWindowConfiguration {
+    static let styleMask: NSWindow.StyleMask = [.borderless, .nonactivatingPanel]
+    static let level: NSWindow.Level = .statusBar
+    static let fallbackPresentationLevel = NSWindow.Level(
+        rawValue: Int(CGShieldingWindowLevel()) + 1
+    )
+    // Keep the proven panel presentation behavior and only add the explicit
+    // cross-application fullscreen-space eligibility we were missing.
+    static let collectionBehavior: NSWindow.CollectionBehavior = [
+        .canJoinAllSpaces,
+        .fullScreenAuxiliary,
+        .ignoresCycle,
+        .stationary,
+        .canJoinAllApplications
+    ]
+
+    static func presentationLevel(
+        frontmostWindowIsFullScreen: Bool,
+        requiresFallbackElevation: Bool = false
+    ) -> NSWindow.Level {
+        guard frontmostWindowIsFullScreen || requiresFallbackElevation else { return level }
+        return fallbackPresentationLevel
+    }
+
+    static func presentationCollectionBehavior(
+        requiresActiveSpaceMove: Bool = false
+    ) -> NSWindow.CollectionBehavior {
+        guard requiresActiveSpaceMove else { return collectionBehavior }
+
+        var behavior = collectionBehavior
+        behavior.insert(.moveToActiveSpace)
+        return behavior
+    }
+}
+
+private enum FrontmostWindowInspector {
+    private static let fullScreenAttribute = "AXFullScreen" as CFString
+    private static let titleAttribute = kAXTitleAttribute as CFString
+
+    struct Inspection {
+        let axTrusted: Bool
+        let appName: String
+        let pid: pid_t?
+        let focusedWindowAvailable: Bool
+        let focusedWindowTitle: String?
+        let fullScreenDetected: Bool
+        let failureReason: String?
+    }
+
+    static func inspect() -> Inspection {
+        guard AXIsProcessTrusted() else {
+            return Inspection(
+                axTrusted: false,
+                appName: "unavailable",
+                pid: nil,
+                focusedWindowAvailable: false,
+                focusedWindowTitle: nil,
+                fullScreenDetected: false,
+                failureReason: "ax_not_trusted"
+            )
+        }
+        guard let app = NSWorkspace.shared.frontmostApplication else {
+            return Inspection(
+                axTrusted: true,
+                appName: "unavailable",
+                pid: nil,
+                focusedWindowAvailable: false,
+                focusedWindowTitle: nil,
+                fullScreenDetected: false,
+                failureReason: "frontmost_app_unavailable"
+            )
+        }
+
+        let appName = app.localizedName ?? app.bundleIdentifier ?? "pid:\(app.processIdentifier)"
+        let appElement = AXUIElementCreateApplication(app.processIdentifier)
+        var focusedWindowValue: CFTypeRef?
+        guard
+            AXUIElementCopyAttributeValue(
+                appElement,
+                kAXFocusedWindowAttribute as CFString,
+                &focusedWindowValue
+            ) == .success,
+            let focusedWindowValue
+        else {
+            return Inspection(
+                axTrusted: true,
+                appName: appName,
+                pid: app.processIdentifier,
+                focusedWindowAvailable: false,
+                focusedWindowTitle: nil,
+                fullScreenDetected: false,
+                failureReason: "focused_window_unavailable"
+            )
+        }
+        let focusedWindow = focusedWindowValue as! AXUIElement
+
+        var titleValue: CFTypeRef?
+        let focusedWindowTitle: String?
+        if
+            AXUIElementCopyAttributeValue(
+                focusedWindow,
+                titleAttribute,
+                &titleValue
+            ) == .success,
+            let title = titleValue as? String,
+            !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        {
+            focusedWindowTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        } else {
+            focusedWindowTitle = nil
+        }
+
+        var fullScreenValue: CFTypeRef?
+        guard
+            AXUIElementCopyAttributeValue(
+                focusedWindow,
+                fullScreenAttribute,
+                &fullScreenValue
+            ) == .success,
+            let number = fullScreenValue as? NSNumber
+        else {
+            return Inspection(
+                axTrusted: true,
+                appName: appName,
+                pid: app.processIdentifier,
+                focusedWindowAvailable: true,
+                focusedWindowTitle: focusedWindowTitle,
+                fullScreenDetected: false,
+                failureReason: "fullscreen_attribute_unavailable"
+            )
+        }
+        return Inspection(
+            axTrusted: true,
+            appName: appName,
+            pid: app.processIdentifier,
+            focusedWindowAvailable: true,
+            focusedWindowTitle: focusedWindowTitle,
+            fullScreenDetected: number.boolValue,
+            failureReason: nil
+        )
+    }
+
+    static func frontmostWindowIsFullScreen() -> Bool {
+        inspect().fullScreenDetected
+    }
+}
+
 @MainActor
 final class SwitcherPanelController {
     private enum HotkeySessionKind {
@@ -81,15 +228,16 @@ final class SwitcherPanelController {
     init() {
         panel = SwitcherOverlayPanel(
             contentRect: NSRect(x: 0, y: 0, width: 880, height: 290),
-            styleMask: [.borderless],
+            styleMask: SwitcherPanelWindowConfiguration.styleMask,
             backing: .buffered,
             defer: false
         )
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false
-        panel.level = .statusBar
-        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle, .stationary]
+        panel.becomesKeyOnlyIfNeeded = false
+        panel.level = SwitcherPanelWindowConfiguration.level
+        panel.collectionBehavior = SwitcherPanelWindowConfiguration.presentationCollectionBehavior()
         panel.hidesOnDeactivate = false
         panel.ignoresMouseEvents = false
         let hostingView = NSHostingView(rootView: SwitcherPanelRootView(model: model))
@@ -167,6 +315,26 @@ final class SwitcherPanelController {
 
     private func logInputTrace(_ message: String) {
         RuntimeLog.info("InputTrace", message)
+    }
+
+    private func schedulePanelVisibilityRecovery(
+        trigger: String,
+        delayNanoseconds: UInt64 = 50_000_000
+    ) {
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: delayNanoseconds)
+            guard let self else { return }
+            guard self.panel.isVisible else { return }
+            guard !self.panel.occlusionState.contains(.visible) else { return }
+            panel.orderOut(nil)
+            panel.collectionBehavior = SwitcherPanelWindowConfiguration.presentationCollectionBehavior(
+                requiresActiveSpaceMove: true
+            )
+            try? await Task.sleep(nanoseconds: 10_000_000)
+            centerPanelOnActiveScreen(preferredScreen: resolveActivePresentationScreen())
+            panel.makeKeyAndOrderFront(nil)
+            panel.orderFrontRegardless()
+        }
     }
 
     func handleGlobalHotkey(isBackward: Bool) {
@@ -291,13 +459,17 @@ final class SwitcherPanelController {
 
         let targetScreen = resolveActivePresentationScreen()
         activePresentationScreen = targetScreen
-        logPanelPresentationScreen(targetScreen, trigger: "global_show")
         updatePanelSize(for: targetScreen)
         centerPanelOnActiveScreen(preferredScreen: targetScreen)
+        updatePanelPresentationLevel(trigger: "global_show")
         hideNonPanelWindows()
-        NSRunningApplication.current.activate(options: [.activateIgnoringOtherApps])
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
+        schedulePanelVisibilityRecovery(trigger: "global_show_recovery")
+        schedulePanelVisibilityRecovery(
+            trigger: "global_show_recovery_retry",
+            delayNanoseconds: 150_000_000
+        )
         installEventMonitors()
         scheduleDelayedWindowLayerEntryIfNeeded()
     }
@@ -314,15 +486,30 @@ final class SwitcherPanelController {
 
         let targetScreen = resolveActivePresentationScreen()
         activePresentationScreen = targetScreen
-        logPanelPresentationScreen(targetScreen, trigger: "in_app_show")
         updatePanelSize(for: targetScreen)
         centerPanelOnActiveScreen(preferredScreen: targetScreen)
+        updatePanelPresentationLevel(trigger: "in_app_show")
         hideNonPanelWindows()
-        NSRunningApplication.current.activate(options: [.activateIgnoringOtherApps])
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
+        schedulePanelVisibilityRecovery(trigger: "in_app_show_recovery")
+        schedulePanelVisibilityRecovery(
+            trigger: "in_app_show_recovery_retry",
+            delayNanoseconds: 150_000_000
+        )
         installEventMonitors()
         scheduleDelayedWindowLayerEntryIfNeeded()
+    }
+
+    private func updatePanelPresentationLevel(trigger: String) {
+        let inspection = FrontmostWindowInspector.inspect()
+        let requiresFallbackElevation = inspection.failureReason != nil
+        let resolvedLevel = SwitcherPanelWindowConfiguration.presentationLevel(
+            frontmostWindowIsFullScreen: inspection.fullScreenDetected,
+            requiresFallbackElevation: requiresFallbackElevation
+        )
+        panel.collectionBehavior = SwitcherPanelWindowConfiguration.presentationCollectionBehavior()
+        panel.level = resolvedLevel
     }
 
     private func centerPanelOnActiveScreen(preferredScreen: NSScreen? = nil) {
@@ -366,44 +553,6 @@ final class SwitcherPanelController {
             ?? NSScreen.screens.first
     }
 
-    private func displayID(for screen: NSScreen) -> CGDirectDisplayID? {
-        guard
-            let screenNumber = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
-        else {
-            return nil
-        }
-        return CGDirectDisplayID(screenNumber.uint32Value)
-    }
-
-    private func formatRect(_ rect: CGRect) -> String {
-        String(
-            format: "(x:%.1f y:%.1f w:%.1f h:%.1f)",
-            rect.origin.x,
-            rect.origin.y,
-            rect.size.width,
-            rect.size.height
-        )
-    }
-
-    private func logPanelPresentationScreen(_ screen: NSScreen?, trigger: String) {
-        guard let screen else {
-            RuntimeLog.info("PanelLayout", "presentationScreen trigger=\(trigger) unavailable")
-            return
-        }
-        var displayIDText = "displayID=unknown"
-        var displayTypeText = "displayType=unknown"
-        var pixelSizeText = "pixelSize=unknown"
-        if let displayID = displayID(for: screen) {
-            displayIDText = "displayID=\(displayID)"
-            displayTypeText = "displayType=\(CGDisplayIsBuiltin(displayID) != 0 ? "builtIn" : "external")"
-            pixelSizeText = "pixelSize=\(CGDisplayPixelsWide(displayID))x\(CGDisplayPixelsHigh(displayID))"
-        }
-        RuntimeLog.info(
-            "PanelLayout",
-            "presentationScreen trigger=\(trigger) \(displayIDText) \(displayTypeText) frame=\(formatRect(screen.frame)) visibleFrame=\(formatRect(screen.visibleFrame)) scale=\(String(format: "%.2f", screen.backingScaleFactor)) \(pixelSizeText)"
-        )
-    }
-
     private func hideNonPanelWindows() {
         for window in NSApp.windows {
             guard !(window is NSPanel) else { continue }
@@ -418,6 +567,8 @@ final class SwitcherPanelController {
         guard panel.isVisible else { return }
         removeEventMonitors()
         panel.orderOut(nil)
+        panel.level = SwitcherPanelWindowConfiguration.level
+        panel.collectionBehavior = SwitcherPanelWindowConfiguration.presentationCollectionBehavior()
         activeHotkeySessionKind = nil
         activePresentationScreen = nil
         lastCommittedTabAdvanceTimestamp = nil
@@ -432,6 +583,8 @@ final class SwitcherPanelController {
         guard panel.isVisible else { return }
         removeEventMonitors()
         panel.orderOut(nil)
+        panel.level = SwitcherPanelWindowConfiguration.level
+        panel.collectionBehavior = SwitcherPanelWindowConfiguration.presentationCollectionBehavior()
         activeHotkeySessionKind = nil
         activePresentationScreen = nil
         lastCommittedTabAdvanceTimestamp = nil
@@ -1067,6 +1220,8 @@ final class SwitcherPanelController {
             RuntimeLog.info("Session", "terminate selected app ended session")
             removeEventMonitors()
             panel.orderOut(nil)
+            panel.level = SwitcherPanelWindowConfiguration.level
+            panel.collectionBehavior = SwitcherPanelWindowConfiguration.presentationCollectionBehavior()
             activeHotkeySessionKind = nil
             activePresentationScreen = nil
         }

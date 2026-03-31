@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 @testable import FlowTab
 import FlowTabCore
@@ -94,6 +95,71 @@ final class FlowTabTests: XCTestCase {
         XCTAssertEqual(configuration.mainShortcutText, "Command + Space")
         XCTAssertEqual(configuration.backwardShortcutText, "Command + Shift + Space")
         XCTAssertEqual(configuration.quitShortcutText, "Command + W")
+    }
+
+    func testSwitcherPanelWindowConfigurationSupportsFullscreenSpaces() {
+        let behavior = SwitcherPanelWindowConfiguration.collectionBehavior
+        let styleMask = SwitcherPanelWindowConfiguration.styleMask
+
+        XCTAssertEqual(SwitcherPanelWindowConfiguration.level, .statusBar)
+        XCTAssertTrue(styleMask.contains(.borderless))
+        XCTAssertTrue(styleMask.contains(.nonactivatingPanel))
+        XCTAssertTrue(behavior.contains(.canJoinAllSpaces))
+        XCTAssertTrue(behavior.contains(.fullScreenAuxiliary))
+        XCTAssertTrue(behavior.contains(.ignoresCycle))
+        XCTAssertTrue(behavior.contains(.stationary))
+        XCTAssertTrue(behavior.contains(.canJoinAllApplications))
+        XCTAssertFalse(behavior.contains(.moveToActiveSpace))
+        XCTAssertFalse(behavior.contains(.transient))
+    }
+
+    func testSwitcherPanelWindowConfigurationElevatesLevelForFullscreenPresentation() {
+        let normalLevel = SwitcherPanelWindowConfiguration.presentationLevel(
+            frontmostWindowIsFullScreen: false
+        )
+        let fullScreenLevel = SwitcherPanelWindowConfiguration.presentationLevel(
+            frontmostWindowIsFullScreen: true
+        )
+
+        XCTAssertEqual(normalLevel, .statusBar)
+        XCTAssertGreaterThan(fullScreenLevel.rawValue, normalLevel.rawValue)
+    }
+
+    func testSwitcherPanelWindowConfigurationElevatesLevelWhenFullscreenDetectionFallsBack() {
+        let fallbackLevel = SwitcherPanelWindowConfiguration.presentationLevel(
+            frontmostWindowIsFullScreen: false,
+            requiresFallbackElevation: true
+        )
+
+        XCTAssertEqual(SwitcherPanelWindowConfiguration.level, .statusBar)
+        XCTAssertGreaterThan(
+            fallbackLevel.rawValue,
+            SwitcherPanelWindowConfiguration.level.rawValue
+        )
+    }
+
+    func testSwitcherPanelWindowConfigurationAddsMoveToActiveSpaceOnlyForRecovery() {
+        let defaultBehavior = SwitcherPanelWindowConfiguration.presentationCollectionBehavior()
+        let recoveryBehavior = SwitcherPanelWindowConfiguration.presentationCollectionBehavior(
+            requiresActiveSpaceMove: true
+        )
+
+        XCTAssertFalse(defaultBehavior.contains(.moveToActiveSpace))
+        XCTAssertTrue(recoveryBehavior.contains(.moveToActiveSpace))
+        XCTAssertTrue(recoveryBehavior.contains(.canJoinAllSpaces))
+        XCTAssertTrue(recoveryBehavior.contains(.fullScreenAuxiliary))
+        XCTAssertTrue(recoveryBehavior.contains(.stationary))
+        XCTAssertTrue(recoveryBehavior.contains(.canJoinAllApplications))
+        XCTAssertFalse(recoveryBehavior.contains(.transient))
+    }
+
+    func testSwitcherPanelWindowConfigurationUsesNonActivatingBorderlessPanelStyle() {
+        let styleMask = SwitcherPanelWindowConfiguration.styleMask
+
+        XCTAssertTrue(styleMask.contains(.borderless))
+        XCTAssertTrue(styleMask.contains(.nonactivatingPanel))
+        XCTAssertFalse(styleMask.contains(.titled))
+        XCTAssertFalse(styleMask.contains(.resizable))
     }
 
     func testAppLanguageResolveFallsBackToDefaultForUnknownRawValue() {
