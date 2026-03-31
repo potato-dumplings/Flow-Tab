@@ -81,6 +81,18 @@ final class FlowTabTests: XCTestCase {
         XCTAssertEqual(configuration.quitKey, SwitcherHotkeyPreferencesStore.defaultQuitKey)
     }
 
+    func testRuntimeActivatorOpenConfigurationActivatesTargetApp() {
+        let configuration = RuntimeActivator.makeOpenConfiguration()
+
+        XCTAssertTrue(configuration.activates)
+    }
+
+    func testRuntimeActivatorOpenConfigurationReusesRunningAppInstance() {
+        let configuration = RuntimeActivator.makeOpenConfiguration()
+
+        XCTAssertFalse(configuration.createsNewApplicationInstance)
+    }
+
     func testHotkeyConfigurationDerivedFieldsAreConsistent() {
         let configuration = SwitcherHotkeyConfiguration(
             primaryModifier: .command,

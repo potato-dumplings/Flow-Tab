@@ -909,7 +909,7 @@ final class RuntimeActivator {
         if activateCurrentAppIfNeeded(context.runningApp) {
             return
         }
-        context.runningApp.activate(options: [.activateAllWindows])
+        requestActivation(of: context.runningApp)
     }
 
     private func activateWindow(
@@ -922,14 +922,19 @@ final class RuntimeActivator {
         if activateCurrentAppIfNeeded(context.runningApp) {
             return
         }
-        context.runningApp.activate(options: [.activateAllWindows])
-        guard let windowContext = context.windowsByID[windowID] else { return }
-        focusWindow(
-            withID: windowID,
-            withTitle: windowContext.title,
-            restoreIfMinimized: restoreIfMinimized || windowContext.isMinimized,
-            in: context.runningApp
-        )
+        guard let windowContext = context.windowsByID[windowID] else {
+            requestActivation(of: context.runningApp)
+            return
+        }
+        requestActivation(of: context.runningApp) { [weak self] activatedApp in
+            guard let self else { return }
+            self.focusWindow(
+                withID: windowID,
+                withTitle: windowContext.title,
+                restoreIfMinimized: restoreIfMinimized || windowContext.isMinimized,
+                in: activatedApp
+            )
+        }
     }
 
     private func focusWindow(
@@ -960,6 +965,53 @@ final class RuntimeActivator {
             focus(window: window, restoreIfMinimized: restoreIfMinimized)
             return
         }
+    }
+
+    private func requestActivation(
+        of app: NSRunningApplication,
+        completion: ((NSRunningApplication) -> Void)? = nil
+    ) {
+        guard let bundleURL = app.bundleURL else {
+            _ = app.activate()
+            completeActivation(app, completion: completion)
+            return
+        }
+
+        // On modern macOS, NSWorkspace participates in cooperative activation
+        // and is more reliable than asking the target process to activate itself.
+        NSWorkspace.shared.openApplication(
+            at: bundleURL,
+            configuration: Self.makeOpenConfiguration()
+        ) { openedApp, error in
+            if let error {
+                RuntimeLog.info(
+                    "Activation",
+                    "openApplication failed pid=\(app.processIdentifier) bundle=\(app.bundleIdentifier ?? "nil") error=\(error.localizedDescription)"
+                )
+                _ = app.activate()
+                self.completeActivation(app, completion: completion)
+                return
+            }
+
+            self.completeActivation(openedApp ?? app, completion: completion)
+        }
+    }
+
+    private func completeActivation(
+        _ app: NSRunningApplication,
+        completion: ((NSRunningApplication) -> Void)?
+    ) {
+        guard let completion else { return }
+        Task { @MainActor in
+            completion(app)
+        }
+    }
+
+    nonisolated static func makeOpenConfiguration() -> NSWorkspace.OpenConfiguration {
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        configuration.createsNewApplicationInstance = false
+        return configuration
     }
 
     @discardableResult
