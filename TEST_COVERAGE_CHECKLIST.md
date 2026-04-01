@@ -108,20 +108,21 @@ This checklist summarizes the current automated test coverage for FlowTab, inclu
 - [x] `AppWindowCoordinator`
   - Covered: opening or restoring the main app window through status-item flow.
   - Covered: explicit behavior tests for `openHome()`, `openLogs()`, and `openSettings()` tab-selection semantics.
-- [ ] Search feature
+- [x] Search feature
   - Covered: matching engine, query editing, scope-specific result generation, and search-mode key routing for `Tab`, `Esc`, arrows, and result activation.
-  - Missing: panel-level `Enter` to enter search from the main switcher and IME marked-text key routing.
+  - Covered: panel-level `Enter` to enter search from the main switcher and IME marked-text key routing.
 - [ ] `LiveSwitcherModel`
   - Covered: terminate-selected-app refresh path.
   - Covered: session startup, search activation, applying selected search result, and commit/cancel.
-  - Missing: focused-app window session, auto-enter window layer, and broader lifecycle edge cases.
+  - Covered: focused-app window session and auto-enter window layer suppression after manual exit.
+  - Missing: broader lifecycle interruption edge cases.
 
 ## Areas Without Behavior Tests Yet
 
 - [ ] Global hotkey registration and release flow
   - `OptionTabHotkeyMonitor`
-  - Carbon event handling callbacks.
-  - Press/release callback wiring.
+  - Covered: simulated Carbon press/release callback wiring and unrelated-event pass-through.
+  - Missing: registration/install fallback behavior.
 - [x] System `Command + Tab` takeover flow
   - `CommandTabTakeoverController`
   - Takeover success/failure behavior.
@@ -129,24 +130,16 @@ This checklist summarizes the current automated test coverage for FlowTab, inclu
   - Restore-on-terminate behavior.
 - [ ] Switcher panel controller interaction routing
   - `SwitcherPanelController`
-  - Global hotkey press/release.
-  - Key routing across app/group/window/search modes.
-  - Flags-changed handling.
-  - Mouse-down cancellation.
-  - Active-space interruption handling.
-  - Panel occlusion/key-window recovery behavior.
-  - Delayed auto-entry into window layer.
-  - Terminate-selected-app shortcut inside the panel.
+  - Covered: search-mode key routing, panel-level search entry, and terminate-selected-app shortcut inside the panel.
+  - Missing: global hotkey press/release, flags-changed handling, mouse-down cancellation, active-space interruption, panel occlusion/key-window recovery, and delayed auto-entry timing.
 - [ ] Runtime snapshot and MRU behavior
   - `SystemAppMRUTracker`
   - `RuntimeSnapshotProvider`
-  - App filtering, ranking, current-app inclusion/exclusion, and minimized-app handling.
-- [ ] Runtime activation side effects
+  - Covered: current-app inclusion/exclusion helper, minimized-only app-layer filtering helper, and MRU ranking helper behavior.
+  - Missing: end-to-end snapshot assembly/filtering across live `NSRunningApplication` sets.
+- [x] Runtime activation side effects
   - `RuntimeActivator.activate(target:contextsByID:)`
-  - App activation.
-  - Window focus.
-  - Restoring minimized windows.
-  - AX fallback behavior.
+  - Covered: app activation, window focus, restoring minimized windows, and missing-window fallback behavior.
 - [ ] Window preview and title-bar style guess behavior
   - `RuntimeWindowPreviewProvider`
   - `ScreenCapturePermissionChecker`
@@ -224,3 +217,9 @@ The ordering below is based on primary interaction-path risk, likelihood of regr
 - [x] `SwitcherPanelController` search-mode key routing
 - [x] `CommandTabTakeoverController.reconcileIfNeeded / restoreSystemShortcutsIfNeeded`
 - [x] `AppWindowCoordinator.openHome / openLogs / openSettings`
+- [x] `LiveSwitcherModel.startFocusedAppWindowSession / autoEnterWindowLayerIfPossible`
+- [x] `SwitcherPanelController` panel-level `Enter` search entry / IME marked-text routing
+- [x] `SwitcherPanelController` terminate-selected-app shortcut
+- [x] `OptionTabHotkeyMonitor` press/release callback routing
+- [x] `RuntimeSnapshotProvider` visibility helpers / `SystemAppMRUTracker.rankByPID`
+- [x] `RuntimeActivator.activate(target:contextsByID:)` current-app activation / window fallback / restore-minimized

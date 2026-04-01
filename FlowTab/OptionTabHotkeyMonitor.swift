@@ -389,6 +389,11 @@ final class CommandTabTakeoverController {
 }
 
 final class OptionTabHotkeyMonitor {
+    enum HotkeyEventPhase {
+        case pressed
+        case released
+    }
+
     var onHotkeyPressed: ((Bool) -> Void)?
     var onHotkeyReleased: ((Bool) -> Void)?
 
@@ -404,12 +409,14 @@ final class OptionTabHotkeyMonitor {
         configuration: SwitcherHotkeyConfiguration = SwitcherHotkeyPreferencesStore.load(),
         signature: OSType = 0x46544142, // "FTAB"
         forwardHotkeyID: UInt32 = 1,
-        backwardHotkeyID: UInt32 = 2
+        backwardHotkeyID: UInt32 = 2,
+        startsMonitoring: Bool = true
     ) {
         self.hotkeyConfiguration = configuration
         self.signature = signature
         self.forwardHotkeyID = forwardHotkeyID
         self.backwardHotkeyID = backwardHotkeyID
+        guard startsMonitoring else { return }
         installHandler()
         registerHotkeys()
     }
@@ -523,24 +530,60 @@ final class OptionTabHotkeyMonitor {
             &hotkeyID
         )
 
-        guard status == noErr, hotkeyID.signature == signature else {
+        guard status == noErr else {
+            return passThroughStatus
+        }
+        return dispatchResolvedHotkeyEvent(
+            signature: hotkeyID.signature,
+            id: hotkeyID.id,
+            isPressedEvent: isPressedEvent,
+            isReleasedEvent: isReleasedEvent
+        )
+    }
+
+    @discardableResult
+    func dispatchHotkeyEventForTesting(
+        signature: OSType? = nil,
+        id: UInt32,
+        phase: HotkeyEventPhase
+    ) -> OSStatus {
+        dispatchResolvedHotkeyEvent(
+            signature: signature ?? self.signature,
+            id: id,
+            isPressedEvent: phase == .pressed,
+            isReleasedEvent: phase == .released
+        )
+    }
+
+    private func dispatchResolvedHotkeyEvent(
+        signature: OSType,
+        id: UInt32,
+        isPressedEvent: Bool,
+        isReleasedEvent: Bool
+    ) -> OSStatus {
+        let passThroughStatus = OSStatus(eventNotHandledErr)
+        guard signature == self.signature else {
             // Multiple hotkey monitors may be installed in the same process.
             // Pass through unrelated events so the owning monitor can handle them.
             return passThroughStatus
         }
 
-        switch hotkeyID.id {
+        switch id {
         case forwardHotkeyID:
             if isPressedEvent {
                 onHotkeyPressed?(false)
-            } else {
+            } else if isReleasedEvent {
                 onHotkeyReleased?(false)
+            } else {
+                return passThroughStatus
             }
         case backwardHotkeyID:
             if isPressedEvent {
                 onHotkeyPressed?(true)
-            } else {
+            } else if isReleasedEvent {
                 onHotkeyReleased?(true)
+            } else {
+                return passThroughStatus
             }
         default:
             return passThroughStatus

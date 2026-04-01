@@ -1365,6 +1365,7 @@ final class LiveSwitcherModel: ObservableObject {
     var onSearchStateChanged: (() -> Void)?
     var onSessionLayoutChanged: (() -> Void)?
     var snapshotProviderOverride: (() -> RuntimeSnapshot)?
+    var frontmostApplicationOverride: (() -> NSRunningApplication?)?
     var activationOverride: ((ActivationTarget, [String: RuntimeAppContext]) -> Void)?
     var terminateRequestOverride: ((String) -> (sent: Bool, pid: pid_t))?
     var isProcessRunningOverride: ((pid_t) -> Bool)?
@@ -1735,7 +1736,7 @@ final class LiveSwitcherModel: ObservableObject {
         clearTerminateSelectedAppAnimation()
         overlayStyle = .windowOnly
         titleBarStyleInferenceEnabled = true
-        guard let frontmostApp = NSWorkspace.shared.frontmostApplication else {
+        guard let frontmostApp = resolveFrontmostApplication() else {
             resetSessionState()
             return false
         }
@@ -2085,6 +2086,13 @@ final class LiveSwitcherModel: ObservableObject {
             return snapshotProviderOverride()
         }
         return snapshotProvider.snapshot()
+    }
+
+    private func resolveFrontmostApplication() -> NSRunningApplication? {
+        if let frontmostApplicationOverride {
+            return frontmostApplicationOverride()
+        }
+        return NSWorkspace.shared.frontmostApplication
     }
 
     private func makeTerminateRequest(forAppID appID: String) -> (sent: Bool, pid: pid_t)? {

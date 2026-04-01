@@ -74,19 +74,32 @@ final class SystemAppMRUTracker {
         let runningPIDs = Set(runningApps.map(\.processIdentifier))
         let trackedOrder = trackedMRUOrder(for: runningPIDs)
         let currentPID = ProcessInfo.processInfo.processIdentifier
-        let launchRankByPID = Self.launchRankByPID(for: runningApps)
+        return Self.rankByPID(
+            runningPIDs: runningApps.map(\.processIdentifier),
+            trackedOrder: trackedOrder,
+            currentPID: currentPID,
+            launchRankByPID: Self.launchRankByPID(for: runningApps),
+            fallbackRankByPID: fallbackRankByPID
+        )
+    }
 
+    static func rankByPID(
+        runningPIDs: [pid_t],
+        trackedOrder: [pid_t],
+        currentPID: pid_t,
+        launchRankByPID: [pid_t: Int],
+        fallbackRankByPID: [pid_t: Int]
+    ) -> [pid_t: Int] {
         var rankByPID: [pid_t: Int] = [:]
-        rankByPID.reserveCapacity(runningApps.count)
+        rankByPID.reserveCapacity(runningPIDs.count)
 
         var nextRank = 0
-        for pid in trackedOrder where rankByPID[pid] == nil {
+        for pid in trackedOrder where runningPIDs.contains(pid) && rankByPID[pid] == nil {
             rankByPID[pid] = nextRank
             nextRank += 1
         }
 
-        let fallbackPIDs = runningApps
-            .map(\.processIdentifier)
+        let fallbackPIDs = runningPIDs
             .filter { rankByPID[$0] == nil }
             .sorted { lhs, rhs in
                 let lhsRank = fallbackRank(
@@ -185,7 +198,7 @@ final class SystemAppMRUTracker {
         return mruPIDs
     }
 
-    private func fallbackRank(
+    private static func fallbackRank(
         for pid: pid_t,
         currentPID: pid_t,
         launchRankByPID: [pid_t: Int],
@@ -528,10 +541,26 @@ final class RuntimeSnapshotProvider {
         let currentPID = ProcessInfo.processInfo.processIdentifier
         let includeCurrentProcessInAppLayer = AppVisibilityPreferencesStore.loadShowInCommandTab()
         return NSWorkspace.shared.runningApplications.filter {
-            $0.activationPolicy == .regular
-                && !$0.isTerminated
-                && (includeCurrentProcessInAppLayer || $0.processIdentifier != currentPID)
+            Self.shouldIncludeRunningApplication(
+                activationPolicy: $0.activationPolicy,
+                isTerminated: $0.isTerminated,
+                pid: $0.processIdentifier,
+                currentPID: currentPID,
+                includeCurrentProcessInAppLayer: includeCurrentProcessInAppLayer
+            )
         }
+    }
+
+    static func shouldIncludeRunningApplication(
+        activationPolicy: NSApplication.ActivationPolicy,
+        isTerminated: Bool,
+        pid: pid_t,
+        currentPID: pid_t,
+        includeCurrentProcessInAppLayer: Bool
+    ) -> Bool {
+        activationPolicy == .regular
+            && !isTerminated
+            && (includeCurrentProcessInAppLayer || pid != currentPID)
     }
 
     private func filterAppsForAppLayer(
@@ -543,14 +572,28 @@ final class RuntimeSnapshotProvider {
 
         return apps.filter { app in
             let windows = windowsByPID[app.processIdentifier] ?? []
-            guard !windows.isEmpty else { return true }
             let hasVisibleWindow = windows.contains(where: { !$0.isMinimized })
-            if !hasVisibleWindow {
+            guard Self.shouldIncludeAppInAppLayer(
+                hasWindows: !windows.isEmpty,
+                hasVisibleWindow: hasVisibleWindow,
+                hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
+            ) else {
                 let appName = app.localizedName ?? app.bundleIdentifier ?? "pid:\(app.processIdentifier)"
                 RuntimeLog.info("Snapshot", "skip minimized-only app=\(appName) pid=\(app.processIdentifier)")
+                return false
             }
-            return hasVisibleWindow
+            return true
         }
+    }
+
+    static func shouldIncludeAppInAppLayer(
+        hasWindows: Bool,
+        hasVisibleWindow: Bool,
+        hideMinimizedAppsFromAppLayer: Bool
+    ) -> Bool {
+        guard hideMinimizedAppsFromAppLayer else { return true }
+        guard hasWindows else { return true }
+        return hasVisibleWindow
     }
 
     private func filterAppsForAppLayer(
@@ -562,11 +605,16 @@ final class RuntimeSnapshotProvider {
 
         return apps.filter { app in
             guard let stats = windowStatsByPID[app.processIdentifier] else { return true }
-            if !stats.hasVisibleWindow {
+            guard Self.shouldIncludeAppInAppLayer(
+                hasWindows: stats.windowCount > 0,
+                hasVisibleWindow: stats.hasVisibleWindow,
+                hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
+            ) else {
                 let appName = app.localizedName ?? app.bundleIdentifier ?? "pid:\(app.processIdentifier)"
                 RuntimeLog.info("Snapshot", "skip minimized-only app=\(appName) pid=\(app.processIdentifier)")
+                return false
             }
-            return stats.hasVisibleWindow
+            return true
         }
     }
 
@@ -890,6 +938,10 @@ final class RuntimeSnapshotProvider {
 
 @MainActor
 final class RuntimeActivator {
+    var activateCurrentAppIfNeededOverride: ((NSRunningApplication) -> Bool)?
+    var requestActivationOverride: ((NSRunningApplication, ((NSRunningApplication) -> Void)?) -> Void)?
+    var focusWindowOverride: ((String, String, Bool, NSRunningApplication) -> Void)?
+
     func activate(target: ActivationTarget, contextsByID: [String: RuntimeAppContext]) {
         switch target {
         case .app(let appID):
@@ -943,6 +995,10 @@ final class RuntimeActivator {
         restoreIfMinimized: Bool,
         in app: NSRunningApplication
     ) {
+        if let focusWindowOverride {
+            focusWindowOverride(targetWindowID, targetTitle, restoreIfMinimized, app)
+            return
+        }
         let windows = AXWindowInspector.windows(for: app)
         guard !windows.isEmpty else { return }
 
@@ -971,6 +1027,10 @@ final class RuntimeActivator {
         of app: NSRunningApplication,
         completion: ((NSRunningApplication) -> Void)? = nil
     ) {
+        if let requestActivationOverride {
+            requestActivationOverride(app, completion)
+            return
+        }
         guard let bundleURL = app.bundleURL else {
             _ = app.activate()
             completeActivation(app, completion: completion)
@@ -1016,6 +1076,9 @@ final class RuntimeActivator {
 
     @discardableResult
     private func activateCurrentAppIfNeeded(_ app: NSRunningApplication) -> Bool {
+        if let activateCurrentAppIfNeededOverride {
+            return activateCurrentAppIfNeededOverride(app)
+        }
         guard app.processIdentifier == ProcessInfo.processInfo.processIdentifier else {
             return false
         }
