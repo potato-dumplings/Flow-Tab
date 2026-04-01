@@ -3097,6 +3097,82 @@ private final class SearchSystemTextView: NSTextView {
     }
 }
 
+#if DEBUG
+@MainActor
+final class SearchSystemTextInputBridgeTestHarness {
+    struct InputChange: Equatable {
+        let query: String
+        let cursorPosition: Int
+    }
+
+    private let containerView = SearchSystemTextInputContainerView()
+    private let coordinator = SearchSystemTextInputBridge.Coordinator(
+        onInputChanged: { _, _ in },
+        onMarkedTextChanged: { _ in }
+    )
+
+    private(set) var inputChanges: [InputChange] = []
+    private(set) var markedTextChanges: [Bool] = []
+
+    init() {
+        containerView.textView.delegate = coordinator
+        coordinator.attach(textView: containerView.textView)
+        coordinator.updateCallbacks(
+            onInputChanged: { [weak self] query, cursorPosition in
+                self?.inputChanges.append(
+                    InputChange(query: query, cursorPosition: cursorPosition)
+                )
+            },
+            onMarkedTextChanged: { [weak self] hasMarkedText in
+                self?.markedTextChanges.append(hasMarkedText)
+            }
+        )
+    }
+
+    var textView: NSTextView {
+        containerView.textView
+    }
+
+    var containerAccessibilityIdentifier: String? {
+        containerView.accessibilityIdentifier()
+    }
+
+    func synchronize(
+        query: String,
+        cursorPosition: Int,
+        isSearchActive: Bool = false
+    ) {
+        coordinator.synchronize(
+            textView: containerView.textView,
+            query: query,
+            cursorPosition: cursorPosition,
+            isSearchActive: isSearchActive
+        )
+    }
+
+    func notifyTextDidChange(for textView: NSTextView? = nil) {
+        let target = textView ?? containerView.textView
+        coordinator.textDidChange(Notification(name: NSText.didChangeNotification, object: target))
+    }
+
+    func notifySelectionDidChange(for textView: NSTextView? = nil) {
+        let target = textView ?? containerView.textView
+        coordinator.textViewDidChangeSelection(
+            Notification(name: NSTextView.didChangeSelectionNotification, object: target)
+        )
+    }
+
+    func resetRecordedChanges() {
+        inputChanges.removeAll()
+        markedTextChanges.removeAll()
+    }
+
+    func detachTrackedTextView() {
+        coordinator.detach(textView: containerView.textView)
+    }
+}
+#endif
+
 private struct SearchInputHeader: View {
     let query: String
     let cursorPosition: Int

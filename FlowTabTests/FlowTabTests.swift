@@ -175,6 +175,128 @@ final class FlowTabTests: XCTestCase {
     }
 
     @MainActor
+    func testSearchSystemTextInputBridgeConfiguresInvisiblePlainTextResponder() {
+        let harness = SearchSystemTextInputBridgeTestHarness()
+        let textView = harness.textView
+
+        XCTAssertEqual(harness.containerAccessibilityIdentifier, "flowtab.switcher.search.input")
+        XCTAssertTrue(textView.acceptsFirstResponder)
+        XCTAssertFalse(textView.drawsBackground)
+        XCTAssertEqual(textView.backgroundColor, .clear)
+        XCTAssertEqual(textView.textColor, .clear)
+        XCTAssertEqual(textView.insertionPointColor, .clear)
+        XCTAssertTrue(textView.isEditable)
+        XCTAssertTrue(textView.isSelectable)
+        XCTAssertFalse(textView.isRichText)
+        XCTAssertFalse(textView.importsGraphics)
+        XCTAssertFalse(textView.allowsUndo)
+        XCTAssertFalse(textView.isAutomaticQuoteSubstitutionEnabled)
+        XCTAssertFalse(textView.isAutomaticDataDetectionEnabled)
+        XCTAssertFalse(textView.isAutomaticDashSubstitutionEnabled)
+        XCTAssertFalse(textView.isAutomaticLinkDetectionEnabled)
+        XCTAssertFalse(textView.isAutomaticSpellingCorrectionEnabled)
+        XCTAssertFalse(textView.isAutomaticTextReplacementEnabled)
+        XCTAssertFalse(textView.isContinuousSpellCheckingEnabled)
+        XCTAssertFalse(textView.isGrammarCheckingEnabled)
+        XCTAssertEqual(textView.textContainerInset, .zero)
+        XCTAssertFalse(textView.isHorizontallyResizable)
+        XCTAssertFalse(textView.isVerticallyResizable)
+        XCTAssertEqual(textView.textContainer?.lineFragmentPadding, 0)
+        XCTAssertEqual(textView.textContainer?.widthTracksTextView, true)
+        XCTAssertEqual(textView.textContainer?.heightTracksTextView, true)
+    }
+
+    @MainActor
+    func testSearchSystemTextInputBridgeSynchronizeClampsQueryAndCursor() {
+        let harness = SearchSystemTextInputBridgeTestHarness()
+
+        harness.synchronize(query: "wechat", cursorPosition: 99)
+
+        XCTAssertEqual(harness.textView.string, "wechat")
+        XCTAssertEqual(harness.textView.selectedRange(), NSRange(location: 6, length: 0))
+        XCTAssertTrue(harness.inputChanges.isEmpty)
+        XCTAssertGreaterThanOrEqual(harness.markedTextChanges.count, 1)
+        XCTAssertEqual(harness.markedTextChanges.last, false)
+
+        harness.synchronize(query: "wechat", cursorPosition: -4)
+
+        XCTAssertEqual(harness.textView.selectedRange(), NSRange(location: 0, length: 0))
+        XCTAssertEqual(harness.markedTextChanges.last, false)
+    }
+
+    @MainActor
+    func testSearchSystemTextInputBridgePublishesQueryAndCursorFromTextInput() {
+        let harness = SearchSystemTextInputBridgeTestHarness()
+        harness.synchronize(query: "abc", cursorPosition: 3)
+        harness.resetRecordedChanges()
+
+        harness.textView.insertText("d", replacementRange: NSRange(location: 3, length: 0))
+        harness.notifyTextDidChange()
+
+        XCTAssertEqual(
+            harness.inputChanges.last,
+            SearchSystemTextInputBridgeTestHarness.InputChange(
+                query: "abcd",
+                cursorPosition: 4
+            )
+        )
+        XCTAssertEqual(harness.markedTextChanges.last, false)
+
+        harness.textView.setSelectedRange(NSRange(location: 2, length: 0))
+        harness.notifySelectionDidChange()
+
+        XCTAssertEqual(
+            harness.inputChanges.last,
+            SearchSystemTextInputBridgeTestHarness.InputChange(
+                query: "abcd",
+                cursorPosition: 2
+            )
+        )
+    }
+
+    @MainActor
+    func testSearchSystemTextInputBridgeTracksMarkedTextCompositionLifecycle() {
+        let harness = SearchSystemTextInputBridgeTestHarness()
+        harness.resetRecordedChanges()
+
+        harness.textView.setMarkedText(
+            "ni",
+            selectedRange: NSRange(location: 2, length: 0),
+            replacementRange: NSRange(location: NSNotFound, length: 0)
+        )
+        harness.notifyTextDidChange()
+
+        XCTAssertTrue(harness.textView.hasMarkedText())
+        XCTAssertEqual(harness.inputChanges.last?.query, "ni")
+        XCTAssertEqual(harness.markedTextChanges.last, true)
+
+        harness.textView.unmarkText()
+        harness.notifyTextDidChange()
+
+        XCTAssertFalse(harness.textView.hasMarkedText())
+        XCTAssertEqual(harness.inputChanges.last?.query, "ni")
+        XCTAssertEqual(harness.markedTextChanges.last, false)
+    }
+
+    @MainActor
+    func testSearchSystemTextInputBridgeDetachClearsMarkedStateAndIgnoresUntrackedViews() {
+        let harness = SearchSystemTextInputBridgeTestHarness()
+        let untrackedTextView = NSTextView()
+
+        untrackedTextView.string = "ignored"
+        untrackedTextView.setSelectedRange(NSRange(location: 7, length: 0))
+        harness.notifyTextDidChange(for: untrackedTextView)
+        harness.notifySelectionDidChange(for: untrackedTextView)
+
+        XCTAssertTrue(harness.inputChanges.isEmpty)
+        XCTAssertTrue(harness.markedTextChanges.isEmpty)
+
+        harness.detachTrackedTextView()
+
+        XCTAssertEqual(harness.markedTextChanges, [false])
+    }
+
+    @MainActor
     func testTerminateSelectedAppBehaviorKeepsAppUntilProcessActuallyExits() async {
         let model = LiveSwitcherModel()
         let initialApps = terminateScenarioApps()

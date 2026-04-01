@@ -165,11 +165,11 @@ This checklist summarizes the current automated test coverage for FlowTab, inclu
 - [x] In-app window switcher behavior
   - Covered: app-level registration/conflict handling through `AppDelegate` tests.
   - Covered: focused in-app window session start and release-to-commit through `SwitcherPanelController` tests.
-- [ ] Search system text-input bridge behavior
-  - `SearchSystemTextInputContainerView`
-  - `SearchSystemTextView`
-  - Marked-text composition behavior.
-  - Query/cursor synchronization with real text input.
+- [x] Search system text-input bridge behavior
+  - Covered: `SearchSystemTextInputContainerView`
+  - Covered: `SearchSystemTextView`
+  - Covered: marked-text composition behavior.
+  - Covered: query/cursor synchronization with real text input.
 
 ## Recommended Priority Order
 
