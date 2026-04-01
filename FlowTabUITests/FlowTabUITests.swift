@@ -390,6 +390,33 @@ final class FlowTabUITests: XCTestCase {
         XCTAssertTrue(chineseResult.waitForExistence(timeout: 5))
     }
 
+    func testSearchPanelSegmentedChineseQueryShowsCompoundMockResult() throws {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-open-switcher-search",
+                "-showPermissionReminder",
+                "NO"
+            ]
+        )
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+
+        let switcherPanel = app.descendants(matching: .any)
+            .matching(identifier: Identifier.switcherPanel)
+            .firstMatch
+        XCTAssertTrue(switcherPanel.waitForExistence(timeout: 5))
+
+        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+        app.typeText("文件助手")
+
+        let segmentedResult = app.descendants(matching: .any)
+            .matching(identifier: "flowtab.switcher.search.app.com-flowtab-mock-file-transfer-assistant")
+            .firstMatch
+        XCTAssertTrue(segmentedResult.waitForExistence(timeout: 5))
+    }
+
     func testTabSwitchStressCPUAndMemory() throws {
         let options = XCTMeasureOptions()
         options.iterationCount = 3

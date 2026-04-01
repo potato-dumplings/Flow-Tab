@@ -383,12 +383,25 @@ final class RuntimeSnapshotProvider {
                 rank: 1
             ),
             (
+                appID: "com.flowtab.mock.flow-search",
+                name: "FlowTabSearch",
+                windows: [
+                    WindowCandidate(
+                        id: "mock-flow-search-guide",
+                        title: "FlowTabSearchGuide",
+                        isMinimized: false,
+                        lastActiveAt: 285
+                    )
+                ],
+                rank: 2
+            ),
+            (
                 appID: "com.xxx.test",
                 name: "测试",
                 windows: [
                     WindowCandidate(id: "mock-test-cases", title: "用例", isMinimized: false, lastActiveAt: 280)
                 ],
-                rank: 2
+                rank: 3
             ),
             (
                 appID: "com.xxx.csgo",
@@ -396,7 +409,20 @@ final class RuntimeSnapshotProvider {
                 windows: [
                     WindowCandidate(id: "mock-csgo-dust2", title: "Dust2", isMinimized: false, lastActiveAt: 270)
                 ],
-                rank: 3
+                rank: 4
+            ),
+            (
+                appID: "com.flowtab.mock.file-transfer-assistant",
+                name: "文件传输助手",
+                windows: [
+                    WindowCandidate(
+                        id: "mock-file-transfer-assistant",
+                        title: "最近文件",
+                        isMinimized: false,
+                        lastActiveAt: 260
+                    )
+                ],
+                rank: 5
             )
         ]
 

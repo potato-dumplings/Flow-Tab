@@ -826,6 +826,16 @@ final class FlowTabTests: XCTestCase {
         XCTAssertEqual(coordinator.state.results.map(\.primaryText), ["Safari"])
     }
 
+    func testSearchMatchesCamelCaseAppBySegmentedWords() {
+        let coordinator = SwitcherSearchCoordinator()
+        coordinator.rebuildIndex(with: searchSampleApps())
+        XCTAssertTrue(coordinator.activate(defaultScope: .app))
+
+        XCTAssertTrue(coordinator.appendQueryText("flow search"))
+        drainPendingSearchRebuild(on: coordinator)
+        XCTAssertEqual(coordinator.state.results.map(\.primaryText), ["FlowTabSearch"])
+    }
+
     func testSearchQuerySupportsMiddleInsertionViaCursorMovement() {
         let coordinator = SwitcherSearchCoordinator()
         coordinator.rebuildIndex(with: searchSampleApps())
@@ -904,6 +914,16 @@ final class FlowTabTests: XCTestCase {
         XCTAssertTrue(coordinator.appendQueryText("weixin"))
         drainPendingSearchRebuild(on: coordinator)
         XCTAssertEqual(coordinator.state.results.map(\.primaryText), ["微信"])
+    }
+
+    func testSearchMatchesChineseCompoundAppBySegmentedQueryWithoutSpaces() {
+        let coordinator = SwitcherSearchCoordinator()
+        coordinator.rebuildIndex(with: searchSampleApps())
+        XCTAssertTrue(coordinator.activate(defaultScope: .app))
+
+        XCTAssertTrue(coordinator.appendQueryText("文件助手"))
+        drainPendingSearchRebuild(on: coordinator)
+        XCTAssertEqual(coordinator.state.results.map(\.primaryText), ["文件传输助手"])
     }
 
     func testSearchMatchesEnglishAbbreviation() {
@@ -1002,6 +1022,19 @@ final class FlowTabTests: XCTestCase {
         XCTAssertEqual(coordinator.state.results.map(\.secondaryText), ["微信", "微信"])
     }
 
+    func testWindowSearchMatchesCamelCaseTitleBySegmentedWords() {
+        let coordinator = SwitcherSearchCoordinator()
+        coordinator.rebuildIndex(with: searchSampleApps())
+        XCTAssertTrue(coordinator.activate(defaultScope: .window))
+
+        XCTAssertTrue(coordinator.appendQueryText("search coordinator"))
+        drainPendingSearchRebuild(on: coordinator)
+        XCTAssertEqual(
+            coordinator.state.results.map(\.primaryText),
+            ["FlowTab - SwitcherSearchCoordinator.swift"]
+        )
+    }
+
     func testSearchPerformanceWindowScope() {
         let apps = makeBenchmarkApps(appCount: 400, windowsPerApp: 25)
         let queries = benchmarkQueries()
@@ -1080,6 +1113,45 @@ final class FlowTabTests: XCTestCase {
         XCTAssertFalse(probe.isEmpty)
     }
 
+    func testSearchPressureWindowScopeSegmentedQueries() {
+        let apps = makeBenchmarkApps(appCount: 400, windowsPerApp: 25)
+        let queries = segmentedBenchmarkQueries()
+        let rounds = 3
+
+        let buildNanos = measureNanos {
+            let coordinator = SwitcherSearchCoordinator()
+            coordinator.rebuildIndex(with: apps)
+        }
+
+        let queryNanos = measureNanos {
+            let coordinator = SwitcherSearchCoordinator()
+            coordinator.rebuildIndex(with: apps)
+            _ = coordinator.activate(defaultScope: .window)
+            runBaselineQueries(queries, on: coordinator, rounds: rounds)
+        }
+
+        let buildMs = nanosToMilliseconds(buildNanos)
+        let queryMs = nanosToMilliseconds(queryNanos)
+        let queryCount = queries.count * rounds
+        let qps = Double(queryCount) / max(0.001, queryMs / 1000.0)
+
+        print(
+            String(
+                format: "[SearchPressureSegmented] dataset=%d apps / %d windows, rounds=%d, build=%.2fms, query=%.2fms, queries=%d, throughput=%.2f qps",
+                apps.count,
+                apps.reduce(0) { $0 + $1.windows.count },
+                rounds,
+                buildMs,
+                queryMs,
+                queryCount,
+                qps
+            )
+        )
+
+        XCTAssertFalse(runBaselineProbe(query: "flow search", apps: apps, scope: .window).isEmpty)
+        XCTAssertFalse(runBaselineProbe(query: "文件助手", apps: apps, scope: .window).isEmpty)
+    }
+
     private func searchSampleApps() -> [AppSwitchCandidate] {
         [
             AppSwitchCandidate(
@@ -1122,6 +1194,34 @@ final class FlowTabTests: XCTestCase {
                 lastActiveAt: 190,
                 windows: [
                     WindowCandidate(id: "test-1", title: "用例", isMinimized: false, lastActiveAt: 190)
+                ]
+            ),
+            AppSwitchCandidate(
+                id: "com.flowtab.search",
+                displayName: "FlowTabSearch",
+                groupID: "dev",
+                lastActiveAt: 180,
+                windows: [
+                    WindowCandidate(
+                        id: "flow-search-1",
+                        title: "FlowTabSearchGuide",
+                        isMinimized: false,
+                        lastActiveAt: 180
+                    )
+                ]
+            ),
+            AppSwitchCandidate(
+                id: "com.flowtab.file-transfer-assistant",
+                displayName: "文件传输助手",
+                groupID: "tools",
+                lastActiveAt: 170,
+                windows: [
+                    WindowCandidate(
+                        id: "file-transfer-1",
+                        title: "最近文件",
+                        isMinimized: false,
+                        lastActiveAt: 170
+                    )
                 ]
             )
         ]
@@ -1204,25 +1304,42 @@ final class FlowTabTests: XCTestCase {
         apps.reserveCapacity(appCount)
 
         for appIndex in 0..<appCount {
-            let app: (name: String, bundleID: String)
-            switch appIndex % 5 {
+            let app: (name: String, bundleID: String, windowBaseTitle: String?)
+            switch appIndex % 7 {
             case 0:
-                app = ("微信\(appIndex)", "com.tencent.xinWeChat\(appIndex)")
+                app = ("微信\(appIndex)", "com.tencent.xinWeChat\(appIndex)", nil)
             case 1:
-                app = ("Visual Studio Code \(appIndex)", "com.microsoft.VSCode\(appIndex)")
+                app = ("Visual Studio Code \(appIndex)", "com.microsoft.VSCode\(appIndex)", nil)
             case 2:
-                app = ("Safari \(appIndex)", "com.apple.Safari\(appIndex)")
+                app = ("Safari \(appIndex)", "com.apple.Safari\(appIndex)", nil)
             case 3:
-                app = ("Chrome \(appIndex)", "com.google.Chrome\(appIndex)")
+                app = ("Chrome \(appIndex)", "com.google.Chrome\(appIndex)", nil)
+            case 4:
+                app = (
+                    "FlowTabSearch\(appIndex)",
+                    "com.flowtab.search\(appIndex)",
+                    "FlowTabSearchCoordinator"
+                )
+            case 5:
+                app = (
+                    "文件传输助手\(appIndex)",
+                    "com.flowtab.fileTransferAssistant\(appIndex)",
+                    "文件传输助手归档"
+                )
             default:
-                app = ("Notion \(appIndex)", "notion.id.\(appIndex)")
+                app = ("Notion \(appIndex)", "notion.id.\(appIndex)", nil)
             }
 
             var windows: [WindowCandidate] = []
             windows.reserveCapacity(windowsPerApp)
             for windowIndex in 0..<windowsPerApp {
                 let topic = windowTopics[(appIndex + windowIndex) % windowTopics.count]
-                let title = "\(app.name) - \(topic) - w\(windowIndex)"
+                let title: String
+                if let windowBaseTitle = app.windowBaseTitle {
+                    title = "\(windowBaseTitle)\(windowIndex) - \(topic)"
+                } else {
+                    title = "\(app.name) - \(topic) - w\(windowIndex)"
+                }
                 windows.append(
                     WindowCandidate(
                         id: "w-\(appIndex)-\(windowIndex)",
@@ -1253,8 +1370,19 @@ final class FlowTabTests: XCTestCase {
             "sa", "saf", "safa", "safari", "safari 2",
             "de", "des", "desi", "design", "design w2",
             "com", "tencent", "chrome", "road", "review",
+            "flow", "flow search", "文件", "文件助手",
             "wx9", "wx", "not", "notion", "meeting",
             "bug", "bugf", "bugfix", "notes", ""
+        ]
+    }
+
+    private func segmentedBenchmarkQueries() -> [String] {
+        [
+            "f", "fl", "flow", "flow ", "flow s", "flow se", "flow search",
+            "flow sea", "flow", "flow search",
+            "文", "文件", "文件助", "文件助手", "文件 助手",
+            "文件助", "文件", "",
+            "search", "search coor", "search coordinator", ""
         ]
     }
 

@@ -9,6 +9,24 @@ This checklist summarizes the current automated test coverage for FlowTab, inclu
 - `FlowTabCore`: `swift test` passed, `32/32` tests green.
 - `FlowTab` app tests: `xcodebuild test-without-building -only-testing:FlowTabTests` passed, including the new lifecycle and in-app hotkey behavior coverage.
 - `FlowTabUITests`: the new behavior-focused UI cases pass together when selected explicitly (permission reminder/settings persistence, mock Home selection, logs clear, search result activation, and redesigned tab-stress coverage). A raw `-only-testing:FlowTabUITests` target run still shows suite-level launch interference when mixed with the generated launch-only UI tests.
+- Search external sampling baseline: on 2026-04-01, three `30s` search scenarios were sampled at `0.5s` intervals from outside the process. Results are archived under `.build-local/search-external-sampling/results-20260401-230938/`.
+
+## Search Performance Baseline
+
+External `%CPU` / `RSS` sampling was run against the `build-for-testing` host with `xcodebuild test-without-building`, using the `FlowTab.app` test process as the sampled target.
+
+| Scenario | Test Case | Duration | CPU(avg/p95/max) | RSS(avg/p95/max) | Throughput(avg/max) |
+| --- | --- | --- | --- | --- | --- |
+| Realistic window search | `testSearchPerformanceWindowScope` | `32s`, `3` runs | `93.09% / 100.00% / 100.10%` | `135.15MB / 171.09MB / 186.75MB` | `37.60 / 38.07 qps` |
+| Stress unified query mix | `testSearchPressureWindowScopeUnified` | `30s`, `3` runs | `95.67% / 100.00% / 100.10%` | `135.22MB / 158.48MB / 169.75MB` | `37.73 / 37.76 qps` |
+| Stress segmented queries | `testSearchPressureWindowScopeSegmentedQueries` | `34s`, `3` runs | `93.80% / 100.00% / 100.10%` | `135.53MB / 166.83MB / 174.73MB` | `26.34 / 26.35 qps` |
+
+- Dataset for all three runs: `400` apps / `10000` windows.
+- Artifact paths:
+  - `.build-local/search-external-sampling/results-20260401-230938/realistic.summary.txt`
+  - `.build-local/search-external-sampling/results-20260401-230938/stress_unified.summary.txt`
+  - `.build-local/search-external-sampling/results-20260401-230938/stress_segmented.summary.txt`
+- Current interpretation: the tokenizer change does not materially raise steady-state RSS, while segmented queries reduce throughput versus the unified query mix by roughly `30%`.
 
 ## Existing Unit Tests
 
@@ -46,7 +64,7 @@ This checklist summarizes the current automated test coverage for FlowTab, inclu
   - Unknown-ID selection failure paths.
   - Empty-session guard behavior.
 
-### FlowTab app tests (`85` tests)
+### FlowTab app tests (`89` tests)
 
 - [x] Hotkey configuration and preference normalization
   - `SwitcherHotkeyPreferencesStore`
@@ -79,7 +97,9 @@ This checklist summarizes the current automated test coverage for FlowTab, inclu
   - Falls back to opening the home scene when no regular window exists.
 - [x] Search coordinator logic
   - App-name partial matching.
+  - Chinese compound-word segmentation matching.
   - Chinese pinyin initials and full spelling.
+  - camelCase app-name and window-title segmented matching.
   - English abbreviation matching.
   - Bundle ID keyword matching with generic-prefix suppression.
   - Query insertion/deletion with cursor movement.
@@ -87,6 +107,7 @@ This checklist summarizes the current automated test coverage for FlowTab, inclu
   - Window-scope matching.
   - Incremental-cache miss recovery.
   - Search performance pressure tests.
+  - Segmented-query pressure tests.
 
 ## Existing Behavior / Integration Tests
 
@@ -105,6 +126,7 @@ This checklist summarizes the current automated test coverage for FlowTab, inclu
 - [x] Home page mock-app selection updates the window list in the paired window-layer card.
 - [x] Logs page can render seeded runtime logs and clear visible output.
 - [x] Search panel can launch directly into search mode and activate a selected app result.
+- [x] Search panel can resolve a segmented Chinese query into a compound-name mock result.
 - [x] Tab-switch stress uses the built-in auto-cycling runner with deterministic launch arguments and auto-terminate measurement.
 
 ## Areas With Partial Coverage
@@ -115,6 +137,7 @@ This checklist summarizes the current automated test coverage for FlowTab, inclu
 - [x] Search feature
   - Covered: matching engine, query editing, scope-specific result generation, and search-mode key routing for `Tab`, `Esc`, arrows, and result activation.
   - Covered: panel-level `Enter` to enter search from the main switcher and IME marked-text key routing.
+  - Covered: external `30s` `%CPU` / `RSS` sampling baselines for realistic, unified-stress, and segmented-query-stress search scenarios.
 - [x] `LiveSwitcherModel`
   - Covered: terminate-selected-app refresh path.
   - Covered: session startup, search activation, applying selected search result, and commit/cancel.
