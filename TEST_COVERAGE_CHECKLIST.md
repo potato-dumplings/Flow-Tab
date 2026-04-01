@@ -178,20 +178,37 @@ This checklist summarizes the current automated test coverage for FlowTab, inclu
 
 ## Recommended Priority Order
 
+The ordering below is based on primary interaction-path risk, likelihood of regressions, and how much follow-on work each test seam unlocks.
+
 ### Priority 1
 
 - [ ] Add behavior tests around `LiveSwitcherModel` session lifecycle.
+  - Cover session startup, focused-app window session, search activation, selected-result application, auto-enter window layer, commit, and cancel.
 - [ ] Add behavior tests around `SwitcherPanelController` key-routing and interruption handling.
-- [ ] Add stable app-level tests for `CommandTabTakeoverController` and `OptionTabHotkeyMonitor` fallback behavior.
+  - Cover app/group/window/search mode routing, `flagsChanged`, mouse-down cancellation, active-space interruption, panel occlusion, key-window recovery, delayed auto-entry, and terminate-selected-app shortcuts.
+- [ ] Add stable app-level tests for `CommandTabTakeoverController` and `OptionTabHotkeyMonitor`.
+  - Cover takeover success/failure, abnormal-exit recovery, restore-on-terminate, Carbon press/release callbacks, and fallback behavior.
 
 ### Priority 2
 
 - [ ] Add test seams around `RuntimeSnapshotProvider`, `SystemAppMRUTracker`, and `RuntimeActivator`.
+  - Cover app filtering, ranking, current-app inclusion or exclusion, minimized-app handling, activation, window focus, restore-minimized behavior, and AX fallback.
+- [ ] Add app-level behavior tests for search entry and exit flow.
+  - Cover `Enter` to enter search, `Tab` scope toggling, layered `Esc` semantics, delayed auto-enter window-layer logic, and IME marked-text key routing.
 - [ ] Add behavior tests for `AppWindowCoordinator.openHome/openLogs/openSettings`.
-- [ ] Add app tests for delayed auto-enter window-layer logic and search-entry/exit flow.
+- [ ] Add app-level tests for the in-app window switcher.
+  - Cover global in-app hotkey registration, session start, and conflict handling with the main hotkey.
 
 ### Priority 3
 
+- [ ] Add behavior tests for window preview and title-bar style guess behavior.
+  - Cover `RuntimeWindowPreviewProvider`, `ScreenCapturePermissionChecker`, title-style branches, and preview cache behavior.
+- [ ] Add behavior tests for app-icon cache behavior.
+  - Cover `BoundedImageCache` and `AppIconProvider`.
+- [ ] Add lifecycle wiring tests around app startup and teardown.
+  - Cover `FlowTabApp.init()`, `AppDelegate.applicationDidFinishLaunching(...)`, observer installation or removal, accessibility prompt gating, and `applicationWillTerminate(...)`.
+- [ ] Add higher-level UI behavior coverage for Home / Logs / Settings pages.
+  - Cover settings changes affecting runtime state, permission-button clicks, logs refresh or clear, theme and language switching, and home refresh or cache update behavior.
 - [ ] Expand `FlowTabUITests` from smoke/perf checks into real user-behavior coverage.
   - Search entry and result activation.
   - Settings toggles and persistence.
