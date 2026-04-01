@@ -280,20 +280,114 @@ final class FlowTabUITests: XCTestCase {
             ]
         )
         app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
 
-        let switcherPanel = app.otherElements[Identifier.switcherPanel]
+        let switcherPanel = app.descendants(matching: .any)
+            .matching(identifier: Identifier.switcherPanel)
+            .firstMatch
         XCTAssertTrue(switcherPanel.waitForExistence(timeout: 5))
 
-        let searchInput = app.otherElements[Identifier.switcherSearchInput]
-        XCTAssertTrue(searchInput.waitForExistence(timeout: 5))
-        searchInput.tap()
+        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
         app.typeText("browser")
 
-        let browserResult = app.otherElements["flowtab.switcher.search.app.com-flowtab-mock-browser"]
+        let browserResult = app.descendants(matching: .any)
+            .matching(identifier: "flowtab.switcher.search.app.com-flowtab-mock-browser")
+            .firstMatch
         XCTAssertTrue(browserResult.waitForExistence(timeout: 5))
 
         app.typeText("\r")
+        if !waitForNonExistence(switcherPanel, timeout: 1.2) {
+            // XCUI keyboard input may leave the hidden NSTextView in a marked-text
+            // composition state, so the first Return only commits composition.
+            app.typeText("\r")
+        }
         XCTAssertTrue(waitForNonExistence(switcherPanel, timeout: 3))
+    }
+
+    func testSearchPanelChineseQueryShowsChineseMockResult() throws {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-open-switcher-search",
+                "-showPermissionReminder",
+                "NO"
+            ]
+        )
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+
+        let switcherPanel = app.descendants(matching: .any)
+            .matching(identifier: Identifier.switcherPanel)
+            .firstMatch
+        XCTAssertTrue(switcherPanel.waitForExistence(timeout: 5))
+
+        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+        app.typeText("测")
+
+        let chineseResult = app.descendants(matching: .any)
+            .matching(identifier: "flowtab.switcher.search.app.com-xxx-test")
+            .firstMatch
+        XCTAssertTrue(chineseResult.waitForExistence(timeout: 5))
+    }
+
+    func testSearchPanelPinyinInitialsShowChineseMockResult() throws {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-open-switcher-search",
+                "-showPermissionReminder",
+                "NO"
+            ]
+        )
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+
+        let switcherPanel = app.descendants(matching: .any)
+            .matching(identifier: Identifier.switcherPanel)
+            .firstMatch
+        XCTAssertTrue(switcherPanel.waitForExistence(timeout: 5))
+
+        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+        app.typeText("cs")
+
+        let chineseResult = app.descendants(matching: .any)
+            .matching(identifier: "flowtab.switcher.search.app.com-xxx-test")
+            .firstMatch
+        XCTAssertTrue(chineseResult.waitForExistence(timeout: 5))
+    }
+
+    func testSearchPanelSharedCsQueryShowsCSGOAndChineseMockResults() throws {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-open-switcher-search",
+                "-showPermissionReminder",
+                "NO"
+            ]
+        )
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+
+        let switcherPanel = app.descendants(matching: .any)
+            .matching(identifier: Identifier.switcherPanel)
+            .firstMatch
+        XCTAssertTrue(switcherPanel.waitForExistence(timeout: 5))
+
+        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+        app.typeText("cs")
+
+        let csgoResult = app.descendants(matching: .any)
+            .matching(identifier: "flowtab.switcher.search.app.com-xxx-csgo")
+            .firstMatch
+        XCTAssertTrue(csgoResult.waitForExistence(timeout: 5))
+
+        let chineseResult = app.descendants(matching: .any)
+            .matching(identifier: "flowtab.switcher.search.app.com-xxx-test")
+            .firstMatch
+        XCTAssertTrue(chineseResult.waitForExistence(timeout: 5))
     }
 
     func testTabSwitchStressCPUAndMemory() throws {

@@ -931,6 +931,50 @@ final class FlowTabTests: XCTestCase {
         XCTAssertTrue(coordinator.state.results.isEmpty)
     }
 
+    func testSearchLocksChineseTestAppByPinyinInitials() {
+        let coordinator = SwitcherSearchCoordinator()
+        coordinator.rebuildIndex(with: searchSampleApps())
+        XCTAssertTrue(coordinator.activate(defaultScope: .app))
+
+        XCTAssertTrue(coordinator.appendQueryText("c"))
+        XCTAssertTrue(coordinator.appendQueryText("s"))
+        drainPendingSearchRebuild(on: coordinator)
+
+        XCTAssertEqual(coordinator.state.results.first?.primaryText, "测试")
+        XCTAssertEqual(coordinator.state.selectedResult?.primaryText, "测试")
+        XCTAssertEqual(coordinator.state.selectedResult?.kind, .app(appID: "com.xxx.test"))
+    }
+
+    func testSearchLocksChineseTestAppByBundleIDPrefixes() {
+        let coordinator = SwitcherSearchCoordinator()
+        coordinator.rebuildIndex(with: searchSampleApps())
+        XCTAssertTrue(coordinator.activate(defaultScope: .app))
+
+        let expectedKind = SwitcherSearchResultKind.app(appID: "com.xxx.test")
+        for suffix in ["t", "e", "s", "t"] {
+            XCTAssertTrue(coordinator.appendQueryText(suffix))
+            drainPendingSearchRebuild(on: coordinator)
+            XCTAssertEqual(coordinator.state.results.first?.primaryText, "测试", "Query \(coordinator.state.query)")
+            XCTAssertEqual(coordinator.state.selectedResult?.primaryText, "测试", "Query \(coordinator.state.query)")
+            XCTAssertEqual(coordinator.state.selectedResult?.kind, expectedKind, "Query \(coordinator.state.query)")
+        }
+    }
+
+    func testSearchQueryCsMatchesBothCSGOAndChineseTestApp() {
+        let coordinator = SwitcherSearchCoordinator()
+        coordinator.rebuildIndex(with: searchSampleAppsForSharedCSQuery())
+        XCTAssertTrue(coordinator.activate(defaultScope: .app))
+
+        XCTAssertTrue(coordinator.appendQueryText("c"))
+        XCTAssertTrue(coordinator.appendQueryText("s"))
+        drainPendingSearchRebuild(on: coordinator)
+
+        XCTAssertEqual(
+            Set(coordinator.state.results.map(\.primaryText)),
+            Set(["CSGO", "测试"])
+        )
+    }
+
     func testSearchRecoversResultsWhenIncrementalCandidateCacheMisses() {
         let coordinator = SwitcherSearchCoordinator()
         coordinator.rebuildIndex(with: searchCacheMissSampleApps())
@@ -1069,6 +1113,47 @@ final class FlowTabTests: XCTestCase {
                 lastActiveAt: 200,
                 windows: [
                     WindowCandidate(id: "safari-1", title: "Apple", isMinimized: false, lastActiveAt: 200)
+                ]
+            ),
+            AppSwitchCandidate(
+                id: "com.xxx.test",
+                displayName: "测试",
+                groupID: "qa",
+                lastActiveAt: 190,
+                windows: [
+                    WindowCandidate(id: "test-1", title: "用例", isMinimized: false, lastActiveAt: 190)
+                ]
+            )
+        ]
+    }
+
+    private func searchSampleAppsForSharedCSQuery() -> [AppSwitchCandidate] {
+        [
+            AppSwitchCandidate(
+                id: "com.xxx.csgo",
+                displayName: "CSGO",
+                groupID: "games",
+                lastActiveAt: 200,
+                windows: [
+                    WindowCandidate(id: "csgo-1", title: "Dust2", isMinimized: false, lastActiveAt: 200)
+                ]
+            ),
+            AppSwitchCandidate(
+                id: "com.xxx.test",
+                displayName: "测试",
+                groupID: "qa",
+                lastActiveAt: 190,
+                windows: [
+                    WindowCandidate(id: "test-1", title: "用例", isMinimized: false, lastActiveAt: 190)
+                ]
+            ),
+            AppSwitchCandidate(
+                id: "com.apple.Safari",
+                displayName: "Safari",
+                groupID: "web",
+                lastActiveAt: 180,
+                windows: [
+                    WindowCandidate(id: "safari-1", title: "Apple", isMinimized: false, lastActiveAt: 180)
                 ]
             )
         ]

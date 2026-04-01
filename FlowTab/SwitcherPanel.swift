@@ -187,12 +187,14 @@ final class SwitcherPanelController {
     private var delayedWindowLayerTimer: Timer?
     private var lastCommittedTabAdvanceTimestamp: TimeInterval?
     private var ignoreHotkeyPressesUntil: TimeInterval = 0
+    private var ignoreActiveSpaceChangesUntil: TimeInterval = 0
     private var windowLayerPresentationDelay: TimeInterval {
         windowLayerPresentationDelayOverride ?? WindowLayerPreferencesStore.loadAutoEnterDelay()
     }
     private let modifierReleaseConfirmationSampleIntervalNs: UInt64 = 25_000_000
     private let modifierReleaseConfirmationSampleCount: Int = 2
     private let postFinishHotkeyIgnoreWindow: TimeInterval = 0.02
+    private let activeSpaceChangeIgnoreWindow: TimeInterval = 0.35
     private let autoEnterWindowLayerEnabled = true
     private let tabAdvanceMinimumInterval: TimeInterval = 0.016
     private let panelScreenMargin: CGFloat = 80
@@ -447,6 +449,32 @@ final class SwitcherPanelController {
         RuntimeLog.info("InputTrace", message)
     }
 
+    private func logSearchTrace(_ message: String) {
+        RuntimeDiagnostics.shared.log(level: .info, category: "SearchTrace", message: message)
+    }
+
+    private func panelFirstResponderDebugName() -> String {
+        guard let firstResponder = panel.firstResponder else { return "nil" }
+        return String(describing: type(of: firstResponder))
+    }
+
+    private func searchTraceStateSummary() -> String {
+        let now = ProcessInfo.processInfo.systemUptime
+        let activeSpaceIgnoreMs = max(0, (ignoreActiveSpaceChangesUntil - now) * 1_000)
+        return "panelVisible=\(isPanelPresented ? 1 : 0) panelKey=\(panel.isKeyWindow ? 1 : 0) appActive=\(isAppCurrentlyActive ? 1 : 0) searchActive=\(model.isSearchActive ? 1 : 0) inputFocused=\(model.isSearchInputFocused ? 1 : 0) marked=\(model.hasMarkedSearchText ? 1 : 0) firstResponder=\(panelFirstResponderDebugName()) activeSpaceIgnoreMs=\(formatMilliseconds(activeSpaceIgnoreMs))"
+    }
+
+    private func beginIgnoringActiveSpaceChanges(trigger: String) {
+        ignoreActiveSpaceChangesUntil = ProcessInfo.processInfo.systemUptime + activeSpaceChangeIgnoreWindow
+        logSearchTrace(
+            "activeSpaceIgnore trigger=\(trigger) durationMs=\(formatMilliseconds(activeSpaceChangeIgnoreWindow * 1_000)) \(searchTraceStateSummary())"
+        )
+    }
+
+    private func shouldIgnoreActiveSpaceDidChange() -> Bool {
+        ProcessInfo.processInfo.systemUptime < ignoreActiveSpaceChangesUntil
+    }
+
     private func schedulePanelVisibilityRecovery(
         trigger: String,
         delayNanoseconds: UInt64 = 50_000_000
@@ -595,6 +623,7 @@ final class SwitcherPanelController {
         hideNonPanelWindows()
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
+        beginIgnoringActiveSpaceChanges(trigger: "global_show")
         schedulePanelVisibilityRecovery(trigger: "global_show_recovery")
         schedulePanelVisibilityRecovery(
             trigger: "global_show_recovery_retry",
@@ -622,6 +651,7 @@ final class SwitcherPanelController {
         hideNonPanelWindows()
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
+        beginIgnoringActiveSpaceChanges(trigger: "in_app_show")
         schedulePanelVisibilityRecovery(trigger: "in_app_show_recovery")
         schedulePanelVisibilityRecovery(
             trigger: "in_app_show_recovery_retry",
@@ -701,6 +731,7 @@ final class SwitcherPanelController {
         panel.collectionBehavior = SwitcherPanelWindowConfiguration.presentationCollectionBehavior()
         activeHotkeySessionKind = nil
         activePresentationScreen = nil
+        ignoreActiveSpaceChangesUntil = 0
         lastCommittedTabAdvanceTimestamp = nil
         if panelVisibilityOverride != nil {
             panelVisibilityOverride = false
@@ -1024,11 +1055,19 @@ final class SwitcherPanelController {
 
     @discardableResult
     private func enterSearchModeIfPossible() -> Bool {
-        guard searchFeatureEnabled else { return false }
-        guard model.enterSearchMode() else { return false }
+        logSearchTrace("enterSearchMode action=attempt \(searchTraceStateSummary())")
+        guard searchFeatureEnabled else {
+            logSearchTrace("enterSearchMode action=ignored reason=featureDisabled \(searchTraceStateSummary())")
+            return false
+        }
+        guard model.enterSearchMode() else {
+            logSearchTrace("enterSearchMode action=ignored reason=modelRejected \(searchTraceStateSummary())")
+            return false
+        }
         cancelPendingModifierReleaseConfirmation()
         updatePanelSize()
         RuntimeLog.info("Session", "enter search mode")
+        logSearchTrace("enterSearchMode action=entered \(searchTraceStateSummary())")
         return true
     }
 
@@ -1131,33 +1170,43 @@ final class SwitcherPanelController {
 
     private func handleApplicationDidResignActive() {
         guard isPanelPresented else { return }
+        logSearchTrace("systemInterruption trigger=applicationDidResignActive \(searchTraceStateSummary())")
         cancelSelectionForSystemInterruption(trigger: "applicationDidResignActive")
     }
 
     private func handleActiveSpaceDidChange() {
         guard isPanelPresented else { return }
+        if shouldIgnoreActiveSpaceDidChange() {
+            logSearchTrace("systemInterruption trigger=activeSpaceDidChange action=ignored reason=graceWindow \(searchTraceStateSummary())")
+            return
+        }
+        logSearchTrace("systemInterruption trigger=activeSpaceDidChange \(searchTraceStateSummary())")
         cancelSelectionForSystemInterruption(trigger: "activeSpaceDidChange")
     }
 
     private func handlePanelOcclusionStateDidChange() {
         guard isPanelPresented else { return }
         guard !resolvedPanelOcclusionState.contains(.visible) else { return }
+        logSearchTrace("systemInterruption trigger=panelOccluded \(searchTraceStateSummary())")
         cancelSelectionForSystemInterruption(trigger: "panelOccluded")
     }
 
     private func handlePanelDidResignKey() {
         guard isPanelPresented else { return }
         guard !isAppCurrentlyActive else { return }
+        logSearchTrace("systemInterruption trigger=panelDidResignKey \(searchTraceStateSummary())")
         cancelSelectionForSystemInterruption(trigger: "panelDidResignKey")
     }
 
     private func cancelSelectionForSystemInterruption(trigger: String) {
         guard isPanelPresented else { return }
         let sessionKind = activeHotkeySessionKind
+        logSearchTrace("cancelSelectionForSystemInterruption trigger=\(trigger) action=begin \(searchTraceStateSummary())")
         logInputTrace(
             "\(trigger) action=cancelSelection nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
         )
         cancelSelection()
+        logSearchTrace("cancelSelectionForSystemInterruption trigger=\(trigger) action=finished \(searchTraceStateSummary())")
         if let sessionKind {
             beginHotkeyReplaySuppressionUntilRelease(for: sessionKind, trigger: trigger)
         }
@@ -1221,6 +1270,9 @@ final class SwitcherPanelController {
                     self.logInputTrace(
                         "releaseConfirm stop trigger=\(trigger) reason=searchActive nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
                     )
+                    self.logSearchTrace(
+                        "releaseConfirm trigger=\(trigger) action=stop reason=searchActive \(self.searchTraceStateSummary())"
+                    )
                     self.pendingModifierReleaseConfirmationTask = nil
                     return
                 }
@@ -1245,6 +1297,9 @@ final class SwitcherPanelController {
                 self.pendingModifierReleaseConfirmationTask = nil
                 self.logInputTrace(
                     "releaseConfirm confirmed trigger=\(trigger) action=finishSelection nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
+                )
+                self.logSearchTrace(
+                    "releaseConfirm trigger=\(trigger) action=confirmed \(self.searchTraceStateSummary())"
                 )
                 self.finishSelection()
                 return
@@ -1774,6 +1829,11 @@ final class LiveSwitcherModel: ObservableObject {
         let defaultScope = SearchInteractionPreferencesStore.loadDefaultScope()
         let changed = searchCoordinator.activate(defaultScope: defaultScope)
         publishSearchStateIfNeeded()
+        RuntimeDiagnostics.shared.log(
+            level: .info,
+            category: "SearchModel",
+            message: "enterSearchMode changed=\(changed ? 1 : 0) scope=\(defaultScope.rawValue) appCount=\(session.apps.count) inputFocused=\(searchViewState.isInputFocused ? 1 : 0)"
+        )
         return changed
     }
 
@@ -1824,12 +1884,24 @@ final class LiveSwitcherModel: ObservableObject {
         )
         guard changed else { return }
         publishSearchStateIfNeeded()
+        RuntimeDiagnostics.shared.log(
+            level: .info,
+            category: "SearchModel",
+            message: "synchronizeSearchInput query=\(query.debugDescription) cursor=\(cursorPosition) previousQuery=\(previousQuery.debugDescription) active=\(searchViewState.isActive ? 1 : 0) inputFocused=\(searchViewState.isInputFocused ? 1 : 0)"
+        )
         guard previousQuery != searchCoordinator.state.query else { return }
         scheduleSearchComputation(resetSelection: true, debounced: true)
     }
 
     func updateSearchInputMarkedTextState(_ hasMarkedText: Bool) {
-        searchInputHasMarkedText = searchViewState.isActive ? hasMarkedText : false
+        let nextValue = searchViewState.isActive ? hasMarkedText : false
+        guard searchInputHasMarkedText != nextValue else { return }
+        searchInputHasMarkedText = nextValue
+        RuntimeDiagnostics.shared.log(
+            level: .info,
+            category: "SearchModel",
+            message: "markedText changed=\(nextValue ? 1 : 0) active=\(searchViewState.isActive ? 1 : 0) inputFocused=\(searchViewState.isInputFocused ? 1 : 0) query=\(searchViewState.query.debugDescription)"
+        )
     }
 
     @discardableResult
@@ -2928,10 +3000,17 @@ private struct SearchSystemTextInputBridge: NSViewRepresentable {
     }
 
     final class Coordinator: NSObject, NSTextViewDelegate {
+        private struct InputSnapshot: Equatable {
+            let query: String
+            let cursorPosition: Int
+        }
+
         private var onInputChanged: (String, Int) -> Void
         private var onMarkedTextChanged: (Bool) -> Void
         private var isApplyingViewState = false
         private weak var trackedTextView: NSTextView?
+        private var lastPublishedInputSnapshot: InputSnapshot?
+        private var lastPublishedMarkedTextState: Bool?
 
         init(
             onInputChanged: @escaping (String, Int) -> Void,
@@ -3001,30 +3080,77 @@ private struct SearchSystemTextInputBridge: NSViewRepresentable {
         }
 
         private func publishInputState(for textView: NSTextView) {
+            let snapshot = InputSnapshot(
+                query: textView.string,
+                cursorPosition: textView.selectedRange().location
+            )
+            if lastPublishedInputSnapshot != snapshot {
+                lastPublishedInputSnapshot = snapshot
+                Self.logSearchInput(
+                    "publishInputState query=\(snapshot.query.debugDescription) cursor=\(snapshot.cursorPosition) hasMarked=\(textView.hasMarkedText() ? 1 : 0)"
+                )
+            }
             onInputChanged(textView.string, textView.selectedRange().location)
             publishMarkedTextState(for: textView)
         }
 
         private func publishMarkedTextState(for textView: NSTextView) {
-            onMarkedTextChanged(textView.hasMarkedText())
+            let hasMarkedText = textView.hasMarkedText()
+            if lastPublishedMarkedTextState != hasMarkedText {
+                lastPublishedMarkedTextState = hasMarkedText
+                Self.logSearchInput(
+                    "publishMarkedTextState hasMarked=\(hasMarkedText ? 1 : 0) query=\(textView.string.debugDescription)"
+                )
+            }
+            onMarkedTextChanged(hasMarkedText)
         }
 
         private func synchronizeFirstResponder(for textView: NSTextView, isSearchActive: Bool) {
             if isSearchActive {
                 DispatchQueue.main.async { [weak textView] in
                     guard let textView else { return }
-                    guard let window = textView.window else { return }
-                    guard window.firstResponder !== textView else { return }
-                    _ = window.makeFirstResponder(textView)
+                    guard let window = textView.window else {
+                        Self.logSearchInput("syncFirstResponder active=1 skipped=noWindow")
+                        return
+                    }
+                    if window.firstResponder === textView {
+                        Self.logSearchInput(
+                            "syncFirstResponder active=1 skipped=alreadyFirstResponder windowKey=\(window.isKeyWindow ? 1 : 0) appActive=\(NSApp.isActive ? 1 : 0)"
+                        )
+                        return
+                    }
+                    let before = Self.responderName(window.firstResponder)
+                    let didBecomeFirstResponder = window.makeFirstResponder(textView)
+                    let after = Self.responderName(window.firstResponder)
+                    Self.logSearchInput(
+                        "syncFirstResponder active=1 result=\(didBecomeFirstResponder ? 1 : 0) windowKey=\(window.isKeyWindow ? 1 : 0) appActive=\(NSApp.isActive ? 1 : 0) before=\(before) after=\(after)"
+                    )
                 }
             } else {
                 DispatchQueue.main.async { [weak textView] in
                     guard let textView else { return }
-                    guard let window = textView.window else { return }
+                    guard let window = textView.window else {
+                        Self.logSearchInput("syncFirstResponder active=0 skipped=noWindow")
+                        return
+                    }
                     guard window.firstResponder === textView else { return }
-                    _ = window.makeFirstResponder(nil)
+                    let before = Self.responderName(window.firstResponder)
+                    let clearedFirstResponder = window.makeFirstResponder(nil)
+                    let after = Self.responderName(window.firstResponder)
+                    Self.logSearchInput(
+                        "syncFirstResponder active=0 result=\(clearedFirstResponder ? 1 : 0) windowKey=\(window.isKeyWindow ? 1 : 0) appActive=\(NSApp.isActive ? 1 : 0) before=\(before) after=\(after)"
+                    )
                 }
             }
+        }
+
+        private static func logSearchInput(_ message: String) {
+            RuntimeDiagnostics.shared.log(level: .info, category: "SearchInput", message: message)
+        }
+
+        private static func responderName(_ responder: NSResponder?) -> String {
+            guard let responder else { return "nil" }
+            return String(describing: type(of: responder))
         }
     }
 }

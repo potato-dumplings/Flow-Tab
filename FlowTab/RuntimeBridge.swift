@@ -381,6 +381,22 @@ final class RuntimeSnapshotProvider {
                     WindowCandidate(id: "mock-browser-docs", title: "Docs", isMinimized: false, lastActiveAt: 290)
                 ],
                 rank: 1
+            ),
+            (
+                appID: "com.xxx.test",
+                name: "测试",
+                windows: [
+                    WindowCandidate(id: "mock-test-cases", title: "用例", isMinimized: false, lastActiveAt: 280)
+                ],
+                rank: 2
+            ),
+            (
+                appID: "com.xxx.csgo",
+                name: "CSGO",
+                windows: [
+                    WindowCandidate(id: "mock-csgo-dust2", title: "Dust2", isMinimized: false, lastActiveAt: 270)
+                ],
+                rank: 3
             )
         ]
 
