@@ -63,6 +63,10 @@ enum FlowTabTestLaunchOptions {
         return Int(rawValue)
     }
 
+    static var runtimeLogLevelOverrideRawValue: String? {
+        value(after: "--flowtab-ui-runtime-log-level")
+    }
+
     private static func value(after flag: String) -> String? {
         guard let index = arguments.firstIndex(of: flag) else { return nil }
         let nextIndex = arguments.index(after: index)

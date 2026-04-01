@@ -20,7 +20,12 @@ final class FlowTabUITests: XCTestCase {
         static let permissionDismiss = "flowtab.home.permission.dismiss"
         static let permissionReminderSwitch = "flowtab.settings.permission.reminder"
         static let logsClearButton = "flowtab.logs.clear"
+        static let logsLines = "flowtab.logs.lines"
         static let logsEmptyHint = "flowtab.logs.empty-hint"
+        static let logsSeededDebugLine = "flowtab.logs.line.seeded.debug"
+        static let logsSeededInfoLine = "flowtab.logs.line.seeded.info"
+        static let logsSeededWarnLine = "flowtab.logs.line.seeded.warn"
+        static let logsSeededErrorLine = "flowtab.logs.line.seeded.error"
         static let switcherPanel = "flowtab.switcher.panel"
         static let switcherSearchInput = "flowtab.switcher.search.input"
     }
@@ -164,23 +169,104 @@ final class FlowTabUITests: XCTestCase {
             additionalArguments: [
                 "--flowtab-ui-reset-defaults",
                 "--flowtab-ui-seed-logs",
-                "3",
+                "4",
+                "--flowtab-ui-runtime-log-level",
+                "debug",
                 "-showPermissionReminder",
                 "NO"
             ]
         )
         app.launch()
 
-        app.buttons[Identifier.logsTabButton].tap()
-        XCTAssertTrue(app.otherElements[Identifier.logsTabContent].waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            tapFirstHittable(in: app.buttons.matching(identifier: Identifier.logsTabButton), timeout: 5)
+        )
 
-        let seededLine = app.staticTexts.containing(
-            NSPredicate(format: "label CONTAINS %@", "seeded-log-3")
-        ).firstMatch
-        XCTAssertTrue(seededLine.waitForExistence(timeout: 5))
+        let logsTabContent = app.descendants(matching: .any)
+            .matching(identifier: Identifier.logsTabContent)
+            .firstMatch
+        XCTAssertTrue(logsTabContent.waitForExistence(timeout: 5))
 
-        app.buttons[Identifier.logsClearButton].tap()
-        XCTAssertTrue(app.staticTexts[Identifier.logsEmptyHint].waitForExistence(timeout: 5))
+        let logsLines = app.descendants(matching: .any)
+            .matching(identifier: Identifier.logsLines)
+            .firstMatch
+        XCTAssertTrue(logsLines.waitForExistence(timeout: 8))
+        let expectedSeededLogs: [(identifier: String, marker: String)] = [
+            (Identifier.logsSeededDebugLine, "seeded-debug-log-1"),
+            (Identifier.logsSeededInfoLine, "seeded-info-log-2"),
+            (Identifier.logsSeededWarnLine, "seeded-warn-log-3"),
+            (Identifier.logsSeededErrorLine, "seeded-error-log-4")
+        ]
+        for expectedSeededLog in expectedSeededLogs {
+            let line = app.descendants(matching: .any)
+                .matching(identifier: expectedSeededLog.identifier)
+                .firstMatch
+            XCTAssertTrue(
+                line.waitForExistence(timeout: 8),
+                "Missing seeded log row: \(expectedSeededLog.identifier)"
+            )
+            let lineValue = (line.value as? String) ?? line.label
+            XCTAssertTrue(
+                lineValue.contains(expectedSeededLog.marker),
+                "Unexpected seeded log value for \(expectedSeededLog.identifier): \(lineValue)"
+            )
+        }
+        XCTAssertFalse(app.descendants(matching: .any).matching(identifier: Identifier.logsEmptyHint).firstMatch.exists)
+
+        XCTAssertTrue(
+            tapFirstHittable(in: app.buttons.matching(identifier: Identifier.logsClearButton), timeout: 5)
+        )
+
+        let logsEmptyHint = app.descendants(matching: .any)
+            .matching(identifier: Identifier.logsEmptyHint)
+            .firstMatch
+        XCTAssertTrue(logsEmptyHint.waitForExistence(timeout: 5))
+    }
+
+    func testLogsPageRespectsRuntimeLogLevelVisibility() throws {
+        let scenarios: [(level: String, visible: [String], hidden: [String])] = [
+            (
+                "DEBUG",
+                [
+                    Identifier.logsSeededDebugLine,
+                    Identifier.logsSeededInfoLine,
+                    Identifier.logsSeededWarnLine,
+                    Identifier.logsSeededErrorLine
+                ],
+                []
+            ),
+            (
+                "INFO",
+                [
+                    Identifier.logsSeededInfoLine,
+                    Identifier.logsSeededWarnLine,
+                    Identifier.logsSeededErrorLine
+                ],
+                [Identifier.logsSeededDebugLine]
+            ),
+            (
+                "WARN",
+                [Identifier.logsSeededWarnLine, Identifier.logsSeededErrorLine],
+                [Identifier.logsSeededDebugLine, Identifier.logsSeededInfoLine]
+            ),
+            (
+                "ERROR",
+                [Identifier.logsSeededErrorLine],
+                [
+                    Identifier.logsSeededDebugLine,
+                    Identifier.logsSeededInfoLine,
+                    Identifier.logsSeededWarnLine
+                ]
+            )
+        ]
+
+        for scenario in scenarios {
+            assertLogVisibility(
+                at: scenario.level,
+                visibleIdentifiers: scenario.visible,
+                hiddenIdentifiers: scenario.hidden
+            )
+        }
     }
 
     func testSearchPanelEntryAndResultActivation() throws {
@@ -247,6 +333,67 @@ final class FlowTabUITests: XCTestCase {
         }
         let checkboxElement = app.checkBoxes[Identifier.permissionReminderSwitch]
         return checkboxElement
+    }
+
+    private func assertLogVisibility(
+        at logLevel: String,
+        visibleIdentifiers: [String],
+        hiddenIdentifiers: [String]
+    ) {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-seed-logs",
+                "4",
+                "--flowtab-ui-runtime-log-level",
+                logLevel,
+                "-showPermissionReminder",
+                "NO"
+            ]
+        )
+        app.launch()
+        defer {
+            if app.state == .runningForeground || app.state == .runningBackground {
+                app.terminate()
+            }
+        }
+
+        XCTAssertTrue(
+            tapFirstHittable(in: app.buttons.matching(identifier: Identifier.logsTabButton), timeout: 5),
+            "Failed to open logs tab at level \(logLevel)"
+        )
+
+        let logsTabContent = app.descendants(matching: .any)
+            .matching(identifier: Identifier.logsTabContent)
+            .firstMatch
+        XCTAssertTrue(logsTabContent.waitForExistence(timeout: 5), "Missing logs tab content at level \(logLevel)")
+
+        let logsLines = app.descendants(matching: .any)
+            .matching(identifier: Identifier.logsLines)
+            .firstMatch
+        XCTAssertTrue(logsLines.waitForExistence(timeout: 8), "Missing logs container at level \(logLevel)")
+
+        for identifier in visibleIdentifiers {
+            let line = app.descendants(matching: .any)
+                .matching(identifier: identifier)
+                .firstMatch
+            XCTAssertTrue(
+                line.waitForExistence(timeout: 8),
+                "Expected visible log row \(identifier) at level \(logLevel)"
+            )
+        }
+
+        RunLoop.current.run(until: Date().addingTimeInterval(1.2))
+
+        for identifier in hiddenIdentifiers {
+            let line = app.descendants(matching: .any)
+                .matching(identifier: identifier)
+                .firstMatch
+            XCTAssertFalse(
+                line.exists,
+                "Expected hidden log row \(identifier) at level \(logLevel)"
+            )
+        }
     }
 
     private func waitForNonExistence(_ element: XCUIElement, timeout: TimeInterval) -> Bool {

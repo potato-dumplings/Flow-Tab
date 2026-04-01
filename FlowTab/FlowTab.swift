@@ -79,7 +79,8 @@ enum RuntimeLogPreferencesStore {
     static let defaultLevel: RuntimeLogLevel = .error
 
     static func resolve(rawValue: String) -> RuntimeLogLevel {
-        RuntimeLogLevel(rawValue: rawValue) ?? defaultLevel
+        let normalized = rawValue.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        return RuntimeLogLevel(rawValue: normalized) ?? defaultLevel
     }
 
     static func loadMinimumLevel(userDefaults: UserDefaults = .standard) -> RuntimeLogLevel {
@@ -474,14 +475,21 @@ private enum FlowTabUITestBootstrapper {
             RuntimeDiagnostics.shared.clear()
         }
 
+        if let runtimeLogLevelRaw = FlowTabTestLaunchOptions.runtimeLogLevelOverrideRawValue {
+            let resolved = RuntimeLogPreferencesStore.resolve(rawValue: runtimeLogLevelRaw)
+            userDefaults.set(resolved.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
+        }
+
         if let seededLogCount = FlowTabTestLaunchOptions.seededLogCount {
             RuntimeDiagnostics.shared.clear()
             if seededLogCount > 0 {
+                let seededLevels: [RuntimeLogLevel] = [.debug, .info, .warning, .error]
                 for index in 1...seededLogCount {
+                    let level = seededLevels[(index - 1) % seededLevels.count]
                     RuntimeDiagnostics.shared.log(
-                        level: .info,
+                        level: level,
                         category: "UITest",
-                        message: "seeded-log-\(index)"
+                        message: "seeded-\(level.rawValue.lowercased())-log-\(index)"
                     )
                 }
             }
@@ -5326,6 +5334,22 @@ private struct RuntimeLogsSection: View {
         _ = NSWorkspace.shared.open(logsURL)
     }
 
+    private func accessibilityIdentifier(forLogLine line: String, index: Int) -> String {
+        if line.contains("seeded-debug-log-") {
+            return "flowtab.logs.line.seeded.debug"
+        }
+        if line.contains("seeded-info-log-") {
+            return "flowtab.logs.line.seeded.info"
+        }
+        if line.contains("seeded-warn-log-") {
+            return "flowtab.logs.line.seeded.warn"
+        }
+        if line.contains("seeded-error-log-") {
+            return "flowtab.logs.line.seeded.error"
+        }
+        return "flowtab.logs.line.row.\(index)"
+    }
+
     private var logsActionButtonTint: Color {
         Color(.sRGB, red: 58 / 255, green: 128 / 255, blue: 247 / 255, opacity: 1)
     }
@@ -5410,7 +5434,7 @@ private struct RuntimeLogsSection: View {
                                 .accessibilityIdentifier("flowtab.logs.empty-hint")
                         } else {
                             LazyVStack(alignment: .leading, spacing: 2) {
-                                ForEach(Array(logsViewModel.lines.enumerated()), id: \.offset) { _, line in
+                                ForEach(Array(logsViewModel.lines.enumerated()), id: \.offset) { index, line in
                                     Text(line)
                                         .font(.system(size: 11, design: .monospaced))
                                         .foregroundStyle(.secondary)
@@ -5419,9 +5443,13 @@ private struct RuntimeLogsSection: View {
                                         .padding(.horizontal, 6)
                                         .padding(.vertical, 4)
                                     .frame(maxWidth: .infinity, alignment: .leading)
+                                    .accessibilityIdentifier(accessibilityIdentifier(forLogLine: line, index: index))
+                                    .accessibilityLabel(line)
+                                    .accessibilityValue(line)
                                 }
                             }
                             .accessibilityIdentifier("flowtab.logs.lines")
+                            .accessibilityValue(logsViewModel.lines.joined(separator: "\n"))
                         }
                     }
                     .padding(8)
