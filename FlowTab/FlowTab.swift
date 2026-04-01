@@ -1803,7 +1803,10 @@ private final class HotkeySettingsCardAppKitView: NSView {
     private let inAppRowsContainer = NSStackView()
     private let inAppSummaryLabel = HotkeySettingsCardAppKitView.makeSecondaryLabel()
     private let inAppTakeoverStatusLabel = HotkeySettingsCardAppKitView.makeStatusLabel()
+    private let takeoverInactiveDisplayDelay: TimeInterval = 0.25
     private var isApplyingState = false
+    private var mainInactiveStatusWorkItem: DispatchWorkItem?
+    private var inAppInactiveStatusWorkItem: DispatchWorkItem?
     private var currentState: HotkeySettingsCardState?
 
     override init(frame frameRect: NSRect) {
@@ -1814,6 +1817,11 @@ private final class HotkeySettingsCardAppKitView: NSView {
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         buildViewHierarchy()
+    }
+
+    deinit {
+        mainInactiveStatusWorkItem?.cancel()
+        inAppInactiveStatusWorkItem?.cancel()
     }
 
     override var intrinsicContentSize: NSSize {
@@ -1840,17 +1848,13 @@ private final class HotkeySettingsCardAppKitView: NSView {
         isApplyingState = false
 
         mainSummaryLabel.stringValue = state.mainSummaryText
-        mainTakeoverStatusLabel.stringValue = state.commandTabTakeoverStatusText
-        mainTakeoverStatusLabel.textColor = state.commandTabTakeoverActive ? .systemGreen : .systemRed
-        mainTakeoverStatusLabel.isHidden = !state.mainUsesCommandTab
+        updateMainTakeoverStatus(with: state)
 
         inAppRowsContainer.alphaValue = state.accessibilityTrusted ? 1 : 0.55
         inAppPrimaryModifierSelect.isEnabled = state.accessibilityTrusted
         inAppMainKeySelect.isEnabled = state.accessibilityTrusted
         inAppSummaryLabel.stringValue = state.inAppSummaryText
-        inAppTakeoverStatusLabel.stringValue = state.commandTabTakeoverStatusText
-        inAppTakeoverStatusLabel.textColor = state.commandTabTakeoverActive ? .systemGreen : .systemRed
-        inAppTakeoverStatusLabel.isHidden = !state.inAppUsesCommandTab
+        updateInAppTakeoverStatus(with: state)
 
         invalidateIntrinsicContentSize()
     }
@@ -2004,6 +2008,64 @@ private final class HotkeySettingsCardAppKitView: NSView {
     private func handleInAppMainKeyChanged(_ rawValue: String) {
         guard !isApplyingState else { return }
         onInAppWindowMainKeyChanged?(rawValue)
+    }
+
+    private func updateMainTakeoverStatus(with state: HotkeySettingsCardState) {
+        updateTakeoverStatus(
+            label: mainTakeoverStatusLabel,
+            usesCommandTab: state.mainUsesCommandTab,
+            takeoverActive: state.commandTabTakeoverActive,
+            workItem: &mainInactiveStatusWorkItem
+        )
+    }
+
+    private func updateInAppTakeoverStatus(with state: HotkeySettingsCardState) {
+        updateTakeoverStatus(
+            label: inAppTakeoverStatusLabel,
+            usesCommandTab: state.inAppUsesCommandTab,
+            takeoverActive: state.commandTabTakeoverActive,
+            workItem: &inAppInactiveStatusWorkItem
+        )
+    }
+
+    private func updateTakeoverStatus(
+        label: NSTextField,
+        usesCommandTab: Bool,
+        takeoverActive: Bool,
+        workItem: inout DispatchWorkItem?
+    ) {
+        workItem?.cancel()
+        workItem = nil
+
+        guard usesCommandTab else {
+            label.isHidden = true
+            return
+        }
+
+        if takeoverActive {
+            label.stringValue = AppStrings.text(.hotkeyCommandTabTakeoverActive)
+            label.textColor = .systemGreen
+            label.isHidden = false
+            return
+        }
+
+        // Treat fresh Command+Tab updates as pending; only show inactive text after confirmation delay.
+        label.isHidden = true
+        let pendingWorkItem = DispatchWorkItem { [weak self, weak label] in
+            guard let self, let label else { return }
+            guard let latestState = self.currentState else { return }
+
+            let latestUsesCommandTab = label === self.mainTakeoverStatusLabel
+                ? latestState.mainUsesCommandTab
+                : latestState.inAppUsesCommandTab
+
+            guard latestUsesCommandTab, !latestState.commandTabTakeoverActive else { return }
+            label.stringValue = AppStrings.text(.hotkeyCommandTabTakeoverInactive)
+            label.textColor = .systemRed
+            label.isHidden = false
+        }
+        workItem = pendingWorkItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + takeoverInactiveDisplayDelay, execute: pendingWorkItem)
     }
 
     private static func makeSecondaryLabel() -> NSTextField {
