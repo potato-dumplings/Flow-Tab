@@ -1082,15 +1082,11 @@ final class SwitcherPanelController {
             return true
         case 125:
             guard !isComposingMarkedText else { return false }
-            if !model.focusSearchResults() {
-                _ = model.moveSearchSelection(by: +1)
-            }
+            _ = model.stepSearchSelectionDown()
             return true
         case 126:
             guard !isComposingMarkedText else { return false }
-            if !model.focusSearchInput() {
-                _ = model.moveSearchSelection(by: -1)
-            }
+            _ = model.stepSearchSelectionUp()
             return true
         case 123:
             guard !isComposingMarkedText else { return false }
@@ -1866,6 +1862,23 @@ final class LiveSwitcherModel: ObservableObject {
         let changed = searchCoordinator.moveSelection(by: delta)
         publishSearchStateIfNeeded()
         return changed
+    }
+
+    @discardableResult
+    func stepSearchSelectionDown() -> Bool {
+        if searchViewState.isInputFocused {
+            return focusSearchResults()
+        }
+        return moveSearchSelection(by: +1)
+    }
+
+    @discardableResult
+    func stepSearchSelectionUp() -> Bool {
+        guard !searchViewState.isInputFocused else { return false }
+        if searchViewState.selectedResultIndex == 0 {
+            return focusSearchInput()
+        }
+        return moveSearchSelection(by: -1)
     }
 
     @discardableResult

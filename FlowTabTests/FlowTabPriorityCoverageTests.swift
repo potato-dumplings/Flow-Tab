@@ -242,7 +242,7 @@ final class FlowTabPriorityCoverageTests: XCTestCase {
     }
 
     @MainActor
-    func testSwitcherPanelControllerSearchArrowKeysMoveFocusAndSelection() async {
+    func testSwitcherPanelControllerSearchArrowKeysOnlyReturnToInputFromFirstResult() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
             let controller = SwitcherPanelController()
             controller.modelForTesting.snapshotProviderOverride = {
@@ -259,6 +259,11 @@ final class FlowTabPriorityCoverageTests: XCTestCase {
 
             XCTAssertTrue(controller.handleKeyDownForTesting(Self.makeKeyDownEvent(keyCode: 125)))
             XCTAssertEqual(controller.modelForTesting.searchViewState.selectedResultIndex, 1)
+            XCTAssertFalse(controller.modelForTesting.isSearchInputFocused)
+
+            XCTAssertTrue(controller.handleKeyDownForTesting(Self.makeKeyDownEvent(keyCode: 126)))
+            XCTAssertFalse(controller.modelForTesting.isSearchInputFocused)
+            XCTAssertEqual(controller.modelForTesting.searchViewState.selectedResultIndex, 0)
 
             XCTAssertTrue(controller.handleKeyDownForTesting(Self.makeKeyDownEvent(keyCode: 126)))
             XCTAssertTrue(controller.modelForTesting.isSearchInputFocused)
