@@ -249,6 +249,11 @@ final class SwitcherPanelController {
             guard self.panel.isVisible else { return }
             self.updatePanelSize()
         }
+        model.onSessionLayoutChanged = { [weak self] in
+            guard let self else { return }
+            guard self.panel.isVisible else { return }
+            self.updatePanelSize()
+        }
 
         appDidResignActiveObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didResignActiveNotification,
@@ -1298,6 +1303,12 @@ final class LiveSwitcherModel: ObservableObject {
     )
 
     var onSearchStateChanged: (() -> Void)?
+    var onSessionLayoutChanged: (() -> Void)?
+    var snapshotProviderOverride: (() -> RuntimeSnapshot)?
+    var terminateRequestOverride: ((String) -> (sent: Bool, pid: pid_t))?
+    var isProcessRunningOverride: ((pid_t) -> Bool)?
+    var terminateRefreshPollIntervalNs: UInt64 = 60_000_000
+    var terminateRefreshTimeoutNs: UInt64 = 1_800_000_000
 
     private var sessionAppsByID: [String: AppSwitchCandidate] = [:]
     private var runtimeContextsByID: [String: RuntimeAppContext] = [:]
@@ -1307,6 +1318,7 @@ final class LiveSwitcherModel: ObservableObject {
     private var titleBarStyleInferenceEnabled = false
     private var searchInputHasMarkedText = false
     private var pendingSearchComputationTask: Task<Void, Never>?
+    private var pendingTerminateRefreshTask: Task<Void, Never>?
     private var searchComputationRevision: UInt64 = 0
     private var searchDebounceNanoseconds: UInt64 = 20_000_000
 
@@ -1649,12 +1661,14 @@ final class LiveSwitcherModel: ObservableObject {
     }
 
     func startSession(triggerDirection: CycleDirection) -> Bool {
+        cancelPendingTerminateRefresh()
         overlayStyle = .appAndWindow
         titleBarStyleInferenceEnabled = false
         return loadSnapshot(triggerDirection: triggerDirection, preferredSelectedAppID: nil)
     }
 
     func startFocusedAppWindowSession(triggerDirection: CycleDirection) -> Bool {
+        cancelPendingTerminateRefresh()
         overlayStyle = .windowOnly
         titleBarStyleInferenceEnabled = true
         guard let frontmostApp = NSWorkspace.shared.frontmostApplication else {
@@ -1664,7 +1678,7 @@ final class LiveSwitcherModel: ObservableObject {
 
         let frontmostAppID = frontmostApp.bundleIdentifier
             ?? "pid:\(frontmostApp.processIdentifier)"
-        let snapshot = snapshotProvider.snapshot()
+        let snapshot = makeSnapshot()
         guard
             let appCandidate = snapshot.apps.first(where: { $0.id == frontmostAppID }),
             let context = snapshot.contextsByID[frontmostAppID]
@@ -1703,10 +1717,12 @@ final class LiveSwitcherModel: ObservableObject {
         guard let currentSession = session else { return .notHandled }
 
         let selectedApp = currentSession.selectedApp
-        guard let context = runtimeContextsByID[selectedApp.id] else { return .notHandled }
-
+        guard let terminateRequest = makeTerminateRequest(forAppID: selectedApp.id) else {
+            return .notHandled
+        }
         let preferredSelectedAppID = preferredAppIDAfterRemovingSelectedApp(from: currentSession)
-        let sent = context.runningApp.terminate()
+        let terminatingPID = terminateRequest.pid
+        let sent = terminateRequest.sent
         RuntimeLog.info(
             "Session",
             "terminate request app=\(selectedApp.displayName) appID=\(selectedApp.id) sent=\(sent)"
@@ -1714,16 +1730,61 @@ final class LiveSwitcherModel: ObservableObject {
         guard sent else { return .notHandled }
 
         if loadSnapshot(triggerDirection: .forward, preferredSelectedAppID: preferredSelectedAppID) {
+            if session?.apps.contains(where: { $0.id == selectedApp.id }) == true {
+                schedulePostTerminateRefresh(
+                    appID: selectedApp.id,
+                    pid: terminatingPID,
+                    preferredSelectedAppID: preferredSelectedAppID
+                )
+            } else {
+                cancelPendingTerminateRefresh()
+            }
             return .updatedSession
         }
+        cancelPendingTerminateRefresh()
         return .sessionEnded
+    }
+
+    private func schedulePostTerminateRefresh(
+        appID: String,
+        pid: pid_t,
+        preferredSelectedAppID: String?
+    ) {
+        cancelPendingTerminateRefresh()
+        let maxAttempts = max(1, Int(terminateRefreshTimeoutNs / terminateRefreshPollIntervalNs))
+        pendingTerminateRefreshTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            for _ in 0..<maxAttempts {
+                try? await Task.sleep(nanoseconds: self.terminateRefreshPollIntervalNs)
+                guard !Task.isCancelled else { return }
+                guard self.session != nil else {
+                    self.pendingTerminateRefreshTask = nil
+                    return
+                }
+                guard !self.isProcessRunning(pid) else { continue }
+
+                let refreshed = self.loadSnapshot(
+                    triggerDirection: .forward,
+                    preferredSelectedAppID: preferredSelectedAppID
+                )
+                RuntimeLog.info(
+                    "Session",
+                    "terminate post-refresh appID=\(appID) pid=\(pid) refreshed=\(refreshed)"
+                )
+                self.onSessionLayoutChanged?()
+                self.pendingTerminateRefreshTask = nil
+                return
+            }
+            RuntimeLog.info("Session", "terminate post-refresh timeout appID=\(appID) pid=\(pid)")
+            self.pendingTerminateRefreshTask = nil
+        }
     }
 
     private func loadSnapshot(
         triggerDirection: CycleDirection,
         preferredSelectedAppID: String?
     ) -> Bool {
-        let snapshot = snapshotProvider.snapshot()
+        let snapshot = makeSnapshot()
         guard !snapshot.apps.isEmpty else {
             resetSessionState()
             return false
@@ -1824,6 +1885,7 @@ final class LiveSwitcherModel: ObservableObject {
         guard var session else { return }
         let target = session.commitSelection()
         rememberedWindowIDByAppID = session.rememberedWindowIDByAppID
+        cancelPendingTerminateRefresh()
         cancelPendingSearchComputation()
         self.session = nil
         _ = searchCoordinator.exit()
@@ -1844,6 +1906,7 @@ final class LiveSwitcherModel: ObservableObject {
     }
 
     private func resetSessionState() {
+        cancelPendingTerminateRefresh()
         cancelPendingSearchComputation()
         session = nil
         overlayStyle = .appAndWindow
@@ -1864,6 +1927,36 @@ final class LiveSwitcherModel: ObservableObject {
         pendingSearchComputationTask?.cancel()
         pendingSearchComputationTask = nil
         searchComputationRevision &+= 1
+    }
+
+    private func cancelPendingTerminateRefresh() {
+        pendingTerminateRefreshTask?.cancel()
+        pendingTerminateRefreshTask = nil
+    }
+
+    private func makeSnapshot() -> RuntimeSnapshot {
+        if let snapshotProviderOverride {
+            return snapshotProviderOverride()
+        }
+        return snapshotProvider.snapshot()
+    }
+
+    private func makeTerminateRequest(forAppID appID: String) -> (sent: Bool, pid: pid_t)? {
+        if let terminateRequestOverride {
+            return terminateRequestOverride(appID)
+        }
+        guard let context = runtimeContextsByID[appID] else { return nil }
+        return (
+            sent: context.runningApp.terminate(),
+            pid: context.runningApp.processIdentifier
+        )
+    }
+
+    private func isProcessRunning(_ pid: pid_t) -> Bool {
+        if let isProcessRunningOverride {
+            return isProcessRunningOverride(pid)
+        }
+        return NSRunningApplication(processIdentifier: pid) != nil
     }
 
     private func scheduleSearchComputation(resetSelection: Bool, debounced: Bool) {

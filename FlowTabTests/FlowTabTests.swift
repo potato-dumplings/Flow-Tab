@@ -174,6 +174,87 @@ final class FlowTabTests: XCTestCase {
         XCTAssertFalse(styleMask.contains(.resizable))
     }
 
+    @MainActor
+    func testTerminateSelectedAppBehaviorTriggersDeferredLayoutRefreshAfterProcessExit() async {
+        let model = LiveSwitcherModel()
+        let initialApps = terminateScenarioApps()
+        var snapshots: [RuntimeSnapshot] = [makeRuntimeSnapshot(apps: initialApps)]
+        model.snapshotProviderOverride = {
+            XCTAssertFalse(snapshots.isEmpty)
+            return snapshots.removeFirst()
+        }
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        guard let terminatedAppID = model.session?.selectedApp.id else {
+            XCTFail("Expected an active session before terminate flow")
+            return
+        }
+
+        let appsAfterTermination = initialApps.filter { $0.id != terminatedAppID }
+        snapshots.append(makeRuntimeSnapshot(apps: initialApps))
+        snapshots.append(makeRuntimeSnapshot(apps: appsAfterTermination))
+
+        model.terminateRequestOverride = { _ in (sent: true, pid: 42_000) }
+        model.terminateRefreshPollIntervalNs = 2_000_000
+        model.terminateRefreshTimeoutNs = 100_000_000
+
+        var processCheckCount = 0
+        model.isProcessRunningOverride = { _ in
+            processCheckCount += 1
+            return processCheckCount < 2
+        }
+
+        let layoutRefreshed = expectation(description: "post terminate layout refreshed")
+        model.onSessionLayoutChanged = { layoutRefreshed.fulfill() }
+
+        let result = model.terminateSelectedApp()
+        XCTAssertEqual(result, .updatedSession)
+
+        await fulfillment(of: [layoutRefreshed], timeout: 1.0)
+        XCTAssertGreaterThanOrEqual(processCheckCount, 2)
+        XCTAssertEqual(model.appCount, appsAfterTermination.count)
+        XCTAssertFalse(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? true)
+    }
+
+    @MainActor
+    func testTerminateSelectedAppUnitSkipsDeferredLayoutRefreshWhenImmediateSnapshotAlreadyUpdated() async {
+        let model = LiveSwitcherModel()
+        let initialApps = terminateScenarioApps()
+        var snapshots: [RuntimeSnapshot] = [makeRuntimeSnapshot(apps: initialApps)]
+        model.snapshotProviderOverride = {
+            XCTAssertFalse(snapshots.isEmpty)
+            return snapshots.removeFirst()
+        }
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        guard let terminatedAppID = model.session?.selectedApp.id else {
+            XCTFail("Expected an active session before terminate flow")
+            return
+        }
+
+        let appsAfterTermination = initialApps.filter { $0.id != terminatedAppID }
+        snapshots.append(makeRuntimeSnapshot(apps: appsAfterTermination))
+
+        model.terminateRequestOverride = { _ in (sent: true, pid: 42_001) }
+        var processCheckCount = 0
+        model.isProcessRunningOverride = { _ in
+            processCheckCount += 1
+            return false
+        }
+
+        let noDeferredLayoutRefresh = expectation(description: "no deferred layout refresh")
+        noDeferredLayoutRefresh.isInverted = true
+        model.onSessionLayoutChanged = { noDeferredLayoutRefresh.fulfill() }
+
+        let result = model.terminateSelectedApp()
+        XCTAssertEqual(result, .updatedSession)
+
+        await fulfillment(of: [noDeferredLayoutRefresh], timeout: 0.15)
+        XCTAssertEqual(processCheckCount, 0)
+        XCTAssertEqual(model.appCount, appsAfterTermination.count)
+        XCTAssertFalse(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? true)
+    }
+
     func testAppLanguageResolveFallsBackToDefaultForUnknownRawValue() {
         XCTAssertEqual(AppLanguagePreferencesStore.resolve(rawValue: "invalid"), .simplifiedChinese)
         XCTAssertEqual(AppLanguagePreferencesStore.resolve(rawValue: AppLanguage.english.rawValue), .english)
@@ -767,6 +848,42 @@ final class FlowTabTests: XCTestCase {
                 ]
             )
         ]
+    }
+
+    private func terminateScenarioApps() -> [AppSwitchCandidate] {
+        [
+            AppSwitchCandidate(
+                id: "com.example.mail",
+                displayName: "Mail",
+                groupID: "office",
+                lastActiveAt: 300,
+                windows: [
+                    WindowCandidate(id: "mail-1", title: "Inbox", isMinimized: false, lastActiveAt: 300)
+                ]
+            ),
+            AppSwitchCandidate(
+                id: "com.example.code",
+                displayName: "Code",
+                groupID: "dev",
+                lastActiveAt: 290,
+                windows: [
+                    WindowCandidate(id: "code-1", title: "FlowTab", isMinimized: false, lastActiveAt: 290)
+                ]
+            ),
+            AppSwitchCandidate(
+                id: "com.example.browser",
+                displayName: "Browser",
+                groupID: "web",
+                lastActiveAt: 280,
+                windows: [
+                    WindowCandidate(id: "browser-1", title: "Docs", isMinimized: false, lastActiveAt: 280)
+                ]
+            )
+        ]
+    }
+
+    private func makeRuntimeSnapshot(apps: [AppSwitchCandidate]) -> RuntimeSnapshot {
+        RuntimeSnapshot(apps: apps, contextsByID: [:])
     }
 
     private func makeBenchmarkApps(appCount: Int, windowsPerApp: Int) -> [AppSwitchCandidate] {
