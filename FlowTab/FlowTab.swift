@@ -186,7 +186,7 @@ enum AppVisibilityPreferencesStore {
 }
 
 enum WindowLayerPreferencesStore {
-    static let defaultAutoEnterDelay: Double = 0.35
+    static let defaultAutoEnterDelay: Double = 0.75
     static let minAutoEnterDelay: Double = 0.0
     static let maxAutoEnterDelay: Double = 999.99
 
@@ -2393,7 +2393,7 @@ private final class FlowSoftTextField: NSView {
         textField.isBordered = false
         textField.drawsBackground = false
         textField.focusRingType = .none
-        textField.placeholderString = "0.35"
+        textField.placeholderString = "0.75"
         textField.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
         textField.alignment = .center
         textField.setContentHuggingPriority(.required, for: .vertical)
