@@ -1,5 +1,6 @@
 import AppKit
 import Carbon
+import CoreGraphics
 import XCTest
 @testable import FlowTab
 import FlowTabCore
@@ -653,6 +654,434 @@ final class FlowTabPriorityCoverageTests: XCTestCase {
         XCTAssertTrue(focusedWindowCalls.isEmpty)
     }
 
+    @MainActor
+    func testLiveSwitcherModelHandleApplicationTerminatedRefreshesSessionAndKeepsPreferredNextSelection() async {
+        let model = LiveSwitcherModel()
+        let initialApps = terminateScenarioApps()
+        let refreshedApps = initialApps.filter { $0.id != "com.example.code" }
+        var snapshots = [
+            RuntimeSnapshot(apps: initialApps, contextsByID: [:]),
+            RuntimeSnapshot(apps: refreshedApps, contextsByID: [:])
+        ]
+        var snapshotReadCount = 0
+        model.snapshotProviderOverride = {
+            snapshotReadCount += 1
+            return snapshots.removeFirst()
+        }
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        XCTAssertEqual(model.selectedApp?.id, "com.example.code")
+
+        let layoutRefreshed = expectation(description: "layout refreshed after app termination")
+        model.onSessionLayoutChanged = { layoutRefreshed.fulfill() }
+
+        model.handleApplicationTerminated(appID: "com.example.code", pid: 42_300)
+
+        await fulfillment(of: [layoutRefreshed], timeout: 1.0)
+        XCTAssertEqual(snapshotReadCount, 2)
+        XCTAssertEqual(model.appCount, 2)
+        XCTAssertEqual(model.selectedApp?.id, "com.example.browser")
+    }
+
+    @MainActor
+    func testLiveSwitcherModelHandleApplicationTerminatedIgnoresUntrackedApp() {
+        let model = LiveSwitcherModel()
+        let initialApps = terminateScenarioApps()
+        var snapshotReadCount = 0
+        model.snapshotProviderOverride = {
+            snapshotReadCount += 1
+            return RuntimeSnapshot(apps: initialApps, contextsByID: [:])
+        }
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        let selectedAppID = model.selectedApp?.id
+
+        model.handleApplicationTerminated(appID: "com.example.unrelated", pid: 99_999)
+
+        XCTAssertEqual(snapshotReadCount, 1)
+        XCTAssertEqual(model.appCount, initialApps.count)
+        XCTAssertEqual(model.selectedApp?.id, selectedAppID)
+    }
+
+    func testOptionTabHotkeyMonitorSkipsHotkeyRegistrationWhenHandlerInstallFails() {
+        var registerCalls: [UInt32] = []
+        let monitor = OptionTabHotkeyMonitor(
+            signature: 0x54455354,
+            forwardHotkeyID: 11,
+            backwardHotkeyID: 22,
+            startsMonitoring: true,
+            handlerInstallerOverride: { false },
+            hotkeyRegistrarOverride: { id, _, _ in
+                registerCalls.append(id)
+                return true
+            }
+        )
+
+        XCTAssertFalse(monitor.isEventHandlerInstalledForTesting)
+        XCTAssertTrue(registerCalls.isEmpty)
+    }
+
+    func testOptionTabHotkeyMonitorStopUnregistersOnlySuccessfullyRegisteredHotkeys() {
+        var registerCalls: [UInt32] = []
+        var unregisterCalls: [UInt32] = []
+        var removeHandlerCallCount = 0
+        let monitor = OptionTabHotkeyMonitor(
+            signature: 0x54455354,
+            forwardHotkeyID: 11,
+            backwardHotkeyID: 22,
+            startsMonitoring: true,
+            handlerInstallerOverride: { true },
+            hotkeyRegistrarOverride: { id, _, _ in
+                registerCalls.append(id)
+                return id == 11
+            },
+            hotkeyUnregisterOverride: { unregisterCalls.append($0) },
+            eventHandlerRemoverOverride: { removeHandlerCallCount += 1 }
+        )
+
+        XCTAssertTrue(monitor.isEventHandlerInstalledForTesting)
+        XCTAssertEqual(registerCalls, [11, 22])
+
+        monitor.stop()
+
+        XCTAssertEqual(unregisterCalls, [11])
+        XCTAssertEqual(removeHandlerCallCount, 1)
+        XCTAssertFalse(monitor.isEventHandlerInstalledForTesting)
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerGlobalHotkeyAdvanceAndReleaseCommitSession() async {
+        let controller = SwitcherPanelController()
+        controller.modelForTesting.snapshotProviderOverride = {
+            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
+        }
+
+        var activatedTarget: ActivationTarget?
+        controller.modelForTesting.activationOverride = { target, _ in
+            activatedTarget = target
+        }
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        controller.globalPrimaryModifierPressedOverride = true
+        let initialSelectedAppID = controller.modelForTesting.selectedApp?.id
+
+        controller.handleGlobalHotkey(isBackward: false)
+
+        XCTAssertNotEqual(controller.modelForTesting.selectedApp?.id, initialSelectedAppID)
+
+        controller.globalPrimaryModifierPressedOverride = false
+        controller.handleGlobalHotkeyReleased()
+
+        try? await Task.sleep(nanoseconds: 120_000_000)
+        XCTAssertNil(controller.modelForTesting.session)
+        XCTAssertNotNil(activatedTarget)
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerFlagsChangedReleaseConfirmationEndsSession() async {
+        let controller = SwitcherPanelController()
+        controller.modelForTesting.snapshotProviderOverride = {
+            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
+        }
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        controller.globalPrimaryModifierPressedOverride = false
+
+        controller.handleFlagsChangedForTesting(
+            Self.makeFlagsChangedEvent(keyCode: UInt16(kVK_Option))
+        )
+
+        try? await Task.sleep(nanoseconds: 120_000_000)
+        XCTAssertNil(controller.modelForTesting.session)
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerMouseDownOutsideSearchCancelsSession() async {
+        await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
+            let controller = SwitcherPanelController()
+            controller.modelForTesting.snapshotProviderOverride = {
+                RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
+            }
+
+            XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+            XCTAssertTrue(controller.modelForTesting.enterSearchMode())
+            controller.panelContainsPointOverride = { _ in false }
+
+            controller.handleGlobalMouseDownForTesting(location: .zero)
+
+            XCTAssertNil(controller.modelForTesting.session)
+        }
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerSystemInterruptionsCancelSessionAndSuppressReplayUntilRelease() async {
+        let controller = SwitcherPanelController()
+        controller.modelForTesting.snapshotProviderOverride = {
+            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
+        }
+        controller.globalPrimaryModifierPressedOverride = false
+        controller.globalMainKeyPressedOverride = false
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        controller.handleActiveSpaceDidChangeForTesting()
+
+        XCTAssertNil(controller.modelForTesting.session)
+        XCTAssertTrue(controller.suppressHotkeyReplayUntilReleaseForTesting)
+
+        try? await Task.sleep(nanoseconds: 80_000_000)
+        XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        controller.panelOcclusionStateOverride = []
+        controller.handlePanelOcclusionStateDidChangeForTesting()
+
+        XCTAssertNil(controller.modelForTesting.session)
+        XCTAssertTrue(controller.suppressHotkeyReplayUntilReleaseForTesting)
+
+        try? await Task.sleep(nanoseconds: 80_000_000)
+        XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        controller.appIsActiveOverride = false
+        controller.handlePanelDidResignKeyForTesting()
+
+        XCTAssertNil(controller.modelForTesting.session)
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerDelayedAutoEnterWindowLayerTriggersAfterConfiguredDelay() async {
+        let controller = SwitcherPanelController()
+        controller.modelForTesting.snapshotProviderOverride = {
+            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
+        }
+        controller.windowLayerPresentationDelayOverride = 0.01
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        XCTAssertEqual(controller.modelForTesting.session?.mode, .appCycle)
+
+        controller.scheduleDelayedWindowLayerEntryForTesting()
+
+        try? await Task.sleep(nanoseconds: 80_000_000)
+        XCTAssertEqual(
+            controller.modelForTesting.session?.mode,
+            .windowCycle(appID: controller.modelForTesting.selectedApp?.id ?? "")
+        )
+        controller.cancelSelectionForTesting()
+    }
+
+    func testRuntimeSnapshotProviderAssemblySelectsPrimaryRowsAndFiltersMinimizedOnlyApps() {
+        let rows = RuntimeSnapshotProvider.assembleSnapshotRowsForTesting(
+            apps: [
+                RuntimeSnapshotProvider.SnapshotAssemblyApp(
+                    pid: 10,
+                    bundleIdentifier: "com.example.mail",
+                    localizedName: "Mail",
+                    launchDate: Date(timeIntervalSince1970: 100)
+                ),
+                RuntimeSnapshotProvider.SnapshotAssemblyApp(
+                    pid: 11,
+                    bundleIdentifier: "com.example.mail",
+                    localizedName: "Mail",
+                    launchDate: Date(timeIntervalSince1970: 200)
+                ),
+                RuntimeSnapshotProvider.SnapshotAssemblyApp(
+                    pid: 20,
+                    bundleIdentifier: "com.example.chat",
+                    localizedName: "Chat",
+                    launchDate: Date(timeIntervalSince1970: 150)
+                ),
+                RuntimeSnapshotProvider.SnapshotAssemblyApp(
+                    pid: 30,
+                    bundleIdentifier: "com.example.notes",
+                    localizedName: "Notes",
+                    launchDate: Date(timeIntervalSince1970: 50)
+                )
+            ],
+            windowsByPID: [
+                10: [
+                    RuntimeSnapshotProvider.SnapshotAssemblyWindow(
+                        windowID: "mail-legacy",
+                        title: "Inbox",
+                        isMinimized: false,
+                        cgWindowID: 10
+                    )
+                ],
+                11: [
+                    RuntimeSnapshotProvider.SnapshotAssemblyWindow(
+                        windowID: "mail-1",
+                        title: "Inbox",
+                        isMinimized: false,
+                        cgWindowID: 11
+                    ),
+                    RuntimeSnapshotProvider.SnapshotAssemblyWindow(
+                        windowID: "mail-2",
+                        title: "Draft",
+                        isMinimized: false,
+                        cgWindowID: 12
+                    )
+                ],
+                20: [
+                    RuntimeSnapshotProvider.SnapshotAssemblyWindow(
+                        windowID: "chat-1",
+                        title: "Standup",
+                        isMinimized: true,
+                        cgWindowID: 20
+                    )
+                ]
+            ],
+            rankByPID: [11: 0, 20: 1, 10: 2, 30: 3],
+            hideMinimizedAppsFromAppLayer: true,
+            now: 1_000
+        )
+
+        XCTAssertEqual(rows.map(\.pid), [11, 30])
+        XCTAssertEqual(rows.first?.candidate.id, "com.example.mail")
+        XCTAssertEqual(rows.first?.candidate.windows.map(\.id), ["mail-1", "mail-2"])
+        XCTAssertEqual(rows.last?.candidate.id, "com.example.notes")
+        XCTAssertTrue(rows.allSatisfy { $0.candidate.id != "com.example.chat" })
+    }
+
+    func testRuntimeWindowPreviewProviderGuessesDarkLightAndUnknownTitleBars() {
+        let darkImage = makeSolidPreviewCGImage(color: .black)
+        let lightImage = makeSolidPreviewCGImage(color: .white)
+        let noisyImage = makeStripedPreviewCGImage()
+
+        XCTAssertEqual(
+            RuntimeWindowPreviewProvider.guessTitleBarStyleForTesting(from: darkImage),
+            .dark
+        )
+        XCTAssertEqual(
+            RuntimeWindowPreviewProvider.guessTitleBarStyleForTesting(from: lightImage),
+            .light
+        )
+        XCTAssertNil(RuntimeWindowPreviewProvider.guessTitleBarStyleForTesting(from: noisyImage))
+    }
+
+    @MainActor
+    func testLiveSwitcherModelWindowPreviewUsesCaptureCacheAcrossReads() {
+        let model = LiveSwitcherModel()
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let windows = [
+            WindowCandidate(id: "front-1", title: "Inbox", isMinimized: false, lastActiveAt: 30),
+            WindowCandidate(id: "front-2", title: "Draft", isMinimized: false, lastActiveAt: 20)
+        ]
+        let context = makeRuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windows: windows
+        )
+
+        model.frontmostApplicationOverride = { currentApp }
+        model.snapshotProviderOverride = {
+            RuntimeSnapshot(
+                apps: [
+                    AppSwitchCandidate(
+                        id: appID,
+                        displayName: currentApp.localizedName ?? "Current App",
+                        groupID: "current",
+                        lastActiveAt: 100,
+                        windows: windows
+                    )
+                ],
+                contextsByID: [appID: context]
+            )
+        }
+
+        var captureCallCount = 0
+        model.previewCaptureOverride = { _, _, title, _ in
+            captureCallCount += 1
+            let imageColor: NSColor = title == "Inbox" ? .black : .white
+            let titleBarStyle: WindowTitleBarStyleGuess = title == "Inbox" ? .dark : .light
+            return (
+                image: self.makeColorImage(color: imageColor),
+                resolvedWindowID: CGWindowID(captureCallCount),
+                titleBarStyle: titleBarStyle
+            )
+        }
+
+        XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
+
+        let firstSnapshot = model.windowPreviewSnapshotForTesting()
+        let secondSnapshot = model.windowPreviewSnapshotForTesting()
+
+        XCTAssertEqual(captureCallCount, 2)
+        XCTAssertEqual(firstSnapshot.count, 2)
+        XCTAssertTrue(firstSnapshot.allSatisfy { $0.hasImage })
+        XCTAssertEqual(
+            firstSnapshot.first(where: { $0.id == "front-1" })?.titleBarStyle,
+            .dark
+        )
+        XCTAssertEqual(
+            secondSnapshot.first(where: { $0.id == "front-2" })?.titleBarStyle,
+            .light
+        )
+    }
+
+    func testBoundedImageCacheStoresAndClearsImages() {
+        let cache = BoundedImageCache(countLimit: 4, totalCostLimit: 1_024 * 1_024)
+        let image = makeColorImage(color: .systemBlue)
+
+        cache.insert(image, forKey: "mail")
+
+        XCTAssertNotNil(cache.image(forKey: "mail"))
+
+        cache.removeAll()
+
+        XCTAssertNil(cache.image(forKey: "mail"))
+    }
+
+    func testAppIconProviderCachesResolvedIconsAndMemoizesMissingApps() {
+        let cache = BoundedImageCache(countLimit: 8, totalCostLimit: 1_024 * 1_024)
+        var requestedAppIDs: [String] = []
+        var requestedIconPaths: [String] = []
+        let provider = AppIconProvider(
+            cache: cache,
+            applicationURLProvider: { appID in
+                requestedAppIDs.append(appID)
+                if appID == "com.example.present" {
+                    return URL(fileURLWithPath: "/Applications/Present.app")
+                }
+                return nil
+            },
+            fileIconProvider: { path in
+                requestedIconPaths.append(path)
+                return self.makeColorImage(color: .systemGreen)
+            }
+        )
+
+        let presentApp = AppSwitchCandidate(
+            id: "com.example.present",
+            displayName: "Present",
+            groupID: "present",
+            lastActiveAt: 10,
+            windows: []
+        )
+        let missingApp = AppSwitchCandidate(
+            id: "com.example.missing",
+            displayName: "Missing",
+            groupID: "missing",
+            lastActiveAt: 5,
+            windows: []
+        )
+
+        let firstIcon = provider.icon(for: presentApp, context: nil)
+        let secondIcon = provider.icon(for: presentApp, context: nil)
+
+        XCTAssertNotNil(firstIcon)
+        if let firstIcon, let secondIcon {
+            XCTAssertTrue(firstIcon === secondIcon)
+        } else {
+            XCTFail("Expected cached icon for present app")
+        }
+        XCTAssertEqual(requestedAppIDs.filter { $0 == "com.example.present" }.count, 1)
+        XCTAssertEqual(requestedIconPaths, ["/Applications/Present.app"])
+
+        XCTAssertNil(provider.icon(for: missingApp, context: nil))
+        XCTAssertNil(provider.icon(for: missingApp, context: nil))
+        XCTAssertEqual(requestedAppIDs.filter { $0 == "com.example.missing" }.count, 1)
+    }
+
     private func commitScenarioApps() -> [AppSwitchCandidate] {
         [
             AppSwitchCandidate(
@@ -851,5 +1280,89 @@ final class FlowTabPriorityCoverageTests: XCTestCase {
             fatalError("Failed to create key event for tests")
         }
         return event
+    }
+
+    private static func makeFlagsChangedEvent(
+        keyCode: UInt16,
+        modifierFlags: NSEvent.ModifierFlags = []
+    ) -> NSEvent {
+        guard let event = NSEvent.keyEvent(
+            with: .flagsChanged,
+            location: .zero,
+            modifierFlags: modifierFlags,
+            timestamp: ProcessInfo.processInfo.systemUptime,
+            windowNumber: 0,
+            context: nil,
+            characters: "",
+            charactersIgnoringModifiers: "",
+            isARepeat: false,
+            keyCode: keyCode
+        ) else {
+            fatalError("Failed to create flagsChanged event for tests")
+        }
+        return event
+    }
+
+    private func makeColorImage(
+        color: NSColor,
+        size: NSSize = NSSize(width: 48, height: 48)
+    ) -> NSImage {
+        let cgImage = makeSolidPreviewCGImage(
+            color: color,
+            size: CGSize(width: size.width, height: size.height)
+        )
+        return NSImage(cgImage: cgImage, size: size)
+    }
+
+    private func makeSolidPreviewCGImage(
+        color: NSColor,
+        size: CGSize = CGSize(width: 180, height: 120)
+    ) -> CGImage {
+        makePreviewCGImage(size: size) { context in
+            context.setFillColor(color.cgColor)
+            context.fill(CGRect(origin: .zero, size: size))
+        }
+    }
+
+    private func makeStripedPreviewCGImage(
+        size: CGSize = CGSize(width: 180, height: 120)
+    ) -> CGImage {
+        makePreviewCGImage(size: size) { context in
+            let stripeWidth: CGFloat = 10
+            var x: CGFloat = 0
+            var useRed = true
+            while x < size.width {
+                context.setFillColor((useRed ? NSColor.systemRed : NSColor.systemBlue).cgColor)
+                context.fill(CGRect(x: x, y: 0, width: stripeWidth, height: size.height))
+                useRed.toggle()
+                x += stripeWidth
+            }
+        }
+    }
+
+    private func makePreviewCGImage(
+        size: CGSize,
+        draw: (CGContext) -> Void
+    ) -> CGImage {
+        guard
+            let context = CGContext(
+                data: nil,
+                width: Int(size.width),
+                height: Int(size.height),
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            )
+        else {
+            fatalError("Failed to create bitmap context for preview tests")
+        }
+
+        draw(context)
+
+        guard let image = context.makeImage() else {
+            fatalError("Failed to create CGImage for preview tests")
+        }
+        return image
     }
 }

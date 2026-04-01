@@ -399,25 +399,40 @@ final class OptionTabHotkeyMonitor {
 
     private var eventHandlerRef: EventHandlerRef?
     private var hotkeyRefs: [UInt32: EventHotKeyRef] = [:]
+    private var registeredHotkeyIDs: Set<UInt32> = []
 
     private let signature: OSType
     private let forwardHotkeyID: UInt32
     private let backwardHotkeyID: UInt32
     private let hotkeyConfiguration: SwitcherHotkeyConfiguration
+    private let handlerInstallerOverride: (() -> Bool)?
+    private let hotkeyRegistrarOverride: ((UInt32, UInt32, UInt32) -> Bool)?
+    private let hotkeyUnregisterOverride: ((UInt32) -> Void)?
+    private let eventHandlerRemoverOverride: (() -> Void)?
+
+    private(set) var isEventHandlerInstalledForTesting = false
 
     init(
         configuration: SwitcherHotkeyConfiguration = SwitcherHotkeyPreferencesStore.load(),
         signature: OSType = 0x46544142, // "FTAB"
         forwardHotkeyID: UInt32 = 1,
         backwardHotkeyID: UInt32 = 2,
-        startsMonitoring: Bool = true
+        startsMonitoring: Bool = true,
+        handlerInstallerOverride: (() -> Bool)? = nil,
+        hotkeyRegistrarOverride: ((UInt32, UInt32, UInt32) -> Bool)? = nil,
+        hotkeyUnregisterOverride: ((UInt32) -> Void)? = nil,
+        eventHandlerRemoverOverride: (() -> Void)? = nil
     ) {
         self.hotkeyConfiguration = configuration
         self.signature = signature
         self.forwardHotkeyID = forwardHotkeyID
         self.backwardHotkeyID = backwardHotkeyID
+        self.handlerInstallerOverride = handlerInstallerOverride
+        self.hotkeyRegistrarOverride = hotkeyRegistrarOverride
+        self.hotkeyUnregisterOverride = hotkeyUnregisterOverride
+        self.eventHandlerRemoverOverride = eventHandlerRemoverOverride
         guard startsMonitoring else { return }
-        installHandler()
+        guard installHandler() else { return }
         registerHotkeys()
     }
 
@@ -426,18 +441,39 @@ final class OptionTabHotkeyMonitor {
     }
 
     func stop() {
-        for hotkeyRef in hotkeyRefs.values {
-            UnregisterEventHotKey(hotkeyRef)
+        if let hotkeyUnregisterOverride {
+            for id in registeredHotkeyIDs.sorted() {
+                hotkeyUnregisterOverride(id)
+            }
+        } else {
+            for hotkeyRef in hotkeyRefs.values {
+                UnregisterEventHotKey(hotkeyRef)
+            }
         }
         hotkeyRefs.removeAll()
+        registeredHotkeyIDs.removeAll()
 
         if let eventHandlerRef {
-            RemoveEventHandler(eventHandlerRef)
+            if let eventHandlerRemoverOverride {
+                eventHandlerRemoverOverride()
+            } else {
+                RemoveEventHandler(eventHandlerRef)
+            }
             self.eventHandlerRef = nil
+        } else if isEventHandlerInstalledForTesting, let eventHandlerRemoverOverride {
+            eventHandlerRemoverOverride()
         }
+        isEventHandlerInstalledForTesting = false
     }
 
-    private func installHandler() {
+    @discardableResult
+    private func installHandler() -> Bool {
+        if let handlerInstallerOverride {
+            let installed = handlerInstallerOverride()
+            isEventHandlerInstalledForTesting = installed
+            return installed
+        }
+
         var eventTypes: [EventTypeSpec] = [
             EventTypeSpec(
                 eventClass: OSType(kEventClassKeyboard),
@@ -467,7 +503,11 @@ final class OptionTabHotkeyMonitor {
 
         if status != noErr {
             eventHandlerRef = nil
+            isEventHandlerInstalledForTesting = false
+            return false
         }
+        isEventHandlerInstalledForTesting = true
+        return true
     }
 
     private func registerHotkeys() {
@@ -484,6 +524,22 @@ final class OptionTabHotkeyMonitor {
     }
 
     private func registerHotkey(id: UInt32, keyCode: UInt32, modifiers: UInt32) {
+        if let hotkeyRegistrarOverride {
+            if hotkeyRegistrarOverride(id, keyCode, modifiers) {
+                registeredHotkeyIDs.insert(id)
+                RuntimeLog.info(
+                    "HotKey",
+                    "register ok signature=\(self.signature) id=\(id) keyCode=\(keyCode) modifiers=\(modifiers)"
+                )
+            } else {
+                RuntimeLog.info(
+                    "HotKey",
+                    "register failed signature=\(self.signature) id=\(id) keyCode=\(keyCode) modifiers=\(modifiers) status=test_override"
+                )
+            }
+            return
+        }
+
         let hotkeyID = EventHotKeyID(signature: signature, id: id)
         var hotkeyRef: EventHotKeyRef?
 
@@ -498,6 +554,7 @@ final class OptionTabHotkeyMonitor {
 
         if status == noErr, let hotkeyRef {
             hotkeyRefs[id] = hotkeyRef
+            registeredHotkeyIDs.insert(id)
             RuntimeLog.info(
                 "HotKey",
                 "register ok signature=\(self.signature) id=\(id) keyCode=\(keyCode) modifiers=\(modifiers)"

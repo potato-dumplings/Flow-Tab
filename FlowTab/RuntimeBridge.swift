@@ -247,6 +247,25 @@ final class RuntimeSnapshotProvider {
         let hasVisibleWindow: Bool
     }
 
+    struct SnapshotAssemblyApp {
+        let pid: pid_t
+        let bundleIdentifier: String?
+        let localizedName: String?
+        let launchDate: Date?
+    }
+
+    struct SnapshotAssemblyWindow {
+        let windowID: String
+        let title: String
+        let isMinimized: Bool
+        let cgWindowID: CGWindowID?
+    }
+
+    struct SnapshotAssemblyRow {
+        let pid: pid_t
+        let candidate: AppSwitchCandidate
+    }
+
     func snapshot() -> RuntimeSnapshot {
         let runningApps = filteredRunningApplications()
 
@@ -354,6 +373,78 @@ final class RuntimeSnapshotProvider {
             apps: rows.map(\.candidate),
             contextsByID: contextsByID
         )
+    }
+
+    static func assembleSnapshotRowsForTesting(
+        apps: [SnapshotAssemblyApp],
+        windowsByPID: [pid_t: [SnapshotAssemblyWindow]],
+        rankByPID: [pid_t: Int],
+        hideMinimizedAppsFromAppLayer: Bool,
+        now: TimeInterval
+    ) -> [SnapshotAssemblyRow] {
+        func baseAppID(for app: SnapshotAssemblyApp) -> String {
+            app.bundleIdentifier ?? "pid:\(app.pid)"
+        }
+
+        func score(for app: SnapshotAssemblyApp) -> Int {
+            let windows = windowsByPID[app.pid] ?? []
+            let hasWindowsScore = windows.isEmpty ? 0 : 1_000_000
+            let windowCountScore = min(windows.count, 9_999) * 100
+            let rankScore = 10_000 - min(rankByPID[app.pid] ?? 10_000, 10_000)
+            let launchScore = Int(app.launchDate?.timeIntervalSince1970 ?? 0) % 10_000
+            return hasWindowsScore + windowCountScore + rankScore + launchScore
+        }
+
+        let groupedApps = Dictionary(grouping: apps, by: baseAppID(for:))
+        let selectedApps = groupedApps.values.compactMap { group -> SnapshotAssemblyApp? in
+            group.max { lhs, rhs in
+                score(for: lhs) < score(for: rhs)
+            }
+        }
+
+        let filteredApps = selectedApps.filter { app in
+            let windows = windowsByPID[app.pid] ?? []
+            return shouldIncludeAppInAppLayer(
+                hasWindows: !windows.isEmpty,
+                hasVisibleWindow: windows.contains(where: { !$0.isMinimized }),
+                hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
+            )
+        }
+
+        var rows: [SnapshotAssemblyRow] = []
+        rows.reserveCapacity(filteredApps.count)
+
+        for (index, app) in filteredApps.enumerated() {
+            let appID = baseAppID(for: app)
+            let displayName = app.localizedName ?? appID
+            let windows = windowsByPID[app.pid] ?? []
+            let rank = rankByPID[app.pid] ?? (10_000 + index)
+            let candidate = AppSwitchCandidate(
+                id: appID,
+                displayName: displayName,
+                groupID: groupID(for: app.bundleIdentifier, fallbackName: displayName),
+                lastActiveAt: now - Double(rank),
+                windows: windows.enumerated().map { entryIndex, entry in
+                    WindowCandidate(
+                        id: entry.windowID,
+                        title: entry.title,
+                        isMinimized: entry.isMinimized,
+                        lastActiveAt: now - Double(entryIndex)
+                    )
+                }
+            )
+            rows.append(SnapshotAssemblyRow(pid: app.pid, candidate: candidate))
+        }
+
+        rows.sort { lhs, rhs in
+            if lhs.candidate.lastActiveAt == rhs.candidate.lastActiveAt {
+                return lhs.candidate.displayName.localizedCaseInsensitiveCompare(
+                    rhs.candidate.displayName
+                ) == .orderedAscending
+            }
+            return lhs.candidate.lastActiveAt > rhs.candidate.lastActiveAt
+        }
+        return rows
     }
 
     func homeAppSummaries() -> [RuntimeHomeAppSummary] {
@@ -1528,6 +1619,10 @@ enum RuntimeWindowPreviewProvider {
             sampleCount: sampleCount
         )
     }
+
+    static func guessTitleBarStyleForTesting(from image: CGImage) -> WindowTitleBarStyleGuess? {
+        estimateTitleBarStyle(from: image)
+    }
 }
 
 enum ScreenCapturePermissionChecker {
@@ -1584,11 +1679,25 @@ private extension NSImage {
 }
 
 final class AppIconProvider {
-    private let cache = BoundedImageCache(
-        countLimit: 256,
-        totalCostLimit: 64 * 1_024 * 1_024
-    )
+    private let cache: BoundedImageCache
+    private let applicationURLProvider: (String) -> URL?
+    private let fileIconProvider: (String) -> NSImage
     private var missingAppIDs: Set<String> = []
+
+    init(
+        cache: BoundedImageCache = BoundedImageCache(
+            countLimit: 256,
+            totalCostLimit: 64 * 1_024 * 1_024
+        ),
+        applicationURLProvider: ((String) -> URL?)? = nil,
+        fileIconProvider: ((String) -> NSImage)? = nil
+    ) {
+        self.cache = cache
+        self.applicationURLProvider = applicationURLProvider
+            ?? { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) }
+        self.fileIconProvider = fileIconProvider
+            ?? { NSWorkspace.shared.icon(forFile: $0) }
+    }
 
     func icon(for app: AppSwitchCandidate, context: RuntimeAppContext?) -> NSImage? {
         if let cached = cache.image(forKey: app.id) {
@@ -1603,12 +1712,12 @@ final class AppIconProvider {
             return runtimeIcon
         }
 
-        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: app.id) else {
+        guard let url = applicationURLProvider(app.id) else {
             missingAppIDs.insert(app.id)
             return nil
         }
 
-        let icon = NSWorkspace.shared.icon(forFile: url.path)
+        let icon = fileIconProvider(url.path)
         cache.insert(icon, forKey: app.id)
         return icon
     }

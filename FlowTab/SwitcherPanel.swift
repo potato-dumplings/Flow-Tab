@@ -188,7 +188,7 @@ final class SwitcherPanelController {
     private var lastCommittedTabAdvanceTimestamp: TimeInterval?
     private var ignoreHotkeyPressesUntil: TimeInterval = 0
     private var windowLayerPresentationDelay: TimeInterval {
-        WindowLayerPreferencesStore.loadAutoEnterDelay()
+        windowLayerPresentationDelayOverride ?? WindowLayerPreferencesStore.loadAutoEnterDelay()
     }
     private let modifierReleaseConfirmationSampleIntervalNs: UInt64 = 25_000_000
     private let modifierReleaseConfirmationSampleCount: Int = 2
@@ -223,8 +223,30 @@ final class SwitcherPanelController {
     private var activePresentationScreen: NSScreen?
     private var terminateSelectedAppTask: Task<Void, Never>?
 
+    var panelVisibilityOverride: Bool?
+    var panelOcclusionStateOverride: NSWindow.OcclusionState?
+    var appIsActiveOverride: Bool?
+    var globalPrimaryModifierPressedOverride: Bool?
+    var inAppPrimaryModifierPressedOverride: Bool?
+    var globalMainKeyPressedOverride: Bool?
+    var inAppMainKeyPressedOverride: Bool?
+    var panelContainsPointOverride: ((NSPoint) -> Bool)?
+    var windowLayerPresentationDelayOverride: TimeInterval?
+
     private var searchFeatureEnabled: Bool {
         SearchInteractionPreferencesStore.loadIsEnabled()
+    }
+
+    private var isPanelPresented: Bool {
+        panelVisibilityOverride ?? panel.isVisible
+    }
+
+    private var resolvedPanelOcclusionState: NSWindow.OcclusionState {
+        panelOcclusionStateOverride ?? panel.occlusionState
+    }
+
+    private var isAppCurrentlyActive: Bool {
+        appIsActiveOverride ?? NSApp.isActive
     }
 
     init() {
@@ -249,12 +271,12 @@ final class SwitcherPanelController {
         panel.contentView = hostingView
         model.onSearchStateChanged = { [weak self] in
             guard let self else { return }
-            guard self.panel.isVisible else { return }
+            guard self.isPanelPresented else { return }
             self.updatePanelSize()
         }
         model.onSessionLayoutChanged = { [weak self] in
             guard let self else { return }
-            guard self.panel.isVisible else { return }
+            guard self.isPanelPresented else { return }
             guard self.model.session != nil else {
                 self.endPresentationSession()
                 return
@@ -318,6 +340,53 @@ final class SwitcherPanelController {
         handleKeyDown(event)
     }
 
+    @discardableResult
+    func beginGlobalHotkeySessionForTesting(
+        triggerDirection: CycleDirection = .forward
+    ) -> Bool {
+        guard model.startSession(triggerDirection: triggerDirection) else { return false }
+        activeHotkeySessionKind = .globalAppSwitcher
+        lastCommittedTabAdvanceTimestamp = nil
+        panelVisibilityOverride = true
+        return true
+    }
+
+    func cancelSelectionForTesting() {
+        cancelSelection()
+    }
+
+    func handleFlagsChangedForTesting(_ event: NSEvent) {
+        handleFlagsChanged(event)
+    }
+
+    func handleGlobalMouseDownForTesting(location: NSPoint) {
+        handleGlobalMouseDown(at: location)
+    }
+
+    func handleApplicationDidResignActiveForTesting() {
+        handleApplicationDidResignActive()
+    }
+
+    func handleActiveSpaceDidChangeForTesting() {
+        handleActiveSpaceDidChange()
+    }
+
+    func handlePanelOcclusionStateDidChangeForTesting() {
+        handlePanelOcclusionStateDidChange()
+    }
+
+    func handlePanelDidResignKeyForTesting() {
+        handlePanelDidResignKey()
+    }
+
+    func scheduleDelayedWindowLayerEntryForTesting() {
+        scheduleDelayedWindowLayerEntryIfNeeded()
+    }
+
+    var suppressHotkeyReplayUntilReleaseForTesting: Bool {
+        suppressHotkeyReplayUntilRelease
+    }
+
     deinit {
         suppressHotkeyReplayTask?.cancel()
         suppressHotkeyReplayTask = nil
@@ -359,8 +428,8 @@ final class SwitcherPanelController {
         Task { @MainActor [weak self] in
             try? await Task.sleep(nanoseconds: delayNanoseconds)
             guard let self else { return }
-            guard self.panel.isVisible else { return }
-            guard !self.panel.occlusionState.contains(.visible) else { return }
+            guard self.isPanelPresented else { return }
+            guard !self.resolvedPanelOcclusionState.contains(.visible) else { return }
             panel.orderOut(nil)
             panel.collectionBehavior = SwitcherPanelWindowConfiguration.presentationCollectionBehavior(
                 requiresActiveSpaceMove: true
@@ -388,7 +457,7 @@ final class SwitcherPanelController {
             )
             return
         }
-        if panel.isVisible {
+        if isPanelPresented {
             guard activeHotkeySessionKind == .globalAppSwitcher else { return }
             guard !model.isSearchActive else {
                 logInputTrace(
@@ -419,7 +488,7 @@ final class SwitcherPanelController {
     }
 
     func handleGlobalHotkeyReleased() {
-        guard panel.isVisible else { return }
+        guard isPanelPresented else { return }
         guard activeHotkeySessionKind == .globalAppSwitcher else { return }
         guard !model.isSearchActive else { return }
         // Carbon hotkey "released" also fires when the main key (for example Tab) is released
@@ -449,7 +518,7 @@ final class SwitcherPanelController {
             )
             return
         }
-        if panel.isVisible {
+        if isPanelPresented {
             guard activeHotkeySessionKind == .inAppWindowSwitcher else { return }
             guard isPrimaryModifierLikelyPressed() else {
                 logInputTrace(
@@ -472,7 +541,7 @@ final class SwitcherPanelController {
     }
 
     func handleInAppWindowHotkeyReleased() {
-        guard panel.isVisible else { return }
+        guard isPanelPresented else { return }
         guard activeHotkeySessionKind == .inAppWindowSwitcher else { return }
         guard !isPrimaryModifierPressedInHardwareState() else { return }
         let nowMs = monotonicMilliseconds()
@@ -599,7 +668,7 @@ final class SwitcherPanelController {
     }
 
     private func endPresentationSession() {
-        guard panel.isVisible else { return }
+        guard isPanelPresented else { return }
         removeEventMonitors()
         panel.orderOut(nil)
         panel.level = SwitcherPanelWindowConfiguration.level
@@ -607,10 +676,13 @@ final class SwitcherPanelController {
         activeHotkeySessionKind = nil
         activePresentationScreen = nil
         lastCommittedTabAdvanceTimestamp = nil
+        if panelVisibilityOverride != nil {
+            panelVisibilityOverride = false
+        }
     }
 
     private func finishSelection() {
-        guard panel.isVisible else { return }
+        guard isPanelPresented else { return }
         endPresentationSession()
         ignoreHotkeyPressesUntil = ProcessInfo.processInfo.systemUptime + postFinishHotkeyIgnoreWindow
         logInputTrace(
@@ -620,7 +692,7 @@ final class SwitcherPanelController {
     }
 
     private func cancelSelection() {
-        guard panel.isVisible else { return }
+        guard isPanelPresented else { return }
         endPresentationSession()
         ignoreHotkeyPressesUntil = ProcessInfo.processInfo.systemUptime + postFinishHotkeyIgnoreWindow
         logInputTrace(
@@ -998,7 +1070,7 @@ final class SwitcherPanelController {
     private func handleFlagsChanged(_ event: NSEvent) {
         let isPrimaryEvent = isPrimaryModifierFlagsEvent(event)
         guard isPrimaryEvent else { return }
-        guard panel.isVisible else { return }
+        guard isPanelPresented else { return }
         guard !model.isSearchActive else { return }
         logInputTrace(
             "flagsChanged keyCode=\(event.keyCode) action=scheduleReleaseConfirm nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
@@ -1007,9 +1079,14 @@ final class SwitcherPanelController {
     }
 
     private func handleGlobalMouseDown(_ event: NSEvent) {
-        guard panel.isVisible else { return }
+        handleGlobalMouseDown(at: event.locationInWindow)
+    }
+
+    private func handleGlobalMouseDown(at location: NSPoint) {
+        guard isPanelPresented else { return }
         guard model.isSearchActive else { return }
-        guard !panel.frame.contains(event.locationInWindow) else { return }
+        let isInsidePanel = panelContainsPointOverride?(location) ?? panel.frame.contains(location)
+        guard !isInsidePanel else { return }
         logInputTrace(
             "globalMouseDownOutsidePanel action=cancelSelection nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
         )
@@ -1017,8 +1094,8 @@ final class SwitcherPanelController {
     }
 
     private func handleGlobalKeyDown(_ event: NSEvent) {
-        guard panel.isVisible else { return }
-        guard !NSApp.isActive else { return }
+        guard isPanelPresented else { return }
+        guard !isAppCurrentlyActive else { return }
         guard event.keyCode == 53 else { return }
         logInputTrace(
             "globalEscWhileAppInactive action=cancelSelection nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
@@ -1027,34 +1104,34 @@ final class SwitcherPanelController {
     }
 
     private func handleApplicationDidResignActive() {
-        guard panel.isVisible else { return }
+        guard isPanelPresented else { return }
         cancelSelectionForSystemInterruption(trigger: "applicationDidResignActive")
     }
 
     private func handleActiveSpaceDidChange() {
-        guard panel.isVisible else { return }
+        guard isPanelPresented else { return }
         cancelSelectionForSystemInterruption(trigger: "activeSpaceDidChange")
     }
 
     private func handleWorkspaceApplicationDidTerminate(_ notification: Notification) {
-        guard panel.isVisible else { return }
+        guard isPanelPresented else { return }
         model.handleWorkspaceApplicationDidTerminate(notification)
     }
 
     private func handlePanelOcclusionStateDidChange() {
-        guard panel.isVisible else { return }
-        guard !panel.occlusionState.contains(.visible) else { return }
+        guard isPanelPresented else { return }
+        guard !resolvedPanelOcclusionState.contains(.visible) else { return }
         cancelSelectionForSystemInterruption(trigger: "panelOccluded")
     }
 
     private func handlePanelDidResignKey() {
-        guard panel.isVisible else { return }
-        guard !NSApp.isActive else { return }
+        guard isPanelPresented else { return }
+        guard !isAppCurrentlyActive else { return }
         cancelSelectionForSystemInterruption(trigger: "panelDidResignKey")
     }
 
     private func cancelSelectionForSystemInterruption(trigger: String) {
-        guard panel.isVisible else { return }
+        guard isPanelPresented else { return }
         let sessionKind = activeHotkeySessionKind
         logInputTrace(
             "\(trigger) action=cancelSelection nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
@@ -1112,7 +1189,7 @@ final class SwitcherPanelController {
             while true {
                 try? await Task.sleep(nanoseconds: self.modifierReleaseConfirmationSampleIntervalNs)
                 guard !Task.isCancelled else { return }
-                guard self.panel.isVisible else {
+                guard self.isPanelPresented else {
                     self.logInputTrace(
                         "releaseConfirm stop trigger=\(trigger) reason=panelHidden nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
                     )
@@ -1179,6 +1256,17 @@ final class SwitcherPanelController {
     }
 
     private func isPrimaryModifierPressedInHardwareState(for sessionKind: HotkeySessionKind) -> Bool {
+        switch sessionKind {
+        case .globalAppSwitcher:
+            if let globalPrimaryModifierPressedOverride {
+                return globalPrimaryModifierPressedOverride
+            }
+        case .inAppWindowSwitcher:
+            if let inAppPrimaryModifierPressedOverride {
+                return inAppPrimaryModifierPressedOverride
+            }
+        }
+
         switch primaryModifier(for: sessionKind) {
         case .option:
             return CGEventSource.keyState(.combinedSessionState, key: CGKeyCode(kVK_Option))
@@ -1193,6 +1281,17 @@ final class SwitcherPanelController {
     }
 
     private func isSessionMainKeyPressedInHardwareState(for sessionKind: HotkeySessionKind) -> Bool {
+        switch sessionKind {
+        case .globalAppSwitcher:
+            if let globalMainKeyPressedOverride {
+                return globalMainKeyPressedOverride
+            }
+        case .inAppWindowSwitcher:
+            if let inAppMainKeyPressedOverride {
+                return inAppMainKeyPressedOverride
+            }
+        }
+
         let keyCode: CGKeyCode
         switch sessionKind {
         case .globalAppSwitcher:
@@ -1223,7 +1322,7 @@ final class SwitcherPanelController {
             return
         }
 
-        guard panel.isVisible else {
+        guard isPanelPresented else {
             RuntimeLog.info("AutoEnter", "skip panelHidden")
             return
         }
@@ -1236,7 +1335,7 @@ final class SwitcherPanelController {
         let timer = Timer(timeInterval: windowLayerPresentationDelay, repeats: false) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                guard self.panel.isVisible else { return }
+                guard self.isPanelPresented else { return }
                 if self.model.autoEnterWindowLayerIfPossible() {
                     RuntimeLog.info("AutoEnter", "entered window layer \(self.model.debugSelectionSummary())")
                     self.updatePanelSize()
@@ -1369,6 +1468,12 @@ final class LiveSwitcherModel: ObservableObject {
     var activationOverride: ((ActivationTarget, [String: RuntimeAppContext]) -> Void)?
     var terminateRequestOverride: ((String) -> (sent: Bool, pid: pid_t))?
     var isProcessRunningOverride: ((pid_t) -> Bool)?
+    var previewCaptureOverride: ((
+        CGWindowID?,
+        pid_t,
+        String?,
+        Bool
+    ) -> (image: NSImage, resolvedWindowID: CGWindowID, titleBarStyle: WindowTitleBarStyleGuess?)?)?
     var terminateRefreshPollIntervalNs: UInt64 = 60_000_000
     var terminateRefreshTimeoutNs: UInt64 = 1_800_000_000
 
@@ -1481,12 +1586,22 @@ final class LiveSwitcherModel: ObservableObject {
             "attempt appID=\(appID) pid=\(appContext.runningApp.processIdentifier) windowID=\(window.id) mappedCG=\(windowContext.cgWindowID.map(String.init) ?? "nil") title=\(windowContext.title)"
         )
         guard
-            let capture = RuntimeWindowPreviewProvider.captureWindowPreview(
-                preferredWindowID: windowContext.cgWindowID,
-                ownerPID: appContext.runningApp.processIdentifier,
-                preferredTitle: windowContext.title,
-                inferTitleBarStyle: titleBarStyleInferenceEnabled
-            )
+            let capture = {
+                if let previewCaptureOverride {
+                    return previewCaptureOverride(
+                        windowContext.cgWindowID,
+                        appContext.runningApp.processIdentifier,
+                        windowContext.title,
+                        titleBarStyleInferenceEnabled
+                    )
+                }
+                return RuntimeWindowPreviewProvider.captureWindowPreview(
+                    preferredWindowID: windowContext.cgWindowID,
+                    ownerPID: appContext.runningApp.processIdentifier,
+                    preferredTitle: windowContext.title,
+                    inferTitleBarStyle: titleBarStyleInferenceEnabled
+                )
+            }()
         else {
             RuntimeLog.info("Preview", "attempt failed appID=\(appID) windowID=\(window.id)")
             return (
@@ -1534,6 +1649,24 @@ final class LiveSwitcherModel: ObservableObject {
                 image: preview.image,
                 titleBarStyle: preview.titleBarStyle,
                 isSelected: index == selectedIndex
+            )
+        }
+    }
+
+    func windowPreviewSnapshotForTesting() -> [(
+        id: String,
+        title: String,
+        hasImage: Bool,
+        titleBarStyle: WindowTitleBarStyleGuess?,
+        isSelected: Bool
+    )] {
+        windowPreviewItems().map {
+            (
+                id: $0.id,
+                title: $0.title,
+                hasImage: $0.image != nil,
+                titleBarStyle: $0.titleBarStyle,
+                isSelected: $0.isSelected
             )
         }
     }

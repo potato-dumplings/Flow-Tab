@@ -46,7 +46,7 @@ This checklist summarizes the current automated test coverage for FlowTab, inclu
   - Unknown-ID selection failure paths.
   - Empty-session guard behavior.
 
-### FlowTab app tests (`49` tests)
+### FlowTab app tests (`85` tests)
 
 - [x] Hotkey configuration and preference normalization
   - `SwitcherHotkeyPreferencesStore`
@@ -111,41 +111,41 @@ This checklist summarizes the current automated test coverage for FlowTab, inclu
 - [x] Search feature
   - Covered: matching engine, query editing, scope-specific result generation, and search-mode key routing for `Tab`, `Esc`, arrows, and result activation.
   - Covered: panel-level `Enter` to enter search from the main switcher and IME marked-text key routing.
-- [ ] `LiveSwitcherModel`
+- [x] `LiveSwitcherModel`
   - Covered: terminate-selected-app refresh path.
   - Covered: session startup, search activation, applying selected search result, and commit/cancel.
   - Covered: focused-app window session and auto-enter window layer suppression after manual exit.
-  - Missing: broader lifecycle interruption edge cases.
+  - Covered: broader lifecycle interruption edge cases around terminated-app refresh and ignored unrelated termination notifications.
 
 ## Areas Without Behavior Tests Yet
 
-- [ ] Global hotkey registration and release flow
+- [x] Global hotkey registration and release flow
   - `OptionTabHotkeyMonitor`
   - Covered: simulated Carbon press/release callback wiring and unrelated-event pass-through.
-  - Missing: registration/install fallback behavior.
+  - Covered: registration/install fallback behavior and unregister-on-stop semantics for partially registered hotkeys.
 - [x] System `Command + Tab` takeover flow
   - `CommandTabTakeoverController`
   - Takeover success/failure behavior.
   - Abnormal-exit recovery behavior.
   - Restore-on-terminate behavior.
-- [ ] Switcher panel controller interaction routing
+- [x] Switcher panel controller interaction routing
   - `SwitcherPanelController`
   - Covered: search-mode key routing, panel-level search entry, and terminate-selected-app shortcut inside the panel.
-  - Missing: global hotkey press/release, flags-changed handling, mouse-down cancellation, active-space interruption, panel occlusion/key-window recovery, and delayed auto-entry timing.
-- [ ] Runtime snapshot and MRU behavior
+  - Covered: global hotkey press/release, `flagsChanged` handling, mouse-down cancellation, active-space interruption, panel occlusion/key-window interruption handling, and delayed auto-entry timing.
+- [x] Runtime snapshot and MRU behavior
   - `SystemAppMRUTracker`
   - `RuntimeSnapshotProvider`
   - Covered: current-app inclusion/exclusion helper, minimized-only app-layer filtering helper, and MRU ranking helper behavior.
-  - Missing: end-to-end snapshot assembly/filtering across live `NSRunningApplication` sets.
+  - Covered: snapshot assembly/filtering across deterministic live-app descriptor sets, including dedupe and minimized-only filtering.
 - [x] Runtime activation side effects
   - `RuntimeActivator.activate(target:contextsByID:)`
   - Covered: app activation, window focus, restoring minimized windows, and missing-window fallback behavior.
-- [ ] Window preview and title-bar style guess behavior
+- [x] Window preview and title-bar style guess behavior
   - `RuntimeWindowPreviewProvider`
   - `ScreenCapturePermissionChecker`
   - Title-style guess branches.
   - Preview cache behavior.
-- [ ] App-icon cache behavior
+- [x] App-icon cache behavior
   - `BoundedImageCache`
   - `AppIconProvider`
 - [ ] App lifecycle wiring
@@ -176,28 +176,28 @@ The ordering below is based on primary interaction-path risk, likelihood of regr
 
 ### Priority 1
 
-- [ ] Add behavior tests around `LiveSwitcherModel` session lifecycle.
+- [x] Add behavior tests around `LiveSwitcherModel` session lifecycle.
   - Cover session startup, focused-app window session, search activation, selected-result application, auto-enter window layer, commit, and cancel.
-- [ ] Add behavior tests around `SwitcherPanelController` key-routing and interruption handling.
+- [x] Add behavior tests around `SwitcherPanelController` key-routing and interruption handling.
   - Cover app/group/window/search mode routing, `flagsChanged`, mouse-down cancellation, active-space interruption, panel occlusion, key-window recovery, delayed auto-entry, and terminate-selected-app shortcuts.
-- [ ] Add stable app-level tests for `CommandTabTakeoverController` and `OptionTabHotkeyMonitor`.
+- [x] Add stable app-level tests for `CommandTabTakeoverController` and `OptionTabHotkeyMonitor`.
   - Cover takeover success/failure, abnormal-exit recovery, restore-on-terminate, Carbon press/release callbacks, and fallback behavior.
 
 ### Priority 2
 
-- [ ] Add test seams around `RuntimeSnapshotProvider`, `SystemAppMRUTracker`, and `RuntimeActivator`.
+- [x] Add test seams around `RuntimeSnapshotProvider`, `SystemAppMRUTracker`, and `RuntimeActivator`.
   - Cover app filtering, ranking, current-app inclusion or exclusion, minimized-app handling, activation, window focus, restore-minimized behavior, and AX fallback.
-- [ ] Add app-level behavior tests for search entry and exit flow.
+- [x] Add app-level behavior tests for search entry and exit flow.
   - Cover `Enter` to enter search, `Tab` scope toggling, layered `Esc` semantics, delayed auto-enter window-layer logic, and IME marked-text key routing.
-- [ ] Add behavior tests for `AppWindowCoordinator.openHome/openLogs/openSettings`.
+- [x] Add behavior tests for `AppWindowCoordinator.openHome/openLogs/openSettings`.
 - [ ] Add app-level tests for the in-app window switcher.
   - Cover global in-app hotkey registration, session start, and conflict handling with the main hotkey.
 
 ### Priority 3
 
-- [ ] Add behavior tests for window preview and title-bar style guess behavior.
+- [x] Add behavior tests for window preview and title-bar style guess behavior.
   - Cover `RuntimeWindowPreviewProvider`, `ScreenCapturePermissionChecker`, title-style branches, and preview cache behavior.
-- [ ] Add behavior tests for app-icon cache behavior.
+- [x] Add behavior tests for app-icon cache behavior.
   - Cover `BoundedImageCache` and `AppIconProvider`.
 - [ ] Add lifecycle wiring tests around app startup and teardown.
   - Cover `FlowTabApp.init()`, `AppDelegate.applicationDidFinishLaunching(...)`, observer installation or removal, accessibility prompt gating, and `applicationWillTerminate(...)`.
