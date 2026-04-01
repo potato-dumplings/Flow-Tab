@@ -418,12 +418,15 @@ private final class TabSwitchStressRunner {
 }
 
 enum AppWindowCoordinator {
+    @MainActor
+    static var activateMainWindowOrOpenHomeSceneOverride: (() -> Void)?
+
     static func openHome() {
         Task { @MainActor in
             if HomeTabState.shared.selectedTab != .home {
                 HomeTabState.shared.selectedTab = .home
             }
-            activateMainWindowOrOpenHomeScene()
+            activateMainWindowOrOpenHomeSceneForCurrentProcess()
         }
     }
 
@@ -432,7 +435,7 @@ enum AppWindowCoordinator {
             if HomeTabState.shared.selectedTab != .logs {
                 HomeTabState.shared.selectedTab = .logs
             }
-            activateMainWindowOrOpenHomeScene()
+            activateMainWindowOrOpenHomeSceneForCurrentProcess()
         }
     }
 
@@ -441,8 +444,17 @@ enum AppWindowCoordinator {
             if HomeTabState.shared.selectedTab != .settings {
                 HomeTabState.shared.selectedTab = .settings
             }
-            activateMainWindowOrOpenHomeScene()
+            activateMainWindowOrOpenHomeSceneForCurrentProcess()
         }
+    }
+
+    @MainActor
+    private static func activateMainWindowOrOpenHomeSceneForCurrentProcess() {
+        if let activateMainWindowOrOpenHomeSceneOverride {
+            activateMainWindowOrOpenHomeSceneOverride()
+            return
+        }
+        activateMainWindowOrOpenHomeScene()
     }
 
     @MainActor

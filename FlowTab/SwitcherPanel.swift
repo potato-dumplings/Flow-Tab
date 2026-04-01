@@ -168,7 +168,7 @@ final class SwitcherPanelController {
         case inAppWindowSwitcher
     }
 
-    private let model = LiveSwitcherModel()
+    private let model: LiveSwitcherModel
     private let panel: NSPanel
 
     private var keyDownMonitor: Any?
@@ -228,6 +228,7 @@ final class SwitcherPanelController {
     }
 
     init() {
+        model = LiveSwitcherModel()
         panel = SwitcherOverlayPanel(
             contentRect: NSRect(x: 0, y: 0, width: 880, height: 290),
             styleMask: SwitcherPanelWindowConfiguration.styleMask,
@@ -306,6 +307,15 @@ final class SwitcherPanelController {
                 self?.handlePanelDidResignKey()
             }
         }
+    }
+
+    var modelForTesting: LiveSwitcherModel {
+        model
+    }
+
+    @discardableResult
+    func handleKeyDownForTesting(_ event: NSEvent) -> Bool {
+        handleKeyDown(event)
     }
 
     deinit {
@@ -1355,6 +1365,7 @@ final class LiveSwitcherModel: ObservableObject {
     var onSearchStateChanged: (() -> Void)?
     var onSessionLayoutChanged: (() -> Void)?
     var snapshotProviderOverride: (() -> RuntimeSnapshot)?
+    var activationOverride: ((ActivationTarget, [String: RuntimeAppContext]) -> Void)?
     var terminateRequestOverride: ((String) -> (sent: Bool, pid: pid_t))?
     var isProcessRunningOverride: ((pid_t) -> Bool)?
     var terminateRefreshPollIntervalNs: UInt64 = 60_000_000
@@ -2025,7 +2036,11 @@ final class LiveSwitcherModel: ObservableObject {
             resetRuntimeState()
             return
         }
-        activator.activate(target: target, contextsByID: runtimeContextsByID)
+        if let activationOverride {
+            activationOverride(target, runtimeContextsByID)
+        } else {
+            activator.activate(target: target, contextsByID: runtimeContextsByID)
+        }
         overlayStyle = .appAndWindow
         resetRuntimeState()
     }

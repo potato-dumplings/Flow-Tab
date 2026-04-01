@@ -259,13 +259,18 @@ final class CommandTabTakeoverController {
     private typealias SetSymbolicHotKeyEnabledFn = @convention(c) (Int32, Bool) -> Int32
 
     private let userDefaults: UserDefaults
+    private let symbolicHotKeySetterOverride: ((Int32, Bool) -> Int32)?
     private var frameworkHandle: UnsafeMutableRawPointer?
     private var setSymbolicHotKeyEnabled: SetSymbolicHotKeyEnabledFn?
     private var hasRecoveredAtLaunch = false
     private var isTakeoverActive = false
 
-    init(userDefaults: UserDefaults = .standard) {
+    init(
+        userDefaults: UserDefaults = .standard,
+        symbolicHotKeySetterOverride: ((Int32, Bool) -> Int32)? = nil
+    ) {
         self.userDefaults = userDefaults
+        self.symbolicHotKeySetterOverride = symbolicHotKeySetterOverride
     }
 
     deinit {
@@ -332,7 +337,14 @@ final class CommandTabTakeoverController {
     }
 
     private func setSystemCommandTabEnabled(_ isEnabled: Bool) -> Bool {
-        guard let setSymbolicHotKeyEnabled = resolveSetSymbolicHotKeyEnabled() else { return false }
+        let setSymbolicHotKeyEnabled: (Int32, Bool) -> Int32
+        if let symbolicHotKeySetterOverride {
+            setSymbolicHotKeyEnabled = symbolicHotKeySetterOverride
+        } else if let resolvedSetter = resolveSetSymbolicHotKeyEnabled() {
+            setSymbolicHotKeyEnabled = resolvedSetter
+        } else {
+            return false
+        }
         var hasFailure = false
 
         for hotKey in SymbolicHotKey.allCases {

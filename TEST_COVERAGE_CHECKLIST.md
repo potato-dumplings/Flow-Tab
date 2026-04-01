@@ -105,15 +105,16 @@ This checklist summarizes the current automated test coverage for FlowTab, inclu
 
 ## Areas With Partial Coverage
 
-- [ ] `AppWindowCoordinator`
+- [x] `AppWindowCoordinator`
   - Covered: opening or restoring the main app window through status-item flow.
-  - Missing: explicit behavior tests for `openHome()`, `openLogs()`, and `openSettings()` tab-selection semantics.
+  - Covered: explicit behavior tests for `openHome()`, `openLogs()`, and `openSettings()` tab-selection semantics.
 - [ ] Search feature
-  - Covered: matching engine, query editing, scope-specific result generation.
-  - Missing: real panel-level behavior such as `Enter` to enter search, `Tab` to toggle scope, `Esc` layered exit semantics, and IME marked-text key routing.
+  - Covered: matching engine, query editing, scope-specific result generation, and search-mode key routing for `Tab`, `Esc`, arrows, and result activation.
+  - Missing: panel-level `Enter` to enter search from the main switcher and IME marked-text key routing.
 - [ ] `LiveSwitcherModel`
   - Covered: terminate-selected-app refresh path.
-  - Missing: session startup, focused-app window session, search activation, applying selected search result, auto-enter window layer, commit/cancel, and full session lifecycle behavior.
+  - Covered: session startup, search activation, applying selected search result, and commit/cancel.
+  - Missing: focused-app window session, auto-enter window layer, and broader lifecycle edge cases.
 
 ## Areas Without Behavior Tests Yet
 
@@ -121,7 +122,7 @@ This checklist summarizes the current automated test coverage for FlowTab, inclu
   - `OptionTabHotkeyMonitor`
   - Carbon event handling callbacks.
   - Press/release callback wiring.
-- [ ] System `Command + Tab` takeover flow
+- [x] System `Command + Tab` takeover flow
   - `CommandTabTakeoverController`
   - Takeover success/failure behavior.
   - Abnormal-exit recovery behavior.
@@ -218,8 +219,8 @@ The ordering below is based on primary interaction-path risk, likelihood of regr
 
 ## Suggested Next Batch To Implement
 
-- [ ] `LiveSwitcherModel.startSession / commitSelection / cancelSelection`
-- [ ] `LiveSwitcherModel.enterSearchMode / applySelectedSearchResultToSession`
-- [ ] `SwitcherPanelController` search-mode key routing
-- [ ] `CommandTabTakeoverController.reconcileIfNeeded / restoreSystemShortcutsIfNeeded`
-- [ ] `AppWindowCoordinator.openHome / openLogs / openSettings`
+- [x] `LiveSwitcherModel.startSession / commitSelection / cancelSelection`
+- [x] `LiveSwitcherModel.enterSearchMode / applySelectedSearchResultToSession`
+- [x] `SwitcherPanelController` search-mode key routing
+- [x] `CommandTabTakeoverController.reconcileIfNeeded / restoreSystemShortcutsIfNeeded`
+- [x] `AppWindowCoordinator.openHome / openLogs / openSettings`
