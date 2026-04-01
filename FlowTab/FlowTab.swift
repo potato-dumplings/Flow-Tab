@@ -958,18 +958,21 @@ private struct HomeLandingView: View {
 
             Spacer(minLength: 0)
 
-            FlowActionButton(title: AppStrings.text(.actionGoToSettings, language: appLanguage), tone: .blueDominant) {
+            FlowActionButton(
+                title: AppStrings.text(.actionGoToSettings, language: appLanguage),
+                tone: .blueDominant,
+                accessibilityIdentifier: "flowtab.home.permission.open-settings"
+            ) {
                 openSettings()
             }
-            .accessibilityIdentifier("flowtab.home.permission.open-settings")
 
             FlowActionButton(
                 title: AppStrings.text(.actionDontRemindAgain, language: appLanguage),
-                tone: .grayDominant
+                tone: .grayDominant,
+                accessibilityIdentifier: "flowtab.home.permission.dismiss"
             ) {
                 showPermissionReminder = false
             }
-            .accessibilityIdentifier("flowtab.home.permission.dismiss")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
@@ -982,6 +985,7 @@ private struct HomeLandingView: View {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .stroke(Color.orange.opacity(0.35), lineWidth: 1)
         )
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("flowtab.home.permission.banner")
     }
 
@@ -1674,7 +1678,7 @@ private struct FlowActionButton: View {
     }
 
     var body: some View {
-        Button(action: action) {
+        let button = Button(action: action) {
             Group {
                 if let systemImage {
                     Label(title, systemImage: systemImage)
@@ -1700,7 +1704,12 @@ private struct FlowActionButton: View {
             .shadow(color: shadowColor, radius: 6, y: 2)
         }
         .buttonStyle(.plain)
-        .accessibilityIdentifier(accessibilityIdentifier ?? "")
+
+        if let accessibilityIdentifier {
+            button.accessibilityIdentifier(accessibilityIdentifier)
+        } else {
+            button
+        }
     }
 }
 
@@ -4964,6 +4973,7 @@ private struct AppSettingsView: View {
         .onDisappear {
             cancelPermissionPolling()
         }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("flowtab.tab.settings.content")
     }
 

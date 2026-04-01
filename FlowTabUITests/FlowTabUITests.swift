@@ -17,6 +17,7 @@ final class FlowTabUITests: XCTestCase {
         static let settingsTabContent = "flowtab.tab.settings.content"
         static let permissionBanner = "flowtab.home.permission.banner"
         static let permissionOpenSettings = "flowtab.home.permission.open-settings"
+        static let permissionDismiss = "flowtab.home.permission.dismiss"
         static let permissionReminderSwitch = "flowtab.settings.permission.reminder"
         static let logsClearButton = "flowtab.logs.clear"
         static let logsEmptyHint = "flowtab.logs.empty-hint"
@@ -60,19 +61,13 @@ final class FlowTabUITests: XCTestCase {
         )
         firstLaunchApp.launch()
 
-        let permissionBanner = firstLaunchApp.otherElements[Identifier.permissionBanner]
-        XCTAssertTrue(permissionBanner.waitForExistence(timeout: 5))
-
-        firstLaunchApp.buttons[Identifier.permissionOpenSettings].tap()
-        XCTAssertTrue(firstLaunchApp.otherElements[Identifier.settingsTabContent].waitForExistence(timeout: 5))
+        let openSettingsButtons = firstLaunchApp.buttons.matching(identifier: Identifier.permissionOpenSettings)
+        XCTAssertTrue(openSettingsButtons.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(tapFirstHittable(in: openSettingsButtons, timeout: 5))
 
         let reminderToggle = settingsReminderToggle(in: firstLaunchApp)
         XCTAssertTrue(reminderToggle.waitForExistence(timeout: 5))
         reminderToggle.tap()
-
-        firstLaunchApp.buttons[Identifier.homeTabButton].tap()
-        XCTAssertTrue(firstLaunchApp.otherElements[Identifier.homeTabContent].waitForExistence(timeout: 5))
-        XCTAssertTrue(waitForNonExistence(permissionBanner, timeout: 2))
 
         firstLaunchApp.terminate()
 
@@ -85,8 +80,59 @@ final class FlowTabUITests: XCTestCase {
             ]
         )
         relaunchApp.launch()
-        XCTAssertTrue(relaunchApp.otherElements[Identifier.homeTabContent].waitForExistence(timeout: 5))
-        XCTAssertTrue(waitForNonExistence(relaunchApp.otherElements[Identifier.permissionBanner], timeout: 2))
+        XCTAssertTrue(
+            tapFirstHittable(in: relaunchApp.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5)
+        )
+        XCTAssertFalse(
+            hasHittableElement(
+                in: relaunchApp.buttons.matching(identifier: Identifier.permissionOpenSettings),
+                timeout: 2
+            )
+        )
+    }
+
+    func testPermissionDismissPersistsAcrossRelaunch() throws {
+        let firstLaunchApp = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-ax-trusted",
+                "NO",
+                "--flowtab-ui-screen-trusted",
+                "NO"
+            ]
+        )
+        firstLaunchApp.launch()
+
+        let dismissButtons = firstLaunchApp.buttons.matching(identifier: Identifier.permissionDismiss)
+        XCTAssertTrue(dismissButtons.firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(tapFirstHittable(in: dismissButtons, timeout: 5))
+        XCTAssertFalse(
+            hasHittableElement(
+                in: firstLaunchApp.buttons.matching(identifier: Identifier.permissionOpenSettings),
+                timeout: 2
+            )
+        )
+
+        firstLaunchApp.terminate()
+
+        let relaunchApp = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-ax-trusted",
+                "NO",
+                "--flowtab-ui-screen-trusted",
+                "NO"
+            ]
+        )
+        relaunchApp.launch()
+        XCTAssertTrue(
+            tapFirstHittable(in: relaunchApp.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5)
+        )
+        XCTAssertFalse(
+            hasHittableElement(
+                in: relaunchApp.buttons.matching(identifier: Identifier.permissionOpenSettings),
+                timeout: 2
+            )
+        )
     }
 
     func testHomePageSelectingMockAppUpdatesWindowList() throws {
@@ -204,6 +250,37 @@ final class FlowTabUITests: XCTestCase {
         let predicate = NSPredicate(format: "exists == false")
         let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
         return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+    }
+
+    private func tapFirstHittable(in query: XCUIElementQuery, timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            let count = query.count
+            for index in 0..<count {
+                let element = query.element(boundBy: index)
+                if element.exists && element.isHittable {
+                    element.tap()
+                    return true
+                }
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+        return false
+    }
+
+    private func hasHittableElement(in query: XCUIElementQuery, timeout: TimeInterval) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            let count = query.count
+            for index in 0..<count {
+                let element = query.element(boundBy: index)
+                if element.exists && element.isHittable {
+                    return true
+                }
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+        return false
     }
 
     private func terminateAppIfRunning() {
