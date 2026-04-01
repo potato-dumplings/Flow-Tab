@@ -472,7 +472,7 @@ enum AppWindowCoordinator {
 struct FlowTabApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     private let appWindowWidth: CGFloat = 1120
-    private let appWindowHeight: CGFloat = 760
+    private let appWindowHeight: CGFloat = 780
     @AppStorage(AppPreferenceKeys.appLanguage)
     private var appLanguageRaw = AppLanguagePreferencesStore.defaultLanguage.rawValue
 
