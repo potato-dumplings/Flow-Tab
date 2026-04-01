@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_DIR="{user-home}/Projeck-Works/Personal/FlowTab"
+PROJECT_DIR="{user-home}/Projeck-Works/Personal/FlowTabApp"
 DERIVED_DATA_PATH="${PROJECT_DIR}/.build-local"
 RELEASE_APP_PATH="${DERIVED_DATA_PATH}/Build/Products/Release/FlowTab.app"
 INSTALL_PATH="/Applications/FlowTab.app"
