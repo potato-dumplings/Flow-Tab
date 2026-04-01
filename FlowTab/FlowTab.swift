@@ -3775,14 +3775,14 @@ private final class AppearanceSettingsCardAppKitView: AppKitSettingsCardBaseView
         addFullWidthArrangedSubview(descriptionLabel)
         addFullWidthArrangedSubview(
             AppKitSettingsCardBaseView.makeControlRow(
-                title: AppStrings.text(.appearanceThemeMode),
-                control: themeModeControl
+                title: AppStrings.text(.appearanceLanguage),
+                control: appLanguageSelect
             )
         )
         addFullWidthArrangedSubview(
             AppKitSettingsCardBaseView.makeControlRow(
-                title: AppStrings.text(.appearanceLanguage),
-                control: appLanguageSelect
+                title: AppStrings.text(.appearanceThemeMode),
+                control: themeModeControl
             )
         )
     }
