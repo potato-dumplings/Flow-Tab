@@ -188,6 +188,18 @@ struct SwitcherHotkeyConfiguration {
     }
 }
 
+protocol CommandTabTakeoverControlling: AnyObject {
+    func reconcileIfNeeded(shouldTakeOver: Bool) -> Bool
+    func restoreSystemShortcutsIfNeeded()
+}
+
+protocol HotkeyMonitoring: AnyObject {
+    var onHotkeyPressed: ((Bool) -> Void)? { get set }
+    var onHotkeyReleased: ((Bool) -> Void)? { get set }
+
+    func stop()
+}
+
 enum SwitcherHotkeyPreferencesStore {
     static let defaultPrimaryModifier: SwitcherPrimaryModifier = .option
     static let defaultMainKey: SwitcherHotkeyKey = .tab
@@ -387,6 +399,8 @@ final class CommandTabTakeoverController {
         return nil
     }
 }
+
+extension CommandTabTakeoverController: CommandTabTakeoverControlling {}
 
 final class OptionTabHotkeyMonitor {
     enum HotkeyEventPhase {
@@ -648,3 +662,5 @@ final class OptionTabHotkeyMonitor {
         return noErr
     }
 }
+
+extension OptionTabHotkeyMonitor: HotkeyMonitoring {}

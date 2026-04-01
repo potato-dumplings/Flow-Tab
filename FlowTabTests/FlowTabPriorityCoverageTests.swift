@@ -750,6 +750,318 @@ final class FlowTabPriorityCoverageTests: XCTestCase {
     }
 
     @MainActor
+    func testFlowTabAppInitStartsMRUTracking() {
+        let previousTracker = FlowTabApp.mruTracker
+        let tracker = SpyMRUTracker()
+        defer {
+            FlowTabApp.mruTracker = previousTracker
+        }
+
+        FlowTabApp.mruTracker = tracker
+
+        _ = FlowTabApp()
+
+        XCTAssertEqual(tracker.startCallCount, 1)
+    }
+
+    @MainActor
+    func testAppDelegateLaunchInstallsObserversPromptsAccessibilityAndStartsStressRunner() async {
+        guard let userDefaults = makeIsolatedUserDefaults() else { return }
+
+        let previousHooks = AppDelegate.testHooks
+        let previousActivationOverride = AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride
+        let previousAXTrusted = AccessibilityPermissionChecker.isTrustedOverrideForTesting
+        let previousAXRequest = AccessibilityPermissionChecker.requestPermissionOverrideForTesting
+        let hotkeyFactory = SpyHotkeyMonitorFactory()
+        let takeoverController = SpyCommandTabTakeoverController()
+        let stressRunner = SpyStressRunner()
+        defer {
+            AppDelegate.testHooks = previousHooks
+            AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride = previousActivationOverride
+            AccessibilityPermissionChecker.isTrustedOverrideForTesting = previousAXTrusted
+            AccessibilityPermissionChecker.requestPermissionOverrideForTesting = previousAXRequest
+            clearIsolatedUserDefaults(userDefaults)
+        }
+
+        var accessibilityPromptCount = 0
+        AccessibilityPermissionChecker.isTrustedOverrideForTesting = { false }
+        AccessibilityPermissionChecker.requestPermissionOverrideForTesting = {
+            accessibilityPromptCount += 1
+            return false
+        }
+
+        let openHome = expectation(description: "open home after launch")
+        HomeTabState.shared.selectedTab = .settings
+        AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride = {
+            openHome.fulfill()
+        }
+        AppDelegate.testHooks = AppDelegate.TestHooks(
+            userDefaults: userDefaults,
+            makePanelController: nil,
+            makeHotkeyMonitor: { configuration, signature, forwardHotkeyID, backwardHotkeyID in
+                hotkeyFactory.make(
+                    configuration: configuration,
+                    signature: signature,
+                    forwardHotkeyID: forwardHotkeyID,
+                    backwardHotkeyID: backwardHotkeyID
+                )
+            },
+            commandTabTakeoverController: takeoverController,
+            stressRunner: stressRunner
+        )
+
+        let delegate = AppDelegate()
+        delegate.applicationDidFinishLaunching(
+            Notification(name: NSApplication.didFinishLaunchingNotification)
+        )
+
+        await fulfillment(of: [openHome], timeout: 1.0)
+        XCTAssertEqual(HomeTabState.shared.selectedTab, .home)
+        XCTAssertTrue(delegate.hasPanelControllerForTesting)
+        XCTAssertTrue(delegate.hasMainHotkeyMonitorForTesting)
+        XCTAssertTrue(delegate.hasInAppHotkeyMonitorForTesting)
+        XCTAssertTrue(delegate.hasHotkeyObserverForTesting)
+        XCTAssertTrue(delegate.hasAppVisibilityObserverForTesting)
+        XCTAssertTrue(delegate.hasLanguageObserverForTesting)
+        XCTAssertTrue(delegate.hasStatusItemForTesting)
+        XCTAssertEqual(accessibilityPromptCount, 1)
+        XCTAssertTrue(userDefaults.bool(forKey: AppPreferenceKeys.hasPromptedAccessibilityPermission))
+        XCTAssertEqual(stressRunner.startCallCount, 1)
+        XCTAssertEqual(takeoverController.reconcileCalls, [false])
+        XCTAssertEqual(hotkeyFactory.records.map(\.signature), [0x46544142, 0x4654574E])
+        XCTAssertEqual(hotkeyFactory.records.map(\.forwardHotkeyID), [1, 101])
+        XCTAssertEqual(hotkeyFactory.records.map(\.backwardHotkeyID), [2, 102])
+    }
+
+    @MainActor
+    func testAppDelegateLaunchSkipsAccessibilityPromptWhenAlreadyPromptedOrReminderDisabled() {
+        guard let userDefaults = makeIsolatedUserDefaults() else { return }
+
+        let previousHooks = AppDelegate.testHooks
+        let previousActivationOverride = AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride
+        let previousAXTrusted = AccessibilityPermissionChecker.isTrustedOverrideForTesting
+        let previousAXRequest = AccessibilityPermissionChecker.requestPermissionOverrideForTesting
+        defer {
+            AppDelegate.testHooks = previousHooks
+            AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride = previousActivationOverride
+            AccessibilityPermissionChecker.isTrustedOverrideForTesting = previousAXTrusted
+            AccessibilityPermissionChecker.requestPermissionOverrideForTesting = previousAXRequest
+            clearIsolatedUserDefaults(userDefaults)
+        }
+
+        let cases: [(name: String, configure: (UserDefaults) -> Void)] = [
+            ("alreadyPrompted", { defaults in
+                defaults.set(true, forKey: AppPreferenceKeys.hasPromptedAccessibilityPermission)
+            }),
+            ("reminderDisabled", { defaults in
+                defaults.set(false, forKey: AppPreferenceKeys.showPermissionReminder)
+            })
+        ]
+
+        AccessibilityPermissionChecker.isTrustedOverrideForTesting = { false }
+        AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride = {}
+
+        for item in cases {
+            userDefaults.removePersistentDomain(
+                forName: userDefaults.string(forKey: "FlowTabPriorityCoverageTestsSuiteName") ?? ""
+            )
+            item.configure(userDefaults)
+
+            let hotkeyFactory = SpyHotkeyMonitorFactory()
+            var promptCount = 0
+            AccessibilityPermissionChecker.requestPermissionOverrideForTesting = {
+                promptCount += 1
+                return false
+            }
+            AppDelegate.testHooks = AppDelegate.TestHooks(
+                userDefaults: userDefaults,
+                makePanelController: nil,
+                makeHotkeyMonitor: { configuration, signature, forwardHotkeyID, backwardHotkeyID in
+                    hotkeyFactory.make(
+                        configuration: configuration,
+                        signature: signature,
+                        forwardHotkeyID: forwardHotkeyID,
+                        backwardHotkeyID: backwardHotkeyID
+                    )
+                },
+                commandTabTakeoverController: SpyCommandTabTakeoverController(),
+                stressRunner: SpyStressRunner()
+            )
+
+            let delegate = AppDelegate()
+            delegate.applicationDidFinishLaunching(
+                Notification(name: NSApplication.didFinishLaunchingNotification)
+            )
+
+            XCTAssertEqual(promptCount, 0, "Unexpected accessibility prompt for \(item.name)")
+        }
+    }
+
+    @MainActor
+    func testAppDelegateTerminationRemovesObserversStopsHotkeyMonitorsAndRestoresTakeover() {
+        guard let userDefaults = makeIsolatedUserDefaults() else { return }
+
+        let previousHooks = AppDelegate.testHooks
+        let previousActivationOverride = AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride
+        let previousAXTrusted = AccessibilityPermissionChecker.isTrustedOverrideForTesting
+        let previousAXRequest = AccessibilityPermissionChecker.requestPermissionOverrideForTesting
+        let hotkeyFactory = SpyHotkeyMonitorFactory()
+        let takeoverController = SpyCommandTabTakeoverController()
+        defer {
+            AppDelegate.testHooks = previousHooks
+            AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride = previousActivationOverride
+            AccessibilityPermissionChecker.isTrustedOverrideForTesting = previousAXTrusted
+            AccessibilityPermissionChecker.requestPermissionOverrideForTesting = previousAXRequest
+            clearIsolatedUserDefaults(userDefaults)
+        }
+
+        AccessibilityPermissionChecker.isTrustedOverrideForTesting = { true }
+        AccessibilityPermissionChecker.requestPermissionOverrideForTesting = { true }
+        AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride = {}
+        AppDelegate.testHooks = AppDelegate.TestHooks(
+            userDefaults: userDefaults,
+            makePanelController: nil,
+            makeHotkeyMonitor: { configuration, signature, forwardHotkeyID, backwardHotkeyID in
+                hotkeyFactory.make(
+                    configuration: configuration,
+                    signature: signature,
+                    forwardHotkeyID: forwardHotkeyID,
+                    backwardHotkeyID: backwardHotkeyID
+                )
+            },
+            commandTabTakeoverController: takeoverController,
+            stressRunner: SpyStressRunner()
+        )
+
+        let delegate = AppDelegate()
+        delegate.applicationDidFinishLaunching(
+            Notification(name: NSApplication.didFinishLaunchingNotification)
+        )
+        delegate.applicationWillTerminate(
+            Notification(name: NSApplication.willTerminateNotification)
+        )
+
+        XCTAssertFalse(delegate.hasHotkeyObserverForTesting)
+        XCTAssertFalse(delegate.hasAppVisibilityObserverForTesting)
+        XCTAssertFalse(delegate.hasLanguageObserverForTesting)
+        XCTAssertEqual(hotkeyFactory.records.count, 2)
+        XCTAssertEqual(hotkeyFactory.records[0].monitor.stopCallCount, 1)
+        XCTAssertEqual(hotkeyFactory.records[1].monitor.stopCallCount, 1)
+        XCTAssertEqual(takeoverController.restoreCallCount, 1)
+    }
+
+    @MainActor
+    func testAppDelegateSkipsInAppHotkeyMonitorWhenShortcutConflictsWithMainHotkey() {
+        guard let userDefaults = makeIsolatedUserDefaults() else { return }
+
+        let previousHooks = AppDelegate.testHooks
+        let previousActivationOverride = AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride
+        let previousAXTrusted = AccessibilityPermissionChecker.isTrustedOverrideForTesting
+        let previousAXRequest = AccessibilityPermissionChecker.requestPermissionOverrideForTesting
+        let hotkeyFactory = SpyHotkeyMonitorFactory()
+        defer {
+            AppDelegate.testHooks = previousHooks
+            AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride = previousActivationOverride
+            AccessibilityPermissionChecker.isTrustedOverrideForTesting = previousAXTrusted
+            AccessibilityPermissionChecker.requestPermissionOverrideForTesting = previousAXRequest
+            clearIsolatedUserDefaults(userDefaults)
+        }
+
+        userDefaults.set(
+            SwitcherPrimaryModifier.option.rawValue,
+            forKey: AppPreferenceKeys.inAppWindowHotkeyPrimaryModifier
+        )
+        userDefaults.set(
+            SwitcherHotkeyKey.tab.rawValue,
+            forKey: AppPreferenceKeys.inAppWindowHotkeyMainKey
+        )
+        AccessibilityPermissionChecker.isTrustedOverrideForTesting = { true }
+        AccessibilityPermissionChecker.requestPermissionOverrideForTesting = { true }
+        AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride = {}
+        AppDelegate.testHooks = AppDelegate.TestHooks(
+            userDefaults: userDefaults,
+            makePanelController: nil,
+            makeHotkeyMonitor: { configuration, signature, forwardHotkeyID, backwardHotkeyID in
+                hotkeyFactory.make(
+                    configuration: configuration,
+                    signature: signature,
+                    forwardHotkeyID: forwardHotkeyID,
+                    backwardHotkeyID: backwardHotkeyID
+                )
+            },
+            commandTabTakeoverController: SpyCommandTabTakeoverController(),
+            stressRunner: SpyStressRunner()
+        )
+
+        let delegate = AppDelegate()
+        delegate.applicationDidFinishLaunching(
+            Notification(name: NSApplication.didFinishLaunchingNotification)
+        )
+
+        XCTAssertTrue(delegate.hasMainHotkeyMonitorForTesting)
+        XCTAssertFalse(delegate.hasInAppHotkeyMonitorForTesting)
+        XCTAssertEqual(hotkeyFactory.records.count, 1)
+        XCTAssertEqual(hotkeyFactory.records.first?.signature, 0x46544142)
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerInAppHotkeyReleaseCommitsFocusedWindowSession() async {
+        let controller = SwitcherPanelController()
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let windows = [
+            WindowCandidate(id: "front-1", title: "Inbox", isMinimized: false, lastActiveAt: 30),
+            WindowCandidate(id: "front-2", title: "Draft", isMinimized: false, lastActiveAt: 20)
+        ]
+        controller.modelForTesting.frontmostApplicationOverride = { currentApp }
+        controller.modelForTesting.snapshotProviderOverride = {
+            RuntimeSnapshot(
+                apps: [
+                    AppSwitchCandidate(
+                        id: appID,
+                        displayName: currentApp.localizedName ?? "Current App",
+                        groupID: "current",
+                        lastActiveAt: 100,
+                        windows: windows
+                    )
+                ],
+                contextsByID: [
+                    appID: self.makeRuntimeAppContext(
+                        appID: appID,
+                        runningApp: currentApp,
+                        windows: windows
+                    )
+                ]
+            )
+        }
+
+        var activatedTarget: ActivationTarget?
+        controller.modelForTesting.activationOverride = { target, _ in
+            activatedTarget = target
+        }
+
+        XCTAssertTrue(controller.beginInAppWindowHotkeySessionForTesting())
+        XCTAssertEqual(controller.modelForTesting.overlayStyle, .windowOnly)
+        XCTAssertEqual(controller.modelForTesting.session?.mode, .windowCycle(appID: appID))
+        let selectedWindowID = controller.modelForTesting.session?.selectedWindow?.id
+        XCTAssertNotNil(selectedWindowID)
+
+        controller.inAppPrimaryModifierPressedOverride = false
+        controller.handleInAppWindowHotkeyReleased()
+
+        try? await Task.sleep(nanoseconds: 120_000_000)
+        XCTAssertNil(controller.modelForTesting.session)
+        XCTAssertEqual(
+            activatedTarget,
+            .window(
+                appID: appID,
+                windowID: selectedWindowID ?? "",
+                restoreIfMinimized: false
+            )
+        )
+    }
+
+    @MainActor
     func testSwitcherPanelControllerGlobalHotkeyAdvanceAndReleaseCommitSession() async {
         let controller = SwitcherPanelController()
         controller.modelForTesting.snapshotProviderOverride = {
@@ -1364,5 +1676,78 @@ final class FlowTabPriorityCoverageTests: XCTestCase {
             fatalError("Failed to create CGImage for preview tests")
         }
         return image
+    }
+}
+
+private final class SpyHotkeyMonitor: HotkeyMonitoring {
+    var onHotkeyPressed: ((Bool) -> Void)?
+    var onHotkeyReleased: ((Bool) -> Void)?
+
+    private(set) var stopCallCount = 0
+
+    func stop() {
+        stopCallCount += 1
+    }
+}
+
+private struct SpyHotkeyMonitorRecord {
+    let configuration: SwitcherHotkeyConfiguration
+    let signature: OSType
+    let forwardHotkeyID: UInt32
+    let backwardHotkeyID: UInt32
+    let monitor: SpyHotkeyMonitor
+}
+
+private final class SpyHotkeyMonitorFactory {
+    private(set) var records: [SpyHotkeyMonitorRecord] = []
+
+    func make(
+        configuration: SwitcherHotkeyConfiguration,
+        signature: OSType,
+        forwardHotkeyID: UInt32,
+        backwardHotkeyID: UInt32
+    ) -> any HotkeyMonitoring {
+        let monitor = SpyHotkeyMonitor()
+        records.append(
+            SpyHotkeyMonitorRecord(
+                configuration: configuration,
+                signature: signature,
+                forwardHotkeyID: forwardHotkeyID,
+                backwardHotkeyID: backwardHotkeyID,
+                monitor: monitor
+            )
+        )
+        return monitor
+    }
+}
+
+private final class SpyCommandTabTakeoverController: CommandTabTakeoverControlling {
+    private(set) var reconcileCalls: [Bool] = []
+    private(set) var restoreCallCount = 0
+    var reconcileResult = true
+
+    func reconcileIfNeeded(shouldTakeOver: Bool) -> Bool {
+        reconcileCalls.append(shouldTakeOver)
+        return reconcileResult
+    }
+
+    func restoreSystemShortcutsIfNeeded() {
+        restoreCallCount += 1
+    }
+}
+
+private final class SpyStressRunner: TabSwitchStressRunning {
+    private(set) var startCallCount = 0
+
+    func startIfNeeded() {
+        startCallCount += 1
+    }
+}
+
+private final class SpyMRUTracker: MRUTracking {
+    private(set) var startCallCount = 0
+
+    func startIfNeeded() {
+        startCallCount += 1
     }
 }

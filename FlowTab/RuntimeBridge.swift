@@ -28,6 +28,90 @@ struct RuntimeWindowContext {
     var inferredTitleBarStyle: WindowTitleBarStyleGuess?
 }
 
+enum FlowTabTestLaunchOptions {
+    private static var arguments: [String] {
+        ProcessInfo.processInfo.arguments
+    }
+
+    static var usesMockRuntimeSnapshot: Bool {
+        arguments.contains("--flowtab-ui-mock-runtime")
+    }
+
+    static var resetsUserDefaultsOnLaunch: Bool {
+        arguments.contains("--flowtab-ui-reset-defaults")
+    }
+
+    static var opensSwitcherOnLaunch: Bool {
+        arguments.contains("--flowtab-ui-open-switcher")
+            || arguments.contains("--flowtab-ui-open-switcher-search")
+    }
+
+    static var entersSearchOnLaunch: Bool {
+        arguments.contains("--flowtab-ui-open-switcher-search")
+    }
+
+    static var accessibilityTrustedOverride: Bool? {
+        boolValue(after: "--flowtab-ui-ax-trusted")
+    }
+
+    static var screenCaptureTrustedOverride: Bool? {
+        boolValue(after: "--flowtab-ui-screen-trusted")
+    }
+
+    static var seededLogCount: Int? {
+        guard let rawValue = value(after: "--flowtab-ui-seed-logs") else { return nil }
+        return Int(rawValue)
+    }
+
+    private static func value(after flag: String) -> String? {
+        guard let index = arguments.firstIndex(of: flag) else { return nil }
+        let nextIndex = arguments.index(after: index)
+        guard nextIndex < arguments.endIndex else { return nil }
+        return arguments[nextIndex]
+    }
+
+    private static func boolValue(after flag: String) -> Bool? {
+        guard let rawValue = value(after: flag)?.lowercased() else { return nil }
+        switch rawValue {
+        case "1", "true", "yes":
+            return true
+        case "0", "false", "no":
+            return false
+        default:
+            return nil
+        }
+    }
+}
+
+enum AccessibilityPermissionChecker {
+    static var isTrustedOverrideForTesting: (() -> Bool)?
+    static var requestPermissionOverrideForTesting: (() -> Bool)?
+
+    static func isTrusted() -> Bool {
+        if let isTrustedOverrideForTesting {
+            return isTrustedOverrideForTesting()
+        }
+        if let override = FlowTabTestLaunchOptions.accessibilityTrustedOverride {
+            return override
+        }
+        return AXIsProcessTrusted()
+    }
+
+    @discardableResult
+    static func requestPermission() -> Bool {
+        if let requestPermissionOverrideForTesting {
+            return requestPermissionOverrideForTesting()
+        }
+        if let override = FlowTabTestLaunchOptions.accessibilityTrustedOverride {
+            return override
+        }
+        let options = [
+            kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true
+        ] as CFDictionary
+        return AXIsProcessTrustedWithOptions(options)
+    }
+}
+
 struct RuntimeHomeAppSummary: Equatable, Identifiable {
     let appID: String
     let displayName: String
@@ -266,7 +350,94 @@ final class RuntimeSnapshotProvider {
         let candidate: AppSwitchCandidate
     }
 
+    private struct UITestRuntimeDataset {
+        let snapshot: RuntimeSnapshot
+        let summaries: [RuntimeHomeAppSummary]
+        let snapshotsByAppID: [String: RuntimeHomeAppSnapshot]
+    }
+
+    private static func uiTestRuntimeDataset() -> UITestRuntimeDataset? {
+        guard FlowTabTestLaunchOptions.usesMockRuntimeSnapshot else { return nil }
+
+        let runningApp = NSRunningApplication.current
+        let appDefinitions: [(appID: String, name: String, windows: [WindowCandidate], rank: Int)] = [
+            (
+                appID: "com.flowtab.mock.mail",
+                name: "Mock Mail",
+                windows: [
+                    WindowCandidate(id: "mock-mail-inbox", title: "Inbox", isMinimized: false, lastActiveAt: 300),
+                    WindowCandidate(id: "mock-mail-draft", title: "Draft", isMinimized: false, lastActiveAt: 299)
+                ],
+                rank: 0
+            ),
+            (
+                appID: "com.flowtab.mock.browser",
+                name: "Mock Browser",
+                windows: [
+                    WindowCandidate(id: "mock-browser-docs", title: "Docs", isMinimized: false, lastActiveAt: 290)
+                ],
+                rank: 1
+            )
+        ]
+
+        let candidates = appDefinitions.map { definition in
+            AppSwitchCandidate(
+                id: definition.appID,
+                displayName: definition.name,
+                groupID: "mock",
+                lastActiveAt: Self.stableLastActiveValue(forRank: definition.rank),
+                windows: definition.windows
+            )
+        }
+
+        let summaries = appDefinitions.enumerated().map { index, definition in
+            RuntimeHomeAppSummary(
+                appID: definition.appID,
+                displayName: definition.name,
+                groupID: "mock",
+                lastActiveAt: Self.stableLastActiveValue(forRank: definition.rank),
+                windowCount: definition.windows.count,
+                pid: pid_t(10_000 + index)
+            )
+        }
+
+        let snapshotsByAppID = Dictionary(uniqueKeysWithValues: appDefinitions.enumerated().map { index, definition in
+            let windowContexts = Dictionary(uniqueKeysWithValues: definition.windows.map { window in
+                (
+                    window.id,
+                    RuntimeWindowContext(
+                        id: window.id,
+                        title: window.title,
+                        isMinimized: window.isMinimized,
+                        cgWindowID: nil,
+                        inferredTitleBarStyle: nil
+                    )
+                )
+            })
+            let context = RuntimeAppContext(
+                appID: definition.appID,
+                runningApp: runningApp,
+                windowsByID: windowContexts
+            )
+            let snapshot = RuntimeHomeAppSnapshot(
+                summary: summaries[index],
+                candidate: candidates[index],
+                context: context
+            )
+            return (definition.appID, snapshot)
+        })
+
+        return UITestRuntimeDataset(
+            snapshot: RuntimeSnapshot(apps: candidates, contextsByID: [:]),
+            summaries: summaries,
+            snapshotsByAppID: snapshotsByAppID
+        )
+    }
+
     func snapshot() -> RuntimeSnapshot {
+        if let uiTestRuntimeDataset = Self.uiTestRuntimeDataset() {
+            return uiTestRuntimeDataset.snapshot
+        }
         let runningApps = filteredRunningApplications()
 
         guard !runningApps.isEmpty else {
@@ -448,6 +619,9 @@ final class RuntimeSnapshotProvider {
     }
 
     func homeAppSummaries() -> [RuntimeHomeAppSummary] {
+        if let uiTestRuntimeDataset = Self.uiTestRuntimeDataset() {
+            return uiTestRuntimeDataset.summaries
+        }
         let runningApps = filteredRunningApplications()
         guard !runningApps.isEmpty else { return [] }
 
@@ -501,6 +675,9 @@ final class RuntimeSnapshotProvider {
     }
 
     func homeAppSnapshot(for appID: String) -> RuntimeHomeAppSnapshot? {
+        if let uiTestRuntimeDataset = Self.uiTestRuntimeDataset() {
+            return uiTestRuntimeDataset.snapshotsByAppID[appID]
+        }
         let runningApps = filteredRunningApplications()
         let matchingApps = runningApps.filter { Self.baseAppID(for: $0) == appID }
         guard !matchingApps.isEmpty else { return nil }
@@ -585,6 +762,9 @@ final class RuntimeSnapshotProvider {
     }
 
     func homeAppSummary(for appID: String) -> RuntimeHomeAppSummary? {
+        if let uiTestRuntimeDataset = Self.uiTestRuntimeDataset() {
+            return uiTestRuntimeDataset.summaries.first(where: { $0.appID == appID })
+        }
         let runningApps = filteredRunningApplications()
         let matchingApps = runningApps.filter { Self.baseAppID(for: $0) == appID }
         guard !matchingApps.isEmpty else { return nil }
@@ -725,7 +905,7 @@ final class RuntimeSnapshotProvider {
         for runningApps: [NSRunningApplication],
         cgWindowsByPID: [pid_t: [CGWindowEntry]]
     ) -> [pid_t: [WindowListEntry]] {
-        guard AXIsProcessTrusted() else {
+        guard AccessibilityPermissionChecker.isTrusted() else {
             RuntimeLog.info("AX", "not trusted; all app windows will be reported as 0")
             return [:]
         }
@@ -776,7 +956,7 @@ final class RuntimeSnapshotProvider {
     }
 
     private func collectAXWindowStats(for runningApps: [NSRunningApplication]) -> [pid_t: AXWindowStats] {
-        guard AXIsProcessTrusted() else {
+        guard AccessibilityPermissionChecker.isTrusted() else {
             RuntimeLog.info("AX", "not trusted; all app windows will be reported as 0")
             return [:]
         }
@@ -1192,7 +1372,7 @@ private enum AXWindowInspector {
     private static let windowIDPrefix = "ax"
 
     static func windows(for app: NSRunningApplication) -> [AXUIElement] {
-        guard AXIsProcessTrusted() else { return [] }
+        guard AccessibilityPermissionChecker.isTrusted() else { return [] }
 
         let appElement = AXUIElementCreateApplication(app.processIdentifier)
         var windowsValue: CFTypeRef?
@@ -1626,7 +1806,16 @@ enum RuntimeWindowPreviewProvider {
 }
 
 enum ScreenCapturePermissionChecker {
+    static var hasPermissionOverrideForTesting: (() -> Bool)?
+    static var requestPermissionOverrideForTesting: (() -> Bool)?
+
     static var hasScreenCapturePermission: Bool {
+        if let hasPermissionOverrideForTesting {
+            return hasPermissionOverrideForTesting()
+        }
+        if let override = FlowTabTestLaunchOptions.screenCaptureTrustedOverride {
+            return override
+        }
         if #available(macOS 10.15, *) {
             return CGPreflightScreenCaptureAccess()
         }
@@ -1635,6 +1824,12 @@ enum ScreenCapturePermissionChecker {
 
     @discardableResult
     static func requestScreenCapturePermission() -> Bool {
+        if let requestPermissionOverrideForTesting {
+            return requestPermissionOverrideForTesting()
+        }
+        if let override = FlowTabTestLaunchOptions.screenCaptureTrustedOverride {
+            return override
+        }
         if #available(macOS 10.15, *) {
             return CGRequestScreenCaptureAccess()
         }

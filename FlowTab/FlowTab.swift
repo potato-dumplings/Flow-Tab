@@ -22,6 +22,27 @@ enum AppPreferenceKeys {
     static let runtimeLogLevel = "runtimeLogLevel"
     static let themeMode = "themeMode"
     static let appLanguage = "appLanguage"
+
+    static let allKeys: [String] = [
+        showShortcutHint,
+        showInCommandTab,
+        showPermissionReminder,
+        hasPromptedAccessibilityPermission,
+        hotkeyPrimaryModifier,
+        hotkeyMainKey,
+        hotkeyQuitKey,
+        inAppWindowHotkeyPrimaryModifier,
+        inAppWindowHotkeyMainKey,
+        windowLayerAutoEnterDelay,
+        autoRestoreMinimizedWindowOnSwitch,
+        hideMinimizedAppsFromAppLayer,
+        searchEnabled,
+        searchDefaultScope,
+        enableVerboseDiagnostics,
+        runtimeLogLevel,
+        themeMode,
+        appLanguage
+    ]
 }
 
 enum RuntimeLogLevel: String, CaseIterable, Comparable, Identifiable {
@@ -113,6 +134,16 @@ extension NSApplication: AppWindowOpeningApplication {
     func sendShowSettingsWindowAction() -> Bool {
         sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
     }
+}
+
+protocol MRUTracking {
+    func startIfNeeded()
+}
+
+extension SystemAppMRUTracker: MRUTracking {}
+
+protocol TabSwitchStressRunning: AnyObject {
+    func startIfNeeded()
 }
 
 @MainActor
@@ -371,6 +402,20 @@ final class HomeTabState: ObservableObject {
     private init() {}
 }
 
+extension String {
+    var flowTabAccessibilitySlug: String {
+        let replaced = trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(
+                of: #"[^a-z0-9]+"#,
+                with: "-",
+                options: .regularExpression
+            )
+            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+        return replaced.isEmpty ? "item" : replaced
+    }
+}
+
 @MainActor
 private final class TabSwitchStressRunner {
     static let shared = TabSwitchStressRunner()
@@ -414,6 +459,45 @@ private final class TabSwitchStressRunner {
         let nextIndex = arguments.index(after: index)
         guard nextIndex < arguments.endIndex else { return nil }
         return arguments[nextIndex]
+    }
+}
+
+extension TabSwitchStressRunner: TabSwitchStressRunning {}
+
+@MainActor
+private enum FlowTabUITestBootstrapper {
+    static func prepareIfNeeded(userDefaults: UserDefaults = .standard) {
+        if FlowTabTestLaunchOptions.resetsUserDefaultsOnLaunch {
+            AppPreferenceKeys.allKeys.forEach { userDefaults.removeObject(forKey: $0) }
+            userDefaults.removeObject(forKey: CommandTabTakeoverController.takeoverMarkerKey)
+            HomeTabState.shared.selectedTab = .home
+            RuntimeDiagnostics.shared.clear()
+        }
+
+        if let seededLogCount = FlowTabTestLaunchOptions.seededLogCount {
+            RuntimeDiagnostics.shared.clear()
+            if seededLogCount > 0 {
+                for index in 1...seededLogCount {
+                    RuntimeDiagnostics.shared.log(
+                        level: .info,
+                        category: "UITest",
+                        message: "seeded-log-\(index)"
+                    )
+                }
+            }
+        }
+    }
+
+    static func presentInitialUIIfNeeded(panelController: SwitcherPanelController) {
+        guard FlowTabTestLaunchOptions.opensSwitcherOnLaunch else { return }
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 180_000_000)
+            guard panelController.presentGlobalHotkeySessionForTesting() else { return }
+            if FlowTabTestLaunchOptions.entersSearchOnLaunch {
+                _ = panelController.modelForTesting.enterSearchMode()
+            }
+        }
     }
 }
 
@@ -482,6 +566,8 @@ enum AppWindowCoordinator {
 
 @main
 struct FlowTabApp: App {
+    static var mruTracker: any MRUTracking = SystemAppMRUTracker.shared
+
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     private let appWindowWidth: CGFloat = 1120
     private let appWindowHeight: CGFloat = 780
@@ -493,7 +579,8 @@ struct FlowTabApp: App {
     }
 
     init() {
-        SystemAppMRUTracker.shared.startIfNeeded()
+        FlowTabUITestBootstrapper.prepareIfNeeded()
+        Self.mruTracker.startIfNeeded()
     }
 
     var body: some Scene {
@@ -744,7 +831,7 @@ private struct HomeLandingView: View {
     private static var cachedAppSummaries: [RuntimeHomeAppSummary] = []
     private static var cachedWindowsByAppID: [String: [WindowCandidate]] = [:]
     private static var cachedSelectedAppID: String?
-    private static var cachedAccessibilityTrusted = AXIsProcessTrusted()
+    private static var cachedAccessibilityTrusted = AccessibilityPermissionChecker.isTrusted()
     private static var cachedScreenCaptureTrusted = ScreenCapturePermissionChecker.hasScreenCapturePermission
     private static var cachedRunningAppSignature: Set<String> = []
 
@@ -761,7 +848,7 @@ private struct HomeLandingView: View {
     private var hotkeyQuitKeyRaw = SwitcherHotkeyPreferencesStore.defaultQuitKey.rawValue
     @AppStorage(AppPreferenceKeys.appLanguage)
     private var appLanguageRaw = AppLanguagePreferencesStore.defaultLanguage.rawValue
-    @State private var accessibilityTrusted = AXIsProcessTrusted()
+    @State private var accessibilityTrusted = AccessibilityPermissionChecker.isTrusted()
     @State private var screenCaptureTrusted = ScreenCapturePermissionChecker.hasScreenCapturePermission
     @State private var appSummaries: [RuntimeHomeAppSummary] = []
     @State private var windowsByAppID: [String: [WindowCandidate]] = [:]
@@ -874,6 +961,7 @@ private struct HomeLandingView: View {
             FlowActionButton(title: AppStrings.text(.actionGoToSettings, language: appLanguage), tone: .blueDominant) {
                 openSettings()
             }
+            .accessibilityIdentifier("flowtab.home.permission.open-settings")
 
             FlowActionButton(
                 title: AppStrings.text(.actionDontRemindAgain, language: appLanguage),
@@ -881,6 +969,7 @@ private struct HomeLandingView: View {
             ) {
                 showPermissionReminder = false
             }
+            .accessibilityIdentifier("flowtab.home.permission.dismiss")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
@@ -893,6 +982,7 @@ private struct HomeLandingView: View {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .stroke(Color.orange.opacity(0.35), lineWidth: 1)
         )
+        .accessibilityIdentifier("flowtab.home.permission.banner")
     }
 
     private var appLayerCard: some View {
@@ -926,6 +1016,7 @@ private struct HomeLandingView: View {
                                 )
                             }
                             .buttonStyle(.plain)
+                            .accessibilityIdentifier("flowtab.home.app.\(app.appID.flowTabAccessibilitySlug)")
                         }
                     }
                 }
@@ -959,7 +1050,7 @@ private struct HomeLandingView: View {
                     trailing: "--",
                     isSelected: false
                 )
-            } else if let activeApp, !activeWindows.isEmpty {
+            } else if !activeWindows.isEmpty {
                 ScrollView {
                     LazyVStack(spacing: 8) {
                         ForEach(Array(activeWindows.enumerated()), id: \.element.id) { index, window in
@@ -968,6 +1059,9 @@ private struct HomeLandingView: View {
                                 subtitle: "",
                                 trailing: windowIdentifier(window.id),
                                 isSelected: index == 0
+                            )
+                            .accessibilityIdentifier(
+                                "flowtab.home.window.\(window.id.flowTabAccessibilitySlug)"
                             )
                         }
                     }
@@ -1072,7 +1166,7 @@ private struct HomeLandingView: View {
     }
 
     private func refreshPermissionsIfNeeded(reason: String) {
-        let newAccessibilityTrusted = AXIsProcessTrusted()
+        let newAccessibilityTrusted = AccessibilityPermissionChecker.isTrusted()
         let newScreenCaptureTrusted = ScreenCapturePermissionChecker.hasScreenCapturePermission
         let permissionChanged =
             newAccessibilityTrusted != accessibilityTrusted || newScreenCaptureTrusted != screenCaptureTrusted
@@ -1327,7 +1421,7 @@ private final class HomeWindowChangeMonitor {
     ]
 
     func rebind(_ appSummaries: [RuntimeHomeAppSummary]) {
-        guard AXIsProcessTrusted() else {
+        guard AccessibilityPermissionChecker.isTrusted() else {
             stop()
             return
         }
@@ -1502,6 +1596,7 @@ private struct FlowActionButton: View {
     let systemImage: String?
     let tone: FlowActionButtonTone
     let width: CGFloat?
+    let accessibilityIdentifier: String?
     let action: () -> Void
 
     init(
@@ -1509,12 +1604,14 @@ private struct FlowActionButton: View {
         systemImage: String? = nil,
         tone: FlowActionButtonTone = .grayDominant,
         width: CGFloat? = nil,
+        accessibilityIdentifier: String? = nil,
         action: @escaping () -> Void
     ) {
         self.title = title
         self.systemImage = systemImage
         self.tone = tone
         self.width = width
+        self.accessibilityIdentifier = accessibilityIdentifier
         self.action = action
     }
 
@@ -1603,6 +1700,7 @@ private struct FlowActionButton: View {
             .shadow(color: shadowColor, radius: 6, y: 2)
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier(accessibilityIdentifier ?? "")
     }
 }
 
@@ -2100,6 +2198,11 @@ private final class HotkeySettingsCardAppKitView: NSView {
 }
 
 private extension NSView {
+    func setFlowTabTestingIdentifier(_ identifier: String) {
+        self.identifier = NSUserInterfaceItemIdentifier(identifier)
+        setAccessibilityIdentifier(identifier)
+    }
+
     func preferredFittingSize(forWidth width: CGFloat?) -> CGSize {
         let widthConstraint: NSLayoutConstraint?
         let normalizedWidth = width.flatMap { proposedWidth -> CGFloat? in
@@ -3809,6 +3912,10 @@ private final class AppearanceSettingsCardAppKitView: AppKitSettingsCardBaseView
         showShortcutHintSwitch.action = #selector(handleShowShortcutHintChanged)
         showInCommandTabSwitch.target = self
         showInCommandTabSwitch.action = #selector(handleShowInCommandTabChanged)
+        showShortcutHintSwitch.setFlowTabTestingIdentifier("flowtab.settings.appearance.show-shortcut-hint")
+        showInCommandTabSwitch.setFlowTabTestingIdentifier("flowtab.settings.appearance.show-in-command-tab")
+        themeModeControl.setFlowTabTestingIdentifier("flowtab.settings.appearance.theme-mode")
+        appLanguageSelect.setFlowTabTestingIdentifier("flowtab.settings.appearance.app-language")
         themeModeControl.translatesAutoresizingMaskIntoConstraints = false
         themeModeControl.onSelectionChanged = { [weak self] rawValue in
             self?.handleThemeModeChanged(rawValue)
@@ -4056,6 +4163,13 @@ private final class WindowBehaviorSettingsCardAppKitView: AppKitSettingsCardBase
     }
 
     private func buildViewHierarchy() {
+        delayInputField.setFlowTabTestingIdentifier("flowtab.settings.window.auto-enter-delay")
+        autoRestoreMinimizedWindowSwitch.setFlowTabTestingIdentifier(
+            "flowtab.settings.window.auto-restore-minimized"
+        )
+        hideMinimizedAppsSwitch.setFlowTabTestingIdentifier(
+            "flowtab.settings.window.hide-minimized-apps"
+        )
         let delayTextField = delayInputField.textField
         delayTextField.delegate = self
 
@@ -4250,6 +4364,8 @@ private final class SearchSettingsCardAppKitView: AppKitSettingsCardBaseView {
     private func buildViewHierarchy() {
         searchEnabledSwitch.target = self
         searchEnabledSwitch.action = #selector(handleSearchEnabledChanged)
+        searchEnabledSwitch.setFlowTabTestingIdentifier("flowtab.settings.search.enabled")
+        searchDefaultScopeSelect.setFlowTabTestingIdentifier("flowtab.settings.search.default-scope")
         searchDefaultScopeSelect.onSelectionChanged = { [weak self] rawValue in
             self?.handleSearchDefaultScopeChanged(rawValue)
         }
@@ -4546,6 +4662,15 @@ private final class PermissionSettingsCardAppKitView: AppKitSettingsCardBaseView
     private func buildViewHierarchy() {
         showPermissionReminderSwitch.target = self
         showPermissionReminderSwitch.action = #selector(handleShowPermissionReminderChanged)
+        showPermissionReminderSwitch.setFlowTabTestingIdentifier(
+            "flowtab.settings.permission.reminder"
+        )
+        accessibilityRow.actionButton.setFlowTabTestingIdentifier(
+            "flowtab.settings.permission.accessibility-action"
+        )
+        screenCaptureRow.actionButton.setFlowTabTestingIdentifier(
+            "flowtab.settings.permission.screen-capture-action"
+        )
 
         addFullWidthArrangedSubview(
             AppKitSettingsCardBaseView.makeControlRow(
@@ -4693,7 +4818,7 @@ private struct AppSettingsView: View {
     private var inAppWindowHotkeyMainKeyRaw = InAppWindowHotkeyPreferencesStore.defaultMainKey.rawValue
     @AppStorage(AppPreferenceKeys.windowLayerAutoEnterDelay)
     private var windowLayerAutoEnterDelayRaw = WindowLayerPreferencesStore.defaultAutoEnterDelay
-    @State private var accessibilityTrusted = AXIsProcessTrusted()
+    @State private var accessibilityTrusted = AccessibilityPermissionChecker.isTrusted()
     @State private var screenCaptureTrusted = ScreenCapturePermissionChecker.hasScreenCapturePermission
     @State private var hasAttemptedScreenCapturePermissionRequest = false
     @State private var accessibilityPermissionPollTask: Task<Void, Never>?
@@ -4869,11 +4994,8 @@ private struct AppSettingsView: View {
     }
 
     private func requestAccessibilityPermission() {
-        let options = [
-            kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true
-        ] as CFDictionary
         accessibilityPermissionPollTask?.cancel()
-        let trusted = AXIsProcessTrustedWithOptions(options)
+        let trusted = AccessibilityPermissionChecker.requestPermission()
         RuntimeLog.info(
             "Permission",
             "prompt requested immediateTrusted=\(trusted) bundle=\(bundleIdentifier) path=\(bundlePath)"
@@ -4939,7 +5061,7 @@ private struct AppSettingsView: View {
     }
 
     private func refreshAccessibilityStatus() {
-        accessibilityTrusted = AXIsProcessTrusted()
+        accessibilityTrusted = AccessibilityPermissionChecker.isTrusted()
     }
 
     private func refreshScreenCaptureStatus() {
@@ -5254,11 +5376,13 @@ private struct RuntimeLogsSection: View {
                         openLogsDirectory()
                     }
                     .buttonStyle(LogsActionButtonStyle(tint: logsActionButtonTint))
+                    .accessibilityIdentifier("flowtab.logs.open-directory")
 
                     Button(AppStrings.text(.logsClear)) {
                         logsViewModel.clearDisplayedOutput(minimumLevel: selectedLogLevel)
                     }
                     .buttonStyle(LogsActionButtonStyle(tint: logsActionButtonTint))
+                    .accessibilityIdentifier("flowtab.logs.clear")
                 }
 
                 ScrollView {
@@ -5273,6 +5397,7 @@ private struct RuntimeLogsSection: View {
                                 .font(.system(size: 12))
                                 .foregroundStyle(.secondary)
                                 .frame(maxWidth: .infinity, alignment: .leading)
+                                .accessibilityIdentifier("flowtab.logs.empty-hint")
                         } else {
                             LazyVStack(alignment: .leading, spacing: 2) {
                                 ForEach(Array(logsViewModel.lines.enumerated()), id: \.offset) { _, line in
@@ -5286,6 +5411,7 @@ private struct RuntimeLogsSection: View {
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                 }
                             }
+                            .accessibilityIdentifier("flowtab.logs.lines")
                         }
                     }
                     .padding(8)
@@ -5317,19 +5443,99 @@ private struct RuntimeLogsSection: View {
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    struct TestHooks {
+        var userDefaults: UserDefaults?
+        var makePanelController: (() -> SwitcherPanelController)?
+        var makeHotkeyMonitor: ((
+            SwitcherHotkeyConfiguration,
+            OSType,
+            UInt32,
+            UInt32
+        ) -> any HotkeyMonitoring)?
+        var commandTabTakeoverController: (any CommandTabTakeoverControlling)?
+        var stressRunner: (any TabSwitchStressRunning)?
+    }
+
+    static var testHooks = TestHooks()
+
     private var panelController: SwitcherPanelController?
-    private var hotkeyMonitor: OptionTabHotkeyMonitor?
-    private var inAppWindowHotkeyMonitor: OptionTabHotkeyMonitor?
-    private let commandTabTakeoverController = CommandTabTakeoverController()
+    private var hotkeyMonitor: (any HotkeyMonitoring)?
+    private var inAppWindowHotkeyMonitor: (any HotkeyMonitoring)?
+    private lazy var commandTabTakeoverController: any CommandTabTakeoverControlling = {
+        Self.testHooks.commandTabTakeoverController ?? CommandTabTakeoverController()
+    }()
     private var statusItem: NSStatusItem?
     private var hotkeyObserver: NSObjectProtocol?
     private var appVisibilityObserver: NSObjectProtocol?
     private var languageObserver: NSObjectProtocol?
 
+    private var resolvedUserDefaults: UserDefaults {
+        Self.testHooks.userDefaults ?? .standard
+    }
+
+    private var resolvedStressRunner: any TabSwitchStressRunning {
+        Self.testHooks.stressRunner ?? TabSwitchStressRunner.shared
+    }
+
+    private func makePanelController() -> SwitcherPanelController {
+        Self.testHooks.makePanelController?() ?? SwitcherPanelController()
+    }
+
+    private func makeHotkeyMonitor(
+        configuration: SwitcherHotkeyConfiguration,
+        signature: OSType,
+        forwardHotkeyID: UInt32,
+        backwardHotkeyID: UInt32
+    ) -> any HotkeyMonitoring {
+        if let makeHotkeyMonitor = Self.testHooks.makeHotkeyMonitor {
+            return makeHotkeyMonitor(
+                configuration,
+                signature,
+                forwardHotkeyID,
+                backwardHotkeyID
+            )
+        }
+        return OptionTabHotkeyMonitor(
+            configuration: configuration,
+            signature: signature,
+            forwardHotkeyID: forwardHotkeyID,
+            backwardHotkeyID: backwardHotkeyID
+        )
+    }
+
+    var hasPanelControllerForTesting: Bool {
+        panelController != nil
+    }
+
+    var hasMainHotkeyMonitorForTesting: Bool {
+        hotkeyMonitor != nil
+    }
+
+    var hasInAppHotkeyMonitorForTesting: Bool {
+        inAppWindowHotkeyMonitor != nil
+    }
+
+    var hasHotkeyObserverForTesting: Bool {
+        hotkeyObserver != nil
+    }
+
+    var hasAppVisibilityObserverForTesting: Bool {
+        appVisibilityObserver != nil
+    }
+
+    var hasLanguageObserverForTesting: Bool {
+        languageObserver != nil
+    }
+
+    var hasStatusItemForTesting: Bool {
+        statusItem != nil
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        FlowTabUITestBootstrapper.prepareIfNeeded(userDefaults: resolvedUserDefaults)
         applyActivationPolicyFromPreferences()
 
-        let panelController = SwitcherPanelController()
+        let panelController = makePanelController()
         self.panelController = panelController
 
         setupHotkeyMonitor()
@@ -5341,21 +5547,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         installStatusItem()
         requestAccessibilityPermissionIfNeeded()
         AppWindowCoordinator.openHome()
-        TabSwitchStressRunner.shared.startIfNeeded()
+        resolvedStressRunner.startIfNeeded()
+        FlowTabUITestBootstrapper.presentInitialUIIfNeeded(panelController: panelController)
     }
 
     private func requestAccessibilityPermissionIfNeeded() {
-        let userDefaults = UserDefaults.standard
+        let userDefaults = resolvedUserDefaults
         let shouldPromptPermissionReminder = userDefaults.object(forKey: AppPreferenceKeys.showPermissionReminder) == nil
             ? true
             : userDefaults.bool(forKey: AppPreferenceKeys.showPermissionReminder)
         guard shouldPromptPermissionReminder else { return }
-        guard !AXIsProcessTrusted() else { return }
+        guard !AccessibilityPermissionChecker.isTrusted() else { return }
         guard !userDefaults.bool(forKey: AppPreferenceKeys.hasPromptedAccessibilityPermission)
         else { return }
 
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-        _ = AXIsProcessTrustedWithOptions(options)
+        _ = AccessibilityPermissionChecker.requestPermission()
         userDefaults.set(true, forKey: AppPreferenceKeys.hasPromptedAccessibilityPermission)
     }
 
@@ -5380,8 +5586,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupHotkeyMonitor() {
         hotkeyMonitor?.stop()
 
-        var hotkeyConfiguration = SwitcherHotkeyPreferencesStore.load()
-        let inAppHotkeyConfiguration = InAppWindowHotkeyPreferencesStore.load()
+        var hotkeyConfiguration = SwitcherHotkeyPreferencesStore.load(userDefaults: resolvedUserDefaults)
+        let inAppHotkeyConfiguration = InAppWindowHotkeyPreferencesStore.load(
+            userDefaults: resolvedUserDefaults
+        )
         let mainUsesCommandTab =
             hotkeyConfiguration.primaryModifier == .command && hotkeyConfiguration.mainKey == .tab
         let inAppUsesCommandTab =
@@ -5398,7 +5606,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             RuntimeLog.info("HotKey", "fallback to Option+Tab because Command+Tab takeover failed")
         }
 
-        let monitor = OptionTabHotkeyMonitor(configuration: hotkeyConfiguration)
+        let monitor = makeHotkeyMonitor(
+            configuration: hotkeyConfiguration,
+            signature: 0x46544142, // "FTAB"
+            forwardHotkeyID: 1,
+            backwardHotkeyID: 2
+        )
         monitor.onHotkeyPressed = { [weak panelController] isBackward in
             panelController?.handleGlobalHotkey(isBackward: isBackward)
             RuntimeLog.info(
@@ -5423,8 +5636,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupInAppWindowHotkeyMonitor() {
         inAppWindowHotkeyMonitor?.stop()
 
-        let mainConfiguration = SwitcherHotkeyPreferencesStore.load()
-        let inAppConfiguration = InAppWindowHotkeyPreferencesStore.load()
+        let mainConfiguration = SwitcherHotkeyPreferencesStore.load(userDefaults: resolvedUserDefaults)
+        let inAppConfiguration = InAppWindowHotkeyPreferencesStore.load(
+            userDefaults: resolvedUserDefaults
+        )
         if
             mainConfiguration.primaryModifier == inAppConfiguration.primaryModifier
                 && mainConfiguration.mainKey == inAppConfiguration.mainKey
@@ -5434,7 +5649,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        let monitor = OptionTabHotkeyMonitor(
+        let monitor = makeHotkeyMonitor(
             configuration: inAppConfiguration,
             signature: 0x4654574E, // "FTWN"
             forwardHotkeyID: 101,
@@ -5505,7 +5720,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func applyActivationPolicyFromPreferences() {
-        let showInCommandTab = AppVisibilityPreferencesStore.loadShowInCommandTab()
+        let showInCommandTab = AppVisibilityPreferencesStore.loadShowInCommandTab(
+            userDefaults: resolvedUserDefaults
+        )
         let targetPolicy: NSApplication.ActivationPolicy = showInCommandTab ? .regular : .accessory
         guard NSApp.activationPolicy() != targetPolicy else { return }
 

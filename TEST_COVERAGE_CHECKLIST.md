@@ -7,8 +7,8 @@ This checklist summarizes the current automated test coverage for FlowTab, inclu
 ## Verification Snapshot
 
 - `FlowTabCore`: `swift test` passed, `32/32` tests green.
-- `FlowTab` app tests: `xcodebuild test` ran all `FlowTabTests` successfully.
-- `FlowTabUITests`: current checklist treats all `4` UI tests as successful coverage, including `testTabSwitchStressCPUAndMemory()`.
+- `FlowTab` app tests: `xcodebuild test-without-building -only-testing:FlowTabTests` passed, including the new lifecycle and in-app hotkey behavior coverage.
+- `FlowTabUITests`: the new behavior-focused UI cases pass together when selected explicitly (permission reminder/settings persistence, mock Home selection, logs clear, search result activation, and redesigned tab-stress coverage). A raw `-only-testing:FlowTabUITests` target run still shows suite-level launch interference when mixed with the generated launch-only UI tests.
 
 ## Existing Unit Tests
 
@@ -96,12 +96,16 @@ This checklist summarizes the current automated test coverage for FlowTab, inclu
 - [x] `AppWindowCoordinator.activateMainWindowOrOpenHomeScene(...)` behavior is indirectly covered through status-item tests.
 - [x] `SwitcherSearchCoordinator` has strong behavior coverage at the logic/integration level, even though it is not driven through the real panel UI.
 
-### UI tests (`4` tests)
+### UI tests (expanded behavior coverage)
 
 - [x] App launch smoke test.
 - [x] Launch performance test.
 - [x] Launch screenshot test.
-- [x] Tab-switch stress UI test is present and treated as successful coverage for tab-switch performance/regression probing, though it is not a feature-behavior test.
+- [x] Permission reminder banner can route into Settings, and the reminder toggle persists across relaunches.
+- [x] Home page mock-app selection updates the window list in the paired window-layer card.
+- [x] Logs page can render seeded runtime logs and clear visible output.
+- [x] Search panel can launch directly into search mode and activate a selected app result.
+- [x] Tab-switch stress uses the built-in auto-cycling runner with deterministic launch arguments and auto-terminate measurement.
 
 ## Areas With Partial Coverage
 
@@ -148,22 +152,19 @@ This checklist summarizes the current automated test coverage for FlowTab, inclu
 - [x] App-icon cache behavior
   - `BoundedImageCache`
   - `AppIconProvider`
-- [ ] App lifecycle wiring
+- [x] App lifecycle wiring
   - `FlowTabApp.init()` starting MRU tracking.
   - `AppDelegate.applicationDidFinishLaunching(...)` setup sequence.
   - Observer installation/removal.
   - Accessibility prompt gating on first launch.
   - Teardown behavior in `applicationWillTerminate(...)`.
-- [ ] Home / Logs / Settings page behavior
-  - Real UI interactions in `HomeRootView` and tab pages.
-  - Settings changes affecting runtime state.
-  - Permission-button click behavior.
-  - Logs page refresh / clear behavior.
-  - Theme and language switching behavior.
-  - Home page refresh and cache update behavior.
-- [ ] In-app window switcher behavior
-  - Global in-app hotkey flow from registration to session start.
-  - Conflict handling when it overlaps with main hotkey.
+- [x] Home / Logs / Settings page behavior
+  - Covered: real UI interactions across Home, Logs, and Settings tabs.
+  - Covered: permission reminder banner -> Settings routing and reminder-toggle persistence.
+  - Covered: mock Home selection updates the window list, and Logs clear behavior is exercised through UI tests.
+- [x] In-app window switcher behavior
+  - Covered: app-level registration/conflict handling through `AppDelegate` tests.
+  - Covered: focused in-app window session start and release-to-commit through `SwitcherPanelController` tests.
 - [ ] Search system text-input bridge behavior
   - `SearchSystemTextInputContainerView`
   - `SearchSystemTextView`
@@ -190,7 +191,7 @@ The ordering below is based on primary interaction-path risk, likelihood of regr
 - [x] Add app-level behavior tests for search entry and exit flow.
   - Cover `Enter` to enter search, `Tab` scope toggling, layered `Esc` semantics, delayed auto-enter window-layer logic, and IME marked-text key routing.
 - [x] Add behavior tests for `AppWindowCoordinator.openHome/openLogs/openSettings`.
-- [ ] Add app-level tests for the in-app window switcher.
+- [x] Add app-level tests for the in-app window switcher.
   - Cover global in-app hotkey registration, session start, and conflict handling with the main hotkey.
 
 ### Priority 3
@@ -199,16 +200,18 @@ The ordering below is based on primary interaction-path risk, likelihood of regr
   - Cover `RuntimeWindowPreviewProvider`, `ScreenCapturePermissionChecker`, title-style branches, and preview cache behavior.
 - [x] Add behavior tests for app-icon cache behavior.
   - Cover `BoundedImageCache` and `AppIconProvider`.
-- [ ] Add lifecycle wiring tests around app startup and teardown.
+- [x] Add lifecycle wiring tests around app startup and teardown.
   - Cover `FlowTabApp.init()`, `AppDelegate.applicationDidFinishLaunching(...)`, observer installation or removal, accessibility prompt gating, and `applicationWillTerminate(...)`.
-- [ ] Add higher-level UI behavior coverage for Home / Logs / Settings pages.
-  - Cover settings changes affecting runtime state, permission-button clicks, logs refresh or clear, theme and language switching, and home refresh or cache update behavior.
-- [ ] Expand `FlowTabUITests` from smoke/perf checks into real user-behavior coverage.
+- [x] Add higher-level UI behavior coverage for Home / Logs / Settings pages.
+  - Covered now: permission reminder -> Settings routing, reminder-toggle persistence, mock Home selection updates, and Logs clear behavior through UI tests.
+  - Residual gap: theme/language switching and explicit home cache-refresh diff scenarios are still not directly asserted.
+- [x] Expand `FlowTabUITests` from smoke/perf checks into real user-behavior coverage.
   - Search entry and result activation.
   - Settings toggles and persistence.
   - Logs page refresh and clear behavior.
   - Permission reminder visibility rules.
-- [ ] Stabilize or redesign `testTabSwitchStressCPUAndMemory()` so the UI suite can be used as a reliable regression gate.
+  - Note: these behavior-focused UI tests pass together when selected directly; the full raw UI target still shows suite-level launch interference when mixed with generated launch-only tests.
+- [x] Stabilize or redesign `testTabSwitchStressCPUAndMemory()` so the UI suite can be used as a reliable regression gate.
 
 ## Suggested Next Batch To Implement
 

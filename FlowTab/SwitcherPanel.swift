@@ -64,7 +64,7 @@ private enum FrontmostWindowInspector {
     }
 
     static func inspect() -> Inspection {
-        guard AXIsProcessTrusted() else {
+        guard AccessibilityPermissionChecker.isTrusted() else {
             return Inspection(
                 axTrusted: false,
                 appName: "unavailable",
@@ -307,8 +307,15 @@ final class SwitcherPanelController {
             object: nil,
             queue: .main
         ) { [weak self] notification in
+            guard
+                let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+            else {
+                return
+            }
+            let appID = app.bundleIdentifier ?? "pid:\(app.processIdentifier)"
+            let pid = app.processIdentifier
             Task { @MainActor [weak self] in
-                self?.handleWorkspaceApplicationDidTerminate(notification)
+                self?.model.handleApplicationTerminated(appID: appID, pid: pid)
             }
         }
         panelOcclusionObserver = NotificationCenter.default.addObserver(
@@ -349,6 +356,25 @@ final class SwitcherPanelController {
         lastCommittedTabAdvanceTimestamp = nil
         panelVisibilityOverride = true
         return true
+    }
+
+    @discardableResult
+    func beginInAppWindowHotkeySessionForTesting(
+        triggerDirection: CycleDirection = .forward
+    ) -> Bool {
+        guard model.startFocusedAppWindowSession(triggerDirection: triggerDirection) else { return false }
+        activeHotkeySessionKind = .inAppWindowSwitcher
+        lastCommittedTabAdvanceTimestamp = nil
+        panelVisibilityOverride = true
+        return true
+    }
+
+    @discardableResult
+    func presentGlobalHotkeySessionForTesting(
+        triggerDirection: CycleDirection = .forward
+    ) -> Bool {
+        show(direction: triggerDirection)
+        return model.session != nil
     }
 
     func cancelSelectionForTesting() {
@@ -1111,11 +1137,6 @@ final class SwitcherPanelController {
     private func handleActiveSpaceDidChange() {
         guard isPanelPresented else { return }
         cancelSelectionForSystemInterruption(trigger: "activeSpaceDidChange")
-    }
-
-    private func handleWorkspaceApplicationDidTerminate(_ notification: Notification) {
-        guard isPanelPresented else { return }
-        model.handleWorkspaceApplicationDidTerminate(notification)
     }
 
     private func handlePanelOcclusionStateDidChange() {
@@ -2411,6 +2432,7 @@ private struct SwitcherPanelRootView: View {
         .background(Color.clear)
         .preferredColorScheme(resolvedColorScheme)
         .animation(.none, value: resolvedColorScheme)
+        .accessibilityIdentifier("flowtab.switcher.panel")
         .id(appLanguageRaw)
     }
 }
@@ -2706,6 +2728,7 @@ private struct CommandTabOverlay: View {
                 .opacity(0.01)
                 .allowsHitTesting(false)
             )
+            .accessibilityIdentifier("flowtab.switcher.search")
 
             if searchState.scope == .app {
                 if searchAppItems.isEmpty {
@@ -3021,6 +3044,7 @@ private final class SearchSystemTextInputContainerView: NSView {
 
         textView = SearchSystemTextView(frame: .zero, textContainer: textContainer)
         super.init(frame: frameRect)
+        setAccessibilityIdentifier("flowtab.switcher.search.input")
 
         textView.translatesAutoresizingMaskIntoConstraints = false
         textView.drawsBackground = false
@@ -3308,6 +3332,7 @@ private struct SearchAppRow: View {
                     lineWidth: item.isSelected ? 1.4 : 1
                 )
         )
+        .accessibilityIdentifier("flowtab.switcher.search.app.\(item.app.id.flowTabAccessibilitySlug)")
     }
 }
 
@@ -3371,6 +3396,7 @@ private struct SearchWindowRow: View {
                     lineWidth: item.isSelected ? 1.4 : 1
                 )
         )
+        .accessibilityIdentifier("flowtab.switcher.search.window.\(item.id.flowTabAccessibilitySlug)")
     }
 }
 
