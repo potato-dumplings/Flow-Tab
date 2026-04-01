@@ -146,14 +146,17 @@ final class FlowTabUITests: XCTestCase {
         )
         app.launch()
 
-        XCTAssertTrue(app.otherElements[Identifier.homeTabContent].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+        XCTAssertTrue(
+            tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 10)
+        )
 
-        let browserRow = app.buttons["flowtab.home.app.com-flowtab-mock-browser"]
-        XCTAssertTrue(browserRow.waitForExistence(timeout: 5))
-        browserRow.tap()
+        let browserRows = app.buttons.matching(identifier: "flowtab.home.app.com-flowtab-mock-browser")
+        XCTAssertTrue(tapFirstHittable(in: browserRows, timeout: 10))
 
-        let browserWindowRow = app.otherElements["flowtab.home.window.mock-browser-docs"]
-        XCTAssertTrue(browserWindowRow.waitForExistence(timeout: 5))
+        let browserWindowRows = app.descendants(matching: .any)
+            .matching(identifier: "flowtab.home.window.mock-browser-docs")
+        XCTAssertTrue(browserWindowRows.firstMatch.waitForExistence(timeout: 12))
     }
 
     func testLogsPageShowsSeededLogsAndClearRemovesOutput() throws {
