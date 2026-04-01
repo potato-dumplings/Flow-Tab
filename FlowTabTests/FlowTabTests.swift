@@ -371,6 +371,32 @@ final class FlowTabTests: XCTestCase {
         XCTAssertEqual(AppStrings.text(.tabSettings, language: .english), "Settings")
     }
 
+    func testPermissionSettingsCardStateUsesDeniedCopyWhenPermissionsMissing() {
+        let state = PermissionSettingsCardState(
+            showPermissionReminder: true,
+            accessibilityTrusted: false,
+            screenCaptureTrusted: false
+        )
+
+        XCTAssertEqual(state.accessibilityStatusText, AppStrings.text(.permissionAccessibilityDenied))
+        XCTAssertEqual(state.accessibilityButtonTitle, AppStrings.text(.permissionAccessibilityRequest))
+        XCTAssertEqual(state.screenCaptureStatusText, AppStrings.text(.permissionScreenDenied))
+        XCTAssertEqual(state.screenCaptureButtonTitle, AppStrings.text(.permissionScreenRequest))
+    }
+
+    func testPermissionSettingsCardStateUsesGrantedCopyWhenPermissionsPresent() {
+        let state = PermissionSettingsCardState(
+            showPermissionReminder: false,
+            accessibilityTrusted: true,
+            screenCaptureTrusted: true
+        )
+
+        XCTAssertEqual(state.accessibilityStatusText, AppStrings.text(.permissionAccessibilityGranted))
+        XCTAssertEqual(state.accessibilityButtonTitle, AppStrings.text(.permissionAccessibilityClose))
+        XCTAssertEqual(state.screenCaptureStatusText, AppStrings.text(.permissionScreenGranted))
+        XCTAssertEqual(state.screenCaptureButtonTitle, AppStrings.text(.permissionScreenClose))
+    }
+
     func testRuntimeLogLevelOrderingUsesPriority() {
         XCTAssertLessThan(RuntimeLogLevel.debug, .info)
         XCTAssertLessThan(RuntimeLogLevel.info, .warning)

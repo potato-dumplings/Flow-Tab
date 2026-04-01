@@ -4374,7 +4374,7 @@ private struct AppKitPermissionSettingsCardContent: NSViewRepresentable {
     }
 }
 
-private struct PermissionSettingsCardState: Equatable {
+struct PermissionSettingsCardState: Equatable {
     let showPermissionReminder: Bool
     let accessibilityTrusted: Bool
     let screenCaptureTrusted: Bool
@@ -4816,6 +4816,13 @@ private struct AppSettingsView: View {
         }
         .onChange(of: searchDefaultScopeRaw) {
             enforceSearchPreferencesConsistency()
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: NSApplication.didBecomeActiveNotification
+        )) { _ in
+            guard isActive else { return }
+            refreshAccessibilityStatus()
+            refreshScreenCaptureStatus()
         }
         .onDisappear {
             cancelPermissionPolling()
