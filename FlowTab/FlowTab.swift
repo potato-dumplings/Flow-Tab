@@ -1792,11 +1792,11 @@ private final class HotkeySettingsCardAppKitView: NSView {
     var onInAppWindowMainKeyChanged: ((String) -> Void)?
 
     private let stackView = NSStackView()
-    private let mainPrimaryModifierPopUp = NSPopUpButton(frame: .zero, pullsDown: false)
-    private let mainKeyPopUp = NSPopUpButton(frame: .zero, pullsDown: false)
-    private let quitKeyPopUp = NSPopUpButton(frame: .zero, pullsDown: false)
-    private let inAppPrimaryModifierPopUp = NSPopUpButton(frame: .zero, pullsDown: false)
-    private let inAppMainKeyPopUp = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let mainPrimaryModifierSelect = FlowFormSelectControl(frame: .zero)
+    private let mainKeySelect = FlowFormSelectControl(frame: .zero)
+    private let quitKeySelect = FlowFormSelectControl(frame: .zero)
+    private let inAppPrimaryModifierSelect = FlowFormSelectControl(frame: .zero)
+    private let inAppMainKeySelect = FlowFormSelectControl(frame: .zero)
     private let mainSummaryLabel = HotkeySettingsCardAppKitView.makeSecondaryLabel()
     private let mainTakeoverStatusLabel = HotkeySettingsCardAppKitView.makeStatusLabel()
     private let divider = NSBox()
@@ -1826,15 +1826,15 @@ private final class HotkeySettingsCardAppKitView: NSView {
         currentState = state
 
         isApplyingState = true
-        selectItem(in: mainPrimaryModifierPopUp, rawValue: state.hotkeyConfiguration.primaryModifier.rawValue)
-        selectItem(in: mainKeyPopUp, rawValue: state.hotkeyConfiguration.mainKey.rawValue)
-        selectItem(in: quitKeyPopUp, rawValue: state.hotkeyConfiguration.quitKey.rawValue)
+        selectItem(in: mainPrimaryModifierSelect, rawValue: state.hotkeyConfiguration.primaryModifier.rawValue)
+        selectItem(in: mainKeySelect, rawValue: state.hotkeyConfiguration.mainKey.rawValue)
+        selectItem(in: quitKeySelect, rawValue: state.hotkeyConfiguration.quitKey.rawValue)
         selectItem(
-            in: inAppPrimaryModifierPopUp,
+            in: inAppPrimaryModifierSelect,
             rawValue: state.inAppWindowHotkeyConfiguration.primaryModifier.rawValue
         )
         selectItem(
-            in: inAppMainKeyPopUp,
+            in: inAppMainKeySelect,
             rawValue: state.inAppWindowHotkeyConfiguration.mainKey.rawValue
         )
         isApplyingState = false
@@ -1845,8 +1845,8 @@ private final class HotkeySettingsCardAppKitView: NSView {
         mainTakeoverStatusLabel.isHidden = !state.mainUsesCommandTab
 
         inAppRowsContainer.alphaValue = state.accessibilityTrusted ? 1 : 0.55
-        inAppPrimaryModifierPopUp.isEnabled = state.accessibilityTrusted
-        inAppMainKeyPopUp.isEnabled = state.accessibilityTrusted
+        inAppPrimaryModifierSelect.isEnabled = state.accessibilityTrusted
+        inAppMainKeySelect.isEnabled = state.accessibilityTrusted
         inAppSummaryLabel.stringValue = state.inAppSummaryText
         inAppTakeoverStatusLabel.stringValue = state.commandTabTakeoverStatusText
         inAppTakeoverStatusLabel.textColor = state.commandTabTakeoverActive ? .systemGreen : .systemRed
@@ -1877,34 +1877,44 @@ private final class HotkeySettingsCardAppKitView: NSView {
         ])
 
         configure(
-            popUp: mainPrimaryModifierPopUp,
+            selectControl: mainPrimaryModifierSelect,
             options: SwitcherPrimaryModifier.allCases.map { (id: $0.rawValue, title: $0.displayName) },
-            action: #selector(handleMainPrimaryModifierChanged)
+            onSelectionChanged: { [weak self] rawValue in
+                self?.handleMainPrimaryModifierChanged(rawValue)
+            }
         )
         configure(
-            popUp: mainKeyPopUp,
+            selectControl: mainKeySelect,
             options: SwitcherHotkeyKey.allCases.map { (id: $0.rawValue, title: $0.displayName) },
-            action: #selector(handleMainKeyChanged)
+            onSelectionChanged: { [weak self] rawValue in
+                self?.handleMainKeyChanged(rawValue)
+            }
         )
         configure(
-            popUp: quitKeyPopUp,
+            selectControl: quitKeySelect,
             options: SwitcherHotkeyKey.allCases.map { (id: $0.rawValue, title: $0.displayName) },
-            action: #selector(handleQuitKeyChanged)
+            onSelectionChanged: { [weak self] rawValue in
+                self?.handleQuitKeyChanged(rawValue)
+            }
         )
         configure(
-            popUp: inAppPrimaryModifierPopUp,
+            selectControl: inAppPrimaryModifierSelect,
             options: SwitcherPrimaryModifier.allCases.map { (id: $0.rawValue, title: $0.displayName) },
-            action: #selector(handleInAppPrimaryModifierChanged)
+            onSelectionChanged: { [weak self] rawValue in
+                self?.handleInAppPrimaryModifierChanged(rawValue)
+            }
         )
         configure(
-            popUp: inAppMainKeyPopUp,
+            selectControl: inAppMainKeySelect,
             options: SwitcherHotkeyKey.allCases.map { (id: $0.rawValue, title: $0.displayName) },
-            action: #selector(handleInAppMainKeyChanged)
+            onSelectionChanged: { [weak self] rawValue in
+                self?.handleInAppMainKeyChanged(rawValue)
+            }
         )
 
-        let mainPrimaryRow = makeControlRow(title: AppStrings.text(.hotkeyRowMainModifier), control: mainPrimaryModifierPopUp)
-        let mainKeyRow = makeControlRow(title: AppStrings.text(.hotkeyRowMainKey), control: mainKeyPopUp)
-        let quitKeyRow = makeControlRow(title: AppStrings.text(.hotkeyRowQuitKey), control: quitKeyPopUp)
+        let mainPrimaryRow = makeControlRow(title: AppStrings.text(.hotkeyRowMainModifier), control: mainPrimaryModifierSelect)
+        let mainKeyRow = makeControlRow(title: AppStrings.text(.hotkeyRowMainKey), control: mainKeySelect)
+        let quitKeyRow = makeControlRow(title: AppStrings.text(.hotkeyRowQuitKey), control: quitKeySelect)
         stackView.addArrangedSubview(mainPrimaryRow)
         stackView.addArrangedSubview(mainKeyRow)
         stackView.addArrangedSubview(quitKeyRow)
@@ -1926,8 +1936,8 @@ private final class HotkeySettingsCardAppKitView: NSView {
         inAppRowsContainer.translatesAutoresizingMaskIntoConstraints = false
         inAppRowsContainer.setContentHuggingPriority(.required, for: .vertical)
         inAppRowsContainer.setContentCompressionResistancePriority(.required, for: .vertical)
-        let inAppPrimaryRow = makeControlRow(title: AppStrings.text(.hotkeyRowInAppModifier), control: inAppPrimaryModifierPopUp)
-        let inAppMainKeyRow = makeControlRow(title: AppStrings.text(.hotkeyRowInAppKey), control: inAppMainKeyPopUp)
+        let inAppPrimaryRow = makeControlRow(title: AppStrings.text(.hotkeyRowInAppModifier), control: inAppPrimaryModifierSelect)
+        let inAppMainKeyRow = makeControlRow(title: AppStrings.text(.hotkeyRowInAppKey), control: inAppMainKeySelect)
         inAppRowsContainer.addArrangedSubview(inAppPrimaryRow)
         inAppRowsContainer.addArrangedSubview(inAppMainKeyRow)
         inAppPrimaryRow.widthAnchor.constraint(equalTo: inAppRowsContainer.widthAnchor).isActive = true
@@ -1938,7 +1948,7 @@ private final class HotkeySettingsCardAppKitView: NSView {
         stackView.addArrangedSubview(inAppTakeoverStatusLabel)
     }
 
-    private func makeControlRow(title: String, control: NSPopUpButton) -> NSStackView {
+    private func makeControlRow(title: String, control: NSView) -> NSStackView {
         let titleLabel = NSTextField(labelWithString: title)
         titleLabel.font = .systemFont(ofSize: 13)
         titleLabel.lineBreakMode = .byTruncatingTail
@@ -1959,61 +1969,40 @@ private final class HotkeySettingsCardAppKitView: NSView {
     }
 
     private func configure(
-        popUp: NSPopUpButton,
+        selectControl: FlowFormSelectControl,
         options: [(id: String, title: String)],
-        action: Selector
+        onSelectionChanged: @escaping (String) -> Void
     ) {
-        popUp.target = self
-        popUp.action = action
-        popUp.controlSize = .regular
-        popUp.font = .systemFont(ofSize: 13)
-        popUp.alignment = .right
-        popUp.translatesAutoresizingMaskIntoConstraints = false
-        popUp.menu = NSMenu()
-
-        for option in options {
-            let item = NSMenuItem(title: option.title, action: nil, keyEquivalent: "")
-            item.representedObject = option.id
-            popUp.menu?.addItem(item)
-        }
-
-        popUp.widthAnchor.constraint(equalToConstant: 160).isActive = true
+        selectControl.onSelectionChanged = onSelectionChanged
+        AppKitSettingsCardBaseView.configure(selectControl: selectControl, options: options, width: 160)
     }
 
-    private func selectItem(in popUp: NSPopUpButton, rawValue: String) {
-        guard let item = popUp.itemArray.first(where: { ($0.representedObject as? String) == rawValue }) else {
-            return
-        }
-        popUp.select(item)
+    private func selectItem(in selectControl: FlowFormSelectControl, rawValue: String) {
+        AppKitSettingsCardBaseView.selectItem(in: selectControl, rawValue: rawValue)
     }
 
-    @objc private func handleMainPrimaryModifierChanged(_ sender: NSPopUpButton) {
+    private func handleMainPrimaryModifierChanged(_ rawValue: String) {
         guard !isApplyingState else { return }
-        guard let rawValue = sender.selectedItem?.representedObject as? String else { return }
         onHotkeyPrimaryModifierChanged?(rawValue)
     }
 
-    @objc private func handleMainKeyChanged(_ sender: NSPopUpButton) {
+    private func handleMainKeyChanged(_ rawValue: String) {
         guard !isApplyingState else { return }
-        guard let rawValue = sender.selectedItem?.representedObject as? String else { return }
         onHotkeyMainKeyChanged?(rawValue)
     }
 
-    @objc private func handleQuitKeyChanged(_ sender: NSPopUpButton) {
+    private func handleQuitKeyChanged(_ rawValue: String) {
         guard !isApplyingState else { return }
-        guard let rawValue = sender.selectedItem?.representedObject as? String else { return }
         onHotkeyQuitKeyChanged?(rawValue)
     }
 
-    @objc private func handleInAppPrimaryModifierChanged(_ sender: NSPopUpButton) {
+    private func handleInAppPrimaryModifierChanged(_ rawValue: String) {
         guard !isApplyingState else { return }
-        guard let rawValue = sender.selectedItem?.representedObject as? String else { return }
         onInAppWindowPrimaryModifierChanged?(rawValue)
     }
 
-    @objc private func handleInAppMainKeyChanged(_ sender: NSPopUpButton) {
+    private func handleInAppMainKeyChanged(_ rawValue: String) {
         guard !isApplyingState else { return }
-        guard let rawValue = sender.selectedItem?.representedObject as? String else { return }
         onInAppWindowMainKeyChanged?(rawValue)
     }
 
