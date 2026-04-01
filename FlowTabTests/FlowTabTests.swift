@@ -175,11 +175,13 @@ final class FlowTabTests: XCTestCase {
     }
 
     @MainActor
-    func testTerminateSelectedAppBehaviorTriggersDeferredLayoutRefreshAfterProcessExit() async {
+    func testTerminateSelectedAppBehaviorKeepsAppUntilProcessActuallyExits() async {
         let model = LiveSwitcherModel()
         let initialApps = terminateScenarioApps()
         var snapshots: [RuntimeSnapshot] = [makeRuntimeSnapshot(apps: initialApps)]
+        var snapshotReadCount = 0
         model.snapshotProviderOverride = {
+            snapshotReadCount += 1
             XCTAssertFalse(snapshots.isEmpty)
             return snapshots.removeFirst()
         }
@@ -191,7 +193,6 @@ final class FlowTabTests: XCTestCase {
         }
 
         let appsAfterTermination = initialApps.filter { $0.id != terminatedAppID }
-        snapshots.append(makeRuntimeSnapshot(apps: initialApps))
         snapshots.append(makeRuntimeSnapshot(apps: appsAfterTermination))
 
         model.terminateRequestOverride = { _ in (sent: true, pid: 42_000) }
@@ -209,19 +210,75 @@ final class FlowTabTests: XCTestCase {
 
         let result = model.terminateSelectedApp()
         XCTAssertEqual(result, .updatedSession)
+        XCTAssertEqual(snapshotReadCount, 1)
+        XCTAssertEqual(model.appCount, initialApps.count)
+        XCTAssertTrue(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? false)
+        XCTAssertEqual(model.terminatingAppID, terminatedAppID)
 
         await fulfillment(of: [layoutRefreshed], timeout: 1.0)
+        XCTAssertEqual(snapshotReadCount, 2)
         XCTAssertGreaterThanOrEqual(processCheckCount, 2)
         XCTAssertEqual(model.appCount, appsAfterTermination.count)
         XCTAssertFalse(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? true)
+        XCTAssertNil(model.terminatingAppID)
+        model.cancelSelection()
     }
 
     @MainActor
-    func testTerminateSelectedAppUnitSkipsDeferredLayoutRefreshWhenImmediateSnapshotAlreadyUpdated() async {
+    func testTerminateSelectedAppUnitStopsPollingAfterTimeoutWhenAppStillRunning() async {
         let model = LiveSwitcherModel()
         let initialApps = terminateScenarioApps()
         var snapshots: [RuntimeSnapshot] = [makeRuntimeSnapshot(apps: initialApps)]
+        var snapshotReadCount = 0
         model.snapshotProviderOverride = {
+            snapshotReadCount += 1
+            XCTAssertFalse(snapshots.isEmpty)
+            return snapshots.removeFirst()
+        }
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        guard let terminatedAppID = model.session?.selectedApp.id else {
+            XCTFail("Expected an active session before terminate flow")
+            return
+        }
+
+        model.terminateRequestOverride = { _ in (sent: true, pid: 42_001) }
+        model.terminateRefreshPollIntervalNs = 2_000_000
+        model.terminateRefreshTimeoutNs = 12_000_000
+        var processCheckCount = 0
+        model.isProcessRunningOverride = { _ in
+            processCheckCount += 1
+            return true
+        }
+
+        let noDeferredLayoutRefresh = expectation(description: "no deferred layout refresh")
+        noDeferredLayoutRefresh.isInverted = true
+        model.onSessionLayoutChanged = { noDeferredLayoutRefresh.fulfill() }
+
+        let result = model.terminateSelectedApp()
+        XCTAssertEqual(result, .updatedSession)
+        XCTAssertEqual(snapshotReadCount, 1)
+        XCTAssertEqual(model.appCount, initialApps.count)
+        XCTAssertTrue(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? false)
+        XCTAssertEqual(model.terminatingAppID, terminatedAppID)
+
+        await fulfillment(of: [noDeferredLayoutRefresh], timeout: 0.08)
+        XCTAssertGreaterThan(processCheckCount, 0)
+        XCTAssertEqual(snapshotReadCount, 1)
+        XCTAssertEqual(model.appCount, initialApps.count)
+        XCTAssertTrue(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? false)
+        XCTAssertNil(model.terminatingAppID)
+        model.cancelSelection()
+    }
+
+    @MainActor
+    func testTerminateSelectedAppUnitRefreshesOnWorkspaceTerminateAfterPollingTimeout() async {
+        let model = LiveSwitcherModel()
+        let initialApps = terminateScenarioApps()
+        var snapshots: [RuntimeSnapshot] = [makeRuntimeSnapshot(apps: initialApps)]
+        var snapshotReadCount = 0
+        model.snapshotProviderOverride = {
+            snapshotReadCount += 1
             XCTAssertFalse(snapshots.isEmpty)
             return snapshots.removeFirst()
         }
@@ -235,24 +292,43 @@ final class FlowTabTests: XCTestCase {
         let appsAfterTermination = initialApps.filter { $0.id != terminatedAppID }
         snapshots.append(makeRuntimeSnapshot(apps: appsAfterTermination))
 
-        model.terminateRequestOverride = { _ in (sent: true, pid: 42_001) }
+        model.terminateRequestOverride = { _ in (sent: true, pid: 42_002) }
+        model.terminateRefreshPollIntervalNs = 2_000_000
+        model.terminateRefreshTimeoutNs = 12_000_000
+
         var processCheckCount = 0
         model.isProcessRunningOverride = { _ in
             processCheckCount += 1
-            return false
+            return true
         }
 
-        let noDeferredLayoutRefresh = expectation(description: "no deferred layout refresh")
-        noDeferredLayoutRefresh.isInverted = true
-        model.onSessionLayoutChanged = { noDeferredLayoutRefresh.fulfill() }
+        let deferredLayoutRefresh = expectation(description: "deferred layout refresh")
+        var layoutRefreshCount = 0
+        model.onSessionLayoutChanged = {
+            layoutRefreshCount += 1
+            deferredLayoutRefresh.fulfill()
+        }
 
         let result = model.terminateSelectedApp()
         XCTAssertEqual(result, .updatedSession)
+        XCTAssertEqual(snapshotReadCount, 1)
+        XCTAssertEqual(model.appCount, initialApps.count)
+        XCTAssertTrue(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? false)
 
-        await fulfillment(of: [noDeferredLayoutRefresh], timeout: 0.15)
-        XCTAssertEqual(processCheckCount, 0)
+        try? await Task.sleep(nanoseconds: 80_000_000)
+        XCTAssertGreaterThan(processCheckCount, 0)
+        XCTAssertEqual(layoutRefreshCount, 0)
+        XCTAssertEqual(snapshotReadCount, 1)
+        XCTAssertNil(model.terminatingAppID)
+
+        model.handleApplicationTerminated(appID: terminatedAppID, pid: 42_002)
+
+        await fulfillment(of: [deferredLayoutRefresh], timeout: 1.0)
+        XCTAssertEqual(layoutRefreshCount, 1)
+        XCTAssertEqual(snapshotReadCount, 2)
         XCTAssertEqual(model.appCount, appsAfterTermination.count)
         XCTAssertFalse(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? true)
+        model.cancelSelection()
     }
 
     func testAppLanguageResolveFallsBackToDefaultForUnknownRawValue() {

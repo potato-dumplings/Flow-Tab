@@ -178,6 +178,7 @@ final class SwitcherPanelController {
     private var globalMouseDownMonitor: Any?
     private var appDidResignActiveObserver: NSObjectProtocol?
     private var activeSpaceDidChangeObserver: NSObjectProtocol?
+    private var workspaceDidTerminateApplicationObserver: NSObjectProtocol?
     private var panelOcclusionObserver: NSObjectProtocol?
     private var panelDidResignKeyObserver: NSObjectProtocol?
     private var suppressHotkeyReplayUntilRelease = false
@@ -220,6 +221,7 @@ final class SwitcherPanelController {
     private let searchHeaderHeight: CGFloat = 62
     private var activeHotkeySessionKind: HotkeySessionKind?
     private var activePresentationScreen: NSScreen?
+    private var terminateSelectedAppTask: Task<Void, Never>?
 
     private var searchFeatureEnabled: Bool {
         SearchInteractionPreferencesStore.loadIsEnabled()
@@ -252,6 +254,10 @@ final class SwitcherPanelController {
         model.onSessionLayoutChanged = { [weak self] in
             guard let self else { return }
             guard self.panel.isVisible else { return }
+            guard self.model.session != nil else {
+                self.endPresentationSession()
+                return
+            }
             self.updatePanelSize()
         }
 
@@ -271,6 +277,15 @@ final class SwitcherPanelController {
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.handleActiveSpaceDidChange()
+            }
+        }
+        workspaceDidTerminateApplicationObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didTerminateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            Task { @MainActor [weak self] in
+                self?.handleWorkspaceApplicationDidTerminate(notification)
             }
         }
         panelOcclusionObserver = NotificationCenter.default.addObserver(
@@ -296,11 +311,16 @@ final class SwitcherPanelController {
     deinit {
         suppressHotkeyReplayTask?.cancel()
         suppressHotkeyReplayTask = nil
+        terminateSelectedAppTask?.cancel()
+        terminateSelectedAppTask = nil
         if let appDidResignActiveObserver {
             NotificationCenter.default.removeObserver(appDidResignActiveObserver)
         }
         if let activeSpaceDidChangeObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(activeSpaceDidChangeObserver)
+        }
+        if let workspaceDidTerminateApplicationObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(workspaceDidTerminateApplicationObserver)
         }
         if let panelOcclusionObserver {
             NotificationCenter.default.removeObserver(panelOcclusionObserver)
@@ -568,7 +588,7 @@ final class SwitcherPanelController {
         }
     }
 
-    private func finishSelection() {
+    private func endPresentationSession() {
         guard panel.isVisible else { return }
         removeEventMonitors()
         panel.orderOut(nil)
@@ -577,6 +597,11 @@ final class SwitcherPanelController {
         activeHotkeySessionKind = nil
         activePresentationScreen = nil
         lastCommittedTabAdvanceTimestamp = nil
+    }
+
+    private func finishSelection() {
+        guard panel.isVisible else { return }
+        endPresentationSession()
         ignoreHotkeyPressesUntil = ProcessInfo.processInfo.systemUptime + postFinishHotkeyIgnoreWindow
         logInputTrace(
             "finishSelection nowMs=\(formatMilliseconds(monotonicMilliseconds())) ignoreUntilMs=\(formatMilliseconds(ignoreHotkeyPressesUntil * 1_000))"
@@ -586,13 +611,7 @@ final class SwitcherPanelController {
 
     private func cancelSelection() {
         guard panel.isVisible else { return }
-        removeEventMonitors()
-        panel.orderOut(nil)
-        panel.level = SwitcherPanelWindowConfiguration.level
-        panel.collectionBehavior = SwitcherPanelWindowConfiguration.presentationCollectionBehavior()
-        activeHotkeySessionKind = nil
-        activePresentationScreen = nil
-        lastCommittedTabAdvanceTimestamp = nil
+        endPresentationSession()
         ignoreHotkeyPressesUntil = ProcessInfo.processInfo.systemUptime + postFinishHotkeyIgnoreWindow
         logInputTrace(
             "cancelSelection nowMs=\(formatMilliseconds(monotonicMilliseconds())) ignoreUntilMs=\(formatMilliseconds(ignoreHotkeyPressesUntil * 1_000))"
@@ -812,6 +831,9 @@ final class SwitcherPanelController {
     }
 
     private func removeEventMonitors() {
+        terminateSelectedAppTask?.cancel()
+        terminateSelectedAppTask = nil
+        model.clearTerminateSelectedAppAnimation()
         cancelPendingModifierReleaseConfirmation()
         if let keyDownMonitor {
             NSEvent.removeMonitor(keyDownMonitor)
@@ -1002,6 +1024,11 @@ final class SwitcherPanelController {
     private func handleActiveSpaceDidChange() {
         guard panel.isVisible else { return }
         cancelSelectionForSystemInterruption(trigger: "activeSpaceDidChange")
+    }
+
+    private func handleWorkspaceApplicationDidTerminate(_ notification: Notification) {
+        guard panel.isVisible else { return }
+        model.handleWorkspaceApplicationDidTerminate(notification)
     }
 
     private func handlePanelOcclusionStateDidChange() {
@@ -1213,22 +1240,34 @@ final class SwitcherPanelController {
     }
 
     private func terminateSelectedApp() {
-        switch model.terminateSelectedApp() {
-        case .notHandled:
-            RuntimeLog.info("Session", "terminate selected app ignored")
-            NSSound.beep()
-        case .updatedSession:
-            RuntimeLog.info("Session", "terminate selected app \(self.model.debugSelectionSummary())")
-            updatePanelSize()
-            scheduleDelayedWindowLayerEntryIfNeeded()
-        case .sessionEnded:
-            RuntimeLog.info("Session", "terminate selected app ended session")
-            removeEventMonitors()
-            panel.orderOut(nil)
-            panel.level = SwitcherPanelWindowConfiguration.level
-            panel.collectionBehavior = SwitcherPanelWindowConfiguration.presentationCollectionBehavior()
-            activeHotkeySessionKind = nil
-            activePresentationScreen = nil
+        guard terminateSelectedAppTask == nil else { return }
+        let shouldAnimatePress = model.prepareTerminateSelectedAppAnimation()
+
+        terminateSelectedAppTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer {
+                self.terminateSelectedAppTask = nil
+            }
+
+            if shouldAnimatePress {
+                try? await Task.sleep(nanoseconds: 80_000_000)
+                guard !Task.isCancelled else { return }
+            }
+
+            switch self.model.terminateSelectedApp() {
+            case .notHandled:
+                self.model.clearTerminateSelectedAppAnimation()
+                RuntimeLog.info("Session", "terminate selected app ignored")
+                NSSound.beep()
+            case .updatedSession:
+                RuntimeLog.info("Session", "terminate selected app \(self.model.debugSelectionSummary())")
+                self.updatePanelSize()
+                self.scheduleDelayedWindowLayerEntryIfNeeded()
+            case .sessionEnded:
+                self.model.clearTerminateSelectedAppAnimation()
+                RuntimeLog.info("Session", "terminate selected app ended session")
+                self.endPresentationSession()
+            }
         }
     }
 
@@ -1275,6 +1314,16 @@ final class LiveSwitcherModel: ObservableObject {
         case sessionEnded
     }
 
+    private struct PendingTerminateRequest: Equatable {
+        let appID: String
+        let pid: pid_t
+        let preferredSelectedAppID: String?
+
+        func matches(appID: String, pid: pid_t) -> Bool {
+            self.pid == pid || self.appID == appID
+        }
+    }
+
     @Published private(set) var session: SwitcherSession? {
         didSet {
             guard let session else {
@@ -1292,6 +1341,7 @@ final class LiveSwitcherModel: ObservableObject {
     @Published private(set) var previewSectionHeight: CGFloat = 220
     @Published private(set) var overlayStyle: SwitcherOverlayStyle = .appAndWindow
     @Published private(set) var searchViewState: SwitcherSearchViewState = .inactive
+    @Published private(set) var terminatingAppID: String?
 
     private let snapshotProvider = RuntimeSnapshotProvider()
     private let activator = RuntimeActivator()
@@ -1319,6 +1369,7 @@ final class LiveSwitcherModel: ObservableObject {
     private var searchInputHasMarkedText = false
     private var pendingSearchComputationTask: Task<Void, Never>?
     private var pendingTerminateRefreshTask: Task<Void, Never>?
+    private var pendingTerminateRequest: PendingTerminateRequest?
     private var searchComputationRevision: UInt64 = 0
     private var searchDebounceNanoseconds: UInt64 = 20_000_000
 
@@ -1662,6 +1713,7 @@ final class LiveSwitcherModel: ObservableObject {
 
     func startSession(triggerDirection: CycleDirection) -> Bool {
         cancelPendingTerminateRefresh()
+        clearTerminateSelectedAppAnimation()
         overlayStyle = .appAndWindow
         titleBarStyleInferenceEnabled = false
         return loadSnapshot(triggerDirection: triggerDirection, preferredSelectedAppID: nil)
@@ -1669,6 +1721,7 @@ final class LiveSwitcherModel: ObservableObject {
 
     func startFocusedAppWindowSession(triggerDirection: CycleDirection) -> Bool {
         cancelPendingTerminateRefresh()
+        clearTerminateSelectedAppAnimation()
         overlayStyle = .windowOnly
         titleBarStyleInferenceEnabled = true
         guard let frontmostApp = NSWorkspace.shared.frontmostApplication else {
@@ -1729,27 +1782,18 @@ final class LiveSwitcherModel: ObservableObject {
         )
         guard sent else { return .notHandled }
 
-        if loadSnapshot(triggerDirection: .forward, preferredSelectedAppID: preferredSelectedAppID) {
-            if session?.apps.contains(where: { $0.id == selectedApp.id }) == true {
-                schedulePostTerminateRefresh(
-                    appID: selectedApp.id,
-                    pid: terminatingPID,
-                    preferredSelectedAppID: preferredSelectedAppID
-                )
-            } else {
-                cancelPendingTerminateRefresh()
-            }
-            return .updatedSession
-        }
-        cancelPendingTerminateRefresh()
-        return .sessionEnded
+        let request = PendingTerminateRequest(
+            appID: selectedApp.id,
+            pid: terminatingPID,
+            preferredSelectedAppID: preferredSelectedAppID
+        )
+        pendingTerminateRequest = request
+        terminatingAppID = selectedApp.id
+        schedulePostTerminateRefresh(for: request)
+        return .updatedSession
     }
 
-    private func schedulePostTerminateRefresh(
-        appID: String,
-        pid: pid_t,
-        preferredSelectedAppID: String?
-    ) {
+    private func schedulePostTerminateRefresh(for request: PendingTerminateRequest) {
         cancelPendingTerminateRefresh()
         let maxAttempts = max(1, Int(terminateRefreshTimeoutNs / terminateRefreshPollIntervalNs))
         pendingTerminateRefreshTask = Task { @MainActor [weak self] in
@@ -1757,32 +1801,48 @@ final class LiveSwitcherModel: ObservableObject {
             for _ in 0..<maxAttempts {
                 try? await Task.sleep(nanoseconds: self.terminateRefreshPollIntervalNs)
                 guard !Task.isCancelled else { return }
-                guard self.session != nil else {
-                    self.pendingTerminateRefreshTask = nil
-                    return
-                }
-                guard !self.isProcessRunning(pid) else { continue }
+                guard self.session != nil else { break }
+                guard self.pendingTerminateRequest == request else { break }
 
-                let refreshed = self.loadSnapshot(
-                    triggerDirection: .forward,
-                    preferredSelectedAppID: preferredSelectedAppID
+                guard !self.isProcessRunning(request.pid) else { continue }
+                self.refreshSessionAfterTerminatedApplication(
+                    appID: request.appID,
+                    pid: request.pid,
+                    reason: "poll"
                 )
-                RuntimeLog.info(
-                    "Session",
-                    "terminate post-refresh appID=\(appID) pid=\(pid) refreshed=\(refreshed)"
-                )
-                self.onSessionLayoutChanged?()
                 self.pendingTerminateRefreshTask = nil
                 return
             }
-            RuntimeLog.info("Session", "terminate post-refresh timeout appID=\(appID) pid=\(pid)")
+
+            guard self.pendingTerminateRequest == request else {
+                self.pendingTerminateRefreshTask = nil
+                return
+            }
+            if !self.isProcessRunning(request.pid) {
+                self.refreshSessionAfterTerminatedApplication(
+                    appID: request.appID,
+                    pid: request.pid,
+                    reason: "poll_timeout_final_check"
+                )
+                self.pendingTerminateRefreshTask = nil
+                return
+            }
+            RuntimeLog.info(
+                "Session",
+                "terminate post-refresh timeout appID=\(request.appID) pid=\(request.pid)"
+            )
+            self.pendingTerminateRequest = nil
+            if self.terminatingAppID == request.appID {
+                self.terminatingAppID = nil
+            }
             self.pendingTerminateRefreshTask = nil
         }
     }
 
     private func loadSnapshot(
         triggerDirection: CycleDirection,
-        preferredSelectedAppID: String?
+        preferredSelectedAppID: String?,
+        animateAppStripUpdate _: Bool = false
     ) -> Bool {
         let snapshot = makeSnapshot()
         guard !snapshot.apps.isEmpty else {
@@ -1815,9 +1875,66 @@ final class LiveSwitcherModel: ObservableObject {
         }
 
         session = rebuiltSession
+        if
+            let pendingTerminateRequest,
+            !rebuiltSession.apps.contains(where: { $0.id == pendingTerminateRequest.appID })
+        {
+            self.pendingTerminateRequest = nil
+            if terminatingAppID == pendingTerminateRequest.appID {
+                self.terminatingAppID = nil
+            }
+        }
+        if let terminatingAppID, !rebuiltSession.apps.contains(where: { $0.id == terminatingAppID }) {
+            self.terminatingAppID = nil
+        }
         searchCoordinator.rebuildIndex(with: rebuiltSession.apps)
         publishSearchStateIfNeeded()
         return true
+    }
+
+    func handleWorkspaceApplicationDidTerminate(_ notification: Notification) {
+        guard
+            let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+        else {
+            return
+        }
+        let appID = app.bundleIdentifier ?? "pid:\(app.processIdentifier)"
+        handleApplicationTerminated(appID: appID, pid: app.processIdentifier)
+    }
+
+    func handleApplicationTerminated(appID: String, pid: pid_t) {
+        refreshSessionAfterTerminatedApplication(appID: appID, pid: pid, reason: "workspace_notification")
+    }
+
+    private func refreshSessionAfterTerminatedApplication(appID: String, pid: pid_t, reason: String) {
+        guard session != nil else { return }
+
+        let pendingRequest = pendingTerminateRequest
+        let matchesPending = pendingRequest?.matches(appID: appID, pid: pid) == true
+        let appPresentInSessionByID = session?.apps.contains(where: { $0.id == appID }) == true
+        let appPresentInSessionByPID = runtimeContextsByID.values.contains {
+            $0.runningApp.processIdentifier == pid
+        }
+        guard matchesPending || appPresentInSessionByID || appPresentInSessionByPID else {
+            return
+        }
+
+        if matchesPending {
+            pendingTerminateRequest = nil
+        }
+        let refreshed = loadSnapshot(
+            triggerDirection: .forward,
+            preferredSelectedAppID: pendingRequest?.preferredSelectedAppID,
+            animateAppStripUpdate: true
+        )
+        RuntimeLog.info(
+            "Session",
+            "terminate post-refresh reason=\(reason) appID=\(appID) pid=\(pid) refreshed=\(refreshed)"
+        )
+        if matchesPending, let pendingRequest, terminatingAppID == pendingRequest.appID {
+            terminatingAppID = nil
+        }
+        onSessionLayoutChanged?()
     }
 
     private func preferredAppIDAfterRemovingSelectedApp(from session: SwitcherSession) -> String? {
@@ -1858,6 +1975,17 @@ final class LiveSwitcherModel: ObservableObject {
         self.session = session
     }
 
+    func prepareTerminateSelectedAppAnimation() -> Bool {
+        guard let session else { return false }
+        terminatingAppID = session.selectedApp.id
+        return true
+    }
+
+    func clearTerminateSelectedAppAnimation() {
+        pendingTerminateRequest = nil
+        terminatingAppID = nil
+    }
+
     @discardableResult
     func autoEnterWindowLayerIfPossible() -> Bool {
         guard var session else { return false }
@@ -1886,6 +2014,7 @@ final class LiveSwitcherModel: ObservableObject {
         let target = session.commitSelection()
         rememberedWindowIDByAppID = session.rememberedWindowIDByAppID
         cancelPendingTerminateRefresh()
+        clearTerminateSelectedAppAnimation()
         cancelPendingSearchComputation()
         self.session = nil
         _ = searchCoordinator.exit()
@@ -1909,6 +2038,8 @@ final class LiveSwitcherModel: ObservableObject {
         cancelPendingTerminateRefresh()
         cancelPendingSearchComputation()
         session = nil
+        pendingTerminateRequest = nil
+        terminatingAppID = nil
         overlayStyle = .appAndWindow
         searchCoordinator.rebuildIndex(with: [])
         publishSearchStateIfNeeded()
@@ -2110,6 +2241,7 @@ private struct SwitcherPanelRootView: View {
                     searchFeatureEnabled: searchEnabled,
                     searchDefaultScope: searchDefaultScope,
                     selectedApp: model.selectedApp,
+                    terminatingAppID: model.terminatingAppID,
                     appTileSize: model.appGridTileSize,
                     appTileSpacing: model.appGridSpacing,
                     iconForApp: { app in
@@ -2141,6 +2273,7 @@ private struct CommandTabOverlay: View {
     let searchFeatureEnabled: Bool
     let searchDefaultScope: SwitcherSearchScope
     let selectedApp: AppSwitchCandidate?
+    let terminatingAppID: String?
     let appTileSize: CGFloat
     let appTileSpacing: CGFloat
     let iconForApp: (AppSwitchCandidate) -> NSImage?
@@ -2290,18 +2423,6 @@ private struct CommandTabOverlay: View {
         }
     }
 
-    private func appGridColumns(for itemCount: Int) -> [GridItem] {
-        let count = max(itemCount, 1)
-        return Array(
-            repeating: GridItem(
-                .fixed(appTileSize),
-                spacing: appTileSpacing,
-                alignment: .leading
-            ),
-            count: count
-        )
-    }
-
     private func scrollToSelectedPreview(using proxy: ScrollViewProxy) {
         guard let selectedWindowPreviewID else { return }
         var transaction = Transaction(animation: nil)
@@ -2323,6 +2444,7 @@ private struct CommandTabOverlay: View {
 
     @ViewBuilder
     private var standardOverlayBody: some View {
+        let appIDs = session.apps.map(\.id)
         VStack(alignment: .leading, spacing: 12) {
             if showsSearchHeaderInStandardOverlay {
                 SearchInputHeader(
@@ -2334,20 +2456,22 @@ private struct CommandTabOverlay: View {
                 )
             }
 
-            LazyVGrid(
-                columns: appGridColumns(for: session.apps.count),
-                alignment: .leading,
-                spacing: appTileSpacing
-            ) {
+            HStack(alignment: .center, spacing: appTileSpacing) {
                 ForEach(Array(session.apps.enumerated()), id: \.element.id) { index, app in
                     AppTileView(
                         app: app,
                         isSelected: index == session.selectedAppIndex,
+                        isTerminating: app.id == terminatingAppID,
                         size: appTileSize,
                         icon: iconForApp(app)
                     )
+                    .transition(.appQuitRemoval)
                 }
             }
+            .animation(
+                session.apps.count <= 16 ? .easeOut(duration: 0.14) : nil,
+                value: appIDs
+            )
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 2)
 
@@ -3291,9 +3415,19 @@ private struct WindowOnlyPreviewCard: View {
     }
 }
 
+private extension AnyTransition {
+    static var appQuitRemoval: AnyTransition {
+        let removal = AnyTransition.opacity
+            .combined(with: .scale(scale: 0.72, anchor: .center))
+        let insertion = AnyTransition.opacity
+        return .asymmetric(insertion: insertion, removal: removal)
+    }
+}
+
 private struct AppTileView: View {
     let app: AppSwitchCandidate
     let isSelected: Bool
+    let isTerminating: Bool
     let size: CGFloat
     let icon: NSImage?
 
@@ -3332,5 +3466,9 @@ private struct AppTileView: View {
             }
         }
         .frame(width: size, height: size)
+        .scaleEffect(isTerminating ? 0.96 : 1.0)
+        .opacity(isTerminating ? 0.9 : 1.0)
+        .saturation(isTerminating ? 0.88 : 1.0)
+        .animation(.easeOut(duration: 0.12), value: isTerminating)
     }
 }
