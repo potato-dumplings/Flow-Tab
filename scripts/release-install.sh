@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-PROJECT_DIR="{user-home}/Projeck-Works/Personal/FlowTabApp"
-DERIVED_DATA_PATH="${PROJECT_DIR}/.build-local"
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+DERIVED_DATA_PATH="${ROOT_DIR}/.build-local"
 RELEASE_APP_PATH="${DERIVED_DATA_PATH}/Build/Products/Release/FlowTab.app"
 INSTALL_PATH="/Applications/FlowTab.app"
 BUNDLE_ID="io.github.potato-dumplings.flowtab"
@@ -55,7 +55,7 @@ reset_tcc_permission "ScreenCapture"
 
 STEP=$((STEP + 1))
 echo "[${STEP}/${TOTAL_STEPS}] Build Release"
-cd "${PROJECT_DIR}"
+cd "${ROOT_DIR}"
 xcodebuild \
   -project FlowTab.xcodeproj \
   -scheme FlowTab \
