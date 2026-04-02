@@ -379,6 +379,14 @@ final class SwitcherPanelController {
         return model.session != nil
     }
 
+    func updatePanelSizeForTesting(visibleFrame: CGRect) {
+        updatePanelSize(forVisibleFrame: visibleFrame)
+    }
+
+    var panelContentSizeForTesting: NSSize {
+        panel.contentRect(forFrameRect: panel.frame).size
+    }
+
     func cancelSelectionForTesting() {
         cancelSelection()
     }
@@ -761,6 +769,10 @@ final class SwitcherPanelController {
     private func updatePanelSize(for preferredScreen: NSScreen? = nil) {
         let visibleFrame = resolveSizingScreen(preferredScreen: preferredScreen)?.visibleFrame
             ?? CGRect(x: 0, y: 0, width: 1440, height: 900)
+        updatePanelSize(forVisibleFrame: visibleFrame)
+    }
+
+    private func updatePanelSize(forVisibleFrame visibleFrame: CGRect) {
         if model.isWindowOnlyOverlay {
             let width = max(640, visibleFrame.width - windowOnlyOverlayScreenMargin)
             let height = max(360, visibleFrame.height - windowOnlyOverlayScreenMargin)
@@ -776,7 +788,19 @@ final class SwitcherPanelController {
 
         let maxWidth = max(appLayerMinimumWidth, visibleFrame.width - panelScreenMargin)
         let maxHeight = max(minimumPanelHeight, visibleFrame.height - panelScreenMargin)
-        let width = maxWidth
+        let preferredWidth: CGFloat
+        if model.isPreviewLayerMode {
+            preferredWidth = preferredAppStripWidth(
+                appCount: model.appCount,
+                maxTileSize: previewLayerAppTileSize
+            )
+        } else {
+            preferredWidth = preferredAppStripWidth(
+                appCount: model.appCount,
+                maxTileSize: appLayerMaxAdaptiveTileSize
+            )
+        }
+        let width = min(maxWidth, preferredWidth)
         let height: CGFloat
 
         if model.isSearchActive {
@@ -853,6 +877,15 @@ final class SwitcherPanelController {
         return cardHeight
     }
 
+    private func preferredAppStripWidth(appCount: Int, maxTileSize: CGFloat) -> CGFloat {
+        let count = max(appCount, 1)
+        let spacing = count > 1 ? maxAppTileSpacing : 0
+        let stripWidth =
+            CGFloat(count) * maxTileSize
+            + CGFloat(max(count - 1, 0)) * spacing
+        return max(appLayerMinimumWidth, stripWidth + overlayHorizontalInset)
+    }
+
     private struct AppGridLayout {
         let tileSize: CGFloat
         let spacing: CGFloat
@@ -875,20 +908,15 @@ final class SwitcherPanelController {
     ) -> AppGridLayout {
         let count = max(appCount, 1)
         let safeWidth = max(1, availableWidth)
-        let baselineSpacing = maxAppTileSpacing
-        let tileByBaselineSpacing = (
-            safeWidth - CGFloat(max(count - 1, 0)) * baselineSpacing
-        ) / CGFloat(count)
-        let tileSize = max(minAppTileSize, min(maxTileSize, tileByBaselineSpacing))
-        let spacing: CGFloat
-        if count <= 1 {
-            spacing = 0
-        } else {
-            let fillSpacing = (
-                safeWidth - CGFloat(count) * tileSize
-            ) / CGFloat(count - 1)
-            spacing = max(0, fillSpacing)
-        }
+        let spacing = count > 1 ? maxAppTileSpacing : 0
+        let totalSpacing = CGFloat(max(count - 1, 0)) * spacing
+        let tileSize = max(
+            minAppTileSize,
+            min(
+                maxTileSize,
+                (safeWidth - totalSpacing) / CGFloat(count)
+            )
+        )
 
         return AppGridLayout(
             tileSize: tileSize,
@@ -2756,7 +2784,7 @@ private struct CommandTabOverlay: View {
                 session.apps.count <= 16 ? .easeOut(duration: 0.14) : nil,
                 value: appIDs
             )
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, alignment: .center)
             .padding(.horizontal, 2)
 
             if isPreviewLayer {

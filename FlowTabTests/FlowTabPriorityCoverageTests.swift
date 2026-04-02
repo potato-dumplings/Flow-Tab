@@ -1272,6 +1272,42 @@ final class FlowTabPriorityCoverageTests: XCTestCase {
         controller.cancelSelectionForTesting()
     }
 
+    @MainActor
+    func testSwitcherPanelControllerFewAppsShrinkPanelWidthWithoutChangingSpacing() {
+        let controller = SwitcherPanelController()
+        controller.modelForTesting.snapshotProviderOverride = {
+            RuntimeSnapshot(apps: self.layoutScenarioApps(count: 5), contextsByID: [:])
+        }
+
+        XCTAssertTrue(controller.modelForTesting.startSession(triggerDirection: .forward))
+
+        controller.updatePanelSizeForTesting(
+            visibleFrame: CGRect(x: 0, y: 0, width: 1440, height: 900)
+        )
+
+        XCTAssertEqual(controller.modelForTesting.appGridTileSize, 90, accuracy: 0.001)
+        XCTAssertEqual(controller.modelForTesting.appGridSpacing, 10, accuracy: 0.001)
+        XCTAssertEqual(controller.panelContentSizeForTesting.width, 554, accuracy: 0.001)
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerManyAppsReduceTileSizeWhileKeepingSpacingConstant() {
+        let controller = SwitcherPanelController()
+        controller.modelForTesting.snapshotProviderOverride = {
+            RuntimeSnapshot(apps: self.layoutScenarioApps(count: 20), contextsByID: [:])
+        }
+
+        XCTAssertTrue(controller.modelForTesting.startSession(triggerDirection: .forward))
+
+        controller.updatePanelSizeForTesting(
+            visibleFrame: CGRect(x: 0, y: 0, width: 1440, height: 900)
+        )
+
+        XCTAssertEqual(controller.modelForTesting.appGridSpacing, 10, accuracy: 0.001)
+        XCTAssertLessThan(controller.modelForTesting.appGridTileSize, 90)
+        XCTAssertEqual(controller.panelContentSizeForTesting.width, 1360, accuracy: 0.001)
+    }
+
     func testRuntimeSnapshotProviderAssemblySelectsPrimaryRowsAndFiltersMinimizedOnlyApps() {
         let rows = RuntimeSnapshotProvider.assembleSnapshotRowsForTesting(
             apps: [
@@ -1582,6 +1618,26 @@ final class FlowTabPriorityCoverageTests: XCTestCase {
                 ]
             )
         ]
+    }
+
+    private func layoutScenarioApps(count: Int) -> [AppSwitchCandidate] {
+        (0..<count).map { index in
+            let suffix = index + 1
+            return AppSwitchCandidate(
+                id: "com.example.layout-\(suffix)",
+                displayName: "Layout \(suffix)",
+                groupID: "layout",
+                lastActiveAt: TimeInterval(1_000 - index),
+                windows: [
+                    WindowCandidate(
+                        id: "layout-window-\(suffix)",
+                        title: "Window \(suffix)",
+                        isMinimized: false,
+                        lastActiveAt: TimeInterval(1_000 - index)
+                    )
+                ]
+            )
+        }
     }
 
     private func makeRuntimeAppContext(
