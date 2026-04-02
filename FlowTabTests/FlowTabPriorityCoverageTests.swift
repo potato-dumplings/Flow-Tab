@@ -443,6 +443,54 @@ final class FlowTabPriorityCoverageTests: XCTestCase {
         controller.modelForTesting.cancelSelection()
     }
 
+    @MainActor
+    func testSwitcherPanelControllerQuitFrontmostAppInAppLayerKeepsSessionAfterAutomaticTerminationRefresh() async {
+        await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
+            let controller = SwitcherPanelController()
+            let initialApps = self.terminateScenarioApps()
+            let refreshedApps = initialApps.filter { $0.id != "com.example.code" }
+            var snapshots = [
+                RuntimeSnapshot(apps: initialApps, contextsByID: [:]),
+                RuntimeSnapshot(apps: refreshedApps, contextsByID: [:])
+            ]
+            controller.modelForTesting.snapshotProviderOverride = {
+                snapshots.removeFirst()
+            }
+            controller.modelForTesting.terminateRequestOverride = { _ in
+                (sent: true, pid: 42_100)
+            }
+            // Use polling path to drive a fully automatic refresh after quit shortcut.
+            controller.modelForTesting.isProcessRunningOverride = { _ in false }
+
+            XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+            XCTAssertEqual(controller.modelForTesting.selectedApp?.id, "com.example.code")
+            XCTAssertFalse(controller.modelForTesting.isSearchActive)
+
+            let layoutRefreshed = expectation(
+                description: "layout refreshed automatically after terminating frontmost app in app layer"
+            )
+            controller.modelForTesting.onSessionLayoutChanged = { layoutRefreshed.fulfill() }
+
+            let hotkeyConfiguration = SwitcherHotkeyPreferencesStore.load()
+            let handled = controller.handleKeyDownForTesting(
+                Self.makeKeyDownEvent(
+                    keyCode: hotkeyConfiguration.quitKeyCode,
+                    modifierFlags: hotkeyConfiguration.primaryModifier.eventModifierFlag
+                )
+            )
+            XCTAssertTrue(handled)
+
+            await fulfillment(of: [layoutRefreshed], timeout: 1.0)
+            try? await Task.sleep(nanoseconds: 120_000_000)
+
+            XCTAssertNotNil(controller.modelForTesting.session)
+            XCTAssertEqual(controller.modelForTesting.appCount, 2)
+            XCTAssertEqual(controller.modelForTesting.selectedApp?.id, "com.example.browser")
+            XCTAssertFalse(controller.modelForTesting.isSearchActive)
+            controller.cancelSelectionForTesting()
+        }
+    }
+
     func testOptionTabHotkeyMonitorRoutesForwardAndBackwardPressReleaseCallbacks() {
         let monitor = OptionTabHotkeyMonitor(
             configuration: SwitcherHotkeyPreferencesStore.resolve(
