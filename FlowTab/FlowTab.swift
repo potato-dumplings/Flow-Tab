@@ -363,6 +363,27 @@ enum InAppWindowHotkeyPreferencesStore {
         let mainKey = SwitcherHotkeyKey(rawValue: mainKeyRaw) ?? defaultMainKey
         return (primaryModifier, mainKey)
     }
+
+    static func resolveAvoidingMainHotkeyConflict(
+        primaryModifierRaw: String,
+        mainKeyRaw: String,
+        mainHotkeyConfiguration: SwitcherHotkeyConfiguration
+    ) -> (primaryModifier: SwitcherPrimaryModifier, mainKey: SwitcherHotkeyKey) {
+        let resolved = resolve(primaryModifierRaw: primaryModifierRaw, mainKeyRaw: mainKeyRaw)
+        guard
+            resolved.primaryModifier == mainHotkeyConfiguration.primaryModifier,
+            resolved.mainKey == mainHotkeyConfiguration.mainKey
+        else {
+            return resolved
+        }
+
+        let candidateModifiers = [defaultPrimaryModifier] + SwitcherPrimaryModifier.allCases
+        let fallbackPrimaryModifier = candidateModifiers.first {
+            $0 != mainHotkeyConfiguration.primaryModifier
+        } ?? defaultPrimaryModifier
+
+        return (fallbackPrimaryModifier, resolved.mainKey)
+    }
 }
 
 extension ThemeMode {
@@ -5104,9 +5125,10 @@ private struct AppSettingsView: View {
     }
 
     private func enforceInAppWindowHotkeyConsistency() {
-        let resolved = InAppWindowHotkeyPreferencesStore.resolve(
+        let resolved = InAppWindowHotkeyPreferencesStore.resolveAvoidingMainHotkeyConflict(
             primaryModifierRaw: inAppWindowHotkeyPrimaryModifierRaw,
-            mainKeyRaw: inAppWindowHotkeyMainKeyRaw
+            mainKeyRaw: inAppWindowHotkeyMainKeyRaw,
+            mainHotkeyConfiguration: hotkeyConfiguration
         )
         if inAppWindowHotkeyPrimaryModifierRaw != resolved.primaryModifier.rawValue {
             inAppWindowHotkeyPrimaryModifierRaw = resolved.primaryModifier.rawValue

@@ -644,6 +644,38 @@ final class FlowTabTests: XCTestCase {
         )
     }
 
+    func testInAppWindowHotkeyResolveAvoidingMainConflictFallsBackToNonConflictingModifier() {
+        let mainConfiguration = SwitcherHotkeyConfiguration(
+            primaryModifier: .control,
+            mainKey: .tab,
+            quitKey: .q
+        )
+
+        let resolved = InAppWindowHotkeyPreferencesStore.resolveAvoidingMainHotkeyConflict(
+            primaryModifierRaw: SwitcherPrimaryModifier.control.rawValue,
+            mainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
+            mainHotkeyConfiguration: mainConfiguration
+        )
+        XCTAssertEqual(resolved.primaryModifier, .option)
+        XCTAssertEqual(resolved.mainKey, .tab)
+    }
+
+    func testInAppWindowHotkeyResolveAvoidingMainConflictKeepsNonConflictingShortcut() {
+        let mainConfiguration = SwitcherHotkeyConfiguration(
+            primaryModifier: .option,
+            mainKey: .tab,
+            quitKey: .q
+        )
+
+        let resolved = InAppWindowHotkeyPreferencesStore.resolveAvoidingMainHotkeyConflict(
+            primaryModifierRaw: SwitcherPrimaryModifier.option.rawValue,
+            mainKeyRaw: SwitcherHotkeyKey.space.rawValue,
+            mainHotkeyConfiguration: mainConfiguration
+        )
+        XCTAssertEqual(resolved.primaryModifier, .option)
+        XCTAssertEqual(resolved.mainKey, .space)
+    }
+
     func testSwitcherBehaviorAndVisibilityPreferenceDefaults() {
         guard let userDefaults = makeIsolatedUserDefaults() else { return }
         defer { clearIsolatedUserDefaults(userDefaults) }
@@ -997,7 +1029,13 @@ final class FlowTabTests: XCTestCase {
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
         let expectedKind = SwitcherSearchResultKind.app(appID: "com.xxx.test")
-        for suffix in ["t", "e", "s", "t"] {
+        XCTAssertTrue(coordinator.appendQueryText("t"))
+        drainPendingSearchRebuild(on: coordinator)
+        let firstStepResults = Set(coordinator.state.results.map(\.primaryText))
+        XCTAssertTrue(firstStepResults.contains("FlowTabSearch"), "Query \(coordinator.state.query)")
+        XCTAssertTrue(firstStepResults.contains("测试"), "Query \(coordinator.state.query)")
+
+        for suffix in ["e", "s", "t"] {
             XCTAssertTrue(coordinator.appendQueryText(suffix))
             drainPendingSearchRebuild(on: coordinator)
             XCTAssertEqual(coordinator.state.results.first?.primaryText, "测试", "Query \(coordinator.state.query)")
