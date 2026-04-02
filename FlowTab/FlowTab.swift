@@ -103,6 +103,83 @@ extension Notification.Name {
     )
 }
 
+struct HotkeyRegistrationRequest: Sendable {
+    private enum NotificationUserInfoKey {
+        static let requestID = "requestID"
+        static let mainPrimaryModifier = "mainPrimaryModifier"
+        static let mainKey = "mainKey"
+        static let quitKey = "quitKey"
+        static let inAppPrimaryModifier = "inAppPrimaryModifier"
+        static let inAppMainKey = "inAppMainKey"
+    }
+
+    let requestID: UUID
+    let mainConfiguration: SwitcherHotkeyConfiguration
+    let inAppWindowConfiguration: SwitcherHotkeyConfiguration
+
+    init(
+        requestID: UUID = UUID(),
+        mainConfiguration: SwitcherHotkeyConfiguration,
+        inAppWindowConfiguration: SwitcherHotkeyConfiguration
+    ) {
+        self.requestID = requestID
+        self.mainConfiguration = mainConfiguration
+        self.inAppWindowConfiguration = inAppWindowConfiguration
+    }
+
+    static func load(userDefaults: UserDefaults = .standard) -> HotkeyRegistrationRequest {
+        HotkeyRegistrationRequest(
+            mainConfiguration: SwitcherHotkeyPreferencesStore.load(userDefaults: userDefaults),
+            inAppWindowConfiguration: InAppWindowHotkeyPreferencesStore.load(userDefaults: userDefaults)
+        )
+    }
+
+    init?(notificationUserInfo: [AnyHashable: Any]) {
+        guard
+            let requestIDRaw = notificationUserInfo[NotificationUserInfoKey.requestID] as? String,
+            let mainPrimaryModifierRaw =
+                notificationUserInfo[NotificationUserInfoKey.mainPrimaryModifier] as? String,
+            let mainKeyRaw = notificationUserInfo[NotificationUserInfoKey.mainKey] as? String,
+            let quitKeyRaw = notificationUserInfo[NotificationUserInfoKey.quitKey] as? String,
+            let inAppPrimaryModifierRaw =
+                notificationUserInfo[NotificationUserInfoKey.inAppPrimaryModifier] as? String,
+            let inAppMainKeyRaw = notificationUserInfo[NotificationUserInfoKey.inAppMainKey] as? String
+        else {
+            return nil
+        }
+
+        let resolvedInAppWindowConfiguration = InAppWindowHotkeyPreferencesStore.resolve(
+            primaryModifierRaw: inAppPrimaryModifierRaw,
+            mainKeyRaw: inAppMainKeyRaw
+        )
+        self.init(
+            requestID: UUID(uuidString: requestIDRaw) ?? UUID(),
+            mainConfiguration: SwitcherHotkeyPreferencesStore.resolve(
+                primaryModifierRaw: mainPrimaryModifierRaw,
+                mainKeyRaw: mainKeyRaw,
+                quitKeyRaw: quitKeyRaw
+            ),
+            inAppWindowConfiguration: SwitcherHotkeyConfiguration(
+                primaryModifier: resolvedInAppWindowConfiguration.primaryModifier,
+                mainKey: resolvedInAppWindowConfiguration.mainKey,
+                quitKey: .q
+            )
+        )
+    }
+
+    var notificationUserInfo: [AnyHashable: Any] {
+        [
+            NotificationUserInfoKey.requestID: requestID.uuidString,
+            NotificationUserInfoKey.mainPrimaryModifier: mainConfiguration.primaryModifier.rawValue,
+            NotificationUserInfoKey.mainKey: mainConfiguration.mainKey.rawValue,
+            NotificationUserInfoKey.quitKey: mainConfiguration.quitKey.rawValue,
+            NotificationUserInfoKey.inAppPrimaryModifier:
+                inAppWindowConfiguration.primaryModifier.rawValue,
+            NotificationUserInfoKey.inAppMainKey: inAppWindowConfiguration.mainKey.rawValue
+        ]
+    }
+}
+
 protocol AppWindowOpeningWindow: AnyObject {
     var isPanelWindow: Bool { get }
     var isMiniaturized: Bool { get }
@@ -5204,12 +5281,49 @@ private struct AppSettingsView: View {
         syncWindowLayerAutoEnterDelayText()
     }
 
+    @MainActor
+    private func persistHotkeyRegistrationRequest(_ request: HotkeyRegistrationRequest) {
+        let userDefaults = UserDefaults.standard
+        userDefaults.set(
+            request.mainConfiguration.primaryModifier.rawValue,
+            forKey: AppPreferenceKeys.hotkeyPrimaryModifier
+        )
+        userDefaults.set(request.mainConfiguration.mainKey.rawValue, forKey: AppPreferenceKeys.hotkeyMainKey)
+        userDefaults.set(request.mainConfiguration.quitKey.rawValue, forKey: AppPreferenceKeys.hotkeyQuitKey)
+        userDefaults.set(
+            request.inAppWindowConfiguration.primaryModifier.rawValue,
+            forKey: AppPreferenceKeys.inAppWindowHotkeyPrimaryModifier
+        )
+        userDefaults.set(
+            request.inAppWindowConfiguration.mainKey.rawValue,
+            forKey: AppPreferenceKeys.inAppWindowHotkeyMainKey
+        )
+    }
+
+    @MainActor
     private func notifyHotkeyConfigChanged() {
+        let request = HotkeyRegistrationRequest(
+            mainConfiguration: hotkeyConfiguration,
+            inAppWindowConfiguration: inAppWindowHotkeyConfiguration
+        )
+        persistHotkeyRegistrationRequest(request)
         RuntimeLog.info(
             "HotKey",
-            "updated main=\(hotkeyConfiguration.mainShortcutText) backward=\(hotkeyConfiguration.backwardShortcutText) quit=\(hotkeyConfiguration.quitShortcutText) inApp=\(inAppWindowHotkeyConfiguration.mainShortcutText) inAppBackward=\(inAppWindowHotkeyConfiguration.backwardShortcutText)"
+            "updated main=\(request.mainConfiguration.mainShortcutText) backward=\(request.mainConfiguration.backwardShortcutText) quit=\(request.mainConfiguration.quitShortcutText) inApp=\(request.inAppWindowConfiguration.mainShortcutText) inAppBackward=\(request.inAppWindowConfiguration.backwardShortcutText)"
         )
-        NotificationCenter.default.post(name: .flowTabReRegisterHotkeys, object: nil)
+        if let appDelegate = AppDelegate.shared {
+            appDelegate.requestHotkeyReload(using: request, source: "settings_view")
+        } else {
+            RuntimeLog.info(
+                "HotKey",
+                "re-register requested source=settings_view requestID=\(request.requestID.uuidString) action=notification_only"
+            )
+            NotificationCenter.default.post(
+                name: .flowTabReRegisterHotkeys,
+                object: nil,
+                userInfo: request.notificationUserInfo
+            )
+        }
     }
 
     private func notifyAppVisibilityPreferenceChanged() {
@@ -5516,6 +5630,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         var stressRunner: (any TabSwitchStressRunning)?
     }
 
+    static weak var shared: AppDelegate?
     static var testHooks = TestHooks()
 
     private var panelController: SwitcherPanelController?
@@ -5592,14 +5707,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        Self.shared = self
         FlowTabUITestBootstrapper.prepareIfNeeded(userDefaults: resolvedUserDefaults)
         applyActivationPolicyFromPreferences()
 
         let panelController = makePanelController()
         self.panelController = panelController
 
-        setupHotkeyMonitor()
-        setupInAppWindowHotkeyMonitor()
+        setupHotkeyMonitors(using: HotkeyRegistrationRequest.load(userDefaults: resolvedUserDefaults))
         installHotkeyObserver()
         installAppVisibilityObserver()
         installLanguageObserver()
@@ -5626,6 +5741,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        if Self.shared === self {
+            Self.shared = nil
+        }
         if let hotkeyObserver {
             NotificationCenter.default.removeObserver(hotkeyObserver)
             self.hotkeyObserver = nil
@@ -5643,13 +5761,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         commandTabTakeoverController.restoreSystemShortcutsIfNeeded()
     }
 
-    private func setupHotkeyMonitor() {
+    func requestHotkeyReload(using request: HotkeyRegistrationRequest, source: String) {
+        RuntimeLog.info(
+            "HotKey",
+            "re-register requested source=\(source) requestID=\(request.requestID.uuidString) main=\(request.mainConfiguration.mainShortcutText) inApp=\(request.inAppWindowConfiguration.mainShortcutText)"
+        )
+        applyHotkeyReload(request, source: source)
+        NotificationCenter.default.post(
+            name: .flowTabReRegisterHotkeys,
+            object: self,
+            userInfo: request.notificationUserInfo
+        )
+    }
+
+    private func setupHotkeyMonitors(using request: HotkeyRegistrationRequest) {
+        setupHotkeyMonitor(using: request)
+        setupInAppWindowHotkeyMonitor(using: request)
+    }
+
+    private func applyHotkeyReload(_ request: HotkeyRegistrationRequest, source: String) {
+        RuntimeLog.info(
+            "HotKey",
+            "re-register applying source=\(source) requestID=\(request.requestID.uuidString)"
+        )
+        setupHotkeyMonitors(using: request)
+    }
+
+    private func setupHotkeyMonitor(using request: HotkeyRegistrationRequest) {
         hotkeyMonitor?.stop()
 
-        var hotkeyConfiguration = SwitcherHotkeyPreferencesStore.load(userDefaults: resolvedUserDefaults)
-        let inAppHotkeyConfiguration = InAppWindowHotkeyPreferencesStore.load(
-            userDefaults: resolvedUserDefaults
-        )
+        var hotkeyConfiguration = request.mainConfiguration
+        let inAppHotkeyConfiguration = request.inAppWindowConfiguration
         let mainUsesCommandTab =
             hotkeyConfiguration.primaryModifier == .command && hotkeyConfiguration.mainKey == .tab
         let inAppUsesCommandTab =
@@ -5693,13 +5835,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotkeyMonitor = monitor
     }
 
-    private func setupInAppWindowHotkeyMonitor() {
+    private func setupInAppWindowHotkeyMonitor(using request: HotkeyRegistrationRequest) {
         inAppWindowHotkeyMonitor?.stop()
 
-        let mainConfiguration = SwitcherHotkeyPreferencesStore.load(userDefaults: resolvedUserDefaults)
-        let inAppConfiguration = InAppWindowHotkeyPreferencesStore.load(
-            userDefaults: resolvedUserDefaults
-        )
+        let mainConfiguration = request.mainConfiguration
+        let inAppConfiguration = request.inAppWindowConfiguration
         if
             mainConfiguration.primaryModifier == inAppConfiguration.primaryModifier
                 && mainConfiguration.mainKey == inAppConfiguration.mainKey
@@ -5741,10 +5881,51 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             forName: .flowTabReRegisterHotkeys,
             object: nil,
             queue: .main
-        ) { [weak self] _ in
+        ) { [weak self] notification in
+            let postedRequest = notification.userInfo.flatMap(HotkeyRegistrationRequest.init)
+            let sendingDelegateID = (notification.object as AnyObject?).map(ObjectIdentifier.init)
             Task { @MainActor [weak self] in
-                self?.setupHotkeyMonitor()
-                self?.setupInAppWindowHotkeyMonitor()
+                guard let self else { return }
+                if Self.shared !== self {
+                    if let postedRequest {
+                        RuntimeLog.info(
+                            "HotKey",
+                            "re-register ignored source=notification_stale_delegate requestID=\(postedRequest.requestID.uuidString)"
+                        )
+                    } else {
+                        RuntimeLog.info(
+                            "HotKey",
+                            "re-register ignored source=notification_stale_delegate requestID=missing_payload"
+                        )
+                    }
+                    return
+                }
+                if sendingDelegateID == ObjectIdentifier(self) {
+                    if let postedRequest {
+                        RuntimeLog.info(
+                            "HotKey",
+                            "re-register ignored source=notification_self requestID=\(postedRequest.requestID.uuidString)"
+                        )
+                    } else {
+                        RuntimeLog.info(
+                            "HotKey",
+                            "re-register ignored source=notification_self requestID=missing_payload"
+                        )
+                    }
+                    return
+                }
+                guard let postedRequest else {
+                    RuntimeLog.info(
+                        "HotKey",
+                        "re-register ignored source=notification_missing_payload"
+                    )
+                    return
+                }
+                RuntimeLog.info(
+                    "HotKey",
+                    "re-register requested source=notification_payload requestID=\(postedRequest.requestID.uuidString) main=\(postedRequest.mainConfiguration.mainShortcutText) inApp=\(postedRequest.inAppWindowConfiguration.mainShortcutText)"
+                )
+                self.applyHotkeyReload(postedRequest, source: "notification_payload")
             }
         }
     }

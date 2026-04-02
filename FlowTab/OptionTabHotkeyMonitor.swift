@@ -3,7 +3,7 @@ import Carbon
 import Foundation
 import Darwin
 
-enum SwitcherPrimaryModifier: String, CaseIterable, Identifiable {
+enum SwitcherPrimaryModifier: String, CaseIterable, Identifiable, Sendable {
     case option
     case control
     case command
@@ -44,7 +44,7 @@ enum SwitcherPrimaryModifier: String, CaseIterable, Identifiable {
     }
 }
 
-enum SwitcherHotkeyKey: String, CaseIterable, Identifiable {
+enum SwitcherHotkeyKey: String, CaseIterable, Identifiable, Sendable {
     case tab
     case space
     case grave
@@ -154,7 +154,7 @@ enum SwitcherHotkeyKey: String, CaseIterable, Identifiable {
     }
 }
 
-struct SwitcherHotkeyConfiguration {
+struct SwitcherHotkeyConfiguration: Sendable {
     let primaryModifier: SwitcherPrimaryModifier
     let mainKey: SwitcherHotkeyKey
     let quitKey: SwitcherHotkeyKey
