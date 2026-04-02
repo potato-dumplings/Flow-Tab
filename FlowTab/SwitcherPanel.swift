@@ -2712,7 +2712,6 @@ private struct CommandTabOverlay: View {
             if showsSearchHeaderInStandardOverlay {
                 SearchInputHeader(
                     query: "",
-                    cursorPosition: 0,
                     scope: searchDefaultScope,
                     isInputFocused: false,
                     hintText: AppStrings.text(.panelHintEnterToSearch)
@@ -2793,25 +2792,15 @@ private struct CommandTabOverlay: View {
     @ViewBuilder
     private var searchOverlayBody: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SearchInputHeader(
+            SearchPresentationHeader(
                 query: searchState.query,
                 cursorPosition: searchState.queryCursorPosition,
                 scope: searchState.scope,
                 isInputFocused: searchState.isInputFocused,
-                hintText: AppStrings.text(.panelHintSearchMode),
                 highlightedItem: searchHeaderHighlightItem,
-                isSearchPresentation: true
-            )
-            .background(
-                SearchSystemTextInputBridge(
-                    query: searchState.query,
-                    cursorPosition: searchState.queryCursorPosition,
-                    isSearchActive: searchState.isActive,
-                    onInputChanged: onSearchInputChanged,
-                    onMarkedTextChanged: onSearchMarkedTextChanged
-                )
-                .opacity(0.01)
-                .allowsHitTesting(false)
+                isSearchActive: searchState.isActive,
+                onSearchInputChanged: onSearchInputChanged,
+                onSearchMarkedTextChanged: onSearchMarkedTextChanged
             )
             .accessibilityIdentifier("flowtab.switcher.search")
 
@@ -2975,6 +2964,7 @@ private struct SearchSystemTextInputBridge: NSViewRepresentable {
     let query: String
     let cursorPosition: Int
     let isSearchActive: Bool
+    let showsInsertionPoint: Bool
     let onInputChanged: (String, Int) -> Void
     let onMarkedTextChanged: (Bool) -> Void
 
@@ -3001,7 +2991,8 @@ private struct SearchSystemTextInputBridge: NSViewRepresentable {
             textView: nsView.textView,
             query: query,
             cursorPosition: cursorPosition,
-            isSearchActive: isSearchActive
+            isSearchActive: isSearchActive,
+            showsInsertionPoint: showsInsertionPoint
         )
     }
 
@@ -3055,7 +3046,8 @@ private struct SearchSystemTextInputBridge: NSViewRepresentable {
             textView: NSTextView,
             query: String,
             cursorPosition: Int,
-            isSearchActive: Bool
+            isSearchActive: Bool,
+            showsInsertionPoint: Bool
         ) {
             let resolvedCursorPosition = min(max(cursorPosition, 0), query.count)
             let selectedRange = NSRange(location: resolvedCursorPosition, length: 0)
@@ -3065,6 +3057,10 @@ private struct SearchSystemTextInputBridge: NSViewRepresentable {
             }
             if textView.selectedRange() != selectedRange {
                 textView.setSelectedRange(selectedRange)
+            }
+            let insertionPointColor: NSColor = showsInsertionPoint ? .controlAccentColor : .clear
+            if textView.insertionPointColor != insertionPointColor {
+                textView.insertionPointColor = insertionPointColor
             }
             isApplyingViewState = false
 
@@ -3178,6 +3174,8 @@ private final class SearchSystemTextInputContainerView: NSView {
         textContainer.widthTracksTextView = true
         textContainer.heightTracksTextView = true
         textContainer.lineFragmentPadding = 0
+        textContainer.maximumNumberOfLines = 1
+        textContainer.lineBreakMode = .byClipping
         textStorage.addLayoutManager(layoutManager)
         layoutManager.addTextContainer(textContainer)
 
@@ -3188,8 +3186,8 @@ private final class SearchSystemTextInputContainerView: NSView {
         textView.translatesAutoresizingMaskIntoConstraints = false
         textView.drawsBackground = false
         textView.backgroundColor = .clear
-        textView.textColor = .clear
-        textView.insertionPointColor = .clear
+        textView.textColor = .labelColor
+        textView.insertionPointColor = .controlAccentColor
         textView.font = .systemFont(ofSize: 20, weight: .regular)
         textView.isEditable = true
         textView.isSelectable = true
@@ -3279,13 +3277,15 @@ final class SearchSystemTextInputBridgeTestHarness {
     func synchronize(
         query: String,
         cursorPosition: Int,
-        isSearchActive: Bool = false
+        isSearchActive: Bool = false,
+        showsInsertionPoint: Bool = true
     ) {
         coordinator.synchronize(
             textView: containerView.textView,
             query: query,
             cursorPosition: cursorPosition,
-            isSearchActive: isSearchActive
+            isSearchActive: isSearchActive,
+            showsInsertionPoint: showsInsertionPoint
         )
     }
 
@@ -3314,165 +3314,167 @@ final class SearchSystemTextInputBridgeTestHarness {
 
 private struct SearchInputHeader: View {
     let query: String
-    let cursorPosition: Int
     let scope: SwitcherSearchScope
     let isInputFocused: Bool
     let hintText: String
-    let highlightedItem: SearchHeaderHighlightItem?
-    let isSearchPresentation: Bool
     @Environment(\.colorScheme) private var colorScheme
 
     init(
         query: String,
-        cursorPosition: Int,
         scope: SwitcherSearchScope,
         isInputFocused: Bool,
-        hintText: String,
-        highlightedItem: SearchHeaderHighlightItem? = nil,
-        isSearchPresentation: Bool = false
+        hintText: String
     ) {
         self.query = query
-        self.cursorPosition = cursorPosition
         self.scope = scope
         self.isInputFocused = isInputFocused
         self.hintText = hintText
-        self.highlightedItem = highlightedItem
-        self.isSearchPresentation = isSearchPresentation
     }
 
-    private var queryTextWithCursor: String {
+    private var queryText: String {
         if query.isEmpty && !isInputFocused {
             return AppStrings.text(.panelInputPlaceholder)
-        }
-        guard isInputFocused else {
-            return query
-        }
-        let clampedCursorPosition = min(max(cursorPosition, 0), query.count)
-        let splitIndex = query.index(query.startIndex, offsetBy: clampedCursorPosition)
-        return String(query[..<splitIndex]) + "│" + String(query[splitIndex...])
-    }
-
-    private var searchModeQueryText: String {
-        if query.isEmpty {
-            return isInputFocused ? "│" : AppStrings.text(.panelSearchLabel)
-        }
-        let clampedCursorPosition = min(max(cursorPosition, 0), query.count)
-        if isInputFocused {
-            let splitIndex = query.index(query.startIndex, offsetBy: clampedCursorPosition)
-            return String(query[..<splitIndex]) + "│" + String(query[splitIndex...])
         }
         return query
     }
 
     var body: some View {
-        Group {
-            if isSearchPresentation {
-                HStack(spacing: 12) {
-                    Text(searchModeQueryText)
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.secondary)
+
+                Text(queryText)
+                    .foregroundStyle(query.isEmpty && !isInputFocused ? .secondary : .primary)
+                    .lineLimit(1)
+                    .font(.system(size: 13, weight: .medium))
+
+                Spacer(minLength: 8)
+
+                Text(scope.label)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule(style: .continuous)
+                            .fill(Color.primary.opacity(colorScheme == .dark ? 0.20 : 0.08))
+                    )
+            }
+
+            Text(hintText)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary.opacity(isInputFocused ? 0.95 : 0.78))
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(
+                    isInputFocused
+                        ? Color.accentColor.opacity(colorScheme == .dark ? 0.78 : 0.58)
+                        : Color.primary.opacity(colorScheme == .dark ? 0.20 : 0.10),
+                    lineWidth: isInputFocused ? 1.6 : 1
+                )
+        )
+    }
+}
+
+private struct SearchPresentationHeader: View {
+    let query: String
+    let cursorPosition: Int
+    let scope: SwitcherSearchScope
+    let isInputFocused: Bool
+    let highlightedItem: SearchHeaderHighlightItem?
+    let isSearchActive: Bool
+    let onSearchInputChanged: (String, Int) -> Void
+    let onSearchMarkedTextChanged: (Bool) -> Void
+    @Environment(\.colorScheme) private var colorScheme
+
+    private let inputLineHeight: CGFloat = 24
+
+    var body: some View {
+        HStack(spacing: 12) {
+            ZStack(alignment: .leading) {
+                if query.isEmpty && !isInputFocused {
+                    Text(AppStrings.text(.panelSearchLabel))
                         .lineLimit(1)
-                        .minimumScaleFactor(0.72)
+                        .truncationMode(.tail)
                         .font(.system(size: 20, weight: .regular))
-                        .foregroundStyle(query.isEmpty && !isInputFocused ? .secondary : .primary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    if let highlightedItem {
-                        HStack(spacing: 8) {
-                            Text("—")
-                                .font(.system(size: 16, weight: .regular))
-                                .foregroundStyle(.secondary)
-                            Text(highlightedItem.title)
-                                .lineLimit(1)
-                                .font(.system(size: 14, weight: .regular))
-                                .foregroundStyle(.primary)
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 6)
-                        .background(
-                            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                .fill(Color.accentColor.opacity(colorScheme == .dark ? 0.30 : 0.20))
-                        )
-                    }
-
-                    Group {
-                        if let icon = highlightedItem?.icon {
-                            Image(nsImage: icon)
-                                .resizable()
-                                .interpolation(.high)
-                        } else {
-                            RoundedRectangle(cornerRadius: 7, style: .continuous)
-                                .fill(Color.primary.opacity(0.13))
-                                .overlay(
-                                    Image(systemName: scope == .app ? "app.badge.fill" : "macwindow")
-                                        .font(.system(size: 12, weight: .semibold))
-                                        .foregroundStyle(.secondary)
-                                )
-                        }
-                    }
-                    .frame(width: 26, height: 26)
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    .shadow(color: .black.opacity(colorScheme == .dark ? 0.22 : 0.10), radius: 3, y: 1)
+                        .foregroundStyle(.secondary)
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.05))
+
+                SearchSystemTextInputBridge(
+                    query: query,
+                    cursorPosition: cursorPosition,
+                    isSearchActive: isSearchActive,
+                    showsInsertionPoint: isInputFocused,
+                    onInputChanged: onSearchInputChanged,
+                    onMarkedTextChanged: onSearchMarkedTextChanged
                 )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(
-                            isInputFocused
-                                ? Color.accentColor.opacity(colorScheme == .dark ? 0.76 : 0.54)
-                                : Color.primary.opacity(colorScheme == .dark ? 0.20 : 0.10),
-                            lineWidth: isInputFocused ? 1.6 : 1
-                        )
-                )
-            } else {
-                VStack(alignment: .leading, spacing: 7) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(.secondary)
+                .opacity(query.isEmpty && !isInputFocused ? 0.01 : 1)
+                .allowsHitTesting(false)
+            }
+            .frame(maxWidth: .infinity, minHeight: inputLineHeight, maxHeight: inputLineHeight, alignment: .leading)
+            .clipped()
 
-                        Text(queryTextWithCursor)
-                            .foregroundStyle(query.isEmpty && !isInputFocused ? .secondary : .primary)
-                            .lineLimit(1)
-                            .font(.system(size: 13, weight: .medium))
-
-                        Spacer(minLength: 8)
-
-                        Text(scope.label)
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(
-                                Capsule(style: .continuous)
-                                    .fill(Color.primary.opacity(colorScheme == .dark ? 0.20 : 0.08))
-                            )
-                    }
-
-                    Text(hintText)
-                        .font(.system(size: 11))
-                        .foregroundStyle(.secondary.opacity(isInputFocused ? 0.95 : 0.78))
+            if let highlightedItem {
+                HStack(spacing: 8) {
+                    Text("—")
+                        .font(.system(size: 16, weight: .regular))
+                        .foregroundStyle(.secondary)
+                    Text(highlightedItem.title)
+                        .lineLimit(1)
+                        .font(.system(size: 14, weight: .regular))
+                        .foregroundStyle(.primary)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 6)
                 .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.05))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .stroke(
-                            isInputFocused
-                                ? Color.accentColor.opacity(colorScheme == .dark ? 0.78 : 0.58)
-                                : Color.primary.opacity(colorScheme == .dark ? 0.20 : 0.10),
-                            lineWidth: isInputFocused ? 1.6 : 1
-                        )
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .fill(Color.accentColor.opacity(colorScheme == .dark ? 0.30 : 0.20))
                 )
             }
+
+            Group {
+                if let icon = highlightedItem?.icon {
+                    Image(nsImage: icon)
+                        .resizable()
+                        .interpolation(.high)
+                } else {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .fill(Color.primary.opacity(0.13))
+                        .overlay(
+                            Image(systemName: scope == .app ? "app.badge.fill" : "macwindow")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(.secondary)
+                        )
+                }
+            }
+            .frame(width: 26, height: 26)
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .shadow(color: .black.opacity(colorScheme == .dark ? 0.22 : 0.10), radius: 3, y: 1)
         }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(Color.primary.opacity(colorScheme == .dark ? 0.16 : 0.05))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(
+                    isInputFocused
+                        ? Color.accentColor.opacity(colorScheme == .dark ? 0.76 : 0.54)
+                        : Color.primary.opacity(colorScheme == .dark ? 0.20 : 0.10),
+                    lineWidth: isInputFocused ? 1.6 : 1
+                )
+        )
     }
 }
 

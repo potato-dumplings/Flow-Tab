@@ -175,7 +175,7 @@ final class FlowTabTests: XCTestCase {
     }
 
     @MainActor
-    func testSearchSystemTextInputBridgeConfiguresInvisiblePlainTextResponder() {
+    func testSearchSystemTextInputBridgeConfiguresVisiblePlainTextResponder() {
         let harness = SearchSystemTextInputBridgeTestHarness()
         let textView = harness.textView
 
@@ -183,8 +183,8 @@ final class FlowTabTests: XCTestCase {
         XCTAssertTrue(textView.acceptsFirstResponder)
         XCTAssertFalse(textView.drawsBackground)
         XCTAssertEqual(textView.backgroundColor, .clear)
-        XCTAssertEqual(textView.textColor, .clear)
-        XCTAssertEqual(textView.insertionPointColor, .clear)
+        XCTAssertEqual(textView.textColor, .labelColor)
+        XCTAssertEqual(textView.insertionPointColor, .controlAccentColor)
         XCTAssertTrue(textView.isEditable)
         XCTAssertTrue(textView.isSelectable)
         XCTAssertFalse(textView.isRichText)
@@ -202,6 +202,8 @@ final class FlowTabTests: XCTestCase {
         XCTAssertFalse(textView.isHorizontallyResizable)
         XCTAssertFalse(textView.isVerticallyResizable)
         XCTAssertEqual(textView.textContainer?.lineFragmentPadding, 0)
+        XCTAssertEqual(textView.textContainer?.maximumNumberOfLines, 1)
+        XCTAssertEqual(textView.textContainer?.lineBreakMode, .byClipping)
         XCTAssertEqual(textView.textContainer?.widthTracksTextView, true)
         XCTAssertEqual(textView.textContainer?.heightTracksTextView, true)
     }
@@ -210,17 +212,19 @@ final class FlowTabTests: XCTestCase {
     func testSearchSystemTextInputBridgeSynchronizeClampsQueryAndCursor() {
         let harness = SearchSystemTextInputBridgeTestHarness()
 
-        harness.synchronize(query: "wechat", cursorPosition: 99)
+        harness.synchronize(query: "wechat", cursorPosition: 99, showsInsertionPoint: true)
 
         XCTAssertEqual(harness.textView.string, "wechat")
         XCTAssertEqual(harness.textView.selectedRange(), NSRange(location: 6, length: 0))
+        XCTAssertEqual(harness.textView.insertionPointColor, .controlAccentColor)
         XCTAssertTrue(harness.inputChanges.isEmpty)
         XCTAssertGreaterThanOrEqual(harness.markedTextChanges.count, 1)
         XCTAssertEqual(harness.markedTextChanges.last, false)
 
-        harness.synchronize(query: "wechat", cursorPosition: -4)
+        harness.synchronize(query: "wechat", cursorPosition: -4, showsInsertionPoint: false)
 
         XCTAssertEqual(harness.textView.selectedRange(), NSRange(location: 0, length: 0))
+        XCTAssertEqual(harness.textView.insertionPointColor, .clear)
         XCTAssertEqual(harness.markedTextChanges.last, false)
     }
 
