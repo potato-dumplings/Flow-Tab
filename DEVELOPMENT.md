@@ -219,13 +219,13 @@ swift test
 压测命令（参数分别为：持续秒数、切换间隔毫秒、采样间隔秒）：
 
 ```bash
-./scripts/tab-switch-stress.sh 20 20 0.5
+./scripts/perf/tab-switch-stress.sh 20 20 0.5
 ```
 
 建议同时补一组较低频切换对照数据：
 
 ```bash
-./scripts/tab-switch-stress.sh 20 50 0.5
+./scripts/perf/tab-switch-stress.sh 20 50 0.5
 ```
 
 ### 压测定位结论（2026-03-30）
@@ -289,7 +289,7 @@ swift test
 - 样式更可控：按钮、输入框、分段控件、卡片留白都可以持续向旧版视觉靠拢，而不用受系统默认 SwiftUI 包装行为影响。
 - 高频切换更可控：去掉混合宿主后，性能问题更容易定位到具体卡片或具体原生控件，而不是卡在跨框架边界。
 
-当前最新压测结果（`Debug`，`30s / 20ms / 0.5s sample`，命令：`./scripts/tab-switch-stress.sh 30 20 0.5`）：
+当前最新压测结果（`Debug`，`30s / 20ms / 0.5s sample`，命令：`./scripts/perf/tab-switch-stress.sh 30 20 0.5`）：
 
 | 版本 | CPU(avg/peak) | RSS(avg/peak) | MEM%(avg/peak) |
 | --- | --- | --- | --- |
@@ -299,11 +299,17 @@ swift test
 - 与此前 `Settings` 为主要热点的 SwiftUI / 混合结构相比，这一版已经把高频 tab 切换时的 CPU 峰值明显收住。
 - 内存占用保持在可接受区间，当前更值得继续优化的是表单密度与局部控件视觉，而不是再回到跨框架混搭。
 
+## 脚本分类
+
+- `scripts/release/release-install.sh`：Release 构建并安装到 `/Applications/Flow Tab.app`。
+- `scripts/release/release-dmg.sh`：构建并打包 DMG 到 `release/flowtab-v<version>/`。
+- `scripts/perf/tab-switch-stress.sh`：tab 高频切换性能压测。
+
 ## Release 安装到 /Applications
 
 ```bash
-chmod +x scripts/release-install.sh
-./scripts/release-install.sh
+chmod +x scripts/release/release-install.sh
+./scripts/release/release-install.sh
 ```
 
 该脚本会执行：
@@ -320,8 +326,8 @@ chmod +x scripts/release-install.sh
 ## 生成 DMG（未签名）
 
 ```bash
-chmod +x scripts/release-dmg.sh
-./scripts/release-dmg.sh
+chmod +x scripts/release/release-dmg.sh
+./scripts/release/release-dmg.sh
 ```
 
 输出文件：
@@ -342,7 +348,7 @@ chmod +x scripts/release-dmg.sh
 
 ```bash
 TAG="flowtab-v1.0.0"
-bash scripts/release-dmg.sh --version 1.0.0
+bash scripts/release/release-dmg.sh --version 1.0.0
 gh release create "${TAG}" release/"${TAG}"/flowtab-aarch64-apple-darwin.dmg --title "${TAG}"
 ```
 

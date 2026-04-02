@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 DERIVED_DATA_DIR="$ROOT_DIR/.build-local/DerivedData"
 APP_BIN="$DERIVED_DATA_DIR/Build/Products/Debug/Flow Tab.app/Contents/MacOS/FlowTab"
 

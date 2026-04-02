@@ -10,8 +10,8 @@ build/
 .swiftpm/
 FlowTabCore/.build/
 
-# Local release exports
-release/
+# Local release exports (repo root only)
+/release/
 
 # Local workspace artifacts
 .build-local/

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 DERIVED_DATA_PATH="${ROOT_DIR}/.build-local"
 APP_BUNDLE_NAME="Flow Tab.app"
 RELEASE_APP_PATH="${DERIVED_DATA_PATH}/Build/Products/Release/${APP_BUNDLE_NAME}"
@@ -11,7 +11,7 @@ APP_EXECUTABLE_PATH="${RELEASE_APP_PATH}/Contents/MacOS/FlowTab"
 
 usage() {
   cat <<'EOF'
-Usage: ./scripts/release-dmg.sh [--version <version>] [--target <target>] [--skip-build]
+Usage: ./scripts/release/release-dmg.sh [--version <version>] [--target <target>] [--skip-build]
 
 Options:
   --version <version>  Set release version for tag output (supports 1.2.3 or v1.2.3).

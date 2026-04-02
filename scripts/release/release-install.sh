@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 DERIVED_DATA_PATH="${ROOT_DIR}/.build-local"
 APP_BUNDLE_NAME="Flow Tab.app"
 APP_DISPLAY_NAME="Flow Tab"
@@ -14,7 +14,7 @@ for arg in "$@"; do
   case "${arg}" in
     -h|--help)
       cat <<'EOF'
-Usage: ./scripts/release-install.sh
+Usage: ./scripts/release/release-install.sh
 EOF
       exit 0
       ;;
