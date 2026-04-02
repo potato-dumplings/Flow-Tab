@@ -16,8 +16,7 @@ FlowTab 是一个 macOS 应用切换器，目标是在接近系统 `Command + Ta
 
 请从 GitHub Releases 下载 DMG：
 
-- Apple Silicon: `flowtab-aarch64-apple-darwin.dmg`
-- Intel Mac: `flowtab-x86_64-apple-darwin.dmg`
+- 通用（Apple Silicon + Intel）: `flowtab-universal2-apple-darwin.dmg`
 
 安装步骤：
 

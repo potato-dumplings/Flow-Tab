@@ -16,8 +16,7 @@ FlowTab is a macOS app switcher designed to stay close to the native `Command + 
 
 Download the DMG from GitHub Releases:
 
-- Apple Silicon: `flowtab-aarch64-apple-darwin.dmg`
-- Intel Mac: `flowtab-x86_64-apple-darwin.dmg`
+- Universal (Apple Silicon + Intel): `flowtab-universal2-apple-darwin.dmg`
 
 Install steps:
 

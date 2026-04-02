@@ -331,7 +331,8 @@ chmod +x scripts/release/release-dmg.sh
 ```
 
 输出文件：
-- `release/flowtab-v<version>/flowtab-<target>.dmg`（例如 `release/flowtab-v1.0.0/flowtab-aarch64-apple-darwin.dmg`）
+- `release/flowtab-v<version>/flowtab-<target>.dmg`（例如 `release/flowtab-v1.0.0/flowtab-universal2-apple-darwin.dmg`）
+- 未指定 `--target` 时：若 Release 产物是通用二进制（`arm64 + x86_64`），会生成一个通用 DMG：`flowtab-universal2-apple-darwin.dmg`。
 
 可选参数：
 - `--version <version>`：设置发布版本（支持 `1.2.3` 或 `v1.2.3`；默认读取 `MARKETING_VERSION`）
@@ -349,7 +350,7 @@ chmod +x scripts/release/release-dmg.sh
 ```bash
 TAG="flowtab-v1.0.0"
 bash scripts/release/release-dmg.sh --version 1.0.0
-gh release create "${TAG}" release/"${TAG}"/flowtab-aarch64-apple-darwin.dmg --title "${TAG}"
+gh release create "${TAG}" release/"${TAG}"/flowtab-universal2-apple-darwin.dmg --title "${TAG}"
 ```
 
 ## 权限说明

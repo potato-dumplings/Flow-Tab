@@ -18,6 +18,10 @@ Options:
   --target <target>    Set asset target name (for example aarch64-apple-darwin).
   --skip-build         Reuse existing Release app without rebuilding.
   -h, --help           Show this help message.
+
+When --target is not provided:
+- Single-arch app -> produce one DMG for that architecture.
+- Universal app (arm64 + x86_64) -> produce one universal DMG.
 EOF
 }
 
@@ -92,6 +96,20 @@ VERSION="$(normalize_version "${VERSION}")"
 RELEASE_TAG="${PROJECT_PREFIX}-${VERSION}"
 RELEASE_VERSION_DIR="${RELEASE_DIR}/${RELEASE_TAG}"
 
+default_target_for_uname() {
+  case "$(uname -m)" in
+    arm64)
+      echo "aarch64-apple-darwin"
+      ;;
+    x86_64)
+      echo "x86_64-apple-darwin"
+      ;;
+    *)
+      echo "$(uname -m)-apple-darwin"
+      ;;
+  esac
+}
+
 mkdir -p "${RELEASE_DIR}"
 
 if [[ "${SKIP_BUILD}" != "true" ]]; then
@@ -110,42 +128,50 @@ if [[ ! -d "${RELEASE_APP_PATH}" ]]; then
   exit 1
 fi
 
-if [[ -z "${TARGET}" ]]; then
+TARGET_NAME=""
+if [[ -n "${TARGET}" ]]; then
+  TARGET_NAME="${TARGET}"
+else
   APP_ARCHS="$(lipo -archs "${APP_EXECUTABLE_PATH}" 2>/dev/null || true)"
-  if [[ "${APP_ARCHS}" == "arm64" ]]; then
-    TARGET="aarch64-apple-darwin"
-  elif [[ "${APP_ARCHS}" == "x86_64" ]]; then
-    TARGET="x86_64-apple-darwin"
-  else
-    case "$(uname -m)" in
-      arm64)
-        TARGET="aarch64-apple-darwin"
+  HAS_ARM64="false"
+  HAS_X86_64="false"
+  for ARCH in ${APP_ARCHS}; do
+    case "${ARCH}" in
+      arm64|arm64e)
+        HAS_ARM64="true"
         ;;
       x86_64)
-        TARGET="x86_64-apple-darwin"
-        ;;
-      *)
-        TARGET="$(uname -m)-apple-darwin"
+        HAS_X86_64="true"
         ;;
     esac
+  done
+
+  if [[ "${HAS_ARM64}" == "true" && "${HAS_X86_64}" == "true" ]]; then
+    TARGET_NAME="universal2-apple-darwin"
+  elif [[ "${HAS_ARM64}" == "true" ]]; then
+    TARGET_NAME="aarch64-apple-darwin"
+  elif [[ "${HAS_X86_64}" == "true" ]]; then
+    TARGET_NAME="x86_64-apple-darwin"
+  else
+    TARGET_NAME="$(default_target_for_uname)"
   fi
 fi
 
-ASSET_BASENAME="${PROJECT_PREFIX}-${TARGET}.dmg"
-OUTPUT_DMG_PATH="${RELEASE_VERSION_DIR}/${ASSET_BASENAME}"
-VOLUME_NAME="Flow Tab ${VERSION}"
-STAGING_DIR="${RELEASE_VERSION_DIR}/.dmg-staging"
-RW_DMG_PATH="${RELEASE_VERSION_DIR}/.flowtab-temp.rw.dmg"
-
 mkdir -p "${RELEASE_VERSION_DIR}"
 
-echo "[2/4] Prepare DMG staging"
+ASSET_BASENAME="${PROJECT_PREFIX}-${TARGET_NAME}.dmg"
+OUTPUT_DMG_PATH="${RELEASE_VERSION_DIR}/${ASSET_BASENAME}"
+VOLUME_NAME="Flow Tab ${VERSION}"
+STAGING_DIR="${RELEASE_VERSION_DIR}/.dmg-staging-${TARGET_NAME}"
+RW_DMG_PATH="${RELEASE_VERSION_DIR}/.flowtab-${TARGET_NAME}.temp.rw.dmg"
+
+echo "[2/4] Prepare DMG staging (${TARGET_NAME})"
 rm -rf "${STAGING_DIR}" "${RW_DMG_PATH}" "${OUTPUT_DMG_PATH}"
 mkdir -p "${STAGING_DIR}"
 cp -R "${RELEASE_APP_PATH}" "${STAGING_DIR}/${APP_BUNDLE_NAME}"
 ln -s /Applications "${STAGING_DIR}/Applications"
 
-echo "[3/4] Create writable image"
+echo "[3/4] Create writable image (${TARGET_NAME})"
 hdiutil create \
   -volname "${VOLUME_NAME}" \
   -srcfolder "${STAGING_DIR}" \
@@ -153,7 +179,7 @@ hdiutil create \
   -format UDRW \
   "${RW_DMG_PATH}" >/dev/null
 
-echo "[4/4] Convert to compressed image"
+echo "[4/4] Convert to compressed image (${TARGET_NAME})"
 hdiutil convert \
   "${RW_DMG_PATH}" \
   -format UDZO \
@@ -161,8 +187,8 @@ hdiutil convert \
   -o "${OUTPUT_DMG_PATH}" >/dev/null
 
 rm -rf "${STAGING_DIR}" "${RW_DMG_PATH}"
-
 echo "Done: ${OUTPUT_DMG_PATH}"
+
 echo "Release tag: ${RELEASE_TAG}"
 echo "Release asset: ${ASSET_BASENAME}"
 echo "Release directory: ${RELEASE_VERSION_DIR}"
