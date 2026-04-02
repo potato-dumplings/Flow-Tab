@@ -1021,7 +1021,7 @@ private struct HomeLandingView: View {
         .onAppear {
             handleVisibilityChanged(isActive)
         }
-        .onChange(of: isActive) { _, active in
+        .onChange(of: isActive) { active in
             if active {
                 handleVisibilityChanged(true)
             }
@@ -5025,48 +5025,48 @@ private struct AppSettingsView: View {
         .onAppear {
             handleVisibilityChanged(isActive)
         }
-        .onChange(of: isActive) { _, active in
+        .onChange(of: isActive) { active in
             handleVisibilityChanged(active)
         }
-        .onChange(of: themeModeRaw) {
+        .onChange(of: themeModeRaw) { _ in
             enforceThemeModeConsistency()
         }
-        .onChange(of: appLanguageRaw) {
+        .onChange(of: appLanguageRaw) { _ in
             enforceLanguageConsistency()
             notifyLanguagePreferenceChanged()
         }
-        .onChange(of: showInCommandTab) {
+        .onChange(of: showInCommandTab) { _ in
             notifyAppVisibilityPreferenceChanged()
         }
-        .onChange(of: hotkeyPrimaryModifierRaw) {
+        .onChange(of: hotkeyPrimaryModifierRaw) { _ in
             enforceHotkeyConsistency()
             enforceInAppWindowHotkeyConsistency()
             notifyHotkeyConfigChanged()
         }
-        .onChange(of: hotkeyMainKeyRaw) {
+        .onChange(of: hotkeyMainKeyRaw) { _ in
             enforceHotkeyConsistency()
             enforceInAppWindowHotkeyConsistency()
             notifyHotkeyConfigChanged()
         }
-        .onChange(of: hotkeyQuitKeyRaw) {
+        .onChange(of: hotkeyQuitKeyRaw) { _ in
             enforceHotkeyConsistency()
             notifyHotkeyConfigChanged()
         }
-        .onChange(of: inAppWindowHotkeyPrimaryModifierRaw) {
+        .onChange(of: inAppWindowHotkeyPrimaryModifierRaw) { _ in
             enforceInAppWindowHotkeyConsistency()
             notifyHotkeyConfigChanged()
         }
-        .onChange(of: inAppWindowHotkeyMainKeyRaw) {
+        .onChange(of: inAppWindowHotkeyMainKeyRaw) { _ in
             enforceInAppWindowHotkeyConsistency()
             notifyHotkeyConfigChanged()
         }
-        .onChange(of: windowLayerAutoEnterDelayRaw) {
+        .onChange(of: windowLayerAutoEnterDelayRaw) { _ in
             enforceWindowLayerPreferencesConsistency()
             if !isWindowLayerAutoEnterDelayEditing {
                 syncWindowLayerAutoEnterDelayText()
             }
         }
-        .onChange(of: searchDefaultScopeRaw) {
+        .onChange(of: searchDefaultScopeRaw) { _ in
             enforceSearchPreferencesConsistency()
         }
         .onReceive(NotificationCenter.default.publisher(
@@ -5601,7 +5601,7 @@ private struct RuntimeLogsSection: View {
             synchronizeLogLevelIfNeeded()
             logsViewModel.start(minimumLevel: selectedLogLevel)
         }
-        .onChange(of: runtimeLogLevelRaw) { _, newValue in
+        .onChange(of: runtimeLogLevelRaw) { newValue in
             let resolved = RuntimeLogPreferencesStore.resolve(rawValue: newValue)
             if newValue != resolved.rawValue {
                 runtimeLogLevelRaw = resolved.rawValue

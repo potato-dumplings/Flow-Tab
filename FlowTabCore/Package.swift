@@ -5,7 +5,7 @@ import PackageDescription
 let package = Package(
     name: "FlowTab",
     platforms: [
-        .macOS(.v14)
+        .macOS(.v13)
     ],
     products: [
         .library(name: "FlowTabCore", targets: ["FlowTabCore"])

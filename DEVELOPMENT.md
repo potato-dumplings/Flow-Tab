@@ -175,7 +175,7 @@ FlowTab 使用三层会话模型：
 
 ## 环境要求
 
-- macOS 14+
+- macOS 13+
 - Xcode 15+
 - Swift 5.9+
 

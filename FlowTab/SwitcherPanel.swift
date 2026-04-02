@@ -2816,7 +2816,7 @@ private struct CommandTabOverlay: View {
                         .onAppear {
                             scrollToSelectedPreview(using: scrollProxy)
                         }
-                        .onChange(of: selectedWindowPreviewID) {
+                        .onChange(of: selectedWindowPreviewID) { _ in
                             scrollToSelectedPreview(using: scrollProxy)
                         }
                     }
@@ -2876,10 +2876,10 @@ private struct CommandTabOverlay: View {
                         .onAppear {
                             scrollToSelectedSearchResult(using: scrollProxy)
                         }
-                        .onChange(of: selectedSearchResultID) {
+                        .onChange(of: selectedSearchResultID) { _ in
                             scrollToSelectedSearchResult(using: scrollProxy)
                         }
-                        .onChange(of: searchState.isInputFocused) {
+                        .onChange(of: searchState.isInputFocused) { _ in
                             scrollToSelectedSearchResult(using: scrollProxy)
                         }
                     }
@@ -2903,10 +2903,10 @@ private struct CommandTabOverlay: View {
                         .onAppear {
                             scrollToSelectedSearchResult(using: scrollProxy)
                         }
-                        .onChange(of: selectedSearchResultID) {
+                        .onChange(of: selectedSearchResultID) { _ in
                             scrollToSelectedSearchResult(using: scrollProxy)
                         }
-                        .onChange(of: searchState.isInputFocused) {
+                        .onChange(of: searchState.isInputFocused) { _ in
                             scrollToSelectedSearchResult(using: scrollProxy)
                         }
                     }

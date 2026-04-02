@@ -1662,13 +1662,21 @@ enum RuntimeWindowPreviewProvider {
     }
 
     private static func captureWindow(shareableWindow: SCWindow) -> CGImage? {
+        if #available(macOS 14.0, *) {
+            return captureWindowUsingScreenshotManager(shareableWindow: shareableWindow)
+        }
+        return captureWindowUsingCoreGraphics(windowID: shareableWindow.windowID)
+    }
+
+    @available(macOS 14.0, *)
+    private static func captureWindowUsingScreenshotManager(shareableWindow: SCWindow) -> CGImage? {
         let filter = SCContentFilter(desktopIndependentWindow: shareableWindow)
         let configuration = SCStreamConfiguration()
         let sourceWidth = max(1, shareableWindow.frame.width)
         let sourceHeight = max(1, shareableWindow.frame.height)
-        let scale = min(1, maxPreviewCaptureDimension / max(sourceWidth, sourceHeight))
-        let width = max(1, Int(ceil(sourceWidth * scale)))
-        let height = max(1, Int(ceil(sourceHeight * scale)))
+        let scaledSize = scaledPreviewSize(sourceWidth: sourceWidth, sourceHeight: sourceHeight)
+        let width = scaledSize.width
+        let height = scaledSize.height
         configuration.width = width
         configuration.height = height
         configuration.showsCursor = false
@@ -1695,6 +1703,65 @@ enum RuntimeWindowPreviewProvider {
             )
         }
         return capturedImage
+    }
+
+    private static func captureWindowUsingCoreGraphics(windowID: CGWindowID) -> CGImage? {
+        guard
+            let image = CGWindowListCreateImage(
+                .null,
+                .optionIncludingWindow,
+                windowID,
+                [.boundsIgnoreFraming, .bestResolution]
+            )
+        else {
+            RuntimeLog.info("Preview", "legacy capture failed windowID=\(windowID)")
+            return nil
+        }
+        return scaledPreviewImageIfNeeded(image)
+    }
+
+    private static func scaledPreviewSize(
+        sourceWidth: CGFloat,
+        sourceHeight: CGFloat
+    ) -> (width: Int, height: Int) {
+        let scale = min(1, maxPreviewCaptureDimension / max(sourceWidth, sourceHeight))
+        return (
+            width: max(1, Int(ceil(sourceWidth * scale))),
+            height: max(1, Int(ceil(sourceHeight * scale)))
+        )
+    }
+
+    private static func scaledPreviewImageIfNeeded(_ image: CGImage) -> CGImage? {
+        let sourceWidth = CGFloat(image.width)
+        let sourceHeight = CGFloat(image.height)
+        let scaledSize = scaledPreviewSize(sourceWidth: sourceWidth, sourceHeight: sourceHeight)
+        guard scaledSize.width != image.width || scaledSize.height != image.height else {
+            return image
+        }
+        guard
+            let context = CGContext(
+                data: nil,
+                width: scaledSize.width,
+                height: scaledSize.height,
+                bitsPerComponent: 8,
+                bytesPerRow: 0,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+            )
+        else {
+            return image
+        }
+        context.interpolationQuality = .medium
+        context.draw(
+            image,
+            in: CGRect(
+                x: 0,
+                y: 0,
+                width: scaledSize.width,
+                height: scaledSize.height
+            )
+        )
+        return context.makeImage() ?? image
     }
 
     private static func estimateTitleBarStyle(from image: CGImage) -> WindowTitleBarStyleGuess? {
