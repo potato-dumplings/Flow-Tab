@@ -689,6 +689,44 @@ final class FlowTabPriorityCoverageTests: XCTestCase {
     }
 
     @MainActor
+    func testLiveSwitcherModelHandleApplicationTerminatedPreservesSearchStateDuringRefresh() async {
+        await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
+            let model = LiveSwitcherModel()
+            let initialApps = self.searchScenarioApps()
+            let refreshedApps = initialApps.filter { $0.id != "com.example.code" }
+            var snapshots = [
+                RuntimeSnapshot(apps: initialApps, contextsByID: [:]),
+                RuntimeSnapshot(apps: refreshedApps, contextsByID: [:])
+            ]
+            model.snapshotProviderOverride = {
+                snapshots.removeFirst()
+            }
+
+            XCTAssertTrue(model.startSession(triggerDirection: .forward))
+            XCTAssertTrue(model.enterSearchMode())
+            model.synchronizeSearchInput(query: "bro", cursorPosition: 3)
+
+            try? await Task.sleep(nanoseconds: 120_000_000)
+            XCTAssertTrue(model.isSearchActive)
+            XCTAssertEqual(model.searchViewState.query, "bro")
+
+            let layoutRefreshed = expectation(description: "layout refreshed while preserving search state")
+            model.onSessionLayoutChanged = { layoutRefreshed.fulfill() }
+
+            model.handleApplicationTerminated(appID: "com.example.code", pid: 42_300)
+
+            await fulfillment(of: [layoutRefreshed], timeout: 1.0)
+            try? await Task.sleep(nanoseconds: 120_000_000)
+
+            XCTAssertEqual(model.appCount, 2)
+            XCTAssertTrue(model.isSearchActive)
+            XCTAssertEqual(model.searchViewState.scope, .app)
+            XCTAssertEqual(model.searchViewState.query, "bro")
+            XCTAssertGreaterThanOrEqual(model.searchResultCount, 1)
+        }
+    }
+
+    @MainActor
     func testLiveSwitcherModelHandleApplicationTerminatedIgnoresUntrackedApp() {
         let model = LiveSwitcherModel()
         let initialApps = terminateScenarioApps()

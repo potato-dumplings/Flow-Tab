@@ -2093,8 +2093,11 @@ final class LiveSwitcherModel: ObservableObject {
     private func loadSnapshot(
         triggerDirection: CycleDirection,
         preferredSelectedAppID: String?,
-        animateAppStripUpdate _: Bool = false
+        animateAppStripUpdate _: Bool = false,
+        preserveSearchState: Bool = false
     ) -> Bool {
+        let previousSearchState = preserveSearchState ? searchViewState : .inactive
+        cancelPendingSearchComputation()
         let snapshot = makeSnapshot()
         guard !snapshot.apps.isEmpty else {
             resetSessionState()
@@ -2139,8 +2142,26 @@ final class LiveSwitcherModel: ObservableObject {
             self.terminatingAppID = nil
         }
         searchCoordinator.rebuildIndex(with: rebuiltSession.apps)
+        restoreSearchStateAfterSnapshotRefreshIfNeeded(previousSearchState)
         publishSearchStateIfNeeded()
         return true
+    }
+
+    private func restoreSearchStateAfterSnapshotRefreshIfNeeded(
+        _ previousState: SwitcherSearchViewState
+    ) {
+        guard previousState.isActive else { return }
+        guard searchCoordinator.activate(defaultScope: previousState.scope) else { return }
+        if !previousState.query.isEmpty {
+            _ = searchCoordinator.replaceQueryWithoutRebuild(
+                previousState.query,
+                cursorPosition: previousState.queryCursorPosition
+            )
+        }
+        if !previousState.isInputFocused {
+            _ = searchCoordinator.focusResults()
+        }
+        scheduleSearchComputation(resetSelection: true, debounced: false)
     }
 
     func handleWorkspaceApplicationDidTerminate(_ notification: Notification) {
@@ -2176,7 +2197,8 @@ final class LiveSwitcherModel: ObservableObject {
         let refreshed = loadSnapshot(
             triggerDirection: .forward,
             preferredSelectedAppID: pendingRequest?.preferredSelectedAppID,
-            animateAppStripUpdate: true
+            animateAppStripUpdate: true,
+            preserveSearchState: searchViewState.isActive
         )
         RuntimeLog.info(
             "Session",
