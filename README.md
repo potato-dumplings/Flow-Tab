@@ -24,6 +24,12 @@ FlowTab 是一个 macOS 应用切换器，目标是在接近系统 `Command + Ta
 2. 将 `Flow Tab.app` 拖到 `Applications` 文件夹。
 3. 在 `Applications` 中打开 FlowTab。
 
+卸载步骤：
+
+1. 重新打开下载的 `.dmg` 文件。
+2. 双击里面的 `Uninstall Flow Tab.app`。
+3. 按提示确认后，会自动退出应用、删除 `/Applications/Flow Tab.app`，并清理权限记录与本地偏好设置。
+
 注意：
 
 - 当前发布包为未签名、未公证版本，首次打开可能出现 Gatekeeper 提示。

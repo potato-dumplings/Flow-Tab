@@ -303,6 +303,7 @@ swift test
 
 - `scripts/release/release-install.sh`：Release 构建并安装到 `/Applications/Flow Tab.app`。
 - `scripts/release/release-dmg.sh`：构建并打包 DMG 到 `release/flowtab-v<version>/`。
+- `scripts/release/uninstall-flowtab.js`：生成 DMG 内可双击的一键卸载器。
 - `scripts/perf/tab-switch-stress.sh`：tab 高频切换性能压测。
 
 ## Release 安装到 /Applications
@@ -333,6 +334,7 @@ chmod +x scripts/release/release-dmg.sh
 输出文件：
 - `release/flowtab-v<version>/flowtab-<target>.dmg`（例如 `release/flowtab-v1.0.0/flowtab-universal2-apple-darwin.dmg`）
 - 未指定 `--target` 时：若 Release 产物是通用二进制（`arm64 + x86_64`），会生成一个通用 DMG：`flowtab-universal2-apple-darwin.dmg`。
+- DMG 内会额外包含 `Uninstall Flow Tab.app`，可用于一键卸载 `/Applications/Flow Tab.app`，并清理权限记录与本地偏好设置。
 
 可选参数：
 - `--version <version>`：设置发布版本（支持 `1.2.3` 或 `v1.2.3`；默认读取 `MARKETING_VERSION`）

@@ -4,10 +4,12 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 DERIVED_DATA_PATH="${ROOT_DIR}/.build-local"
 APP_BUNDLE_NAME="Flow Tab.app"
+UNINSTALLER_APP_NAME="Uninstall Flow Tab.app"
 RELEASE_APP_PATH="${DERIVED_DATA_PATH}/Build/Products/Release/${APP_BUNDLE_NAME}"
 RELEASE_DIR="${ROOT_DIR}/release"
 PROJECT_PREFIX="flowtab"
 APP_EXECUTABLE_PATH="${RELEASE_APP_PATH}/Contents/MacOS/FlowTab"
+UNINSTALLER_SOURCE_PATH="${ROOT_DIR}/scripts/release/uninstall-flowtab.js"
 
 usage() {
   cat <<'EOF'
@@ -169,6 +171,7 @@ echo "[2/4] Prepare DMG staging (${TARGET_NAME})"
 rm -rf "${STAGING_DIR}" "${RW_DMG_PATH}" "${OUTPUT_DMG_PATH}"
 mkdir -p "${STAGING_DIR}"
 cp -R "${RELEASE_APP_PATH}" "${STAGING_DIR}/${APP_BUNDLE_NAME}"
+osacompile -l JavaScript -o "${STAGING_DIR}/${UNINSTALLER_APP_NAME}" "${UNINSTALLER_SOURCE_PATH}" >/dev/null
 ln -s /Applications "${STAGING_DIR}/Applications"
 
 echo "[3/4] Create writable image (${TARGET_NAME})"

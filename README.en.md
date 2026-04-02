@@ -24,6 +24,12 @@ Install steps:
 2. Drag `Flow Tab.app` into the `Applications` folder.
 3. Launch FlowTab from `Applications`.
 
+Uninstall steps:
+
+1. Open the downloaded `.dmg` again.
+2. Double-click `Uninstall Flow Tab.app`.
+3. Confirm the prompt to quit the app, remove `/Applications/Flow Tab.app`, and clear permissions plus local preferences.
+
 Notes:
 
 - Current builds are unsigned and not notarized, so Gatekeeper prompts may appear on first launch.
