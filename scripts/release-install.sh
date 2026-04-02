@@ -3,8 +3,11 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 DERIVED_DATA_PATH="${ROOT_DIR}/.build-local"
-RELEASE_APP_PATH="${DERIVED_DATA_PATH}/Build/Products/Release/FlowTab.app"
-INSTALL_PATH="/Applications/FlowTab.app"
+APP_BUNDLE_NAME="Flown Tab.app"
+APP_DISPLAY_NAME="Flown Tab"
+APP_PROCESS_NAME="FlowTab"
+RELEASE_APP_PATH="${DERIVED_DATA_PATH}/Build/Products/Release/${APP_BUNDLE_NAME}"
+INSTALL_PATH="/Applications/${APP_BUNDLE_NAME}"
 BUNDLE_ID="io.github.potato-dumplings.flowtab"
 
 for arg in "$@"; do
@@ -43,9 +46,9 @@ reset_tcc_permission() {
   fi
 }
 
-echo "[${STEP}/${TOTAL_STEPS}] Quit running FlowTab"
-osascript -e 'quit app "FlowTab"' >/dev/null 2>&1 || true
-pkill -x FlowTab >/dev/null 2>&1 || true
+echo "[${STEP}/${TOTAL_STEPS}] Quit running ${APP_DISPLAY_NAME}"
+osascript -e "quit app \"${APP_DISPLAY_NAME}\"" >/dev/null 2>&1 || true
+pkill -x "${APP_PROCESS_NAME}" >/dev/null 2>&1 || true
 sleep 1
 
 STEP=$((STEP + 1))

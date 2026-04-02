@@ -22,7 +22,7 @@ Download the DMG from GitHub Releases:
 Install steps:
 
 1. Open the downloaded `.dmg`.
-2. Drag `FlowTab.app` into the `Applications` folder.
+2. Drag `Flown Tab.app` into the `Applications` folder.
 3. Launch FlowTab from `Applications`.
 
 Notes:

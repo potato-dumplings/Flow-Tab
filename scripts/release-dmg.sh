@@ -3,7 +3,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 DERIVED_DATA_PATH="${ROOT_DIR}/.build-local"
-RELEASE_APP_PATH="${DERIVED_DATA_PATH}/Build/Products/Release/FlowTab.app"
+APP_BUNDLE_NAME="Flown Tab.app"
+RELEASE_APP_PATH="${DERIVED_DATA_PATH}/Build/Products/Release/${APP_BUNDLE_NAME}"
 RELEASE_DIR="${ROOT_DIR}/release"
 PROJECT_PREFIX="flowtab"
 APP_EXECUTABLE_PATH="${RELEASE_APP_PATH}/Contents/MacOS/FlowTab"
@@ -132,7 +133,7 @@ fi
 
 ASSET_BASENAME="${PROJECT_PREFIX}-${TARGET}.dmg"
 OUTPUT_DMG_PATH="${RELEASE_VERSION_DIR}/${ASSET_BASENAME}"
-VOLUME_NAME="FlowTab ${VERSION}"
+VOLUME_NAME="Flown Tab ${VERSION}"
 STAGING_DIR="${RELEASE_VERSION_DIR}/.dmg-staging"
 RW_DMG_PATH="${RELEASE_VERSION_DIR}/.flowtab-temp.rw.dmg"
 
@@ -141,7 +142,7 @@ mkdir -p "${RELEASE_VERSION_DIR}"
 echo "[2/4] Prepare DMG staging"
 rm -rf "${STAGING_DIR}" "${RW_DMG_PATH}" "${OUTPUT_DMG_PATH}"
 mkdir -p "${STAGING_DIR}"
-cp -R "${RELEASE_APP_PATH}" "${STAGING_DIR}/FlowTab.app"
+cp -R "${RELEASE_APP_PATH}" "${STAGING_DIR}/${APP_BUNDLE_NAME}"
 ln -s /Applications "${STAGING_DIR}/Applications"
 
 echo "[3/4] Create writable image"
