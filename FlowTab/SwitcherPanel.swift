@@ -3101,11 +3101,12 @@ private struct SearchSystemTextInputBridge: NSViewRepresentable {
         ) {
             let resolvedCursorPosition = min(max(cursorPosition, 0), query.count)
             let selectedRange = NSRange(location: resolvedCursorPosition, length: 0)
+            let shouldPreserveSelection = textView.string == query && textView.selectedRange().length > 0
             isApplyingViewState = true
             if textView.string != query {
                 textView.string = query
             }
-            if textView.selectedRange() != selectedRange {
+            if !shouldPreserveSelection, textView.selectedRange() != selectedRange {
                 textView.setSelectedRange(selectedRange)
             }
             let insertionPointColor: NSColor = showsInsertionPoint ? .controlAccentColor : .clear
@@ -3114,6 +3115,7 @@ private struct SearchSystemTextInputBridge: NSViewRepresentable {
             }
             isApplyingViewState = false
 
+            ensureCursorIsVisible(for: textView)
             synchronizeFirstResponder(for: textView, isSearchActive: isSearchActive)
             publishMarkedTextState(for: textView)
         }
@@ -3125,6 +3127,7 @@ private struct SearchSystemTextInputBridge: NSViewRepresentable {
                 publishMarkedTextState(for: textView)
                 return
             }
+            ensureCursorIsVisible(for: textView)
             publishInputState(for: textView)
         }
 
@@ -3135,13 +3138,19 @@ private struct SearchSystemTextInputBridge: NSViewRepresentable {
                 publishMarkedTextState(for: textView)
                 return
             }
+            ensureCursorIsVisible(for: textView)
             publishInputState(for: textView)
         }
 
         private func publishInputState(for textView: NSTextView) {
+            let selectedRange = textView.selectedRange()
+            guard selectedRange.length == 0 else {
+                publishMarkedTextState(for: textView)
+                return
+            }
             let snapshot = InputSnapshot(
                 query: textView.string,
-                cursorPosition: textView.selectedRange().location
+                cursorPosition: selectedRange.location
             )
             if lastPublishedInputSnapshot != snapshot {
                 lastPublishedInputSnapshot = snapshot
@@ -3149,7 +3158,7 @@ private struct SearchSystemTextInputBridge: NSViewRepresentable {
                     "publishInputState query=\(snapshot.query.debugDescription) cursor=\(snapshot.cursorPosition) hasMarked=\(textView.hasMarkedText() ? 1 : 0)"
                 )
             }
-            onInputChanged(textView.string, textView.selectedRange().location)
+            onInputChanged(textView.string, selectedRange.location)
             publishMarkedTextState(for: textView)
         }
 
@@ -3162,6 +3171,12 @@ private struct SearchSystemTextInputBridge: NSViewRepresentable {
                 )
             }
             onMarkedTextChanged(hasMarkedText)
+        }
+
+        private func ensureCursorIsVisible(for textView: NSTextView) {
+            let selectedRange = textView.selectedRange()
+            guard selectedRange.length == 0 else { return }
+            textView.scrollRangeToVisible(selectedRange)
         }
 
         private func synchronizeFirstResponder(for textView: NSTextView, isSearchActive: Bool) {
@@ -3216,12 +3231,18 @@ private struct SearchSystemTextInputBridge: NSViewRepresentable {
 
 private final class SearchSystemTextInputContainerView: NSView {
     let textView: SearchSystemTextView
+    let scrollView: NSScrollView
 
     override init(frame frameRect: NSRect) {
         let textStorage = NSTextStorage()
         let layoutManager = NSLayoutManager()
-        let textContainer = NSTextContainer(size: .zero)
-        textContainer.widthTracksTextView = true
+        let textContainer = NSTextContainer(
+            size: NSSize(
+                width: CGFloat.greatestFiniteMagnitude,
+                height: CGFloat.greatestFiniteMagnitude
+            )
+        )
+        textContainer.widthTracksTextView = false
         textContainer.heightTracksTextView = true
         textContainer.lineFragmentPadding = 0
         textContainer.maximumNumberOfLines = 1
@@ -3230,10 +3251,34 @@ private final class SearchSystemTextInputContainerView: NSView {
         layoutManager.addTextContainer(textContainer)
 
         textView = SearchSystemTextView(frame: .zero, textContainer: textContainer)
+        scrollView = NSScrollView(frame: .zero)
         super.init(frame: frameRect)
         setAccessibilityIdentifier("flowtab.switcher.search.input")
 
-        textView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.drawsBackground = false
+        scrollView.hasVerticalScroller = false
+        scrollView.hasHorizontalScroller = false
+        scrollView.autohidesScrollers = true
+        scrollView.borderType = .noBorder
+        scrollView.horizontalScrollElasticity = .none
+        scrollView.verticalScrollElasticity = .none
+
+        textView.minSize = .zero
+        textView.maxSize = NSSize(
+            width: CGFloat.greatestFiniteMagnitude,
+            height: CGFloat.greatestFiniteMagnitude
+        )
+        textView.isHorizontallyResizable = true
+        textView.isVerticallyResizable = false
+        textView.autoresizingMask = [.height]
+        textView.textContainer?.containerSize = NSSize(
+            width: CGFloat.greatestFiniteMagnitude,
+            height: CGFloat.greatestFiniteMagnitude
+        )
+        textView.textContainer?.widthTracksTextView = false
+        textView.textContainer?.heightTracksTextView = true
+
         textView.drawsBackground = false
         textView.backgroundColor = .clear
         textView.textColor = .labelColor
@@ -3253,22 +3298,14 @@ private final class SearchSystemTextInputContainerView: NSView {
         textView.isContinuousSpellCheckingEnabled = false
         textView.isGrammarCheckingEnabled = false
         textView.textContainerInset = .zero
-        textView.minSize = .zero
-        textView.maxSize = NSSize(
-            width: CGFloat.greatestFiniteMagnitude,
-            height: CGFloat.greatestFiniteMagnitude
-        )
-        textView.isHorizontallyResizable = false
-        textView.isVerticallyResizable = false
-        textView.textContainer?.widthTracksTextView = true
-        textView.textContainer?.heightTracksTextView = true
+        scrollView.documentView = textView
 
-        addSubview(textView)
+        addSubview(scrollView)
         NSLayoutConstraint.activate([
-            textView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            textView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            textView.topAnchor.constraint(equalTo: topAnchor),
-            textView.bottomAnchor.constraint(equalTo: bottomAnchor)
+            scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            scrollView.topAnchor.constraint(equalTo: topAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
     }
 
@@ -3322,6 +3359,10 @@ final class SearchSystemTextInputBridgeTestHarness {
 
     var containerAccessibilityIdentifier: String? {
         containerView.accessibilityIdentifier()
+    }
+
+    var enclosingScrollView: NSScrollView? {
+        containerView.textView.enclosingScrollView
     }
 
     func synchronize(

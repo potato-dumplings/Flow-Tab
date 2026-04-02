@@ -178,8 +178,13 @@ final class FlowTabTests: XCTestCase {
     func testSearchSystemTextInputBridgeConfiguresVisiblePlainTextResponder() {
         let harness = SearchSystemTextInputBridgeTestHarness()
         let textView = harness.textView
+        let scrollView = harness.enclosingScrollView
 
         XCTAssertEqual(harness.containerAccessibilityIdentifier, "flowtab.switcher.search.input")
+        XCTAssertNotNil(scrollView)
+        XCTAssertEqual(scrollView?.drawsBackground, false)
+        XCTAssertEqual(scrollView?.hasHorizontalScroller, false)
+        XCTAssertEqual(scrollView?.hasVerticalScroller, false)
         XCTAssertTrue(textView.acceptsFirstResponder)
         XCTAssertFalse(textView.drawsBackground)
         XCTAssertEqual(textView.backgroundColor, .clear)
@@ -199,12 +204,12 @@ final class FlowTabTests: XCTestCase {
         XCTAssertFalse(textView.isContinuousSpellCheckingEnabled)
         XCTAssertFalse(textView.isGrammarCheckingEnabled)
         XCTAssertEqual(textView.textContainerInset, .zero)
-        XCTAssertFalse(textView.isHorizontallyResizable)
+        XCTAssertTrue(textView.isHorizontallyResizable)
         XCTAssertFalse(textView.isVerticallyResizable)
         XCTAssertEqual(textView.textContainer?.lineFragmentPadding, 0)
         XCTAssertEqual(textView.textContainer?.maximumNumberOfLines, 1)
         XCTAssertEqual(textView.textContainer?.lineBreakMode, .byClipping)
-        XCTAssertEqual(textView.textContainer?.widthTracksTextView, true)
+        XCTAssertEqual(textView.textContainer?.widthTracksTextView, false)
         XCTAssertEqual(textView.textContainer?.heightTracksTextView, true)
     }
 
@@ -256,6 +261,23 @@ final class FlowTabTests: XCTestCase {
                 cursorPosition: 2
             )
         )
+    }
+
+    @MainActor
+    func testSearchSystemTextInputBridgePreservesSelectAllAndDoesNotPublishCollapsedCursor() {
+        let harness = SearchSystemTextInputBridgeTestHarness()
+        harness.synchronize(query: "abcdef", cursorPosition: 6)
+        harness.resetRecordedChanges()
+
+        harness.textView.setSelectedRange(NSRange(location: 0, length: 6))
+        harness.notifySelectionDidChange()
+
+        XCTAssertTrue(harness.inputChanges.isEmpty)
+        XCTAssertEqual(harness.textView.selectedRange(), NSRange(location: 0, length: 6))
+
+        harness.synchronize(query: "abcdef", cursorPosition: 6)
+
+        XCTAssertEqual(harness.textView.selectedRange(), NSRange(location: 0, length: 6))
     }
 
     @MainActor
