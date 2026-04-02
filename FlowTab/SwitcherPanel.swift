@@ -234,6 +234,7 @@ final class SwitcherPanelController {
     var inAppMainKeyPressedOverride: Bool?
     var panelContainsPointOverride: ((NSPoint) -> Bool)?
     var windowLayerPresentationDelayOverride: TimeInterval?
+    var hideNonPanelWindowsOverride: (() -> Void)?
 
     private var searchFeatureEnabled: Bool {
         SearchInteractionPreferencesStore.loadIsEnabled()
@@ -263,6 +264,7 @@ final class SwitcherPanelController {
         panel.backgroundColor = .clear
         panel.hasShadow = false
         panel.becomesKeyOnlyIfNeeded = false
+        panel.identifier = NSUserInterfaceItemIdentifier(AppWindowCoordinator.switcherPanelWindowIdentifier)
         panel.level = SwitcherPanelWindowConfiguration.level
         panel.collectionBehavior = SwitcherPanelWindowConfiguration.presentationCollectionBehavior()
         panel.hidesOnDeactivate = false
@@ -628,7 +630,9 @@ final class SwitcherPanelController {
         updatePanelSize(for: targetScreen)
         centerPanelOnActiveScreen(preferredScreen: targetScreen)
         updatePanelPresentationLevel(trigger: "global_show")
-        hideNonPanelWindows()
+        panel.makeKeyAndOrderFront(nil)
+        panel.orderFrontRegardless()
+        hideNonPanelWindowsIfNeeded()
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
         beginIgnoringActiveSpaceChanges(trigger: "global_show")
@@ -656,7 +660,9 @@ final class SwitcherPanelController {
         updatePanelSize(for: targetScreen)
         centerPanelOnActiveScreen(preferredScreen: targetScreen)
         updatePanelPresentationLevel(trigger: "in_app_show")
-        hideNonPanelWindows()
+        panel.makeKeyAndOrderFront(nil)
+        panel.orderFrontRegardless()
+        hideNonPanelWindowsIfNeeded()
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
         beginIgnoringActiveSpaceChanges(trigger: "in_app_show")
@@ -721,7 +727,16 @@ final class SwitcherPanelController {
             ?? NSScreen.screens.first
     }
 
+    private func hideNonPanelWindowsIfNeeded() {
+        guard !isAppCurrentlyActive else { return }
+        hideNonPanelWindows()
+    }
+
     private func hideNonPanelWindows() {
+        if let hideNonPanelWindowsOverride {
+            hideNonPanelWindowsOverride()
+            return
+        }
         for window in NSApp.windows {
             guard !(window is NSPanel) else { continue }
             guard window.isVisible else { continue }

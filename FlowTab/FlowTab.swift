@@ -183,6 +183,8 @@ struct HotkeyRegistrationRequest: Sendable {
 protocol AppWindowOpeningWindow: AnyObject {
     var isPanelWindow: Bool { get }
     var isMiniaturized: Bool { get }
+    var isVisible: Bool { get }
+    var flowTabWindowIdentifier: String? { get }
 
     func deminiaturize(_ sender: Any?)
     func makeKeyAndOrderFront(_ sender: Any?)
@@ -201,6 +203,10 @@ protocol AppWindowOpeningApplication: AnyObject {
 extension NSWindow: AppWindowOpeningWindow {
     var isPanelWindow: Bool {
         self is NSPanel
+    }
+
+    var flowTabWindowIdentifier: String? {
+        identifier?.rawValue
     }
 }
 
@@ -608,6 +614,8 @@ private enum FlowTabUITestBootstrapper {
 }
 
 enum AppWindowCoordinator {
+    static let switcherPanelWindowIdentifier = "flowtab.switcher.panel"
+
     @MainActor
     static var activateMainWindowOrOpenHomeSceneOverride: (() -> Void)?
 
@@ -654,6 +662,13 @@ enum AppWindowCoordinator {
 
     @MainActor
     static func activateMainWindowOrOpenHomeScene(application: any AppWindowOpeningApplication) {
+        guard !application.appWindows.contains(where: {
+            $0.isPanelWindow
+                && $0.isVisible
+                && $0.flowTabWindowIdentifier == switcherPanelWindowIdentifier
+        }) else {
+            return
+        }
         application.activate(ignoringOtherApps: true)
         if application.isHidden {
             application.unhide(nil)

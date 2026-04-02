@@ -746,6 +746,29 @@ final class FlowTabTests: XCTestCase {
         XCTAssertEqual(panelWindow.orderFrontRegardlessCallCount, 0)
     }
 
+    @MainActor
+    func testAppWindowCoordinatorSkipsActivationWhenSwitcherPanelIsVisible() {
+        let switcherPanelWindow = TestAppWindow(
+            isPanelWindow: true,
+            isMiniaturized: false,
+            isVisible: true,
+            flowTabWindowIdentifier: AppWindowCoordinator.switcherPanelWindowIdentifier
+        )
+        let mainWindow = TestAppWindow(isPanelWindow: false, isMiniaturized: false)
+        let application = TestAppWindowApplication(
+            isHidden: true,
+            appWindows: [switcherPanelWindow, mainWindow]
+        )
+
+        AppWindowCoordinator.activateMainWindowOrOpenHomeScene(application: application)
+
+        XCTAssertEqual(application.activateCallCount, 0)
+        XCTAssertEqual(application.unhideCallCount, 0)
+        XCTAssertEqual(application.showSettingsWindowActionCount, 0)
+        XCTAssertEqual(mainWindow.makeKeyAndOrderFrontCallCount, 0)
+        XCTAssertEqual(mainWindow.orderFrontRegardlessCallCount, 0)
+    }
+
     func testRuntimeDiagnosticsReadRecentLinesAppliesMinimumLevelFilter() async {
         await resetRuntimeLogsForTest()
 
@@ -1591,14 +1614,23 @@ final class FlowTabTests: XCTestCase {
 private final class TestAppWindow: AppWindowOpeningWindow {
     let isPanelWindow: Bool
     var isMiniaturized: Bool
+    var isVisible: Bool
+    let flowTabWindowIdentifier: String?
 
     private(set) var deminiaturizeCallCount = 0
     private(set) var makeKeyAndOrderFrontCallCount = 0
     private(set) var orderFrontRegardlessCallCount = 0
 
-    init(isPanelWindow: Bool, isMiniaturized: Bool) {
+    init(
+        isPanelWindow: Bool,
+        isMiniaturized: Bool,
+        isVisible: Bool = true,
+        flowTabWindowIdentifier: String? = nil
+    ) {
         self.isPanelWindow = isPanelWindow
         self.isMiniaturized = isMiniaturized
+        self.isVisible = isVisible
+        self.flowTabWindowIdentifier = flowTabWindowIdentifier
     }
 
     func deminiaturize(_ sender: Any?) {

@@ -1459,6 +1459,44 @@ final class FlowTabPriorityCoverageTests: XCTestCase {
     }
 
     @MainActor
+    func testSwitcherPanelControllerShowSkipsHidingRegularWindowsWhileAppIsActive() {
+        let controller = SwitcherPanelController()
+        controller.modelForTesting.snapshotProviderOverride = {
+            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
+        }
+        controller.appIsActiveOverride = true
+
+        var hideCallCount = 0
+        controller.hideNonPanelWindowsOverride = {
+            hideCallCount += 1
+        }
+
+        XCTAssertTrue(controller.presentGlobalHotkeySessionForTesting())
+        XCTAssertEqual(hideCallCount, 0)
+
+        controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerShowStillHidesRegularWindowsWhileAppIsInactive() {
+        let controller = SwitcherPanelController()
+        controller.modelForTesting.snapshotProviderOverride = {
+            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
+        }
+        controller.appIsActiveOverride = false
+
+        var hideCallCount = 0
+        controller.hideNonPanelWindowsOverride = {
+            hideCallCount += 1
+        }
+
+        XCTAssertTrue(controller.presentGlobalHotkeySessionForTesting())
+        XCTAssertEqual(hideCallCount, 1)
+
+        controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
     func testSwitcherPanelControllerFewAppsShrinkPanelWidthWithoutChangingSpacing() {
         let controller = SwitcherPanelController()
         controller.modelForTesting.snapshotProviderOverride = {
