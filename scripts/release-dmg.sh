@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 DERIVED_DATA_PATH="${ROOT_DIR}/.build-local"
-APP_BUNDLE_NAME="Flown Tab.app"
+APP_BUNDLE_NAME="Flow Tab.app"
 RELEASE_APP_PATH="${DERIVED_DATA_PATH}/Build/Products/Release/${APP_BUNDLE_NAME}"
 RELEASE_DIR="${ROOT_DIR}/release"
 PROJECT_PREFIX="flowtab"
@@ -133,7 +133,7 @@ fi
 
 ASSET_BASENAME="${PROJECT_PREFIX}-${TARGET}.dmg"
 OUTPUT_DMG_PATH="${RELEASE_VERSION_DIR}/${ASSET_BASENAME}"
-VOLUME_NAME="Flown Tab ${VERSION}"
+VOLUME_NAME="Flow Tab ${VERSION}"
 STAGING_DIR="${RELEASE_VERSION_DIR}/.dmg-staging"
 RW_DMG_PATH="${RELEASE_VERSION_DIR}/.flowtab-temp.rw.dmg"
 

@@ -3,8 +3,8 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 DERIVED_DATA_PATH="${ROOT_DIR}/.build-local"
-APP_BUNDLE_NAME="Flown Tab.app"
-APP_DISPLAY_NAME="Flown Tab"
+APP_BUNDLE_NAME="Flow Tab.app"
+APP_DISPLAY_NAME="Flow Tab"
 APP_PROCESS_NAME="FlowTab"
 RELEASE_APP_PATH="${DERIVED_DATA_PATH}/Build/Products/Release/${APP_BUNDLE_NAME}"
 INSTALL_PATH="/Applications/${APP_BUNDLE_NAME}"

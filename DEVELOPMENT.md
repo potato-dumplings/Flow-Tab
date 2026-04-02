@@ -310,7 +310,7 @@ chmod +x scripts/release-install.sh
 1. 退出正在运行的 `FlowTab`
 2. 重置该应用的辅助功能与屏幕录制授权记录
 3. 构建 Release
-4. 替换 `/Applications/Flown Tab.app`
+4. 替换 `/Applications/Flow Tab.app`
 5. 启动新版本
 
 注意：
@@ -373,7 +373,7 @@ gh release create "${TAG}" release/"${TAG}"/flowtab-aarch64-apple-darwin.dmg --t
 ### 1) 看不到可切换窗口，日志里 `windows=0`
 
 通常是辅助功能权限未生效，或者当前运行实例路径与授权路径不一致。
-建议安装到固定路径 `/Applications/Flown Tab.app` 后重新授权。
+建议安装到固定路径 `/Applications/Flow Tab.app` 后重新授权。
 
 ### 2) 窗口预览没有真实画面
 

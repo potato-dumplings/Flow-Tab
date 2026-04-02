@@ -22,7 +22,7 @@ FlowTab 是一个 macOS 应用切换器，目标是在接近系统 `Command + Ta
 安装步骤：
 
 1. 打开下载的 `.dmg` 文件。
-2. 将 `Flown Tab.app` 拖到 `Applications` 文件夹。
+2. 将 `Flow Tab.app` 拖到 `Applications` 文件夹。
 3. 在 `Applications` 中打开 FlowTab。
 
 注意：

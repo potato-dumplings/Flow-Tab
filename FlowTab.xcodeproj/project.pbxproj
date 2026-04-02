@@ -41,7 +41,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-			4A6DAE6A2F727AF500B0D737 /* Flown Tab.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Flown Tab.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+			4A6DAE6A2F727AF500B0D737 /* Flow Tab.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Flow Tab.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 			4A6DAE6D2F727AF500B0D737 /* FlowTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTab.swift; sourceTree = "<group>"; };
 			4A6DAE6F2F727AF500B0D737 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 			B1C2D3E32F74000100B0D737 /* AppLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLocalization.swift; sourceTree = "<group>"; };
@@ -100,7 +100,7 @@
 		4A6DAE6B2F727AF500B0D737 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-					4A6DAE6A2F727AF500B0D737 /* Flown Tab.app */,
+					4A6DAE6A2F727AF500B0D737 /* Flow Tab.app */,
 				4A6DAE7B2F727AF600B0D737 /* FlowTabTests.xctest */,
 				4A6DAE852F727AF600B0D737 /* FlowTabUITests.xctest */,
 			);
@@ -176,8 +176,8 @@
 			packageProductDependencies = (
 				4A6DAE9C2F727C0900B0D737 /* FlowTabCore */,
 			);
-				productName = "Flown Tab";
-				productReference = 4A6DAE6A2F727AF500B0D737 /* Flown Tab.app */;
+				productName = "Flow Tab";
+				productReference = 4A6DAE6A2F727AF500B0D737 /* Flow Tab.app */;
 			productType = "com.apple.product-type.application";
 		};
 		4A6DAE7A2F727AF600B0D737 /* FlowTabTests */ = {
@@ -468,7 +468,7 @@
 					ENABLE_PREVIEWS = YES;
 					EXECUTABLE_NAME = FlowTab;
 					GENERATE_INFOPLIST_FILE = YES;
-					INFOPLIST_KEY_CFBundleDisplayName = "Flown Tab";
+					INFOPLIST_KEY_CFBundleDisplayName = "Flow Tab";
 					INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -477,7 +477,7 @@
 					MARKETING_VERSION = 1.0;
 					PRODUCT_BUNDLE_IDENTIFIER = io.github.potato-dumplings.flowtab;
 					PRODUCT_MODULE_NAME = FlowTab;
-					PRODUCT_NAME = "Flown Tab";
+					PRODUCT_NAME = "Flow Tab";
 					SWIFT_EMIT_LOC_STRINGS = YES;
 					SWIFT_VERSION = 5.0;
 			};
@@ -496,7 +496,7 @@
 					ENABLE_PREVIEWS = YES;
 					EXECUTABLE_NAME = FlowTab;
 					GENERATE_INFOPLIST_FILE = YES;
-					INFOPLIST_KEY_CFBundleDisplayName = "Flown Tab";
+					INFOPLIST_KEY_CFBundleDisplayName = "Flow Tab";
 					INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -505,7 +505,7 @@
 					MARKETING_VERSION = 1.0;
 					PRODUCT_BUNDLE_IDENTIFIER = io.github.potato-dumplings.flowtab;
 					PRODUCT_MODULE_NAME = FlowTab;
-					PRODUCT_NAME = "Flown Tab";
+					PRODUCT_NAME = "Flow Tab";
 					SWIFT_EMIT_LOC_STRINGS = YES;
 					SWIFT_VERSION = 5.0;
 			};
@@ -525,7 +525,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-					TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Flown Tab.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/FlowTab";
+					TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Flow Tab.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/FlowTab";
 			};
 			name = Debug;
 		};
@@ -543,7 +543,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_VERSION = 5.0;
-					TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Flown Tab.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/FlowTab";
+					TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Flow Tab.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/FlowTab";
 			};
 			name = Release;
 		};
