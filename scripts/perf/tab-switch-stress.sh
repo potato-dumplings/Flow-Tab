@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 DERIVED_DATA_DIR="$ROOT_DIR/.build-local/DerivedData"
 APP_BIN="$DERIVED_DATA_DIR/Build/Products/Debug/Flow Tab.app/Contents/MacOS/FlowTab"
+HOST_ARCH="$(uname -m)"
 
 DURATION_SECONDS="${1:-30}"
 SWITCH_INTERVAL_MS="${2:-20}"
@@ -14,6 +15,7 @@ xcodebuild \
   -project "$ROOT_DIR/FlowTab.xcodeproj" \
   -scheme FlowTab \
   -configuration Debug \
+  -destination "platform=macOS,arch=${HOST_ARCH}" \
   -sdk macosx \
   -derivedDataPath "$DERIVED_DATA_DIR" \
   build >/dev/null

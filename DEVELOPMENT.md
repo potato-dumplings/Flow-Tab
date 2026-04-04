@@ -195,6 +195,7 @@ xcodebuild \
   -project FlowTab.xcodeproj \
   -scheme FlowTab \
   -configuration Debug \
+  -destination "platform=macOS,arch=$(uname -m)" \
   -derivedDataPath ./.build-local \
   build
 ```
@@ -475,7 +476,7 @@ gh release create "${TAG}" release/"${TAG}"/flowtab-universal2-apple-darwin.dmg 
 xcodebuild \
   -project FlowTab.xcodeproj \
   -scheme FlowTab \
-  -destination 'platform=macOS' \
+  -destination "platform=macOS,arch=$(uname -m)" \
   -only-testing:FlowTabTests/FlowTabTests/testSearchPerformanceWindowScope \
   -only-testing:FlowTabTests/FlowTabTests/testSearchPressureWindowScopeUnified \
   test
