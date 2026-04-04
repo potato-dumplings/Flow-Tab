@@ -190,6 +190,17 @@ final class FlowTabPriorityCoverageTests: XCTestCase {
         XCTAssertFalse(userDefaults.bool(forKey: CommandTabTakeoverController.takeoverMarkerKey))
     }
 
+    func testCommandTabTakeoverControllerSymbolicHotKeyResolverIsStableAcrossLookups() {
+        guard let userDefaults = makeIsolatedUserDefaults() else { return }
+        defer { clearIsolatedUserDefaults(userDefaults) }
+
+        let controller = CommandTabTakeoverController(userDefaults: userDefaults)
+        let firstLookup = controller.hasSymbolicHotKeySetterForTesting()
+        let secondLookup = controller.hasSymbolicHotKeySetterForTesting()
+
+        XCTAssertEqual(firstLookup, secondLookup)
+    }
+
     @MainActor
     func testAppWindowCoordinatorOpenMethodsSelectRequestedTabBeforeActivation() async {
         let previousSelectedTab = HomeTabState.shared.selectedTab
@@ -552,6 +563,74 @@ final class FlowTabPriorityCoverageTests: XCTestCase {
         XCTAssertEqual(callbackCount, 0)
     }
 
+    func testOptionTabHotkeyMonitorParsesRawCarbonEvents() {
+        let monitor = OptionTabHotkeyMonitor(
+            signature: 0x54455354,
+            forwardHotkeyID: 11,
+            backwardHotkeyID: 22,
+            startsMonitoring: false
+        )
+
+        var events: [String] = []
+        monitor.onHotkeyPressed = { isBackward in
+            events.append(isBackward ? "press-backward" : "press-forward")
+        }
+        monitor.onHotkeyReleased = { isBackward in
+            events.append(isBackward ? "release-backward" : "release-forward")
+        }
+
+        let unsupportedKind = makeCarbonHotkeyEvent(
+            kind: UInt32(kEventRawKeyDown),
+            signature: 0x54455354,
+            id: 11,
+            includeHotkeyPayload: true
+        )
+        XCTAssertEqual(
+            monitor.handleHotkeyEventForTesting(unsupportedKind),
+            OSStatus(eventNotHandledErr)
+        )
+
+        let missingPayload = makeCarbonHotkeyEvent(
+            kind: UInt32(kEventHotKeyPressed),
+            signature: 0x54455354,
+            id: 11,
+            includeHotkeyPayload: false
+        )
+        XCTAssertEqual(
+            monitor.handleHotkeyEventForTesting(missingPayload),
+            OSStatus(eventNotHandledErr)
+        )
+
+        let wrongSignature = makeCarbonHotkeyEvent(
+            kind: UInt32(kEventHotKeyPressed),
+            signature: 0x42414421,
+            id: 11,
+            includeHotkeyPayload: true
+        )
+        XCTAssertEqual(
+            monitor.handleHotkeyEventForTesting(wrongSignature),
+            OSStatus(eventNotHandledErr)
+        )
+
+        let forwardPressed = makeCarbonHotkeyEvent(
+            kind: UInt32(kEventHotKeyPressed),
+            signature: 0x54455354,
+            id: 11,
+            includeHotkeyPayload: true
+        )
+        XCTAssertEqual(monitor.handleHotkeyEventForTesting(forwardPressed), noErr)
+
+        let backwardReleased = makeCarbonHotkeyEvent(
+            kind: UInt32(kEventHotKeyReleased),
+            signature: 0x54455354,
+            id: 22,
+            includeHotkeyPayload: true
+        )
+        XCTAssertEqual(monitor.handleHotkeyEventForTesting(backwardReleased), noErr)
+
+        XCTAssertEqual(events, ["press-forward", "release-backward"])
+    }
+
     func testRuntimeSnapshotProviderVisibilityHelpersCoverCurrentProcessAndMinimizedApps() {
         XCTAssertFalse(
             RuntimeSnapshotProvider.shouldIncludeRunningApplication(
@@ -626,6 +705,86 @@ final class FlowTabPriorityCoverageTests: XCTestCase {
         XCTAssertEqual(rankByPID[30], 1)
         XCTAssertEqual(rankByPID[40], 2)
         XCTAssertEqual(rankByPID[10], 3)
+    }
+
+    func testSystemAppMRUTrackerHelpersCoverNotificationRemovalAndPruningPaths() {
+        let tracker = SystemAppMRUTracker.shared
+        tracker.resetStateForTesting()
+        defer { tracker.resetStateForTesting() }
+
+        tracker.recordActivationForTesting(pid: 4_001)
+        tracker.recordActivationForTesting(pid: 4_002)
+        tracker.recordActivationForTesting(pid: 4_001)
+        XCTAssertEqual(tracker.trackedMRUOrderForTesting(runningPIDs: [4_001, 4_002]), [4_001, 4_002])
+
+        tracker.removeForTesting(pid: 4_002)
+        XCTAssertEqual(tracker.trackedMRUOrderForTesting(runningPIDs: [4_001, 4_002]), [4_001])
+
+        tracker.handleApplicationNotificationForTesting(app: nil, removeOnly: true)
+        XCTAssertEqual(tracker.trackedMRUOrderForTesting(runningPIDs: [4_001]), [4_001])
+
+        tracker.handleApplicationNotificationForTesting(app: .current, removeOnly: false)
+        XCTAssertEqual(
+            tracker.trackedMRUOrderForTesting(
+                runningPIDs: [4_001, ProcessInfo.processInfo.processIdentifier]
+            ),
+            [4_001]
+        )
+
+        tracker.recordActivationForTesting(pid: 4_999)
+        XCTAssertEqual(tracker.trackedMRUOrderForTesting(runningPIDs: [4_001]), [4_001])
+    }
+
+    func testSystemAppMRUTrackerRankingFallsBackWhenCurrentPIDLaunchRankIsMissing() {
+        let rankByPID = SystemAppMRUTracker.rankByPID(
+            runningPIDs: [101, 202],
+            trackedOrder: [],
+            currentPID: 101,
+            launchRankByPID: [:],
+            fallbackRankByPID: [202: 0, 101: 5]
+        )
+
+        XCTAssertEqual(rankByPID[202], 0)
+        XCTAssertEqual(rankByPID[101], 1)
+    }
+
+    @MainActor
+    func testSystemAppMRUTrackerObserversProcessWorkspaceActivationAndTerminationNotifications() throws {
+        let currentPID = ProcessInfo.processInfo.processIdentifier
+        guard
+            let otherApp = NSWorkspace.shared.runningApplications.first(where: {
+                $0.processIdentifier != currentPID && !$0.isTerminated
+            })
+        else {
+            throw XCTSkip("No secondary running app is available for observer notification coverage.")
+        }
+
+        let tracker = SystemAppMRUTracker.shared
+        tracker.resetStateForTesting()
+        defer { tracker.resetStateForTesting() }
+
+        tracker.startIfNeeded()
+        let notificationCenter = NSWorkspace.shared.notificationCenter
+
+        notificationCenter.post(
+            name: NSWorkspace.didActivateApplicationNotification,
+            object: nil,
+            userInfo: [NSWorkspace.applicationUserInfoKey: otherApp]
+        )
+        XCTAssertEqual(
+            tracker.trackedMRUOrderForTesting(runningPIDs: [otherApp.processIdentifier]),
+            [otherApp.processIdentifier]
+        )
+
+        notificationCenter.post(
+            name: NSWorkspace.didTerminateApplicationNotification,
+            object: nil,
+            userInfo: [NSWorkspace.applicationUserInfoKey: otherApp]
+        )
+        XCTAssertEqual(
+            tracker.trackedMRUOrderForTesting(runningPIDs: [otherApp.processIdentifier]),
+            []
+        )
     }
 
     @MainActor
@@ -1282,6 +1441,181 @@ final class FlowTabPriorityCoverageTests: XCTestCase {
     }
 
     @MainActor
+    func testAppDelegateLaunchWithUITestBootstrapArgumentsSeedsLogsAndOpensSearch() async {
+        guard let userDefaults = makeIsolatedUserDefaults() else { return }
+
+        let previousHooks = AppDelegate.testHooks
+        let previousSharedDelegate = AppDelegate.shared
+        let previousActivationOverride = AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride
+        let previousAXTrusted = AccessibilityPermissionChecker.isTrustedOverrideForTesting
+        let previousAXRequest = AccessibilityPermissionChecker.requestPermissionOverrideForTesting
+        let previousLaunchArguments = FlowTabTestLaunchOptions.argumentsOverrideForTesting
+        let hotkeyFactory = SpyHotkeyMonitorFactory()
+        let takeoverController = SpyCommandTabTakeoverController()
+        let stressRunner = SpyStressRunner()
+        let panelController = SwitcherPanelController()
+        var delegate: AppDelegate?
+        defer {
+            delegate?.applicationWillTerminate(
+                Notification(name: NSApplication.willTerminateNotification)
+            )
+            AppDelegate.testHooks = previousHooks
+            AppDelegate.shared = previousSharedDelegate
+            AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride = previousActivationOverride
+            AccessibilityPermissionChecker.isTrustedOverrideForTesting = previousAXTrusted
+            AccessibilityPermissionChecker.requestPermissionOverrideForTesting = previousAXRequest
+            FlowTabTestLaunchOptions.argumentsOverrideForTesting = previousLaunchArguments
+            RuntimeDiagnostics.shared.clear()
+            clearIsolatedUserDefaults(userDefaults)
+        }
+
+        panelController.modelForTesting.snapshotProviderOverride = {
+            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
+        }
+
+        userDefaults.set(false, forKey: AppPreferenceKeys.showShortcutHint)
+        userDefaults.set(
+            RuntimeLogLevel.error.rawValue,
+            forKey: AppPreferenceKeys.runtimeLogLevel
+        )
+        userDefaults.set(true, forKey: CommandTabTakeoverController.takeoverMarkerKey)
+        HomeTabState.shared.selectedTab = .logs
+
+        RuntimeDiagnostics.shared.clear()
+        RuntimeDiagnostics.shared.log(
+            level: .info,
+            category: "UnitTest",
+            message: "before-seed-cleanup"
+        )
+
+        FlowTabTestLaunchOptions.argumentsOverrideForTesting = [
+            "FlowTab",
+            "--flowtab-ui-reset-defaults",
+            "--flowtab-ui-runtime-log-level", "warn",
+            "--flowtab-ui-seed-logs", "3",
+            "--flowtab-ui-open-switcher-search"
+        ]
+        AccessibilityPermissionChecker.isTrustedOverrideForTesting = { true }
+        AccessibilityPermissionChecker.requestPermissionOverrideForTesting = { true }
+        AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride = {}
+        AppDelegate.testHooks = AppDelegate.TestHooks(
+            userDefaults: userDefaults,
+            makePanelController: { panelController },
+            makeHotkeyMonitor: { configuration, signature, forwardHotkeyID, backwardHotkeyID in
+                hotkeyFactory.make(
+                    configuration: configuration,
+                    signature: signature,
+                    forwardHotkeyID: forwardHotkeyID,
+                    backwardHotkeyID: backwardHotkeyID
+                )
+            },
+            commandTabTakeoverController: takeoverController,
+            stressRunner: stressRunner
+        )
+
+        let appDelegate = AppDelegate()
+        delegate = appDelegate
+        appDelegate.applicationDidFinishLaunching(
+            Notification(name: NSApplication.didFinishLaunchingNotification)
+        )
+        try? await Task.sleep(nanoseconds: 420_000_000)
+
+        XCTAssertNil(userDefaults.object(forKey: AppPreferenceKeys.showShortcutHint))
+        XCTAssertFalse(userDefaults.bool(forKey: CommandTabTakeoverController.takeoverMarkerKey))
+        XCTAssertEqual(
+            userDefaults.string(forKey: AppPreferenceKeys.runtimeLogLevel),
+            RuntimeLogLevel.warning.rawValue
+        )
+        XCTAssertEqual(HomeTabState.shared.selectedTab, .home)
+        XCTAssertEqual(stressRunner.startCallCount, 1)
+        XCTAssertEqual(hotkeyFactory.records.map(\.signature), [0x46544142, 0x4654574E])
+        XCTAssertTrue(panelController.modelForTesting.isSearchActive)
+        XCTAssertNotNil(panelController.modelForTesting.session)
+
+        let lines = await RuntimeDiagnostics.shared.readRecentLines(limit: 40, minimumLevel: .debug)
+        XCTAssertFalse(lines.contains(where: { $0.contains("before-seed-cleanup") }))
+        let seededLines = lines.filter { $0.contains("[UITest] seeded-") }
+        XCTAssertEqual(seededLines.count, 3)
+    }
+
+    @MainActor
+    func testAppDelegateLaunchOpenSwitcherWithoutResultsDoesNotEnterSearchAndSeedZeroSkipsSeededLogs() async {
+        guard let userDefaults = makeIsolatedUserDefaults() else { return }
+
+        let previousHooks = AppDelegate.testHooks
+        let previousSharedDelegate = AppDelegate.shared
+        let previousActivationOverride = AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride
+        let previousAXTrusted = AccessibilityPermissionChecker.isTrustedOverrideForTesting
+        let previousAXRequest = AccessibilityPermissionChecker.requestPermissionOverrideForTesting
+        let previousLaunchArguments = FlowTabTestLaunchOptions.argumentsOverrideForTesting
+        let hotkeyFactory = SpyHotkeyMonitorFactory()
+        let panelController = SwitcherPanelController()
+        var delegate: AppDelegate?
+        defer {
+            delegate?.applicationWillTerminate(
+                Notification(name: NSApplication.willTerminateNotification)
+            )
+            AppDelegate.testHooks = previousHooks
+            AppDelegate.shared = previousSharedDelegate
+            AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride = previousActivationOverride
+            AccessibilityPermissionChecker.isTrustedOverrideForTesting = previousAXTrusted
+            AccessibilityPermissionChecker.requestPermissionOverrideForTesting = previousAXRequest
+            FlowTabTestLaunchOptions.argumentsOverrideForTesting = previousLaunchArguments
+            RuntimeDiagnostics.shared.clear()
+            clearIsolatedUserDefaults(userDefaults)
+        }
+
+        panelController.modelForTesting.snapshotProviderOverride = {
+            RuntimeSnapshot(apps: [], contextsByID: [:])
+        }
+
+        RuntimeDiagnostics.shared.clear()
+        RuntimeDiagnostics.shared.log(
+            level: .info,
+            category: "UnitTest",
+            message: "seed-zero-cleanup"
+        )
+
+        FlowTabTestLaunchOptions.argumentsOverrideForTesting = [
+            "FlowTab",
+            "--flowtab-ui-open-switcher",
+            "--flowtab-ui-seed-logs", "0"
+        ]
+        AccessibilityPermissionChecker.isTrustedOverrideForTesting = { true }
+        AccessibilityPermissionChecker.requestPermissionOverrideForTesting = { true }
+        AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride = {}
+        AppDelegate.testHooks = AppDelegate.TestHooks(
+            userDefaults: userDefaults,
+            makePanelController: { panelController },
+            makeHotkeyMonitor: { configuration, signature, forwardHotkeyID, backwardHotkeyID in
+                hotkeyFactory.make(
+                    configuration: configuration,
+                    signature: signature,
+                    forwardHotkeyID: forwardHotkeyID,
+                    backwardHotkeyID: backwardHotkeyID
+                )
+            },
+            commandTabTakeoverController: SpyCommandTabTakeoverController(),
+            stressRunner: SpyStressRunner()
+        )
+
+        let appDelegate = AppDelegate()
+        delegate = appDelegate
+        appDelegate.applicationDidFinishLaunching(
+            Notification(name: NSApplication.didFinishLaunchingNotification)
+        )
+        try? await Task.sleep(nanoseconds: 420_000_000)
+
+        XCTAssertNil(panelController.modelForTesting.session)
+        XCTAssertFalse(panelController.modelForTesting.isSearchActive)
+        XCTAssertEqual(hotkeyFactory.records.count, 2)
+
+        let lines = await RuntimeDiagnostics.shared.readRecentLines(limit: 40, minimumLevel: .debug)
+        XCTAssertFalse(lines.contains(where: { $0.contains("seed-zero-cleanup") }))
+        XCTAssertFalse(lines.contains(where: { $0.contains("[UITest] seeded-") }))
+    }
+
+    @MainActor
     func testSwitcherPanelControllerInAppHotkeyReleaseCommitsFocusedWindowSession() async {
         let controller = SwitcherPanelController()
         let currentApp = NSRunningApplication.current
@@ -1429,6 +1763,63 @@ final class FlowTabPriorityCoverageTests: XCTestCase {
         try? await Task.sleep(nanoseconds: 220_000_000)
         XCTAssertNotNil(controller.modelForTesting.session)
         XCTAssertEqual(activateCallCount, 0)
+        XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerActiveSpaceNotificationKeepsSessionVisibleWithoutReactivatingApp() async {
+        let controller = SwitcherPanelController()
+        controller.modelForTesting.snapshotProviderOverride = {
+            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
+        }
+        controller.globalPrimaryModifierPressedOverride = true
+        controller.appIsActiveOverride = false
+
+        var activateCallCount = 0
+        controller.activateApplicationIgnoringOtherAppsOverride = {
+            activateCallCount += 1
+        }
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        controller.panelOcclusionStateOverride = []
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 60_000_000)
+            controller.panelOcclusionStateOverride = .visible
+        }
+
+        NSWorkspace.shared.notificationCenter.post(
+            name: NSWorkspace.activeSpaceDidChangeNotification,
+            object: nil
+        )
+
+        try? await Task.sleep(nanoseconds: 260_000_000)
+        XCTAssertNotNil(controller.modelForTesting.session)
+        XCTAssertEqual(activateCallCount, 0)
+        XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerActiveSpaceNotificationCancelsSessionAfterModifierRelease() async {
+        let controller = SwitcherPanelController()
+        controller.modelForTesting.snapshotProviderOverride = {
+            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
+        }
+        controller.globalPrimaryModifierPressedOverride = false
+        controller.globalMainKeyPressedOverride = false
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+
+        NSWorkspace.shared.notificationCenter.post(
+            name: NSWorkspace.activeSpaceDidChangeNotification,
+            object: nil
+        )
+
+        try? await Task.sleep(nanoseconds: 40_000_000)
+        XCTAssertNil(controller.modelForTesting.session)
+        XCTAssertTrue(controller.suppressHotkeyReplayUntilReleaseForTesting)
+
+        try? await Task.sleep(nanoseconds: 80_000_000)
         XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
     }
 
@@ -1676,6 +2067,50 @@ final class FlowTabPriorityCoverageTests: XCTestCase {
         XCTAssertTrue(rows.allSatisfy { $0.candidate.id != "com.example.chat" })
     }
 
+    func testRuntimeSnapshotProviderAssemblyIncludesMinimizedAppsWhenFilterDisabledAndUsesFallbackGroup() {
+        let rows = RuntimeSnapshotProvider.assembleSnapshotRowsForTesting(
+            apps: [
+                RuntimeSnapshotProvider.SnapshotAssemblyApp(
+                    pid: 41,
+                    bundleIdentifier: nil,
+                    localizedName: "Zulu",
+                    launchDate: Date(timeIntervalSince1970: 100)
+                ),
+                RuntimeSnapshotProvider.SnapshotAssemblyApp(
+                    pid: 42,
+                    bundleIdentifier: nil,
+                    localizedName: "Alpha",
+                    launchDate: Date(timeIntervalSince1970: 100)
+                )
+            ],
+            windowsByPID: [
+                41: [
+                    RuntimeSnapshotProvider.SnapshotAssemblyWindow(
+                        windowID: "z-1",
+                        title: "Zulu Window",
+                        isMinimized: true,
+                        cgWindowID: 41
+                    )
+                ],
+                42: [
+                    RuntimeSnapshotProvider.SnapshotAssemblyWindow(
+                        windowID: "a-1",
+                        title: "Alpha Window",
+                        isMinimized: true,
+                        cgWindowID: 42
+                    )
+                ]
+            ],
+            rankByPID: [41: 5, 42: 5],
+            hideMinimizedAppsFromAppLayer: false,
+            now: 2_000
+        )
+
+        XCTAssertEqual(rows.map(\.pid), [42, 41])
+        XCTAssertEqual(rows.map(\.candidate.groupID), ["a", "z"])
+        XCTAssertTrue(rows.allSatisfy { $0.candidate.windows.first?.isMinimized == true })
+    }
+
     func testRuntimeWindowPreviewProviderGuessesDarkLightAndUnknownTitleBars() {
         let darkImage = makeSolidPreviewCGImage(color: .black)
         let lightImage = makeSolidPreviewCGImage(color: .white)
@@ -1690,6 +2125,189 @@ final class FlowTabPriorityCoverageTests: XCTestCase {
             .light
         )
         XCTAssertNil(RuntimeWindowPreviewProvider.guessTitleBarStyleForTesting(from: noisyImage))
+    }
+
+    func testRuntimeWindowPreviewProviderCandidateWindowOrderingForPreferredAndTitleMatches() {
+        let candidateIDs = RuntimeWindowPreviewProvider.candidateWindowIDsForTesting(
+            preferredWindowID: 3,
+            preferredTitle: "Inbox",
+            liveWindows: [
+                .init(id: 1, title: "Inbox"),
+                .init(id: 2, title: "inbox"),
+                .init(id: 3, title: "Draft"),
+                .init(id: 4, title: nil)
+            ]
+        )
+
+        XCTAssertEqual(candidateIDs, [3, 1, 2, 4])
+    }
+
+    func testRuntimeWindowPreviewProviderOwnerPIDPathKeepsPreferredWindowFirst() {
+        let preferredWindowID: CGWindowID = 777
+        let candidateIDs = RuntimeWindowPreviewProvider.candidateWindowIDsForTesting(
+            preferredWindowID: preferredWindowID,
+            ownerPID: ProcessInfo.processInfo.processIdentifier,
+            preferredTitle: "unlikely-title-\(UUID().uuidString)"
+        )
+
+        XCTAssertEqual(candidateIDs.first, preferredWindowID)
+    }
+
+    func testRuntimeWindowPreviewProviderScaledPreviewSizeAndImageDownscaleBehavior() {
+        let largeSize = RuntimeWindowPreviewProvider.scaledPreviewSizeForTesting(
+            sourceWidth: 2_400,
+            sourceHeight: 1_200
+        )
+        XCTAssertEqual(largeSize.width, 1_200)
+        XCTAssertEqual(largeSize.height, 600)
+
+        let unchangedSize = RuntimeWindowPreviewProvider.scaledPreviewSizeForTesting(
+            sourceWidth: 800,
+            sourceHeight: 400
+        )
+        XCTAssertEqual(unchangedSize.width, 800)
+        XCTAssertEqual(unchangedSize.height, 400)
+
+        let minimalSize = RuntimeWindowPreviewProvider.scaledPreviewSizeForTesting(
+            sourceWidth: 0.2,
+            sourceHeight: 0.2
+        )
+        XCTAssertEqual(minimalSize.width, 1)
+        XCTAssertEqual(minimalSize.height, 1)
+
+        let largeImage = makeSolidPreviewCGImage(
+            color: .systemTeal,
+            size: CGSize(width: 2_000, height: 1_000)
+        )
+        let scaledImage = RuntimeWindowPreviewProvider.scaledPreviewImageIfNeededForTesting(largeImage)
+        XCTAssertEqual(scaledImage?.width, 1_200)
+        XCTAssertEqual(scaledImage?.height, 600)
+
+        let smallImage = makeSolidPreviewCGImage(
+            color: .systemOrange,
+            size: CGSize(width: 600, height: 300)
+        )
+        let unchangedImage = RuntimeWindowPreviewProvider.scaledPreviewImageIfNeededForTesting(smallImage)
+        XCTAssertEqual(unchangedImage?.width, 600)
+        XCTAssertEqual(unchangedImage?.height, 300)
+    }
+
+    func testRuntimeSnapshotProviderGroupIDMappingCoversFallbackAndBundleShapes() {
+        XCTAssertEqual(
+            RuntimeSnapshotProvider.groupIDForTesting(
+                bundleIdentifier: nil,
+                fallbackName: "Notes"
+            ),
+            "n"
+        )
+        XCTAssertEqual(
+            RuntimeSnapshotProvider.groupIDForTesting(
+                bundleIdentifier: "com.example.mail",
+                fallbackName: "Mail"
+            ),
+            "example"
+        )
+        XCTAssertEqual(
+            RuntimeSnapshotProvider.groupIDForTesting(
+                bundleIdentifier: "singleton",
+                fallbackName: "Single"
+            ),
+            "singleton"
+        )
+        XCTAssertEqual(
+            RuntimeSnapshotProvider.groupIDForTesting(
+                bundleIdentifier: "",
+                fallbackName: "Empty"
+            ),
+            "apps"
+        )
+    }
+
+    func testRuntimeSnapshotProviderResolveCGWindowIDCoversExactInsensitiveFallbackAndExhaustedCases() {
+        let cgWindows: [RuntimeSnapshotProvider.CGWindowEntryForTesting] = [
+            .init(id: 11, title: "Inbox"),
+            .init(id: 22, title: "Draft"),
+            .init(id: 33, title: nil)
+        ]
+
+        var usedIndexes: Set<Int> = []
+        XCTAssertEqual(
+            RuntimeSnapshotProvider.resolveCGWindowIDForTesting(
+                preferredTitle: "Inbox",
+                fallbackIndex: 2,
+                cgWindows: cgWindows,
+                usedIndexes: &usedIndexes
+            ),
+            11
+        )
+        XCTAssertEqual(usedIndexes, [0])
+
+        XCTAssertEqual(
+            RuntimeSnapshotProvider.resolveCGWindowIDForTesting(
+                preferredTitle: "draft",
+                fallbackIndex: 0,
+                cgWindows: cgWindows,
+                usedIndexes: &usedIndexes
+            ),
+            22
+        )
+        XCTAssertEqual(usedIndexes, [0, 1])
+
+        XCTAssertEqual(
+            RuntimeSnapshotProvider.resolveCGWindowIDForTesting(
+                preferredTitle: "unknown",
+                fallbackIndex: 2,
+                cgWindows: cgWindows,
+                usedIndexes: &usedIndexes
+            ),
+            33
+        )
+        XCTAssertEqual(usedIndexes, [0, 1, 2])
+
+        var fallbackFromFirstUnmatched: Set<Int> = [0]
+        XCTAssertEqual(
+            RuntimeSnapshotProvider.resolveCGWindowIDForTesting(
+                preferredTitle: nil,
+                fallbackIndex: 99,
+                cgWindows: cgWindows,
+                usedIndexes: &fallbackFromFirstUnmatched
+            ),
+            22
+        )
+        XCTAssertEqual(fallbackFromFirstUnmatched, [0, 1])
+
+        var fullyUsed: Set<Int> = [0, 1, 2]
+        XCTAssertNil(
+            RuntimeSnapshotProvider.resolveCGWindowIDForTesting(
+                preferredTitle: nil,
+                fallbackIndex: 99,
+                cgWindows: cgWindows,
+                usedIndexes: &fullyUsed
+            )
+        )
+    }
+
+    func testAXWindowInspectorHelpersRoundTripWindowIDsAndHandleSystemElementLookups() {
+        let windowID = AXWindowInspectorForTesting.makeWindowID(pid: 123, index: 7)
+        XCTAssertEqual(windowID, "ax:123:7")
+        XCTAssertEqual(AXWindowInspectorForTesting.windowIndex(from: windowID, expectedPID: 123), 7)
+        XCTAssertNil(AXWindowInspectorForTesting.windowIndex(from: "invalid", expectedPID: 123))
+        XCTAssertNil(AXWindowInspectorForTesting.windowIndex(from: "ax:999:7", expectedPID: 123))
+        XCTAssertEqual(AXWindowInspectorForTesting.fallbackTitle(index: 0), "Window #1")
+
+        let systemElement = AXUIElementCreateSystemWide()
+        let role = AXWindowInspectorForTesting.role(for: systemElement)
+        let isSwitchable = AXWindowInspectorForTesting.isSwitchable(systemElement)
+        if let role {
+            XCTAssertEqual(isSwitchable, role == kAXWindowRole as String)
+        } else {
+            XCTAssertTrue(isSwitchable)
+        }
+        XCTAssertFalse(AXWindowInspectorForTesting.isMinimized(systemElement))
+
+        if let title = AXWindowInspectorForTesting.title(for: systemElement) {
+            XCTAssertFalse(title.isEmpty)
+        }
     }
 
     @MainActor
@@ -1764,6 +2382,15 @@ final class FlowTabPriorityCoverageTests: XCTestCase {
         cache.removeAll()
 
         XCTAssertNil(cache.image(forKey: "mail"))
+    }
+
+    func testBoundedImageCacheHandlesImagesWithoutBitmapRepresentations() {
+        let cache = BoundedImageCache(countLimit: 4, totalCostLimit: 1_024 * 1_024)
+        let vectorOnlyImage = NSImage(size: NSSize(width: 19.2, height: 7.8))
+
+        cache.insert(vectorOnlyImage, forKey: "vector")
+
+        XCTAssertNotNil(cache.image(forKey: "vector"))
     }
 
     func testAppIconProviderCachesResolvedIconsAndMemoizesMissingApps() {
@@ -2014,6 +2641,42 @@ final class FlowTabPriorityCoverageTests: XCTestCase {
             )
         }
         try await body()
+    }
+
+    private func makeCarbonHotkeyEvent(
+        kind: UInt32,
+        signature: OSType,
+        id: UInt32,
+        includeHotkeyPayload: Bool
+    ) -> EventRef {
+        var eventRef: EventRef?
+        let createStatus = CreateEvent(
+            nil,
+            OSType(kEventClassKeyboard),
+            kind,
+            EventTime(0),
+            EventAttributes(kEventAttributeNone),
+            &eventRef
+        )
+        XCTAssertEqual(createStatus, noErr)
+        guard let eventRef else {
+            fatalError("Failed to create Carbon event for tests")
+        }
+
+        if includeHotkeyPayload {
+            var hotkeyID = EventHotKeyID(signature: signature, id: id)
+            let payloadStatus = withUnsafePointer(to: &hotkeyID) { pointer in
+                SetEventParameter(
+                    eventRef,
+                    EventParamName(kEventParamDirectObject),
+                    EventParamType(typeEventHotKeyID),
+                    MemoryLayout<EventHotKeyID>.size,
+                    pointer
+                )
+            }
+            XCTAssertEqual(payloadStatus, noErr)
+        }
+        return eventRef
     }
 
     private static func makeKeyDownEvent(
