@@ -4,71 +4,171 @@
 
 ## 目标与范围
 
-- 目标：将 FlowTab 的可自动化 UI 主路径保持在可回归状态。
-- 范围：`FlowTabUITests` / `FlowTabUITestsLaunchTests`，聚焦应用内可稳定自动化的交互。
+- 目标：把 FlowTab 的可自动化 UI 主路径保持在可回归状态，并让每个 UI case 的覆盖意图、操作路径与断言点都能直接从文档读出来。
+- 范围：`FlowTabUITests`、`FlowTabUITestsLaunchTests`。
+- 说明：仅覆盖应用内可稳定自动化的交互；系统级跳转、Finder 打开目录等外部行为只验证入口是否存在，不把系统结果作为稳定断言。
 
 ## 覆盖总览（当前）
 
 - 用例总数：27
-- 覆盖域：启动导航、Home、Logs、Settings、Switcher/Search、压测。
-- 当前状态：应用内可稳定自动化的核心场景已全部覆盖，无未完成项。
-- 边界说明：系统级交互（系统设置页实际跳转、Finder 实际打开目录）仅覆盖入口按钮存在性，不作为稳定 UI 自动化断言目标。
+- 覆盖域：启动导航、Home、权限提示、Logs、Settings、Switcher/Search、压测。
+- 当前状态：应用内可稳定自动化的核心场景已全部覆盖，无挂起项。
+- 执行前提：大多数用例依赖 UI test launch arguments 控制权限状态、Mock Runtime、预置日志和重置偏好，以减少系统环境抖动。
 
-## 覆盖清单（当前）
+## 用例详情（当前）
 
 ### 启动与导航
 
-- `testLaunch`（截图冒烟）
-- `testLaunchPerformance`（启动性能）
-- `testSidebarTabsSwitchContent`（Home/Logs/Settings 切换）
+- `testLaunch`
+  场景：使用默认启动方式执行一次启动冒烟。
+  步骤：直接启动 `XCUIApplication()`，在首帧稳定后抓取当前窗口截图并附加到测试结果。
+  验证：应用能正常启动，且能生成名为 `Launch Screen` 的截图附件。
+
+- `testLaunchPerformance`
+  场景：在重置用户偏好并关闭权限提醒横幅的前提下测量启动耗时。
+  步骤：使用 `--flowtab-ui-reset-defaults` 和 `-showPermissionReminder NO` 启动应用，并通过 `XCTApplicationLaunchMetric` 统计启动性能。
+  验证：应用可在测量周期内重复完成启动，不因首启提示或历史状态干扰性能数据。
+
+- `testSidebarTabsSwitchContent`
+  场景：权限已授权，验证侧边栏三大页签可稳定切换。
+  步骤：启动后依次点击 `Home`、`Logs`、`Settings` 页签按钮。
+  验证：每次点击后，对应内容容器 `home/logs/settings` 都会出现，确保导航与页面挂载链路正常。
 
 ### Home 与权限提示
 
-- `testHomePermissionBannerHiddenWhenPermissionsGranted`（权限已授权时隐藏权限提示横幅）
-- `testPermissionReminderTogglePersistsAcrossRelaunch`（权限提醒开关在重启后保持）
-- `testPermissionDismissPersistsAcrossRelaunch`（权限提示关闭状态在重启后保持）
-- `testHomePageSelectingMockAppUpdatesWindowList`（选择模拟应用后窗口列表同步更新）
+- `testHomePermissionBannerHiddenWhenPermissionsGranted`
+  场景：无障碍和录屏权限都被标记为已授权。
+  步骤：启动应用后进入 `Home` 页面，检查权限横幅和“打开设置”按钮。
+  验证：权限横幅不存在，权限入口按钮也不可点击，说明已授权状态不会误提示。
+
+- `testPermissionReminderTogglePersistsAcrossRelaunch`
+  场景：首启时权限未授权，需要从 Home 入口进入设置页关闭提醒。
+  步骤：首次启动点击 Home 的“打开设置”，切换权限提醒开关；随后终止应用并在同样的未授权状态下重新启动。
+  验证：重启后 Home 不再出现可点击的权限入口，说明“显示权限提醒”偏好已持久化。
+
+- `testPermissionDismissPersistsAcrossRelaunch`
+  场景：权限未授权，但用户选择在 Home 直接关闭当前权限提示。
+  步骤：首次启动点击权限横幅上的关闭按钮，确认入口消失；随后终止并重新启动应用。
+  验证：重启后 Home 仍不出现权限入口按钮，说明横幅关闭状态被正确记住。
+
+- `testHomePageSelectingMockAppUpdatesWindowList`
+  场景：使用 Mock Runtime，在 Home 页验证“应用列表 -> 窗口列表”的联动。
+  步骤：启动后进入 `Home`，选中模拟应用 `Mock Browser`。
+  验证：窗口列表中会出现 `mock-browser-docs` 对应的窗口行，说明首页应用选择会同步刷新窗口明细。
 
 ### Logs
 
-- `testLogsPageShowsSeededLogsAndClearRemovesOutput`（展示预置日志并验证清空输出）
-- `testLogsPageRespectsRuntimeLogLevelVisibility`（运行时日志级别过滤生效）
-- `testLogsOpenDirectoryButtonIsVisible`（打开日志目录按钮可见）
+- `testLogsPageShowsSeededLogsAndClearRemovesOutput`
+  场景：启动时预置 4 条不同级别日志，并把运行时日志级别设为 `debug`。
+  步骤：进入 `Logs` 页面，检查四条带固定标记的日志是否渲染；随后点击“清空日志”按钮。
+  验证：`debug/info/warn/error` 四条预置日志都存在且内容带指定 marker；清空后空状态提示出现。
+
+- `testLogsPageRespectsRuntimeLogLevelVisibility`
+  场景：同样预置四个级别的日志，但分别在 `DEBUG/INFO/WARN/ERROR` 四种运行时过滤级别下验证可见性。
+  步骤：逐一启动对应日志级别场景，进入 `Logs` 页面检查每条日志行是否显示。
+  验证：日志页面只展示不低于当前阈值的日志，低优先级日志会被隐藏。
+
+- `testLogsOpenDirectoryButtonIsVisible`
+  场景：有日志数据时，用户应能看到“打开日志目录”入口。
+  步骤：预置 1 条日志后进入 `Logs` 页面。
+  验证：`flowtab.logs.open-directory` 按钮存在，确保日志目录入口没有丢失。
 
 ### Settings - Appearance
 
-- `testSettingsAppearanceTogglesCanBeChanged`（外观相关开关可切换）
-- `testSettingsAppearanceThemeAndLanguagePersistAcrossRelaunch`（主题与语言配置在重启后保持）
+- `testSettingsAppearanceTogglesCanBeChanged`
+  场景：权限已授权，验证外观页两个布尔开关可交互。
+  步骤：进入 `Settings`，找到“显示快捷键提示”和“在 Command-Tab 中显示”两个开关，并切换到与当前值相反的状态。
+  验证：两个控件都存在，且切换后实际值与目标值一致。
+
+- `testSettingsAppearanceThemeAndLanguagePersistAcrossRelaunch`
+  场景：验证主题与语言设置的持久化。
+  步骤：首次启动进入 `Settings`，把主题切到 `dark`、语言切到 `en`；终止后再次启动并回到设置页。
+  验证：重启后主题仍为 `dark`，语言仍为 `en`，说明选择型偏好已正确写回。
 
 ### Settings - Window Behavior
 
-- `testSettingsWindowBehaviorDelayAndTogglesPersistAcrossRelaunch`（窗口行为延迟与开关配置在重启后保持）
+- `testSettingsWindowBehaviorDelayAndTogglesPersistAcrossRelaunch`
+  场景：验证窗口层自动进入延迟和相关开关的保存逻辑。
+  步骤：首次启动进入 `Settings`，把自动进入延迟文本输入改为 `1.2345` 并提交，再切换“自动恢复最小化窗口”和“隐藏仅最小化应用”两个开关；随后重启应用。
+  验证：延迟值会被归一化为以 `1.23` 开头的文本，两个布尔开关在重启后保持刚才的状态。
 
 ### Settings - Search
 
-- `testSettingsSearchDisabledPreventsAutoSearchLaunchEntry`（禁用搜索后不自动注入启动入口）
-- `testSettingsSearchDefaultWindowScopePersistsAndShowsWindowResults`（默认窗口范围在重启后保持并展示窗口结果）
-- `testSettingsSearchDefaultScopeCanSwitchBetweenAppAndWindow`（默认范围可在应用与窗口之间切换）
+- `testSettingsSearchDisabledPreventsAutoSearchLaunchEntry`
+  场景：用户关闭搜索功能后，即使通过 UI test 参数要求“启动即进入搜索”，也不应真正进入搜索态。
+  步骤：首次启动在 `Settings` 关闭搜索开关；重启时注入 `--flowtab-ui-open-switcher-search` 并使用 Mock Runtime。
+  验证：Switcher 面板会打开，但搜索输入框不存在，说明“禁用搜索”优先级高于自动进入搜索的启动参数。
+
+- `testSettingsSearchDefaultWindowScopePersistsAndShowsWindowResults`
+  场景：验证搜索默认范围切到 `window` 后会持久化。
+  步骤：首次启动在 `Settings` 打开搜索功能，并把默认范围切到 `window`；重启后再次进入设置页读取该值。
+  验证：默认搜索范围仍为 `window`，确保窗口级搜索偏好不会丢失。
+
+- `testSettingsSearchDefaultScopeCanSwitchBetweenAppAndWindow`
+  场景：验证默认搜索范围控件本身可在 `app` 与 `window` 间切换。
+  步骤：进入 `Settings` 并确保搜索已启用，然后先选 `app` 再选 `window`。
+  验证：控件值会即时跟随变更，说明范围选择器可用且双向切换正常。
 
 ### Settings - Permission & Hotkey
 
-- `testSettingsPermissionActionButtonsAreVisible`（权限操作按钮可见）
-- `testSettingsHotkeySelectionsPersistAcrossRelaunch`（快捷键选择在重启后保持）
-- `testSettingsHotkeyInAppControlsDisabledWithoutAccessibilityPermission`（无障碍未授权时 In-App 控件禁用）
+- `testSettingsPermissionActionButtonsAreVisible`
+  场景：权限未授权时，设置页应暴露两个权限处理入口。
+  步骤：在无障碍和录屏权限均为未授权的前提下进入 `Settings`。
+  验证：无障碍权限按钮和录屏权限按钮都存在。
+
+- `testSettingsHotkeySelectionsPersistAcrossRelaunch`
+  场景：验证主快捷键、退出键和 In-App 键位选择可持久化。
+  步骤：首次启动进入 `Settings`，依次把主键改成 `space`、退出键改成 `z`、In-App 键改成 `a`；随后重启应用。
+  验证：重启后三个下拉选择仍分别为 `space/z/a`。
+
+- `testSettingsHotkeyInAppControlsDisabledWithoutAccessibilityPermission`
+  场景：无障碍权限缺失时，In-App 快捷键不应允许配置。
+  步骤：在无障碍未授权、录屏已授权的前提下进入 `Settings`，定位 In-App 修饰键和主键控件。
+  验证：两个控件都存在但处于禁用状态。
 
 ### Switcher / Search 面板
 
-- `testSwitcherPanelShowsMockAppTilesInStandardMode`（标准模式展示模拟应用卡片）
-- `testSearchPanelEntryAndResultActivation`（搜索输入与结果激活流程可用）
-- `testSearchPanelChineseQueryShowsChineseMockResult`（中文查询可命中中文模拟结果）
-- `testSearchPanelPinyinInitialsShowChineseMockResult`（拼音首字母查询可命中中文模拟结果）
-- `testSearchPanelSharedCsQueryShowsCSGOAndChineseMockResults`（共享关键词查询可同时命中 CSGO 与中文结果）
-- `testSearchPanelSegmentedChineseQueryShowsCompoundMockResult`（分词中文查询可命中组合模拟结果）
-- `testSwitcherPanelMoveAppThenAutoEnterWindowLayerShowsMockWindows`（移动应用后自动进入窗口层并展示模拟窗口）
+- `testSwitcherPanelShowsMockAppTilesInStandardMode`
+  场景：用 Mock Runtime 打开 Switcher/Search 面板，并验证可以退回标准卡片模式。
+  步骤：启动即进入搜索态，确认面板存在后按一次 `Escape`。
+  验证：搜索输入框消失，说明面板能从搜索态退回到标准应用卡片模式。
+
+- `testSearchPanelEntryAndResultActivation`
+  场景：验证搜索输入、结果命中和回车激活整条链路。
+  步骤：启动即进入搜索态，输入 `browser`，等待 `Mock Browser` 结果出现，然后按回车提交；若首次回车只结束输入法组合态，则补发一次回车。
+  验证：搜索结果会出现，提交后 Switcher 面板最终消失，说明结果激活成功。
+
+- `testSearchPanelChineseQueryShowsChineseMockResult`
+  场景：验证中文查询可命中中文模拟应用。
+  步骤：启动即进入搜索态，输入中文字符 `测`。
+  验证：搜索结果中出现 `com-xxx-test` 对应条目。
+
+- `testSearchPanelPinyinInitialsShowChineseMockResult`
+  场景：验证拼音首字母查询可命中中文应用。
+  步骤：启动即进入搜索态，输入 `cs`。
+  验证：结果中出现中文模拟应用 `com-xxx-test`。
+
+- `testSearchPanelSharedCsQueryShowsCSGOAndChineseMockResults`
+  场景：验证共享关键词查询可返回多条不同来源结果。
+  步骤：启动即进入搜索态，输入 `cs`。
+  验证：结果中同时出现 `com-xxx-csgo` 和 `com-xxx-test` 两条记录。
+
+- `testSearchPanelSegmentedChineseQueryShowsCompoundMockResult`
+  场景：验证中文复合词查询可命中分词索引结果。
+  步骤：启动即进入搜索态，输入 `文件助手`。
+  验证：结果中出现 `com-flowtab-mock-file-transfer-assistant` 对应条目。
+
+- `testSwitcherPanelMoveAppThenAutoEnterWindowLayerShowsMockWindows`
+  场景：验证在标准 Switcher 模式中移动应用选择后，可自动切入窗口层。
+  步骤：启动即进入搜索态后先按 `Escape` 回到标准模式，确认当前未展示 `Mock Mail` 的窗口列表，再按左方向键切换应用。
+  验证：`mock-mail-inbox` 与 `mock-mail-draft` 两个窗口条目出现，说明移动应用选择后成功自动进入窗口层。
 
 ### 压测
 
-- `testTabSwitchStressCPUAndMemory`（Tab 切换场景下 CPU 与内存压力验证）
+- `testTabSwitchStressCPUAndMemory`
+  场景：对 Tab 切换压测脚本做 CPU、内存和耗时基线观测。
+  步骤：以 `--flowtab-tab-stress` 启动应用，持续 2 秒、每 16ms 触发一次切换，并通过 `XCTClockMetric`、`XCTCPUMetric`、`XCTMemoryMetric` 进行 3 轮测量。
+  验证：应用能在压测窗口内正常启动并按预期自行退出，且性能指标可被持续采集。
 
 ## 回归命令（示例）
 
