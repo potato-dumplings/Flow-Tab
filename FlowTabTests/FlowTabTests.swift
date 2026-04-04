@@ -153,12 +153,12 @@ final class FlowTabTests: XCTestCase {
     func testSwitcherPanelWindowConfigurationAddsMoveToActiveSpaceOnlyForRecovery() {
         let defaultBehavior = SwitcherPanelWindowConfiguration.presentationCollectionBehavior()
         let recoveryBehavior = SwitcherPanelWindowConfiguration.presentationCollectionBehavior(
-            requiresActiveSpaceMove: true
+            mode: .activeSpaceMove
         )
 
         XCTAssertFalse(defaultBehavior.contains(.moveToActiveSpace))
         XCTAssertTrue(recoveryBehavior.contains(.moveToActiveSpace))
-        XCTAssertTrue(recoveryBehavior.contains(.canJoinAllSpaces))
+        XCTAssertFalse(recoveryBehavior.contains(.canJoinAllSpaces))
         XCTAssertTrue(recoveryBehavior.contains(.fullScreenAuxiliary))
         XCTAssertTrue(recoveryBehavior.contains(.stationary))
         XCTAssertTrue(recoveryBehavior.contains(.canJoinAllApplications))
