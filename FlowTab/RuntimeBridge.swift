@@ -29,8 +29,11 @@ struct RuntimeWindowContext {
 }
 
 enum FlowTabTestLaunchOptions {
+    // Allows deterministic launch-argument parsing tests without mutating process state.
+    static var argumentsOverrideForTesting: [String]?
+
     private static var arguments: [String] {
-        ProcessInfo.processInfo.arguments
+        argumentsOverrideForTesting ?? ProcessInfo.processInfo.arguments
     }
 
     static var usesMockRuntimeSnapshot: Bool {
@@ -314,6 +317,47 @@ final class SystemAppMRUTracker {
             rankByPID[app.processIdentifier] = rank
         }
         return rankByPID
+    }
+
+    func resetStateForTesting() {
+        lock.lock()
+        hasStarted = false
+        mruPIDs.removeAll()
+        let existingObservers = observers
+        observers.removeAll()
+        lock.unlock()
+
+        let workspaceNotificationCenter = NSWorkspace.shared.notificationCenter
+        for observer in existingObservers {
+            workspaceNotificationCenter.removeObserver(observer)
+        }
+    }
+
+    func recordActivationForTesting(pid: pid_t) {
+        recordActivation(of: pid)
+    }
+
+    func removeForTesting(pid: pid_t) {
+        remove(pid: pid)
+    }
+
+    func trackedMRUOrderForTesting(runningPIDs: [pid_t]) -> [pid_t] {
+        trackedMRUOrder(for: Set(runningPIDs))
+    }
+
+    func handleApplicationNotificationForTesting(
+        app: NSRunningApplication?,
+        removeOnly: Bool
+    ) {
+        let name =
+            removeOnly
+            ? NSWorkspace.didTerminateApplicationNotification
+            : NSWorkspace.didActivateApplicationNotification
+        let userInfo: [AnyHashable: Any]? = app.map {
+            [NSWorkspace.applicationUserInfoKey: $0]
+        }
+        let notification = Notification(name: name, object: nil, userInfo: userInfo)
+        handleApplicationNotification(notification, removeOnly: removeOnly)
     }
 }
 
@@ -1131,6 +1175,30 @@ final class RuntimeSnapshotProvider {
         return "apps"
     }
 
+    static func groupIDForTesting(bundleIdentifier: String?, fallbackName: String) -> String {
+        groupID(for: bundleIdentifier, fallbackName: fallbackName)
+    }
+
+    struct CGWindowEntryForTesting {
+        let id: CGWindowID
+        let title: String?
+    }
+
+    static func resolveCGWindowIDForTesting(
+        preferredTitle: String?,
+        fallbackIndex: Int,
+        cgWindows: [CGWindowEntryForTesting],
+        usedIndexes: inout Set<Int>
+    ) -> CGWindowID? {
+        let provider = RuntimeSnapshotProvider()
+        return provider.resolveCGWindowID(
+            preferredTitle: preferredTitle,
+            fallbackIndex: fallbackIndex,
+            cgWindows: cgWindows.map { CGWindowEntry(id: $0.id, title: $0.title) },
+            usedIndexes: &usedIndexes
+        )
+    }
+
     private func selectPrimaryApps(
         from runningApps: [NSRunningApplication],
         windowsByPID: [pid_t: [WindowListEntry]],
@@ -1492,8 +1560,43 @@ private enum AXWindowInspector {
     }
 }
 
+enum AXWindowInspectorForTesting {
+    static func makeWindowID(pid: pid_t, index: Int) -> String {
+        AXWindowInspector.makeWindowID(pid: pid, index: index)
+    }
+
+    static func windowIndex(from windowID: String, expectedPID: pid_t) -> Int? {
+        AXWindowInspector.windowIndex(from: windowID, expectedPID: expectedPID)
+    }
+
+    static func fallbackTitle(index: Int) -> String {
+        AXWindowInspector.fallbackTitle(index: index)
+    }
+
+    static func title(for window: AXUIElement) -> String? {
+        AXWindowInspector.title(for: window)
+    }
+
+    static func role(for window: AXUIElement) -> String? {
+        AXWindowInspector.role(for: window)
+    }
+
+    static func isSwitchable(_ window: AXUIElement) -> Bool {
+        AXWindowInspector.isSwitchable(window)
+    }
+
+    static func isMinimized(_ window: AXUIElement) -> Bool {
+        AXWindowInspector.isMinimized(window)
+    }
+}
+
 enum RuntimeWindowPreviewProvider {
     private struct LiveCGWindowEntry {
+        let id: CGWindowID
+        let title: String?
+    }
+
+    struct LiveWindowCandidateForTesting {
         let id: CGWindowID
         let title: String?
     }
@@ -1570,6 +1673,18 @@ enum RuntimeWindowPreviewProvider {
         preferredTitle: String?
     ) -> [CGWindowID] {
         let liveWindows = collectLiveCGWindows(ownerPID: ownerPID)
+        return candidateWindowIDs(
+            preferredWindowID: preferredWindowID,
+            preferredTitle: preferredTitle,
+            liveWindows: liveWindows
+        )
+    }
+
+    private static func candidateWindowIDs(
+        preferredWindowID: CGWindowID?,
+        preferredTitle: String?,
+        liveWindows: [LiveCGWindowEntry]
+    ) -> [CGWindowID] {
         var candidateIDs: [CGWindowID] = []
         var seen: Set<CGWindowID> = []
 
@@ -1916,37 +2031,103 @@ enum RuntimeWindowPreviewProvider {
     static func guessTitleBarStyleForTesting(from image: CGImage) -> WindowTitleBarStyleGuess? {
         estimateTitleBarStyle(from: image)
     }
+
+    static func candidateWindowIDsForTesting(
+        preferredWindowID: CGWindowID?,
+        ownerPID: pid_t,
+        preferredTitle: String?
+    ) -> [CGWindowID] {
+        candidateWindowIDs(
+            preferredWindowID: preferredWindowID,
+            ownerPID: ownerPID,
+            preferredTitle: preferredTitle
+        )
+    }
+
+    static func candidateWindowIDsForTesting(
+        preferredWindowID: CGWindowID?,
+        preferredTitle: String?,
+        liveWindows: [LiveWindowCandidateForTesting]
+    ) -> [CGWindowID] {
+        candidateWindowIDs(
+            preferredWindowID: preferredWindowID,
+            preferredTitle: preferredTitle,
+            liveWindows: liveWindows.map { LiveCGWindowEntry(id: $0.id, title: $0.title) }
+        )
+    }
+
+    static func scaledPreviewSizeForTesting(
+        sourceWidth: CGFloat,
+        sourceHeight: CGFloat
+    ) -> (width: Int, height: Int) {
+        scaledPreviewSize(sourceWidth: sourceWidth, sourceHeight: sourceHeight)
+    }
+
+    static func scaledPreviewImageIfNeededForTesting(_ image: CGImage) -> CGImage? {
+        scaledPreviewImageIfNeeded(image)
+    }
 }
 
 enum ScreenCapturePermissionChecker {
     static var hasPermissionOverrideForTesting: (() -> Bool)?
     static var requestPermissionOverrideForTesting: (() -> Bool)?
 
-    static var hasScreenCapturePermission: Bool {
-        if let hasPermissionOverrideForTesting {
-            return hasPermissionOverrideForTesting()
-        }
-        if let override = FlowTabTestLaunchOptions.screenCaptureTrustedOverride {
-            return override
-        }
+    private static var supportsScreenCapturePermissionAPI: Bool {
         if #available(macOS 10.15, *) {
-            return CGPreflightScreenCaptureAccess()
+            return true
         }
-        return true
+        return false
+    }
+
+    static var hasScreenCapturePermission: Bool {
+        resolvePermission(
+            testingOverride: hasPermissionOverrideForTesting,
+            launchOverride: FlowTabTestLaunchOptions.screenCaptureTrustedOverride,
+            supportsPermissionAPI: supportsScreenCapturePermissionAPI,
+            systemPermissionProvider: { CGPreflightScreenCaptureAccess() }
+        )
     }
 
     @discardableResult
     static func requestScreenCapturePermission() -> Bool {
-        if let requestPermissionOverrideForTesting {
-            return requestPermissionOverrideForTesting()
+        resolvePermission(
+            testingOverride: requestPermissionOverrideForTesting,
+            launchOverride: FlowTabTestLaunchOptions.screenCaptureTrustedOverride,
+            supportsPermissionAPI: supportsScreenCapturePermissionAPI,
+            systemPermissionProvider: { CGRequestScreenCaptureAccess() }
+        )
+    }
+
+    private static func resolvePermission(
+        testingOverride: (() -> Bool)?,
+        launchOverride: Bool?,
+        supportsPermissionAPI: Bool,
+        systemPermissionProvider: () -> Bool
+    ) -> Bool {
+        if let testingOverride {
+            return testingOverride()
         }
-        if let override = FlowTabTestLaunchOptions.screenCaptureTrustedOverride {
-            return override
+        if let launchOverride {
+            return launchOverride
         }
-        if #available(macOS 10.15, *) {
-            return CGRequestScreenCaptureAccess()
+        guard supportsPermissionAPI else {
+            return true
         }
-        return true
+        return systemPermissionProvider()
+    }
+
+    static func resolvePermissionForTesting(
+        testingOverride: (() -> Bool)?,
+        launchOverride: Bool?,
+        supportsPermissionAPI: Bool,
+        systemPermissionProvider: () -> Bool
+    ) -> Bool {
+        resolvePermission(
+            testingOverride: testingOverride,
+            launchOverride: launchOverride,
+            supportsPermissionAPI: supportsPermissionAPI,
+            systemPermissionProvider: systemPermissionProvider
+        )
     }
 }
 

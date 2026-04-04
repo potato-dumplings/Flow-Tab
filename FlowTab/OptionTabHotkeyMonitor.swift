@@ -398,6 +398,10 @@ final class CommandTabTakeoverController {
         RuntimeLog.info("HotKey", "CGSSetSymbolicHotKeyEnabled symbol not found")
         return nil
     }
+
+    func hasSymbolicHotKeySetterForTesting() -> Bool {
+        resolveSetSymbolicHotKeyEnabled() != nil
+    }
 }
 
 extension CommandTabTakeoverController: CommandTabTakeoverControlling {}
@@ -624,6 +628,11 @@ final class OptionTabHotkeyMonitor {
             isPressedEvent: phase == .pressed,
             isReleasedEvent: phase == .released
         )
+    }
+
+    @discardableResult
+    func handleHotkeyEventForTesting(_ event: EventRef) -> OSStatus {
+        handleHotkeyEvent(event)
     }
 
     private func dispatchResolvedHotkeyEvent(
