@@ -711,12 +711,14 @@ struct FlowTabApp: App {
                 .id(appLanguageRaw)
         }
         .defaultSize(width: appWindowWidth, height: appWindowHeight)
+        .windowStyle(.hiddenTitleBar)
 
         Settings {
             HomeRootView()
                 .frame(minWidth: appWindowWidth, minHeight: appWindowHeight)
                 .id(appLanguageRaw)
         }
+        .windowStyle(.hiddenTitleBar)
 
         .commands {
             CommandGroup(replacing: .appSettings) {
@@ -804,6 +806,10 @@ private struct HomeRootView: View {
         .animation(.none, value: resolvedColorScheme)
         .id(appLanguageRaw)
     }
+}
+
+private enum HomePageLayout {
+    static let alignedTopInset: CGFloat = 18
 }
 
 private struct HomeSidebar: View {
@@ -1030,7 +1036,9 @@ private struct HomeLandingView: View {
 
                 Spacer(minLength: 0)
             }
-            .padding(24)
+            .padding(.horizontal, 24)
+            .padding(.bottom, 24)
+            .padding(.top, HomePageLayout.alignedTopInset)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onAppear {
@@ -3382,7 +3390,8 @@ private final class AppKitSettingsPageContainerView: NSView {
 
     private let scrollView = NSScrollView()
     private let documentView = AppKitFlippedDocumentView()
-    private let contentInset: CGFloat = 24
+    private let horizontalContentInset: CGFloat = 24
+    private let verticalContentInset = HomePageLayout.alignedTopInset
     private var wasActive = false
     private var pendingInitialFocusClear = false
 
@@ -3411,9 +3420,10 @@ private final class AppKitSettingsPageContainerView: NSView {
         let viewportWidth = scrollView.contentView.bounds.width
         guard viewportWidth > 0 else { return }
 
-        let pageWidth = max(viewportWidth - contentInset * 2, 320)
+        let pageWidth = max(viewportWidth - horizontalContentInset * 2, 320)
         let fittedSize = pageView.preferredFittingSize(forWidth: pageWidth)
-        let documentHeight = fittedSize.height + contentInset * 2
+        let topInset = verticalContentInset + safeAreaInsets.top
+        let documentHeight = fittedSize.height + topInset + verticalContentInset
 
         documentView.frame = NSRect(
             x: 0,
@@ -3422,8 +3432,8 @@ private final class AppKitSettingsPageContainerView: NSView {
             height: documentHeight
         )
         pageView.frame = NSRect(
-            x: contentInset,
-            y: contentInset,
+            x: horizontalContentInset,
+            y: topInset,
             width: pageWidth,
             height: fittedSize.height
         )
@@ -4905,7 +4915,9 @@ private struct AppLogsView: View {
                         hotkeyShortcutText: hotkeyConfiguration.mainShortcutText
                     )
                 }
-                .padding(24)
+                .padding(.horizontal, 24)
+                .padding(.bottom, 24)
+                .padding(.top, HomePageLayout.alignedTopInset)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
