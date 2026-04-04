@@ -2842,6 +2842,7 @@ private final class SpyCommandTabTakeoverController: CommandTabTakeoverControlli
     }
 }
 
+@MainActor
 private final class SpyStressRunner: TabSwitchStressRunning {
     private(set) var startCallCount = 0
 

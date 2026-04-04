@@ -226,10 +226,6 @@ protocol MRUTracking {
 
 extension SystemAppMRUTracker: MRUTracking {}
 
-protocol TabSwitchStressRunning: AnyObject {
-    func startIfNeeded()
-}
-
 @MainActor
 final class SystemThemeState: ObservableObject {
     static let shared = SystemThemeState()
@@ -521,53 +517,6 @@ extension String {
     }
 }
 
-@MainActor
-private final class TabSwitchStressRunner {
-    static let shared = TabSwitchStressRunner()
-
-    private var task: Task<Void, Never>?
-
-    private init() {}
-
-    func startIfNeeded() {
-        guard task == nil else { return }
-        let arguments = ProcessInfo.processInfo.arguments
-        guard arguments.contains("--flowtab-tab-stress") else { return }
-
-        let durationSeconds = max(
-            1,
-            Double(argumentValue(after: "--flowtab-tab-stress-duration", in: arguments) ?? "") ?? 30
-        )
-        let intervalMilliseconds = max(
-            1,
-            Double(argumentValue(after: "--flowtab-tab-stress-interval-ms", in: arguments) ?? "") ?? 20
-        )
-        let sleepNanoseconds = UInt64(intervalMilliseconds * 1_000_000)
-        let endTime = Date().addingTimeInterval(durationSeconds)
-
-        task = Task { @MainActor in
-            defer { self.task = nil }
-
-            let cycle: [HomeTab] = [.home, .logs, .settings]
-            var index = 0
-            while Date() < endTime {
-                HomeTabState.shared.selectedTab = cycle[index % cycle.count]
-                index += 1
-                try? await Task.sleep(nanoseconds: sleepNanoseconds)
-            }
-            NSApp.terminate(nil)
-        }
-    }
-
-    private func argumentValue(after flag: String, in arguments: [String]) -> String? {
-        guard let index = arguments.firstIndex(of: flag) else { return nil }
-        let nextIndex = arguments.index(after: index)
-        guard nextIndex < arguments.endIndex else { return nil }
-        return arguments[nextIndex]
-    }
-}
-
-extension TabSwitchStressRunner: TabSwitchStressRunning {}
 
 enum AppWindowCoordinator {
     static let switcherPanelWindowIdentifier = "flowtab.switcher.panel"

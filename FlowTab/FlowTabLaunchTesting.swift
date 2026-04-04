@@ -1,0 +1,113 @@
+import AppKit
+import Foundation
+
+enum FlowTabTestLaunchOptions {
+    static var argumentsOverrideForTesting: [String]?
+
+    private static var arguments: [String] {
+        argumentsOverrideForTesting ?? ProcessInfo.processInfo.arguments
+    }
+
+    static var usesMockRuntimeSnapshot: Bool {
+        arguments.contains("--flowtab-ui-mock-runtime")
+    }
+
+    static var resetsUserDefaultsOnLaunch: Bool {
+        arguments.contains("--flowtab-ui-reset-defaults")
+    }
+
+    static var opensSwitcherOnLaunch: Bool {
+        arguments.contains("--flowtab-ui-open-switcher")
+            || arguments.contains("--flowtab-ui-open-switcher-search")
+    }
+
+    static var entersSearchOnLaunch: Bool {
+        arguments.contains("--flowtab-ui-open-switcher-search")
+    }
+
+    static var accessibilityTrustedOverride: Bool? {
+        boolValue(after: "--flowtab-ui-ax-trusted")
+    }
+
+    static var screenCaptureTrustedOverride: Bool? {
+        boolValue(after: "--flowtab-ui-screen-trusted")
+    }
+
+    static var seededLogCount: Int? {
+        guard let rawValue = value(after: "--flowtab-ui-seed-logs") else { return nil }
+        return Int(rawValue)
+    }
+
+    static var runtimeLogLevelOverrideRawValue: String? {
+        value(after: "--flowtab-ui-runtime-log-level")
+    }
+
+    static var runsTabSwitchStressTest: Bool {
+        arguments.contains("--flowtab-tab-stress")
+    }
+
+    static var tabSwitchStressDurationSeconds: Double {
+        max(1, Double(value(after: "--flowtab-tab-stress-duration") ?? "") ?? 30)
+    }
+
+    static var tabSwitchStressIntervalMilliseconds: Double {
+        max(1, Double(value(after: "--flowtab-tab-stress-interval-ms") ?? "") ?? 20)
+    }
+
+    private static func value(after flag: String) -> String? {
+        guard let index = arguments.firstIndex(of: flag) else { return nil }
+        let nextIndex = arguments.index(after: index)
+        guard nextIndex < arguments.endIndex else { return nil }
+        return arguments[nextIndex]
+    }
+
+    private static func boolValue(after flag: String) -> Bool? {
+        guard let rawValue = value(after: flag)?.lowercased() else { return nil }
+        switch rawValue {
+        case "1", "true", "yes":
+            return true
+        case "0", "false", "no":
+            return false
+        default:
+            return nil
+        }
+    }
+}
+
+protocol TabSwitchStressRunning: AnyObject {
+    @MainActor func startIfNeeded()
+}
+
+@MainActor
+final class TabSwitchStressRunner: TabSwitchStressRunning {
+    static let shared = TabSwitchStressRunner()
+
+    private var task: Task<Void, Never>?
+
+    private init() {}
+
+    func startIfNeeded() {
+        guard task == nil else { return }
+        guard FlowTabTestLaunchOptions.runsTabSwitchStressTest else { return }
+
+        let sleepNanoseconds = UInt64(
+            FlowTabTestLaunchOptions.tabSwitchStressIntervalMilliseconds * 1_000_000
+        )
+        let endTime = Date().addingTimeInterval(
+            FlowTabTestLaunchOptions.tabSwitchStressDurationSeconds
+        )
+
+        task = Task { @MainActor in
+            defer { self.task = nil }
+
+            let cycle: [HomeTab] = [.home, .logs, .settings]
+            var index = 0
+            while Date() < endTime {
+                HomeTabState.shared.selectedTab = cycle[index % cycle.count]
+                index += 1
+                try? await Task.sleep(nanoseconds: sleepNanoseconds)
+            }
+            NSApp.terminate(nil)
+        }
+    }
+}
