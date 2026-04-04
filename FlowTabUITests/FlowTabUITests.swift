@@ -20,14 +20,35 @@ final class FlowTabUITests: XCTestCase {
         static let permissionDismiss = "flowtab.home.permission.dismiss"
         static let permissionReminderSwitch = "flowtab.settings.permission.reminder"
         static let logsClearButton = "flowtab.logs.clear"
+        static let logsOpenDirectoryButton = "flowtab.logs.open-directory"
         static let logsLines = "flowtab.logs.lines"
         static let logsEmptyHint = "flowtab.logs.empty-hint"
         static let logsSeededDebugLine = "flowtab.logs.line.seeded.debug"
         static let logsSeededInfoLine = "flowtab.logs.line.seeded.info"
         static let logsSeededWarnLine = "flowtab.logs.line.seeded.warn"
         static let logsSeededErrorLine = "flowtab.logs.line.seeded.error"
+        static let settingsAppearanceShowShortcutHint = "flowtab.settings.appearance.show-shortcut-hint"
+        static let settingsAppearanceShowInCommandTab = "flowtab.settings.appearance.show-in-command-tab"
+        static let settingsAppearanceThemeMode = "flowtab.settings.appearance.theme-mode"
+        static let settingsAppearanceAppLanguage = "flowtab.settings.appearance.app-language"
+        static let settingsWindowAutoEnterDelay = "flowtab.settings.window.auto-enter-delay"
+        static let settingsWindowAutoEnterDelayInput = "flowtab.settings.window.auto-enter-delay.input"
+        static let settingsWindowAutoRestoreMinimized = "flowtab.settings.window.auto-restore-minimized"
+        static let settingsWindowHideMinimizedApps = "flowtab.settings.window.hide-minimized-apps"
+        static let settingsSearchEnabled = "flowtab.settings.search.enabled"
+        static let settingsSearchDefaultScope = "flowtab.settings.search.default-scope"
+        static let settingsPermissionAccessibilityAction = "flowtab.settings.permission.accessibility-action"
+        static let settingsPermissionScreenCaptureAction = "flowtab.settings.permission.screen-capture-action"
+        static let settingsHotkeyMainModifier = "flowtab.settings.hotkey.main-modifier"
+        static let settingsHotkeyMainKey = "flowtab.settings.hotkey.main-key"
+        static let settingsHotkeyQuitKey = "flowtab.settings.hotkey.quit-key"
+        static let settingsHotkeyInAppModifier = "flowtab.settings.hotkey.in-app-modifier"
+        static let settingsHotkeyInAppKey = "flowtab.settings.hotkey.in-app-key"
         static let switcherPanel = "flowtab.switcher.panel"
         static let switcherSearchInput = "flowtab.switcher.search.input"
+        static let switcherAppMockMail = "flowtab.switcher.app.com-flowtab-mock-mail"
+        static let switcherAppMockBrowser = "flowtab.switcher.app.com-flowtab-mock-browser"
+        static let switcherSearchWindowMockMailInbox = "flowtab.switcher.search.window.mock-mail-inbox"
         static let switcherWindowMockMailInbox = "flowtab.switcher.window.mock-mail-inbox"
         static let switcherWindowMockMailDraft = "flowtab.switcher.window.mock-mail-draft"
     }
@@ -54,6 +75,49 @@ final class FlowTabUITests: XCTestCase {
                 ).launch()
             }
         }
+    }
+
+    func testSidebarTabsSwitchContent() throws {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-ax-trusted",
+                "YES",
+                "--flowtab-ui-screen-trusted",
+                "YES"
+            ]
+        )
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 8))
+
+        XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5))
+        XCTAssertTrue(element(in: app, identifier: Identifier.homeTabContent).waitForExistence(timeout: 5))
+
+        XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.logsTabButton), timeout: 5))
+        XCTAssertTrue(element(in: app, identifier: Identifier.logsTabContent).waitForExistence(timeout: 5))
+
+        XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.settingsTabButton), timeout: 5))
+        XCTAssertTrue(element(in: app, identifier: Identifier.settingsTabContent).waitForExistence(timeout: 5))
+    }
+
+    func testHomePermissionBannerHiddenWhenPermissionsGranted() throws {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-ax-trusted",
+                "YES",
+                "--flowtab-ui-screen-trusted",
+                "YES"
+            ]
+        )
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 8))
+        XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5))
+
+        XCTAssertFalse(
+            hasHittableElement(in: app.buttons.matching(identifier: Identifier.permissionOpenSettings), timeout: 2)
+        )
+        XCTAssertFalse(element(in: app, identifier: Identifier.permissionBanner).exists)
     }
 
     func testPermissionReminderTogglePersistsAcrossRelaunch() throws {
@@ -269,6 +333,338 @@ final class FlowTabUITests: XCTestCase {
                 hiddenIdentifiers: scenario.hidden
             )
         }
+    }
+
+    func testLogsOpenDirectoryButtonIsVisible() throws {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-seed-logs",
+                "1",
+                "-showPermissionReminder",
+                "NO"
+            ]
+        )
+        app.launch()
+        openLogsTab(in: app)
+
+        let openDirectoryButton = app.buttons[Identifier.logsOpenDirectoryButton]
+        XCTAssertTrue(openDirectoryButton.waitForExistence(timeout: 5))
+    }
+
+    func testSettingsAppearanceTogglesCanBeChanged() throws {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-ax-trusted",
+                "YES",
+                "--flowtab-ui-screen-trusted",
+                "YES"
+            ]
+        )
+        app.launch()
+        openSettingsTab(in: app)
+
+        let showShortcutHintToggle = toggleElement(in: app, identifier: Identifier.settingsAppearanceShowShortcutHint)
+        let showInCommandTabToggle = toggleElement(in: app, identifier: Identifier.settingsAppearanceShowInCommandTab)
+        XCTAssertTrue(showShortcutHintToggle.waitForExistence(timeout: 5))
+        XCTAssertTrue(showInCommandTabToggle.waitForExistence(timeout: 5))
+
+        let targetShortcutHint = !toggleIsOn(showShortcutHintToggle)
+        let targetShowInCommandTab = !toggleIsOn(showInCommandTabToggle)
+        setToggle(showShortcutHintToggle, to: targetShortcutHint)
+        setToggle(showInCommandTabToggle, to: targetShowInCommandTab)
+
+        XCTAssertEqual(toggleIsOn(showShortcutHintToggle), targetShortcutHint)
+        XCTAssertEqual(toggleIsOn(showInCommandTabToggle), targetShowInCommandTab)
+    }
+
+    func testSettingsAppearanceThemeAndLanguagePersistAcrossRelaunch() throws {
+        let firstLaunchApp = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-ax-trusted",
+                "YES",
+                "--flowtab-ui-screen-trusted",
+                "YES"
+            ]
+        )
+        firstLaunchApp.launch()
+        openSettingsTab(in: firstLaunchApp)
+
+        selectOption(in: firstLaunchApp, controlIdentifier: Identifier.settingsAppearanceThemeMode, optionIdentifier: "dark")
+        assertValue(of: element(in: firstLaunchApp, identifier: Identifier.settingsAppearanceThemeMode), equals: "dark")
+
+        selectOption(in: firstLaunchApp, controlIdentifier: Identifier.settingsAppearanceAppLanguage, optionIdentifier: "en")
+        assertValue(of: element(in: firstLaunchApp, identifier: Identifier.settingsAppearanceAppLanguage), equals: "en")
+
+        firstLaunchApp.terminate()
+
+        let relaunchApp = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-ax-trusted",
+                "YES",
+                "--flowtab-ui-screen-trusted",
+                "YES"
+            ]
+        )
+        relaunchApp.launch()
+        openSettingsTab(in: relaunchApp)
+
+        assertValue(of: element(in: relaunchApp, identifier: Identifier.settingsAppearanceThemeMode), equals: "dark")
+        assertValue(of: element(in: relaunchApp, identifier: Identifier.settingsAppearanceAppLanguage), equals: "en")
+    }
+
+    func testSettingsWindowBehaviorDelayAndTogglesPersistAcrossRelaunch() throws {
+        let firstLaunchApp = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-ax-trusted",
+                "YES",
+                "--flowtab-ui-screen-trusted",
+                "YES"
+            ]
+        )
+        firstLaunchApp.launch()
+        openSettingsTab(in: firstLaunchApp)
+
+        let delayInput = element(in: firstLaunchApp, identifier: Identifier.settingsWindowAutoEnterDelayInput)
+        XCTAssertTrue(delayInput.waitForExistence(timeout: 5))
+        replaceText(in: delayInput, with: "1.2345", app: firstLaunchApp)
+        commitEditing(in: firstLaunchApp)
+        assertValuePrefix(of: delayInput, expectedPrefix: "1.23")
+
+        let autoRestoreToggle = toggleElement(in: firstLaunchApp, identifier: Identifier.settingsWindowAutoRestoreMinimized)
+        let hideMinimizedToggle = toggleElement(in: firstLaunchApp, identifier: Identifier.settingsWindowHideMinimizedApps)
+        XCTAssertTrue(autoRestoreToggle.waitForExistence(timeout: 5))
+        XCTAssertTrue(hideMinimizedToggle.waitForExistence(timeout: 5))
+
+        let expectedAutoRestore = !toggleIsOn(autoRestoreToggle)
+        let expectedHideMinimized = !toggleIsOn(hideMinimizedToggle)
+        setToggle(autoRestoreToggle, to: expectedAutoRestore)
+        setToggle(hideMinimizedToggle, to: expectedHideMinimized)
+
+        firstLaunchApp.terminate()
+
+        let relaunchApp = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-ax-trusted",
+                "YES",
+                "--flowtab-ui-screen-trusted",
+                "YES"
+            ]
+        )
+        relaunchApp.launch()
+        openSettingsTab(in: relaunchApp)
+
+        let relaunchDelayInput = element(in: relaunchApp, identifier: Identifier.settingsWindowAutoEnterDelayInput)
+        assertValuePrefix(of: relaunchDelayInput, expectedPrefix: "1.23")
+        XCTAssertEqual(
+            toggleIsOn(toggleElement(in: relaunchApp, identifier: Identifier.settingsWindowAutoRestoreMinimized)),
+            expectedAutoRestore
+        )
+        XCTAssertEqual(
+            toggleIsOn(toggleElement(in: relaunchApp, identifier: Identifier.settingsWindowHideMinimizedApps)),
+            expectedHideMinimized
+        )
+    }
+
+    func testSettingsSearchDisabledPreventsAutoSearchLaunchEntry() throws {
+        let firstLaunchApp = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-ax-trusted",
+                "YES",
+                "--flowtab-ui-screen-trusted",
+                "YES"
+            ]
+        )
+        firstLaunchApp.launch()
+        openSettingsTab(in: firstLaunchApp)
+
+        let searchEnabledToggle = toggleElement(in: firstLaunchApp, identifier: Identifier.settingsSearchEnabled)
+        XCTAssertTrue(searchEnabledToggle.waitForExistence(timeout: 5))
+        setToggle(searchEnabledToggle, to: false)
+        XCTAssertFalse(toggleIsOn(searchEnabledToggle))
+        firstLaunchApp.terminate()
+
+        let relaunchApp = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-open-switcher-search",
+                "--flowtab-ui-ax-trusted",
+                "YES",
+                "--flowtab-ui-screen-trusted",
+                "YES"
+            ]
+        )
+        relaunchApp.launch()
+        XCTAssertTrue(relaunchApp.wait(for: .runningForeground, timeout: 10))
+
+        let switcherPanel = element(in: relaunchApp, identifier: Identifier.switcherPanel)
+        XCTAssertTrue(switcherPanel.waitForExistence(timeout: 8))
+        XCTAssertFalse(element(in: relaunchApp, identifier: Identifier.switcherSearchInput).exists)
+    }
+
+    func testSettingsSearchDefaultWindowScopePersistsAndShowsWindowResults() throws {
+        let firstLaunchApp = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-ax-trusted",
+                "YES",
+                "--flowtab-ui-screen-trusted",
+                "YES"
+            ]
+        )
+        firstLaunchApp.launch()
+        openSettingsTab(in: firstLaunchApp)
+
+        let searchEnabledToggle = toggleElement(in: firstLaunchApp, identifier: Identifier.settingsSearchEnabled)
+        XCTAssertTrue(searchEnabledToggle.waitForExistence(timeout: 5))
+        setToggle(searchEnabledToggle, to: true)
+
+        selectOption(in: firstLaunchApp, controlIdentifier: Identifier.settingsSearchDefaultScope, optionIdentifier: "window")
+        assertValue(of: element(in: firstLaunchApp, identifier: Identifier.settingsSearchDefaultScope), equals: "window")
+        firstLaunchApp.terminate()
+
+        let relaunchApp = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-ax-trusted",
+                "YES",
+                "--flowtab-ui-screen-trusted",
+                "YES"
+            ]
+        )
+        relaunchApp.launch()
+        openSettingsTab(in: relaunchApp)
+        assertValue(of: element(in: relaunchApp, identifier: Identifier.settingsSearchDefaultScope), equals: "window")
+    }
+
+    func testSettingsSearchDefaultScopeCanSwitchBetweenAppAndWindow() throws {
+        let firstLaunchApp = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-ax-trusted",
+                "YES",
+                "--flowtab-ui-screen-trusted",
+                "YES"
+            ]
+        )
+        firstLaunchApp.launch()
+        openSettingsTab(in: firstLaunchApp)
+
+        let searchEnabledToggle = toggleElement(in: firstLaunchApp, identifier: Identifier.settingsSearchEnabled)
+        XCTAssertTrue(searchEnabledToggle.waitForExistence(timeout: 5))
+        setToggle(searchEnabledToggle, to: true)
+
+        selectOption(in: firstLaunchApp, controlIdentifier: Identifier.settingsSearchDefaultScope, optionIdentifier: "app")
+        assertValue(of: element(in: firstLaunchApp, identifier: Identifier.settingsSearchDefaultScope), equals: "app")
+
+        selectOption(in: firstLaunchApp, controlIdentifier: Identifier.settingsSearchDefaultScope, optionIdentifier: "window")
+        assertValue(of: element(in: firstLaunchApp, identifier: Identifier.settingsSearchDefaultScope), equals: "window")
+    }
+
+    func testSettingsPermissionActionButtonsAreVisible() throws {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-ax-trusted",
+                "NO",
+                "--flowtab-ui-screen-trusted",
+                "NO"
+            ]
+        )
+        app.launch()
+        openSettingsTab(in: app)
+
+        XCTAssertTrue(
+            element(in: app, identifier: Identifier.settingsPermissionAccessibilityAction).waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            element(in: app, identifier: Identifier.settingsPermissionScreenCaptureAction).waitForExistence(timeout: 5)
+        )
+    }
+
+    func testSettingsHotkeySelectionsPersistAcrossRelaunch() throws {
+        let firstLaunchApp = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-ax-trusted",
+                "YES",
+                "--flowtab-ui-screen-trusted",
+                "YES"
+            ]
+        )
+        firstLaunchApp.launch()
+        openSettingsTab(in: firstLaunchApp)
+
+        let expectedSelections: [(control: String, option: String)] = [
+            (Identifier.settingsHotkeyMainKey, "space"),
+            (Identifier.settingsHotkeyQuitKey, "z"),
+            (Identifier.settingsHotkeyInAppKey, "a")
+        ]
+        for selection in expectedSelections {
+            selectOption(in: firstLaunchApp, controlIdentifier: selection.control, optionIdentifier: selection.option)
+            assertValue(of: element(in: firstLaunchApp, identifier: selection.control), equals: selection.option)
+        }
+
+        firstLaunchApp.terminate()
+
+        let relaunchApp = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-ax-trusted",
+                "YES",
+                "--flowtab-ui-screen-trusted",
+                "YES"
+            ]
+        )
+        relaunchApp.launch()
+        openSettingsTab(in: relaunchApp)
+
+        for selection in expectedSelections {
+            assertValue(of: element(in: relaunchApp, identifier: selection.control), equals: selection.option)
+        }
+    }
+
+    func testSettingsHotkeyInAppControlsDisabledWithoutAccessibilityPermission() throws {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-ax-trusted",
+                "NO",
+                "--flowtab-ui-screen-trusted",
+                "YES"
+            ]
+        )
+        app.launch()
+        openSettingsTab(in: app)
+
+        let inAppModifier = element(in: app, identifier: Identifier.settingsHotkeyInAppModifier)
+        let inAppKey = element(in: app, identifier: Identifier.settingsHotkeyInAppKey)
+        XCTAssertTrue(inAppModifier.waitForExistence(timeout: 5))
+        XCTAssertTrue(inAppKey.waitForExistence(timeout: 5))
+
+        XCTAssertFalse(inAppModifier.isEnabled)
+        XCTAssertFalse(inAppKey.isEnabled)
+    }
+
+    func testSwitcherPanelShowsMockAppTilesInStandardMode() throws {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-open-switcher-search",
+                "-showPermissionReminder",
+                "NO"
+            ]
+        )
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+
+        XCTAssertTrue(element(in: app, identifier: Identifier.switcherPanel).waitForExistence(timeout: 8))
+        app.typeKey(.escape, modifierFlags: [])
+        RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        XCTAssertFalse(element(in: app, identifier: Identifier.switcherSearchInput).exists)
     }
 
     func testSearchPanelEntryAndResultActivation() throws {
@@ -487,12 +883,120 @@ final class FlowTabUITests: XCTestCase {
     }
 
     private func settingsReminderToggle(in app: XCUIApplication) -> XCUIElement {
-        let switchElement = app.switches[Identifier.permissionReminderSwitch]
+        toggleElement(in: app, identifier: Identifier.permissionReminderSwitch)
+    }
+
+    private func openSettingsTab(in app: XCUIApplication) {
+        XCTAssertTrue(
+            tapFirstHittable(in: app.buttons.matching(identifier: Identifier.settingsTabButton), timeout: 6)
+        )
+        XCTAssertTrue(element(in: app, identifier: Identifier.settingsTabContent).waitForExistence(timeout: 6))
+    }
+
+    private func openLogsTab(in app: XCUIApplication) {
+        XCTAssertTrue(
+            tapFirstHittable(in: app.buttons.matching(identifier: Identifier.logsTabButton), timeout: 6)
+        )
+        XCTAssertTrue(element(in: app, identifier: Identifier.logsTabContent).waitForExistence(timeout: 6))
+    }
+
+    private func element(in app: XCUIApplication, identifier: String) -> XCUIElement {
+        app.descendants(matching: .any).matching(identifier: identifier).firstMatch
+    }
+
+    private func toggleElement(in app: XCUIApplication, identifier: String) -> XCUIElement {
+        let switchElement = app.switches[identifier]
         if switchElement.exists || switchElement.waitForExistence(timeout: 1) {
             return switchElement
         }
-        let checkboxElement = app.checkBoxes[Identifier.permissionReminderSwitch]
-        return checkboxElement
+        return app.checkBoxes[identifier]
+    }
+
+    private func toggleIsOn(_ element: XCUIElement) -> Bool {
+        if let stringValue = element.value as? String {
+            let normalized = stringValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            return normalized == "1" || normalized == "true" || normalized == "on"
+        }
+        if let numericValue = element.value as? NSNumber {
+            return numericValue.intValue != 0
+        }
+        return element.isSelected
+    }
+
+    private func setToggle(_ element: XCUIElement, to expectedValue: Bool) {
+        if toggleIsOn(element) != expectedValue {
+            tapElement(element)
+        }
+    }
+
+    private func selectOption(
+        in app: XCUIApplication,
+        controlIdentifier: String,
+        optionIdentifier: String
+    ) {
+        let control = element(in: app, identifier: controlIdentifier)
+        XCTAssertTrue(control.waitForExistence(timeout: 6), "Missing control: \(controlIdentifier)")
+        tapElement(control)
+
+        let optionsQuery = app.descendants(matching: .any).matching(identifier: optionIdentifier)
+        XCTAssertTrue(
+            tapFirstHittable(in: optionsQuery, timeout: 6),
+            "Missing or non-hittable option: \(optionIdentifier)"
+        )
+    }
+
+    private func elementStringValue(_ element: XCUIElement) -> String {
+        if let value = element.value as? String {
+            return value
+        }
+        if let numberValue = element.value as? NSNumber {
+            return numberValue.stringValue
+        }
+        return element.label
+    }
+
+    private func assertValue(of element: XCUIElement, equals expectedValue: String, timeout: TimeInterval = 5) {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if element.exists && elementStringValue(element) == expectedValue {
+                return
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+        XCTFail("Expected value '\(expectedValue)' for \(element.identifier), actual: '\(elementStringValue(element))'")
+    }
+
+    private func assertValuePrefix(of element: XCUIElement, expectedPrefix: String, timeout: TimeInterval = 5) {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if element.exists && elementStringValue(element).hasPrefix(expectedPrefix) {
+                return
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+        XCTFail(
+            "Expected prefix '\(expectedPrefix)' for \(element.identifier), actual: '\(elementStringValue(element))'"
+        )
+    }
+
+    private func replaceText(in field: XCUIElement, with text: String, app: XCUIApplication) {
+        tapElement(field)
+        app.typeKey("a", modifierFlags: .command)
+        app.typeKey(.delete, modifierFlags: [])
+        app.typeText(text)
+    }
+
+    private func commitEditing(in app: XCUIApplication) {
+        app.typeKey(.tab, modifierFlags: [])
+        RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+    }
+
+    private func tapElement(_ element: XCUIElement) {
+        if element.isHittable {
+            element.tap()
+            return
+        }
+        element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
     }
 
     private func assertLogVisibility(

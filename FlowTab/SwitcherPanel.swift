@@ -244,6 +244,7 @@ final class SwitcherPanelController {
     private var activeHotkeySessionKind: HotkeySessionKind?
     private var activePresentationScreen: NSScreen?
     private var terminateSelectedAppTask: Task<Void, Never>?
+    private var suppressModifierReleaseConfirmationForTesting = false
 
     var panelVisibilityOverride: Bool?
     var panelOcclusionStateOverride: NSWindow.OcclusionState?
@@ -414,6 +415,10 @@ final class SwitcherPanelController {
     ) -> Bool {
         show(direction: triggerDirection)
         return model.session != nil
+    }
+
+    func setModifierReleaseConfirmationSuppressedForTesting(_ suppressed: Bool) {
+        suppressModifierReleaseConfirmationForTesting = suppressed
     }
 
     func updatePanelSizeForTesting(visibleFrame: CGRect) {
@@ -1457,6 +1462,12 @@ final class SwitcherPanelController {
     }
 
     private func scheduleModifierReleaseConfirmation(trigger: String) {
+        guard !suppressModifierReleaseConfirmationForTesting else {
+            logInputTrace(
+                "releaseConfirm suppressed trigger=\(trigger) nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
+            )
+            return
+        }
         if pendingModifierReleaseConfirmationTask != nil {
             logInputTrace(
                 "releaseConfirm alreadyRunning trigger=\(trigger) nowMs=\(formatMilliseconds(monotonicMilliseconds()))"

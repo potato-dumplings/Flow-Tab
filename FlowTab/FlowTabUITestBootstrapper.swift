@@ -33,12 +33,22 @@ enum FlowTabUITestBootstrapper {
 
     static func presentInitialUIIfNeeded(panelController: SwitcherPanelController) {
         guard FlowTabTestLaunchOptions.opensSwitcherOnLaunch else { return }
+        panelController.setModifierReleaseConfirmationSuppressedForTesting(true)
 
         Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 180_000_000)
-            guard panelController.presentGlobalHotkeySessionForTesting() else { return }
-            if FlowTabTestLaunchOptions.entersSearchOnLaunch {
-                _ = panelController.modelForTesting.enterSearchMode()
+            let retrySleepNanoseconds: UInt64 = 150_000_000
+            let maxAttempts = 20
+
+            for attempt in 0..<maxAttempts {
+                if panelController.presentGlobalHotkeySessionForTesting() {
+                    if FlowTabTestLaunchOptions.entersSearchOnLaunch {
+                        _ = panelController.modelForTesting.enterSearchMode()
+                    }
+                    return
+                }
+
+                guard attempt < maxAttempts - 1 else { return }
+                try? await Task.sleep(nanoseconds: retrySleepNanoseconds)
             }
         }
     }

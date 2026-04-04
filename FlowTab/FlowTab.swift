@@ -2053,6 +2053,15 @@ private final class HotkeySettingsCardAppKitView: NSView {
                 self?.handleInAppMainKeyChanged(rawValue)
             }
         )
+        mainPrimaryModifierSelect.setFlowTabTestingIdentifier("flowtab.settings.hotkey.main-modifier")
+        mainKeySelect.setFlowTabTestingIdentifier("flowtab.settings.hotkey.main-key")
+        quitKeySelect.setFlowTabTestingIdentifier("flowtab.settings.hotkey.quit-key")
+        inAppPrimaryModifierSelect.setFlowTabTestingIdentifier("flowtab.settings.hotkey.in-app-modifier")
+        inAppMainKeySelect.setFlowTabTestingIdentifier("flowtab.settings.hotkey.in-app-key")
+        mainSummaryLabel.setFlowTabTestingIdentifier("flowtab.settings.hotkey.main-summary")
+        inAppSummaryLabel.setFlowTabTestingIdentifier("flowtab.settings.hotkey.in-app-summary")
+        mainTakeoverStatusLabel.setFlowTabTestingIdentifier("flowtab.settings.hotkey.main-takeover-status")
+        inAppTakeoverStatusLabel.setFlowTabTestingIdentifier("flowtab.settings.hotkey.in-app-takeover-status")
 
         let mainPrimaryRow = makeControlRow(title: AppStrings.text(.hotkeyRowMainModifier), control: mainPrimaryModifierSelect)
         let mainKeyRow = makeControlRow(title: AppStrings.text(.hotkeyRowMainKey), control: mainKeySelect)
@@ -2281,6 +2290,7 @@ private final class FlowCapsuleSegmentedControl: NSView {
     func updateSelection(id: String) {
         guard selectedID != id else { return }
         selectedID = id
+        setAccessibilityValue(selectedID ?? "")
         updateAppearance()
     }
 
@@ -2289,6 +2299,9 @@ private final class FlowCapsuleSegmentedControl: NSView {
         translatesAutoresizingMaskIntoConstraints = false
         setContentHuggingPriority(.required, for: .vertical)
         setContentCompressionResistancePriority(.required, for: .vertical)
+        setAccessibilityElement(true)
+        setAccessibilityRole(.radioGroup)
+        setAccessibilityValue(selectedID ?? "")
 
         stackView.orientation = .horizontal
         stackView.alignment = .centerY
@@ -2307,7 +2320,7 @@ private final class FlowCapsuleSegmentedControl: NSView {
 
         for option in options {
             let button = NSButton(title: option.title, target: self, action: #selector(handleButtonPressed(_:)))
-            button.identifier = NSUserInterfaceItemIdentifier(option.id)
+            button.setFlowTabTestingIdentifier(option.id)
             button.setButtonType(.momentaryChange)
             button.isBordered = false
             button.focusRingType = .none
@@ -2326,6 +2339,7 @@ private final class FlowCapsuleSegmentedControl: NSView {
     @objc private func handleButtonPressed(_ sender: NSButton) {
         guard let id = sender.identifier?.rawValue else { return }
         selectedID = id
+        setAccessibilityValue(selectedID ?? "")
         updateAppearance()
         onSelectionChanged?(id)
     }
@@ -2749,7 +2763,7 @@ private final class FlowFormSelectMenuView: NSView {
 
         for option in options {
             let button = FlowFormSelectOptionButton(frame: .zero)
-            button.identifier = NSUserInterfaceItemIdentifier(option.id)
+            button.setFlowTabTestingIdentifier(option.id)
             button.target = self
             button.action = #selector(handleOptionPressed(_:))
             button.update(title: option.title, isSelected: option.id == selectedID)
@@ -2950,6 +2964,9 @@ private final class FlowFormSelectControl: NSView, NSPopoverDelegate {
         setContentCompressionResistancePriority(.required, for: .vertical)
         heightAnchor.constraint(equalToConstant: 32).isActive = true
         popover.delegate = self
+        setAccessibilityElement(true)
+        setAccessibilityRole(.popUpButton)
+        setAccessibilityValue(selectedID ?? "")
 
         titleLabel.font = .systemFont(ofSize: 13)
         titleLabel.lineBreakMode = .byTruncatingTail
@@ -2993,6 +3010,7 @@ private final class FlowFormSelectControl: NSView, NSPopoverDelegate {
 
     private func updateDisplayTitle() {
         titleLabel.stringValue = options.first(where: { $0.id == selectedID })?.title ?? ""
+        setAccessibilityValue(selectedID ?? "")
     }
 
     private func updateAppearance() {
@@ -4196,6 +4214,7 @@ private final class WindowBehaviorSettingsCardAppKitView: AppKitSettingsCardBase
             "flowtab.settings.window.hide-minimized-apps"
         )
         let delayTextField = delayInputField.textField
+        delayTextField.setFlowTabTestingIdentifier("flowtab.settings.window.auto-enter-delay.input")
         delayTextField.delegate = self
 
         let delayUnitLabel = NSTextField(labelWithString: AppStrings.text(.windowBehaviorSecondUnit))
