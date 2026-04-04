@@ -1701,6 +1701,28 @@ final class FlowTabPriorityCoverageTests: XCTestCase {
     }
 
     @MainActor
+    func testSwitcherPanelControllerDownArrowInAppCycleEntersWindowLayer() {
+        let controller = SwitcherPanelController()
+        controller.modelForTesting.snapshotProviderOverride = {
+            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
+        }
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        let selectedAppID = controller.modelForTesting.selectedApp?.id
+        XCTAssertEqual(controller.modelForTesting.session?.mode, .appCycle)
+
+        let handled = controller.handleKeyDownForTesting(Self.makeKeyDownEvent(keyCode: 125))
+
+        XCTAssertTrue(handled)
+        XCTAssertEqual(
+            controller.modelForTesting.session?.mode,
+            .windowCycle(appID: selectedAppID ?? "")
+        )
+        XCTAssertTrue(controller.modelForTesting.isPreviewLayerMode)
+        controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
     func testSwitcherPanelControllerFlagsChangedReleaseConfirmationEndsSession() async {
         let controller = SwitcherPanelController()
         controller.modelForTesting.snapshotProviderOverride = {
@@ -1919,6 +1941,28 @@ final class FlowTabPriorityCoverageTests: XCTestCase {
             .windowCycle(appID: controller.modelForTesting.selectedApp?.id ?? "")
         )
         controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerDelayedAutoEnterWindowLayerUsesPreferenceDelay() async {
+        await withTemporaryWindowLayerAutoEnterDelay(0.01) {
+            let controller = SwitcherPanelController()
+            controller.modelForTesting.snapshotProviderOverride = {
+                RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
+            }
+
+            XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+            XCTAssertEqual(controller.modelForTesting.session?.mode, .appCycle)
+
+            controller.scheduleDelayedWindowLayerEntryForTesting()
+
+            try? await Task.sleep(nanoseconds: 80_000_000)
+            XCTAssertEqual(
+                controller.modelForTesting.session?.mode,
+                .windowCycle(appID: controller.modelForTesting.selectedApp?.id ?? "")
+            )
+            controller.cancelSelectionForTesting()
+        }
     }
 
     @MainActor
@@ -2637,6 +2681,23 @@ final class FlowTabPriorityCoverageTests: XCTestCase {
             restoreUserDefaultsValue(
                 previousScope,
                 forKey: AppPreferenceKeys.searchDefaultScope,
+                userDefaults: defaults
+            )
+        }
+        try await body()
+    }
+
+    private func withTemporaryWindowLayerAutoEnterDelay(
+        _ delay: Double,
+        perform body: () async throws -> Void
+    ) async rethrows {
+        let defaults = UserDefaults.standard
+        let previousDelay = defaults.object(forKey: AppPreferenceKeys.windowLayerAutoEnterDelay)
+        defaults.set(delay, forKey: AppPreferenceKeys.windowLayerAutoEnterDelay)
+        defer {
+            restoreUserDefaultsValue(
+                previousDelay,
+                forKey: AppPreferenceKeys.windowLayerAutoEnterDelay,
                 userDefaults: defaults
             )
         }
