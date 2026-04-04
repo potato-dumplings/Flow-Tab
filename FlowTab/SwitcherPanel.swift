@@ -1677,7 +1677,7 @@ final class SwitcherPanelController {
 
     private func primaryModifier(for sessionKind: HotkeySessionKind) -> SwitcherPrimaryModifier {
         if sessionKind == .inAppWindowSwitcher {
-            return .control
+            return InAppWindowHotkeyPreferencesStore.load().primaryModifier
         }
         return SwitcherHotkeyPreferencesStore.load().primaryModifier
     }
