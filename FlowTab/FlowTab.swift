@@ -727,21 +727,6 @@ struct FlowTabApp: App {
                 }
                 .keyboardShortcut(",", modifiers: [.command])
             }
-
-            CommandMenu(AppStrings.text(.menuLogs, language: appLanguage)) {
-                Button(AppStrings.text(.menuOpenLogs, language: appLanguage)) {
-                    AppWindowCoordinator.openLogs()
-                }
-            }
-
-            CommandMenu(AppStrings.text(.menuSettings, language: appLanguage)) {
-                Button(AppStrings.text(.menuOpenSettings, language: appLanguage)) {
-                    AppWindowCoordinator.openSettings()
-                }
-                Button(AppStrings.text(.menuOpenHome, language: appLanguage)) {
-                    AppWindowCoordinator.openHome()
-                }
-            }
         }
     }
 }
