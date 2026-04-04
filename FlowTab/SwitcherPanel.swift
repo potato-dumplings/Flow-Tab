@@ -15,6 +15,11 @@ private final class SwitcherOverlayPanel: NSPanel {
 }
 
 enum SwitcherPanelWindowConfiguration {
+    enum PresentationBehaviorMode {
+        case allSpaces
+        case activeSpaceMove
+    }
+
     static let styleMask: NSWindow.StyleMask = [.borderless, .nonactivatingPanel]
     static let level: NSWindow.Level = .statusBar
     static let fallbackPresentationLevel = NSWindow.Level(
@@ -39,13 +44,17 @@ enum SwitcherPanelWindowConfiguration {
     }
 
     static func presentationCollectionBehavior(
-        requiresActiveSpaceMove: Bool = false
+        mode: PresentationBehaviorMode = .allSpaces
     ) -> NSWindow.CollectionBehavior {
-        guard requiresActiveSpaceMove else { return collectionBehavior }
-
-        var behavior = collectionBehavior
-        behavior.insert(.moveToActiveSpace)
-        return behavior
+        switch mode {
+        case .allSpaces:
+            return collectionBehavior
+        case .activeSpaceMove:
+            var behavior = collectionBehavior
+            behavior.remove(.canJoinAllSpaces)
+            behavior.insert(.moveToActiveSpace)
+            return behavior
+        }
     }
 }
 
@@ -184,10 +193,12 @@ final class SwitcherPanelController {
     private var suppressHotkeyReplayUntilRelease = false
     private var suppressHotkeyReplayTask: Task<Void, Never>?
     private var pendingModifierReleaseConfirmationTask: Task<Void, Never>?
+    private var panelPresentationRecoveryTask: Task<Void, Never>?
     private var delayedWindowLayerTimer: Timer?
     private var lastCommittedTabAdvanceTimestamp: TimeInterval?
     private var ignoreHotkeyPressesUntil: TimeInterval = 0
     private var ignoreActiveSpaceChangesUntil: TimeInterval = 0
+    private var suppressApplicationActivationUntil: TimeInterval = 0
     private var windowLayerPresentationDelay: TimeInterval {
         windowLayerPresentationDelayOverride ?? WindowLayerPreferencesStore.loadAutoEnterDelay()
     }
@@ -195,6 +206,15 @@ final class SwitcherPanelController {
     private let modifierReleaseConfirmationSampleCount: Int = 2
     private let postFinishHotkeyIgnoreWindow: TimeInterval = 0.02
     private let activeSpaceChangeIgnoreWindow: TimeInterval = 0.35
+    private let activeSpaceMigrationActivationSuppressionWindow: TimeInterval = 0.5
+    private let initialPresentationRecoveryAttemptDelaysNs: [UInt64] = [50_000_000, 150_000_000]
+    private let interruptionPresentationRecoveryAttemptDelaysNs: [UInt64] = [
+        0,
+        50_000_000,
+        150_000_000,
+        300_000_000
+    ]
+    private let panelPresentationRecoveryReorderDelayNs: UInt64 = 10_000_000
     private let autoEnterWindowLayerEnabled = true
     private let tabAdvanceMinimumInterval: TimeInterval = 0.016
     private let panelScreenMargin: CGFloat = 80
@@ -235,6 +255,7 @@ final class SwitcherPanelController {
     var panelContainsPointOverride: ((NSPoint) -> Bool)?
     var windowLayerPresentationDelayOverride: TimeInterval?
     var hideNonPanelWindowsOverride: (() -> Void)?
+    var activateApplicationIgnoringOtherAppsOverride: (() -> Void)?
 
     private var searchFeatureEnabled: Bool {
         SearchInteractionPreferencesStore.loadIsEnabled()
@@ -244,12 +265,24 @@ final class SwitcherPanelController {
         panelVisibilityOverride ?? panel.isVisible
     }
 
+    private var isPanelVisibleToUser: Bool {
+        guard isPanelPresented else { return false }
+        if panelVisibilityOverride != nil, panelOcclusionStateOverride == nil {
+            return true
+        }
+        return resolvedPanelOcclusionState.contains(.visible)
+    }
+
     private var resolvedPanelOcclusionState: NSWindow.OcclusionState {
         panelOcclusionStateOverride ?? panel.occlusionState
     }
 
     private var isAppCurrentlyActive: Bool {
         appIsActiveOverride ?? NSApp.isActive
+    }
+
+    private var hasActivePresentationSession: Bool {
+        activeHotkeySessionKind != nil && model.session != nil
     }
 
     init() {
@@ -359,6 +392,7 @@ final class SwitcherPanelController {
         activeHotkeySessionKind = .globalAppSwitcher
         lastCommittedTabAdvanceTimestamp = nil
         panelVisibilityOverride = true
+        updatePanelPresentationLevel(trigger: "testing_global_show")
         return true
     }
 
@@ -370,6 +404,7 @@ final class SwitcherPanelController {
         activeHotkeySessionKind = .inAppWindowSwitcher
         lastCommittedTabAdvanceTimestamp = nil
         panelVisibilityOverride = true
+        updatePanelPresentationLevel(trigger: "testing_in_app_show")
         return true
     }
 
@@ -428,6 +463,8 @@ final class SwitcherPanelController {
     deinit {
         suppressHotkeyReplayTask?.cancel()
         suppressHotkeyReplayTask = nil
+        panelPresentationRecoveryTask?.cancel()
+        panelPresentationRecoveryTask = nil
         terminateSelectedAppTask?.cancel()
         terminateSelectedAppTask = nil
         if let appDidResignActiveObserver {
@@ -487,22 +524,109 @@ final class SwitcherPanelController {
 
     private func schedulePanelVisibilityRecovery(
         trigger: String,
-        delayNanoseconds: UInt64 = 50_000_000
+        attemptDelaysNanoseconds: [UInt64] = [50_000_000],
+        cancelSessionOnFailure: Bool = false,
+        activateApplicationIfNeeded: Bool = true
     ) {
-        Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: delayNanoseconds)
+        panelPresentationRecoveryTask?.cancel()
+        panelPresentationRecoveryTask = Task { @MainActor [weak self] in
             guard let self else { return }
-            guard self.isPanelPresented else { return }
-            guard !self.resolvedPanelOcclusionState.contains(.visible) else { return }
-            panel.orderOut(nil)
-            panel.collectionBehavior = SwitcherPanelWindowConfiguration.presentationCollectionBehavior(
-                requiresActiveSpaceMove: true
+            let delays = attemptDelaysNanoseconds.isEmpty ? [UInt64(0)] : attemptDelaysNanoseconds
+
+            for (attemptIndex, delayNanoseconds) in delays.enumerated() {
+                if delayNanoseconds > 0 {
+                    try? await Task.sleep(nanoseconds: delayNanoseconds)
+                }
+                guard !Task.isCancelled else { return }
+                guard self.hasActivePresentationSession else {
+                    self.panelPresentationRecoveryTask = nil
+                    return
+                }
+                if self.isPanelVisibleToUser {
+                    self.logSearchTrace(
+                        "presentationRecovery trigger=\(trigger) action=complete reason=alreadyVisible attempt=\(attemptIndex + 1)/\(delays.count) \(self.searchTraceStateSummary())"
+                    )
+                    self.panelPresentationRecoveryTask = nil
+                    self.scheduleModifierReleaseConfirmationAfterRecoveredPresentationIfNeeded(trigger: trigger)
+                    return
+                }
+
+                self.logSearchTrace(
+                    "presentationRecovery trigger=\(trigger) action=attempt index=\(attemptIndex + 1)/\(delays.count) \(self.searchTraceStateSummary())"
+                )
+                await self.performPanelVisibilityRecoveryAttempt(
+                    trigger: trigger,
+                    activateApplicationIfNeeded: activateApplicationIfNeeded
+                )
+
+                guard !Task.isCancelled else { return }
+                guard self.hasActivePresentationSession else {
+                    self.panelPresentationRecoveryTask = nil
+                    return
+                }
+                if self.isPanelVisibleToUser {
+                    self.updatePanelPresentationLevel(
+                        trigger: "\(trigger)_steady",
+                        behaviorMode: .allSpaces
+                    )
+                    self.logSearchTrace(
+                        "presentationRecovery trigger=\(trigger) action=complete reason=recovered attempt=\(attemptIndex + 1)/\(delays.count) \(self.searchTraceStateSummary())"
+                    )
+                    self.panelPresentationRecoveryTask = nil
+                    self.scheduleModifierReleaseConfirmationAfterRecoveredPresentationIfNeeded(trigger: trigger)
+                    return
+                }
+            }
+
+            self.panelPresentationRecoveryTask = nil
+            guard cancelSessionOnFailure else { return }
+            guard self.hasActivePresentationSession else { return }
+            self.logSearchTrace(
+                "presentationRecovery trigger=\(trigger) action=failed \(self.searchTraceStateSummary())"
             )
-            try? await Task.sleep(nanoseconds: 10_000_000)
-            centerPanelOnActiveScreen(preferredScreen: resolveActivePresentationScreen())
-            panel.makeKeyAndOrderFront(nil)
-            panel.orderFrontRegardless()
+            self.cancelSelectionForSystemInterruption(trigger: trigger)
         }
+    }
+
+    private func performPanelVisibilityRecoveryAttempt(
+        trigger: String,
+        activateApplicationIfNeeded: Bool
+    ) async {
+        if activateApplicationIfNeeded {
+            activateApplicationForPanelPresentationIfNeeded()
+        }
+        panel.orderOut(nil)
+        updatePanelPresentationLevel(
+            trigger: "\(trigger)_recovery",
+            behaviorMode: .activeSpaceMove
+        )
+        centerPanelOnActiveScreen(preferredScreen: resolveActivePresentationScreen())
+        try? await Task.sleep(nanoseconds: panelPresentationRecoveryReorderDelayNs)
+        guard hasActivePresentationSession else { return }
+        panel.makeKeyAndOrderFront(nil)
+        panel.orderFrontRegardless()
+    }
+
+    private func activateApplicationForPanelPresentationIfNeeded() {
+        guard !isAppCurrentlyActive else { return }
+        guard ProcessInfo.processInfo.systemUptime >= suppressApplicationActivationUntil else { return }
+        if let activateApplicationIgnoringOtherAppsOverride {
+            activateApplicationIgnoringOtherAppsOverride()
+            return
+        }
+        NSApp.activate(ignoringOtherApps: true)
+    }
+
+    private func scheduleModifierReleaseConfirmationAfterRecoveredPresentationIfNeeded(
+        trigger: String
+    ) {
+        guard let sessionKind = activeHotkeySessionKind else { return }
+        guard !model.isSearchActive else { return }
+        guard !isPrimaryModifierPressedInHardwareState(for: sessionKind) else { return }
+        logInputTrace(
+            "presentationRecovery trigger=\(trigger) action=scheduleReleaseConfirm nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
+        )
+        scheduleModifierReleaseConfirmation(trigger: "presentation_recovered")
     }
 
     func handleGlobalHotkey(isBackward: Bool) {
@@ -636,10 +760,9 @@ final class SwitcherPanelController {
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
         beginIgnoringActiveSpaceChanges(trigger: "global_show")
-        schedulePanelVisibilityRecovery(trigger: "global_show_recovery")
         schedulePanelVisibilityRecovery(
-            trigger: "global_show_recovery_retry",
-            delayNanoseconds: 150_000_000
+            trigger: "global_show",
+            attemptDelaysNanoseconds: initialPresentationRecoveryAttemptDelaysNs
         )
         installEventMonitors()
         scheduleDelayedWindowLayerEntryIfNeeded()
@@ -666,23 +789,27 @@ final class SwitcherPanelController {
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
         beginIgnoringActiveSpaceChanges(trigger: "in_app_show")
-        schedulePanelVisibilityRecovery(trigger: "in_app_show_recovery")
         schedulePanelVisibilityRecovery(
-            trigger: "in_app_show_recovery_retry",
-            delayNanoseconds: 150_000_000
+            trigger: "in_app_show",
+            attemptDelaysNanoseconds: initialPresentationRecoveryAttemptDelaysNs
         )
         installEventMonitors()
         scheduleDelayedWindowLayerEntryIfNeeded()
     }
 
-    private func updatePanelPresentationLevel(trigger: String) {
+    private func updatePanelPresentationLevel(
+        trigger: String,
+        behaviorMode: SwitcherPanelWindowConfiguration.PresentationBehaviorMode = .allSpaces
+    ) {
         let inspection = FrontmostWindowInspector.inspect()
         let requiresFallbackElevation = inspection.failureReason != nil
         let resolvedLevel = SwitcherPanelWindowConfiguration.presentationLevel(
             frontmostWindowIsFullScreen: inspection.fullScreenDetected,
             requiresFallbackElevation: requiresFallbackElevation
         )
-        panel.collectionBehavior = SwitcherPanelWindowConfiguration.presentationCollectionBehavior()
+        panel.collectionBehavior = SwitcherPanelWindowConfiguration.presentationCollectionBehavior(
+            mode: behaviorMode
+        )
         panel.level = resolvedLevel
     }
 
@@ -747,7 +874,9 @@ final class SwitcherPanelController {
     }
 
     private func endPresentationSession() {
-        guard isPanelPresented else { return }
+        guard isPanelPresented || hasActivePresentationSession else { return }
+        panelPresentationRecoveryTask?.cancel()
+        panelPresentationRecoveryTask = nil
         removeEventMonitors()
         panel.orderOut(nil)
         panel.level = SwitcherPanelWindowConfiguration.level
@@ -755,6 +884,7 @@ final class SwitcherPanelController {
         activeHotkeySessionKind = nil
         activePresentationScreen = nil
         ignoreActiveSpaceChangesUntil = 0
+        suppressApplicationActivationUntil = 0
         lastCommittedTabAdvanceTimestamp = nil
         if panelVisibilityOverride != nil {
             panelVisibilityOverride = false
@@ -762,7 +892,7 @@ final class SwitcherPanelController {
     }
 
     private func finishSelection() {
-        guard isPanelPresented else { return }
+        guard isPanelPresented || hasActivePresentationSession else { return }
         endPresentationSession()
         ignoreHotkeyPressesUntil = ProcessInfo.processInfo.systemUptime + postFinishHotkeyIgnoreWindow
         logInputTrace(
@@ -772,7 +902,7 @@ final class SwitcherPanelController {
     }
 
     private func cancelSelection() {
-        guard isPanelPresented else { return }
+        guard isPanelPresented || hasActivePresentationSession else { return }
         endPresentationSession()
         ignoreHotkeyPressesUntil = ProcessInfo.processInfo.systemUptime + postFinishHotkeyIgnoreWindow
         logInputTrace(
@@ -1210,7 +1340,7 @@ final class SwitcherPanelController {
     private func handleApplicationDidResignActive() {
         guard isPanelPresented else { return }
         logSearchTrace("systemInterruption trigger=applicationDidResignActive \(searchTraceStateSummary())")
-        cancelSelectionForSystemInterruption(trigger: "applicationDidResignActive")
+        handleRecoverableSystemInterruption(trigger: "applicationDidResignActive")
     }
 
     private func handleActiveSpaceDidChange() {
@@ -1219,26 +1349,72 @@ final class SwitcherPanelController {
             logSearchTrace("systemInterruption trigger=activeSpaceDidChange action=ignored reason=graceWindow \(searchTraceStateSummary())")
             return
         }
-        logSearchTrace("systemInterruption trigger=activeSpaceDidChange \(searchTraceStateSummary())")
-        cancelSelectionForSystemInterruption(trigger: "activeSpaceDidChange")
+        guard let sessionKind = activeHotkeySessionKind else {
+            cancelSelectionForSystemInterruption(trigger: "activeSpaceDidChange")
+            return
+        }
+        let shouldKeepSessionVisible = model.isSearchActive
+            || isPrimaryModifierPressedInHardwareState(for: sessionKind)
+        guard shouldKeepSessionVisible else {
+            logSearchTrace(
+                "systemInterruption trigger=activeSpaceDidChange action=cancel reason=modifierReleased \(searchTraceStateSummary())"
+            )
+            cancelSelectionForSystemInterruption(trigger: "activeSpaceDidChange")
+            return
+        }
+        logSearchTrace(
+            "systemInterruption trigger=activeSpaceDidChange action=migrate reason=spaceChanged \(searchTraceStateSummary())"
+        )
+        suppressApplicationActivationUntil = ProcessInfo.processInfo.systemUptime
+            + activeSpaceMigrationActivationSuppressionWindow
+        schedulePanelVisibilityRecovery(
+            trigger: "activeSpaceDidChange",
+            attemptDelaysNanoseconds: interruptionPresentationRecoveryAttemptDelaysNs,
+            cancelSessionOnFailure: true,
+            activateApplicationIfNeeded: false
+        )
     }
 
     private func handlePanelOcclusionStateDidChange() {
         guard isPanelPresented else { return }
         guard !resolvedPanelOcclusionState.contains(.visible) else { return }
         logSearchTrace("systemInterruption trigger=panelOccluded \(searchTraceStateSummary())")
-        cancelSelectionForSystemInterruption(trigger: "panelOccluded")
+        handleRecoverableSystemInterruption(trigger: "panelOccluded")
     }
 
     private func handlePanelDidResignKey() {
         guard isPanelPresented else { return }
         guard !isAppCurrentlyActive else { return }
         logSearchTrace("systemInterruption trigger=panelDidResignKey \(searchTraceStateSummary())")
-        cancelSelectionForSystemInterruption(trigger: "panelDidResignKey")
+        handleRecoverableSystemInterruption(trigger: "panelDidResignKey")
+    }
+
+    private func handleRecoverableSystemInterruption(trigger: String) {
+        guard let sessionKind = activeHotkeySessionKind else {
+            cancelSelectionForSystemInterruption(trigger: trigger)
+            return
+        }
+        let shouldKeepSessionVisible = model.isSearchActive
+            || isPrimaryModifierPressedInHardwareState(for: sessionKind)
+        guard shouldKeepSessionVisible else {
+            logSearchTrace(
+                "systemInterruption trigger=\(trigger) action=cancel reason=modifierReleased \(searchTraceStateSummary())"
+            )
+            cancelSelectionForSystemInterruption(trigger: trigger)
+            return
+        }
+        logSearchTrace(
+            "systemInterruption trigger=\(trigger) action=recover \(searchTraceStateSummary())"
+        )
+        schedulePanelVisibilityRecovery(
+            trigger: trigger,
+            attemptDelaysNanoseconds: interruptionPresentationRecoveryAttemptDelaysNs,
+            cancelSessionOnFailure: true
+        )
     }
 
     private func cancelSelectionForSystemInterruption(trigger: String) {
-        guard isPanelPresented else { return }
+        guard isPanelPresented || hasActivePresentationSession else { return }
         let sessionKind = activeHotkeySessionKind
         logSearchTrace("cancelSelectionForSystemInterruption trigger=\(trigger) action=begin \(searchTraceStateSummary())")
         logInputTrace(

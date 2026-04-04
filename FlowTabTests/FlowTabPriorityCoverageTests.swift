@@ -1403,6 +1403,78 @@ final class FlowTabPriorityCoverageTests: XCTestCase {
     }
 
     @MainActor
+    func testSwitcherPanelControllerActiveSpaceChangeKeepsSessionVisibleWithoutReactivatingApp() async {
+        let controller = SwitcherPanelController()
+        controller.modelForTesting.snapshotProviderOverride = {
+            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
+        }
+        controller.globalPrimaryModifierPressedOverride = true
+        controller.appIsActiveOverride = false
+
+        var activateCallCount = 0
+        controller.activateApplicationIgnoringOtherAppsOverride = {
+            activateCallCount += 1
+        }
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        controller.panelOcclusionStateOverride = []
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 60_000_000)
+            controller.panelOcclusionStateOverride = .visible
+        }
+
+        controller.handleActiveSpaceDidChangeForTesting()
+
+        try? await Task.sleep(nanoseconds: 220_000_000)
+        XCTAssertNotNil(controller.modelForTesting.session)
+        XCTAssertEqual(activateCallCount, 0)
+        XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerActiveSpaceChangeCancelsSessionAfterModifierRelease() async {
+        let controller = SwitcherPanelController()
+        controller.modelForTesting.snapshotProviderOverride = {
+            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
+        }
+        controller.globalPrimaryModifierPressedOverride = false
+        controller.globalMainKeyPressedOverride = false
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        controller.handleActiveSpaceDidChangeForTesting()
+
+        XCTAssertNil(controller.modelForTesting.session)
+        XCTAssertTrue(controller.suppressHotkeyReplayUntilReleaseForTesting)
+
+        try? await Task.sleep(nanoseconds: 80_000_000)
+        XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerRecoverableOcclusionKeepsSessionVisible() async {
+        let occlusionController = SwitcherPanelController()
+        occlusionController.modelForTesting.snapshotProviderOverride = {
+            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
+        }
+        occlusionController.globalPrimaryModifierPressedOverride = true
+
+        XCTAssertTrue(occlusionController.beginGlobalHotkeySessionForTesting())
+        occlusionController.panelOcclusionStateOverride = []
+
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 60_000_000)
+            occlusionController.panelOcclusionStateOverride = .visible
+        }
+
+        occlusionController.handlePanelOcclusionStateDidChangeForTesting()
+
+        try? await Task.sleep(nanoseconds: 220_000_000)
+        XCTAssertNotNil(occlusionController.modelForTesting.session)
+        XCTAssertFalse(occlusionController.suppressHotkeyReplayUntilReleaseForTesting)
+    }
+
+    @MainActor
     func testSwitcherPanelControllerSystemInterruptionsCancelSessionAndSuppressReplayUntilRelease() async {
         let controller = SwitcherPanelController()
         controller.modelForTesting.snapshotProviderOverride = {
