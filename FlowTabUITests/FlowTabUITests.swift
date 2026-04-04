@@ -28,6 +28,8 @@ final class FlowTabUITests: XCTestCase {
         static let logsSeededErrorLine = "flowtab.logs.line.seeded.error"
         static let switcherPanel = "flowtab.switcher.panel"
         static let switcherSearchInput = "flowtab.switcher.search.input"
+        static let switcherWindowMockMailInbox = "flowtab.switcher.window.mock-mail-inbox"
+        static let switcherWindowMockMailDraft = "flowtab.switcher.window.mock-mail-draft"
     }
 
     override func setUpWithError() throws {
@@ -415,6 +417,43 @@ final class FlowTabUITests: XCTestCase {
             .matching(identifier: "flowtab.switcher.search.app.com-flowtab-mock-file-transfer-assistant")
             .firstMatch
         XCTAssertTrue(segmentedResult.waitForExistence(timeout: 5))
+    }
+
+    func testSwitcherPanelMoveAppThenAutoEnterWindowLayerShowsMockWindows() throws {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-open-switcher-search",
+                "-showPermissionReminder",
+                "NO"
+            ]
+        )
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+
+        let switcherPanel = app.descendants(matching: .any)
+            .matching(identifier: Identifier.switcherPanel)
+            .firstMatch
+        XCTAssertTrue(switcherPanel.waitForExistence(timeout: 8))
+
+        app.typeKey(.escape, modifierFlags: [])
+        RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+
+        let mailInboxWindow = switcherPanel.descendants(matching: .any)
+            .matching(identifier: Identifier.switcherWindowMockMailInbox)
+            .firstMatch
+        let mailDraftWindow = switcherPanel.descendants(matching: .any)
+            .matching(identifier: Identifier.switcherWindowMockMailDraft)
+            .firstMatch
+        XCTAssertFalse(mailInboxWindow.exists)
+        XCTAssertFalse(mailDraftWindow.exists)
+
+        RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        app.typeKey(.leftArrow, modifierFlags: [])
+
+        XCTAssertTrue(mailInboxWindow.waitForExistence(timeout: 3))
+        XCTAssertTrue(mailDraftWindow.waitForExistence(timeout: 3))
     }
 
     func testTabSwitchStressCPUAndMemory() throws {

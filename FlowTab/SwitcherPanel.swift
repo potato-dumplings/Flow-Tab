@@ -2968,6 +2968,7 @@ private struct CommandTabOverlay: View {
                         size: appTileSize,
                         icon: iconForApp(app)
                     )
+                    .accessibilityIdentifier("flowtab.switcher.app.\(app.id.flowTabAccessibilitySlug)")
                     .transition(.appQuitRemoval)
                 }
             }
@@ -2997,6 +2998,9 @@ private struct CommandTabOverlay: View {
                                         isSelected: preview.isSelected,
                                         width: cardWidth,
                                         height: cardHeight
+                                    )
+                                    .accessibilityIdentifier(
+                                        "flowtab.switcher.window.\(preview.id.flowTabAccessibilitySlug)"
                                     )
                                     .id(preview.id)
                                 }
@@ -3151,6 +3155,9 @@ private struct CommandTabOverlay: View {
                             isSelected: preview.isSelected,
                             width: layout.cardWidth,
                             height: layout.cardHeight
+                        )
+                        .accessibilityIdentifier(
+                            "flowtab.switcher.window.\(preview.id.flowTabAccessibilitySlug)"
                         )
                         .id(preview.id)
                     }
