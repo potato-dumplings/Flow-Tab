@@ -16,20 +16,21 @@ usage() {
 Usage: ./scripts/release/release-dmg.sh [--version <version>] [--target <target>] [--skip-build]
 
 Options:
-  --version <version>  Set release version for tag output (supports 1.2.3 or v1.2.3).
+  --version <version>  Override release version (supports 1.2.3, v1.2.3, or flowtab-v1.2.3).
   --target <target>    Set asset target name (for example aarch64-apple-darwin).
   --skip-build         Reuse existing Release app without rebuilding.
   -h, --help           Show this help message.
+
+Release version resolution:
+- Prefer --version when provided.
+- Otherwise read the current release tag from GITHUB_REF_NAME or tags pointing at HEAD.
+- Supported tag forms: flowtab-v<version> (preferred) and v<version>.
+- MARKETING_VERSION is validated against the resolved release version, but is not used as the release source.
 
 When --target is not provided:
 - Single-arch app -> produce one DMG for that architecture.
 - Universal app (arm64 + x86_64) -> produce one universal DMG.
 EOF
-}
-
-detect_version() {
-  awk -F '= ' '/MARKETING_VERSION = / {gsub(/[ ;]/, "", $2); print $2; exit}' \
-    "${ROOT_DIR}/FlowTab.xcodeproj/project.pbxproj"
 }
 
 normalize_version() {
@@ -46,6 +47,105 @@ normalize_version() {
   fi
 
   echo "v${raw}"
+}
+
+release_version_from_ref() {
+  local raw="$1"
+
+  if [[ "${raw}" == "${PROJECT_PREFIX}-v"* ]]; then
+    normalize_version "${raw}"
+    return 0
+  fi
+
+  if [[ "${raw}" == v* ]]; then
+    normalize_version "${raw}"
+    return 0
+  fi
+
+  return 1
+}
+
+detect_version_from_github_ref() {
+  local ref_name="${GITHUB_REF_NAME:-}"
+  local ref_type="${GITHUB_REF_TYPE:-}"
+
+  if [[ "${ref_type}" != "tag" || -z "${ref_name}" ]]; then
+    return 0
+  fi
+
+  if ! release_version_from_ref "${ref_name}"; then
+    echo "Unsupported release tag: ${ref_name}" >&2
+    echo "Use ${PROJECT_PREFIX}-v<version> or v<version>." >&2
+    return 1
+  fi
+}
+
+detect_version_from_head_tags() {
+  local tag=""
+  local normalized=""
+  local unique_versions=()
+
+  while IFS= read -r tag; do
+    [[ -z "${tag}" ]] && continue
+    if ! normalized="$(release_version_from_ref "${tag}")"; then
+      continue
+    fi
+    if [[ " ${unique_versions[*]} " != *" ${normalized} "* ]]; then
+      unique_versions+=("${normalized}")
+    fi
+  done < <(git tag --points-at HEAD 2>/dev/null || true)
+
+  case "${#unique_versions[@]}" in
+    0)
+      return 0
+      ;;
+    1)
+      echo "${unique_versions[0]}"
+      ;;
+    *)
+      echo "Multiple release tags point at HEAD: ${unique_versions[*]}" >&2
+      echo "Pass --version explicitly or keep a single release tag on the release commit." >&2
+      return 1
+      ;;
+  esac
+}
+
+detect_app_marketing_version() {
+  local release_config_id=""
+
+  release_config_id="$(
+    awk '
+      /Build configuration list for PBXNativeTarget "FlowTab"/ {
+        in_config_list = 1
+        next
+      }
+      in_config_list && /\);/ {
+        in_config_list = 0
+      }
+      in_config_list && /\/\* Release \*\// {
+        print $1
+        exit
+      }
+    ' "${ROOT_DIR}/FlowTab.xcodeproj/project.pbxproj"
+  )"
+
+  [[ -z "${release_config_id}" ]] && return 0
+
+  awk -v release_config_id="${release_config_id}" '
+    $0 ~ "^[[:space:]]*" release_config_id " /\\* Release \\*/ = \\{" {
+      in_release_config = 1
+      next
+    }
+    in_release_config && /MARKETING_VERSION = / {
+      split($0, parts, "= ")
+      gsub(/[ ;]/, "", parts[2])
+      print parts[2]
+      exit
+    }
+    in_release_config && /^[[:space:]]*};/ {
+      in_release_config = 0
+    }
+  ' "${ROOT_DIR}/FlowTab.xcodeproj/project.pbxproj"
 }
 
 VERSION=""
@@ -86,15 +186,40 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "${VERSION}" ]]; then
-  VERSION="$(detect_version)"
+TAG_VERSION=""
+if ! TAG_VERSION="$(detect_version_from_github_ref)"; then
+  exit 1
+fi
+
+if [[ -z "${TAG_VERSION}" ]]; then
+  if ! TAG_VERSION="$(detect_version_from_head_tags)"; then
+    exit 1
+  fi
+fi
+
+if [[ -n "${VERSION}" ]]; then
+  VERSION="$(normalize_version "${VERSION}")"
+  if [[ -n "${TAG_VERSION}" && "${TAG_VERSION}" != "${VERSION}" ]]; then
+    echo "--version (${VERSION}) does not match the current release tag (${TAG_VERSION})." >&2
+    exit 1
+  fi
+else
+  VERSION="${TAG_VERSION}"
 fi
 
 if [[ -z "${VERSION}" ]]; then
-  VERSION="dev"
+  echo "Release version is required." >&2
+  echo "Pass --version or run the script on a release tag (${PROJECT_PREFIX}-v<version> / v<version>)." >&2
+  exit 1
 fi
 
-VERSION="$(normalize_version "${VERSION}")"
+APP_MARKETING_VERSION="$(detect_app_marketing_version)"
+if [[ -n "${APP_MARKETING_VERSION}" && "${APP_MARKETING_VERSION}" != "${VERSION#v}" ]]; then
+  echo "FlowTab MARKETING_VERSION (${APP_MARKETING_VERSION}) does not match release version (${VERSION#v})." >&2
+  echo "Update the app display version before packaging this release." >&2
+  exit 1
+fi
+
 RELEASE_TAG="${PROJECT_PREFIX}-${VERSION}"
 RELEASE_VERSION_DIR="${RELEASE_DIR}/${RELEASE_TAG}"
 
@@ -192,6 +317,7 @@ hdiutil convert \
 rm -rf "${STAGING_DIR}" "${RW_DMG_PATH}"
 echo "Done: ${OUTPUT_DMG_PATH}"
 
+echo "Release version: ${VERSION}"
 echo "Release tag: ${RELEASE_TAG}"
 echo "Release asset: ${ASSET_BASENAME}"
 echo "Release directory: ${RELEASE_VERSION_DIR}"
