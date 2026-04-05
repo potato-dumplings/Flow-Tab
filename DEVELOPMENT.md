@@ -165,10 +165,56 @@ FlowTab 当前有三种面板：
 
 ## 仓库结构
 
-- `FlowTab/`：macOS App 层（热键、面板、运行时桥接、首页与监控 UI）
+- `FlowTab/`：macOS App 层
 - `FlowTabCore/`：核心状态机与模型（可单测）
 - `FlowTabTests/`、`FlowTabUITests/`：测试目标
-- `scripts/`：构建与安装脚本
+- `scripts/`：构建、发布、压测脚本
+
+### FlowTab App 目录（2026-04-05）
+
+```text
+FlowTab/
+  App/
+    FlowTab.swift
+    ContentView.swift
+    AppLocalization.swift
+  Features/
+    Switcher/
+      OptionTabHotkeyMonitor.swift
+      SwitcherPanel.swift
+      SwitcherSearchCoordinator.swift
+  Infrastructure/
+    Runtime/
+      RuntimeBridge.swift
+      RuntimeLogging.swift
+      RuntimeLogsSection.swift
+  TestingSupport/
+    AppDelegate+Testing.swift
+    FlowTabLaunchTesting.swift
+    FlowTabUITestBootstrapper.swift
+    NSView+FlowTabTesting.swift
+    RuntimeBridge+Testing.swift
+  Resources/
+    Assets.xcassets
+    FlowTab.entitlements
+    Preview Content/
+      Preview Assets.xcassets
+```
+
+### 目录分层逻辑（重排约定）
+
+- `App/`：应用入口、生命周期与根 UI 装配。只放“启动与装配”相关代码，不承载业务细节。
+- `Features/`：按业务能力分组（例如 `Switcher`）。同一功能的 monitor / panel / coordinator 放在一起，便于联动修改。
+- `Infrastructure/`：对系统 API、运行时快照、日志与桥接的封装。业务层只依赖这里的能力，不直接散落调用系统细节。
+- `TestingSupport/`：仅用于测试注入、测试可见性扩展、测试启动辅助。避免与业务代码平铺混放。
+- `Resources/`：资源与签名相关文件统一收口（`Assets`、`entitlements`、`Preview Content`），同时同步 Xcode 构建路径。
+
+### 新增文件放置规则
+
+- 新功能先在 `Features/<FeatureName>/` 建目录，再放实现文件；避免直接在 `FlowTab/` 根下加文件。
+- 跨功能共用且偏系统能力的代码放 `Infrastructure/`，不要放进任一具体 feature。
+- 仅为测试服务的扩展或引导代码放 `TestingSupport/`，命名保持 `+Testing` 或 `...Testing` 语义。
+- 资源文件一律放 `Resources/`，移动资源时必须同步更新 `project.pbxproj` 中对应路径配置。
 
 ## 技术架构
 
