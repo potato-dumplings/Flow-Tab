@@ -1409,6 +1409,21 @@ final class FlowTabTests: XCTestCase {
         XCTAssertEqual(coordinator.state.queryCursorPosition, 3)
     }
 
+    func testSearchSelectionWrapsFromLastResultBackToFirstResult() {
+        let coordinator = SwitcherSearchCoordinator()
+        coordinator.rebuildIndex(with: searchSampleApps())
+        XCTAssertTrue(coordinator.activate(defaultScope: .app))
+        XCTAssertTrue(coordinator.focusResults())
+
+        XCTAssertTrue(coordinator.moveSelection(by: -1))
+        XCTAssertEqual(coordinator.state.selectedResultIndex, coordinator.state.results.count - 1)
+        XCTAssertEqual(coordinator.state.selectedResult?.primaryText, "文件传输助手")
+
+        XCTAssertTrue(coordinator.moveSelection(by: 1))
+        XCTAssertEqual(coordinator.state.selectedResultIndex, 0)
+        XCTAssertEqual(coordinator.state.selectedResult?.primaryText, "微信")
+    }
+
     func testSearchReplaceQueryWithoutRebuildUpdatesQueryAndCursor() {
         let coordinator = SwitcherSearchCoordinator()
         coordinator.rebuildIndex(with: searchSampleApps())

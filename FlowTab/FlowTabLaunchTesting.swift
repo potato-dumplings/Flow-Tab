@@ -38,6 +38,10 @@ enum FlowTabTestLaunchOptions {
         return Int(rawValue)
     }
 
+    static var mockRuntimeVariant: String? {
+        value(after: "--flowtab-ui-mock-runtime-variant")
+    }
+
     static var runtimeLogLevelOverrideRawValue: String? {
         value(after: "--flowtab-ui-runtime-log-level")
     }

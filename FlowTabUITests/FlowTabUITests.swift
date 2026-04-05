@@ -815,6 +815,55 @@ final class FlowTabUITests: XCTestCase {
         XCTAssertTrue(segmentedResult.waitForExistence(timeout: 5))
     }
 
+    func testSearchPanelWrapFromLastResultScrollsBackToFirstResult() throws {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-mock-runtime-variant",
+                "search-wrap",
+                "--flowtab-ui-open-switcher-search",
+                "-showPermissionReminder",
+                "NO"
+            ]
+        )
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+
+        let switcherPanel = app.descendants(matching: .any)
+            .matching(identifier: Identifier.switcherPanel)
+            .firstMatch
+        XCTAssertTrue(switcherPanel.waitForExistence(timeout: 5))
+
+        let firstResultIdentifier = "flowtab.switcher.search.app.com-flowtab-mock-wrap-01"
+        let lastResultIdentifier = "flowtab.switcher.search.app.com-flowtab-mock-wrap-10"
+
+        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+        app.typeKey(.downArrow, modifierFlags: [])
+        RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+
+        for _ in 0..<9 {
+            app.typeKey(.downArrow, modifierFlags: [])
+            RunLoop.current.run(until: Date().addingTimeInterval(0.08))
+        }
+
+        XCTAssertTrue(
+            hasHittableElement(
+                in: app.descendants(matching: .any).matching(identifier: lastResultIdentifier),
+                timeout: 2
+            )
+        )
+
+        app.typeKey(.downArrow, modifierFlags: [])
+
+        XCTAssertTrue(
+            hasHittableElement(
+                in: app.descendants(matching: .any).matching(identifier: firstResultIdentifier),
+                timeout: 5
+            )
+        )
+    }
+
     func testSwitcherPanelMoveAppThenAutoEnterWindowLayerShowsMockWindows() throws {
         let app = makeApp(
             additionalArguments: [

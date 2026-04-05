@@ -1,6 +1,6 @@
 # UI 自动化测试覆盖清单（FlowTab）
 
-更新时间：2026-04-04
+更新时间：2026-04-05
 
 ## 目标与范围
 
@@ -10,7 +10,7 @@
 
 ## 覆盖总览（当前）
 
-- 用例总数：27
+- 用例总数：28
 - 覆盖域：启动导航、Home、权限提示、Logs、Settings、Switcher/Search、压测。
 - 当前状态：应用内可稳定自动化的核心场景已全部覆盖，无挂起项。
 - 执行前提：大多数用例依赖 UI test launch arguments 控制权限状态、Mock Runtime、预置日志和重置偏好，以减少系统环境抖动。
@@ -157,6 +157,11 @@
   场景：验证中文复合词查询可命中分词索引结果。
   步骤：启动即进入搜索态，输入 `文件助手`。
   验证：结果中出现 `com-flowtab-mock-file-transfer-assistant` 对应条目。
+
+- `testSearchPanelWrapFromLastResultScrollsBackToFirstResult`
+  场景：验证搜索结果列表在选中项从最后一条回环到第一条时，会同步把视口滚回顶部附近。
+  步骤：使用 `search-wrap` Mock Runtime 变体启动搜索面板，连续按下方向键直到命中最后一个结果 `Mock Wrap 10`，再额外按一次下方向键触发回环。
+  验证：最后一项在回环前可见，回环后第一项 `com-flowtab-mock-wrap-01` 会重新变为可点击元素，说明选中态与列表滚动保持同步。
 
 - `testSwitcherPanelMoveAppThenAutoEnterWindowLayerShowsMockWindows`
   场景：验证在标准 Switcher 模式中移动应用选择后，可自动切入窗口层。

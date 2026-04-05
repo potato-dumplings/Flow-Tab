@@ -282,6 +282,55 @@ final class FlowTabPriorityCoverageTests: XCTestCase {
     }
 
     @MainActor
+    func testSwitcherPanelControllerSearchWrapRequestsScrollBackToFirstResult() async {
+        await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
+            let controller = SwitcherPanelController()
+            controller.modelForTesting.snapshotProviderOverride = {
+                RuntimeSnapshot(apps: self.searchWrapScenarioApps(), contextsByID: [:])
+            }
+
+            var scrollRequests: [String] = []
+            controller.modelForTesting.onSearchResultScrollRequestForTesting = { resultID in
+                scrollRequests.append(resultID)
+            }
+
+            XCTAssertTrue(controller.presentGlobalHotkeySessionForTesting())
+            XCTAssertTrue(controller.modelForTesting.enterSearchMode())
+            controller.updatePanelSizeForTesting(
+                visibleFrame: CGRect(x: 0, y: 0, width: 1440, height: 900)
+            )
+            try? await Task.sleep(nanoseconds: 200_000_000)
+
+            guard let firstResultID = controller.modelForTesting.searchViewState.results.first?.id else {
+                XCTFail("Expected search results after entering search mode")
+                controller.cancelSelectionForTesting()
+                return
+            }
+
+            XCTAssertTrue(controller.handleKeyDownForTesting(Self.makeKeyDownEvent(keyCode: 125)))
+            try? await Task.sleep(nanoseconds: 50_000_000)
+
+            let moveCountToLastResult = max(0, controller.modelForTesting.searchResultCount - 1)
+            for _ in 0..<moveCountToLastResult {
+                XCTAssertTrue(controller.handleKeyDownForTesting(Self.makeKeyDownEvent(keyCode: 125)))
+                try? await Task.sleep(nanoseconds: 50_000_000)
+            }
+
+            XCTAssertEqual(
+                controller.modelForTesting.searchViewState.selectedResultIndex,
+                controller.modelForTesting.searchResultCount - 1
+            )
+
+            XCTAssertTrue(controller.handleKeyDownForTesting(Self.makeKeyDownEvent(keyCode: 125)))
+            try? await Task.sleep(nanoseconds: 50_000_000)
+
+            XCTAssertEqual(controller.modelForTesting.searchViewState.selectedResultIndex, 0)
+            XCTAssertEqual(scrollRequests.last, firstResultID)
+            controller.cancelSelectionForTesting()
+        }
+    }
+
+    @MainActor
     func testSwitcherPanelControllerSearchEnterAppliesSelectionAndEscapeExitsSearch() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
             let controller = SwitcherPanelController()
@@ -2553,6 +2602,27 @@ final class FlowTabPriorityCoverageTests: XCTestCase {
                 ]
             )
         ]
+    }
+
+    private func searchWrapScenarioApps() -> [AppSwitchCandidate] {
+        return (1...10).map { item in
+            let suffix = String(format: "%02d", item)
+            let rank = 501 - item
+            return AppSwitchCandidate(
+                id: "com.flowtab.mock.wrap.\(suffix)",
+                displayName: "Mock Wrap \(suffix)",
+                groupID: "mock",
+                lastActiveAt: TimeInterval(rank),
+                windows: [
+                    WindowCandidate(
+                        id: "mock-wrap-\(suffix)-primary",
+                        title: "MockWrap\(suffix)Window",
+                        isMinimized: false,
+                        lastActiveAt: TimeInterval(rank)
+                    )
+                ]
+            )
+        }
     }
 
     private func terminateScenarioApps() -> [AppSwitchCandidate] {

@@ -9,71 +9,98 @@ extension RuntimeSnapshotProvider {
         let snapshotsByAppID: [String: RuntimeHomeAppSnapshot]
     }
 
+    private static func uiTestAppDefinitions(
+        variant: String?
+    ) -> [(appID: String, name: String, windows: [WindowCandidate], rank: Int)] {
+        switch variant {
+        case "search-wrap":
+            return (1...10).map { item in
+                let suffix = String(format: "%02d", item)
+                let lastActiveAt = TimeInterval(401 - item)
+                return (
+                    appID: "com.flowtab.mock.wrap.\(suffix)",
+                    name: "Mock Wrap \(suffix)",
+                    windows: [
+                        WindowCandidate(
+                            id: "mock-wrap-\(suffix)-primary",
+                            title: "MockWrap\(suffix)Window",
+                            isMinimized: false,
+                            lastActiveAt: lastActiveAt
+                        )
+                    ],
+                    rank: item - 1
+                )
+            }
+        default:
+            return [
+                (
+                    appID: "com.flowtab.mock.mail",
+                    name: "Mock Mail",
+                    windows: [
+                        WindowCandidate(id: "mock-mail-inbox", title: "Inbox", isMinimized: false, lastActiveAt: 300),
+                        WindowCandidate(id: "mock-mail-draft", title: "Draft", isMinimized: false, lastActiveAt: 299)
+                    ],
+                    rank: 0
+                ),
+                (
+                    appID: "com.flowtab.mock.browser",
+                    name: "Mock Browser",
+                    windows: [
+                        WindowCandidate(id: "mock-browser-docs", title: "Docs", isMinimized: false, lastActiveAt: 290)
+                    ],
+                    rank: 1
+                ),
+                (
+                    appID: "com.flowtab.mock.flow-search",
+                    name: "FlowTabSearch",
+                    windows: [
+                        WindowCandidate(
+                            id: "mock-flow-search-guide",
+                            title: "FlowTabSearchGuide",
+                            isMinimized: false,
+                            lastActiveAt: 285
+                        )
+                    ],
+                    rank: 2
+                ),
+                (
+                    appID: "com.xxx.test",
+                    name: "测试",
+                    windows: [
+                        WindowCandidate(id: "mock-test-cases", title: "用例", isMinimized: false, lastActiveAt: 280)
+                    ],
+                    rank: 3
+                ),
+                (
+                    appID: "com.xxx.csgo",
+                    name: "CSGO",
+                    windows: [
+                        WindowCandidate(id: "mock-csgo-dust2", title: "Dust2", isMinimized: false, lastActiveAt: 270)
+                    ],
+                    rank: 4
+                ),
+                (
+                    appID: "com.flowtab.mock.file-transfer-assistant",
+                    name: "文件传输助手",
+                    windows: [
+                        WindowCandidate(
+                            id: "mock-file-transfer-assistant",
+                            title: "最近文件",
+                            isMinimized: false,
+                            lastActiveAt: 260
+                        )
+                    ],
+                    rank: 5
+                )
+            ]
+        }
+    }
+
     static func uiTestRuntimeDataset() -> UITestRuntimeDataset? {
         guard FlowTabTestLaunchOptions.usesMockRuntimeSnapshot else { return nil }
 
         let runningApp = NSRunningApplication.current
-        let appDefinitions: [(appID: String, name: String, windows: [WindowCandidate], rank: Int)] = [
-            (
-                appID: "com.flowtab.mock.mail",
-                name: "Mock Mail",
-                windows: [
-                    WindowCandidate(id: "mock-mail-inbox", title: "Inbox", isMinimized: false, lastActiveAt: 300),
-                    WindowCandidate(id: "mock-mail-draft", title: "Draft", isMinimized: false, lastActiveAt: 299)
-                ],
-                rank: 0
-            ),
-            (
-                appID: "com.flowtab.mock.browser",
-                name: "Mock Browser",
-                windows: [
-                    WindowCandidate(id: "mock-browser-docs", title: "Docs", isMinimized: false, lastActiveAt: 290)
-                ],
-                rank: 1
-            ),
-            (
-                appID: "com.flowtab.mock.flow-search",
-                name: "FlowTabSearch",
-                windows: [
-                    WindowCandidate(
-                        id: "mock-flow-search-guide",
-                        title: "FlowTabSearchGuide",
-                        isMinimized: false,
-                        lastActiveAt: 285
-                    )
-                ],
-                rank: 2
-            ),
-            (
-                appID: "com.xxx.test",
-                name: "测试",
-                windows: [
-                    WindowCandidate(id: "mock-test-cases", title: "用例", isMinimized: false, lastActiveAt: 280)
-                ],
-                rank: 3
-            ),
-            (
-                appID: "com.xxx.csgo",
-                name: "CSGO",
-                windows: [
-                    WindowCandidate(id: "mock-csgo-dust2", title: "Dust2", isMinimized: false, lastActiveAt: 270)
-                ],
-                rank: 4
-            ),
-            (
-                appID: "com.flowtab.mock.file-transfer-assistant",
-                name: "文件传输助手",
-                windows: [
-                    WindowCandidate(
-                        id: "mock-file-transfer-assistant",
-                        title: "最近文件",
-                        isMinimized: false,
-                        lastActiveAt: 260
-                    )
-                ],
-                rank: 5
-            )
-        ]
+        let appDefinitions = uiTestAppDefinitions(variant: FlowTabTestLaunchOptions.mockRuntimeVariant)
 
         let candidates = appDefinitions.map { definition in
             AppSwitchCandidate(

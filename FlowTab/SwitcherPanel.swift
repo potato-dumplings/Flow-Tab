@@ -1752,6 +1752,7 @@ final class LiveSwitcherModel: ObservableObject {
     @Published private(set) var previewSectionHeight: CGFloat = 220
     @Published private(set) var overlayStyle: SwitcherOverlayStyle = .appAndWindow
     @Published private(set) var searchViewState: SwitcherSearchViewState = .inactive
+    @Published private(set) var searchResultScrollRevision: UInt64 = 0
     @Published private(set) var terminatingAppID: String?
 
     private let snapshotProvider = RuntimeSnapshotProvider()
@@ -1765,6 +1766,7 @@ final class LiveSwitcherModel: ObservableObject {
 
     var onSearchStateChanged: (() -> Void)?
     var onSessionLayoutChanged: (() -> Void)?
+    var onSearchResultScrollRequestForTesting: ((String) -> Void)?
     var snapshotProviderOverride: (() -> RuntimeSnapshot)?
     var frontmostApplicationOverride: (() -> NSRunningApplication?)?
     var activationOverride: ((ActivationTarget, [String: RuntimeAppContext]) -> Void)?
@@ -1855,6 +1857,20 @@ final class LiveSwitcherModel: ObservableObject {
 
     var shouldClearSearchOnEscape: Bool {
         searchViewState.isInputFocused && !searchViewState.query.isEmpty
+    }
+
+    func recordSearchResultScrollRequestForTesting(_ resultID: String) {
+        onSearchResultScrollRequestForTesting?(resultID)
+    }
+
+    private func shouldBumpSearchResultScrollRevision(
+        from oldState: SwitcherSearchViewState,
+        to newState: SwitcherSearchViewState
+    ) -> Bool {
+        guard newState.isActive else { return false }
+        return oldState.isInputFocused != newState.isInputFocused
+            || oldState.selectedResultIndex != newState.selectedResultIndex
+            || oldState.results.map(\.id) != newState.results.map(\.id)
     }
 
     private func previewData(
@@ -2654,11 +2670,18 @@ final class LiveSwitcherModel: ObservableObject {
 
     private func publishSearchStateIfNeeded() {
         let newState = searchCoordinator.state
+        let shouldBumpScrollRevision = shouldBumpSearchResultScrollRevision(
+            from: searchViewState,
+            to: newState
+        )
         if !newState.isActive {
             searchInputHasMarkedText = false
         }
         guard searchViewState != newState else { return }
         searchViewState = newState
+        if shouldBumpScrollRevision {
+            searchResultScrollRevision &+= 1
+        }
     }
 }
 
@@ -2744,6 +2767,7 @@ private struct SwitcherPanelRootView: View {
                     previewSectionHeight: model.previewSectionHeight,
                     windowPreviewItems: model.windowPreviewItems(),
                     searchState: model.searchViewState,
+                    searchResultScrollRevision: model.searchResultScrollRevision,
                     searchAppItems: model.searchAppItems(),
                     searchWindowItems: model.searchWindowItems(),
                     onSearchInputChanged: { query, cursorPosition in
@@ -2758,6 +2782,9 @@ private struct SwitcherPanelRootView: View {
                     terminatingAppID: model.terminatingAppID,
                     appTileSize: model.appGridTileSize,
                     appTileSpacing: model.appGridSpacing,
+                    onSearchResultScrollRequested: { resultID in
+                        model.recordSearchResultScrollRequestForTesting(resultID)
+                    },
                     iconForApp: { app in
                         model.icon(for: app)
                     }
@@ -2781,6 +2808,7 @@ private struct CommandTabOverlay: View {
     let previewSectionHeight: CGFloat
     let windowPreviewItems: [WindowPreviewItem]
     let searchState: SwitcherSearchViewState
+    let searchResultScrollRevision: UInt64
     let searchAppItems: [SearchAppResultItem]
     let searchWindowItems: [SearchWindowResultItem]
     let onSearchInputChanged: (String, Int) -> Void
@@ -2791,6 +2819,7 @@ private struct CommandTabOverlay: View {
     let terminatingAppID: String?
     let appTileSize: CGFloat
     let appTileSpacing: CGFloat
+    let onSearchResultScrollRequested: (String) -> Void
     let iconForApp: (AppSwitchCandidate) -> NSImage?
     @Environment(\.colorScheme) private var colorScheme
 
@@ -2950,6 +2979,7 @@ private struct CommandTabOverlay: View {
     private func scrollToSelectedSearchResult(using proxy: ScrollViewProxy) {
         guard !searchState.isInputFocused else { return }
         guard let selectedSearchResultID else { return }
+        onSearchResultScrollRequested(selectedSearchResultID)
         var transaction = Transaction(animation: nil)
         transaction.disablesAnimations = true
         withTransaction(transaction) {
@@ -3079,13 +3109,7 @@ private struct CommandTabOverlay: View {
                             .padding(.vertical, 2)
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                        .onAppear {
-                            scrollToSelectedSearchResult(using: scrollProxy)
-                        }
-                        .onChange(of: selectedSearchResultID) { _ in
-                            scrollToSelectedSearchResult(using: scrollProxy)
-                        }
-                        .onChange(of: searchState.isInputFocused) { _ in
+                        .task(id: searchResultScrollRevision) {
                             scrollToSelectedSearchResult(using: scrollProxy)
                         }
                     }
@@ -3106,13 +3130,7 @@ private struct CommandTabOverlay: View {
                             .padding(.vertical, 2)
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                        .onAppear {
-                            scrollToSelectedSearchResult(using: scrollProxy)
-                        }
-                        .onChange(of: selectedSearchResultID) { _ in
-                            scrollToSelectedSearchResult(using: scrollProxy)
-                        }
-                        .onChange(of: searchState.isInputFocused) { _ in
+                        .task(id: searchResultScrollRevision) {
                             scrollToSelectedSearchResult(using: scrollProxy)
                         }
                     }
