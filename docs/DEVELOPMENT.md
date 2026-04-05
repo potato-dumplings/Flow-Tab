@@ -509,8 +509,10 @@ gh release create "${TAG}" release/"${TAG}"/flowtab-universal2-apple-darwin.dmg 
 
 ## 文档维护约定
 
-- 本仓库以根目录 `DEVELOPMENT.md` 作为需求与实现状态基线文档。
+- 本仓库以 `docs/DEVELOPMENT.md` 作为需求与实现状态基线文档。
+- 详细项目文档统一放在 `docs/` 目录下维护。
 - 根目录 `README.md` 面向使用者，保持安装与使用说明。
+- 根目录 `AGENTS.md` 只保留项目入口级工程约束。
 - `FlowTabCore/docs/requirements.md` 与 `FlowTabCore/docs/implementation-split.md` 仅保留跳转说明。
 
 ## 搜索压测要求（必须）

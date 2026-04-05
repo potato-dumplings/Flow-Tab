@@ -1,0 +1,55 @@
+---
+name: flowtab-engineering
+description: "FlowTab project engineering workflow and architecture rules. Use when changing this repository for feature extensions, new features, bug fixes, refactors, logging or test-code placement, or module-boundary decisions. Enforce FlowTab-specific rules: feature work must add unit, behavior, and UI coverage and pass related tests before submission; bug fixes must be diagnosed with tests and logs before code changes; never introduce single-feature or single-scenario special cases; keep test-only or debug-only code out of production files; respect FlowTabCore, FlowTab, TestingSupport, and test-target boundaries."
+---
+
+# FlowTab Engineering
+
+Apply this skill to repository changes in FlowTab. Use it to keep implementation, test coverage, file placement, and architectural decisions aligned with project rules.
+
+## Core Rules
+
+1. Do not introduce single-feature or single-scenario special cases.
+   If a change only works by adding one-off branching for a single feature, single scenario, page, caller, or bug case, treat the design as invalid and rework it from a global perspective.
+
+2. Treat feature work as incomplete until test coverage exists in all required layers.
+   For every feature extension or new feature, add or update unit, behavior, and UI tests. Do not submit code until the related unit, behavior, and UI suites pass.
+
+3. Diagnose bugs before changing production logic.
+   Reproduce the bug with tests and logs first. Do not patch production code by guesswork. Keep regression coverage after the fix.
+
+4. Keep test-only and debug-only code out of production files.
+   Place unit tests in test targets, test scaffolding in testing support files, and temporary bug-investigation logs or hooks outside the final production path. Keep only minimal production logging that is genuinely part of runtime behavior.
+
+5. Respect module boundaries and dependency direction.
+   Put code in the lowest reasonable layer, avoid duplicated logic across modules, and do not break package boundaries just to land a quick fix.
+
+6. Extract repeated properties into shared constants.
+   When the same property, spacing value, or behavior configuration is needed in more than two places, introduce a shared constant instead of repeating literals. For example, shared top, bottom, leading, and trailing spacing used by Home, Settings, and Logs should come from a constant.
+
+7. Enforce file-size guardrails.
+   New source files should usually stay within 400 lines. Files between 400 and 800 lines must still have a clear single responsibility. Files over 800 lines are oversized and should be split instead of expanded. When changing an already oversized file, prefer extracting focused helpers, state, UI pieces, or services, and do not keep growing the file without also reducing or isolating responsibilities.
+
+8. Keep detailed project documentation under `docs/`.
+   Reserve repo root for entry documents such as `README*`, `AGENTS.md`, and top-level build or configuration files. Move development, testing, architecture, and other detailed project documents into `docs/`.
+
+## Choose the Right Reference
+
+- For feature extensions or new features, read `references/feature-workflow.md`.
+- For bug investigation and bug fixes, read `references/bugfix-workflow.md`.
+- For file placement, refactoring, or architecture decisions, read `references/module-boundaries.md`.
+
+## Working Method
+
+1. Classify the task before editing.
+2. Choose the correct module before writing code.
+3. Design the solution so it generalizes beyond the current case.
+4. Add or update tests alongside the code change.
+5. Run the related test suites before considering the task complete.
+6. Stop and report clearly if required verification cannot be completed.
+
+## References
+
+- `references/feature-workflow.md`
+- `references/bugfix-workflow.md`
+- `references/module-boundaries.md`

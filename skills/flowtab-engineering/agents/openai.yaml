@@ -1,0 +1,4 @@
+interface:
+  display_name: "FlowTab Engineering"
+  short_description: "FlowTab project rules, tests, and boundaries"
+  default_prompt: "Use $flowtab-engineering to apply FlowTab's project-specific engineering rules, testing workflow, and module-boundary guidance to this task."
