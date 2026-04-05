@@ -42,11 +42,12 @@ Apply this skill to repository changes in FlowTab. Use it to keep implementation
 ## Working Method
 
 1. Classify the task before editing.
-2. Choose the correct module before writing code.
-3. Design the solution so it generalizes beyond the current case.
-4. Add or update tests alongside the code change.
-5. Run the related test suites before considering the task complete.
-6. Stop and report clearly if required verification cannot be completed.
+2. Classify each affected file by architecture role and feature ownership before choosing a module.
+3. Choose the correct module before writing code.
+4. Design the solution so it generalizes beyond the current case.
+5. Add or update tests alongside the code change.
+6. Run the related test suites before considering the task complete.
+7. Stop and report clearly if required verification cannot be completed.
 
 ## References
 

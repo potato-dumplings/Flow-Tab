@@ -19,8 +19,10 @@ Use this reference when deciding where code should live or when a change feels l
 
 ## Placement Rules
 
+- Classify every production file by architecture role and feature ownership before choosing a directory.
+- Let directories reflect architecture role and business module, not the history of which large file the code was extracted from.
 - Move logic to `FlowTabCore` when it can be expressed without `AppKit`, `SwiftUI`, accessibility APIs, screen capture APIs, or test-only hooks.
-- Keep application startup, dependency wiring, root composition, and app lifecycle concerns in `FlowTab/App`.
+- Keep application startup, dependency wiring, root composition, and app lifecycle concerns in `FlowTab/App`, and treat that directory as the app shell rather than a general landing zone for extracted files.
 - Keep feature UI and feature-local interaction logic in `FlowTab/Features`.
 - Keep runtime snapshots, logging services, workspace integration, and platform bridges in `FlowTab/Infrastructure`.
 - Keep mock-only code, launch flags, and testing adapters in `FlowTab/TestingSupport`.
@@ -44,6 +46,7 @@ Use this reference when deciding where code should live or when a change feels l
 
 ## Architecture Heuristics
 
+- Ask why the file exists before asking which framework it uses. Place it by primary responsibility, then verify the dependency direction still holds.
 - If the code is deterministic and reusable across UI surfaces, prefer `FlowTabCore`.
 - If the code exists to talk to the OS or the app runtime, prefer `Infrastructure`.
 - If the code exists only to support tests, prefer `TestingSupport`.
