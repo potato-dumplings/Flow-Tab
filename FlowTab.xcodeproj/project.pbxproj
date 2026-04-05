@@ -7,12 +7,15 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-			4A6DAE6E2F727AF500B0D737 /* FlowTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6DAE6D2F727AF500B0D737 /* FlowTab.swift */; };
-			4A6DAE702F727AF500B0D737 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6DAE6F2F727AF500B0D737 /* ContentView.swift */; };
-			B1C2D3E42F74000100B0D737 /* AppLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E32F74000100B0D737 /* AppLocalization.swift */; };
-			A1B2C3D42F73000100B0D737 /* OptionTabHotkeyMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D12F73000100B0D737 /* OptionTabHotkeyMonitor.swift */; };
-		A1B2C3D52F73000100B0D737 /* RuntimeBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D22F73000100B0D737 /* RuntimeBridge.swift */; };
-		A1B2C3D62F73000100B0D737 /* SwitcherPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D32F73000100B0D737 /* SwitcherPanel.swift */; };
+				4A6DAE6E2F727AF500B0D737 /* FlowTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6DAE6D2F727AF500B0D737 /* FlowTab.swift */; };
+				4A6DAE702F727AF500B0D737 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6DAE6F2F727AF500B0D737 /* ContentView.swift */; };
+				B1C2D3E42F74000100B0D737 /* AppLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E32F74000100B0D737 /* AppLocalization.swift */; };
+				E1F100012B00000100B0D737 /* RuntimeLogging.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F100112B00000100B0D737 /* RuntimeLogging.swift */; };
+				E1F100022B00000100B0D737 /* RuntimeLogsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F100122B00000100B0D737 /* RuntimeLogsSection.swift */; };
+				E1F100032B00000100B0D737 /* AppDelegate+Testing.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F100132B00000100B0D737 /* AppDelegate+Testing.swift */; };
+				A1B2C3D42F73000100B0D737 /* OptionTabHotkeyMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D12F73000100B0D737 /* OptionTabHotkeyMonitor.swift */; };
+			A1B2C3D52F73000100B0D737 /* RuntimeBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D22F73000100B0D737 /* RuntimeBridge.swift */; };
+			A1B2C3D62F73000100B0D737 /* SwitcherPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D32F73000100B0D737 /* SwitcherPanel.swift */; };
 		A1B2C3D72F73000100B0D737 /* SwitcherSearchCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D82F73000100B0D737 /* SwitcherSearchCoordinator.swift */; };
 		D1A1B1D42A00000100B0D737 /* FlowTabLaunchTesting.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A1B1C42A00000100B0D737 /* FlowTabLaunchTesting.swift */; };
 		D1A1B1D12A00000100B0D737 /* FlowTabUITestBootstrapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A1B1C12A00000100B0D737 /* FlowTabUITestBootstrapper.swift */; };
@@ -46,12 +49,15 @@
 
 /* Begin PBXFileReference section */
 			4A6DAE6A2F727AF500B0D737 /* Flow Tab.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Flow Tab.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-			4A6DAE6D2F727AF500B0D737 /* FlowTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTab.swift; sourceTree = "<group>"; };
-			4A6DAE6F2F727AF500B0D737 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
-			B1C2D3E32F74000100B0D737 /* AppLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLocalization.swift; sourceTree = "<group>"; };
-			A1B2C3D12F73000100B0D737 /* OptionTabHotkeyMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OptionTabHotkeyMonitor.swift; sourceTree = "<group>"; };
-		A1B2C3D22F73000100B0D737 /* RuntimeBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeBridge.swift; sourceTree = "<group>"; };
-		A1B2C3D32F73000100B0D737 /* SwitcherPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherPanel.swift; sourceTree = "<group>"; };
+				4A6DAE6D2F727AF500B0D737 /* FlowTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTab.swift; sourceTree = "<group>"; };
+				4A6DAE6F2F727AF500B0D737 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+				B1C2D3E32F74000100B0D737 /* AppLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLocalization.swift; sourceTree = "<group>"; };
+				E1F100112B00000100B0D737 /* RuntimeLogging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeLogging.swift; sourceTree = "<group>"; };
+				E1F100122B00000100B0D737 /* RuntimeLogsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeLogsSection.swift; sourceTree = "<group>"; };
+				E1F100132B00000100B0D737 /* AppDelegate+Testing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppDelegate+Testing.swift"; sourceTree = "<group>"; };
+				A1B2C3D12F73000100B0D737 /* OptionTabHotkeyMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OptionTabHotkeyMonitor.swift; sourceTree = "<group>"; };
+			A1B2C3D22F73000100B0D737 /* RuntimeBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeBridge.swift; sourceTree = "<group>"; };
+			A1B2C3D32F73000100B0D737 /* SwitcherPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherPanel.swift; sourceTree = "<group>"; };
 		A1B2C3D82F73000100B0D737 /* SwitcherSearchCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherSearchCoordinator.swift; sourceTree = "<group>"; };
 		D1A1B1C42A00000100B0D737 /* FlowTabLaunchTesting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTabLaunchTesting.swift; sourceTree = "<group>"; };
 		D1A1B1C12A00000100B0D737 /* FlowTabUITestBootstrapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTabUITestBootstrapper.swift; sourceTree = "<group>"; };
@@ -118,12 +124,15 @@
 		4A6DAE6C2F727AF500B0D737 /* FlowTab */ = {
 			isa = PBXGroup;
 				children = (
-					4A6DAE6D2F727AF500B0D737 /* FlowTab.swift */,
-					4A6DAE6F2F727AF500B0D737 /* ContentView.swift */,
-					B1C2D3E32F74000100B0D737 /* AppLocalization.swift */,
-					A1B2C3D12F73000100B0D737 /* OptionTabHotkeyMonitor.swift */,
-				A1B2C3D22F73000100B0D737 /* RuntimeBridge.swift */,
-				A1B2C3D32F73000100B0D737 /* SwitcherPanel.swift */,
+						4A6DAE6D2F727AF500B0D737 /* FlowTab.swift */,
+						4A6DAE6F2F727AF500B0D737 /* ContentView.swift */,
+						B1C2D3E32F74000100B0D737 /* AppLocalization.swift */,
+						E1F100112B00000100B0D737 /* RuntimeLogging.swift */,
+						E1F100122B00000100B0D737 /* RuntimeLogsSection.swift */,
+						E1F100132B00000100B0D737 /* AppDelegate+Testing.swift */,
+						A1B2C3D12F73000100B0D737 /* OptionTabHotkeyMonitor.swift */,
+					A1B2C3D22F73000100B0D737 /* RuntimeBridge.swift */,
+					A1B2C3D32F73000100B0D737 /* SwitcherPanel.swift */,
 				A1B2C3D82F73000100B0D737 /* SwitcherSearchCoordinator.swift */,
 				D1A1B1C42A00000100B0D737 /* FlowTabLaunchTesting.swift */,
 				D1A1B1C12A00000100B0D737 /* FlowTabUITestBootstrapper.swift */,
@@ -304,11 +313,14 @@
 		4A6DAE662F727AF500B0D737 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
-				files = (
-					B1C2D3E42F74000100B0D737 /* AppLocalization.swift in Sources */,
-						A1B2C3D42F73000100B0D737 /* OptionTabHotkeyMonitor.swift in Sources */,
-					A1B2C3D52F73000100B0D737 /* RuntimeBridge.swift in Sources */,
-					A1B2C3D62F73000100B0D737 /* SwitcherPanel.swift in Sources */,
+					files = (
+						B1C2D3E42F74000100B0D737 /* AppLocalization.swift in Sources */,
+						E1F100012B00000100B0D737 /* RuntimeLogging.swift in Sources */,
+						E1F100022B00000100B0D737 /* RuntimeLogsSection.swift in Sources */,
+						E1F100032B00000100B0D737 /* AppDelegate+Testing.swift in Sources */,
+							A1B2C3D42F73000100B0D737 /* OptionTabHotkeyMonitor.swift in Sources */,
+						A1B2C3D52F73000100B0D737 /* RuntimeBridge.swift in Sources */,
+						A1B2C3D62F73000100B0D737 /* SwitcherPanel.swift in Sources */,
 					A1B2C3D72F73000100B0D737 /* SwitcherSearchCoordinator.swift in Sources */,
 					D1A1B1D42A00000100B0D737 /* FlowTabLaunchTesting.swift in Sources */,
 					D1A1B1D12A00000100B0D737 /* FlowTabUITestBootstrapper.swift in Sources */,
