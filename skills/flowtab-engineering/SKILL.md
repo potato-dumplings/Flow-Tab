@@ -1,6 +1,6 @@
 ---
 name: flowtab-engineering
-description: "FlowTab project engineering workflow and architecture rules. Use when changing this repository for feature extensions, new features, bug fixes, refactors, logging or test-code placement, or module-boundary decisions. Enforce FlowTab-specific rules: feature work must add unit, behavior, and UI coverage and pass related tests before submission; bug fixes must be diagnosed with tests and logs before code changes; never introduce single-feature or single-scenario special cases; keep test-only or debug-only code out of production files; respect FlowTabCore, FlowTab, TestingSupport, and test-target boundaries."
+description: "FlowTab project engineering workflow and architecture rules. Use when changing this repository for feature extensions, new features, bug fixes, refactors, logging or test-code placement, or module-boundary decisions. Enforce FlowTab-specific rules: feature work must add unit, behavior, and UI coverage and pass related tests before submission; bug fixes must run or explicitly attempt the relevant tests and gather a reproducible signal before production edits, stopping to report blockers when that cannot be done; never introduce single-feature or single-scenario special cases; keep test-only or debug-only code out of production files; respect FlowTabCore, FlowTab, TestingSupport, and test-target boundaries."
 ---
 
 # FlowTab Engineering
@@ -16,7 +16,7 @@ Apply this skill to repository changes in FlowTab. Use it to keep implementation
    For every feature extension or new feature, add or update unit, behavior, and UI tests. Do not submit code until the related unit, behavior, and UI suites pass.
 
 3. Diagnose bugs before changing production logic.
-   Reproduce the bug with tests and logs first. Do not patch production code by guesswork. Keep regression coverage after the fix.
+   Before editing production files, run or explicitly attempt the relevant existing unit, behavior, and UI tests for the affected layers. Reproduce the bug with tests or stable logs first. If there is no reproducible signal yet, a required test layer cannot run, or the environment is missing required permissions, fixtures, or tooling, stop and report the blocker instead of patching by guesswork. Keep regression coverage after the fix.
 
 4. Keep test-only and debug-only code out of production files.
    Place unit tests in test targets, test scaffolding in testing support files, and temporary bug-investigation logs or hooks outside the final production path. Keep only minimal production logging that is genuinely part of runtime behavior.
@@ -44,10 +44,11 @@ Apply this skill to repository changes in FlowTab. Use it to keep implementation
 1. Classify the task before editing.
 2. Classify each affected file by architecture role and feature ownership before choosing a module.
 3. Choose the correct module before writing code.
-4. Design the solution so it generalizes beyond the current case.
-5. Add or update tests alongside the code change.
-6. Run the related test suites before considering the task complete.
-7. Stop and report clearly if required verification cannot be completed.
+4. For bug fixes, run or explicitly attempt the relevant existing tests before production edits and stop if reproduction evidence or required environment access is missing.
+5. Design the solution so it generalizes beyond the current case.
+6. Add or update tests alongside the code change.
+7. Run the related test suites before considering the task complete.
+8. Final bugfix handoff must state the pre-change failing signal, pre-change tests attempted, evidence supporting the root cause, post-change tests run, and any required test layer that could not be run with the reason.
 
 ## References
 
