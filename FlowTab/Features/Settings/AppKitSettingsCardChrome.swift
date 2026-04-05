@@ -1,0 +1,209 @@
+import AppKit
+
+class AppKitSettingsCardBaseView: NSView {
+    let stackView = NSStackView()
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        configureRootStack()
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        configureRootStack()
+    }
+
+    override var intrinsicContentSize: NSSize {
+        layoutSubtreeIfNeeded()
+        return NSSize(width: NSView.noIntrinsicMetric, height: stackView.fittingSize.height)
+    }
+
+    func addFullWidthArrangedSubview(_ view: NSView) {
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.setContentHuggingPriority(.required, for: .vertical)
+        view.setContentCompressionResistancePriority(.required, for: .vertical)
+        stackView.addArrangedSubview(view)
+        view.widthAnchor.constraint(equalTo: stackView.widthAnchor).isActive = true
+    }
+
+    private func configureRootStack() {
+        translatesAutoresizingMaskIntoConstraints = false
+        setContentHuggingPriority(.required, for: .vertical)
+        setContentCompressionResistancePriority(.required, for: .vertical)
+        stackView.orientation = .vertical
+        stackView.alignment = .leading
+        stackView.spacing = 10
+        stackView.detachesHiddenViews = true
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        stackView.setContentHuggingPriority(.required, for: .vertical)
+        stackView.setContentCompressionResistancePriority(.required, for: .vertical)
+        addSubview(stackView)
+
+        NSLayoutConstraint.activate([
+            stackView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            stackView.topAnchor.constraint(equalTo: topAnchor),
+            stackView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            stackView.bottomAnchor.constraint(lessThanOrEqualTo: bottomAnchor)
+        ])
+    }
+
+    static func makeControlRow(title: String, control: NSView) -> NSStackView {
+        let titleLabel = NSTextField(labelWithString: title)
+        titleLabel.font = .systemFont(ofSize: 13)
+        titleLabel.lineBreakMode = .byTruncatingTail
+        titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        let spacer = NSView()
+        spacer.translatesAutoresizingMaskIntoConstraints = false
+        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        spacer.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        let row = NSStackView(views: [titleLabel, spacer, control])
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.spacing = 10
+        row.detachesHiddenViews = true
+        row.translatesAutoresizingMaskIntoConstraints = false
+        return row
+    }
+
+    static func makeBodyLabel(fontSize: CGFloat = 11) -> NSTextField {
+        let label = NSTextField(wrappingLabelWithString: "")
+        label.font = .systemFont(ofSize: fontSize)
+        label.textColor = .secondaryLabelColor
+        label.lineBreakMode = .byWordWrapping
+        label.maximumNumberOfLines = 0
+        return label
+    }
+
+    static func makeStatusLabel(fontSize: CGFloat = 12) -> NSTextField {
+        let label = NSTextField(wrappingLabelWithString: "")
+        label.font = .systemFont(ofSize: fontSize)
+        label.lineBreakMode = .byWordWrapping
+        label.maximumNumberOfLines = 0
+        return label
+    }
+
+    static func configure(
+        selectControl: FlowFormSelectControl,
+        options: [(id: String, title: String)],
+        width: CGFloat
+    ) {
+        selectControl.configure(options: options)
+        selectControl.widthAnchor.constraint(equalToConstant: width).isActive = true
+    }
+
+    static func selectItem(in selectControl: FlowFormSelectControl, rawValue: String) {
+        selectControl.updateSelection(id: rawValue)
+    }
+
+}
+
+extension NSAppearance {
+    var isFlowTabDarkInterface: Bool {
+        bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+    }
+}
+
+final class AppKitSectionCardView: NSView {
+    private let stackView = NSStackView()
+    private let titleLabel: NSTextField
+    private let subtitleLabel: NSTextField
+    private let verticalInset: CGFloat = 14
+
+    init(title: String, subtitle: String, contentView: NSView) {
+        titleLabel = NSTextField(labelWithString: title)
+        subtitleLabel = NSTextField(labelWithString: subtitle)
+        super.init(frame: .zero)
+        buildViewHierarchy(contentView: contentView)
+    }
+
+    required init?(coder: NSCoder) {
+        titleLabel = NSTextField(labelWithString: "")
+        subtitleLabel = NSTextField(labelWithString: "")
+        super.init(coder: coder)
+        buildViewHierarchy(contentView: NSView())
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        updateAppearance()
+    }
+
+    override func layout() {
+        super.layout()
+        updateAppearance()
+    }
+
+    override var intrinsicContentSize: NSSize {
+        layoutSubtreeIfNeeded()
+        return NSSize(
+            width: NSView.noIntrinsicMetric,
+            height: stackView.fittingSize.height + verticalInset * 2
+        )
+    }
+
+    private func buildViewHierarchy(contentView: NSView) {
+        wantsLayer = true
+        translatesAutoresizingMaskIntoConstraints = false
+        setContentHuggingPriority(.required, for: .vertical)
+        setContentCompressionResistancePriority(.required, for: .vertical)
+
+        titleLabel.font = .systemFont(ofSize: 15, weight: .semibold)
+        subtitleLabel.font = .systemFont(ofSize: 11)
+        subtitleLabel.textColor = .secondaryLabelColor
+
+        stackView.orientation = .vertical
+        stackView.alignment = .leading
+        stackView.spacing = 10
+        stackView.detachesHiddenViews = true
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stackView)
+
+        stackView.addArrangedSubview(titleLabel)
+        stackView.addArrangedSubview(subtitleLabel)
+        stackView.addArrangedSubview(contentView)
+        contentView.translatesAutoresizingMaskIntoConstraints = false
+        contentView.setContentHuggingPriority(.required, for: .vertical)
+        contentView.setContentCompressionResistancePriority(.required, for: .vertical)
+        contentView.widthAnchor.constraint(equalTo: stackView.widthAnchor).isActive = true
+
+        NSLayoutConstraint.activate([
+            stackView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
+            stackView.topAnchor.constraint(equalTo: topAnchor, constant: verticalInset),
+            stackView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -14),
+            stackView.bottomAnchor.constraint(lessThanOrEqualTo: bottomAnchor, constant: -verticalInset)
+        ])
+
+        updateAppearance()
+    }
+
+    private func updateAppearance() {
+        guard let layer else { return }
+        if effectiveAppearance.isFlowTabDarkInterface {
+            layer.backgroundColor = NSColor(
+                red: 0.13,
+                green: 0.13,
+                blue: 0.15,
+                alpha: 0.96
+            ).cgColor
+            layer.borderColor = NSColor.labelColor.withAlphaComponent(0.10).cgColor
+            layer.shadowOpacity = 0
+        } else {
+            layer.backgroundColor = NSColor(
+                red: 0.965,
+                green: 0.97,
+                blue: 0.978,
+                alpha: 1
+            ).cgColor
+            layer.borderColor = NSColor.black.withAlphaComponent(0.14).cgColor
+            layer.shadowColor = NSColor.black.withAlphaComponent(0.05).cgColor
+            layer.shadowOpacity = 1
+            layer.shadowRadius = 6
+            layer.shadowOffset = CGSize(width: 0, height: 2)
+        }
+        layer.cornerRadius = 12
+        layer.borderWidth = 1
+    }
+}
+

@@ -10,6 +10,25 @@
 				4A6DAE6E2F727AF500B0D737 /* FlowTab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6DAE6D2F727AF500B0D737 /* FlowTab.swift */; };
 				4A6DAE702F727AF500B0D737 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6DAE6F2F727AF500B0D737 /* ContentView.swift */; };
 				B1C2D3E42F74000100B0D737 /* AppLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E32F74000100B0D737 /* AppLocalization.swift */; };
+				C10000012F75000100B0D737 /* AppFoundation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000112F75000100B0D737 /* AppFoundation.swift */; };
+				C10000022F75000100B0D737 /* HomeRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000122F75000100B0D737 /* HomeRootView.swift */; };
+				C10000032F75000100B0D737 /* HomeLandingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000132F75000100B0D737 /* HomeLandingView.swift */; };
+				C10000042F75000100B0D737 /* HomeChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000142F75000100B0D737 /* HomeChrome.swift */; };
+				C10000052F75000100B0D737 /* HotkeySettingsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000152F75000100B0D737 /* HotkeySettingsCard.swift */; };
+				C10000062F75000100B0D737 /* AppKitMeasurementControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000162F75000100B0D737 /* AppKitMeasurementControls.swift */; };
+				C10000072F75000100B0D737 /* AppKitFormSelectControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000172F75000100B0D737 /* AppKitFormSelectControls.swift */; };
+				C10000082F75000100B0D737 /* AppKitSettingsCardChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000182F75000100B0D737 /* AppKitSettingsCardChrome.swift */; };
+				C10000092F75000100B0D737 /* AppKitSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000192F75000100B0D737 /* AppKitSettingsPage.swift */; };
+				C100000A2F75000100B0D737 /* AppearanceSettingsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100001A2F75000100B0D737 /* AppearanceSettingsCard.swift */; };
+				C100000B2F75000100B0D737 /* WindowBehaviorSettingsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100001B2F75000100B0D737 /* WindowBehaviorSettingsCard.swift */; };
+				C100000C2F75000100B0D737 /* SearchSettingsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100001C2F75000100B0D737 /* SearchSettingsCard.swift */; };
+				C100000D2F75000100B0D737 /* PermissionSettingsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100001D2F75000100B0D737 /* PermissionSettingsCard.swift */; };
+				C100000E2F75000100B0D737 /* AppLogsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100001E2F75000100B0D737 /* AppLogsView.swift */; };
+				C100000F2F75000100B0D737 /* AppSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100001F2F75000100B0D737 /* AppSettingsView.swift */; };
+				C10000102F75000100B0D737 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000202F75000100B0D737 /* AppDelegate.swift */; };
+				C10000242F75000100B0D737 /* AppPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000212F75000100B0D737 /* AppPreferences.swift */; };
+				C10000252F75000100B0D737 /* SystemThemeState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000222F75000100B0D737 /* SystemThemeState.swift */; };
+				C10000262F75000100B0D737 /* String+FlowTabAccessibilitySlug.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000232F75000100B0D737 /* String+FlowTabAccessibilitySlug.swift */; };
 				E1F100012B00000100B0D737 /* RuntimeLogging.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F100112B00000100B0D737 /* RuntimeLogging.swift */; };
 				E1F100022B00000100B0D737 /* RuntimeLogsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F100122B00000100B0D737 /* RuntimeLogsSection.swift */; };
 				E1F100032B00000100B0D737 /* AppDelegate+Testing.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F100132B00000100B0D737 /* AppDelegate+Testing.swift */; };
@@ -48,10 +67,29 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-			4A6DAE6A2F727AF500B0D737 /* Flow Tab.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Flow Tab.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+				4A6DAE6A2F727AF500B0D737 /* Flow Tab.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Flow Tab.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 				4A6DAE6D2F727AF500B0D737 /* FlowTab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTab.swift; sourceTree = "<group>"; };
 				4A6DAE6F2F727AF500B0D737 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 				B1C2D3E32F74000100B0D737 /* AppLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLocalization.swift; sourceTree = "<group>"; };
+				C10000112F75000100B0D737 /* AppFoundation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppFoundation.swift; sourceTree = "<group>"; };
+				C10000122F75000100B0D737 /* HomeRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeRootView.swift; sourceTree = "<group>"; };
+				C10000132F75000100B0D737 /* HomeLandingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeLandingView.swift; sourceTree = "<group>"; };
+				C10000142F75000100B0D737 /* HomeChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeChrome.swift; sourceTree = "<group>"; };
+				C10000152F75000100B0D737 /* HotkeySettingsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeySettingsCard.swift; sourceTree = "<group>"; };
+				C10000162F75000100B0D737 /* AppKitMeasurementControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitMeasurementControls.swift; sourceTree = "<group>"; };
+				C10000172F75000100B0D737 /* AppKitFormSelectControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitFormSelectControls.swift; sourceTree = "<group>"; };
+				C10000182F75000100B0D737 /* AppKitSettingsCardChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitSettingsCardChrome.swift; sourceTree = "<group>"; };
+				C10000192F75000100B0D737 /* AppKitSettingsPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitSettingsPage.swift; sourceTree = "<group>"; };
+				C100001A2F75000100B0D737 /* AppearanceSettingsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceSettingsCard.swift; sourceTree = "<group>"; };
+				C100001B2F75000100B0D737 /* WindowBehaviorSettingsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowBehaviorSettingsCard.swift; sourceTree = "<group>"; };
+				C100001C2F75000100B0D737 /* SearchSettingsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchSettingsCard.swift; sourceTree = "<group>"; };
+				C100001D2F75000100B0D737 /* PermissionSettingsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionSettingsCard.swift; sourceTree = "<group>"; };
+				C100001E2F75000100B0D737 /* AppLogsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLogsView.swift; sourceTree = "<group>"; };
+				C100001F2F75000100B0D737 /* AppSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettingsView.swift; sourceTree = "<group>"; };
+				C10000202F75000100B0D737 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+				C10000212F75000100B0D737 /* AppPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPreferences.swift; sourceTree = "<group>"; };
+				C10000222F75000100B0D737 /* SystemThemeState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemThemeState.swift; sourceTree = "<group>"; };
+				C10000232F75000100B0D737 /* String+FlowTabAccessibilitySlug.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "String+FlowTabAccessibilitySlug.swift"; sourceTree = "<group>"; };
 				E1F100112B00000100B0D737 /* RuntimeLogging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeLogging.swift; sourceTree = "<group>"; };
 				E1F100122B00000100B0D737 /* RuntimeLogsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeLogsSection.swift; sourceTree = "<group>"; };
 				E1F100132B00000100B0D737 /* AppDelegate+Testing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppDelegate+Testing.swift"; sourceTree = "<group>"; };
@@ -137,8 +175,11 @@
 			isa = PBXGroup;
 			children = (
 				4A6DAE6D2F727AF500B0D737 /* FlowTab.swift */,
-				4A6DAE6F2F727AF500B0D737 /* ContentView.swift */,
+				C10000112F75000100B0D737 /* AppFoundation.swift */,
+				C10000202F75000100B0D737 /* AppDelegate.swift */,
 				B1C2D3E32F74000100B0D737 /* AppLocalization.swift */,
+				C10000122F75000100B0D737 /* HomeRootView.swift */,
+				4A6DAE6F2F727AF500B0D737 /* ContentView.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -146,9 +187,55 @@
 		F10000022F74000100B0D737 /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				F10000082F74000100B0D737 /* Home */,
+				F10000092F74000100B0D737 /* Logs */,
+				F100000A2F74000100B0D737 /* Settings */,
+				F100000B2F74000100B0D737 /* SharedUI */,
 				F10000032F74000100B0D737 /* Switcher */,
 			);
 			path = Features;
+			sourceTree = "<group>";
+		};
+		F10000082F74000100B0D737 /* Home */ = {
+			isa = PBXGroup;
+			children = (
+				C10000132F75000100B0D737 /* HomeLandingView.swift */,
+			);
+			path = Home;
+			sourceTree = "<group>";
+		};
+		F10000092F74000100B0D737 /* Logs */ = {
+			isa = PBXGroup;
+			children = (
+				C100001E2F75000100B0D737 /* AppLogsView.swift */,
+				E1F100122B00000100B0D737 /* RuntimeLogsSection.swift */,
+			);
+			path = Logs;
+			sourceTree = "<group>";
+		};
+		F100000A2F74000100B0D737 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				C100001F2F75000100B0D737 /* AppSettingsView.swift */,
+				C10000192F75000100B0D737 /* AppKitSettingsPage.swift */,
+				C100001A2F75000100B0D737 /* AppearanceSettingsCard.swift */,
+				C100001B2F75000100B0D737 /* WindowBehaviorSettingsCard.swift */,
+				C100001C2F75000100B0D737 /* SearchSettingsCard.swift */,
+				C100001D2F75000100B0D737 /* PermissionSettingsCard.swift */,
+				C10000152F75000100B0D737 /* HotkeySettingsCard.swift */,
+				C10000182F75000100B0D737 /* AppKitSettingsCardChrome.swift */,
+				C10000172F75000100B0D737 /* AppKitFormSelectControls.swift */,
+				C10000162F75000100B0D737 /* AppKitMeasurementControls.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		F100000B2F74000100B0D737 /* SharedUI */ = {
+			isa = PBXGroup;
+			children = (
+				C10000142F75000100B0D737 /* HomeChrome.swift */,
+			);
+			path = SharedUI;
 			sourceTree = "<group>";
 		};
 		F10000032F74000100B0D737 /* Switcher */ = {
@@ -164,9 +251,28 @@
 		F10000042F74000100B0D737 /* Infrastructure */ = {
 			isa = PBXGroup;
 			children = (
+				F100000C2F74000100B0D737 /* Appearance */,
+				F100000D2F74000100B0D737 /* Preferences */,
 				F10000052F74000100B0D737 /* Runtime */,
+				F100000E2F74000100B0D737 /* Support */,
 			);
 			path = Infrastructure;
+			sourceTree = "<group>";
+		};
+		F100000C2F74000100B0D737 /* Appearance */ = {
+			isa = PBXGroup;
+			children = (
+				C10000222F75000100B0D737 /* SystemThemeState.swift */,
+			);
+			path = Appearance;
+			sourceTree = "<group>";
+		};
+		F100000D2F74000100B0D737 /* Preferences */ = {
+			isa = PBXGroup;
+			children = (
+				C10000212F75000100B0D737 /* AppPreferences.swift */,
+			);
+			path = Preferences;
 			sourceTree = "<group>";
 		};
 		F10000052F74000100B0D737 /* Runtime */ = {
@@ -174,9 +280,16 @@
 			children = (
 				A1B2C3D22F73000100B0D737 /* RuntimeBridge.swift */,
 				E1F100112B00000100B0D737 /* RuntimeLogging.swift */,
-				E1F100122B00000100B0D737 /* RuntimeLogsSection.swift */,
 			);
 			path = Runtime;
+			sourceTree = "<group>";
+		};
+		F100000E2F74000100B0D737 /* Support */ = {
+			isa = PBXGroup;
+			children = (
+				C10000232F75000100B0D737 /* String+FlowTabAccessibilitySlug.swift */,
+			);
+			path = Support;
 			sourceTree = "<group>";
 		};
 		F10000062F74000100B0D737 /* TestingSupport */ = {
@@ -370,6 +483,25 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 					files = (
+						C10000102F75000100B0D737 /* AppDelegate.swift in Sources */,
+						C100000F2F75000100B0D737 /* AppSettingsView.swift in Sources */,
+						C100000E2F75000100B0D737 /* AppLogsView.swift in Sources */,
+						C100000D2F75000100B0D737 /* PermissionSettingsCard.swift in Sources */,
+						C100000C2F75000100B0D737 /* SearchSettingsCard.swift in Sources */,
+						C100000B2F75000100B0D737 /* WindowBehaviorSettingsCard.swift in Sources */,
+						C100000A2F75000100B0D737 /* AppearanceSettingsCard.swift in Sources */,
+						C10000092F75000100B0D737 /* AppKitSettingsPage.swift in Sources */,
+						C10000082F75000100B0D737 /* AppKitSettingsCardChrome.swift in Sources */,
+						C10000072F75000100B0D737 /* AppKitFormSelectControls.swift in Sources */,
+						C10000062F75000100B0D737 /* AppKitMeasurementControls.swift in Sources */,
+						C10000052F75000100B0D737 /* HotkeySettingsCard.swift in Sources */,
+						C10000042F75000100B0D737 /* HomeChrome.swift in Sources */,
+						C10000032F75000100B0D737 /* HomeLandingView.swift in Sources */,
+						C10000022F75000100B0D737 /* HomeRootView.swift in Sources */,
+						C10000012F75000100B0D737 /* AppFoundation.swift in Sources */,
+						C10000252F75000100B0D737 /* SystemThemeState.swift in Sources */,
+						C10000242F75000100B0D737 /* AppPreferences.swift in Sources */,
+						C10000262F75000100B0D737 /* String+FlowTabAccessibilitySlug.swift in Sources */,
 						B1C2D3E42F74000100B0D737 /* AppLocalization.swift in Sources */,
 						E1F100012B00000100B0D737 /* RuntimeLogging.swift in Sources */,
 						E1F100022B00000100B0D737 /* RuntimeLogsSection.swift in Sources */,

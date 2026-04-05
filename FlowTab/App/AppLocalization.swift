@@ -1,4 +1,5 @@
 import Foundation
+import FlowTabCore
 
 enum AppLanguage: String, CaseIterable, Equatable, Sendable, Identifiable {
     case simplifiedChinese = "zh-Hans"
@@ -30,6 +31,19 @@ enum AppLanguagePreferencesStore {
             userDefaults.set(resolved.rawValue, forKey: AppPreferenceKeys.appLanguage)
         }
         return resolved
+    }
+}
+
+extension ThemeMode {
+    var displayName: String {
+        switch self {
+        case .followSystem:
+            return AppStrings.text(.themeFollowSystem)
+        case .light:
+            return AppStrings.text(.themeLight)
+        case .dark:
+            return AppStrings.text(.themeDark)
+        }
     }
 }
 

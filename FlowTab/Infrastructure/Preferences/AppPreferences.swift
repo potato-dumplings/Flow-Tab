@@ -1,0 +1,319 @@
+import Foundation
+import FlowTabCore
+
+enum AppPreferenceKeys {
+    static let showShortcutHint = "showShortcutHint"
+    static let showInCommandTab = "showInCommandTab"
+    static let showPermissionReminder = "showPermissionReminder"
+    static let hasPromptedAccessibilityPermission = "hasPromptedAccessibilityPermission"
+    static let hotkeyPrimaryModifier = "hotkeyPrimaryModifier"
+    static let hotkeyMainKey = "hotkeyMainKey"
+    static let hotkeyQuitKey = "hotkeyQuitKey"
+    static let inAppWindowHotkeyPrimaryModifier = "inAppWindowHotkeyPrimaryModifier"
+    static let inAppWindowHotkeyMainKey = "inAppWindowHotkeyMainKey"
+    static let windowLayerAutoEnterDelay = "windowLayerAutoEnterDelay"
+    static let autoRestoreMinimizedWindowOnSwitch = "autoRestoreMinimizedWindowOnSwitch"
+    static let hideMinimizedAppsFromAppLayer = "hideMinimizedAppsFromAppLayer"
+    static let searchEnabled = "searchEnabled"
+    static let searchDefaultScope = "searchDefaultScope"
+    static let enableVerboseDiagnostics = "enableVerboseDiagnostics"
+    static let runtimeLogLevel = "runtimeLogLevel"
+    static let themeMode = "themeMode"
+    static let appLanguage = "appLanguage"
+
+    static let allKeys: [String] = [
+        showShortcutHint,
+        showInCommandTab,
+        showPermissionReminder,
+        hasPromptedAccessibilityPermission,
+        hotkeyPrimaryModifier,
+        hotkeyMainKey,
+        hotkeyQuitKey,
+        inAppWindowHotkeyPrimaryModifier,
+        inAppWindowHotkeyMainKey,
+        windowLayerAutoEnterDelay,
+        autoRestoreMinimizedWindowOnSwitch,
+        hideMinimizedAppsFromAppLayer,
+        searchEnabled,
+        searchDefaultScope,
+        enableVerboseDiagnostics,
+        runtimeLogLevel,
+        themeMode,
+        appLanguage
+    ]
+}
+
+extension Notification.Name {
+    static let flowTabReRegisterHotkeys = Notification.Name("FlowTab.ReRegisterHotkeys")
+    static let flowTabAppVisibilityPreferenceChanged = Notification.Name(
+        "FlowTab.AppVisibilityPreferenceChanged"
+    )
+    static let flowTabLanguagePreferenceChanged = Notification.Name(
+        "FlowTab.LanguagePreferenceChanged"
+    )
+}
+
+struct HotkeyRegistrationRequest: Sendable {
+    private enum NotificationUserInfoKey {
+        static let requestID = "requestID"
+        static let mainPrimaryModifier = "mainPrimaryModifier"
+        static let mainKey = "mainKey"
+        static let quitKey = "quitKey"
+        static let inAppPrimaryModifier = "inAppPrimaryModifier"
+        static let inAppMainKey = "inAppMainKey"
+    }
+
+    let requestID: UUID
+    let mainConfiguration: SwitcherHotkeyConfiguration
+    let inAppWindowConfiguration: SwitcherHotkeyConfiguration
+
+    init(
+        requestID: UUID = UUID(),
+        mainConfiguration: SwitcherHotkeyConfiguration,
+        inAppWindowConfiguration: SwitcherHotkeyConfiguration
+    ) {
+        self.requestID = requestID
+        self.mainConfiguration = mainConfiguration
+        self.inAppWindowConfiguration = inAppWindowConfiguration
+    }
+
+    static func load(userDefaults: UserDefaults = .standard) -> HotkeyRegistrationRequest {
+        HotkeyRegistrationRequest(
+            mainConfiguration: SwitcherHotkeyPreferencesStore.load(userDefaults: userDefaults),
+            inAppWindowConfiguration: InAppWindowHotkeyPreferencesStore.load(userDefaults: userDefaults)
+        )
+    }
+
+    init?(notificationUserInfo: [AnyHashable: Any]) {
+        guard
+            let requestIDRaw = notificationUserInfo[NotificationUserInfoKey.requestID] as? String,
+            let mainPrimaryModifierRaw =
+                notificationUserInfo[NotificationUserInfoKey.mainPrimaryModifier] as? String,
+            let mainKeyRaw = notificationUserInfo[NotificationUserInfoKey.mainKey] as? String,
+            let quitKeyRaw = notificationUserInfo[NotificationUserInfoKey.quitKey] as? String,
+            let inAppPrimaryModifierRaw =
+                notificationUserInfo[NotificationUserInfoKey.inAppPrimaryModifier] as? String,
+            let inAppMainKeyRaw = notificationUserInfo[NotificationUserInfoKey.inAppMainKey] as? String
+        else {
+            return nil
+        }
+
+        let resolvedInAppWindowConfiguration = InAppWindowHotkeyPreferencesStore.resolve(
+            primaryModifierRaw: inAppPrimaryModifierRaw,
+            mainKeyRaw: inAppMainKeyRaw
+        )
+        self.init(
+            requestID: UUID(uuidString: requestIDRaw) ?? UUID(),
+            mainConfiguration: SwitcherHotkeyPreferencesStore.resolve(
+                primaryModifierRaw: mainPrimaryModifierRaw,
+                mainKeyRaw: mainKeyRaw,
+                quitKeyRaw: quitKeyRaw
+            ),
+            inAppWindowConfiguration: SwitcherHotkeyConfiguration(
+                primaryModifier: resolvedInAppWindowConfiguration.primaryModifier,
+                mainKey: resolvedInAppWindowConfiguration.mainKey,
+                quitKey: .q
+            )
+        )
+    }
+
+    var notificationUserInfo: [AnyHashable: Any] {
+        [
+            NotificationUserInfoKey.requestID: requestID.uuidString,
+            NotificationUserInfoKey.mainPrimaryModifier: mainConfiguration.primaryModifier.rawValue,
+            NotificationUserInfoKey.mainKey: mainConfiguration.mainKey.rawValue,
+            NotificationUserInfoKey.quitKey: mainConfiguration.quitKey.rawValue,
+            NotificationUserInfoKey.inAppPrimaryModifier:
+                inAppWindowConfiguration.primaryModifier.rawValue,
+            NotificationUserInfoKey.inAppMainKey: inAppWindowConfiguration.mainKey.rawValue
+        ]
+    }
+}
+
+enum ThemePreferencesStore {
+    static let defaultMode: ThemeMode = .followSystem
+
+    static func resolve(rawValue: String) -> ThemeMode {
+        ThemeMode(rawValue: rawValue) ?? defaultMode
+    }
+}
+
+enum AppVisibilityPreferencesStore {
+    static let defaultShowInCommandTab = true
+
+    static func loadShowInCommandTab(userDefaults: UserDefaults = .standard) -> Bool {
+        guard userDefaults.object(forKey: AppPreferenceKeys.showInCommandTab) != nil else {
+            return defaultShowInCommandTab
+        }
+        return userDefaults.bool(forKey: AppPreferenceKeys.showInCommandTab)
+    }
+}
+
+enum WindowLayerPreferencesStore {
+    static let defaultAutoEnterDelay: Double = 0.75
+    static let minAutoEnterDelay: Double = 0.0
+    static let maxAutoEnterDelay: Double = 999.99
+
+    static func loadAutoEnterDelay(userDefaults: UserDefaults = .standard) -> TimeInterval {
+        guard userDefaults.object(forKey: AppPreferenceKeys.windowLayerAutoEnterDelay) != nil else {
+            return defaultAutoEnterDelay
+        }
+        return normalizedAutoEnterDelay(
+            userDefaults.double(forKey: AppPreferenceKeys.windowLayerAutoEnterDelay)
+        )
+    }
+
+    static func normalizedAutoEnterDelay(_ rawValue: Double) -> Double {
+        guard rawValue.isFinite else { return defaultAutoEnterDelay }
+        let clamped = min(max(rawValue, minAutoEnterDelay), maxAutoEnterDelay)
+        return (clamped * 100).rounded() / 100
+    }
+
+    static func sanitizeAutoEnterDelayText(_ rawText: String) -> String {
+        var sanitized = ""
+        var hasDecimalSeparator = false
+        var fractionalDigitCount = 0
+
+        for character in rawText {
+            if character.isNumber {
+                if hasDecimalSeparator {
+                    guard fractionalDigitCount < 2 else { continue }
+                    fractionalDigitCount += 1
+                }
+                sanitized.append(character)
+                continue
+            }
+            if character == ".", !hasDecimalSeparator {
+                hasDecimalSeparator = true
+                if sanitized.isEmpty {
+                    sanitized = "0"
+                }
+                sanitized.append(".")
+            }
+        }
+
+        if let parsedValue = Double(sanitized), parsedValue > maxAutoEnterDelay {
+            return String(format: "%.2f", maxAutoEnterDelay)
+        }
+
+        return sanitized
+    }
+}
+
+enum SwitcherBehaviorPreferencesStore {
+    static let defaultAutoRestoreMinimizedWindowOnSwitch = false
+    static let defaultHideMinimizedAppsFromAppLayer = false
+
+    static func loadAutoRestoreMinimizedWindowOnSwitch(
+        userDefaults: UserDefaults = .standard
+    ) -> Bool {
+        guard userDefaults.object(forKey: AppPreferenceKeys.autoRestoreMinimizedWindowOnSwitch) != nil else {
+            return defaultAutoRestoreMinimizedWindowOnSwitch
+        }
+        return userDefaults.bool(forKey: AppPreferenceKeys.autoRestoreMinimizedWindowOnSwitch)
+    }
+
+    static func loadHideMinimizedAppsFromAppLayer(
+        userDefaults: UserDefaults = .standard
+    ) -> Bool {
+        guard userDefaults.object(forKey: AppPreferenceKeys.hideMinimizedAppsFromAppLayer) != nil else {
+            return defaultHideMinimizedAppsFromAppLayer
+        }
+        return userDefaults.bool(forKey: AppPreferenceKeys.hideMinimizedAppsFromAppLayer)
+    }
+
+    static func loadSwitcherPreferences(userDefaults: UserDefaults = .standard) -> SwitcherPreferences {
+        var preferences = SwitcherPreferences.default
+        preferences.autoRestoreMinimizedWindowOnSwitch = loadAutoRestoreMinimizedWindowOnSwitch(
+            userDefaults: userDefaults
+        )
+        return preferences
+    }
+}
+
+enum SearchInteractionPreferencesStore {
+    static let defaultIsEnabled = true
+    static let defaultScope: SwitcherSearchScope = .app
+
+    static func loadIsEnabled(userDefaults: UserDefaults = .standard) -> Bool {
+        guard userDefaults.object(forKey: AppPreferenceKeys.searchEnabled) != nil else {
+            return defaultIsEnabled
+        }
+        return userDefaults.bool(forKey: AppPreferenceKeys.searchEnabled)
+    }
+
+    static func loadDefaultScope(userDefaults: UserDefaults = .standard) -> SwitcherSearchScope {
+        let rawValue = userDefaults.string(forKey: AppPreferenceKeys.searchDefaultScope) ?? defaultScope.rawValue
+        let resolved = SwitcherSearchScope(rawValue: rawValue) ?? defaultScope
+        if rawValue != resolved.rawValue {
+            userDefaults.set(resolved.rawValue, forKey: AppPreferenceKeys.searchDefaultScope)
+        }
+        return resolved
+    }
+}
+
+enum InAppWindowHotkeyPreferencesStore {
+    static let defaultPrimaryModifier: SwitcherPrimaryModifier = .control
+    static let defaultMainKey: SwitcherHotkeyKey = .tab
+
+    static func load(userDefaults: UserDefaults = .standard) -> SwitcherHotkeyConfiguration {
+        let primaryModifierRaw = userDefaults.string(forKey: AppPreferenceKeys.inAppWindowHotkeyPrimaryModifier)
+            ?? defaultPrimaryModifier.rawValue
+        let mainKeyRaw = userDefaults.string(forKey: AppPreferenceKeys.inAppWindowHotkeyMainKey)
+            ?? defaultMainKey.rawValue
+
+        let resolved = resolve(
+            primaryModifierRaw: primaryModifierRaw,
+            mainKeyRaw: mainKeyRaw
+        )
+
+        if primaryModifierRaw != resolved.primaryModifier.rawValue {
+            userDefaults.set(
+                resolved.primaryModifier.rawValue,
+                forKey: AppPreferenceKeys.inAppWindowHotkeyPrimaryModifier
+            )
+        }
+        if mainKeyRaw != resolved.mainKey.rawValue {
+            userDefaults.set(
+                resolved.mainKey.rawValue,
+                forKey: AppPreferenceKeys.inAppWindowHotkeyMainKey
+            )
+        }
+
+        return SwitcherHotkeyConfiguration(
+            primaryModifier: resolved.primaryModifier,
+            mainKey: resolved.mainKey,
+            quitKey: .q
+        )
+    }
+
+    static func resolve(
+        primaryModifierRaw: String,
+        mainKeyRaw: String
+    ) -> (primaryModifier: SwitcherPrimaryModifier, mainKey: SwitcherHotkeyKey) {
+        let primaryModifier = SwitcherPrimaryModifier(rawValue: primaryModifierRaw) ?? defaultPrimaryModifier
+        let mainKey = SwitcherHotkeyKey(rawValue: mainKeyRaw) ?? defaultMainKey
+        return (primaryModifier, mainKey)
+    }
+
+    static func resolveAvoidingMainHotkeyConflict(
+        primaryModifierRaw: String,
+        mainKeyRaw: String,
+        mainHotkeyConfiguration: SwitcherHotkeyConfiguration
+    ) -> (primaryModifier: SwitcherPrimaryModifier, mainKey: SwitcherHotkeyKey) {
+        let resolved = resolve(primaryModifierRaw: primaryModifierRaw, mainKeyRaw: mainKeyRaw)
+        guard
+            resolved.primaryModifier == mainHotkeyConfiguration.primaryModifier,
+            resolved.mainKey == mainHotkeyConfiguration.mainKey
+        else {
+            return resolved
+        }
+
+        let candidateModifiers = [defaultPrimaryModifier] + SwitcherPrimaryModifier.allCases
+        let fallbackPrimaryModifier = candidateModifiers.first {
+            $0 != mainHotkeyConfiguration.primaryModifier
+        } ?? defaultPrimaryModifier
+
+        return (fallbackPrimaryModifier, resolved.mainKey)
+    }
+}
