@@ -45,6 +45,7 @@ Apply this skill to repository changes in FlowTab. Use it to keep implementation
 2. Classify each affected file by architecture role and feature ownership before choosing a module.
 3. Choose the correct module before writing code.
 4. For bug fixes, run or explicitly attempt the relevant existing tests before production edits and stop if reproduction evidence or required environment access is missing.
+   If relevant UI automation is blocked by sandboxed temp or cache paths, first try `./scripts/testing/run-ui-tests-local.sh`. If that still fails for environment reasons, report the blocker and request the required elevation or external Terminal run instead of continuing with production edits.
 5. Design the solution so it generalizes beyond the current case.
 6. Add or update tests alongside the code change.
 7. Run the related test suites before considering the task complete.

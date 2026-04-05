@@ -30,6 +30,12 @@ Use this workflow for regressions, flaky behavior, broken edge cases, and user-r
 - If a test layer is relevant but cannot run, treat that as a blocker to completion. Report it explicitly instead of silently proceeding.
 - If required permissions or OS capabilities are unavailable, stop and report the blocker rather than inferring runtime behavior from code inspection alone.
 
+## Sandboxed Test Blockers
+
+- When UI automation is relevant and `xcodebuild` fails because sandboxed temp files, module caches, or SwiftPM caches cannot be created, first try `./scripts/testing/run-ui-tests-local.sh`.
+- Treat that script as the standard local fallback because it redirects `DerivedData`, `TMPDIR`, module caches, and source packages into `./.build-local/ui-tests`.
+- If the fallback script still fails for environment reasons, stop and report the blocker, then request the needed elevated run or an external Terminal run. Do not continue with production edits while that blocker remains unresolved.
+
 ## Logging Rules
 
 - Prefer existing runtime logging and stable observability points first.

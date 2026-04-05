@@ -177,6 +177,21 @@
 
 ## 回归命令（示例）
 
+优先使用仓库脚本，把 `DerivedData`、临时目录和缓存统一压到 `./.build-local/ui-tests`：
+
+```bash
+./scripts/testing/run-ui-tests-local.sh
+```
+
+需要缩小到单个 UI 用例时：
+
+```bash
+./scripts/testing/run-ui-tests-local.sh \
+  -only-testing:FlowTabUITests/FlowTabUITests/testHomePageSelectingMockAppUpdatesWindowList
+```
+
+如果仍需直接调用 `xcodebuild`，可参考下面的基础命令：
+
 ```bash
 xcodebuild -project FlowTab.xcodeproj -scheme FlowTab \
   -destination 'platform=macOS' \
