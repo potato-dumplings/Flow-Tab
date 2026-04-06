@@ -32,8 +32,17 @@
 				E1F100012B00000100B0D737 /* RuntimeLogging.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F100112B00000100B0D737 /* RuntimeLogging.swift */; };
 				E1F100022B00000100B0D737 /* RuntimeLogsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F100122B00000100B0D737 /* RuntimeLogsSection.swift */; };
 				E1F100032B00000100B0D737 /* AppDelegate+Testing.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F100132B00000100B0D737 /* AppDelegate+Testing.swift */; };
-				A1B2C3D42F73000100B0D737 /* OptionTabHotkeyMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D12F73000100B0D737 /* OptionTabHotkeyMonitor.swift */; };
+			A1B2C3D42F73000100B0D737 /* OptionTabHotkeyMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D12F73000100B0D737 /* OptionTabHotkeyMonitor.swift */; };
 			A1B2C3D52F73000100B0D737 /* RuntimeBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D22F73000100B0D737 /* RuntimeBridge.swift */; };
+			A1B2C4392F73000100B0D737 /* AccessibilityPermissionChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4302F73000100B0D737 /* AccessibilityPermissionChecker.swift */; };
+			A1B2C43A2F73000100B0D737 /* SystemAppMRUTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4312F73000100B0D737 /* SystemAppMRUTracker.swift */; };
+			A1B2C43B2F73000100B0D737 /* RuntimeSnapshotProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4322F73000100B0D737 /* RuntimeSnapshotProvider.swift */; };
+			A1B2C43C2F73000100B0D737 /* RuntimeSnapshotProvider+HomeApps.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4332F73000100B0D737 /* RuntimeSnapshotProvider+HomeApps.swift */; };
+			A1B2C43D2F73000100B0D737 /* RuntimeActivator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4342F73000100B0D737 /* RuntimeActivator.swift */; };
+			A1B2C43E2F73000100B0D737 /* AXLiveWindowRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4352F73000100B0D737 /* AXLiveWindowRegistry.swift */; };
+			A1B2C43F2F73000100B0D737 /* AXWindowInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4362F73000100B0D737 /* AXWindowInspector.swift */; };
+			A1B2C4402F73000100B0D737 /* RuntimeWindowPreviewProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4372F73000100B0D737 /* RuntimeWindowPreviewProvider.swift */; };
+			A1B2C4412F73000100B0D737 /* AppIconProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4382F73000100B0D737 /* AppIconProvider.swift */; };
 			A1B2C3F12F73000100B0D737 /* SwitcherPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3E12F73000100B0D737 /* SwitcherPanelController.swift */; };
 			A1B2C3F22F73000100B0D737 /* LiveSwitcherModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3E22F73000100B0D737 /* LiveSwitcherModel.swift */; };
 			A1B2C3F32F73000100B0D737 /* SwitcherPanelOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3E32F73000100B0D737 /* SwitcherPanelOverlayView.swift */; };
@@ -108,8 +117,17 @@
 				E1F100112B00000100B0D737 /* RuntimeLogging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeLogging.swift; sourceTree = "<group>"; };
 				E1F100122B00000100B0D737 /* RuntimeLogsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeLogsSection.swift; sourceTree = "<group>"; };
 				E1F100132B00000100B0D737 /* AppDelegate+Testing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppDelegate+Testing.swift"; sourceTree = "<group>"; };
-				A1B2C3D12F73000100B0D737 /* OptionTabHotkeyMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OptionTabHotkeyMonitor.swift; sourceTree = "<group>"; };
+			A1B2C3D12F73000100B0D737 /* OptionTabHotkeyMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OptionTabHotkeyMonitor.swift; sourceTree = "<group>"; };
 			A1B2C3D22F73000100B0D737 /* RuntimeBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeBridge.swift; sourceTree = "<group>"; };
+			A1B2C4302F73000100B0D737 /* AccessibilityPermissionChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityPermissionChecker.swift; sourceTree = "<group>"; };
+			A1B2C4312F73000100B0D737 /* SystemAppMRUTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAppMRUTracker.swift; sourceTree = "<group>"; };
+			A1B2C4322F73000100B0D737 /* RuntimeSnapshotProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeSnapshotProvider.swift; sourceTree = "<group>"; };
+			A1B2C4332F73000100B0D737 /* RuntimeSnapshotProvider+HomeApps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RuntimeSnapshotProvider+HomeApps.swift"; sourceTree = "<group>"; };
+			A1B2C4342F73000100B0D737 /* RuntimeActivator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeActivator.swift; sourceTree = "<group>"; };
+			A1B2C4352F73000100B0D737 /* AXLiveWindowRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AXLiveWindowRegistry.swift; sourceTree = "<group>"; };
+			A1B2C4362F73000100B0D737 /* AXWindowInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AXWindowInspector.swift; sourceTree = "<group>"; };
+			A1B2C4372F73000100B0D737 /* RuntimeWindowPreviewProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowPreviewProvider.swift; sourceTree = "<group>"; };
+			A1B2C4382F73000100B0D737 /* AppIconProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconProvider.swift; sourceTree = "<group>"; };
 			A1B2C3E12F73000100B0D737 /* SwitcherPanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherPanelController.swift; sourceTree = "<group>"; };
 			A1B2C3E22F73000100B0D737 /* LiveSwitcherModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveSwitcherModel.swift; sourceTree = "<group>"; };
 			A1B2C3E32F73000100B0D737 /* SwitcherPanelOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherPanelOverlayView.swift; sourceTree = "<group>"; };
@@ -324,6 +342,15 @@
 			isa = PBXGroup;
 			children = (
 				A1B2C3D22F73000100B0D737 /* RuntimeBridge.swift */,
+				A1B2C4302F73000100B0D737 /* AccessibilityPermissionChecker.swift */,
+				A1B2C4312F73000100B0D737 /* SystemAppMRUTracker.swift */,
+				A1B2C4322F73000100B0D737 /* RuntimeSnapshotProvider.swift */,
+				A1B2C4332F73000100B0D737 /* RuntimeSnapshotProvider+HomeApps.swift */,
+				A1B2C4342F73000100B0D737 /* RuntimeActivator.swift */,
+				A1B2C4352F73000100B0D737 /* AXLiveWindowRegistry.swift */,
+				A1B2C4362F73000100B0D737 /* AXWindowInspector.swift */,
+				A1B2C4372F73000100B0D737 /* RuntimeWindowPreviewProvider.swift */,
+				A1B2C4382F73000100B0D737 /* AppIconProvider.swift */,
 				E1F100112B00000100B0D737 /* RuntimeLogging.swift */,
 			);
 			path = Runtime;
@@ -553,6 +580,15 @@
 						E1F100032B00000100B0D737 /* AppDelegate+Testing.swift in Sources */,
 							A1B2C3D42F73000100B0D737 /* OptionTabHotkeyMonitor.swift in Sources */,
 							A1B2C3D52F73000100B0D737 /* RuntimeBridge.swift in Sources */,
+							A1B2C4392F73000100B0D737 /* AccessibilityPermissionChecker.swift in Sources */,
+							A1B2C43A2F73000100B0D737 /* SystemAppMRUTracker.swift in Sources */,
+							A1B2C43B2F73000100B0D737 /* RuntimeSnapshotProvider.swift in Sources */,
+							A1B2C43C2F73000100B0D737 /* RuntimeSnapshotProvider+HomeApps.swift in Sources */,
+							A1B2C43D2F73000100B0D737 /* RuntimeActivator.swift in Sources */,
+							A1B2C43E2F73000100B0D737 /* AXLiveWindowRegistry.swift in Sources */,
+							A1B2C43F2F73000100B0D737 /* AXWindowInspector.swift in Sources */,
+							A1B2C4402F73000100B0D737 /* RuntimeWindowPreviewProvider.swift in Sources */,
+							A1B2C4412F73000100B0D737 /* AppIconProvider.swift in Sources */,
 							A1B2C3F12F73000100B0D737 /* SwitcherPanelController.swift in Sources */,
 							A1B2C4112F73000100B0D737 /* SwitcherPanelWindowConfiguration.swift in Sources */,
 							A1B2C4122F73000100B0D737 /* SwitcherPanelController+Presentation.swift in Sources */,

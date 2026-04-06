@@ -1,0 +1,278 @@
+import AppKit
+import Foundation
+import FlowTabCore
+
+extension RuntimeSnapshotProvider {
+    func homeAppSummaries() -> [RuntimeHomeAppSummary] {
+        if let uiTestRuntimeDataset = Self.uiTestRuntimeDataset() {
+            return uiTestRuntimeDataset.summaries
+        }
+        let runningApps = filteredRunningApplications()
+        guard !runningApps.isEmpty else { return [] }
+
+        let rankByPID = collectAppRankByPID(for: runningApps)
+        let windowStatsByPID = collectAXWindowStats(for: runningApps)
+        let windowCountByPID = Dictionary(
+            uniqueKeysWithValues: windowStatsByPID.map { ($0.key, $0.value.windowCount) }
+        )
+        let selectedApps = selectPrimaryApps(
+            from: runningApps,
+            windowCountByPID: windowCountByPID,
+            rankByPID: rankByPID
+        )
+        let hideMinimizedAppsFromAppLayer =
+            SwitcherBehaviorPreferencesStore.loadHideMinimizedAppsFromAppLayer()
+        let appLayerCandidates = filterAppsForAppLayer(
+            selectedApps,
+            windowStatsByPID: windowStatsByPID,
+            hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
+        )
+        guard !appLayerCandidates.isEmpty else { return [] }
+
+        var summaries: [RuntimeHomeAppSummary] = []
+        summaries.reserveCapacity(appLayerCandidates.count)
+        for (index, app) in appLayerCandidates.enumerated() {
+            let pid = app.processIdentifier
+            let appID = Self.baseAppID(for: app)
+            let displayName = app.localizedName ?? appID
+            let rank = rankByPID[pid] ?? (10_000 + index)
+            summaries.append(
+                RuntimeHomeAppSummary(
+                    appID: appID,
+                    displayName: displayName,
+                    groupID: Self.groupID(for: app.bundleIdentifier, fallbackName: displayName),
+                    lastActiveAt: Self.stableLastActiveValue(forRank: rank),
+                    windowCount: windowStatsByPID[pid]?.windowCount ?? 0,
+                    pid: pid
+                )
+            )
+        }
+
+        summaries.sort { lhs, rhs in
+            if lhs.lastActiveAt == rhs.lastActiveAt {
+                return lhs.displayName.localizedCaseInsensitiveCompare(
+                    rhs.displayName
+                ) == .orderedAscending
+            }
+            return lhs.lastActiveAt > rhs.lastActiveAt
+        }
+        return summaries
+    }
+
+    func homeAppSnapshot(for appID: String) -> RuntimeHomeAppSnapshot? {
+        if let uiTestRuntimeDataset = Self.uiTestRuntimeDataset() {
+            return uiTestRuntimeDataset.snapshotsByAppID[appID]
+        }
+        let runningApps = filteredRunningApplications()
+        let matchingApps = runningApps.filter { Self.baseAppID(for: $0) == appID }
+        guard !matchingApps.isEmpty else { return nil }
+
+        let rankByPID = collectAppRankByPID(for: runningApps)
+        let cgWindowsByPID = collectCGWindowsByPID()
+        let windowsByPID = collectAXWindowData(for: matchingApps, cgWindowsByPID: cgWindowsByPID)
+        let windowCountByPID = Dictionary(
+            uniqueKeysWithValues: windowsByPID.map { ($0.key, $0.value.count) }
+        )
+        let sortedApps = matchingApps.sorted { lhs, rhs in
+            score(
+                for: lhs,
+                windowCountByPID: windowCountByPID,
+                rankByPID: rankByPID
+            ) > score(
+                for: rhs,
+                windowCountByPID: windowCountByPID,
+                rankByPID: rankByPID
+            )
+        }
+        guard let app = sortedApps.first else { return nil }
+
+        let windows = windowsByPID[app.processIdentifier] ?? []
+        let hideMinimizedAppsFromAppLayer =
+            SwitcherBehaviorPreferencesStore.loadHideMinimizedAppsFromAppLayer()
+        if hideMinimizedAppsFromAppLayer && !windows.isEmpty && !windows.contains(where: { !$0.isMinimized }) {
+            return nil
+        }
+
+        let now = Date.timeIntervalSinceReferenceDate
+        let displayName = app.localizedName ?? appID
+        let rank = rankByPID[app.processIdentifier] ?? 10_000
+        let windowCandidates = windows.enumerated().map { entryIndex, entry in
+            WindowCandidate(
+                id: entry.windowID,
+                title: entry.title,
+                isMinimized: entry.isMinimized,
+                lastActiveAt: now - Double(entryIndex)
+            )
+        }
+        let candidate = AppSwitchCandidate(
+            id: appID,
+            displayName: displayName,
+            groupID: Self.groupID(for: app.bundleIdentifier, fallbackName: displayName),
+            lastActiveAt: now - Double(rank),
+            windows: windowCandidates
+        )
+        let windowContexts = Dictionary(
+            uniqueKeysWithValues: windows.map {
+                let id = $0.windowID
+                return (
+                    id,
+                    RuntimeWindowContext(
+                        id: id,
+                        title: $0.title,
+                        isMinimized: $0.isMinimized,
+                        cgWindowID: $0.cgWindowID,
+                        inferredTitleBarStyle: nil,
+                        axWindow: $0.axWindow
+                    )
+                )
+            }
+        )
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: app,
+            windowsByID: windowContexts
+        )
+        let summary = RuntimeHomeAppSummary(
+            appID: appID,
+            displayName: displayName,
+            groupID: Self.groupID(for: app.bundleIdentifier, fallbackName: displayName),
+            lastActiveAt: Self.stableLastActiveValue(forRank: rank),
+            windowCount: windows.count,
+            pid: app.processIdentifier
+        )
+        return RuntimeHomeAppSnapshot(
+            summary: summary,
+            candidate: candidate,
+            context: context
+        )
+    }
+
+    func homeAppSummary(for appID: String) -> RuntimeHomeAppSummary? {
+        if let uiTestRuntimeDataset = Self.uiTestRuntimeDataset() {
+            return uiTestRuntimeDataset.summaries.first(where: { $0.appID == appID })
+        }
+        let runningApps = filteredRunningApplications()
+        let matchingApps = runningApps.filter { Self.baseAppID(for: $0) == appID }
+        guard !matchingApps.isEmpty else { return nil }
+
+        let rankByPID = collectAppRankByPID(for: runningApps)
+        let windowStatsByPID = collectAXWindowStats(for: matchingApps)
+        let windowCountByPID = Dictionary(
+            uniqueKeysWithValues: windowStatsByPID.map { ($0.key, $0.value.windowCount) }
+        )
+        let sortedApps = matchingApps.sorted { lhs, rhs in
+            score(
+                for: lhs,
+                windowCountByPID: windowCountByPID,
+                rankByPID: rankByPID
+            ) > score(
+                for: rhs,
+                windowCountByPID: windowCountByPID,
+                rankByPID: rankByPID
+            )
+        }
+        guard let app = sortedApps.first else { return nil }
+
+        if
+            SwitcherBehaviorPreferencesStore.loadHideMinimizedAppsFromAppLayer(),
+            let stats = windowStatsByPID[app.processIdentifier],
+            stats.windowCount > 0,
+            !stats.hasVisibleWindow
+        {
+            return nil
+        }
+
+        let displayName = app.localizedName ?? appID
+        let rank = rankByPID[app.processIdentifier] ?? 10_000
+        return RuntimeHomeAppSummary(
+            appID: appID,
+            displayName: displayName,
+            groupID: Self.groupID(for: app.bundleIdentifier, fallbackName: displayName),
+            lastActiveAt: Self.stableLastActiveValue(forRank: rank),
+            windowCount: windowStatsByPID[app.processIdentifier]?.windowCount ?? 0,
+            pid: app.processIdentifier
+        )
+    }
+
+    func filteredRunningApplications() -> [NSRunningApplication] {
+        let currentPID = ProcessInfo.processInfo.processIdentifier
+        let includeCurrentProcessInAppLayer = AppVisibilityPreferencesStore.loadShowInCommandTab()
+        return NSWorkspace.shared.runningApplications.filter {
+            Self.shouldIncludeRunningApplication(
+                activationPolicy: $0.activationPolicy,
+                isTerminated: $0.isTerminated,
+                pid: $0.processIdentifier,
+                currentPID: currentPID,
+                includeCurrentProcessInAppLayer: includeCurrentProcessInAppLayer
+            )
+        }
+    }
+
+    static func shouldIncludeRunningApplication(
+        activationPolicy: NSApplication.ActivationPolicy,
+        isTerminated: Bool,
+        pid: pid_t,
+        currentPID: pid_t,
+        includeCurrentProcessInAppLayer: Bool
+    ) -> Bool {
+        activationPolicy == .regular
+            && !isTerminated
+            && (includeCurrentProcessInAppLayer || pid != currentPID)
+    }
+
+    func filterAppsForAppLayer(
+        _ apps: [NSRunningApplication],
+        windowsByPID: [pid_t: [WindowListEntry]],
+        hideMinimizedAppsFromAppLayer: Bool
+    ) -> [NSRunningApplication] {
+        guard hideMinimizedAppsFromAppLayer else { return apps }
+
+        return apps.filter { app in
+            let windows = windowsByPID[app.processIdentifier] ?? []
+            let hasVisibleWindow = windows.contains(where: { !$0.isMinimized })
+            guard Self.shouldIncludeAppInAppLayer(
+                hasWindows: !windows.isEmpty,
+                hasVisibleWindow: hasVisibleWindow,
+                hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
+            ) else {
+                let appName = app.localizedName ?? app.bundleIdentifier ?? "pid:\(app.processIdentifier)"
+                RuntimeLog.info("Snapshot", "skip minimized-only app=\(appName) pid=\(app.processIdentifier)")
+                return false
+            }
+            return true
+        }
+    }
+
+    static func shouldIncludeAppInAppLayer(
+        hasWindows: Bool,
+        hasVisibleWindow: Bool,
+        hideMinimizedAppsFromAppLayer: Bool
+    ) -> Bool {
+        guard hideMinimizedAppsFromAppLayer else { return true }
+        guard hasWindows else { return true }
+        return hasVisibleWindow
+    }
+
+    func filterAppsForAppLayer(
+        _ apps: [NSRunningApplication],
+        windowStatsByPID: [pid_t: AXWindowStats],
+        hideMinimizedAppsFromAppLayer: Bool
+    ) -> [NSRunningApplication] {
+        guard hideMinimizedAppsFromAppLayer else { return apps }
+
+        return apps.filter { app in
+            guard let stats = windowStatsByPID[app.processIdentifier] else { return true }
+            guard Self.shouldIncludeAppInAppLayer(
+                hasWindows: stats.windowCount > 0,
+                hasVisibleWindow: stats.hasVisibleWindow,
+                hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
+            ) else {
+                let appName = app.localizedName ?? app.bundleIdentifier ?? "pid:\(app.processIdentifier)"
+                RuntimeLog.info("Snapshot", "skip minimized-only app=\(appName) pid=\(app.processIdentifier)")
+                return false
+            }
+            return true
+        }
+    }
+
+}
