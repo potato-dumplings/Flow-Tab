@@ -34,8 +34,23 @@
 				E1F100032B00000100B0D737 /* AppDelegate+Testing.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F100132B00000100B0D737 /* AppDelegate+Testing.swift */; };
 				A1B2C3D42F73000100B0D737 /* OptionTabHotkeyMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D12F73000100B0D737 /* OptionTabHotkeyMonitor.swift */; };
 			A1B2C3D52F73000100B0D737 /* RuntimeBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D22F73000100B0D737 /* RuntimeBridge.swift */; };
-			A1B2C3D62F73000100B0D737 /* SwitcherPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D32F73000100B0D737 /* SwitcherPanel.swift */; };
-		A1B2C3D72F73000100B0D737 /* SwitcherSearchCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D82F73000100B0D737 /* SwitcherSearchCoordinator.swift */; };
+			A1B2C3F12F73000100B0D737 /* SwitcherPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3E12F73000100B0D737 /* SwitcherPanelController.swift */; };
+			A1B2C3F22F73000100B0D737 /* LiveSwitcherModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3E22F73000100B0D737 /* LiveSwitcherModel.swift */; };
+			A1B2C3F32F73000100B0D737 /* SwitcherPanelOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3E32F73000100B0D737 /* SwitcherPanelOverlayView.swift */; };
+			A1B2C3F42F73000100B0D737 /* SwitcherPanelSearchBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3E42F73000100B0D737 /* SwitcherPanelSearchBridge.swift */; };
+			A1B2C3F52F73000100B0D737 /* SwitcherPanelSearchViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3E52F73000100B0D737 /* SwitcherPanelSearchViews.swift */; };
+			A1B2C3F62F73000100B0D737 /* SwitcherPanelPreviewViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3E62F73000100B0D737 /* SwitcherPanelPreviewViews.swift */; };
+			A1B2C4112F73000100B0D737 /* SwitcherPanelWindowConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4012F73000100B0D737 /* SwitcherPanelWindowConfiguration.swift */; };
+			A1B2C4122F73000100B0D737 /* SwitcherPanelController+Presentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4022F73000100B0D737 /* SwitcherPanelController+Presentation.swift */; };
+			A1B2C4132F73000100B0D737 /* SwitcherPanelController+InputHandling.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4032F73000100B0D737 /* SwitcherPanelController+InputHandling.swift */; };
+			A1B2C4142F73000100B0D737 /* SwitcherPanelController+Hotkeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4042F73000100B0D737 /* SwitcherPanelController+Hotkeys.swift */; };
+			A1B2C4152F73000100B0D737 /* LiveSwitcherModel+Preview.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4052F73000100B0D737 /* LiveSwitcherModel+Preview.swift */; };
+			A1B2C4162F73000100B0D737 /* LiveSwitcherModel+Search.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4062F73000100B0D737 /* LiveSwitcherModel+Search.swift */; };
+			A1B2C4172F73000100B0D737 /* LiveSwitcherModel+Types.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4072F73000100B0D737 /* LiveSwitcherModel+Types.swift */; };
+			A1B2C4182F73000100B0D737 /* SwitcherSearchCoordinator+Compute.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4082F73000100B0D737 /* SwitcherSearchCoordinator+Compute.swift */; };
+			A1B2C4192F73000100B0D737 /* SwitcherSearchCoordinator+Ranking.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4092F73000100B0D737 /* SwitcherSearchCoordinator+Ranking.swift */; };
+			A1B2C41A2F73000100B0D737 /* SwitcherSearchCoordinator+Tokenization.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C40A2F73000100B0D737 /* SwitcherSearchCoordinator+Tokenization.swift */; };
+			A1B2C3D72F73000100B0D737 /* SwitcherSearchCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D82F73000100B0D737 /* SwitcherSearchCoordinator.swift */; };
 		D1A1B1D42A00000100B0D737 /* FlowTabLaunchTesting.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A1B1C42A00000100B0D737 /* FlowTabLaunchTesting.swift */; };
 		D1A1B1D12A00000100B0D737 /* FlowTabUITestBootstrapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A1B1C12A00000100B0D737 /* FlowTabUITestBootstrapper.swift */; };
 		D1A1B1D22A00000100B0D737 /* NSView+FlowTabTesting.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A1B1C22A00000100B0D737 /* NSView+FlowTabTesting.swift */; };
@@ -95,8 +110,23 @@
 				E1F100132B00000100B0D737 /* AppDelegate+Testing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppDelegate+Testing.swift"; sourceTree = "<group>"; };
 				A1B2C3D12F73000100B0D737 /* OptionTabHotkeyMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OptionTabHotkeyMonitor.swift; sourceTree = "<group>"; };
 			A1B2C3D22F73000100B0D737 /* RuntimeBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeBridge.swift; sourceTree = "<group>"; };
-			A1B2C3D32F73000100B0D737 /* SwitcherPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherPanel.swift; sourceTree = "<group>"; };
-		A1B2C3D82F73000100B0D737 /* SwitcherSearchCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherSearchCoordinator.swift; sourceTree = "<group>"; };
+			A1B2C3E12F73000100B0D737 /* SwitcherPanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherPanelController.swift; sourceTree = "<group>"; };
+			A1B2C3E22F73000100B0D737 /* LiveSwitcherModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveSwitcherModel.swift; sourceTree = "<group>"; };
+			A1B2C3E32F73000100B0D737 /* SwitcherPanelOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherPanelOverlayView.swift; sourceTree = "<group>"; };
+			A1B2C3E42F73000100B0D737 /* SwitcherPanelSearchBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherPanelSearchBridge.swift; sourceTree = "<group>"; };
+			A1B2C3E52F73000100B0D737 /* SwitcherPanelSearchViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherPanelSearchViews.swift; sourceTree = "<group>"; };
+			A1B2C3E62F73000100B0D737 /* SwitcherPanelPreviewViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherPanelPreviewViews.swift; sourceTree = "<group>"; };
+			A1B2C4012F73000100B0D737 /* SwitcherPanelWindowConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherPanelWindowConfiguration.swift; sourceTree = "<group>"; };
+			A1B2C4022F73000100B0D737 /* SwitcherPanelController+Presentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelController+Presentation.swift"; sourceTree = "<group>"; };
+			A1B2C4032F73000100B0D737 /* SwitcherPanelController+InputHandling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelController+InputHandling.swift"; sourceTree = "<group>"; };
+			A1B2C4042F73000100B0D737 /* SwitcherPanelController+Hotkeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelController+Hotkeys.swift"; sourceTree = "<group>"; };
+			A1B2C4052F73000100B0D737 /* LiveSwitcherModel+Preview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LiveSwitcherModel+Preview.swift"; sourceTree = "<group>"; };
+			A1B2C4062F73000100B0D737 /* LiveSwitcherModel+Search.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LiveSwitcherModel+Search.swift"; sourceTree = "<group>"; };
+			A1B2C4072F73000100B0D737 /* LiveSwitcherModel+Types.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LiveSwitcherModel+Types.swift"; sourceTree = "<group>"; };
+			A1B2C4082F73000100B0D737 /* SwitcherSearchCoordinator+Compute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherSearchCoordinator+Compute.swift"; sourceTree = "<group>"; };
+			A1B2C4092F73000100B0D737 /* SwitcherSearchCoordinator+Ranking.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherSearchCoordinator+Ranking.swift"; sourceTree = "<group>"; };
+			A1B2C40A2F73000100B0D737 /* SwitcherSearchCoordinator+Tokenization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherSearchCoordinator+Tokenization.swift"; sourceTree = "<group>"; };
+			A1B2C3D82F73000100B0D737 /* SwitcherSearchCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherSearchCoordinator.swift; sourceTree = "<group>"; };
 		D1A1B1C42A00000100B0D737 /* FlowTabLaunchTesting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTabLaunchTesting.swift; sourceTree = "<group>"; };
 		D1A1B1C12A00000100B0D737 /* FlowTabUITestBootstrapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTabUITestBootstrapper.swift; sourceTree = "<group>"; };
 		D1A1B1C22A00000100B0D737 /* NSView+FlowTabTesting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSView+FlowTabTesting.swift"; sourceTree = "<group>"; };
@@ -238,16 +268,31 @@
 			path = SharedUI;
 			sourceTree = "<group>";
 		};
-		F10000032F74000100B0D737 /* Switcher */ = {
-			isa = PBXGroup;
-			children = (
-				A1B2C3D12F73000100B0D737 /* OptionTabHotkeyMonitor.swift */,
-				A1B2C3D32F73000100B0D737 /* SwitcherPanel.swift */,
-				A1B2C3D82F73000100B0D737 /* SwitcherSearchCoordinator.swift */,
-			);
-			path = Switcher;
-			sourceTree = "<group>";
-		};
+			F10000032F74000100B0D737 /* Switcher */ = {
+				isa = PBXGroup;
+				children = (
+					A1B2C3D12F73000100B0D737 /* OptionTabHotkeyMonitor.swift */,
+					A1B2C4012F73000100B0D737 /* SwitcherPanelWindowConfiguration.swift */,
+					A1B2C3E12F73000100B0D737 /* SwitcherPanelController.swift */,
+					A1B2C4022F73000100B0D737 /* SwitcherPanelController+Presentation.swift */,
+					A1B2C4032F73000100B0D737 /* SwitcherPanelController+InputHandling.swift */,
+					A1B2C4042F73000100B0D737 /* SwitcherPanelController+Hotkeys.swift */,
+					A1B2C3E22F73000100B0D737 /* LiveSwitcherModel.swift */,
+					A1B2C4052F73000100B0D737 /* LiveSwitcherModel+Preview.swift */,
+					A1B2C4062F73000100B0D737 /* LiveSwitcherModel+Search.swift */,
+					A1B2C4072F73000100B0D737 /* LiveSwitcherModel+Types.swift */,
+					A1B2C3E32F73000100B0D737 /* SwitcherPanelOverlayView.swift */,
+					A1B2C3E42F73000100B0D737 /* SwitcherPanelSearchBridge.swift */,
+					A1B2C3E52F73000100B0D737 /* SwitcherPanelSearchViews.swift */,
+					A1B2C3E62F73000100B0D737 /* SwitcherPanelPreviewViews.swift */,
+					A1B2C3D82F73000100B0D737 /* SwitcherSearchCoordinator.swift */,
+					A1B2C4082F73000100B0D737 /* SwitcherSearchCoordinator+Compute.swift */,
+					A1B2C4092F73000100B0D737 /* SwitcherSearchCoordinator+Ranking.swift */,
+					A1B2C40A2F73000100B0D737 /* SwitcherSearchCoordinator+Tokenization.swift */,
+				);
+				path = Switcher;
+				sourceTree = "<group>";
+			};
 		F10000042F74000100B0D737 /* Infrastructure */ = {
 			isa = PBXGroup;
 			children = (
@@ -507,9 +552,24 @@
 						E1F100022B00000100B0D737 /* RuntimeLogsSection.swift in Sources */,
 						E1F100032B00000100B0D737 /* AppDelegate+Testing.swift in Sources */,
 							A1B2C3D42F73000100B0D737 /* OptionTabHotkeyMonitor.swift in Sources */,
-						A1B2C3D52F73000100B0D737 /* RuntimeBridge.swift in Sources */,
-						A1B2C3D62F73000100B0D737 /* SwitcherPanel.swift in Sources */,
-					A1B2C3D72F73000100B0D737 /* SwitcherSearchCoordinator.swift in Sources */,
+							A1B2C3D52F73000100B0D737 /* RuntimeBridge.swift in Sources */,
+							A1B2C3F12F73000100B0D737 /* SwitcherPanelController.swift in Sources */,
+							A1B2C4112F73000100B0D737 /* SwitcherPanelWindowConfiguration.swift in Sources */,
+							A1B2C4122F73000100B0D737 /* SwitcherPanelController+Presentation.swift in Sources */,
+							A1B2C4132F73000100B0D737 /* SwitcherPanelController+InputHandling.swift in Sources */,
+							A1B2C4142F73000100B0D737 /* SwitcherPanelController+Hotkeys.swift in Sources */,
+							A1B2C3F22F73000100B0D737 /* LiveSwitcherModel.swift in Sources */,
+							A1B2C4152F73000100B0D737 /* LiveSwitcherModel+Preview.swift in Sources */,
+							A1B2C4162F73000100B0D737 /* LiveSwitcherModel+Search.swift in Sources */,
+							A1B2C4172F73000100B0D737 /* LiveSwitcherModel+Types.swift in Sources */,
+							A1B2C3F32F73000100B0D737 /* SwitcherPanelOverlayView.swift in Sources */,
+							A1B2C3F42F73000100B0D737 /* SwitcherPanelSearchBridge.swift in Sources */,
+							A1B2C3F52F73000100B0D737 /* SwitcherPanelSearchViews.swift in Sources */,
+							A1B2C3F62F73000100B0D737 /* SwitcherPanelPreviewViews.swift in Sources */,
+							A1B2C3D72F73000100B0D737 /* SwitcherSearchCoordinator.swift in Sources */,
+							A1B2C4182F73000100B0D737 /* SwitcherSearchCoordinator+Compute.swift in Sources */,
+							A1B2C4192F73000100B0D737 /* SwitcherSearchCoordinator+Ranking.swift in Sources */,
+							A1B2C41A2F73000100B0D737 /* SwitcherSearchCoordinator+Tokenization.swift in Sources */,
 					D1A1B1D42A00000100B0D737 /* FlowTabLaunchTesting.swift in Sources */,
 					D1A1B1D12A00000100B0D737 /* FlowTabUITestBootstrapper.swift in Sources */,
 					D1A1B1D22A00000100B0D737 /* NSView+FlowTabTesting.swift in Sources */,

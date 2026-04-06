@@ -1,0 +1,259 @@
+import AppKit
+import Carbon
+import CoreGraphics
+import SwiftUI
+import FlowTabCore
+
+extension SwitcherPanelController {
+    func handleGlobalHotkey(isBackward: Bool) {
+        let now = ProcessInfo.processInfo.systemUptime
+        let nowMs = monotonicMilliseconds()
+        let directionText = isBackward ? "backward" : "forward"
+        if now < ignoreHotkeyPressesUntil {
+            logInputTrace(
+                "hotkeyPressed dir=\(directionText) dropped=postFinishWindow nowMs=\(formatMilliseconds(nowMs)) ignoreUntilMs=\(formatMilliseconds(ignoreHotkeyPressesUntil * 1_000))"
+            )
+            return
+        }
+        if suppressHotkeyReplayUntilRelease {
+            logInputTrace(
+                "hotkeyPressed dir=\(directionText) dropped=awaitingHotkeyRelease nowMs=\(formatMilliseconds(nowMs))"
+            )
+            return
+        }
+        if isPanelPresented {
+            guard activeHotkeySessionKind == .globalAppSwitcher else { return }
+            guard !model.isSearchActive else {
+                logInputTrace(
+                    "hotkeyPressed dir=\(directionText) panelVisible=1 action=ignoredSearchMode nowMs=\(formatMilliseconds(nowMs))"
+                )
+                return
+            }
+            guard isPrimaryModifierLikelyPressed() else {
+                logInputTrace(
+                    "hotkeyPressed dir=\(directionText) panelVisible=1 modifierPressed=0 action=scheduleReleaseConfirm nowMs=\(formatMilliseconds(nowMs))"
+                )
+                scheduleModifierReleaseConfirmation(trigger: "pressed_without_modifier")
+                return
+            }
+            logInputTrace(
+                "hotkeyPressed dir=\(directionText) panelVisible=1 modifierPressed=1 action=advance nowMs=\(formatMilliseconds(nowMs))"
+            )
+            // Main switch hotkey is registered globally, so repeated key presses should keep
+            // advancing while the panel is visible.
+            advance(isBackward ? .tabBackward : .tabForward)
+            return
+        }
+        logInputTrace(
+            "hotkeyPressed dir=\(directionText) panelVisible=0 action=show nowMs=\(formatMilliseconds(nowMs))"
+        )
+        let direction: CycleDirection = isBackward ? .backward : .forward
+        show(direction: direction)
+    }
+
+    func handleGlobalHotkeyReleased() {
+        guard isPanelPresented else { return }
+        guard activeHotkeySessionKind == .globalAppSwitcher else { return }
+        guard !model.isSearchActive else { return }
+        // Carbon hotkey "released" also fires when the main key (for example Tab) is released
+        // while the modifier is still held. Ignore those events to avoid repeatedly spinning up
+        // release-confirmation work during rapid cycling.
+        guard !isPrimaryModifierPressedInHardwareState() else { return }
+        let nowMs = monotonicMilliseconds()
+        logInputTrace(
+            "hotkeyReleased panelVisible=1 action=scheduleReleaseConfirm nowMs=\(formatMilliseconds(nowMs))"
+        )
+        scheduleModifierReleaseConfirmation(trigger: "hotkey_released")
+    }
+
+    func handleInAppWindowHotkey(isBackward: Bool) {
+        let now = ProcessInfo.processInfo.systemUptime
+        let nowMs = monotonicMilliseconds()
+        let directionText = isBackward ? "backward" : "forward"
+        if now < ignoreHotkeyPressesUntil {
+            logInputTrace(
+                "inAppHotkeyPressed dir=\(directionText) dropped=postFinishWindow nowMs=\(formatMilliseconds(nowMs)) ignoreUntilMs=\(formatMilliseconds(ignoreHotkeyPressesUntil * 1_000))"
+            )
+            return
+        }
+        if suppressHotkeyReplayUntilRelease {
+            logInputTrace(
+                "inAppHotkeyPressed dir=\(directionText) dropped=awaitingHotkeyRelease nowMs=\(formatMilliseconds(nowMs))"
+            )
+            return
+        }
+        if isPanelPresented {
+            guard activeHotkeySessionKind == .inAppWindowSwitcher else { return }
+            guard isPrimaryModifierLikelyPressed() else {
+                logInputTrace(
+                    "inAppHotkeyPressed dir=\(directionText) panelVisible=1 modifierPressed=0 action=scheduleReleaseConfirm nowMs=\(formatMilliseconds(nowMs))"
+                )
+                scheduleModifierReleaseConfirmation(trigger: "in_app_pressed_without_modifier")
+                return
+            }
+            logInputTrace(
+                "inAppHotkeyPressed dir=\(directionText) panelVisible=1 modifierPressed=1 action=advance nowMs=\(formatMilliseconds(nowMs))"
+            )
+            advance(isBackward ? .tabBackward : .tabForward)
+            return
+        }
+        logInputTrace(
+            "inAppHotkeyPressed dir=\(directionText) panelVisible=0 action=show nowMs=\(formatMilliseconds(nowMs))"
+        )
+        let direction: CycleDirection = isBackward ? .backward : .forward
+        showInAppWindowSwitcher(direction: direction)
+    }
+
+    func handleInAppWindowHotkeyReleased() {
+        guard isPanelPresented else { return }
+        guard activeHotkeySessionKind == .inAppWindowSwitcher else { return }
+        guard !isPrimaryModifierPressedInHardwareState() else { return }
+        let nowMs = monotonicMilliseconds()
+        logInputTrace(
+            "inAppHotkeyReleased panelVisible=1 action=scheduleReleaseConfirm nowMs=\(formatMilliseconds(nowMs))"
+        )
+        scheduleModifierReleaseConfirmation(trigger: "in_app_hotkey_released")
+    }
+
+    func advance(_ keyInput: KeyInput) {
+        guard !model.isSearchActive else {
+            logInputTrace(
+                "advance key=\(keyInput.debugName) dropped=searchActive nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
+            )
+            return
+        }
+        if keyInput == .tabForward || keyInput == .tabBackward {
+            guard isPrimaryModifierLikelyPressed() else {
+                logInputTrace(
+                    "advance key=\(keyInput.debugName) dropped=modifierNotPressed action=scheduleReleaseConfirm nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
+                )
+                scheduleModifierReleaseConfirmation(trigger: "advance_without_modifier")
+                return
+            }
+            let now = ProcessInfo.processInfo.systemUptime
+            let nowMs = now * 1_000
+            if
+                let lastCommittedTabAdvanceTimestamp,
+                now - lastCommittedTabAdvanceTimestamp < tabAdvanceMinimumInterval
+            {
+                logInputTrace(
+                    "advance key=\(keyInput.debugName) dropped=throttle nowMs=\(formatMilliseconds(nowMs)) deltaMs=\(formatMilliseconds((now - lastCommittedTabAdvanceTimestamp) * 1_000)) thresholdMs=\(formatMilliseconds(tabAdvanceMinimumInterval * 1_000))"
+                )
+                return
+            }
+            self.lastCommittedTabAdvanceTimestamp = now
+            logInputTrace(
+                "advance key=\(keyInput.debugName) accepted nowMs=\(formatMilliseconds(nowMs))"
+            )
+        }
+
+        cancelPendingModifierReleaseConfirmation()
+        model.handle(keyInput)
+        RuntimeLog.info("Session", "advance key=\(keyInput.debugName) \(self.model.debugSelectionSummary())")
+        updatePanelSize()
+        scheduleDelayedWindowLayerEntryIfNeeded()
+    }
+
+    func scheduleDelayedWindowLayerEntryIfNeeded() {
+        if let delayedWindowLayerTimer {
+            delayedWindowLayerTimer.invalidate()
+            self.delayedWindowLayerTimer = nil
+        }
+        guard autoEnterWindowLayerEnabled else { return }
+        guard !model.isSearchActive else {
+            RuntimeLog.info("AutoEnter", "skip searchActive")
+            return
+        }
+
+        guard isPanelPresented else {
+            RuntimeLog.info("AutoEnter", "skip panelHidden")
+            return
+        }
+        guard model.canAutoEnterWindowLayer else {
+            RuntimeLog.info("AutoEnter", "skip \(self.model.debugSelectionSummary())")
+            return
+        }
+        RuntimeLog.info("AutoEnter", "schedule delay=\(self.windowLayerPresentationDelay)s \(self.model.debugSelectionSummary())")
+
+        let timer = Timer(timeInterval: windowLayerPresentationDelay, repeats: false) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                guard self.isPanelPresented else { return }
+                if self.model.autoEnterWindowLayerIfPossible() {
+                    RuntimeLog.info("AutoEnter", "entered window layer \(self.model.debugSelectionSummary())")
+                    self.updatePanelSize()
+                } else {
+                    RuntimeLog.info("AutoEnter", "timer fired but stay app layer \(self.model.debugSelectionSummary())")
+                }
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        delayedWindowLayerTimer = timer
+    }
+
+    func terminateSelectedApp() {
+        guard terminateSelectedAppTask == nil else { return }
+        let shouldAnimatePress = model.prepareTerminateSelectedAppAnimation()
+
+        terminateSelectedAppTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer {
+                self.terminateSelectedAppTask = nil
+            }
+
+            if shouldAnimatePress {
+                try? await Task.sleep(nanoseconds: 80_000_000)
+                guard !Task.isCancelled else { return }
+            }
+
+            switch self.model.terminateSelectedApp() {
+            case .notHandled:
+                self.model.clearTerminateSelectedAppAnimation()
+                RuntimeLog.info("Session", "terminate selected app ignored")
+                NSSound.beep()
+            case .updatedSession:
+                RuntimeLog.info("Session", "terminate selected app \(self.model.debugSelectionSummary())")
+                self.updatePanelSize()
+                self.scheduleDelayedWindowLayerEntryIfNeeded()
+            case .sessionEnded:
+                self.model.clearTerminateSelectedAppAnimation()
+                RuntimeLog.info("Session", "terminate selected app ended session")
+                self.endPresentationSession()
+            }
+        }
+    }
+
+    func activePrimaryModifier() -> SwitcherPrimaryModifier {
+        primaryModifier(for: activeHotkeySessionKind ?? .globalAppSwitcher)
+    }
+
+    func primaryModifier(for sessionKind: HotkeySessionKind) -> SwitcherPrimaryModifier {
+        if sessionKind == .inAppWindowSwitcher {
+            return InAppWindowHotkeyPreferencesStore.load().primaryModifier
+        }
+        return SwitcherHotkeyPreferencesStore.load().primaryModifier
+    }
+
+    func activePrimaryModifierFlag() -> NSEvent.ModifierFlags {
+        activePrimaryModifier().eventModifierFlag
+    }
+
+    func isTerminateSelectedAppShortcut(_ event: NSEvent) -> Bool {
+        guard activeHotkeySessionKind != .inAppWindowSwitcher else { return false }
+        let hotkeyConfiguration = SwitcherHotkeyPreferencesStore.load()
+        guard event.keyCode == hotkeyConfiguration.quitKeyCode else { return false }
+
+        let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        guard flags.contains(hotkeyConfiguration.primaryModifier.eventModifierFlag) else { return false }
+        guard !flags.contains(.shift) else { return false }
+
+        switch hotkeyConfiguration.primaryModifier {
+        case .option:
+            return !flags.contains(.command) && !flags.contains(.control)
+        case .control:
+            return !flags.contains(.command) && !flags.contains(.option)
+        case .command:
+            return !flags.contains(.control) && !flags.contains(.option)
+        }
+    }
+}
