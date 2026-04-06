@@ -429,6 +429,50 @@ final class FlowTabTests: XCTestCase {
         XCTAssertEqual(requestCallCount, 1)
     }
 
+    @MainActor
+    func testRuntimeActivatorPrefersLiveAXWindowHandleBeforeIndexOrTitleFallback() {
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let activator = RuntimeActivator()
+        activator.activateCurrentAppIfNeededOverride = { _ in false }
+
+        var requestCallCount = 0
+        activator.requestActivationOverride = { app, completion in
+            requestCallCount += 1
+            completion?(app)
+        }
+
+        var directFocusCount = 0
+        activator.focusAXWindowOverride = { _, _, _ in
+            directFocusCount += 1
+            return true
+        }
+
+        let liveHandle = AXUIElementCreateApplication(currentApp.processIdentifier)
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windowsByID: [
+                "mail-1": RuntimeWindowContext(
+                    id: "mail-1",
+                    title: "Inbox",
+                    isMinimized: false,
+                    cgWindowID: nil,
+                    inferredTitleBarStyle: nil,
+                    axWindow: liveHandle
+                )
+            ]
+        )
+
+        activator.activate(
+            target: .window(appID: appID, windowID: "mail-1", restoreIfMinimized: false),
+            contextsByID: [appID: context]
+        )
+
+        XCTAssertEqual(requestCallCount, 1)
+        XCTAssertEqual(directFocusCount, 1)
+    }
+
     func testPermissionCheckersPreferTestingOverridesOverLaunchArgumentOverrides() {
         let previousAXTrusted = AccessibilityPermissionChecker.isTrustedOverrideForTesting
         let previousAXRequest = AccessibilityPermissionChecker.requestPermissionOverrideForTesting

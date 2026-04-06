@@ -26,6 +26,7 @@ struct RuntimeWindowContext {
     let isMinimized: Bool
     var cgWindowID: CGWindowID?
     var inferredTitleBarStyle: WindowTitleBarStyleGuess?
+    var axWindow: AXUIElement? = nil
 }
 
 enum AccessibilityPermissionChecker {
@@ -305,11 +306,28 @@ final class RuntimeSnapshotProvider {
         let title: String
         let isMinimized: Bool
         let cgWindowID: CGWindowID?
+        let axWindow: AXUIElement
     }
 
     private struct CGWindowEntry {
         let id: CGWindowID
         let title: String?
+        let bounds: CGRect?
+    }
+
+    private struct AXWindowEntry {
+        let index: Int
+        let id: String
+        let title: String
+        let isMinimized: Bool
+        let window: AXUIElement
+        let frame: CGRect?
+    }
+
+    private struct WindowPairScore {
+        let axIndex: Int
+        let cgIndex: Int
+        let score: Double
     }
 
     private struct AXWindowStats {
@@ -335,6 +353,13 @@ final class RuntimeSnapshotProvider {
         let pid: pid_t
         let candidate: AppSwitchCandidate
     }
+
+    private static let cgMatchMinimumConfidence = 0.56
+    private static let cgMatchAmbiguityDelta = 0.10
+    private static let cgMatchStickyBonus = 0.18
+    private static let cgMatchIndexWeight = 0.20
+
+    private var lastCGWindowIDByAXWindowID: [String: CGWindowID] = [:]
 
     func snapshot() -> RuntimeSnapshot {
         if let uiTestRuntimeDataset = Self.uiTestRuntimeDataset() {
@@ -412,7 +437,8 @@ final class RuntimeSnapshotProvider {
                             title: $0.title,
                             isMinimized: $0.isMinimized,
                             cgWindowID: $0.cgWindowID,
-                            inferredTitleBarStyle: nil
+                            inferredTitleBarStyle: nil,
+                            axWindow: $0.axWindow
                         )
                     )
                 }
@@ -638,7 +664,8 @@ final class RuntimeSnapshotProvider {
                         title: $0.title,
                         isMinimized: $0.isMinimized,
                         cgWindowID: $0.cgWindowID,
-                        inferredTitleBarStyle: nil
+                        inferredTitleBarStyle: nil,
+                        axWindow: $0.axWindow
                     )
                 )
             }
@@ -795,6 +822,7 @@ final class RuntimeSnapshotProvider {
         windowsByPID: [pid_t: [WindowListEntry]],
         rankByPID: [pid_t: Int]
     ) {
+        AXLiveWindowRegistry.shared.rebind(runningApps)
         let cgWindowsByPID = collectCGWindowsByPID()
         // Keep a single source of truth for window counting and selection: AX window list.
         return (
@@ -816,12 +844,15 @@ final class RuntimeSnapshotProvider {
         for app in runningApps {
             let appName = app.localizedName ?? app.bundleIdentifier ?? "pid:\(app.processIdentifier)"
             let windows = AXWindowInspector.windows(for: app)
+            AXLiveWindowRegistry.shared.refreshSnapshot(
+                forPID: app.processIdentifier,
+                windows: windows
+            )
             let cgWindows = cgWindowsByPID[app.processIdentifier] ?? []
-            var matchedCGWindowIndexes: Set<Int> = []
             RuntimeLog.info("AX", "\(appName) rawWindows=\(windows.count)")
             guard !windows.isEmpty else { continue }
 
-            let entries = windows.enumerated().compactMap { index, window -> WindowListEntry? in
+            let axEntries = windows.enumerated().compactMap { index, window -> AXWindowEntry? in
                 guard AXWindowInspector.isSwitchable(window) else {
                     let role = AXWindowInspector.role(for: window) ?? "unknown"
                     RuntimeLog.info("AX", "\(appName) skip[\(index)] role=\(role)")
@@ -836,21 +867,39 @@ final class RuntimeSnapshotProvider {
                     RuntimeLog.info("AX", "\(appName) untitled[\(index)] use fallback")
                     return AXWindowInspector.fallbackTitle(index: index)
                 }()
-                let cgWindowID = resolveCGWindowID(
-                    preferredTitle: titleFromAX,
-                    fallbackIndex: index,
-                    cgWindows: cgWindows,
-                    usedIndexes: &matchedCGWindowIndexes
-                )
-                return WindowListEntry(
-                    windowID: windowID,
+                return AXWindowEntry(
+                    index: index,
+                    id: windowID,
                     title: title,
                     isMinimized: AXWindowInspector.isMinimized(window),
-                    cgWindowID: cgWindowID
+                    window: window,
+                    frame: AXWindowInspector.frame(for: window)
                 )
             }
 
-            guard !entries.isEmpty else { continue }
+            guard !axEntries.isEmpty else {
+                pruneCachedCGMatches(for: app.processIdentifier, validWindowIDs: Set<String>())
+                continue
+            }
+
+            let cgMatchesByAXWindowID = resolveCGWindowAssignments(
+                axWindows: axEntries,
+                cgWindows: cgWindows
+            )
+            let entries = axEntries.map { axEntry in
+                WindowListEntry(
+                    windowID: axEntry.id,
+                    title: axEntry.title,
+                    isMinimized: axEntry.isMinimized,
+                    cgWindowID: cgMatchesByAXWindowID[axEntry.id],
+                    axWindow: axEntry.window
+                )
+            }
+
+            pruneCachedCGMatches(
+                for: app.processIdentifier,
+                validWindowIDs: Set(entries.map(\.windowID))
+            )
             RuntimeLog.info("AX", "\(appName) switchableWindows=\(entries.count)")
             windowsByPID[app.processIdentifier] = entries
         }
@@ -901,48 +950,146 @@ final class RuntimeSnapshotProvider {
             guard let windowNumber = item[kCGWindowNumber as String] as? NSNumber else { continue }
             let title = (item[kCGWindowName as String] as? String)?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
+            let bounds = (item[kCGWindowBounds as String] as? [String: Any])
+                .flatMap { CGRect(dictionaryRepresentation: $0 as CFDictionary) }?
+                .standardized
             windowsByPID[ownerPID, default: []].append(
                 CGWindowEntry(
                     id: CGWindowID(windowNumber.uint32Value),
-                    title: title
+                    title: title,
+                    bounds: bounds
                 )
             )
         }
         return windowsByPID
     }
 
-    private func resolveCGWindowID(
-        preferredTitle: String?,
-        fallbackIndex: Int,
-        cgWindows: [CGWindowEntry],
-        usedIndexes: inout Set<Int>
-    ) -> CGWindowID? {
-        if let preferredTitle, !preferredTitle.isEmpty {
-            if let exactMatchIndex = cgWindows.indices.first(where: { index in
-                !usedIndexes.contains(index) && cgWindows[index].title == preferredTitle
-            }) {
-                usedIndexes.insert(exactMatchIndex)
-                return cgWindows[exactMatchIndex].id
+    private func resolveCGWindowAssignments(
+        axWindows: [AXWindowEntry],
+        cgWindows: [CGWindowEntry]
+    ) -> [String: CGWindowID] {
+        guard !axWindows.isEmpty, !cgWindows.isEmpty else { return [:] }
+
+        var allScores: [WindowPairScore] = []
+        allScores.reserveCapacity(axWindows.count * cgWindows.count)
+        var sortedScoresByAXIndex: [[Double]] = Array(repeating: [], count: axWindows.count)
+
+        for (axIndex, axWindow) in axWindows.enumerated() {
+            var scoresForAX: [Double] = []
+            scoresForAX.reserveCapacity(cgWindows.count)
+            for (cgIndex, cgWindow) in cgWindows.enumerated() {
+                let score = cgMatchScore(
+                    axWindow: axWindow,
+                    cgWindow: cgWindow,
+                    cgIndex: cgIndex,
+                    axCount: axWindows.count,
+                    cgCount: cgWindows.count
+                )
+                scoresForAX.append(score)
+                allScores.append(WindowPairScore(axIndex: axIndex, cgIndex: cgIndex, score: score))
             }
-            if let insensitiveMatchIndex = cgWindows.indices.first(where: { index in
-                guard !usedIndexes.contains(index), let title = cgWindows[index].title else { return false }
-                return title.caseInsensitiveCompare(preferredTitle) == .orderedSame
-            }) {
-                usedIndexes.insert(insensitiveMatchIndex)
-                return cgWindows[insensitiveMatchIndex].id
+            scoresForAX.sort(by: >)
+            sortedScoresByAXIndex[axIndex] = scoresForAX
+        }
+
+        var ambiguousAXIndexes: Set<Int> = []
+        for (axIndex, scores) in sortedScoresByAXIndex.enumerated() {
+            guard let bestScore = scores.first else {
+                ambiguousAXIndexes.insert(axIndex)
+                continue
+            }
+            if bestScore < Self.cgMatchMinimumConfidence {
+                ambiguousAXIndexes.insert(axIndex)
+                continue
+            }
+            if scores.count > 1, bestScore - scores[1] < Self.cgMatchAmbiguityDelta {
+                ambiguousAXIndexes.insert(axIndex)
             }
         }
 
-        if cgWindows.indices.contains(fallbackIndex), !usedIndexes.contains(fallbackIndex) {
-            usedIndexes.insert(fallbackIndex)
-            return cgWindows[fallbackIndex].id
+        var matchedCGIndexes: Set<Int> = []
+        var assignmentByAXIndex: [Int: Int] = [:]
+        for pair in allScores.sorted(by: { lhs, rhs in
+            if lhs.score != rhs.score { return lhs.score > rhs.score }
+            if lhs.axIndex != rhs.axIndex { return lhs.axIndex < rhs.axIndex }
+            return lhs.cgIndex < rhs.cgIndex
+        }) {
+            guard !ambiguousAXIndexes.contains(pair.axIndex) else { continue }
+            guard pair.score >= Self.cgMatchMinimumConfidence else { continue }
+            guard assignmentByAXIndex[pair.axIndex] == nil else { continue }
+            guard !matchedCGIndexes.contains(pair.cgIndex) else { continue }
+            assignmentByAXIndex[pair.axIndex] = pair.cgIndex
+            matchedCGIndexes.insert(pair.cgIndex)
         }
 
-        guard let firstUnmatchedIndex = cgWindows.indices.first(where: { !usedIndexes.contains($0) }) else {
-            return nil
+        var matchedByWindowID: [String: CGWindowID] = [:]
+        for (axIndex, cgIndex) in assignmentByAXIndex {
+            let windowID = axWindows[axIndex].id
+            let cgWindowID = cgWindows[cgIndex].id
+            matchedByWindowID[windowID] = cgWindowID
+            lastCGWindowIDByAXWindowID[windowID] = cgWindowID
         }
-        usedIndexes.insert(firstUnmatchedIndex)
-        return cgWindows[firstUnmatchedIndex].id
+        return matchedByWindowID
+    }
+
+    private func cgMatchScore(
+        axWindow: AXWindowEntry,
+        cgWindow: CGWindowEntry,
+        cgIndex: Int,
+        axCount: Int,
+        cgCount: Int
+    ) -> Double {
+        let indexRange = max(1, max(axCount, cgCount) - 1)
+        let indexDistance = Double(abs(axWindow.index - cgIndex))
+        let indexScore = max(0, 1.0 - (indexDistance / Double(indexRange)))
+
+        let frameScore: Double
+        if let axFrame = axWindow.frame, let cgBounds = cgWindow.bounds {
+            frameScore = geometryScore(axFrame: axFrame, cgFrame: cgBounds)
+        } else {
+            frameScore = 0.10
+        }
+
+        var score = frameScore * (1.0 - Self.cgMatchIndexWeight)
+        score += indexScore * Self.cgMatchIndexWeight
+
+        if lastCGWindowIDByAXWindowID[axWindow.id] == cgWindow.id {
+            score += Self.cgMatchStickyBonus
+        }
+
+        return min(1.0, max(0.0, score))
+    }
+
+    private func geometryScore(axFrame: CGRect, cgFrame: CGRect) -> Double {
+        let ax = axFrame.standardized
+        let cg = cgFrame.standardized
+        guard ax.width > 0, ax.height > 0, cg.width > 0, cg.height > 0 else { return 0.0 }
+
+        let intersection = ax.intersection(cg)
+        let intersectionArea = max(0, intersection.width * intersection.height)
+        let unionArea = max(0, ax.width * ax.height + cg.width * cg.height - intersectionArea)
+        let iou = unionArea > 0 ? min(1.0, intersectionArea / unionArea) : 0.0
+
+        let axCenter = CGPoint(x: ax.midX, y: ax.midY)
+        let cgCenter = CGPoint(x: cg.midX, y: cg.midY)
+        let distance = hypot(axCenter.x - cgCenter.x, axCenter.y - cgCenter.y)
+        let distanceScore = max(0.0, 1.0 - min(1.0, distance / 650.0))
+
+        let axArea = ax.width * ax.height
+        let cgArea = cg.width * cg.height
+        let areaScore = max(0.0, min(1.0, min(axArea, cgArea) / max(axArea, cgArea)))
+
+        return iou * 0.65 + distanceScore * 0.25 + areaScore * 0.10
+    }
+
+    private func pruneCachedCGMatches(for pid: pid_t, validWindowIDs: Set<String>) {
+        let prefix = "ax:\(pid):"
+        let staleKeys = lastCGWindowIDByAXWindowID.keys.filter { key in
+            key.hasPrefix(prefix) && !validWindowIDs.contains(key)
+        }
+        for key in staleKeys {
+            lastCGWindowIDByAXWindowID.removeValue(forKey: key)
+        }
     }
 
     private func collectAppRankByPID(for runningApps: [NSRunningApplication]) -> [pid_t: Int] {
@@ -994,20 +1141,34 @@ final class RuntimeSnapshotProvider {
     struct CGWindowEntryForTesting {
         let id: CGWindowID
         let title: String?
+        let bounds: CGRect?
     }
 
-    static func resolveCGWindowIDForTesting(
-        preferredTitle: String?,
-        fallbackIndex: Int,
+    struct AXWindowEntryForTesting {
+        let id: String
+        let index: Int
+        let bounds: CGRect?
+    }
+
+    static func resolveCGWindowAssignmentsForTesting(
+        axWindows: [AXWindowEntryForTesting],
         cgWindows: [CGWindowEntryForTesting],
-        usedIndexes: inout Set<Int>
-    ) -> CGWindowID? {
+        previousMatches: [String: CGWindowID] = [:]
+    ) -> [String: CGWindowID] {
         let provider = RuntimeSnapshotProvider()
-        return provider.resolveCGWindowID(
-            preferredTitle: preferredTitle,
-            fallbackIndex: fallbackIndex,
-            cgWindows: cgWindows.map { CGWindowEntry(id: $0.id, title: $0.title) },
-            usedIndexes: &usedIndexes
+        provider.lastCGWindowIDByAXWindowID = previousMatches
+        return provider.resolveCGWindowAssignments(
+            axWindows: axWindows.map {
+                AXWindowEntry(
+                    index: $0.index,
+                    id: $0.id,
+                    title: "",
+                    isMinimized: false,
+                    window: AXUIElementCreateSystemWide(),
+                    frame: $0.bounds
+                )
+            },
+            cgWindows: cgWindows.map { CGWindowEntry(id: $0.id, title: $0.title, bounds: $0.bounds) }
         )
     }
 
@@ -1138,6 +1299,8 @@ final class RuntimeActivator {
     var activateCurrentAppIfNeededOverride: ((NSRunningApplication) -> Bool)?
     var requestActivationOverride: ((NSRunningApplication, ((NSRunningApplication) -> Void)?) -> Void)?
     var focusWindowOverride: ((String, String, Bool, NSRunningApplication) -> Void)?
+    var focusAXWindowOverride: ((AXUIElement, Bool, NSRunningApplication) -> Bool)?
+    var liveWindowRegistry: AXLiveWindowRegistry = .shared
 
     func activate(target: ActivationTarget, contextsByID: [String: RuntimeAppContext]) {
         switch target {
@@ -1180,6 +1343,7 @@ final class RuntimeActivator {
             self.focusWindow(
                 withID: windowID,
                 withTitle: windowContext.title,
+                preferredAXWindow: windowContext.axWindow,
                 restoreIfMinimized: restoreIfMinimized || windowContext.isMinimized,
                 in: activatedApp
             )
@@ -1189,6 +1353,7 @@ final class RuntimeActivator {
     private func focusWindow(
         withID targetWindowID: String,
         withTitle targetTitle: String,
+        preferredAXWindow: AXUIElement?,
         restoreIfMinimized: Bool,
         in app: NSRunningApplication
     ) {
@@ -1196,6 +1361,22 @@ final class RuntimeActivator {
             focusWindowOverride(targetWindowID, targetTitle, restoreIfMinimized, app)
             return
         }
+
+        let windowFromRegistry = liveWindowRegistry.window(
+            forWindowID: targetWindowID,
+            expectedPID: app.processIdentifier
+        )
+        if
+            let directWindow = preferredAXWindow ?? windowFromRegistry,
+            AXWindowInspector.belongsToProcess(directWindow, pid: app.processIdentifier)
+        {
+            if let focusAXWindowOverride, focusAXWindowOverride(directWindow, restoreIfMinimized, app) {
+                return
+            }
+            focus(window: directWindow, restoreIfMinimized: restoreIfMinimized)
+            return
+        }
+
         let windows = AXWindowInspector.windows(for: app)
         guard !windows.isEmpty else { return }
 
@@ -1294,6 +1475,151 @@ final class RuntimeActivator {
 
 }
 
+final class AXLiveWindowRegistry {
+    static let shared = AXLiveWindowRegistry()
+
+    private final class ObserverContext {
+        weak var registry: AXLiveWindowRegistry?
+        let pid: pid_t
+
+        init(registry: AXLiveWindowRegistry, pid: pid_t) {
+            self.registry = registry
+            self.pid = pid
+        }
+    }
+
+    private let lock = NSLock()
+    private var windowsByPID: [pid_t: [String: AXUIElement]] = [:]
+    private var observersByPID: [pid_t: AXObserver] = [:]
+    private var observerContextsByPID: [pid_t: ObserverContext] = [:]
+    private let watchedNotifications: [CFString] = [
+        kAXWindowCreatedNotification as CFString,
+        kAXWindowMovedNotification as CFString,
+        kAXWindowResizedNotification as CFString,
+        kAXMainWindowChangedNotification as CFString,
+        kAXFocusedWindowChangedNotification as CFString,
+        kAXWindowMiniaturizedNotification as CFString,
+        kAXWindowDeminiaturizedNotification as CFString,
+        kAXUIElementDestroyedNotification as CFString
+    ]
+
+    private init() {}
+
+    func rebind(_ runningApps: [NSRunningApplication]) {
+        let expectedPIDs = Set(runningApps.map(\.processIdentifier))
+        DispatchQueue.main.async { [weak self] in
+            self?.rebindOnMainThread(expectedPIDs: expectedPIDs)
+        }
+    }
+
+    func refreshSnapshot(forPID pid: pid_t, windows: [AXUIElement]) {
+        let windowsByID = makeWindowMap(pid: pid, windows: windows)
+        lock.lock()
+        windowsByPID[pid] = windowsByID
+        lock.unlock()
+    }
+
+    func window(forWindowID windowID: String, expectedPID: pid_t) -> AXUIElement? {
+        lock.lock()
+        defer { lock.unlock() }
+        return windowsByPID[expectedPID]?[windowID]
+    }
+
+    private func makeWindowMap(pid: pid_t, windows: [AXUIElement]) -> [String: AXUIElement] {
+        Dictionary(
+            uniqueKeysWithValues: windows.enumerated().map { index, window in
+                (AXWindowInspector.makeWindowID(pid: pid, index: index), window)
+            }
+        )
+    }
+
+    private func rebindOnMainThread(expectedPIDs: Set<pid_t>) {
+        if !AccessibilityPermissionChecker.isTrusted() {
+            for pid in Array(observersByPID.keys) {
+                removeObserver(pid: pid)
+            }
+            lock.lock()
+            windowsByPID.removeAll()
+            lock.unlock()
+            return
+        }
+
+        for pid in Array(observersByPID.keys) where !expectedPIDs.contains(pid) {
+            removeObserver(pid: pid)
+            lock.lock()
+            windowsByPID.removeValue(forKey: pid)
+            lock.unlock()
+        }
+
+        for pid in expectedPIDs where observersByPID[pid] == nil {
+            installObserver(pid: pid)
+        }
+    }
+
+    private func installObserver(pid: pid_t) {
+        var observerRef: AXObserver?
+        let createResult = AXObserverCreate(pid, Self.callback, &observerRef)
+        guard createResult == .success, let observerRef else { return }
+
+        let appElement = AXUIElementCreateApplication(pid)
+        let context = ObserverContext(registry: self, pid: pid)
+        let contextPointer = UnsafeMutableRawPointer(Unmanaged.passUnretained(context).toOpaque())
+        for notification in watchedNotifications {
+            let addResult = AXObserverAddNotification(
+                observerRef,
+                appElement,
+                notification,
+                contextPointer
+            )
+            if addResult == .notificationUnsupported {
+                continue
+            }
+            guard addResult == .success || addResult == .notificationAlreadyRegistered else { continue }
+        }
+
+        CFRunLoopAddSource(
+            CFRunLoopGetMain(),
+            AXObserverGetRunLoopSource(observerRef),
+            .defaultMode
+        )
+        observersByPID[pid] = observerRef
+        observerContextsByPID[pid] = context
+    }
+
+    private func removeObserver(pid: pid_t) {
+        guard let observer = observersByPID.removeValue(forKey: pid) else { return }
+        let appElement = AXUIElementCreateApplication(pid)
+        for notification in watchedNotifications {
+            AXObserverRemoveNotification(observer, appElement, notification)
+        }
+        CFRunLoopRemoveSource(
+            CFRunLoopGetMain(),
+            AXObserverGetRunLoopSource(observer),
+            .defaultMode
+        )
+        observerContextsByPID.removeValue(forKey: pid)
+    }
+
+    private func refreshFromObserver(pid: pid_t) {
+        guard let app = NSRunningApplication(processIdentifier: pid) else {
+            lock.lock()
+            windowsByPID.removeValue(forKey: pid)
+            lock.unlock()
+            return
+        }
+        let windows = AXWindowInspector.windows(for: app)
+        refreshSnapshot(forPID: pid, windows: windows)
+    }
+
+    private static let callback: AXObserverCallback = { _, _, _, refcon in
+        guard let refcon else { return }
+        let context = Unmanaged<ObserverContext>.fromOpaque(refcon).takeUnretainedValue()
+        Task { @MainActor in
+            context.registry?.refreshFromObserver(pid: context.pid)
+        }
+    }
+}
+
 private enum AXWindowInspector {
     private static let windowIDPrefix = "ax"
 
@@ -1342,6 +1668,22 @@ private enum AXWindowInspector {
         return title
     }
 
+    static func frame(for window: AXUIElement) -> CGRect? {
+        guard
+            let position = pointValue(for: window, attribute: kAXPositionAttribute as CFString),
+            let size = sizeValue(for: window, attribute: kAXSizeAttribute as CFString)
+        else {
+            return nil
+        }
+        return CGRect(origin: position, size: size).standardized
+    }
+
+    static func belongsToProcess(_ window: AXUIElement, pid: pid_t) -> Bool {
+        var ownerPID: pid_t = 0
+        guard AXUIElementGetPid(window, &ownerPID) == .success else { return false }
+        return ownerPID == pid
+    }
+
     static func isSwitchable(_ window: AXUIElement) -> Bool {
         guard let role = role(for: window) else { return true }
         return role == kAXWindowRole as String
@@ -1370,6 +1712,46 @@ private enum AXWindowInspector {
         }
         return number.boolValue
     }
+
+    private static func pointValue(for window: AXUIElement, attribute: CFString) -> CGPoint? {
+        var value: CFTypeRef?
+        guard
+            AXUIElementCopyAttributeValue(window, attribute, &value) == .success,
+            let rawValue = value,
+            CFGetTypeID(rawValue) == AXValueGetTypeID()
+        else {
+            return nil
+        }
+        let axValue = rawValue as! AXValue
+        guard
+            AXValueGetType(axValue) == .cgPoint
+        else {
+            return nil
+        }
+        var point = CGPoint.zero
+        guard AXValueGetValue(axValue, .cgPoint, &point) else { return nil }
+        return point
+    }
+
+    private static func sizeValue(for window: AXUIElement, attribute: CFString) -> CGSize? {
+        var value: CFTypeRef?
+        guard
+            AXUIElementCopyAttributeValue(window, attribute, &value) == .success,
+            let rawValue = value,
+            CFGetTypeID(rawValue) == AXValueGetTypeID()
+        else {
+            return nil
+        }
+        let axValue = rawValue as! AXValue
+        guard
+            AXValueGetType(axValue) == .cgSize
+        else {
+            return nil
+        }
+        var size = CGSize.zero
+        guard AXValueGetValue(axValue, .cgSize, &size) else { return nil }
+        return size
+    }
 }
 
 enum AXWindowInspectorForTesting {
@@ -1387,6 +1769,10 @@ enum AXWindowInspectorForTesting {
 
     static func title(for window: AXUIElement) -> String? {
         AXWindowInspector.title(for: window)
+    }
+
+    static func frame(for window: AXUIElement) -> CGRect? {
+        AXWindowInspector.frame(for: window)
     }
 
     static func role(for window: AXUIElement) -> String? {

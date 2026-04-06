@@ -2316,68 +2316,53 @@ final class FlowTabPriorityCoverageTests: XCTestCase {
         )
     }
 
-    func testRuntimeSnapshotProviderResolveCGWindowIDCoversExactInsensitiveFallbackAndExhaustedCases() {
+    func testRuntimeSnapshotProviderResolveCGWindowAssignmentsUsesGeometryWithDuplicateTitles() {
+        let axWindows: [RuntimeSnapshotProvider.AXWindowEntryForTesting] = [
+            .init(id: "ax:100:0", index: 0, bounds: CGRect(x: 10, y: 10, width: 600, height: 420)),
+            .init(id: "ax:100:1", index: 1, bounds: CGRect(x: 640, y: 10, width: 600, height: 420))
+        ]
         let cgWindows: [RuntimeSnapshotProvider.CGWindowEntryForTesting] = [
-            .init(id: 11, title: "Inbox"),
-            .init(id: 22, title: "Draft"),
-            .init(id: 33, title: nil)
+            .init(
+                id: 22,
+                title: "Document",
+                bounds: CGRect(x: 640, y: 14, width: 600, height: 418)
+            ),
+            .init(
+                id: 11,
+                title: "Document",
+                bounds: CGRect(x: 8, y: 8, width: 602, height: 420)
+            )
         ]
 
-        var usedIndexes: Set<Int> = []
-        XCTAssertEqual(
-            RuntimeSnapshotProvider.resolveCGWindowIDForTesting(
-                preferredTitle: "Inbox",
-                fallbackIndex: 2,
-                cgWindows: cgWindows,
-                usedIndexes: &usedIndexes
-            ),
-            11
+        let assignments = RuntimeSnapshotProvider.resolveCGWindowAssignmentsForTesting(
+            axWindows: axWindows,
+            cgWindows: cgWindows
         )
-        XCTAssertEqual(usedIndexes, [0])
 
-        XCTAssertEqual(
-            RuntimeSnapshotProvider.resolveCGWindowIDForTesting(
-                preferredTitle: "draft",
-                fallbackIndex: 0,
-                cgWindows: cgWindows,
-                usedIndexes: &usedIndexes
-            ),
-            22
-        )
-        XCTAssertEqual(usedIndexes, [0, 1])
+        XCTAssertEqual(assignments["ax:100:0"], 11)
+        XCTAssertEqual(assignments["ax:100:1"], 22)
+    }
 
-        XCTAssertEqual(
-            RuntimeSnapshotProvider.resolveCGWindowIDForTesting(
-                preferredTitle: "unknown",
-                fallbackIndex: 2,
-                cgWindows: cgWindows,
-                usedIndexes: &usedIndexes
-            ),
-            33
-        )
-        XCTAssertEqual(usedIndexes, [0, 1, 2])
+    func testRuntimeSnapshotProviderResolveCGWindowAssignmentsSkipsAmbiguousOrLowConfidenceMatches() {
+        let axWindows: [RuntimeSnapshotProvider.AXWindowEntryForTesting] = [
+            .init(id: "ax:200:2", index: 2, bounds: CGRect(x: 100, y: 100, width: 800, height: 500)),
+            .init(id: "ax:200:0", index: 0, bounds: nil)
+        ]
+        let cgWindows: [RuntimeSnapshotProvider.CGWindowEntryForTesting] = [
+            .init(id: 1, title: nil, bounds: CGRect(x: 100, y: 100, width: 800, height: 500)),
+            .init(id: 2, title: nil, bounds: CGRect(x: 100, y: 100, width: 800, height: 500)),
+            .init(id: 3, title: nil, bounds: CGRect(x: 100, y: 100, width: 800, height: 500)),
+            .init(id: 4, title: nil, bounds: CGRect(x: 100, y: 100, width: 800, height: 500)),
+            .init(id: 5, title: nil, bounds: CGRect(x: 100, y: 100, width: 800, height: 500))
+        ]
 
-        var fallbackFromFirstUnmatched: Set<Int> = [0]
-        XCTAssertEqual(
-            RuntimeSnapshotProvider.resolveCGWindowIDForTesting(
-                preferredTitle: nil,
-                fallbackIndex: 99,
-                cgWindows: cgWindows,
-                usedIndexes: &fallbackFromFirstUnmatched
-            ),
-            22
+        let assignments = RuntimeSnapshotProvider.resolveCGWindowAssignmentsForTesting(
+            axWindows: axWindows,
+            cgWindows: cgWindows
         )
-        XCTAssertEqual(fallbackFromFirstUnmatched, [0, 1])
 
-        var fullyUsed: Set<Int> = [0, 1, 2]
-        XCTAssertNil(
-            RuntimeSnapshotProvider.resolveCGWindowIDForTesting(
-                preferredTitle: nil,
-                fallbackIndex: 99,
-                cgWindows: cgWindows,
-                usedIndexes: &fullyUsed
-            )
-        )
+        XCTAssertNil(assignments["ax:200:2"], "Ambiguous high-score windows should remain unbound")
+        XCTAssertNil(assignments["ax:200:0"], "Low-confidence windows should remain unbound")
     }
 
     func testAXWindowInspectorHelpersRoundTripWindowIDsAndHandleSystemElementLookups() {
