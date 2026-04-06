@@ -16,7 +16,7 @@ Apply this skill to repository changes in FlowTab. Use it to keep implementation
    For every feature extension or new feature, add or update unit, behavior, and UI tests. Do not submit code until the related unit, behavior, and UI suites pass.
 
 3. Diagnose bugs before changing production logic.
-   Before editing production files, run or explicitly attempt the relevant existing unit, behavior, and UI tests for the affected layers. Reproduce the bug with tests or stable logs first. If there is no reproducible signal yet, a required test layer cannot run, or the environment is missing required permissions, fixtures, or tooling, stop and report the blocker instead of patching by guesswork. Keep regression coverage after the fix.
+   Before editing production files, run or explicitly attempt the relevant existing unit, behavior, and UI tests for the affected layers. Reproduce the bug with tests or stable logs first. If existing tests cannot reproduce, analyze stable logs first and, when logs support a concrete scenario, add a failing scenario-based test before production edits. If there is no reproducible signal yet, a required test layer cannot run, or the environment is missing required permissions, fixtures, or tooling, stop and report the blocker instead of patching by guesswork. Keep regression coverage after the fix.
 
 4. Keep test-only and debug-only code out of production files.
    Place unit tests in test targets, test scaffolding in testing support files, and temporary bug-investigation logs or hooks outside the final production path. Keep only minimal production logging that is genuinely part of runtime behavior.
@@ -45,6 +45,7 @@ Apply this skill to repository changes in FlowTab. Use it to keep implementation
 2. Classify each affected file by architecture role and feature ownership before choosing a module.
 3. Choose the correct module before writing code.
 4. For bug fixes, run or explicitly attempt the relevant existing tests before production edits and stop if reproduction evidence or required environment access is missing.
+   If existing tests cannot reproduce, analyze stable logs first and add a scenario-based failing test from the log-supported hypothesis when feasible before production edits.
    If relevant UI automation is blocked by sandboxed temp or cache paths, first try `./scripts/testing/run-ui-tests-local.sh`. If that still fails for environment reasons, report the blocker and request the required elevation or external Terminal run instead of continuing with production edits.
 5. Design the solution so it generalizes beyond the current case.
 6. Add or update tests alongside the code change.

@@ -6,6 +6,7 @@ Use this workflow for regressions, flaky behavior, broken edge cases, and user-r
 
 - Run or explicitly attempt the relevant existing unit, behavior, and UI tests before changing production logic.
 - Reproduce the bug with a failing test, an existing failing suite, or stable logs before changing production logic.
+- If existing tests cannot reproduce the issue, analyze stable logs first; when logs support a concrete scenario, add a failing test that captures the scenario and expected log-backed behavior before changing production logic.
 - Stop and report the blocker if no reproducible signal exists yet or a required environment, permission, fixture, or test layer is unavailable.
 - Use tests and logs to narrow the root cause instead of guessing.
 - Keep regression coverage after the fix.
@@ -16,8 +17,8 @@ Use this workflow for regressions, flaky behavior, broken edge cases, and user-r
 2. Identify the affected layer or layers: unit, behavior, UI, runtime integration.
 3. Identify any required environment prerequisites for reproduction, such as Accessibility trust, screen capture permission, seeded fixtures, or launch arguments.
 4. Before touching production code, run or explicitly attempt the relevant existing unit, behavior, and UI tests and record which layers failed, passed, were not relevant, or were blocked.
-5. Add a missing failing test when the current suite cannot localize the defect. Start at the lowest layer that can express the failure.
-6. Use existing logs or add temporary diagnostic logging to confirm the hypothesis.
+5. If existing tests cannot reproduce the defect, analyze existing stable logs first, or add temporary diagnostic logging when needed to confirm a concrete hypothesis.
+6. When logs support a concrete scenario, add a missing failing test that captures that scenario and expected behavior. Start at the lowest layer that can express the failure and add higher-layer coverage when the bug is user-visible.
 7. If there is still no reproducible signal, or a required layer cannot run because the environment is blocked, stop and report the blocker. Do not edit production files past this point.
 8. Change production code only after tests or logs support the root-cause theory.
 9. Remove temporary debug-only logging or hooks from the final production path.
@@ -26,6 +27,7 @@ Use this workflow for regressions, flaky behavior, broken edge cases, and user-r
 ## Hard Gates
 
 - Do not edit production files before steps 4 through 7 establish either a reproducible failing signal or a clearly reported blocker.
+- If existing tests do not reproduce the issue, do not skip directly to production edits. Use logs to form a hypothesis and encode that hypothesis as a failing scenario test whenever feasible.
 - If a bug is user-visible and affects switcher behavior, keyboard interaction, window selection, launch flows, settings flows, or permission flows, keep or add a higher-layer regression. Prefer UI coverage when the scenario can be automated reasonably.
 - If a test layer is relevant but cannot run, treat that as a blocker to completion. Report it explicitly instead of silently proceeding.
 - If required permissions or OS capabilities are unavailable, stop and report the blocker rather than inferring runtime behavior from code inspection alone.
@@ -46,6 +48,7 @@ Use this workflow for regressions, flaky behavior, broken edge cases, and user-r
 ## Test Strategy
 
 - Add the lowest-layer failing reproduction you can express.
+- When existing suites cannot reproduce, derive the new failing test from the observed runtime scenario and the log signal that supports the hypothesis.
 - Run every relevant existing test layer before production edits. If a layer is not relevant, say why. If it is relevant but blocked, stop and report the blocker.
 - Keep or add a higher-layer regression when the bug was user-visible or crossed module boundaries.
 - Use UI coverage for user-facing regressions, interaction issues, settings flows, switcher behavior, and launch-time behavior.
@@ -64,5 +67,6 @@ Use this workflow for regressions, flaky behavior, broken edge cases, and user-r
 
 - Reject blind patches that are not backed by a reproducible failing signal.
 - Reject bugfixes that edit production code before running or explicitly attempting the relevant pre-change tests.
+- Reject bugfixes where existing tests could not reproduce, logs were available for diagnosis, but no scenario-based failing test was added from that log-backed analysis.
 - Reject completions that omit blocked test layers or missing-environment reasons from the final report.
 - Reject fixes that add test-only or debug-only logic into the production code path.
