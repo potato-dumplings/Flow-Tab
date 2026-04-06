@@ -77,7 +77,7 @@ extension RuntimeSnapshotProvider {
         }
         RuntimeLog.info(
             "AX",
-            "\(appName) supplementalOffSpaceWindows=\(supplementalEntries.count) explicitTitles=\(explicitTitleCount) appNameFallbacks=\(appNameFallbackCount) backfilledAXEntries=\(backfilledEntryCount)"
+            "\(appName) supplementalCGWindows=\(supplementalEntries.count) explicitTitles=\(explicitTitleCount) appNameFallbacks=\(appNameFallbackCount) backfilledAXEntries=\(backfilledEntryCount)"
         )
         return mergedEntries + supplementalEntries
     }
@@ -98,7 +98,8 @@ extension RuntimeSnapshotProvider {
         )
 
         let candidates = allCGWindows.filter { window in
-            guard !window.isOnscreen else { return false }
+            // AX can miss large top-level windows that remain in the current space,
+            // so supplement from unmatched CG windows whether they are on-screen or off-space.
             guard !existingCGWindowIDs.contains(window.id) else { return false }
             guard window.alpha > Self.offSpaceSupplementAlphaThreshold else { return false }
             guard window.storeType == Self.standardBufferedStoreType else { return false }

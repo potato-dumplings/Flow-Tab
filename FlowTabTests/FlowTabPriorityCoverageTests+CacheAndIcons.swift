@@ -79,4 +79,73 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(requestedAppIDs.filter { $0 == "com.example.missing" }.count, 1)
     }
 
+    func testRuntimeSnapshotProviderSupplementalCGWindowsIncludeLargeOnScreenWindowsWhenAXMissesThem() {
+        let mergedEntries = RuntimeSnapshotProvider.appendOffSpaceCGWindowsForTesting(
+            entries: [
+                .init(
+                    windowID: "ax:18405:0",
+                    title: "百度一下，你就知道 - Google Chrome - test1",
+                    isMinimized: false,
+                    cgWindowID: 240001
+                ),
+                .init(
+                    windowID: "ax:18405:1",
+                    title: "百度一下，你就知道 - Google Chrome - test2",
+                    isMinimized: false,
+                    cgWindowID: 240002
+                ),
+                .init(
+                    windowID: "ax:18405:2",
+                    title: "百度一下，你就知道 - Google Chrome - test3",
+                    isMinimized: false,
+                    cgWindowID: 240003
+                ),
+                .init(
+                    windowID: "ax:18405:3",
+                    title: "百度一下，你就知道 - Google Chrome - test4",
+                    isMinimized: false,
+                    cgWindowID: 240004
+                )
+            ],
+            appName: "Google Chrome",
+            pid: 18405,
+            allCGWindows: [
+                .init(
+                    id: 240001,
+                    title: "百度一下，你就知道 - Google Chrome - test1",
+                    bounds: CGRect(x: 0, y: 38, width: 1_728, height: 1_079),
+                    isOnscreen: true
+                ),
+                .init(
+                    id: 240002,
+                    title: "百度一下，你就知道 - Google Chrome - test2",
+                    bounds: CGRect(x: 20, y: 58, width: 1_728, height: 1_079),
+                    isOnscreen: true
+                ),
+                .init(
+                    id: 240003,
+                    title: "百度一下，你就知道 - Google Chrome - test3",
+                    bounds: CGRect(x: 40, y: 78, width: 1_728, height: 1_079),
+                    isOnscreen: true
+                ),
+                .init(
+                    id: 240004,
+                    title: "百度一下，你就知道 - Google Chrome - test4",
+                    bounds: CGRect(x: 60, y: 98, width: 1_728, height: 1_079),
+                    isOnscreen: true
+                ),
+                .init(
+                    id: 240005,
+                    title: "百度一下，你就知道 - Google Chrome - test5",
+                    bounds: CGRect(x: 0, y: 38, width: 1_728, height: 1_079),
+                    isOnscreen: true
+                )
+            ]
+        )
+
+        XCTAssertEqual(mergedEntries.count, 5)
+        XCTAssertEqual(mergedEntries.last?.windowID, "cg:18405:240005")
+        XCTAssertEqual(mergedEntries.last?.title, "百度一下，你就知道 - Google Chrome - test5")
+    }
+
 }
