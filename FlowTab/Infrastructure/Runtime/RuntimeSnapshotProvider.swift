@@ -9,19 +9,23 @@ final class RuntimeSnapshotProvider {
         let title: String
         let isMinimized: Bool
         let cgWindowID: CGWindowID?
-        let axWindow: AXUIElement
+        let axWindow: AXUIElement?
     }
 
     struct CGWindowEntry {
         let id: CGWindowID
         let title: String?
         let bounds: CGRect?
+        let isOnscreen: Bool
+        let alpha: Double
+        let storeType: Int
     }
 
-    private struct AXWindowEntry {
+    struct AXWindowEntry {
         let index: Int
         let id: String
         let title: String
+        let sourceTitle: String?
         let isMinimized: Bool
         let window: AXUIElement
         let frame: CGRect?
@@ -76,16 +80,28 @@ final class RuntimeSnapshotProvider {
 
         RuntimeLog.info("Snapshot", "runningApps=\(runningApps.count)")
         let windowData = collectWindowData(for: runningApps)
+        let appsGroupedByBaseID = groupedAppsByBaseID(runningApps)
         let selectedApps = selectPrimaryApps(
             from: runningApps,
             windowsByPID: windowData.windowsByPID,
             rankByPID: windowData.rankByPID
         )
+        let mergedWindowsByPrimaryPID = Dictionary(uniqueKeysWithValues: selectedApps.map { app in
+            let appGroup = appsGroupedByBaseID[Self.baseAppID(for: app)] ?? [app]
+            return (
+                app.processIdentifier,
+                mergedWindowEntries(
+                    for: appGroup,
+                    windowsByPID: windowData.windowsByPID,
+                    rankByPID: windowData.rankByPID
+                )
+            )
+        })
         let hideMinimizedAppsFromAppLayer =
             SwitcherBehaviorPreferencesStore.loadHideMinimizedAppsFromAppLayer()
         let appLayerCandidates = filterAppsForAppLayer(
             selectedApps,
-            windowsByPID: windowData.windowsByPID,
+            windowsByPID: mergedWindowsByPrimaryPID,
             hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
         )
         RuntimeLog.info(
@@ -104,10 +120,11 @@ final class RuntimeSnapshotProvider {
         for (index, app) in appLayerCandidates.enumerated() {
             let pid = app.processIdentifier
             let baseAppID = Self.baseAppID(for: app)
+            let appGroup = appsGroupedByBaseID[baseAppID] ?? [app]
             let appID = baseAppID
             let displayName = app.localizedName ?? baseAppID
 
-            let windows = windowData.windowsByPID[pid] ?? []
+            let windows = mergedWindowsByPrimaryPID[pid] ?? []
             RuntimeLog.info(
                 "Snapshot",
                 "\(displayName) pid=\(pid) appID=\(appID) windows=\(windows.count)"
@@ -121,7 +138,11 @@ final class RuntimeSnapshotProvider {
                 )
             }
 
-            let rank = windowData.rankByPID[pid] ?? (10_000 + index)
+            let rank = preferredRankForAppGroup(
+                appGroup,
+                rankByPID: windowData.rankByPID,
+                fallback: 10_000 + index
+            )
             let candidate = AppSwitchCandidate(
                 id: appID,
                 displayName: displayName,
@@ -198,29 +219,34 @@ final class RuntimeSnapshotProvider {
         }
 
         let groupedApps = Dictionary(grouping: apps, by: baseAppID(for:))
-        let selectedApps = groupedApps.values.compactMap { group -> SnapshotAssemblyApp? in
-            group.max { lhs, rhs in
-                score(for: lhs) < score(for: rhs)
-            }
-        }
+        var rows: [SnapshotAssemblyRow] = []
+        rows.reserveCapacity(groupedApps.count)
 
-        let filteredApps = selectedApps.filter { app in
-            let windows = windowsByPID[app.pid] ?? []
-            return shouldIncludeAppInAppLayer(
+        for group in groupedApps.values {
+            guard let app = group.max(by: { lhs, rhs in
+                score(for: lhs) < score(for: rhs)
+            }) else {
+                continue
+            }
+            let appID = baseAppID(for: app)
+            let displayName = app.localizedName ?? appID
+            let windows = group
+                .sorted(by: { lhs, rhs in
+                    score(for: lhs) > score(for: rhs)
+                })
+                .flatMap { groupApp in
+                    windowsByPID[groupApp.pid] ?? []
+                }
+            guard shouldIncludeAppInAppLayer(
                 hasWindows: !windows.isEmpty,
                 hasVisibleWindow: windows.contains(where: { !$0.isMinimized }),
                 hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
-            )
-        }
-
-        var rows: [SnapshotAssemblyRow] = []
-        rows.reserveCapacity(filteredApps.count)
-
-        for (index, app) in filteredApps.enumerated() {
-            let appID = baseAppID(for: app)
-            let displayName = app.localizedName ?? appID
-            let windows = windowsByPID[app.pid] ?? []
-            let rank = rankByPID[app.pid] ?? (10_000 + index)
+            ) else {
+                continue
+            }
+            let rank = group.compactMap { groupApp in
+                rankByPID[groupApp.pid]
+            }.min() ?? (10_000 + rows.count)
             let candidate = AppSwitchCandidate(
                 id: appID,
                 displayName: displayName,
@@ -249,22 +275,28 @@ final class RuntimeSnapshotProvider {
         return rows
     }
 
-    private func collectWindowData(for runningApps: [NSRunningApplication]) -> (
+    func collectWindowData(for runningApps: [NSRunningApplication]) -> (
         windowsByPID: [pid_t: [WindowListEntry]],
         rankByPID: [pid_t: Int]
     ) {
         AXLiveWindowRegistry.shared.rebind(runningApps)
-        let cgWindowsByPID = collectCGWindowsByPID()
+        let onScreenCGWindowsByPID = collectCGWindowsByPID()
+        let allCGWindowsByPID = collectCGWindowsByPID(options: [.optionAll, .excludeDesktopElements])
         // Keep a single source of truth for window counting and selection: AX window list.
         return (
-            windowsByPID: collectAXWindowData(for: runningApps, cgWindowsByPID: cgWindowsByPID),
+            windowsByPID: collectAXWindowData(
+                for: runningApps,
+                cgWindowsByPID: onScreenCGWindowsByPID,
+                allCGWindowsByPID: allCGWindowsByPID
+            ),
             rankByPID: collectAppRankByPID(for: runningApps)
         )
     }
 
     func collectAXWindowData(
         for runningApps: [NSRunningApplication],
-        cgWindowsByPID: [pid_t: [CGWindowEntry]]
+        cgWindowsByPID: [pid_t: [CGWindowEntry]],
+        allCGWindowsByPID: [pid_t: [CGWindowEntry]] = [:]
     ) -> [pid_t: [WindowListEntry]] {
         guard AccessibilityPermissionChecker.isTrusted() else {
             RuntimeLog.info("AX", "not trusted; all app windows will be reported as 0")
@@ -280,6 +312,7 @@ final class RuntimeSnapshotProvider {
                 windows: windows
             )
             let cgWindows = cgWindowsByPID[app.processIdentifier] ?? []
+            let allCGWindows = allCGWindowsByPID[app.processIdentifier] ?? cgWindows
             RuntimeLog.info("AX", "\(appName) rawWindows=\(windows.count)")
             guard !windows.isEmpty else { continue }
 
@@ -294,14 +327,11 @@ final class RuntimeSnapshotProvider {
                     index: index
                 )
                 let titleFromAX = AXWindowInspector.title(for: window)
-                let title = titleFromAX ?? {
-                    RuntimeLog.info("AX", "\(appName) untitled[\(index)] use fallback")
-                    return AXWindowInspector.fallbackTitle(index: index)
-                }()
                 return AXWindowEntry(
                     index: index,
                     id: windowID,
-                    title: title,
+                    title: titleFromAX ?? "",
+                    sourceTitle: titleFromAX,
                     isMinimized: AXWindowInspector.isMinimized(window),
                     window: window,
                     frame: AXWindowInspector.frame(for: window)
@@ -317,24 +347,61 @@ final class RuntimeSnapshotProvider {
                 axWindows: axEntries,
                 cgWindows: cgWindows
             )
-            let entries = axEntries.map { axEntry in
-                WindowListEntry(
+            let cgWindowByID = Dictionary(uniqueKeysWithValues: cgWindows.map { ($0.id, $0) })
+            let entries: [WindowListEntry] = axEntries.map { axEntry in
+                let matchedCGTitle = cgMatchesByAXWindowID[axEntry.id]
+                    .flatMap { cgWindowByID[$0]?.title }
+                let title = resolvedAXWindowTitle(
+                    sourceTitle: axEntry.sourceTitle,
+                    matchedCGTitle: matchedCGTitle,
+                    appName: appName,
+                    fallbackIndex: axEntry.index
+                )
+                return WindowListEntry(
                     windowID: axEntry.id,
-                    title: axEntry.title,
+                    title: title,
                     isMinimized: axEntry.isMinimized,
                     cgWindowID: cgMatchesByAXWindowID[axEntry.id],
                     axWindow: axEntry.window
                 )
             }
+            let mergedEntries = appendOffSpaceCGWindows(
+                to: entries,
+                appName: appName,
+                pid: app.processIdentifier,
+                allCGWindows: allCGWindows
+            )
 
             pruneCachedCGMatches(
                 for: app.processIdentifier,
-                validWindowIDs: Set(entries.map(\.windowID))
+                validWindowIDs: Set(mergedEntries.map(\.windowID))
             )
-            RuntimeLog.info("AX", "\(appName) switchableWindows=\(entries.count)")
-            windowsByPID[app.processIdentifier] = entries
+            RuntimeLog.info("AX", "\(appName) switchableWindows=\(mergedEntries.count)")
+            windowsByPID[app.processIdentifier] = mergedEntries
         }
         return windowsByPID
+    }
+
+    private func resolvedAXWindowTitle(
+        sourceTitle: String?,
+        matchedCGTitle: String?,
+        appName: String,
+        fallbackIndex: Int
+    ) -> String {
+        if let sourceTitle = normalizedWindowTitle(sourceTitle) {
+            return sourceTitle
+        }
+        if let matchedCGTitle = normalizedWindowTitle(matchedCGTitle) {
+            return matchedCGTitle
+        }
+        RuntimeLog.info("AX", "\(appName) untitled[\(fallbackIndex)] use app-name fallback")
+        return appName
+    }
+
+    private func normalizedWindowTitle(_ title: String?) -> String? {
+        guard let title else { return nil }
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     func collectAXWindowStats(for runningApps: [NSRunningApplication]) -> [pid_t: AXWindowStats] {
@@ -366,8 +433,9 @@ final class RuntimeSnapshotProvider {
         return statsByPID
     }
 
-    func collectCGWindowsByPID() -> [pid_t: [CGWindowEntry]] {
-        let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
+    func collectCGWindowsByPID(
+        options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
+    ) -> [pid_t: [CGWindowEntry]] {
         guard
             let rawList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]]
         else {
@@ -384,11 +452,18 @@ final class RuntimeSnapshotProvider {
             let bounds = (item[kCGWindowBounds as String] as? [String: Any])
                 .flatMap { CGRect(dictionaryRepresentation: $0 as CFDictionary) }?
                 .standardized
+            let isOnscreen = (item[kCGWindowIsOnscreen as String] as? NSNumber)?.boolValue
+                ?? options.contains(.optionOnScreenOnly)
+            let alpha = (item[kCGWindowAlpha as String] as? NSNumber)?.doubleValue ?? 1.0
+            let storeType = (item[kCGWindowStoreType as String] as? NSNumber)?.intValue ?? 1
             windowsByPID[ownerPID, default: []].append(
                 CGWindowEntry(
                     id: CGWindowID(windowNumber.uint32Value),
                     title: title,
-                    bounds: bounds
+                    bounds: bounds,
+                    isOnscreen: isOnscreen,
+                    alpha: alpha,
+                    storeType: storeType
                 )
             )
         }
@@ -569,10 +644,43 @@ final class RuntimeSnapshotProvider {
         groupID(for: bundleIdentifier, fallbackName: fallbackName)
     }
 
+    static func resolvedAXWindowTitleForTesting(
+        sourceTitle: String?,
+        matchedCGTitle: String?,
+        appName: String,
+        fallbackIndex: Int
+    ) -> String {
+        RuntimeSnapshotProvider().resolvedAXWindowTitle(
+            sourceTitle: sourceTitle,
+            matchedCGTitle: matchedCGTitle,
+            appName: appName,
+            fallbackIndex: fallbackIndex
+        )
+    }
+
     struct CGWindowEntryForTesting {
         let id: CGWindowID
         let title: String?
         let bounds: CGRect?
+        let isOnscreen: Bool
+        let alpha: Double
+        let storeType: Int
+
+        init(
+            id: CGWindowID,
+            title: String?,
+            bounds: CGRect?,
+            isOnscreen: Bool = true,
+            alpha: Double = 1.0,
+            storeType: Int = 1
+        ) {
+            self.id = id
+            self.title = title
+            self.bounds = bounds
+            self.isOnscreen = isOnscreen
+            self.alpha = alpha
+            self.storeType = storeType
+        }
     }
 
     struct AXWindowEntryForTesting {
@@ -594,12 +702,22 @@ final class RuntimeSnapshotProvider {
                     index: $0.index,
                     id: $0.id,
                     title: "",
+                    sourceTitle: nil,
                     isMinimized: false,
                     window: AXUIElementCreateSystemWide(),
                     frame: $0.bounds
                 )
             },
-            cgWindows: cgWindows.map { CGWindowEntry(id: $0.id, title: $0.title, bounds: $0.bounds) }
+            cgWindows: cgWindows.map {
+                CGWindowEntry(
+                    id: $0.id,
+                    title: $0.title,
+                    bounds: $0.bounds,
+                    isOnscreen: $0.isOnscreen,
+                    alpha: $0.alpha,
+                    storeType: $0.storeType
+                )
+            }
         )
     }
 
