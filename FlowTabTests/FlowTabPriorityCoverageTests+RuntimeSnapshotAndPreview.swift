@@ -209,6 +209,142 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(title, "Google Chrome")
     }
 
+    func testRuntimeSnapshotProviderSupplementalCGWindowsBackfillsUnmatchedAXEntriesBeforeAppending() {
+        let mergedEntries = RuntimeSnapshotProvider.appendOffSpaceCGWindowsForTesting(
+            entries: [
+                .init(windowID: "ax:18405:0", title: "Google Chrome", isMinimized: false, cgWindowID: nil),
+                .init(windowID: "ax:18405:1", title: "Google Chrome", isMinimized: false, cgWindowID: nil),
+                .init(windowID: "ax:18405:2", title: "Google Chrome", isMinimized: false, cgWindowID: nil),
+                .init(windowID: "ax:18405:3", title: "Google Chrome", isMinimized: false, cgWindowID: nil),
+                .init(
+                    windowID: "ax:18405:4",
+                    title: "新标签页 - Google Chrome - test4",
+                    isMinimized: false,
+                    cgWindowID: nil
+                )
+            ],
+            appName: "Google Chrome",
+            pid: 18405,
+            allCGWindows: [
+                .init(
+                    id: 243747,
+                    title: nil,
+                    bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
+                    isOnscreen: false
+                ),
+                .init(
+                    id: 240029,
+                    title: nil,
+                    bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
+                    isOnscreen: false
+                ),
+                .init(
+                    id: 240016,
+                    title: nil,
+                    bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
+                    isOnscreen: false
+                ),
+                .init(
+                    id: 240002,
+                    title: nil,
+                    bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
+                    isOnscreen: false
+                )
+            ]
+        )
+
+        XCTAssertEqual(mergedEntries.count, 5)
+        XCTAssertTrue(mergedEntries.allSatisfy { !$0.windowID.hasPrefix("cg:") })
+        XCTAssertEqual(
+            mergedEntries.compactMap(\.cgWindowID),
+            [243747, 240029, 240016, 240002]
+        )
+    }
+
+    func testRuntimeSnapshotProviderSupplementalCGWindowsBackfillsFallbackTitledAXEntriesBeforeAppending() {
+        let mergedEntries = RuntimeSnapshotProvider.appendOffSpaceCGWindowsForTesting(
+            entries: [
+                .init(windowID: "ax:18405:0", title: "Google Chrome", isMinimized: false, cgWindowID: 500),
+                .init(windowID: "ax:18405:1", title: "Google Chrome", isMinimized: false, cgWindowID: 501),
+                .init(windowID: "ax:18405:2", title: "Google Chrome", isMinimized: false, cgWindowID: 502),
+                .init(windowID: "ax:18405:3", title: "Google Chrome", isMinimized: false, cgWindowID: 503),
+                .init(
+                    windowID: "ax:18405:4",
+                    title: "新标签页 - Google Chrome - test4",
+                    isMinimized: false,
+                    cgWindowID: 504
+                )
+            ],
+            appName: "Google Chrome",
+            pid: 18405,
+            allCGWindows: [
+                .init(
+                    id: 243747,
+                    title: nil,
+                    bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
+                    isOnscreen: false
+                ),
+                .init(
+                    id: 240029,
+                    title: nil,
+                    bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
+                    isOnscreen: false
+                ),
+                .init(
+                    id: 240016,
+                    title: nil,
+                    bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
+                    isOnscreen: false
+                ),
+                .init(
+                    id: 240002,
+                    title: nil,
+                    bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
+                    isOnscreen: false
+                )
+            ]
+        )
+
+        XCTAssertEqual(mergedEntries.count, 5)
+        XCTAssertTrue(mergedEntries.allSatisfy { !$0.windowID.hasPrefix("cg:") })
+        XCTAssertEqual(
+            mergedEntries.compactMap(\.cgWindowID),
+            [243747, 240029, 240016, 240002, 504]
+        )
+        XCTAssertEqual(mergedEntries.last?.title, "新标签页 - Google Chrome - test4")
+    }
+
+    func testRuntimeSnapshotProviderSupplementalCGBackfillReplacesAppNameFallbackWithExplicitCGTitle() {
+        let mergedEntries = RuntimeSnapshotProvider.appendOffSpaceCGWindowsForTesting(
+            entries: [
+                .init(windowID: "ax:18405:0", title: "Google Chrome", isMinimized: false, cgWindowID: nil),
+                .init(windowID: "ax:18405:1", title: "Google Chrome", isMinimized: false, cgWindowID: nil),
+                .init(windowID: "ax:18405:2", title: "Google Chrome", isMinimized: false, cgWindowID: nil),
+                .init(windowID: "ax:18405:3", title: "Google Chrome", isMinimized: false, cgWindowID: nil)
+            ],
+            appName: "Google Chrome",
+            pid: 18405,
+            allCGWindows: [
+                .init(
+                    id: 243747,
+                    title: "百度一下，你就知道 - Google Chrome - test2",
+                    bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
+                    isOnscreen: false
+                ),
+                .init(
+                    id: 240029,
+                    title: nil,
+                    bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
+                    isOnscreen: false
+                )
+            ]
+        )
+
+        XCTAssertEqual(mergedEntries.count, 4)
+        XCTAssertEqual(mergedEntries.first?.title, "百度一下，你就知道 - Google Chrome - test2")
+        XCTAssertEqual(mergedEntries.dropFirst().first?.title, "Google Chrome")
+    }
+
     func testRuntimeSnapshotProviderAXWindowTitleFallsBackToAppNameWhenSourceTitleMissing() {
         let fallbackTitle = RuntimeSnapshotProvider.resolvedAXWindowTitleForTesting(
             sourceTitle: nil,

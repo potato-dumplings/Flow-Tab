@@ -25,9 +25,39 @@ extension RuntimeSnapshotProvider {
         )
         guard !supplementalWindows.isEmpty else { return entries }
 
+        var mergedEntries = entries
+        var remainingSupplementalWindows = supplementalWindows
+        var backfilledEntryCount = 0
+        let backfillTargetIndexes = supplementalBackfillTargetIndexes(
+            in: mergedEntries,
+            appName: appName
+        )
+        if !backfillTargetIndexes.isEmpty {
+            let backfillCount = min(backfillTargetIndexes.count, remainingSupplementalWindows.count)
+            for offset in 0..<backfillCount {
+                let entryIndex = backfillTargetIndexes[offset]
+                let supplementalWindow = remainingSupplementalWindows[offset]
+                var title = mergedEntries[entryIndex].title
+                if isAppNameFallbackTitle(title, appName: appName),
+                    let supplementalTitle = normalizedWindowTitle(supplementalWindow.title)
+                {
+                    title = supplementalTitle
+                }
+                mergedEntries[entryIndex] = WindowListEntry(
+                    windowID: mergedEntries[entryIndex].windowID,
+                    title: title,
+                    isMinimized: mergedEntries[entryIndex].isMinimized,
+                    cgWindowID: supplementalWindow.id,
+                    axWindow: mergedEntries[entryIndex].axWindow
+                )
+                backfilledEntryCount += 1
+            }
+            remainingSupplementalWindows.removeFirst(backfillCount)
+        }
+
         var explicitTitleCount = 0
         var appNameFallbackCount = 0
-        let supplementalEntries: [WindowListEntry] = supplementalWindows.map { cgWindow in
+        let supplementalEntries: [WindowListEntry] = remainingSupplementalWindows.map { cgWindow in
             let title = resolvedTitleForSupplementalCGWindow(
                 appName: appName,
                 cgWindow: cgWindow
@@ -47,9 +77,9 @@ extension RuntimeSnapshotProvider {
         }
         RuntimeLog.info(
             "AX",
-            "\(appName) supplementalOffSpaceWindows=\(supplementalEntries.count) explicitTitles=\(explicitTitleCount) appNameFallbacks=\(appNameFallbackCount)"
+            "\(appName) supplementalOffSpaceWindows=\(supplementalEntries.count) explicitTitles=\(explicitTitleCount) appNameFallbacks=\(appNameFallbackCount) backfilledAXEntries=\(backfilledEntryCount)"
         )
-        return entries + supplementalEntries
+        return mergedEntries + supplementalEntries
     }
 
     func selectSupplementalOffSpaceCGWindows(
@@ -128,6 +158,53 @@ extension RuntimeSnapshotProvider {
         )
     }
 
+    struct SupplementalMergeEntryForTesting {
+        let windowID: String
+        let title: String
+        let isMinimized: Bool
+        let cgWindowID: CGWindowID?
+    }
+
+    static func appendOffSpaceCGWindowsForTesting(
+        entries: [SupplementalMergeEntryForTesting],
+        appName: String,
+        pid: pid_t,
+        allCGWindows: [CGWindowEntryForTesting]
+    ) -> [SupplementalMergeEntryForTesting] {
+        let provider = RuntimeSnapshotProvider()
+        let mergedEntries = provider.appendOffSpaceCGWindows(
+            to: entries.map {
+                WindowListEntry(
+                    windowID: $0.windowID,
+                    title: $0.title,
+                    isMinimized: $0.isMinimized,
+                    cgWindowID: $0.cgWindowID,
+                    axWindow: nil
+                )
+            },
+            appName: appName,
+            pid: pid,
+            allCGWindows: allCGWindows.map {
+                CGWindowEntry(
+                    id: $0.id,
+                    title: $0.title,
+                    bounds: $0.bounds,
+                    isOnscreen: $0.isOnscreen,
+                    alpha: $0.alpha,
+                    storeType: $0.storeType
+                )
+            }
+        )
+        return mergedEntries.map {
+            SupplementalMergeEntryForTesting(
+                windowID: $0.windowID,
+                title: $0.title,
+                isMinimized: $0.isMinimized,
+                cgWindowID: $0.cgWindowID
+            )
+        }
+    }
+
     private static func windowArea(_ bounds: CGRect?) -> CGFloat? {
         guard let bounds else { return nil }
         let standardized = bounds.standardized
@@ -148,5 +225,23 @@ extension RuntimeSnapshotProvider {
         guard let title else { return nil }
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private func isAppNameFallbackTitle(_ title: String, appName: String) -> Bool {
+        guard let normalizedTitle = normalizedWindowTitle(title) else { return false }
+        guard let normalizedAppName = normalizedWindowTitle(appName) else { return false }
+        return normalizedTitle.caseInsensitiveCompare(normalizedAppName) == .orderedSame
+    }
+
+    private func supplementalBackfillTargetIndexes(
+        in entries: [WindowListEntry],
+        appName: String
+    ) -> [Int] {
+        let unresolvedIndexes = entries.indices.filter { entries[$0].cgWindowID == nil }
+        let fallbackTitleIndexes = entries.indices.filter { index in
+            guard entries[index].cgWindowID != nil else { return false }
+            return isAppNameFallbackTitle(entries[index].title, appName: appName)
+        }
+        return unresolvedIndexes + fallbackTitleIndexes
     }
 }
