@@ -154,6 +154,7 @@ extension FlowTabPriorityCoverageTests {
                         id: window.id,
                         title: window.title,
                         isMinimized: window.isMinimized,
+                        ownerPID: runningApp.processIdentifier,
                         cgWindowID: nil,
                         inferredTitleBarStyle: nil
                     )

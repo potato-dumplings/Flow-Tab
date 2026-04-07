@@ -281,6 +281,111 @@ extension FlowTabTests {
         }
     }
 
+    func testRuntimeSnapshotProviderMockSingleAppFiveWindowsVariantKeepsAllWindowsInHomeLayer() {
+        let expectedWindowIDs = [
+            "mock-browser-normal-1",
+            "mock-browser-normal-2",
+            "mock-browser-fullscreen-1",
+            "mock-browser-fullscreen-2",
+            "mock-browser-fullscreen-3"
+        ]
+
+        withLaunchArgumentsForTesting(
+            [
+                "FlowTab",
+                "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-mock-runtime-variant",
+                "single-app-five-windows"
+            ]
+        ) {
+            let provider = RuntimeSnapshotProvider()
+
+            let snapshot = provider.snapshot()
+            XCTAssertEqual(snapshot.apps.count, 1)
+            XCTAssertEqual(snapshot.apps.first?.id, "com.flowtab.mock.browser")
+            XCTAssertEqual(snapshot.apps.first?.windows.count, 5)
+            XCTAssertEqual(snapshot.apps.first?.windows.map(\.id), expectedWindowIDs)
+
+            let summaries = provider.homeAppSummaries()
+            XCTAssertEqual(summaries.count, 1)
+            XCTAssertEqual(summaries.first?.appID, "com.flowtab.mock.browser")
+            XCTAssertEqual(summaries.first?.windowCount, 5)
+
+            let summary = provider.homeAppSummary(for: "com.flowtab.mock.browser")
+            XCTAssertNotNil(summary)
+            XCTAssertEqual(summary?.windowCount, 5)
+
+            let homeSnapshot = provider.homeAppSnapshot(for: "com.flowtab.mock.browser")
+            XCTAssertNotNil(homeSnapshot)
+            XCTAssertEqual(homeSnapshot?.summary.windowCount, 5)
+            XCTAssertEqual(homeSnapshot?.candidate.windows.map(\.id), expectedWindowIDs)
+            XCTAssertEqual(homeSnapshot?.context.windowsByID.count, 5)
+        }
+    }
+
+    func testRuntimeSnapshotProviderMockSingleAppFiveWindowsCGOffSpaceVariantKeepsAllWindowsInHomeLayer() {
+        let expectedWindowIDs = [
+            "cg:100:240001",
+            "cg:100:240002",
+            "cg:100:243747",
+            "cg:100:243679",
+            "cg:100:240029"
+        ]
+
+        withLaunchArgumentsForTesting(
+            [
+                "FlowTab",
+                "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-mock-runtime-variant",
+                "single-app-five-windows-cg-offspace"
+            ]
+        ) {
+            let provider = RuntimeSnapshotProvider()
+
+            let snapshot = provider.snapshot()
+            XCTAssertEqual(snapshot.apps.count, 1)
+            XCTAssertEqual(snapshot.apps.first?.id, "com.flowtab.mock.browser")
+            XCTAssertEqual(snapshot.apps.first?.windows.count, 5)
+            XCTAssertEqual(snapshot.apps.first?.windows.map(\.id), expectedWindowIDs)
+
+            let summaries = provider.homeAppSummaries()
+            XCTAssertEqual(summaries.count, 1)
+            XCTAssertEqual(summaries.first?.appID, "com.flowtab.mock.browser")
+            XCTAssertEqual(summaries.first?.windowCount, 5)
+
+            let homeSnapshot = provider.homeAppSnapshot(for: "com.flowtab.mock.browser")
+            XCTAssertNotNil(homeSnapshot)
+            XCTAssertEqual(homeSnapshot?.summary.windowCount, 5)
+            XCTAssertEqual(homeSnapshot?.candidate.windows.map(\.id), expectedWindowIDs)
+            XCTAssertEqual(homeSnapshot?.context.windowsByID.count, 5)
+        }
+    }
+
+    func testRuntimeSnapshotProviderMockSingleAppFiveWindowsCGOffSpaceTitledVariantUsesExplicitTitles() {
+        withLaunchArgumentsForTesting(
+            [
+                "FlowTab",
+                "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-mock-runtime-variant",
+                "single-app-five-windows-cg-offspace-titled"
+            ]
+        ) {
+            let provider = RuntimeSnapshotProvider()
+            let snapshot = provider.snapshot()
+            XCTAssertEqual(snapshot.apps.count, 1)
+            XCTAssertEqual(
+                snapshot.apps.first?.windows.map(\.title),
+                ["Normal 1", "Normal 2", "Fullscreen 3", "Fullscreen 4", "Fullscreen 5"]
+            )
+
+            let homeSnapshot = provider.homeAppSnapshot(for: "com.flowtab.mock.browser")
+            XCTAssertEqual(
+                homeSnapshot?.candidate.windows.map(\.title),
+                ["Normal 1", "Normal 2", "Fullscreen 3", "Fullscreen 4", "Fullscreen 5"]
+            )
+        }
+    }
+
     func testRuntimeSnapshotProviderRealPathWithoutAccessibilityBuildsConsistentSnapshot() {
         let previousAXTrusted = AccessibilityPermissionChecker.isTrustedOverrideForTesting
         let userDefaults = UserDefaults.standard

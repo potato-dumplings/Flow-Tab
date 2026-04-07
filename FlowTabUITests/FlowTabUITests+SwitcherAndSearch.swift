@@ -254,6 +254,45 @@ extension FlowTabUITests {
         XCTAssertTrue(mailDraftWindow.waitForExistence(timeout: 3))
     }
 
+    func testSwitcherPanelSingleAppFiveWindowsCGOffSpaceTitledVariantShowsAllWindowCards() throws {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-mock-runtime-variant",
+                "single-app-five-windows-cg-offspace-titled",
+                "--flowtab-ui-open-switcher",
+                "-showPermissionReminder",
+                "NO"
+            ]
+        )
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+
+        let switcherPanel = app.descendants(matching: .any)
+            .matching(identifier: Identifier.switcherPanel)
+            .firstMatch
+        XCTAssertTrue(switcherPanel.waitForExistence(timeout: 8))
+
+        RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        app.typeKey(.downArrow, modifierFlags: [])
+
+        let expectedWindowIdentifiers = [
+            "flowtab.switcher.window.cg-100-240001",
+            "flowtab.switcher.window.cg-100-240002",
+            "flowtab.switcher.window.cg-100-243747",
+            "flowtab.switcher.window.cg-100-243679",
+            "flowtab.switcher.window.cg-100-240029"
+        ]
+        for windowIdentifier in expectedWindowIdentifiers {
+            let card = switcherPanel.descendants(matching: .any)
+                .matching(identifier: windowIdentifier)
+                .firstMatch
+            XCTAssertTrue(card.waitForExistence(timeout: 5), "Missing switcher window card: \(windowIdentifier)")
+        }
+        XCTAssertTrue(app.staticTexts["Fullscreen 5"].waitForExistence(timeout: 5))
+    }
+
     func testTabSwitchStressCPUAndMemory() throws {
         let options = XCTMeasureOptions()
         options.iterationCount = 3

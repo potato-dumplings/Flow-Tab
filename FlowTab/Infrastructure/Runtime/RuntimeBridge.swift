@@ -19,13 +19,53 @@ struct RuntimeAppContext {
     let windowsByID: [String: RuntimeWindowContext]
 }
 
+enum WindowBindingConfirmationSource: String {
+    case stickyBinding
+    case publicExactMatch
+    case privateExactBridge
+}
+
 struct RuntimeWindowContext {
     let id: String
     let title: String
     let isMinimized: Bool
+    let ownerPID: pid_t
     var cgWindowID: CGWindowID?
     var inferredTitleBarStyle: WindowTitleBarStyleGuess?
+    var activationHandleID: String?
     var axWindow: AXUIElement? = nil
+    let frame: CGRect?
+    let allowsPublicAXRecovery: Bool
+    let hasStickyBinding: Bool
+    let lastConfirmationSource: WindowBindingConfirmationSource?
+
+    init(
+        id: String,
+        title: String,
+        isMinimized: Bool,
+        ownerPID: pid_t = 0,
+        cgWindowID: CGWindowID? = nil,
+        inferredTitleBarStyle: WindowTitleBarStyleGuess? = nil,
+        activationHandleID: String? = nil,
+        axWindow: AXUIElement? = nil,
+        frame: CGRect? = nil,
+        allowsPublicAXRecovery: Bool = false,
+        hasStickyBinding: Bool = false,
+        lastConfirmationSource: WindowBindingConfirmationSource? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.isMinimized = isMinimized
+        self.ownerPID = ownerPID
+        self.cgWindowID = cgWindowID
+        self.inferredTitleBarStyle = inferredTitleBarStyle
+        self.activationHandleID = activationHandleID
+        self.axWindow = axWindow
+        self.frame = frame
+        self.allowsPublicAXRecovery = allowsPublicAXRecovery
+        self.hasStickyBinding = hasStickyBinding
+        self.lastConfirmationSource = lastConfirmationSource
+    }
 }
 
 

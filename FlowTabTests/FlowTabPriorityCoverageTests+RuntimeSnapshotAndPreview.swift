@@ -92,76 +92,58 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(mergedStats.hasVisibleWindow)
     }
 
-    func testRuntimeSnapshotProviderSupplementalCGWindowsPrefersLargeOffSpaceWindows() {
-        let supplementalWindowIDs = RuntimeSnapshotProvider.supplementalCGWindowIDsForTesting(
-            existingCGWindowIDs: Set<CGWindowID>([240016, 240002]),
+    func testRuntimeSnapshotProviderValidCGWindowsFilterSkipsInvalidEntries() {
+        let validWindowIDs = RuntimeSnapshotProvider.validCGWindowIDsForTesting(
+            existingCGWindowIDs: Set<CGWindowID>([240016]),
             allCGWindows: [
                 .init(
                     id: 240016,
-                    title: nil,
-                    bounds: CGRect(x: 0, y: 38, width: 1_728, height: 1_079),
-                    isOnscreen: true
-                ),
-                .init(
-                    id: 240002,
-                    title: nil,
+                    title: "Visible",
                     bounds: CGRect(x: 0, y: 38, width: 1_728, height: 1_079),
                     isOnscreen: true
                 ),
                 .init(
                     id: 243747,
-                    title: nil,
+                    title: "Recovered 1",
                     bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
                     isOnscreen: false
                 ),
                 .init(
-                    id: 243679,
-                    title: nil,
-                    bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
-                    isOnscreen: false
-                ),
-                .init(
-                    id: 240029,
-                    title: nil,
-                    bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
+                    id: 260000,
+                    title: "Recovered 2",
+                    bounds: CGRect(x: 200, y: 160, width: 420, height: 240),
                     isOnscreen: false
                 ),
                 .init(
                     id: 243749,
-                    title: nil,
+                    title: "Too Short",
                     bounds: CGRect(x: 0, y: 37, width: 1_728, height: 41),
                     isOnscreen: false
                 ),
                 .init(
-                    id: 243748,
-                    title: nil,
-                    bounds: CGRect(x: 0, y: 78, width: 1_728, height: 46),
-                    isOnscreen: false
-                ),
-                .init(
                     id: 245064,
-                    title: nil,
+                    title: "Transparent",
                     bounds: CGRect(x: 0, y: 38, width: 1_728, height: 1_079),
                     isOnscreen: false,
                     alpha: 0.0003
                 ),
                 .init(
                     id: 240080,
-                    title: nil,
+                    title: "Wrong Store",
                     bounds: CGRect(x: 0, y: 0, width: 1_728, height: 1_079),
                     isOnscreen: false,
                     storeType: 2
                 ),
                 .init(
                     id: 240018,
-                    title: nil,
+                    title: "Tiny",
                     bounds: CGRect(x: 0, y: 0, width: 1, height: 1),
                     isOnscreen: false
                 )
             ]
         )
 
-        XCTAssertEqual(supplementalWindowIDs, [243747, 243679, 240029])
+        XCTAssertEqual(validWindowIDs, [243747, 260000])
     }
 
     func testRuntimeSnapshotProviderSupplementalCGWindowTitleUsesAppNameWhenCGTitleMissing() {
@@ -209,140 +191,190 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(title, "Google Chrome")
     }
 
-    func testRuntimeSnapshotProviderSupplementalCGWindowsBackfillsUnmatchedAXEntriesBeforeAppending() {
+    func testRuntimeSnapshotProviderWindowListAppendsUnmatchedCGEntriesAfterExactMatches() {
         let mergedEntries = RuntimeSnapshotProvider.appendOffSpaceCGWindowsForTesting(
             entries: [
-                .init(windowID: "ax:18405:0", title: "Google Chrome", isMinimized: false, cgWindowID: nil),
-                .init(windowID: "ax:18405:1", title: "Google Chrome", isMinimized: false, cgWindowID: nil),
-                .init(windowID: "ax:18405:2", title: "Google Chrome", isMinimized: false, cgWindowID: nil),
-                .init(windowID: "ax:18405:3", title: "Google Chrome", isMinimized: false, cgWindowID: nil),
                 .init(
-                    windowID: "ax:18405:4",
-                    title: "新标签页 - Google Chrome - test4",
+                    windowID: "cg:18405:240001",
+                    title: "Normal 1",
                     isMinimized: false,
-                    cgWindowID: nil
+                    cgWindowID: 240_001
+                ),
+                .init(
+                    windowID: "cg:18405:240002",
+                    title: "Normal 2",
+                    isMinimized: false,
+                    cgWindowID: 240_002
                 )
             ],
             appName: "Google Chrome",
             pid: 18405,
             allCGWindows: [
                 .init(
-                    id: 243747,
-                    title: nil,
+                    id: 240_001,
+                    title: "Normal 1",
+                    bounds: CGRect(x: 0, y: 38, width: 1_200, height: 800),
+                    isOnscreen: true
+                ),
+                .init(
+                    id: 240_002,
+                    title: "Normal 2",
+                    bounds: CGRect(x: 20, y: 58, width: 1_200, height: 800),
+                    isOnscreen: true
+                ),
+                .init(
+                    id: 243_747,
+                    title: "Fullscreen 3",
                     bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
                     isOnscreen: false
                 ),
                 .init(
-                    id: 240029,
-                    title: nil,
-                    bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
-                    isOnscreen: false
-                ),
-                .init(
-                    id: 240016,
-                    title: nil,
-                    bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
-                    isOnscreen: false
-                ),
-                .init(
-                    id: 240002,
+                    id: 243_679,
                     title: nil,
                     bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
                     isOnscreen: false
                 )
-            ]
+            ],
+            matchedCGWindowIDs: Set<CGWindowID>([240_001, 240_002])
         )
 
-        XCTAssertEqual(mergedEntries.count, 5)
-        XCTAssertTrue(mergedEntries.allSatisfy { !$0.windowID.hasPrefix("cg:") })
         XCTAssertEqual(
-            mergedEntries.compactMap(\.cgWindowID),
-            [243747, 240029, 240016, 240002]
+            mergedEntries.map(\.windowID),
+            ["cg:18405:240001", "cg:18405:240002", "cg:18405:243747", "cg:18405:243679"]
         )
+        XCTAssertEqual(mergedEntries[2].title, "Fullscreen 3")
+        XCTAssertEqual(mergedEntries[3].title, "Google Chrome")
     }
 
-    func testRuntimeSnapshotProviderSupplementalCGWindowsBackfillsFallbackTitledAXEntriesBeforeAppending() {
-        let mergedEntries = RuntimeSnapshotProvider.appendOffSpaceCGWindowsForTesting(
-            entries: [
-                .init(windowID: "ax:18405:0", title: "Google Chrome", isMinimized: false, cgWindowID: 500),
-                .init(windowID: "ax:18405:1", title: "Google Chrome", isMinimized: false, cgWindowID: 501),
-                .init(windowID: "ax:18405:2", title: "Google Chrome", isMinimized: false, cgWindowID: 502),
-                .init(windowID: "ax:18405:3", title: "Google Chrome", isMinimized: false, cgWindowID: 503),
+    func testRuntimeSnapshotProviderWindowListDropsEntriesWithoutBindingOrExactBridge() {
+        let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
+        let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+            axWindows: [
                 .init(
-                    windowID: "ax:18405:4",
-                    title: "新标签页 - Google Chrome - test4",
-                    isMinimized: false,
-                    cgWindowID: 504
+                    id: "ax:18405:0",
+                    index: 0,
+                    title: "Google 搜索 - Google Chrome - test1",
+                    bounds: fullscreenBounds
+                ),
+                .init(
+                    id: "ax:18405:1",
+                    index: 1,
+                    title: "Only In AX",
+                    bounds: CGRect(x: 60, y: 98, width: 1_728, height: 1_079)
                 )
             ],
-            appName: "Google Chrome",
-            pid: 18405,
-            allCGWindows: [
+            cgWindows: [
                 .init(
-                    id: 243747,
-                    title: nil,
-                    bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
-                    isOnscreen: false
+                    id: 240_001,
+                    title: "Google 搜索 - Google Chrome - test1",
+                    bounds: fullscreenBounds,
+                    isOnscreen: true
                 ),
                 .init(
-                    id: 240029,
-                    title: nil,
-                    bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
-                    isOnscreen: false
-                ),
-                .init(
-                    id: 240016,
-                    title: nil,
-                    bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
-                    isOnscreen: false
-                ),
-                .init(
-                    id: 240002,
-                    title: nil,
+                    id: 243_747,
+                    title: "Recovered Tab",
                     bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
                     isOnscreen: false
                 )
-            ]
+            ],
+            pid: 18405,
+            appName: "Google Chrome"
         )
 
-        XCTAssertEqual(mergedEntries.count, 5)
-        XCTAssertTrue(mergedEntries.allSatisfy { !$0.windowID.hasPrefix("cg:") })
         XCTAssertEqual(
-            mergedEntries.compactMap(\.cgWindowID),
-            [243747, 240029, 240016, 240002, 504]
+            mergedEntries.map(\.windowID),
+            ["cg:18405:240001"]
         )
-        XCTAssertEqual(mergedEntries.last?.title, "新标签页 - Google Chrome - test4")
+        XCTAssertEqual(mergedEntries.first?.cgWindowID, 240_001)
+        XCTAssertEqual(mergedEntries.first?.title, "Google 搜索 - Google Chrome - test1")
+        XCTAssertEqual(mergedEntries.first?.lastConfirmationSource, .publicExactMatch)
     }
 
-    func testRuntimeSnapshotProviderSupplementalCGBackfillReplacesAppNameFallbackWithExplicitCGTitle() {
-        let mergedEntries = RuntimeSnapshotProvider.appendOffSpaceCGWindowsForTesting(
-            entries: [
-                .init(windowID: "ax:18405:0", title: "Google Chrome", isMinimized: false, cgWindowID: nil),
-                .init(windowID: "ax:18405:1", title: "Google Chrome", isMinimized: false, cgWindowID: nil),
-                .init(windowID: "ax:18405:2", title: "Google Chrome", isMinimized: false, cgWindowID: nil),
-                .init(windowID: "ax:18405:3", title: "Google Chrome", isMinimized: false, cgWindowID: nil)
-            ],
-            appName: "Google Chrome",
-            pid: 18405,
-            allCGWindows: [
+    func testRuntimeSnapshotProviderWindowListUsesPrivateExactBridgeWhenPublicSignalsRemainAmbiguous() {
+        let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
+        let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+            axWindows: [
                 .init(
-                    id: 243747,
-                    title: "百度一下，你就知道 - Google Chrome - test2",
-                    bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
-                    isOnscreen: false
+                    id: "ax:18405:0",
+                    index: 0,
+                    title: "Google 搜索 - Google Chrome",
+                    bounds: fullscreenBounds,
+                    bridgedCGWindowID: 240_001
                 ),
                 .init(
-                    id: 240029,
-                    title: nil,
+                    id: "ax:18405:1",
+                    index: 1,
+                    title: "Google 搜索 - Google Chrome",
+                    bounds: fullscreenBounds,
+                    bridgedCGWindowID: 240_002
+                )
+            ],
+            cgWindows: [
+                .init(
+                    id: 240_001,
+                    title: "Google 搜索 - Google Chrome",
+                    bounds: fullscreenBounds,
+                    isOnscreen: true
+                ),
+                .init(
+                    id: 240_002,
+                    title: "Google 搜索 - Google Chrome",
+                    bounds: fullscreenBounds,
+                    isOnscreen: true
+                )
+            ],
+            pid: 18405,
+            appName: "Google Chrome"
+        )
+
+        XCTAssertEqual(mergedEntries.map(\.windowID), ["cg:18405:240001", "cg:18405:240002"])
+        XCTAssertEqual(mergedEntries.map(\.cgWindowID), [240_001, 240_002])
+        XCTAssertTrue(mergedEntries.allSatisfy { $0.lastConfirmationSource == .privateExactBridge })
+    }
+
+    func testRuntimeSnapshotProviderWindowListDropsNewCGEntriesAfterAXDisappearsWithoutStickyBinding() {
+        let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+            axWindows: [],
+            cgWindows: [
+                .init(
+                    id: 243_747,
+                    title: "Recovered Window",
                     bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
                     isOnscreen: false
                 )
-            ]
+            ],
+            previousMatches: [:],
+            previousAXWindowIDs: ["ax:18405:0"],
+            previousCGWindowIDs: [240_029],
+            pid: 18405,
+            appName: "Google Chrome"
         )
 
-        XCTAssertEqual(mergedEntries.count, 4)
-        XCTAssertEqual(mergedEntries.first?.title, "百度一下，你就知道 - Google Chrome - test2")
-        XCTAssertEqual(mergedEntries.dropFirst().first?.title, "Google Chrome")
+        XCTAssertTrue(mergedEntries.isEmpty)
+    }
+
+    func testRuntimeSnapshotProviderWindowListKeepsStickyCGEntriesWhenCurrentAXHandleIsMissing() {
+        let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+            axWindows: [],
+            cgWindows: [
+                .init(
+                    id: 243_747,
+                    title: "Recovered Window",
+                    bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
+                    isOnscreen: false
+                )
+            ],
+            previousMatches: ["ax:18405:0": 243_747],
+            previousAXWindowIDs: ["ax:18405:0"],
+            previousCGWindowIDs: [243_747],
+            pid: 18405,
+            appName: "Google Chrome"
+        )
+
+        XCTAssertEqual(mergedEntries.map(\.windowID), ["cg:18405:243747"])
+        XCTAssertEqual(mergedEntries.first?.title, "Recovered Window")
+        XCTAssertEqual(mergedEntries.first?.cgWindowID, 243_747)
+        XCTAssertEqual(mergedEntries.first?.lastConfirmationSource, .stickyBinding)
     }
 
     func testRuntimeSnapshotProviderAXWindowTitleFallsBackToAppNameWhenSourceTitleMissing() {
@@ -369,6 +401,38 @@ extension FlowTabPriorityCoverageTests {
             matchedCGTitle: "百度一下，你就知道 - Google Chrome - test2",
             appName: "Google Chrome",
             fallbackIndex: 0
+        )
+        XCTAssertEqual(title, "百度一下，你就知道 - Google Chrome - test2")
+    }
+
+    func testRuntimeSnapshotProviderAXWindowTitleTreatsAppNameSourceAsFallbackWhenCGTitleExists() {
+        let title = RuntimeSnapshotProvider.resolvedAXWindowTitleForTesting(
+            sourceTitle: "Google Chrome",
+            matchedCGTitle: "百度一下，你就知道 - Google Chrome - test2",
+            appName: "Google Chrome",
+            fallbackIndex: 0
+        )
+        XCTAssertEqual(title, "百度一下，你就知道 - Google Chrome - test2")
+    }
+
+    func testRuntimeSnapshotProviderAXWindowTitleTreatsAppNameSourceAsFallbackWhenRefreshedAXTitleExists() {
+        let title = RuntimeSnapshotProvider.resolvedAXWindowTitleForTesting(
+            sourceTitle: "Google Chrome",
+            matchedCGTitle: nil,
+            appName: "Google Chrome",
+            fallbackIndex: 2,
+            refreshedAXTitle: "百度一下，你就知道 - Google Chrome - test3"
+        )
+        XCTAssertEqual(title, "百度一下，你就知道 - Google Chrome - test3")
+    }
+
+    func testRuntimeSnapshotProviderAXWindowTitleUsesRefreshedAXTitleWhenPrimaryTitleMissing() {
+        let title = RuntimeSnapshotProvider.resolvedAXWindowTitleForTesting(
+            sourceTitle: nil,
+            matchedCGTitle: nil,
+            appName: "Google Chrome",
+            fallbackIndex: 2,
+            refreshedAXTitle: "百度一下，你就知道 - Google Chrome - test2"
         )
         XCTAssertEqual(title, "百度一下，你就知道 - Google Chrome - test2")
     }
@@ -433,7 +497,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertNil(RuntimeWindowPreviewProvider.guessTitleBarStyleForTesting(from: noisyImage))
     }
 
-    func testRuntimeWindowPreviewProviderCandidateWindowOrderingForPreferredAndTitleMatches() {
+    func testRuntimeWindowPreviewProviderCandidateWindowIDsPreferOnlyExplicitWindowID() {
         let candidateIDs = RuntimeWindowPreviewProvider.candidateWindowIDsForTesting(
             preferredWindowID: 3,
             preferredTitle: "Inbox",
@@ -445,7 +509,34 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
 
-        XCTAssertEqual(candidateIDs, [3, 1, 2, 4])
+        XCTAssertEqual(candidateIDs, [3])
+    }
+
+    func testRuntimeWindowPreviewProviderCandidateWindowIDsUseUniqueExactTitleMatches() {
+        let candidateIDs = RuntimeWindowPreviewProvider.candidateWindowIDsForTesting(
+            preferredWindowID: nil,
+            preferredTitle: "Inbox",
+            liveWindows: [
+                .init(id: 1, title: "Inbox"),
+                .init(id: 2, title: "inbox"),
+                .init(id: 3, title: "Draft")
+            ]
+        )
+
+        XCTAssertEqual(candidateIDs, [1])
+    }
+
+    func testRuntimeWindowPreviewProviderCandidateWindowIDsAvoidArbitraryFallbackAcrossMultipleWindows() {
+        let candidateIDs = RuntimeWindowPreviewProvider.candidateWindowIDsForTesting(
+            preferredWindowID: nil,
+            preferredTitle: "Archive",
+            liveWindows: [
+                .init(id: 1, title: "Inbox"),
+                .init(id: 2, title: "Draft")
+            ]
+        )
+
+        XCTAssertTrue(candidateIDs.isEmpty)
     }
 
     func testRuntimeWindowPreviewProviderOwnerPIDPathKeepsPreferredWindowFirst() {
@@ -457,6 +548,19 @@ extension FlowTabPriorityCoverageTests {
         )
 
         XCTAssertEqual(candidateIDs.first, preferredWindowID)
+    }
+
+    func testRuntimeWindowPreviewProviderAllowsOffScreenShareableLookupForKnownWindowIDs() {
+        XCTAssertFalse(
+            RuntimeWindowPreviewProvider.shareableContentOnScreenOnlyForTesting(
+                preferredWindowID: 243747
+            )
+        )
+        XCTAssertTrue(
+            RuntimeWindowPreviewProvider.shareableContentOnScreenOnlyForTesting(
+                preferredWindowID: nil
+            )
+        )
     }
 
     func testRuntimeWindowPreviewProviderScaledPreviewSizeAndImageDownscaleBehavior() {
@@ -531,8 +635,8 @@ extension FlowTabPriorityCoverageTests {
 
     func testRuntimeSnapshotProviderResolveCGWindowAssignmentsUsesGeometryWithDuplicateTitles() {
         let axWindows: [RuntimeSnapshotProvider.AXWindowEntryForTesting] = [
-            .init(id: "ax:100:0", index: 0, bounds: CGRect(x: 10, y: 10, width: 600, height: 420)),
-            .init(id: "ax:100:1", index: 1, bounds: CGRect(x: 640, y: 10, width: 600, height: 420))
+            .init(id: "ax:100:0", index: 0, title: "Document", bounds: CGRect(x: 10, y: 10, width: 600, height: 420)),
+            .init(id: "ax:100:1", index: 1, title: "Document", bounds: CGRect(x: 640, y: 10, width: 600, height: 420))
         ]
         let cgWindows: [RuntimeSnapshotProvider.CGWindowEntryForTesting] = [
             .init(
@@ -556,7 +660,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(assignments["ax:100:1"], 22)
     }
 
-    func testRuntimeSnapshotProviderResolveCGWindowAssignmentsSkipsAmbiguousOrLowConfidenceMatches() {
+    func testRuntimeSnapshotProviderResolveCGWindowAssignmentsRequiresTitleHitAndSkipsAmbiguousMatches() {
         let axWindows: [RuntimeSnapshotProvider.AXWindowEntryForTesting] = [
             .init(id: "ax:200:2", index: 2, bounds: CGRect(x: 100, y: 100, width: 800, height: 500)),
             .init(id: "ax:200:0", index: 0, bounds: nil)
@@ -574,8 +678,187 @@ extension FlowTabPriorityCoverageTests {
             cgWindows: cgWindows
         )
 
-        XCTAssertNil(assignments["ax:200:2"], "Ambiguous high-score windows should remain unbound")
-        XCTAssertNil(assignments["ax:200:0"], "Low-confidence windows should remain unbound")
+        XCTAssertNil(assignments["ax:200:2"], "Ambiguous windows should remain unbound")
+        XCTAssertNil(assignments["ax:200:0"], "Windows without a title hit should remain unbound")
+    }
+
+    func testRuntimeSnapshotProviderResolveCGWindowAssignmentsBindsSingleNewUnmatchedPairFromDelta() {
+        let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
+        let assignments = RuntimeSnapshotProvider.resolveCGWindowAssignmentsForTesting(
+            axWindows: [
+                .init(id: "ax:100:0", index: 0, title: "百度一下，你就知道", bounds: fullscreenBounds),
+                .init(id: "ax:100:1", index: 1, title: "百度一下，你就知道", bounds: fullscreenBounds),
+                .init(id: "ax:100:2", index: 2, title: "百度一下，你就知道", bounds: fullscreenBounds),
+                .init(id: "ax:100:3", index: 3, title: "百度一下，你就知道", bounds: fullscreenBounds)
+            ],
+            cgWindows: [
+                .init(id: 243_747, title: "百度一下，你就知道", bounds: fullscreenBounds),
+                .init(id: 243_679, title: "百度一下，你就知道", bounds: fullscreenBounds),
+                .init(id: 240_029, title: "百度一下，你就知道", bounds: fullscreenBounds),
+                .init(id: 251_969, title: "百度一下，你就知道", bounds: fullscreenBounds)
+            ],
+            previousMatches: [
+                "ax:100:0": 243_747,
+                "ax:100:1": 243_679,
+                "ax:100:2": 240_029
+            ],
+            previousAXWindowIDs: ["ax:100:0", "ax:100:1", "ax:100:2"],
+            previousCGWindowIDs: [243_747, 243_679, 240_029],
+            pid: 100,
+            appName: "Google Chrome"
+        )
+
+        XCTAssertEqual(assignments["ax:100:0"], 243_747)
+        XCTAssertEqual(assignments["ax:100:1"], 243_679)
+        XCTAssertEqual(assignments["ax:100:2"], 240_029)
+        XCTAssertEqual(assignments["ax:100:3"], 251_969)
+    }
+
+    func testRuntimeSnapshotProviderResolveCGWindowAssignmentsDoesNotGuessAcrossInitialAmbiguousSnapshot() {
+        let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
+        let assignments = RuntimeSnapshotProvider.resolveCGWindowAssignmentsForTesting(
+            axWindows: [
+                .init(id: "ax:100:0", index: 0, title: "百度一下，你就知道 - Google Chrome - test3", bounds: fullscreenBounds),
+                .init(id: "ax:100:1", index: 1, title: "百度一下，你就知道 - Google Chrome - test2", bounds: fullscreenBounds),
+                .init(id: "ax:100:2", index: 2, title: "百度一下，你就知道 - Google Chrome - test1", bounds: fullscreenBounds),
+                .init(id: "ax:100:3", index: 3, title: "百度一下，你就知道 - Google Chrome - test5", bounds: fullscreenBounds)
+            ],
+            cgWindows: [
+                .init(id: 243_747, title: "百度一下，你就知道", bounds: fullscreenBounds),
+                .init(id: 240_029, title: "百度一下，你就知道", bounds: fullscreenBounds),
+                .init(id: 240_016, title: "百度一下，你就知道", bounds: fullscreenBounds),
+                .init(id: 240_002, title: "百度一下，你就知道", bounds: fullscreenBounds),
+                .init(id: 251_969, title: "百度一下，你就知道", bounds: fullscreenBounds)
+            ],
+            previousMatches: [:],
+            previousAXWindowIDs: [],
+            previousCGWindowIDs: [],
+            pid: 100,
+            appName: "Google Chrome"
+        )
+
+        XCTAssertTrue(assignments.isEmpty)
+    }
+
+    func testRuntimeSnapshotProviderResolveCGWindowAssignmentsUsesPrivateExactBridgeWhenPublicSignalsRemainAmbiguous() {
+        let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
+        let assignments = RuntimeSnapshotProvider.resolveCGWindowAssignmentsForTesting(
+            axWindows: [
+                .init(
+                    id: "ax:100:0",
+                    index: 0,
+                    title: "百度一下，你就知道",
+                    bounds: fullscreenBounds,
+                    bridgedCGWindowID: 243_747
+                ),
+                .init(
+                    id: "ax:100:1",
+                    index: 1,
+                    title: "百度一下，你就知道",
+                    bounds: fullscreenBounds,
+                    bridgedCGWindowID: 243_679
+                ),
+                .init(
+                    id: "ax:100:2",
+                    index: 2,
+                    title: "百度一下，你就知道",
+                    bounds: fullscreenBounds,
+                    bridgedCGWindowID: 240_029
+                )
+            ],
+            cgWindows: [
+                .init(id: 243_747, title: "百度一下，你就知道", bounds: fullscreenBounds),
+                .init(id: 243_679, title: "百度一下，你就知道", bounds: fullscreenBounds),
+                .init(id: 240_029, title: "百度一下，你就知道", bounds: fullscreenBounds)
+            ],
+            pid: 100,
+            appName: "Google Chrome"
+        )
+
+        XCTAssertEqual(assignments["ax:100:0"], 243_747)
+        XCTAssertEqual(assignments["ax:100:1"], 243_679)
+        XCTAssertEqual(assignments["ax:100:2"], 240_029)
+    }
+
+    func testRuntimeSnapshotProviderResolveCGWindowAssignmentsKeepsHistoricalBindingsWhenSnapshotBecomesAmbiguous() {
+        let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
+        let assignments = RuntimeSnapshotProvider.resolveCGWindowAssignmentsForTesting(
+            axWindows: [
+                .init(id: "ax:100:0", index: 0, title: "百度一下，你就知道", bounds: fullscreenBounds),
+                .init(id: "ax:100:1", index: 1, title: "百度一下，你就知道", bounds: fullscreenBounds),
+                .init(id: "ax:100:2", index: 2, title: "百度一下，你就知道", bounds: fullscreenBounds),
+                .init(id: "ax:100:3", index: 3, title: "百度一下，你就知道", bounds: fullscreenBounds)
+            ],
+            cgWindows: [
+                .init(id: 243_747, title: "百度一下，你就知道", bounds: fullscreenBounds),
+                .init(id: 243_679, title: "百度一下，你就知道", bounds: fullscreenBounds),
+                .init(id: 240_029, title: "百度一下，你就知道", bounds: fullscreenBounds),
+                .init(id: 251_969, title: "百度一下，你就知道", bounds: fullscreenBounds)
+            ],
+            previousMatches: [
+                "ax:100:0": 243_747,
+                "ax:100:1": 243_679
+            ],
+            previousAXWindowIDs: ["ax:100:0", "ax:100:1"],
+            previousCGWindowIDs: [243_747, 243_679],
+            pid: 100,
+            appName: "Google Chrome"
+        )
+
+        XCTAssertEqual(assignments["ax:100:0"], 243_747)
+        XCTAssertEqual(assignments["ax:100:1"], 243_679)
+        XCTAssertNil(assignments["ax:100:2"])
+        XCTAssertNil(assignments["ax:100:3"])
+    }
+
+    func testRuntimeSnapshotProviderResolveCGWindowAssignmentsUsesExactTitlesToBreakFullscreenGeometryTies() {
+        let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
+        let axWindows: [RuntimeSnapshotProvider.AXWindowEntryForTesting] = [
+            .init(
+                id: "ax:100:0",
+                index: 0,
+                title: "Google 搜索 - Google Chrome - test1",
+                bounds: fullscreenBounds
+            ),
+            .init(
+                id: "ax:100:1",
+                index: 1,
+                title: "Google 搜索 - Google Chrome - test3",
+                bounds: fullscreenBounds
+            ),
+            .init(
+                id: "ax:100:2",
+                index: 2,
+                title: "Google 搜索 - Google Chrome - test5",
+                bounds: fullscreenBounds
+            )
+        ]
+        let cgWindows: [RuntimeSnapshotProvider.CGWindowEntryForTesting] = [
+            .init(
+                id: 243_679,
+                title: "Google 搜索 - Google Chrome - test3",
+                bounds: fullscreenBounds
+            ),
+            .init(
+                id: 243_747,
+                title: "Google 搜索 - Google Chrome - test1",
+                bounds: fullscreenBounds
+            ),
+            .init(
+                id: 240_029,
+                title: "Google 搜索 - Google Chrome - test5",
+                bounds: fullscreenBounds
+            )
+        ]
+
+        let assignments = RuntimeSnapshotProvider.resolveCGWindowAssignmentsForTesting(
+            axWindows: axWindows,
+            cgWindows: cgWindows
+        )
+
+        XCTAssertEqual(assignments["ax:100:0"], 243_747)
+        XCTAssertEqual(assignments["ax:100:1"], 243_679)
+        XCTAssertEqual(assignments["ax:100:2"], 240_029)
     }
 
     func testAXWindowInspectorHelpersRoundTripWindowIDsAndHandleSystemElementLookups() {
@@ -599,6 +882,59 @@ extension FlowTabPriorityCoverageTests {
         if let title = AXWindowInspectorForTesting.title(for: systemElement) {
             XCTAssertFalse(title.isEmpty)
         }
+    }
+
+    func testAXWindowInspectorPreferredWindowTitleSelectsMostSpecificCandidate() {
+        let preferredTitle = AXWindowInspectorForTesting.preferredWindowTitle(
+            candidates: [
+                "Google Chrome",
+                "新标签页 - Google Chrome - test4",
+                nil
+            ]
+        )
+        XCTAssertEqual(preferredTitle, "新标签页 - Google Chrome - test4")
+
+        let fallbackTitle = AXWindowInspectorForTesting.preferredWindowTitle(
+            candidates: [
+                "Google Chrome",
+                nil
+            ]
+        )
+        XCTAssertEqual(fallbackTitle, "Google Chrome")
+    }
+
+    func testRuntimeWindowPreviewProviderPreferredCaptureSourceSizeUsesContentRectPixelScale() {
+        let preferredSize = RuntimeWindowPreviewProvider.preferredCaptureSourceSizeForTesting(
+            contentRect: CGRect(x: 24, y: 38, width: 1_600, height: 1_000),
+            pointPixelScale: 2,
+            fallbackFrame: CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
+        )
+        XCTAssertEqual(preferredSize.width, 3_200)
+        XCTAssertEqual(preferredSize.height, 2_000)
+
+        let fallbackSize = RuntimeWindowPreviewProvider.preferredCaptureSourceSizeForTesting(
+            contentRect: .zero,
+            pointPixelScale: 2,
+            fallbackFrame: CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
+        )
+        XCTAssertEqual(fallbackSize.width, 1_728)
+        XCTAssertEqual(fallbackSize.height, 1_079)
+    }
+
+    func testRuntimeWindowPreviewProviderTrimsTransparentPaddingFromCapturedImage() {
+        let image = makePreviewCGImage(size: CGSize(width: 180, height: 120)) { context in
+            context.setFillColor(NSColor.clear.cgColor)
+            context.fill(CGRect(x: 0, y: 0, width: 180, height: 120))
+            context.setFillColor(NSColor.systemBlue.cgColor)
+            context.fill(CGRect(x: 0, y: 0, width: 160, height: 120))
+        }
+
+        let trimmedImage = RuntimeWindowPreviewProvider.trimmedTransparentPaddingIfNeededForTesting(
+            image
+        )
+
+        XCTAssertEqual(trimmedImage.width, 160)
+        XCTAssertEqual(trimmedImage.height, 120)
     }
 
     @MainActor

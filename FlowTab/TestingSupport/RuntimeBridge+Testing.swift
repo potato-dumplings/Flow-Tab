@@ -31,6 +31,66 @@ extension RuntimeSnapshotProvider {
                     rank: item - 1
                 )
             }
+        case "single-app-five-windows":
+            return [
+                (
+                    appID: "com.flowtab.mock.browser",
+                    name: "Mock Browser",
+                    windows: [
+                        WindowCandidate(id: "mock-browser-normal-1", title: "Normal 1", isMinimized: false, lastActiveAt: 300),
+                        WindowCandidate(id: "mock-browser-normal-2", title: "Normal 2", isMinimized: false, lastActiveAt: 299),
+                        WindowCandidate(
+                            id: "mock-browser-fullscreen-1",
+                            title: "Fullscreen 1",
+                            isMinimized: false,
+                            lastActiveAt: 298
+                        ),
+                        WindowCandidate(
+                            id: "mock-browser-fullscreen-2",
+                            title: "Fullscreen 2",
+                            isMinimized: false,
+                            lastActiveAt: 297
+                        ),
+                        WindowCandidate(
+                            id: "mock-browser-fullscreen-3",
+                            title: "Fullscreen 3",
+                            isMinimized: false,
+                            lastActiveAt: 296
+                        )
+                    ],
+                    rank: 0
+                )
+            ]
+        case "single-app-five-windows-cg-offspace":
+            return [
+                (
+                    appID: "com.flowtab.mock.browser",
+                    name: "Mock Browser",
+                    windows: [
+                        WindowCandidate(id: "cg:100:240001", title: "Normal 1", isMinimized: false, lastActiveAt: 300),
+                        WindowCandidate(id: "cg:100:240002", title: "Normal 2", isMinimized: false, lastActiveAt: 299),
+                        WindowCandidate(id: "cg:100:243747", title: "Window #3", isMinimized: false, lastActiveAt: 298),
+                        WindowCandidate(id: "cg:100:243679", title: "Window #4", isMinimized: false, lastActiveAt: 297),
+                        WindowCandidate(id: "cg:100:240029", title: "Window #5", isMinimized: false, lastActiveAt: 296)
+                    ],
+                    rank: 0
+                )
+            ]
+        case "single-app-five-windows-cg-offspace-titled":
+            return [
+                (
+                    appID: "com.flowtab.mock.browser",
+                    name: "Mock Browser",
+                    windows: [
+                        WindowCandidate(id: "cg:100:240001", title: "Normal 1", isMinimized: false, lastActiveAt: 300),
+                        WindowCandidate(id: "cg:100:240002", title: "Normal 2", isMinimized: false, lastActiveAt: 299),
+                        WindowCandidate(id: "cg:100:243747", title: "Fullscreen 3", isMinimized: false, lastActiveAt: 298),
+                        WindowCandidate(id: "cg:100:243679", title: "Fullscreen 4", isMinimized: false, lastActiveAt: 297),
+                        WindowCandidate(id: "cg:100:240029", title: "Fullscreen 5", isMinimized: false, lastActiveAt: 296)
+                    ],
+                    rank: 0
+                )
+            ]
         default:
             return [
                 (
@@ -132,8 +192,10 @@ extension RuntimeSnapshotProvider {
                             id: window.id,
                             title: window.title,
                             isMinimized: window.isMinimized,
-                            cgWindowID: nil,
-                            inferredTitleBarStyle: nil
+                            ownerPID: runningApp.processIdentifier,
+                            cgWindowID: mockCGWindowID(from: window.id),
+                            inferredTitleBarStyle: nil,
+                            allowsPublicAXRecovery: mockCGWindowID(from: window.id) != nil
                         )
                     )
                 })
@@ -156,5 +218,13 @@ extension RuntimeSnapshotProvider {
             summaries: summaries,
             snapshotsByAppID: snapshotsByAppID
         )
+    }
+
+    private static func mockCGWindowID(from windowID: String) -> CGWindowID? {
+        let parts = windowID.split(separator: ":")
+        guard parts.count == 3, parts[0] == "cg", let rawWindowID = UInt32(parts[2]) else {
+            return nil
+        }
+        return CGWindowID(rawWindowID)
     }
 }

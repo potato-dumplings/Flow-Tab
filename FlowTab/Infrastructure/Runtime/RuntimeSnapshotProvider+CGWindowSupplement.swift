@@ -3,10 +3,10 @@ import ApplicationServices
 import Foundation
 
 extension RuntimeSnapshotProvider {
-    private static let offSpaceSupplementMinimumArea: CGFloat = 450_000
-    private static let offSpaceSupplementAreaRatio: CGFloat = 0.55
-    private static let offSpaceSupplementMaxCount: Int = 8
-    private static let offSpaceSupplementAlphaThreshold: Double = 0.001
+    private static let minimumValidCGWindowWidth: CGFloat = 80
+    private static let minimumValidCGWindowHeight: CGFloat = 60
+    private static let minimumValidCGWindowArea: CGFloat = 20_000
+    private static let validCGWindowAlphaThreshold: Double = 0.001
     private static let standardBufferedStoreType: Int = 1
 
     static func makeCGWindowID(pid: pid_t, cgWindowID: CGWindowID) -> String {
@@ -17,127 +17,76 @@ extension RuntimeSnapshotProvider {
         to entries: [WindowListEntry],
         appName: String,
         pid: pid_t,
-        allCGWindows: [CGWindowEntry]
+        allCGWindows: [CGWindowEntry],
+        matchedCGWindowIDs: Set<CGWindowID> = []
     ) -> [WindowListEntry] {
-        let supplementalWindows = selectSupplementalOffSpaceCGWindows(
-            existingCGWindowIDs: Set(entries.compactMap(\.cgWindowID)),
+        let unmatchedCGWindows = selectSupplementalOffSpaceCGWindows(
+            existingCGWindowIDs: matchedCGWindowIDs,
             allCGWindows: allCGWindows
         )
-        guard !supplementalWindows.isEmpty else { return entries }
+        guard !unmatchedCGWindows.isEmpty else { return entries }
 
-        var mergedEntries = entries
-        var remainingSupplementalWindows = supplementalWindows
-        var backfilledEntryCount = 0
-        let backfillTargetIndexes = supplementalBackfillTargetIndexes(
-            in: mergedEntries,
-            appName: appName
-        )
-        if !backfillTargetIndexes.isEmpty {
-            let backfillCount = min(backfillTargetIndexes.count, remainingSupplementalWindows.count)
-            for offset in 0..<backfillCount {
-                let entryIndex = backfillTargetIndexes[offset]
-                let supplementalWindow = remainingSupplementalWindows[offset]
-                var title = mergedEntries[entryIndex].title
-                if isAppNameFallbackTitle(title, appName: appName),
-                    let supplementalTitle = normalizedWindowTitle(supplementalWindow.title)
-                {
-                    title = supplementalTitle
-                }
-                mergedEntries[entryIndex] = WindowListEntry(
-                    windowID: mergedEntries[entryIndex].windowID,
-                    title: title,
-                    isMinimized: mergedEntries[entryIndex].isMinimized,
-                    cgWindowID: supplementalWindow.id,
-                    axWindow: mergedEntries[entryIndex].axWindow
-                )
-                backfilledEntryCount += 1
-            }
-            remainingSupplementalWindows.removeFirst(backfillCount)
-        }
-
-        var explicitTitleCount = 0
-        var appNameFallbackCount = 0
-        let supplementalEntries: [WindowListEntry] = remainingSupplementalWindows.map { cgWindow in
-            let title = resolvedTitleForSupplementalCGWindow(
-                appName: appName,
-                cgWindow: cgWindow
-            )
-            if normalizedWindowTitle(cgWindow.title) == nil {
-                appNameFallbackCount += 1
-            } else {
-                explicitTitleCount += 1
-            }
-            return WindowListEntry(
+        let cgOnlyEntries = unmatchedCGWindows.map { cgWindow in
+            WindowListEntry(
                 windowID: Self.makeCGWindowID(pid: pid, cgWindowID: cgWindow.id),
-                title: title,
+                title: resolvedTitleForSupplementalCGWindow(
+                    appName: appName,
+                    cgWindow: cgWindow
+                ),
                 isMinimized: false,
+                ownerPID: pid,
                 cgWindowID: cgWindow.id,
-                axWindow: nil
+                axWindow: nil,
+                frame: cgWindow.bounds,
+                allowsPublicAXRecovery: true,
+                hasStickyBinding: false,
+                lastConfirmationSource: nil
             )
         }
         RuntimeLog.info(
             "AX",
-            "\(appName) supplementalCGWindows=\(supplementalEntries.count) explicitTitles=\(explicitTitleCount) appNameFallbacks=\(appNameFallbackCount) backfilledAXEntries=\(backfilledEntryCount)"
+            "\(appName) unmatched-cg windows=\(cgOnlyEntries.count)"
         )
-        return mergedEntries + supplementalEntries
+        return entries + cgOnlyEntries
     }
 
     func selectSupplementalOffSpaceCGWindows(
         existingCGWindowIDs: Set<CGWindowID>,
         allCGWindows: [CGWindowEntry]
     ) -> [CGWindowEntry] {
-        guard !allCGWindows.isEmpty else { return [] }
-
-        let referenceArea = allCGWindows
-            .filter(\.isOnscreen)
-            .compactMap { Self.windowArea($0.bounds) }
-            .max() ?? 0
-        let minimumArea = max(
-            Self.offSpaceSupplementMinimumArea,
-            referenceArea * Self.offSpaceSupplementAreaRatio
-        )
-
-        let candidates = allCGWindows.filter { window in
-            // AX can miss large top-level windows that remain in the current space,
-            // so supplement from unmatched CG windows whether they are on-screen or off-space.
-            guard !existingCGWindowIDs.contains(window.id) else { return false }
-            guard window.alpha > Self.offSpaceSupplementAlphaThreshold else { return false }
-            guard window.storeType == Self.standardBufferedStoreType else { return false }
-            guard let area = Self.windowArea(window.bounds) else { return false }
-            return area >= minimumArea
+        allCGWindows.filter { window in
+            !existingCGWindowIDs.contains(window.id) && Self.cgWindowPassesValidityConstraints(window)
         }
-        guard !candidates.isEmpty else { return [] }
+    }
 
-        let sorted = candidates.sorted { lhs, rhs in
-            let lhsArea = Self.windowArea(lhs.bounds) ?? 0
-            let rhsArea = Self.windowArea(rhs.bounds) ?? 0
-            if lhsArea == rhsArea {
-                return lhs.id > rhs.id
+    static func validCGWindowIDsForTesting(
+        existingCGWindowIDs: Set<CGWindowID>,
+        allCGWindows: [CGWindowEntryForTesting]
+    ) -> [CGWindowID] {
+        let provider = RuntimeSnapshotProvider()
+        return provider.selectSupplementalOffSpaceCGWindows(
+            existingCGWindowIDs: existingCGWindowIDs,
+            allCGWindows: allCGWindows.map {
+                CGWindowEntry(
+                    id: $0.id,
+                    title: $0.title,
+                    bounds: $0.bounds,
+                    isOnscreen: $0.isOnscreen,
+                    alpha: $0.alpha,
+                    storeType: $0.storeType
+                )
             }
-            return lhsArea > rhsArea
-        }
-        return Array(sorted.prefix(Self.offSpaceSupplementMaxCount))
+        ).map(\.id)
     }
 
     static func supplementalCGWindowIDsForTesting(
         existingCGWindowIDs: Set<CGWindowID>,
         allCGWindows: [CGWindowEntryForTesting]
     ) -> [CGWindowID] {
-        let provider = RuntimeSnapshotProvider()
-        let windows = allCGWindows.map {
-            CGWindowEntry(
-                id: $0.id,
-                title: $0.title,
-                bounds: $0.bounds,
-                isOnscreen: $0.isOnscreen,
-                alpha: $0.alpha,
-                storeType: $0.storeType
-            )
-        }
-        return provider.selectSupplementalOffSpaceCGWindows(
+        validCGWindowIDsForTesting(
             existingCGWindowIDs: existingCGWindowIDs,
-            allCGWindows: windows
-        ).map(\.id)
+            allCGWindows: allCGWindows
+        )
     }
 
     static func supplementalCGWindowTitleForTesting(
@@ -164,23 +113,44 @@ extension RuntimeSnapshotProvider {
         let title: String
         let isMinimized: Bool
         let cgWindowID: CGWindowID?
+        let frame: CGRect?
+        let lastConfirmationSource: WindowBindingConfirmationSource?
+
+        init(
+            windowID: String,
+            title: String,
+            isMinimized: Bool,
+            cgWindowID: CGWindowID?,
+            frame: CGRect? = nil,
+            lastConfirmationSource: WindowBindingConfirmationSource? = nil
+        ) {
+            self.windowID = windowID
+            self.title = title
+            self.isMinimized = isMinimized
+            self.cgWindowID = cgWindowID
+            self.frame = frame
+            self.lastConfirmationSource = lastConfirmationSource
+        }
     }
 
     static func appendOffSpaceCGWindowsForTesting(
         entries: [SupplementalMergeEntryForTesting],
         appName: String,
         pid: pid_t,
-        allCGWindows: [CGWindowEntryForTesting]
+        allCGWindows: [CGWindowEntryForTesting],
+        matchedCGWindowIDs: Set<CGWindowID> = []
     ) -> [SupplementalMergeEntryForTesting] {
         let provider = RuntimeSnapshotProvider()
-        let mergedEntries = provider.appendOffSpaceCGWindows(
+        return provider.appendOffSpaceCGWindows(
             to: entries.map {
                 WindowListEntry(
                     windowID: $0.windowID,
                     title: $0.title,
                     isMinimized: $0.isMinimized,
                     cgWindowID: $0.cgWindowID,
-                    axWindow: nil
+                    axWindow: nil,
+                    frame: $0.frame,
+                    lastConfirmationSource: $0.lastConfirmationSource
                 )
             },
             appName: appName,
@@ -194,23 +164,27 @@ extension RuntimeSnapshotProvider {
                     alpha: $0.alpha,
                     storeType: $0.storeType
                 )
-            }
-        )
-        return mergedEntries.map {
+            },
+            matchedCGWindowIDs: matchedCGWindowIDs
+        ).map {
             SupplementalMergeEntryForTesting(
                 windowID: $0.windowID,
                 title: $0.title,
                 isMinimized: $0.isMinimized,
-                cgWindowID: $0.cgWindowID
+                cgWindowID: $0.cgWindowID,
+                frame: $0.frame,
+                lastConfirmationSource: $0.lastConfirmationSource
             )
         }
     }
 
-    private static func windowArea(_ bounds: CGRect?) -> CGFloat? {
-        guard let bounds else { return nil }
-        let standardized = bounds.standardized
-        guard standardized.width > 0, standardized.height > 0 else { return nil }
-        return standardized.width * standardized.height
+    static func cgWindowPassesValidityConstraints(_ window: CGWindowEntry) -> Bool {
+        guard window.alpha > validCGWindowAlphaThreshold else { return false }
+        guard window.storeType == standardBufferedStoreType else { return false }
+        guard let bounds = window.bounds?.standardized else { return false }
+        guard bounds.width >= minimumValidCGWindowWidth else { return false }
+        guard bounds.height >= minimumValidCGWindowHeight else { return false }
+        return bounds.width * bounds.height >= minimumValidCGWindowArea
     }
 
     private func resolvedTitleForSupplementalCGWindow(
@@ -226,23 +200,5 @@ extension RuntimeSnapshotProvider {
         guard let title else { return nil }
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
-    }
-
-    private func isAppNameFallbackTitle(_ title: String, appName: String) -> Bool {
-        guard let normalizedTitle = normalizedWindowTitle(title) else { return false }
-        guard let normalizedAppName = normalizedWindowTitle(appName) else { return false }
-        return normalizedTitle.caseInsensitiveCompare(normalizedAppName) == .orderedSame
-    }
-
-    private func supplementalBackfillTargetIndexes(
-        in entries: [WindowListEntry],
-        appName: String
-    ) -> [Int] {
-        let unresolvedIndexes = entries.indices.filter { entries[$0].cgWindowID == nil }
-        let fallbackTitleIndexes = entries.indices.filter { index in
-            guard entries[index].cgWindowID != nil else { return false }
-            return isAppNameFallbackTitle(entries[index].title, appName: appName)
-        }
-        return unresolvedIndexes + fallbackTitleIndexes
     }
 }

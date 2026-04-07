@@ -8,8 +8,40 @@ final class RuntimeSnapshotProvider {
         let windowID: String
         let title: String
         let isMinimized: Bool
+        let ownerPID: pid_t
         let cgWindowID: CGWindowID?
+        let activationHandleID: String?
         let axWindow: AXUIElement?
+        let frame: CGRect?
+        let allowsPublicAXRecovery: Bool
+        let hasStickyBinding: Bool
+        let lastConfirmationSource: WindowBindingConfirmationSource?
+
+        init(
+            windowID: String,
+            title: String,
+            isMinimized: Bool,
+            ownerPID: pid_t = 0,
+            cgWindowID: CGWindowID?,
+            activationHandleID: String? = nil,
+            axWindow: AXUIElement? = nil,
+            frame: CGRect? = nil,
+            allowsPublicAXRecovery: Bool = false,
+            hasStickyBinding: Bool = false,
+            lastConfirmationSource: WindowBindingConfirmationSource? = nil
+        ) {
+            self.windowID = windowID
+            self.title = title
+            self.isMinimized = isMinimized
+            self.ownerPID = ownerPID
+            self.cgWindowID = cgWindowID
+            self.activationHandleID = activationHandleID
+            self.axWindow = axWindow
+            self.frame = frame
+            self.allowsPublicAXRecovery = allowsPublicAXRecovery
+            self.hasStickyBinding = hasStickyBinding
+            self.lastConfirmationSource = lastConfirmationSource
+        }
     }
 
     struct CGWindowEntry {
@@ -29,12 +61,6 @@ final class RuntimeSnapshotProvider {
         let isMinimized: Bool
         let window: AXUIElement
         let frame: CGRect?
-    }
-
-    private struct WindowPairScore {
-        let axIndex: Int
-        let cgIndex: Int
-        let score: Double
     }
 
     struct AXWindowStats {
@@ -61,12 +87,7 @@ final class RuntimeSnapshotProvider {
         let candidate: AppSwitchCandidate
     }
 
-    private static let cgMatchMinimumConfidence = 0.56
-    private static let cgMatchAmbiguityDelta = 0.10
-    private static let cgMatchStickyBonus = 0.18
-    private static let cgMatchIndexWeight = 0.20
-
-    private var lastCGWindowIDByAXWindowID: [String: CGWindowID] = [:]
+    var windowMappingStateByPID: [pid_t: RuntimeWindowMappingState] = [:]
 
     func snapshot() -> RuntimeSnapshot {
         if let uiTestRuntimeDataset = Self.uiTestRuntimeDataset() {
@@ -160,9 +181,15 @@ final class RuntimeSnapshotProvider {
                             id: id,
                             title: $0.title,
                             isMinimized: $0.isMinimized,
+                            ownerPID: $0.ownerPID,
                             cgWindowID: $0.cgWindowID,
                             inferredTitleBarStyle: nil,
-                            axWindow: $0.axWindow
+                            activationHandleID: $0.activationHandleID,
+                            axWindow: $0.axWindow,
+                            frame: $0.frame,
+                            allowsPublicAXRecovery: $0.allowsPublicAXRecovery,
+                            hasStickyBinding: $0.hasStickyBinding,
+                            lastConfirmationSource: $0.lastConfirmationSource
                         )
                     )
                 }
@@ -279,6 +306,7 @@ final class RuntimeSnapshotProvider {
         windowsByPID: [pid_t: [WindowListEntry]],
         rankByPID: [pid_t: Int]
     ) {
+        cleanupWindowMappingState(for: runningApps)
         AXLiveWindowRegistry.shared.rebind(runningApps)
         let onScreenCGWindowsByPID = collectCGWindowsByPID()
         let allCGWindowsByPID = collectCGWindowsByPID(options: [.optionAll, .excludeDesktopElements])
@@ -314,7 +342,6 @@ final class RuntimeSnapshotProvider {
             let cgWindows = cgWindowsByPID[app.processIdentifier] ?? []
             let allCGWindows = allCGWindowsByPID[app.processIdentifier] ?? cgWindows
             RuntimeLog.info("AX", "\(appName) rawWindows=\(windows.count)")
-            guard !windows.isEmpty else { continue }
 
             let axEntries = windows.enumerated().compactMap { index, window -> AXWindowEntry? in
                 guard AXWindowInspector.isSwitchable(window) else {
@@ -338,62 +365,77 @@ final class RuntimeSnapshotProvider {
                 )
             }
 
-            guard !axEntries.isEmpty else {
-                pruneCachedCGMatches(for: app.processIdentifier, validWindowIDs: Set<String>())
-                continue
-            }
-
-            let cgMatchesByAXWindowID = resolveCGWindowAssignments(
+            let resolvedEntries = resolvedWindowEntries(
                 axWindows: axEntries,
-                cgWindows: cgWindows
-            )
-            let cgWindowByID = Dictionary(uniqueKeysWithValues: cgWindows.map { ($0.id, $0) })
-            let entries: [WindowListEntry] = axEntries.map { axEntry in
-                let matchedCGTitle = cgMatchesByAXWindowID[axEntry.id]
-                    .flatMap { cgWindowByID[$0]?.title }
-                let title = resolvedAXWindowTitle(
-                    sourceTitle: axEntry.sourceTitle,
-                    matchedCGTitle: matchedCGTitle,
-                    appName: appName,
-                    fallbackIndex: axEntry.index
-                )
-                return WindowListEntry(
-                    windowID: axEntry.id,
-                    title: title,
-                    isMinimized: axEntry.isMinimized,
-                    cgWindowID: cgMatchesByAXWindowID[axEntry.id],
-                    axWindow: axEntry.window
-                )
-            }
-            let mergedEntries = appendOffSpaceCGWindows(
-                to: entries,
-                appName: appName,
+                cgWindows: allCGWindows,
                 pid: app.processIdentifier,
-                allCGWindows: allCGWindows
+                appName: appName
             )
-
-            pruneCachedCGMatches(
-                for: app.processIdentifier,
-                validWindowIDs: Set(mergedEntries.map(\.windowID))
-            )
-            RuntimeLog.info("AX", "\(appName) switchableWindows=\(mergedEntries.count)")
-            windowsByPID[app.processIdentifier] = mergedEntries
+            guard !resolvedEntries.isEmpty else { continue }
+            RuntimeLog.info("AX", "\(appName) switchableWindows=\(resolvedEntries.count)")
+            windowsByPID[app.processIdentifier] = resolvedEntries
         }
         return windowsByPID
+    }
+
+    private func resolvedWindowEntries(
+        axWindows: [AXWindowEntry],
+        cgWindows: [CGWindowEntry],
+        pid: pid_t,
+        appName: String
+    ) -> [WindowListEntry] {
+        resolvedStableWindowEntries(
+            axWindows: axWindows,
+            cgWindows: cgWindows,
+            pid: pid,
+            appName: appName
+        )
     }
 
     private func resolvedAXWindowTitle(
         sourceTitle: String?,
         matchedCGTitle: String?,
         appName: String,
-        fallbackIndex: Int
+        fallbackIndex: Int,
+        refreshedAXTitle: String?
     ) -> String {
-        if let sourceTitle = normalizedWindowTitle(sourceTitle) {
+        let normalizedSourceTitle = normalizedWindowTitle(sourceTitle)
+        let normalizedMatchedCGTitle = normalizedWindowTitle(matchedCGTitle)
+        let normalizedRefreshedAXTitle = normalizedWindowTitle(refreshedAXTitle)
+        let sourceLooksLikeAppNameFallback = isAppNameFallbackTitle(
+            normalizedSourceTitle,
+            appName: appName
+        )
+
+        if !sourceLooksLikeAppNameFallback,
+            let sourceTitle = normalizedSourceTitle
+        {
             return sourceTitle
         }
-        if let matchedCGTitle = normalizedWindowTitle(matchedCGTitle) {
+
+        if let matchedCGTitle = normalizedMatchedCGTitle,
+            !isAppNameFallbackTitle(matchedCGTitle, appName: appName)
+        {
             return matchedCGTitle
         }
+
+        if let refreshedAXTitle = normalizedRefreshedAXTitle,
+            !isAppNameFallbackTitle(refreshedAXTitle, appName: appName)
+        {
+            RuntimeLog.info("AX", "\(appName) untitled[\(fallbackIndex)] recovered-from-ax")
+            return refreshedAXTitle
+        }
+
+        if let matchedCGTitle = normalizedMatchedCGTitle {
+            return matchedCGTitle
+        }
+        if let refreshedAXTitle = normalizedRefreshedAXTitle {
+            return refreshedAXTitle
+        }
+        if let sourceTitle = normalizedSourceTitle {
+            return sourceTitle
+        }
+
         RuntimeLog.info("AX", "\(appName) untitled[\(fallbackIndex)] use app-name fallback")
         return appName
     }
@@ -402,6 +444,12 @@ final class RuntimeSnapshotProvider {
         guard let title else { return nil }
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private func isAppNameFallbackTitle(_ title: String?, appName: String) -> Bool {
+        guard let normalizedTitle = normalizedWindowTitle(title) else { return false }
+        guard let normalizedAppName = normalizedWindowTitle(appName) else { return false }
+        return normalizedTitle.caseInsensitiveCompare(normalizedAppName) == .orderedSame
     }
 
     func collectAXWindowStats(for runningApps: [NSRunningApplication]) -> [pid_t: AXWindowStats] {
@@ -470,132 +518,137 @@ final class RuntimeSnapshotProvider {
         return windowsByPID
     }
 
-    private func resolveCGWindowAssignments(
+    static func matchCGWindowAssignments(
         axWindows: [AXWindowEntry],
-        cgWindows: [CGWindowEntry]
+        cgWindows: [CGWindowEntry],
+        appName: String? = nil,
+        previousMatches: [String: CGWindowID] = [:]
     ) -> [String: CGWindowID] {
+        _ = previousMatches
         guard !axWindows.isEmpty, !cgWindows.isEmpty else { return [:] }
 
-        var allScores: [WindowPairScore] = []
-        allScores.reserveCapacity(axWindows.count * cgWindows.count)
-        var sortedScoresByAXIndex: [[Double]] = Array(repeating: [], count: axWindows.count)
+        var candidateCGIDsByAXWindowID: [String: Set<CGWindowID>] = [:]
+        var candidateAXWindowIDsByCGWindowID: [CGWindowID: Set<String>] = [:]
 
-        for (axIndex, axWindow) in axWindows.enumerated() {
-            var scoresForAX: [Double] = []
-            scoresForAX.reserveCapacity(cgWindows.count)
-            for (cgIndex, cgWindow) in cgWindows.enumerated() {
-                let score = cgMatchScore(
+        for axWindow in axWindows {
+            let candidateCGWindowIDs = Set(cgWindows.compactMap { cgWindow -> CGWindowID? in
+                guard exactCandidateMatch(
                     axWindow: axWindow,
                     cgWindow: cgWindow,
-                    cgIndex: cgIndex,
-                    axCount: axWindows.count,
-                    cgCount: cgWindows.count
-                )
-                scoresForAX.append(score)
-                allScores.append(WindowPairScore(axIndex: axIndex, cgIndex: cgIndex, score: score))
-            }
-            scoresForAX.sort(by: >)
-            sortedScoresByAXIndex[axIndex] = scoresForAX
-        }
-
-        var ambiguousAXIndexes: Set<Int> = []
-        for (axIndex, scores) in sortedScoresByAXIndex.enumerated() {
-            guard let bestScore = scores.first else {
-                ambiguousAXIndexes.insert(axIndex)
-                continue
-            }
-            if bestScore < Self.cgMatchMinimumConfidence {
-                ambiguousAXIndexes.insert(axIndex)
-                continue
-            }
-            if scores.count > 1, bestScore - scores[1] < Self.cgMatchAmbiguityDelta {
-                ambiguousAXIndexes.insert(axIndex)
+                    appName: appName
+                ) else {
+                    return nil
+                }
+                return cgWindow.id
+            })
+            if !candidateCGWindowIDs.isEmpty {
+                candidateCGIDsByAXWindowID[axWindow.id] = candidateCGWindowIDs
             }
         }
 
-        var matchedCGIndexes: Set<Int> = []
-        var assignmentByAXIndex: [Int: Int] = [:]
-        for pair in allScores.sorted(by: { lhs, rhs in
-            if lhs.score != rhs.score { return lhs.score > rhs.score }
-            if lhs.axIndex != rhs.axIndex { return lhs.axIndex < rhs.axIndex }
-            return lhs.cgIndex < rhs.cgIndex
-        }) {
-            guard !ambiguousAXIndexes.contains(pair.axIndex) else { continue }
-            guard pair.score >= Self.cgMatchMinimumConfidence else { continue }
-            guard assignmentByAXIndex[pair.axIndex] == nil else { continue }
-            guard !matchedCGIndexes.contains(pair.cgIndex) else { continue }
-            assignmentByAXIndex[pair.axIndex] = pair.cgIndex
-            matchedCGIndexes.insert(pair.cgIndex)
+        for cgWindow in cgWindows {
+            let candidateAXWindowIDs = Set(axWindows.compactMap { axWindow -> String? in
+                guard exactCandidateMatch(
+                    axWindow: axWindow,
+                    cgWindow: cgWindow,
+                    appName: appName
+                ) else {
+                    return nil
+                }
+                return axWindow.id
+            })
+            if !candidateAXWindowIDs.isEmpty {
+                candidateAXWindowIDsByCGWindowID[cgWindow.id] = candidateAXWindowIDs
+            }
         }
 
+        var remainingCGIDsByAXWindowID = candidateCGIDsByAXWindowID
+        var remainingAXIDsByCGWindowID = candidateAXWindowIDsByCGWindowID
         var matchedByWindowID: [String: CGWindowID] = [:]
-        for (axIndex, cgIndex) in assignmentByAXIndex {
-            let windowID = axWindows[axIndex].id
-            let cgWindowID = cgWindows[cgIndex].id
-            matchedByWindowID[windowID] = cgWindowID
-            lastCGWindowIDByAXWindowID[windowID] = cgWindowID
+
+        while true {
+            let exactPairs = remainingCGIDsByAXWindowID.compactMap { axWindowID, candidateCGWindowIDs -> (String, CGWindowID)? in
+                guard candidateCGWindowIDs.count == 1, let cgWindowID = candidateCGWindowIDs.first else {
+                    return nil
+                }
+                guard remainingAXIDsByCGWindowID[cgWindowID]?.count == 1 else { return nil }
+                return (axWindowID, cgWindowID)
+            }
+            if exactPairs.isEmpty {
+                break
+            }
+
+            for (axWindowID, cgWindowID) in exactPairs.sorted(by: { lhs, rhs in
+                if lhs.0 == rhs.0 {
+                    return lhs.1 < rhs.1
+                }
+                return lhs.0 < rhs.0
+            }) {
+                matchedByWindowID[axWindowID] = cgWindowID
+                remainingCGIDsByAXWindowID.removeValue(forKey: axWindowID)
+                remainingAXIDsByCGWindowID.removeValue(forKey: cgWindowID)
+                for key in remainingCGIDsByAXWindowID.keys {
+                    remainingCGIDsByAXWindowID[key]?.remove(cgWindowID)
+                }
+                for key in remainingAXIDsByCGWindowID.keys {
+                    remainingAXIDsByCGWindowID[key]?.remove(axWindowID)
+                }
+            }
         }
+
         return matchedByWindowID
     }
 
-    private func cgMatchScore(
+    private static func normalizedMatchingTitle(_ title: String?) -> String? {
+        guard let title else { return nil }
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private static func exactCandidateMatch(
         axWindow: AXWindowEntry,
         cgWindow: CGWindowEntry,
-        cgIndex: Int,
-        axCount: Int,
-        cgCount: Int
-    ) -> Double {
-        let indexRange = max(1, max(axCount, cgCount) - 1)
-        let indexDistance = Double(abs(axWindow.index - cgIndex))
-        let indexScore = max(0, 1.0 - (indexDistance / Double(indexRange)))
-
-        let frameScore: Double
-        if let axFrame = axWindow.frame, let cgBounds = cgWindow.bounds {
-            frameScore = geometryScore(axFrame: axFrame, cgFrame: cgBounds)
-        } else {
-            frameScore = 0.10
+        appName: String?
+    ) -> Bool {
+        guard cgWindowPassesValidityConstraints(cgWindow) else { return false }
+        guard
+            let normalizedAXTitle = exactMatchingTitle(axWindow.sourceTitle ?? axWindow.title, appName: appName),
+            let normalizedCGTitle = exactMatchingTitle(cgWindow.title, appName: appName),
+            normalizedAXTitle.caseInsensitiveCompare(normalizedCGTitle) == .orderedSame
+        else {
+            return false
         }
-
-        var score = frameScore * (1.0 - Self.cgMatchIndexWeight)
-        score += indexScore * Self.cgMatchIndexWeight
-
-        if lastCGWindowIDByAXWindowID[axWindow.id] == cgWindow.id {
-            score += Self.cgMatchStickyBonus
+        if let axFrame = axWindow.frame, let cgFrame = cgWindow.bounds {
+            return framesApproximatelyMatch(axFrame: axFrame, cgFrame: cgFrame)
         }
-
-        return min(1.0, max(0.0, score))
+        return true
     }
 
-    private func geometryScore(axFrame: CGRect, cgFrame: CGRect) -> Double {
-        let ax = axFrame.standardized
-        let cg = cgFrame.standardized
-        guard ax.width > 0, ax.height > 0, cg.width > 0, cg.height > 0 else { return 0.0 }
-
-        let intersection = ax.intersection(cg)
-        let intersectionArea = max(0, intersection.width * intersection.height)
-        let unionArea = max(0, ax.width * ax.height + cg.width * cg.height - intersectionArea)
-        let iou = unionArea > 0 ? min(1.0, intersectionArea / unionArea) : 0.0
-
-        let axCenter = CGPoint(x: ax.midX, y: ax.midY)
-        let cgCenter = CGPoint(x: cg.midX, y: cg.midY)
-        let distance = hypot(axCenter.x - cgCenter.x, axCenter.y - cgCenter.y)
-        let distanceScore = max(0.0, 1.0 - min(1.0, distance / 650.0))
-
-        let axArea = ax.width * ax.height
-        let cgArea = cg.width * cg.height
-        let areaScore = max(0.0, min(1.0, min(axArea, cgArea) / max(axArea, cgArea)))
-
-        return iou * 0.65 + distanceScore * 0.25 + areaScore * 0.10
+    private static func exactMatchingTitle(_ title: String?, appName: String?) -> String? {
+        guard let normalizedTitle = normalizedMatchingTitle(title) else { return nil }
+        guard let appName else { return normalizedTitle }
+        guard let normalizedAppName = normalizedMatchingTitle(appName) else { return normalizedTitle }
+        if normalizedTitle.caseInsensitiveCompare(normalizedAppName) == .orderedSame {
+            return nil
+        }
+        return normalizedTitle
     }
 
-    private func pruneCachedCGMatches(for pid: pid_t, validWindowIDs: Set<String>) {
-        let prefix = "ax:\(pid):"
-        let staleKeys = lastCGWindowIDByAXWindowID.keys.filter { key in
-            key.hasPrefix(prefix) && !validWindowIDs.contains(key)
+    private static func framesApproximatelyMatch(axFrame: CGRect, cgFrame: CGRect) -> Bool {
+        let normalizedAXFrame = axFrame.standardized
+        let normalizedCGFrame = cgFrame.standardized
+        guard
+            normalizedAXFrame.width > 0,
+            normalizedAXFrame.height > 0,
+            normalizedCGFrame.width > 0,
+            normalizedCGFrame.height > 0
+        else {
+            return false
         }
-        for key in staleKeys {
-            lastCGWindowIDByAXWindowID.removeValue(forKey: key)
-        }
+        return abs(normalizedAXFrame.minX - normalizedCGFrame.minX) <= 24
+            && abs(normalizedAXFrame.minY - normalizedCGFrame.minY) <= 24
+            && abs(normalizedAXFrame.width - normalizedCGFrame.width) <= 40
+            && abs(normalizedAXFrame.height - normalizedCGFrame.height) <= 40
     }
 
     func collectAppRankByPID(for runningApps: [NSRunningApplication]) -> [pid_t: Int] {
@@ -648,13 +701,15 @@ final class RuntimeSnapshotProvider {
         sourceTitle: String?,
         matchedCGTitle: String?,
         appName: String,
-        fallbackIndex: Int
+        fallbackIndex: Int,
+        refreshedAXTitle: String? = nil
     ) -> String {
         RuntimeSnapshotProvider().resolvedAXWindowTitle(
             sourceTitle: sourceTitle,
             matchedCGTitle: matchedCGTitle,
             appName: appName,
-            fallbackIndex: fallbackIndex
+            fallbackIndex: fallbackIndex,
+            refreshedAXTitle: refreshedAXTitle
         )
     }
 
@@ -686,28 +741,91 @@ final class RuntimeSnapshotProvider {
     struct AXWindowEntryForTesting {
         let id: String
         let index: Int
+        let title: String?
         let bounds: CGRect?
+        let bridgedCGWindowID: CGWindowID?
+
+        init(
+            id: String,
+            index: Int,
+            title: String? = nil,
+            bounds: CGRect?,
+            bridgedCGWindowID: CGWindowID? = nil
+        ) {
+            self.id = id
+            self.index = index
+            self.title = title
+            self.bounds = bounds
+            self.bridgedCGWindowID = bridgedCGWindowID
+        }
     }
 
     static func resolveCGWindowAssignmentsForTesting(
         axWindows: [AXWindowEntryForTesting],
         cgWindows: [CGWindowEntryForTesting],
-        previousMatches: [String: CGWindowID] = [:]
+        previousMatches: [String: CGWindowID] = [:],
+        previousAXWindowIDs: Set<String> = [],
+        previousCGWindowIDs: Set<CGWindowID> = [],
+        pid: pid_t = 100,
+        appName: String = "FlowTab Test"
     ) -> [String: CGWindowID] {
         let provider = RuntimeSnapshotProvider()
-        provider.lastCGWindowIDByAXWindowID = previousMatches
-        return provider.resolveCGWindowAssignments(
-            axWindows: axWindows.map {
-                AXWindowEntry(
-                    index: $0.index,
-                    id: $0.id,
-                    title: "",
-                    sourceTitle: nil,
-                    isMinimized: false,
-                    window: AXUIElementCreateSystemWide(),
-                    frame: $0.bounds
-                )
-            },
+        provider.windowMappingStateByPID[pid] = RuntimeWindowMappingState(
+            bindingsByCGWindowID: Dictionary(
+                uniqueKeysWithValues: previousMatches.map { axWindowID, cgWindowID in
+                    (
+                        cgWindowID,
+                        RuntimeStickyWindowBinding(
+                            stableWindowID: Self.makeCGWindowID(pid: pid, cgWindowID: cgWindowID),
+                            cgWindowID: cgWindowID,
+                            lastKnownAXWindowID: previousAXWindowIDs.contains(axWindowID) ? axWindowID : nil,
+                            axWindow: nil,
+                            title: nil,
+                            frame: nil,
+                            isMinimized: false,
+                            lastConfirmationSource: .stickyBinding,
+                            hasCurrentActivationHandle: false
+                        )
+                    )
+                }
+            ),
+            lastKnownCGWindowsByID: Dictionary(
+                uniqueKeysWithValues: previousCGWindowIDs.map { cgWindowID in
+                    (
+                        cgWindowID,
+                        CGWindowEntry(
+                            id: cgWindowID,
+                            title: nil,
+                            bounds: nil,
+                            isOnscreen: false,
+                            alpha: 1.0,
+                            storeType: 1
+                        )
+                    )
+                }
+            )
+        )
+        let axEntries = axWindows.map {
+            AXWindowEntry(
+                index: $0.index,
+                id: $0.id,
+                title: $0.title ?? "",
+                sourceTitle: $0.title,
+                isMinimized: false,
+                window: AXUIElementCreateApplication(pid + pid_t($0.index) + 1),
+                frame: $0.bounds
+            )
+        }
+        let previousExactBridgeOverride = AXWindowInspector.cgWindowIDOverrideForTesting
+        AXWindowInspector.cgWindowIDOverrideForTesting = exactBridgeOverrideForTesting(
+            axEntries: axEntries,
+            requestedWindowIDsByAXWindowID: requestedWindowIDsByAXWindowIDForTesting(axWindows)
+        )
+        defer {
+            AXWindowInspector.cgWindowIDOverrideForTesting = previousExactBridgeOverride
+        }
+        return provider.resolveStableWindowMapping(
+            axWindows: axEntries,
             cgWindows: cgWindows.map {
                 CGWindowEntry(
                     id: $0.id,
@@ -717,6 +835,126 @@ final class RuntimeSnapshotProvider {
                     alpha: $0.alpha,
                     storeType: $0.storeType
                 )
+            },
+            pid: pid,
+            appName: appName
+        ).exactMatchesByAXWindowID
+    }
+
+    static func resolveWindowEntriesForTesting(
+        axWindows: [AXWindowEntryForTesting],
+        cgWindows: [CGWindowEntryForTesting],
+        previousMatches: [String: CGWindowID] = [:],
+        previousAXWindowIDs: Set<String> = [],
+        previousCGWindowIDs: Set<CGWindowID> = [],
+        pid: pid_t = 100,
+        appName: String = "FlowTab Test"
+    ) -> [SupplementalMergeEntryForTesting] {
+        let provider = RuntimeSnapshotProvider()
+        provider.windowMappingStateByPID[pid] = RuntimeWindowMappingState(
+            bindingsByCGWindowID: Dictionary(
+                uniqueKeysWithValues: previousMatches.map { axWindowID, cgWindowID in
+                    (
+                        cgWindowID,
+                        RuntimeStickyWindowBinding(
+                            stableWindowID: Self.makeCGWindowID(pid: pid, cgWindowID: cgWindowID),
+                            cgWindowID: cgWindowID,
+                            lastKnownAXWindowID: previousAXWindowIDs.contains(axWindowID) ? axWindowID : nil,
+                            axWindow: nil,
+                            title: nil,
+                            frame: nil,
+                            isMinimized: false,
+                            lastConfirmationSource: .stickyBinding,
+                            hasCurrentActivationHandle: false
+                        )
+                    )
+                }
+            ),
+            lastKnownCGWindowsByID: Dictionary(
+                uniqueKeysWithValues: previousCGWindowIDs.map { cgWindowID in
+                    (
+                        cgWindowID,
+                        CGWindowEntry(
+                            id: cgWindowID,
+                            title: nil,
+                            bounds: nil,
+                            isOnscreen: false,
+                            alpha: 1.0,
+                            storeType: 1
+                        )
+                    )
+                }
+            )
+        )
+        let axEntries = axWindows.map {
+            AXWindowEntry(
+                index: $0.index,
+                id: $0.id,
+                title: $0.title ?? "",
+                sourceTitle: $0.title,
+                isMinimized: false,
+                window: AXUIElementCreateApplication(pid + pid_t($0.index) + 1),
+                frame: $0.bounds
+            )
+        }
+        let previousExactBridgeOverride = AXWindowInspector.cgWindowIDOverrideForTesting
+        AXWindowInspector.cgWindowIDOverrideForTesting = exactBridgeOverrideForTesting(
+            axEntries: axEntries,
+            requestedWindowIDsByAXWindowID: requestedWindowIDsByAXWindowIDForTesting(axWindows)
+        )
+        defer {
+            AXWindowInspector.cgWindowIDOverrideForTesting = previousExactBridgeOverride
+        }
+        return provider.resolvedWindowEntries(
+            axWindows: axEntries,
+            cgWindows: cgWindows.map {
+                CGWindowEntry(
+                    id: $0.id,
+                    title: $0.title,
+                    bounds: $0.bounds,
+                    isOnscreen: $0.isOnscreen,
+                    alpha: $0.alpha,
+                    storeType: $0.storeType
+                )
+            },
+            pid: pid,
+            appName: appName
+        ).map {
+            SupplementalMergeEntryForTesting(
+                windowID: $0.windowID,
+                title: $0.title,
+                isMinimized: $0.isMinimized,
+                cgWindowID: $0.cgWindowID,
+                frame: $0.frame,
+                lastConfirmationSource: $0.lastConfirmationSource
+            )
+        }
+    }
+
+    private static func exactBridgeOverrideForTesting(
+        axEntries: [AXWindowEntry],
+        requestedWindowIDsByAXWindowID: [String: CGWindowID]
+    ) -> ((AXUIElement) -> CGWindowID?)? {
+        guard !requestedWindowIDsByAXWindowID.isEmpty else { return nil }
+        let requestedWindowIDsByPointer = [UnsafeMutableRawPointer: CGWindowID](
+            uniqueKeysWithValues: axEntries.compactMap { axEntry in
+                guard let cgWindowID = requestedWindowIDsByAXWindowID[axEntry.id] else { return nil }
+                let pointer = Unmanaged.passUnretained(axEntry.window).toOpaque()
+                return (pointer, cgWindowID)
+            }
+        )
+        return { window in
+            requestedWindowIDsByPointer[Unmanaged.passUnretained(window).toOpaque()]
+        }
+    }
+
+    private static func requestedWindowIDsByAXWindowIDForTesting(
+        _ axWindows: [AXWindowEntryForTesting]
+    ) -> [String: CGWindowID] {
+        [String: CGWindowID](
+            uniqueKeysWithValues: axWindows.compactMap { axWindow in
+                guard let bridgedCGWindowID = axWindow.bridgedCGWindowID else { return nil }
+                return (axWindow.id, bridgedCGWindowID)
             }
         )
     }

@@ -40,24 +40,27 @@ extension LiveSwitcherModel {
             )
         }
         previewCaptureAttemptedKeys.insert(previewCacheKey)
+        let ownerPID = windowContext.ownerPID == 0
+            ? appContext.runningApp.processIdentifier
+            : windowContext.ownerPID
 
         RuntimeLog.info(
             "Preview",
-            "attempt appID=\(appID) pid=\(appContext.runningApp.processIdentifier) windowID=\(window.id) mappedCG=\(windowContext.cgWindowID.map(String.init) ?? "nil") title=\(windowContext.title)"
+            "attempt appID=\(appID) pid=\(ownerPID) windowID=\(window.id) mappedCG=\(windowContext.cgWindowID.map(String.init) ?? "nil") title=\(windowContext.title)"
         )
         guard
             let capture = {
                 if let previewCaptureOverride {
                     return previewCaptureOverride(
                         windowContext.cgWindowID,
-                        appContext.runningApp.processIdentifier,
+                        ownerPID,
                         windowContext.title,
                         titleBarStyleInferenceEnabled
                     )
                 }
                 return RuntimeWindowPreviewProvider.captureWindowPreview(
                     preferredWindowID: windowContext.cgWindowID,
-                    ownerPID: appContext.runningApp.processIdentifier,
+                    ownerPID: ownerPID,
                     preferredTitle: windowContext.title,
                     inferTitleBarStyle: titleBarStyleInferenceEnabled
                 )

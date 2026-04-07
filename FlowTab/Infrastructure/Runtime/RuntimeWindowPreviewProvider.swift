@@ -29,6 +29,7 @@ enum RuntimeWindowPreviewProvider {
     private static let shareableContentLookupTimeout: TimeInterval = 1.0
     private static let screenshotCaptureTimeout: TimeInterval = 1.0
     private static let maxPreviewCaptureDimension: CGFloat = 1_200
+    private static let previewTrimAlphaThreshold: UInt8 = 12
 
     static func captureWindowPreview(
         preferredWindowID: CGWindowID?,
@@ -57,7 +58,11 @@ enum RuntimeWindowPreviewProvider {
             return nil
         }
 
-        let shareableWindowsByID = fetchShareableWindowsByID()
+        let shareableWindowsByID = fetchShareableWindowsByID(
+            onScreenWindowsOnly: shareableContentOnScreenOnly(
+                preferredWindowID: preferredWindowID
+            )
+        )
         for candidateID in candidateIDs {
             guard let shareableWindow = shareableWindowsByID[candidateID] else { continue }
             guard let cgImage = captureWindow(shareableWindow: shareableWindow) else { continue }
@@ -98,40 +103,41 @@ enum RuntimeWindowPreviewProvider {
         preferredTitle: String?,
         liveWindows: [LiveCGWindowEntry]
     ) -> [CGWindowID] {
-        var candidateIDs: [CGWindowID] = []
-        var seen: Set<CGWindowID> = []
-
-        func appendCandidate(_ id: CGWindowID) {
-            guard !seen.contains(id) else { return }
-            seen.insert(id)
-            candidateIDs.append(id)
-        }
-
         if let preferredWindowID {
-            appendCandidate(preferredWindowID)
+            return [preferredWindowID]
         }
 
         let trimmedTitle = preferredTitle?
             .trimmingCharacters(in: .whitespacesAndNewlines)
         if let trimmedTitle, !trimmedTitle.isEmpty {
-            for window in liveWindows {
-                guard let title = window.title else { continue }
-                if title == trimmedTitle {
-                    appendCandidate(window.id)
-                }
+            let exactMatches = liveWindows.compactMap { window -> CGWindowID? in
+                guard let title = window.title else { return nil }
+                return title == trimmedTitle ? window.id : nil
             }
-            for window in liveWindows {
-                guard let title = window.title else { continue }
-                if title.caseInsensitiveCompare(trimmedTitle) == .orderedSame {
-                    appendCandidate(window.id)
-                }
+            if exactMatches.count == 1 {
+                return exactMatches
+            }
+            if !exactMatches.isEmpty {
+                return []
+            }
+
+            let caseInsensitiveMatches = liveWindows.compactMap { window -> CGWindowID? in
+                guard let title = window.title else { return nil }
+                return title.caseInsensitiveCompare(trimmedTitle) == .orderedSame ? window.id : nil
+            }
+            if caseInsensitiveMatches.count == 1 {
+                return caseInsensitiveMatches
+            }
+            if !caseInsensitiveMatches.isEmpty {
+                return []
             }
         }
 
-        for window in liveWindows {
-            appendCandidate(window.id)
+        // Showing no preview is safer than binding another window's image to this slot.
+        if let onlyWindow = liveWindows.only {
+            return [onlyWindow.id]
         }
-        return candidateIDs
+        return []
     }
 
     private static func collectLiveCGWindows(ownerPID: pid_t) -> [LiveCGWindowEntry] {
@@ -160,11 +166,20 @@ enum RuntimeWindowPreviewProvider {
         return windows
     }
 
-    private static func fetchShareableWindowsByID() -> [CGWindowID: SCWindow] {
+    private static func shareableContentOnScreenOnly(preferredWindowID: CGWindowID?) -> Bool {
+        preferredWindowID == nil
+    }
+
+    private static func fetchShareableWindowsByID(
+        onScreenWindowsOnly: Bool
+    ) -> [CGWindowID: SCWindow] {
         var shareableContent: SCShareableContent?
         var capturedError: Error?
         let semaphore = DispatchSemaphore(value: 0)
-        SCShareableContent.getExcludingDesktopWindows(true, onScreenWindowsOnly: true) { content, error in
+        SCShareableContent.getExcludingDesktopWindows(
+            true,
+            onScreenWindowsOnly: onScreenWindowsOnly
+        ) { content, error in
             shareableContent = content
             capturedError = error
             semaphore.signal()
@@ -200,8 +215,13 @@ enum RuntimeWindowPreviewProvider {
     private static func captureWindowUsingScreenshotManager(shareableWindow: SCWindow) -> CGImage? {
         let filter = SCContentFilter(desktopIndependentWindow: shareableWindow)
         let configuration = SCStreamConfiguration()
-        let sourceWidth = max(1, shareableWindow.frame.width)
-        let sourceHeight = max(1, shareableWindow.frame.height)
+        let sourceSize = preferredCaptureSourceSize(
+            contentRect: filter.contentRect,
+            pointPixelScale: CGFloat(filter.pointPixelScale),
+            fallbackFrame: shareableWindow.frame
+        )
+        let sourceWidth = sourceSize.width
+        let sourceHeight = sourceSize.height
         let scaledSize = scaledPreviewSize(sourceWidth: sourceWidth, sourceHeight: sourceHeight)
         let width = scaledSize.width
         let height = scaledSize.height
@@ -230,7 +250,8 @@ enum RuntimeWindowPreviewProvider {
                 "screenshot capture failed windowID=\(shareableWindow.windowID) error=\(capturedError.localizedDescription)"
             )
         }
-        return capturedImage
+        guard let capturedImage else { return nil }
+        return normalizedPreviewImageIfNeeded(capturedImage)
     }
 
     private static func captureWindowUsingCoreGraphics(windowID: CGWindowID) -> CGImage? {
@@ -245,7 +266,123 @@ enum RuntimeWindowPreviewProvider {
             RuntimeLog.info("Preview", "legacy capture failed windowID=\(windowID)")
             return nil
         }
-        return scaledPreviewImageIfNeeded(image)
+        return normalizedPreviewImageIfNeeded(image)
+    }
+
+    private static func preferredCaptureSourceSize(
+        contentRect: CGRect?,
+        pointPixelScale: CGFloat?,
+        fallbackFrame: CGRect
+    ) -> CGSize {
+        let normalizedFrame = fallbackFrame.standardized
+        let resolvedScale = pointPixelScale.map { max(1, $0) } ?? 1
+
+        if let contentRect {
+            let normalizedContentRect = contentRect.standardized
+            if normalizedContentRect.width > 0, normalizedContentRect.height > 0 {
+                return CGSize(
+                    width: normalizedContentRect.width * resolvedScale,
+                    height: normalizedContentRect.height * resolvedScale
+                )
+            }
+        }
+
+        return CGSize(
+            width: max(1, normalizedFrame.width),
+            height: max(1, normalizedFrame.height)
+        )
+    }
+
+    private static func normalizedPreviewImageIfNeeded(_ image: CGImage) -> CGImage? {
+        let trimmedImage = trimmedTransparentPaddingIfNeeded(image)
+        return scaledPreviewImageIfNeeded(trimmedImage)
+    }
+
+    private static func trimmedTransparentPaddingIfNeeded(_ image: CGImage) -> CGImage {
+        let width = image.width
+        let height = image.height
+        guard width > 1, height > 1 else { return image }
+
+        let bytesPerPixel = 4
+        let bytesPerRow = width * bytesPerPixel
+        var pixels = [UInt8](repeating: 0, count: height * bytesPerRow)
+
+        let rendered = pixels.withUnsafeMutableBytes { buffer in
+            guard let baseAddress = buffer.baseAddress else { return false }
+            guard
+                let context = CGContext(
+                    data: baseAddress,
+                    width: width,
+                    height: height,
+                    bitsPerComponent: 8,
+                    bytesPerRow: bytesPerRow,
+                    space: CGColorSpaceCreateDeviceRGB(),
+                    bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+                )
+            else {
+                return false
+            }
+            context.draw(
+                image,
+                in: CGRect(x: 0, y: 0, width: width, height: height)
+            )
+            return true
+        }
+        guard rendered else { return image }
+
+        func rowHasOpaquePixel(_ y: Int) -> Bool {
+            let rowOffset = y * bytesPerRow
+            for x in 0..<width {
+                let alpha = pixels[rowOffset + x * bytesPerPixel + 3]
+                if alpha >= previewTrimAlphaThreshold {
+                    return true
+                }
+            }
+            return false
+        }
+
+        func columnHasOpaquePixel(_ x: Int) -> Bool {
+            for y in 0..<height {
+                let alpha = pixels[y * bytesPerRow + x * bytesPerPixel + 3]
+                if alpha >= previewTrimAlphaThreshold {
+                    return true
+                }
+            }
+            return false
+        }
+
+        var left = 0
+        while left < width, !columnHasOpaquePixel(left) {
+            left += 1
+        }
+        guard left < width else { return image }
+
+        var right = width - 1
+        while right > left, !columnHasOpaquePixel(right) {
+            right -= 1
+        }
+
+        var bottom = 0
+        while bottom < height, !rowHasOpaquePixel(bottom) {
+            bottom += 1
+        }
+
+        var top = height - 1
+        while top > bottom, !rowHasOpaquePixel(top) {
+            top -= 1
+        }
+
+        guard left > 0 || right < width - 1 || bottom > 0 || top < height - 1 else {
+            return image
+        }
+
+        let cropRect = CGRect(
+            x: left,
+            y: bottom,
+            width: right - left + 1,
+            height: top - bottom + 1
+        )
+        return image.cropping(to: cropRect) ?? image
     }
 
     private static func scaledPreviewSize(
@@ -478,6 +615,34 @@ enum RuntimeWindowPreviewProvider {
 
     static func scaledPreviewImageIfNeededForTesting(_ image: CGImage) -> CGImage? {
         scaledPreviewImageIfNeeded(image)
+    }
+
+    static func preferredCaptureSourceSizeForTesting(
+        contentRect: CGRect?,
+        pointPixelScale: CGFloat?,
+        fallbackFrame: CGRect
+    ) -> CGSize {
+        preferredCaptureSourceSize(
+            contentRect: contentRect,
+            pointPixelScale: pointPixelScale,
+            fallbackFrame: fallbackFrame
+        )
+    }
+
+    static func trimmedTransparentPaddingIfNeededForTesting(_ image: CGImage) -> CGImage {
+        trimmedTransparentPaddingIfNeeded(image)
+    }
+
+    static func shareableContentOnScreenOnlyForTesting(
+        preferredWindowID: CGWindowID?
+    ) -> Bool {
+        shareableContentOnScreenOnly(preferredWindowID: preferredWindowID)
+    }
+}
+
+private extension Array {
+    var only: Element? {
+        count == 1 ? first : nil
     }
 }
 

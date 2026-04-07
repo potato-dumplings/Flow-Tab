@@ -371,6 +371,309 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testRuntimeActivatorIgnoresCachedAXWindowHandlesFromOtherProcesses() {
+        let previousAXTrusted = AccessibilityPermissionChecker.isTrustedOverrideForTesting
+        defer {
+            AccessibilityPermissionChecker.isTrustedOverrideForTesting = previousAXTrusted
+        }
+
+        AccessibilityPermissionChecker.isTrustedOverrideForTesting = { false }
+
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let activator = RuntimeActivator()
+        activator.activateCurrentAppIfNeededOverride = { _ in false }
+        activator.requestActivationOverride = { app, completion in
+            completion?(app)
+        }
+
+        var directFocusOwnerPIDs: [pid_t] = []
+        activator.focusAXWindowOverride = { window, _, _ in
+            var ownerPID: pid_t = 0
+            let ownerResult = AXUIElementGetPid(window, &ownerPID)
+            XCTAssertEqual(ownerResult, .success)
+            directFocusOwnerPIDs.append(ownerPID)
+            return true
+        }
+
+        let staleForeignHandle = AXUIElementCreateApplication(currentApp.processIdentifier + 77)
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windowsByID: [
+                "mail-1": RuntimeWindowContext(
+                    id: "mail-1",
+                    title: "Inbox",
+                    isMinimized: false,
+                    cgWindowID: nil,
+                    inferredTitleBarStyle: nil,
+                    axWindow: staleForeignHandle
+                )
+            ]
+        )
+
+        activator.activate(
+            target: .window(appID: appID, windowID: "mail-1", restoreIfMinimized: false),
+            contextsByID: [appID: context]
+        )
+
+        XCTAssertTrue(directFocusOwnerPIDs.isEmpty)
+    }
+
+    @MainActor
+    func testRuntimeActivatorResolvesCGWindowTargetsBeforeTitleFallback() {
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let activator = RuntimeActivator()
+        activator.activateCurrentAppIfNeededOverride = { _ in false }
+        activator.requestActivationOverride = { app, completion in
+            completion?(app)
+        }
+
+        let liveWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
+        let targetFrame = CGRect(x: 40, y: 60, width: 1440, height: 900)
+        let targetCGWindowID: CGWindowID = 243_747
+        activator.currentAXWindowsOverride = { _ in
+            [liveWindow]
+        }
+        activator.axWindowTitleOverride = { window in
+            CFEqual(window, liveWindow) ? "Fullscreen Target" : nil
+        }
+        activator.axWindowFrameOverride = { window in
+            CFEqual(window, liveWindow) ? targetFrame : nil
+        }
+        activator.currentCGWindowsOverride = { pid in
+            XCTAssertEqual(pid, currentApp.processIdentifier)
+            return [
+                RuntimeSnapshotProvider.CGWindowEntry(
+                    id: targetCGWindowID,
+                    title: "Fullscreen Target",
+                    bounds: targetFrame,
+                    isOnscreen: false,
+                    alpha: 1.0,
+                    storeType: 1
+                )
+            ]
+        }
+
+        var focusedResolvedWindow = false
+        activator.focusAXWindowOverride = { window, restoreIfMinimized, _ in
+            XCTAssertFalse(restoreIfMinimized)
+            focusedResolvedWindow = CFEqual(window, liveWindow)
+            return true
+        }
+
+        let windowID = "cg:\(currentApp.processIdentifier):\(targetCGWindowID)"
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windowsByID: [
+                windowID: RuntimeWindowContext(
+                    id: windowID,
+                    title: "Fullscreen Target",
+                    isMinimized: false,
+                    ownerPID: currentApp.processIdentifier,
+                    cgWindowID: targetCGWindowID,
+                    inferredTitleBarStyle: nil,
+                    frame: targetFrame,
+                    allowsPublicAXRecovery: true
+                )
+            ]
+        )
+
+        activator.activate(
+            target: .window(appID: appID, windowID: windowID, restoreIfMinimized: false),
+            contextsByID: [appID: context]
+        )
+
+        XCTAssertTrue(focusedResolvedWindow)
+    }
+
+    @MainActor
+    func testRuntimeActivatorUsesPrivateExactBridgeWhenCGTargetRemainsPubliclyAmbiguous() {
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let activator = RuntimeActivator()
+        activator.activateCurrentAppIfNeededOverride = { _ in false }
+        activator.requestActivationOverride = { app, completion in
+            completion?(app)
+        }
+
+        let targetFrame = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
+        let windows = [
+            AXUIElementCreateApplication(currentApp.processIdentifier),
+            AXUIElementCreateApplication(currentApp.processIdentifier)
+        ]
+        let targetCGWindowID: CGWindowID = 243_747
+        let otherCGWindowID: CGWindowID = 240_029
+
+        activator.currentAXWindowsOverride = { _ in windows }
+        activator.axWindowTitleOverride = { _ in "Ambiguous Fullscreen" }
+        activator.axWindowFrameOverride = { _ in targetFrame }
+        activator.currentCGWindowsOverride = { pid in
+            XCTAssertEqual(pid, currentApp.processIdentifier)
+            return [
+                RuntimeSnapshotProvider.CGWindowEntry(
+                    id: targetCGWindowID,
+                    title: "Ambiguous Fullscreen",
+                    bounds: targetFrame,
+                    isOnscreen: false,
+                    alpha: 1.0,
+                    storeType: 1
+                ),
+                RuntimeSnapshotProvider.CGWindowEntry(
+                    id: otherCGWindowID,
+                    title: "Ambiguous Fullscreen",
+                    bounds: targetFrame,
+                    isOnscreen: false,
+                    alpha: 1.0,
+                    storeType: 1
+                )
+            ]
+        }
+
+        let previousExactBridgeOverride = AXWindowInspector.cgWindowIDOverrideForTesting
+        let bridgedWindowIDs = Dictionary(
+            uniqueKeysWithValues: [
+                (Unmanaged.passUnretained(windows[0]).toOpaque(), otherCGWindowID),
+                (Unmanaged.passUnretained(windows[1]).toOpaque(), targetCGWindowID)
+            ]
+        )
+        AXWindowInspector.cgWindowIDOverrideForTesting = { window in
+            bridgedWindowIDs[Unmanaged.passUnretained(window).toOpaque()]
+        }
+        defer {
+            AXWindowInspector.cgWindowIDOverrideForTesting = previousExactBridgeOverride
+        }
+
+        var focusedWindowPointer: UnsafeMutableRawPointer?
+        activator.focusAXWindowOverride = { window, restoreIfMinimized, _ in
+            XCTAssertFalse(restoreIfMinimized)
+            focusedWindowPointer = Unmanaged.passUnretained(window).toOpaque()
+            return true
+        }
+
+        let windowID = "cg:\(currentApp.processIdentifier):\(targetCGWindowID)"
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windowsByID: [
+                windowID: RuntimeWindowContext(
+                    id: windowID,
+                    title: "Ambiguous Fullscreen",
+                    isMinimized: false,
+                    ownerPID: currentApp.processIdentifier,
+                    cgWindowID: targetCGWindowID,
+                    inferredTitleBarStyle: nil,
+                    frame: targetFrame,
+                    allowsPublicAXRecovery: true
+                )
+            ]
+        )
+
+        activator.activate(
+            target: .window(appID: appID, windowID: windowID, restoreIfMinimized: false),
+            contextsByID: [appID: context]
+        )
+
+        XCTAssertEqual(focusedWindowPointer, Unmanaged.passUnretained(windows[1]).toOpaque())
+    }
+
+    @MainActor
+    func testRuntimeActivatorResolvesFullscreenCGTargetUsingExactTitlesWhenGeometryMatches() {
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let activator = RuntimeActivator()
+        activator.activateCurrentAppIfNeededOverride = { _ in false }
+        activator.requestActivationOverride = { app, completion in
+            completion?(app)
+        }
+
+        let fullscreenFrame = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
+        let windows = [
+            AXUIElementCreateApplication(currentApp.processIdentifier),
+            AXUIElementCreateApplication(currentApp.processIdentifier),
+            AXUIElementCreateApplication(currentApp.processIdentifier)
+        ]
+        let titlesByWindowPointer = Dictionary(
+            uniqueKeysWithValues: zip(
+                windows.map { Unmanaged.passUnretained($0).toOpaque() },
+                [
+                    "Google 搜索 - Google Chrome - test1",
+                    "Google 搜索 - Google Chrome - test3",
+                    "Google 搜索 - Google Chrome - test5"
+                ]
+            )
+        )
+        activator.currentAXWindowsOverride = { _ in windows }
+        activator.axWindowFrameOverride = { _ in fullscreenFrame }
+        activator.axWindowTitleOverride = { window in
+            titlesByWindowPointer[Unmanaged.passUnretained(window).toOpaque()]
+        }
+        activator.currentCGWindowsOverride = { pid in
+            XCTAssertEqual(pid, currentApp.processIdentifier)
+            return [
+                RuntimeSnapshotProvider.CGWindowEntry(
+                    id: 243_679,
+                    title: "Google 搜索 - Google Chrome - test3",
+                    bounds: fullscreenFrame,
+                    isOnscreen: false,
+                    alpha: 1.0,
+                    storeType: 1
+                ),
+                RuntimeSnapshotProvider.CGWindowEntry(
+                    id: 243_747,
+                    title: "Google 搜索 - Google Chrome - test1",
+                    bounds: fullscreenFrame,
+                    isOnscreen: false,
+                    alpha: 1.0,
+                    storeType: 1
+                ),
+                RuntimeSnapshotProvider.CGWindowEntry(
+                    id: 240_029,
+                    title: "Google 搜索 - Google Chrome - test5",
+                    bounds: fullscreenFrame,
+                    isOnscreen: false,
+                    alpha: 1.0,
+                    storeType: 1
+                )
+            ]
+        }
+
+        var focusedWindowPointer: UnsafeMutableRawPointer?
+        activator.focusAXWindowOverride = { window, restoreIfMinimized, _ in
+            XCTAssertFalse(restoreIfMinimized)
+            focusedWindowPointer = Unmanaged.passUnretained(window).toOpaque()
+            return true
+        }
+
+        let windowID = "cg:\(currentApp.processIdentifier):240029"
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windowsByID: [
+                windowID: RuntimeWindowContext(
+                    id: windowID,
+                    title: "Google 搜索 - Google Chrome - test5",
+                    isMinimized: false,
+                    ownerPID: currentApp.processIdentifier,
+                    cgWindowID: 240_029,
+                    inferredTitleBarStyle: nil,
+                    frame: fullscreenFrame,
+                    allowsPublicAXRecovery: true
+                )
+            ]
+        )
+
+        activator.activate(
+            target: .window(appID: appID, windowID: windowID, restoreIfMinimized: false),
+            contextsByID: [appID: context]
+        )
+
+        XCTAssertEqual(focusedWindowPointer, Unmanaged.passUnretained(windows[2]).toOpaque())
+    }
+
+    @MainActor
     func testLiveSwitcherModelHandleApplicationTerminatedRefreshesSessionAndKeepsPreferredNextSelection() async {
         let model = LiveSwitcherModel()
         let initialApps = terminateScenarioApps()

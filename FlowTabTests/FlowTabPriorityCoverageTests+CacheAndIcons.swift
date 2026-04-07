@@ -140,7 +140,8 @@ extension FlowTabPriorityCoverageTests {
                     bounds: CGRect(x: 0, y: 38, width: 1_728, height: 1_079),
                     isOnscreen: true
                 )
-            ]
+            ],
+            matchedCGWindowIDs: Set<CGWindowID>([240001, 240002, 240003, 240004])
         )
 
         XCTAssertEqual(mergedEntries.count, 5)

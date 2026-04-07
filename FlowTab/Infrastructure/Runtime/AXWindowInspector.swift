@@ -1,9 +1,16 @@
 import AppKit
 import ApplicationServices
+import Darwin
 import Foundation
 
 enum AXWindowInspector {
     private static let windowIDPrefix = "ax"
+    private static let exactBridgeSymbolName = "_AXUIElementGetWindow"
+    private typealias AXUIElementGetWindowFn = @convention(c) (
+        AXUIElement,
+        UnsafeMutablePointer<CGWindowID>
+    ) -> AXError
+    static var cgWindowIDOverrideForTesting: ((AXUIElement) -> CGWindowID?)?
 
     static func windows(for app: NSRunningApplication) -> [AXUIElement] {
         guard AccessibilityPermissionChecker.isTrusted() else { return [] }
@@ -37,17 +44,40 @@ enum AXWindowInspector {
     }
 
     static func title(for window: AXUIElement) -> String? {
-        var titleValue: CFTypeRef?
+        let titleFromAX = title(from: window, attribute: kAXTitleAttribute as CFString)
+
+        var titleElementValue: CFTypeRef?
         guard
-            AXUIElementCopyAttributeValue(window, kAXTitleAttribute as CFString, &titleValue)
-                == .success,
-            let title = (titleValue as? String)?
-                .trimmingCharacters(in: .whitespacesAndNewlines),
-            !title.isEmpty
+            AXUIElementCopyAttributeValue(
+                window,
+                kAXTitleUIElementAttribute as CFString,
+                &titleElementValue
+            ) == .success
         else {
-            return nil
+            return preferredWindowTitle(candidates: [titleFromAX])
         }
-        return title
+        guard let rawTitleElement = titleElementValue else {
+            return preferredWindowTitle(candidates: [titleFromAX])
+        }
+        guard CFGetTypeID(rawTitleElement) == AXUIElementGetTypeID() else {
+            return preferredWindowTitle(candidates: [titleFromAX])
+        }
+        let titleElement = unsafeBitCast(rawTitleElement, to: AXUIElement.self)
+        let titleFromTitleElementValue = title(
+            from: titleElement,
+            attribute: kAXValueAttribute as CFString
+        )
+        let titleFromTitleElementTitle = title(
+            from: titleElement,
+            attribute: kAXTitleAttribute as CFString
+        )
+        return preferredWindowTitle(
+            candidates: [
+                titleFromTitleElementValue,
+                titleFromTitleElementTitle,
+                titleFromAX
+            ]
+        )
     }
 
     static func frame(for window: AXUIElement) -> CGRect? {
@@ -58,6 +88,16 @@ enum AXWindowInspector {
             return nil
         }
         return CGRect(origin: position, size: size).standardized
+    }
+
+    static func cgWindowID(for window: AXUIElement) -> CGWindowID? {
+        if let cgWindowIDOverrideForTesting {
+            return cgWindowIDOverrideForTesting(window)
+        }
+        guard let exactBridgeFunction else { return nil }
+        var cgWindowID: CGWindowID = 0
+        guard exactBridgeFunction(window, &cgWindowID) == .success else { return nil }
+        return cgWindowID == 0 ? nil : cgWindowID
     }
 
     static func belongsToProcess(_ window: AXUIElement, pid: pid_t) -> Bool {
@@ -134,6 +174,67 @@ enum AXWindowInspector {
         guard AXValueGetValue(axValue, .cgSize, &size) else { return nil }
         return size
     }
+
+    private static func title(from element: AXUIElement, attribute: CFString) -> String? {
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(element, attribute, &value) == .success else { return nil }
+        return normalizedTitle(from: value)
+    }
+
+    private static func normalizedTitle(from rawValue: CFTypeRef?) -> String? {
+        if let title = (rawValue as? String)?.trimmingCharacters(in: .whitespacesAndNewlines),
+            !title.isEmpty
+        {
+            return title
+        }
+        if let title = (rawValue as? NSAttributedString)?.string
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+            !title.isEmpty
+        {
+            return title
+        }
+        return nil
+    }
+
+    fileprivate static func preferredWindowTitle(candidates: [String?]) -> String? {
+        let normalizedCandidates = candidates.compactMap { normalizedTitle($0) }
+        guard !normalizedCandidates.isEmpty else { return nil }
+        return normalizedCandidates.max(by: { titleSpecificityScore($0) < titleSpecificityScore($1) })
+    }
+
+    private static func normalizedTitle(_ title: String?) -> String? {
+        guard let title else { return nil }
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private static func titleSpecificityScore(_ title: String) -> Int {
+        var score = title.count
+        if title.contains(" - ") {
+            score += 50
+        }
+        return score
+    }
+
+    private static let exactBridgeFunction: AXUIElementGetWindowFn? = {
+        let candidateHandles = [
+            UnsafeMutableRawPointer(bitPattern: -2),
+            dlopen(
+                "/System/Library/Frameworks/ApplicationServices.framework/Frameworks/HIServices.framework/HIServices",
+                RTLD_LAZY
+            ),
+            dlopen(
+                "/System/Library/Frameworks/ApplicationServices.framework/ApplicationServices",
+                RTLD_LAZY
+            )
+        ]
+        for handle in candidateHandles {
+            guard let handle else { continue }
+            guard let symbol = dlsym(handle, exactBridgeSymbolName) else { continue }
+            return unsafeBitCast(symbol, to: AXUIElementGetWindowFn.self)
+        }
+        return nil
+    }()
 }
 
 enum AXWindowInspectorForTesting {
@@ -153,8 +254,16 @@ enum AXWindowInspectorForTesting {
         AXWindowInspector.title(for: window)
     }
 
+    static func preferredWindowTitle(candidates: [String?]) -> String? {
+        AXWindowInspector.preferredWindowTitle(candidates: candidates)
+    }
+
     static func frame(for window: AXUIElement) -> CGRect? {
         AXWindowInspector.frame(for: window)
+    }
+
+    static func cgWindowID(for window: AXUIElement) -> CGWindowID? {
+        AXWindowInspector.cgWindowID(for: window)
     }
 
     static func role(for window: AXUIElement) -> String? {

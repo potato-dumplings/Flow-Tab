@@ -9,6 +9,7 @@ struct HomeLandingView: View {
         label: "FlowTab.HomeLandingSnapshotQueue",
         qos: .utility
     )
+    private static let snapshotProvider = RuntimeSnapshotProvider()
     private static var cachedAppSummaries: [RuntimeHomeAppSummary] = []
     private static var cachedWindowsByAppID: [String: [WindowCandidate]] = [:]
     private static var cachedSelectedAppID: String?
@@ -520,7 +521,7 @@ struct HomeLandingView: View {
     private func fetchHomeAppSummariesOnBackground() async -> [RuntimeHomeAppSummary] {
         await withCheckedContinuation { continuation in
             Self.snapshotQueue.async {
-                continuation.resume(returning: RuntimeSnapshotProvider().homeAppSummaries())
+                continuation.resume(returning: Self.snapshotProvider.homeAppSummaries())
             }
         }
     }
@@ -528,7 +529,7 @@ struct HomeLandingView: View {
     private func fetchHomeAppSummaryOnBackground(appID: String) async -> RuntimeHomeAppSummary? {
         await withCheckedContinuation { continuation in
             Self.snapshotQueue.async {
-                continuation.resume(returning: RuntimeSnapshotProvider().homeAppSummary(for: appID))
+                continuation.resume(returning: Self.snapshotProvider.homeAppSummary(for: appID))
             }
         }
     }
@@ -536,7 +537,7 @@ struct HomeLandingView: View {
     private func fetchHomeAppSnapshotOnBackground(appID: String) async -> RuntimeHomeAppSnapshot? {
         await withCheckedContinuation { continuation in
             Self.snapshotQueue.async {
-                continuation.resume(returning: RuntimeSnapshotProvider().homeAppSnapshot(for: appID))
+                continuation.resume(returning: Self.snapshotProvider.homeAppSnapshot(for: appID))
             }
         }
     }
@@ -736,4 +737,3 @@ private struct HomeLayerRowView: View {
         )
     }
 }
-
