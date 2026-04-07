@@ -1,0 +1,4 @@
+interface:
+  display_name: "FlowTab Direct Delivery"
+  short_description: "Concrete answers and implementation-first handoffs"
+  default_prompt: "Use $flowtab-direct-delivery to answer FlowTab tasks with concrete implementation guidance, direct recommendations, and complete handoff details."

@@ -3,6 +3,7 @@
 ## Local Skill
 
 - Use the project-local skill `flowtab-engineering` at `skills/flowtab-engineering/SKILL.md` for any feature work, bug fix, refactor, test-coverage decision, logging-placement decision, or module-boundary decision in this repository.
+- Use the project-local skill `flowtab-direct-delivery` at `skills/flowtab-direct-delivery/SKILL.md` for implementation guidance, architecture proposals, change summaries, and remediation or handoff responses in this repository.
 - Read the relevant reference file from that skill before editing:
   - `references/feature-workflow.md`
   - `references/bugfix-workflow.md`
