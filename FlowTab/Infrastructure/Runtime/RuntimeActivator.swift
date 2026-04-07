@@ -5,6 +5,17 @@ import FlowTabCore
 
 @MainActor
 final class RuntimeActivator {
+    private struct WindowFocusRequest {
+        let windowID: String
+        let title: String
+        let frame: CGRect?
+        let preferredAXWindow: AXUIElement?
+        let preferredActivationHandleID: String?
+        let preferredCGWindowID: CGWindowID?
+        let allowsPublicAXRecovery: Bool
+        let restoreIfMinimized: Bool
+    }
+
     var activateCurrentAppIfNeededOverride: ((NSRunningApplication) -> Bool)?
     var requestActivationOverride: ((NSRunningApplication, ((NSRunningApplication) -> Void)?) -> Void)?
     var focusWindowOverride: ((String, String, Bool, NSRunningApplication) -> Void)?
@@ -14,8 +25,14 @@ final class RuntimeActivator {
     var currentCGWindowsOverride: ((pid_t) -> [RuntimeSnapshotProvider.CGWindowEntry])?
     var axWindowFrameOverride: ((AXUIElement) -> CGRect?)?
     var axWindowTitleOverride: ((AXUIElement) -> String?)?
+    var focusRecoveryRetryDelaysNanoseconds: [UInt64] = [50_000_000, 150_000_000]
+
+    private var focusRecoveryTask: Task<Void, Never>?
 
     func activate(target: ActivationTarget, contextsByID: [String: RuntimeAppContext]) {
+        focusRecoveryTask?.cancel()
+        focusRecoveryTask = nil
+
         switch target {
         case .app(let appID):
             activateApp(appID: appID, contextsByID: contextsByID)
@@ -54,62 +71,80 @@ final class RuntimeActivator {
         }
         requestActivation(of: targetApp) { [weak self] _ in
             guard let self else { return }
-            self.focusWindow(
-                withID: windowID,
-                withTitle: windowContext.title,
-                targetFrame: windowContext.frame,
+            let request = WindowFocusRequest(
+                windowID: windowID,
+                title: windowContext.title,
+                frame: windowContext.frame,
                 preferredAXWindow: windowContext.axWindow,
                 preferredActivationHandleID: windowContext.activationHandleID,
                 preferredCGWindowID: windowContext.cgWindowID,
                 allowsPublicAXRecovery: windowContext.allowsPublicAXRecovery,
-                restoreIfMinimized: restoreIfMinimized || windowContext.isMinimized,
-                in: targetApp
+                restoreIfMinimized: restoreIfMinimized || windowContext.isMinimized
             )
+            self.focusWindow(request, in: targetApp)
         }
     }
 
-    private func focusWindow(
-        withID targetWindowID: String,
-        withTitle targetTitle: String,
-        targetFrame: CGRect?,
-        preferredAXWindow: AXUIElement?,
-        preferredActivationHandleID: String?,
-        preferredCGWindowID: CGWindowID?,
-        allowsPublicAXRecovery: Bool,
-        restoreIfMinimized: Bool,
-        in app: NSRunningApplication
-    ) {
+    private func focusWindow(_ request: WindowFocusRequest, in app: NSRunningApplication) {
+        guard !attemptWindowFocus(request, in: app) else { return }
+        scheduleFocusRecovery(for: request, in: app)
+    }
+
+    @discardableResult
+    private func attemptWindowFocus(_ request: WindowFocusRequest, in app: NSRunningApplication) -> Bool {
         if let focusWindowOverride {
-            focusWindowOverride(targetWindowID, targetTitle, restoreIfMinimized, app)
-            return
+            focusWindowOverride(request.windowID, request.title, request.restoreIfMinimized, app)
+            return true
         }
 
         let windowFromRegistry = liveWindowRegistry.window(
-            forWindowID: preferredActivationHandleID ?? targetWindowID,
+            forWindowID: request.preferredActivationHandleID ?? request.windowID,
             expectedPID: app.processIdentifier
         )
-        if let directWindow = preferredAXWindow ?? windowFromRegistry,
-            focusAXWindow(directWindow, restoreIfMinimized: restoreIfMinimized, in: app)
+        if let directWindow = request.preferredAXWindow ?? windowFromRegistry,
+            focusAXWindow(directWindow, restoreIfMinimized: request.restoreIfMinimized, in: app)
         {
-            return
+            return true
         }
 
         let windows = currentAXWindows(for: app)
-        guard !windows.isEmpty else { return }
-        guard allowsPublicAXRecovery else { return }
+        guard !windows.isEmpty else { return false }
+        guard request.allowsPublicAXRecovery else { return false }
 
-        let targetCGWindowID = preferredCGWindowID
-            ?? Self.cgWindowID(from: targetWindowID, expectedPID: app.processIdentifier)
+        let targetCGWindowID = request.preferredCGWindowID
+            ?? Self.cgWindowID(from: request.windowID, expectedPID: app.processIdentifier)
         if let matchedWindow = resolveAXWindow(
             matchingCGWindowID: targetCGWindowID,
-            expectedTitle: targetTitle,
-            expectedFrame: targetFrame,
+            expectedTitle: request.title,
+            expectedFrame: request.frame,
             windows: windows,
             in: app
         ),
-            focusAXWindow(matchedWindow, restoreIfMinimized: restoreIfMinimized, in: app)
+            focusAXWindow(matchedWindow, restoreIfMinimized: request.restoreIfMinimized, in: app)
         {
-            return
+            return true
+        }
+
+        return false
+    }
+
+    private func scheduleFocusRecovery(for request: WindowFocusRequest, in app: NSRunningApplication) {
+        guard !focusRecoveryRetryDelaysNanoseconds.isEmpty else { return }
+        focusRecoveryTask?.cancel()
+        let retryDelays = focusRecoveryRetryDelaysNanoseconds
+        focusRecoveryTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer { self.focusRecoveryTask = nil }
+
+            for delay in retryDelays {
+                if delay > 0 {
+                    try? await Task.sleep(nanoseconds: delay)
+                }
+                guard !Task.isCancelled else { return }
+                if self.attemptWindowFocus(request, in: app) {
+                    return
+                }
+            }
         }
     }
 

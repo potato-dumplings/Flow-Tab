@@ -5,6 +5,31 @@ import SwiftUI
 import FlowTabCore
 
 extension LiveSwitcherModel {
+    func handleSessionPreviewSnapshotLifecycle(_ session: SwitcherSession) {
+        guard case .windowCycle(let appID) = session.mode else { return }
+        freezeWindowPreviewSnapshotIfNeeded(for: appID, session: session)
+    }
+
+    func clearPreviewSnapshotState() {
+        previewImageCache.removeAll()
+        previewCaptureAttemptedKeys = []
+        previewSnapshotFrozenAppIDs = []
+    }
+
+    func freezeWindowPreviewSnapshotIfNeeded(
+        for appID: String,
+        session: SwitcherSession? = nil
+    ) {
+        guard !previewSnapshotFrozenAppIDs.contains(appID) else { return }
+        let resolvedSession = session ?? self.session
+        guard let app = resolvedSession?.apps.first(where: { $0.id == appID }) else { return }
+
+        for window in app.windows {
+            _ = previewData(for: appID, window: window)
+        }
+        previewSnapshotFrozenAppIDs.insert(appID)
+    }
+
     func shouldBumpSearchResultScrollRevision(
         from oldState: SwitcherSearchViewState,
         to newState: SwitcherSearchViewState

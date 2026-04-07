@@ -998,4 +998,85 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
+    @MainActor
+    func testLiveSwitcherModelFocusedWindowSessionFreezesPreviewSnapshotUntilSessionEnds() {
+        let model = LiveSwitcherModel()
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let windows = [
+            WindowCandidate(id: "front-1", title: "Inbox", isMinimized: false, lastActiveAt: 30),
+            WindowCandidate(id: "front-2", title: "Draft", isMinimized: false, lastActiveAt: 20)
+        ]
+        let context = makeRuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windows: windows
+        )
+
+        model.frontmostApplicationOverride = { currentApp }
+        model.snapshotProviderOverride = {
+            RuntimeSnapshot(
+                apps: [
+                    AppSwitchCandidate(
+                        id: appID,
+                        displayName: currentApp.localizedName ?? "Current App",
+                        groupID: "current",
+                        lastActiveAt: 100,
+                        windows: windows
+                    )
+                ],
+                contextsByID: [appID: context]
+            )
+        }
+
+        enum PreviewPhase {
+            case initial
+            case invalidated
+        }
+
+        var previewPhase: PreviewPhase = .initial
+        var captureCallCount = 0
+        model.previewCaptureOverride = { _, _, title, _ in
+            captureCallCount += 1
+            switch previewPhase {
+            case .initial:
+                let imageColor: NSColor = title == "Inbox" ? .black : .white
+                let titleBarStyle: WindowTitleBarStyleGuess = title == "Inbox" ? .dark : .light
+                return (
+                    image: self.makeColorImage(color: imageColor),
+                    resolvedWindowID: CGWindowID(captureCallCount),
+                    titleBarStyle: titleBarStyle
+                )
+            case .invalidated:
+                return nil
+            }
+        }
+
+        XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
+        XCTAssertEqual(captureCallCount, 2)
+
+        previewPhase = .invalidated
+
+        let initialSnapshot = model.windowPreviewSnapshotForTesting()
+        XCTAssertEqual(initialSnapshot.count, 2)
+        XCTAssertTrue(initialSnapshot.allSatisfy(\.hasImage))
+
+        model.handle(.tabForward)
+
+        let switchedSnapshot = model.windowPreviewSnapshotForTesting()
+        XCTAssertEqual(captureCallCount, 2)
+        XCTAssertEqual(switchedSnapshot.count, 2)
+        XCTAssertTrue(switchedSnapshot.allSatisfy(\.hasImage))
+
+        model.cancelSelection()
+        XCTAssertNil(model.session)
+
+        XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
+        XCTAssertEqual(captureCallCount, 4)
+
+        let restartedSnapshot = model.windowPreviewSnapshotForTesting()
+        XCTAssertEqual(restartedSnapshot.count, 2)
+        XCTAssertTrue(restartedSnapshot.allSatisfy { !$0.hasImage })
+    }
+
 }

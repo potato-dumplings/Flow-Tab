@@ -85,6 +85,7 @@
 		B100110C2F76000100B0D737 /* FlowTabPriorityCoverageTests+CacheAndIcons.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100010C2F76000100B0D737 /* FlowTabPriorityCoverageTests+CacheAndIcons.swift */; };
 		B100110D2F76000100B0D737 /* FlowTabPriorityCoverageTests+Support.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100010D2F76000100B0D737 /* FlowTabPriorityCoverageTests+Support.swift */; };
 		B100110E2F76000100B0D737 /* FlowTabPriorityCoverageTests+TestDoubles.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100010E2F76000100B0D737 /* FlowTabPriorityCoverageTests+TestDoubles.swift */; };
+		B100110F2F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeActivationRecovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100010F2F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeActivationRecovery.swift */; };
 		4A6DAE8A2F727AF600B0D737 /* FlowTabUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6DAE892F727AF600B0D737 /* FlowTabUITests.swift */; };
 		4A6DAE8C2F727AF600B0D737 /* FlowTabUITestsLaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6DAE8B2F727AF600B0D737 /* FlowTabUITestsLaunchTests.swift */; };
 		B10012012F76000100B0D737 /* FlowTabUITests+HomeAndLogs.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002012F76000100B0D737 /* FlowTabUITests+HomeAndLogs.swift */; };
@@ -193,6 +194,7 @@
 		B100010C2F76000100B0D737 /* FlowTabPriorityCoverageTests+CacheAndIcons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+CacheAndIcons.swift"; sourceTree = "<group>"; };
 		B100010D2F76000100B0D737 /* FlowTabPriorityCoverageTests+Support.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+Support.swift"; sourceTree = "<group>"; };
 		B100010E2F76000100B0D737 /* FlowTabPriorityCoverageTests+TestDoubles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+TestDoubles.swift"; sourceTree = "<group>"; };
+		B100010F2F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeActivationRecovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+RuntimeActivationRecovery.swift"; sourceTree = "<group>"; };
 		4A6DAE852F727AF600B0D737 /* FlowTabUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FlowTabUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		4A6DAE892F727AF600B0D737 /* FlowTabUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTabUITests.swift; sourceTree = "<group>"; };
 		4A6DAE8B2F727AF600B0D737 /* FlowTabUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTabUITestsLaunchTests.swift; sourceTree = "<group>"; };
@@ -458,6 +460,7 @@
 				B100010C2F76000100B0D737 /* FlowTabPriorityCoverageTests+CacheAndIcons.swift */,
 				B100010D2F76000100B0D737 /* FlowTabPriorityCoverageTests+Support.swift */,
 				B100010E2F76000100B0D737 /* FlowTabPriorityCoverageTests+TestDoubles.swift */,
+				B100010F2F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeActivationRecovery.swift */,
 			);
 			path = FlowTabTests;
 			sourceTree = "<group>";
@@ -701,6 +704,7 @@
 				B100110C2F76000100B0D737 /* FlowTabPriorityCoverageTests+CacheAndIcons.swift in Sources */,
 				B100110D2F76000100B0D737 /* FlowTabPriorityCoverageTests+Support.swift in Sources */,
 				B100110E2F76000100B0D737 /* FlowTabPriorityCoverageTests+TestDoubles.swift in Sources */,
+				B100110F2F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeActivationRecovery.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -28,6 +28,7 @@ final class LiveSwitcherModel: ObservableObject {
                 sessionAppsByID = [:]
                 return
             }
+            handleSessionPreviewSnapshotLifecycle(session)
             guard searchViewState.isActive else {
                 return
             }
@@ -72,6 +73,7 @@ final class LiveSwitcherModel: ObservableObject {
     var runtimeContextsByID: [String: RuntimeAppContext] = [:]
     var rememberedWindowIDByAppID: [String: String] = [:]
     var previewCaptureAttemptedKeys: Set<String> = []
+    var previewSnapshotFrozenAppIDs: Set<String> = []
     var autoEnterSuppressedAppID: String?
     var titleBarStyleInferenceEnabled = false
     var searchInputHasMarkedText = false
@@ -184,8 +186,7 @@ final class LiveSwitcherModel: ObservableObject {
         }
 
         runtimeContextsByID = [frontmostAppID: context]
-        previewImageCache.removeAll()
-        previewCaptureAttemptedKeys = []
+        clearPreviewSnapshotState()
         autoEnterSuppressedAppID = nil
         let preferences = SwitcherBehaviorPreferencesStore.loadSwitcherPreferences()
         var rebuiltSession = SwitcherSession(
@@ -293,8 +294,7 @@ final class LiveSwitcherModel: ObservableObject {
         }
 
         runtimeContextsByID = snapshot.contextsByID
-        previewImageCache.removeAll()
-        previewCaptureAttemptedKeys = []
+        clearPreviewSnapshotState()
         autoEnterSuppressedAppID = nil
         let preferences = SwitcherBehaviorPreferencesStore.loadSwitcherPreferences()
         var rebuiltSession = SwitcherSession(
@@ -513,8 +513,7 @@ final class LiveSwitcherModel: ObservableObject {
 
     func resetRuntimeState() {
         runtimeContextsByID = [:]
-        previewImageCache.removeAll()
-        previewCaptureAttemptedKeys = []
+        clearPreviewSnapshotState()
         autoEnterSuppressedAppID = nil
         titleBarStyleInferenceEnabled = false
     }
