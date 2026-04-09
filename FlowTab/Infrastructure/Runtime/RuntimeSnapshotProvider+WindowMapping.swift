@@ -17,6 +17,8 @@ struct RuntimeStickyWindowBinding {
 struct RuntimeWindowMappingState {
     var bindingsByCGWindowID: [CGWindowID: RuntimeStickyWindowBinding] = [:]
     var lastKnownCGWindowsByID: [CGWindowID: RuntimeSnapshotProvider.CGWindowEntry] = [:]
+    var hasObservedAXWindowHandle = false
+    var consecutiveSnapshotsWithoutAXWindows = 0
 
     var isEmpty: Bool {
         bindingsByCGWindowID.isEmpty && lastKnownCGWindowsByID.isEmpty
@@ -28,13 +30,22 @@ struct RuntimeWindowMappingResolution {
     let bindingsByCGWindowID: [CGWindowID: RuntimeStickyWindowBinding]
     let validCGWindows: [RuntimeSnapshotProvider.CGWindowEntry]
     let knownCGWindowsByID: [CGWindowID: RuntimeSnapshotProvider.CGWindowEntry]
+    let allowSpaceOneWithoutCurrentAXHandle: Bool
 }
 
 private let runtimeCGFrameOriginTolerance: CGFloat = 24
 private let runtimeCGFrameSizeTolerance: CGFloat = 40
 private let runtimeSpaceIDRequiringAXHandle = 1
+private let runtimeAXRebuildGraceMissingSnapshotLimit = 3
 
 extension RuntimeSnapshotProvider {
+    func isLikelyTransientAXRebuild(for pid: pid_t) -> Bool {
+        guard let state = windowMappingStateByPID[pid] else { return false }
+        guard state.hasObservedAXWindowHandle else { return false }
+        let missingSnapshots = state.consecutiveSnapshotsWithoutAXWindows
+        return missingSnapshots > 0 && missingSnapshots <= runtimeAXRebuildGraceMissingSnapshotLimit
+    }
+
     func cleanupWindowMappingState(for runningApps: [NSRunningApplication]) {
         let runningPIDs = Set(runningApps.map(\.processIdentifier))
         windowMappingStateByPID = windowMappingStateByPID.filter { runningPIDs.contains($0.key) }
@@ -105,7 +116,10 @@ extension RuntimeSnapshotProvider {
             }
             let rawSpaceIDs = mappingResolution.knownCGWindowsByID[cgWindow.id]?.spaceIDs ?? cgWindow.spaceIDs
             let normalizedSpaceIDs = Array(Set(rawSpaceIDs)).sorted()
-            guard runtimeWindowCanBeExposedWithoutCurrentAXHandle(spaceIDs: normalizedSpaceIDs) else {
+            guard runtimeWindowCanBeExposedWithoutCurrentAXHandle(
+                spaceIDs: normalizedSpaceIDs,
+                allowSpaceOneWithoutCurrentAXHandle: mappingResolution.allowSpaceOneWithoutCurrentAXHandle
+            ) else {
                 return nil
             }
             return WindowListEntry(
@@ -135,7 +149,10 @@ extension RuntimeSnapshotProvider {
                 hiddenProvisionalCGOnlyCount += 1
                 return nil
             }
-            guard runtimeWindowCanBeExposedWithoutCurrentAXHandle(spaceIDs: normalizedSpaceIDs) else {
+            guard runtimeWindowCanBeExposedWithoutCurrentAXHandle(
+                spaceIDs: normalizedSpaceIDs,
+                allowSpaceOneWithoutCurrentAXHandle: mappingResolution.allowSpaceOneWithoutCurrentAXHandle
+            ) else {
                 hiddenProvisionalCGOnlyCount += 1
                 return nil
             }
@@ -183,6 +200,14 @@ extension RuntimeSnapshotProvider {
         let validCGWindowIDs = Set(validCGWindows.map(\.id))
         let currentAXWindowsByID = Dictionary(uniqueKeysWithValues: axWindows.map { ($0.id, $0) })
         let previousState = windowMappingStateByPID[pid] ?? RuntimeWindowMappingState()
+        let hasAXWindowsInCurrentSnapshot = !axWindows.isEmpty
+        let hasObservedAXWindowHandle = previousState.hasObservedAXWindowHandle || hasAXWindowsInCurrentSnapshot
+        let consecutiveSnapshotsWithoutAXWindows = hasAXWindowsInCurrentSnapshot
+            ? 0
+            : previousState.consecutiveSnapshotsWithoutAXWindows + 1
+        let allowSpaceOneWithoutCurrentAXHandle = hasObservedAXWindowHandle
+            && !hasAXWindowsInCurrentSnapshot
+            && consecutiveSnapshotsWithoutAXWindows <= runtimeAXRebuildGraceMissingSnapshotLimit
 
         var knownCGWindowsByID = previousState.lastKnownCGWindowsByID
         for cgWindow in validCGWindows {
@@ -285,7 +310,9 @@ extension RuntimeSnapshotProvider {
         knownCGWindowsByID = knownCGWindowsByID.filter { retainedCGWindowIDs.contains($0.key) }
         let nextState = RuntimeWindowMappingState(
             bindingsByCGWindowID: bindingsByCGWindowID,
-            lastKnownCGWindowsByID: knownCGWindowsByID
+            lastKnownCGWindowsByID: knownCGWindowsByID,
+            hasObservedAXWindowHandle: hasObservedAXWindowHandle,
+            consecutiveSnapshotsWithoutAXWindows: consecutiveSnapshotsWithoutAXWindows
         )
         if nextState.isEmpty {
             windowMappingStateByPID.removeValue(forKey: pid)
@@ -299,11 +326,18 @@ extension RuntimeSnapshotProvider {
             "AXMatch",
             "\(appName) sticky=\(bindingsByCGWindowID.count) exact=\(exactMatchesByAXWindowID.count) unmatchedAX=\(unmatchedAXCount) unmatchedCG=\(unmatchedCGCount)"
         )
+        if allowSpaceOneWithoutCurrentAXHandle {
+            RuntimeLog.info(
+                "AXMatch",
+                "\(appName) transient-ax-rebuild suspected; keeping space-1 windows missingAXSnapshots=\(consecutiveSnapshotsWithoutAXWindows)/\(runtimeAXRebuildGraceMissingSnapshotLimit)"
+            )
+        }
         return RuntimeWindowMappingResolution(
             exactMatchesByAXWindowID: exactMatchesByAXWindowID,
             bindingsByCGWindowID: bindingsByCGWindowID,
             validCGWindows: validCGWindows,
-            knownCGWindowsByID: knownCGWindowsByID
+            knownCGWindowsByID: knownCGWindowsByID,
+            allowSpaceOneWithoutCurrentAXHandle: allowSpaceOneWithoutCurrentAXHandle
         )
     }
 
@@ -572,10 +606,16 @@ private func runtimeSupplementalCGWindowTitle(
         ?? appName
 }
 
-private func runtimeWindowCanBeExposedWithoutCurrentAXHandle(spaceIDs: [Int]) -> Bool {
+private func runtimeWindowCanBeExposedWithoutCurrentAXHandle(
+    spaceIDs: [Int],
+    allowSpaceOneWithoutCurrentAXHandle: Bool
+) -> Bool {
     let normalizedSpaceIDs = Array(Set(spaceIDs)).sorted()
     guard !normalizedSpaceIDs.isEmpty else { return true }
-    return normalizedSpaceIDs != [runtimeSpaceIDRequiringAXHandle]
+    if normalizedSpaceIDs == [runtimeSpaceIDRequiringAXHandle] {
+        return allowSpaceOneWithoutCurrentAXHandle
+    }
+    return true
 }
 
 private func resolveStableWindowTitle(

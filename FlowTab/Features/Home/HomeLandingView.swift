@@ -258,7 +258,8 @@ struct HomeLandingView: View {
             } else if activeApp != nil {
                 HomeLayerRowView(
                     title: AppStrings.text(.homeNoSwitchableWindows, language: appLanguage),
-                    subtitle: AppStrings.text(.homeConfirmAccessibility, language: appLanguage),
+                    subtitle: activeApp.flatMap(noSwitchableWindowsSubtitle(for:))
+                        ?? AppStrings.text(.homeConfirmAccessibility, language: appLanguage),
                     trailing: "0w",
                     isSelected: false
                 )
@@ -290,6 +291,16 @@ struct HomeLandingView: View {
 
     private func windowIdentifier(_ rawID: String) -> String {
         rawID.replacingOccurrences(of: "ax:", with: "").replacingOccurrences(of: ":", with: "-")
+    }
+
+    private func noSwitchableWindowsSubtitle(for app: RuntimeHomeAppSummary) -> String {
+        if
+            accessibilityTrusted,
+            Self.snapshotProvider.isLikelyTransientAXRebuild(for: app.pid)
+        {
+            return AppStrings.text(.homeWaitCacheUpdate, language: appLanguage)
+        }
+        return AppStrings.text(.homeConfirmAccessibility, language: appLanguage)
     }
 
     private func handleVisibilityChanged(_ active: Bool) {

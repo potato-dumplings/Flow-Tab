@@ -286,6 +286,26 @@ AX 通知应被视为“某个应用发生了变化”的脏信号，而不是�
 
 该策略的目标是避免把 AX 树重建期间的短暂空返回误判为“窗口已消失”。
 
+### AX 树重建高概率判定（已实现）
+
+针对“历史上可切换、但当前快照 AX 列表瞬时拉空”的场景，运行时增加了按快照计数的高概率判定：
+
+1. 状态字段：
+   - `hasObservedAXWindowHandle`
+   - `consecutiveSnapshotsWithoutAXWindows`
+2. 判定条件：
+   - 历史上该 `pid` 曾观测到 AX 窗口；
+   - 当前快照 `axWindows.isEmpty`；
+   - `consecutiveSnapshotsWithoutAXWindows <= 3`（按快照次数，不是绝对时间）。
+3. 判定成立时：
+   - 认为“疑似 AX 树重建中”；
+   - 对 `spaceIDs == [1]` 的窗口不立即隐藏，继续保留 sticky/CG 侧可恢复条目。
+4. 判定失效时：
+   - 当连续缺失快照超过阈值（第 4 次）后，恢复严格策略；
+   - `spaceIDs == [1]` 且无当前 AX 句柄的条目会被隐藏。
+
+该策略只放宽短窗口内的可见性，不改变强删除信号优先级，也不绕过最终删除条件。
+
 ### 通知路径与首页稳定行为对齐
 
 通知维护路径应尽量向首页首次打开时的“稳定优先”行为对齐，避免业务结果直接暴露 AX 瞬时抖动：
@@ -368,6 +388,7 @@ AX 通知应被视为“某个应用发生了变化”的脏信号，而不是�
 3. 再输出没有历史 sticky binding、但 `CG -> Space` 已确认且具备提交恢复路径的 `space-backed window`。
 4. 对仅有 CG 信息、且没有历史 sticky binding、也没有 `CG -> Space` 或其他已确认提交路径的新 `provisional CG-only` 条目，不进入主窗口切换路径，只保留在内部候选池。
 5. 对既不能切换、也不能稳定展示的死条目，只允许进入诊断或调试视图，不进入主 `window-layer`。
+6. 当命中“疑似 AX 树重建中”判定时，`spaceIDs == [1]` 的历史可恢复条目允许在短窗口内继续展示；超过阈值后必须回落到严格过滤。
 
 这条规则的目标是：
 
@@ -433,5 +454,6 @@ AX 通知应被视为“某个应用发生了变化”的脏信号，而不是�
 - AX 通知只作为脏信号；通知后以受影响 `pid/appID` 做局部回拉与 reconciliation，若 `AXWindows` 瞬时为空，先重试并保留 sticky/space-backed，不做立即删除。
 - 通知维护路径与首页稳定策略保持一致：先去抖与重试，再决定是否提交空窗口状态。
 - `window-layer` 采用 exact、sticky、space-backed、provisional 四层判断，只展示可提交的窗口条目，不展示无法激活的死条目。
+- 已实现“AX 树重建高概率判定”：当 `hasObservedAXWindowHandle=true` 且 `consecutiveSnapshotsWithoutAXWindows` 在阈值内时，短暂放行 `spaceIDs == [1]` 的可恢复条目，超过阈值后回落到严格隐藏策略。
 - sticky 复用时，若 `CFEqual` 命中历史 `AXUIElement`，必须允许在标题或 frame 变化时继续复用，并在该次 reconciliation 刷新标题与几何信息。
 - 存在覆盖“sticky 绑定保持不变、AX 标题更新后应刷新输出标题”的回归测试：`FlowTabPriorityCoverageTests.testRuntimeSnapshotProviderWindowListKeepsStickyMatchesWhenAXTitlesChange`。

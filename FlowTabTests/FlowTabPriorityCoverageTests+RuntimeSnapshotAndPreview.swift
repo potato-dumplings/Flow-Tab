@@ -481,26 +481,112 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(mergedEntries.first?.lastConfirmationSource, .stickyBinding)
     }
 
-    func testRuntimeSnapshotProviderWindowListHidesStickyCGEntriesBoundToSpaceOneWithoutAXHandle() {
-        let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+    func testRuntimeSnapshotProviderWindowListKeepsStickyCGEntriesBoundToSpaceOneDuringTransientAXRebuild() {
+        let provider = RuntimeSnapshotProvider()
+        let pid: pid_t = 18_405
+        let appName = "Google Chrome"
+        let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
+        let cgWindows = [
+            RuntimeSnapshotProvider.CGWindowEntry(
+                id: 243_747,
+                title: "Recovered Window",
+                bounds: fullscreenBounds,
+                isOnscreen: false,
+                alpha: 1.0,
+                storeType: 1,
+                spaceIDs: [1]
+            )
+        ]
+        let initialAXWindows = [
+            RuntimeSnapshotProvider.AXWindowEntry(
+                index: 0,
+                id: "ax:18405:0",
+                title: "Recovered Window",
+                sourceTitle: "Recovered Window",
+                isMinimized: false,
+                window: AXUIElementCreateApplication(90_001),
+                frame: fullscreenBounds
+            )
+        ]
+
+        let initialEntries = provider.resolvedStableWindowEntries(
+            axWindows: initialAXWindows,
+            cgWindows: cgWindows,
+            pid: pid,
+            appName: appName
+        )
+        XCTAssertEqual(initialEntries.map(\.windowID), ["cg:18405:243747"])
+        XCTAssertEqual(initialEntries.first?.lastConfirmationSource, .publicExactMatch)
+        XCTAssertFalse(provider.isLikelyTransientAXRebuild(for: pid))
+
+        let transientMissingAXEntries = provider.resolvedStableWindowEntries(
             axWindows: [],
-            cgWindows: [
-                .init(
-                    id: 243_747,
-                    title: "Recovered Window",
-                    bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
-                    isOnscreen: false,
-                    spaceIDs: [1]
-                )
-            ],
-            previousMatches: ["ax:18405:0": 243_747],
-            previousAXWindowIDs: ["ax:18405:0"],
-            previousCGWindowIDs: [243_747],
-            pid: 18405,
-            appName: "Google Chrome"
+            cgWindows: cgWindows,
+            pid: pid,
+            appName: appName
         )
 
-        XCTAssertTrue(mergedEntries.isEmpty)
+        XCTAssertEqual(transientMissingAXEntries.map(\.windowID), ["cg:18405:243747"])
+        XCTAssertTrue(transientMissingAXEntries.first?.hasStickyBinding == true)
+        XCTAssertNotNil(transientMissingAXEntries.first?.lastConfirmationSource)
+        XCTAssertTrue(provider.isLikelyTransientAXRebuild(for: pid))
+    }
+
+    func testRuntimeSnapshotProviderWindowListHidesStickyCGEntriesBoundToSpaceOneAfterAXRebuildGraceRetriesExhausted() {
+        let provider = RuntimeSnapshotProvider()
+        let pid: pid_t = 18_405
+        let appName = "Google Chrome"
+        let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
+        let cgWindows = [
+            RuntimeSnapshotProvider.CGWindowEntry(
+                id: 243_747,
+                title: "Recovered Window",
+                bounds: fullscreenBounds,
+                isOnscreen: false,
+                alpha: 1.0,
+                storeType: 1,
+                spaceIDs: [1]
+            )
+        ]
+        let initialAXWindows = [
+            RuntimeSnapshotProvider.AXWindowEntry(
+                index: 0,
+                id: "ax:18405:0",
+                title: "Recovered Window",
+                sourceTitle: "Recovered Window",
+                isMinimized: false,
+                window: AXUIElementCreateApplication(90_002),
+                frame: fullscreenBounds
+            )
+        ]
+
+        _ = provider.resolvedStableWindowEntries(
+            axWindows: initialAXWindows,
+            cgWindows: cgWindows,
+            pid: pid,
+            appName: appName
+        )
+        XCTAssertFalse(provider.isLikelyTransientAXRebuild(for: pid))
+
+        for _ in 0..<3 {
+            let retryEntries = provider.resolvedStableWindowEntries(
+                axWindows: [],
+                cgWindows: cgWindows,
+                pid: pid,
+                appName: appName
+            )
+            XCTAssertEqual(retryEntries.map(\.windowID), ["cg:18405:243747"])
+            XCTAssertTrue(provider.isLikelyTransientAXRebuild(for: pid))
+        }
+
+        let exhaustedEntries = provider.resolvedStableWindowEntries(
+            axWindows: [],
+            cgWindows: cgWindows,
+            pid: pid,
+            appName: appName
+        )
+        XCTAssertTrue(exhaustedEntries.isEmpty)
+        XCTAssertFalse(provider.isLikelyTransientAXRebuild(for: pid))
     }
 
     func testRuntimeSnapshotProviderWindowListKeepsStickyMatchesWhenAXTitlesChange() {
