@@ -398,7 +398,10 @@ extension RuntimeSnapshotProvider {
         return axWindows.first { axWindow in
             guard !assignedAXWindowIDs.contains(axWindow.id) else { return false }
             guard CFEqual(axWindow.window, previousAXWindow) else { return false }
-            return stickyBindingCanReuse(binding, axWindow: axWindow)
+            // Title changes are expected for a stable AX window handle. Once the
+            // underlying AX element identity matches, prefer continuity and let
+            // the current snapshot refresh title/frame in binding state.
+            return true
         }
     }
 

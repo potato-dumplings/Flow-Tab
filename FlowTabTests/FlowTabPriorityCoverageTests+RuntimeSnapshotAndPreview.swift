@@ -434,6 +434,115 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(mergedEntries.first?.lastConfirmationSource, .stickyBinding)
     }
 
+    func testRuntimeSnapshotProviderWindowListKeepsStickyMatchesWhenAXTitlesChange() {
+        let provider = RuntimeSnapshotProvider()
+        let pid: pid_t = 18405
+        let appName = "Google Chrome"
+        let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
+
+        let firstAXWindows = [
+            RuntimeSnapshotProvider.AXWindowEntry(
+                index: 0,
+                id: "ax:18405:0",
+                title: "Doc A",
+                sourceTitle: "Doc A",
+                isMinimized: false,
+                window: AXUIElementCreateApplication(90_001),
+                frame: fullscreenBounds
+            ),
+            RuntimeSnapshotProvider.AXWindowEntry(
+                index: 1,
+                id: "ax:18405:1",
+                title: "Doc B",
+                sourceTitle: "Doc B",
+                isMinimized: false,
+                window: AXUIElementCreateApplication(90_002),
+                frame: fullscreenBounds
+            )
+        ]
+        let firstCGWindows = [
+            RuntimeSnapshotProvider.CGWindowEntry(
+                id: 240_001,
+                title: "Doc A",
+                bounds: fullscreenBounds,
+                isOnscreen: true,
+                alpha: 1.0,
+                storeType: 1
+            ),
+            RuntimeSnapshotProvider.CGWindowEntry(
+                id: 240_002,
+                title: "Doc B",
+                bounds: fullscreenBounds,
+                isOnscreen: true,
+                alpha: 1.0,
+                storeType: 1
+            )
+        ]
+
+        let firstEntries = provider.resolvedStableWindowEntries(
+            axWindows: firstAXWindows,
+            cgWindows: firstCGWindows,
+            pid: pid,
+            appName: appName
+        )
+        XCTAssertEqual(Set(firstEntries.compactMap(\.cgWindowID)), Set<CGWindowID>([240_001, 240_002]))
+
+        let secondAXWindows = [
+            RuntimeSnapshotProvider.AXWindowEntry(
+                index: 0,
+                id: "ax:18405:0",
+                title: "Doc A (Updated)",
+                sourceTitle: "Doc A (Updated)",
+                isMinimized: false,
+                window: firstAXWindows[0].window,
+                frame: fullscreenBounds
+            ),
+            RuntimeSnapshotProvider.AXWindowEntry(
+                index: 1,
+                id: "ax:18405:1",
+                title: "Doc B (Updated)",
+                sourceTitle: "Doc B (Updated)",
+                isMinimized: false,
+                window: firstAXWindows[1].window,
+                frame: fullscreenBounds
+            )
+        ]
+        let secondCGWindows = [
+            RuntimeSnapshotProvider.CGWindowEntry(
+                id: 240_001,
+                title: nil,
+                bounds: fullscreenBounds,
+                isOnscreen: true,
+                alpha: 1.0,
+                storeType: 1
+            ),
+            RuntimeSnapshotProvider.CGWindowEntry(
+                id: 240_002,
+                title: nil,
+                bounds: fullscreenBounds,
+                isOnscreen: true,
+                alpha: 1.0,
+                storeType: 1
+            )
+        ]
+
+        let secondEntries = provider.resolvedStableWindowEntries(
+            axWindows: secondAXWindows,
+            cgWindows: secondCGWindows,
+            pid: pid,
+            appName: appName
+        )
+
+        let secondEntriesByCGWindowID = Dictionary(
+            uniqueKeysWithValues: secondEntries.compactMap { entry -> (CGWindowID, RuntimeSnapshotProvider.WindowListEntry)? in
+                guard let cgWindowID = entry.cgWindowID else { return nil }
+                return (cgWindowID, entry)
+            }
+        )
+        XCTAssertEqual(secondEntriesByCGWindowID[240_001]?.title, "Doc A (Updated)")
+        XCTAssertEqual(secondEntriesByCGWindowID[240_002]?.title, "Doc B (Updated)")
+    }
+
     func testRuntimeSnapshotProviderAXWindowTitleFallsBackToAppNameWhenSourceTitleMissing() {
         let fallbackTitle = RuntimeSnapshotProvider.resolvedAXWindowTitleForTesting(
             sourceTitle: nil,

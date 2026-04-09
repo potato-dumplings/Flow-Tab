@@ -263,6 +263,17 @@ AX 通知应被视为“某个应用发生了变化”的脏信号，而不是�
 4. 若仍无法确认，则保持 unresolved，不做猜测性长期绑定；若存在 `CG -> Space` 恢复证据，则保留为 `space-backed window`。
 5. 这类事件默认只修复和增强绑定，不主动解绑历史 sticky binding。
 
+### sticky 复用中的标题刷新策略
+
+为避免“绑定后标题卡死在旧值”，sticky 复用应区分两条路径：
+
+1. `lastKnownAXWindowID` 命中时，仍使用 `title + frame` 的可复用校验，避免索引复用导致的误绑。
+2. 若 `lastKnownAXWindowID` 未命中，但 `CFEqual(currentAX.window, previousBinding.axWindow)` 成立，则应直接复用该 AX 句柄，不再因标题或 frame 变化拒绝复用。
+
+第二条是关键约束：当 AX 元素身份稳定时，标题变化是正常现象，不应被当作解绑或拒绝复用信号。复用后应在当前 reconciliation 内立刻用最新 `AX sourceTitle` 重新计算并覆盖 `binding.title`，并同步刷新 `binding.frame` 与最小化状态。
+
+这意味着标题刷新依赖的是“下一次该应用进入 reconciliation”，而不是“必须收到某个专门的标题通知”。任何会触发该应用重跑快照与绑定管线的入口都可刷新标题。
+
 ### 通知后 `AXWindows` 拉空
 
 当通知已到达，但对该应用回拉 `AXWindows` 得到空结果时，默认按“瞬时空窗”处理，而不是直接删窗：
@@ -422,3 +433,5 @@ AX 通知应被视为“某个应用发生了变化”的脏信号，而不是�
 - AX 通知只作为脏信号；通知后以受影响 `pid/appID` 做局部回拉与 reconciliation，若 `AXWindows` 瞬时为空，先重试并保留 sticky/space-backed，不做立即删除。
 - 通知维护路径与首页稳定策略保持一致：先去抖与重试，再决定是否提交空窗口状态。
 - `window-layer` 采用 exact、sticky、space-backed、provisional 四层判断，只展示可提交的窗口条目，不展示无法激活的死条目。
+- sticky 复用时，若 `CFEqual` 命中历史 `AXUIElement`，必须允许在标题或 frame 变化时继续复用，并在该次 reconciliation 刷新标题与几何信息。
+- 存在覆盖“sticky 绑定保持不变、AX 标题更新后应刷新输出标题”的回归测试：`FlowTabPriorityCoverageTests.testRuntimeSnapshotProviderWindowListKeepsStickyMatchesWhenAXTitlesChange`。
