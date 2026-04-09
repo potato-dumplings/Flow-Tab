@@ -32,6 +32,7 @@ struct RuntimeWindowMappingResolution {
 
 private let runtimeCGFrameOriginTolerance: CGFloat = 24
 private let runtimeCGFrameSizeTolerance: CGFloat = 40
+private let runtimeSpaceIDRequiringAXHandle = 1
 
 extension RuntimeSnapshotProvider {
     func cleanupWindowMappingState(for runningApps: [NSRunningApplication]) {
@@ -102,6 +103,11 @@ extension RuntimeSnapshotProvider {
             guard let binding = mappingResolution.bindingsByCGWindowID[cgWindow.id] else {
                 return nil
             }
+            let rawSpaceIDs = mappingResolution.knownCGWindowsByID[cgWindow.id]?.spaceIDs ?? cgWindow.spaceIDs
+            let normalizedSpaceIDs = Array(Set(rawSpaceIDs)).sorted()
+            guard runtimeWindowCanBeExposedWithoutCurrentAXHandle(spaceIDs: normalizedSpaceIDs) else {
+                return nil
+            }
             return WindowListEntry(
                 windowID: binding.stableWindowID,
                 title: binding.title
@@ -126,6 +132,10 @@ extension RuntimeSnapshotProvider {
             let rawSpaceIDs = mappingResolution.knownCGWindowsByID[cgWindow.id]?.spaceIDs ?? cgWindow.spaceIDs
             let normalizedSpaceIDs = Array(Set(rawSpaceIDs)).sorted()
             guard !normalizedSpaceIDs.isEmpty else {
+                hiddenProvisionalCGOnlyCount += 1
+                return nil
+            }
+            guard runtimeWindowCanBeExposedWithoutCurrentAXHandle(spaceIDs: normalizedSpaceIDs) else {
                 hiddenProvisionalCGOnlyCount += 1
                 return nil
             }
@@ -560,6 +570,12 @@ private func runtimeSupplementalCGWindowTitle(
     normalizedRuntimeWindowTitle(cgWindow.title)
         ?? normalizedRuntimeWindowTitle(appName)
         ?? appName
+}
+
+private func runtimeWindowCanBeExposedWithoutCurrentAXHandle(spaceIDs: [Int]) -> Bool {
+    let normalizedSpaceIDs = Array(Set(spaceIDs)).sorted()
+    guard !normalizedSpaceIDs.isEmpty else { return true }
+    return normalizedSpaceIDs != [runtimeSpaceIDRequiringAXHandle]
 }
 
 private func resolveStableWindowTitle(
