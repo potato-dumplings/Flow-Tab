@@ -119,9 +119,16 @@ extension RuntimeSnapshotProvider {
         }
 
         let stickyCGWindowIDs = Set(stickyCGEntries.compactMap(\.cgWindowID))
+        var hiddenProvisionalCGOnlyCount = 0
         let unmatchedCGEntries = mappingResolution.validCGWindows.compactMap { cgWindow -> WindowListEntry? in
             guard !exactCGWindowIDs.contains(cgWindow.id) else { return nil }
             guard !stickyCGWindowIDs.contains(cgWindow.id) else { return nil }
+            let rawSpaceIDs = mappingResolution.knownCGWindowsByID[cgWindow.id]?.spaceIDs ?? cgWindow.spaceIDs
+            let normalizedSpaceIDs = Array(Set(rawSpaceIDs)).sorted()
+            guard !normalizedSpaceIDs.isEmpty else {
+                hiddenProvisionalCGOnlyCount += 1
+                return nil
+            }
             return WindowListEntry(
                 windowID: Self.makeCGWindowID(pid: pid, cgWindowID: cgWindow.id),
                 title: runtimeSupplementalCGWindowTitle(appName: appName, cgWindow: cgWindow),
@@ -134,6 +141,12 @@ extension RuntimeSnapshotProvider {
                 allowsPublicAXRecovery: true,
                 hasStickyBinding: false,
                 lastConfirmationSource: nil
+            )
+        }
+        if hiddenProvisionalCGOnlyCount > 0 {
+            RuntimeLog.info(
+                "AXMatch",
+                "\(appName) hidden-provisional-cg windows=\(hiddenProvisionalCGOnlyCount)"
             )
         }
 

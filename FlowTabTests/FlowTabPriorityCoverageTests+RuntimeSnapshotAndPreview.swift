@@ -246,7 +246,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(mergedEntries[3].title, "Google Chrome")
     }
 
-    func testRuntimeSnapshotProviderWindowListKeepsUnmatchedCGEntriesWithoutBindingOrExactBridge() {
+    func testRuntimeSnapshotProviderWindowListDoesNotExposeProvisionalCGOnlyEntriesWithoutRecoveryEvidence() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
             axWindows: [
@@ -283,14 +283,11 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertEqual(
             mergedEntries.map(\.windowID),
-            ["cg:18405:240001", "cg:18405:243747"]
+            ["cg:18405:240001"]
         )
         XCTAssertEqual(mergedEntries.first?.cgWindowID, 240_001)
         XCTAssertEqual(mergedEntries.first?.title, "Google 搜索 - Google Chrome - test1")
         XCTAssertEqual(mergedEntries.first?.lastConfirmationSource, .publicExactMatch)
-        XCTAssertEqual(mergedEntries.last?.cgWindowID, 243_747)
-        XCTAssertEqual(mergedEntries.last?.title, "Recovered Tab")
-        XCTAssertNil(mergedEntries.last?.lastConfirmationSource)
     }
 
     func testRuntimeSnapshotProviderWindowListUsesPrivateExactBridgeWhenPublicSignalsRemainAmbiguous() {
@@ -335,7 +332,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(mergedEntries.allSatisfy { $0.lastConfirmationSource == .privateExactBridge })
     }
 
-    func testRuntimeSnapshotProviderWindowListKeepsNewCGEntriesAfterAXDisappearsWithoutStickyBinding() {
+    func testRuntimeSnapshotProviderWindowListKeepsSpaceBackedEntriesAfterAXDisappearsWithoutStickyBinding() {
         let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
             axWindows: [],
             cgWindows: [
@@ -343,7 +340,8 @@ extension FlowTabPriorityCoverageTests {
                     id: 243_747,
                     title: "Recovered Window",
                     bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
-                    isOnscreen: false
+                    isOnscreen: false,
+                    spaceIDs: [11_679]
                 )
             ],
             previousMatches: [:],
