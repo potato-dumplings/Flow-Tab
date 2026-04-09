@@ -46,6 +46,7 @@
 			A1B2C43F2F73000100B0D737 /* AXWindowInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4362F73000100B0D737 /* AXWindowInspector.swift */; };
 			A1B2C4402F73000100B0D737 /* RuntimeWindowPreviewProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4372F73000100B0D737 /* RuntimeWindowPreviewProvider.swift */; };
 			A1B2C4412F73000100B0D737 /* AppIconProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4382F73000100B0D737 /* AppIconProvider.swift */; };
+			F4D5E6F735AB000100B0D737 /* RuntimeCGSpaceInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4D5E6F835AB000100B0D737 /* RuntimeCGSpaceInspector.swift */; };
 			A1B2C3F12F73000100B0D737 /* SwitcherPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3E12F73000100B0D737 /* SwitcherPanelController.swift */; };
 			A1B2C3F22F73000100B0D737 /* LiveSwitcherModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3E22F73000100B0D737 /* LiveSwitcherModel.swift */; };
 			A1B2C3F32F73000100B0D737 /* SwitcherPanelOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3E32F73000100B0D737 /* SwitcherPanelOverlayView.swift */; };
@@ -153,6 +154,7 @@
 			A1B2C4362F73000100B0D737 /* AXWindowInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AXWindowInspector.swift; sourceTree = "<group>"; };
 			A1B2C4372F73000100B0D737 /* RuntimeWindowPreviewProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowPreviewProvider.swift; sourceTree = "<group>"; };
 			A1B2C4382F73000100B0D737 /* AppIconProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconProvider.swift; sourceTree = "<group>"; };
+			F4D5E6F835AB000100B0D737 /* RuntimeCGSpaceInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeCGSpaceInspector.swift; sourceTree = "<group>"; };
 			A1B2C3E12F73000100B0D737 /* SwitcherPanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherPanelController.swift; sourceTree = "<group>"; };
 			A1B2C3E22F73000100B0D737 /* LiveSwitcherModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveSwitcherModel.swift; sourceTree = "<group>"; };
 			A1B2C3E32F73000100B0D737 /* SwitcherPanelOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherPanelOverlayView.swift; sourceTree = "<group>"; };
@@ -398,6 +400,7 @@
 				A1B2C4362F73000100B0D737 /* AXWindowInspector.swift */,
 				A1B2C4372F73000100B0D737 /* RuntimeWindowPreviewProvider.swift */,
 				A1B2C4382F73000100B0D737 /* AppIconProvider.swift */,
+				F4D5E6F835AB000100B0D737 /* RuntimeCGSpaceInspector.swift */,
 				E1F100112B00000100B0D737 /* RuntimeLogging.swift */,
 			);
 			path = Runtime;
@@ -655,10 +658,11 @@
 							F3C4D5E62FA2000100B0D737 /* RuntimeSnapshotProvider+WindowMapping.swift in Sources */,
 							A1B2C43D2F73000100B0D737 /* RuntimeActivator.swift in Sources */,
 							A1B2C43E2F73000100B0D737 /* AXLiveWindowRegistry.swift in Sources */,
-							A1B2C43F2F73000100B0D737 /* AXWindowInspector.swift in Sources */,
-							A1B2C4402F73000100B0D737 /* RuntimeWindowPreviewProvider.swift in Sources */,
-							A1B2C4412F73000100B0D737 /* AppIconProvider.swift in Sources */,
-							A1B2C3F12F73000100B0D737 /* SwitcherPanelController.swift in Sources */,
+								A1B2C43F2F73000100B0D737 /* AXWindowInspector.swift in Sources */,
+								A1B2C4402F73000100B0D737 /* RuntimeWindowPreviewProvider.swift in Sources */,
+								A1B2C4412F73000100B0D737 /* AppIconProvider.swift in Sources */,
+								F4D5E6F735AB000100B0D737 /* RuntimeCGSpaceInspector.swift in Sources */,
+								A1B2C3F12F73000100B0D737 /* SwitcherPanelController.swift in Sources */,
 							A1B2C4112F73000100B0D737 /* SwitcherPanelWindowConfiguration.swift in Sources */,
 							A1B2C4122F73000100B0D737 /* SwitcherPanelController+Presentation.swift in Sources */,
 							A1B2C4132F73000100B0D737 /* SwitcherPanelController+InputHandling.swift in Sources */,

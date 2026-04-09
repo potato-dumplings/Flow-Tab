@@ -118,7 +118,33 @@ extension RuntimeSnapshotProvider {
             )
         }
 
-        return exactEntries + stickyCGEntries
+        let stickyCGWindowIDs = Set(stickyCGEntries.compactMap(\.cgWindowID))
+        let unmatchedCGEntries = mappingResolution.validCGWindows.compactMap { cgWindow -> WindowListEntry? in
+            guard !exactCGWindowIDs.contains(cgWindow.id) else { return nil }
+            guard !stickyCGWindowIDs.contains(cgWindow.id) else { return nil }
+            return WindowListEntry(
+                windowID: Self.makeCGWindowID(pid: pid, cgWindowID: cgWindow.id),
+                title: runtimeSupplementalCGWindowTitle(appName: appName, cgWindow: cgWindow),
+                isMinimized: false,
+                ownerPID: pid,
+                cgWindowID: cgWindow.id,
+                activationHandleID: nil,
+                axWindow: nil,
+                frame: cgWindow.bounds,
+                allowsPublicAXRecovery: true,
+                hasStickyBinding: false,
+                lastConfirmationSource: nil
+            )
+        }
+
+        let unmatchedAXEntries = stickyCGEntries + unmatchedCGEntries
+        let deduplicatedUnmatchedAXEntries = deduplicateUnmatchedAXEntriesBySpace(
+            unmatchedAXEntries,
+            knownCGWindowsByID: mappingResolution.knownCGWindowsByID,
+            appName: appName
+        )
+
+        return exactEntries + deduplicatedUnmatchedAXEntries
     }
 
     func resolveStableWindowMapping(
@@ -298,6 +324,46 @@ extension RuntimeSnapshotProvider {
             bindingsByCGWindowID[cgWindowID] = binding
             exactMatchesByAXWindowID[axWindowID] = cgWindowID
         }
+    }
+
+    private func deduplicateUnmatchedAXEntriesBySpace(
+        _ entries: [WindowListEntry],
+        knownCGWindowsByID: [CGWindowID: CGWindowEntry],
+        appName: String
+    ) -> [WindowListEntry] {
+        var deduplicatedEntries: [WindowListEntry] = []
+        deduplicatedEntries.reserveCapacity(entries.count)
+
+        var seenSpaceKeys: Set<String> = []
+        var droppedCount = 0
+
+        for entry in entries {
+            guard let cgWindowID = entry.cgWindowID else {
+                deduplicatedEntries.append(entry)
+                continue
+            }
+            let rawSpaceIDs = knownCGWindowsByID[cgWindowID]?.spaceIDs ?? []
+            let normalizedSpaceIDs = Array(Set(rawSpaceIDs)).sorted()
+            guard !normalizedSpaceIDs.isEmpty else {
+                deduplicatedEntries.append(entry)
+                continue
+            }
+            let spaceKey = normalizedSpaceIDs.map(String.init).joined(separator: ",")
+            if seenSpaceKeys.insert(spaceKey).inserted {
+                deduplicatedEntries.append(entry)
+            } else {
+                droppedCount += 1
+            }
+        }
+
+        if droppedCount > 0 {
+            RuntimeLog.info(
+                "AXMatch",
+                "\(appName) dedupe-unmatched-ax-by-space dropped=\(droppedCount)"
+            )
+        }
+
+        return deduplicatedEntries
     }
 
     private func resolveStickyAXWindow(

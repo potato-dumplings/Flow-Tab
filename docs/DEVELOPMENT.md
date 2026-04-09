@@ -231,7 +231,7 @@ FlowTab/
 - `RuntimeSnapshotProvider`：运行中应用与窗口快照
 - `RuntimeActivator`：应用/窗口激活
 - `RuntimeWindowPreviewProvider`：窗口预览抓图（`ScreenCaptureKit`）与窗口标题样式猜测
-- `AX/CG` 窗口映射流程：见 [RUNTIME_AX_CG_WINDOW_MAPPING.md](./RUNTIME_AX_CG_WINDOW_MAPPING.md)
+- `AX/CG/Space` 窗口映射流程：见 [RUNTIME_AX_CG_SPACE_WINDOW_MAPPING.md](./RUNTIME_AX_CG_SPACE_WINDOW_MAPPING.md)
 - `FlowTab`：应用生命周期、首页、监控页、预览日志页、状态栏菜单
 
 ## 环境要求

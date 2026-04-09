@@ -4,6 +4,22 @@ import Darwin
 import Foundation
 
 enum AXWindowInspector {
+    struct WindowsFetchResult {
+        let windows: [AXUIElement]
+        let error: AXError
+        let rawValueTypeDescription: String
+        let rawArrayCount: Int?
+
+        var logDetails: String {
+            AXWindowInspector.windowsFetchLogDetails(
+                error: error,
+                rawValueTypeDescription: rawValueTypeDescription,
+                rawArrayCount: rawArrayCount,
+                decodedCount: windows.count
+            )
+        }
+    }
+
     private static let windowIDPrefix = "ax"
     private static let exactBridgeSymbolName = "_AXUIElementGetWindow"
     private typealias AXUIElementGetWindowFn = @convention(c) (
@@ -13,18 +29,42 @@ enum AXWindowInspector {
     static var cgWindowIDOverrideForTesting: ((AXUIElement) -> CGWindowID?)?
 
     static func windows(for app: NSRunningApplication) -> [AXUIElement] {
-        guard AccessibilityPermissionChecker.isTrusted() else { return [] }
+        windowsFetchResult(for: app).windows
+    }
+
+    static func windowsFetchResult(for app: NSRunningApplication) -> WindowsFetchResult {
+        guard AccessibilityPermissionChecker.isTrusted() else {
+            return WindowsFetchResult(
+                windows: [],
+                error: .apiDisabled,
+                rawValueTypeDescription: "nil",
+                rawArrayCount: nil
+            )
+        }
 
         let appElement = AXUIElementCreateApplication(app.processIdentifier)
         var windowsValue: CFTypeRef?
-        guard
-            AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsValue)
-                == .success,
-            let windows = windowsValue as? [AXUIElement]
-        else {
-            return []
+        let error = AXUIElementCopyAttributeValue(
+            appElement,
+            kAXWindowsAttribute as CFString,
+            &windowsValue
+        )
+        let rawValueTypeDescription = cfTypeDescription(for: windowsValue)
+        let rawArrayCount = rawArrayCount(from: windowsValue)
+        guard error == .success, let windows = windowsValue as? [AXUIElement] else {
+            return WindowsFetchResult(
+                windows: [],
+                error: error,
+                rawValueTypeDescription: rawValueTypeDescription,
+                rawArrayCount: rawArrayCount
+            )
         }
-        return windows
+        return WindowsFetchResult(
+            windows: windows,
+            error: error,
+            rawValueTypeDescription: rawValueTypeDescription,
+            rawArrayCount: rawArrayCount
+        )
     }
 
     static func makeWindowID(pid: pid_t, index: Int) -> String {
@@ -135,6 +175,16 @@ enum AXWindowInspector {
         return number.boolValue
     }
 
+    static func windowsFetchLogDetails(
+        error: AXError,
+        rawValueTypeDescription: String,
+        rawArrayCount: Int?,
+        decodedCount: Int
+    ) -> String {
+        let rawArrayCountDescription = rawArrayCount.map(String.init) ?? "nil"
+        return "fetchError=\(error.rawValue) rawValueType=\(rawValueTypeDescription) rawArrayCount=\(rawArrayCountDescription) decodedCount=\(decodedCount)"
+    }
+
     private static func pointValue(for window: AXUIElement, attribute: CFString) -> CGPoint? {
         var value: CFTypeRef?
         guard
@@ -216,6 +266,38 @@ enum AXWindowInspector {
         return score
     }
 
+    private static func rawArrayCount(from rawValue: CFTypeRef?) -> Int? {
+        guard let rawValue else { return nil }
+        guard CFGetTypeID(rawValue) == CFArrayGetTypeID() else { return nil }
+        let array = unsafeBitCast(rawValue, to: CFArray.self)
+        return CFArrayGetCount(array)
+    }
+
+    private static func cfTypeDescription(for rawValue: CFTypeRef?) -> String {
+        guard let rawValue else { return "nil" }
+        let typeID = CFGetTypeID(rawValue)
+        switch typeID {
+        case CFArrayGetTypeID():
+            return "CFArray"
+        case AXUIElementGetTypeID():
+            return "AXUIElement"
+        case AXValueGetTypeID():
+            return "AXValue"
+        case CFStringGetTypeID():
+            return "CFString"
+        case CFAttributedStringGetTypeID():
+            return "CFAttributedString"
+        case CFDictionaryGetTypeID():
+            return "CFDictionary"
+        case CFBooleanGetTypeID():
+            return "CFBoolean"
+        case CFNumberGetTypeID():
+            return "CFNumber"
+        default:
+            return "typeID=\(typeID)"
+        }
+    }
+
     private static let exactBridgeFunction: AXUIElementGetWindowFn? = {
         let candidateHandles = [
             UnsafeMutableRawPointer(bitPattern: -2),
@@ -276,5 +358,19 @@ enum AXWindowInspectorForTesting {
 
     static func isMinimized(_ window: AXUIElement) -> Bool {
         AXWindowInspector.isMinimized(window)
+    }
+
+    static func windowsFetchLogDetails(
+        error: AXError,
+        rawValueTypeDescription: String,
+        rawArrayCount: Int?,
+        decodedCount: Int
+    ) -> String {
+        AXWindowInspector.windowsFetchLogDetails(
+            error: error,
+            rawValueTypeDescription: rawValueTypeDescription,
+            rawArrayCount: rawArrayCount,
+            decodedCount: decodedCount
+        )
     }
 }

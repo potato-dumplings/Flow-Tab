@@ -246,7 +246,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(mergedEntries[3].title, "Google Chrome")
     }
 
-    func testRuntimeSnapshotProviderWindowListDropsEntriesWithoutBindingOrExactBridge() {
+    func testRuntimeSnapshotProviderWindowListKeepsUnmatchedCGEntriesWithoutBindingOrExactBridge() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
             axWindows: [
@@ -283,11 +283,14 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertEqual(
             mergedEntries.map(\.windowID),
-            ["cg:18405:240001"]
+            ["cg:18405:240001", "cg:18405:243747"]
         )
         XCTAssertEqual(mergedEntries.first?.cgWindowID, 240_001)
         XCTAssertEqual(mergedEntries.first?.title, "Google 搜索 - Google Chrome - test1")
         XCTAssertEqual(mergedEntries.first?.lastConfirmationSource, .publicExactMatch)
+        XCTAssertEqual(mergedEntries.last?.cgWindowID, 243_747)
+        XCTAssertEqual(mergedEntries.last?.title, "Recovered Tab")
+        XCTAssertNil(mergedEntries.last?.lastConfirmationSource)
     }
 
     func testRuntimeSnapshotProviderWindowListUsesPrivateExactBridgeWhenPublicSignalsRemainAmbiguous() {
@@ -332,7 +335,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(mergedEntries.allSatisfy { $0.lastConfirmationSource == .privateExactBridge })
     }
 
-    func testRuntimeSnapshotProviderWindowListDropsNewCGEntriesAfterAXDisappearsWithoutStickyBinding() {
+    func testRuntimeSnapshotProviderWindowListKeepsNewCGEntriesAfterAXDisappearsWithoutStickyBinding() {
         let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
             axWindows: [],
             cgWindows: [
@@ -350,7 +353,63 @@ extension FlowTabPriorityCoverageTests {
             appName: "Google Chrome"
         )
 
-        XCTAssertTrue(mergedEntries.isEmpty)
+        XCTAssertEqual(mergedEntries.map(\.windowID), ["cg:18405:243747"])
+        XCTAssertEqual(mergedEntries.first?.title, "Recovered Window")
+        XCTAssertEqual(mergedEntries.first?.cgWindowID, 243_747)
+        XCTAssertNil(mergedEntries.first?.lastConfirmationSource)
+    }
+
+    func testRuntimeSnapshotProviderWindowListDeduplicatesUnmatchedAXEntriesSharingSameSpaceBinding() {
+        let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+            axWindows: [],
+            cgWindows: [
+                .init(
+                    id: 288_544,
+                    title: "Google Chrome",
+                    bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
+                    isOnscreen: false,
+                    spaceIDs: [11_679]
+                ),
+                .init(
+                    id: 258_323,
+                    title: "Google Chrome",
+                    bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
+                    isOnscreen: false,
+                    spaceIDs: [11_679]
+                )
+            ],
+            pid: 18405,
+            appName: "Google Chrome"
+        )
+
+        XCTAssertEqual(mergedEntries.map(\.windowID), ["cg:18405:288544"])
+        XCTAssertEqual(mergedEntries.first?.cgWindowID, 288_544)
+    }
+
+    func testRuntimeSnapshotProviderWindowListKeepsUnmatchedAXEntriesWhenSpaceBindingDiffers() {
+        let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+            axWindows: [],
+            cgWindows: [
+                .init(
+                    id: 288_544,
+                    title: "Google Chrome",
+                    bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
+                    isOnscreen: false,
+                    spaceIDs: [11_679]
+                ),
+                .init(
+                    id: 258_323,
+                    title: "Google Chrome",
+                    bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
+                    isOnscreen: false,
+                    spaceIDs: [11_680]
+                )
+            ],
+            pid: 18405,
+            appName: "Google Chrome"
+        )
+
+        XCTAssertEqual(mergedEntries.map(\.windowID), ["cg:18405:288544", "cg:18405:258323"])
     }
 
     func testRuntimeSnapshotProviderWindowListKeepsStickyCGEntriesWhenCurrentAXHandleIsMissing() {
@@ -901,6 +960,34 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
         XCTAssertEqual(fallbackTitle, "Google Chrome")
+    }
+
+    func testAXWindowInspectorWindowsFetchLogDetailsIncludesErrorTypeAndCounts() {
+        let details = AXWindowInspectorForTesting.windowsFetchLogDetails(
+            error: .cannotComplete,
+            rawValueTypeDescription: "CFArray",
+            rawArrayCount: 5,
+            decodedCount: 0
+        )
+
+        XCTAssertEqual(
+            details,
+            "fetchError=-25204 rawValueType=CFArray rawArrayCount=5 decodedCount=0"
+        )
+    }
+
+    func testAXWindowInspectorWindowsFetchLogDetailsUsesNilRawArrayCountWhenMissing() {
+        let details = AXWindowInspectorForTesting.windowsFetchLogDetails(
+            error: .success,
+            rawValueTypeDescription: "nil",
+            rawArrayCount: nil,
+            decodedCount: 0
+        )
+
+        XCTAssertEqual(
+            details,
+            "fetchError=0 rawValueType=nil rawArrayCount=nil decodedCount=0"
+        )
     }
 
     func testRuntimeWindowPreviewProviderPreferredCaptureSourceSizeUsesContentRectPixelScale() {

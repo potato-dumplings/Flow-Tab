@@ -73,7 +73,8 @@ extension RuntimeSnapshotProvider {
                     bounds: $0.bounds,
                     isOnscreen: $0.isOnscreen,
                     alpha: $0.alpha,
-                    storeType: $0.storeType
+                    storeType: $0.storeType,
+                    spaceIDs: $0.spaceIDs
                 )
             }
         ).map(\.id)
@@ -103,7 +104,8 @@ extension RuntimeSnapshotProvider {
                 bounds: cgWindow.bounds,
                 isOnscreen: cgWindow.isOnscreen,
                 alpha: cgWindow.alpha,
-                storeType: cgWindow.storeType
+                storeType: cgWindow.storeType,
+                spaceIDs: cgWindow.spaceIDs
             )
         )
     }
@@ -162,7 +164,8 @@ extension RuntimeSnapshotProvider {
                     bounds: $0.bounds,
                     isOnscreen: $0.isOnscreen,
                     alpha: $0.alpha,
-                    storeType: $0.storeType
+                    storeType: $0.storeType,
+                    spaceIDs: $0.spaceIDs
                 )
             },
             matchedCGWindowIDs: matchedCGWindowIDs

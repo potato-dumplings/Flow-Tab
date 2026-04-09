@@ -127,22 +127,27 @@ final class AXLiveWindowRegistry {
         observerContextsByPID.removeValue(forKey: pid)
     }
 
-    private func refreshFromObserver(pid: pid_t) {
+    private func refreshFromObserver(pid: pid_t, notification: CFString) {
         guard let app = NSRunningApplication(processIdentifier: pid) else {
             lock.lock()
             windowsByPID.removeValue(forKey: pid)
             lock.unlock()
             return
         }
-        let windows = AXWindowInspector.windows(for: app)
-        refreshSnapshot(forPID: pid, windows: windows)
+        let fetchResult = AXWindowInspector.windowsFetchResult(for: app)
+        let appName = app.localizedName ?? app.bundleIdentifier ?? "pid:\(pid)"
+        RuntimeLog.info(
+            "AXObserver",
+            "\(appName) pid=\(pid) notification=\(notification) rawWindows=\(fetchResult.windows.count) \(fetchResult.logDetails)"
+        )
+        refreshSnapshot(forPID: pid, windows: fetchResult.windows)
     }
 
-    private static let callback: AXObserverCallback = { _, _, _, refcon in
+    private static let callback: AXObserverCallback = { _, _, notification, refcon in
         guard let refcon else { return }
         let context = Unmanaged<ObserverContext>.fromOpaque(refcon).takeUnretainedValue()
         Task { @MainActor in
-            context.registry?.refreshFromObserver(pid: context.pid)
+            context.registry?.refreshFromObserver(pid: context.pid, notification: notification)
         }
     }
 }

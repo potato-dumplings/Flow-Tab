@@ -51,6 +51,25 @@ final class RuntimeSnapshotProvider {
         let isOnscreen: Bool
         let alpha: Double
         let storeType: Int
+        let spaceIDs: [Int]
+
+        init(
+            id: CGWindowID,
+            title: String?,
+            bounds: CGRect?,
+            isOnscreen: Bool,
+            alpha: Double,
+            storeType: Int,
+            spaceIDs: [Int] = []
+        ) {
+            self.id = id
+            self.title = title
+            self.bounds = bounds
+            self.isOnscreen = isOnscreen
+            self.alpha = alpha
+            self.storeType = storeType
+            self.spaceIDs = spaceIDs
+        }
     }
 
     struct AXWindowEntry {
@@ -334,14 +353,18 @@ final class RuntimeSnapshotProvider {
         var windowsByPID: [pid_t: [WindowListEntry]] = [:]
         for app in runningApps {
             let appName = app.localizedName ?? app.bundleIdentifier ?? "pid:\(app.processIdentifier)"
-            let windows = AXWindowInspector.windows(for: app)
+            let windowsFetchResult = AXWindowInspector.windowsFetchResult(for: app)
+            let windows = windowsFetchResult.windows
             AXLiveWindowRegistry.shared.refreshSnapshot(
                 forPID: app.processIdentifier,
                 windows: windows
             )
             let cgWindows = cgWindowsByPID[app.processIdentifier] ?? []
             let allCGWindows = allCGWindowsByPID[app.processIdentifier] ?? cgWindows
-            RuntimeLog.info("AX", "\(appName) rawWindows=\(windows.count)")
+            RuntimeLog.info(
+                "AX",
+                "\(appName) rawWindows=\(windows.count) \(windowsFetchResult.logDetails)"
+            )
 
             let axEntries = windows.enumerated().compactMap { index, window -> AXWindowEntry? in
                 guard AXWindowInspector.isSwitchable(window) else {
@@ -491,10 +514,12 @@ final class RuntimeSnapshotProvider {
         }
 
         var windowsByPID: [pid_t: [CGWindowEntry]] = [:]
+        var windowIDs: [CGWindowID] = []
         for item in rawList {
             guard let ownerPID = item[kCGWindowOwnerPID as String] as? pid_t else { continue }
             guard let layer = item[kCGWindowLayer as String] as? Int, layer == 0 else { continue }
             guard let windowNumber = item[kCGWindowNumber as String] as? NSNumber else { continue }
+            let cgWindowID = CGWindowID(windowNumber.uint32Value)
             let title = (item[kCGWindowName as String] as? String)?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             let bounds = (item[kCGWindowBounds as String] as? [String: Any])
@@ -504,9 +529,10 @@ final class RuntimeSnapshotProvider {
                 ?? options.contains(.optionOnScreenOnly)
             let alpha = (item[kCGWindowAlpha as String] as? NSNumber)?.doubleValue ?? 1.0
             let storeType = (item[kCGWindowStoreType as String] as? NSNumber)?.intValue ?? 1
+            windowIDs.append(cgWindowID)
             windowsByPID[ownerPID, default: []].append(
                 CGWindowEntry(
-                    id: CGWindowID(windowNumber.uint32Value),
+                    id: cgWindowID,
                     title: title,
                     bounds: bounds,
                     isOnscreen: isOnscreen,
@@ -515,7 +541,25 @@ final class RuntimeSnapshotProvider {
                 )
             )
         }
-        return windowsByPID
+        let spaceIDsByWindowID = RuntimeCGSpaceInspector.spaceIDsByWindowID(windowIDs)
+        guard !spaceIDsByWindowID.isEmpty else { return windowsByPID }
+
+        return Dictionary(uniqueKeysWithValues: windowsByPID.map { pid, windows in
+            (
+                pid,
+                windows.map { window in
+                    CGWindowEntry(
+                        id: window.id,
+                        title: window.title,
+                        bounds: window.bounds,
+                        isOnscreen: window.isOnscreen,
+                        alpha: window.alpha,
+                        storeType: window.storeType,
+                        spaceIDs: spaceIDsByWindowID[window.id] ?? window.spaceIDs
+                    )
+                }
+            )
+        })
     }
 
     static func matchCGWindowAssignments(
@@ -720,6 +764,7 @@ final class RuntimeSnapshotProvider {
         let isOnscreen: Bool
         let alpha: Double
         let storeType: Int
+        let spaceIDs: [Int]
 
         init(
             id: CGWindowID,
@@ -727,7 +772,8 @@ final class RuntimeSnapshotProvider {
             bounds: CGRect?,
             isOnscreen: Bool = true,
             alpha: Double = 1.0,
-            storeType: Int = 1
+            storeType: Int = 1,
+            spaceIDs: [Int] = []
         ) {
             self.id = id
             self.title = title
@@ -735,6 +781,7 @@ final class RuntimeSnapshotProvider {
             self.isOnscreen = isOnscreen
             self.alpha = alpha
             self.storeType = storeType
+            self.spaceIDs = spaceIDs
         }
     }
 
@@ -833,7 +880,8 @@ final class RuntimeSnapshotProvider {
                     bounds: $0.bounds,
                     isOnscreen: $0.isOnscreen,
                     alpha: $0.alpha,
-                    storeType: $0.storeType
+                    storeType: $0.storeType,
+                    spaceIDs: $0.spaceIDs
                 )
             },
             pid: pid,
@@ -914,7 +962,8 @@ final class RuntimeSnapshotProvider {
                     bounds: $0.bounds,
                     isOnscreen: $0.isOnscreen,
                     alpha: $0.alpha,
-                    storeType: $0.storeType
+                    storeType: $0.storeType,
+                    spaceIDs: $0.spaceIDs
                 )
             },
             pid: pid,
