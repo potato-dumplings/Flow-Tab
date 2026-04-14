@@ -28,6 +28,20 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
+               BlueprintIdentifier = "F50002012F90000100B0D737"
+               BuildableName = "FlowTabSpaceFixture.app"
+               BlueprintName = "FlowTabSpaceFixture"
+               ReferencedContainer = "container:FlowTab.xcodeproj">
+            </BuildableReference>
+         </BuildActionEntry>
+         <BuildActionEntry
+            buildForTesting = "YES"
+            buildForRunning = "NO"
+            buildForProfiling = "NO"
+            buildForArchiving = "NO"
+            buildForAnalyzing = "YES">
+            <BuildableReference
+               BuildableIdentifier = "primary"
                BlueprintIdentifier = "4A6DAE7A2F727AF600B0D737"
                BuildableName = "FlowTabTests.xctest"
                BlueprintName = "FlowTabTests"

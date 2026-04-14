@@ -93,6 +93,21 @@
 		B10012022F76000100B0D737 /* FlowTabUITests+Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002022F76000100B0D737 /* FlowTabUITests+Settings.swift */; };
 		B10012032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift */; };
 		B10012042F76000100B0D737 /* FlowTabUITests+Support.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002042F76000100B0D737 /* FlowTabUITests+Support.swift */; };
+		F50001012F90000100B0D737 /* FlowTabSpaceFixtureApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000022F90000100B0D737 /* FlowTabSpaceFixtureApp.swift */; };
+		F50001022F90000100B0D737 /* SpaceFixtureAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000032F90000100B0D737 /* SpaceFixtureAppDelegate.swift */; };
+		F50001032F90000100B0D737 /* SpaceFixtureLaunchConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000042F90000100B0D737 /* SpaceFixtureLaunchConfiguration.swift */; };
+		F50001042F90000100B0D737 /* SpaceFixtureWindowPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000052F90000100B0D737 /* SpaceFixtureWindowPlan.swift */; };
+		F50001052F90000100B0D737 /* SpaceFixtureWindowCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000062F90000100B0D737 /* SpaceFixtureWindowCoordinator.swift */; };
+		F50001062F90000100B0D737 /* AppKitSpaceFixtureWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000072F90000100B0D737 /* AppKitSpaceFixtureWindow.swift */; };
+		F50001072F90000100B0D737 /* SpaceFixtureWindowContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000082F90000100B0D737 /* SpaceFixtureWindowContentView.swift */; };
+		F50001082F90000100B0D737 /* SpaceFixtureLaunchConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000042F90000100B0D737 /* SpaceFixtureLaunchConfiguration.swift */; };
+		F50001092F90000100B0D737 /* SpaceFixtureWindowPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000052F90000100B0D737 /* SpaceFixtureWindowPlan.swift */; };
+		F500010A2F90000100B0D737 /* SpaceFixtureWindowCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000062F90000100B0D737 /* SpaceFixtureWindowCoordinator.swift */; };
+		F500010B2F90000100B0D737 /* FlowTabTests+SpaceFixtureLaunchConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000092F90000100B0D737 /* FlowTabTests+SpaceFixtureLaunchConfiguration.swift */; };
+		F500010C2F90000100B0D737 /* FlowTabTests+SpaceFixtureWindowCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F500000A2F90000100B0D737 /* FlowTabTests+SpaceFixtureWindowCoordinator.swift */; };
+		F500010D2F90000100B0D737 /* FlowTabUITests+SpaceFixtureApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F500000B2F90000100B0D737 /* FlowTabUITests+SpaceFixtureApp.swift */; };
+		F500010E2F90000100B0D737 /* AppKitSpaceFixtureWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000072F90000100B0D737 /* AppKitSpaceFixtureWindow.swift */; };
+		F500010F2F90000100B0D737 /* SpaceFixtureWindowContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000082F90000100B0D737 /* SpaceFixtureWindowContentView.swift */; };
 		4A6DAE9D2F727C0900B0D737 /* FlowTabCore in Frameworks */ = {isa = PBXBuildFile; productRef = 4A6DAE9C2F727C0900B0D737 /* FlowTabCore */; };
 /* End PBXBuildFile section */
 
@@ -204,6 +219,17 @@
 		B10002022F76000100B0D737 /* FlowTabUITests+Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+Settings.swift"; sourceTree = "<group>"; };
 		B10002032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SwitcherAndSearch.swift"; sourceTree = "<group>"; };
 		B10002042F76000100B0D737 /* FlowTabUITests+Support.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+Support.swift"; sourceTree = "<group>"; };
+		F50000012F90000100B0D737 /* FlowTabSpaceFixture.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FlowTabSpaceFixture.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F50000022F90000100B0D737 /* FlowTabSpaceFixtureApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTabSpaceFixtureApp.swift; sourceTree = "<group>"; };
+		F50000032F90000100B0D737 /* SpaceFixtureAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceFixtureAppDelegate.swift; sourceTree = "<group>"; };
+		F50000042F90000100B0D737 /* SpaceFixtureLaunchConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceFixtureLaunchConfiguration.swift; sourceTree = "<group>"; };
+		F50000052F90000100B0D737 /* SpaceFixtureWindowPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceFixtureWindowPlan.swift; sourceTree = "<group>"; };
+		F50000062F90000100B0D737 /* SpaceFixtureWindowCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceFixtureWindowCoordinator.swift; sourceTree = "<group>"; };
+		F50000072F90000100B0D737 /* AppKitSpaceFixtureWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitSpaceFixtureWindow.swift; sourceTree = "<group>"; };
+		F50000082F90000100B0D737 /* SpaceFixtureWindowContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceFixtureWindowContentView.swift; sourceTree = "<group>"; };
+		F50000092F90000100B0D737 /* FlowTabTests+SpaceFixtureLaunchConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+SpaceFixtureLaunchConfiguration.swift"; sourceTree = "<group>"; };
+		F500000A2F90000100B0D737 /* FlowTabTests+SpaceFixtureWindowCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+SpaceFixtureWindowCoordinator.swift"; sourceTree = "<group>"; };
+		F500000B2F90000100B0D737 /* FlowTabUITests+SpaceFixtureApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureApp.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -229,6 +255,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		F50002032F90000100B0D737 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -238,6 +271,7 @@
 				4A6DAE6C2F727AF500B0D737 /* FlowTab */,
 				4A6DAE7E2F727AF600B0D737 /* FlowTabTests */,
 				4A6DAE882F727AF600B0D737 /* FlowTabUITests */,
+				F50000112F90000100B0D737 /* FlowTabSpaceFixture */,
 				4A6DAE6B2F727AF500B0D737 /* Products */,
 				4A6DAE992F727BEA00B0D737 /* Frameworks */,
 			);
@@ -249,6 +283,7 @@
 					4A6DAE6A2F727AF500B0D737 /* Flow Tab.app */,
 				4A6DAE7B2F727AF600B0D737 /* FlowTabTests.xctest */,
 				4A6DAE852F727AF600B0D737 /* FlowTabUITests.xctest */,
+				F50000012F90000100B0D737 /* FlowTabSpaceFixture.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -464,6 +499,8 @@
 				B100010D2F76000100B0D737 /* FlowTabPriorityCoverageTests+Support.swift */,
 				B100010E2F76000100B0D737 /* FlowTabPriorityCoverageTests+TestDoubles.swift */,
 				B100010F2F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeActivationRecovery.swift */,
+				F50000092F90000100B0D737 /* FlowTabTests+SpaceFixtureLaunchConfiguration.swift */,
+				F500000A2F90000100B0D737 /* FlowTabTests+SpaceFixtureWindowCoordinator.swift */,
 			);
 			path = FlowTabTests;
 			sourceTree = "<group>";
@@ -476,9 +513,24 @@
 				B10002022F76000100B0D737 /* FlowTabUITests+Settings.swift */,
 				B10002032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift */,
 				B10002042F76000100B0D737 /* FlowTabUITests+Support.swift */,
+				F500000B2F90000100B0D737 /* FlowTabUITests+SpaceFixtureApp.swift */,
 				4A6DAE8B2F727AF600B0D737 /* FlowTabUITestsLaunchTests.swift */,
 			);
 			path = FlowTabUITests;
+			sourceTree = "<group>";
+		};
+		F50000112F90000100B0D737 /* FlowTabSpaceFixture */ = {
+			isa = PBXGroup;
+			children = (
+				F50000022F90000100B0D737 /* FlowTabSpaceFixtureApp.swift */,
+				F50000032F90000100B0D737 /* SpaceFixtureAppDelegate.swift */,
+				F50000042F90000100B0D737 /* SpaceFixtureLaunchConfiguration.swift */,
+				F50000052F90000100B0D737 /* SpaceFixtureWindowPlan.swift */,
+				F50000062F90000100B0D737 /* SpaceFixtureWindowCoordinator.swift */,
+				F50000072F90000100B0D737 /* AppKitSpaceFixtureWindow.swift */,
+				F50000082F90000100B0D737 /* SpaceFixtureWindowContentView.swift */,
+			);
+			path = FlowTabSpaceFixture;
 			sourceTree = "<group>";
 		};
 		4A6DAE992F727BEA00B0D737 /* Frameworks */ = {
@@ -547,6 +599,23 @@
 			productReference = 4A6DAE852F727AF600B0D737 /* FlowTabUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		F50002012F90000100B0D737 /* FlowTabSpaceFixture */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F50003032F90000100B0D737 /* Build configuration list for PBXNativeTarget "FlowTabSpaceFixture" */;
+			buildPhases = (
+				F50002022F90000100B0D737 /* Sources */,
+				F50002032F90000100B0D737 /* Frameworks */,
+				F50002042F90000100B0D737 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = FlowTabSpaceFixture;
+			productName = FlowTabSpaceFixture;
+			productReference = F50000012F90000100B0D737 /* FlowTabSpaceFixture.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -567,6 +636,9 @@
 					4A6DAE842F727AF600B0D737 = {
 						CreatedOnToolsVersion = 15.4;
 						TestTargetID = 4A6DAE692F727AF500B0D737;
+					};
+					F50002012F90000100B0D737 = {
+						CreatedOnToolsVersion = 15.4;
 					};
 				};
 			};
@@ -589,6 +661,7 @@
 				4A6DAE692F727AF500B0D737 /* FlowTab */,
 				4A6DAE7A2F727AF600B0D737 /* FlowTabTests */,
 				4A6DAE842F727AF600B0D737 /* FlowTabUITests */,
+				F50002012F90000100B0D737 /* FlowTabSpaceFixture */,
 			);
 		};
 /* End PBXProject section */
@@ -611,6 +684,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		4A6DAE832F727AF600B0D737 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F50002042F90000100B0D737 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -709,6 +789,13 @@
 				B100110D2F76000100B0D737 /* FlowTabPriorityCoverageTests+Support.swift in Sources */,
 				B100110E2F76000100B0D737 /* FlowTabPriorityCoverageTests+TestDoubles.swift in Sources */,
 				B100110F2F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeActivationRecovery.swift in Sources */,
+				F50001082F90000100B0D737 /* SpaceFixtureLaunchConfiguration.swift in Sources */,
+				F50001092F90000100B0D737 /* SpaceFixtureWindowPlan.swift in Sources */,
+				F500010A2F90000100B0D737 /* SpaceFixtureWindowCoordinator.swift in Sources */,
+				F500010E2F90000100B0D737 /* AppKitSpaceFixtureWindow.swift in Sources */,
+				F500010F2F90000100B0D737 /* SpaceFixtureWindowContentView.swift in Sources */,
+				F500010B2F90000100B0D737 /* FlowTabTests+SpaceFixtureLaunchConfiguration.swift in Sources */,
+				F500010C2F90000100B0D737 /* FlowTabTests+SpaceFixtureWindowCoordinator.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -722,6 +809,21 @@
 				B10012022F76000100B0D737 /* FlowTabUITests+Settings.swift in Sources */,
 				B10012032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift in Sources */,
 				B10012042F76000100B0D737 /* FlowTabUITests+Support.swift in Sources */,
+				F500010D2F90000100B0D737 /* FlowTabUITests+SpaceFixtureApp.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F50002022F90000100B0D737 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F50001012F90000100B0D737 /* FlowTabSpaceFixtureApp.swift in Sources */,
+				F50001022F90000100B0D737 /* SpaceFixtureAppDelegate.swift in Sources */,
+				F50001032F90000100B0D737 /* SpaceFixtureLaunchConfiguration.swift in Sources */,
+				F50001042F90000100B0D737 /* SpaceFixtureWindowPlan.swift in Sources */,
+				F50001052F90000100B0D737 /* SpaceFixtureWindowCoordinator.swift in Sources */,
+				F50001062F90000100B0D737 /* AppKitSpaceFixtureWindow.swift in Sources */,
+				F50001072F90000100B0D737 /* SpaceFixtureWindowContentView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -983,6 +1085,52 @@
 			};
 			name = Release;
 		};
+		F50003012F90000100B0D737 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				EXECUTABLE_NAME = FlowTabSpaceFixture;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "FlowTab Space Fixture";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.potato-dumplings.flowtab.spacefixture;
+				PRODUCT_MODULE_NAME = FlowTabSpaceFixture;
+				PRODUCT_NAME = FlowTabSpaceFixture;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		F50003022F90000100B0D737 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				EXECUTABLE_NAME = FlowTabSpaceFixture;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "FlowTab Space Fixture";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.potato-dumplings.flowtab.spacefixture;
+				PRODUCT_MODULE_NAME = FlowTabSpaceFixture;
+				PRODUCT_NAME = FlowTabSpaceFixture;
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1018,6 +1166,15 @@
 			buildConfigurations = (
 				4A6DAE962F727AF600B0D737 /* Debug */,
 				4A6DAE972F727AF600B0D737 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F50003032F90000100B0D737 /* Build configuration list for PBXNativeTarget "FlowTabSpaceFixture" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F50003012F90000100B0D737 /* Debug */,
+				F50003022F90000100B0D737 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
