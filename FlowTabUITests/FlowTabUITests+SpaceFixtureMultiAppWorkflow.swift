@@ -12,6 +12,13 @@ private enum SpaceFixtureMultiAppWorkflowDefaults {
             .appendingPathComponent("space-fixture-home-multi-app-workflow.json")
     }
 
+    static var fullscreenOnlyWorkflowSourceURL: URL {
+        repositoryRootURL
+            .appendingPathComponent("docs", isDirectory: true)
+            .appendingPathComponent("fixtures", isDirectory: true)
+            .appendingPathComponent("space-fixture-home-fullscreen-only-workflow.json")
+    }
+
     static var defaultResolvedWorkflowURL: URL {
         repositoryRootURL
             .appendingPathComponent(".build-local", isDirectory: true)
@@ -36,6 +43,8 @@ private enum SpaceFixtureMultiAppWorkflowError: LocalizedError, Equatable {
     case workflowAppMissingBundleIdentifier(String)
     case workflowAppMissingPath(String)
     case workflowAppPathNotFound(String, String)
+    case workflowScenarioMissingAppVariant(String, String)
+    case workflowScenarioBundleIdentifierMismatch(String, String, String)
 
     var errorDescription: String? {
         switch self {
@@ -55,6 +64,13 @@ private enum SpaceFixtureMultiAppWorkflowError: LocalizedError, Equatable {
             return "Workflow app \(appID) does not define an appPath."
         case let .workflowAppPathNotFound(appID, path):
             return "Workflow app \(appID) references a missing app bundle: \(path)"
+        case let .workflowScenarioMissingAppVariant(appID, workflowName):
+            return "Workflow scenario \(workflowName) could not find a built fixture app for \(appID)."
+        case let .workflowScenarioBundleIdentifierMismatch(appID, expectedBundleIdentifier, actualBundleIdentifier):
+            return """
+            Workflow scenario \(appID) expects bundle identifier \(expectedBundleIdentifier), \
+            but the installed fixture app uses \(actualBundleIdentifier).
+            """
         }
     }
 }
@@ -170,7 +186,7 @@ private struct SpaceFixtureResolvedWorkflow: Equatable {
     }
 }
 
-private struct SpaceFixtureResolvedWorkflowDocument: Decodable {
+private struct SpaceFixtureResolvedWorkflowDocument: Codable {
     let workflowName: String
     let settleTimeoutMilliseconds: Int?
     let apps: [SpaceFixtureResolvedWorkflowAppDocument]
@@ -182,7 +198,7 @@ private struct SpaceFixtureResolvedWorkflowDocument: Decodable {
     }
 }
 
-private struct SpaceFixtureResolvedWorkflowAppDocument: Decodable {
+private struct SpaceFixtureResolvedWorkflowAppDocument: Codable {
     let appID: String
     let appName: String
     let bundleIdentifier: String
@@ -200,12 +216,12 @@ private struct SpaceFixtureResolvedWorkflowAppDocument: Decodable {
     }
 }
 
-private enum SpaceFixtureResolvedWorkflowWindowMode: String, Decodable {
+private enum SpaceFixtureResolvedWorkflowWindowMode: String, Codable {
     case standard
     case fullscreen
 }
 
-private struct SpaceFixtureResolvedWorkflowWindowDocument: Decodable {
+private struct SpaceFixtureResolvedWorkflowWindowDocument: Codable {
     let title: String
     let mode: SpaceFixtureResolvedWorkflowWindowMode
     let tabs: [SpaceFixtureResolvedWorkflowTabDocument]
@@ -221,13 +237,30 @@ private struct SpaceFixtureResolvedWorkflowWindowDocument: Decodable {
     }
 }
 
-private struct SpaceFixtureResolvedWorkflowTabDocument: Decodable {
+private struct SpaceFixtureResolvedWorkflowTabDocument: Codable {
     let title: String
     let isSelected: Bool
 
     var trimmedTitle: String {
         title.trimmingCharacters(in: .whitespacesAndNewlines)
     }
+}
+
+private extension SpaceFixtureResolvedWorkflow {
+    var allExpectedWindowTitles: [String] {
+        apps.flatMap(\.expectedWindowTitles)
+    }
+
+    var hasUniqueExpectedWindowTitles: Bool {
+        Set(allExpectedWindowTitles).count == allExpectedWindowTitles.count
+    }
+
+    func otherExpectedWindowTitles(excluding appID: String) -> [String] {
+        apps
+            .filter { $0.appID != appID }
+            .flatMap(\.expectedWindowTitles)
+    }
+
 }
 
 extension FlowTabUITests {
@@ -311,6 +344,192 @@ extension FlowTabUITests {
         XCTAssertEqual(workflow.settleTimeout, 8.5)
     }
 
+    func testSpaceFixtureResolvedWorkflowResolvesScenarioUsingInstalledWorkflowAppVariants() throws {
+        let tempRootURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: tempRootURL, withIntermediateDirectories: true)
+        addTeardownBlock {
+            try? FileManager.default.removeItem(at: tempRootURL)
+        }
+
+        let finderAppURL = try makeTemporarySpaceFixtureAppBundle(
+            named: "Finder Fixture.app",
+            in: tempRootURL
+        )
+        let chromeAppURL = try makeTemporarySpaceFixtureAppBundle(
+            named: "Chrome Fixture.app",
+            in: tempRootURL
+        )
+
+        let installedWorkflow = SpaceFixtureResolvedWorkflow(
+            workflowName: "installed-variants",
+            workflowURL: tempRootURL.appendingPathComponent("resolved-workflow.json"),
+            settleTimeout: 8,
+            apps: [
+                .init(
+                    appID: "finder",
+                    appName: "Finder Fixture",
+                    identity: SpaceFixtureAppIdentity(
+                        bundleIdentifier: "com.example.fixture.finder",
+                        appURL: finderAppURL
+                    ),
+                    launchOrder: 1,
+                    windowCount: 1,
+                    expectedWindowTitles: ["Finder Main"],
+                    fullscreenWindowIndex: nil
+                ),
+                .init(
+                    appID: "chrome",
+                    appName: "Chrome Fixture",
+                    identity: SpaceFixtureAppIdentity(
+                        bundleIdentifier: "com.example.fixture.chrome",
+                        appURL: chromeAppURL
+                    ),
+                    launchOrder: 2,
+                    windowCount: 1,
+                    expectedWindowTitles: ["Review"],
+                    fullscreenWindowIndex: 1
+                )
+            ]
+        )
+
+        let sourceWorkflowURL = try makeSpaceFixtureWorkflowFile(
+            """
+            {
+              "workflowName": "multi-app-home-fullscreen-only",
+              "settleTimeoutMs": 8000,
+              "apps": [
+                {
+                  "appID": "finder",
+                  "appName": "Finder Fixture",
+                  "bundleId": "com.example.fixture.finder",
+                  "launchOrder": 1,
+                  "windows": [
+                    {
+                      "title": "Finder Main",
+                      "mode": "standard",
+                      "tabs": []
+                    }
+                  ]
+                },
+                {
+                  "appID": "chrome",
+                  "appName": "Chrome Fixture",
+                  "bundleId": "com.example.fixture.chrome",
+                  "launchOrder": 2,
+                  "windows": [
+                    {
+                      "title": "Chrome Fullscreen",
+                      "mode": "fullscreen",
+                      "tabs": [
+                        { "title": "Review", "isSelected": true }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+            """
+        )
+
+        let workflow = try resolveSpaceFixtureWorkflowScenario(
+            sourceWorkflowURL: sourceWorkflowURL,
+            using: installedWorkflow
+        )
+
+        XCTAssertEqual(workflow.workflowName, "multi-app-home-fullscreen-only")
+        XCTAssertEqual(workflow.apps.map(\.appID), ["finder", "chrome"])
+        XCTAssertEqual(workflow.apps[0].identity.appURL, finderAppURL.standardizedFileURL)
+        XCTAssertEqual(workflow.apps[1].identity.appURL, chromeAppURL.standardizedFileURL)
+        XCTAssertEqual(workflow.apps[1].expectedWindowTitles, ["Review"])
+        XCTAssertEqual(workflow.apps[1].fullscreenWindowIndex, 1)
+    }
+
+    func testSpaceFixtureResolvedWorkflowComputesPerAppExcludedTitlesForHomeIsolation() {
+        let workflow = SpaceFixtureResolvedWorkflow(
+            workflowName: "multi-app-home-isolation",
+            workflowURL: URL(fileURLWithPath: "/tmp/resolved-workflow.json"),
+            settleTimeout: 8,
+            apps: [
+                .init(
+                    appID: "finder",
+                    appName: "Finder Fixture",
+                    identity: SpaceFixtureAppIdentity(bundleIdentifier: "com.example.fixture.finder", appURL: nil),
+                    launchOrder: 1,
+                    windowCount: 1,
+                    expectedWindowTitles: ["Finder Main"],
+                    fullscreenWindowIndex: nil
+                ),
+                .init(
+                    appID: "chrome",
+                    appName: "Chrome Fixture",
+                    identity: SpaceFixtureAppIdentity(bundleIdentifier: "com.example.fixture.chrome", appURL: nil),
+                    launchOrder: 2,
+                    windowCount: 3,
+                    expectedWindowTitles: ["Docs", "Mail", "Review"],
+                    fullscreenWindowIndex: 3
+                ),
+                .init(
+                    appID: "notes",
+                    appName: "Notes Fixture",
+                    identity: SpaceFixtureAppIdentity(bundleIdentifier: "com.example.fixture.notes", appURL: nil),
+                    launchOrder: 3,
+                    windowCount: 1,
+                    expectedWindowTitles: ["Notes Inbox"],
+                    fullscreenWindowIndex: nil
+                )
+            ]
+        )
+
+        XCTAssertTrue(workflow.hasUniqueExpectedWindowTitles)
+        XCTAssertEqual(
+            Set(workflow.otherExpectedWindowTitles(excluding: "chrome")),
+            Set(["Finder Main", "Notes Inbox"])
+        )
+        XCTAssertEqual(
+            Set(workflow.otherExpectedWindowTitles(excluding: "finder")),
+            Set(["Docs", "Mail", "Review", "Notes Inbox"])
+        )
+    }
+
+    func testHomePageShowsFullscreenOnlyWorkflowAppAndResolvedWindowTitle() throws {
+        let workflow: SpaceFixtureResolvedWorkflow
+        do {
+            workflow = try configuredFullscreenOnlySpaceFixtureWorkflow()
+        } catch let error as SpaceFixtureMultiAppWorkflowError {
+            switch error {
+            case .missingWorkflowPath, .workflowScenarioMissingAppVariant, .workflowScenarioBundleIdentifierMismatch:
+                throw XCTSkip(
+                    multiAppWorkflowSetupMessage(
+                        reason: error.localizedDescription,
+                        scenarioSourceURL: SpaceFixtureMultiAppWorkflowDefaults.fullscreenOnlyWorkflowSourceURL
+                    )
+                )
+            default:
+                XCTFail(error.localizedDescription)
+                return
+            }
+        } catch {
+            XCTFail(error.localizedDescription)
+            return
+        }
+
+        try validateMultiAppHomeFullscreenOnlyWorkflow(workflow)
+
+        try runRealSpaceFixtureWorkflow(workflow) { workflow, app in
+            try assertHomePageShowsOnlySelectedWorkflowAppTitles(
+                workflow,
+                in: app,
+                setupMessage: { reason in
+                    self.multiAppWorkflowSetupMessage(
+                        reason: reason,
+                        scenarioSourceURL: SpaceFixtureMultiAppWorkflowDefaults.fullscreenOnlyWorkflowSourceURL
+                    )
+                }
+            )
+        }
+    }
+
     func testHomePageShowsMultipleRealSpaceFixtureWorkflowAppsAndWindowCounts() throws {
         try runRealSpaceFixtureMultiAppWorkflow { workflow, app in
             XCTAssertTrue(
@@ -330,6 +549,18 @@ extension FlowTabUITests {
         }
     }
 
+    func testHomePageSelectingWorkflowAppShowsOnlyThatAppsResolvedWindowTitles() throws {
+        try runRealSpaceFixtureMultiAppWorkflow { workflow, app in
+            try assertHomePageShowsOnlySelectedWorkflowAppTitles(
+                workflow,
+                in: app,
+                setupMessage: { reason in
+                    self.multiAppWorkflowSetupMessage(reason: reason)
+                }
+            )
+        }
+    }
+
     func terminateConfiguredSpaceFixtureWorkflowAppsIfRunning() {
         guard let workflow = try? SpaceFixtureResolvedWorkflow.configured() else { return }
         terminateSpaceFixtureWorkflowAppsIfRunning(workflow.apps.map(\.identity))
@@ -337,7 +568,7 @@ extension FlowTabUITests {
 
     private func runRealSpaceFixtureMultiAppWorkflow(
         flowTabAdditionalArguments: [String] = [],
-        perform assertions: (SpaceFixtureResolvedWorkflow, XCUIApplication) -> Void
+        perform assertions: (SpaceFixtureResolvedWorkflow, XCUIApplication) throws -> Void
     ) throws {
         let workflow: SpaceFixtureResolvedWorkflow
         do {
@@ -354,6 +585,18 @@ extension FlowTabUITests {
         }
 
         try validateMultiAppHomeWindowCountWorkflow(workflow)
+        try runRealSpaceFixtureWorkflow(
+            workflow,
+            flowTabAdditionalArguments: flowTabAdditionalArguments,
+            perform: assertions
+        )
+    }
+
+    private func runRealSpaceFixtureWorkflow(
+        _ workflow: SpaceFixtureResolvedWorkflow,
+        flowTabAdditionalArguments: [String] = [],
+        perform assertions: (SpaceFixtureResolvedWorkflow, XCUIApplication) throws -> Void
+    ) throws {
         terminateSpaceFixtureWorkflowAppsIfRunning(workflow.apps.map(\.identity))
         let fixtureApps = launchResolvedSpaceFixtureWorkflow(workflow)
         defer {
@@ -371,7 +614,77 @@ extension FlowTabUITests {
         }
 
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 12))
-        assertions(workflow, app)
+        try assertions(workflow, app)
+    }
+
+    private func configuredFullscreenOnlySpaceFixtureWorkflow(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) throws -> SpaceFixtureResolvedWorkflow {
+        let installedWorkflow = try SpaceFixtureResolvedWorkflow.configured(environment: environment)
+        return try resolveSpaceFixtureWorkflowScenario(
+            sourceWorkflowURL: SpaceFixtureMultiAppWorkflowDefaults.fullscreenOnlyWorkflowSourceURL,
+            using: installedWorkflow
+        )
+    }
+
+    private func resolveSpaceFixtureWorkflowScenario(
+        sourceWorkflowURL: URL,
+        using installedWorkflow: SpaceFixtureResolvedWorkflow
+    ) throws -> SpaceFixtureResolvedWorkflow {
+        let sourceData = try Data(contentsOf: sourceWorkflowURL.standardizedFileURL)
+        let sourceDocument = try JSONDecoder().decode(SpaceFixtureResolvedWorkflowDocument.self, from: sourceData)
+        let installedAppsByID = Dictionary(
+            uniqueKeysWithValues: installedWorkflow.apps.map { ($0.appID, $0) }
+        )
+
+        let resolvedApps = try sourceDocument.apps.map { app in
+            guard let installedApp = installedAppsByID[app.appID] else {
+                throw SpaceFixtureMultiAppWorkflowError.workflowScenarioMissingAppVariant(
+                    app.appID,
+                    sourceDocument.workflowName
+                )
+            }
+
+            let expectedBundleIdentifier = app.bundleIdentifier
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let installedBundleIdentifier = installedApp.identity.bundleIdentifier
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard expectedBundleIdentifier == installedBundleIdentifier else {
+                throw SpaceFixtureMultiAppWorkflowError.workflowScenarioBundleIdentifierMismatch(
+                    app.appID,
+                    expectedBundleIdentifier,
+                    installedBundleIdentifier
+                )
+            }
+
+            return SpaceFixtureResolvedWorkflowAppDocument(
+                appID: app.appID,
+                appName: app.appName,
+                bundleIdentifier: app.bundleIdentifier,
+                appPath: installedApp.identity.appURL?.path,
+                launchOrder: app.launchOrder,
+                windows: app.windows
+            )
+        }
+
+        let resolvedDocument = SpaceFixtureResolvedWorkflowDocument(
+            workflowName: sourceDocument.workflowName,
+            settleTimeoutMilliseconds: sourceDocument.settleTimeoutMilliseconds,
+            apps: resolvedApps
+        )
+
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        addTeardownBlock {
+            try? FileManager.default.removeItem(at: directoryURL)
+        }
+
+        let resolvedWorkflowURL = directoryURL.appendingPathComponent("resolved-workflow.json")
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try encoder.encode(resolvedDocument).write(to: resolvedWorkflowURL)
+        return try SpaceFixtureResolvedWorkflow.load(from: resolvedWorkflowURL)
     }
 
     private func validateMultiAppHomeWindowCountWorkflow(
@@ -386,15 +699,93 @@ extension FlowTabUITests {
         }
     }
 
-    private func multiAppWorkflowSetupMessage(reason: String) -> String {
+    private func validateMultiAppHomeFullscreenOnlyWorkflow(
+        _ workflow: SpaceFixtureResolvedWorkflow
+    ) throws {
+        guard workflow.apps.count == 2 else {
+            throw XCTSkip(
+                multiAppWorkflowSetupMessage(
+                    reason: "Resolved workflow does not match the fullscreen-only Home fixture scenario.",
+                    scenarioSourceURL: SpaceFixtureMultiAppWorkflowDefaults.fullscreenOnlyWorkflowSourceURL
+                )
+            )
+        }
+
+        guard workflow.apps.contains(where: { $0.windowCount == 1 && $0.fullscreenWindowIndex == 1 }) else {
+            throw XCTSkip(
+                multiAppWorkflowSetupMessage(
+                    reason: "Resolved workflow is missing the fullscreen-only app fixture.",
+                    scenarioSourceURL: SpaceFixtureMultiAppWorkflowDefaults.fullscreenOnlyWorkflowSourceURL
+                )
+            )
+        }
+
+        guard workflow.apps.contains(where: { $0.windowCount == 1 && $0.fullscreenWindowIndex == nil }) else {
+            throw XCTSkip(
+                multiAppWorkflowSetupMessage(
+                    reason: "Resolved workflow is missing the standard desktop app fixture.",
+                    scenarioSourceURL: SpaceFixtureMultiAppWorkflowDefaults.fullscreenOnlyWorkflowSourceURL
+                )
+            )
+        }
+    }
+
+    private func assertHomePageShowsOnlySelectedWorkflowAppTitles(
+        _ workflow: SpaceFixtureResolvedWorkflow,
+        in app: XCUIApplication,
+        setupMessage: (String) -> String
+    ) throws {
+        guard workflow.hasUniqueExpectedWindowTitles else {
+            throw XCTSkip(
+                setupMessage(
+                    "Resolved workflow does not define unique window titles per app for Home isolation assertions."
+                )
+            )
+        }
+
+        XCTAssertTrue(
+            tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 10)
+        )
+
+        for workflowApp in workflow.apps {
+            let homeRows = app.buttons.matching(identifier: workflowApp.identity.homeAppAccessibilityIdentifier)
+            let homeRow = homeRows.firstMatch
+            XCTAssertTrue(
+                homeRow.waitForExistence(timeout: 20),
+                "FlowTab did not surface \(workflowApp.appName) on the home page"
+            )
+            tapElement(homeRow)
+            assertValue(of: homeRow, equals: "\(workflowApp.windowCount)w", timeout: 20)
+
+            for title in workflowApp.expectedWindowTitles {
+                XCTAssertTrue(
+                    app.staticTexts[title].waitForExistence(timeout: 12),
+                    "Missing window title for \(workflowApp.appName): \(title)"
+                )
+            }
+            assertStaticTextsAbsent(
+                workflow.otherExpectedWindowTitles(excluding: workflowApp.appID),
+                in: app,
+                timeout: 12
+            )
+        }
+    }
+
+    private func multiAppWorkflowSetupMessage(
+        reason: String,
+        scenarioSourceURL: URL = SpaceFixtureMultiAppWorkflowDefaults.workflowSourceURL
+    ) -> String {
         """
         \(reason)
 
-        Build the multi-app fixture workflow with:
+        Build or refresh the shared multi-app fixture app variants with:
           ./scripts/testing/build-space-fixture-workflow.sh --workflow-config \(SpaceFixtureMultiAppWorkflowDefaults.workflowSourceURL.path)
 
-        Then rerun the test with:
+        Baseline resolved workflow path:
           \(SpaceFixtureMultiAppWorkflowDefaults.defaultResolvedWorkflowURL.path)
+
+        Scenario source:
+          \(scenarioSourceURL.path)
 
         Or set FLOWTAB_SPACE_FIXTURE_WORKFLOW_PATH to the resolved workflow JSON you generated.
         """
@@ -443,6 +834,11 @@ extension FlowTabUITests {
         }
 
         RunLoop.current.run(until: Date().addingTimeInterval(workflow.settleTimeout))
+        if let desktopAnchorIndex = workflow.apps.firstIndex(where: { $0.fullscreenWindowIndex == nil }) {
+            let desktopAnchorApp = launchedApps[desktopAnchorIndex]
+            desktopAnchorApp.activate()
+            _ = desktopAnchorApp.wait(for: .runningForeground, timeout: 5)
+        }
         return launchedApps
     }
 

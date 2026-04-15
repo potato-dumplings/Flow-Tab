@@ -292,6 +292,23 @@ extension FlowTabUITests {
         let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
         return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
     }
+    func assertStaticTextsAbsent(
+        _ titles: [String],
+        in app: XCUIApplication,
+        timeout: TimeInterval = 5
+    ) {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            let unexpectedTitles = titles.filter { app.staticTexts[$0].exists }
+            if unexpectedTitles.isEmpty {
+                return
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+
+        let unexpectedTitles = titles.filter { app.staticTexts[$0].exists }
+        XCTFail("Unexpected visible window titles: \(unexpectedTitles)")
+    }
     func tapFirstHittable(in query: XCUIElementQuery, timeout: TimeInterval) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
         repeat {

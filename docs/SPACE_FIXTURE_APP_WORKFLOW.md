@@ -376,15 +376,18 @@ resolved workflow JSON 里的每个 app 会包含：
 
 ### 已接入的 FlowTab multi-app 真实环境 UI 用例
 
-当前已补上第一个基于 resolved workflow JSON 的 multi-app E2E 用例：
+当前已补上两条基于 resolved workflow JSON 的 multi-app `Home` E2E 用例：
 
 - [FlowTabUITests+SpaceFixtureMultiAppWorkflow.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabUITests/FlowTabUITests+SpaceFixtureMultiAppWorkflow.swift)
 - [space-fixture-home-multi-app-workflow.json]({user-home}/Projeck-Works/Personal/FlowTabApp/docs/fixtures/space-fixture-home-multi-app-workflow.json)
+- [space-fixture-home-fullscreen-only-workflow.json]({user-home}/Projeck-Works/Personal/FlowTabApp/docs/fixtures/space-fixture-home-fullscreen-only-workflow.json)
 
-该用例当前验证：
+这些用例当前验证：
 
 - `Home` 页会同时展示多个 workflow app row
 - `finder(1)`、`chrome(3, 含 1 个 fullscreen)`、`notes(1)` 的 `windowCount` 会分别显示为 `1w / 3w / 1w`
+- `Home` 页切换不同 workflow app 后，窗口区只展示当前 app 的 resolved window titles，不混入其他 workflow app 的窗口标题
+- `fullscreen-only` app 与普通 app 共存时，`Home` 页仍会展示该 app，且选中后仍能看到它的 resolved window title
 - workflow 模式下的 per-app 启动顺序、resolved window title 和 fullscreen 标记会被测试驱动层正确读取
 
 该链路当前优先读取：
@@ -407,7 +410,7 @@ resolved workflow JSON 里的每个 app 会包含：
 也就是说：
 
 - 多 app workflow 构建和 per-app 启动能力已经实现
-- FlowTab 真实 runtime end-to-end UI 用例已经开始消费 resolved workflow JSON，但当前只覆盖了首个 `Home` 多 app 计数场景
+- FlowTab 真实 runtime end-to-end UI 用例已经开始消费 resolved workflow JSON，当前已覆盖 `Home` 多 app 计数、app 切换后的窗口列表隔离，以及 `fullscreen-only app` 的稳定展示
 - 更大范围的 `Switcher`、search、列表隔离等 multi-app 用例仍未全部切到这条链路
 
 ## 当前限制
@@ -432,27 +435,24 @@ resolved workflow JSON 里的每个 app 会包含：
 - `--workflow-config` + `--workflow-app-id`
 - fixture app 自身的 UI/配置测试
 
-如果要运行当前已经接入的首个 multi-app `Home` 回归，优先使用：
+如果要运行当前已经接入的 multi-app `Home` 回归，优先使用：
 
 - `build-space-fixture-workflow.sh --workflow-config docs/fixtures/space-fixture-home-multi-app-workflow.json`
 - 默认输出的 `resolved-workflow.json`，或通过 `FLOWTAB_SPACE_FIXTURE_WORKFLOW_PATH` 显式指定路径
 - [FlowTabUITests+SpaceFixtureMultiAppWorkflow.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabUITests/FlowTabUITests+SpaceFixtureMultiAppWorkflow.swift)
 
-如果要继续把更多 multi-app workflow 场景接到 FlowTab 真实 runtime end-to-end 测试，仍需要继续扩展这层测试驱动逻辑；当前只落地了第一个 `Home` 多 app 计数场景。
+其中：
+
+- `space-fixture-home-multi-app-workflow.json` 直接对应默认生成的 `resolved-workflow.json`
+- `space-fixture-home-fullscreen-only-workflow.json` 会在 UI 测试里复用同一批已构建的 fixture app 变体，并临时生成场景专用的 resolved workflow JSON
+
+如果要继续把更多 multi-app workflow 场景接到 FlowTab 真实 runtime end-to-end 测试，仍需要继续扩展这层测试驱动逻辑；当前已落地 `Home` 多 app 计数、窗口列表隔离和 `fullscreen-only` 场景。
 
 ## 待接入清单（按代码现状）
 
 以下清单按“当前代码真实接入情况”整理，指的是**尚未接入到 FlowTab 真实 runtime UI tests 的 multi-app workflow E2E 用例**，不包含已经由 unit、behavior、mock runtime 或 fixture app 自身 UI tests 覆盖的场景。
 
 当前优先级最高的是：
-
-- `Home` 页切换不同 workflow app，只展示该 app 的窗口列表。
-  建议场景：为每个 app 配置互不重复的窗口标题。
-  目标断言：点击某个 app 后，窗口区只出现该 app 的 resolved window titles，不混入其他 app 的窗口标题。
-
-- fullscreen-only app 与普通 app 共存时，`Home` 页仍能稳定展示该 app。
-  建议场景：一个 app 只有 fullscreen window，另一个 app 只有 standard windows。
-  目标断言：fullscreen-only app 仍出现在 app layer，且选中后能看到对应窗口标题。
 
 - `Switcher` app strip 在 multi-app workflow 下展示全部真实 app。
   建议场景：至少 3 个 app，使用不同 bundle identifier 和 appName。
@@ -476,10 +476,10 @@ resolved workflow JSON 里的每个 app 会包含：
 
 建议的首批落地顺序：
 
-1. `Home` 多 app 列表隔离与 fullscreen-only 稳定展示
-2. `Switcher` 多 app strip 与 preview 切换
-3. window-scope search 的真实多 app 窗口结果
-4. tabbed window selected title 的跨 app 展示
+1. `Switcher` 多 app strip 与 preview 切换
+2. window-scope search 的真实多 app 窗口结果
+3. tabbed window selected title 的跨 app 展示
+4. 同名窗口标题下的 search 结果区分
 
 ## 当前结论
 
@@ -490,7 +490,7 @@ resolved workflow JSON 里的每个 app 会包含：
 - 已实现 workflow 配置解析与应用内 tab 模型
 - 已实现 workflow 级 app 变体构建脚本
 - 已实现 fixture app 自身对 tabbed window 的 UI 覆盖
-- 已实现首个基于 resolved workflow JSON 的 FlowTab multi-app `Home` 计数 E2E 用例
+- 已实现基于 resolved workflow JSON 的 FlowTab multi-app `Home` 计数、app 切换窗口列表隔离，以及 `fullscreen-only app` 稳定展示 E2E 用例
 - 尚未把多 app workflow 全量接到 FlowTab 真实 runtime end-to-end UI workflow
 
 因此，这份文档应按“当前实现说明”理解，而不是“未来设计提案”。

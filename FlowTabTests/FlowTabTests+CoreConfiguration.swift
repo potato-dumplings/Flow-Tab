@@ -281,6 +281,20 @@ extension FlowTabTests {
         }
     }
 
+    func testRuntimeSnapshotProviderMockRuntimeKeepsHomeSnapshotsScopedPerApp() {
+        withLaunchArgumentsForTesting(["FlowTab", "--flowtab-ui-mock-runtime"]) {
+            let provider = RuntimeSnapshotProvider()
+
+            let mailSnapshot = provider.homeAppSnapshot(for: "com.flowtab.mock.mail")
+            XCTAssertEqual(mailSnapshot?.candidate.windows.map(\.title), ["Inbox", "Draft"])
+            XCTAssertFalse(mailSnapshot?.candidate.windows.contains(where: { $0.title == "Docs" }) ?? true)
+
+            let browserSnapshot = provider.homeAppSnapshot(for: "com.flowtab.mock.browser")
+            XCTAssertEqual(browserSnapshot?.candidate.windows.map(\.title), ["Docs"])
+            XCTAssertFalse(browserSnapshot?.candidate.windows.contains(where: { $0.title == "Inbox" }) ?? true)
+        }
+    }
+
     func testRuntimeSnapshotProviderMockSingleAppFiveWindowsVariantKeepsAllWindowsInHomeLayer() {
         let expectedWindowIDs = [
             "mock-browser-normal-1",
