@@ -15,6 +15,7 @@ DEFAULT_UI_TEST_APP_PATH="${USER_HOME}/Applications/Flow Tab UITest.app"
 ACTION="test"
 ACTION_SET=false
 HAS_CUSTOM_TEST_FILTER=false
+HAS_CODE_SIGNING_OVERRIDE=false
 USE_STABLE_UI_TEST_APP=true
 UI_TEST_APP_PATH="${FLOWTAB_UI_TEST_APP_PATH:-${DEFAULT_UI_TEST_APP_PATH}}"
 declare -a EXTRA_ARGS=()
@@ -75,6 +76,11 @@ while [[ $# -gt 0 ]]; do
       EXTRA_ARGS+=("$1")
       shift
       ;;
+    CODE_SIGNING_ALLOWED=*)
+      HAS_CODE_SIGNING_OVERRIDE=true
+      EXTRA_ARGS+=("$1")
+      shift
+      ;;
     *)
       EXTRA_ARGS+=("$1")
       shift
@@ -123,6 +129,11 @@ if [[ -n "${FLOWTAB_UI_TEST_APP_PATH:-}" ]]; then
 else
   echo "UI test app: DerivedData build product"
 fi
+if [[ "${HAS_CODE_SIGNING_OVERRIDE}" == true ]]; then
+  echo "Code signing for build products: caller override"
+else
+  echo "Code signing for build products: disabled"
+fi
 
 XCODEBUILD_CMD=(
   xcodebuild
@@ -135,6 +146,12 @@ XCODEBUILD_CMD=(
 
 if [[ "${ACTION}" == "test" || "${ACTION}" == "test-without-building" ]]; then
   XCODEBUILD_CMD+=(-resultBundlePath "${RESULT_BUNDLE_PATH}")
+fi
+
+# Local UI test builds do not need signed build products, and disabling signing
+# avoids coupling test execution to whichever Xcode account happens to be configured.
+if [[ "${HAS_CODE_SIGNING_OVERRIDE}" == false ]]; then
+  XCODEBUILD_CMD+=("CODE_SIGNING_ALLOWED=NO")
 fi
 
 XCODEBUILD_CMD+=("${ACTION}")
