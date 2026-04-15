@@ -16,3 +16,4 @@ FlowTabCore/.build/
 # Local workspace artifacts
 .build-local/
 local/
+xcconfigs/LocalSigning.xcconfig

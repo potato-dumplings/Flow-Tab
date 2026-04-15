@@ -241,6 +241,8 @@
 		F50000142F90000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflowConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureWorkflowConfiguration.swift"; sourceTree = "<group>"; };
 		F50000152FA1000100B0D737 /* FlowTabUITests+SpaceFixtureMultiAppWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureMultiAppWorkflow.swift"; sourceTree = "<group>"; };
 		F6E7A8B935AC000100B0D737 /* RuntimeWindowRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowRecord.swift; sourceTree = "<group>"; };
+		F7A1000135B7000100B0D737 /* SigningDefaults.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = SigningDefaults.xcconfig; sourceTree = "<group>"; };
+		F7A1000235B7000100B0D737 /* LocalSigning.example.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "LocalSigning.example.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -283,6 +285,7 @@
 				4A6DAE7E2F727AF600B0D737 /* FlowTabTests */,
 				4A6DAE882F727AF600B0D737 /* FlowTabUITests */,
 				F50000112F90000100B0D737 /* FlowTabSpaceFixture */,
+				F7A1000335B7000100B0D737 /* xcconfigs */,
 				4A6DAE6B2F727AF500B0D737 /* Products */,
 				4A6DAE992F727BEA00B0D737 /* Frameworks */,
 			);
@@ -554,6 +557,15 @@
 				F50000082F90000100B0D737 /* SpaceFixtureWindowContentView.swift */,
 			);
 			path = FlowTabSpaceFixture;
+			sourceTree = "<group>";
+		};
+		F7A1000335B7000100B0D737 /* xcconfigs */ = {
+			isa = PBXGroup;
+			children = (
+				F7A1000135B7000100B0D737 /* SigningDefaults.xcconfig */,
+				F7A1000235B7000100B0D737 /* LocalSigning.example.xcconfig */,
+			);
+			path = xcconfigs;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -867,6 +879,7 @@
 /* Begin XCBuildConfiguration section */
 		4A6DAE8D2F727AF600B0D737 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = F7A1000135B7000100B0D737 /* SigningDefaults.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -931,6 +944,7 @@
 		};
 		4A6DAE8E2F727AF600B0D737 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = F7A1000135B7000100B0D737 /* SigningDefaults.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -987,6 +1001,7 @@
 		};
 		4A6DAE902F727AF600B0D737 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = F7A1000135B7000100B0D737 /* SigningDefaults.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
@@ -1017,6 +1032,7 @@
 		};
 		4A6DAE912F727AF600B0D737 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = F7A1000135B7000100B0D737 /* SigningDefaults.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;

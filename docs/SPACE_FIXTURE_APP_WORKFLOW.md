@@ -293,6 +293,59 @@ resolved workflow JSON 里的每个 app 会包含：
 
 ## 当前测试接入情况
 
+### 运行真实环境 multi-app UI workflow 的本地前置条件
+
+对于会真实拉起 `FlowTabSpaceFixture` app 变体并驱动 FlowTab 首页或 switcher 的 UI 用例，本地环境除了 fixture app 本身外，还需要满足以下条件：
+
+- FlowTab 已授予 `Accessibility`
+- FlowTab 已授予 `Screen & System Audio Recording`
+- `Flow Tab.app` 与 `Flow Tab UITest.app` 使用同一套 macOS code identity，而不是一份 `adhoc`、一份 `Apple Development`
+
+这里要注意：
+
+- macOS 隐私权限实际绑定的是 app 的 code identity，不是单纯绑定文件名或 bundle id。
+- 如果 `/Applications/Flow Tab.app` 仍然是 `adhoc`，而 UI tests 启动的是另一份 `Apple Development` 签名的 `Flow Tab UITest.app`，系统可能不会复用你已经授过的权限。
+
+当前推荐的本地准备方式：
+
+1. 安装固定路径的 UI test app：
+
+```bash
+./scripts/testing/install-ui-test-app.sh --development-team <TEAM_ID>
+```
+
+默认会安装到：
+
+- `~/Applications/Flow Tab UITest.app`
+
+2. 确保平时运行的 `/Applications/Flow Tab.app` 也使用同一套本地开发签名。
+
+如果需要覆盖安装到固定路径，可使用：
+
+```bash
+./scripts/testing/install-ui-test-app.sh \
+  --development-team <TEAM_ID> \
+  --install-path "/Applications/Flow Tab.app"
+```
+
+3. 在下面两处确认 `Flow Tab` 已授权：
+
+- `系统设置 -> 隐私与安全性 -> 辅助功能`
+- `系统设置 -> 隐私与安全性 -> 屏幕与系统音频录制`
+
+4. 再运行：
+
+```bash
+./scripts/testing/run-ui-tests-local.sh
+```
+
+该脚本当前会：
+
+- 优先启动固定路径 `~/Applications/Flow Tab UITest.app`
+- 对本地 UI test 构建产物默认关闭代码签名，避免测试执行再次受 Xcode 当前签名配置影响
+
+如果之前已经给 `/Applications/Flow Tab.app` 授权，但真实环境 workflow 用例仍在首页看到权限引导按钮，优先检查的不是“有没有授权”，而是“`Flow Tab.app` 和 `Flow Tab UITest.app` 当前是不是同一个签名身份”。
+
 ### 已接入的逻辑与行为测试
 
 当前以下能力已经有自动化覆盖：

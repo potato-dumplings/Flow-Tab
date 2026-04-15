@@ -368,6 +368,26 @@ swift test
 - `scripts/release/uninstall-flowtab.js`：生成 DMG 内可双击的一键卸载器。
 - `scripts/perf/tab-switch-stress.sh`：tab 高频切换性能压测。
 
+## 本地签名配置
+
+仓库默认不再把个人 `DEVELOPMENT_TEAM` 固定写进 [project.pbxproj]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTab.xcodeproj/project.pbxproj)，而是通过本地忽略的 `xcconfigs/LocalSigning.xcconfig` 提供：
+
+```bash
+cp xcconfigs/LocalSigning.example.xcconfig xcconfigs/LocalSigning.xcconfig
+```
+
+然后把其中的 `YOUR_TEAM_ID` 改成你自己的 team id：
+
+```text
+FLOWTAB_DEVELOPMENT_TEAM = YOUR_TEAM_ID
+```
+
+当前工程会通过 [SigningDefaults.xcconfig]({user-home}/Projeck-Works/Personal/FlowTabApp/xcconfigs/SigningDefaults.xcconfig) 可选包含这份本地文件，因此：
+
+- `xcconfigs/LocalSigning.xcconfig` 不会进入 git
+- Xcode GUI 和 `xcodebuild` 会读取同一份本地 team 配置
+- 本地 release/install 构建不需要再把个人 Team ID 提交进仓库
+
 ## Release 安装到 /Applications
 
 ```bash
