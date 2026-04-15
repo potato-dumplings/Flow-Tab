@@ -1,15 +1,70 @@
 import ApplicationServices
 import AppKit
 import CoreGraphics
+import Foundation
 import XCTest
 
-extension FlowTabUITests {
-    private var spaceFixtureBundleIdentifier: String {
-        "io.github.potato-dumplings.flowtab.spacefixture"
+private enum SpaceFixtureEnvironmentKey {
+    static let appPath = "FLOWTAB_SPACE_FIXTURE_APP_PATH"
+    static let bundleIdentifier = "FLOWTAB_SPACE_FIXTURE_BUNDLE_ID"
+}
+
+private struct SpaceFixtureAppIdentity: Equatable {
+    static let defaultBundleIdentifier = "io.github.potato-dumplings.flowtab.spacefixture"
+
+    let bundleIdentifier: String
+    let appURL: URL?
+
+    var homeAppAccessibilityIdentifier: String {
+        "flowtab.home.app.\(bundleIdentifier.spaceFixtureAccessibilitySlug)"
     }
 
-    private var spaceFixtureHomeAppAccessibilityIdentifier: String {
-        "flowtab.home.app.io-github-potato-dumplings-flowtab-spacefixture"
+    static func configured(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> SpaceFixtureAppIdentity {
+        let configuredBundleIdentifier = environment[SpaceFixtureEnvironmentKey.bundleIdentifier]?
+            .trimmedSpaceFixtureValue
+        let resolvedBundleIdentifier = configuredBundleIdentifier?.isEmpty == false
+            ? configuredBundleIdentifier!
+            : defaultBundleIdentifier
+
+        guard
+            let configuredAppPath = environment[SpaceFixtureEnvironmentKey.appPath]?.trimmedSpaceFixtureValue,
+            !configuredAppPath.isEmpty
+        else {
+            return SpaceFixtureAppIdentity(bundleIdentifier: resolvedBundleIdentifier, appURL: nil)
+        }
+
+        let appURL = URL(fileURLWithPath: configuredAppPath).standardizedFileURL
+        let bundleIdentifier = configuredBundleIdentifier?.isEmpty == false
+            ? configuredBundleIdentifier!
+            : Bundle(url: appURL)?.bundleIdentifier ?? defaultBundleIdentifier
+
+        return SpaceFixtureAppIdentity(bundleIdentifier: bundleIdentifier, appURL: appURL)
+    }
+}
+
+private extension String {
+    var trimmedSpaceFixtureValue: String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var spaceFixtureAccessibilitySlug: String {
+        let replaced = trimmedSpaceFixtureValue
+            .lowercased()
+            .replacingOccurrences(
+                of: #"[^a-z0-9]+"#,
+                with: "-",
+                options: .regularExpression
+            )
+            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+        return replaced.isEmpty ? "item" : replaced
+    }
+}
+
+extension FlowTabUITests {
+    private var spaceFixtureAppIdentity: SpaceFixtureAppIdentity {
+        SpaceFixtureAppIdentity.configured()
     }
 
     private var spaceFixtureWorkflowReadyAccessibilityIdentifier: String {
@@ -20,26 +75,41 @@ extension FlowTabUITests {
         "flowtab.spacefixture.workflow.summary"
     }
 
-    func makeSpaceFixtureApp(additionalArguments: [String] = []) -> XCUIApplication {
-        let app = XCUIApplication(bundleIdentifier: spaceFixtureBundleIdentifier)
+    private func makeSpaceFixtureApplication(for identity: SpaceFixtureAppIdentity) -> XCUIApplication {
+        if let appURL = identity.appURL {
+            return XCUIApplication(url: appURL)
+        }
+        return XCUIApplication(bundleIdentifier: identity.bundleIdentifier)
+    }
+
+    private func makeSpaceFixtureApp(
+        identity: SpaceFixtureAppIdentity = .configured(),
+        additionalArguments: [String] = []
+    ) -> XCUIApplication {
+        let app = makeSpaceFixtureApplication(for: identity)
         app.launchArguments += additionalArguments
         return app
     }
 
     func terminateSpaceFixtureAppIfRunning() {
-        let app = XCUIApplication(bundleIdentifier: spaceFixtureBundleIdentifier)
+        terminateSpaceFixtureAppIfRunning(identity: .configured())
+    }
+
+    private func terminateSpaceFixtureAppIfRunning(identity: SpaceFixtureAppIdentity) {
+        let app = makeSpaceFixtureApplication(for: identity)
         if app.state == .runningForeground || app.state == .runningBackground {
             app.terminate()
         }
     }
 
-    func launchSpaceFixtureWorkflow(
+    private func launchSpaceFixtureWorkflow(
+        identity: SpaceFixtureAppIdentity = .configured(),
         windowCount: Int = 3,
         fullscreenWindowIndex: Int? = 3,
         titlePrefix: String = "Workflow",
         enterFullscreenDelayMilliseconds: Int = 1_500
     ) -> XCUIApplication {
-        terminateSpaceFixtureAppIfRunning()
+        terminateSpaceFixtureAppIfRunning(identity: identity)
 
         var additionalArguments = [
             "--window-count", String(windowCount),
@@ -52,7 +122,7 @@ extension FlowTabUITests {
             additionalArguments += ["--fullscreen-window-index", String(fullscreenWindowIndex)]
         }
 
-        let app = makeSpaceFixtureApp(additionalArguments: additionalArguments)
+        let app = makeSpaceFixtureApp(identity: identity, additionalArguments: additionalArguments)
         app.launch()
 
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
@@ -110,10 +180,39 @@ extension FlowTabUITests {
         )
     }
 
+    func testSpaceFixtureAppIdentityUsesEnvironmentOverridesForCustomFixtureVariants() {
+        let identity = SpaceFixtureAppIdentity.configured(
+            environment: [
+                SpaceFixtureEnvironmentKey.appPath: "/tmp/Chrome Fixture.app",
+                SpaceFixtureEnvironmentKey.bundleIdentifier: "com.example.chrome.fixture"
+            ]
+        )
+
+        XCTAssertEqual(identity.appURL, URL(fileURLWithPath: "/tmp/Chrome Fixture.app").standardizedFileURL)
+        XCTAssertEqual(identity.bundleIdentifier, "com.example.chrome.fixture")
+        XCTAssertEqual(
+            identity.homeAppAccessibilityIdentifier,
+            "flowtab.home.app.com-example-chrome-fixture"
+        )
+    }
+
+    func testSpaceFixtureAppIdentityFallsBackToDefaultBundleIdentifierWithoutOverrides() {
+        let identity = SpaceFixtureAppIdentity.configured(environment: [:])
+
+        XCTAssertNil(identity.appURL)
+        XCTAssertEqual(identity.bundleIdentifier, SpaceFixtureAppIdentity.defaultBundleIdentifier)
+        XCTAssertEqual(
+            identity.homeAppAccessibilityIdentifier,
+            "flowtab.home.app.io-github-potato-dumplings-flowtab-spacefixture"
+        )
+    }
+
     func testSpaceFixtureAppShowsConfiguredWindowTitles() throws {
-        terminateSpaceFixtureAppIfRunning()
+        let identity = spaceFixtureAppIdentity
+        terminateSpaceFixtureAppIfRunning(identity: identity)
 
         let app = makeSpaceFixtureApp(
+            identity: identity,
             additionalArguments: [
                 "--window-count", "3",
                 "--window-title-prefix", "UITest",
@@ -139,9 +238,11 @@ extension FlowTabUITests {
     }
 
     func testSpaceFixtureAppMarksFullscreenTargetWindowBeforeTransition() throws {
-        terminateSpaceFixtureAppIfRunning()
+        let identity = spaceFixtureAppIdentity
+        terminateSpaceFixtureAppIfRunning(identity: identity)
 
         let app = makeSpaceFixtureApp(
+            identity: identity,
             additionalArguments: [
                 "--window-count", "2",
                 "--window-title-prefix", "Targeted",
@@ -173,7 +274,9 @@ extension FlowTabUITests {
         guard assertRealSpaceFixtureWorkflowPrerequisites() else { return }
 
         let titlePrefix = "Workflow"
+        let identity = spaceFixtureAppIdentity
         let fixtureApp = launchSpaceFixtureWorkflow(
+            identity: identity,
             windowCount: 3,
             fullscreenWindowIndex: 3,
             titlePrefix: titlePrefix,
@@ -193,7 +296,7 @@ extension FlowTabUITests {
             tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 10)
         )
 
-        let fixtureAppRows = app.buttons.matching(identifier: spaceFixtureHomeAppAccessibilityIdentifier)
+        let fixtureAppRows = app.buttons.matching(identifier: identity.homeAppAccessibilityIdentifier)
         let fixtureAppRow = fixtureAppRows.firstMatch
         XCTAssertTrue(fixtureAppRow.waitForExistence(timeout: 20))
         assertValue(of: fixtureAppRow, equals: "3w", timeout: 20)

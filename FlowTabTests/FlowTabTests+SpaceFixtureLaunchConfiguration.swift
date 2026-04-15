@@ -1,7 +1,19 @@
 import CoreGraphics
 import XCTest
+@testable import FlowTab
 
 extension FlowTabTests {
+    func testFlowTabAccessibilitySlugNormalizesBundleIdentifierCharacters() {
+        XCTAssertEqual(
+            "Com.Example Chrome_Fixture".flowTabAccessibilitySlug,
+            "com-example-chrome-fixture"
+        )
+    }
+
+    func testFlowTabAccessibilitySlugFallsBackWhenInputOnlyContainsSeparators() {
+        XCTAssertEqual(" -._ ".flowTabAccessibilitySlug, "item")
+    }
+
     func testSpaceFixtureLaunchConfigurationUsesDefaultsWhenArgumentsAreMissing() {
         let configuration = SpaceFixtureLaunchConfiguration(arguments: ["FlowTabSpaceFixture"])
 

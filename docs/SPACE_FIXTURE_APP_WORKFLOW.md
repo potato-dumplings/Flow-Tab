@@ -38,11 +38,18 @@
 
 推荐新增一个独立的测试 app target，例如 `FlowTabSpaceFixture`，而不是复用 FlowTab 本体。
 
+如果还需要模拟不同的应用身份，不建议继续新增多个几乎相同的 fixture targets。更合适的做法是：
+
+- 保留一个 `FlowTabSpaceFixture` 模板 target。
+- 在生成 app bundle 时传入 `appName` 和 `bundleId`。
+- 用同一套二进制和窗口行为，产出多个不同身份的 fixture app 变体。
+
 原因如下：
 
 - FlowTab 自己的面板窗口具有跨 Space 和 fullscreen 辅助行为，不能很好模拟普通目标应用。
 - 测试目标需要的是“像 Chrome 一样的单应用多窗口”，而不是“FlowTab 自己进入全屏”。
 - 独立 fixture app 更容易稳定控制窗口数量、标题、布局和 fullscreen 行为。
+- 用模板 target 生成变体，比维护多个重复 target 更容易保持一致性。
 
 ## Fixture App 必备能力
 
@@ -55,6 +62,35 @@
 - 可指定某一个窗口在启动后自动进入 fullscreen。
 - 可关闭系统自动 window tabbing，避免多个窗口被合并成标签页。
 - 可设置窗口初始位置和尺寸，避免全部重叠。
+
+## 参数分层
+
+这里需要明确区分两类参数：
+
+- 应用身份参数：决定系统看到的 app 名称和 bundle identifier，必须在生成 app bundle 时传入。
+- 运行时场景参数：决定窗口数量、标题和 fullscreen 行为，可以在 app 启动时传入。
+
+仅通过启动参数不能真正改变 `NSRunningApplication.localizedName` 或 bundle identifier，因此 `appName` / `bundleId` 不能只做成运行时参数。
+
+## 建议生成参数
+
+建议新增一个生成脚本，例如：
+
+```bash
+./scripts/testing/build-space-fixture-app.sh \
+  --app-name "Chrome Fixture" \
+  --bundle-id "com.example.chrome.fixture"
+```
+
+该脚本应完成：
+
+- 构建 `FlowTabSpaceFixture` 模板 app
+- 复制出一个新的 app bundle 变体
+- 写入新的 `CFBundleDisplayName`
+- 写入新的 `CFBundleIdentifier`
+- 重新签名，确保本地可启动
+
+生成完成后，可以继续给这个变体传入运行时场景参数。
 
 ## 建议启动参数
 
@@ -69,7 +105,10 @@
 示例：
 
 ```text
-FlowTabSpaceFixture --window-count 3 --fullscreen-window-index 3 --window-title-prefix "Fixture"
+/path/to/Chrome Fixture.app/Contents/MacOS/FlowTabSpaceFixture \
+  --window-count 3 \
+  --fullscreen-window-index 3 \
+  --window-title-prefix "Fixture"
 ```
 
 对应预期：
@@ -92,9 +131,17 @@ FlowTabSpaceFixture --window-count 3 --fullscreen-window-index 3 --window-title-
 
 ## 测试流程
 
-### 1. 构建 fixture app
+### 1. 生成 fixture app 变体
 
-先构建 `FlowTabSpaceFixture` target，确保测试环境中能拿到可启动的 app bundle。
+先基于 `FlowTabSpaceFixture` 模板 target 生成目标 app 变体，确保测试环境中拿到的是带目标 `appName` / `bundleId` 的 app bundle，而不是固定身份的默认产物。
+
+例如：
+
+```bash
+./scripts/testing/build-space-fixture-app.sh \
+  --app-name "Chrome Fixture" \
+  --bundle-id "com.example.chrome.fixture"
+```
 
 ### 2. 启动 fixture app
 
@@ -126,6 +173,21 @@ FlowTabSpaceFixture --window-count 3 --fullscreen-window-index 3 --window-title-
 - 同 app 多窗口展示
 - fullscreen 或 off-space 窗口的恢复展示
 - 激活指定窗口后的 space 切换与焦点行为
+
+如果通过 UI 自动化执行这条流程，建议把生成结果传给测试层，而不是把 bundle id 写死在测试代码里。当前建议约定以下环境变量：
+
+- `FLOWTAB_SPACE_FIXTURE_APP_PATH`
+- `FLOWTAB_SPACE_FIXTURE_BUNDLE_ID`
+
+示例：
+
+```bash
+FLOWTAB_SPACE_FIXTURE_APP_PATH="/absolute/path/Chrome Fixture.app" \
+FLOWTAB_SPACE_FIXTURE_BUNDLE_ID="com.example.chrome.fixture" \
+./scripts/testing/run-ui-tests-local.sh \
+  test-without-building \
+  -only-testing:FlowTabUITests/FlowTabUITests/testHomePageShowsRealSpaceFixtureWorkflowWindows
+```
 
 ### 5. 执行断言
 
@@ -183,12 +245,15 @@ fixture app 方案补充负责：
 
 建议按以下顺序推进：
 
-1. 新增 `FlowTabSpaceFixture` target，先只支持多窗口和稳定标题。
-2. 再增加“指定窗口自动 fullscreen”能力。
-3. 先做一条本地可重复的手工回归流程。
-4. 在流程稳定后，再接入低频 UI 自动化或集成测试。
-5. 最后再决定是否需要把该流程纳入常规测试脚本。
+1. 保留 `FlowTabSpaceFixture` 作为模板 target，先稳定多窗口和标题行为。
+2. 增加基于 `appName` / `bundleId` 的 app 变体生成脚本。
+3. 再增加“指定窗口自动 fullscreen”能力。
+4. 先做一条本地可重复的手工回归流程。
+5. 在流程稳定后，再接入低频 UI 自动化或集成测试。
+6. 最后再决定是否需要把该流程纳入常规测试脚本。
 
 ## 当前结论
 
 如果要验证接近 Chrome 的真实空间场景，fixture app 必须支持单应用多窗口，且至少有一个窗口可以进入 fullscreen。仅创建单窗口空壳 app 不足以覆盖我们需要的场景。
+
+如果还要模拟不同目标应用，应该把 `appName` / `bundleId` 设计成“生成 app 变体时”的输入，而不是“启动 app 时”的输入。
