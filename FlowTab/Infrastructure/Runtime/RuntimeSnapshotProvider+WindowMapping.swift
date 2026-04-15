@@ -2,35 +2,32 @@ import AppKit
 import ApplicationServices
 import Foundation
 
-struct RuntimeStickyWindowBinding {
-    let stableWindowID: String
-    let cgWindowID: CGWindowID
-    var lastKnownAXWindowID: String?
-    var axWindow: AXUIElement?
-    var title: String?
-    var frame: CGRect?
-    var isMinimized: Bool
-    var lastConfirmationSource: WindowBindingConfirmationSource
-    var hasCurrentActivationHandle: Bool
-}
-
 struct RuntimeWindowMappingState {
-    var bindingsByCGWindowID: [CGWindowID: RuntimeStickyWindowBinding] = [:]
-    var lastKnownCGWindowsByID: [CGWindowID: RuntimeSnapshotProvider.CGWindowEntry] = [:]
+    var windowRecordsByCGWindowID: [CGWindowID: RuntimeWindowRecord] = [:]
+    var currentAXToCG: [String: CGWindowID] = [:]
+    var currentCGToAX: [CGWindowID: String] = [:]
+    var validCGWindowIDs: Set<CGWindowID> = []
+    var lastAXWindowIDs: Set<String> = []
     var hasObservedAXWindowHandle = false
     var consecutiveSnapshotsWithoutAXWindows = 0
 
     var isEmpty: Bool {
-        bindingsByCGWindowID.isEmpty && lastKnownCGWindowsByID.isEmpty
+        windowRecordsByCGWindowID.isEmpty
     }
 }
 
 struct RuntimeWindowMappingResolution {
     let exactMatchesByAXWindowID: [String: CGWindowID]
-    let bindingsByCGWindowID: [CGWindowID: RuntimeStickyWindowBinding]
+    let windowRecordsByCGWindowID: [CGWindowID: RuntimeWindowRecord]
     let validCGWindows: [RuntimeSnapshotProvider.CGWindowEntry]
-    let knownCGWindowsByID: [CGWindowID: RuntimeSnapshotProvider.CGWindowEntry]
     let allowSpaceOneWithoutCurrentAXHandle: Bool
+
+    var knownCGWindowsByID: [CGWindowID: RuntimeSnapshotProvider.CGWindowEntry] {
+        runtimeKnownCGWindowsByID(
+            windowRecordsByCGWindowID: windowRecordsByCGWindowID,
+            validCGWindows: validCGWindows
+        )
+    }
 }
 
 private let runtimeCGFrameOriginTolerance: CGFloat = 24
@@ -63,14 +60,15 @@ extension RuntimeSnapshotProvider {
             pid: pid,
             appName: appName
         )
+        let knownCGWindowsByID = mappingResolution.knownCGWindowsByID
         let exactEntries = axWindows.compactMap { axEntry -> WindowListEntry? in
             guard
                 let cgWindowID = mappingResolution.exactMatchesByAXWindowID[axEntry.id],
-                let binding = mappingResolution.bindingsByCGWindowID[cgWindowID]
+                let record = mappingResolution.windowRecordsByCGWindowID[cgWindowID]
             else {
                 return nil
             }
-            let matchedCGTitle = mappingResolution.knownCGWindowsByID[cgWindowID]?.title ?? binding.title
+            let matchedCGTitle = knownCGWindowsByID[cgWindowID]?.title ?? record.displayTitle
             let sourceLooksLikeAppNameFallback = runtimeTitleLooksLikeAppNameFallback(
                 axEntry.sourceTitle,
                 appName: appName
@@ -94,27 +92,32 @@ extension RuntimeSnapshotProvider {
                 refreshedAXTitle: refreshedAXTitle
             )
             return WindowListEntry(
-                windowID: binding.stableWindowID,
+                windowID: record.stableWindowID,
                 title: title,
                 isMinimized: axEntry.isMinimized,
                 ownerPID: pid,
                 cgWindowID: cgWindowID,
                 activationHandleID: axEntry.id,
                 axWindow: axEntry.window,
-                frame: axEntry.frame ?? binding.frame,
+                frame: axEntry.frame ?? record.displayFrame,
                 allowsPublicAXRecovery: true,
                 hasStickyBinding: true,
-                lastConfirmationSource: binding.lastConfirmationSource
+                lastConfirmationSource: record.lastConfirmationSource
             )
         }
 
         let exactCGWindowIDs = Set(exactEntries.compactMap(\.cgWindowID))
         let stickyCGEntries = mappingResolution.validCGWindows.compactMap { cgWindow -> WindowListEntry? in
             guard !exactCGWindowIDs.contains(cgWindow.id) else { return nil }
-            guard let binding = mappingResolution.bindingsByCGWindowID[cgWindow.id] else {
+            guard
+                let record = mappingResolution.windowRecordsByCGWindowID[cgWindow.id],
+                record.hasStickyBinding
+            else {
                 return nil
             }
-            let rawSpaceIDs = mappingResolution.knownCGWindowsByID[cgWindow.id]?.spaceIDs ?? cgWindow.spaceIDs
+            let rawSpaceIDs = knownCGWindowsByID[cgWindow.id]?.spaceIDs
+                ?? record.spaceRecovery?.spaceIDs
+                ?? cgWindow.spaceIDs
             let normalizedSpaceIDs = Array(Set(rawSpaceIDs)).sorted()
             guard runtimeWindowCanBeExposedWithoutCurrentAXHandle(
                 spaceIDs: normalizedSpaceIDs,
@@ -123,18 +126,18 @@ extension RuntimeSnapshotProvider {
                 return nil
             }
             return WindowListEntry(
-                windowID: binding.stableWindowID,
-                title: binding.title
+                windowID: record.stableWindowID,
+                title: record.displayTitle
                     ?? runtimeSupplementalCGWindowTitle(appName: appName, cgWindow: cgWindow),
-                isMinimized: false,
+                isMinimized: record.isMinimized,
                 ownerPID: pid,
                 cgWindowID: cgWindow.id,
                 activationHandleID: nil,
                 axWindow: nil,
-                frame: binding.frame ?? cgWindow.bounds,
+                frame: record.displayFrame ?? cgWindow.bounds,
                 allowsPublicAXRecovery: true,
                 hasStickyBinding: true,
-                lastConfirmationSource: binding.lastConfirmationSource
+                lastConfirmationSource: record.lastConfirmationSource
             )
         }
 
@@ -143,7 +146,10 @@ extension RuntimeSnapshotProvider {
         let unmatchedCGEntries = mappingResolution.validCGWindows.compactMap { cgWindow -> WindowListEntry? in
             guard !exactCGWindowIDs.contains(cgWindow.id) else { return nil }
             guard !stickyCGWindowIDs.contains(cgWindow.id) else { return nil }
-            let rawSpaceIDs = mappingResolution.knownCGWindowsByID[cgWindow.id]?.spaceIDs ?? cgWindow.spaceIDs
+            let record = mappingResolution.windowRecordsByCGWindowID[cgWindow.id]
+            let rawSpaceIDs = knownCGWindowsByID[cgWindow.id]?.spaceIDs
+                ?? record?.spaceRecovery?.spaceIDs
+                ?? cgWindow.spaceIDs
             let normalizedSpaceIDs = Array(Set(rawSpaceIDs)).sorted()
             guard !normalizedSpaceIDs.isEmpty else {
                 hiddenProvisionalCGOnlyCount += 1
@@ -157,14 +163,15 @@ extension RuntimeSnapshotProvider {
                 return nil
             }
             return WindowListEntry(
-                windowID: Self.makeCGWindowID(pid: pid, cgWindowID: cgWindow.id),
-                title: runtimeSupplementalCGWindowTitle(appName: appName, cgWindow: cgWindow),
+                windowID: record?.stableWindowID ?? Self.makeCGWindowID(pid: pid, cgWindowID: cgWindow.id),
+                title: record?.displayTitle
+                    ?? runtimeSupplementalCGWindowTitle(appName: appName, cgWindow: cgWindow),
                 isMinimized: false,
                 ownerPID: pid,
                 cgWindowID: cgWindow.id,
                 activationHandleID: nil,
                 axWindow: nil,
-                frame: cgWindow.bounds,
+                frame: record?.displayFrame ?? cgWindow.bounds,
                 allowsPublicAXRecovery: true,
                 hasStickyBinding: false,
                 lastConfirmationSource: nil
@@ -180,7 +187,7 @@ extension RuntimeSnapshotProvider {
         let unmatchedAXEntries = stickyCGEntries + unmatchedCGEntries
         let deduplicatedUnmatchedAXEntries = deduplicateUnmatchedAXEntriesBySpace(
             unmatchedAXEntries,
-            knownCGWindowsByID: mappingResolution.knownCGWindowsByID,
+            knownCGWindowsByID: knownCGWindowsByID,
             appName: appName
         )
 
@@ -200,6 +207,7 @@ extension RuntimeSnapshotProvider {
         let validCGWindowIDs = Set(validCGWindows.map(\.id))
         let currentAXWindowsByID = Dictionary(uniqueKeysWithValues: axWindows.map { ($0.id, $0) })
         let previousState = windowMappingStateByPID[pid] ?? RuntimeWindowMappingState()
+        let observedAt = Date.timeIntervalSinceReferenceDate
         let hasAXWindowsInCurrentSnapshot = !axWindows.isEmpty
         let hasObservedAXWindowHandle = previousState.hasObservedAXWindowHandle || hasAXWindowsInCurrentSnapshot
         let consecutiveSnapshotsWithoutAXWindows = hasAXWindowsInCurrentSnapshot
@@ -209,55 +217,66 @@ extension RuntimeSnapshotProvider {
             && !hasAXWindowsInCurrentSnapshot
             && consecutiveSnapshotsWithoutAXWindows <= runtimeAXRebuildGraceMissingSnapshotLimit
 
-        var knownCGWindowsByID = previousState.lastKnownCGWindowsByID
+        var windowRecordsByCGWindowID = previousState.windowRecordsByCGWindowID
         for cgWindow in validCGWindows {
-            knownCGWindowsByID[cgWindow.id] = cgWindow
+            var record = windowRecordsByCGWindowID[cgWindow.id]
+                ?? RuntimeWindowRecord(
+                    cgWindowID: cgWindow.id,
+                    stableWindowID: Self.makeCGWindowID(pid: pid, cgWindowID: cgWindow.id),
+                    firstSeenAt: observedAt
+                )
+            record.refreshCGState(from: cgWindow, observedAt: observedAt)
+            record.updateFallbackDisplayStateIfNeeded()
+            windowRecordsByCGWindowID[cgWindow.id] = record
+        }
+        for cgWindowID in windowRecordsByCGWindowID.keys.sorted() {
+            guard var record = windowRecordsByCGWindowID[cgWindowID] else { continue }
+            record.clearCurrentAXAttachment()
+            windowRecordsByCGWindowID[cgWindowID] = record
         }
 
-        var bindingsByCGWindowID = previousState.bindingsByCGWindowID
+        let knownCGWindowsByID = runtimeKnownCGWindowsByID(
+            windowRecordsByCGWindowID: windowRecordsByCGWindowID,
+            validCGWindows: validCGWindows
+        )
         var exactMatchesByAXWindowID: [String: CGWindowID] = [:]
         var assignedAXWindowIDs: Set<String> = []
 
-        for cgWindowID in bindingsByCGWindowID.keys.sorted() {
-            guard var binding = bindingsByCGWindowID[cgWindowID] else { continue }
+        for cgWindowID in windowRecordsByCGWindowID.keys.sorted() {
+            guard var record = windowRecordsByCGWindowID[cgWindowID] else { continue }
             let reusedAXWindow = resolveStickyAXWindow(
-                for: binding,
+                for: record,
                 axWindows: axWindows,
                 assignedAXWindowIDs: assignedAXWindowIDs
             )
 
             if let reusedAXWindow {
-                binding.lastKnownAXWindowID = reusedAXWindow.id
-                binding.axWindow = reusedAXWindow.window
-                binding.title = resolveStableWindowTitle(
+                let resolvedTitle = resolveStableWindowTitle(
                     sourceTitle: reusedAXWindow.sourceTitle,
-                    matchedCGTitle: knownCGWindowsByID[cgWindowID]?.title ?? binding.title,
+                    matchedCGTitle: knownCGWindowsByID[cgWindowID]?.title ?? record.displayTitle,
                     appName: appName,
                     fallbackIndex: reusedAXWindow.index,
                     refreshedAXTitle: nil
                 )
-                binding.frame = reusedAXWindow.frame ?? binding.frame ?? knownCGWindowsByID[cgWindowID]?.bounds
-                binding.isMinimized = reusedAXWindow.isMinimized
-                binding.lastConfirmationSource = .stickyBinding
-                binding.hasCurrentActivationHandle = true
+                record.applyExactMatch(
+                    axWindow: reusedAXWindow,
+                    resolvedTitle: resolvedTitle,
+                    confirmationSource: .stickyBinding,
+                    observedAt: observedAt,
+                    matchedCGWindow: knownCGWindowsByID[cgWindowID]
+                )
                 exactMatchesByAXWindowID[reusedAXWindow.id] = cgWindowID
                 assignedAXWindowIDs.insert(reusedAXWindow.id)
             } else {
-                binding.hasCurrentActivationHandle = false
-                if binding.title == nil, let cgTitle = normalizedRuntimeWindowTitle(knownCGWindowsByID[cgWindowID]?.title) {
-                    binding.title = cgTitle
-                }
-                if binding.frame == nil {
-                    binding.frame = knownCGWindowsByID[cgWindowID]?.bounds
-                }
+                record.updateFallbackDisplayStateIfNeeded()
             }
 
-            bindingsByCGWindowID[cgWindowID] = binding
+            windowRecordsByCGWindowID[cgWindowID] = record
         }
 
         let unresolvedAXWindows = axWindows.filter { !assignedAXWindowIDs.contains($0.id) }
         let unresolvedCGWindows = validCGWindows.filter { cgWindow in
-            bindingsByCGWindowID[cgWindow.id]?.hasCurrentActivationHandle != true
+            windowRecordsByCGWindowID[cgWindow.id]?.hasCurrentActivationHandle != true
         }
         let publicMatches = Self.matchCGWindowAssignments(
             axWindows: unresolvedAXWindows,
@@ -272,7 +291,8 @@ extension RuntimeSnapshotProvider {
             currentAXWindowsByID: currentAXWindowsByID,
             knownCGWindowsByID: knownCGWindowsByID,
             appName: appName,
-            bindingsByCGWindowID: &bindingsByCGWindowID,
+            observedAt: observedAt,
+            windowRecordsByCGWindowID: &windowRecordsByCGWindowID,
             exactMatchesByAXWindowID: &exactMatchesByAXWindowID
         )
 
@@ -291,26 +311,34 @@ extension RuntimeSnapshotProvider {
             currentAXWindowsByID: currentAXWindowsByID,
             knownCGWindowsByID: knownCGWindowsByID,
             appName: appName,
-            bindingsByCGWindowID: &bindingsByCGWindowID,
+            observedAt: observedAt,
+            windowRecordsByCGWindowID: &windowRecordsByCGWindowID,
             exactMatchesByAXWindowID: &exactMatchesByAXWindowID
         )
 
-        for cgWindow in validCGWindows {
-            guard var binding = bindingsByCGWindowID[cgWindow.id] else { continue }
-            if binding.title == nil, let cgTitle = normalizedRuntimeWindowTitle(cgWindow.title) {
-                binding.title = cgTitle
-            }
-            if binding.frame == nil {
-                binding.frame = cgWindow.bounds
-            }
-            bindingsByCGWindowID[cgWindow.id] = binding
+        for cgWindowID in windowRecordsByCGWindowID.keys.sorted() {
+            guard var record = windowRecordsByCGWindowID[cgWindowID] else { continue }
+            record.updateFallbackDisplayStateIfNeeded()
+            windowRecordsByCGWindowID[cgWindowID] = record
         }
 
-        let retainedCGWindowIDs = Set(bindingsByCGWindowID.keys).union(validCGWindowIDs)
-        knownCGWindowsByID = knownCGWindowsByID.filter { retainedCGWindowIDs.contains($0.key) }
+        let retainedCGWindowIDs = Set(windowRecordsByCGWindowID.keys.filter { cgWindowID in
+            guard let record = windowRecordsByCGWindowID[cgWindowID] else { return false }
+            return validCGWindowIDs.contains(cgWindowID)
+                || record.hasStickyBinding
+                || record.spaceRecovery != nil
+        })
+        windowRecordsByCGWindowID = windowRecordsByCGWindowID.filter {
+            retainedCGWindowIDs.contains($0.key)
+        }
+        let currentAXToCG = exactMatchesByAXWindowID
+        let currentCGToAX = Dictionary(uniqueKeysWithValues: currentAXToCG.map { ($1, $0) })
         let nextState = RuntimeWindowMappingState(
-            bindingsByCGWindowID: bindingsByCGWindowID,
-            lastKnownCGWindowsByID: knownCGWindowsByID,
+            windowRecordsByCGWindowID: windowRecordsByCGWindowID,
+            currentAXToCG: currentAXToCG,
+            currentCGToAX: currentCGToAX,
+            validCGWindowIDs: validCGWindowIDs,
+            lastAXWindowIDs: Set(axWindows.map(\.id)),
             hasObservedAXWindowHandle: hasObservedAXWindowHandle,
             consecutiveSnapshotsWithoutAXWindows: consecutiveSnapshotsWithoutAXWindows
         )
@@ -322,9 +350,10 @@ extension RuntimeSnapshotProvider {
 
         let unmatchedAXCount = max(0, axWindows.count - exactMatchesByAXWindowID.count)
         let unmatchedCGCount = max(0, validCGWindows.count - Set(exactMatchesByAXWindowID.values).count)
+        let stickyCount = windowRecordsByCGWindowID.values.filter(\.hasStickyBinding).count
         RuntimeLog.info(
             "AXMatch",
-            "\(appName) sticky=\(bindingsByCGWindowID.count) exact=\(exactMatchesByAXWindowID.count) unmatchedAX=\(unmatchedAXCount) unmatchedCG=\(unmatchedCGCount)"
+            "\(appName) records=\(windowRecordsByCGWindowID.count) sticky=\(stickyCount) exact=\(exactMatchesByAXWindowID.count) unmatchedAX=\(unmatchedAXCount) unmatchedCG=\(unmatchedCGCount)"
         )
         if allowSpaceOneWithoutCurrentAXHandle {
             RuntimeLog.info(
@@ -334,9 +363,8 @@ extension RuntimeSnapshotProvider {
         }
         return RuntimeWindowMappingResolution(
             exactMatchesByAXWindowID: exactMatchesByAXWindowID,
-            bindingsByCGWindowID: bindingsByCGWindowID,
+            windowRecordsByCGWindowID: windowRecordsByCGWindowID,
             validCGWindows: validCGWindows,
-            knownCGWindowsByID: knownCGWindowsByID,
             allowSpaceOneWithoutCurrentAXHandle: allowSpaceOneWithoutCurrentAXHandle
         )
     }
@@ -348,37 +376,33 @@ extension RuntimeSnapshotProvider {
         currentAXWindowsByID: [String: AXWindowEntry],
         knownCGWindowsByID: [CGWindowID: CGWindowEntry],
         appName: String,
-        bindingsByCGWindowID: inout [CGWindowID: RuntimeStickyWindowBinding],
+        observedAt: TimeInterval,
+        windowRecordsByCGWindowID: inout [CGWindowID: RuntimeWindowRecord],
         exactMatchesByAXWindowID: inout [String: CGWindowID]
     ) {
         for (axWindowID, cgWindowID) in matches {
             guard let axWindow = currentAXWindowsByID[axWindowID] else { continue }
-            var binding = bindingsByCGWindowID[cgWindowID]
-                ?? RuntimeStickyWindowBinding(
-                    stableWindowID: Self.makeCGWindowID(pid: pid, cgWindowID: cgWindowID),
+            var record = windowRecordsByCGWindowID[cgWindowID]
+                ?? RuntimeWindowRecord(
                     cgWindowID: cgWindowID,
-                    lastKnownAXWindowID: nil,
-                    axWindow: nil,
-                    title: nil,
-                    frame: nil,
-                    isMinimized: false,
-                    lastConfirmationSource: source,
-                    hasCurrentActivationHandle: false
+                    stableWindowID: Self.makeCGWindowID(pid: pid, cgWindowID: cgWindowID),
+                    firstSeenAt: observedAt
                 )
-            binding.lastKnownAXWindowID = axWindowID
-            binding.axWindow = axWindow.window
-            binding.title = resolveStableWindowTitle(
+            let resolvedTitle = resolveStableWindowTitle(
                 sourceTitle: axWindow.sourceTitle,
                 matchedCGTitle: knownCGWindowsByID[cgWindowID]?.title,
                 appName: appName,
                 fallbackIndex: axWindow.index,
                 refreshedAXTitle: nil
             )
-            binding.frame = axWindow.frame ?? binding.frame ?? knownCGWindowsByID[cgWindowID]?.bounds
-            binding.isMinimized = axWindow.isMinimized
-            binding.lastConfirmationSource = source
-            binding.hasCurrentActivationHandle = true
-            bindingsByCGWindowID[cgWindowID] = binding
+            record.applyExactMatch(
+                axWindow: axWindow,
+                resolvedTitle: resolvedTitle,
+                confirmationSource: source,
+                observedAt: observedAt,
+                matchedCGWindow: knownCGWindowsByID[cgWindowID]
+            )
+            windowRecordsByCGWindowID[cgWindowID] = record
             exactMatchesByAXWindowID[axWindowID] = cgWindowID
         }
     }
@@ -424,21 +448,21 @@ extension RuntimeSnapshotProvider {
     }
 
     private func resolveStickyAXWindow(
-        for binding: RuntimeStickyWindowBinding,
+        for record: RuntimeWindowRecord,
         axWindows: [AXWindowEntry],
         assignedAXWindowIDs: Set<String>
     ) -> AXWindowEntry? {
         if
-            let lastKnownAXWindowID = binding.lastKnownAXWindowID,
+            let lastKnownAXWindowID = record.lastExactAXWindowID,
             let exactIDMatch = axWindows.first(where: {
                 $0.id == lastKnownAXWindowID && !assignedAXWindowIDs.contains($0.id)
             }),
-            stickyBindingCanReuse(binding, axWindow: exactIDMatch)
+            stickyBindingCanReuse(record, axWindow: exactIDMatch)
         {
             return exactIDMatch
         }
 
-        guard let previousAXWindow = binding.axWindow else { return nil }
+        guard let previousAXWindow = record.lastExactAXWindow else { return nil }
         return axWindows.first { axWindow in
             guard !assignedAXWindowIDs.contains(axWindow.id) else { return false }
             guard CFEqual(axWindow.window, previousAXWindow) else { return false }
@@ -556,11 +580,24 @@ extension RuntimeSnapshotProvider {
     }
 }
 
+private func runtimeKnownCGWindowsByID(
+    windowRecordsByCGWindowID: [CGWindowID: RuntimeWindowRecord],
+    validCGWindows: [RuntimeSnapshotProvider.CGWindowEntry]
+) -> [CGWindowID: RuntimeSnapshotProvider.CGWindowEntry] {
+    var knownCGWindowsByID = Dictionary(uniqueKeysWithValues: validCGWindows.map { ($0.id, $0) })
+    for (cgWindowID, record) in windowRecordsByCGWindowID {
+        guard knownCGWindowsByID[cgWindowID] == nil else { continue }
+        guard let knownCGWindow = record.synthesizedKnownCGWindowEntry() else { continue }
+        knownCGWindowsByID[cgWindowID] = knownCGWindow
+    }
+    return knownCGWindowsByID
+}
+
 private func stickyBindingCanReuse(
-    _ binding: RuntimeStickyWindowBinding,
+    _ record: RuntimeWindowRecord,
     axWindow: RuntimeSnapshotProvider.AXWindowEntry
 ) -> Bool {
-    let normalizedBindingTitle = normalizedRuntimeWindowTitle(binding.title)
+    let normalizedBindingTitle = normalizedRuntimeWindowTitle(record.displayTitle)
     let normalizedAXTitle = normalizedRuntimeWindowTitle(axWindow.sourceTitle ?? axWindow.title)
     let titleMatches: Bool
     switch (normalizedBindingTitle, normalizedAXTitle) {
@@ -573,7 +610,7 @@ private func stickyBindingCanReuse(
     }
 
     let frameMatches: Bool
-    switch (binding.frame, axWindow.frame) {
+    switch (record.displayFrame, axWindow.frame) {
     case let (bindingFrame?, axFrame?):
         frameMatches = runtimeFramesApproximatelyMatch(axFrame: axFrame, cgFrame: bindingFrame)
     case (nil, _):
@@ -585,7 +622,7 @@ private func stickyBindingCanReuse(
     return titleMatches && frameMatches
 }
 
-private func normalizedRuntimeWindowTitle(_ title: String?) -> String? {
+func normalizedRuntimeWindowTitle(_ title: String?) -> String? {
     guard let title else { return nil }
     let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
     return trimmed.isEmpty ? nil : trimmed

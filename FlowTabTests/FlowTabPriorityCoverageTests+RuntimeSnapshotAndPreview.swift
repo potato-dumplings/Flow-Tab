@@ -357,6 +357,79 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertNil(mergedEntries.first?.lastConfirmationSource)
     }
 
+    func testRuntimeSnapshotProviderStoresCGFirstWindowRecordsAsSingleSourceOfTruth() throws {
+        let provider = RuntimeSnapshotProvider()
+        let pid: pid_t = 18_405
+        let appName = "Google Chrome"
+        let exactBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
+        let recoveryBounds = CGRect(x: 0, y: 124, width: 1_728, height: 993)
+
+        let axWindows = [
+            RuntimeSnapshotProvider.AXWindowEntry(
+                index: 0,
+                id: "ax:18405:0",
+                title: "Doc A",
+                sourceTitle: "Doc A",
+                isMinimized: false,
+                window: AXUIElementCreateApplication(90_101),
+                frame: exactBounds
+            )
+        ]
+        let cgWindows = [
+            RuntimeSnapshotProvider.CGWindowEntry(
+                id: 240_001,
+                title: "Doc A",
+                bounds: exactBounds,
+                isOnscreen: true,
+                alpha: 1.0,
+                storeType: 1,
+                spaceIDs: [11_679]
+            ),
+            RuntimeSnapshotProvider.CGWindowEntry(
+                id: 243_747,
+                title: "Recovered Window",
+                bounds: recoveryBounds,
+                isOnscreen: false,
+                alpha: 1.0,
+                storeType: 1,
+                spaceIDs: [11_680]
+            )
+        ]
+
+        let entries = provider.resolvedStableWindowEntries(
+            axWindows: axWindows,
+            cgWindows: cgWindows,
+            pid: pid,
+            appName: appName
+        )
+
+        XCTAssertEqual(entries.map(\.windowID), ["cg:18405:240001", "cg:18405:243747"])
+
+        let state = try XCTUnwrap(provider.windowMappingStateByPID[pid])
+        XCTAssertEqual(state.currentAXToCG["ax:18405:0"], 240_001)
+        XCTAssertEqual(state.currentCGToAX[240_001], "ax:18405:0")
+        XCTAssertEqual(state.validCGWindowIDs, Set<CGWindowID>([240_001, 243_747]))
+        XCTAssertEqual(state.lastAXWindowIDs, Set(["ax:18405:0"]))
+
+        let exactRecord = try XCTUnwrap(state.windowRecordsByCGWindowID[240_001])
+        XCTAssertEqual(exactRecord.stableWindowID, "cg:18405:240001")
+        XCTAssertEqual(exactRecord.lastKnownCGTitle, "Doc A")
+        XCTAssertEqual(exactRecord.lastKnownDisplayTitle, "Doc A")
+        XCTAssertEqual(exactRecord.currentAXAttachment?.axWindowID, "ax:18405:0")
+        XCTAssertEqual(exactRecord.lastExactAXWindowID, "ax:18405:0")
+        XCTAssertEqual(exactRecord.spaceRecovery?.spaceIDs, [11_679])
+        XCTAssertEqual(exactRecord.lastConfirmationSource, .publicExactMatch)
+
+        let recoveryRecord = try XCTUnwrap(state.windowRecordsByCGWindowID[243_747])
+        XCTAssertEqual(recoveryRecord.stableWindowID, "cg:18405:243747")
+        XCTAssertEqual(recoveryRecord.lastKnownCGTitle, "Recovered Window")
+        XCTAssertEqual(recoveryRecord.lastKnownCGFrame, recoveryBounds)
+        XCTAssertNil(recoveryRecord.currentAXAttachment)
+        XCTAssertNil(recoveryRecord.lastExactAXWindowID)
+        XCTAssertEqual(recoveryRecord.spaceRecovery?.spaceIDs, [11_680])
+        XCTAssertNil(recoveryRecord.lastConfirmationSource)
+    }
+
     func testRuntimeSnapshotProviderWindowListHidesCGOnlyEntriesBoundToSpaceOneWithoutAXHandle() {
         let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
             axWindows: [],

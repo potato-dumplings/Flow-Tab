@@ -817,40 +817,11 @@ final class RuntimeSnapshotProvider {
         appName: String = "FlowTab Test"
     ) -> [String: CGWindowID] {
         let provider = RuntimeSnapshotProvider()
-        provider.windowMappingStateByPID[pid] = RuntimeWindowMappingState(
-            bindingsByCGWindowID: Dictionary(
-                uniqueKeysWithValues: previousMatches.map { axWindowID, cgWindowID in
-                    (
-                        cgWindowID,
-                        RuntimeStickyWindowBinding(
-                            stableWindowID: Self.makeCGWindowID(pid: pid, cgWindowID: cgWindowID),
-                            cgWindowID: cgWindowID,
-                            lastKnownAXWindowID: previousAXWindowIDs.contains(axWindowID) ? axWindowID : nil,
-                            axWindow: nil,
-                            title: nil,
-                            frame: nil,
-                            isMinimized: false,
-                            lastConfirmationSource: .stickyBinding,
-                            hasCurrentActivationHandle: false
-                        )
-                    )
-                }
-            ),
-            lastKnownCGWindowsByID: Dictionary(
-                uniqueKeysWithValues: previousCGWindowIDs.map { cgWindowID in
-                    (
-                        cgWindowID,
-                        CGWindowEntry(
-                            id: cgWindowID,
-                            title: nil,
-                            bounds: nil,
-                            isOnscreen: false,
-                            alpha: 1.0,
-                            storeType: 1
-                        )
-                    )
-                }
-            )
+        provider.windowMappingStateByPID[pid] = windowMappingStateForTesting(
+            previousMatches: previousMatches,
+            previousAXWindowIDs: previousAXWindowIDs,
+            previousCGWindowIDs: previousCGWindowIDs,
+            pid: pid
         )
         let axEntries = axWindows.map {
             AXWindowEntry(
@@ -899,40 +870,11 @@ final class RuntimeSnapshotProvider {
         appName: String = "FlowTab Test"
     ) -> [SupplementalMergeEntryForTesting] {
         let provider = RuntimeSnapshotProvider()
-        provider.windowMappingStateByPID[pid] = RuntimeWindowMappingState(
-            bindingsByCGWindowID: Dictionary(
-                uniqueKeysWithValues: previousMatches.map { axWindowID, cgWindowID in
-                    (
-                        cgWindowID,
-                        RuntimeStickyWindowBinding(
-                            stableWindowID: Self.makeCGWindowID(pid: pid, cgWindowID: cgWindowID),
-                            cgWindowID: cgWindowID,
-                            lastKnownAXWindowID: previousAXWindowIDs.contains(axWindowID) ? axWindowID : nil,
-                            axWindow: nil,
-                            title: nil,
-                            frame: nil,
-                            isMinimized: false,
-                            lastConfirmationSource: .stickyBinding,
-                            hasCurrentActivationHandle: false
-                        )
-                    )
-                }
-            ),
-            lastKnownCGWindowsByID: Dictionary(
-                uniqueKeysWithValues: previousCGWindowIDs.map { cgWindowID in
-                    (
-                        cgWindowID,
-                        CGWindowEntry(
-                            id: cgWindowID,
-                            title: nil,
-                            bounds: nil,
-                            isOnscreen: false,
-                            alpha: 1.0,
-                            storeType: 1
-                        )
-                    )
-                }
-            )
+        provider.windowMappingStateByPID[pid] = windowMappingStateForTesting(
+            previousMatches: previousMatches,
+            previousAXWindowIDs: previousAXWindowIDs,
+            previousCGWindowIDs: previousCGWindowIDs,
+            pid: pid
         )
         let axEntries = axWindows.map {
             AXWindowEntry(
@@ -1005,6 +947,36 @@ final class RuntimeSnapshotProvider {
                 guard let bridgedCGWindowID = axWindow.bridgedCGWindowID else { return nil }
                 return (axWindow.id, bridgedCGWindowID)
             }
+        )
+    }
+
+    private static func windowMappingStateForTesting(
+        previousMatches: [String: CGWindowID],
+        previousAXWindowIDs: Set<String>,
+        previousCGWindowIDs: Set<CGWindowID>,
+        pid: pid_t
+    ) -> RuntimeWindowMappingState {
+        let seedTimestamp = Date.timeIntervalSinceReferenceDate
+        let historicalCGWindowIDs = Set(previousMatches.values).union(previousCGWindowIDs)
+        let records = Dictionary(uniqueKeysWithValues: historicalCGWindowIDs.map { cgWindowID in
+            var record = RuntimeWindowRecord(
+                cgWindowID: cgWindowID,
+                stableWindowID: makeCGWindowID(pid: pid, cgWindowID: cgWindowID),
+                firstSeenAt: seedTimestamp
+            )
+            if let previousAXWindowID = previousMatches.first(where: { $0.value == cgWindowID })?.key {
+                if previousAXWindowIDs.contains(previousAXWindowID) {
+                    record.lastExactAXWindowID = previousAXWindowID
+                }
+                record.lastConfirmationSource = .stickyBinding
+                record.lastExactConfirmedAt = seedTimestamp
+            }
+            return (cgWindowID, record)
+        })
+        return RuntimeWindowMappingState(
+            windowRecordsByCGWindowID: records,
+            validCGWindowIDs: previousCGWindowIDs,
+            lastAXWindowIDs: previousAXWindowIDs
         )
     }
 
