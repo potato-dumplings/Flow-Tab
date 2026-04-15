@@ -4,10 +4,12 @@ import AppKit
 final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
     let plan: SpaceFixtureWindowPlan
 
+    private let contentView: SpaceFixtureWindowContentView
     private let window: NSWindow
 
     init(plan: SpaceFixtureWindowPlan) {
         self.plan = plan
+        let contentView = SpaceFixtureWindowContentView(plan: plan)
 
         let window = NSWindow(
             contentRect: plan.frame,
@@ -21,8 +23,9 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
         window.tabbingMode = .disallowed
         window.isReleasedWhenClosed = false
         window.setFrame(plan.frame, display: false)
-        window.contentView = SpaceFixtureWindowContentView(plan: plan)
+        window.contentView = contentView
 
+        self.contentView = contentView
         self.window = window
     }
 
@@ -36,5 +39,9 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
 
     func enterFullScreen() {
         window.toggleFullScreen(nil)
+    }
+
+    func updateWorkflowReadiness(windowTitles: [String]) {
+        contentView.updateWorkflowReadiness(windowTitles: windowTitles)
     }
 }

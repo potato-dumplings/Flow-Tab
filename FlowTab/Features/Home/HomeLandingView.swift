@@ -205,6 +205,7 @@ struct HomeLandingView: View {
                             }
                             .buttonStyle(.plain)
                             .accessibilityIdentifier("flowtab.home.app.\(app.appID.flowTabAccessibilitySlug)")
+                            .accessibilityValue("\(app.windowCount)w")
                         }
                     }
                 }

@@ -7,6 +7,7 @@ private final class SpaceFixtureWindowSpy: SpaceFixtureWindowing {
 
     private(set) var showCalls: [Bool] = []
     private(set) var enterFullScreenCallCount = 0
+    private(set) var workflowReadyCalls: [[String]] = []
 
     init(plan: SpaceFixtureWindowPlan) {
         self.plan = plan
@@ -19,6 +20,10 @@ private final class SpaceFixtureWindowSpy: SpaceFixtureWindowing {
     func enterFullScreen() {
         enterFullScreenCallCount += 1
     }
+
+    func updateWorkflowReadiness(windowTitles: [String]) {
+        workflowReadyCalls.append(windowTitles)
+    }
 }
 
 extension FlowTabTests {
@@ -29,12 +34,13 @@ extension FlowTabTests {
             fullscreenWindowIndex: 2,
             windowTitlePrefix: "Fixture",
             usesStaggeredLayout: true,
-            enterFullscreenDelayMilliseconds: 1200
+            enterFullscreenDelayMilliseconds: 1200,
+            preservesDesktopAfterFullscreen: true
         )
 
         var windowSpies: [SpaceFixtureWindowSpy] = []
-        var scheduledDelay: Int?
-        var scheduledAction: (@MainActor () -> Void)?
+        var scheduledDelays: [Int] = []
+        var scheduledActions: [(@MainActor () -> Void)] = []
         var activationCallCount = 0
 
         let coordinator = SpaceFixtureWindowCoordinator(
@@ -46,8 +52,8 @@ extension FlowTabTests {
                 return spy
             },
             fullscreenScheduler: { delay, action in
-                scheduledDelay = delay
-                scheduledAction = action
+                scheduledDelays.append(delay)
+                scheduledActions.append(action)
             },
             activateApplication: {
                 activationCallCount += 1
@@ -61,14 +67,25 @@ extension FlowTabTests {
         XCTAssertEqual(windowSpies[0].showCalls, [false])
         XCTAssertEqual(windowSpies[1].showCalls, [true])
         XCTAssertEqual(windowSpies[2].showCalls, [false])
+        XCTAssertEqual(windowSpies[0].workflowReadyCalls, [["Fixture 1", "Fixture 2", "Fixture 3"]])
+        XCTAssertEqual(windowSpies[1].workflowReadyCalls, [["Fixture 1", "Fixture 2", "Fixture 3"]])
+        XCTAssertEqual(windowSpies[2].workflowReadyCalls, [["Fixture 1", "Fixture 2", "Fixture 3"]])
         XCTAssertEqual(activationCallCount, 1)
-        XCTAssertEqual(scheduledDelay, 1200)
+        XCTAssertEqual(scheduledDelays, [1200])
 
-        scheduledAction?()
+        scheduledActions[0]()
 
         XCTAssertEqual(windowSpies[1].enterFullScreenCallCount, 1)
         XCTAssertEqual(windowSpies[0].enterFullScreenCallCount, 0)
         XCTAssertEqual(windowSpies[2].enterFullScreenCallCount, 0)
+        XCTAssertEqual(scheduledDelays, [1200, 1200])
+
+        scheduledActions[1]()
+
+        XCTAssertEqual(windowSpies[0].showCalls, [false, true])
+        XCTAssertEqual(windowSpies[1].showCalls, [true])
+        XCTAssertEqual(windowSpies[2].showCalls, [false])
+        XCTAssertEqual(activationCallCount, 2)
     }
 
     @MainActor
@@ -78,7 +95,8 @@ extension FlowTabTests {
             fullscreenWindowIndex: nil,
             windowTitlePrefix: "Fixture",
             usesStaggeredLayout: false,
-            enterFullscreenDelayMilliseconds: 500
+            enterFullscreenDelayMilliseconds: 500,
+            preservesDesktopAfterFullscreen: false
         )
 
         var windowSpies: [SpaceFixtureWindowSpy] = []
@@ -102,6 +120,8 @@ extension FlowTabTests {
         XCTAssertEqual(windowSpies.count, 2)
         XCTAssertEqual(windowSpies[0].showCalls, [true])
         XCTAssertEqual(windowSpies[1].showCalls, [false])
+        XCTAssertEqual(windowSpies[0].workflowReadyCalls, [["Fixture 1", "Fixture 2"]])
+        XCTAssertEqual(windowSpies[1].workflowReadyCalls, [["Fixture 1", "Fixture 2"]])
         XCTAssertEqual(scheduledCallCount, 0)
     }
 }

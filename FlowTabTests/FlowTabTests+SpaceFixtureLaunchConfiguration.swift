@@ -13,6 +13,7 @@ extension FlowTabTests {
             configuration.enterFullscreenDelayMilliseconds,
             SpaceFixtureLaunchConfiguration.defaultEnterFullscreenDelayMilliseconds
         )
+        XCTAssertFalse(configuration.preservesDesktopAfterFullscreen)
     }
 
     func testSpaceFixtureLaunchConfigurationNormalizesInvalidNumericArguments() {
@@ -30,6 +31,7 @@ extension FlowTabTests {
         XCTAssertNil(configuration.fullscreenWindowIndex)
         XCTAssertEqual(configuration.windowTitlePrefix, SpaceFixtureLaunchConfiguration.defaultWindowTitlePrefix)
         XCTAssertEqual(configuration.enterFullscreenDelayMilliseconds, 0)
+        XCTAssertFalse(configuration.preservesDesktopAfterFullscreen)
     }
 
     func testSpaceFixtureWindowPlannerCreatesStaggeredPlansAndFullscreenMarker() {
@@ -38,7 +40,8 @@ extension FlowTabTests {
             fullscreenWindowIndex: 2,
             windowTitlePrefix: "UITest",
             usesStaggeredLayout: true,
-            enterFullscreenDelayMilliseconds: 900
+            enterFullscreenDelayMilliseconds: 900,
+            preservesDesktopAfterFullscreen: false
         )
 
         let plans = SpaceFixtureWindowPlanner.makePlans(

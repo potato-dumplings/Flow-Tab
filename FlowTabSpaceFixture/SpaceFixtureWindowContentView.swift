@@ -2,6 +2,8 @@ import AppKit
 
 final class SpaceFixtureWindowContentView: NSView {
     private let plan: SpaceFixtureWindowPlan
+    private let workflowReadyLabel = NSTextField(labelWithString: SpaceFixtureWorkflowStatus.launchingText)
+    private let workflowSummaryLabel = NSTextField(labelWithString: "")
 
     init(plan: SpaceFixtureWindowPlan) {
         self.plan = plan
@@ -42,7 +44,9 @@ final class SpaceFixtureWindowContentView: NSView {
                 font: .systemFont(ofSize: 16, weight: .bold),
                 textColor: .labelColor,
                 identifier: plan.modeAccessibilityIdentifier
-            )
+            ),
+            workflowReadyLabel,
+            workflowSummaryLabel
         ])
         stackView.orientation = .vertical
         stackView.alignment = .leading
@@ -60,6 +64,11 @@ final class SpaceFixtureWindowContentView: NSView {
         identifier = NSUserInterfaceItemIdentifier(plan.rootAccessibilityIdentifier)
         setAccessibilityIdentifier(plan.rootAccessibilityIdentifier)
         setAccessibilityElement(false)
+
+        // XCTest does not reliably expose every NSWindow subtree once multiple
+        // windows reorder or move into fullscreen Spaces, so mirror launch
+        // readiness into shared labels that any visible fixture window can expose.
+        configureWorkflowLabels()
     }
 
     private func makeLabel(
@@ -80,5 +89,45 @@ final class SpaceFixtureWindowContentView: NSView {
         label.setAccessibilityValue(text)
         label.setAccessibilityElement(true)
         return label
+    }
+
+    func updateWorkflowReadiness(windowTitles: [String]) {
+        applyText(SpaceFixtureWorkflowStatus.readyText, to: workflowReadyLabel)
+        applyText(
+            SpaceFixtureWorkflowStatus.summaryText(for: windowTitles),
+            to: workflowSummaryLabel
+        )
+    }
+
+    private func configureWorkflowLabels() {
+        workflowReadyLabel.font = .systemFont(ofSize: 13, weight: .semibold)
+        workflowReadyLabel.textColor = .secondaryLabelColor
+        workflowReadyLabel.identifier = NSUserInterfaceItemIdentifier(
+            SpaceFixtureWorkflowStatus.readyAccessibilityIdentifier
+        )
+        workflowReadyLabel.setAccessibilityIdentifier(
+            SpaceFixtureWorkflowStatus.readyAccessibilityIdentifier
+        )
+        workflowReadyLabel.setAccessibilityElement(true)
+        applyText(SpaceFixtureWorkflowStatus.launchingText, to: workflowReadyLabel)
+
+        workflowSummaryLabel.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+        workflowSummaryLabel.textColor = .secondaryLabelColor
+        workflowSummaryLabel.lineBreakMode = .byTruncatingTail
+        workflowSummaryLabel.maximumNumberOfLines = 1
+        workflowSummaryLabel.identifier = NSUserInterfaceItemIdentifier(
+            SpaceFixtureWorkflowStatus.summaryAccessibilityIdentifier
+        )
+        workflowSummaryLabel.setAccessibilityIdentifier(
+            SpaceFixtureWorkflowStatus.summaryAccessibilityIdentifier
+        )
+        workflowSummaryLabel.setAccessibilityElement(true)
+        applyText("", to: workflowSummaryLabel)
+    }
+
+    private func applyText(_ text: String, to label: NSTextField) {
+        label.stringValue = text
+        label.setAccessibilityLabel(text)
+        label.setAccessibilityValue(text)
     }
 }

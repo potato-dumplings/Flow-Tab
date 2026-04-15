@@ -56,10 +56,12 @@ final class FlowTabUITests: XCTestCase {
     override func setUpWithError() throws {
         continueAfterFailure = false
         terminateAppIfRunning()
+        terminateSpaceFixtureAppIfRunning()
     }
 
     override func tearDownWithError() throws {
         terminateAppIfRunning()
+        terminateSpaceFixtureAppIfRunning()
     }
 
 }

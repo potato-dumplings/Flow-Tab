@@ -1,5 +1,16 @@
 import CoreGraphics
 
+enum SpaceFixtureWorkflowStatus {
+    static let readyAccessibilityIdentifier = "flowtab.spacefixture.workflow.ready"
+    static let summaryAccessibilityIdentifier = "flowtab.spacefixture.workflow.summary"
+    static let launchingText = "Launching"
+    static let readyText = "Ready"
+
+    static func summaryText(for windowTitles: [String]) -> String {
+        windowTitles.joined(separator: " | ")
+    }
+}
+
 struct SpaceFixtureWindowPlan: Equatable {
     let index: Int
     let totalWindowCount: Int

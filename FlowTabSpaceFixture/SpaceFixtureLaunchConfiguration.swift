@@ -11,6 +11,7 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
     let windowTitlePrefix: String
     let usesStaggeredLayout: Bool
     let enterFullscreenDelayMilliseconds: Int
+    let preservesDesktopAfterFullscreen: Bool
 
     func title(forWindowIndex index: Int) -> String {
         "\(windowTitlePrefix) \(index)"
@@ -45,7 +46,8 @@ extension SpaceFixtureLaunchConfiguration {
                 ? normalizedWindowTitlePrefix!
                 : Self.defaultWindowTitlePrefix,
             usesStaggeredLayout: arguments.contains("--staggered-layout"),
-            enterFullscreenDelayMilliseconds: normalizedDelayMilliseconds
+            enterFullscreenDelayMilliseconds: normalizedDelayMilliseconds,
+            preservesDesktopAfterFullscreen: arguments.contains("--preserve-desktop-after-fullscreen")
         )
     }
 

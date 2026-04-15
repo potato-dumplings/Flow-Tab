@@ -7,6 +7,7 @@ protocol SpaceFixtureWindowing: AnyObject {
     var plan: SpaceFixtureWindowPlan { get }
     func show(isKey: Bool)
     func enterFullScreen()
+    func updateWorkflowReadiness(windowTitles: [String])
 }
 
 @MainActor
@@ -15,6 +16,8 @@ final class SpaceFixtureWindowCoordinator {
     typealias WindowFactory = (SpaceFixtureWindowPlan) -> any SpaceFixtureWindowing
     typealias FullscreenScheduler = (Int, @escaping @MainActor () -> Void) -> Void
     typealias ActivationHandler = () -> Void
+
+    private static let desktopRefocusDelayMilliseconds = 1_200
 
     private let configuration: SpaceFixtureLaunchConfiguration
     private let visibleFrameProvider: VisibleFrameProvider
@@ -46,6 +49,7 @@ final class SpaceFixtureWindowCoordinator {
             visibleFrame: visibleFrameProvider()
         )
         windows = windowPlans.map(windowFactory)
+        let windowTitles = windowPlans.map(\.title)
 
         let keyWindowIndex = configuration.fullscreenWindowIndex ?? 1
         for window in windows where window.plan.index != keyWindowIndex {
@@ -54,14 +58,26 @@ final class SpaceFixtureWindowCoordinator {
         windows.first(where: { $0.plan.index == keyWindowIndex })?.show(isKey: true)
 
         activateApplication()
+        windows.forEach { $0.updateWorkflowReadiness(windowTitles: windowTitles) }
 
         guard let fullscreenWindowIndex = configuration.fullscreenWindowIndex else { return }
         guard let fullscreenWindow = windows.first(where: { $0.plan.index == fullscreenWindowIndex }) else {
             return
         }
+        let desktopAnchorWindow = configuration.preservesDesktopAfterFullscreen
+            ? windows.first(where: { $0.plan.index != fullscreenWindowIndex })
+            : nil
 
         fullscreenScheduler(configuration.enterFullscreenDelayMilliseconds) {
             fullscreenWindow.enterFullScreen()
+
+            guard let desktopAnchorWindow else { return }
+            // Keep the post-launch topology anchored on the normal desktop so
+            // runtime sampling can still observe the app's non-fullscreen windows.
+            self.fullscreenScheduler(Self.desktopRefocusDelayMilliseconds) {
+                self.activateApplication()
+                desktopAnchorWindow.show(isKey: true)
+            }
         }
     }
 
