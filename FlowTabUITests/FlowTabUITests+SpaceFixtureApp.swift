@@ -1,6 +1,4 @@
-import ApplicationServices
 import AppKit
-import CoreGraphics
 import Foundation
 import XCTest
 
@@ -9,7 +7,7 @@ private enum SpaceFixtureEnvironmentKey {
     static let bundleIdentifier = "FLOWTAB_SPACE_FIXTURE_BUNDLE_ID"
 }
 
-private struct SpaceFixtureAppIdentity: Equatable {
+struct SpaceFixtureAppIdentity: Equatable {
     static let defaultBundleIdentifier = "io.github.potato-dumplings.flowtab.spacefixture"
 
     let bundleIdentifier: String
@@ -17,6 +15,29 @@ private struct SpaceFixtureAppIdentity: Equatable {
 
     var homeAppAccessibilityIdentifier: String {
         "flowtab.home.app.\(bundleIdentifier.spaceFixtureAccessibilitySlug)"
+    }
+
+    var switcherAppAccessibilityIdentifier: String {
+        "flowtab.switcher.app.\(bundleIdentifier.spaceFixtureAccessibilitySlug)"
+    }
+
+    var switcherSearchAppAccessibilityIdentifier: String {
+        "flowtab.switcher.search.app.\(bundleIdentifier.spaceFixtureAccessibilitySlug)"
+    }
+
+    var switcherSearchQuery: String {
+        let ignoredTokens = Set(["com", "org", "net", "io", "app", "www"])
+        let relevantTokens = bundleIdentifier
+            .split(separator: ".")
+            .map(String.init)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+            .filter { !$0.isEmpty && !ignoredTokens.contains($0) }
+
+        let tailTokens = relevantTokens.suffix(2)
+        if !tailTokens.isEmpty {
+            return tailTokens.joined(separator: " ")
+        }
+        return "spacefixture"
     }
 
     static func configured(
@@ -63,7 +84,7 @@ private extension String {
 }
 
 extension FlowTabUITests {
-    private var spaceFixtureAppIdentity: SpaceFixtureAppIdentity {
+    var spaceFixtureAppIdentity: SpaceFixtureAppIdentity {
         SpaceFixtureAppIdentity.configured()
     }
 
@@ -102,7 +123,7 @@ extension FlowTabUITests {
         }
     }
 
-    private func launchSpaceFixtureWorkflow(
+    func launchSpaceFixtureWorkflow(
         identity: SpaceFixtureAppIdentity = .configured(),
         windowCount: Int = 3,
         fullscreenWindowIndex: Int? = 3,
@@ -171,13 +192,22 @@ extension FlowTabUITests {
         RunLoop.current.run(until: Date().addingTimeInterval(settleTimeout))
     }
 
-    func makeRealRuntimeFlowTabApp(additionalArguments: [String] = []) -> XCUIApplication {
-        makeApp(
-            additionalArguments: [
-                "--flowtab-ui-reset-defaults",
-                "-showPermissionReminder", "NO"
-            ] + additionalArguments
-        )
+    func makeRealRuntimeFlowTabApp(
+        showsPermissionReminder: Bool = false,
+        additionalArguments: [String] = []
+    ) -> XCUIApplication {
+        var launchArguments = ["--flowtab-ui-reset-defaults"]
+        if !showsPermissionReminder {
+            launchArguments += ["-showPermissionReminder", "NO"]
+        }
+        return makeApp(additionalArguments: launchArguments + additionalArguments)
+    }
+
+    func expectedSpaceFixtureWorkflowWindowTitles(
+        titlePrefix: String,
+        windowCount: Int
+    ) -> [String] {
+        (1...windowCount).map { "\(titlePrefix) \($0)" }
     }
 
     func testSpaceFixtureAppIdentityUsesEnvironmentOverridesForCustomFixtureVariants() {
@@ -270,42 +300,6 @@ extension FlowTabUITests {
         XCTAssertEqual(element(in: app, identifier: "flowtab.spacefixture.window.mode.2").label, "Fullscreen Target")
     }
 
-    func testHomePageShowsRealSpaceFixtureWorkflowWindows() throws {
-        guard assertRealSpaceFixtureWorkflowPrerequisites() else { return }
-
-        let titlePrefix = "Workflow"
-        let identity = spaceFixtureAppIdentity
-        let fixtureApp = launchSpaceFixtureWorkflow(
-            identity: identity,
-            windowCount: 3,
-            fullscreenWindowIndex: 3,
-            titlePrefix: titlePrefix,
-            enterFullscreenDelayMilliseconds: 5_000
-        )
-        defer {
-            if fixtureApp.state == .runningForeground || fixtureApp.state == .runningBackground {
-                fixtureApp.terminate()
-            }
-        }
-
-        let app = makeRealRuntimeFlowTabApp()
-        app.launch()
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 12))
-
-        XCTAssertTrue(
-            tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 10)
-        )
-
-        let fixtureAppRows = app.buttons.matching(identifier: identity.homeAppAccessibilityIdentifier)
-        let fixtureAppRow = fixtureAppRows.firstMatch
-        XCTAssertTrue(fixtureAppRow.waitForExistence(timeout: 20))
-        assertValue(of: fixtureAppRow, equals: "3w", timeout: 20)
-        XCTAssertTrue(
-            tapFirstHittable(in: fixtureAppRows, timeout: 20),
-            "FlowTab did not surface the real space fixture app on the home page"
-        )
-    }
-
     private func expectedSpaceFixtureWorkflowSummary(
         titlePrefix: String,
         windowCount: Int
@@ -313,21 +307,32 @@ extension FlowTabUITests {
         (1...windowCount).map { "\(titlePrefix) \($0)" }.joined(separator: " | ")
     }
 
-    private func assertRealSpaceFixtureWorkflowPrerequisites() -> Bool {
-        var missingPermissions: [String] = []
-        if !AXIsProcessTrusted() {
-            missingPermissions.append("Accessibility")
+    func assertSpaceFixtureWorkflowPermissionsAvailable() -> Bool {
+        let app = makeRealRuntimeFlowTabApp(
+            showsPermissionReminder: true,
+            additionalArguments: []
+        )
+        app.launch()
+        defer {
+            if app.state == .runningForeground || app.state == .runningBackground {
+                app.terminate()
+            }
         }
-        if !CGPreflightScreenCaptureAccess() {
-            missingPermissions.append("Screen Recording")
-        }
-        guard !missingPermissions.isEmpty else { return true }
 
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 12))
+        XCTAssertTrue(
+            tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 10)
+        )
+
+        let openSettingsButtons = app.buttons.matching(identifier: Identifier.permissionOpenSettings)
+        guard openSettingsButtons.firstMatch.waitForExistence(timeout: 2) else { return true }
+
+        XCTAssertTrue(hasHittableElement(in: openSettingsButtons, timeout: 5))
+        XCTAssertTrue(app.buttons.matching(identifier: Identifier.permissionDismiss).firstMatch.waitForExistence(timeout: 5))
         XCTFail(
             """
-            Real Space Fixture workflow requires real macOS permissions before it can run.
-            Missing: \(missingPermissions.joined(separator: ", ")).
-            Grant access in System Settings > Privacy & Security, then rerun this UI test.
+            Space Fixture workflow requires Accessibility and Screen Recording permissions.
+            FlowTab showed the missing-permissions prompt instead of fixture window data.
             """
         )
         return false

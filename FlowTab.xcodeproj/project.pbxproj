@@ -109,6 +109,7 @@
 		F500010D2F90000100B0D737 /* FlowTabUITests+SpaceFixtureApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F500000B2F90000100B0D737 /* FlowTabUITests+SpaceFixtureApp.swift */; };
 		F500010E2F90000100B0D737 /* AppKitSpaceFixtureWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000072F90000100B0D737 /* AppKitSpaceFixtureWindow.swift */; };
 		F500010F2F90000100B0D737 /* SpaceFixtureWindowContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000082F90000100B0D737 /* SpaceFixtureWindowContentView.swift */; };
+		F50001102F90000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000122F90000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflow.swift */; };
 		4A6DAE9D2F727C0900B0D737 /* FlowTabCore in Frameworks */ = {isa = PBXBuildFile; productRef = 4A6DAE9C2F727C0900B0D737 /* FlowTabCore */; };
 /* End PBXBuildFile section */
 
@@ -232,6 +233,7 @@
 		F50000092F90000100B0D737 /* FlowTabTests+SpaceFixtureLaunchConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+SpaceFixtureLaunchConfiguration.swift"; sourceTree = "<group>"; };
 		F500000A2F90000100B0D737 /* FlowTabTests+SpaceFixtureWindowCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+SpaceFixtureWindowCoordinator.swift"; sourceTree = "<group>"; };
 		F500000B2F90000100B0D737 /* FlowTabUITests+SpaceFixtureApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureApp.swift"; sourceTree = "<group>"; };
+		F50000122F90000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureWorkflow.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -517,6 +519,7 @@
 				B10002032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift */,
 				B10002042F76000100B0D737 /* FlowTabUITests+Support.swift */,
 				F500000B2F90000100B0D737 /* FlowTabUITests+SpaceFixtureApp.swift */,
+				F50000122F90000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflow.swift */,
 				4A6DAE8B2F727AF600B0D737 /* FlowTabUITestsLaunchTests.swift */,
 			);
 			path = FlowTabUITests;
@@ -814,6 +817,7 @@
 				B10012032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift in Sources */,
 				B10012042F76000100B0D737 /* FlowTabUITests+Support.swift in Sources */,
 				F500010D2F90000100B0D737 /* FlowTabUITests+SpaceFixtureApp.swift in Sources */,
+				F50001102F90000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflow.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

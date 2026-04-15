@@ -1,58 +1,31 @@
 import XCTest
 
 extension FlowTabUITests {
-    func testSwitcherPanelShowsMockAppTilesInStandardMode() throws {
-        let app = makeApp(
-            additionalArguments: [
-                "--flowtab-ui-reset-defaults",
-                "--flowtab-ui-mock-runtime",
-                "--flowtab-ui-open-switcher-search",
-                "-showPermissionReminder",
-                "NO"
-            ]
-        )
-        app.launch()
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
-
-        XCTAssertTrue(element(in: app, identifier: Identifier.switcherPanel).waitForExistence(timeout: 8))
-        app.typeKey(.escape, modifierFlags: [])
-        RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-        XCTAssertFalse(element(in: app, identifier: Identifier.switcherSearchInput).exists)
-    }
-
     func testSearchPanelEntryAndResultActivation() throws {
-        let app = makeApp(
-            additionalArguments: [
-                "--flowtab-ui-reset-defaults",
-                "--flowtab-ui-mock-runtime",
-                "--flowtab-ui-open-switcher-search",
-                "-showPermissionReminder",
-                "NO"
-            ]
-        )
-        app.launch()
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+        runRealSpaceFixtureWorkflow(
+            flowTabAdditionalArguments: ["--flowtab-ui-open-switcher-search"]
+        ) { identity, app in
+            let switcherPanel = app.descendants(matching: .any)
+                .matching(identifier: Identifier.switcherPanel)
+                .firstMatch
+            XCTAssertTrue(switcherPanel.waitForExistence(timeout: 5))
 
-        let switcherPanel = app.descendants(matching: .any)
-            .matching(identifier: Identifier.switcherPanel)
-            .firstMatch
-        XCTAssertTrue(switcherPanel.waitForExistence(timeout: 5))
+            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+            app.typeText(identity.switcherSearchQuery)
 
-        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
-        app.typeText("browser")
+            let fixtureResult = app.descendants(matching: .any)
+                .matching(identifier: identity.switcherSearchAppAccessibilityIdentifier)
+                .firstMatch
+            XCTAssertTrue(fixtureResult.waitForExistence(timeout: 5))
 
-        let browserResult = app.descendants(matching: .any)
-            .matching(identifier: "flowtab.switcher.search.app.com-flowtab-mock-browser")
-            .firstMatch
-        XCTAssertTrue(browserResult.waitForExistence(timeout: 5))
-
-        app.typeText("\r")
-        if !waitForNonExistence(switcherPanel, timeout: 1.2) {
-            // XCUI keyboard input may leave the hidden NSTextView in a marked-text
-            // composition state, so the first Return only commits composition.
             app.typeText("\r")
+            if !waitForNonExistence(switcherPanel, timeout: 1.2) {
+                // XCUI keyboard input may leave the hidden NSTextView in a marked-text
+                // composition state, so the first Return only commits composition.
+                app.typeText("\r")
+            }
+            XCTAssertTrue(waitForNonExistence(switcherPanel, timeout: 3))
         }
-        XCTAssertTrue(waitForNonExistence(switcherPanel, timeout: 3))
     }
 
     func testSearchPanelChineseQueryShowsChineseMockResult() throws {
@@ -215,82 +188,6 @@ extension FlowTabUITests {
                 timeout: 5
             )
         )
-    }
-
-    func testSwitcherPanelMoveAppThenAutoEnterWindowLayerShowsMockWindows() throws {
-        let app = makeApp(
-            additionalArguments: [
-                "--flowtab-ui-reset-defaults",
-                "--flowtab-ui-mock-runtime",
-                "--flowtab-ui-open-switcher-search",
-                "-showPermissionReminder",
-                "NO"
-            ]
-        )
-        app.launch()
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
-
-        let switcherPanel = app.descendants(matching: .any)
-            .matching(identifier: Identifier.switcherPanel)
-            .firstMatch
-        XCTAssertTrue(switcherPanel.waitForExistence(timeout: 8))
-
-        app.typeKey(.escape, modifierFlags: [])
-        RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-
-        let mailInboxWindow = switcherPanel.descendants(matching: .any)
-            .matching(identifier: Identifier.switcherWindowMockMailInbox)
-            .firstMatch
-        let mailDraftWindow = switcherPanel.descendants(matching: .any)
-            .matching(identifier: Identifier.switcherWindowMockMailDraft)
-            .firstMatch
-        XCTAssertFalse(mailInboxWindow.exists)
-        XCTAssertFalse(mailDraftWindow.exists)
-
-        RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-        app.typeKey(.leftArrow, modifierFlags: [])
-
-        XCTAssertTrue(mailInboxWindow.waitForExistence(timeout: 3))
-        XCTAssertTrue(mailDraftWindow.waitForExistence(timeout: 3))
-    }
-
-    func testSwitcherPanelSingleAppFiveWindowsCGOffSpaceTitledVariantShowsAllWindowCards() throws {
-        let app = makeApp(
-            additionalArguments: [
-                "--flowtab-ui-reset-defaults",
-                "--flowtab-ui-mock-runtime",
-                "--flowtab-ui-mock-runtime-variant",
-                "single-app-five-windows-cg-offspace-titled",
-                "--flowtab-ui-open-switcher",
-                "-showPermissionReminder",
-                "NO"
-            ]
-        )
-        app.launch()
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
-
-        let switcherPanel = app.descendants(matching: .any)
-            .matching(identifier: Identifier.switcherPanel)
-            .firstMatch
-        XCTAssertTrue(switcherPanel.waitForExistence(timeout: 8))
-
-        RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-        app.typeKey(.downArrow, modifierFlags: [])
-
-        let expectedWindowIdentifiers = [
-            "flowtab.switcher.window.cg-100-240001",
-            "flowtab.switcher.window.cg-100-240002",
-            "flowtab.switcher.window.cg-100-243747",
-            "flowtab.switcher.window.cg-100-243679",
-            "flowtab.switcher.window.cg-100-240029"
-        ]
-        for windowIdentifier in expectedWindowIdentifiers {
-            let card = switcherPanel.descendants(matching: .any)
-                .matching(identifier: windowIdentifier)
-                .firstMatch
-            XCTAssertTrue(card.waitForExistence(timeout: 5), "Missing switcher window card: \(windowIdentifier)")
-        }
-        XCTAssertTrue(app.staticTexts["Fullscreen 5"].waitForExistence(timeout: 5))
     }
 
     func testTabSwitchStressCPUAndMemory() throws {
