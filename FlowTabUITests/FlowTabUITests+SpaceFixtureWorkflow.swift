@@ -1,3 +1,4 @@
+import Foundation
 import XCTest
 
 extension FlowTabUITests {
@@ -59,6 +60,18 @@ extension FlowTabUITests {
                 in: app
             )
         }
+    }
+
+    func makeSpaceFixtureWorkflowFile(_ contents: String) throws -> URL {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        let fileURL = directoryURL.appendingPathComponent("workflow.json")
+        try Data(contents.utf8).write(to: fileURL)
+        addTeardownBlock {
+            try? FileManager.default.removeItem(at: directoryURL)
+        }
+        return fileURL
     }
 
     func runRealSpaceFixtureWorkflow(

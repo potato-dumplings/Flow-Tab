@@ -113,6 +113,7 @@
 		F50001112F90000100B0D737 /* SpaceFixtureWorkflowConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000132F90000100B0D737 /* SpaceFixtureWorkflowConfiguration.swift */; };
 		F50001122F90000100B0D737 /* SpaceFixtureWorkflowConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000132F90000100B0D737 /* SpaceFixtureWorkflowConfiguration.swift */; };
 		F50001132F90000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflowConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000142F90000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflowConfiguration.swift */; };
+		F50001142FA1000100B0D737 /* FlowTabUITests+SpaceFixtureMultiAppWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000152FA1000100B0D737 /* FlowTabUITests+SpaceFixtureMultiAppWorkflow.swift */; };
 		4A6DAE9D2F727C0900B0D737 /* FlowTabCore in Frameworks */ = {isa = PBXBuildFile; productRef = 4A6DAE9C2F727C0900B0D737 /* FlowTabCore */; };
 /* End PBXBuildFile section */
 
@@ -239,6 +240,7 @@
 		F50000122F90000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureWorkflow.swift"; sourceTree = "<group>"; };
 		F50000132F90000100B0D737 /* SpaceFixtureWorkflowConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceFixtureWorkflowConfiguration.swift; sourceTree = "<group>"; };
 		F50000142F90000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflowConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureWorkflowConfiguration.swift"; sourceTree = "<group>"; };
+		F50000152FA1000100B0D737 /* FlowTabUITests+SpaceFixtureMultiAppWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureMultiAppWorkflow.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -525,6 +527,7 @@
 				B10002042F76000100B0D737 /* FlowTabUITests+Support.swift */,
 				F500000B2F90000100B0D737 /* FlowTabUITests+SpaceFixtureApp.swift */,
 				F50000122F90000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflow.swift */,
+				F50000152FA1000100B0D737 /* FlowTabUITests+SpaceFixtureMultiAppWorkflow.swift */,
 				F50000142F90000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflowConfiguration.swift */,
 				4A6DAE8B2F727AF600B0D737 /* FlowTabUITestsLaunchTests.swift */,
 			);
@@ -826,6 +829,7 @@
 				B10012042F76000100B0D737 /* FlowTabUITests+Support.swift in Sources */,
 				F500010D2F90000100B0D737 /* FlowTabUITests+SpaceFixtureApp.swift in Sources */,
 				F50001102F90000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflow.swift in Sources */,
+				F50001142FA1000100B0D737 /* FlowTabUITests+SpaceFixtureMultiAppWorkflow.swift in Sources */,
 				F50001132F90000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflowConfiguration.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

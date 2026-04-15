@@ -53,11 +53,13 @@ final class FlowTabUITests: XCTestCase {
         continueAfterFailure = false
         terminateAppIfRunning()
         terminateSpaceFixtureAppIfRunning()
+        terminateConfiguredSpaceFixtureWorkflowAppsIfRunning()
     }
 
     override func tearDownWithError() throws {
         terminateAppIfRunning()
         terminateSpaceFixtureAppIfRunning()
+        terminateConfiguredSpaceFixtureWorkflowAppsIfRunning()
     }
 
 }
