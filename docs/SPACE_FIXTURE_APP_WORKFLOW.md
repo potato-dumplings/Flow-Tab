@@ -363,6 +363,51 @@ resolved workflow JSON 里的每个 app 会包含：
 
 如果要继续把多 app workflow 接到 FlowTab 真实 runtime end-to-end 测试，需要新增一层“统一启动所有 workflow app 并把结果传给 FlowTab UI 测试”的驱动逻辑；这部分当前不属于已实现范围。
 
+## 待接入清单（按代码现状）
+
+以下清单按“当前代码真实接入情况”整理，指的是**尚未接入到 FlowTab 真实 runtime UI tests 的 multi-app workflow E2E 用例**，不包含已经由 unit、behavior、mock runtime 或 fixture app 自身 UI tests 覆盖的场景。
+
+当前优先级最高的是：
+
+- `Home` 页展示多个 workflow app，并校验每个 app 的窗口计数。
+  建议场景：`finder(1)`、`chrome(3, 含 1 个 fullscreen)`、`notes(1)`。
+  目标断言：FlowTab 首页能同时看到多个 app row，且 `windowCount` 分别正确显示为 `1w / 3w / 1w`。
+
+- `Home` 页切换不同 workflow app，只展示该 app 的窗口列表。
+  建议场景：为每个 app 配置互不重复的窗口标题。
+  目标断言：点击某个 app 后，窗口区只出现该 app 的 resolved window titles，不混入其他 app 的窗口标题。
+
+- fullscreen-only app 与普通 app 共存时，`Home` 页仍能稳定展示该 app。
+  建议场景：一个 app 只有 fullscreen window，另一个 app 只有 standard windows。
+  目标断言：fullscreen-only app 仍出现在 app layer，且选中后能看到对应窗口标题。
+
+- `Switcher` app strip 在 multi-app workflow 下展示全部真实 app。
+  建议场景：至少 3 个 app，使用不同 bundle identifier 和 appName。
+  目标断言：打开 switcher 后，`flowtab.switcher.app.*` 能覆盖 workflow 中全部 app，而不是只出现当前前台 app 或单一 fixture app。
+
+- `Switcher` window preview 在切换 app 后只展示当前 app 的窗口 cards。
+  建议场景：每个 app 至少 2 个窗口，其中一个 app 含 tabbed window，另一个 app 含 fullscreen window。
+  目标断言：进入 preview layer 后，`flowtab.switcher.window.*` 只对应当前选中 app 的窗口集合。
+
+- window-scope search 在 multi-app workflow 下能检索真实窗口标题。
+  建议场景：把默认搜索范围切到 `window`，让多个 app 分别提供 `Docs`、`Mail`、`Finder Main` 等标题。
+  目标断言：搜索结果出现真实 `flowtab.switcher.search.window.*` 项，并能跨 app 找到目标窗口。
+
+- tabbed window 的 selected tab title 能跨 app 正确进入 FlowTab UI。
+  建议场景：Chrome fixture 使用原始窗口标题 `Chrome Window 1/2`，选中 tab 为 `Docs/Mail`，同时再启动至少一个非 tabbed app。
+  目标断言：FlowTab 在 `Home` 或 `Switcher` 中显示的是 `Docs/Mail` 这类 resolved title，而不是原始 window title。
+
+- 不同 app 拥有同名窗口时，window-scope search 仍能同时给出多条真实结果。
+  建议场景：两个 app 都含标题为 `Docs` 的窗口。
+  目标断言：搜索结果保留多个 `Docs` 命中项，并通过 app name 区分归属，而不是错误合并或只保留一条。
+
+建议的首批落地顺序：
+
+1. `Home` 多 app 计数与列表隔离
+2. `Switcher` 多 app strip 与 preview 切换
+3. window-scope search 的真实多 app 窗口结果
+4. tabbed window selected title 的跨 app 展示
+
 ## 当前结论
 
 当前 `SPACE_FIXTURE_APP_WORKFLOW` 的实际状态可以概括为：
