@@ -474,12 +474,17 @@ resolved workflow JSON 里的每个 app 会包含：
   建议场景：两个 app 都含标题为 `Docs` 的窗口。
   目标断言：搜索结果保留多个 `Docs` 命中项，并通过 app name 区分归属，而不是错误合并或只保留一条。
 
+- 多个真实窗口在标题、尺寸、位置等可见属性完全相同时，FlowTab 仍保留独立窗口结果。
+  建议场景：两个窗口使用相同 resolved title、相同 frame、相同 mode，可分布在两个 app 或同一 app 内。
+  目标断言：`Switcher` preview、window-scope search，以及需要时的 `Home` 窗口列表中仍保留多条独立窗口记录，而不是被错误合并、去重或只保留一条。
+
 建议的首批落地顺序：
 
 1. `Switcher` 多 app strip 与 preview 切换
 2. window-scope search 的真实多 app 窗口结果
 3. tabbed window selected title 的跨 app 展示
-4. 同名窗口标题下的 search 结果区分
+4. 标题、尺寸、位置等属性完全相同的窗口仍保留独立结果
+5. 同名窗口标题下的 search 结果区分
 
 ## 当前结论
 
