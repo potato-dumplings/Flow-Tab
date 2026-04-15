@@ -124,4 +124,58 @@ extension FlowTabTests {
         XCTAssertEqual(windowSpies[1].workflowReadyCalls, [["Fixture 1", "Fixture 2"]])
         XCTAssertEqual(scheduledCallCount, 0)
     }
+
+    @MainActor
+    func testSpaceFixtureWindowCoordinatorPublishesResolvedWorkflowWindowTitles() {
+        let configuration = SpaceFixtureLaunchConfiguration(
+            windows: [
+                SpaceFixtureConfiguredWindow(
+                    configuredTitle: "Chrome Window 1",
+                    windowTitle: "Docs",
+                    mode: .standard,
+                    tabs: [
+                        SpaceFixtureConfiguredTab(title: "Docs", identifier: "tab-1", isSelected: true),
+                        SpaceFixtureConfiguredTab(title: "PR", identifier: "tab-2", isSelected: false)
+                    ]
+                ),
+                SpaceFixtureConfiguredWindow(
+                    configuredTitle: "Chrome Window 2",
+                    windowTitle: "Mail",
+                    mode: .fullscreen,
+                    tabs: [
+                        SpaceFixtureConfiguredTab(title: "Mail", identifier: "tab-1", isSelected: true),
+                        SpaceFixtureConfiguredTab(title: "Calendar", identifier: "tab-2", isSelected: false)
+                    ]
+                )
+            ],
+            windowTitlePrefix: SpaceFixtureLaunchConfiguration.defaultWindowTitlePrefix,
+            usesStaggeredLayout: true,
+            enterFullscreenDelayMilliseconds: 750,
+            preservesDesktopAfterFullscreen: false,
+            workflowName: "multi-app-space-topology",
+            workflowAppID: "chrome"
+        )
+
+        var windowSpies: [SpaceFixtureWindowSpy] = []
+
+        let coordinator = SpaceFixtureWindowCoordinator(
+            configuration: configuration,
+            visibleFrameProvider: { CGRect(x: 0, y: 0, width: 1440, height: 900) },
+            windowFactory: { plan in
+                let spy = SpaceFixtureWindowSpy(plan: plan)
+                windowSpies.append(spy)
+                return spy
+            },
+            fullscreenScheduler: { _, _ in }
+        )
+
+        coordinator.launch()
+
+        XCTAssertEqual(windowSpies.count, 2)
+        XCTAssertEqual(windowSpies[0].plan.title, "Docs")
+        XCTAssertEqual(windowSpies[0].plan.subtitleText, "Chrome Window 1")
+        XCTAssertEqual(windowSpies[1].plan.title, "Mail")
+        XCTAssertEqual(windowSpies[0].workflowReadyCalls, [["Docs", "Mail"]])
+        XCTAssertEqual(windowSpies[1].workflowReadyCalls, [["Docs", "Mail"]])
+    }
 }

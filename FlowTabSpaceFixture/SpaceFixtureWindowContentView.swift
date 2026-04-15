@@ -26,7 +26,7 @@ final class SpaceFixtureWindowContentView: NSView {
             alpha: 1
         ).cgColor
 
-        let stackView = NSStackView(views: [
+        let arrangedViews: [NSView] = [
             makeLabel(
                 text: plan.title,
                 font: .systemFont(ofSize: 30, weight: .semibold),
@@ -44,10 +44,13 @@ final class SpaceFixtureWindowContentView: NSView {
                 font: .systemFont(ofSize: 16, weight: .bold),
                 textColor: .labelColor,
                 identifier: plan.modeAccessibilityIdentifier
-            ),
+            )
+        ] + tabViews() + [
             workflowReadyLabel,
             workflowSummaryLabel
-        ])
+        ]
+
+        let stackView = NSStackView(views: arrangedViews)
         stackView.orientation = .vertical
         stackView.alignment = .leading
         stackView.spacing = 14
@@ -88,6 +91,60 @@ final class SpaceFixtureWindowContentView: NSView {
         label.setAccessibilityLabel(text)
         label.setAccessibilityValue(text)
         label.setAccessibilityElement(true)
+        return label
+    }
+
+    private func tabViews() -> [NSView] {
+        guard plan.tabs.isEmpty == false else { return [] }
+
+        let sectionLabel = makeLabel(
+            text: "Tabs",
+            font: .systemFont(ofSize: 12, weight: .semibold),
+            textColor: .secondaryLabelColor,
+            identifier: plan.tabStripAccessibilityIdentifier
+        )
+
+        let tabStrip = NSStackView()
+        tabStrip.orientation = .horizontal
+        tabStrip.alignment = .centerY
+        tabStrip.spacing = 10
+        tabStrip.translatesAutoresizingMaskIntoConstraints = false
+
+        for (offset, tab) in plan.tabs.enumerated() {
+            tabStrip.addArrangedSubview(makeTabLabel(tab, tabIndex: offset + 1))
+        }
+
+        if let selectedTabTitle = plan.selectedTabTitle {
+            let selectedTabLabel = makeLabel(
+                text: "Selected Tab: \(selectedTabTitle)",
+                font: .systemFont(ofSize: 12, weight: .medium),
+                textColor: .secondaryLabelColor,
+                identifier: plan.selectedTabAccessibilityIdentifier
+            )
+            return [sectionLabel, tabStrip, selectedTabLabel]
+        }
+
+        return [sectionLabel, tabStrip]
+    }
+
+    private func makeTabLabel(
+        _ tab: SpaceFixtureConfiguredTab,
+        tabIndex: Int
+    ) -> NSTextField {
+        let label = NSTextField(labelWithString: tab.title)
+        label.font = .systemFont(ofSize: 13, weight: tab.isSelected ? .semibold : .regular)
+        label.textColor = tab.isSelected ? .labelColor : .secondaryLabelColor
+        label.lineBreakMode = .byTruncatingTail
+        label.maximumNumberOfLines = 1
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.identifier = NSUserInterfaceItemIdentifier(plan.tabAccessibilityIdentifier(for: tabIndex))
+        label.setAccessibilityIdentifier(plan.tabAccessibilityIdentifier(for: tabIndex))
+        label.setAccessibilityLabel(tab.title)
+        label.setAccessibilityValue(tab.isSelected ? "Selected Tab" : "Background Tab")
+        label.setAccessibilityElement(true)
+        label.wantsLayer = true
+        label.layer?.cornerRadius = 6
+        label.layer?.backgroundColor = (tab.isSelected ? NSColor.white : NSColor.clear).cgColor
         return label
     }
 

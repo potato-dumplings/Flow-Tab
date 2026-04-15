@@ -67,4 +67,180 @@ extension FlowTabTests {
         XCTAssertNotEqual(plans[1].frame.origin, plans[2].frame.origin)
         XCTAssertEqual(plans[1].modeText, "Fullscreen Target")
     }
+
+    func testSpaceFixtureLaunchConfigurationLoadsWorkflowWindowsAndTabs() throws {
+        let workflowURL = try makeSpaceFixtureWorkflowFile(
+            """
+            {
+              "workflowName": "multi-app-space-topology",
+              "settleTimeoutMs": 8000,
+              "apps": [
+                {
+                  "appID": "chrome",
+                  "appName": "Chrome Fixture",
+                  "bundleId": "com.example.fixture.chrome",
+                  "launchOrder": 3,
+                  "windows": [
+                    {
+                      "title": "Chrome Window 1",
+                      "mode": "standard",
+                      "tabs": [
+                        { "title": "Docs", "isSelected": true },
+                        { "title": "PR", "isSelected": false }
+                      ]
+                    },
+                    {
+                      "title": "Chrome Window 2",
+                      "mode": "fullscreen",
+                      "tabs": [
+                        { "title": "Mail", "isSelected": false },
+                        { "title": "Calendar", "isSelected": true }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+            """
+        )
+
+        let configuration = try SpaceFixtureLaunchConfiguration.load(
+            arguments: [
+                "FlowTabSpaceFixture",
+                "--workflow-config", workflowURL.path,
+                "--workflow-app-id", "chrome",
+                "--staggered-layout",
+                "--enter-fullscreen-delay-ms", "900",
+                "--preserve-desktop-after-fullscreen"
+            ]
+        )
+
+        XCTAssertEqual(configuration.workflowName, "multi-app-space-topology")
+        XCTAssertEqual(configuration.workflowAppID, "chrome")
+        XCTAssertEqual(configuration.windowCount, 2)
+        XCTAssertEqual(configuration.windowTitles, ["Docs", "Calendar"])
+        XCTAssertEqual(configuration.fullscreenWindowIndex, 2)
+        XCTAssertTrue(configuration.usesStaggeredLayout)
+        XCTAssertEqual(configuration.enterFullscreenDelayMilliseconds, 900)
+        XCTAssertTrue(configuration.preservesDesktopAfterFullscreen)
+        XCTAssertEqual(configuration.windows[0].configuredTitle, "Chrome Window 1")
+        XCTAssertEqual(configuration.windows[0].tabs.map(\.title), ["Docs", "PR"])
+        XCTAssertEqual(configuration.windows[0].tabs.map(\.isSelected), [true, false])
+        XCTAssertEqual(configuration.windows[1].tabs.map(\.isSelected), [false, true])
+    }
+
+    func testSpaceFixtureLaunchConfigurationSelectsFirstWorkflowTabWhenNoneMarkedSelected() throws {
+        let workflowURL = try makeSpaceFixtureWorkflowFile(
+            """
+            {
+              "workflowName": "tab-normalization",
+              "apps": [
+                {
+                  "appID": "browser",
+                  "appName": "Browser Fixture",
+                  "bundleId": "com.example.fixture.browser",
+                  "launchOrder": 1,
+                  "windows": [
+                    {
+                      "title": "Browser Window",
+                      "mode": "standard",
+                      "tabs": [
+                        { "title": "Inbox", "isSelected": false },
+                        { "title": "Calendar", "isSelected": false }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+            """
+        )
+
+        let configuration = try SpaceFixtureLaunchConfiguration.load(
+            arguments: [
+                "FlowTabSpaceFixture",
+                "--workflow-config", workflowURL.path,
+                "--workflow-app-id", "browser"
+            ]
+        )
+
+        XCTAssertEqual(configuration.windowTitles, ["Inbox"])
+        XCTAssertEqual(configuration.windows[0].tabs.map(\.isSelected), [true, false])
+    }
+
+    func testSpaceFixtureLaunchConfigurationRequiresWorkflowAppIDWhenWorkflowConfigProvided() throws {
+        let workflowURL = try makeSpaceFixtureWorkflowFile(
+            """
+            {
+              "workflowName": "missing-app-id",
+              "apps": []
+            }
+            """
+        )
+
+        XCTAssertThrowsError(
+            try SpaceFixtureLaunchConfiguration.load(
+                arguments: [
+                    "FlowTabSpaceFixture",
+                    "--workflow-config", workflowURL.path
+                ]
+            )
+        ) { error in
+            XCTAssertEqual(
+                error as? SpaceFixtureLaunchConfigurationError,
+                .missingWorkflowAppID
+            )
+        }
+    }
+
+    func testSpaceFixtureWindowPlannerUsesTabbedWorkflowWindowTitles() {
+        let configuration = SpaceFixtureLaunchConfiguration(
+            windows: [
+                SpaceFixtureConfiguredWindow(
+                    configuredTitle: "Chrome Window 1",
+                    windowTitle: "Docs",
+                    mode: .standard,
+                    tabs: [
+                        SpaceFixtureConfiguredTab(title: "Docs", identifier: "tab-1", isSelected: true),
+                        SpaceFixtureConfiguredTab(title: "PR", identifier: "tab-2", isSelected: false)
+                    ]
+                ),
+                SpaceFixtureConfiguredWindow(
+                    configuredTitle: "Chrome Window 2",
+                    windowTitle: "Calendar",
+                    mode: .fullscreen,
+                    tabs: [
+                        SpaceFixtureConfiguredTab(title: "Mail", identifier: "tab-1", isSelected: false),
+                        SpaceFixtureConfiguredTab(title: "Calendar", identifier: "tab-2", isSelected: true)
+                    ]
+                )
+            ],
+            windowTitlePrefix: SpaceFixtureLaunchConfiguration.defaultWindowTitlePrefix,
+            usesStaggeredLayout: false,
+            enterFullscreenDelayMilliseconds: 400,
+            preservesDesktopAfterFullscreen: false
+        )
+
+        let plans = SpaceFixtureWindowPlanner.makePlans(
+            configuration: configuration,
+            visibleFrame: CGRect(x: 0, y: 0, width: 1440, height: 900)
+        )
+
+        XCTAssertEqual(plans.map(\.title), ["Docs", "Calendar"])
+        XCTAssertEqual(plans[0].subtitleText, "Chrome Window 1")
+        XCTAssertEqual(plans[0].tabs.map(\.title), ["Docs", "PR"])
+        XCTAssertEqual(plans[1].modeText, "Fullscreen Target")
+    }
+
+    private func makeSpaceFixtureWorkflowFile(_ contents: String) throws -> URL {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        let fileURL = directoryURL.appendingPathComponent("workflow.json")
+        try Data(contents.utf8).write(to: fileURL)
+        addTeardownBlock {
+            try? FileManager.default.removeItem(at: directoryURL)
+        }
+        return fileURL
+    }
 }

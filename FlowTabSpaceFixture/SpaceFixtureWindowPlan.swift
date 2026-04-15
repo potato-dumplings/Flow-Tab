@@ -14,9 +14,11 @@ enum SpaceFixtureWorkflowStatus {
 struct SpaceFixtureWindowPlan: Equatable {
     let index: Int
     let totalWindowCount: Int
+    let configuredTitle: String
     let title: String
     let frame: CGRect
     let isFullscreenTarget: Bool
+    let tabs: [SpaceFixtureConfiguredTab]
 
     var rootAccessibilityIdentifier: String {
         "flowtab.spacefixture.window.root.\(index)"
@@ -34,16 +36,32 @@ struct SpaceFixtureWindowPlan: Equatable {
         "flowtab.spacefixture.window.mode.\(index)"
     }
 
+    var tabStripAccessibilityIdentifier: String {
+        "flowtab.spacefixture.window.tabs.\(index)"
+    }
+
+    var selectedTabAccessibilityIdentifier: String {
+        "flowtab.spacefixture.window.selected-tab.\(index)"
+    }
+
     var windowAccessibilityIdentifier: String {
         "flowtab.spacefixture.window.\(index)"
     }
 
     var subtitleText: String {
-        "Window \(index) of \(totalWindowCount)"
+        tabs.isEmpty ? "Window \(index) of \(totalWindowCount)" : configuredTitle
     }
 
     var modeText: String {
         isFullscreenTarget ? "Fullscreen Target" : "Standard Window"
+    }
+
+    var selectedTabTitle: String? {
+        tabs.first(where: \.isSelected)?.title
+    }
+
+    func tabAccessibilityIdentifier(for tabIndex: Int) -> String {
+        "flowtab.spacefixture.window.tab.\(index).\(tabIndex)"
     }
 }
 
@@ -75,12 +93,15 @@ enum SpaceFixtureWindowPlanner {
                 )
             )
 
+            let configuredWindow = configuration.windows[index - 1]
             return SpaceFixtureWindowPlan(
                 index: index,
                 totalWindowCount: configuration.windowCount,
-                title: configuration.title(forWindowIndex: index),
+                configuredTitle: configuredWindow.configuredTitle,
+                title: configuredWindow.windowTitle,
                 frame: CGRect(origin: origin, size: defaultWindowSize),
-                isFullscreenTarget: configuration.fullscreenWindowIndex == index
+                isFullscreenTarget: configuredWindow.isFullscreenTarget,
+                tabs: configuredWindow.tabs
             )
         }
     }

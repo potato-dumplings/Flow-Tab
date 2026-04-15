@@ -7,100 +7,73 @@
 - 通过 `--flowtab-ui-mock-runtime` 注入运行时快照，验证 UI 展示和交互逻辑。
 - 通过 `handleActiveSpaceDidChangeForTesting()` 或发布 `NSWorkspace.activeSpaceDidChangeNotification`，验证收到空间变化信号后的恢复与取消策略。
 
-这类自动化可以稳定覆盖 FlowTab 自己的逻辑判断，但不能证明 XCTest 已真实驱动 macOS 完成以下行为：
+这些测试可以稳定覆盖 FlowTab 自身的逻辑判断，但不能直接证明 XCTest 已真实驱动 macOS 完成以下行为：
 
-- 新建或进入真实 Space
-- fullscreen Space 的生成与切换
-- Mission Control 或系统手势动画过程
 - 单应用多窗口跨 Space 的真实运行时拓扑
+- fullscreen Space 的生成与切换
+- 应用内多标签窗口对真实窗口标题的影响
+- 多个真实应用并存时的 runtime snapshot 与分组结果
 
-因此，如果要补充“更接近真实环境”的验证，需要单独引入一个测试专用的 fixture app。
+为补充这部分验证，仓库当前提供了一个测试专用 app target：`FlowTabSpaceFixture`。
 
-## 目标
+## 当前实现总览
 
-新增一个专用于本地真实环境回归的 fixture app，用它制造接近 Chrome 的单应用多窗口场景：
+当前仓库里的实现不是“未来要做的方案草图”，而是已经落地的两层能力：
 
-- 同一个应用同时存在多个窗口
-- 其中一个窗口进入 fullscreen，生成独立 fullscreen Space
-- 其他窗口仍停留在普通桌面
-- FlowTab 对这些窗口执行真实的 runtime snapshot、分组、排序、space 识别和激活相关逻辑
+- 一个模板 target：`FlowTabSpaceFixture`
+- 两种启动模式：
+  - 单 app 扁平参数模式
+  - workflow 配置模式
 
-## 非目标
+其中：
 
-该 fixture app 不用于替代现有 mock-runtime 自动化，也不应承担以下职责：
+- 单 app 模式已经接入现有 FlowTab 真实环境 UI 用例。
+- workflow 模式已经接入 fixture app 自身的配置解析、窗口规划和 UI 渲染测试。
+- workflow 模式当前支持“按 appID 启动某一个 app 变体”，但仓库里还没有统一的一键多 app 启动器把所有 app 一次性拉起后再驱动 FlowTab。
+
+因此，当前实现应理解为：
+
+- `FlowTabSpaceFixture` 已经能表达多窗口、fullscreen、应用内 tab。
+- `build-space-fixture-workflow.sh` 已经能生成多 app bundle 变体和 resolved workflow JSON。
+- FlowTab 端到端真实 UI workflow 目前仍主要跑单 app 路径。
+
+## 当前目标边界
+
+`FlowTabSpaceFixture` 当前负责的是“制造受控的真实应用窗口拓扑”，不负责：
 
 - 替代现有 unit、behavior、UI 主覆盖链路
 - 作为稳定 CI 的唯一空间验证方案
-- 直接证明所有 Mission Control 动画时序都稳定可自动化
-- 把测试专用逻辑混入 FlowTab 生产代码路径
+- 复刻真实 Chrome、Finder、Notes 的全部交互逻辑
+- 把测试专用逻辑混入 FlowTab 生产路径
 
-## 推荐方案
+## Target 与文件入口
 
-推荐新增一个独立的测试 app target，例如 `FlowTabSpaceFixture`，而不是复用 FlowTab 本体。
+当前相关实现主要分布在以下位置：
 
-如果还需要模拟不同的应用身份，不建议继续新增多个几乎相同的 fixture targets。更合适的做法是：
+- [FlowTabSpaceFixture/FlowTabSpaceFixtureApp.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabSpaceFixture/FlowTabSpaceFixtureApp.swift)
+- [FlowTabSpaceFixture/SpaceFixtureAppDelegate.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabSpaceFixture/SpaceFixtureAppDelegate.swift)
+- [FlowTabSpaceFixture/SpaceFixtureLaunchConfiguration.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabSpaceFixture/SpaceFixtureLaunchConfiguration.swift)
+- [FlowTabSpaceFixture/SpaceFixtureWorkflowConfiguration.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabSpaceFixture/SpaceFixtureWorkflowConfiguration.swift)
+- [FlowTabSpaceFixture/SpaceFixtureWindowPlan.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabSpaceFixture/SpaceFixtureWindowPlan.swift)
+- [FlowTabSpaceFixture/SpaceFixtureWindowCoordinator.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabSpaceFixture/SpaceFixtureWindowCoordinator.swift)
+- [FlowTabSpaceFixture/SpaceFixtureWindowContentView.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabSpaceFixture/SpaceFixtureWindowContentView.swift)
+- [scripts/testing/build-space-fixture-app.sh]({user-home}/Projeck-Works/Personal/FlowTabApp/scripts/testing/build-space-fixture-app.sh)
+- [scripts/testing/build-space-fixture-workflow.sh]({user-home}/Projeck-Works/Personal/FlowTabApp/scripts/testing/build-space-fixture-workflow.sh)
 
-- 保留一个 `FlowTabSpaceFixture` 模板 target。
-- 在生成 app bundle 时传入 `appName` 和 `bundleId`。
-- 用同一套二进制和窗口行为，产出多个不同身份的 fixture app 变体。
+## 当前支持的两种启动模式
 
-原因如下：
+### 1. 单 app 扁平参数模式
 
-- FlowTab 自己的面板窗口具有跨 Space 和 fullscreen 辅助行为，不能很好模拟普通目标应用。
-- 测试目标需要的是“像 Chrome 一样的单应用多窗口”，而不是“FlowTab 自己进入全屏”。
-- 独立 fixture app 更容易稳定控制窗口数量、标题、布局和 fullscreen 行为。
-- 用模板 target 生成变体，比维护多个重复 target 更容易保持一致性。
+这是当前 FlowTab 真实环境 UI 用例实际在用的路径。
 
-## Fixture App 必备能力
-
-该 app 至少应具备以下能力：
-
-- 是普通 macOS app，而不是 `LSUIElement` 或 agent app。
-- 支持单应用多窗口。
-- 启动时可通过参数创建指定数量窗口。
-- 每个窗口具备稳定、可预测的标题。
-- 可指定某一个窗口在启动后自动进入 fullscreen。
-- 可关闭系统自动 window tabbing，避免多个窗口被合并成标签页。
-- 可设置窗口初始位置和尺寸，避免全部重叠。
-
-## 参数分层
-
-这里需要明确区分两类参数：
-
-- 应用身份参数：决定系统看到的 app 名称和 bundle identifier，必须在生成 app bundle 时传入。
-- 运行时场景参数：决定窗口数量、标题和 fullscreen 行为，可以在 app 启动时传入。
-
-仅通过启动参数不能真正改变 `NSRunningApplication.localizedName` 或 bundle identifier，因此 `appName` / `bundleId` 不能只做成运行时参数。
-
-## 建议生成参数
-
-建议新增一个生成脚本，例如：
-
-```bash
-./scripts/testing/build-space-fixture-app.sh \
-  --app-name "Chrome Fixture" \
-  --bundle-id "com.example.chrome.fixture"
-```
-
-该脚本应完成：
-
-- 构建 `FlowTabSpaceFixture` 模板 app
-- 复制出一个新的 app bundle 变体
-- 写入新的 `CFBundleDisplayName`
-- 写入新的 `CFBundleIdentifier`
-- 重新签名，确保本地可启动
-
-生成完成后，可以继续给这个变体传入运行时场景参数。
-
-## 建议启动参数
-
-建议 fixture app 支持以下启动参数：
+支持的主要参数有：
 
 - `--window-count <N>`
 - `--fullscreen-window-index <index>`
 - `--window-title-prefix <prefix>`
 - `--staggered-layout`
 - `--enter-fullscreen-delay-ms <value>`
+- `--preserve-desktop-after-fullscreen`
 
 示例：
 
@@ -108,34 +81,175 @@
 /path/to/Chrome Fixture.app/Contents/MacOS/FlowTabSpaceFixture \
   --window-count 3 \
   --fullscreen-window-index 3 \
-  --window-title-prefix "Fixture"
+  --window-title-prefix "Workflow" \
+  --staggered-layout \
+  --enter-fullscreen-delay-ms 5000 \
+  --preserve-desktop-after-fullscreen
 ```
 
-对应预期：
+该模式的特点：
 
-- 创建 3 个窗口
-- 标题分别为 `Fixture 1`、`Fixture 2`、`Fixture 3`
-- 第 3 个窗口进入 fullscreen
-- 第 1、2 个窗口保留在普通桌面
+- 适合单应用多窗口 smoke 和当前现有真实环境回归。
+- 由 fixture app 自己生成窗口标题，例如 `Workflow 1`、`Workflow 2`、`Workflow 3`。
+- 可指定一个窗口在启动后自动进入 fullscreen。
+- 若启用 `--preserve-desktop-after-fullscreen`，fullscreen 后会重新把普通桌面窗口拉回前台，便于 FlowTab 采样。
 
-## 为什么必须支持单应用多窗口
+### 2. workflow 配置模式
 
-如果 fixture app 只有一个窗口，它只能证明“系统里出现了一个 fullscreen Space”，但不能有效覆盖我们更关心的真实场景：
+这是当前仓库里已经实现但尚未全面接入 FlowTab 端到端真实 UI 用例的路径。
 
-- FlowTab 是否把多个窗口识别为同一个应用
-- fullscreen 窗口和普通窗口是否会同时出现在运行时快照中
-- 同一应用下的窗口列表是否能覆盖普通桌面窗口和 off-space 窗口
-- 后续激活和切换逻辑是否能处理同 app 多窗口的 space 差异
+支持的主要参数有：
 
-因此，单窗口空壳 app 不足以代表 Chrome 这类真实目标应用。
+- `--workflow-config <path>`
+- `--workflow-app-id <id>`
+- `--staggered-layout`
+- `--enter-fullscreen-delay-ms <value>`
+- `--preserve-desktop-after-fullscreen`
 
-## 测试流程
+示例：
 
-### 1. 生成 fixture app 变体
+```text
+/path/to/Chrome Fixture.app/Contents/MacOS/FlowTabSpaceFixture \
+  --workflow-config /absolute/path/to/resolved-workflow.json \
+  --workflow-app-id chrome \
+  --staggered-layout
+```
 
-先基于 `FlowTabSpaceFixture` 模板 target 生成目标 app 变体，确保测试环境中拿到的是带目标 `appName` / `bundleId` 的 app bundle，而不是固定身份的默认产物。
+该模式的特点：
+
+- 进程启动时只读取 workflow 中属于当前 `appID` 的那一段配置。
+- 一个 `FlowTabSpaceFixture` 进程对应一个 workflow app。
+- 如果要同时启动多个 app，需要外部脚本或测试驱动层分别启动多个 app 变体。
+
+## 当前 workflow 数据模型
+
+当前实现已经支持以下层级：
+
+| 层级 | 当前字段 |
+| --- | --- |
+| Workflow | `workflowName`、`settleTimeoutMs`、`apps` |
+| App | `appID`、`appName`、`bundleId`、`appPath`、`launchOrder`、`windows` |
+| Window | `title`、`mode`、`tabs` |
+| Tab | `title`、`isSelected`、`identifier` |
+
+当前 `mode` 支持：
+
+- `standard`
+- `fullscreen`
+
+示例：
+
+```json
+{
+  "workflowName": "multi-app-space-topology",
+  "settleTimeoutMs": 8000,
+  "apps": [
+    {
+      "appID": "finder",
+      "appName": "Finder Fixture",
+      "bundleId": "com.example.fixture.finder",
+      "launchOrder": 1,
+      "windows": [
+        {
+          "title": "Finder Main",
+          "mode": "standard",
+          "tabs": []
+        }
+      ]
+    },
+    {
+      "appID": "chrome",
+      "appName": "Chrome Fixture",
+      "bundleId": "com.example.fixture.chrome",
+      "launchOrder": 2,
+      "windows": [
+        {
+          "title": "Chrome Window 1",
+          "mode": "standard",
+          "tabs": [
+            { "title": "Docs", "isSelected": true },
+            { "title": "PR", "isSelected": false }
+          ]
+        },
+        {
+          "title": "Chrome Window 2",
+          "mode": "fullscreen",
+          "tabs": [
+            { "title": "Mail", "isSelected": true },
+            { "title": "Calendar", "isSelected": false }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+## 当前窗口与标签行为
+
+当前实现里，window 和 tab 的关系不是未来设计，而是已经体现在启动配置归一化和窗口渲染里的行为：
+
+- `tabs` 为空时，该窗口就是普通窗口。
+- `tabs` 非空时，该窗口表示“应用内部自己管理的 tab 模型”。
+- 当前实现会把第一个 `isSelected = true` 的 tab 视为当前选中 tab。
+- 如果没有任何 tab 标记为选中，则会把第一个 tab 归一化为选中状态。
+- 当前选中 tab 的标题会成为窗口的真实标题。
+- 原始 window `title` 不会丢失，而是作为 subtitle 展示出来。
 
 例如：
+
+- window 配置标题为 `Chrome Window 1`
+- tab 为 `Docs`、`PR`
+- `Docs` 被标记为 `isSelected = true`
+
+则当前窗口会表现为：
+
+- 窗口标题：`Docs`
+- 窗口副标题：`Chrome Window 1`
+
+这就是当前仓库用来覆盖 Chrome 类场景的方式。
+
+## 当前对系统 window tabbing 的处理
+
+当前实现明确区分两种 tab：
+
+- macOS 自动 window tabbing
+- 应用内部自定义 tab
+
+`FlowTabSpaceFixture` 当前固定关闭系统 automatic window tabbing：
+
+- `NSWindow.allowsAutomaticWindowTabbing = false`
+- `window.tabbingMode = .disallowed`
+
+因此，当前 workflow 配置里的 `tabs` 只表示应用内 tab，不表示系统层面的 window tabbing。
+
+## 当前 Fixture App 可观测信号
+
+为了让 XCTest 稳定观测 fixture app 状态，当前窗口内容会暴露以下信息：
+
+- workflow ready 标记：`flowtab.spacefixture.workflow.ready`
+- workflow summary 标记：`flowtab.spacefixture.workflow.summary`
+- 每个窗口标题标记：`flowtab.spacefixture.window.title.<index>`
+- 每个窗口副标题标记：`flowtab.spacefixture.window.subtitle.<index>`
+- 每个窗口模式标记：`flowtab.spacefixture.window.mode.<index>`
+- 每个窗口 tab 标记：`flowtab.spacefixture.window.tab.<windowIndex>.<tabIndex>`
+- 每个窗口当前选中 tab 摘要：`flowtab.spacefixture.window.selected-tab.<index>`
+
+其中 workflow summary 当前展示的是“归一化后的窗口标题列表”，也就是 FlowTab 更关心的真实窗口标题，而不是原始配置标题。
+
+## 当前构建脚本
+
+### `build-space-fixture-app.sh`
+
+当前用途：
+
+- 构建 `FlowTabSpaceFixture` 模板 app
+- 复制一个 app bundle 变体
+- 重写 `CFBundleDisplayName`
+- 重写 `CFBundleIdentifier`
+- 重新签名
+
+示例：
 
 ```bash
 ./scripts/testing/build-space-fixture-app.sh \
@@ -143,117 +257,121 @@
   --bundle-id "com.example.chrome.fixture"
 ```
 
-### 2. 启动 fixture app
+该脚本适合：
 
-通过启动参数创建多窗口场景，并让指定窗口进入 fullscreen。
+- 单 app 路径
+- 当前 FlowTab 真实环境 UI 用例
+- 手工本地验证
 
-建议初始场景：
+### `build-space-fixture-workflow.sh`
 
-- 3 个窗口
-- 第 3 个窗口 fullscreen
-- 其余 2 个窗口留在普通桌面
+当前用途：
 
-### 3. 等待系统状态稳定
-
-在 FlowTab 开始采样前，等待以下状态稳定：
-
-- fixture app 所有窗口创建完成
-- 指定窗口已进入 fullscreen
-- macOS 已为该窗口建立 fullscreen Space
-- 前台应用和活跃 Space 状态不再抖动
-
-这一步应由测试驱动层显式等待，而不是依赖固定极短延时。
-
-### 4. 启动或操作 FlowTab
-
-在真实空间场景已经建立后，再启动或唤起 FlowTab，执行目标验证，例如：
-
-- 首页窗口列表
-- switcher 中的 app card 与 window card
-- 同 app 多窗口展示
-- fullscreen 或 off-space 窗口的恢复展示
-- 激活指定窗口后的 space 切换与焦点行为
-
-如果通过 UI 自动化执行这条流程，建议把生成结果传给测试层，而不是把 bundle id 写死在测试代码里。当前建议约定以下环境变量：
-
-- `FLOWTAB_SPACE_FIXTURE_APP_PATH`
-- `FLOWTAB_SPACE_FIXTURE_BUNDLE_ID`
+- 构建一次 `FlowTabSpaceFixture` 模板 app
+- 为 workflow 中每个 app 生成对应的 app bundle 变体
+- 把每个变体的绝对 `appPath` 回写到 resolved workflow JSON
 
 示例：
 
 ```bash
-FLOWTAB_SPACE_FIXTURE_APP_PATH="/absolute/path/Chrome Fixture.app" \
-FLOWTAB_SPACE_FIXTURE_BUNDLE_ID="com.example.chrome.fixture" \
-./scripts/testing/run-ui-tests-local.sh \
-  test-without-building \
-  -only-testing:FlowTabUITests/FlowTabUITests/testHomePageShowsRealSpaceFixtureWorkflowWindows
+./scripts/testing/build-space-fixture-workflow.sh \
+  --workflow-config /absolute/path/to/workflow.json
 ```
 
-### 5. 执行断言
+运行后会得到：
 
-断言应聚焦在真实环境下仍然可稳定判断的结果：
+- 多个 fixture app 变体
+- 一份 resolved workflow JSON
 
-- FlowTab 是否识别到 fixture app
-- 是否识别到该 app 下的多个窗口
-- fullscreen 窗口是否进入了可预期的展示或恢复路径
-- 激活后是否发生预期的窗口聚焦或 space 切换
+resolved workflow JSON 里的每个 app 会包含：
 
-不应把系统动画帧级时序作为主断言目标。
+- `appName`
+- `bundleId`
+- `appPath`
 
-### 6. 清理环境
+这份文件当前适合给外部启动器、手工测试或后续测试驱动层读取。
 
-测试结束后关闭 fixture app 和 FlowTab，确保不会污染下一条用例的空间状态。
+## 当前测试接入情况
 
-## 测试分层建议
+### 已接入的逻辑与行为测试
 
-推荐把测试职责拆成两层：
+当前以下能力已经有自动化覆盖：
 
-- 主自动化层：继续使用现有 mock runtime 和信号模拟，覆盖稳定、可重复的业务逻辑。
-- 真实环境补充层：使用 fixture app 制造多窗口 fullscreen Space 场景，做本地回归或低频集成验证。
+- workflow 配置解析
+- tab 归一化
+- fullscreen window 标记
+- window planner 生成结果
+- coordinator 对窗口显示和 fullscreen 调度的处理
 
-这样做的原因是：
+对应测试主要在：
 
-- 主自动化负责稳定性和覆盖面。
-- 真实环境补充层负责发现 mock 路径无法证明的系统行为偏差。
+- [FlowTabTests+SpaceFixtureLaunchConfiguration.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabTests/FlowTabTests+SpaceFixtureLaunchConfiguration.swift)
+- [FlowTabTests+SpaceFixtureWindowCoordinator.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabTests/FlowTabTests+SpaceFixtureWindowCoordinator.swift)
 
-## 风险与限制
+### 已接入的 fixture app UI 测试
 
-该方案虽然比“直接让 FlowTab 自己全屏”更合理，但仍有以下限制：
+当前 workflow 模式已经有 fixture app 自身的 UI 用例覆盖：
 
-- fullscreen 进入时机可能受系统动画、焦点和桌面设置影响。
-- `activeSpaceDidChange` 的触发时序可能和 UI 自动化脚本不同步。
-- 不同 macOS 版本和桌面设置可能导致行为差异。
-- 这类测试更适合本地回归或低频集成运行，不适合作为唯一稳定 CI 依据。
+- [FlowTabUITests+SpaceFixtureWorkflowConfiguration.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabUITests/FlowTabUITests+SpaceFixtureWorkflowConfiguration.swift)
 
-## 与现有自动化的关系
+该用例当前验证：
 
-这套方案是对现有自动化的补充，不是替换。
+- workflow 文件能正确驱动 tabbed windows
+- 当前选中 tab 会成为窗口标题
+- 原始 window title 会作为 subtitle 保留
+- tab strip 与 selected-tab 标识可被 XCTest 观测
 
-现有自动化继续负责：
+### 当前仍在使用单 app 路径的 FlowTab 真实环境用例
 
-- mock runtime 数据场景
-- `activeSpaceDidChange` 后的控制器策略
-- UI 可见性、交互、搜索、列表展示
+当前真实环境 FlowTab UI workflow 仍主要通过单 app 路径启动 fixture app，相关 helper 在：
 
-fixture app 方案补充负责：
+- [FlowTabUITests+SpaceFixtureApp.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabUITests/FlowTabUITests+SpaceFixtureApp.swift)
+- [FlowTabUITests+SpaceFixtureWorkflow.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabUITests/FlowTabUITests+SpaceFixtureWorkflow.swift)
 
-- 真实单应用多窗口场景
-- 真实 fullscreen Space 生成
-- 真实窗口拓扑对 FlowTab runtime 的影响
+当前这条链路使用的环境变量仍是：
 
-## 后续实施顺序
+- `FLOWTAB_SPACE_FIXTURE_APP_PATH`
+- `FLOWTAB_SPACE_FIXTURE_BUNDLE_ID`
 
-建议按以下顺序推进：
+也就是说：
 
-1. 保留 `FlowTabSpaceFixture` 作为模板 target，先稳定多窗口和标题行为。
-2. 增加基于 `appName` / `bundleId` 的 app 变体生成脚本。
-3. 再增加“指定窗口自动 fullscreen”能力。
-4. 先做一条本地可重复的手工回归流程。
-5. 在流程稳定后，再接入低频 UI 自动化或集成测试。
-6. 最后再决定是否需要把该流程纳入常规测试脚本。
+- 多 app workflow 构建和 per-app 启动能力已经实现
+- 但 FlowTab 真实 runtime end-to-end UI 用例当前还没有统一切换到 resolved workflow JSON
+
+## 当前限制
+
+- 仓库里目前没有统一的 workflow 启动器去一次性启动多个 fixture app。
+- `build-space-fixture-workflow.sh` 当前只负责生成 app 变体和 resolved workflow JSON，不负责把所有 app 拉起。
+- FlowTab 真实环境 UI workflow 当前仍主要验证单 app 多窗口路径。
+- 仓库当前没有消费 `FLOWTAB_SPACE_FIXTURE_WORKFLOW_PATH` 的现成测试入口。
+- Mission Control 动画和 `activeSpaceDidChange` 的系统级时序仍不适合做精确帧级断言。
+- 这套机制更适合本地回归和低频集成，不适合作为唯一稳定 CI 依据。
+
+## 当前推荐用法
+
+如果要做当前仓库已经完全打通的回归路径，优先使用：
+
+- `build-space-fixture-app.sh`
+- 单 app 扁平参数模式
+- 现有 FlowTab 真实环境 UI tests
+
+如果要验证当前已经实现的 workflow/tab 能力，优先使用：
+
+- `build-space-fixture-workflow.sh`
+- `--workflow-config` + `--workflow-app-id`
+- fixture app 自身的 UI/配置测试
+
+如果要继续把多 app workflow 接到 FlowTab 真实 runtime end-to-end 测试，需要新增一层“统一启动所有 workflow app 并把结果传给 FlowTab UI 测试”的驱动逻辑；这部分当前不属于已实现范围。
 
 ## 当前结论
 
-如果要验证接近 Chrome 的真实空间场景，fixture app 必须支持单应用多窗口，且至少有一个窗口可以进入 fullscreen。仅创建单窗口空壳 app 不足以覆盖我们需要的场景。
+当前 `SPACE_FIXTURE_APP_WORKFLOW` 的实际状态可以概括为：
 
-如果还要模拟不同目标应用，应该把 `appName` / `bundleId` 设计成“生成 app 变体时”的输入，而不是“启动 app 时”的输入。
+- 已实现一个模板 fixture app：`FlowTabSpaceFixture`
+- 已实现单 app 多窗口与 fullscreen 路径
+- 已实现 workflow 配置解析与应用内 tab 模型
+- 已实现 workflow 级 app 变体构建脚本
+- 已实现 fixture app 自身对 tabbed window 的 UI 覆盖
+- 尚未把多 app workflow 全量接到 FlowTab 真实 runtime end-to-end UI workflow
+
+因此，这份文档应按“当前实现说明”理解，而不是“未来设计提案”。

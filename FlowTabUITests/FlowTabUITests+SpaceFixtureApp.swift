@@ -149,8 +149,10 @@ extension FlowTabUITests {
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
         waitForSpaceFixtureWorkflowToStabilize(
             in: app,
-            windowCount: windowCount,
-            titlePrefix: titlePrefix,
+            expectedWindowTitles: expectedSpaceFixtureWorkflowWindowTitles(
+                titlePrefix: titlePrefix,
+                windowCount: windowCount
+            ),
             fullscreenWindowIndex: fullscreenWindowIndex,
             settleTimeout: max(4.5, Double(enterFullscreenDelayMilliseconds) / 1_000 + 3.5)
         )
@@ -165,6 +167,23 @@ extension FlowTabUITests {
         fullscreenWindowIndex: Int?,
         settleTimeout: TimeInterval
     ) {
+        waitForSpaceFixtureWorkflowToStabilize(
+            in: app,
+            expectedWindowTitles: expectedSpaceFixtureWorkflowWindowTitles(
+                titlePrefix: titlePrefix,
+                windowCount: windowCount
+            ),
+            fullscreenWindowIndex: fullscreenWindowIndex,
+            settleTimeout: settleTimeout
+        )
+    }
+
+    func waitForSpaceFixtureWorkflowToStabilize(
+        in app: XCUIApplication,
+        expectedWindowTitles: [String],
+        fullscreenWindowIndex: Int?,
+        settleTimeout: TimeInterval
+    ) {
         let readyLabel = element(in: app, identifier: spaceFixtureWorkflowReadyAccessibilityIdentifier)
         XCTAssertTrue(readyLabel.waitForExistence(timeout: 8))
         XCTAssertEqual(readyLabel.label, "Ready")
@@ -173,7 +192,7 @@ extension FlowTabUITests {
         XCTAssertTrue(summaryLabel.waitForExistence(timeout: 8))
         assertValue(
             of: summaryLabel,
-            equals: expectedSpaceFixtureWorkflowSummary(titlePrefix: titlePrefix, windowCount: windowCount),
+            equals: expectedSpaceFixtureWorkflowSummary(windowTitles: expectedWindowTitles),
             timeout: 8
         )
 
@@ -304,7 +323,16 @@ extension FlowTabUITests {
         titlePrefix: String,
         windowCount: Int
     ) -> String {
-        (1...windowCount).map { "\(titlePrefix) \($0)" }.joined(separator: " | ")
+        expectedSpaceFixtureWorkflowSummary(
+            windowTitles: expectedSpaceFixtureWorkflowWindowTitles(
+                titlePrefix: titlePrefix,
+                windowCount: windowCount
+            )
+        )
+    }
+
+    func expectedSpaceFixtureWorkflowSummary(windowTitles: [String]) -> String {
+        windowTitles.joined(separator: " | ")
     }
 
     func assertSpaceFixtureWorkflowPermissionsAvailable() -> Bool {
