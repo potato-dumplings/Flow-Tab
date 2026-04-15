@@ -1,10 +1,128 @@
+import Foundation
 import XCTest
+
+private enum FlowTabUITestAppEnvironmentKey {
+    static let appPath = "FLOWTAB_UI_TEST_APP_PATH"
+}
+
+private enum FlowTabUITestAppDefaults {
+    static let defaultBundleIdentifier = "io.github.potato-dumplings.flowtab"
+
+    static var installedAppURL: URL {
+        URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+            .appendingPathComponent("Applications", isDirectory: true)
+            .appendingPathComponent("Flow Tab UITest.app", isDirectory: true)
+    }
+}
+
+struct FlowTabUITestAppIdentity: Equatable {
+    let bundleIdentifier: String
+    let appURL: URL?
+
+    static func configured(
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        defaultInstalledAppURL: URL = FlowTabUITestAppDefaults.installedAppURL,
+        fileExistsAtPath: (String) -> Bool = { FileManager.default.fileExists(atPath: $0) }
+    ) -> FlowTabUITestAppIdentity {
+        if let configuredPath = environment[FlowTabUITestAppEnvironmentKey.appPath]?.trimmedFlowTabUITestValue,
+           !configuredPath.isEmpty {
+            return identity(for: URL(fileURLWithPath: NSString(string: configuredPath).expandingTildeInPath))
+        }
+
+        guard fileExistsAtPath(defaultInstalledAppURL.path) else {
+            return FlowTabUITestAppIdentity(
+                bundleIdentifier: FlowTabUITestAppDefaults.defaultBundleIdentifier,
+                appURL: nil
+            )
+        }
+
+        return identity(for: defaultInstalledAppURL)
+    }
+
+    private static func identity(for appURL: URL) -> FlowTabUITestAppIdentity {
+        let resolvedURL = appURL.standardizedFileURL
+        return FlowTabUITestAppIdentity(
+            bundleIdentifier: Bundle(url: resolvedURL)?.bundleIdentifier
+                ?? FlowTabUITestAppDefaults.defaultBundleIdentifier,
+            appURL: resolvedURL
+        )
+    }
+}
+
+private extension String {
+    var trimmedFlowTabUITestValue: String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+func makeFlowTabUITestApplication(
+    additionalArguments: [String] = [],
+    environment: [String: String] = ProcessInfo.processInfo.environment
+) -> XCUIApplication {
+    let identity = FlowTabUITestAppIdentity.configured(environment: environment)
+    let app: XCUIApplication
+    if let appURL = identity.appURL {
+        app = XCUIApplication(url: appURL)
+    } else {
+        app = XCUIApplication()
+    }
+    app.launchArguments += additionalArguments
+    return app
+}
+
+private func shouldActivateFlowTabUITestApplicationAfterLaunch(
+    environment: [String: String] = ProcessInfo.processInfo.environment
+) -> Bool {
+    FlowTabUITestAppIdentity.configured(environment: environment).appURL != nil
+}
+
+func launchFlowTabUITestApplication(
+    _ app: XCUIApplication,
+    environment: [String: String] = ProcessInfo.processInfo.environment
+) {
+    app.launch()
+    if shouldActivateFlowTabUITestApplicationAfterLaunch(environment: environment) {
+        app.activate()
+        _ = app.wait(for: .runningForeground, timeout: 12)
+    }
+}
+
+func waitForFlowTabUITestApplicationToBecomeReady(
+    _ app: XCUIApplication,
+    timeout: TimeInterval,
+    environment: [String: String] = ProcessInfo.processInfo.environment
+) -> Bool {
+    if app.wait(for: .runningForeground, timeout: timeout) {
+        return true
+    }
+
+    guard shouldActivateFlowTabUITestApplicationAfterLaunch(environment: environment) else {
+        return false
+    }
+
+    app.activate()
+    return app.wait(for: .runningForeground, timeout: min(timeout, 4))
+}
+
+func terminateFlowTabUITestApplicationIfRunning(
+    environment: [String: String] = ProcessInfo.processInfo.environment
+) {
+    let identity = FlowTabUITestAppIdentity.configured(environment: environment)
+    let app: XCUIApplication
+    if let appURL = identity.appURL {
+        app = XCUIApplication(url: appURL)
+    } else {
+        app = XCUIApplication()
+    }
+
+    if app.state == .runningForeground || app.state == .runningBackground {
+        app.terminate()
+    }
+}
 
 extension FlowTabUITests {
     func makeApp(additionalArguments: [String] = []) -> XCUIApplication {
-        let app = XCUIApplication()
-        app.launchArguments += additionalArguments
-        return app
+        makeFlowTabUITestApplication(additionalArguments: additionalArguments)
     }
     func settingsReminderToggle(in app: XCUIApplication) -> XCUIElement {
         toggleElement(in: app, identifier: Identifier.permissionReminderSwitch)
@@ -125,7 +243,7 @@ extension FlowTabUITests {
                 "NO"
             ]
         )
-        app.launch()
+        launchFlowTabUITestApplication(app)
         defer {
             if app.state == .runningForeground || app.state == .runningBackground {
                 app.terminate()
@@ -204,9 +322,34 @@ extension FlowTabUITests {
         return false
     }
     func terminateAppIfRunning() {
-        let app = XCUIApplication()
-        if app.state == .runningForeground || app.state == .runningBackground {
-            app.terminate()
-        }
+        terminateFlowTabUITestApplicationIfRunning()
+    }
+
+    func testFlowTabUITestAppIdentityUsesEnvironmentOverridePath() {
+        let identity = FlowTabUITestAppIdentity.configured(
+            environment: [
+                FlowTabUITestAppEnvironmentKey.appPath: "~/Applications/Flow Tab UITest.app"
+            ]
+        )
+
+        XCTAssertEqual(
+            identity.appURL?.standardizedFileURL.path,
+            FlowTabUITestAppDefaults.installedAppURL.standardizedFileURL.path
+        )
+        XCTAssertEqual(
+            identity.bundleIdentifier,
+            FlowTabUITestAppDefaults.defaultBundleIdentifier
+        )
+    }
+
+    func testFlowTabUITestAppIdentityUsesDefaultInstalledAppWhenPresent() {
+        let defaultInstalledAppURL = URL(fileURLWithPath: "/tmp/Flow Tab UITest.app")
+        let identity = FlowTabUITestAppIdentity.configured(
+            environment: [:],
+            defaultInstalledAppURL: defaultInstalledAppURL,
+            fileExistsAtPath: { $0 == defaultInstalledAppURL.path }
+        )
+
+        XCTAssertEqual(identity.appURL?.standardizedFileURL.path, defaultInstalledAppURL.standardizedFileURL.path)
     }
 }

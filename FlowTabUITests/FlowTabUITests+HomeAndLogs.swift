@@ -26,8 +26,8 @@ extension FlowTabUITests {
                 "YES"
             ]
         )
-        app.launch()
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 8))
+        launchFlowTabUITestApplication(app)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
 
         XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5))
         XCTAssertTrue(element(in: app, identifier: Identifier.homeTabContent).waitForExistence(timeout: 5))
@@ -49,8 +49,8 @@ extension FlowTabUITests {
                 "YES"
             ]
         )
-        app.launch()
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 8))
+        launchFlowTabUITestApplication(app)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
         XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5))
 
         XCTAssertFalse(
@@ -69,7 +69,7 @@ extension FlowTabUITests {
                 "NO"
             ]
         )
-        firstLaunchApp.launch()
+        launchFlowTabUITestApplication(firstLaunchApp)
 
         let openSettingsButtons = firstLaunchApp.buttons.matching(identifier: Identifier.permissionOpenSettings)
         XCTAssertTrue(openSettingsButtons.firstMatch.waitForExistence(timeout: 5))
@@ -89,7 +89,7 @@ extension FlowTabUITests {
                 "NO"
             ]
         )
-        relaunchApp.launch()
+        launchFlowTabUITestApplication(relaunchApp)
         XCTAssertTrue(
             tapFirstHittable(in: relaunchApp.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5)
         )
@@ -111,7 +111,7 @@ extension FlowTabUITests {
                 "NO"
             ]
         )
-        firstLaunchApp.launch()
+        launchFlowTabUITestApplication(firstLaunchApp)
 
         let dismissButtons = firstLaunchApp.buttons.matching(identifier: Identifier.permissionDismiss)
         XCTAssertTrue(dismissButtons.firstMatch.waitForExistence(timeout: 5))
@@ -133,7 +133,7 @@ extension FlowTabUITests {
                 "NO"
             ]
         )
-        relaunchApp.launch()
+        launchFlowTabUITestApplication(relaunchApp)
         XCTAssertTrue(
             tapFirstHittable(in: relaunchApp.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5)
         )
@@ -157,7 +157,7 @@ extension FlowTabUITests {
                 "NO"
             ]
         )
-        app.launch()
+        launchFlowTabUITestApplication(app)
 
         XCTAssertTrue(
             tapFirstHittable(in: app.buttons.matching(identifier: Identifier.logsTabButton), timeout: 5)
@@ -260,7 +260,7 @@ extension FlowTabUITests {
                 "NO"
             ]
         )
-        app.launch()
+        launchFlowTabUITestApplication(app)
         openLogsTab(in: app)
 
         let openDirectoryButton = app.buttons[Identifier.logsOpenDirectoryButton]

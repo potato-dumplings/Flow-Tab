@@ -38,8 +38,8 @@ extension FlowTabUITests {
                 "NO"
             ]
         )
-        app.launch()
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+        launchFlowTabUITestApplication(app)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
 
         let switcherPanel = app.descendants(matching: .any)
             .matching(identifier: Identifier.switcherPanel)
@@ -65,8 +65,8 @@ extension FlowTabUITests {
                 "NO"
             ]
         )
-        app.launch()
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+        launchFlowTabUITestApplication(app)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
 
         let switcherPanel = app.descendants(matching: .any)
             .matching(identifier: Identifier.switcherPanel)
@@ -92,8 +92,8 @@ extension FlowTabUITests {
                 "NO"
             ]
         )
-        app.launch()
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+        launchFlowTabUITestApplication(app)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
 
         let switcherPanel = app.descendants(matching: .any)
             .matching(identifier: Identifier.switcherPanel)
@@ -124,8 +124,8 @@ extension FlowTabUITests {
                 "NO"
             ]
         )
-        app.launch()
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+        launchFlowTabUITestApplication(app)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
 
         let switcherPanel = app.descendants(matching: .any)
             .matching(identifier: Identifier.switcherPanel)
@@ -153,8 +153,8 @@ extension FlowTabUITests {
                 "NO"
             ]
         )
-        app.launch()
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+        launchFlowTabUITestApplication(app)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
 
         let switcherPanel = app.descendants(matching: .any)
             .matching(identifier: Identifier.switcherPanel)
@@ -208,8 +208,8 @@ extension FlowTabUITests {
                     "NO"
                 ]
             )
-            app.launch()
-            XCTAssertTrue(app.wait(for: .runningForeground, timeout: 5))
+            launchFlowTabUITestApplication(app)
+            XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 5))
             XCTAssertTrue(app.wait(for: .notRunning, timeout: 10))
         }
     }

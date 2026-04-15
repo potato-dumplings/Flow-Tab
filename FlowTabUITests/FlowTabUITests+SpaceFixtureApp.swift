@@ -340,14 +340,14 @@ extension FlowTabUITests {
             showsPermissionReminder: true,
             additionalArguments: []
         )
-        app.launch()
+        launchFlowTabUITestApplication(app)
         defer {
             if app.state == .runningForeground || app.state == .runningBackground {
                 app.terminate()
             }
         }
 
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 12))
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 12))
         XCTAssertTrue(
             tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 10)
         )

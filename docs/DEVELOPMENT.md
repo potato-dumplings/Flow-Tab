@@ -455,6 +455,33 @@ gh release create "${TAG}" release/"${TAG}"/flowtab-universal2-apple-darwin.dmg 
 通常是辅助功能权限未生效，或者当前运行实例路径与授权路径不一致。
 建议安装到固定路径 `/Applications/Flow Tab.app` 后重新授权。
 
+### 1.1) UI automation 每次都像是权限丢失
+
+如果 `FlowTabUITests` 直接启动 `DerivedData` 里的调试构建产物，macOS 可能不会把它识别成你已经授权过的那一份应用。
+
+建议先准备固定路径的 UI test app：
+
+```bash
+./scripts/testing/install-ui-test-app.sh
+```
+
+默认会安装到：
+
+- `~/Applications/Flow Tab UITest.app`
+
+然后在下面两处把这份 app 加进去并授权：
+
+- `系统设置 -> 隐私与安全性 -> 辅助功能`
+- `系统设置 -> 隐私与安全性 -> 屏幕与系统音频录制`
+
+完成后再运行：
+
+```bash
+./scripts/testing/run-ui-tests-local.sh
+```
+
+该脚本会自动优先使用 `~/Applications/Flow Tab UITest.app`；如果该路径不存在，才回退到 `DerivedData` 构建产物。
+
 ### 2) 窗口预览没有真实画面
 
 请检查：

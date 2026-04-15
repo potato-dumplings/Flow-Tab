@@ -363,14 +363,14 @@ extension FlowTabUITests {
         guard assertSpaceFixtureWorkflowPermissionsAvailable() else { return }
 
         let app = makeRealRuntimeFlowTabApp(additionalArguments: flowTabAdditionalArguments)
-        app.launch()
+        launchFlowTabUITestApplication(app)
         defer {
             if app.state == .runningForeground || app.state == .runningBackground {
                 app.terminate()
             }
         }
 
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 12))
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 12))
         assertions(workflow, app)
     }
 

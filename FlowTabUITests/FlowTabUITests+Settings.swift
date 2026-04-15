@@ -11,7 +11,7 @@ extension FlowTabUITests {
                 "YES"
             ]
         )
-        app.launch()
+        launchFlowTabUITestApplication(app)
         openSettingsTab(in: app)
 
         let showShortcutHintToggle = toggleElement(in: app, identifier: Identifier.settingsAppearanceShowShortcutHint)
@@ -38,7 +38,7 @@ extension FlowTabUITests {
                 "YES"
             ]
         )
-        firstLaunchApp.launch()
+        launchFlowTabUITestApplication(firstLaunchApp)
         openSettingsTab(in: firstLaunchApp)
 
         selectOption(in: firstLaunchApp, controlIdentifier: Identifier.settingsAppearanceThemeMode, optionIdentifier: "dark")
@@ -57,7 +57,7 @@ extension FlowTabUITests {
                 "YES"
             ]
         )
-        relaunchApp.launch()
+        launchFlowTabUITestApplication(relaunchApp)
         openSettingsTab(in: relaunchApp)
 
         assertValue(of: element(in: relaunchApp, identifier: Identifier.settingsAppearanceThemeMode), equals: "dark")
@@ -74,7 +74,7 @@ extension FlowTabUITests {
                 "YES"
             ]
         )
-        firstLaunchApp.launch()
+        launchFlowTabUITestApplication(firstLaunchApp)
         openSettingsTab(in: firstLaunchApp)
 
         let delayInput = element(in: firstLaunchApp, identifier: Identifier.settingsWindowAutoEnterDelayInput)
@@ -103,7 +103,7 @@ extension FlowTabUITests {
                 "YES"
             ]
         )
-        relaunchApp.launch()
+        launchFlowTabUITestApplication(relaunchApp)
         openSettingsTab(in: relaunchApp)
 
         let relaunchDelayInput = element(in: relaunchApp, identifier: Identifier.settingsWindowAutoEnterDelayInput)
@@ -128,7 +128,7 @@ extension FlowTabUITests {
                 "YES"
             ]
         )
-        firstLaunchApp.launch()
+        launchFlowTabUITestApplication(firstLaunchApp)
         openSettingsTab(in: firstLaunchApp)
 
         let searchEnabledToggle = toggleElement(in: firstLaunchApp, identifier: Identifier.settingsSearchEnabled)
@@ -147,8 +147,8 @@ extension FlowTabUITests {
                 "YES"
             ]
         )
-        relaunchApp.launch()
-        XCTAssertTrue(relaunchApp.wait(for: .runningForeground, timeout: 10))
+        launchFlowTabUITestApplication(relaunchApp)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(relaunchApp, timeout: 10))
 
         let switcherPanel = element(in: relaunchApp, identifier: Identifier.switcherPanel)
         XCTAssertTrue(switcherPanel.waitForExistence(timeout: 8))
@@ -165,7 +165,7 @@ extension FlowTabUITests {
                 "YES"
             ]
         )
-        firstLaunchApp.launch()
+        launchFlowTabUITestApplication(firstLaunchApp)
         openSettingsTab(in: firstLaunchApp)
 
         let searchEnabledToggle = toggleElement(in: firstLaunchApp, identifier: Identifier.settingsSearchEnabled)
@@ -184,7 +184,7 @@ extension FlowTabUITests {
                 "YES"
             ]
         )
-        relaunchApp.launch()
+        launchFlowTabUITestApplication(relaunchApp)
         openSettingsTab(in: relaunchApp)
         assertValue(of: element(in: relaunchApp, identifier: Identifier.settingsSearchDefaultScope), equals: "window")
     }
@@ -199,7 +199,7 @@ extension FlowTabUITests {
                 "YES"
             ]
         )
-        firstLaunchApp.launch()
+        launchFlowTabUITestApplication(firstLaunchApp)
         openSettingsTab(in: firstLaunchApp)
 
         let searchEnabledToggle = toggleElement(in: firstLaunchApp, identifier: Identifier.settingsSearchEnabled)
@@ -223,7 +223,7 @@ extension FlowTabUITests {
                 "NO"
             ]
         )
-        app.launch()
+        launchFlowTabUITestApplication(app)
         openSettingsTab(in: app)
 
         XCTAssertTrue(
@@ -244,7 +244,7 @@ extension FlowTabUITests {
                 "YES"
             ]
         )
-        firstLaunchApp.launch()
+        launchFlowTabUITestApplication(firstLaunchApp)
         openSettingsTab(in: firstLaunchApp)
 
         let expectedSelections: [(control: String, option: String)] = [
@@ -267,7 +267,7 @@ extension FlowTabUITests {
                 "YES"
             ]
         )
-        relaunchApp.launch()
+        launchFlowTabUITestApplication(relaunchApp)
         openSettingsTab(in: relaunchApp)
 
         for selection in expectedSelections {
@@ -285,7 +285,7 @@ extension FlowTabUITests {
                 "YES"
             ]
         )
-        app.launch()
+        launchFlowTabUITestApplication(app)
         openSettingsTab(in: app)
 
         let inAppModifier = element(in: app, identifier: Identifier.settingsHotkeyInAppModifier)

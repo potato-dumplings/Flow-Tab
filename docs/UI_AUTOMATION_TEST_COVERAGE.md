@@ -180,7 +180,19 @@
 优先使用仓库脚本，把 `DerivedData`、临时目录和缓存统一压到 `./.build-local/ui-tests`：
 
 ```bash
+./scripts/testing/install-ui-test-app.sh
 ./scripts/testing/run-ui-tests-local.sh
+```
+
+如果已经准备好了固定路径的 UI test app，`run-ui-tests-local.sh` 会自动优先使用：
+
+- `~/Applications/Flow Tab UITest.app`
+
+也可以显式指定或关闭这条路径：
+
+```bash
+./scripts/testing/run-ui-tests-local.sh --ui-test-app-path ~/Applications/Flow\ Tab\ UITest.app
+./scripts/testing/run-ui-tests-local.sh --no-ui-test-app
 ```
 
 需要缩小到单个 UI 用例时：
