@@ -10,6 +10,7 @@ Use this workflow for regressions, flaky behavior, broken edge cases, and user-r
 - If existing tests cannot reproduce the issue, analyze stable logs first; when logs support a concrete scenario, add a failing test that captures the scenario and expected log-backed behavior before changing production logic.
 - Stop and report the blocker if no reproducible signal exists yet or a required environment, permission, fixture, or test layer is unavailable.
 - Use tests and logs to narrow the root cause instead of guessing.
+- Keep each regression layer focused on different evidence instead of cloning the same assertion everywhere.
 - Keep regression coverage after the fix.
 
 ## Workflow
@@ -17,14 +18,15 @@ Use this workflow for regressions, flaky behavior, broken edge cases, and user-r
 1. State the observed failure in one sentence.
 2. List the current evidence, assumptions, and open questions. If more than one plausible root-cause theory exists, name the contenders instead of choosing silently.
 3. Identify the affected layer or layers: unit, behavior, UI, runtime integration.
-4. Identify any required environment prerequisites for reproduction, such as Accessibility trust, screen capture permission, seeded fixtures, or launch arguments.
-5. Before touching production code, run or explicitly attempt the relevant existing unit, behavior, and UI tests and record which layers failed, passed, were not relevant, or were blocked.
-6. If existing tests cannot reproduce the defect, analyze existing stable logs first, or add temporary diagnostic logging when needed to confirm a concrete hypothesis.
-7. When logs or tests support a concrete scenario, add a missing failing test that captures that scenario and expected behavior. Start at the lowest layer that can express the failure and add higher-layer coverage when the bug is user-visible.
-8. If there is still no reproducible signal, if the evidence does not clearly support one theory, or a required layer cannot run because the environment is blocked, stop and report the blocker. Do not edit production files past this point.
-9. Change production code only after tests or logs support the root-cause theory, and prefer the smallest fix that explains the evidence.
-10. Remove temporary debug-only logging or hooks from the final production path.
-11. Re-run the relevant unit, behavior, and UI tests and keep the new regression coverage.
+4. Read `test-layer-boundaries.md` and decide which layer should hold the failing reproduction, which layer should hold app-orchestration coverage, and whether a visible UI regression is required.
+5. Identify any required environment prerequisites for reproduction, such as Accessibility trust, screen capture permission, seeded fixtures, or launch arguments.
+6. Before touching production code, run or explicitly attempt the relevant existing unit, behavior, and UI tests and record which layers failed, passed, were not relevant, or were blocked.
+7. If existing tests cannot reproduce the defect, analyze existing stable logs first, or add temporary diagnostic logging when needed to confirm a concrete hypothesis.
+8. When logs or tests support a concrete scenario, add a missing failing test that captures that scenario and expected behavior. Start at the lowest layer that can express the failure and add higher-layer coverage when the bug is user-visible.
+9. If there is still no reproducible signal, if the evidence does not clearly support one theory, or a required layer cannot run because the environment is blocked, stop and report the blocker. Do not edit production files past this point.
+10. Change production code only after tests or logs support the root-cause theory, and prefer the smallest fix that explains the evidence.
+11. Remove temporary debug-only logging or hooks from the final production path.
+12. Re-run the relevant unit, behavior, and UI tests and keep the new regression coverage.
 
 ## Hard Gates
 
@@ -54,6 +56,8 @@ Use this workflow for regressions, flaky behavior, broken edge cases, and user-r
 - When existing suites cannot reproduce, derive the new failing test from the observed runtime scenario and the log signal that supports the hypothesis.
 - Run every relevant existing test layer before production edits. If a layer is not relevant, say why. If it is relevant but blocked, stop and report the blocker.
 - Keep or add a higher-layer regression when the bug was user-visible or crossed module boundaries.
+- Use the layer that owns the evidence instead of cloning the same assertion across unit, behavior, and UI.
+- Let unit tests prove deterministic rules, behavior tests prove in-process orchestration, and UI tests prove visible user impact.
 - Use UI coverage for user-facing regressions, interaction issues, settings flows, switcher behavior, and launch-time behavior.
 - Use behavior coverage for app-level state transitions, persistence, permission handling, runtime wiring, and search lifecycle issues.
 - Use unit coverage for deterministic logic and state machines.

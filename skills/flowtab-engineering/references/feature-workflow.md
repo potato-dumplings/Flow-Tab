@@ -6,6 +6,7 @@ Use this workflow for new features and for extending existing behavior.
 
 - State the user-visible behavior, shared rule, and material assumptions before implementation.
 - Add or update coverage in all three layers: unit, behavior, and UI.
+- Make each test layer prove a different part of the change instead of repeating the same assertion.
 - Pass the related unit, behavior, and UI tests before submission.
 - Keep the implementation generic rather than feature-specific.
 
@@ -20,19 +21,29 @@ Use this workflow for new features and for extending existing behavior.
 
 1. Define the user-visible behavior, the shared rule behind it, and the assumptions that materially affect the design.
 2. If the request supports multiple interpretations, resolve them before editing. Do not silently pick one.
-3. Read `module-boundaries.md` and choose the lowest reasonable module for the change.
-4. Reject any design that only works through a one-off special case or unnecessary abstraction.
-5. Add or update unit tests for the smallest reusable logic first.
-6. Add or update behavior tests for the feature flow or integration path.
-7. Add or update UI tests for the user-visible path.
-8. Implement the production change.
-9. Run the related test suites and iterate until they pass.
+3. Read `test-layer-boundaries.md` and decide what distinct evidence unit, behavior, and UI coverage should provide.
+4. Read `module-boundaries.md` and choose the lowest reasonable module for the change.
+5. Reject any design that only works through a one-off special case or unnecessary abstraction.
+6. Add or update unit tests for the smallest reusable rule first.
+7. Add or update behavior tests for the app-level flow or integration path.
+8. Add or update UI tests for the visible user path.
+9. Implement the production change.
+10. Run the related test suites and iterate until they pass.
 
 ## Coverage Expectations
 
-- Unit tests should verify pure logic, state transitions, normalization rules, and deterministic helpers.
+- Unit tests should verify pure logic, state transitions, normalization rules, deterministic helpers, and the smallest shared rule behind the feature.
 - Behavior tests should verify application-level flows, persistence, launch options, permissions, logging behavior, or integration seams that are still stable in-process.
 - UI tests should verify the visible user path, not just internal state.
+- Treat these as coverage layers, not simple aliases for Xcode target names. Use `test-layer-boundaries.md` when placement feels ambiguous.
+- Do not make all three layers assert the same branch. The unit layer should prove the rule, the behavior layer should prove orchestration, and the UI layer should prove visibility.
+
+## Layer Placement Guide
+
+- Use `FlowTabCore/Tests/FlowTabCoreTests` for pure `FlowTabCore` unit rules.
+- Use `FlowTabTests` for app-scoped unit tests and behavior tests that stay in-process.
+- Use `FlowTabUITests` for XCUI-visible paths and fixture-app workflows.
+- If a feature seems to have no unit seam, that is usually a signal to extract or isolate the deterministic rule rather than skipping unit coverage.
 
 ## File Placement
 
@@ -52,4 +63,5 @@ Use this workflow for new features and for extending existing behavior.
 
 - Start with the smallest directly related unit or behavior suite.
 - Run the directly related UI tests for the affected surface.
+- Prefer one strong assertion per layer over many duplicated assertions across layers.
 - Expand to broader suites when the change touches shared state, launch flow, search, runtime bridging, hotkeys, or panel presentation.
