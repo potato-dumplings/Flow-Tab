@@ -4,6 +4,19 @@ Use this reference when deciding whether a scenario belongs in unit, behavior, o
 
 These labels describe coverage layers, not a one-to-one naming scheme for Xcode targets. Pick the layer based on what evidence the test provides, then place it in the target that can express that evidence cleanly.
 
+## Contents
+
+- [Layer Model Versus Test Targets](#layer-model-versus-test-targets)
+- [Unit Tests](#unit-tests)
+- [Behavior Tests](#behavior-tests)
+- [UI Tests](#ui-tests)
+- [Cross-Layer Rules](#cross-layer-rules)
+- [Quick Selection Rules](#quick-selection-rules)
+- [Standard Product Scenarios](#standard-product-scenarios)
+- [Three Apps in One Space, Search in the Panel, Activate the Target Window](#1-three-apps-in-one-space-search-in-the-panel-activate-the-target-window)
+- [Three Apps Across Spaces, Search in the Panel, Cross-Space Activate the Target](#2-three-apps-across-spaces-search-in-the-panel-cross-space-activate-the-target)
+- [Three Apps Running, App-Managed Tab Titles Participate in Search](#3-three-apps-running-app-managed-tab-titles-participate-in-search)
+
 ## Layer Model Versus Test Targets
 
 - `FlowTabCore/Tests/FlowTabCoreTests` is the default home for pure `FlowTabCore` unit tests.

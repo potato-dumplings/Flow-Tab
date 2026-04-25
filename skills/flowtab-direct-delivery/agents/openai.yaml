@@ -1,4 +1,4 @@
 interface:
   display_name: "FlowTab Direct Delivery"
-  short_description: "Concrete FlowTab answers with assumptions and simplification"
-  default_prompt: "Use $flowtab-direct-delivery to answer FlowTab tasks with concrete implementation guidance, explicit assumptions, simpler-path recommendations, and complete handoff details."
+  short_description: "Concrete FlowTab answers for implementation, review, and handoff"
+  default_prompt: "Use $flowtab-direct-delivery to answer FlowTab tasks with concrete guidance or findings, explicit assumptions, simpler-path recommendations, layer-by-layer validation outcomes, blocked-layer reasons, and complete FlowTab handoff details."

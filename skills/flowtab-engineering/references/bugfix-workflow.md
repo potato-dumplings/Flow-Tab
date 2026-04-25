@@ -11,6 +11,7 @@ Use this workflow for regressions, flaky behavior, broken edge cases, and user-r
 - Stop and report the blocker if no reproducible signal exists yet or a required environment, permission, fixture, or test layer is unavailable.
 - Use tests and logs to narrow the root cause instead of guessing.
 - Keep each regression layer focused on different evidence instead of cloning the same assertion everywhere.
+- Run pressure validation when the bug or the fix touches sustained-load, repeated-interaction, or scale-sensitive behavior.
 - Keep regression coverage after the fix.
 
 ## Workflow
@@ -19,14 +20,16 @@ Use this workflow for regressions, flaky behavior, broken edge cases, and user-r
 2. List the current evidence, assumptions, and open questions. If more than one plausible root-cause theory exists, name the contenders instead of choosing silently.
 3. Identify the affected layer or layers: unit, behavior, UI, runtime integration.
 4. Read `test-layer-boundaries.md` and decide which layer should hold the failing reproduction, which layer should hold app-orchestration coverage, and whether a visible UI regression is required.
-5. Identify any required environment prerequisites for reproduction, such as Accessibility trust, screen capture permission, seeded fixtures, or launch arguments.
-6. Before touching production code, run or explicitly attempt the relevant existing unit, behavior, and UI tests and record which layers failed, passed, were not relevant, or were blocked.
-7. If existing tests cannot reproduce the defect, analyze existing stable logs first, or add temporary diagnostic logging when needed to confirm a concrete hypothesis.
-8. When logs or tests support a concrete scenario, add a missing failing test that captures that scenario and expected behavior. Start at the lowest layer that can express the failure and add higher-layer coverage when the bug is user-visible.
-9. If there is still no reproducible signal, if the evidence does not clearly support one theory, or a required layer cannot run because the environment is blocked, stop and report the blocker. Do not edit production files past this point.
-10. Change production code only after tests or logs support the root-cause theory, and prefer the smallest fix that explains the evidence.
-11. Remove temporary debug-only logging or hooks from the final production path.
-12. Re-run the relevant unit, behavior, and UI tests and keep the new regression coverage.
+5. If UI automation is relevant, read `ui-automation-prerequisites.md` and satisfy the repo-specific setup before deciding the environment is blocked.
+6. Read `performance-pressure-workflow.md` and decide whether the defect or fix requires pressure validation in addition to functional regression coverage.
+7. Identify any required environment prerequisites for reproduction, such as Accessibility trust, screen capture permission, seeded fixtures, launch arguments, fixed-path UI app preparation, or code-identity matching.
+8. Before touching production code, run or explicitly attempt the relevant existing unit, behavior, and UI tests and record which layers failed, passed, were not relevant, or were blocked.
+9. If existing tests cannot reproduce the defect, analyze existing stable logs first, or add temporary diagnostic logging when needed to confirm a concrete hypothesis.
+10. When logs or tests support a concrete scenario, add a missing failing test that captures that scenario and expected behavior. Start at the lowest layer that can express the failure and add higher-layer coverage when the bug is user-visible.
+11. If there is still no reproducible signal, if the evidence does not clearly support one theory, or a required layer cannot run because the environment is blocked, stop and report the blocker. Do not edit production files past this point.
+12. Change production code only after tests or logs support the root-cause theory, and prefer the smallest fix that explains the evidence.
+13. Remove temporary debug-only logging or hooks from the final production path.
+14. Re-run the relevant unit, behavior, and UI tests and any required pressure checks, then keep the new regression coverage.
 
 ## Hard Gates
 
@@ -36,12 +39,15 @@ Use this workflow for regressions, flaky behavior, broken edge cases, and user-r
 - If a bug is user-visible and affects switcher behavior, keyboard interaction, window selection, launch flows, settings flows, or permission flows, keep or add a higher-layer regression. Prefer UI coverage when the scenario can be automated reasonably.
 - If a test layer is relevant but cannot run, treat that as a blocker to completion. Report it explicitly instead of silently proceeding.
 - If required permissions or OS capabilities are unavailable, stop and report the blocker rather than inferring runtime behavior from code inspection alone.
+- If the defect or fix involves hot paths, scale growth, repeated async work, or long-lived resources, treat skipped pressure validation as a blocker unless there is a concrete not-applicable reason.
 
 ## Sandboxed Test Blockers
 
-- When UI automation is relevant and `xcodebuild` fails because sandboxed temp files, module caches, or SwiftPM caches cannot be created, first try `./scripts/testing/run-ui-tests-local.sh`.
-- Treat that script as the standard local fallback because it redirects `DerivedData`, `TMPDIR`, module caches, and source packages into `./.build-local/ui-tests`.
-- If the fallback script still fails for environment reasons, stop and report the blocker, then request the needed elevated run or an external Terminal run. Do not continue with production edits while that blocker remains unresolved.
+- Before calling UI automation blocked, first satisfy the repository prerequisites from `ui-automation-prerequisites.md`.
+- When a fixed-path UI test app has not been prepared yet, first run `./scripts/testing/install-ui-test-app.sh`.
+- Then run `./scripts/testing/run-ui-tests-local.sh`, because it redirects `DerivedData`, `TMPDIR`, module caches, and source packages into `./.build-local/ui-tests` and prefers the fixed-path UI test app when present.
+- If the run still looks like a permission loss or missing live-runtime signal, check fixed-path app usage, Accessibility permission, Screen & System Audio Recording permission, and code-identity matching before reporting a blocker.
+- If those checks are satisfied and the fallback script still fails for sandbox or external-environment reasons, stop and report the blocker, then request the needed elevated run or an external Terminal run. Do not continue with production edits while that blocker remains unresolved.
 
 ## Logging Rules
 
@@ -58,6 +64,7 @@ Use this workflow for regressions, flaky behavior, broken edge cases, and user-r
 - Keep or add a higher-layer regression when the bug was user-visible or crossed module boundaries.
 - Use the layer that owns the evidence instead of cloning the same assertion across unit, behavior, and UI.
 - Let unit tests prove deterministic rules, behavior tests prove in-process orchestration, and UI tests prove visible user impact.
+- Add pressure validation when the bug or fix touches repeated interaction cost, scale-sensitive search or runtime work, or memory-lifetime risks.
 - Use UI coverage for user-facing regressions, interaction issues, settings flows, switcher behavior, and launch-time behavior.
 - Use behavior coverage for app-level state transitions, persistence, permission handling, runtime wiring, and search lifecycle issues.
 - Use unit coverage for deterministic logic and state machines.

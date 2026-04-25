@@ -1,11 +1,22 @@
 ---
 name: flowtab-direct-delivery
-description: "Direct answer and implementation handoff rules for FlowTab tasks. Use when writing implementation guidance, architecture proposals, bugfix explanations, change summaries, or remediation plans in this repository. Require concrete steps, affected modules or files, validation, rollback or failure handling when relevant, state assumptions and unresolved ambiguity when they matter, push toward the simplest viable path, and avoid placeholder offers such as 'if you want, I can...'."
+description: "Direct answer and FlowTab-specific handoff rules for FlowTab tasks. Use when writing implementation guidance, architecture proposals, bugfix explanations, review findings, diagnostic summaries, change summaries, or remediation plans in this repository. Require concrete conclusions, affected modules or files, explicit assumptions, layer-by-layer validation outcomes, blocked-layer reasons, performance or pressure baselines when relevant, and rollback or failure handling when it matters. Push toward the simplest viable path and avoid placeholder offers such as 'if you want, I can...'."
 ---
 
 # FlowTab Direct Delivery
 
-Apply this skill when explaining how to implement, change, fix, or summarize work in FlowTab. The answer should deliver the usable content first instead of offering to provide it later.
+Apply this skill when explaining how to implement, change, fix, review, diagnose, or summarize work in FlowTab. The answer should deliver the usable content first instead of offering to provide it later.
+
+This skill is not only a generic answer-style guide. It is the FlowTab delivery wrapper around the repository's engineering workflows, so handoffs must include the project-specific closure fields that make the work reviewable and transferable inside this codebase.
+
+## When To Load FlowTab References
+
+- For feature delivery or feature handoff, read `../flowtab-engineering/references/feature-workflow.md`.
+- For bugfix delivery or bugfix handoff, read `../flowtab-engineering/references/bugfix-workflow.md`.
+- For test-layer ownership, coverage audits, or layer-by-layer validation reporting, read `../flowtab-engineering/references/test-layer-boundaries.md`.
+- For UI blocker diagnosis, local UI test triage, or permission-path explanations, read `../flowtab-engineering/references/ui-automation-prerequisites.md`.
+- For architecture, refactor, or file-placement guidance, read `../flowtab-engineering/references/module-boundaries.md`.
+- For pressure or performance statements, read `../flowtab-engineering/references/performance-pressure-workflow.md` when the change touches hot paths, repeated interaction, scale-sensitive work, or long-lived resources.
 
 ## Required Response Contract
 
@@ -19,7 +30,7 @@ Apply this skill when explaining how to implement, change, fix, or summarize wor
    State the assumptions or missing information that materially affect the recommendation. If multiple interpretations exist, say so instead of silently choosing one. If the simpler path is better, recommend it directly.
 
 4. Make implementation guidance concrete.
-   Only explain the implementation approach and execution order. First state how the change should be implemented, then state the sequence for carrying it out.
+   State the implementation approach, the affected ownership boundary, and the execution order. First state how the change should be implemented, then state the sequence for carrying it out.
 
 5. Prefer direct recommendations over meta commentary.
    If one path is clearly best, recommend it directly instead of narrating that a plan could be created.
@@ -27,12 +38,37 @@ Apply this skill when explaining how to implement, change, fix, or summarize wor
 6. Keep optional next steps genuinely optional.
    Offer follow-up actions only after the answer is complete, and only when there are multiple meaningful directions the user may want.
 
+7. Treat FlowTab closure fields as required, not decorative.
+   Do not stop at generic `what / why / where / how validated`. Include the repository-specific fields that make the handoff actionable for reviewers and the next engineer.
+
+8. Report validation by layer.
+   When tests or validation matter, name the relevant layers individually. State whether each layer passed, failed, was not relevant, or was blocked, and give the blocking reason when a layer could not run.
+
+9. Surface pressure and performance status when relevant.
+   If the change affects hot paths, repeated interaction cost, scale-sensitive work, or long-lived resources, include the baseline, the pressure attempt or result, or a concrete not-applicable reason.
+
+## FlowTab Handoff Minimums
+
+- All implementation summaries or handoffs must state what changed, why it changed, where it changed, and the assumptions or constraints that shaped the choice.
+- When rollback, fallback, or failure handling materially affects delivery risk, handoffs must state it explicitly instead of leaving it implicit.
+- Bugfix handoffs must also state the pre-change failing signal.
+- Bugfix handoffs must list the pre-change test runs or test attempts by layer and their outcomes.
+- Bugfix handoffs must state which logs or observations supported the root-cause theory.
+- Bugfix handoffs must list the post-change tests run by layer and their outcomes.
+- Bugfix handoffs must state any relevant layer that was not run and why it was blocked or not possible.
+- When pressure validation is relevant, handoffs must state the performance or pressure baseline, the validation attempt or result, or the concrete reason it did not apply.
+- Feature handoffs must state the user-visible behavior, the shared rule behind the change, where the logic should live, and what unit, behavior, and UI coverage proves.
+- Architecture or migration handoffs must state the target design, module ownership, migration stages, fallback path, and validation plan.
+- Remediation responses must state the current blocker, the affected layer or environment, what remains unproven, and the next concrete step.
+- Review, audit, or diagnosis responses must state the observed gap, the supporting evidence, the affected layer or module, and the next concrete corrective action or blocker.
+
 ## Response Patterns
 
 - For architecture or migration proposals, state the target design, material assumptions, migration stages, fallback path, and validation plan.
-- For bugfix explanations, state the failing signal, evidence supporting the root cause, production change, regression coverage, and any remaining risk or blocked validation.
-- For implementation guidance, state where the code should live, what the API or data flow should look like, which assumptions drive the choice, and how success should be verified.
-- For change summaries or handoffs, state what changed, why it changed, where it changed, what assumptions or constraints shaped the change, and how it was validated.
+- For bugfix explanations or bugfix handoffs, state the pre-change failing signal, pre-change test attempts by layer, logs or observations supporting the root cause, production change, post-change tests by layer, any blocked layer with the reason, and the relevant pressure or performance baseline when applicable.
+- For implementation guidance, state where the code should live, what the API or data flow should look like, which assumptions drive the choice, which validation layer should own each kind of evidence, and whether pressure validation is required.
+- For reviews, audits, or no-edit diagnosis, state the finding or gap first, then the evidence, impact, affected ownership boundary, and the smallest corrective path.
+- For change summaries or handoffs, do not stop at what changed, why it changed, where it changed, and how it was validated. Include the FlowTab-specific closure fields from the relevant engineering workflow, especially pre-change signal, layer-by-layer test attempts or outcomes, blocked validation reasons, and performance or pressure status when relevant.
 
 ## Bad and Better
 
