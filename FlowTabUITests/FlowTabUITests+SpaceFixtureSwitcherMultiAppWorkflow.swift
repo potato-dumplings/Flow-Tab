@@ -1,3 +1,5 @@
+import AppKit
+import ApplicationServices
 import Foundation
 import XCTest
 
@@ -5,6 +7,16 @@ private struct SwitcherWindowCardObservation: Equatable {
     let identifier: String
     let title: String
     let appName: String
+}
+
+private struct SwitcherSearchWindowResultObservation: Equatable {
+    let identifier: String
+    let searchableText: String
+
+    func matches(title: String, appName: String) -> Bool {
+        searchableText.localizedCaseInsensitiveContains(title)
+            && searchableText.localizedCaseInsensitiveContains(appName)
+    }
 }
 
 extension FlowTabUITests {
@@ -178,6 +190,51 @@ extension FlowTabUITests {
             }
 
             XCTAssertEqual(Set(observedAppIDs), Set(workflow.apps.map(\.appID)))
+        }
+    }
+
+    func testSwitcherPanelWindowSearchFindsAndActivatesRealWorkflowWindow() throws {
+        let workflow = try configuredSwitcherSpaceFixtureWorkflow()
+        let targetWindowTitle = "Docs"
+        let targetApp = try XCTUnwrap(
+            workflow.apps.first { $0.expectedWindowTitles.contains(targetWindowTitle) },
+            "Switcher workflow must include a real fixture window titled \(targetWindowTitle)"
+        )
+
+        try runRealSpaceFixtureWorkflow(
+            workflow,
+            flowTabAdditionalArguments: [
+                "--flowtab-ui-open-switcher-search",
+                "-searchDefaultScope",
+                "window"
+            ]
+        ) { _, app in
+            let searchInput = element(in: app, identifier: Identifier.switcherSearchInput)
+            XCTAssertTrue(searchInput.waitForExistence(timeout: 8))
+
+            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+            app.typeText(targetWindowTitle)
+
+            let result = waitForSearchWindowResult(
+                in: app,
+                title: targetWindowTitle,
+                appName: targetApp.appName,
+                timeout: 8
+            )
+            XCTAssertNotNil(
+                result,
+                "FlowTab did not expose \(targetWindowTitle) as a real window-scope search result."
+            )
+
+            confirmSwitcherSearchSelection(in: app, searchInput: searchInput)
+            XCTAssertTrue(
+                waitForFocusedWorkflowWindow(
+                    title: targetWindowTitle,
+                    app: targetApp,
+                    timeout: 10
+                ),
+                "Search confirmation did not activate the \(targetWindowTitle) fixture window."
+            )
         }
     }
 
@@ -389,6 +446,121 @@ extension FlowTabUITests {
                 appName: elementStringValue(element).trimmingCharacters(in: .whitespacesAndNewlines)
             )
         }
+    }
+
+    private func waitForSearchWindowResult(
+        in app: XCUIApplication,
+        title: String,
+        appName: String,
+        timeout: TimeInterval
+    ) -> SwitcherSearchWindowResultObservation? {
+        let deadline = Date().addingTimeInterval(timeout)
+        var latestResults: [SwitcherSearchWindowResultObservation] = []
+        repeat {
+            latestResults = searchWindowResultObservations(in: app)
+            if let result = latestResults.first(where: { $0.matches(title: title, appName: appName) }) {
+                return result
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+
+        XCTFail(
+            """
+            Expected a window-scope search result for \(appName) / \(title), \
+            found \(latestResults.map(\.identifier).sorted()).
+            """
+        )
+        return nil
+    }
+
+    private func searchWindowResultObservations(in app: XCUIApplication) -> [SwitcherSearchWindowResultObservation] {
+        app.descendants(matching: .any).allElementsBoundByIndex.compactMap { element in
+            guard element.identifier.hasPrefix("flowtab.switcher.search.window.") else { return nil }
+            guard element.exists else { return nil }
+            let debugSummary = String(element.debugDescription.prefix(1_200))
+            let searchableText = [
+                element.label,
+                elementStringValue(element),
+                debugSummary
+            ]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined(separator: "\n")
+
+            return SwitcherSearchWindowResultObservation(
+                identifier: element.identifier,
+                searchableText: searchableText
+            )
+        }
+    }
+
+    private func confirmSwitcherSearchSelection(in app: XCUIApplication, searchInput: XCUIElement) {
+        app.typeText("\r")
+        if !waitForNonExistence(searchInput, timeout: 1.2) {
+            app.typeText("\r")
+        }
+        XCTAssertTrue(waitForNonExistence(searchInput, timeout: 4))
+    }
+
+    private func waitForFocusedWorkflowWindow(
+        title: String,
+        app workflowApp: SpaceFixtureResolvedWorkflow.App,
+        timeout: TimeInterval
+    ) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        var latestFrontmostBundleIdentifier: String?
+        var latestFocusedTitle: String?
+        repeat {
+            latestFrontmostBundleIdentifier = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+            latestFocusedTitle = focusedWindowTitle(forBundleIdentifier: workflowApp.identity.bundleIdentifier)
+            if latestFrontmostBundleIdentifier == workflowApp.identity.bundleIdentifier,
+               latestFocusedTitle == title {
+                return true
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+
+        XCTFail(
+            """
+            Expected frontmost window \(workflowApp.appName) / \(title), \
+            found frontmost bundle \(latestFrontmostBundleIdentifier ?? "nil") \
+            with focused title \(latestFocusedTitle ?? "nil").
+            """
+        )
+        return false
+    }
+
+    private func focusedWindowTitle(forBundleIdentifier bundleIdentifier: String) -> String? {
+        guard let runningApp = NSRunningApplication
+            .runningApplications(withBundleIdentifier: bundleIdentifier)
+            .first(where: { !$0.isTerminated })
+        else {
+            return nil
+        }
+
+        let appElement = AXUIElementCreateApplication(runningApp.processIdentifier)
+        var focusedWindowValue: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            appElement,
+            kAXFocusedWindowAttribute as CFString,
+            &focusedWindowValue
+        ) == .success,
+            let focusedWindowValue
+        else {
+            return nil
+        }
+
+        let focusedWindow = focusedWindowValue as! AXUIElement
+        var titleValue: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            focusedWindow,
+            kAXTitleAttribute as CFString,
+            &titleValue
+        ) == .success else {
+            return nil
+        }
+
+        return (titleValue as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func switcherAppStripSummary(
