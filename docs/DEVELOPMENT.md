@@ -487,6 +487,8 @@ gh release create "${TAG}" release/"${TAG}"/flowtab-universal2-apple-darwin.dmg 
 
 脚本会使用 `FLOWTAB_DEVELOPMENT_TEAM`：如果当前 shell 没有导出它，就从 `xcconfigs/LocalSigning.xcconfig` 读取同名配置；本机存在匹配的 `Apple Development` identity 时会用它重新签名这份固定路径 app。没有本地开发证书时，脚本仍会回退到默认 adhoc 安装。
 
+注意这里说的是固定路径 `Flow Tab.app` / `Flow Tab UITest.app` 的权限稳定性，不是 fixture app 变体生成。`build-space-fixture-app.sh` 和 `build-space-fixture-workflow.sh` 会禁用模板 app 的开发签名，并对生成出来的测试变体做 ad-hoc 重签；生成 fixture workflow 不需要 Apple Development 或 Mac Development 私钥。
+
 默认会安装到：
 
 - `~/Applications/Flow Tab UITest.app`

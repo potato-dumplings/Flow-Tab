@@ -157,6 +157,7 @@ XCODEBUILD_CMD=(
   -destination "platform=macOS"
   -derivedDataPath "${DERIVED_DATA_PATH}"
   -clonedSourcePackagesDirPath "${PACKAGE_CACHE_PATH}"
+  CODE_SIGNING_ALLOWED=NO
   build
 )
 

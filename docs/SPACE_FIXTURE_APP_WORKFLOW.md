@@ -247,7 +247,7 @@
 - 复制一个 app bundle 变体
 - 重写 `CFBundleDisplayName`
 - 重写 `CFBundleIdentifier`
-- 重新签名
+- 使用 ad-hoc 签名重新签名生成的变体
 
 示例：
 
@@ -290,6 +290,18 @@ resolved workflow JSON 里的每个 app 会包含：
 - `appPath`
 
 这份文件当前适合给外部启动器、手工测试或后续测试驱动层读取。
+
+### 签名行为
+
+fixture app 变体只是用于本地 UI 测试和手工回归的测试拓扑，不需要 Apple Development 或 Mac Development 证书。两个构建脚本都会在模板 app 的 `xcodebuild` 阶段禁用签名，然后在改写 app name 和 bundle id 后，对最终生成的变体执行 ad-hoc 重签。
+
+这个流程的目标是：
+
+- 避免 fixture 生成依赖本机是否安装了 `FLOWTAB_DEVELOPMENT_TEAM` 对应的私钥
+- 保证修改过 `Info.plist` 的 app bundle 仍有一致的本地代码签名
+- 让 fixture 变体保留测试用途的临时身份，而不是绑定到开发者账号
+
+因此，`build-space-fixture-app.sh` 和 `build-space-fixture-workflow.sh` 的成功生成不应该要求本机存在 `Apple Development` identity。`Apple Development` 只用于下面提到的固定路径 `Flow Tab.app` / `Flow Tab UITest.app` 权限稳定性场景。
 
 ## 当前测试接入情况
 
