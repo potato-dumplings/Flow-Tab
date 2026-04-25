@@ -485,6 +485,8 @@ gh release create "${TAG}" release/"${TAG}"/flowtab-universal2-apple-darwin.dmg 
 ./scripts/testing/install-ui-test-app.sh
 ```
 
+脚本会使用 `FLOWTAB_DEVELOPMENT_TEAM`：如果当前 shell 没有导出它，就从 `xcconfigs/LocalSigning.xcconfig` 读取同名配置；本机存在匹配的 `Apple Development` identity 时会用它重新签名这份固定路径 app。没有本地开发证书时，脚本仍会回退到默认 adhoc 安装。
+
 默认会安装到：
 
 - `~/Applications/Flow Tab UITest.app`

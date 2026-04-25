@@ -23,6 +23,12 @@ Default install path:
 
 - `~/Applications/Flow Tab UITest.app`
 
+The script uses `FLOWTAB_DEVELOPMENT_TEAM`. If it is not exported in the
+current shell, the script reads the same setting from
+`xcconfigs/LocalSigning.xcconfig`. With a matching local `Apple Development`
+identity, the script signs the fixed-path app; without one, it keeps the
+default adhoc install so the fixed path can still be refreshed.
+
 2. Grant permissions to that fixed-path app in macOS:
 
 - `System Settings -> Privacy & Security -> Accessibility`
@@ -61,8 +67,10 @@ Important interpretation:
 1. Install a fixed-path UI test app with a stable local development signing identity when available:
 
 ```bash
-./scripts/testing/install-ui-test-app.sh --development-team <TEAM_ID>
+./scripts/testing/install-ui-test-app.sh
 ```
+
+Use `--development-team <TEAM_ID>` only when the run needs a different team.
 
 2. Ensure the regularly launched FlowTab app also uses the same signing identity.
 

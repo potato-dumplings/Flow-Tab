@@ -311,12 +311,18 @@ resolved workflow JSON 里的每个 app 会包含：
 1. 安装固定路径的 UI test app：
 
 ```bash
-./scripts/testing/install-ui-test-app.sh --development-team <TEAM_ID>
+./scripts/testing/install-ui-test-app.sh
 ```
 
 默认会安装到：
 
 - `~/Applications/Flow Tab UITest.app`
+
+脚本会使用 `FLOWTAB_DEVELOPMENT_TEAM`：如果当前 shell 没有导出它，就从 `xcconfigs/LocalSigning.xcconfig` 读取同名配置，并尝试使用匹配的本地 `Apple Development` identity 签名。需要临时覆盖 team 时，仍可使用：
+
+```bash
+./scripts/testing/install-ui-test-app.sh --development-team <TEAM_ID>
+```
 
 2. 确保平时运行的 `/Applications/Flow Tab.app` 也使用同一套本地开发签名。
 
@@ -324,9 +330,10 @@ resolved workflow JSON 里的每个 app 会包含：
 
 ```bash
 ./scripts/testing/install-ui-test-app.sh \
-  --development-team <TEAM_ID> \
   --install-path "/Applications/Flow Tab.app"
 ```
+
+如果需要使用另一组 team，则加上 `--development-team <TEAM_ID>`。
 
 3. 在下面两处确认 `Flow Tab` 已授权：
 

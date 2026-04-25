@@ -11,13 +11,19 @@ PACKAGE_CACHE_PATH="${BUILD_ROOT}/source-packages"
 USER_HOME="${HOME}"
 ORIGINAL_HOME="${HOME}"
 ORIGINAL_CFFIXED_USER_HOME="${CFFIXED_USER_HOME:-${HOME}}"
+LOCAL_SIGNING_CONFIG_PATH="${ROOT_DIR}/xcconfigs/LocalSigning.xcconfig"
 
 CONFIGURATION="Debug"
 INSTALL_PATH="${USER_HOME}/Applications/Flow Tab UITest.app"
-DEVELOPMENT_TEAM="${FLOWTAB_UI_TEST_APP_DEVELOPMENT_TEAM:-}"
-CODE_SIGN_IDENTITY="${FLOWTAB_UI_TEST_APP_CODE_SIGN_IDENTITY:-}"
+DEVELOPMENT_TEAM="${FLOWTAB_DEVELOPMENT_TEAM:-}"
+CODE_SIGN_IDENTITY=""
 RESOLVED_CODE_SIGN_IDENTITY=""
 MANUAL_CODESIGN_ENABLED=0
+DEVELOPMENT_TEAM_SOURCE=""
+
+if [[ -n "${DEVELOPMENT_TEAM}" ]]; then
+  DEVELOPMENT_TEAM_SOURCE="FLOWTAB_DEVELOPMENT_TEAM"
+fi
 
 expand_path() {
   local path="$1"
@@ -26,6 +32,29 @@ expand_path() {
     return
   fi
   printf '%s' "${path}"
+}
+
+detect_local_development_team() {
+  if [[ ! -f "${LOCAL_SIGNING_CONFIG_PATH}" ]]; then
+    return 0
+  fi
+
+  awk '
+    /^[[:space:]]*(#|\/\/)/ {
+      next
+    }
+    /^[[:space:]]*FLOWTAB_DEVELOPMENT_TEAM[[:space:]]*=/ {
+      value = $0
+      sub(/^[^=]*=/, "", value)
+      sub(/[[:space:]]*\/\/.*$/, "", value)
+      sub(/[[:space:]]+$/, "", value)
+      sub(/^[[:space:]]+/, "", value)
+      if (value != "" && value != "YOUR_TEAM_ID") {
+        print value
+      }
+      exit
+    }
+  ' "${LOCAL_SIGNING_CONFIG_PATH}"
 }
 
 resolve_code_sign_identity() {
@@ -84,9 +113,12 @@ Defaults:
   configuration: Debug
   install path: ~/Applications/Flow Tab UITest.app
 
-Environment overrides:
-  FLOWTAB_UI_TEST_APP_DEVELOPMENT_TEAM
-  FLOWTAB_UI_TEST_APP_CODE_SIGN_IDENTITY
+Development team:
+  FLOWTAB_DEVELOPMENT_TEAM
+
+Local signing fallback:
+  When FLOWTAB_DEVELOPMENT_TEAM is not exported, the script reads it from
+  xcconfigs/LocalSigning.xcconfig when present.
 EOF
 }
 
@@ -102,6 +134,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     --development-team)
       DEVELOPMENT_TEAM="${2-}"
+      DEVELOPMENT_TEAM_SOURCE="--development-team"
       shift 2
       ;;
     --code-sign-identity)
@@ -127,22 +160,39 @@ if [[ "${CONFIGURATION}" != "Debug" && "${CONFIGURATION}" != "Release" ]]; then
   exit 1
 fi
 
+if [[ -z "${DEVELOPMENT_TEAM}" ]]; then
+  DEVELOPMENT_TEAM="$(detect_local_development_team)"
+  if [[ -n "${DEVELOPMENT_TEAM}" ]]; then
+    DEVELOPMENT_TEAM_SOURCE="xcconfigs/LocalSigning.xcconfig"
+  fi
+fi
+
 if [[ -n "${DEVELOPMENT_TEAM}" || -n "${CODE_SIGN_IDENTITY}" ]]; then
   MANUAL_CODESIGN_ENABLED=1
+  REQUESTED_CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY}"
 
   if [[ -z "${CODE_SIGN_IDENTITY}" ]]; then
     CODE_SIGN_IDENTITY="Apple Development"
   fi
 
   if ! RESOLVED_CODE_SIGN_IDENTITY="$(resolve_code_sign_identity "${CODE_SIGN_IDENTITY}" "${DEVELOPMENT_TEAM}")"; then
-    echo "Could not resolve a local codesigning identity for install-ui-test-app.sh." >&2
-    echo "Requested identity: ${CODE_SIGN_IDENTITY}" >&2
-    if [[ -n "${DEVELOPMENT_TEAM}" ]]; then
-      echo "Requested team: ${DEVELOPMENT_TEAM}" >&2
+    if [[ "${DEVELOPMENT_TEAM_SOURCE}" != "--development-team" && -z "${REQUESTED_CODE_SIGN_IDENTITY}" ]]; then
+      echo "Project signing team ${DEVELOPMENT_TEAM} found, but no matching Apple Development identity is installed." >&2
+      echo "Continuing with the default adhoc UI test app install." >&2
+      DEVELOPMENT_TEAM=""
+      CODE_SIGN_IDENTITY=""
+      RESOLVED_CODE_SIGN_IDENTITY=""
+      MANUAL_CODESIGN_ENABLED=0
+    else
+      echo "Could not resolve a local codesigning identity for install-ui-test-app.sh." >&2
+      echo "Requested identity: ${CODE_SIGN_IDENTITY}" >&2
+      if [[ -n "${DEVELOPMENT_TEAM}" ]]; then
+        echo "Requested team: ${DEVELOPMENT_TEAM}" >&2
+      fi
+      echo "Available code-signing identities:" >&2
+      security find-identity -v -p codesigning >&2 || true
+      exit 1
     fi
-    echo "Available code-signing identities:" >&2
-    security find-identity -v -p codesigning >&2 || true
-    exit 1
   fi
 fi
 
@@ -216,4 +266,4 @@ echo "  2. Grant Accessibility and Screen & System Audio Recording permissions t
 echo "  3. Run ./scripts/testing/run-ui-tests-local.sh"
 echo
 echo "If the codesign summary shows Signature=adhoc, permissions may still be unstable."
-echo "Provide --development-team and a local Apple Development identity to install a stable signed app."
+echo "Provide --development-team or FLOWTAB_DEVELOPMENT_TEAM with a local Apple Development identity to install a stable signed app."
