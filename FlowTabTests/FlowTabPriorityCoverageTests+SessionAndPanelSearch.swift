@@ -116,6 +116,64 @@ extension FlowTabPriorityCoverageTests {
         }
     }
 
+    @MainActor
+    func testLiveSwitcherModelWindowSearchCommitActivatesSelectedWindowTarget() async {
+        await withTemporarySearchPreferences(enabled: true, defaultScope: .window) {
+            let model = LiveSwitcherModel()
+            let apps = self.searchScenarioApps()
+            let contextsByID = Dictionary(
+                uniqueKeysWithValues: apps.map { app in
+                    (
+                        app.id,
+                        self.makeRuntimeAppContext(
+                            appID: app.id,
+                            runningApp: NSRunningApplication.current,
+                            windows: app.windows
+                        )
+                    )
+                }
+            )
+            model.snapshotProviderOverride = {
+                RuntimeSnapshot(apps: apps, contextsByID: contextsByID)
+            }
+
+            var activatedTarget: ActivationTarget?
+            var activatedContextIDs: Set<String> = []
+            model.activationOverride = { target, contextsByID in
+                activatedTarget = target
+                activatedContextIDs = Set(contextsByID.keys)
+            }
+
+            XCTAssertTrue(model.startSession(triggerDirection: .forward))
+            XCTAssertTrue(model.enterSearchMode())
+            XCTAssertTrue(
+                model.searchCoordinator.replaceQueryWithoutRebuild(
+                    "README",
+                    cursorPosition: "README".count
+                )
+            )
+            model.searchCoordinator.rebuildResults(resetSelection: true)
+            model.publishSearchStateIfNeeded()
+
+            XCTAssertEqual(
+                model.searchViewState.selectedResult?.kind,
+                .window(appID: "com.example.code", windowID: "code-2")
+            )
+            XCTAssertTrue(model.applySelectedSearchResultToSession())
+            XCTAssertEqual(model.session?.selectedWindow?.id, "code-2")
+
+            model.commitSelection()
+
+            XCTAssertEqual(
+                activatedTarget,
+                .window(appID: "com.example.code", windowID: "code-2", restoreIfMinimized: false)
+            )
+            XCTAssertEqual(activatedContextIDs, Set(apps.map(\.id)))
+            XCTAssertNil(model.session)
+            XCTAssertFalse(model.isSearchActive)
+        }
+    }
+
     func testCommandTabTakeoverControllerReconcileActivatesAndRestoreReenablesSystemShortcuts() {
         guard let userDefaults = makeIsolatedUserDefaults() else { return }
         defer { clearIsolatedUserDefaults(userDefaults) }

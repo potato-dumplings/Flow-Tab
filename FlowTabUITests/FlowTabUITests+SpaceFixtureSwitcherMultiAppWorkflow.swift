@@ -238,6 +238,65 @@ extension FlowTabUITests {
         }
     }
 
+    func testSwitcherPanelWindowSearchActivatesFullscreenWorkflowWindowAcrossSpaces() throws {
+        let workflow = try configuredSwitcherSpaceFixtureWorkflow()
+        let targetApp = try XCTUnwrap(
+            workflow.apps.first { fullscreenWindowTitle(in: $0) != nil },
+            "Switcher workflow must include an app with a fullscreen fixture window"
+        )
+        let targetWindowTitle = try XCTUnwrap(
+            fullscreenWindowTitle(in: targetApp),
+            "Switcher workflow must expose the fullscreen fixture window title"
+        )
+
+        try runRealSpaceFixtureWorkflow(
+            workflow,
+            flowTabAdditionalArguments: [
+                "--flowtab-ui-open-switcher-search",
+                "-searchDefaultScope",
+                "window"
+            ]
+        ) { _, app in
+            let searchInput = element(in: app, identifier: Identifier.switcherSearchInput)
+            let diagnosticsSummary = element(in: app, identifier: "flowtab.testing.switcher.summary")
+            XCTAssertTrue(searchInput.waitForExistence(timeout: 8))
+            XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
+            XCTAssertNotEqual(
+                NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+                targetApp.identity.bundleIdentifier,
+                "The fullscreen activation scenario must start outside the target fixture app."
+            )
+
+            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+            app.typeText(targetWindowTitle)
+
+            let result = waitForSearchWindowResult(
+                in: app,
+                title: targetWindowTitle,
+                appName: targetApp.appName,
+                timeout: 8
+            )
+            XCTAssertNotNil(
+                result,
+                "FlowTab did not expose \(targetWindowTitle) as a fullscreen window-scope search result."
+            )
+
+            confirmSwitcherSearchSelection(in: app, searchInput: searchInput)
+            XCTAssertTrue(
+                waitForNonExistence(diagnosticsSummary, timeout: 4),
+                "FlowTab panel remained visible after confirming the fullscreen window target."
+            )
+            XCTAssertTrue(
+                waitForFocusedWorkflowWindow(
+                    title: targetWindowTitle,
+                    app: targetApp,
+                    timeout: 12
+                ),
+                "Search confirmation did not activate the fullscreen \(targetWindowTitle) fixture window."
+            )
+        }
+    }
+
     private func configuredSwitcherSpaceFixtureWorkflow(
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) throws -> SpaceFixtureResolvedWorkflow {
@@ -266,6 +325,13 @@ extension FlowTabUITests {
             XCTFail(error.localizedDescription)
             throw error
         }
+    }
+
+    private func fullscreenWindowTitle(in workflowApp: SpaceFixtureResolvedWorkflow.App) -> String? {
+        guard let fullscreenWindowIndex = workflowApp.fullscreenWindowIndex else { return nil }
+        let titleIndex = fullscreenWindowIndex - 1
+        guard workflowApp.expectedWindowTitles.indices.contains(titleIndex) else { return nil }
+        return workflowApp.expectedWindowTitles[titleIndex]
     }
 
     private func validateSwitcherMultiAppWorkflow(

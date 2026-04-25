@@ -35,7 +35,7 @@
 
 - `FlowTabSpaceFixture` 已经能表达多窗口、fullscreen、应用内 tab。
 - `build-space-fixture-workflow.sh` 已经能生成多 app bundle 变体和 resolved workflow JSON。
-- FlowTab 端到端真实 UI workflow 已开始消费 multi-app resolved workflow JSON，当前覆盖 `Home` 多 app 路径和 `Switcher` app strip 路径；其余更细的 switcher/search 场景仍在逐步接入。
+- FlowTab 端到端真实 UI workflow 已开始消费 multi-app resolved workflow JSON，当前覆盖 `Home` 多 app 路径、`Switcher` app strip、preview 隔离和 window-scope search 激活路径；其余更细的 switcher/search 场景仍在逐步接入。
 
 ## 当前目标边界
 
@@ -311,14 +311,19 @@ fixture app 变体只是用于本地 UI 测试和手工回归的测试拓扑，�
 
 - FlowTab 已授予 `Accessibility`
 - FlowTab 已授予 `Screen & System Audio Recording`
-- `Flow Tab.app` 与 `Flow Tab UITest.app` 使用同一套 macOS code identity，而不是一份 `adhoc`、一份 `Apple Development`
+- `Flow Tab.app` 与 `Flow Tab UITest.app` 使用互相兼容的 macOS designated requirement，而不是一份 `adhoc`、一份 `Apple Development`
 
 这里要注意：
 
-- macOS 隐私权限实际绑定的是 app 的 code identity，不是单纯绑定文件名或 bundle id。
+- macOS 隐私权限实际绑定的是 app 的 designated requirement，不是单纯绑定文件名，也不是只看 `TeamIdentifier`。
+- `TeamIdentifier` 是 requirement 的重要组成部分，但不是完整身份。对于本仓库的 FlowTab app，稳定共享权限通常要求同一个 signing identifier（这里应是 `io.github.potato-dumplings.flowtab`）并由同一个 Apple Developer Team 签名。
+- `Flow Tab UITest.app` 只是固定路径副本；文件名带 `UITest` 不代表它应该换一个 bundle/signing identifier。只要它和已安装的 `Flow Tab.app` 满足同一条隐私授权记录里的 requirement，macOS 才能复用权限。
+- `CDHash` 不是 Apple Development 签名 app 是否共享权限的主要判据，正常重建后它可能变化。`CDHash` 只在判断 `adhoc` 或具体构建绑定时有辅助意义。
 - 如果 `/Applications/Flow Tab.app` 仍然是 `adhoc`，而 UI tests 启动的是另一份 `Apple Development` 签名的 `Flow Tab UITest.app`，系统可能不会复用你已经授过的权限。
 
-当前推荐的本地准备方式：
+#### 首次运行前的权限获取流程（必须先做）
+
+不要把第一次真实 workflow UI test 当成申请权限的入口。第一次运行应该只用于安装、启动并授权后续测试真正会启动的同一个 FlowTab 身份；确认权限稳定后，再跑 multi-app workflow。
 
 1. 安装固定路径的 UI test app：
 
@@ -336,23 +341,44 @@ fixture app 变体只是用于本地 UI 测试和手工回归的测试拓扑，�
 ./scripts/testing/install-ui-test-app.sh --development-team <TEAM_ID>
 ```
 
-2. 确保平时运行的 `/Applications/Flow Tab.app` 也使用同一套本地开发签名。
+如果脚本输出的 codesign summary 显示 `Signature=adhoc` 或 `TeamIdentifier=not set`，不要继续把真实 workflow UI test 当成稳定权限验证。先安装带 Apple Development 签名的固定路径 app，或者明确接受每次重建后都需要重新授权这份 `adhoc` app。
 
-如果需要覆盖安装到固定路径，可使用：
+2. 确认后续测试会启动哪个 app，并只给那一个身份授权。
+
+默认情况下，`run-ui-tests-local.sh` 会优先启动：
+
+- `~/Applications/Flow Tab UITest.app`
+
+因此首次授权也应该打开这个路径：
+
+```bash
+open "$HOME/Applications/Flow Tab UITest.app"
+```
+
+如果你希望测试直接复用已经安装在 `/Applications` 里的 app，则先把同一份签名构建安装到该路径：
 
 ```bash
 ./scripts/testing/install-ui-test-app.sh \
   --install-path "/Applications/Flow Tab.app"
 ```
 
-如果需要使用另一组 team，则加上 `--development-team <TEAM_ID>`。
+然后运行 UI test 时也显式使用同一个路径：
 
-3. 在下面两处确认 `Flow Tab` 已授权：
+```bash
+./scripts/testing/run-ui-tests-local.sh \
+  --ui-test-app-path "/Applications/Flow Tab.app"
+```
+
+不要先给 `/Applications/Flow Tab.app` 授权，随后又让测试启动 `~/Applications/Flow Tab UITest.app` 的 `adhoc` 副本；这两者不一定满足同一条 TCC 授权 requirement。
+
+3. 首次启动后，立即在系统设置里给这次实际启动的 FlowTab 授权：
 
 - `系统设置 -> 隐私与安全性 -> 辅助功能`
 - `系统设置 -> 隐私与安全性 -> 屏幕与系统音频录制`
 
-4. 再运行：
+可以通过 FlowTab 首页的权限引导或 Settings 里的权限入口打开系统设置。授权完成后，完全退出 FlowTab，再从同一个 app 路径重新打开一次；确认首页不再出现 `flowtab.home.permission.open-settings` / `flowtab.home.permission.dismiss` 权限引导按钮。
+
+4. 确认权限已经授给正确身份后，再运行真实 workflow UI tests：
 
 ```bash
 ./scripts/testing/run-ui-tests-local.sh
@@ -363,7 +389,65 @@ fixture app 变体只是用于本地 UI 测试和手工回归的测试拓扑，�
 - 优先启动固定路径 `~/Applications/Flow Tab UITest.app`
 - 对本地 UI test 构建产物默认关闭代码签名，避免测试执行再次受 Xcode 当前签名配置影响
 
-如果之前已经给 `/Applications/Flow Tab.app` 授权，但真实环境 workflow 用例仍在首页看到权限引导按钮，优先检查的不是“有没有授权”，而是“`Flow Tab.app` 和 `Flow Tab UITest.app` 当前是不是同一个签名身份”。
+本机已验证过的成功路径：
+
+```bash
+./scripts/testing/install-ui-test-app.sh
+codesign -dr - "$HOME/Applications/Flow Tab UITest.app"
+codesign -dr - "/Applications/Flow Tab.app"
+open -n "$HOME/Applications/Flow Tab UITest.app"
+./scripts/testing/run-ui-tests-local.sh \
+  -only-testing:FlowTabUITests/FlowTabUITests/testSwitcherPanelWindowSearchActivatesFullscreenWorkflowWindowAcrossSpaces
+```
+
+成功获取或复用权限的判定信号不是整条 UI 用例必须通过，而是：
+
+- `install-ui-test-app.sh` 输出 `Signing FlowTab UI automation app with Apple Development: ...`，而不是 `Signature=adhoc`。
+- 两份 app 的 `codesign -dr -` 输出使用同一个 `identifier "io.github.potato-dumplings.flowtab"` 和同一条 Apple Development requirement；`CDHash` 可以不同。
+- `run-ui-tests-local.sh` 输出 `UI test app: {user-home}/Applications/Flow Tab UITest.app`。
+- 测试日志中 fixture app 已经启动并出现 `flowtab.spacefixture.workflow.ready` / `flowtab.spacefixture.window.mode.*`。
+- FlowTab 打开后，`flowtab.home.permission.open-settings` 没有出现，测试继续进入 `flowtab.switcher.search.input` 或 `flowtab.switcher.search.window.*`。
+
+如果后续失败点已经发生在 `Switcher`、search result 或 window activation 断言阶段，就说明权限门禁已经通过；这类失败应按对应 UI 用例或 XCUI snapshot 问题继续诊断，不要再归因到首次权限获取。
+
+在 Codex 或其他受限沙盒里，`install-ui-test-app.sh` 可能先误报找不到本地 Apple Development identity，或被 SwiftPM 临时文件权限拦住。此时应在普通 Terminal 里重跑，或用允许访问本机 keychain / Xcode 临时目录的提权执行重跑；只有在非沙盒环境下仍找不到 identity，才把它判定为本机缺少签名证书。
+
+如果之前已经给 `/Applications/Flow Tab.app` 授权，但真实环境 workflow 用例仍在首页看到权限引导按钮，优先检查的不是“有没有授权”，而是“本次启动的 `Flow Tab.app` / `Flow Tab UITest.app` 是否满足同一条 designated requirement”。
+
+#### 权限门禁失败的判定
+
+真实 multi-app workflow UI 用例有两个阶段：
+
+- 先由 XCTest 拉起 `Finder Fixture`、`Chrome Fixture`、`Notes Fixture` 等真实 fixture app，并等待 `flowtab.spacefixture.workflow.ready`、`flowtab.spacefixture.workflow.summary`、`flowtab.spacefixture.window.mode.*` 等 fixture 可观测标记。
+- 再启动被测 FlowTab，通过 FlowTab 真实 runtime 采样这些窗口，并进入 `Home`、`Switcher` 或 search 断言。
+
+如果日志已经显示 fixture app 成功启动，甚至已经观测到 fullscreen 标记，例如 `flowtab.spacefixture.window.mode.2`，但随后 FlowTab 首页出现 `flowtab.home.permission.open-settings` / `flowtab.home.permission.dismiss` 权限引导按钮，则说明用例还没有跑到真正的 `Switcher`、search 或激活断言。此时失败点是仓库的权限门禁：当前环境没有给**本次被测的 FlowTab 实例**可用的 `Accessibility` 或 `Screen & System Audio Recording` 权限，或者权限记录里的 designated requirement 与本次启动的 app 不兼容。
+
+不要把这种失败误判为新增 UI 用例、fixture workflow、fullscreen Space 激活逻辑或 search 逻辑失败。它只证明：
+
+- 新增 UI 用例已经编译。
+- XCTest 已经成功拉起真实 fixture app。
+- 测试被 FlowTab 权限前置检查拦在激活断言之前。
+
+即使用 `/Applications/Flow Tab.app` 跑，UI 前置权限仍失败，也仍然表示这台环境当前没有给被测 FlowTab 实例可用的 `Accessibility` / `Screen Recording` 权限；这不是“已经授权所以测试应该继续”的反证。
+
+出现该情况时，先核对实际被测 app 路径和签名身份：
+
+```bash
+codesign -dv --verbose=4 "$HOME/Applications/Flow Tab UITest.app"
+codesign -dr - "$HOME/Applications/Flow Tab UITest.app"
+codesign -dv --verbose=4 "/Applications/Flow Tab.app"
+codesign -dr - "/Applications/Flow Tab.app"
+```
+
+重点比较：
+
+- `Identifier`
+- `TeamIdentifier`
+- `Signature`
+- `designated requirement`
+
+如果两者都是 Apple Development 签名、`Identifier` 相同、`TeamIdentifier` 相同，并且 designated requirement 互相兼容，通常可以共享 `/Applications/Flow Tab.app` 已经获得的隐私权限；这时不要因为 `CDHash` 不同就直接判定不能共享。反过来，如果 `~/Applications/Flow Tab UITest.app` 是 `adhoc` / `TeamIdentifier=not set`，或者 `Identifier` / `TeamIdentifier` / designated requirement 不兼容，则 macOS 不会把其中一个 app 的隐私授权自动复用给另一个 app。处理方式是重新安装固定路径 UI test app，并给这次实际启动的 app 身份重新授予 `Accessibility` 和 `Screen & System Audio Recording`。
 
 ### 已接入的逻辑与行为测试
 
@@ -410,6 +494,8 @@ fixture app 变体只是用于本地 UI 测试和手工回归的测试拓扑，�
 - `Home` 页切换不同 workflow app 后，窗口区只展示当前 app 的 resolved window titles，不混入其他 workflow app 的窗口标题
 - `fullscreen-only` app 与普通 app 共存时，`Home` 页仍会展示该 app，且选中后仍能看到它的 resolved window title
 - `Switcher` app strip 会同时暴露 workflow 中至少 3 个真实 app 的 `flowtab.switcher.app.*` accessibility anchors
+- `Switcher` preview layer 会用真实 `flowtab.switcher.window.*` window card anchors 证明当前选中 app 的窗口隔离
+- `Switcher` window-scope search 能检索普通窗口和 fullscreen/off-space 窗口，并在确认后激活目标 fixture window、收起 panel
 - workflow 模式下的 per-app 启动顺序、resolved window title 和 fullscreen 标记会被测试驱动层正确读取
 
 该链路当前优先读取：
@@ -432,7 +518,7 @@ fixture app 变体只是用于本地 UI 测试和手工回归的测试拓扑，�
 也就是说：
 
 - 多 app workflow 构建和 per-app 启动能力已经实现
-- FlowTab 真实 runtime end-to-end UI 用例已经开始消费 resolved workflow JSON，当前已覆盖 `Home` 多 app 计数、app 切换后的窗口列表隔离、`fullscreen-only app` 的稳定展示，以及 `Switcher` app strip 展示
+- FlowTab 真实 runtime end-to-end UI 用例已经开始消费 resolved workflow JSON，当前已覆盖 `Home` 多 app 计数、app 切换后的窗口列表隔离、`fullscreen-only app` 的稳定展示，以及 `Switcher` app strip、preview 隔离、window-scope search 激活
 - 更大范围的 `Switcher` preview、search、列表隔离等 multi-app 用例仍未全部切到这条链路
 
 ## 当前限制
@@ -474,7 +560,7 @@ fixture app 变体只是用于本地 UI 测试和手工回归的测试拓扑，�
 - 默认输出的 `resolved-workflow.json`，或通过 `FLOWTAB_SPACE_FIXTURE_WORKFLOW_PATH` 显式指定路径
 - [FlowTabUITests+SpaceFixtureSwitcherMultiAppWorkflow.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabUITests/FlowTabUITests+SpaceFixtureSwitcherMultiAppWorkflow.swift)
 
-如果要继续把更多 multi-app workflow 场景接到 FlowTab 真实 runtime end-to-end 测试，仍需要继续扩展这层测试驱动逻辑；当前已落地 `Home` 多 app 计数、窗口列表隔离、`fullscreen-only` 场景和 `Switcher` app strip 场景。
+如果要继续把更多 multi-app workflow 场景接到 FlowTab 真实 runtime end-to-end 测试，仍需要继续扩展这层测试驱动逻辑；当前已落地 `Home` 多 app 计数、窗口列表隔离、`fullscreen-only` 场景，以及 `Switcher` app strip、preview 隔离、window-scope search 普通窗口和 fullscreen/off-space 激活场景。
 
 ## 待接入清单（按代码现状）
 
@@ -491,6 +577,9 @@ fixture app 变体只是用于本地 UI 测试和手工回归的测试拓扑，�
 - `Switcher` window-scope search 在 multi-app workflow 下检索真实窗口标题并确认激活目标窗口。
   场景：至少 3 个 app，Chrome 类 fixture 提供 tab-derived `Docs` window title。
   断言：search 默认范围切到 `window` 后，真实 `flowtab.switcher.search.window.*` 结果出现；确认结果后，目标 fixture window 成为 frontmost window。
+- `Switcher` window-scope search 能从当前 Space 激活 fullscreen/off-space window。
+  场景：一个 app 保持当前桌面窗口，一个 app 拥有 fullscreen window，另一个 app 处于普通窗口状态。
+  断言：从当前 Space 打开 search 并选择 fullscreen window 后，macOS 切到目标 Space，目标 fixture window 成为 frontmost window，FlowTab panel 不残留。
 
 ### 未实现优先级清单
 
@@ -500,39 +589,35 @@ fixture app 变体只是用于本地 UI 测试和手工回归的测试拓扑，�
 - `P1`：核心用户路径，mock/behavior 覆盖不足以证明真实 app、window、Space 激活。
 - `P2`：重要回归边界，主要覆盖去重、刷新、标题归一化和测试基础设施可靠性。
 
-1. `P1` fullscreen/off-space 目标能从当前 Space 被 Switcher 或 search 激活。
-   建议场景：一个 app 保持当前桌面窗口，一个 app 拥有 fullscreen window，另一个 app 处于普通窗口状态。
-   目标断言：从当前 Space 打开 switcher 或 search，选择 fullscreen/off-space window 后，macOS 切到对应 Space，目标窗口成为 frontmost window，FlowTab panel 不残留。
-
-2. `P1` app-scope search 在 multi-app workflow 下检索真实 appName/bundle identity 并激活目标 app。
+1. `P1` app-scope search 在 multi-app workflow 下检索真实 appName/bundle identity 并激活目标 app。
    建议场景：至少 3 个 app 使用不同 appName 和 bundle identifier，查询命中非前台 app。
    目标断言：搜索结果出现真实 `flowtab.switcher.search.app.*` 项；确认结果后，对应 fixture app 成为 frontmost app。
 
-3. `P1` `Home` 窗口列表点击真实窗口后激活对应 fixture window。
+2. `P1` `Home` 窗口列表点击真实窗口后激活对应 fixture window。
    建议场景：Home 已展示多个 workflow app，选中其中一个 app 后点击它的某个 resolved window title。
    目标断言：被点击的真实窗口成为 frontmost window；同 app 其他窗口和其他 app 的窗口不会被错误激活。
 
-4. `P1` tabbed window 的 selected tab title 跨 app 进入 FlowTab 的 Home、Switcher 和 search。
+3. `P1` tabbed window 的 selected tab title 跨 app 进入 FlowTab 的 Home、Switcher 和 search。
    建议场景：Chrome fixture 使用原始窗口标题 `Chrome Window 1/2`，选中 tab 为 `Docs/Mail`，同时再启动至少一个非 tabbed app。
    目标断言：FlowTab 在 `Home`、`Switcher` preview 和 window-scope search 中显示的是 `Docs/Mail` 这类 resolved title，而不是原始 window title。
 
-5. `P2` 不同 app 拥有同名窗口时，window-scope search 仍能同时给出多条真实结果。
+4. `P2` 不同 app 拥有同名窗口时，window-scope search 仍能同时给出多条真实结果。
    建议场景：两个 app 都含标题为 `Docs` 的窗口。
    目标断言：搜索结果保留多个 `Docs` 命中项，并通过 app name 区分归属，而不是错误合并或只保留一条。
 
-6. `P2` 多个真实窗口在标题、尺寸、位置等可见属性完全相同时，FlowTab 仍保留独立窗口结果。
+5. `P2` 多个真实窗口在标题、尺寸、位置等可见属性完全相同时，FlowTab 仍保留独立窗口结果。
    建议场景：两个窗口使用相同 resolved title、相同 frame、相同 mode，可分布在两个 app 或同一 app 内。
    目标断言：`Switcher` preview、window-scope search，以及需要时的 `Home` 窗口列表中仍保留多条独立窗口记录，而不是被错误合并、去重或只保留一条。
 
-7. `P2` 非 ASCII、标点、空白和长标题能通过真实 AX 链路进入 FlowTab。
+6. `P2` 非 ASCII、标点、空白和长标题能通过真实 AX 链路进入 FlowTab。
    建议场景：workflow window titles 包含中文、空格、标点、大小写混合和较长标题。
    目标断言：`Home`、`Switcher` preview 和 window-scope search 展示与匹配 resolved title 时不丢字符、不错误 slug 化，也不因长标题导致结果不可定位。
 
-8. `P2` multi-app workflow 运行中 app/window 生命周期刷新不会留下 stale 结果。
+7. `P2` multi-app workflow 运行中 app/window 生命周期刷新不会留下 stale 结果。
     建议场景：启动多个 workflow app 后，退出其中一个 app，或关闭其中一个 fixture window，再重新打开 Home/Switcher/search。
     目标断言：已退出 app 和已关闭 window 从 `Home`、`Switcher` 和 search 结果中消失；仍存活的 app/window 不受影响。
 
-9. `P2` 增加统一的 multi-app workflow 启动和清理入口。
+8. `P2` 增加统一的 multi-app workflow 启动和清理入口。
     当前状态：`build-space-fixture-workflow.sh` 只生成 app 变体和 resolved workflow JSON，真实多 app 启动主要存在于 `FlowTabUITests` helper 内。
     目标能力：提供一个测试/本地回归可复用的启动与清理入口，按 `launchOrder` 拉起全部 fixture app，并在失败或测试结束时可靠终止所有 workflow app。
 
@@ -545,7 +630,7 @@ fixture app 变体只是用于本地 UI 测试和手工回归的测试拓扑，�
 - 已实现 workflow 配置解析与应用内 tab 模型
 - 已实现 workflow 级 app 变体构建脚本
 - 已实现 fixture app 自身对 tabbed window 的 UI 覆盖
-- 已实现基于 resolved workflow JSON 的 FlowTab multi-app `Home` 计数、app 切换窗口列表隔离、`fullscreen-only app` 稳定展示，以及 `Switcher` app strip E2E 用例
+- 已实现基于 resolved workflow JSON 的 FlowTab multi-app `Home` 计数、app 切换窗口列表隔离、`fullscreen-only app` 稳定展示，以及 `Switcher` app strip、preview 隔离、window-scope search 激活 E2E 用例
 - 尚未把多 app workflow 全量接到 FlowTab 真实 runtime end-to-end UI workflow
 
 因此，这份文档应按“当前实现说明”理解，而不是“未来设计提案”。

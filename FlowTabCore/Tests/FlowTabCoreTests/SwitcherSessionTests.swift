@@ -134,6 +134,19 @@ final class SwitcherSessionTests: XCTestCase {
         XCTAssertEqual(session.selectedWindow?.id, "term-1")
     }
 
+    func testSelectedWindowCommitsExactWindowTarget() {
+        var session = SwitcherSession(apps: sampleApps(), triggerDirection: .backward)
+
+        XCTAssertTrue(session.selectWindow(appID: "com.apple.Terminal", windowID: "term-2"))
+
+        let target = session.commitSelection()
+
+        XCTAssertEqual(
+            target,
+            .window(appID: "com.apple.Terminal", windowID: "term-2", restoreIfMinimized: false)
+        )
+    }
+
     func testCommitDoesNotRestoreMinimizedWindowWhenDisabled() {
         var preferences = SwitcherPreferences.default
         preferences.autoRestoreMinimizedWindowOnSwitch = false
