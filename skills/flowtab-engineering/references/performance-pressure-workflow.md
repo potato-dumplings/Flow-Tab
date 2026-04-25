@@ -18,6 +18,8 @@ Pressure testing is required when the risk is about sustained CPU, RSS growth, l
 - Identify whether the change touches a pressure-sensitive path before calling the task done.
 - Run the relevant pressure scenario when the change can affect sustained load, repeated interaction cost, or scale-sensitive behavior.
 - Report the scenario, duration, sampling method, and baseline comparison.
+- Use the nearest same-machine baseline from `docs/DEVELOPMENT.md`, `docs/TEST_COVERAGE_CHECKLIST.md`, or a previous named `.build-local` result when available.
+- If no comparable baseline exists, record the run as a new local baseline and state that it is not a regression comparison.
 - Treat unexplained CPU regressions or warm-state RSS growth as blockers, not as optional follow-up.
 
 ## When Pressure Testing Is Required
@@ -102,7 +104,8 @@ Every required pressure run should report:
 - Why that scenario matches the changed code path
 - Duration, sampling cadence, and dataset or topology size
 - CPU and RSS summary, plus throughput when relevant
-- Comparison against the prior baseline or the most recent known good run
+- Comparison against the prior same-machine baseline or the most recent known good run, when available
+- Whether the result is a regression comparison or a newly recorded local baseline
 - Whether any observed regression is expected, explained, and accepted
 
 ## Rejection Criteria

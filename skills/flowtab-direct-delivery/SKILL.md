@@ -13,10 +13,13 @@ This skill is not only a generic answer-style guide. It is the FlowTab delivery 
 
 - For feature delivery or feature handoff, read `../flowtab-engineering/references/feature-workflow.md`.
 - For bugfix delivery or bugfix handoff, read `../flowtab-engineering/references/bugfix-workflow.md`.
+- For risk-calibrated validation, not-relevant layer decisions, or compact reporting, read `../flowtab-engineering/references/risk-calibration.md`.
 - For test-layer ownership, coverage audits, or layer-by-layer validation reporting, read `../flowtab-engineering/references/test-layer-boundaries.md`.
+- For exact validation commands or command-selection explanations, read `../flowtab-engineering/references/validation-command-cookbook.md`.
 - For UI blocker diagnosis, local UI test triage, or permission-path explanations, read `../flowtab-engineering/references/ui-automation-prerequisites.md`.
 - For architecture, refactor, or file-placement guidance, read `../flowtab-engineering/references/module-boundaries.md`.
 - For pressure or performance statements, read `../flowtab-engineering/references/performance-pressure-workflow.md` when the change touches hot paths, repeated interaction, scale-sensitive work, or long-lived resources.
+- For concurrency, permissions, logging, dependency, and lifetime tradeoffs, read `../flowtab-engineering/references/engineering-specialty-rules.md`.
 
 ## Required Response Contract
 
@@ -47,6 +50,9 @@ This skill is not only a generic answer-style guide. It is the FlowTab delivery 
 9. Surface pressure and performance status when relevant.
    If the change affects hot paths, repeated interaction cost, scale-sensitive work, or long-lived resources, include the baseline, the pressure attempt or result, or a concrete not-applicable reason.
 
+10. Scale the handoff to the risk.
+   Use the full FlowTab handoff for feature delivery, bugfixes, architecture changes, hot-path changes, or blocked validation. Use the compact handoff for docs-only, skill-only, mechanical, or no-runtime-behavior changes.
+
 ## FlowTab Handoff Minimums
 
 - All implementation summaries or handoffs must state what changed, why it changed, where it changed, and the assumptions or constraints that shaped the choice.
@@ -61,6 +67,17 @@ This skill is not only a generic answer-style guide. It is the FlowTab delivery 
 - Architecture or migration handoffs must state the target design, module ownership, migration stages, fallback path, and validation plan.
 - Remediation responses must state the current blocker, the affected layer or environment, what remains unproven, and the next concrete step.
 - Review, audit, or diagnosis responses must state the observed gap, the supporting evidence, the affected layer or module, and the next concrete corrective action or blocker.
+
+## Compact Handoff
+
+Use this for documentation-only, skill-only, mechanical, or no-runtime-behavior changes:
+
+- State what changed and where.
+- State why full feature or bugfix validation was not relevant.
+- List any lightweight verification performed, such as file inspection, path checks, or command-source inspection.
+- State any command that was attempted but blocked by the local environment.
+
+Do not use the compact handoff for user-visible features, production bugfixes, permission behavior, runtime topology, hot paths, or any change with a required test layer.
 
 ## Response Patterns
 

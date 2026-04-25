@@ -17,6 +17,33 @@ Use this reference when deciding where code should live or when a change feels l
 - Test targets
   Hold test code only. Do not move test logic back into production modules.
 
+## Current Ownership Map
+
+- `FlowTab/App`
+  App entry, `AppDelegate`, dependency wiring, app lifecycle, root windows, top-level launch behavior.
+- `FlowTab/Features/Home`
+  Home page UI, app/window lists, user-facing home interactions, home-specific coordination.
+- `FlowTab/Features/Logs`
+  Logs page UI, log presentation, log clearing UI behavior, logs-specific state.
+- `FlowTab/Features/Settings`
+  Settings UI, preference controls, permission reminders surfaced through settings.
+- `FlowTab/Features/Switcher`
+  Switcher panel UI, panel controller, presentation behavior, search interaction routing, selection and activation UI flow.
+- `FlowTab/Features/SharedUI`
+  Shared feature-facing UI components that are not tied to one page and do not own runtime integration.
+- `FlowTab/Infrastructure/Runtime`
+  Runtime snapshots, window/app discovery, activation, accessibility and screen-capture integration, topology and preview providers.
+- `FlowTab/Infrastructure/Preferences`
+  App preference storage, preference adapters, app-scoped preference infrastructure.
+- `FlowTab/Infrastructure/Appearance`
+  Shared appearance, colors, typography, and platform-facing styling helpers.
+- `FlowTab/Infrastructure/Support`
+  Cross-feature support helpers that are app-level or platform-facing, but not pure enough for `FlowTabCore`.
+- `FlowTab/TestingSupport`
+  Launch arguments, test-only dependency injection, mock visibility helpers, and fixtures used by tests.
+- `FlowTabSpaceFixture`
+  Fixture app behavior used to create real window and space topology for UI automation.
+
 ## Placement Rules
 
 - Classify every production file by architecture role and feature ownership before choosing a directory.
@@ -33,6 +60,7 @@ Use this reference when deciding where code should live or when a change feels l
 - Do not add `AppKit`, `SwiftUI`, `ApplicationServices`, or `ScreenCaptureKit` dependencies to `FlowTabCore`.
 - Do not place production business logic inside `TestingSupport`.
 - Do not duplicate core algorithms in `FlowTab` when they belong in `FlowTabCore`.
+- Use `engineering-specialty-rules.md` when placement depends on concurrency lifetime, permissions, logging, or dependency ownership.
 
 ## Organization Rules
 

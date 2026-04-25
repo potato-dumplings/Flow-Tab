@@ -6,7 +6,7 @@ Use this workflow for regressions, flaky behavior, broken edge cases, and user-r
 
 - State what is known, what is assumed, and what remains unproven before changing production logic.
 - Run or explicitly attempt the relevant existing unit, behavior, and UI tests before changing production logic.
-- Reproduce the bug with a failing test, an existing failing suite, or stable logs before changing production logic.
+- Reproduce the bug with a stable signal before changing production logic. Acceptable signals include a failing test, an existing failing suite, stable logs, crash output, compiler or static analyzer output, deterministic configuration mismatch, permission or code-identity evidence, or another observation that clearly narrows the defect.
 - If existing tests cannot reproduce the issue, analyze stable logs first; when logs support a concrete scenario, add a failing test that captures the scenario and expected log-backed behavior before changing production logic.
 - Stop and report the blocker if no reproducible signal exists yet or a required environment, permission, fixture, or test layer is unavailable.
 - Use tests and logs to narrow the root cause instead of guessing.
@@ -19,21 +19,23 @@ Use this workflow for regressions, flaky behavior, broken edge cases, and user-r
 1. State the observed failure in one sentence.
 2. List the current evidence, assumptions, and open questions. If more than one plausible root-cause theory exists, name the contenders instead of choosing silently.
 3. Identify the affected layer or layers: unit, behavior, UI, runtime integration.
-4. Read `test-layer-boundaries.md` and decide which layer should hold the failing reproduction, which layer should hold app-orchestration coverage, and whether a visible UI regression is required.
-5. If UI automation is relevant, read `ui-automation-prerequisites.md` and satisfy the repo-specific setup before deciding the environment is blocked.
-6. Read `performance-pressure-workflow.md` and decide whether the defect or fix requires pressure validation in addition to functional regression coverage.
-7. Identify any required environment prerequisites for reproduction, such as Accessibility trust, screen capture permission, seeded fixtures, launch arguments, fixed-path UI app preparation, or code-identity matching.
-8. Before touching production code, run or explicitly attempt the relevant existing unit, behavior, and UI tests and record which layers failed, passed, were not relevant, or were blocked.
-9. If existing tests cannot reproduce the defect, analyze existing stable logs first, or add temporary diagnostic logging when needed to confirm a concrete hypothesis.
-10. When logs or tests support a concrete scenario, add a missing failing test that captures that scenario and expected behavior. Start at the lowest layer that can express the failure and add higher-layer coverage when the bug is user-visible.
-11. If there is still no reproducible signal, if the evidence does not clearly support one theory, or a required layer cannot run because the environment is blocked, stop and report the blocker. Do not edit production files past this point.
-12. Change production code only after tests or logs support the root-cause theory, and prefer the smallest fix that explains the evidence.
-13. Remove temporary debug-only logging or hooks from the final production path.
-14. Re-run the relevant unit, behavior, and UI tests and any required pressure checks, then keep the new regression coverage.
+4. Read `risk-calibration.md` and decide which layers are required, not relevant, or blocked.
+5. Read `test-layer-boundaries.md` and decide which layer should hold the failing reproduction, which layer should hold app-orchestration coverage, and whether a visible UI regression is required.
+6. Read `validation-command-cookbook.md` and choose the concrete pre-change commands to run or attempt.
+7. If UI automation is relevant, read `ui-automation-prerequisites.md` and satisfy the repo-specific setup before deciding the environment is blocked.
+8. Read `performance-pressure-workflow.md` and decide whether the defect or fix requires pressure validation in addition to functional regression coverage.
+9. Identify any required environment prerequisites for reproduction, such as Accessibility trust, screen capture permission, seeded fixtures, launch arguments, fixed-path UI app preparation, or code-identity matching.
+10. Before touching production code, run or explicitly attempt the relevant existing unit, behavior, and UI tests and record which layers failed, passed, were not relevant, or were blocked.
+11. If existing tests cannot reproduce the defect, analyze existing stable logs first, inspect crash/compiler/static output when that is the signal, or add temporary diagnostic logging when needed to confirm a concrete hypothesis.
+12. When logs, tests, compiler output, crash output, or deterministic environment evidence support a concrete scenario, add a missing failing test that captures that scenario and expected behavior when feasible. Start at the lowest layer that can express the failure and add higher-layer coverage when the bug is user-visible.
+13. If there is still no reproducible signal, if the evidence does not clearly support one theory, or a required layer cannot run because the environment is blocked, stop and report the blocker. Do not edit production files past this point.
+14. Change production code only after the stable signal supports the root-cause theory, and prefer the smallest fix that explains the evidence.
+15. Remove temporary debug-only logging or hooks from the final production path.
+16. Re-run the relevant unit, behavior, and UI tests and any required pressure checks, then keep the new regression coverage.
 
 ## Hard Gates
 
-- Do not edit production files before steps 4 through 7 establish either a reproducible failing signal or a clearly reported blocker.
+- Do not edit production files before steps 4 through 9 establish either a reproducible failing signal or a clearly reported blocker.
 - Do not let an unverified theory or silent assumption become the production fix.
 - If existing tests do not reproduce the issue, do not skip directly to production edits. Use logs to form a hypothesis and encode that hypothesis as a failing scenario test whenever feasible.
 - If a bug is user-visible and affects switcher behavior, keyboard interaction, window selection, launch flows, settings flows, or permission flows, keep or add a higher-layer regression. Prefer UI coverage when the scenario can be automated reasonably.
@@ -59,7 +61,7 @@ Use this workflow for regressions, flaky behavior, broken edge cases, and user-r
 ## Test Strategy
 
 - Add the lowest-layer failing reproduction you can express.
-- When existing suites cannot reproduce, derive the new failing test from the observed runtime scenario and the log signal that supports the hypothesis.
+- When existing suites cannot reproduce, derive the new failing test from the observed runtime scenario and the stable signal that supports the hypothesis.
 - Run every relevant existing test layer before production edits. If a layer is not relevant, say why. If it is relevant but blocked, stop and report the blocker.
 - Keep or add a higher-layer regression when the bug was user-visible or crossed module boundaries.
 - Use the layer that owns the evidence instead of cloning the same assertion across unit, behavior, and UI.
@@ -81,6 +83,6 @@ Use this workflow for regressions, flaky behavior, broken edge cases, and user-r
 
 - Reject blind patches that are not backed by a reproducible failing signal.
 - Reject bugfixes that edit production code before running or explicitly attempting the relevant pre-change tests.
-- Reject bugfixes where existing tests could not reproduce, logs were available for diagnosis, but no scenario-based failing test was added from that log-backed analysis.
+- Reject bugfixes where existing tests could not reproduce, stable evidence was available for diagnosis, but no scenario-based failing test was added from that evidence when feasible.
 - Reject completions that omit blocked test layers or missing-environment reasons from the final report.
 - Reject fixes that add test-only or debug-only logic into the production code path.

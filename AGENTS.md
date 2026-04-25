@@ -8,6 +8,8 @@
   - `references/feature-workflow.md`
   - `references/bugfix-workflow.md`
   - `references/module-boundaries.md`
+  - `references/risk-calibration.md`
+  - `references/validation-command-cookbook.md`
 
 ## Core Rules
 
@@ -23,7 +25,7 @@
 
 ## Validation Rules
 
-- For every feature extension or new feature, add or update unit, behavior, and UI tests.
-- Do not consider feature work complete until the related unit, behavior, and UI tests pass.
-- For every bug fix, reproduce and diagnose the issue with tests and logs before changing production logic.
+- For every user-visible feature extension or new feature, add or update unit, behavior, and UI tests unless `risk-calibration.md` makes a layer explicitly not relevant.
+- Do not consider feature work complete until the required related unit, behavior, and UI tests pass. If a required layer is blocked, report the blocker instead of calling the work complete.
+- For every bug fix, reproduce and diagnose the issue with stable tests, logs, crash output, compiler or static analyzer output, deterministic configuration or permission evidence, or another concrete signal before changing production logic.
 - Keep regression coverage after every bug fix.

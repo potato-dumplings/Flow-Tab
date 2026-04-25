@@ -5,10 +5,12 @@ Use this workflow for new features and for extending existing behavior.
 ## Required Outcome
 
 - State the user-visible behavior, shared rule, and material assumptions before implementation.
-- Add or update coverage in all three layers: unit, behavior, and UI.
+- Read `risk-calibration.md` and classify the change before deciding validation scope.
+- For user-visible features and feature extensions, add or update coverage in all three layers: unit, behavior, and UI.
+- For documentation-only or mechanical changes that are not feature work, use the calibrated minimum and state why any layer is not relevant.
 - Make each test layer prove a different part of the change instead of repeating the same assertion.
 - Run pressure validation when the change touches hot paths, scale-sensitive logic, or repeated heavy UI or runtime work.
-- Pass the related unit, behavior, and UI tests before submission.
+- Pass the required related unit, behavior, and UI tests before completion. If a required layer is blocked, report the blocker instead of calling the feature complete.
 - Keep the implementation generic rather than feature-specific.
 
 ## Thinking Checkpoint
@@ -22,16 +24,18 @@ Use this workflow for new features and for extending existing behavior.
 
 1. Define the user-visible behavior, the shared rule behind it, and the assumptions that materially affect the design.
 2. If the request supports multiple interpretations, resolve them before editing. Do not silently pick one.
-3. Read `test-layer-boundaries.md` and decide what distinct evidence unit, behavior, and UI coverage should provide.
-4. If UI automation is relevant, read `ui-automation-prerequisites.md` before planning the validation run.
-5. Read `performance-pressure-workflow.md` and decide whether the change also requires pressure validation.
-6. Read `module-boundaries.md` and choose the lowest reasonable module for the change.
-7. Reject any design that only works through a one-off special case or unnecessary abstraction.
-8. Add or update unit tests for the smallest reusable rule first.
-9. Add or update behavior tests for the app-level flow or integration path.
-10. Add or update UI tests for the visible user path.
-11. Implement the production change.
-12. Run the related test suites and any required pressure checks, then iterate until they pass.
+3. Read `risk-calibration.md` and decide which layers are required, not relevant, or blocked.
+4. Read `test-layer-boundaries.md` and decide what distinct evidence unit, behavior, and UI coverage should provide.
+5. Read `validation-command-cookbook.md` and choose the smallest concrete command for each required layer.
+6. If UI automation is relevant, read `ui-automation-prerequisites.md` before planning the validation run.
+7. Read `performance-pressure-workflow.md` and decide whether the change also requires pressure validation.
+8. Read `module-boundaries.md` and choose the lowest reasonable module for the change.
+9. Reject any design that only works through a one-off special case or unnecessary abstraction.
+10. Add or update unit tests for the smallest reusable rule first when unit coverage is required.
+11. Add or update behavior tests for the app-level flow or integration path when behavior coverage is required.
+12. Add or update UI tests for the visible user path when UI coverage is required.
+13. Implement the production change.
+14. Run the related test suites and any required pressure checks, then iterate until they pass. If a required validation layer is blocked, stop at a blocker report instead of completion.
 
 ## Coverage Expectations
 
@@ -58,10 +62,11 @@ Use this workflow for new features and for extending existing behavior.
 ## Validation Standard
 
 - Do not consider the task ready to implement if key assumptions or expected behavior are still ambiguous enough to force guesswork.
-- Do not consider the task done if any required test layer is missing.
-- Do not consider the task done if tests were added but not run.
+- Do not consider user-visible feature work done if any required test layer is missing.
+- Do not consider the task done if tests were added but not run, unless a required environment blocker is reported.
 - Do not consider the task done if required pressure validation was skipped without a concrete not-applicable reason.
 - Do not consider the task done if the change depends on a feature-specific branch that does not generalize.
+- For docs-only, skill-only, or mechanical changes, explicitly report layers as not relevant using `risk-calibration.md` instead of pretending full feature validation was required.
 
 ## Practical Test Selection
 

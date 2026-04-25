@@ -18,10 +18,10 @@ For no-edit work such as review, audit, root-cause triage, or performance analys
    If a change only works by adding one-off branching for a single feature, single scenario, page, caller, or bug case, treat the design as invalid and rework it from a global perspective.
 
 3. Treat feature work as incomplete until test coverage exists in all required layers.
-   For every feature extension or new feature, add or update unit, behavior, and UI tests. Make each layer provide distinct evidence instead of repeating the same assertion three times. Do not submit code until the related unit, behavior, and UI suites pass.
+   Read `risk-calibration.md` before deciding which layers are required. For user-visible feature extensions or new features, add or update unit, behavior, and UI tests. Make each layer provide distinct evidence instead of repeating the same assertion three times. Do not claim completion until the required related suites pass. If a layer is not applicable, state the concrete reason; if a required layer is blocked, report the blocker instead of claiming completion.
 
 4. Diagnose bugs before changing production logic.
-   Before editing production files, run or explicitly attempt the relevant existing unit, behavior, and UI tests for the affected layers. Reproduce the bug with tests or stable logs first. If existing tests cannot reproduce, analyze stable logs first and, when logs support a concrete scenario, add a failing scenario-based test before production edits. If there is no reproducible signal yet, a required test layer cannot run, or the environment is missing required permissions, fixtures, or tooling, stop and report the blocker instead of patching by guesswork. Keep regression coverage after the fix.
+   Before editing production files, run or explicitly attempt the relevant existing unit, behavior, and UI tests for the affected layers. Reproduce the bug with a stable signal first: failing tests, stable logs, crash output, compiler or static analyzer output, deterministic configuration or permission evidence, or another observation that clearly narrows the defect. If existing tests cannot reproduce, analyze stable logs first and, when logs support a concrete scenario, add a failing scenario-based test before production edits. If there is no reproducible signal yet, a required test layer cannot run, or the environment is missing required permissions, fixtures, or tooling, stop and report the blocker instead of patching by guesswork. Keep regression coverage after the fix.
 
 5. Keep test-only and debug-only code out of production files.
    Place unit tests in test targets, test scaffolding in testing support files, and temporary bug-investigation logs or hooks outside the final production path. Keep only minimal production logging that is genuinely part of runtime behavior.
@@ -45,34 +45,42 @@ For no-edit work such as review, audit, root-cause triage, or performance analys
 
 - For feature extensions or new features, read `references/feature-workflow.md`.
 - For bug investigation and bug fixes, read `references/bugfix-workflow.md`.
+- For risk, coverage, and not-relevant layer decisions, read `references/risk-calibration.md`.
 - For test-scope, test-placement, or unit versus behavior versus UI boundary decisions, read `references/test-layer-boundaries.md`.
+- For concrete build, test, UI, and pressure commands, read `references/validation-command-cookbook.md`.
 - For FlowTab-specific UI automation setup, fixed-path test app preparation, or permission and code-identity prerequisites, read `references/ui-automation-prerequisites.md`.
 - For pressure-test triggers, stress-validation selection, or performance-regression validation, read `references/performance-pressure-workflow.md`.
 - For file placement, refactoring, or architecture decisions, read `references/module-boundaries.md`.
+- For concurrency, permissions, logging, dependency, and lifetime decisions, read `references/engineering-specialty-rules.md`.
 
 ## Working Method
 
 1. Classify the task before editing, then state the assumptions, evidence, and unknowns that matter to the design.
 2. If multiple interpretations or implementation paths exist, name them and resolve them before editing. Prefer the simplest path that still satisfies the request.
-3. Classify each affected file by architecture role and feature ownership before choosing a module.
-4. Choose the correct module before writing code.
-5. For bug fixes, run or explicitly attempt the relevant existing tests before production edits and stop if reproduction evidence or required environment access is missing.
+3. Read `risk-calibration.md` and decide which validation layers are required, not relevant, or blocked.
+4. Classify each affected file by architecture role and feature ownership before choosing a module.
+5. Choose the correct module before writing code.
+6. For bug fixes, run or explicitly attempt the relevant existing tests before production edits and stop if reproduction evidence or required environment access is missing.
    If existing tests cannot reproduce, analyze stable logs first and add a scenario-based failing test from the log-supported hypothesis when feasible before production edits.
    If relevant UI automation is involved, first satisfy the repo-specific prerequisites from `ui-automation-prerequisites.md` before deciding the environment is blocked.
    If relevant UI automation is blocked by sandboxed temp or cache paths, first try `./scripts/testing/install-ui-test-app.sh` when a fixed-path UI test app has not been prepared yet, then run `./scripts/testing/run-ui-tests-local.sh`.
    If UI tests still fail, check for fixed-path bundle mismatch, missing Accessibility or Screen Recording permission, or code-identity mismatch before reporting an environment blocker.
    If those checks are satisfied and the fallback script still fails for environment reasons, report the blocker and request the required elevation or external Terminal run instead of continuing with production edits.
-6. Design the solution so it generalizes beyond the current case and does not rely on a one-off branch.
-7. Decide what unique evidence each required test layer should provide, then add or update those tests alongside the code change.
-8. Decide whether the change also requires pressure validation by reading `performance-pressure-workflow.md`. If it does, run the relevant stress checks or report the concrete blocker.
-9. Run the related test suites before considering the task complete.
-10. Final bugfix handoff must state the pre-change failing signal, pre-change tests attempted, evidence supporting the root cause, post-change tests run, and any required test layer or pressure check that could not be run with the reason.
+7. Design the solution so it generalizes beyond the current case and does not rely on a one-off branch.
+8. Decide what unique evidence each required test layer should provide, then add or update those tests alongside the code change.
+9. Use `validation-command-cookbook.md` to choose concrete commands for the required layers.
+10. Decide whether the change also requires pressure validation by reading `performance-pressure-workflow.md`. If it does, run the relevant stress checks or report the concrete blocker.
+11. Run the related test suites before considering the task complete.
+12. Final bugfix handoff must state the pre-change failing signal, pre-change tests attempted, evidence supporting the root cause, post-change tests run, and any required test layer or pressure check that could not be run with the reason.
 
 ## References
 
 - `references/feature-workflow.md`
 - `references/bugfix-workflow.md`
+- `references/risk-calibration.md`
 - `references/test-layer-boundaries.md`
+- `references/validation-command-cookbook.md`
 - `references/ui-automation-prerequisites.md`
 - `references/performance-pressure-workflow.md`
 - `references/module-boundaries.md`
+- `references/engineering-specialty-rules.md`
