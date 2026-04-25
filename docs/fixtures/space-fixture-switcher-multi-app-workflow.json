@@ -1,0 +1,66 @@
+{
+  "workflowName": "multi-app-switcher-preview-isolation",
+  "settleTimeoutMs": 8000,
+  "apps": [
+    {
+      "appID": "finder",
+      "appName": "Finder Fixture",
+      "bundleId": "com.example.fixture.finder",
+      "launchOrder": 1,
+      "windows": [
+        {
+          "title": "Finder Main",
+          "mode": "standard",
+          "tabs": []
+        },
+        {
+          "title": "Finder Downloads",
+          "mode": "standard",
+          "tabs": []
+        }
+      ]
+    },
+    {
+      "appID": "chrome",
+      "appName": "Chrome Fixture",
+      "bundleId": "com.example.fixture.chrome",
+      "launchOrder": 2,
+      "windows": [
+        {
+          "title": "Chrome Window 1",
+          "mode": "standard",
+          "tabs": [
+            { "title": "Docs", "isSelected": true },
+            { "title": "PR", "isSelected": false }
+          ]
+        },
+        {
+          "title": "Chrome Window 2",
+          "mode": "standard",
+          "tabs": [
+            { "title": "Mail", "isSelected": true },
+            { "title": "Calendar", "isSelected": false }
+          ]
+        }
+      ]
+    },
+    {
+      "appID": "notes",
+      "appName": "Notes Fixture",
+      "bundleId": "com.example.fixture.notes",
+      "launchOrder": 3,
+      "windows": [
+        {
+          "title": "Notes Inbox",
+          "mode": "standard",
+          "tabs": []
+        },
+        {
+          "title": "Notes Focus",
+          "mode": "fullscreen",
+          "tabs": []
+        }
+      ]
+    }
+  ]
+}

@@ -44,7 +44,6 @@ final class FlowTabUITests: XCTestCase {
         static let settingsHotkeyQuitKey = "flowtab.settings.hotkey.quit-key"
         static let settingsHotkeyInAppModifier = "flowtab.settings.hotkey.in-app-modifier"
         static let settingsHotkeyInAppKey = "flowtab.settings.hotkey.in-app-key"
-        static let switcherPanel = "flowtab.switcher.panel"
         static let switcherSearchInput = "flowtab.switcher.search.input"
         static let switcherSearchWindowMockMailInbox = "flowtab.switcher.search.window.mock-mail-inbox"
     }

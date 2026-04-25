@@ -27,12 +27,7 @@ extension FlowTabUITests {
         runRealSpaceFixtureWorkflow(
             flowTabAdditionalArguments: ["--flowtab-ui-open-switcher"]
         ) { identity, app in
-            let switcherPanel = element(in: app, identifier: Identifier.switcherPanel)
-            XCTAssertTrue(switcherPanel.waitForExistence(timeout: 8))
-
-            let fixtureAppTile = switcherPanel.descendants(matching: .any)
-                .matching(identifier: identity.switcherAppAccessibilityIdentifier)
-                .firstMatch
+            let fixtureAppTile = element(in: app, identifier: identity.switcherAppAccessibilityIdentifier)
             XCTAssertTrue(
                 fixtureAppTile.waitForExistence(timeout: 8),
                 "FlowTab did not surface the Space Fixture app in the switcher app strip"
@@ -44,12 +39,7 @@ extension FlowTabUITests {
         runRealSpaceFixtureWorkflow(
             flowTabAdditionalArguments: ["--flowtab-ui-open-switcher"]
         ) { identity, app in
-            let switcherPanel = element(in: app, identifier: Identifier.switcherPanel)
-            XCTAssertTrue(switcherPanel.waitForExistence(timeout: 8))
-
-            let fixtureAppTile = switcherPanel.descendants(matching: .any)
-                .matching(identifier: identity.switcherAppAccessibilityIdentifier)
-                .firstMatch
+            let fixtureAppTile = element(in: app, identifier: identity.switcherAppAccessibilityIdentifier)
             XCTAssertTrue(fixtureAppTile.waitForExistence(timeout: 8))
 
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))

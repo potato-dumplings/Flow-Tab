@@ -13,7 +13,7 @@ final class SwitcherPanelController {
     }
 
     let model: LiveSwitcherModel
-    let panel: NSPanel
+    let panel: SwitcherOverlayPanel
 
     var keyDownMonitor: Any?
     var localFlagsChangedMonitor: Any?
@@ -141,7 +141,8 @@ final class SwitcherPanelController {
         let hostingView = NSHostingView(rootView: SwitcherPanelRootView(model: model))
         hostingView.wantsLayer = true
         hostingView.layer?.backgroundColor = NSColor.clear.cgColor
-        panel.contentView = hostingView
+        let contentView = SwitcherPanelContentView(hostingView: hostingView)
+        panel.contentView = contentView
         model.onSearchStateChanged = { [weak self] in
             guard let self else { return }
             guard self.isPanelPresented else { return }
@@ -149,6 +150,7 @@ final class SwitcherPanelController {
         }
         model.onSessionLayoutChanged = { [weak self] in
             guard let self else { return }
+            self.syncPanelAccessibilityAnchors()
             guard self.isPanelPresented else { return }
             guard self.model.session != nil else {
                 self.endPresentationSession()
@@ -299,6 +301,10 @@ final class SwitcherPanelController {
         handlePanelDidResignKey()
     }
 
+    func syncPanelAccessibilityAnchors() {
+        panel.updateSwitcherAccessibilityApps(model.session?.apps ?? [])
+    }
+
     func scheduleDelayedWindowLayerEntryForTesting() {
         scheduleDelayedWindowLayerEntryIfNeeded()
     }
@@ -329,5 +335,37 @@ final class SwitcherPanelController {
         if let panelDidResignKeyObserver {
             NotificationCenter.default.removeObserver(panelDidResignKeyObserver)
         }
+    }
+}
+
+enum SwitcherAccessibilityIdentifiers {
+    static func app(id: String) -> String {
+        "flowtab.switcher.app.\(id.flowTabAccessibilitySlug)"
+    }
+
+    static func window(id: String) -> String {
+        "flowtab.switcher.window.\(id.flowTabAccessibilitySlug)"
+    }
+}
+
+private final class SwitcherPanelContentView: NSView {
+    private let hostingView: NSView
+
+    init(hostingView: NSView) {
+        self.hostingView = hostingView
+        super.init(frame: .zero)
+        wantsLayer = true
+        layer?.backgroundColor = NSColor.clear.cgColor
+        addSubview(hostingView)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func layout() {
+        super.layout()
+        hostingView.frame = bounds
     }
 }

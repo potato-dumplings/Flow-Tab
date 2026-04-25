@@ -5,10 +5,8 @@ extension FlowTabUITests {
         runRealSpaceFixtureWorkflow(
             flowTabAdditionalArguments: ["--flowtab-ui-open-switcher-search"]
         ) { identity, app in
-            let switcherPanel = app.descendants(matching: .any)
-                .matching(identifier: Identifier.switcherPanel)
-                .firstMatch
-            XCTAssertTrue(switcherPanel.waitForExistence(timeout: 5))
+            let searchInput = element(in: app, identifier: Identifier.switcherSearchInput)
+            XCTAssertTrue(searchInput.waitForExistence(timeout: 5))
 
             RunLoop.current.run(until: Date().addingTimeInterval(0.4))
             app.typeText(identity.switcherSearchQuery)
@@ -19,12 +17,12 @@ extension FlowTabUITests {
             XCTAssertTrue(fixtureResult.waitForExistence(timeout: 5))
 
             app.typeText("\r")
-            if !waitForNonExistence(switcherPanel, timeout: 1.2) {
+            if !waitForNonExistence(searchInput, timeout: 1.2) {
                 // XCUI keyboard input may leave the hidden NSTextView in a marked-text
                 // composition state, so the first Return only commits composition.
                 app.typeText("\r")
             }
-            XCTAssertTrue(waitForNonExistence(switcherPanel, timeout: 3))
+            XCTAssertTrue(waitForNonExistence(searchInput, timeout: 3))
         }
     }
 
@@ -41,10 +39,7 @@ extension FlowTabUITests {
         launchFlowTabUITestApplication(app)
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
 
-        let switcherPanel = app.descendants(matching: .any)
-            .matching(identifier: Identifier.switcherPanel)
-            .firstMatch
-        XCTAssertTrue(switcherPanel.waitForExistence(timeout: 5))
+        XCTAssertTrue(element(in: app, identifier: Identifier.switcherSearchInput).waitForExistence(timeout: 5))
 
         RunLoop.current.run(until: Date().addingTimeInterval(0.4))
         app.typeText("测")
@@ -68,10 +63,7 @@ extension FlowTabUITests {
         launchFlowTabUITestApplication(app)
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
 
-        let switcherPanel = app.descendants(matching: .any)
-            .matching(identifier: Identifier.switcherPanel)
-            .firstMatch
-        XCTAssertTrue(switcherPanel.waitForExistence(timeout: 5))
+        XCTAssertTrue(element(in: app, identifier: Identifier.switcherSearchInput).waitForExistence(timeout: 5))
 
         RunLoop.current.run(until: Date().addingTimeInterval(0.4))
         app.typeText("cs")
@@ -95,10 +87,7 @@ extension FlowTabUITests {
         launchFlowTabUITestApplication(app)
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
 
-        let switcherPanel = app.descendants(matching: .any)
-            .matching(identifier: Identifier.switcherPanel)
-            .firstMatch
-        XCTAssertTrue(switcherPanel.waitForExistence(timeout: 5))
+        XCTAssertTrue(element(in: app, identifier: Identifier.switcherSearchInput).waitForExistence(timeout: 5))
 
         RunLoop.current.run(until: Date().addingTimeInterval(0.4))
         app.typeText("cs")
@@ -127,10 +116,7 @@ extension FlowTabUITests {
         launchFlowTabUITestApplication(app)
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
 
-        let switcherPanel = app.descendants(matching: .any)
-            .matching(identifier: Identifier.switcherPanel)
-            .firstMatch
-        XCTAssertTrue(switcherPanel.waitForExistence(timeout: 5))
+        XCTAssertTrue(element(in: app, identifier: Identifier.switcherSearchInput).waitForExistence(timeout: 5))
 
         RunLoop.current.run(until: Date().addingTimeInterval(0.4))
         app.typeText("文件助手")
@@ -156,10 +142,7 @@ extension FlowTabUITests {
         launchFlowTabUITestApplication(app)
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
 
-        let switcherPanel = app.descendants(matching: .any)
-            .matching(identifier: Identifier.switcherPanel)
-            .firstMatch
-        XCTAssertTrue(switcherPanel.waitForExistence(timeout: 5))
+        XCTAssertTrue(element(in: app, identifier: Identifier.switcherSearchInput).waitForExistence(timeout: 5))
 
         let firstResultIdentifier = "flowtab.switcher.search.app.com-flowtab-mock-wrap-01"
         let lastResultIdentifier = "flowtab.switcher.search.app.com-flowtab-mock-wrap-10"

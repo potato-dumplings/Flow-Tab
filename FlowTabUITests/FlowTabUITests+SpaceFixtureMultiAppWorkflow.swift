@@ -1,7 +1,7 @@
 import Foundation
 import XCTest
 
-private enum SpaceFixtureMultiAppWorkflowDefaults {
+enum SpaceFixtureMultiAppWorkflowDefaults {
     static let enterFullscreenDelayMilliseconds = 5_000
     static let expectedWindowCounts = [1, 3, 1]
 
@@ -19,6 +19,13 @@ private enum SpaceFixtureMultiAppWorkflowDefaults {
             .appendingPathComponent("space-fixture-home-fullscreen-only-workflow.json")
     }
 
+    static var switcherWorkflowSourceURL: URL {
+        repositoryRootURL
+            .appendingPathComponent("docs", isDirectory: true)
+            .appendingPathComponent("fixtures", isDirectory: true)
+            .appendingPathComponent("space-fixture-switcher-multi-app-workflow.json")
+    }
+
     static var defaultResolvedWorkflowURL: URL {
         repositoryRootURL
             .appendingPathComponent(".build-local", isDirectory: true)
@@ -34,7 +41,7 @@ private enum SpaceFixtureMultiAppWorkflowDefaults {
     }
 }
 
-private enum SpaceFixtureMultiAppWorkflowError: LocalizedError, Equatable {
+enum SpaceFixtureMultiAppWorkflowError: LocalizedError, Equatable {
     case missingWorkflowPath(String)
     case workflowFileNotFound(String)
     case workflowFileUnreadable(String)
@@ -75,7 +82,7 @@ private enum SpaceFixtureMultiAppWorkflowError: LocalizedError, Equatable {
     }
 }
 
-private struct SpaceFixtureResolvedWorkflow: Equatable {
+struct SpaceFixtureResolvedWorkflow: Equatable {
     struct App: Equatable {
         let appID: String
         let appName: String
@@ -186,7 +193,7 @@ private struct SpaceFixtureResolvedWorkflow: Equatable {
     }
 }
 
-private struct SpaceFixtureResolvedWorkflowDocument: Codable {
+struct SpaceFixtureResolvedWorkflowDocument: Codable {
     let workflowName: String
     let settleTimeoutMilliseconds: Int?
     let apps: [SpaceFixtureResolvedWorkflowAppDocument]
@@ -198,7 +205,7 @@ private struct SpaceFixtureResolvedWorkflowDocument: Codable {
     }
 }
 
-private struct SpaceFixtureResolvedWorkflowAppDocument: Codable {
+struct SpaceFixtureResolvedWorkflowAppDocument: Codable {
     let appID: String
     let appName: String
     let bundleIdentifier: String
@@ -216,12 +223,12 @@ private struct SpaceFixtureResolvedWorkflowAppDocument: Codable {
     }
 }
 
-private enum SpaceFixtureResolvedWorkflowWindowMode: String, Codable {
+enum SpaceFixtureResolvedWorkflowWindowMode: String, Codable {
     case standard
     case fullscreen
 }
 
-private struct SpaceFixtureResolvedWorkflowWindowDocument: Codable {
+struct SpaceFixtureResolvedWorkflowWindowDocument: Codable {
     let title: String
     let mode: SpaceFixtureResolvedWorkflowWindowMode
     let tabs: [SpaceFixtureResolvedWorkflowTabDocument]
@@ -237,7 +244,7 @@ private struct SpaceFixtureResolvedWorkflowWindowDocument: Codable {
     }
 }
 
-private struct SpaceFixtureResolvedWorkflowTabDocument: Codable {
+struct SpaceFixtureResolvedWorkflowTabDocument: Codable {
     let title: String
     let isSelected: Bool
 
@@ -246,7 +253,7 @@ private struct SpaceFixtureResolvedWorkflowTabDocument: Codable {
     }
 }
 
-private extension SpaceFixtureResolvedWorkflow {
+extension SpaceFixtureResolvedWorkflow {
     var allExpectedWindowTitles: [String] {
         apps.flatMap(\.expectedWindowTitles)
     }
@@ -592,7 +599,7 @@ extension FlowTabUITests {
         )
     }
 
-    private func runRealSpaceFixtureWorkflow(
+    func runRealSpaceFixtureWorkflow(
         _ workflow: SpaceFixtureResolvedWorkflow,
         flowTabAdditionalArguments: [String] = [],
         perform assertions: (SpaceFixtureResolvedWorkflow, XCUIApplication) throws -> Void
@@ -627,7 +634,7 @@ extension FlowTabUITests {
         )
     }
 
-    private func resolveSpaceFixtureWorkflowScenario(
+    func resolveSpaceFixtureWorkflowScenario(
         sourceWorkflowURL: URL,
         using installedWorkflow: SpaceFixtureResolvedWorkflow
     ) throws -> SpaceFixtureResolvedWorkflow {
@@ -771,7 +778,7 @@ extension FlowTabUITests {
         }
     }
 
-    private func multiAppWorkflowSetupMessage(
+    func multiAppWorkflowSetupMessage(
         reason: String,
         scenarioSourceURL: URL = SpaceFixtureMultiAppWorkflowDefaults.workflowSourceURL
     ) -> String {
@@ -821,9 +828,7 @@ extension FlowTabUITests {
                 "--enter-fullscreen-delay-ms", String(SpaceFixtureMultiAppWorkflowDefaults.enterFullscreenDelayMilliseconds),
                 "--preserve-desktop-after-fullscreen"
             ]
-            app.launch()
-
-            XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+            launchSpaceFixtureApplicationAndWaitForForeground(app)
             waitForSpaceFixtureWorkflowToStabilize(
                 in: app,
                 expectedWindowTitles: workflowApp.expectedWindowTitles,
@@ -847,6 +852,7 @@ extension FlowTabUITests {
             let app = makeSpaceFixtureWorkflowApplication(for: identity)
             if app.state == .runningForeground || app.state == .runningBackground {
                 app.terminate()
+                waitForSpaceFixtureApplicationToTerminate(app)
             }
         }
     }
@@ -854,6 +860,7 @@ extension FlowTabUITests {
     private func terminateSpaceFixtureWorkflowApps(_ apps: [XCUIApplication]) {
         for app in apps.reversed() where app.state == .runningForeground || app.state == .runningBackground {
             app.terminate()
+            waitForSpaceFixtureApplicationToTerminate(app)
         }
     }
 }

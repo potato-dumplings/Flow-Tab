@@ -50,6 +50,14 @@ enum FlowTabTestLaunchOptions {
         arguments.contains("--flowtab-tab-stress")
     }
 
+    static var isRunningUITests: Bool {
+        arguments.contains(where: { $0.hasPrefix("--flowtab-ui-") })
+    }
+
+    static var showsSwitcherDiagnostics: Bool {
+        isRunningUITests && opensSwitcherOnLaunch
+    }
+
     static var tabSwitchStressDurationSeconds: Double {
         max(1, Double(value(after: "--flowtab-tab-stress-duration") ?? "") ?? 30)
     }

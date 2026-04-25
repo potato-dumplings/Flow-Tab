@@ -546,6 +546,85 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testAppDelegateLaunchOpenSwitcherWaitsForStableSnapshotBeforeKeepingPanelOpen() async {
+        guard let userDefaults = makeIsolatedUserDefaults() else { return }
+
+        let previousHooks = AppDelegate.testHooks
+        let previousSharedDelegate = AppDelegate.shared
+        let previousActivationOverride = AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride
+        let previousAXTrusted = AccessibilityPermissionChecker.isTrustedOverrideForTesting
+        let previousAXRequest = AccessibilityPermissionChecker.requestPermissionOverrideForTesting
+        let previousLaunchArguments = FlowTabTestLaunchOptions.argumentsOverrideForTesting
+        let hotkeyFactory = SpyHotkeyMonitorFactory()
+        let panelController = SwitcherPanelController()
+        var delegate: AppDelegate?
+        let multiAppSnapshot = Array(searchScenarioApps().prefix(2))
+        var snapshotCallCount = 0
+        defer {
+            delegate?.applicationWillTerminate(
+                Notification(name: NSApplication.willTerminateNotification)
+            )
+            AppDelegate.testHooks = previousHooks
+            AppDelegate.shared = previousSharedDelegate
+            AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride = previousActivationOverride
+            AccessibilityPermissionChecker.isTrustedOverrideForTesting = previousAXTrusted
+            AccessibilityPermissionChecker.requestPermissionOverrideForTesting = previousAXRequest
+            FlowTabTestLaunchOptions.argumentsOverrideForTesting = previousLaunchArguments
+            clearIsolatedUserDefaults(userDefaults)
+        }
+
+        panelController.modelForTesting.snapshotProviderOverride = {
+            snapshotCallCount += 1
+            let apps: [AppSwitchCandidate]
+            switch snapshotCallCount {
+            case 1:
+                apps = [multiAppSnapshot[0]]
+            default:
+                apps = multiAppSnapshot
+            }
+            return RuntimeSnapshot(apps: apps, contextsByID: [:])
+        }
+
+        FlowTabTestLaunchOptions.argumentsOverrideForTesting = [
+            "FlowTab",
+            "--flowtab-ui-open-switcher"
+        ]
+        AccessibilityPermissionChecker.isTrustedOverrideForTesting = { true }
+        AccessibilityPermissionChecker.requestPermissionOverrideForTesting = { true }
+        AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride = {}
+        AppDelegate.testHooks = AppDelegate.TestHooks(
+            userDefaults: userDefaults,
+            makePanelController: { panelController },
+            makeHotkeyMonitor: { configuration, signature, forwardHotkeyID, backwardHotkeyID in
+                hotkeyFactory.make(
+                    configuration: configuration,
+                    signature: signature,
+                    forwardHotkeyID: forwardHotkeyID,
+                    backwardHotkeyID: backwardHotkeyID
+                )
+            },
+            commandTabTakeoverController: SpyCommandTabTakeoverController(),
+            stressRunner: SpyStressRunner()
+        )
+
+        let appDelegate = AppDelegate()
+        delegate = appDelegate
+        appDelegate.applicationDidFinishLaunching(
+            Notification(name: NSApplication.didFinishLaunchingNotification)
+        )
+        try? await Task.sleep(nanoseconds: 650_000_000)
+
+        XCTAssertGreaterThanOrEqual(snapshotCallCount, 3)
+        XCTAssertEqual(panelController.modelForTesting.appCount, multiAppSnapshot.count)
+        XCTAssertEqual(
+            panelController.modelForTesting.session?.apps.map(\.id),
+            multiAppSnapshot.map(\.id)
+        )
+        XCTAssertFalse(panelController.modelForTesting.isSearchActive)
+        XCTAssertEqual(hotkeyFactory.records.count, 2)
+    }
+
+    @MainActor
     func testAppDelegateLaunchOpenSwitcherWithoutResultsDoesNotEnterSearchAndSeedZeroSkipsSeededLogs() async {
         guard let userDefaults = makeIsolatedUserDefaults() else { return }
 

@@ -163,6 +163,7 @@ extension SwitcherPanelController {
         activePresentationScreen = targetScreen
         updatePanelSize(for: targetScreen)
         centerPanelOnActiveScreen(preferredScreen: targetScreen)
+        syncPanelAccessibilityAnchors()
         updatePanelPresentationLevel(trigger: "global_show")
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
@@ -192,6 +193,7 @@ extension SwitcherPanelController {
         activePresentationScreen = targetScreen
         updatePanelSize(for: targetScreen)
         centerPanelOnActiveScreen(preferredScreen: targetScreen)
+        syncPanelAccessibilityAnchors()
         updatePanelPresentationLevel(trigger: "in_app_show")
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
@@ -289,6 +291,7 @@ extension SwitcherPanelController {
         panelPresentationRecoveryTask = nil
         removeEventMonitors()
         panel.orderOut(nil)
+        panel.updateSwitcherAccessibilityApps([])
         panel.level = SwitcherPanelWindowConfiguration.level
         panel.collectionBehavior = SwitcherPanelWindowConfiguration.presentationCollectionBehavior()
         activeHotkeySessionKind = nil

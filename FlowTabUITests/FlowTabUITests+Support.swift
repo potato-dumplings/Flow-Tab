@@ -15,6 +15,11 @@ private enum FlowTabUITestAppDefaults {
     }
 }
 
+private enum FlowTabUITestApplicationTarget: Equatable {
+    case url(URL)
+    case bundleIdentifier(String)
+}
+
 struct FlowTabUITestAppIdentity: Equatable {
     let bundleIdentifier: String
     let appURL: URL?
@@ -46,6 +51,17 @@ struct FlowTabUITestAppIdentity: Equatable {
                 ?? FlowTabUITestAppDefaults.defaultBundleIdentifier,
             appURL: resolvedURL
         )
+    }
+}
+
+private extension FlowTabUITestAppIdentity {
+    var runningApplicationTargets: [FlowTabUITestApplicationTarget] {
+        var targets: [FlowTabUITestApplicationTarget] = []
+        if let appURL {
+            targets.append(.url(appURL))
+        }
+        targets.append(.bundleIdentifier(bundleIdentifier))
+        return targets
     }
 }
 
@@ -108,15 +124,18 @@ func terminateFlowTabUITestApplicationIfRunning(
     environment: [String: String] = ProcessInfo.processInfo.environment
 ) {
     let identity = FlowTabUITestAppIdentity.configured(environment: environment)
-    let app: XCUIApplication
-    if let appURL = identity.appURL {
-        app = XCUIApplication(url: appURL)
-    } else {
-        app = XCUIApplication()
-    }
+    for target in identity.runningApplicationTargets {
+        let app: XCUIApplication
+        switch target {
+        case .url(let appURL):
+            app = XCUIApplication(url: appURL)
+        case .bundleIdentifier(let bundleIdentifier):
+            app = XCUIApplication(bundleIdentifier: bundleIdentifier)
+        }
 
-    if app.state == .runningForeground || app.state == .runningBackground {
-        app.terminate()
+        if app.state == .runningForeground || app.state == .runningBackground {
+            app.terminate()
+        }
     }
 }
 
@@ -368,5 +387,31 @@ extension FlowTabUITests {
         )
 
         XCTAssertEqual(identity.appURL?.standardizedFileURL.path, defaultInstalledAppURL.standardizedFileURL.path)
+    }
+
+    func testFlowTabUITestAppIdentityRunningApplicationTargetsIncludeInstalledAppURLAndBundleIdentifier() {
+        let installedAppURL = URL(fileURLWithPath: "/tmp/Flow Tab UITest.app")
+        let identity = FlowTabUITestAppIdentity.configured(
+            environment: [:],
+            defaultInstalledAppURL: installedAppURL,
+            fileExistsAtPath: { $0 == installedAppURL.path }
+        )
+
+        XCTAssertEqual(
+            identity.runningApplicationTargets,
+            [
+                .url(installedAppURL.standardizedFileURL),
+                .bundleIdentifier(FlowTabUITestAppDefaults.defaultBundleIdentifier)
+            ]
+        )
+    }
+
+    func testFlowTabUITestAppIdentityRunningApplicationTargetsFallBackToBundleIdentifierWithoutInstalledApp() {
+        let identity = FlowTabUITestAppIdentity.configured(environment: [:])
+
+        XCTAssertEqual(
+            identity.runningApplicationTargets,
+            [.bundleIdentifier(FlowTabUITestAppDefaults.defaultBundleIdentifier)]
+        )
     }
 }

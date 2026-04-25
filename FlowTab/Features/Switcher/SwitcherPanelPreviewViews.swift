@@ -214,6 +214,9 @@ struct AppTileView: View {
     let isTerminating: Bool
     let size: CGFloat
     let icon: NSImage?
+    let accessibilityIdentifier: String
+    let accessibilityLabel: String
+    let accessibilityValue: String
 
     var body: some View {
         let cornerRadius = max(1, min(16, size * 0.18))
@@ -237,15 +240,24 @@ struct AppTileView: View {
                     .resizable()
                     .interpolation(.high)
                     .frame(width: iconSize, height: iconSize)
+                    .accessibilityLabel(Text(accessibilityLabel))
+                    .accessibilityValue(Text(accessibilityValue))
+                    .accessibilityIdentifier(accessibilityIdentifier)
             } else {
                 if size >= 11 {
                     Text(app.displayName.prefix(1).uppercased())
                         .font(.system(size: fallbackFontSize, weight: .semibold))
                         .foregroundStyle(.primary)
+                        .accessibilityLabel(Text(accessibilityLabel))
+                        .accessibilityValue(Text(accessibilityValue))
+                        .accessibilityIdentifier(accessibilityIdentifier)
                 } else {
                     Circle()
                         .fill(Color.primary.opacity(0.35))
                         .frame(width: fallbackDotSize, height: fallbackDotSize)
+                        .accessibilityLabel(Text(accessibilityLabel))
+                        .accessibilityValue(Text(accessibilityValue))
+                        .accessibilityIdentifier(accessibilityIdentifier)
                 }
             }
         }

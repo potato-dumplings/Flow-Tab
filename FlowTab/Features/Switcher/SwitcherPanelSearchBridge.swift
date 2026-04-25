@@ -245,6 +245,7 @@ final class SearchSystemTextInputContainerView: NSView {
         scrollView = NSScrollView(frame: .zero)
         super.init(frame: frameRect)
         setAccessibilityIdentifier("flowtab.switcher.search.input")
+        textView.setAccessibilityIdentifier("flowtab.switcher.search.input")
 
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.drawsBackground = false

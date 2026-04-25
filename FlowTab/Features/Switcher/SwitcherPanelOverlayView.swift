@@ -29,12 +29,13 @@ struct SwitcherPanelRootView: View {
     var body: some View {
         ZStack {
             if let session = model.session {
+                let windowPreviewItems = model.windowPreviewItems()
                 CommandTabOverlay(
                     session: session,
                     overlayStyle: model.overlayStyle,
                     isPreviewLayer: model.isPreviewLayerMode,
                     previewSectionHeight: model.previewSectionHeight,
-                    windowPreviewItems: model.windowPreviewItems(),
+                    windowPreviewItems: windowPreviewItems,
                     searchState: model.searchViewState,
                     searchResultScrollRevision: model.searchResultScrollRevision,
                     searchAppItems: model.searchAppItems(),
@@ -65,8 +66,43 @@ struct SwitcherPanelRootView: View {
         .background(Color.clear)
         .preferredColorScheme(resolvedColorScheme)
         .animation(.none, value: resolvedColorScheme)
-        .accessibilityIdentifier("flowtab.switcher.panel")
+        .overlay(alignment: .topLeading) {
+            if FlowTabTestLaunchOptions.showsSwitcherDiagnostics, model.session != nil {
+                Text(switcherDiagnosticsValue)
+                    .font(.system(size: 4))
+                    .lineLimit(1)
+                    .foregroundStyle(Color.black.opacity(0.015))
+                    .padding(.leading, 1)
+                    .padding(.top, 1)
+                    .allowsHitTesting(false)
+                    .accessibilityIdentifier("flowtab.testing.switcher.summary")
+                    .accessibilityLabel(switcherDiagnosticsValue)
+            }
+        }
         .id(appLanguageRaw)
+    }
+
+    private var switcherDiagnosticsValue: String {
+        guard FlowTabTestLaunchOptions.showsSwitcherDiagnostics,
+              let session = model.session else { return "" }
+
+        let appsSummary = session.apps
+            .map { "\($0.id):\($0.windows.count)" }
+            .joined(separator: "|")
+        let previewSummary: String
+        if case .windowCycle(let appID) = session.mode {
+            let titles = model.windowPreviewItems().map(\.title).joined(separator: "|")
+            previewSummary = "\(appID)::\(titles)"
+        } else {
+            previewSummary = "inactive"
+        }
+
+        return [
+            "apps=\(appsSummary)",
+            "selected=\(session.selectedApp.id)",
+            "mode=\(session.mode.debugName)",
+            "preview=\(previewSummary)"
+        ].joined(separator: ";")
     }
 }
 
@@ -236,6 +272,17 @@ private struct CommandTabOverlay: View {
         }
     }
 
+    private func switcherAppAccessibilityIdentifier(_ app: AppSwitchCandidate) -> String {
+        SwitcherAccessibilityIdentifiers.app(id: app.id)
+    }
+
+    private func switcherAppAccessibilityValue(_ app: AppSwitchCandidate) -> String {
+        "\(app.id), \(app.windows.count)w"
+    }
+
+    private func switcherWindowAccessibilityIdentifier(_ preview: WindowPreviewItem) -> String {
+        SwitcherAccessibilityIdentifiers.window(id: preview.id)
+    }
     private func scrollToSelectedPreview(using proxy: ScrollViewProxy) {
         guard let selectedWindowPreviewID else { return }
         var transaction = Transaction(animation: nil)
@@ -277,9 +324,15 @@ private struct CommandTabOverlay: View {
                     isSelected: index == session.selectedAppIndex,
                     isTerminating: app.id == terminatingAppID,
                     size: appTileSize,
-                    icon: iconForApp(app)
+                    icon: iconForApp(app),
+                    accessibilityIdentifier: switcherAppAccessibilityIdentifier(app),
+                    accessibilityLabel: app.displayName,
+                    accessibilityValue: switcherAppAccessibilityValue(app)
                 )
-                .accessibilityIdentifier("flowtab.switcher.app.\(app.id.flowTabAccessibilitySlug)")
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text(app.displayName))
+                .accessibilityValue(Text(switcherAppAccessibilityValue(app)))
+                .accessibilityIdentifier(switcherAppAccessibilityIdentifier(app))
                 .transition(.appQuitRemoval)
             }
         }
@@ -313,9 +366,10 @@ private struct CommandTabOverlay: View {
                                     width: cardWidth,
                                     height: cardHeight
                                 )
-                                .accessibilityIdentifier(
-                                    "flowtab.switcher.window.\(preview.id.flowTabAccessibilitySlug)"
-                                )
+                                .accessibilityElement(children: .ignore)
+                                .accessibilityLabel(Text(preview.title))
+                                .accessibilityValue(Text(selectedApp?.displayName ?? ""))
+                                .accessibilityIdentifier(switcherWindowAccessibilityIdentifier(preview))
                                 .id(preview.id)
                             }
                         }
@@ -465,9 +519,10 @@ private struct CommandTabOverlay: View {
                             width: layout.cardWidth,
                             height: layout.cardHeight
                         )
-                        .accessibilityIdentifier(
-                            "flowtab.switcher.window.\(preview.id.flowTabAccessibilitySlug)"
-                        )
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(Text(preview.title))
+                        .accessibilityValue(Text(selectedApp?.displayName ?? ""))
+                        .accessibilityIdentifier(switcherWindowAccessibilityIdentifier(preview))
                         .id(preview.id)
                     }
                 }
@@ -480,12 +535,14 @@ private struct CommandTabOverlay: View {
     }
 
     var body: some View {
-        if isWindowOnlyMode {
-            windowOnlyOverlayBody
-        } else if isSearchMode {
-            searchOverlayBody
-        } else {
-            standardOverlayBody
+        Group {
+            if isWindowOnlyMode {
+                windowOnlyOverlayBody
+            } else if isSearchMode {
+                searchOverlayBody
+            } else {
+                standardOverlayBody
+            }
         }
     }
 }

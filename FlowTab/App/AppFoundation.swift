@@ -63,7 +63,7 @@ final class HomeTabState: ObservableObject {
 }
 
 enum AppWindowCoordinator {
-    static let switcherPanelWindowIdentifier = "flowtab.switcher.panel"
+    static let switcherPanelWindowIdentifier = "flowtab.window.switcher-panel"
 
     @MainActor
     static var activateMainWindowOrOpenHomeSceneOverride: (() -> Void)?

@@ -38,13 +38,31 @@ enum FlowTabUITestBootstrapper {
         Task { @MainActor in
             let retrySleepNanoseconds: UInt64 = 150_000_000
             let maxAttempts = 20
+            let requiredStableSnapshotCount = 2
+            var lastObservedAppIDs: [String] = []
+            var stableSnapshotCount = 0
 
             for attempt in 0..<maxAttempts {
                 if panelController.presentGlobalHotkeySessionForTesting() {
-                    if FlowTabTestLaunchOptions.entersSearchOnLaunch {
-                        _ = panelController.modelForTesting.enterSearchMode()
+                    let appIDs = panelController.modelForTesting.session?.apps.map(\.id) ?? []
+                    if appIDs == lastObservedAppIDs {
+                        stableSnapshotCount += 1
+                    } else {
+                        lastObservedAppIDs = appIDs
+                        stableSnapshotCount = 1
                     }
-                    return
+
+                    if stableSnapshotCount >= requiredStableSnapshotCount {
+                        if FlowTabTestLaunchOptions.entersSearchOnLaunch {
+                            _ = panelController.modelForTesting.enterSearchMode()
+                        }
+                        return
+                    }
+
+                    panelController.cancelSelectionForTesting()
+                } else {
+                    lastObservedAppIDs = []
+                    stableSnapshotCount = 0
                 }
 
                 guard attempt < maxAttempts - 1 else { return }

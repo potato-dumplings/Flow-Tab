@@ -150,8 +150,8 @@ extension FlowTabUITests {
         launchFlowTabUITestApplication(relaunchApp)
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(relaunchApp, timeout: 10))
 
-        let switcherPanel = element(in: relaunchApp, identifier: Identifier.switcherPanel)
-        XCTAssertTrue(switcherPanel.waitForExistence(timeout: 8))
+        let mockMailAppTile = element(in: relaunchApp, identifier: "flowtab.switcher.app.com-flowtab-mock-mail")
+        XCTAssertTrue(mockMailAppTile.waitForExistence(timeout: 8))
         XCTAssertFalse(element(in: relaunchApp, identifier: Identifier.switcherSearchInput).exists)
     }
 

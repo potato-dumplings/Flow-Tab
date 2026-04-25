@@ -5,12 +5,81 @@ import SwiftUI
 import FlowTabCore
 
 final class SwitcherOverlayPanel: NSPanel {
+    private var switcherAppAccessibilityElements: [String: NSAccessibilityElement] = [:]
+    private var orderedSwitcherAppIDs: [String] = []
+
     override var canBecomeKey: Bool {
         true
     }
 
     override var canBecomeMain: Bool {
         false
+    }
+
+    func updateSwitcherAccessibilityApps(_ apps: [AppSwitchCandidate]) {
+        let visibleAppIDs = Set(apps.map(\.id))
+
+        for appID in Array(switcherAppAccessibilityElements.keys) where !visibleAppIDs.contains(appID) {
+            switcherAppAccessibilityElements.removeValue(forKey: appID)
+        }
+
+        orderedSwitcherAppIDs = apps.map(\.id)
+        for app in apps {
+            let element = switcherAppAccessibilityElements[app.id] ?? NSAccessibilityElement()
+            configureSwitcherAccessibilityElement(
+                element,
+                identifier: SwitcherAccessibilityIdentifiers.app(id: app.id),
+                label: app.displayName,
+                value: "\(app.id), \(app.windows.count)w"
+            )
+            switcherAppAccessibilityElements[app.id] = element
+        }
+
+        updateSwitcherAccessibilityFrames()
+        NSAccessibility.post(element: self, notification: .layoutChanged)
+    }
+
+    override func setFrame(_ frameRect: NSRect, display flag: Bool) {
+        super.setFrame(frameRect, display: flag)
+        updateSwitcherAccessibilityFrames()
+    }
+
+    override func accessibilityChildren() -> [Any]? {
+        switcherAccessibilityChildren()
+    }
+
+    private func switcherAccessibilityChildren() -> [Any] {
+        let appElements = orderedSwitcherAppIDs.compactMap { switcherAppAccessibilityElements[$0] }
+        guard !appElements.isEmpty else { return super.accessibilityChildren() ?? [] }
+        return (super.accessibilityChildren() ?? []) + appElements
+    }
+
+    private func updateSwitcherAccessibilityFrames() {
+        let baseFrame = frame
+        for (index, appID) in orderedSwitcherAppIDs.enumerated() {
+            guard let element = switcherAppAccessibilityElements[appID] else { continue }
+            element.setAccessibilityFrame(
+                NSRect(
+                    x: baseFrame.minX + CGFloat(index + 1),
+                    y: baseFrame.minY + 1,
+                    width: 1,
+                    height: 1
+                )
+            )
+        }
+    }
+
+    private func configureSwitcherAccessibilityElement(
+        _ element: NSAccessibilityElement,
+        identifier: String,
+        label: String,
+        value: String?
+    ) {
+        element.setAccessibilityParent(self)
+        element.setAccessibilityRole(.group)
+        element.setAccessibilityIdentifier(identifier)
+        element.setAccessibilityLabel(label)
+        element.setAccessibilityValue(value ?? "")
     }
 }
 

@@ -120,7 +120,20 @@ extension FlowTabUITests {
         let app = makeSpaceFixtureApplication(for: identity)
         if app.state == .runningForeground || app.state == .runningBackground {
             app.terminate()
+            waitForSpaceFixtureApplicationToTerminate(app)
         }
+    }
+
+    func launchSpaceFixtureApplicationAndWaitForForeground(
+        _ app: XCUIApplication,
+        timeout: TimeInterval = 10
+    ) {
+        app.launch()
+        if app.wait(for: .runningForeground, timeout: min(timeout, 3)) {
+            return
+        }
+        app.activate()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: timeout))
     }
 
     func launchSpaceFixtureWorkflow(
@@ -144,9 +157,7 @@ extension FlowTabUITests {
         }
 
         let app = makeSpaceFixtureApp(identity: identity, additionalArguments: additionalArguments)
-        app.launch()
-
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+        launchSpaceFixtureApplicationAndWaitForForeground(app)
         waitForSpaceFixtureWorkflowToStabilize(
             in: app,
             expectedWindowTitles: expectedSpaceFixtureWorkflowWindowTitles(
@@ -188,11 +199,10 @@ extension FlowTabUITests {
         XCTAssertTrue(readyLabel.waitForExistence(timeout: 8))
         XCTAssertEqual(readyLabel.label, "Ready")
 
-        let summaryLabel = element(in: app, identifier: spaceFixtureWorkflowSummaryAccessibilityIdentifier)
-        XCTAssertTrue(summaryLabel.waitForExistence(timeout: 8))
-        assertValue(
-            of: summaryLabel,
+        assertAnySpaceFixtureWorkflowLabel(
+            withIdentifier: spaceFixtureWorkflowSummaryAccessibilityIdentifier,
             equals: expectedSpaceFixtureWorkflowSummary(windowTitles: expectedWindowTitles),
+            in: app,
             timeout: 8
         )
 
@@ -209,6 +219,39 @@ extension FlowTabUITests {
         // fullscreen Space transition, so give the system a wider settle window
         // before FlowTab samples the real runtime topology.
         RunLoop.current.run(until: Date().addingTimeInterval(settleTimeout))
+    }
+
+    private func assertAnySpaceFixtureWorkflowLabel(
+        withIdentifier identifier: String,
+        equals expectedValue: String,
+        in app: XCUIApplication,
+        timeout: TimeInterval
+    ) {
+        let labels = app.descendants(matching: .any).matching(identifier: identifier)
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            for label in labels.allElementsBoundByIndex {
+                if label.exists && elementStringValue(label) == expectedValue {
+                    return
+                }
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+
+        XCTFail("Expected a visible \(identifier) label with value '\(expectedValue)'")
+    }
+
+    func waitForSpaceFixtureApplicationToTerminate(
+        _ app: XCUIApplication,
+        timeout: TimeInterval = 5
+    ) {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if app.state == .notRunning {
+                return
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
     }
 
     func makeRealRuntimeFlowTabApp(
