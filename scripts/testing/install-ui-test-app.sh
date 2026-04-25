@@ -178,15 +178,9 @@ XCODEBUILD_CMD=(
   -clonedSourcePackagesDirPath "${PACKAGE_CACHE_PATH}"
 )
 
-if [[ "${MANUAL_CODESIGN_ENABLED}" -eq 1 ]]; then
-  XCODEBUILD_CMD+=("CODE_SIGNING_ALLOWED=NO")
-elif [[ -n "${DEVELOPMENT_TEAM}" ]]; then
-  XCODEBUILD_CMD+=("DEVELOPMENT_TEAM=${DEVELOPMENT_TEAM}")
-  XCODEBUILD_CMD+=("CODE_SIGN_STYLE=Automatic")
-  if [[ -n "${CODE_SIGN_IDENTITY}" ]]; then
-    XCODEBUILD_CMD+=("CODE_SIGN_IDENTITY=${CODE_SIGN_IDENTITY}")
-  fi
-fi
+# Build unsigned first. The default install intentionally leaves an adhoc app,
+# while the manual path signs the copied bundle with the resolved local identity.
+XCODEBUILD_CMD+=("CODE_SIGNING_ALLOWED=NO")
 
 XCODEBUILD_CMD+=(build)
 

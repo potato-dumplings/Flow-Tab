@@ -466,6 +466,9 @@ resolved workflow JSON 里的每个 app 会包含：
 - `Switcher` app strip 在 multi-app workflow 下展示全部真实 app。
   场景：至少 3 个 app，使用不同 bundle identifier 和 appName。
   断言：打开 switcher 后，`flowtab.switcher.app.*` 覆盖 workflow 中全部 app，而不是只出现当前前台 app 或单一 fixture app。
+- `Switcher` window preview 使用真实 window card anchors 完成隔离断言。
+  场景：每个 app 至少 2 个窗口，其中一个 app 含 tabbed window，另一个 app 含 fullscreen window。
+  断言：进入 preview layer 后，真实 `flowtab.switcher.window.*` 只对应当前选中 app 的窗口集合；切换 app 后旧 app 的窗口 card anchor 不再可见。
 
 ### 未实现优先级清单
 
@@ -475,48 +478,43 @@ resolved workflow JSON 里的每个 app 会包含：
 - `P1`：核心用户路径，mock/behavior 覆盖不足以证明真实 app、window、Space 激活。
 - `P2`：重要回归边界，主要覆盖去重、刷新、标题归一化和测试基础设施可靠性。
 
-1. `P0` `Switcher` window preview 使用真实 window card anchors 完成隔离断言。
-   当前状态：已有 diagnostics 辅助的 preview 隔离用例，但它主要读取 `flowtab.testing.switcher.summary`，还没有直接证明真实 `flowtab.switcher.window.*` card anchors。
-   建议场景：每个 app 至少 2 个窗口，其中一个 app 含 tabbed window，另一个 app 含 fullscreen window。
-   目标断言：进入 preview layer 后，真实 `flowtab.switcher.window.*` 只对应当前选中 app 的窗口集合；切换 app 后旧 app 的窗口 card 不再可见。
-
-2. `P1` window-scope search 在 multi-app workflow 下检索真实窗口标题并确认激活目标窗口。
+1. `P1` window-scope search 在 multi-app workflow 下检索真实窗口标题并确认激活目标窗口。
    建议场景：把默认搜索范围切到 `window`，让多个 app 分别提供 `Docs`、`Mail`、`Finder Main` 等标题。
    目标断言：搜索结果出现真实 `flowtab.switcher.search.window.*` 项；确认结果后，目标 fixture window 成为 frontmost window。
 
-3. `P1` fullscreen/off-space 目标能从当前 Space 被 Switcher 或 search 激活。
+2. `P1` fullscreen/off-space 目标能从当前 Space 被 Switcher 或 search 激活。
    建议场景：一个 app 保持当前桌面窗口，一个 app 拥有 fullscreen window，另一个 app 处于普通窗口状态。
    目标断言：从当前 Space 打开 switcher 或 search，选择 fullscreen/off-space window 后，macOS 切到对应 Space，目标窗口成为 frontmost window，FlowTab panel 不残留。
 
-4. `P1` app-scope search 在 multi-app workflow 下检索真实 appName/bundle identity 并激活目标 app。
+3. `P1` app-scope search 在 multi-app workflow 下检索真实 appName/bundle identity 并激活目标 app。
    建议场景：至少 3 个 app 使用不同 appName 和 bundle identifier，查询命中非前台 app。
    目标断言：搜索结果出现真实 `flowtab.switcher.search.app.*` 项；确认结果后，对应 fixture app 成为 frontmost app。
 
-5. `P1` `Home` 窗口列表点击真实窗口后激活对应 fixture window。
+4. `P1` `Home` 窗口列表点击真实窗口后激活对应 fixture window。
    建议场景：Home 已展示多个 workflow app，选中其中一个 app 后点击它的某个 resolved window title。
    目标断言：被点击的真实窗口成为 frontmost window；同 app 其他窗口和其他 app 的窗口不会被错误激活。
 
-6. `P1` tabbed window 的 selected tab title 跨 app 进入 FlowTab 的 Home、Switcher 和 search。
+5. `P1` tabbed window 的 selected tab title 跨 app 进入 FlowTab 的 Home、Switcher 和 search。
    建议场景：Chrome fixture 使用原始窗口标题 `Chrome Window 1/2`，选中 tab 为 `Docs/Mail`，同时再启动至少一个非 tabbed app。
    目标断言：FlowTab 在 `Home`、`Switcher` preview 和 window-scope search 中显示的是 `Docs/Mail` 这类 resolved title，而不是原始 window title。
 
-7. `P2` 不同 app 拥有同名窗口时，window-scope search 仍能同时给出多条真实结果。
+6. `P2` 不同 app 拥有同名窗口时，window-scope search 仍能同时给出多条真实结果。
    建议场景：两个 app 都含标题为 `Docs` 的窗口。
    目标断言：搜索结果保留多个 `Docs` 命中项，并通过 app name 区分归属，而不是错误合并或只保留一条。
 
-8. `P2` 多个真实窗口在标题、尺寸、位置等可见属性完全相同时，FlowTab 仍保留独立窗口结果。
+7. `P2` 多个真实窗口在标题、尺寸、位置等可见属性完全相同时，FlowTab 仍保留独立窗口结果。
    建议场景：两个窗口使用相同 resolved title、相同 frame、相同 mode，可分布在两个 app 或同一 app 内。
    目标断言：`Switcher` preview、window-scope search，以及需要时的 `Home` 窗口列表中仍保留多条独立窗口记录，而不是被错误合并、去重或只保留一条。
 
-9. `P2` 非 ASCII、标点、空白和长标题能通过真实 AX 链路进入 FlowTab。
+8. `P2` 非 ASCII、标点、空白和长标题能通过真实 AX 链路进入 FlowTab。
    建议场景：workflow window titles 包含中文、空格、标点、大小写混合和较长标题。
    目标断言：`Home`、`Switcher` preview 和 window-scope search 展示与匹配 resolved title 时不丢字符、不错误 slug 化，也不因长标题导致结果不可定位。
 
-10. `P2` multi-app workflow 运行中 app/window 生命周期刷新不会留下 stale 结果。
+9. `P2` multi-app workflow 运行中 app/window 生命周期刷新不会留下 stale 结果。
     建议场景：启动多个 workflow app 后，退出其中一个 app，或关闭其中一个 fixture window，再重新打开 Home/Switcher/search。
     目标断言：已退出 app 和已关闭 window 从 `Home`、`Switcher` 和 search 结果中消失；仍存活的 app/window 不受影响。
 
-11. `P2` 增加统一的 multi-app workflow 启动和清理入口。
+10. `P2` 增加统一的 multi-app workflow 启动和清理入口。
     当前状态：`build-space-fixture-workflow.sh` 只生成 app 变体和 resolved workflow JSON，真实多 app 启动主要存在于 `FlowTabUITests` helper 内。
     目标能力：提供一个测试/本地回归可复用的启动与清理入口，按 `launchOrder` 拉起全部 fixture app，并在失败或测试结束时可靠终止所有 workflow app。
 
