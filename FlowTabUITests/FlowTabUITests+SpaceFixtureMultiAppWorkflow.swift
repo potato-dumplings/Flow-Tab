@@ -90,7 +90,12 @@ struct SpaceFixtureResolvedWorkflow: Equatable {
         let launchOrder: Int
         let windowCount: Int
         let expectedWindowTitles: [String]
+        var expectedHomeWindowTitles: [String] = []
         let fullscreenWindowIndex: Int?
+
+        var isFullscreenOnlyInHome: Bool {
+            fullscreenWindowIndex != nil && expectedHomeWindowTitles.isEmpty
+        }
     }
 
     let workflowName: String
@@ -155,6 +160,7 @@ struct SpaceFixtureResolvedWorkflow: Equatable {
                     launchOrder: app.launchOrder,
                     windowCount: app.windows.count,
                     expectedWindowTitles: app.windows.map(\.resolvedTitle),
+                    expectedHomeWindowTitles: app.windows.compactMap(\.homeResolvedTitle),
                     fullscreenWindowIndex: app.windows.firstIndex(where: { $0.mode == .fullscreen }).map { $0 + 1 }
                 )
             }
@@ -242,6 +248,13 @@ struct SpaceFixtureResolvedWorkflowWindowDocument: Codable {
         }
         return title.trimmingCharacters(in: .whitespacesAndNewlines)
     }
+
+    var homeResolvedTitle: String? {
+        if mode == .fullscreen {
+            return nil
+        }
+        return resolvedTitle
+    }
 }
 
 struct SpaceFixtureResolvedWorkflowTabDocument: Codable {
@@ -258,8 +271,16 @@ extension SpaceFixtureResolvedWorkflow {
         apps.flatMap(\.expectedWindowTitles)
     }
 
+    var allExpectedHomeWindowTitles: [String] {
+        apps.flatMap(\.expectedHomeWindowTitles)
+    }
+
     var hasUniqueExpectedWindowTitles: Bool {
         Set(allExpectedWindowTitles).count == allExpectedWindowTitles.count
+    }
+
+    var hasUniqueExpectedHomeWindowTitles: Bool {
+        Set(allExpectedHomeWindowTitles).count == allExpectedHomeWindowTitles.count
     }
 
     func otherExpectedWindowTitles(excluding appID: String) -> [String] {
@@ -268,6 +289,11 @@ extension SpaceFixtureResolvedWorkflow {
             .flatMap(\.expectedWindowTitles)
     }
 
+    func otherExpectedHomeWindowTitles(excluding appID: String) -> [String] {
+        apps
+            .filter { $0.appID != appID }
+            .flatMap(\.expectedHomeWindowTitles)
+    }
 }
 
 extension FlowTabUITests {
@@ -347,6 +373,7 @@ extension FlowTabUITests {
         XCTAssertEqual(workflow.apps.map(\.windowCount), [1, 2])
         XCTAssertEqual(workflow.apps[0].expectedWindowTitles, ["Finder Main"])
         XCTAssertEqual(workflow.apps[1].expectedWindowTitles, ["Docs", "Review"])
+        XCTAssertEqual(workflow.apps[1].expectedHomeWindowTitles, ["Docs"])
         XCTAssertEqual(workflow.apps[1].fullscreenWindowIndex, 2)
         XCTAssertEqual(workflow.settleTimeout, 8.5)
     }
@@ -449,6 +476,7 @@ extension FlowTabUITests {
         XCTAssertEqual(workflow.apps[0].identity.appURL, finderAppURL.standardizedFileURL)
         XCTAssertEqual(workflow.apps[1].identity.appURL, chromeAppURL.standardizedFileURL)
         XCTAssertEqual(workflow.apps[1].expectedWindowTitles, ["Review"])
+        XCTAssertEqual(workflow.apps[1].expectedHomeWindowTitles, [])
         XCTAssertEqual(workflow.apps[1].fullscreenWindowIndex, 1)
     }
 
@@ -742,7 +770,7 @@ extension FlowTabUITests {
         in app: XCUIApplication,
         setupMessage: (String) -> String
     ) throws {
-        guard workflow.hasUniqueExpectedWindowTitles else {
+        guard workflow.hasUniqueExpectedHomeWindowTitles else {
             throw XCTSkip(
                 setupMessage(
                     "Resolved workflow does not define unique window titles per app for Home isolation assertions."
@@ -757,21 +785,22 @@ extension FlowTabUITests {
         for workflowApp in workflow.apps {
             let homeRows = app.buttons.matching(identifier: workflowApp.identity.homeAppAccessibilityIdentifier)
             let homeRow = homeRows.firstMatch
-            XCTAssertTrue(
-                homeRow.waitForExistence(timeout: 20),
-                "FlowTab did not surface \(workflowApp.appName) on the home page"
-            )
+            let rowExists = homeRow.waitForExistence(timeout: 20)
+            if !rowExists, workflowApp.isFullscreenOnlyInHome {
+                continue
+            }
+            XCTAssertTrue(rowExists, "FlowTab did not surface \(workflowApp.appName) on the home page")
             tapElement(homeRow)
             assertValue(of: homeRow, equals: "\(workflowApp.windowCount)w", timeout: 20)
 
-            for title in workflowApp.expectedWindowTitles {
+            for title in workflowApp.expectedHomeWindowTitles {
                 XCTAssertTrue(
                     app.staticTexts[title].waitForExistence(timeout: 12),
                     "Missing window title for \(workflowApp.appName): \(title)"
                 )
             }
             assertStaticTextsAbsent(
-                workflow.otherExpectedWindowTitles(excluding: workflowApp.appID),
+                workflow.otherExpectedHomeWindowTitles(excluding: workflowApp.appID),
                 in: app,
                 timeout: 12
             )
