@@ -394,6 +394,121 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testAppDelegateReloadedHotkeyMonitorRoutesCallbacksToSwitcherSession() async {
+        guard let userDefaults = makeIsolatedUserDefaults() else { return }
+
+        let previousHooks = AppDelegate.testHooks
+        let previousSharedDelegate = AppDelegate.shared
+        let previousActivationOverride = AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride
+        let previousAXTrusted = AccessibilityPermissionChecker.isTrustedOverrideForTesting
+        let previousAXRequest = AccessibilityPermissionChecker.requestPermissionOverrideForTesting
+        let standardDefaults = UserDefaults.standard
+        let preferenceKeys = [
+            AppPreferenceKeys.hotkeyPrimaryModifier,
+            AppPreferenceKeys.hotkeyMainKey,
+            AppPreferenceKeys.hotkeyQuitKey
+        ]
+        let previousPreferenceValues = Dictionary(
+            uniqueKeysWithValues: preferenceKeys.map { key in
+                (key, standardDefaults.object(forKey: key))
+            }
+        )
+        let hotkeyFactory = SpyHotkeyMonitorFactory()
+        let panelController = SwitcherPanelController()
+        var delegate: AppDelegate?
+        defer {
+            delegate?.applicationWillTerminate(
+                Notification(name: NSApplication.willTerminateNotification)
+            )
+            AppDelegate.testHooks = previousHooks
+            AppDelegate.shared = previousSharedDelegate
+            AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride = previousActivationOverride
+            AccessibilityPermissionChecker.isTrustedOverrideForTesting = previousAXTrusted
+            AccessibilityPermissionChecker.requestPermissionOverrideForTesting = previousAXRequest
+            preferenceKeys.forEach { key in
+                restoreUserDefaultsValue(
+                    previousPreferenceValues[key] ?? nil,
+                    forKey: key,
+                    userDefaults: standardDefaults
+                )
+            }
+            panelController.cancelSelectionForTesting()
+            clearIsolatedUserDefaults(userDefaults)
+        }
+
+        panelController.modelForTesting.snapshotProviderOverride = {
+            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
+        }
+        AccessibilityPermissionChecker.isTrustedOverrideForTesting = { true }
+        AccessibilityPermissionChecker.requestPermissionOverrideForTesting = { true }
+        AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride = {}
+        AppDelegate.testHooks = AppDelegate.TestHooks(
+            userDefaults: userDefaults,
+            makePanelController: { panelController },
+            makeHotkeyMonitor: { configuration, signature, forwardHotkeyID, backwardHotkeyID in
+                hotkeyFactory.make(
+                    configuration: configuration,
+                    signature: signature,
+                    forwardHotkeyID: forwardHotkeyID,
+                    backwardHotkeyID: backwardHotkeyID
+                )
+            },
+            commandTabTakeoverController: SpyCommandTabTakeoverController(),
+            stressRunner: SpyStressRunner()
+        )
+
+        let appDelegate = AppDelegate()
+        delegate = appDelegate
+        appDelegate.applicationDidFinishLaunching(
+            Notification(name: NSApplication.didFinishLaunchingNotification)
+        )
+        let baselineRecordCount = hotkeyFactory.records.count
+
+        let request = HotkeyRegistrationRequest(
+            mainConfiguration: SwitcherHotkeyConfiguration(
+                primaryModifier: .option,
+                mainKey: .space,
+                quitKey: .z
+            ),
+            inAppWindowConfiguration: SwitcherHotkeyConfiguration(
+                primaryModifier: .command,
+                mainKey: .a,
+                quitKey: .q
+            )
+        )
+        standardDefaults.set(request.mainConfiguration.primaryModifier.rawValue, forKey: AppPreferenceKeys.hotkeyPrimaryModifier)
+        standardDefaults.set(request.mainConfiguration.mainKey.rawValue, forKey: AppPreferenceKeys.hotkeyMainKey)
+        standardDefaults.set(request.mainConfiguration.quitKey.rawValue, forKey: AppPreferenceKeys.hotkeyQuitKey)
+
+        appDelegate.requestHotkeyReload(using: request, source: "test_settings_reload")
+
+        let newRecords = Array(hotkeyFactory.records.dropFirst(baselineRecordCount))
+        XCTAssertEqual(newRecords.count, 2)
+        guard let mainRecord = newRecords.first(where: { $0.signature == 0x46544142 }) else {
+            XCTFail("Expected reloaded main hotkey monitor")
+            return
+        }
+        XCTAssertEqual(mainRecord.configuration.primaryModifier, .option)
+        XCTAssertEqual(mainRecord.configuration.mainKey, .space)
+        XCTAssertEqual(mainRecord.configuration.quitKey, .z)
+        XCTAssertEqual(mainRecord.configuration.forwardKeyCode, UInt32(SwitcherHotkeyKey.space.keyCode))
+        XCTAssertEqual(mainRecord.configuration.forwardModifiers, SwitcherPrimaryModifier.option.carbonModifier)
+
+        mainRecord.monitor.onHotkeyPressed?(false)
+        XCTAssertNotNil(panelController.modelForTesting.session)
+        let initialSelectedAppID = panelController.modelForTesting.selectedApp?.id
+
+        panelController.globalPrimaryModifierPressedOverride = true
+        mainRecord.monitor.onHotkeyPressed?(false)
+        XCTAssertNotEqual(panelController.modelForTesting.selectedApp?.id, initialSelectedAppID)
+
+        panelController.globalPrimaryModifierPressedOverride = false
+        mainRecord.monitor.onHotkeyReleased?(false)
+        try? await Task.sleep(nanoseconds: 180_000_000)
+        XCTAssertNil(panelController.modelForTesting.session)
+    }
+
+    @MainActor
     func testAppDelegateSkipsInAppHotkeyMonitorWhenShortcutConflictsWithMainHotkey() {
         guard let userDefaults = makeIsolatedUserDefaults() else { return }
 

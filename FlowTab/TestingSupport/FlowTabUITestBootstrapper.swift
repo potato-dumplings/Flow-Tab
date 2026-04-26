@@ -2,6 +2,8 @@ import Foundation
 
 @MainActor
 enum FlowTabUITestBootstrapper {
+    private static var hotkeyReloadDiagnosticsObserver: NSObjectProtocol?
+
     static func prepareIfNeeded(userDefaults: UserDefaults = .standard) {
         if FlowTabTestLaunchOptions.resetsUserDefaultsOnLaunch {
             AppPreferenceKeys.allKeys.forEach { userDefaults.removeObject(forKey: $0) }
@@ -14,6 +16,12 @@ enum FlowTabUITestBootstrapper {
             let resolved = RuntimeLogPreferencesStore.resolve(rawValue: runtimeLogLevelRaw)
             userDefaults.set(resolved.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
         }
+
+        if FlowTabTestLaunchOptions.enablesVerboseRuntimeLogs {
+            userDefaults.set(true, forKey: AppPreferenceKeys.enableVerboseDiagnostics)
+        }
+
+        installHotkeyReloadDiagnosticsIfNeeded()
 
         if let seededLogCount = FlowTabTestLaunchOptions.seededLogCount {
             RuntimeDiagnostics.shared.clear()
@@ -28,6 +36,33 @@ enum FlowTabUITestBootstrapper {
                     )
                 }
             }
+        }
+    }
+
+    private static func installHotkeyReloadDiagnosticsIfNeeded() {
+        guard FlowTabTestLaunchOptions.recordsHotkeyReloadDiagnostics else { return }
+        if let hotkeyReloadDiagnosticsObserver {
+            NotificationCenter.default.removeObserver(hotkeyReloadDiagnosticsObserver)
+        }
+        hotkeyReloadDiagnosticsObserver = NotificationCenter.default.addObserver(
+            forName: .flowTabReRegisterHotkeys,
+            object: nil,
+            queue: .main
+        ) { notification in
+            guard let request = notification.userInfo.flatMap(HotkeyRegistrationRequest.init) else {
+                RuntimeDiagnostics.shared.log(
+                    level: .info,
+                    category: "UITest",
+                    message: "hotkeyReloadNotification sender=unknown payload=missing"
+                )
+                return
+            }
+            let sender = notification.object is AppDelegate ? "AppDelegate" : "notification-only"
+            RuntimeDiagnostics.shared.log(
+                level: .info,
+                category: "UITest",
+                message: "hotkeyReloadNotification sender=\(sender) main=\(request.mainConfiguration.mainShortcutText) inApp=\(request.inAppWindowConfiguration.mainShortcutText)"
+            )
         }
     }
 

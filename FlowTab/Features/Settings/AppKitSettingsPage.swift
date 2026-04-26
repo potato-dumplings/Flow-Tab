@@ -22,6 +22,14 @@ struct AppKitSettingsPageState: Equatable {
     let screenCaptureTrusted: Bool
 }
 
+struct AppKitSettingsHotkeyRawValues: Equatable {
+    let hotkeyPrimaryModifierRaw: String
+    let hotkeyMainKeyRaw: String
+    let hotkeyQuitKeyRaw: String
+    let inAppWindowHotkeyPrimaryModifierRaw: String
+    let inAppWindowHotkeyMainKeyRaw: String
+}
+
 final class AppKitFlippedDocumentView: NSView {
     override var isFlipped: Bool { true }
 }
@@ -155,6 +163,9 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
     let onWindowLayerAutoEnterDelayTextChanged: (String) -> Void
     let onWindowLayerAutoEnterDelayTextCommitted: () -> Void
     let onWindowLayerAutoEnterDelayEditingChanged: (Bool) -> Void
+    let onMainHotkeyChanged: (AppKitSettingsHotkeyRawValues) -> Void
+    let onQuitHotkeyChanged: (AppKitSettingsHotkeyRawValues) -> Void
+    let onInAppWindowHotkeyChanged: (AppKitSettingsHotkeyRawValues) -> Void
     let onAccessibilityAction: () -> Void
     let onScreenCaptureAction: () -> Void
 
@@ -178,6 +189,15 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
         let inAppWindowHotkeyPrimaryModifierRaw = $inAppWindowHotkeyPrimaryModifierRaw
         let inAppWindowHotkeyMainKeyRaw = $inAppWindowHotkeyMainKeyRaw
         let pageView = nsView.pageView
+        let currentHotkeyValues = {
+            AppKitSettingsHotkeyRawValues(
+                hotkeyPrimaryModifierRaw: hotkeyPrimaryModifierRaw.wrappedValue,
+                hotkeyMainKeyRaw: hotkeyMainKeyRaw.wrappedValue,
+                hotkeyQuitKeyRaw: hotkeyQuitKeyRaw.wrappedValue,
+                inAppWindowHotkeyPrimaryModifierRaw: inAppWindowHotkeyPrimaryModifierRaw.wrappedValue,
+                inAppWindowHotkeyMainKeyRaw: inAppWindowHotkeyMainKeyRaw.wrappedValue
+            )
+        }
 
         pageView.onShowShortcutHintChanged = { showShortcutHint.wrappedValue = $0 }
         pageView.onShowInCommandTabChanged = { showInCommandTab.wrappedValue = $0 }
@@ -194,14 +214,30 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
         }
         pageView.onSearchEnabledChanged = { searchEnabled.wrappedValue = $0 }
         pageView.onSearchDefaultScopeChanged = { searchDefaultScopeRaw.wrappedValue = $0 }
-        pageView.onHotkeyPrimaryModifierChanged = { hotkeyPrimaryModifierRaw.wrappedValue = $0 }
-        pageView.onHotkeyMainKeyChanged = { hotkeyMainKeyRaw.wrappedValue = $0 }
-        pageView.onHotkeyQuitKeyChanged = { hotkeyQuitKeyRaw.wrappedValue = $0 }
+        pageView.onHotkeyPrimaryModifierChanged = {
+            hotkeyPrimaryModifierRaw.wrappedValue = $0
+            let values = currentHotkeyValues()
+            onMainHotkeyChanged(values)
+        }
+        pageView.onHotkeyMainKeyChanged = {
+            hotkeyMainKeyRaw.wrappedValue = $0
+            let values = currentHotkeyValues()
+            onMainHotkeyChanged(values)
+        }
+        pageView.onHotkeyQuitKeyChanged = {
+            hotkeyQuitKeyRaw.wrappedValue = $0
+            let values = currentHotkeyValues()
+            onQuitHotkeyChanged(values)
+        }
         pageView.onInAppWindowPrimaryModifierChanged = {
             inAppWindowHotkeyPrimaryModifierRaw.wrappedValue = $0
+            let values = currentHotkeyValues()
+            onInAppWindowHotkeyChanged(values)
         }
         pageView.onInAppWindowMainKeyChanged = {
             inAppWindowHotkeyMainKeyRaw.wrappedValue = $0
+            let values = currentHotkeyValues()
+            onInAppWindowHotkeyChanged(values)
         }
         pageView.onShowPermissionReminderChanged = { showPermissionReminder.wrappedValue = $0 }
         pageView.onAccessibilityAction = onAccessibilityAction
@@ -521,4 +557,3 @@ final class AppKitSettingsPageView: NSView {
         card.widthAnchor.constraint(equalTo: column.widthAnchor).isActive = true
     }
 }
-

@@ -46,6 +46,14 @@ enum FlowTabTestLaunchOptions {
         value(after: "--flowtab-ui-runtime-log-level")
     }
 
+    static var enablesVerboseRuntimeLogs: Bool {
+        arguments.contains("--flowtab-ui-enable-verbose-logs")
+    }
+
+    static var recordsHotkeyReloadDiagnostics: Bool {
+        arguments.contains("--flowtab-ui-record-hotkey-reload-diagnostics")
+    }
+
     static var runsTabSwitchStressTest: Bool {
         arguments.contains("--flowtab-tab-stress")
     }

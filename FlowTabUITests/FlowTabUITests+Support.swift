@@ -229,6 +229,95 @@ extension FlowTabUITests {
             "Expected prefix '\(expectedPrefix)' for \(element.identifier), actual: '\(elementStringValue(element))'"
         )
     }
+    func waitForLogs(
+        in app: XCUIApplication,
+        containing markers: [String],
+        timeout: TimeInterval = 8
+    ) {
+        let logsLines = app.descendants(matching: .any)
+            .matching(identifier: Identifier.logsLines)
+            .firstMatch
+        XCTAssertTrue(logsLines.waitForExistence(timeout: timeout), "Missing logs container")
+
+        let deadline = Date().addingTimeInterval(timeout)
+        var latestValue = ""
+        repeat {
+            latestValue = elementStringValue(logsLines)
+            if markers.allSatisfy({ latestValue.contains($0) }) {
+                return
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        } while Date() < deadline
+
+        let missingMarkers = markers.filter { !latestValue.contains($0) }
+        XCTFail("Missing log markers \(missingMarkers). Latest logs: \(latestValue)")
+    }
+    func makeRuntimeLogFileSnapshot() -> [String: UInt64] {
+        runtimeLogFiles().reduce(into: [:]) { result, url in
+            guard let size = runtimeLogFileSize(url) else { return }
+            result[url.path] = size
+        }
+    }
+    func waitForRuntimeLogFiles(
+        containing markers: [String],
+        since snapshot: [String: UInt64],
+        timeout: TimeInterval = 8
+    ) {
+        let deadline = Date().addingTimeInterval(timeout)
+        let logsDirectoryURL = runtimeLogsDirectoryURL()
+        var latestValue = ""
+        repeat {
+            latestValue = runtimeLogContents(since: snapshot)
+            if markers.allSatisfy({ latestValue.contains($0) }) {
+                return
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        } while Date() < deadline
+
+        let missingMarkers = markers.filter { !latestValue.contains($0) }
+        XCTFail(
+            "Missing runtime log markers \(missingMarkers) in \(logsDirectoryURL.path). Latest logs: \(latestValue)"
+        )
+    }
+    private func runtimeLogsDirectoryURL() -> URL {
+        let fallbackURL = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
+        let baseURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? fallbackURL
+        return baseURL.appendingPathComponent("FlowTab/logs", isDirectory: true)
+    }
+    private func runtimeLogFiles() -> [URL] {
+        let directoryURL = runtimeLogsDirectoryURL()
+        let files = (try? FileManager.default.contentsOfDirectory(
+            at: directoryURL,
+            includingPropertiesForKeys: [.contentModificationDateKey],
+            options: [.skipsHiddenFiles]
+        )) ?? []
+        return files
+            .filter { $0.pathExtension == "log" }
+            .sorted { lhs, rhs in
+                let lhsDate = (try? lhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
+                    ?? .distantPast
+                let rhsDate = (try? rhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
+                    ?? .distantPast
+                return lhsDate < rhsDate
+            }
+    }
+    private func runtimeLogFileSize(_ url: URL) -> UInt64? {
+        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path) else {
+            return nil
+        }
+        return (attributes[.size] as? NSNumber)?.uint64Value
+    }
+    private func runtimeLogContents(since snapshot: [String: UInt64]) -> String {
+        runtimeLogFiles()
+            .compactMap { url -> String? in
+                guard let data = try? Data(contentsOf: url) else { return nil }
+                let offset = min(Int(snapshot[url.path] ?? 0), data.count)
+                let newData = data.dropFirst(offset)
+                return String(data: newData, encoding: .utf8)
+            }
+            .joined(separator: "\n")
+    }
     func replaceText(in field: XCUIElement, with text: String, app: XCUIApplication) {
         tapElement(field)
         app.typeKey("a", modifierFlags: .command)

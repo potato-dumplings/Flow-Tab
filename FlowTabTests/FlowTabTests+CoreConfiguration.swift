@@ -189,7 +189,9 @@ extension FlowTabTests {
                 "--flowtab-ui-ax-trusted", "yes",
                 "--flowtab-ui-screen-trusted", "0",
                 "--flowtab-ui-seed-logs", "12",
-                "--flowtab-ui-runtime-log-level", "debug"
+                "--flowtab-ui-runtime-log-level", "debug",
+                "--flowtab-ui-enable-verbose-logs",
+                "--flowtab-ui-record-hotkey-reload-diagnostics"
             ]
         ) {
             XCTAssertTrue(FlowTabTestLaunchOptions.usesMockRuntimeSnapshot)
@@ -198,6 +200,8 @@ extension FlowTabTests {
             XCTAssertEqual(FlowTabTestLaunchOptions.screenCaptureTrustedOverride, false)
             XCTAssertEqual(FlowTabTestLaunchOptions.seededLogCount, 12)
             XCTAssertEqual(FlowTabTestLaunchOptions.runtimeLogLevelOverrideRawValue, "debug")
+            XCTAssertTrue(FlowTabTestLaunchOptions.enablesVerboseRuntimeLogs)
+            XCTAssertTrue(FlowTabTestLaunchOptions.recordsHotkeyReloadDiagnostics)
         }
     }
 
@@ -214,6 +218,8 @@ extension FlowTabTests {
             XCTAssertNil(FlowTabTestLaunchOptions.screenCaptureTrustedOverride)
             XCTAssertNil(FlowTabTestLaunchOptions.seededLogCount)
             XCTAssertNil(FlowTabTestLaunchOptions.runtimeLogLevelOverrideRawValue)
+            XCTAssertFalse(FlowTabTestLaunchOptions.enablesVerboseRuntimeLogs)
+            XCTAssertFalse(FlowTabTestLaunchOptions.recordsHotkeyReloadDiagnostics)
         }
     }
 

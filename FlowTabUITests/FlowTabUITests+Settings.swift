@@ -5,6 +5,11 @@ extension FlowTabUITests {
         let app = makeApp(
             additionalArguments: [
                 "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-runtime-log-level",
+                "DEBUG",
+                "--flowtab-ui-enable-verbose-logs",
+                "--flowtab-ui-record-hotkey-reload-diagnostics",
                 "--flowtab-ui-ax-trusted",
                 "YES",
                 "--flowtab-ui-screen-trusted",
@@ -32,6 +37,10 @@ extension FlowTabUITests {
         let firstLaunchApp = makeApp(
             additionalArguments: [
                 "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-runtime-log-level",
+                "debug",
+                "--flowtab-ui-record-hotkey-reload-diagnostics",
                 "--flowtab-ui-ax-trusted",
                 "YES",
                 "--flowtab-ui-screen-trusted",
@@ -68,6 +77,10 @@ extension FlowTabUITests {
         let firstLaunchApp = makeApp(
             additionalArguments: [
                 "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-runtime-log-level",
+                "debug",
+                "--flowtab-ui-record-hotkey-reload-diagnostics",
                 "--flowtab-ui-ax-trusted",
                 "YES",
                 "--flowtab-ui-screen-trusted",
@@ -122,6 +135,11 @@ extension FlowTabUITests {
         let firstLaunchApp = makeApp(
             additionalArguments: [
                 "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-runtime-log-level",
+                "DEBUG",
+                "--flowtab-ui-enable-verbose-logs",
+                "--flowtab-ui-record-hotkey-reload-diagnostics",
                 "--flowtab-ui-ax-trusted",
                 "YES",
                 "--flowtab-ui-screen-trusted",
@@ -252,15 +270,35 @@ extension FlowTabUITests {
             (Identifier.settingsHotkeyQuitKey, "z"),
             (Identifier.settingsHotkeyInAppKey, "a")
         ]
+        let baselineSelections: [(control: String, option: String)] = [
+            (Identifier.settingsHotkeyMainKey, "x"),
+            (Identifier.settingsHotkeyQuitKey, "y"),
+            (Identifier.settingsHotkeyInAppKey, "b")
+        ]
+        for selection in baselineSelections {
+            selectOption(in: firstLaunchApp, controlIdentifier: selection.control, optionIdentifier: selection.option)
+        }
         for selection in expectedSelections {
             selectOption(in: firstLaunchApp, controlIdentifier: selection.control, optionIdentifier: selection.option)
             assertValue(of: element(in: firstLaunchApp, identifier: selection.control), equals: selection.option)
         }
 
+        let hotkeyLogSnapshot = makeRuntimeLogFileSnapshot()
+        firstLaunchApp.activate()
+        firstLaunchApp.typeKey(.space, modifierFlags: .option)
+        waitForRuntimeLogFiles(
+            containing: [
+                "activeSpaceIgnore trigger=global_show",
+                "releaseConfirm trigger=flags_changed"
+            ],
+            since: hotkeyLogSnapshot
+        )
+
         firstLaunchApp.terminate()
 
         let relaunchApp = makeApp(
             additionalArguments: [
+                "--flowtab-ui-mock-runtime",
                 "--flowtab-ui-ax-trusted",
                 "YES",
                 "--flowtab-ui-screen-trusted",

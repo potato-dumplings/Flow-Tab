@@ -45,6 +45,7 @@ struct AppSettingsView: View {
     @State private var windowLayerAutoEnterDelayText = ""
     @State private var didInitialize = false
     @State private var isWindowLayerAutoEnterDelayEditing = false
+    @State private var lastNotifiedHotkeySignature = ""
 
     private var bundleIdentifier: String {
         Bundle.main.bundleIdentifier ?? "unknown"
@@ -107,6 +108,9 @@ struct AppSettingsView: View {
                 onWindowLayerAutoEnterDelayEditingChanged: {
                     isWindowLayerAutoEnterDelayEditing = $0
                 },
+                onMainHotkeyChanged: handleMainHotkeyChanged,
+                onQuitHotkeyChanged: handleQuitHotkeyChanged,
+                onInAppWindowHotkeyChanged: handleInAppWindowHotkeyChanged,
                 onAccessibilityAction: {
                     if accessibilityTrusted {
                         openAccessibilityPrivacySettings()
@@ -142,28 +146,6 @@ struct AppSettingsView: View {
         .onChange(of: showInCommandTab) { _ in
             notifyAppVisibilityPreferenceChanged()
         }
-        .onChange(of: hotkeyPrimaryModifierRaw) { _ in
-            enforceHotkeyConsistency()
-            enforceInAppWindowHotkeyConsistency()
-            notifyHotkeyConfigChanged()
-        }
-        .onChange(of: hotkeyMainKeyRaw) { _ in
-            enforceHotkeyConsistency()
-            enforceInAppWindowHotkeyConsistency()
-            notifyHotkeyConfigChanged()
-        }
-        .onChange(of: hotkeyQuitKeyRaw) { _ in
-            enforceHotkeyConsistency()
-            notifyHotkeyConfigChanged()
-        }
-        .onChange(of: inAppWindowHotkeyPrimaryModifierRaw) { _ in
-            enforceInAppWindowHotkeyConsistency()
-            notifyHotkeyConfigChanged()
-        }
-        .onChange(of: inAppWindowHotkeyMainKeyRaw) { _ in
-            enforceInAppWindowHotkeyConsistency()
-            notifyHotkeyConfigChanged()
-        }
         .onChange(of: windowLayerAutoEnterDelayRaw) { _ in
             enforceWindowLayerPreferencesConsistency()
             if !isWindowLayerAutoEnterDelayEditing {
@@ -173,12 +155,32 @@ struct AppSettingsView: View {
         .onChange(of: searchDefaultScopeRaw) { _ in
             enforceSearchPreferencesConsistency()
         }
+        .onChange(of: hotkeyPrimaryModifierRaw) { _ in
+            handleStoredMainHotkeyChanged()
+        }
+        .onChange(of: hotkeyMainKeyRaw) { _ in
+            handleStoredMainHotkeyChanged()
+        }
+        .onChange(of: hotkeyQuitKeyRaw) { _ in
+            handleStoredMainHotkeyChanged()
+        }
+        .onChange(of: inAppWindowHotkeyPrimaryModifierRaw) { _ in
+            handleStoredInAppWindowHotkeyChanged()
+        }
+        .onChange(of: inAppWindowHotkeyMainKeyRaw) { _ in
+            handleStoredInAppWindowHotkeyChanged()
+        }
         .onReceive(NotificationCenter.default.publisher(
             for: NSApplication.didBecomeActiveNotification
         )) { _ in
             guard isActive else { return }
             refreshAccessibilityStatus()
             refreshScreenCaptureStatus()
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: UserDefaults.didChangeNotification
+        )) { _ in
+            handleStoredHotkeyDefaultsDidChange()
         }
         .onDisappear {
             cancelPermissionPolling()
@@ -319,6 +321,87 @@ struct AppSettingsView: View {
         }
     }
 
+    @MainActor
+    private func handleMainHotkeyChanged(_ values: AppKitSettingsHotkeyRawValues) {
+        let request = normalizedHotkeyRegistrationRequest(from: values)
+        applyNormalizedHotkeyValues(from: request)
+        notifyHotkeyConfigChanged(using: request)
+    }
+
+    @MainActor
+    private func handleQuitHotkeyChanged(_ values: AppKitSettingsHotkeyRawValues) {
+        let request = normalizedHotkeyRegistrationRequest(from: values)
+        applyNormalizedHotkeyValues(from: request)
+        notifyHotkeyConfigChanged(using: request)
+    }
+
+    @MainActor
+    private func handleInAppWindowHotkeyChanged(_ values: AppKitSettingsHotkeyRawValues) {
+        let request = normalizedHotkeyRegistrationRequest(from: values)
+        applyNormalizedHotkeyValues(from: request)
+        notifyHotkeyConfigChanged(using: request)
+    }
+
+    @MainActor
+    private func handleStoredMainHotkeyChanged() {
+        enforceHotkeyConsistency()
+        enforceInAppWindowHotkeyConsistency()
+        notifyHotkeyConfigChangedIfNeeded(using: HotkeyRegistrationRequest.load())
+    }
+
+    @MainActor
+    private func handleStoredInAppWindowHotkeyChanged() {
+        enforceInAppWindowHotkeyConsistency()
+        notifyHotkeyConfigChangedIfNeeded(using: HotkeyRegistrationRequest.load())
+    }
+
+    @MainActor
+    private func handleStoredHotkeyDefaultsDidChange() {
+        notifyHotkeyConfigChangedIfNeeded(using: HotkeyRegistrationRequest.load())
+    }
+
+    private func normalizedHotkeyRegistrationRequest(
+        from values: AppKitSettingsHotkeyRawValues
+    ) -> HotkeyRegistrationRequest {
+        let mainConfiguration = SwitcherHotkeyPreferencesStore.resolve(
+            primaryModifierRaw: values.hotkeyPrimaryModifierRaw,
+            mainKeyRaw: values.hotkeyMainKeyRaw,
+            quitKeyRaw: values.hotkeyQuitKeyRaw
+        )
+        let resolvedInApp = InAppWindowHotkeyPreferencesStore.resolveAvoidingMainHotkeyConflict(
+            primaryModifierRaw: values.inAppWindowHotkeyPrimaryModifierRaw,
+            mainKeyRaw: values.inAppWindowHotkeyMainKeyRaw,
+            mainHotkeyConfiguration: mainConfiguration
+        )
+        let inAppWindowConfiguration = SwitcherHotkeyConfiguration(
+            primaryModifier: resolvedInApp.primaryModifier,
+            mainKey: resolvedInApp.mainKey,
+            quitKey: .q
+        )
+        return HotkeyRegistrationRequest(
+            mainConfiguration: mainConfiguration,
+            inAppWindowConfiguration: inAppWindowConfiguration
+        )
+    }
+
+    private func applyNormalizedHotkeyValues(from request: HotkeyRegistrationRequest) {
+        if hotkeyPrimaryModifierRaw != request.mainConfiguration.primaryModifier.rawValue {
+            hotkeyPrimaryModifierRaw = request.mainConfiguration.primaryModifier.rawValue
+        }
+        if hotkeyMainKeyRaw != request.mainConfiguration.mainKey.rawValue {
+            hotkeyMainKeyRaw = request.mainConfiguration.mainKey.rawValue
+        }
+        if hotkeyQuitKeyRaw != request.mainConfiguration.quitKey.rawValue {
+            hotkeyQuitKeyRaw = request.mainConfiguration.quitKey.rawValue
+        }
+        if inAppWindowHotkeyPrimaryModifierRaw != request.inAppWindowConfiguration.primaryModifier.rawValue {
+            inAppWindowHotkeyPrimaryModifierRaw = request.inAppWindowConfiguration.primaryModifier.rawValue
+        }
+        if inAppWindowHotkeyMainKeyRaw != request.inAppWindowConfiguration.mainKey.rawValue {
+            inAppWindowHotkeyMainKeyRaw = request.inAppWindowConfiguration.mainKey.rawValue
+        }
+    }
+
     private func enforceThemeModeConsistency() {
         let resolved = ThemePreferencesStore.resolve(rawValue: themeModeRaw)
         if themeModeRaw != resolved.rawValue {
@@ -410,6 +493,20 @@ struct AppSettingsView: View {
             mainConfiguration: hotkeyConfiguration,
             inAppWindowConfiguration: inAppWindowHotkeyConfiguration
         )
+        notifyHotkeyConfigChanged(using: request)
+    }
+
+    @MainActor
+    private func notifyHotkeyConfigChangedIfNeeded(using request: HotkeyRegistrationRequest) {
+        let signature = hotkeyRequestSignature(request)
+        guard signature != lastNotifiedHotkeySignature else { return }
+        lastNotifiedHotkeySignature = signature
+        notifyHotkeyConfigChanged(using: request)
+    }
+
+    @MainActor
+    private func notifyHotkeyConfigChanged(using request: HotkeyRegistrationRequest) {
+        lastNotifiedHotkeySignature = hotkeyRequestSignature(request)
         persistHotkeyRegistrationRequest(request)
         RuntimeLog.info(
             "HotKey",
@@ -428,6 +525,16 @@ struct AppSettingsView: View {
                 userInfo: request.notificationUserInfo
             )
         }
+    }
+
+    private func hotkeyRequestSignature(_ request: HotkeyRegistrationRequest) -> String {
+        [
+            request.mainConfiguration.primaryModifier.rawValue,
+            request.mainConfiguration.mainKey.rawValue,
+            request.mainConfiguration.quitKey.rawValue,
+            request.inAppWindowConfiguration.primaryModifier.rawValue,
+            request.inAppWindowConfiguration.mainKey.rawValue
+        ].joined(separator: "|")
     }
 
     private func notifyAppVisibilityPreferenceChanged() {
