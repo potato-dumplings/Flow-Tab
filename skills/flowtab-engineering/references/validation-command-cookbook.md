@@ -43,27 +43,18 @@ swift test --filter SwitcherSessionTests
 
 Use this for `FlowTabTests`, including app-scoped unit tests and in-process behavior tests:
 
+Before running or reporting these commands, follow `flowtabtests-workflow.md`. That workflow controls signing setup, allowed command variations, blocked outcomes, and handoff reporting.
+
+Full target:
+
 ```bash
-xcodebuild \
-  -project FlowTab.xcodeproj \
-  -scheme FlowTab \
-  -destination "platform=macOS,arch=$(uname -m)" \
-  -derivedDataPath ./.build-local/app-tests \
-  -clonedSourcePackagesDirPath ./.build-local/source-packages \
-  test \
-  -only-testing:FlowTabTests
+./scripts/testing/run-flowtabtests-local.sh
 ```
 
-Target one file/class or one method when reproducing or iterating:
+Target one class or method while reproducing or iterating:
 
 ```bash
-xcodebuild \
-  -project FlowTab.xcodeproj \
-  -scheme FlowTab \
-  -destination "platform=macOS,arch=$(uname -m)" \
-  -derivedDataPath ./.build-local/app-tests \
-  -clonedSourcePackagesDirPath ./.build-local/source-packages \
-  test \
+./scripts/testing/run-flowtabtests-local.sh \
   -only-testing:FlowTabTests/FlowTabTests/testSearchPerformanceWindowScope
 ```
 
@@ -117,13 +108,7 @@ Tab switching pressure:
 Search quick regression for the current high-window deterministic path:
 
 ```bash
-xcodebuild \
-  -project FlowTab.xcodeproj \
-  -scheme FlowTab \
-  -destination "platform=macOS,arch=$(uname -m)" \
-  -derivedDataPath ./.build-local/search-pressure \
-  -clonedSourcePackagesDirPath ./.build-local/source-packages \
-  test \
+./scripts/testing/run-flowtabtests-local.sh \
   -only-testing:FlowTabTests/FlowTabTests/testSearchPerformanceWindowScope \
   -only-testing:FlowTabTests/FlowTabTests/testSearchPressureWindowScopeUnified
 ```

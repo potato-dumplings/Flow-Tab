@@ -48,6 +48,7 @@ For no-edit work such as review, audit, root-cause triage, or performance analys
 - For risk, coverage, and not-relevant layer decisions, read `references/risk-calibration.md`.
 - For test-scope, test-placement, or unit versus behavior versus UI boundary decisions, read `references/test-layer-boundaries.md`.
 - For concrete build, test, UI, and pressure commands, read `references/validation-command-cookbook.md`.
+- For `FlowTabTests` startup, narrowing, signing blockers, or app unit/behavior test reporting, read `references/flowtabtests-workflow.md`.
 - For FlowTab-specific UI automation setup, fixed-path test app preparation, or permission and code-identity prerequisites, read `references/ui-automation-prerequisites.md`.
 - For pressure-test triggers, stress-validation selection, or performance-regression validation, read `references/performance-pressure-workflow.md`.
 - For file placement, refactoring, or architecture decisions, read `references/module-boundaries.md`.
@@ -71,6 +72,8 @@ For no-edit work such as review, audit, root-cause triage, or performance analys
 9. Use `validation-command-cookbook.md` to choose concrete commands for the required layers.
 10. Decide whether the change also requires pressure validation by reading `performance-pressure-workflow.md`. If it does, run the relevant stress checks or report the concrete blocker.
 11. Run the related test suites before considering the task complete.
+    `FlowTabTests` must follow `flowtabtests-workflow.md`.
+    Use the documented local wrapper for unsigned app-test builds instead of inventing one-off app-test commands.
 12. Final bugfix handoff must state the pre-change failing signal, pre-change tests attempted, evidence supporting the root cause, post-change tests run, and any required test layer or pressure check that could not be run with the reason.
 
 ## References
@@ -80,6 +83,7 @@ For no-edit work such as review, audit, root-cause triage, or performance analys
 - `references/risk-calibration.md`
 - `references/test-layer-boundaries.md`
 - `references/validation-command-cookbook.md`
+- `references/flowtabtests-workflow.md`
 - `references/ui-automation-prerequisites.md`
 - `references/performance-pressure-workflow.md`
 - `references/module-boundaries.md`

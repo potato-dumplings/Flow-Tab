@@ -16,6 +16,7 @@ This skill is not only a generic answer-style guide. It is the FlowTab delivery 
 - For risk-calibrated validation, not-relevant layer decisions, or compact reporting, read `../flowtab-engineering/references/risk-calibration.md`.
 - For test-layer ownership, coverage audits, or layer-by-layer validation reporting, read `../flowtab-engineering/references/test-layer-boundaries.md`.
 - For exact validation commands or command-selection explanations, read `../flowtab-engineering/references/validation-command-cookbook.md`.
+- For `FlowTabTests` command attempts, allowed narrowing, signing blockers, or app unit/behavior validation reporting, read `../flowtab-engineering/references/flowtabtests-workflow.md`.
 - For UI blocker diagnosis, local UI test triage, or permission-path explanations, read `../flowtab-engineering/references/ui-automation-prerequisites.md`.
 - For architecture, refactor, or file-placement guidance, read `../flowtab-engineering/references/module-boundaries.md`.
 - For pressure or performance statements, read `../flowtab-engineering/references/performance-pressure-workflow.md` when the change touches hot paths, repeated interaction, scale-sensitive work, or long-lived resources.
