@@ -10,7 +10,7 @@
 
 ## 覆盖总览（当前）
 
-- 用例总数：32
+- 用例总数：33
 - 覆盖域：启动导航、Home、权限提示、Logs、Settings、Switcher/Search、压测。
 - 当前状态：应用内可稳定自动化的核心场景已有覆盖，高价值 Settings-to-runtime 缺口按下方优先级继续补齐。
 - 执行前提：大多数用例依赖 UI test launch arguments 控制权限状态、Mock Runtime、预置日志和重置偏好，以减少系统环境抖动。
@@ -84,6 +84,11 @@
   场景：验证主题与语言设置的持久化。
   步骤：首次启动进入 `Settings`，把主题切到 `dark`、语言切到 `en`；终止后再次启动并回到设置页。
   验证：重启后主题仍为 `dark`，语言仍为 `en`，说明选择型偏好已正确写回。
+
+- `testSettingsAppearanceThemeAndLanguageUpdateVisibleUI`
+  场景：验证主题和语言设置会立即改变可见 UI，而不只是写入设置值。
+  步骤：进入 `Settings`，先把主题切到 `light` 并读取设置页截图亮度，再切到 `dark`；随后把语言切到 `en`。
+  验证：深色主题下设置页截图平均亮度显著低于浅色主题；语言切换后设置页出现英文标题与说明文案，中文说明文案消失。
 
 ### Settings - Window Behavior
 
@@ -206,10 +211,6 @@
   目标断言：从用户路径打开搜索后，默认直接出现窗口级结果；不是只验证 Settings 控件在重启后仍显示 `window`。
 
 ### P1
-
-- Appearance 主题和语言真实生效
-  场景：用户修改主题或语言。
-  目标断言：应用可见 UI 的颜色状态、文案或页面内容实际更新；不是只验证设置值持久化。
 
 - Home 真实窗口点击激活
   场景：真实 fixture workflow 中 Home 页面展示多个 app 和窗口。

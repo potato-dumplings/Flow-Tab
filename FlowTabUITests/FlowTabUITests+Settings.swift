@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 
 extension FlowTabUITests {
@@ -71,6 +72,49 @@ extension FlowTabUITests {
 
         assertValue(of: element(in: relaunchApp, identifier: Identifier.settingsAppearanceThemeMode), equals: "dark")
         assertValue(of: element(in: relaunchApp, identifier: Identifier.settingsAppearanceAppLanguage), equals: "en")
+    }
+
+    func testSettingsAppearanceThemeAndLanguageUpdateVisibleUI() throws {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-ax-trusted",
+                "YES",
+                "--flowtab-ui-screen-trusted",
+                "YES"
+            ]
+        )
+        launchFlowTabUITestApplication(app)
+        openSettingsTab(in: app)
+
+        let settingsContent = element(in: app, identifier: Identifier.settingsTabContent)
+        XCTAssertTrue(settingsContent.waitForExistence(timeout: 6))
+        XCTAssertTrue(app.staticTexts["外观"].waitForExistence(timeout: 5))
+
+        selectOption(in: app, controlIdentifier: Identifier.settingsAppearanceThemeMode, optionIdentifier: "light")
+        assertValue(of: element(in: app, identifier: Identifier.settingsAppearanceThemeMode), equals: "light")
+        let lightLuminance = try XCTUnwrap(
+            waitForAverageLuminance(of: settingsContent, timeout: 5) { $0 > 0.45 },
+            "Settings content did not become visibly light"
+        )
+
+        selectOption(in: app, controlIdentifier: Identifier.settingsAppearanceThemeMode, optionIdentifier: "dark")
+        assertValue(of: element(in: app, identifier: Identifier.settingsAppearanceThemeMode), equals: "dark")
+        let darkLuminance = try XCTUnwrap(
+            waitForAverageLuminance(of: settingsContent, timeout: 5) { $0 < lightLuminance - 0.18 },
+            "Settings content did not become visibly darker after selecting dark theme"
+        )
+        XCTAssertLessThan(darkLuminance, lightLuminance - 0.18)
+
+        selectOption(in: app, controlIdentifier: Identifier.settingsAppearanceAppLanguage, optionIdentifier: "en")
+        assertValue(of: element(in: app, identifier: Identifier.settingsAppearanceAppLanguage), equals: "en")
+        XCTAssertTrue(app.staticTexts["Display, hotkeys, and permissions"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Appearance"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Theme mode"].waitForExistence(timeout: 5))
+        XCTAssertTrue(
+            waitForNonExistence(app.staticTexts["基础显示设置、快捷键与权限"], timeout: 2)
+        )
     }
 
     func testSettingsWindowBehaviorDelayAndTogglesPersistAcrossRelaunch() throws {
@@ -690,6 +734,45 @@ extension FlowTabUITests {
 
         XCTAssertFalse(inAppModifier.isEnabled)
         XCTAssertFalse(inAppKey.isEnabled)
+    }
+
+    private func waitForAverageLuminance(
+        of element: XCUIElement,
+        timeout: TimeInterval,
+        matching predicate: (CGFloat) -> Bool
+    ) -> CGFloat? {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if let luminance = averageLuminance(of: element), predicate(luminance) {
+                return luminance
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+        return nil
+    }
+
+    private func averageLuminance(of element: XCUIElement) -> CGFloat? {
+        guard element.exists,
+              let bitmap = NSBitmapImageRep(data: element.screenshot().pngRepresentation),
+              bitmap.pixelsWide > 0,
+              bitmap.pixelsHigh > 0
+        else {
+            return nil
+        }
+
+        let sampleStep = max(1, min(bitmap.pixelsWide, bitmap.pixelsHigh) / 80)
+        var total: CGFloat = 0
+        var samples = 0
+        for y in stride(from: 0, to: bitmap.pixelsHigh, by: sampleStep) {
+            for x in stride(from: 0, to: bitmap.pixelsWide, by: sampleStep) {
+                guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else { continue }
+                total += color.redComponent * 0.2126
+                    + color.greenComponent * 0.7152
+                    + color.blueComponent * 0.0722
+                samples += 1
+            }
+        }
+        return samples > 0 ? total / CGFloat(samples) : nil
     }
 
 }
