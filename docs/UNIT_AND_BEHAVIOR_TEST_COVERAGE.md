@@ -16,6 +16,54 @@
 - 覆盖域：分组与会话状态机、偏好与热键归一化、权限与启动参数、运行时快照与激活、搜索索引与输入桥接、日志与语言、AppDelegate 启动链路、Switcher 面板交互、窗口预览与缓存。
 - 当前状态：核心逻辑、配置持久化与主要行为回归路径均有对应测试说明，无额外拆分文件。
 
+## 未完成 / 待补覆盖
+
+本节记录尚未进入下方“用例详情”的单元测试与行为/集成测试缺口。跨层状态以 [TEST_COVERAGE_MATRIX.md](TEST_COVERAGE_MATRIX.md) 为准；当补齐任一条后，需要同步更新矩阵状态。
+
+### 单元测试待补
+
+- Settings 热键注册请求映射
+  场景：主快捷键、退出快捷键和 In-App 快捷键的原始选择值需要归一化成同一个 `HotkeyRegistrationRequest`。
+  目标：抽出可复用 helper 后，用表格用例覆盖正常值、非法值、主键与退出键冲突、In-App 与主快捷键冲突，以及回写值。
+
+- 快捷键派生字段组合覆盖
+  场景：当前派生字段测试只覆盖一个代表性组合。
+  目标：用表格用例覆盖所有修饰键类型、代表性主键、代表性退出键、forward/backward modifier、keyCode 和显示文案，避免新增键位后只靠 UI 或行为层发现映射错误。
+
+- Home 列表投影规则
+  场景：Home 页应用行、窗口数量文案、选中应用后的窗口列表投影仍主要由 UI 或 fixture workflow 间接证明。
+  目标：若继续扩展 Home 展示规则，优先抽出 deterministic view model 或投影 helper，覆盖 app row、window count、空窗口、fullscreen-only、仅最小化窗口等输入形态。
+
+- Runtime activation / recovery 纯决策规则
+  场景：激活、恢复最小化、缺失窗口 fallback、retry recovery 的行为测试较强，但部分目标选择规则仍在带 fake runtime 的行为层证明。
+  目标：当 target resolution 或 fallback 规则继续增长时，抽出纯决策 helper，补充目标窗口存在/缺失、最小化、当前进程、歧义候选和恢复策略的单元测试。
+
+- Status item / app launch 决策规则
+  场景：状态项打开窗口、恢复主窗口、fallback 到 Home scene 等路径主要由行为测试覆盖。
+  目标：若状态项或启动路由继续扩展，抽出纯路由选择规则，覆盖已有窗口、无窗口、目标 tab、隐藏窗口恢复和场景打开 fallback。
+
+### 行为 / 集成测试待补
+
+- Core session 到 `LiveSwitcherModel` 的完整编排
+  场景：`SwitcherSession` 规则单测完整，但并非每个 session 规则都有对应的 `LiveSwitcherModel` 编排测试。
+  目标：优先为新增或高风险 session 规则补行为测试，证明 runtime snapshot、model state、panel selection 和 activation handoff 使用同一规则。
+
+- Settings appearance 传播链路
+  场景：主题/语言有偏好与文案单测，也有 UI 持久化测试，但 in-process 的设置变更传播仍偏弱。
+  目标：补充设置变更后 theme/language 状态、文案来源或通知链路被 App 内对象即时消费的行为测试。
+
+- Logs diagnostics 写入、读取、过滤和清空链路
+  场景：log level 与 diagnostics helper 有单测，UI 有 seeded logs 与清空测试，但运行时日志组件间的 in-process 集成仍偏弱。
+  目标：补充 runtime log 写入、按级别读取、since snapshot、clear 后状态和 noisy-category 过滤串联测试。
+
+- App launch / lifecycle / status item 组合路径
+  场景：AppDelegate 启动/退出覆盖较强，status item open 也有代表性测试，但组合矩阵仍可更细。
+  目标：在状态项或启动路由继续变化时，补充 open Home/Logs/Settings、已有窗口恢复、无窗口 fallback、权限提醒状态和 app visibility 偏好的组合行为测试。
+
+- Pressure runner 编排
+  场景：性能压测主要在 UI 或外部采样层证明，行为层只证明 stress runner 启动。
+  目标：如果压测触发条件、参数选择、自动退出或采样记录逻辑继续复杂化，补充不依赖真实 UI 的 in-process 编排测试。
+
 ## 用例详情（当前）
 
 ### FlowTabCore / GroupingTests

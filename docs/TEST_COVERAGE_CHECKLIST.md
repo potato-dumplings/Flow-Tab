@@ -4,6 +4,8 @@ Updated: 2026-04-01
 
 This checklist summarizes the current automated test coverage for FlowTab, including existing unit tests, existing behavior/integration tests, current gaps, and recommended follow-up priorities.
 
+For a product-scenario view across unit, behavior/integration, UI/E2E, pressure, and real-topology coverage, see [TEST_COVERAGE_MATRIX.md](TEST_COVERAGE_MATRIX.md).
+
 ## Verification Snapshot
 
 - `FlowTabCore`: `swift test` passed, `32/32` tests green.

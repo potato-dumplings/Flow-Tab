@@ -1,6 +1,6 @@
 ---
 name: flowtab-engineering
-description: "FlowTab project engineering workflow and architecture rules. Use when changing this repository, reviewing code in it, triaging defects, auditing tests or module boundaries, or analyzing root causes or performance without editing. Enforce FlowTab-specific rules: state assumptions and resolve ambiguity before coding or prescribing changes; feature work must add unit, behavior, and UI coverage and pass related tests before submission; bug fixes and investigations must run or explicitly attempt the relevant tests and gather a reproducible signal before production edits or confident diagnosis, stopping to report blockers when that cannot be done; never introduce single-feature or single-scenario special cases; keep test-only or debug-only code out of production files; respect FlowTabCore, FlowTab, TestingSupport, and test-target boundaries."
+description: "FlowTab project engineering workflow and architecture rules. Use when changing this repository, reviewing code in it, triaging defects, auditing tests or module boundaries, or analyzing root causes or performance without editing. Enforce FlowTab-specific rules: state assumptions and resolve ambiguity before coding or prescribing changes; feature work must add unit, behavior, and UI coverage and pass related tests before submission; test coverage decisions must consult and maintain the product-scenario coverage matrix; bug fixes and investigations must run or explicitly attempt the relevant tests and gather a reproducible signal before production edits or confident diagnosis, stopping to report blockers when that cannot be done; never introduce single-feature or single-scenario special cases; keep test-only or debug-only code out of production files; respect FlowTabCore, FlowTab, TestingSupport, and test-target boundaries."
 ---
 
 # FlowTab Engineering
@@ -20,25 +20,28 @@ For no-edit work such as review, audit, root-cause triage, or performance analys
 3. Treat feature work as incomplete until test coverage exists in all required layers.
    Read `risk-calibration.md` before deciding which layers are required. For user-visible feature extensions or new features, add or update unit, behavior, and UI tests. Make each layer provide distinct evidence instead of repeating the same assertion three times. Do not claim completion until the required related suites pass. If a layer is not applicable, state the concrete reason; if a required layer is blocked, report the blocker instead of claiming completion.
 
-4. Diagnose bugs before changing production logic.
+4. Keep the product-scenario coverage matrix current.
+   For feature work, user-visible bug fixes, regression coverage, coverage audits, or test strategy changes, read `test-coverage-matrix-workflow.md` and update `docs/TEST_COVERAGE_MATRIX.md` when a product scenario's unit, behavior/integration, UI/E2E, pressure, real-topology, or known-gap status changes. Do not mark UI/E2E coverage strong when it only proves persistence or control state.
+
+5. Diagnose bugs before changing production logic.
    Before editing production files, run or explicitly attempt the relevant existing unit, behavior, and UI tests for the affected layers. Reproduce the bug with a stable signal first: failing tests, stable logs, crash output, compiler or static analyzer output, deterministic configuration or permission evidence, or another observation that clearly narrows the defect. If existing tests cannot reproduce, analyze stable logs first and, when logs support a concrete scenario, add a failing scenario-based test before production edits. If there is no reproducible signal yet, a required test layer cannot run, or the environment is missing required permissions, fixtures, or tooling, stop and report the blocker instead of patching by guesswork. Keep regression coverage after the fix.
 
-5. Keep test-only and debug-only code out of production files.
+6. Keep test-only and debug-only code out of production files.
    Place unit tests in test targets, test scaffolding in testing support files, and temporary bug-investigation logs or hooks outside the final production path. Keep only minimal production logging that is genuinely part of runtime behavior.
 
-6. Run pressure validation when changes can affect sustained load or scale-sensitive paths.
+7. Run pressure validation when changes can affect sustained load or scale-sensitive paths.
    If a change touches a high-frequency interaction path, a cost that grows with app or window count, long-lived caches or tasks, repeated runtime sampling, or heavy SwiftUI panel or tab rendering, treat pressure testing as required validation rather than optional follow-up.
 
-7. Respect module boundaries and dependency direction.
+8. Respect module boundaries and dependency direction.
    Put code in the lowest reasonable layer, avoid duplicated logic across modules, and do not break package boundaries just to land a quick fix.
 
-8. Extract repeated properties into shared constants.
+9. Extract repeated properties into shared constants.
    When the same property, spacing value, or behavior configuration is needed in more than two places, introduce a shared constant instead of repeating literals. For example, shared top, bottom, leading, and trailing spacing used by Home, Settings, and Logs should come from a constant.
 
-9. Enforce file-size guardrails.
+10. Enforce file-size guardrails.
    New source files should usually stay within 400 lines. Files between 400 and 800 lines must still have a clear single responsibility. Files over 800 lines are oversized and should be split instead of expanded. When changing an already oversized file, prefer extracting focused helpers, state, UI pieces, or services, and do not keep growing the file without also reducing or isolating responsibilities.
 
-10. Keep detailed project documentation under `docs/`.
+11. Keep detailed project documentation under `docs/`.
    Reserve repo root for entry documents such as `README*`, `AGENTS.md`, and top-level build or configuration files. Move development, testing, architecture, and other detailed project documents into `docs/`.
 
 ## Choose the Right Reference
@@ -47,6 +50,7 @@ For no-edit work such as review, audit, root-cause triage, or performance analys
 - For bug investigation and bug fixes, read `references/bugfix-workflow.md`.
 - For risk, coverage, and not-relevant layer decisions, read `references/risk-calibration.md`.
 - For test-scope, test-placement, or unit versus behavior versus UI boundary decisions, read `references/test-layer-boundaries.md`.
+- For product-scenario coverage matrix decisions or updates, read `references/test-coverage-matrix-workflow.md`.
 - For concrete build, test, UI, and pressure commands, read `references/validation-command-cookbook.md`.
 - For `FlowTabTests` startup, narrowing, signing blockers, or app unit/behavior test reporting, read `references/flowtabtests-workflow.md`.
 - For FlowTab-specific UI automation setup, fixed-path test app preparation, or permission and code-identity prerequisites, read `references/ui-automation-prerequisites.md`.
@@ -69,12 +73,13 @@ For no-edit work such as review, audit, root-cause triage, or performance analys
    If those checks are satisfied and the fallback script still fails for environment reasons, report the blocker and request the required elevation or external Terminal run instead of continuing with production edits.
 7. Design the solution so it generalizes beyond the current case and does not rely on a one-off branch.
 8. Decide what unique evidence each required test layer should provide, then add or update those tests alongside the code change.
-9. Use `validation-command-cookbook.md` to choose concrete commands for the required layers.
-10. Decide whether the change also requires pressure validation by reading `performance-pressure-workflow.md`. If it does, run the relevant stress checks or report the concrete blocker.
-11. Run the related test suites before considering the task complete.
+9. Read `test-coverage-matrix-workflow.md` when the work changes test coverage, exposes a coverage gap, or affects a product scenario represented in `docs/TEST_COVERAGE_MATRIX.md`; update the matrix if the scenario status changes.
+10. Use `validation-command-cookbook.md` to choose concrete commands for the required layers.
+11. Decide whether the change also requires pressure validation by reading `performance-pressure-workflow.md`. If it does, run the relevant stress checks or report the concrete blocker.
+12. Run the related test suites before considering the task complete.
     `FlowTabTests` must follow `flowtabtests-workflow.md`.
     Use the documented local wrapper for unsigned app-test builds instead of inventing one-off app-test commands.
-12. Final bugfix handoff must state the pre-change failing signal, pre-change tests attempted, evidence supporting the root cause, post-change tests run, and any required test layer or pressure check that could not be run with the reason.
+13. Final bugfix handoff must state the pre-change failing signal, pre-change tests attempted, evidence supporting the root cause, post-change tests run, any matrix status change, and any required test layer or pressure check that could not be run with the reason.
 
 ## References
 
@@ -82,6 +87,7 @@ For no-edit work such as review, audit, root-cause triage, or performance analys
 - `references/bugfix-workflow.md`
 - `references/risk-calibration.md`
 - `references/test-layer-boundaries.md`
+- `references/test-coverage-matrix-workflow.md`
 - `references/validation-command-cookbook.md`
 - `references/flowtabtests-workflow.md`
 - `references/ui-automation-prerequisites.md`

@@ -11,6 +11,7 @@ Use this workflow for regressions, flaky behavior, broken edge cases, and user-r
 - Stop and report the blocker if no reproducible signal exists yet or a required environment, permission, fixture, or test layer is unavailable.
 - Use tests and logs to narrow the root cause instead of guessing.
 - Keep each regression layer focused on different evidence instead of cloning the same assertion everywhere.
+- Read `test-coverage-matrix-workflow.md` and update `docs/TEST_COVERAGE_MATRIX.md` when the bugfix changes a product scenario's coverage status or leaves a known gap.
 - Run pressure validation when the bug or the fix touches sustained-load, repeated-interaction, or scale-sensitive behavior.
 - Keep regression coverage after the fix.
 
@@ -21,17 +22,19 @@ Use this workflow for regressions, flaky behavior, broken edge cases, and user-r
 3. Identify the affected layer or layers: unit, behavior, UI, runtime integration.
 4. Read `risk-calibration.md` and decide which layers are required, not relevant, or blocked.
 5. Read `test-layer-boundaries.md` and decide which layer should hold the failing reproduction, which layer should hold app-orchestration coverage, and whether a visible UI regression is required.
-6. Read `validation-command-cookbook.md` and choose the concrete pre-change commands to run or attempt.
-7. If UI automation is relevant, read `ui-automation-prerequisites.md` and satisfy the repo-specific setup before deciding the environment is blocked.
-8. Read `performance-pressure-workflow.md` and decide whether the defect or fix requires pressure validation in addition to functional regression coverage.
-9. Identify any required environment prerequisites for reproduction, such as Accessibility trust, screen capture permission, seeded fixtures, launch arguments, fixed-path UI app preparation, or code-identity matching.
-10. Before touching production code, run or explicitly attempt the relevant existing unit, behavior, and UI tests and record which layers failed, passed, were not relevant, or were blocked.
-11. If existing tests cannot reproduce the defect, analyze existing stable logs first, inspect crash/compiler/static output when that is the signal, or add temporary diagnostic logging when needed to confirm a concrete hypothesis.
-12. When logs, tests, compiler output, crash output, or deterministic environment evidence support a concrete scenario, add a missing failing test that captures that scenario and expected behavior when feasible. Start at the lowest layer that can express the failure and add higher-layer coverage when the bug is user-visible.
-13. If there is still no reproducible signal, if the evidence does not clearly support one theory, or a required layer cannot run because the environment is blocked, stop and report the blocker. Do not edit production files past this point.
-14. Change production code only after the stable signal supports the root-cause theory, and prefer the smallest fix that explains the evidence.
-15. Remove temporary debug-only logging or hooks from the final production path.
-16. Re-run the relevant unit, behavior, and UI tests and any required pressure checks, then keep the new regression coverage.
+6. Read `test-coverage-matrix-workflow.md` when the defect maps to a product scenario in the matrix or reveals a missing scenario.
+7. Read `validation-command-cookbook.md` and choose the concrete pre-change commands to run or attempt.
+8. If UI automation is relevant, read `ui-automation-prerequisites.md` and satisfy the repo-specific setup before deciding the environment is blocked.
+9. Read `performance-pressure-workflow.md` and decide whether the defect or fix requires pressure validation in addition to functional regression coverage.
+10. Identify any required environment prerequisites for reproduction, such as Accessibility trust, screen capture permission, seeded fixtures, launch arguments, fixed-path UI app preparation, or code-identity matching.
+11. Before touching production code, run or explicitly attempt the relevant existing unit, behavior, and UI tests and record which layers failed, passed, were not relevant, or were blocked.
+12. If existing tests cannot reproduce the defect, analyze existing stable logs first, inspect crash/compiler/static output when that is the signal, or add temporary diagnostic logging when needed to confirm a concrete hypothesis.
+13. When logs, tests, compiler output, crash output, or deterministic environment evidence support a concrete scenario, add a missing failing test that captures that scenario and expected behavior when feasible. Start at the lowest layer that can express the failure and add higher-layer coverage when the bug is user-visible.
+14. If there is still no reproducible signal, if the evidence does not clearly support one theory, or a required layer cannot run because the environment is blocked, stop and report the blocker. Do not edit production files past this point.
+15. Change production code only after the stable signal supports the root-cause theory, and prefer the smallest fix that explains the evidence.
+16. Remove temporary debug-only logging or hooks from the final production path.
+17. Update `docs/TEST_COVERAGE_MATRIX.md` if the regression coverage changes matrix status, adds a scenario, or records a remaining product-scenario gap.
+18. Re-run the relevant unit, behavior, and UI tests and any required pressure checks, then keep the new regression coverage.
 
 ## Hard Gates
 
@@ -77,6 +80,7 @@ Use this workflow for regressions, flaky behavior, broken edge cases, and user-r
 - List the pre-change tests or test attempts by layer and their outcomes.
 - State which logs or observations supported the root-cause theory.
 - List the post-change tests run and their outcomes.
+- State any product-scenario matrix status change, or why the matrix did not need an update.
 - State any relevant layer that was not run and why it was not possible.
 
 ## Rejection Criteria

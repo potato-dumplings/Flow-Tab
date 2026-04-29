@@ -15,6 +15,7 @@ This skill is not only a generic answer-style guide. It is the FlowTab delivery 
 - For bugfix delivery or bugfix handoff, read `../flowtab-engineering/references/bugfix-workflow.md`.
 - For risk-calibrated validation, not-relevant layer decisions, or compact reporting, read `../flowtab-engineering/references/risk-calibration.md`.
 - For test-layer ownership, coverage audits, or layer-by-layer validation reporting, read `../flowtab-engineering/references/test-layer-boundaries.md`.
+- For product-scenario coverage matrix status, matrix updates, or coverage-gap reporting, read `../flowtab-engineering/references/test-coverage-matrix-workflow.md`.
 - For exact validation commands or command-selection explanations, read `../flowtab-engineering/references/validation-command-cookbook.md`.
 - For `FlowTabTests` command attempts, allowed narrowing, signing blockers, or app unit/behavior validation reporting, read `../flowtab-engineering/references/flowtabtests-workflow.md`.
 - For UI blocker diagnosis, local UI test triage, or permission-path explanations, read `../flowtab-engineering/references/ui-automation-prerequisites.md`.
@@ -67,7 +68,7 @@ This skill is not only a generic answer-style guide. It is the FlowTab delivery 
 - Feature handoffs must state the user-visible behavior, the shared rule behind the change, where the logic should live, and what unit, behavior, and UI coverage proves.
 - Architecture or migration handoffs must state the target design, module ownership, migration stages, fallback path, and validation plan.
 - Remediation responses must state the current blocker, the affected layer or environment, what remains unproven, and the next concrete step.
-- Review, audit, or diagnosis responses must state the observed gap, the supporting evidence, the affected layer or module, and the next concrete corrective action or blocker.
+- Review, audit, or diagnosis responses must state the observed gap, the supporting evidence, the affected layer or module, the related product-scenario matrix status when coverage is involved, and the next concrete corrective action or blocker.
 
 ## Compact Handoff
 

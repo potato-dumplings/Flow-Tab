@@ -175,6 +175,52 @@
   步骤：以 `--flowtab-tab-stress` 启动应用，持续 2 秒、每 16ms 触发一次切换，并通过 `XCTClockMetric`、`XCTCPUMetric`、`XCTMemoryMetric` 进行 3 轮测量。
   验证：应用能在压测窗口内正常启动并按预期自行退出，且性能指标可被持续采集。
 
+## 未完成 / 待补覆盖
+
+本节记录尚未进入上方“用例详情”的 UI 自动化与端到端缺口。跨层状态以 [TEST_COVERAGE_MATRIX.md](TEST_COVERAGE_MATRIX.md) 为准；当补齐任一条后，需要同步更新矩阵状态。
+
+### P0
+
+- Settings 快捷键设置后真实生效
+  场景：用户修改主快捷键、退出快捷键或 In-App 快捷键。
+  目标断言：设置完成后按新快捷键，主切换器、退出当前选中应用或 In-App 窗口会话确实按新配置触发。不能只验证控件值、持久化值或 reload 日志。
+
+- Settings 搜索默认范围真实生效
+  场景：用户把默认搜索范围改为 `window`。
+  目标断言：从用户路径打开搜索后，默认直接出现窗口级结果；不是只验证 Settings 控件在重启后仍显示 `window`。
+
+### P1
+
+- Settings 窗口行为真实生效
+  场景：用户修改自动进入窗口层延迟、自动恢复最小化窗口、隐藏仅最小化应用等设置。
+  目标断言：打开 switcher 后，自动进入时机、窗口恢复或最小化应用展示行为确实跟随新设置变化。
+
+- Appearance 主题和语言真实生效
+  场景：用户修改主题或语言。
+  目标断言：应用可见 UI 的颜色状态、文案或页面内容实际更新；不是只验证设置值持久化。
+
+- Home 真实窗口点击激活
+  场景：真实 fixture workflow 中 Home 页面展示多个 app 和窗口。
+  目标断言：点击某个真实窗口行后，对应 fixture window 成为 frontmost window，且不会误激活同 app 其他窗口或其他 app 窗口。
+
+- 真实 app-scope search 激活
+  场景：真实 multi-app fixture workflow 中使用 app scope 搜索 app 名称或 bundle identity。
+  目标断言：搜索结果出现真实 `flowtab.switcher.search.app.*` 项；确认后目标 fixture app 成为 frontmost app。
+
+### P2
+
+- 真实拓扑边缘输入
+  场景：不同 app 拥有同名窗口、多个窗口标题/尺寸/位置相同、非 ASCII 标题、标点、空白和长标题。
+  目标断言：真实 AX/runtime 链路仍能生成正确独立结果，并且搜索、预览或激活不会错误合并目标。
+
+- `Command + Tab` takeover 系统级端到端
+  场景：用户启用系统快捷键接管后使用真实 `Command + Tab`。
+  目标断言：FlowTab 接管链路稳定触发，并能在退出后恢复系统快捷键。该路径受系统权限和全局快捷键限制，自动化稳定性需要单独评估。
+
+- 退出当前选中应用的完整 UI 快捷键路径
+  场景：用户打开 switcher 后按配置的退出快捷键。
+  目标断言：选中应用收到退出请求，面板刷新策略正确，且会话不会在进程真正退出前错误移除目标。
+
 ## 回归命令（示例）
 
 优先使用仓库脚本，把 `DerivedData`、临时目录和缓存统一压到 `./.build-local/ui-tests`：
