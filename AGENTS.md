@@ -10,6 +10,7 @@
   - `references/module-boundaries.md`
   - `references/risk-calibration.md`
   - `references/validation-command-cookbook.md`
+  - `references/flowtabtests-workflow.md`
 
 ## Core Rules
 
@@ -29,3 +30,4 @@
 - Do not consider feature work complete until the required related unit, behavior, and UI tests pass. If a required layer is blocked, report the blocker instead of calling the work complete.
 - For every bug fix, reproduce and diagnose the issue with stable tests, logs, crash output, compiler or static analyzer output, deterministic configuration or permission evidence, or another concrete signal before changing production logic.
 - Keep regression coverage after every bug fix.
+- Run `FlowTabTests` only through `skills/flowtab-engineering/references/flowtabtests-workflow.md`. Do not add signing bypasses or alternate app-test commands to get past certificate failures; report the missing or invalid local signing setup as the blocker.

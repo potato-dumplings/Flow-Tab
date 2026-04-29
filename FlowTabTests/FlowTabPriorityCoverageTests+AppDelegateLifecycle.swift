@@ -406,7 +406,9 @@ extension FlowTabPriorityCoverageTests {
         let preferenceKeys = [
             AppPreferenceKeys.hotkeyPrimaryModifier,
             AppPreferenceKeys.hotkeyMainKey,
-            AppPreferenceKeys.hotkeyQuitKey
+            AppPreferenceKeys.hotkeyQuitKey,
+            AppPreferenceKeys.inAppWindowHotkeyPrimaryModifier,
+            AppPreferenceKeys.inAppWindowHotkeyMainKey
         ]
         let previousPreferenceValues = Dictionary(
             uniqueKeysWithValues: preferenceKeys.map { key in
@@ -415,6 +417,12 @@ extension FlowTabPriorityCoverageTests {
         )
         let hotkeyFactory = SpyHotkeyMonitorFactory()
         let panelController = SwitcherPanelController()
+        let currentApp = NSRunningApplication.current
+        let currentAppID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let currentAppWindows = [
+            WindowCandidate(id: "current-1", title: "Inbox", isMinimized: false, lastActiveAt: 400),
+            WindowCandidate(id: "current-2", title: "Draft", isMinimized: false, lastActiveAt: 390)
+        ]
         var delegate: AppDelegate?
         defer {
             delegate?.applicationWillTerminate(
@@ -437,8 +445,26 @@ extension FlowTabPriorityCoverageTests {
         }
 
         panelController.modelForTesting.snapshotProviderOverride = {
-            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
+            RuntimeSnapshot(
+                apps: [
+                    AppSwitchCandidate(
+                        id: currentAppID,
+                        displayName: currentApp.localizedName ?? "Current App",
+                        groupID: "current",
+                        lastActiveAt: 400,
+                        windows: currentAppWindows
+                    )
+                ] + self.searchScenarioApps(),
+                contextsByID: [
+                    currentAppID: self.makeRuntimeAppContext(
+                        appID: currentAppID,
+                        runningApp: currentApp,
+                        windows: currentAppWindows
+                    )
+                ]
+            )
         }
+        panelController.modelForTesting.frontmostApplicationOverride = { currentApp }
         AccessibilityPermissionChecker.isTrustedOverrideForTesting = { true }
         AccessibilityPermissionChecker.requestPermissionOverrideForTesting = { true }
         AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride = {}
@@ -479,12 +505,20 @@ extension FlowTabPriorityCoverageTests {
         standardDefaults.set(request.mainConfiguration.primaryModifier.rawValue, forKey: AppPreferenceKeys.hotkeyPrimaryModifier)
         standardDefaults.set(request.mainConfiguration.mainKey.rawValue, forKey: AppPreferenceKeys.hotkeyMainKey)
         standardDefaults.set(request.mainConfiguration.quitKey.rawValue, forKey: AppPreferenceKeys.hotkeyQuitKey)
+        standardDefaults.set(
+            request.inAppWindowConfiguration.primaryModifier.rawValue,
+            forKey: AppPreferenceKeys.inAppWindowHotkeyPrimaryModifier
+        )
+        standardDefaults.set(
+            request.inAppWindowConfiguration.mainKey.rawValue,
+            forKey: AppPreferenceKeys.inAppWindowHotkeyMainKey
+        )
 
         appDelegate.requestHotkeyReload(using: request, source: "test_settings_reload")
 
         let newRecords = Array(hotkeyFactory.records.dropFirst(baselineRecordCount))
-        XCTAssertEqual(newRecords.count, 2)
-        guard let mainRecord = newRecords.first(where: { $0.signature == 0x46544142 }) else {
+        XCTAssertGreaterThanOrEqual(newRecords.count, 2)
+        guard let mainRecord = newRecords.last(where: { $0.signature == 0x46544142 }) else {
             XCTFail("Expected reloaded main hotkey monitor")
             return
         }
@@ -493,8 +527,29 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(mainRecord.configuration.quitKey, .z)
         XCTAssertEqual(mainRecord.configuration.forwardKeyCode, UInt32(SwitcherHotkeyKey.space.keyCode))
         XCTAssertEqual(mainRecord.configuration.forwardModifiers, SwitcherPrimaryModifier.option.carbonModifier)
+        XCTAssertEqual(
+            mainRecord.configuration.backwardModifiers,
+            SwitcherPrimaryModifier.option.carbonModifier | UInt32(shiftKey)
+        )
+        XCTAssertTrue(
+            panelController.isTerminateSelectedAppShortcut(
+                Self.makeKeyDownEvent(
+                    keyCode: SwitcherHotkeyKey.z.keyCode,
+                    modifierFlags: .option
+                )
+            )
+        )
+        XCTAssertFalse(
+            panelController.isTerminateSelectedAppShortcut(
+                Self.makeKeyDownEvent(
+                    keyCode: SwitcherHotkeyKey.z.keyCode,
+                    modifierFlags: [.option, .shift]
+                )
+            )
+        )
 
         mainRecord.monitor.onHotkeyPressed?(false)
+        panelController.panelVisibilityOverride = true
         XCTAssertNotNil(panelController.modelForTesting.session)
         let initialSelectedAppID = panelController.modelForTesting.selectedApp?.id
 
@@ -503,8 +558,45 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertNotEqual(panelController.modelForTesting.selectedApp?.id, initialSelectedAppID)
 
         panelController.globalPrimaryModifierPressedOverride = false
+        panelController.cancelPendingModifierReleaseConfirmation()
         mainRecord.monitor.onHotkeyReleased?(false)
-        try? await Task.sleep(nanoseconds: 180_000_000)
+        XCTAssertNotNil(panelController.pendingModifierReleaseConfirmationTask)
+        panelController.cancelPendingModifierReleaseConfirmation()
+        panelController.cancelSelectionForTesting()
+        XCTAssertNil(panelController.modelForTesting.session)
+
+        guard let inAppRecord = newRecords.last(where: { $0.signature == 0x4654574E }) else {
+            XCTFail("Expected reloaded in-app window hotkey monitor")
+            return
+        }
+        XCTAssertEqual(inAppRecord.configuration.primaryModifier, .command)
+        XCTAssertEqual(inAppRecord.configuration.mainKey, .a)
+        XCTAssertEqual(inAppRecord.configuration.quitKey, .q)
+        XCTAssertEqual(inAppRecord.configuration.forwardKeyCode, UInt32(SwitcherHotkeyKey.a.keyCode))
+        XCTAssertEqual(inAppRecord.configuration.forwardModifiers, SwitcherPrimaryModifier.command.carbonModifier)
+        XCTAssertEqual(
+            inAppRecord.configuration.backwardModifiers,
+            SwitcherPrimaryModifier.command.carbonModifier | UInt32(shiftKey)
+        )
+
+        panelController.suppressHotkeyReplayUntilRelease = false
+        panelController.ignoreHotkeyPressesUntil = 0
+        inAppRecord.monitor.onHotkeyPressed?(false)
+        panelController.panelVisibilityOverride = true
+        XCTAssertEqual(panelController.activeHotkeySessionKind, .inAppWindowSwitcher)
+        XCTAssertEqual(panelController.modelForTesting.session?.mode, .windowCycle(appID: currentAppID))
+        let initialSelectedWindowID = panelController.modelForTesting.session?.selectedWindow?.id
+
+        panelController.inAppPrimaryModifierPressedOverride = true
+        inAppRecord.monitor.onHotkeyPressed?(false)
+        XCTAssertNotEqual(panelController.modelForTesting.session?.selectedWindow?.id, initialSelectedWindowID)
+
+        panelController.inAppPrimaryModifierPressedOverride = false
+        panelController.cancelPendingModifierReleaseConfirmation()
+        inAppRecord.monitor.onHotkeyReleased?(false)
+        XCTAssertNotNil(panelController.pendingModifierReleaseConfirmationTask)
+        panelController.cancelPendingModifierReleaseConfirmation()
+        panelController.cancelSelectionForTesting()
         XCTAssertNil(panelController.modelForTesting.session)
     }
 

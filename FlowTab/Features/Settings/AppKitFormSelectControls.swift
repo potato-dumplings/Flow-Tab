@@ -1,6 +1,7 @@
 import AppKit
 
 private final class FlowFormSelectOptionButton: NSButton {
+    var optionID = ""
     var isOptionSelected = false {
         didSet { updateAppearance() }
     }
@@ -129,6 +130,7 @@ private final class FlowFormSelectMenuView: NSView {
     private let stackView = NSStackView()
     private var widthConstraint: NSLayoutConstraint?
     private var selectedID: String?
+    private var optionIdentifierPrefix: String?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -158,8 +160,14 @@ private final class FlowFormSelectMenuView: NSView {
         updateAppearance()
     }
 
-    func update(options: [(id: String, title: String)], selectedID: String?, preferredWidth: CGFloat) {
+    func update(
+        options: [(id: String, title: String)],
+        selectedID: String?,
+        preferredWidth: CGFloat,
+        optionIdentifierPrefix: String?
+    ) {
         self.selectedID = selectedID
+        self.optionIdentifierPrefix = optionIdentifierPrefix
 
         stackView.arrangedSubviews.forEach { view in
             stackView.removeArrangedSubview(view)
@@ -168,7 +176,8 @@ private final class FlowFormSelectMenuView: NSView {
 
         for option in options {
             let button = FlowFormSelectOptionButton(frame: .zero)
-            button.setFlowTabTestingIdentifier(option.id)
+            button.optionID = option.id
+            button.setFlowTabTestingIdentifier(optionTestingIdentifier(for: option.id))
             button.target = self
             button.action = #selector(handleOptionPressed(_:))
             button.update(title: option.title, isSelected: option.id == selectedID)
@@ -206,8 +215,15 @@ private final class FlowFormSelectMenuView: NSView {
     }
 
     @objc private func handleOptionPressed(_ sender: NSButton) {
-        guard let id = sender.identifier?.rawValue else { return }
-        onSelectionChanged?(id)
+        guard let button = sender as? FlowFormSelectOptionButton else { return }
+        onSelectionChanged?(button.optionID)
+    }
+
+    private func optionTestingIdentifier(for optionID: String) -> String {
+        guard let optionIdentifierPrefix, !optionIdentifierPrefix.isEmpty else {
+            return optionID
+        }
+        return "\(optionIdentifierPrefix).option.\(optionID)"
     }
 
     private func updateAppearance() {
@@ -236,6 +252,7 @@ private final class FlowFormSelectMenuView: NSView {
 
 private final class FlowFormSelectMenuViewController: NSViewController {
     let menuView = FlowFormSelectMenuView(frame: .zero)
+    var optionIdentifierPrefix: String?
 
     var onSelectionChanged: ((String) -> Void)? {
         didSet { menuView.onSelectionChanged = onSelectionChanged }
@@ -246,7 +263,12 @@ private final class FlowFormSelectMenuViewController: NSViewController {
     }
 
     func update(options: [(id: String, title: String)], selectedID: String?, preferredWidth: CGFloat) {
-        menuView.update(options: options, selectedID: selectedID, preferredWidth: preferredWidth)
+        menuView.update(
+            options: options,
+            selectedID: selectedID,
+            preferredWidth: preferredWidth,
+            optionIdentifierPrefix: optionIdentifierPrefix
+        )
         preferredContentSize = menuView.intrinsicContentSize
     }
 }
@@ -313,6 +335,7 @@ final class FlowFormSelectControl: NSView, NSPopoverDelegate {
         menuViewController.onSelectionChanged = { [weak self] id in
             self?.handleSelectionChanged(id)
         }
+        menuViewController.optionIdentifierPrefix = identifier?.rawValue
         menuViewController.update(
             options: options,
             selectedID: selectedID,
@@ -460,4 +483,3 @@ final class FlowFormSelectControl: NSView, NSPopoverDelegate {
         )?.withSymbolConfiguration(chevronSymbolConfiguration)
     }
 }
-

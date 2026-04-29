@@ -192,6 +192,12 @@ extension FlowTabUITests {
         XCTAssertTrue(control.waitForExistence(timeout: 6), "Missing control: \(controlIdentifier)")
         tapElement(control)
 
+        let scopedOptionIdentifier = "\(controlIdentifier).option.\(optionIdentifier)"
+        let scopedOptionsQuery = app.descendants(matching: .any).matching(identifier: scopedOptionIdentifier)
+        if tapFirstHittable(in: scopedOptionsQuery, timeout: 2) {
+            return
+        }
+
         let optionsQuery = app.descendants(matching: .any).matching(identifier: optionIdentifier)
         XCTAssertTrue(
             tapFirstHittable(in: optionsQuery, timeout: 6),
