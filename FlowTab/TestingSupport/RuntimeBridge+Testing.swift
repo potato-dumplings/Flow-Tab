@@ -73,9 +73,16 @@ extension RuntimeSnapshotProvider {
         let snapshotsByAppID: [String: RuntimeHomeAppSnapshot]
     }
 
+    private typealias UITestAppDefinition = (
+        appID: String,
+        name: String,
+        windows: [WindowCandidate],
+        rank: Int
+    )
+
     private static func uiTestAppDefinitions(
         variant: String?
-    ) -> [(appID: String, name: String, windows: [WindowCandidate], rank: Int)] {
+    ) -> [UITestAppDefinition] {
         switch variant {
         case "search-wrap":
             return (1...10).map { item in
@@ -148,6 +155,37 @@ extension RuntimeSnapshotProvider {
                         )
                     ],
                     rank: 0
+                )
+            ]
+        case "minimized-window-behavior":
+            return [
+                (
+                    appID: "com.flowtab.mock.mail",
+                    name: "Mock Mail",
+                    windows: [
+                        WindowCandidate(id: "mock-mail-inbox", title: "Inbox", isMinimized: false, lastActiveAt: 300),
+                        WindowCandidate(id: "mock-mail-draft", title: "Draft", isMinimized: false, lastActiveAt: 299)
+                    ],
+                    rank: 0
+                ),
+                (
+                    appID: "com.flowtab.mock.minimized-notes",
+                    name: "Mock Minimized Notes",
+                    windows: [
+                        WindowCandidate(
+                            id: "mock-minimized-notes-daily",
+                            title: "Daily Notes",
+                            isMinimized: true,
+                            lastActiveAt: 290
+                        ),
+                        WindowCandidate(
+                            id: "mock-minimized-notes-archive",
+                            title: "Archive",
+                            isMinimized: true,
+                            lastActiveAt: 289
+                        )
+                    ],
+                    rank: 1
                 )
             ]
         case "single-app-five-windows-cg-offspace":
@@ -254,6 +292,9 @@ extension RuntimeSnapshotProvider {
                 !FlowTabTestLaunchOptions.enablesMockHotkeyEffects
                     || !FlowTabUITestMockRuntimeEffects.isTerminated(appID: definition.appID)
             }
+            .filter { definition in
+                shouldIncludeUITestAppDefinitionInAppLayer(definition)
+            }
 
         let candidates = appDefinitions.map { definition in
             AppSwitchCandidate(
@@ -354,5 +395,18 @@ extension RuntimeSnapshotProvider {
             return nil
         }
         return CGWindowID(rawWindowID)
+    }
+
+    private static func shouldIncludeUITestAppDefinitionInAppLayer(
+        _ definition: UITestAppDefinition
+    ) -> Bool {
+        let hideMinimizedAppsFromAppLayer =
+            SwitcherBehaviorPreferencesStore.loadHideMinimizedAppsFromAppLayer()
+        let hasVisibleWindow = definition.windows.contains { !$0.isMinimized }
+        return shouldIncludeAppInAppLayer(
+            hasWindows: !definition.windows.isEmpty,
+            hasVisibleWindow: hasVisibleWindow,
+            hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
+        )
     }
 }

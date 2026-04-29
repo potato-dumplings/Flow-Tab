@@ -131,6 +131,48 @@ extension FlowTabUITests {
         )
     }
 
+    func testSettingsWindowBehaviorHideMinimizedAppsAffectsSwitcherAppLayer() throws {
+        let baselineApp = makeApp(
+            additionalArguments: windowBehaviorRuntimeArguments(
+                resetDefaults: true,
+                opensSwitcher: true
+            )
+        )
+        launchFlowTabUITestApplication(baselineApp)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(baselineApp, timeout: 10))
+        XCTAssertTrue(element(in: baselineApp, identifier: Identifier.switcherAppMockMail).waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            element(
+                in: baselineApp,
+                identifier: Identifier.switcherAppMockMinimizedNotes
+            ).waitForExistence(timeout: 8)
+        )
+        baselineApp.terminate()
+
+        let settingsApp = makeApp(additionalArguments: windowBehaviorRuntimeArguments())
+        launchFlowTabUITestApplication(settingsApp)
+        openSettingsTab(in: settingsApp)
+
+        let hideMinimizedToggle = toggleElement(in: settingsApp, identifier: Identifier.settingsWindowHideMinimizedApps)
+        XCTAssertTrue(hideMinimizedToggle.waitForExistence(timeout: 5))
+        setToggle(hideMinimizedToggle, to: true)
+        XCTAssertTrue(toggleIsOn(hideMinimizedToggle))
+        settingsApp.terminate()
+
+        let filteredApp = makeApp(
+            additionalArguments: windowBehaviorRuntimeArguments(opensSwitcher: true)
+        )
+        launchFlowTabUITestApplication(filteredApp)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(filteredApp, timeout: 10))
+        XCTAssertTrue(element(in: filteredApp, identifier: Identifier.switcherAppMockMail).waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            waitForNonExistence(
+                element(in: filteredApp, identifier: Identifier.switcherAppMockMinimizedNotes),
+                timeout: 2
+            )
+        )
+    }
+
     func testSettingsSearchDisabledPreventsAutoSearchLaunchEntry() throws {
         let firstLaunchApp = makeApp(
             additionalArguments: [
@@ -553,6 +595,31 @@ extension FlowTabUITests {
             "--flowtab-ui-screen-trusted",
             "YES"
         ]
+    }
+
+    private func windowBehaviorRuntimeArguments(
+        resetDefaults: Bool = false,
+        opensSwitcher: Bool = false
+    ) -> [String] {
+        var arguments: [String] = []
+        if resetDefaults {
+            arguments.append("--flowtab-ui-reset-defaults")
+        }
+        arguments += [
+            "--flowtab-ui-mock-runtime",
+            "--flowtab-ui-mock-runtime-variant",
+            "minimized-window-behavior",
+            "-showPermissionReminder",
+            "NO",
+            "--flowtab-ui-ax-trusted",
+            "YES",
+            "--flowtab-ui-screen-trusted",
+            "YES"
+        ]
+        if opensSwitcher {
+            arguments.append("--flowtab-ui-open-switcher")
+        }
+        return arguments
     }
 
     private func configureHotkeysThroughSettings(
