@@ -47,7 +47,9 @@ final class FlowTabUITests: XCTestCase {
         static let switcherAppMockMail = "flowtab.switcher.app.com-flowtab-mock-mail"
         static let switcherAppMockMinimizedNotes = "flowtab.switcher.app.com-flowtab-mock-minimized-notes"
         static let switcherSearchInput = "flowtab.switcher.search.input"
-        static let switcherSearchWindowMockMailInbox = "flowtab.switcher.search.window.mock-mail-inbox"
+        static let switcherSearchAppMockMail = "flowtab.switcher.search.app.com-flowtab-mock-mail"
+        static let switcherSearchWindowMockMailInbox =
+            "flowtab.switcher.search.window.window-com-flowtab-mock-mail-mock-mail-inbox"
     }
 
     override func setUpWithError() throws {

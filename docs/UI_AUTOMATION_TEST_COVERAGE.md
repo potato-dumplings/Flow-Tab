@@ -12,7 +12,7 @@
 
 - 用例总数：33
 - 覆盖域：启动导航、Home、权限提示、Logs、Settings、Switcher/Search、压测。
-- 当前状态：应用内可稳定自动化的核心场景已有覆盖，高价值 Settings-to-runtime 缺口按下方优先级继续补齐。
+- 当前状态：应用内可稳定自动化的核心场景已有覆盖，Settings 搜索默认范围的双向运行时生效路径已补齐，剩余真实 fixture 缺口按下方优先级继续补齐。
 - 执行前提：大多数用例依赖 UI test launch arguments 控制权限状态、Mock Runtime、预置日志和重置偏好，以减少系统环境抖动。
 
 ## 用例详情（当前）
@@ -109,10 +109,10 @@
   步骤：首次启动在 `Settings` 关闭搜索开关；重启时注入 `--flowtab-ui-open-switcher-search` 并使用 Mock Runtime。
   验证：Switcher 面板会打开，但搜索输入框不存在，说明“禁用搜索”优先级高于自动进入搜索的启动参数。
 
-- `testSettingsSearchDefaultWindowScopePersistsAndShowsWindowResults`
-  场景：验证搜索默认范围切到 `window` 后会持久化。
-  步骤：首次启动在 `Settings` 打开搜索功能，并把默认范围切到 `window`；重启后再次进入设置页读取该值。
-  验证：默认搜索范围仍为 `window`，确保窗口级搜索偏好不会丢失。
+- `testSettingsSearchDefaultScopePersistsAndShowsWindowThenAppResults`
+  场景：验证搜索默认范围在 `window` 与 `app` 间切换后都会影响真实搜索结果。
+  步骤：首次启动在 `Settings` 打开搜索功能，并把默认范围切到 `window`；重启后使用 Mock Runtime 打开标准 switcher，再按回车从用户路径进入搜索并输入窗口标题 `Inbox`；随后回到 `Settings` 把默认范围切回 `app`，再次从标准 switcher 进入搜索并输入 `Mail`。
+  验证：`window` 阶段出现 `flowtab.switcher.search.window.window-com-flowtab-mock-mail-mock-mail-inbox` 窗口级结果，切回 `app` 后出现 `flowtab.switcher.search.app.com-flowtab-mock-mail` 应用级结果，说明该设置不只是持久化，已经双向影响搜索默认结果范围。
 
 - `testSettingsSearchDefaultScopeCanSwitchBetweenAppAndWindow`
   场景：验证默认搜索范围控件本身可在 `app` 与 `window` 间切换。
@@ -203,12 +203,6 @@
 ## 未完成 / 待补覆盖
 
 本节记录尚未进入上方“用例详情”的 UI 自动化与端到端缺口。跨层状态以 [TEST_COVERAGE_MATRIX.md](TEST_COVERAGE_MATRIX.md) 为准；当补齐任一条后，需要同步更新矩阵状态。
-
-### P0
-
-- Settings 搜索默认范围真实生效
-  场景：用户把默认搜索范围改为 `window`。
-  目标断言：从用户路径打开搜索后，默认直接出现窗口级结果；不是只验证 Settings 控件在重启后仍显示 `window`。
 
 ### P1
 

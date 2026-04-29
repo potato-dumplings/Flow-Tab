@@ -66,6 +66,7 @@
 		B10012022F76000100B0D737 /* FlowTabUITests+Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002022F76000100B0D737 /* FlowTabUITests+Settings.swift */; };
 		B10012032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift */; };
 		B10012042F76000100B0D737 /* FlowTabUITests+Support.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002042F76000100B0D737 /* FlowTabUITests+Support.swift */; };
+		B10012052F76000100B0D737 /* FlowTabUITests+SettingsSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002052F76000100B0D737 /* FlowTabUITests+SettingsSearch.swift */; };
 		B1C2D3E42F74000100B0D737 /* AppLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E32F74000100B0D737 /* AppLocalization.swift */; };
 		C10000012F75000100B0D737 /* AppFoundation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000112F75000100B0D737 /* AppFoundation.swift */; };
 		C10000022F75000100B0D737 /* HomeRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000122F75000100B0D737 /* HomeRootView.swift */; };
@@ -201,6 +202,7 @@
 		B10002022F76000100B0D737 /* FlowTabUITests+Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+Settings.swift"; sourceTree = "<group>"; };
 		B10002032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SwitcherAndSearch.swift"; sourceTree = "<group>"; };
 		B10002042F76000100B0D737 /* FlowTabUITests+Support.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+Support.swift"; sourceTree = "<group>"; };
+		B10002052F76000100B0D737 /* FlowTabUITests+SettingsSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SettingsSearch.swift"; sourceTree = "<group>"; };
 		B1C2D3E32F74000100B0D737 /* AppLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLocalization.swift; sourceTree = "<group>"; };
 		C10000112F75000100B0D737 /* AppFoundation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppFoundation.swift; sourceTree = "<group>"; };
 		C10000122F75000100B0D737 /* HomeRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeRootView.swift; sourceTree = "<group>"; };
@@ -365,6 +367,7 @@
 				4A6DAE892F727AF600B0D737 /* FlowTabUITests.swift */,
 				B10002012F76000100B0D737 /* FlowTabUITests+HomeAndLogs.swift */,
 				B10002022F76000100B0D737 /* FlowTabUITests+Settings.swift */,
+				B10002052F76000100B0D737 /* FlowTabUITests+SettingsSearch.swift */,
 				B10002032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift */,
 				B10002042F76000100B0D737 /* FlowTabUITests+Support.swift */,
 				F500000B2F90000100B0D737 /* FlowTabUITests+SpaceFixtureApp.swift */,
@@ -852,6 +855,7 @@
 				4A6DAE8A2F727AF600B0D737 /* FlowTabUITests.swift in Sources */,
 				B10012012F76000100B0D737 /* FlowTabUITests+HomeAndLogs.swift in Sources */,
 				B10012022F76000100B0D737 /* FlowTabUITests+Settings.swift in Sources */,
+				B10012052F76000100B0D737 /* FlowTabUITests+SettingsSearch.swift in Sources */,
 				B10012032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift in Sources */,
 				B10012042F76000100B0D737 /* FlowTabUITests+Support.swift in Sources */,
 				F500010D2F90000100B0D737 /* FlowTabUITests+SpaceFixtureApp.swift in Sources */,
