@@ -664,6 +664,9 @@ extension FlowTabPriorityCoverageTests {
         let previousAXTrusted = AccessibilityPermissionChecker.isTrustedOverrideForTesting
         let previousAXRequest = AccessibilityPermissionChecker.requestPermissionOverrideForTesting
         let previousLaunchArguments = FlowTabTestLaunchOptions.argumentsOverrideForTesting
+        let standardDefaults = UserDefaults.standard
+        let previousSearchEnabled = standardDefaults.object(forKey: AppPreferenceKeys.searchEnabled)
+        let previousSearchDefaultScope = standardDefaults.object(forKey: AppPreferenceKeys.searchDefaultScope)
         let hotkeyFactory = SpyHotkeyMonitorFactory()
         let takeoverController = SpyCommandTabTakeoverController()
         let stressRunner = SpyStressRunner()
@@ -679,6 +682,16 @@ extension FlowTabPriorityCoverageTests {
             AccessibilityPermissionChecker.isTrustedOverrideForTesting = previousAXTrusted
             AccessibilityPermissionChecker.requestPermissionOverrideForTesting = previousAXRequest
             FlowTabTestLaunchOptions.argumentsOverrideForTesting = previousLaunchArguments
+            restoreUserDefaultsValue(
+                previousSearchEnabled,
+                forKey: AppPreferenceKeys.searchEnabled,
+                userDefaults: standardDefaults
+            )
+            restoreUserDefaultsValue(
+                previousSearchDefaultScope,
+                forKey: AppPreferenceKeys.searchDefaultScope,
+                userDefaults: standardDefaults
+            )
             RuntimeDiagnostics.shared.clear()
             clearIsolatedUserDefaults(userDefaults)
         }
@@ -709,6 +722,11 @@ extension FlowTabPriorityCoverageTests {
             "--flowtab-ui-seed-logs", "3",
             "--flowtab-ui-open-switcher-search"
         ]
+        standardDefaults.set(true, forKey: AppPreferenceKeys.searchEnabled)
+        standardDefaults.set(
+            SwitcherSearchScope.app.rawValue,
+            forKey: AppPreferenceKeys.searchDefaultScope
+        )
         AccessibilityPermissionChecker.isTrustedOverrideForTesting = { true }
         AccessibilityPermissionChecker.requestPermissionOverrideForTesting = { true }
         AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride = {}
@@ -732,7 +750,10 @@ extension FlowTabPriorityCoverageTests {
         appDelegate.applicationDidFinishLaunching(
             Notification(name: NSApplication.didFinishLaunchingNotification)
         )
-        try? await Task.sleep(nanoseconds: 420_000_000)
+        let lines = await waitForLaunchBootstrapSearchAndSeededLogs(
+            panelController: panelController,
+            seededLogCount: 3
+        )
 
         XCTAssertNil(userDefaults.object(forKey: AppPreferenceKeys.showShortcutHint))
         XCTAssertFalse(userDefaults.bool(forKey: CommandTabTakeoverController.takeoverMarkerKey))
@@ -746,7 +767,6 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(panelController.modelForTesting.isSearchActive)
         XCTAssertNotNil(panelController.modelForTesting.session)
 
-        let lines = await RuntimeDiagnostics.shared.readRecentLines(limit: 40, minimumLevel: .debug)
         XCTAssertFalse(lines.contains(where: { $0.contains("before-seed-cleanup") }))
         let seededLines = lines.filter { $0.contains("[UITest] seeded-") }
         XCTAssertEqual(seededLines.count, 3)

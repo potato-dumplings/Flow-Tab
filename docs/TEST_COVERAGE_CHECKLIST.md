@@ -1,6 +1,6 @@
 # Test Coverage Checklist
 
-Updated: 2026-04-01
+Updated: 2026-04-29
 
 This checklist summarizes the current automated test coverage for FlowTab, including existing unit tests, existing behavior/integration tests, current gaps, and recommended follow-up priorities.
 
@@ -8,8 +8,8 @@ For a product-scenario view across unit, behavior/integration, UI/E2E, pressure,
 
 ## Verification Snapshot
 
-- `FlowTabCore`: `swift test` passed, `32/32` tests green.
-- `FlowTab` app tests: `xcodebuild test-without-building -only-testing:FlowTabTests` passed, including the new lifecycle and in-app hotkey behavior coverage.
+- `FlowTabCore`: `swift test` passed, `33/33` tests green.
+- `FlowTab` app tests: `./scripts/testing/run-flowtabtests-local.sh` passed, `222/222` tests green.
 - `FlowTabUITests`: the new behavior-focused UI cases pass together when selected explicitly (permission reminder/settings persistence, mock Home selection, logs clear, search result activation, and redesigned tab-stress coverage). A raw `-only-testing:FlowTabUITests` target run still shows suite-level launch interference when mixed with the generated launch-only UI tests.
 - Search external sampling baseline: on 2026-04-01, three `30s` search scenarios were sampled at `0.5s` intervals from outside the process. Results are archived under `.build-local/search-external-sampling/results-20260401-230938/`.
 
@@ -32,7 +32,7 @@ External `%CPU` / `RSS` sampling was run against the `build-for-testing` host wi
 
 ## Existing Unit Tests
 
-### FlowTabCore (`32` tests)
+### FlowTabCore (`33` tests)
 
 - [x] `GroupingTests`
   - Preserves first-seen group order.
@@ -55,6 +55,7 @@ External `%CPU` / `RSS` sampling was run against the `build-for-testing` host wi
   - Selecting app/window by ID.
   - Commit behavior for minimized-window policy.
   - Remember-last-window behavior across sessions.
+  - Exact selected-window commit target.
 - [x] `SwitcherSessionEdgeTests`
   - Initial selection for backward trigger.
   - App-cycle edge clamping when wrapping is disabled.
@@ -66,12 +67,15 @@ External `%CPU` / `RSS` sampling was run against the `build-for-testing` host wi
   - Unknown-ID selection failure paths.
   - Empty-session guard behavior.
 
-### FlowTab app tests (`89` tests)
+### FlowTab app unit-style tests (`101` tests in `FlowTabTests`)
 
 - [x] Hotkey configuration and preference normalization
   - `SwitcherHotkeyPreferencesStore`
   - `SwitcherHotkeyConfiguration`
   - `InAppWindowHotkeyPreferencesStore`
+  - Settings raw hotkey values -> `HotkeyRegistrationRequest` normalization.
+  - Persisted invalid/conflicting hotkey values are normalized and written back.
+  - Derived hotkey fields cover all supported primary modifiers and representative main/quit keys.
 - [x] Panel window static configuration
   - `SwitcherPanelWindowConfiguration`
   - Full-screen presentation level and collection behavior branches.
@@ -88,6 +92,7 @@ External `%CPU` / `RSS` sampling was run against the `build-for-testing` host wi
   - `RuntimeLogPreferencesStore`
   - `RuntimeDiagnostics`
   - `RuntimeLog` noisy-category filtering behavior.
+  - Runtime log write/read/filter/since/clear integration chain.
 - [x] Preference stores and normalization helpers
   - `ThemePreferencesStore`
   - `WindowLayerPreferencesStore`
@@ -116,8 +121,11 @@ External `%CPU` / `RSS` sampling was run against the `build-for-testing` host wi
 ### App-level behavior tests
 
 - [x] `LiveSwitcherModel` terminate flow behavior is covered in tests.
+- [x] `LiveSwitcherModel` window-layer navigation and commit handoff is covered in tests.
 - [x] `AppWindowCoordinator.activateMainWindowOrOpenHomeScene(...)` behavior is indirectly covered through status-item tests.
 - [x] `SwitcherSearchCoordinator` has strong behavior coverage at the logic/integration level, even though it is not driven through the real panel UI.
+- [x] Runtime diagnostics write/read/filter/since/clear behavior is covered as an in-process integration chain.
+- [x] UI-test bootstrap launch arguments seed logs and open switcher search without depending on local search preference state.
 
 ### UI tests (expanded behavior coverage)
 
@@ -240,7 +248,10 @@ The ordering below is based on primary interaction-path risk, likelihood of regr
 
 ## Suggested Next Batch To Implement
 
+- [x] Settings hotkey raw values -> `HotkeyRegistrationRequest` normalization.
+- [x] Hotkey derived-field matrix for supported modifiers and representative keys.
 - [x] `LiveSwitcherModel.startSession / commitSelection / cancelSelection`
+- [x] `LiveSwitcherModel` window-layer navigation -> selected-window commit target.
 - [x] `LiveSwitcherModel.enterSearchMode / applySelectedSearchResultToSession`
 - [x] `SwitcherPanelController` search-mode key routing
 - [x] `CommandTabTakeoverController.reconcileIfNeeded / restoreSystemShortcutsIfNeeded`
@@ -251,3 +262,4 @@ The ordering below is based on primary interaction-path risk, likelihood of regr
 - [x] `OptionTabHotkeyMonitor` press/release callback routing
 - [x] `RuntimeSnapshotProvider` visibility helpers / `SystemAppMRUTracker.rankByPID`
 - [x] `RuntimeActivator.activate(target:contextsByID:)` current-app activation / window fallback / restore-minimized
+- [x] `RuntimeDiagnostics` write/read/filter/since/clear integration chain.

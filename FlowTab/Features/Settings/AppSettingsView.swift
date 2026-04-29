@@ -363,24 +363,12 @@ struct AppSettingsView: View {
     private func normalizedHotkeyRegistrationRequest(
         from values: AppKitSettingsHotkeyRawValues
     ) -> HotkeyRegistrationRequest {
-        let mainConfiguration = SwitcherHotkeyPreferencesStore.resolve(
-            primaryModifierRaw: values.hotkeyPrimaryModifierRaw,
+        HotkeyRegistrationRequest.normalized(
+            mainPrimaryModifierRaw: values.hotkeyPrimaryModifierRaw,
             mainKeyRaw: values.hotkeyMainKeyRaw,
-            quitKeyRaw: values.hotkeyQuitKeyRaw
-        )
-        let resolvedInApp = InAppWindowHotkeyPreferencesStore.resolveAvoidingMainHotkeyConflict(
-            primaryModifierRaw: values.inAppWindowHotkeyPrimaryModifierRaw,
-            mainKeyRaw: values.inAppWindowHotkeyMainKeyRaw,
-            mainHotkeyConfiguration: mainConfiguration
-        )
-        let inAppWindowConfiguration = SwitcherHotkeyConfiguration(
-            primaryModifier: resolvedInApp.primaryModifier,
-            mainKey: resolvedInApp.mainKey,
-            quitKey: .q
-        )
-        return HotkeyRegistrationRequest(
-            mainConfiguration: mainConfiguration,
-            inAppWindowConfiguration: inAppWindowConfiguration
+            quitKeyRaw: values.hotkeyQuitKeyRaw,
+            inAppPrimaryModifierRaw: values.inAppWindowHotkeyPrimaryModifierRaw,
+            inAppMainKeyRaw: values.inAppWindowHotkeyMainKeyRaw
         )
     }
 

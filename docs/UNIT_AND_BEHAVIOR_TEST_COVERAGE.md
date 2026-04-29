@@ -1,34 +1,32 @@
 # 单测与行为测试覆盖清单（FlowTab）
 
-更新时间：2026-04-05
+更新时间：2026-04-29
 
 ## 目标与范围
 
 - 目标：把 Core 算法、应用层配置/权限/日志/搜索、以及关键行为链路的测试意图和断言结果沉淀成可回溯文档。
-- 范围：`FlowTabCore/Tests/FlowTabCoreTests`、`FlowTabTests/FlowTabTests.swift`、`FlowTabTests/FlowTabPriorityCoverageTests.swift`。
+- 范围：`FlowTabCore/Tests/FlowTabCoreTests`、`FlowTabTests/*.swift`。
 - 说明：本文件把“单测”和“行为测试”合并维护，格式与 UI 自动化清单一致，统一使用“场景 / 步骤 / 验证”描述。
 
 ## 覆盖总览（当前）
 
-- 用例总数：186
-- 单测：113
-- 行为测试：73
+- 用例总数：255（按 `func test` 统计；`FlowTabCore` 33，`FlowTabTests` 222）
+- 单测 / 行为测试：分层说明见下方用例来源与场景描述。
 - 覆盖域：分组与会话状态机、偏好与热键归一化、权限与启动参数、运行时快照与激活、搜索索引与输入桥接、日志与语言、AppDelegate 启动链路、Switcher 面板交互、窗口预览与缓存。
-- 当前状态：核心逻辑、配置持久化与主要行为回归路径均有对应测试说明，无额外拆分文件。
+- 当前状态：核心逻辑、配置持久化与主要行为回归路径均有对应测试说明，新增覆盖按主题放在同名 extension 文件中。
 
 ## 未完成 / 待补覆盖
 
 本节记录尚未进入下方“用例详情”的单元测试与行为/集成测试缺口。跨层状态以 [TEST_COVERAGE_MATRIX.md](TEST_COVERAGE_MATRIX.md) 为准；当补齐任一条后，需要同步更新矩阵状态。
 
+### 已补覆盖（2026-04-29）
+
+- Settings 热键注册请求映射：新增 `HotkeyRegistrationRequest.normalized(...)` 共享 helper，并用表格用例覆盖正常值、非法值、主键与退出键冲突、In-App 与主快捷键冲突，以及持久化回写。
+- 快捷键派生字段组合覆盖：新增组合表格测试，覆盖所有主修饰键类型、代表性主键、代表性退出键、forward/backward modifier、keyCode 与展示文案。
+- Core session 到 `LiveSwitcherModel` 的代表性窗口层编排：新增行为测试，证明窗口层导航后的提交目标与 session commit 规则一致。
+- Logs diagnostics 写入、读取、过滤和清空链路：新增 in-process 串联测试，覆盖 runtime log 写入、minimum level、since snapshot、noisy-category 过滤与 clear。
+
 ### 单元测试待补
-
-- Settings 热键注册请求映射
-  场景：主快捷键、退出快捷键和 In-App 快捷键的原始选择值需要归一化成同一个 `HotkeyRegistrationRequest`。
-  目标：抽出可复用 helper 后，用表格用例覆盖正常值、非法值、主键与退出键冲突、In-App 与主快捷键冲突，以及回写值。
-
-- 快捷键派生字段组合覆盖
-  场景：当前派生字段测试只覆盖一个代表性组合。
-  目标：用表格用例覆盖所有修饰键类型、代表性主键、代表性退出键、forward/backward modifier、keyCode 和显示文案，避免新增键位后只靠 UI 或行为层发现映射错误。
 
 - Home 列表投影规则
   场景：Home 页应用行、窗口数量文案、选中应用后的窗口列表投影仍主要由 UI 或 fixture workflow 间接证明。
@@ -44,17 +42,9 @@
 
 ### 行为 / 集成测试待补
 
-- Core session 到 `LiveSwitcherModel` 的完整编排
-  场景：`SwitcherSession` 规则单测完整，但并非每个 session 规则都有对应的 `LiveSwitcherModel` 编排测试。
-  目标：优先为新增或高风险 session 规则补行为测试，证明 runtime snapshot、model state、panel selection 和 activation handoff 使用同一规则。
-
 - Settings appearance 传播链路
   场景：主题/语言有偏好与文案单测，也有 UI 持久化测试，但 in-process 的设置变更传播仍偏弱。
   目标：补充设置变更后 theme/language 状态、文案来源或通知链路被 App 内对象即时消费的行为测试。
-
-- Logs diagnostics 写入、读取、过滤和清空链路
-  场景：log level 与 diagnostics helper 有单测，UI 有 seeded logs 与清空测试，但运行时日志组件间的 in-process 集成仍偏弱。
-  目标：补充 runtime log 写入、按级别读取、since snapshot、clear 后状态和 noisy-category 过滤串联测试。
 
 - App launch / lifecycle / status item 组合路径
   场景：AppDelegate 启动/退出覆盖较强，status item open 也有代表性测试，但组合矩阵仍可更细。
@@ -244,7 +234,7 @@
 
 ### FlowTab / 快捷键与启动参数单测
 
-来源：`FlowTabTests/FlowTabTests.swift`
+来源：`FlowTabTests/FlowTabTests.swift`、`FlowTabTests/FlowTabTests+HotkeyCoverageGaps.swift`
 
 - `testResolveKeepsCommandWhenMainShortcutIsCommandTab`
   场景：主快捷键显式配置为 `Command + Tab`。
@@ -280,6 +270,21 @@
   场景：从热键配置推导键码、修饰键掩码和展示文案。
   步骤：构造 `command + space` / `command + w` 配置。
   验证：前进/后退/退出的键码、修饰键位值和展示文本都一致且互相对应。
+
+- `testHotkeyRegistrationRequestNormalizesRawSettingsValues`
+  场景：Settings 中的原始热键选择需要归一化为统一注册请求。
+  步骤：表格化输入正常值、非法值、主键与退出键冲突、In-App 与主快捷键冲突。
+  验证：主热键、退出键和 In-App 热键都解析到预期配置，冲突场景自动回退到安全组合。
+
+- `testHotkeyRegistrationRequestLoadPersistsNormalizedStoredValues`
+  场景：持久化热键值已存在冲突或非法输入。
+  步骤：写入隔离 defaults 后通过 `HotkeyRegistrationRequest.load(userDefaults:)` 读取。
+  验证：返回配置被归一化，同时持久化值被修正为后续启动可直接读取的有效组合。
+
+- `testHotkeyConfigurationDerivedFieldsCoverSupportedModifiersAndRepresentativeKeys`
+  场景：热键派生字段需要覆盖所有支持修饰键和代表性键位。
+  步骤：表格化构造 command/option/control 与 tab/space/grave/q/w 组合。
+  验证：forward/backward/quit 的 modifier、keyCode 和展示文案保持一致。
 
 - `testSwitcherEnumsExposeStableIdentifiersAndDistinctKeyCodes`
   场景：热键枚举需要稳定的 ID 与唯一键码。
@@ -518,9 +523,9 @@
   步骤：在隔离 `UserDefaults` 中读取默认“显示在 Command-Tab 中”和 `SwitcherPreferences`，再写入自定义恢复最小化窗口配置。
   验证：默认值正确，自定义值写入后会体现在读取结果中。
 
-### FlowTab / 状态项、日志与搜索单测
+### FlowTab / 状态项、日志与搜索测试
 
-来源：`FlowTabTests/FlowTabTests.swift`
+来源：`FlowTabTests/FlowTabTests.swift`、`FlowTabTests/FlowTabPriorityCoverageTests+CoverageGaps.swift`
 
 - `testStatusItemOpenActionUnhidesAndRestoresFirstRegularWindow`
   场景：状态栏“打开”操作需要优先恢复现有普通窗口。
@@ -561,6 +566,11 @@
   场景：普通分类不应被额外静音。
   步骤：同样关闭 verbose 并把最低级别设为 `debug`，再写入普通分类 `info` 日志。
   验证：读取结果中能看到该 `info` 日志。
+
+- `testRuntimeLogIntegrationFiltersDeltasAndClearsEntries`
+  场景：运行时日志需要在同一链路中支持写入、过滤、增量读取和清空。
+  步骤：记录初始快照，写入普通分类与 noisy 分类日志，分别按级别和 `since` 读取，再执行清空。
+  验证：低级别日志和关闭 verbose 时的 noisy `info` 被过滤；增量读取只返回新日志；清空后 marker 不再出现。
 
 - `testSearchMatchesAppByPartialName`
   场景：应用搜索支持部分名称命中。
@@ -669,7 +679,7 @@
 
 ### FlowTabPriorityCoverage / LiveSwitcherModel 与会话状态行为测试
 
-来源：`FlowTabTests/FlowTabPriorityCoverageTests.swift`
+来源：`FlowTabTests/FlowTabPriorityCoverageTests*.swift`
 
 - `testLiveSwitcherModelStartSessionLoadsSnapshotAndCommitActivatesPreferredTarget`
   场景：启动切换会话后直接提交当前选择。
@@ -690,6 +700,11 @@
   场景：窗口范围搜索命中某个具体窗口。
   步骤：启用窗口范围搜索，移动到窗口级结果后应用该结果。
   验证：搜索态退出，会话进入对应应用的窗口层，并选中目标窗口。
+
+- `testLiveSwitcherModelWindowLayerNavigationCommitsSessionWindowTarget`
+  场景：`LiveSwitcherModel` 的窗口层导航应沿用 `SwitcherSession` 的窗口提交规则。
+  步骤：注入带多窗口应用的运行时快照，启动会话后进入窗口层，切换窗口并提交。
+  验证：提交目标为当前窗口层选中的窗口，激活器收到的目标与 session 状态一致。
 
 - `testLiveSwitcherModelStartFocusedAppWindowSessionUsesFrontmostAppSnapshot`
   场景：从前台应用直接发起 In-App 窗口会话。

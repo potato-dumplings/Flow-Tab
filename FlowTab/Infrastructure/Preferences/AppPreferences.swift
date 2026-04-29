@@ -84,6 +84,35 @@ struct HotkeyRegistrationRequest: Sendable {
         )
     }
 
+    static func normalized(
+        mainPrimaryModifierRaw: String,
+        mainKeyRaw: String,
+        quitKeyRaw: String,
+        inAppPrimaryModifierRaw: String,
+        inAppMainKeyRaw: String
+    ) -> HotkeyRegistrationRequest {
+        let mainConfiguration = SwitcherHotkeyPreferencesStore.resolve(
+            primaryModifierRaw: mainPrimaryModifierRaw,
+            mainKeyRaw: mainKeyRaw,
+            quitKeyRaw: quitKeyRaw
+        )
+        let resolvedInAppWindowConfiguration =
+            InAppWindowHotkeyPreferencesStore.resolveAvoidingMainHotkeyConflict(
+                primaryModifierRaw: inAppPrimaryModifierRaw,
+                mainKeyRaw: inAppMainKeyRaw,
+                mainHotkeyConfiguration: mainConfiguration
+            )
+        let inAppWindowConfiguration = SwitcherHotkeyConfiguration(
+            primaryModifier: resolvedInAppWindowConfiguration.primaryModifier,
+            mainKey: resolvedInAppWindowConfiguration.mainKey,
+            quitKey: .q
+        )
+        return HotkeyRegistrationRequest(
+            mainConfiguration: mainConfiguration,
+            inAppWindowConfiguration: inAppWindowConfiguration
+        )
+    }
+
     init?(notificationUserInfo: [AnyHashable: Any]) {
         guard
             let requestIDRaw = notificationUserInfo[NotificationUserInfoKey.requestID] as? String,
