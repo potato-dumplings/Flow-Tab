@@ -113,7 +113,11 @@ else
 fi
 
 if [[ "${ACTION}" != "build-for-testing" && "${HAS_CUSTOM_TEST_FILTER}" == false ]]; then
-  EXTRA_ARGS=("-only-testing:FlowTabUITests" "${EXTRA_ARGS[@]}")
+  if ((${#EXTRA_ARGS[@]} > 0)); then
+    EXTRA_ARGS=("-only-testing:FlowTabUITests" "${EXTRA_ARGS[@]}")
+  else
+    EXTRA_ARGS=("-only-testing:FlowTabUITests")
+  fi
 fi
 
 rm -rf "${RESULT_BUNDLE_PATH}"
@@ -155,7 +159,9 @@ if [[ "${HAS_CODE_SIGNING_OVERRIDE}" == false ]]; then
 fi
 
 XCODEBUILD_CMD+=("${ACTION}")
-XCODEBUILD_CMD+=("${EXTRA_ARGS[@]}")
+if ((${#EXTRA_ARGS[@]} > 0)); then
+  XCODEBUILD_CMD+=("${EXTRA_ARGS[@]}")
+fi
 
 if ! "${XCODEBUILD_CMD[@]}"; then
   echo >&2
