@@ -12,6 +12,10 @@ enum FlowTabUITestBootstrapper {
             RuntimeDiagnostics.shared.clear()
         }
 
+        if FlowTabTestLaunchOptions.enablesMockHotkeyEffects {
+            FlowTabUITestMockRuntimeEffects.reset()
+        }
+
         if let runtimeLogLevelRaw = FlowTabTestLaunchOptions.runtimeLogLevelOverrideRawValue {
             let resolved = RuntimeLogPreferencesStore.resolve(rawValue: runtimeLogLevelRaw)
             userDefaults.set(resolved.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
@@ -36,6 +40,19 @@ enum FlowTabUITestBootstrapper {
                     )
                 }
             }
+        }
+    }
+
+    static func configurePanelControllerIfNeeded(panelController: SwitcherPanelController) {
+        guard FlowTabTestLaunchOptions.enablesMockHotkeyEffects else { return }
+
+        panelController.modelForTesting.terminateRequestOverride = { appID in
+            let pid = FlowTabUITestMockRuntimeEffects.recordTerminateRequest(appID: appID)
+            RuntimeLog.info("UITest", "mock terminate request appID=\(appID) pid=\(pid)")
+            return (sent: true, pid: pid)
+        }
+        panelController.modelForTesting.isProcessRunningOverride = { pid in
+            FlowTabUITestMockRuntimeEffects.isProcessRunning(pid: pid)
         }
     }
 

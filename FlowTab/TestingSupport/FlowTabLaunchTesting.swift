@@ -54,6 +54,10 @@ enum FlowTabTestLaunchOptions {
         arguments.contains("--flowtab-ui-record-hotkey-reload-diagnostics")
     }
 
+    static var enablesMockHotkeyEffects: Bool {
+        arguments.contains("--flowtab-ui-enable-mock-hotkey-effects")
+    }
+
     static var runsTabSwitchStressTest: Bool {
         arguments.contains("--flowtab-tab-stress")
     }

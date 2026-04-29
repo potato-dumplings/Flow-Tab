@@ -2,6 +2,70 @@ import AppKit
 import Foundation
 import FlowTabCore
 
+enum FlowTabUITestMockRuntimeEffects {
+    private static let lock = NSLock()
+    private static var terminatedAppIDs: Set<String> = []
+    private static var pidByAppID: [String: pid_t] = [:]
+    private static var appIDByPID: [pid_t: String] = [:]
+    private static var nextPID: pid_t = 72_000
+
+    static func reset() {
+        lock.lock()
+        terminatedAppIDs = []
+        pidByAppID = [:]
+        appIDByPID = [:]
+        nextPID = 72_000
+        lock.unlock()
+    }
+
+    static func pid(for appID: String) -> pid_t {
+        lock.lock()
+        defer { lock.unlock() }
+
+        if let existingPID = pidByAppID[appID] {
+            return existingPID
+        }
+
+        let pid = nextPID
+        nextPID += 1
+        pidByAppID[appID] = pid
+        appIDByPID[pid] = appID
+        return pid
+    }
+
+    static func recordTerminateRequest(appID: String) -> pid_t {
+        lock.lock()
+        defer { lock.unlock() }
+
+        let pid: pid_t
+        if let existingPID = pidByAppID[appID] {
+            pid = existingPID
+        } else {
+            pid = nextPID
+            nextPID += 1
+            pidByAppID[appID] = pid
+            appIDByPID[pid] = appID
+        }
+        terminatedAppIDs.insert(appID)
+        return pid
+    }
+
+    static func isProcessRunning(pid: pid_t) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard let appID = appIDByPID[pid] else { return true }
+        return !terminatedAppIDs.contains(appID)
+    }
+
+    static func isTerminated(appID: String) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+
+        return terminatedAppIDs.contains(appID)
+    }
+}
+
 extension RuntimeSnapshotProvider {
     struct UITestRuntimeDataset {
         let snapshot: RuntimeSnapshot
@@ -56,6 +120,31 @@ extension RuntimeSnapshotProvider {
                             title: "Fullscreen 3",
                             isMinimized: false,
                             lastActiveAt: 296
+                        )
+                    ],
+                    rank: 0
+                )
+            ]
+        case "focused-current-app":
+            let currentAppID = Bundle.main.bundleIdentifier
+                ?? "pid:\(ProcessInfo.processInfo.processIdentifier)"
+            let currentAppName = ProcessInfo.processInfo.processName
+            return [
+                (
+                    appID: currentAppID,
+                    name: currentAppName,
+                    windows: [
+                        WindowCandidate(
+                            id: "mock-current-primary",
+                            title: "Current Primary",
+                            isMinimized: false,
+                            lastActiveAt: 300
+                        ),
+                        WindowCandidate(
+                            id: "mock-current-secondary",
+                            title: "Current Secondary",
+                            isMinimized: false,
+                            lastActiveAt: 299
                         )
                     ],
                     rank: 0
@@ -161,6 +250,10 @@ extension RuntimeSnapshotProvider {
 
         let runningApp = NSRunningApplication.current
         let appDefinitions = uiTestAppDefinitions(variant: FlowTabTestLaunchOptions.mockRuntimeVariant)
+            .filter { definition in
+                !FlowTabTestLaunchOptions.enablesMockHotkeyEffects
+                    || !FlowTabUITestMockRuntimeEffects.isTerminated(appID: definition.appID)
+            }
 
         let candidates = appDefinitions.map { definition in
             AppSwitchCandidate(
@@ -179,9 +272,41 @@ extension RuntimeSnapshotProvider {
                 groupID: "mock",
                 lastActiveAt: -Double(max(definition.rank, 0)),
                 windowCount: definition.windows.count,
-                pid: pid_t(10_000 + index)
+                pid: FlowTabTestLaunchOptions.enablesMockHotkeyEffects
+                    ? FlowTabUITestMockRuntimeEffects.pid(for: definition.appID)
+                    : pid_t(10_000 + index)
             )
         }
+
+        let contextsByAppID = Dictionary(
+            uniqueKeysWithValues: appDefinitions.map { definition in
+                let ownerPID = FlowTabTestLaunchOptions.enablesMockHotkeyEffects
+                    ? FlowTabUITestMockRuntimeEffects.pid(for: definition.appID)
+                    : runningApp.processIdentifier
+                let windowContexts = Dictionary(uniqueKeysWithValues: definition.windows.map { window in
+                    (
+                        window.id,
+                        RuntimeWindowContext(
+                            id: window.id,
+                            title: window.title,
+                            isMinimized: window.isMinimized,
+                            ownerPID: ownerPID,
+                            cgWindowID: mockCGWindowID(from: window.id),
+                            inferredTitleBarStyle: nil,
+                            allowsPublicAXRecovery: mockCGWindowID(from: window.id) != nil
+                        )
+                    )
+                })
+                return (
+                    definition.appID,
+                    RuntimeAppContext(
+                        appID: definition.appID,
+                        runningApp: runningApp,
+                        windowsByID: windowContexts
+                    )
+                )
+            }
+        )
 
         let snapshotsByAppID = Dictionary(
             uniqueKeysWithValues: appDefinitions.enumerated().map { index, definition in
@@ -214,7 +339,10 @@ extension RuntimeSnapshotProvider {
         )
 
         return UITestRuntimeDataset(
-            snapshot: RuntimeSnapshot(apps: candidates, contextsByID: [:]),
+            snapshot: RuntimeSnapshot(
+                apps: candidates,
+                contextsByID: FlowTabTestLaunchOptions.enablesMockHotkeyEffects ? contextsByAppID : [:]
+            ),
             summaries: summaries,
             snapshotsByAppID: snapshotsByAppID
         )

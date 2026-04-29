@@ -1,6 +1,6 @@
 # UI 自动化测试覆盖清单（FlowTab）
 
-更新时间：2026-04-05
+更新时间：2026-04-29
 
 ## 目标与范围
 
@@ -10,9 +10,9 @@
 
 ## 覆盖总览（当前）
 
-- 用例总数：28
+- 用例总数：31
 - 覆盖域：启动导航、Home、权限提示、Logs、Settings、Switcher/Search、压测。
-- 当前状态：应用内可稳定自动化的核心场景已全部覆盖，无挂起项。
+- 当前状态：应用内可稳定自动化的核心场景已有覆盖，高价值 Settings-to-runtime 缺口按下方优先级继续补齐。
 - 执行前提：大多数用例依赖 UI test launch arguments 控制权限状态、Mock Runtime、预置日志和重置偏好，以减少系统环境抖动。
 
 ## 用例详情（当前）
@@ -121,6 +121,21 @@
   步骤：首次启动进入 `Settings`，依次把主键改成 `space`、退出键改成 `z`、In-App 键改成 `a`；随后重启应用。
   验证：重启后三个下拉选择仍分别为 `space/z/a`。
 
+- `testSettingsMainHotkeyRepresentativeMatrixTriggersSwitcher`
+  场景：验证 Settings 中主快捷键的代表性 modifier/key 组合会真实触发 switcher。
+  步骤：分别设置 `Option + Space`、Control + Grave、`Command + B`，每次设置后重新启动并按对应快捷键。
+  验证：每个代表组合都会进入全局 switcher show 路径，覆盖 option/control/command 三类修饰键和空格、反引号、字母三类键位。
+
+- `testSettingsQuitHotkeyExplicitAndFallbackMatrixTerminatesSelectedApp`
+  场景：验证 Settings 中退出快捷键显式配置和 `quit == main` fallback 后都能真实作用于当前选中 app。
+  步骤：先设置 `Option + Z` 并按下退出当前选中 mock app；再设置主快捷键 `Option + Q` 且退出键也选择 `Q`，确认归一化为 `Option + W` 后按 fallback 快捷键。
+  验证：两种路径都会发出 mock 终止请求，刷新后选中 app 从 switcher 中移除。
+
+- `testSettingsInAppHotkeyExplicitAndFallbackMatrixStartsFocusedWindowSession`
+  场景：验证 Settings 中 In-App 快捷键显式配置和 `inApp == main` conflict fallback 后都能真实进入 focused-window session。
+  步骤：先设置 `Option + B` 作为 In-App 快捷键并触发；再设置主快捷键与 In-App 快捷键同为 `Option + B`，确认 In-App 归一化为 `Control + B` 后触发。
+  验证：两种路径都会进入 In-App focused-window switcher 会话。
+
 - `testSettingsHotkeyInAppControlsDisabledWithoutAccessibilityPermission`
   场景：无障碍权限缺失时，In-App 快捷键不应允许配置。
   步骤：在无障碍未授权、录屏已授权的前提下进入 `Settings`，定位 In-App 修饰键和主键控件。
@@ -180,10 +195,6 @@
 本节记录尚未进入上方“用例详情”的 UI 自动化与端到端缺口。跨层状态以 [TEST_COVERAGE_MATRIX.md](TEST_COVERAGE_MATRIX.md) 为准；当补齐任一条后，需要同步更新矩阵状态。
 
 ### P0
-
-- Settings 快捷键设置后真实生效
-  场景：用户修改主快捷键、退出快捷键或 In-App 快捷键。
-  目标断言：设置完成后按新快捷键，主切换器、退出当前选中应用或 In-App 窗口会话确实按新配置触发。不能只验证控件值、持久化值或 reload 日志。
 
 - Settings 搜索默认范围真实生效
   场景：用户把默认搜索范围改为 `window`。

@@ -23,6 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let panelController = makePanelController()
         self.panelController = panelController
+        FlowTabUITestBootstrapper.configurePanelControllerIfNeeded(panelController: panelController)
 
         setupHotkeyMonitors(using: HotkeyRegistrationRequest.load(userDefaults: resolvedUserDefaults))
         installHotkeyObserver()

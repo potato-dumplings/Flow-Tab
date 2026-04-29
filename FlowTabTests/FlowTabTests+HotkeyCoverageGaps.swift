@@ -156,6 +156,69 @@ extension FlowTabTests {
         )
     }
 
+    func testHotkeyRegistrationRequestCoversSupportedSettingsMatrixAxes() {
+        for modifier in SwitcherPrimaryModifier.allCases {
+            for mainKey in SwitcherHotkeyKey.allCases {
+                let quitKey: SwitcherHotkeyKey = mainKey == .q ? .w : .q
+                let inAppModifier: SwitcherPrimaryModifier = modifier == .control ? .option : .control
+
+                let request = HotkeyRegistrationRequest.normalized(
+                    mainPrimaryModifierRaw: modifier.rawValue,
+                    mainKeyRaw: mainKey.rawValue,
+                    quitKeyRaw: quitKey.rawValue,
+                    inAppPrimaryModifierRaw: inAppModifier.rawValue,
+                    inAppMainKeyRaw: mainKey.rawValue
+                )
+
+                XCTAssertEqual(request.mainConfiguration.primaryModifier, modifier)
+                XCTAssertEqual(request.mainConfiguration.mainKey, mainKey)
+                XCTAssertEqual(request.mainConfiguration.quitKey, quitKey)
+                XCTAssertEqual(request.inAppWindowConfiguration.primaryModifier, inAppModifier)
+                XCTAssertEqual(request.inAppWindowConfiguration.mainKey, mainKey)
+                XCTAssertEqual(
+                    HotkeyRegistrationRequest(notificationUserInfo: request.notificationUserInfo)?
+                        .mainConfiguration.mainKey,
+                    mainKey
+                )
+            }
+        }
+
+        for modifier in SwitcherPrimaryModifier.allCases {
+            for mainKey in SwitcherHotkeyKey.allCases {
+                let request = HotkeyRegistrationRequest.normalized(
+                    mainPrimaryModifierRaw: modifier.rawValue,
+                    mainKeyRaw: mainKey.rawValue,
+                    quitKeyRaw: mainKey.rawValue,
+                    inAppPrimaryModifierRaw: SwitcherPrimaryModifier.control.rawValue,
+                    inAppMainKeyRaw: SwitcherHotkeyKey.tab.rawValue
+                )
+                let expectedQuitKey: SwitcherHotkeyKey = mainKey == .q ? .w : .q
+
+                XCTAssertEqual(request.mainConfiguration.primaryModifier, modifier)
+                XCTAssertEqual(request.mainConfiguration.mainKey, mainKey)
+                XCTAssertEqual(request.mainConfiguration.quitKey, expectedQuitKey)
+            }
+        }
+
+        for modifier in SwitcherPrimaryModifier.allCases {
+            for mainKey in SwitcherHotkeyKey.allCases {
+                let quitKey: SwitcherHotkeyKey = mainKey == .q ? .w : .q
+                let request = HotkeyRegistrationRequest.normalized(
+                    mainPrimaryModifierRaw: modifier.rawValue,
+                    mainKeyRaw: mainKey.rawValue,
+                    quitKeyRaw: quitKey.rawValue,
+                    inAppPrimaryModifierRaw: modifier.rawValue,
+                    inAppMainKeyRaw: mainKey.rawValue
+                )
+                let expectedInAppModifier: SwitcherPrimaryModifier = modifier == .control ? .option : .control
+
+                XCTAssertEqual(request.inAppWindowConfiguration.primaryModifier, expectedInAppModifier)
+                XCTAssertEqual(request.inAppWindowConfiguration.mainKey, mainKey)
+                XCTAssertEqual(request.inAppWindowConfiguration.quitKey, .q)
+            }
+        }
+    }
+
     func testHotkeyConfigurationDerivedFieldsCoverSupportedModifiersAndRepresentativeKeys() {
         let modifiers: [(modifier: SwitcherPrimaryModifier, carbon: UInt32, display: String)] = [
             (.option, UInt32(optionKey), "Option"),

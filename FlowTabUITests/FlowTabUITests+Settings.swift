@@ -332,6 +332,277 @@ extension FlowTabUITests {
         }
     }
 
+    func testSettingsMainHotkeyRepresentativeMatrixTriggersSwitcher() throws {
+        let cases: [(modifier: String, key: String, shortcutText: String)] = [
+            ("option", "space", "Option + Space"),
+            ("control", "grave", "Control + `"),
+            ("command", "b", "Command + B")
+        ]
+
+        for item in cases {
+            configureHotkeysThroughSettings(
+                rawSelections: [
+                    (Identifier.settingsHotkeyMainModifier, item.modifier),
+                    (Identifier.settingsHotkeyMainKey, item.key),
+                    (Identifier.settingsHotkeyQuitKey, "z"),
+                    (Identifier.settingsHotkeyInAppModifier, "option"),
+                    (Identifier.settingsHotkeyInAppKey, "c")
+                ],
+                expectedValues: [
+                    (Identifier.settingsHotkeyMainModifier, item.modifier),
+                    (Identifier.settingsHotkeyMainKey, item.key),
+                    (Identifier.settingsHotkeyQuitKey, "z"),
+                    (Identifier.settingsHotkeyInAppModifier, "option"),
+                    (Identifier.settingsHotkeyInAppKey, "c")
+                ],
+                expectedLogMarkers: [
+                    "updated main=\(item.shortcutText)",
+                    "hotkeyReloadNotification sender=AppDelegate main=\(item.shortcutText)"
+                ]
+            )
+
+            let app = makeApp(additionalArguments: hotkeyEffectArguments())
+            launchFlowTabUITestApplication(app)
+            XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+
+            let logSnapshot = makeRuntimeLogFileSnapshot()
+            app.activate()
+            typeHotkey(in: app, key: item.key, modifier: item.modifier)
+            waitForRuntimeLogFiles(
+                containing: [
+                    "hotkeyPressed dir=forward panelVisible=0 action=show",
+                    "activeSpaceIgnore trigger=global_show",
+                    "HotKey Forward"
+                ],
+                since: logSnapshot
+            )
+            app.terminate()
+        }
+    }
+
+    func testSettingsQuitHotkeyExplicitAndFallbackMatrixTerminatesSelectedApp() throws {
+        let cases: [(
+            rawSelections: [(control: String, option: String)],
+            expectedValues: [(control: String, value: String)],
+            triggerKey: String,
+            expectedQuitShortcut: String
+        )] = [
+            (
+                [
+                    (Identifier.settingsHotkeyMainModifier, "option"),
+                    (Identifier.settingsHotkeyMainKey, "space"),
+                    (Identifier.settingsHotkeyQuitKey, "z"),
+                    (Identifier.settingsHotkeyInAppModifier, "option"),
+                    (Identifier.settingsHotkeyInAppKey, "b")
+                ],
+                [
+                    (Identifier.settingsHotkeyMainModifier, "option"),
+                    (Identifier.settingsHotkeyMainKey, "space"),
+                    (Identifier.settingsHotkeyQuitKey, "z"),
+                    (Identifier.settingsHotkeyInAppModifier, "option"),
+                    (Identifier.settingsHotkeyInAppKey, "b")
+                ],
+                "z",
+                "Option + Z"
+            ),
+            (
+                [
+                    (Identifier.settingsHotkeyMainModifier, "option"),
+                    (Identifier.settingsHotkeyMainKey, "q"),
+                    (Identifier.settingsHotkeyQuitKey, "q"),
+                    (Identifier.settingsHotkeyInAppModifier, "control"),
+                    (Identifier.settingsHotkeyInAppKey, "b")
+                ],
+                [
+                    (Identifier.settingsHotkeyMainModifier, "option"),
+                    (Identifier.settingsHotkeyMainKey, "q"),
+                    (Identifier.settingsHotkeyQuitKey, "w"),
+                    (Identifier.settingsHotkeyInAppModifier, "control"),
+                    (Identifier.settingsHotkeyInAppKey, "b")
+                ],
+                "w",
+                "Option + W"
+            )
+        ]
+
+        for item in cases {
+            configureHotkeysThroughSettings(
+                rawSelections: item.rawSelections,
+                expectedValues: item.expectedValues,
+                expectedLogMarkers: [
+                    "quit=\(item.expectedQuitShortcut)",
+                    "hotkeyReloadNotification sender=AppDelegate"
+                ]
+            )
+
+            let app = makeApp(additionalArguments: hotkeyEffectArguments() + ["--flowtab-ui-open-switcher"])
+            launchFlowTabUITestApplication(app)
+            XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+
+            let browserTile = element(in: app, identifier: "flowtab.switcher.app.com-flowtab-mock-browser")
+            XCTAssertTrue(browserTile.waitForExistence(timeout: 8))
+
+            let logSnapshot = makeRuntimeLogFileSnapshot()
+            typeHotkey(in: app, key: item.triggerKey, modifier: "option")
+            waitForRuntimeLogFiles(
+                containing: [
+                    "mock terminate request appID=com.flowtab.mock.browser",
+                    "terminate request app=Mock Browser appID=com.flowtab.mock.browser sent=true",
+                    "terminate post-refresh reason=poll appID=com.flowtab.mock.browser"
+                ],
+                since: logSnapshot,
+                timeout: 10
+            )
+            XCTAssertTrue(waitForNonExistence(browserTile, timeout: 6))
+            app.terminate()
+        }
+    }
+
+    func testSettingsInAppHotkeyExplicitAndFallbackMatrixStartsFocusedWindowSession() throws {
+        let cases: [(
+            rawSelections: [(control: String, option: String)],
+            expectedValues: [(control: String, value: String)],
+            triggerModifier: String,
+            triggerKey: String,
+            expectedInAppShortcut: String
+        )] = [
+            (
+                [
+                    (Identifier.settingsHotkeyMainModifier, "option"),
+                    (Identifier.settingsHotkeyMainKey, "space"),
+                    (Identifier.settingsHotkeyQuitKey, "z"),
+                    (Identifier.settingsHotkeyInAppModifier, "option"),
+                    (Identifier.settingsHotkeyInAppKey, "b")
+                ],
+                [
+                    (Identifier.settingsHotkeyMainModifier, "option"),
+                    (Identifier.settingsHotkeyMainKey, "space"),
+                    (Identifier.settingsHotkeyQuitKey, "z"),
+                    (Identifier.settingsHotkeyInAppModifier, "option"),
+                    (Identifier.settingsHotkeyInAppKey, "b")
+                ],
+                "option",
+                "b",
+                "Option + B"
+            ),
+            (
+                [
+                    (Identifier.settingsHotkeyMainModifier, "option"),
+                    (Identifier.settingsHotkeyMainKey, "b"),
+                    (Identifier.settingsHotkeyQuitKey, "z"),
+                    (Identifier.settingsHotkeyInAppModifier, "option"),
+                    (Identifier.settingsHotkeyInAppKey, "b")
+                ],
+                [
+                    (Identifier.settingsHotkeyMainModifier, "option"),
+                    (Identifier.settingsHotkeyMainKey, "b"),
+                    (Identifier.settingsHotkeyQuitKey, "z"),
+                    (Identifier.settingsHotkeyInAppModifier, "control"),
+                    (Identifier.settingsHotkeyInAppKey, "b")
+                ],
+                "control",
+                "b",
+                "Control + B"
+            )
+        ]
+
+        for item in cases {
+            configureHotkeysThroughSettings(
+                rawSelections: item.rawSelections,
+                expectedValues: item.expectedValues,
+                expectedLogMarkers: [
+                    "inApp=\(item.expectedInAppShortcut)",
+                    "hotkeyReloadNotification sender=AppDelegate"
+                ]
+            )
+
+            let app = makeApp(
+                additionalArguments: hotkeyEffectArguments() + [
+                    "--flowtab-ui-mock-runtime-variant",
+                    "focused-current-app"
+                ]
+            )
+            launchFlowTabUITestApplication(app)
+            XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+
+            let logSnapshot = makeRuntimeLogFileSnapshot()
+            app.activate()
+            typeHotkey(in: app, key: item.triggerKey, modifier: item.triggerModifier)
+            waitForRuntimeLogFiles(
+                containing: [
+                    "inAppHotkeyPressed dir=forward panelVisible=0 action=show",
+                    "activeSpaceIgnore trigger=in_app_show",
+                    "InApp Window Forward"
+                ],
+                since: logSnapshot
+            )
+            app.terminate()
+        }
+    }
+
+    private func hotkeyEffectArguments() -> [String] {
+        [
+            "--flowtab-ui-mock-runtime",
+            "--flowtab-ui-runtime-log-level",
+            "DEBUG",
+            "--flowtab-ui-enable-verbose-logs",
+            "--flowtab-ui-record-hotkey-reload-diagnostics",
+            "--flowtab-ui-enable-mock-hotkey-effects",
+            "--flowtab-ui-ax-trusted",
+            "YES",
+            "--flowtab-ui-screen-trusted",
+            "YES"
+        ]
+    }
+
+    private func configureHotkeysThroughSettings(
+        rawSelections: [(control: String, option: String)],
+        expectedValues: [(control: String, value: String)],
+        expectedLogMarkers: [String]
+    ) {
+        let app = makeApp(additionalArguments: ["--flowtab-ui-reset-defaults"] + hotkeyEffectArguments())
+        launchFlowTabUITestApplication(app)
+        openSettingsTab(in: app)
+
+        let logSnapshot = makeRuntimeLogFileSnapshot()
+        for selection in rawSelections {
+            selectOption(in: app, controlIdentifier: selection.control, optionIdentifier: selection.option)
+        }
+        for expectedValue in expectedValues {
+            assertValue(of: element(in: app, identifier: expectedValue.control), equals: expectedValue.value)
+        }
+        waitForRuntimeLogFiles(containing: expectedLogMarkers, since: logSnapshot)
+        app.terminate()
+    }
+
+    private func typeHotkey(in app: XCUIApplication, key: String, modifier: String) {
+        let modifierFlags = modifierFlags(for: modifier)
+        switch key {
+        case "space":
+            app.typeKey(.space, modifierFlags: modifierFlags)
+        case "tab":
+            app.typeKey(.tab, modifierFlags: modifierFlags)
+        case "grave":
+            app.typeKey("`", modifierFlags: modifierFlags)
+        default:
+            app.typeKey(key, modifierFlags: modifierFlags)
+        }
+    }
+
+    private func modifierFlags(for modifier: String) -> XCUIElement.KeyModifierFlags {
+        switch modifier {
+        case "option":
+            return .option
+        case "control":
+            return .control
+        case "command":
+            return .command
+        default:
+            XCTFail("Unsupported hotkey modifier: \(modifier)")
+            return []
+        }
+    }
+
     func testSettingsHotkeyInAppControlsDisabledWithoutAccessibilityPermission() throws {
         let app = makeApp(
             additionalArguments: [
