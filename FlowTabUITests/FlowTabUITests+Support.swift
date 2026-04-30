@@ -674,7 +674,12 @@ extension FlowTabUITests {
     }
 
     func testFlowTabUITestAppIdentityRunningApplicationTargetsFallBackToBundleIdentifierWithoutInstalledApp() {
-        let identity = FlowTabUITestAppIdentity.configured(environment: [:])
+        let defaultInstalledAppURL = URL(fileURLWithPath: "/tmp/Flow Tab UITest.app")
+        let identity = FlowTabUITestAppIdentity.configured(
+            environment: [:],
+            defaultInstalledAppURL: defaultInstalledAppURL,
+            fileExistsAtPath: { _ in false }
+        )
 
         XCTAssertEqual(
             identity.runningApplicationTargets,
