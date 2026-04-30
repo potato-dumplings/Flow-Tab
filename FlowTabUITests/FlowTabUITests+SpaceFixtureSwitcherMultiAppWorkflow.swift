@@ -237,6 +237,49 @@ extension FlowTabUITests {
         }
     }
 
+    func testSwitcherPanelAppSearchFindsAndActivatesRealWorkflowApp() throws {
+        let workflow = try configuredSwitcherSpaceFixtureWorkflow()
+        let targetApp = try XCTUnwrap(
+            workflow.apps.first { $0.appID == "chrome" },
+            "Switcher workflow must include the Chrome-style fixture app for app-scope search"
+        )
+
+        try runRealSpaceFixtureWorkflow(
+            workflow,
+            flowTabAdditionalArguments: [
+                "--flowtab-ui-open-switcher-search",
+                "-searchDefaultScope",
+                "app"
+            ]
+        ) { _, app in
+            let searchInput = element(in: app, identifier: Identifier.switcherSearchInput)
+            XCTAssertTrue(searchInput.waitForExistence(timeout: 8))
+            XCTAssertNotEqual(
+                NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+                targetApp.identity.bundleIdentifier,
+                "The app-scope activation scenario must start outside the target fixture app."
+            )
+
+            RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+            app.typeText(targetApp.identity.switcherSearchQuery)
+
+            let result = element(
+                in: app,
+                identifier: targetApp.identity.switcherSearchAppAccessibilityIdentifier
+            )
+            XCTAssertTrue(
+                result.waitForExistence(timeout: 8),
+                "FlowTab did not expose \(targetApp.appName) as a real app-scope search result."
+            )
+
+            confirmSwitcherSearchSelection(in: app, searchInput: searchInput)
+            XCTAssertTrue(
+                waitForFrontmostWorkflowApp(targetApp, timeout: 10),
+                "Search confirmation did not activate the \(targetApp.appName) fixture app."
+            )
+        }
+    }
+
     func testSwitcherPanelWindowSearchActivatesFullscreenWorkflowWindowAcrossSpaces() throws {
         let workflow = try configuredSwitcherSpaceFixtureWorkflow()
         let targetApp = try XCTUnwrap(
@@ -401,6 +444,29 @@ extension FlowTabUITests {
         } while Date() < deadline
 
         return nil
+    }
+
+    private func waitForFrontmostWorkflowApp(
+        _ workflowApp: SpaceFixtureResolvedWorkflow.App,
+        timeout: TimeInterval
+    ) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        var latestFrontmostBundleIdentifier: String?
+        repeat {
+            latestFrontmostBundleIdentifier = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+            if latestFrontmostBundleIdentifier == workflowApp.identity.bundleIdentifier {
+                return true
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+
+        XCTFail(
+            """
+            Expected frontmost app \(workflowApp.appName), \
+            found frontmost bundle \(latestFrontmostBundleIdentifier ?? "nil").
+            """
+        )
+        return false
     }
 
     private func assertSwitcherPreviewShowsOnlyExpectedTitles(

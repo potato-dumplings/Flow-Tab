@@ -10,9 +10,9 @@
 
 ## 覆盖总览（当前）
 
-- 用例总数：34
+- 用例总数：35
 - 覆盖域：启动导航、Home、权限提示、Logs、Settings、Switcher/Search、压测。
-- 当前状态：应用内可稳定自动化的核心场景已有覆盖，Settings 搜索默认范围的双向运行时生效路径和 Home 真实窗口点击激活路径已补齐，剩余真实 fixture 缺口按下方优先级继续补齐。
+- 当前状态：应用内可稳定自动化的核心场景已有覆盖，Settings 搜索默认范围的双向运行时生效路径、Home 真实窗口点击激活路径、Switcher 真实 app-scope 搜索激活路径已补齐，剩余真实 fixture 缺口按下方优先级继续补齐。
 - 执行前提：大多数用例依赖 UI test launch arguments 控制权限状态、Mock Runtime、预置日志和重置偏好，以减少系统环境抖动。
 
 ## 用例详情（当前）
@@ -168,6 +168,11 @@
   步骤：启动即进入搜索态，输入 `browser`，等待 `Mock Browser` 结果出现，然后按回车提交；若首次回车只结束输入法组合态，则补发一次回车。
   验证：搜索结果会出现，提交后 Switcher 面板最终消失，说明结果激活成功。
 
+- `testSwitcherPanelAppSearchFindsAndActivatesRealWorkflowApp`
+  场景：真实 multi-app fixture workflow 中使用 app scope 搜索 fixture app 的 bundle identity token。
+  步骤：以 `app` 默认范围启动搜索态 switcher，输入目标 fixture app 的搜索 token，等待真实 `flowtab.switcher.search.app.*` 结果出现后按回车确认。
+  验证：目标 fixture app 成为 frontmost app，证明真实 runtime 搜索结果可以按 app-scope 路径激活正确应用。
+
 - `testSearchPanelChineseQueryShowsChineseMockResult`
   场景：验证中文查询可命中中文模拟应用。
   步骤：启动即进入搜索态，输入中文字符 `测`。
@@ -208,12 +213,6 @@
 ## 未完成 / 待补覆盖
 
 本节记录尚未进入上方“用例详情”的 UI 自动化与端到端缺口。跨层状态以 [TEST_COVERAGE_MATRIX.md](TEST_COVERAGE_MATRIX.md) 为准；当补齐任一条后，需要同步更新矩阵状态。
-
-### P1
-
-- 真实 app-scope search 激活
-  场景：真实 multi-app fixture workflow 中使用 app scope 搜索 app 名称或 bundle identity。
-  目标断言：搜索结果出现真实 `flowtab.switcher.search.app.*` 项；确认后目标 fixture app 成为 frontmost app。
 
 ### P2
 
