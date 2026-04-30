@@ -1,5 +1,4 @@
 import AppKit
-import ApplicationServices
 import Foundation
 import XCTest
 
@@ -566,67 +565,6 @@ extension FlowTabUITests {
             app.typeText("\r")
         }
         XCTAssertTrue(waitForNonExistence(searchInput, timeout: 4))
-    }
-
-    private func waitForFocusedWorkflowWindow(
-        title: String,
-        app workflowApp: SpaceFixtureResolvedWorkflow.App,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestFrontmostBundleIdentifier: String?
-        var latestFocusedTitle: String?
-        repeat {
-            latestFrontmostBundleIdentifier = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-            latestFocusedTitle = focusedWindowTitle(forBundleIdentifier: workflowApp.identity.bundleIdentifier)
-            if latestFrontmostBundleIdentifier == workflowApp.identity.bundleIdentifier,
-               latestFocusedTitle == title {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTFail(
-            """
-            Expected frontmost window \(workflowApp.appName) / \(title), \
-            found frontmost bundle \(latestFrontmostBundleIdentifier ?? "nil") \
-            with focused title \(latestFocusedTitle ?? "nil").
-            """
-        )
-        return false
-    }
-
-    private func focusedWindowTitle(forBundleIdentifier bundleIdentifier: String) -> String? {
-        guard let runningApp = NSRunningApplication
-            .runningApplications(withBundleIdentifier: bundleIdentifier)
-            .first(where: { !$0.isTerminated })
-        else {
-            return nil
-        }
-
-        let appElement = AXUIElementCreateApplication(runningApp.processIdentifier)
-        var focusedWindowValue: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            appElement,
-            kAXFocusedWindowAttribute as CFString,
-            &focusedWindowValue
-        ) == .success,
-            let focusedWindowValue
-        else {
-            return nil
-        }
-
-        let focusedWindow = focusedWindowValue as! AXUIElement
-        var titleValue: CFTypeRef?
-        guard AXUIElementCopyAttributeValue(
-            focusedWindow,
-            kAXTitleAttribute as CFString,
-            &titleValue
-        ) == .success else {
-            return nil
-        }
-
-        return (titleValue as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func switcherAppStripSummary(

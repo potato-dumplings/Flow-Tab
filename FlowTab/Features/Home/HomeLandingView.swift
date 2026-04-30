@@ -34,6 +34,7 @@ struct HomeLandingView: View {
     @State private var screenCaptureTrusted = ScreenCapturePermissionChecker.hasScreenCapturePermission
     @State private var appSummaries: [RuntimeHomeAppSummary] = []
     @State private var windowsByAppID: [String: [WindowCandidate]] = [:]
+    @State private var homeSnapshotsByAppID: [String: RuntimeHomeAppSnapshot] = [:]
     @State private var selectedAppID: String?
     @State private var appSummariesRefreshTask: Task<Void, Never>?
     @State private var selectedAppRefreshTask: Task<Void, Never>?
@@ -239,19 +240,20 @@ struct HomeLandingView: View {
                     trailing: "--",
                     isSelected: false
                 )
-            } else if !activeWindows.isEmpty {
+            } else if let activeApp, !activeWindows.isEmpty {
                 ScrollView {
                     LazyVStack(spacing: 8) {
                         ForEach(Array(activeWindows.enumerated()), id: \.element.id) { index, window in
-                            HomeLayerRowView(
+                            HomeWindowRowButton(
                                 title: windowTitle(window.title, index: index),
-                                subtitle: "",
                                 trailing: windowIdentifier(window.id),
-                                isSelected: index == 0
-                            )
-                            .accessibilityIdentifier(
-                                "flowtab.home.window.\(window.id.flowTabAccessibilitySlug)"
-                            )
+                                isSelected: index == 0,
+                                accessibilityIdentifier: "flowtab.home.window.\(window.id.flowTabAccessibilitySlug)"
+                            ) {
+                                activateWindow(activeApp.appID, windowID: window.id)
+                            }
+                            .frame(height: 34)
+                            .frame(maxWidth: .infinity)
                         }
                     }
                 }
@@ -410,6 +412,14 @@ struct HomeLandingView: View {
         )
     }
 
+    private func activateWindow(_ appID: String, windowID: String) {
+        HomeWindowActivationController.shared.activateWindow(
+            appID: appID,
+            windowID: windowID,
+            snapshot: homeSnapshotsByAppID[appID]
+        )
+    }
+
     private func scheduleAppSummariesRefresh(reason: String) {
         appSummariesRefreshTask?.cancel()
         appSummariesRefreshTask = Task { @MainActor in
@@ -426,6 +436,7 @@ struct HomeLandingView: View {
         appSummaries = summaries
         let validAppIDs = Set(summaries.map(\.appID))
         windowsByAppID = windowsByAppID.filter { validAppIDs.contains($0.key) }
+        homeSnapshotsByAppID = homeSnapshotsByAppID.filter { validAppIDs.contains($0.key) }
         syncSelectedApp()
         setupWindowMonitorIfNeeded()
         persistCache(updateRunningSignature: true)
@@ -482,6 +493,7 @@ struct HomeLandingView: View {
             guard let snapshot else {
                 appSummaries.removeAll { $0.appID == appID }
                 windowsByAppID.removeValue(forKey: appID)
+                homeSnapshotsByAppID.removeValue(forKey: appID)
                 syncSelectedApp()
                 setupWindowMonitorIfNeeded()
                 persistCache()
@@ -501,12 +513,14 @@ struct HomeLandingView: View {
                 appSummaries.append(snapshot.summary)
             }
             windowsByAppID[appID] = snapshot.candidate.windows
+            homeSnapshotsByAppID[appID] = snapshot
         } else {
             let summary = await fetchHomeAppSummaryOnBackground(appID: appID)
             guard !Task.isCancelled else { return }
             guard let summary else {
                 appSummaries.removeAll { $0.appID == appID }
                 windowsByAppID.removeValue(forKey: appID)
+                homeSnapshotsByAppID.removeValue(forKey: appID)
                 syncSelectedApp()
                 setupWindowMonitorIfNeeded()
                 persistCache()

@@ -1,6 +1,6 @@
 # UI 自动化测试覆盖清单（FlowTab）
 
-更新时间：2026-04-29
+更新时间：2026-04-30
 
 ## 目标与范围
 
@@ -10,9 +10,9 @@
 
 ## 覆盖总览（当前）
 
-- 用例总数：33
+- 用例总数：34
 - 覆盖域：启动导航、Home、权限提示、Logs、Settings、Switcher/Search、压测。
-- 当前状态：应用内可稳定自动化的核心场景已有覆盖，Settings 搜索默认范围的双向运行时生效路径已补齐，剩余真实 fixture 缺口按下方优先级继续补齐。
+- 当前状态：应用内可稳定自动化的核心场景已有覆盖，Settings 搜索默认范围的双向运行时生效路径和 Home 真实窗口点击激活路径已补齐，剩余真实 fixture 缺口按下方优先级继续补齐。
 - 执行前提：大多数用例依赖 UI test launch arguments 控制权限状态、Mock Runtime、预置日志和重置偏好，以减少系统环境抖动。
 
 ## 用例详情（当前）
@@ -55,6 +55,11 @@
   场景：使用 Mock Runtime，在 Home 页验证“应用列表 -> 窗口列表”的联动。
   步骤：启动后进入 `Home`，选中模拟应用 `Mock Browser`。
   验证：窗口列表中会出现 `mock-browser-docs` 对应的窗口行，说明首页应用选择会同步刷新窗口明细。
+
+- `testHomePageClickingRealWorkflowWindowActivatesExactFixtureWindow`
+  场景：真实 multi-app fixture workflow 中 Home 页面展示多个 app 和窗口。
+  步骤：进入 `Home`，选择带有多个标准窗口的真实 fixture app，再点击其中一个非默认窗口行。
+  验证：目标 fixture app 成为 frontmost app，且 frontmost CG window number 等于被点击 Home 窗口行暴露的真实 window id，证明不会误激活同 app 的其他窗口或其他 app 窗口。
 
 ### Logs
 
@@ -205,10 +210,6 @@
 本节记录尚未进入上方“用例详情”的 UI 自动化与端到端缺口。跨层状态以 [TEST_COVERAGE_MATRIX.md](TEST_COVERAGE_MATRIX.md) 为准；当补齐任一条后，需要同步更新矩阵状态。
 
 ### P1
-
-- Home 真实窗口点击激活
-  场景：真实 fixture workflow 中 Home 页面展示多个 app 和窗口。
-  目标断言：点击某个真实窗口行后，对应 fixture window 成为 frontmost window，且不会误激活同 app 其他窗口或其他 app 窗口。
 
 - 真实 app-scope search 激活
   场景：真实 multi-app fixture workflow 中使用 app scope 搜索 app 名称或 bundle identity。

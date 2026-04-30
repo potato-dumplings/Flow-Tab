@@ -601,8 +601,9 @@ extension FlowTabUITests {
         terminateSpaceFixtureWorkflowAppsIfRunning(workflow.apps.map(\.identity))
     }
 
-    private func runRealSpaceFixtureMultiAppWorkflow(
+    func runRealSpaceFixtureMultiAppWorkflow(
         flowTabAdditionalArguments: [String] = [],
+        waitsForFullscreenMarkers: Bool = true,
         perform assertions: (SpaceFixtureResolvedWorkflow, XCUIApplication) throws -> Void
     ) throws {
         let workflow: SpaceFixtureResolvedWorkflow
@@ -623,6 +624,7 @@ extension FlowTabUITests {
         try runRealSpaceFixtureWorkflow(
             workflow,
             flowTabAdditionalArguments: flowTabAdditionalArguments,
+            waitsForFullscreenMarkers: waitsForFullscreenMarkers,
             perform: assertions
         )
     }
@@ -630,10 +632,14 @@ extension FlowTabUITests {
     func runRealSpaceFixtureWorkflow(
         _ workflow: SpaceFixtureResolvedWorkflow,
         flowTabAdditionalArguments: [String] = [],
+        waitsForFullscreenMarkers: Bool = true,
         perform assertions: (SpaceFixtureResolvedWorkflow, XCUIApplication) throws -> Void
     ) throws {
         terminateSpaceFixtureWorkflowAppsIfRunning(workflow.apps.map(\.identity))
-        let fixtureApps = launchResolvedSpaceFixtureWorkflow(workflow)
+        let fixtureApps = launchResolvedSpaceFixtureWorkflow(
+            workflow,
+            waitsForFullscreenMarkers: waitsForFullscreenMarkers
+        )
         defer {
             terminateSpaceFixtureWorkflowApps(fixtureApps)
         }
@@ -844,7 +850,8 @@ extension FlowTabUITests {
     }
 
     private func launchResolvedSpaceFixtureWorkflow(
-        _ workflow: SpaceFixtureResolvedWorkflow
+        _ workflow: SpaceFixtureResolvedWorkflow,
+        waitsForFullscreenMarkers: Bool
     ) -> [XCUIApplication] {
         var launchedApps: [XCUIApplication] = []
 
@@ -861,7 +868,7 @@ extension FlowTabUITests {
             waitForSpaceFixtureWorkflowToStabilize(
                 in: app,
                 expectedWindowTitles: workflowApp.expectedWindowTitles,
-                fullscreenWindowIndex: workflowApp.fullscreenWindowIndex,
+                fullscreenWindowIndex: waitsForFullscreenMarkers ? workflowApp.fullscreenWindowIndex : nil,
                 settleTimeout: 0
             )
             launchedApps.append(app)

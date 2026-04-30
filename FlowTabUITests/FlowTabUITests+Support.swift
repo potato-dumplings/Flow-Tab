@@ -1,3 +1,5 @@
+import AppKit
+import ApplicationServices
 import Foundation
 import XCTest
 
@@ -405,6 +407,176 @@ extension FlowTabUITests {
         let predicate = NSPredicate(format: "exists == false")
         let expectation = XCTNSPredicateExpectation(predicate: predicate, object: element)
         return XCTWaiter().wait(for: [expectation], timeout: timeout) == .completed
+    }
+    func waitForFocusedWorkflowWindow(
+        title: String,
+        app workflowApp: SpaceFixtureResolvedWorkflow.App,
+        timeout: TimeInterval
+    ) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        var latestFrontmostBundleIdentifier: String?
+        var latestFocusedTitle: String?
+        repeat {
+            latestFrontmostBundleIdentifier = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+            latestFocusedTitle = activeWindowTitle(forBundleIdentifier: workflowApp.identity.bundleIdentifier)
+            if latestFrontmostBundleIdentifier == workflowApp.identity.bundleIdentifier,
+               latestFocusedTitle == title {
+                return true
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+
+        XCTFail(
+            """
+            Expected frontmost window \(workflowApp.appName) / \(title), \
+            found frontmost bundle \(latestFrontmostBundleIdentifier ?? "nil") \
+            with active window title \(latestFocusedTitle ?? "nil").
+            """
+        )
+        return false
+    }
+
+    func waitForFrontmostWorkflowWindow(
+        windowNumber: CGWindowID,
+        title: String,
+        app workflowApp: SpaceFixtureResolvedWorkflow.App,
+        timeout: TimeInterval
+    ) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        var latestFrontmostBundleIdentifier: String?
+        var latestWindowNumber: CGWindowID?
+        var latestFocusedTitle: String?
+        repeat {
+            latestFrontmostBundleIdentifier = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+            latestWindowNumber = frontmostCGWindowNumber(
+                forBundleIdentifier: workflowApp.identity.bundleIdentifier
+            )
+            latestFocusedTitle = activeWindowTitle(forBundleIdentifier: workflowApp.identity.bundleIdentifier)
+            if latestFrontmostBundleIdentifier == workflowApp.identity.bundleIdentifier,
+               latestWindowNumber == windowNumber {
+                return true
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+
+        XCTFail(
+            """
+            Expected frontmost window \(workflowApp.appName) / \(title) / \(windowNumber), \
+            found frontmost bundle \(latestFrontmostBundleIdentifier ?? "nil") \
+            with active window title \(latestFocusedTitle ?? "nil") \
+            and window number \(latestWindowNumber.map(String.init) ?? "nil").
+            """
+        )
+        return false
+    }
+
+    private func activeWindowTitle(forBundleIdentifier bundleIdentifier: String) -> String? {
+        guard let runningApp = NSRunningApplication
+            .runningApplications(withBundleIdentifier: bundleIdentifier)
+            .first(where: { !$0.isTerminated })
+        else {
+            return nil
+        }
+
+        let appElement = AXUIElementCreateApplication(runningApp.processIdentifier)
+        return windowTitle(
+            for: kAXFocusedWindowAttribute as CFString,
+            in: appElement
+        ) ?? windowTitle(
+            for: kAXMainWindowAttribute as CFString,
+            in: appElement
+        ) ?? frontmostCGWindowTitle(forPID: runningApp.processIdentifier)
+    }
+
+    private func frontmostCGWindowNumber(forBundleIdentifier bundleIdentifier: String) -> CGWindowID? {
+        guard let runningApp = NSRunningApplication
+            .runningApplications(withBundleIdentifier: bundleIdentifier)
+            .first(where: { !$0.isTerminated })
+        else {
+            return nil
+        }
+
+        return frontmostCGWindow(forPID: runningApp.processIdentifier)?.number
+    }
+
+    private func frontmostCGWindowTitle(forPID pid: pid_t) -> String? {
+        frontmostCGWindow(forPID: pid)?.title
+    }
+
+    private func frontmostCGWindow(forPID pid: pid_t) -> (number: CGWindowID, title: String?)? {
+        guard
+            let windows = CGWindowListCopyWindowInfo(
+                [.optionOnScreenOnly, .excludeDesktopElements],
+                kCGNullWindowID
+            ) as? [[String: Any]]
+        else {
+            return nil
+        }
+
+        for window in windows {
+            guard cgWindowPID(window[kCGWindowOwnerPID as String]) == pid else {
+                continue
+            }
+            guard (window[kCGWindowLayer as String] as? Int) == 0 else {
+                continue
+            }
+            let alpha = (window[kCGWindowAlpha as String] as? NSNumber)?.doubleValue ?? 1.0
+            guard alpha > 0 else { continue }
+            guard let number = cgWindowNumber(window[kCGWindowNumber as String]) else {
+                continue
+            }
+
+            let title = (window[kCGWindowName as String] as? String)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return (number: number, title: title?.isEmpty == false ? title : nil)
+        }
+
+        return nil
+    }
+
+    private func cgWindowPID(_ value: Any?) -> pid_t? {
+        if let pid = value as? pid_t {
+            return pid
+        }
+        if let number = value as? NSNumber {
+            return pid_t(number.int32Value)
+        }
+        return nil
+    }
+
+    private func cgWindowNumber(_ value: Any?) -> CGWindowID? {
+        if let windowNumber = value as? CGWindowID {
+            return windowNumber
+        }
+        if let number = value as? NSNumber {
+            return CGWindowID(number.uint32Value)
+        }
+        return nil
+    }
+
+    private func windowTitle(for attribute: CFString, in appElement: AXUIElement) -> String? {
+        var windowValue: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            appElement,
+            attribute,
+            &windowValue
+        ) == .success,
+            let windowValue
+        else {
+            return nil
+        }
+
+        let window = windowValue as! AXUIElement
+        var titleValue: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            window,
+            kAXTitleAttribute as CFString,
+            &titleValue
+        ) == .success else {
+            return nil
+        }
+
+        return (titleValue as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     func assertStaticTextsAbsent(
         _ titles: [String],
