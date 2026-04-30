@@ -486,6 +486,8 @@ codesign -dr - "/Applications/Flow Tab.app"
 - [space-fixture-home-fullscreen-only-workflow.json]({user-home}/Projeck-Works/Personal/FlowTabApp/docs/fixtures/space-fixture-home-fullscreen-only-workflow.json)
 - [FlowTabUITests+SpaceFixtureSwitcherMultiAppWorkflow.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabUITests/FlowTabUITests+SpaceFixtureSwitcherMultiAppWorkflow.swift)
 - [space-fixture-switcher-multi-app-workflow.json]({user-home}/Projeck-Works/Personal/FlowTabApp/docs/fixtures/space-fixture-switcher-multi-app-workflow.json)
+- [FlowTabUITests+SpaceFixtureEdgeInputsWorkflow.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabUITests/FlowTabUITests+SpaceFixtureEdgeInputsWorkflow.swift)
+- [space-fixture-switcher-edge-inputs-workflow.json]({user-home}/Projeck-Works/Personal/FlowTabApp/docs/fixtures/space-fixture-switcher-edge-inputs-workflow.json)
 
 这些用例当前验证：
 
@@ -496,6 +498,8 @@ codesign -dr - "/Applications/Flow Tab.app"
 - `Switcher` app strip 会同时暴露 workflow 中至少 3 个真实 app 的 `flowtab.switcher.app.*` accessibility anchors
 - `Switcher` preview layer 会用真实 `flowtab.switcher.window.*` window card anchors 证明当前选中 app 的窗口隔离
 - `Switcher` window-scope search 能检索普通窗口和 fullscreen/off-space 窗口，并在确认后激活目标 fixture window、收起 panel
+- edge-input workflow 会在不启用 staggered layout 时证明同名、同尺寸、同位置窗口仍保留独立 preview 和 search 结果
+- edge-input workflow 会证明非 ASCII、标点、空白和长标题能通过真实 AX/runtime search 并激活对应 fixture window
 - workflow 模式下的 per-app 启动顺序、resolved window title 和 fullscreen 标记会被测试驱动层正确读取
 
 该链路当前优先读取：
@@ -580,6 +584,12 @@ codesign -dr - "/Applications/Flow Tab.app"
 - `Switcher` window-scope search 能从当前 Space 激活 fullscreen/off-space window。
   场景：一个 app 保持当前桌面窗口，一个 app 拥有 fullscreen window，另一个 app 处于普通窗口状态。
   断言：从当前 Space 打开 search 并选择 fullscreen window 后，macOS 切到目标 Space，目标 fixture window 成为 frontmost window，FlowTab panel 不残留。
+- `Switcher` preview 和 window-scope search 在 edge-input workflow 下保留同名真实窗口。
+  场景：不同 app 都含 `Shared Docs` 窗口，其中一个 app 内有两个标题、尺寸和位置都相同的 `Shared Docs` 标准窗口。
+  断言：preview 保留两张同名独立 window card，window-scope search 保留 3 条同名独立结果，并用 app name 区分归属。
+- `Switcher` window-scope search 在 edge-input workflow 下匹配并激活非 ASCII、标点、空白和长标题。
+  场景：真实 fixture window 标题包含 `报告 Docs`、标点、空白和长标题后缀。
+  断言：搜索能通过长标题中的标点词命中唯一真实窗口结果，确认后对应 fixture window id 成为 frontmost window。
 
 ### 未实现优先级清单
 
@@ -601,23 +611,11 @@ codesign -dr - "/Applications/Flow Tab.app"
    建议场景：Chrome fixture 使用原始窗口标题 `Chrome Window 1/2`，选中 tab 为 `Docs/Mail`，同时再启动至少一个非 tabbed app。
    目标断言：FlowTab 在 `Home`、`Switcher` preview 和 window-scope search 中显示的是 `Docs/Mail` 这类 resolved title，而不是原始 window title。
 
-4. `P2` 不同 app 拥有同名窗口时，window-scope search 仍能同时给出多条真实结果。
-   建议场景：两个 app 都含标题为 `Docs` 的窗口。
-   目标断言：搜索结果保留多个 `Docs` 命中项，并通过 app name 区分归属，而不是错误合并或只保留一条。
-
-5. `P2` 多个真实窗口在标题、尺寸、位置等可见属性完全相同时，FlowTab 仍保留独立窗口结果。
-   建议场景：两个窗口使用相同 resolved title、相同 frame、相同 mode，可分布在两个 app 或同一 app 内。
-   目标断言：`Switcher` preview、window-scope search，以及需要时的 `Home` 窗口列表中仍保留多条独立窗口记录，而不是被错误合并、去重或只保留一条。
-
-6. `P2` 非 ASCII、标点、空白和长标题能通过真实 AX 链路进入 FlowTab。
-   建议场景：workflow window titles 包含中文、空格、标点、大小写混合和较长标题。
-   目标断言：`Home`、`Switcher` preview 和 window-scope search 展示与匹配 resolved title 时不丢字符、不错误 slug 化，也不因长标题导致结果不可定位。
-
-7. `P2` multi-app workflow 运行中 app/window 生命周期刷新不会留下 stale 结果。
+4. `P2` multi-app workflow 运行中 app/window 生命周期刷新不会留下 stale 结果。
     建议场景：启动多个 workflow app 后，退出其中一个 app，或关闭其中一个 fixture window，再重新打开 Home/Switcher/search。
     目标断言：已退出 app 和已关闭 window 从 `Home`、`Switcher` 和 search 结果中消失；仍存活的 app/window 不受影响。
 
-8. `P2` 增加统一的 multi-app workflow 启动和清理入口。
+5. `P2` 增加统一的 multi-app workflow 启动和清理入口。
     当前状态：`build-space-fixture-workflow.sh` 只生成 app 变体和 resolved workflow JSON，真实多 app 启动主要存在于 `FlowTabUITests` helper 内。
     目标能力：提供一个测试/本地回归可复用的启动与清理入口，按 `launchOrder` 拉起全部 fixture app，并在失败或测试结束时可靠终止所有 workflow app。
 
@@ -630,7 +628,7 @@ codesign -dr - "/Applications/Flow Tab.app"
 - 已实现 workflow 配置解析与应用内 tab 模型
 - 已实现 workflow 级 app 变体构建脚本
 - 已实现 fixture app 自身对 tabbed window 的 UI 覆盖
-- 已实现基于 resolved workflow JSON 的 FlowTab multi-app `Home` 计数、app 切换窗口列表隔离、`fullscreen-only app` 稳定展示，以及 `Switcher` app strip、preview 隔离、window-scope search 激活 E2E 用例
+- 已实现基于 resolved workflow JSON 的 FlowTab multi-app `Home` 计数、app 切换窗口列表隔离、`fullscreen-only app` 稳定展示，以及 `Switcher` app strip、preview 隔离、window-scope search 激活和 edge-input E2E 用例
 - 尚未把多 app workflow 全量接到 FlowTab 真实 runtime end-to-end UI workflow
 
 因此，这份文档应按“当前实现说明”理解，而不是“未来设计提案”。

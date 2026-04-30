@@ -10,9 +10,9 @@
 
 ## 覆盖总览（当前）
 
-- 用例总数：35
+- 用例总数：38
 - 覆盖域：启动导航、Home、权限提示、Logs、Settings、Switcher/Search、压测。
-- 当前状态：应用内可稳定自动化的核心场景已有覆盖，Settings 搜索默认范围的双向运行时生效路径、Home 真实窗口点击激活路径、Switcher 真实 app-scope 搜索激活路径已补齐，剩余真实 fixture 缺口按下方优先级继续补齐。
+- 当前状态：应用内可稳定自动化的核心场景已有覆盖，Settings 搜索默认范围的双向运行时生效路径、Home 真实窗口点击激活路径、Switcher 真实 app-scope 搜索激活路径，以及真实 edge-input fixture 下的同名/同尺寸同位置窗口和非 ASCII 长标题路径已补齐，剩余真实 fixture 缺口按下方优先级继续补齐。
 - 执行前提：大多数用例依赖 UI test launch arguments 控制权限状态、Mock Runtime、预置日志和重置偏好，以减少系统环境抖动。
 
 ## 用例详情（当前）
@@ -173,6 +173,21 @@
   步骤：以 `app` 默认范围启动搜索态 switcher，输入目标 fixture app 的搜索 token，等待真实 `flowtab.switcher.search.app.*` 结果出现后按回车确认。
   验证：目标 fixture app 成为 frontmost app，证明真实 runtime 搜索结果可以按 app-scope 路径激活正确应用。
 
+- `testSwitcherPanelPreviewKeepsIdenticalRealWorkflowWindowsDistinct`
+  场景：真实 edge-input fixture workflow 中，同一个 app 拥有两个标题、尺寸和位置都相同的标准窗口。
+  步骤：不启用 staggered layout 启动 edge workflow，打开标准 switcher，切到包含重复 `Shared Docs` 窗口的 fixture app 后进入 window preview layer。
+  验证：preview 中出现两张独立 `flowtab.switcher.window.*` 卡片，标题 multiset 保留两条 `Shared Docs`，且 accessibility id 各不相同，说明真实窗口未被错误合并。
+
+- `testSwitcherPanelWindowSearchKeepsDuplicateRealWorkflowTitlesDistinct`
+  场景：真实 edge-input fixture workflow 中，不同 app 拥有同名窗口，且其中一个 app 内还有两个同名同位置窗口。
+  步骤：以 `window` 默认范围启动搜索态 switcher，查询 `Shared Docs`。
+  验证：搜索结果保留 3 条独立 `Shared Docs` 命中；其中 `Finder Fixture` 1 条、`Chrome Fixture` 2 条，且每条结果的 accessibility id 独立。
+
+- `testSwitcherPanelWindowSearchMatchesAndActivatesRealWorkflowEdgeTitle`
+  场景：真实 edge-input fixture workflow 中，窗口标题包含非 ASCII 字符、标点、空白和长标题文本。
+  步骤：以 `window` 默认范围启动搜索态 switcher，查询 `punctuation` 并确认命中结果。
+  验证：搜索能通过长标题中的标点词命中唯一真实窗口结果，确认选择后对应 fixture window id 成为 frontmost window。
+
 - `testSearchPanelChineseQueryShowsChineseMockResult`
   场景：验证中文查询可命中中文模拟应用。
   步骤：启动即进入搜索态，输入中文字符 `测`。
@@ -215,10 +230,6 @@
 本节记录尚未进入上方“用例详情”的 UI 自动化与端到端缺口。跨层状态以 [TEST_COVERAGE_MATRIX.md](TEST_COVERAGE_MATRIX.md) 为准；当补齐任一条后，需要同步更新矩阵状态。
 
 ### P2
-
-- 真实拓扑边缘输入
-  场景：不同 app 拥有同名窗口、多个窗口标题/尺寸/位置相同、非 ASCII 标题、标点、空白和长标题。
-  目标断言：真实 AX/runtime 链路仍能生成正确独立结果，并且搜索、预览或激活不会错误合并目标。
 
 - `Command + Tab` takeover 系统级端到端
   场景：用户启用系统快捷键接管后使用真实 `Command + Tab`。

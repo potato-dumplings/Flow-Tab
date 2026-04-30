@@ -1,0 +1,60 @@
+{
+  "workflowName": "multi-app-switcher-edge-inputs",
+  "settleTimeoutMs": 8000,
+  "apps": [
+    {
+      "appID": "finder",
+      "appName": "Finder Fixture",
+      "bundleId": "com.example.fixture.finder",
+      "launchOrder": 1,
+      "windows": [
+        {
+          "title": "Shared Docs",
+          "mode": "standard",
+          "tabs": []
+        },
+        {
+          "title": "Finder Scratch",
+          "mode": "standard",
+          "tabs": []
+        }
+      ]
+    },
+    {
+      "appID": "chrome",
+      "appName": "Chrome Fixture",
+      "bundleId": "com.example.fixture.chrome",
+      "launchOrder": 2,
+      "windows": [
+        {
+          "title": "Shared Docs",
+          "mode": "standard",
+          "tabs": []
+        },
+        {
+          "title": "Shared Docs",
+          "mode": "standard",
+          "tabs": []
+        }
+      ]
+    },
+    {
+      "appID": "notes",
+      "appName": "Notes Fixture",
+      "bundleId": "com.example.fixture.notes",
+      "launchOrder": 3,
+      "windows": [
+        {
+          "title": "报告 Docs: QA, punctuation & spaces - Long Title 2026 with extra searchable text for AX runtime coverage",
+          "mode": "standard",
+          "tabs": []
+        },
+        {
+          "title": "Notes Edge Reference",
+          "mode": "standard",
+          "tabs": []
+        }
+      ]
+    }
+  ]
+}
