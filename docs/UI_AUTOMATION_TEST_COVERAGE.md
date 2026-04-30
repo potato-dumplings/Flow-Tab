@@ -10,9 +10,9 @@
 
 ## 覆盖总览（当前）
 
-- 用例总数：38
+- 用例总数：39
 - 覆盖域：启动导航、Home、权限提示、Logs、Settings、Switcher/Search、压测。
-- 当前状态：应用内可稳定自动化的核心场景已有覆盖，Settings 搜索默认范围的双向运行时生效路径、Home 真实窗口点击激活路径、Switcher 真实 app-scope 搜索激活路径，以及真实 edge-input fixture 下的同名/同尺寸同位置窗口和非 ASCII 长标题路径已补齐，剩余真实 fixture 缺口按下方优先级继续补齐。
+- 当前状态：应用内可稳定自动化的核心场景已有覆盖，Settings 搜索默认范围的双向运行时生效路径、Home 真实窗口点击激活路径、Switcher 真实 app-scope 搜索激活路径、Settings 中 `Command + Tab` 接管触发与退出恢复路径，以及真实 edge-input fixture 下的同名/同尺寸同位置窗口和非 ASCII 长标题路径已补齐，剩余真实 fixture 缺口按下方优先级继续补齐。
 - 执行前提：大多数用例依赖 UI test launch arguments 控制权限状态、Mock Runtime、预置日志和重置偏好，以减少系统环境抖动。
 
 ## 用例详情（当前）
@@ -141,6 +141,11 @@
   步骤：分别设置 `Option + Space`、Control + Grave、`Command + B`，每次设置后重新启动并按对应快捷键。
   验证：每个代表组合都会进入全局 switcher show 路径，覆盖 option/control/command 三类修饰键和空格、反引号、字母三类键位。
 
+- `testSettingsCommandTabTakeoverTriggersSwitcherAndRestoresSystemShortcut`
+  场景：用户在 Settings 中把主快捷键切到真实 `Command + Tab`。
+  步骤：先把主键临时切到 `space`，再选择 `command` 修饰键与 `tab` 主键，等待系统 `Command + Tab / Command + Shift + Tab` 接管生效；随后按真实 `Command + Tab`，最后终止 FlowTab。
+  验证：运行时日志出现接管成功和真实快捷键触发 switcher show 路径；takeover marker 在接管后为真，并在应用通过 `Command + Q` 正常退出后清回假，说明系统快捷键恢复成功。
+
 - `testSettingsQuitHotkeyExplicitAndFallbackMatrixTerminatesSelectedApp`
   场景：验证 Settings 中退出快捷键显式配置和 `quit == main` fallback 后都能真实作用于当前选中 app。
   步骤：先设置 `Option + Z` 并按下退出当前选中 mock app；再设置主快捷键 `Option + Q` 且退出键也选择 `Q`，确认归一化为 `Option + W` 后按 fallback 快捷键。
@@ -230,10 +235,6 @@
 本节记录尚未进入上方“用例详情”的 UI 自动化与端到端缺口。跨层状态以 [TEST_COVERAGE_MATRIX.md](TEST_COVERAGE_MATRIX.md) 为准；当补齐任一条后，需要同步更新矩阵状态。
 
 ### P2
-
-- `Command + Tab` takeover 系统级端到端
-  场景：用户启用系统快捷键接管后使用真实 `Command + Tab`。
-  目标断言：FlowTab 接管链路稳定触发，并能在退出后恢复系统快捷键。该路径受系统权限和全局快捷键限制，自动化稳定性需要单独评估。
 
 - 退出当前选中应用的完整 UI 快捷键路径
   场景：用户打开 switcher 后按配置的退出快捷键。

@@ -366,6 +366,65 @@ extension FlowTabUITests {
         }
     }
 
+    func testSettingsCommandTabTakeoverTriggersSwitcherAndRestoresSystemShortcut() throws {
+        let app = makeApp(additionalArguments: hotkeyEffectArguments(resetDefaults: true))
+        launchFlowTabUITestApplication(app)
+        defer {
+            if app.state != .notRunning {
+                app.activate()
+                app.typeKey("q", modifierFlags: .command)
+                if !app.wait(for: .notRunning, timeout: 6) {
+                    app.terminate()
+                    _ = app.wait(for: .notRunning, timeout: 6)
+                }
+            }
+        }
+        openSettingsTab(in: app)
+
+        selectOption(in: app, controlIdentifier: Identifier.settingsHotkeyMainKey, optionIdentifier: "space")
+        assertValue(of: element(in: app, identifier: Identifier.settingsHotkeyMainKey), equals: "space")
+
+        let takeoverLogSnapshot = makeRuntimeLogFileSnapshot()
+        selectOption(in: app, controlIdentifier: Identifier.settingsHotkeyMainModifier, optionIdentifier: "command")
+        selectOption(in: app, controlIdentifier: Identifier.settingsHotkeyMainKey, optionIdentifier: "tab")
+        assertValue(of: element(in: app, identifier: Identifier.settingsHotkeyMainModifier), equals: "command")
+        assertValue(of: element(in: app, identifier: Identifier.settingsHotkeyMainKey), equals: "tab")
+
+        waitForRuntimeLogFiles(
+            containing: [
+                "updated main=Command + Tab",
+                "system Command+Tab shortcuts disabled for FlowTab takeover",
+                "hotkeyReloadNotification sender=AppDelegate main=Command + Tab"
+            ],
+            since: takeoverLogSnapshot,
+            timeout: 10
+        )
+        XCTAssertTrue(waitForCommandTabTakeoverMarker(true, timeout: 5))
+        XCTAssertTrue(
+            element(in: app, identifier: Identifier.settingsHotkeyMainTakeoverStatus)
+                .waitForExistence(timeout: 5)
+        )
+
+        let triggerLogSnapshot = makeRuntimeLogFileSnapshot()
+        app.activate()
+        app.typeKey(.tab, modifierFlags: .command)
+        waitForRuntimeLogFiles(
+            containing: [
+                "hotkeyPressed dir=forward panelVisible=0 action=show",
+                "HotKey Forward"
+            ],
+            since: triggerLogSnapshot,
+            timeout: 10
+        )
+
+        app.activate()
+        app.typeKey("q", modifierFlags: .command)
+        XCTAssertTrue(app.wait(for: .notRunning, timeout: 8))
+        XCTAssertTrue(waitForCommandTabTakeoverMarker(false, timeout: 5))
+
+        resetHotkeyDefaultsAfterCommandTabTakeoverTest()
+    }
+
     func testSettingsQuitHotkeyExplicitAndFallbackMatrixTerminatesSelectedApp() throws {
         let cases: [(
             rawSelections: [(control: String, option: String)],
@@ -425,7 +484,7 @@ extension FlowTabUITests {
             launchFlowTabUITestApplication(app)
             XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
 
-            let browserTile = element(in: app, identifier: "flowtab.switcher.app.com-flowtab-mock-browser")
+            let browserTile = element(in: app, identifier: Identifier.switcherAppMockBrowser)
             XCTAssertTrue(browserTile.waitForExistence(timeout: 8))
 
             let logSnapshot = makeRuntimeLogFileSnapshot()
@@ -526,8 +585,12 @@ extension FlowTabUITests {
         }
     }
 
-    private func hotkeyEffectArguments() -> [String] {
-        [
+    private func hotkeyEffectArguments(resetDefaults: Bool = false) -> [String] {
+        var arguments: [String] = []
+        if resetDefaults {
+            arguments.append("--flowtab-ui-reset-defaults")
+        }
+        arguments += [
             "--flowtab-ui-mock-runtime",
             "--flowtab-ui-runtime-log-level",
             "DEBUG",
@@ -539,6 +602,7 @@ extension FlowTabUITests {
             "--flowtab-ui-screen-trusted",
             "YES"
         ]
+        return arguments
     }
 
     private func windowBehaviorRuntimeArguments(
@@ -571,7 +635,7 @@ extension FlowTabUITests {
         expectedValues: [(control: String, value: String)],
         expectedLogMarkers: [String]
     ) {
-        let app = makeApp(additionalArguments: ["--flowtab-ui-reset-defaults"] + hotkeyEffectArguments())
+        let app = makeApp(additionalArguments: hotkeyEffectArguments(resetDefaults: true))
         launchFlowTabUITestApplication(app)
         openSettingsTab(in: app)
 
@@ -584,6 +648,36 @@ extension FlowTabUITests {
         }
         waitForRuntimeLogFiles(containing: expectedLogMarkers, since: logSnapshot)
         app.terminate()
+    }
+
+    private func resetHotkeyDefaultsAfterCommandTabTakeoverTest() {
+        let cleanupApp = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "-showPermissionReminder",
+                "NO",
+                "--flowtab-ui-ax-trusted",
+                "YES",
+                "--flowtab-ui-screen-trusted",
+                "YES"
+            ]
+        )
+        launchFlowTabUITestApplication(cleanupApp)
+        cleanupApp.terminate()
+        _ = cleanupApp.wait(for: .notRunning, timeout: 6)
+    }
+
+    private func waitForCommandTabTakeoverMarker(_ expectedValue: Bool, timeout: TimeInterval) -> Bool {
+        let defaults = UserDefaults(suiteName: "io.github.potato-dumplings.flowtab") ?? .standard
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            defaults.synchronize()
+            if defaults.bool(forKey: "commandTabTakeoverPendingRestore") == expectedValue {
+                return true
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+        return false
     }
 
     private func typeHotkey(in app: XCUIApplication, key: String, modifier: String) {
