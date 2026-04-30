@@ -1,6 +1,6 @@
 # 单测与行为测试覆盖清单（FlowTab）
 
-更新时间：2026-04-29
+更新时间：2026-04-30
 
 ## 目标与范围
 
@@ -10,7 +10,7 @@
 
 ## 覆盖总览（当前）
 
-- 用例总数：255（按 `func test` 统计；`FlowTabCore` 33，`FlowTabTests` 222）
+- 用例总数：256（按 `func test` 统计；`FlowTabCore` 33，`FlowTabTests` 223）
 - 单测 / 行为测试：分层说明见下方用例来源与场景描述。
 - 覆盖域：分组与会话状态机、偏好与热键归一化、权限与启动参数、运行时快照与激活、搜索索引与输入桥接、日志与语言、AppDelegate 启动链路、Switcher 面板交互、窗口预览与缓存。
 - 当前状态：核心逻辑、配置持久化与主要行为回归路径均有对应测试说明，新增覆盖按主题放在同名 extension 文件中。
@@ -310,6 +310,11 @@
   场景：启动参数值缺失或格式错误。
   步骤：注入非法布尔值、缺少录屏权限参数值、非法日志数等数据。
   验证：对应覆盖项都会返回 `nil`，不会误判为合法值。
+
+- `testSpaceFixtureLaunchConfigurationParsesTerminationDelay`
+  场景：Space Fixture 需要通过启动参数模拟真实 app 延迟响应终止请求。
+  步骤：注入 `--terminate-delay-ms 1200` 后解析 fixture 启动配置。
+  验证：配置中的终止延迟毫秒数被正确记录，供 UI 自动化稳定观察退出前后的面板刷新行为。
 
 - `testPermissionCheckersRespectLaunchOptionOverrides`
   场景：权限检查器在测试启动参数覆盖下工作。

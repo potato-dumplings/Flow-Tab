@@ -26,6 +26,7 @@ extension FlowTabTests {
             SpaceFixtureLaunchConfiguration.defaultEnterFullscreenDelayMilliseconds
         )
         XCTAssertFalse(configuration.preservesDesktopAfterFullscreen)
+        XCTAssertEqual(configuration.terminationDelayMilliseconds, 0)
     }
 
     func testSpaceFixtureLaunchConfigurationNormalizesInvalidNumericArguments() {
@@ -35,7 +36,8 @@ extension FlowTabTests {
                 "--window-count", "0",
                 "--fullscreen-window-index", "9",
                 "--window-title-prefix", "  ",
-                "--enter-fullscreen-delay-ms", "-25"
+                "--enter-fullscreen-delay-ms", "-25",
+                "--terminate-delay-ms", "-40"
             ]
         )
 
@@ -44,6 +46,18 @@ extension FlowTabTests {
         XCTAssertEqual(configuration.windowTitlePrefix, SpaceFixtureLaunchConfiguration.defaultWindowTitlePrefix)
         XCTAssertEqual(configuration.enterFullscreenDelayMilliseconds, 0)
         XCTAssertFalse(configuration.preservesDesktopAfterFullscreen)
+        XCTAssertEqual(configuration.terminationDelayMilliseconds, 0)
+    }
+
+    func testSpaceFixtureLaunchConfigurationParsesTerminationDelay() {
+        let configuration = SpaceFixtureLaunchConfiguration(
+            arguments: [
+                "FlowTabSpaceFixture",
+                "--terminate-delay-ms", "1200"
+            ]
+        )
+
+        XCTAssertEqual(configuration.terminationDelayMilliseconds, 1200)
     }
 
     func testSpaceFixtureWindowPlannerCreatesStaggeredPlansAndFullscreenMarker() {
@@ -111,6 +125,7 @@ extension FlowTabTests {
                 "--workflow-app-id", "chrome",
                 "--staggered-layout",
                 "--enter-fullscreen-delay-ms", "900",
+                "--terminate-delay-ms", "1100",
                 "--preserve-desktop-after-fullscreen"
             ]
         )
@@ -122,6 +137,7 @@ extension FlowTabTests {
         XCTAssertEqual(configuration.fullscreenWindowIndex, 2)
         XCTAssertTrue(configuration.usesStaggeredLayout)
         XCTAssertEqual(configuration.enterFullscreenDelayMilliseconds, 900)
+        XCTAssertEqual(configuration.terminationDelayMilliseconds, 1100)
         XCTAssertTrue(configuration.preservesDesktopAfterFullscreen)
         XCTAssertEqual(configuration.windows[0].configuredTitle, "Chrome Window 1")
         XCTAssertEqual(configuration.windows[0].tabs.map(\.title), ["Docs", "PR"])

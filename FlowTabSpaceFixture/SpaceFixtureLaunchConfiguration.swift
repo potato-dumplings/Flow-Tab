@@ -28,6 +28,7 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
     let usesStaggeredLayout: Bool
     let enterFullscreenDelayMilliseconds: Int
     let preservesDesktopAfterFullscreen: Bool
+    let terminationDelayMilliseconds: Int
     let workflowName: String?
     let workflowAppID: String?
 
@@ -49,6 +50,7 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
         usesStaggeredLayout: Bool,
         enterFullscreenDelayMilliseconds: Int,
         preservesDesktopAfterFullscreen: Bool,
+        terminationDelayMilliseconds: Int = 0,
         workflowName: String? = nil,
         workflowAppID: String? = nil
     ) {
@@ -57,6 +59,7 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
         self.usesStaggeredLayout = usesStaggeredLayout
         self.enterFullscreenDelayMilliseconds = enterFullscreenDelayMilliseconds
         self.preservesDesktopAfterFullscreen = preservesDesktopAfterFullscreen
+        self.terminationDelayMilliseconds = max(0, terminationDelayMilliseconds)
         self.workflowName = workflowName
         self.workflowAppID = workflowAppID
     }
@@ -67,7 +70,8 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
         windowTitlePrefix: String,
         usesStaggeredLayout: Bool,
         enterFullscreenDelayMilliseconds: Int,
-        preservesDesktopAfterFullscreen: Bool
+        preservesDesktopAfterFullscreen: Bool,
+        terminationDelayMilliseconds: Int = 0
     ) {
         let normalizedWindowCount = max(Self.minimumWindowCount, windowCount)
         let normalizedFullscreenWindowIndex: Int?
@@ -96,7 +100,8 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
             windowTitlePrefix: resolvedTitlePrefix,
             usesStaggeredLayout: usesStaggeredLayout,
             enterFullscreenDelayMilliseconds: max(0, enterFullscreenDelayMilliseconds),
-            preservesDesktopAfterFullscreen: preservesDesktopAfterFullscreen
+            preservesDesktopAfterFullscreen: preservesDesktopAfterFullscreen,
+            terminationDelayMilliseconds: terminationDelayMilliseconds
         )
     }
 
@@ -122,6 +127,10 @@ extension SpaceFixtureLaunchConfiguration {
         )
         let normalizedWindowTitlePrefix = Self.stringValue(after: "--window-title-prefix", in: arguments)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedTerminationDelayMilliseconds = max(
+            0,
+            Self.intValue(after: "--terminate-delay-ms", in: arguments) ?? 0
+        )
 
         self.init(
             windowCount: normalizedWindowCount,
@@ -131,7 +140,8 @@ extension SpaceFixtureLaunchConfiguration {
                 : Self.defaultWindowTitlePrefix,
             usesStaggeredLayout: arguments.contains("--staggered-layout"),
             enterFullscreenDelayMilliseconds: normalizedDelayMilliseconds,
-            preservesDesktopAfterFullscreen: arguments.contains("--preserve-desktop-after-fullscreen")
+            preservesDesktopAfterFullscreen: arguments.contains("--preserve-desktop-after-fullscreen"),
+            terminationDelayMilliseconds: normalizedTerminationDelayMilliseconds
         )
     }
 
@@ -184,6 +194,10 @@ extension SpaceFixtureLaunchConfiguration {
                     ?? Self.defaultEnterFullscreenDelayMilliseconds
             ),
             preservesDesktopAfterFullscreen: arguments.contains("--preserve-desktop-after-fullscreen"),
+            terminationDelayMilliseconds: max(
+                0,
+                Self.intValue(after: "--terminate-delay-ms", in: arguments) ?? 0
+            ),
             workflowName: workflowConfiguration.workflowName,
             workflowAppID: appConfiguration.appID
         )

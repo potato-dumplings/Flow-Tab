@@ -35,6 +35,78 @@ extension FlowTabUITests {
         }
     }
 
+    func testSwitcherPanelQuitShortcutKeepsRealFixtureAppUntilProcessTerminates() throws {
+        let identity = spaceFixtureAppIdentity
+        let fixtureApp = launchSpaceFixtureWorkflow(
+            identity: identity,
+            windowCount: 1,
+            fullscreenWindowIndex: nil,
+            titlePrefix: "Quit Target",
+            enterFullscreenDelayMilliseconds: 0,
+            terminationDelayMilliseconds: 2_400
+        )
+        defer {
+            if fixtureApp.state == .runningForeground || fixtureApp.state == .runningBackground {
+                fixtureApp.terminate()
+                waitForSpaceFixtureApplicationToTerminate(fixtureApp)
+            }
+        }
+
+        guard assertSpaceFixtureWorkflowPermissionsAvailable() else { return }
+
+        let app = makeRealRuntimeFlowTabApp(
+            additionalArguments: [
+                "--flowtab-ui-open-switcher",
+                "--flowtab-ui-runtime-log-level",
+                "DEBUG",
+                "--flowtab-ui-enable-verbose-logs"
+            ]
+        )
+        launchFlowTabUITestApplication(app)
+        defer {
+            if app.state == .runningForeground || app.state == .runningBackground {
+                app.terminate()
+            }
+        }
+
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 12))
+
+        let fixtureAppTile = element(in: app, identifier: identity.switcherAppAccessibilityIdentifier)
+        XCTAssertTrue(fixtureAppTile.waitForExistence(timeout: 12))
+        selectSwitcherApp(in: app, appID: identity.bundleIdentifier)
+        XCTAssertTrue(waitForSwitcherSummary(in: app, containing: "selected=\(identity.bundleIdentifier)", timeout: 5))
+
+        let logSnapshot = makeRuntimeLogFileSnapshot()
+        app.activate()
+        app.typeKey("q", modifierFlags: .option)
+
+        waitForRuntimeLogFiles(
+            containing: [
+                "terminate request app=",
+                "appID=\(identity.bundleIdentifier) sent=true"
+            ],
+            since: logSnapshot,
+            timeout: 8
+        )
+        XCTAssertNotEqual(fixtureApp.state, .notRunning)
+        XCTAssertTrue(
+            fixtureAppTile.exists,
+            "The selected fixture app should remain in the panel while its process is still terminating."
+        )
+
+        XCTAssertTrue(waitForApplicationToTerminate(fixtureApp, timeout: 8))
+        waitForRuntimeLogFiles(
+            containing: [
+                "terminate post-refresh reason=",
+                "appID=\(identity.bundleIdentifier)"
+            ],
+            since: logSnapshot,
+            timeout: 10
+        )
+        XCTAssertTrue(waitForNonExistence(fixtureAppTile, timeout: 8))
+        XCTAssertTrue(waitForSwitcherSummary(in: app, containing: "apps=", timeout: 5))
+    }
+
     func testSwitcherPanelShowsRealSpaceFixtureWorkflowWindowCards() throws {
         runRealSpaceFixtureWorkflow(
             flowTabAdditionalArguments: ["--flowtab-ui-open-switcher"]
@@ -50,6 +122,61 @@ extension FlowTabUITests {
                 in: app
             )
         }
+    }
+
+    private func selectSwitcherApp(
+        in app: XCUIApplication,
+        appID: String,
+        maxMoves: Int = 40
+    ) {
+        for _ in 0..<maxMoves {
+            if switcherSummary(in: app).contains("selected=\(appID)") {
+                return
+            }
+            app.typeKey(.rightArrow, modifierFlags: [])
+            RunLoop.current.run(until: Date().addingTimeInterval(0.08))
+        }
+
+        XCTFail("Failed to select switcher app \(appID). Latest summary: \(switcherSummary(in: app))")
+    }
+
+    private func waitForSwitcherSummary(
+        in app: XCUIApplication,
+        containing marker: String,
+        timeout: TimeInterval
+    ) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        var latestValue = ""
+        repeat {
+            latestValue = switcherSummary(in: app)
+            if latestValue.contains(marker) {
+                return true
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+
+        XCTFail("Expected switcher summary to contain \(marker). Latest summary: \(latestValue)")
+        return false
+    }
+
+    private func switcherSummary(in app: XCUIApplication) -> String {
+        let summary = element(in: app, identifier: Identifier.switcherSummary)
+        guard summary.exists else { return "" }
+        return elementStringValue(summary)
+    }
+
+    private func waitForApplicationToTerminate(
+        _ app: XCUIApplication,
+        timeout: TimeInterval
+    ) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if app.state == .notRunning {
+                return true
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+        return false
     }
 
     func makeSpaceFixtureWorkflowFile(_ contents: String) throws -> URL {

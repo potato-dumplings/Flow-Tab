@@ -141,7 +141,8 @@ extension FlowTabUITests {
         windowCount: Int = 3,
         fullscreenWindowIndex: Int? = 3,
         titlePrefix: String = "Workflow",
-        enterFullscreenDelayMilliseconds: Int = 1_500
+        enterFullscreenDelayMilliseconds: Int = 1_500,
+        terminationDelayMilliseconds: Int = 0
     ) -> XCUIApplication {
         terminateSpaceFixtureAppIfRunning(identity: identity)
 
@@ -150,6 +151,7 @@ extension FlowTabUITests {
             "--window-title-prefix", titlePrefix,
             "--staggered-layout",
             "--enter-fullscreen-delay-ms", String(enterFullscreenDelayMilliseconds),
+            "--terminate-delay-ms", String(terminationDelayMilliseconds),
             "--preserve-desktop-after-fullscreen"
         ]
         if let fullscreenWindowIndex {

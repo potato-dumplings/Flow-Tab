@@ -10,9 +10,9 @@
 
 ## 覆盖总览（当前）
 
-- 用例总数：39
+- 用例总数：40
 - 覆盖域：启动导航、Home、权限提示、Logs、Settings、Switcher/Search、压测。
-- 当前状态：应用内可稳定自动化的核心场景已有覆盖，Settings 搜索默认范围的双向运行时生效路径、Home 真实窗口点击激活路径、Switcher 真实 app-scope 搜索激活路径、Settings 中 `Command + Tab` 接管触发与退出恢复路径，以及真实 edge-input fixture 下的同名/同尺寸同位置窗口和非 ASCII 长标题路径已补齐，剩余真实 fixture 缺口按下方优先级继续补齐。
+- 当前状态：应用内可稳定自动化的核心场景已有覆盖，Settings 搜索默认范围的双向运行时生效路径、Home 真实窗口点击激活路径、Switcher 真实 app-scope 搜索激活路径、Settings 中 `Command + Tab` 接管触发与退出恢复路径、真实 edge-input fixture 下的同名/同尺寸同位置窗口和非 ASCII 长标题路径，以及真实 fixture app 的退出快捷键延迟终止路径已补齐。
 - 执行前提：大多数用例依赖 UI test launch arguments 控制权限状态、Mock Runtime、预置日志和重置偏好，以减少系统环境抖动。
 
 ## 用例详情（当前）
@@ -178,6 +178,11 @@
   步骤：以 `app` 默认范围启动搜索态 switcher，输入目标 fixture app 的搜索 token，等待真实 `flowtab.switcher.search.app.*` 结果出现后按回车确认。
   验证：目标 fixture app 成为 frontmost app，证明真实 runtime 搜索结果可以按 app-scope 路径激活正确应用。
 
+- `testSwitcherPanelQuitShortcutKeepsRealFixtureAppUntilProcessTerminates`
+  场景：用户在 switcher 标准模式选中真实 fixture app 后按默认退出快捷键。
+  步骤：启动带延迟终止参数的真实 Space Fixture app，打开 switcher，移动选择到该 app，按 `Option + Q`；在终止延迟窗口内检查 app 仍运行且卡片仍存在，随后等待 fixture 进程退出。
+  验证：运行时日志记录真实 terminate request；进程退出前目标卡片不会被提前移除；进程退出后面板刷新并移除该 app，同时 switcher 会话仍保持有效。
+
 - `testSwitcherPanelPreviewKeepsIdenticalRealWorkflowWindowsDistinct`
   场景：真实 edge-input fixture workflow 中，同一个 app 拥有两个标题、尺寸和位置都相同的标准窗口。
   步骤：不启用 staggered layout 启动 edge workflow，打开标准 switcher，切到包含重复 `Shared Docs` 窗口的 fixture app 后进入 window preview layer。
@@ -234,11 +239,7 @@
 
 本节记录尚未进入上方“用例详情”的 UI 自动化与端到端缺口。跨层状态以 [TEST_COVERAGE_MATRIX.md](TEST_COVERAGE_MATRIX.md) 为准；当补齐任一条后，需要同步更新矩阵状态。
 
-### P2
-
-- 退出当前选中应用的完整 UI 快捷键路径
-  场景：用户打开 switcher 后按配置的退出快捷键。
-  目标断言：选中应用收到退出请求，面板刷新策略正确，且会话不会在进程真正退出前错误移除目标。
+暂无未完成的第一批高优先级 UI 自动化缺口。后续新缺口以 [TEST_COVERAGE_MATRIX.md](TEST_COVERAGE_MATRIX.md) 为准。
 
 ## 回归命令（示例）
 
