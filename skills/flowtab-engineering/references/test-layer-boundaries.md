@@ -11,6 +11,7 @@ These labels describe coverage layers, not a one-to-one naming scheme for Xcode 
 - [Behavior Tests](#behavior-tests)
 - [UI Tests](#ui-tests)
 - [Cross-Layer Rules](#cross-layer-rules)
+- [Scenario Fan-Out](#scenario-fan-out)
 - [Quick Selection Rules](#quick-selection-rules)
 - [Standard Product Scenarios](#standard-product-scenarios)
 - [Three Apps in One Space, Search in the Panel, Activate the Target Window](#1-three-apps-in-one-space-search-in-the-panel-activate-the-target-window)
@@ -127,6 +128,32 @@ Current repo examples:
 - If a feature seems impossible to cover at unit level, first look for the deterministic rule or data transformation that should be extracted. Do not skip the layer just because the current design hides the seam.
 - `FlowTab/TestingSupport` only provides scaffolding. Tests that use it are still unit, behavior, or UI depending on the evidence they produce.
 - `FlowTabSpaceFixture` extends UI evidence for real window topology. It does not replace the normal unit and behavior chain.
+
+## Scenario Fan-Out
+
+The scenario named by the user, a bug report, or a failing test is the seed scenario. Before selecting tests, expand it across the product axes that could change the outcome:
+
+- State variants: empty, single, multiple, selected, unselected, enabled, disabled, default, customized, stale, or missing data.
+- Input variants: exact, partial, case-changed, normalized, ambiguous, duplicate, invalid, or boundary-value input.
+- Runtime topology: current app, other app, current space, off-space, fullscreen, minimized, hidden, duplicate titles, missing windows, or fixture-backed real windows.
+- Lifecycle and persistence: first launch, relaunch, preference reload, runtime refresh, delayed update, interrupted flow, or restored session.
+- Permission and fallback paths: Accessibility denied, screen recording denied, unsupported runtime data, private bridge fallback, unavailable fixture, or degraded-but-safe output.
+- Scale and pressure: many apps, many windows, repeated switching, repeated search edits, long-lived observers, cache churn, or preview-heavy rendering.
+
+Do not turn every axis into UI automation. Use the cheapest responsible layer for breadth:
+
+- Unit tests should cover the rule matrix and edge variants that can be expressed as data.
+- Behavior tests should cover representative orchestration, persistence, runtime adapter, and lifecycle variants.
+- UI tests should cover the critical visible journey and real-topology proof that lower layers cannot prove.
+- Pressure checks should cover sustained load or scale-sensitive variants when the changed path can regress under repetition.
+
+After fan-out, produce a concise scenario plan before editing test files:
+
+- Required: the smallest scenarios needed to satisfy the relevant layers from `risk-calibration.md`.
+- Optional: useful variants that are not included by default because they duplicate evidence, are expensive, or are lower risk.
+- Not adding: variants intentionally left out, with the reason they do not change the current risk judgment.
+
+Wait for confirmation before adding new scenario tests. When a relevant variant is intentionally not automated or is blocked, record it as a gap in the product-scenario matrix if it affects scenario status. A single happy path is enough only when the fan-out shows the remaining axes are genuinely not relevant to the changed behavior.
 
 ## Quick Selection Rules
 

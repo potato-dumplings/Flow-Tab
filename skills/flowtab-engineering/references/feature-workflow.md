@@ -6,6 +6,8 @@ Use this workflow for new features and for extending existing behavior.
 
 - State the user-visible behavior, shared rule, and material assumptions before implementation.
 - Read `risk-calibration.md` and classify the change before deciding validation scope.
+- Treat the user-named scenario as a seed; expand it into a representative scenario family before selecting tests.
+- Present the proposed test scenario set and get confirmation before adding new scenario tests.
 - For user-visible features and feature extensions, add or update coverage in all three layers: unit, behavior, and UI.
 - Read `test-coverage-matrix-workflow.md` and update `docs/TEST_COVERAGE_MATRIX.md` when the feature changes a product scenario's coverage status or exposes a new gap.
 - For documentation-only or mechanical changes that are not feature work, use the calibrated minimum and state why any layer is not relevant.
@@ -18,6 +20,7 @@ Use this workflow for new features and for extending existing behavior.
 
 - Name the smallest behavior change that would satisfy the request.
 - State any assumptions that affect module placement, data flow, or user-visible behavior.
+- Name the scenario axes that matter for the feature, such as default versus changed settings, empty versus multiple runtime records, current-space versus off-space windows, permission states, relaunch or persistence, and pressure scale.
 - If multiple interpretations or designs exist, resolve them before editing instead of choosing silently.
 - Prefer the simplest design that satisfies the behavior without introducing a one-off path.
 
@@ -26,19 +29,21 @@ Use this workflow for new features and for extending existing behavior.
 1. Define the user-visible behavior, the shared rule behind it, and the assumptions that materially affect the design.
 2. If the request supports multiple interpretations, resolve them before editing. Do not silently pick one.
 3. Read `risk-calibration.md` and decide which layers are required, not relevant, or blocked.
-4. Read `test-layer-boundaries.md` and decide what distinct evidence unit, behavior, and UI coverage should provide.
-5. Read `test-coverage-matrix-workflow.md` when the feature maps to an existing matrix scenario or creates a new product scenario.
-6. Read `validation-command-cookbook.md` and choose the smallest concrete command for each required layer.
-7. If UI automation is relevant, read `ui-automation-prerequisites.md` before planning the validation run.
-8. Read `performance-pressure-workflow.md` and decide whether the change also requires pressure validation.
-9. Read `module-boundaries.md` and choose the lowest reasonable module for the change.
-10. Reject any design that only works through a one-off special case or unnecessary abstraction.
-11. Add or update unit tests for the smallest reusable rule first when unit coverage is required.
-12. Add or update behavior tests for the app-level flow or integration path when behavior coverage is required.
-13. Add or update UI tests for the visible user path when UI coverage is required.
-14. Implement the production change.
-15. Update `docs/TEST_COVERAGE_MATRIX.md` if the feature changes matrix status, adds a scenario, or leaves an explicit gap.
-16. Run the related test suites and any required pressure checks, then iterate until they pass. If a required validation layer is blocked, stop at a blocker report instead of completion.
+4. Read `test-layer-boundaries.md` and fan out the seed scenario across the relevant product axes before deciding what distinct evidence unit, behavior, and UI coverage should provide.
+5. Present a concise scenario plan before editing test files. Include required scenarios, optional variants not included by default, variants intentionally not adding, the owning layer, and the reason the set is the smallest representative coverage.
+6. Wait for confirmation before adding new scenario tests. If the confirmed plan omits a layer required by `risk-calibration.md`, report that layer as incomplete or blocked rather than treating the feature as complete.
+7. Read `test-coverage-matrix-workflow.md` when the feature maps to an existing matrix scenario or creates a new product scenario.
+8. Read `validation-command-cookbook.md` and choose the smallest concrete command for each required layer.
+9. If UI automation is relevant, read `ui-automation-prerequisites.md` before planning the validation run.
+10. Read `performance-pressure-workflow.md` and decide whether the change also requires pressure validation.
+11. Read `module-boundaries.md` and choose the lowest reasonable module for the change.
+12. Reject any design that only works through a one-off special case or unnecessary abstraction.
+13. Add or update unit tests for the smallest reusable rule and the cheapest meaningful confirmed scenario variants when unit coverage is required.
+14. Add or update behavior tests for the app-level flow, integration path, and representative confirmed orchestration variants when behavior coverage is required.
+15. Add or update UI tests for the confirmed visible user path; keep UI coverage representative instead of exhaustively repeating variants already proven below.
+16. Implement the production change.
+17. Update `docs/TEST_COVERAGE_MATRIX.md` if the feature changes matrix status, adds a scenario, or leaves an explicit gap.
+18. Run the related test suites and any required pressure checks, then iterate until they pass. If a required validation layer is blocked, stop at a blocker report instead of completion.
 
 ## Coverage Expectations
 
@@ -48,6 +53,8 @@ Use this workflow for new features and for extending existing behavior.
 - A UI test that only proves a Settings control changed or persisted is not enough to mark UI/E2E matrix coverage `Strong`; the resulting runtime or visible behavior must also be exercised.
 - Treat these as coverage layers, not simple aliases for Xcode target names. Use `test-layer-boundaries.md` when placement feels ambiguous.
 - Do not make all three layers assert the same branch. The unit layer should prove the rule, the behavior layer should prove orchestration, and the UI layer should prove visibility.
+- Do not let a single happy-path scenario stand in for the full feature risk. Use unit and behavior tests for variant breadth, then reserve UI tests for the most important visible journeys and real-topology proof.
+- Do not add every generated variant. Propose the smallest representative set first, then wait for confirmation before expanding coverage.
 
 ## Layer Placement Guide
 

@@ -49,10 +49,16 @@ This skill is not only a generic answer-style guide. It is the FlowTab delivery 
 8. Report validation by layer.
    When tests or validation matter, name the relevant layers individually. State whether each layer passed, failed, was not relevant, or was blocked, and give the blocking reason when a layer could not run.
 
-9. Surface pressure and performance status when relevant.
+9. Report scenario fan-out before test conclusions.
+   For implementation guidance, coverage audits, and remediation plans, state the seed scenario, the representative variants considered, which layer owns each variant, and any important variant left as a known gap or blocker.
+
+10. Ask for confirmation before expanding test scenarios.
+   Before adding new scenario tests, present a concise plan grouped into required, optional, and intentionally not adding. Explain why the required set is the smallest representative coverage. If the user does not confirm, stop before editing test files or report the affected validation layer as incomplete or blocked.
+
+11. Surface pressure and performance status when relevant.
    If the change affects hot paths, repeated interaction cost, scale-sensitive work, or long-lived resources, include the baseline, the pressure attempt or result, or a concrete not-applicable reason.
 
-10. Scale the handoff to the risk.
+12. Scale the handoff to the risk.
    Use the full FlowTab handoff for feature delivery, bugfixes, architecture changes, hot-path changes, or blocked validation. Use the compact handoff for docs-only, skill-only, mechanical, or no-runtime-behavior changes.
 
 ## FlowTab Handoff Minimums
@@ -65,7 +71,7 @@ This skill is not only a generic answer-style guide. It is the FlowTab delivery 
 - Bugfix handoffs must list the post-change tests run by layer and their outcomes.
 - Bugfix handoffs must state any relevant layer that was not run and why it was blocked or not possible.
 - When pressure validation is relevant, handoffs must state the performance or pressure baseline, the validation attempt or result, or the concrete reason it did not apply.
-- Feature handoffs must state the user-visible behavior, the shared rule behind the change, where the logic should live, and what unit, behavior, and UI coverage proves.
+- Feature handoffs must state the user-visible behavior, the shared rule behind the change, where the logic should live, the scenario fan-out considered, the confirmed test scenario set, and what unit, behavior, and UI coverage proves.
 - Architecture or migration handoffs must state the target design, module ownership, migration stages, fallback path, and validation plan.
 - Remediation responses must state the current blocker, the affected layer or environment, what remains unproven, and the next concrete step.
 - Review, audit, or diagnosis responses must state the observed gap, the supporting evidence, the affected layer or module, the related product-scenario matrix status when coverage is involved, and the next concrete corrective action or blocker.
