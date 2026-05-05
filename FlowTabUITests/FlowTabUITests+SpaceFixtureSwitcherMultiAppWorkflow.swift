@@ -20,7 +20,7 @@ extension FlowTabUITests {
             workflow,
             flowTabAdditionalArguments: ["--flowtab-ui-open-switcher"]
         ) { workflow, app in
-            let diagnosticsSummary = element(in: app, identifier: "flowtab.testing.switcher.summary")
+            let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
 
             for workflowApp in workflow.apps {
                 assertSwitcherAppStripContainsWorkflowApp(
@@ -70,7 +70,7 @@ extension FlowTabUITests {
             workflow,
             flowTabAdditionalArguments: ["--flowtab-ui-open-switcher"]
         ) { workflow, app in
-            let diagnosticsSummary = element(in: app, identifier: "flowtab.testing.switcher.summary")
+            let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
             XCTAssertTrue(
                 element(
                     in: app,
@@ -129,7 +129,7 @@ extension FlowTabUITests {
             workflow,
             flowTabAdditionalArguments: ["--flowtab-ui-open-switcher"]
         ) { workflow, app in
-            let diagnosticsSummary = element(in: app, identifier: "flowtab.testing.switcher.summary")
+            let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
             XCTAssertTrue(
                 element(
                     in: app,
@@ -316,7 +316,7 @@ extension FlowTabUITests {
             ]
         ) { _, app in
             let searchInput = element(in: app, identifier: Identifier.switcherSearchInput)
-            let diagnosticsSummary = element(in: app, identifier: "flowtab.testing.switcher.summary")
+            let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
             XCTAssertTrue(searchInput.waitForExistence(timeout: 8))
             XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
             XCTAssertNotEqual(

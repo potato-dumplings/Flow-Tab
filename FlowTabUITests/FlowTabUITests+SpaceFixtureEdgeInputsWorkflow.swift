@@ -34,7 +34,7 @@ extension FlowTabUITests {
             workflow,
             flowTabAdditionalArguments: ["--flowtab-ui-open-switcher"]
         ) { workflow, app in
-            let diagnosticsSummary = element(in: app, identifier: "flowtab.testing.switcher.summary")
+            let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
             XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
             XCTAssertTrue(
                 selectEdgeWorkflowAppInSwitcherAppLayer(

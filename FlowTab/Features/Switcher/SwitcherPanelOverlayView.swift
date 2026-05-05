@@ -68,18 +68,26 @@ struct SwitcherPanelRootView: View {
         .animation(.none, value: resolvedColorScheme)
         .overlay(alignment: .topLeading) {
             if FlowTabTestLaunchOptions.showsSwitcherDiagnostics, model.session != nil {
-                Text(switcherDiagnosticsValue)
-                    .font(.system(size: 4))
-                    .lineLimit(1)
-                    .foregroundStyle(Color.black.opacity(0.015))
-                    .padding(.leading, 1)
-                    .padding(.top, 1)
-                    .allowsHitTesting(false)
-                    .accessibilityIdentifier("flowtab.testing.switcher.summary")
-                    .accessibilityLabel(switcherDiagnosticsValue)
+                switcherDiagnosticsSummary
             }
         }
         .id(appLanguageRaw)
+    }
+
+    private var switcherDiagnosticsSummary: some View {
+        let value = switcherDiagnosticsValue
+        return Text(verbatim: value)
+            .font(.system(size: 4))
+            .lineLimit(1)
+            .foregroundStyle(Color.black.opacity(0.015))
+            .frame(minWidth: 16, minHeight: 8, alignment: .topLeading)
+            .padding(.leading, 1)
+            .padding(.top, 1)
+            .allowsHitTesting(false)
+            .accessibilityIdentifier(SwitcherAccessibilityIdentifiers.testingSummary)
+            .accessibilityLabel(Text(verbatim: value))
+            .accessibilityValue(Text(verbatim: value))
+            .accessibilityHidden(false)
     }
 
     private var switcherDiagnosticsValue: String {

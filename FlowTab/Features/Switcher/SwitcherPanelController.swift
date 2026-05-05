@@ -339,6 +339,8 @@ final class SwitcherPanelController {
 }
 
 enum SwitcherAccessibilityIdentifiers {
+    static let testingSummary = "flowtab.testing.switcher.summary"
+
     static func app(id: String) -> String {
         "flowtab.switcher.app.\(id.flowTabAccessibilitySlug)"
     }
