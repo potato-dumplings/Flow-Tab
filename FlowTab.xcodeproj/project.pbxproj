@@ -69,6 +69,7 @@
 		B10012052F76000100B0D737 /* FlowTabUITests+SettingsSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002052F76000100B0D737 /* FlowTabUITests+SettingsSearch.swift */; };
 		B20011012FBD000100B0D737 /* FlowTabTests+HomeWindowActivation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20001012FBD000100B0D737 /* FlowTabTests+HomeWindowActivation.swift */; };
 		B20012012FBD000100B0D737 /* FlowTabUITests+SpaceFixtureHomeActivation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B20002012FBD000100B0D737 /* FlowTabUITests+SpaceFixtureHomeActivation.swift */; };
+		B21012012FC0000100B0D737 /* FlowTabUITests+WorkflowWindowObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B21002012FC0000100B0D737 /* FlowTabUITests+WorkflowWindowObservation.swift */; };
 		B1C2D3E42F74000100B0D737 /* AppLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E32F74000100B0D737 /* AppLocalization.swift */; };
 		C20000012FBD000100B0D737 /* HomeWindowActivationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000112FBD000100B0D737 /* HomeWindowActivationController.swift */; };
 		C20000022FBD000100B0D737 /* HomeWindowRowButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000122FBD000100B0D737 /* HomeWindowRowButton.swift */; };
@@ -212,6 +213,7 @@
 		B10002052F76000100B0D737 /* FlowTabUITests+SettingsSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SettingsSearch.swift"; sourceTree = "<group>"; };
 		B20001012FBD000100B0D737 /* FlowTabTests+HomeWindowActivation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+HomeWindowActivation.swift"; sourceTree = "<group>"; };
 		B20002012FBD000100B0D737 /* FlowTabUITests+SpaceFixtureHomeActivation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureHomeActivation.swift"; sourceTree = "<group>"; };
+		B21002012FC0000100B0D737 /* FlowTabUITests+WorkflowWindowObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+WorkflowWindowObservation.swift"; sourceTree = "<group>"; };
 		B1C2D3E32F74000100B0D737 /* AppLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLocalization.swift; sourceTree = "<group>"; };
 		C20000112FBD000100B0D737 /* HomeWindowActivationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeWindowActivationController.swift; sourceTree = "<group>"; };
 		C20000122FBD000100B0D737 /* HomeWindowRowButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeWindowRowButton.swift; sourceTree = "<group>"; };
@@ -385,6 +387,7 @@
 				B10002052F76000100B0D737 /* FlowTabUITests+SettingsSearch.swift */,
 				B10002032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift */,
 				B10002042F76000100B0D737 /* FlowTabUITests+Support.swift */,
+				B21002012FC0000100B0D737 /* FlowTabUITests+WorkflowWindowObservation.swift */,
 				F500000B2F90000100B0D737 /* FlowTabUITests+SpaceFixtureApp.swift */,
 				F50000122F90000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflow.swift */,
 				F50000152FA1000100B0D737 /* FlowTabUITests+SpaceFixtureMultiAppWorkflow.swift */,
@@ -883,6 +886,7 @@
 				B10012052F76000100B0D737 /* FlowTabUITests+SettingsSearch.swift in Sources */,
 				B10012032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift in Sources */,
 				B10012042F76000100B0D737 /* FlowTabUITests+Support.swift in Sources */,
+				B21012012FC0000100B0D737 /* FlowTabUITests+WorkflowWindowObservation.swift in Sources */,
 				F500010D2F90000100B0D737 /* FlowTabUITests+SpaceFixtureApp.swift in Sources */,
 				F50001102F90000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflow.swift in Sources */,
 				F50001142FA1000100B0D737 /* FlowTabUITests+SpaceFixtureMultiAppWorkflow.swift in Sources */,
