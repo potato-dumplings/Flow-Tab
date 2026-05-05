@@ -515,6 +515,7 @@ enum RuntimeLog {
     private static let noisyCategories: Set<String> = [
         "InputTrace",
         "AX",
+        "AXObserver",
         "Snapshot",
         "HotKey",
         "Session",
