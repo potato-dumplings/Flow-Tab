@@ -9,12 +9,20 @@ APP_PROCESS_NAME="FlowTab"
 RELEASE_APP_PATH="${DERIVED_DATA_PATH}/Build/Products/Release/${APP_BUNDLE_NAME}"
 INSTALL_PATH="/Applications/${APP_BUNDLE_NAME}"
 BUNDLE_ID="io.github.potato-dumplings.flowtab"
+LOCAL_SIGNING_CONFIG_PATH="${ROOT_DIR}/xcconfigs/LocalSigning.xcconfig"
+DEVELOPMENT_TEAM="${FLOWTAB_DEVELOPMENT_TEAM:-}"
+CODE_SIGN_IDENTITY="${FLOWTAB_CODE_SIGN_IDENTITY:-Apple Development}"
+RESOLVED_CODE_SIGN_IDENTITY=""
 
 for arg in "$@"; do
   case "${arg}" in
     -h|--help)
       cat <<'EOF'
 Usage: ./scripts/release/release-install.sh
+
+Environment:
+  FLOWTAB_DEVELOPMENT_TEAM       Optional team id; falls back to xcconfigs/LocalSigning.xcconfig.
+  FLOWTAB_CODE_SIGN_IDENTITY     Optional local identity; defaults to "Apple Development".
 EOF
       exit 0
       ;;
@@ -25,8 +33,87 @@ EOF
   esac
 done
 
-TOTAL_STEPS=6
+TOTAL_STEPS=7
 STEP=1
+
+detect_local_development_team() {
+  if [[ ! -f "${LOCAL_SIGNING_CONFIG_PATH}" ]]; then
+    return 0
+  fi
+
+  awk '
+    /^[[:space:]]*(#|\/\/)/ {
+      next
+    }
+    /^[[:space:]]*FLOWTAB_DEVELOPMENT_TEAM[[:space:]]*=/ {
+      value = $0
+      sub(/^[^=]*=/, "", value)
+      sub(/[[:space:]]*\/\/.*$/, "", value)
+      sub(/[[:space:]]+$/, "", value)
+      sub(/^[[:space:]]+/, "", value)
+      if (value != "" && value != "YOUR_TEAM_ID") {
+        print value
+      }
+      exit
+    }
+  ' "${LOCAL_SIGNING_CONFIG_PATH}"
+}
+
+resolve_code_sign_identity() {
+  local requested="$1"
+  local team="$2"
+  local identities
+  local line
+  local identity
+
+  identities="$(security find-identity -v -p codesigning 2>/dev/null || true)"
+
+  while IFS= read -r line; do
+    identity="${line#*\"}"
+    identity="${identity%\"*}"
+
+    if [[ "${identity}" == "${line}" ]]; then
+      continue
+    fi
+
+    if [[ -n "${team}" && "${identity}" != *"(${team})" ]]; then
+      continue
+    fi
+
+    if [[ -n "${requested}" && "${requested}" != "Apple Development" && "${identity}" != "${requested}" ]]; then
+      continue
+    fi
+
+    if [[ "${requested}" == "Apple Development" && "${identity}" != Apple\ Development:* ]]; then
+      continue
+    fi
+
+    printf '%s' "${identity}"
+    return 0
+  done <<< "${identities}"
+
+  return 1
+}
+
+resolve_release_signing_identity() {
+  if [[ -z "${DEVELOPMENT_TEAM}" ]]; then
+    DEVELOPMENT_TEAM="$(detect_local_development_team)"
+  fi
+
+  if RESOLVED_CODE_SIGN_IDENTITY="$(resolve_code_sign_identity "${CODE_SIGN_IDENTITY}" "${DEVELOPMENT_TEAM}")"; then
+    echo "Using code-signing identity: ${RESOLVED_CODE_SIGN_IDENTITY}"
+    return 0
+  fi
+
+  echo "Could not resolve a local code-signing identity for release install." >&2
+  echo "Requested identity: ${CODE_SIGN_IDENTITY}" >&2
+  if [[ -n "${DEVELOPMENT_TEAM}" ]]; then
+    echo "Requested team: ${DEVELOPMENT_TEAM}" >&2
+  fi
+  echo "Available code-signing identities:" >&2
+  security find-identity -v -p codesigning >&2 || true
+  exit 1
+}
 
 reset_tcc_permission() {
   local service="$1"
@@ -52,6 +139,10 @@ pkill -x "${APP_PROCESS_NAME}" >/dev/null 2>&1 || true
 sleep 1
 
 STEP=$((STEP + 1))
+echo "[${STEP}/${TOTAL_STEPS}] Resolve local signing identity"
+resolve_release_signing_identity
+
+STEP=$((STEP + 1))
 echo "[${STEP}/${TOTAL_STEPS}] Reset Accessibility and Screen Recording permissions"
 reset_tcc_permission "Accessibility"
 reset_tcc_permission "ScreenCapture"
@@ -64,6 +155,7 @@ xcodebuild \
   -scheme FlowTab \
   -configuration Release \
   -derivedDataPath "${DERIVED_DATA_PATH}" \
+  CODE_SIGNING_ALLOWED=NO \
   build
 
 if [[ ! -d "${RELEASE_APP_PATH}" ]]; then
@@ -76,8 +168,10 @@ echo "[${STEP}/${TOTAL_STEPS}] Remove old app"
 rm -rf "${INSTALL_PATH}"
 
 STEP=$((STEP + 1))
-echo "[${STEP}/${TOTAL_STEPS}] Install new app"
-cp -R "${RELEASE_APP_PATH}" "${INSTALL_PATH}"
+echo "[${STEP}/${TOTAL_STEPS}] Install and sign new app"
+/usr/bin/ditto "${RELEASE_APP_PATH}" "${INSTALL_PATH}"
+/usr/bin/codesign --force --deep --sign "${RESOLVED_CODE_SIGN_IDENTITY}" "${INSTALL_PATH}"
+/usr/bin/codesign --verify --deep --strict --verbose=2 "${INSTALL_PATH}"
 
 STEP=$((STEP + 1))
 echo "[${STEP}/${TOTAL_STEPS}] Launch app"

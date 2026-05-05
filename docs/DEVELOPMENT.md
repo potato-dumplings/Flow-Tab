@@ -397,14 +397,17 @@ chmod +x scripts/release/release-install.sh
 
 该脚本会执行：
 1. 退出正在运行的 `FlowTab`
-2. 重置该应用的辅助功能与屏幕录制授权记录
-3. 构建 Release
-4. 替换 `/Applications/Flow Tab.app`
-5. 启动新版本
+2. 从 `FLOWTAB_DEVELOPMENT_TEAM` 或 `xcconfigs/LocalSigning.xcconfig` 解析本地签名 team
+3. 重置该应用的辅助功能与屏幕录制授权记录
+4. 无签名构建 Release，避免 Xcode automatic signing 依赖本机不存在的旧证书类型
+5. 替换 `/Applications/Flow Tab.app`
+6. 使用本机 `Apple Development` identity 手动签名并校验 app
+7. 启动新版本
 
 注意：
 - 脚本依赖 `tccutil`，请在 macOS Terminal/iTerm 中执行。
 - 在受限沙箱环境中执行会因权限不足失败。
+- 可通过 `FLOWTAB_CODE_SIGN_IDENTITY` 指定本地签名身份，默认使用 `Apple Development`。
 
 ## 生成 DMG（未签名）
 
