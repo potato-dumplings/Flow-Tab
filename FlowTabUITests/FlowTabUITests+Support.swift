@@ -67,6 +67,11 @@ private extension FlowTabUITestAppIdentity {
     }
 }
 
+struct SwitcherWindowCardObservation: Equatable {
+    let identifier: String
+    let title: String
+}
+
 private extension String {
     var trimmedFlowTabUITestValue: String {
         trimmingCharacters(in: .whitespacesAndNewlines)
@@ -215,6 +220,148 @@ extension FlowTabUITests {
         }
         return element.label
     }
+    func homeWindowRows(in app: XCUIApplication) -> [XCUIElement] {
+        let buttonRows = app.buttons.allElementsBoundByIndex.filter {
+            $0.exists && $0.identifier.hasPrefix("flowtab.home.window.")
+        }
+        if !buttonRows.isEmpty {
+            return buttonRows
+        }
+
+        return app.descendants(matching: .any).allElementsBoundByIndex.filter {
+            $0.exists && $0.identifier.hasPrefix("flowtab.home.window.")
+        }
+    }
+    func homeWindowRow(_ row: XCUIElement, contains title: String) -> Bool {
+        [
+            row.label,
+            elementStringValue(row),
+            String(row.debugDescription.prefix(1_200))
+        ]
+        .contains { source in
+            source.localizedCaseInsensitiveContains(title)
+        }
+    }
+    func waitForHomeWindowRow(
+        in app: XCUIApplication,
+        title: String,
+        timeout: TimeInterval
+    ) -> XCUIElement? {
+        let deadline = Date().addingTimeInterval(timeout)
+        var latestRowIdentifiers: [String] = []
+        repeat {
+            let rows = homeWindowRows(in: app)
+            latestRowIdentifiers = rows.map(\.identifier)
+            if let row = rows.first(where: { homeWindowRow($0, contains: title) }) {
+                return row
+            }
+
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+
+        XCTFail(
+            """
+            Expected a Home window row containing \(title), \
+            found \(latestRowIdentifiers.sorted()).
+            """
+        )
+        return nil
+    }
+    func waitForHomeWindowTitle(
+        _ title: String,
+        in app: XCUIApplication,
+        timeout: TimeInterval
+    ) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if app.staticTexts[title].exists {
+                return true
+            }
+            if homeWindowRows(in: app).contains(where: { homeWindowRow($0, contains: title) }) {
+                return true
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+        return false
+    }
+    func assertHomeWindowTitle(
+        _ title: String,
+        in app: XCUIApplication,
+        timeout: TimeInterval = 12,
+        message: String? = nil
+    ) {
+        XCTAssertTrue(
+            waitForHomeWindowTitle(title, in: app, timeout: timeout),
+            message ?? "Missing Home window title: \(title)"
+        )
+    }
+    func assertHomeWindowTitlesAbsent(
+        _ titles: [String],
+        in app: XCUIApplication,
+        timeout: TimeInterval = 5
+    ) {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            let rows = homeWindowRows(in: app)
+            let unexpectedTitles = titles.filter { title in
+                app.staticTexts[title].exists
+                    || rows.contains(where: { homeWindowRow($0, contains: title) })
+            }
+            if unexpectedTitles.isEmpty {
+                return
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+
+        let rows = homeWindowRows(in: app)
+        let unexpectedTitles = titles.filter { title in
+            app.staticTexts[title].exists
+                || rows.contains(where: { homeWindowRow($0, contains: title) })
+        }
+        XCTFail("Unexpected visible Home window titles: \(unexpectedTitles)")
+    }
+    func switcherWindowCardObservations(in app: XCUIApplication) -> [SwitcherWindowCardObservation] {
+        var seenIdentifiers: Set<String> = []
+        return app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "flowtab.switcher.window."))
+            .allElementsBoundByIndex
+            .compactMap { element in
+                guard element.exists else { return nil }
+                guard seenIdentifiers.insert(element.identifier).inserted else { return nil }
+                let title = element.label.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !title.isEmpty else { return nil }
+                return SwitcherWindowCardObservation(
+                    identifier: element.identifier,
+                    title: title
+                )
+            }
+    }
+    func waitForSwitcherWindowCards(
+        in app: XCUIApplication,
+        expectedTitles: [String],
+        timeout: TimeInterval
+    ) -> [SwitcherWindowCardObservation] {
+        let deadline = Date().addingTimeInterval(timeout)
+        var latestCards: [SwitcherWindowCardObservation] = []
+        let expectedTitleCounts = windowTitleCounts(expectedTitles)
+
+        repeat {
+            latestCards = switcherWindowCardObservations(in: app)
+            if latestCards.count == expectedTitles.count,
+               windowTitleCounts(latestCards.map(\.title)) == expectedTitleCounts {
+                return latestCards
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+
+        XCTFail(
+            """
+            Expected switcher window cards to expose \(expectedTitles.sorted()), \
+            found \(latestCards.map { "\($0.title)=\($0.identifier)" }.sorted()).
+            """
+        )
+        return latestCards
+    }
     func assertValue(of element: XCUIElement, equals expectedValue: String, timeout: TimeInterval = 5) {
         let deadline = Date().addingTimeInterval(timeout)
         repeat {
@@ -224,6 +371,11 @@ extension FlowTabUITests {
             RunLoop.current.run(until: Date().addingTimeInterval(0.1))
         } while Date() < deadline
         XCTFail("Expected value '\(expectedValue)' for \(element.identifier), actual: '\(elementStringValue(element))'")
+    }
+    private func windowTitleCounts(_ titles: [String]) -> [String: Int] {
+        titles.reduce(into: [:]) { counts, title in
+            counts[title, default: 0] += 1
+        }
     }
     func assertValuePrefix(of element: XCUIElement, expectedPrefix: String, timeout: TimeInterval = 5) {
         let deadline = Date().addingTimeInterval(timeout)

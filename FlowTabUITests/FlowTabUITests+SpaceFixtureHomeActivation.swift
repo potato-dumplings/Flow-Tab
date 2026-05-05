@@ -55,50 +55,6 @@ extension FlowTabUITests {
         }
     }
 
-    private func waitForHomeWindowRow(
-        in app: XCUIApplication,
-        title: String,
-        timeout: TimeInterval
-    ) -> XCUIElement? {
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestRowIdentifiers: [String] = []
-        repeat {
-            let buttonRows = app.buttons.allElementsBoundByIndex.filter {
-                $0.exists && $0.identifier.hasPrefix("flowtab.home.window.")
-            }
-            let rows = buttonRows.isEmpty
-                ? app.descendants(matching: .any).allElementsBoundByIndex.filter {
-                    $0.exists && $0.identifier.hasPrefix("flowtab.home.window.")
-                }
-                : buttonRows
-            latestRowIdentifiers = rows.map(\.identifier)
-            if let row = rows.first(where: { homeWindowRow($0, contains: title) }) {
-                return row
-            }
-
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTFail(
-            """
-            Expected a Home window row containing \(title), \
-            found \(latestRowIdentifiers.sorted()).
-            """
-        )
-        return nil
-    }
-
-    private func homeWindowRow(_ row: XCUIElement, contains title: String) -> Bool {
-        [
-            row.label,
-            elementStringValue(row),
-            String(row.debugDescription.prefix(1_200))
-        ]
-        .contains { source in
-            source.localizedCaseInsensitiveContains(title)
-        }
-    }
-
     private func cgWindowNumber(fromHomeWindowRowIdentifier identifier: String) -> CGWindowID? {
         let prefix = "flowtab.home.window.cg-"
         guard identifier.hasPrefix(prefix) else { return nil }

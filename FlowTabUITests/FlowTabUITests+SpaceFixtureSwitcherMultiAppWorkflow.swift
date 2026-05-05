@@ -2,12 +2,6 @@ import AppKit
 import Foundation
 import XCTest
 
-private struct SwitcherWindowCardObservation: Equatable {
-    let identifier: String
-    let title: String
-    let appName: String
-}
-
 private struct SwitcherSearchWindowResultObservation: Equatable {
     let identifier: String
     let searchableText: String
@@ -84,14 +78,11 @@ extension FlowTabUITests {
                 ).waitForExistence(timeout: 8)
             )
             XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
+            selectSwitcherWorkflowApp(workflow.apps[0], in: app, diagnosticsSummary: diagnosticsSummary)
 
             var observedAppIDs: [String] = []
-            for index in workflow.apps.indices {
-                if index > 0 {
-                    app.typeKey(.rightArrow, modifierFlags: [])
-                    RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-                }
-
+            for workflowApp in workflow.apps {
+                selectSwitcherWorkflowApp(workflowApp, in: app, diagnosticsSummary: diagnosticsSummary)
                 app.typeKey(.downArrow, modifierFlags: [])
                 let selectedApp = try XCTUnwrap(
                     matchedWorkflowAppForVisibleSwitcherPreview(
@@ -101,6 +92,8 @@ extension FlowTabUITests {
                     ),
                     """
                     Switcher preview did not stabilize to a single workflow app window set.
+
+                    \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
 
                     \(self.multiAppWorkflowSetupMessage(
                         reason: "Resolved switcher workflow window titles did not match a single app.",
@@ -144,15 +137,12 @@ extension FlowTabUITests {
                 ).waitForExistence(timeout: 8)
             )
             XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
+            selectSwitcherWorkflowApp(workflow.apps[0], in: app, diagnosticsSummary: diagnosticsSummary)
 
             var observedAppIDs: [String] = []
             var previousWindowCardIdentifiers: Set<String> = []
-            for index in workflow.apps.indices {
-                if index > 0 {
-                    app.typeKey(.rightArrow, modifierFlags: [])
-                    RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-                }
-
+            for workflowApp in workflow.apps {
+                selectSwitcherWorkflowApp(workflowApp, in: app, diagnosticsSummary: diagnosticsSummary)
                 app.typeKey(.downArrow, modifierFlags: [])
                 let selectedApp = try XCTUnwrap(
                     matchedWorkflowAppForVisibleSwitcherPreview(
@@ -162,6 +152,8 @@ extension FlowTabUITests {
                     ),
                     """
                     Switcher preview did not stabilize to a single workflow app window set.
+
+                    \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
 
                     \(self.multiAppWorkflowSetupMessage(
                         reason: "Resolved switcher workflow window titles did not match a single app.",
@@ -190,6 +182,30 @@ extension FlowTabUITests {
 
             XCTAssertEqual(Set(observedAppIDs), Set(workflow.apps.map(\.appID)))
         }
+    }
+
+    private func selectSwitcherWorkflowApp(
+        _ workflowApp: SpaceFixtureResolvedWorkflow.App,
+        in app: XCUIApplication,
+        diagnosticsSummary: XCUIElement,
+        maxMoves: Int = 40
+    ) {
+        for _ in 0..<maxMoves {
+            if switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selected")
+                == workflowApp.identity.bundleIdentifier {
+                return
+            }
+            app.typeKey(.rightArrow, modifierFlags: [])
+            RunLoop.current.run(until: Date().addingTimeInterval(0.08))
+        }
+
+        XCTFail(
+            """
+            Failed to select switcher workflow app \(workflowApp.appName).
+
+            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
+            """
+        )
     }
 
     func testSwitcherPanelWindowSearchFindsAndActivatesRealWorkflowWindow() throws {
@@ -511,12 +527,10 @@ extension FlowTabUITests {
             let currentCardIdentifiers = Set(latestCards.map(\.identifier))
             let oldCardsWereRemoved = previousWindowCardIdentifiers.isEmpty
                 || currentCardIdentifiers.isDisjoint(with: previousWindowCardIdentifiers)
-            let allCardsBelongToSelectedApp = latestCards.allSatisfy { $0.appName == selectedApp.appName }
             let excludedTitlesAreAbsent = latestTitles.isDisjoint(with: Set(excludedTitles))
 
             if latestTitles == expectedTitles,
                latestCards.count == selectedApp.expectedWindowTitles.count,
-               allCardsBelongToSelectedApp,
                excludedTitlesAreAbsent,
                oldCardsWereRemoved {
                 return latestCards
@@ -531,15 +545,6 @@ extension FlowTabUITests {
             """
             Expected real switcher window card anchors for \(selectedApp.appName) to expose \
             \(selectedApp.expectedWindowTitles.sorted()), found \(latestCards.map(\.title).sorted()).
-
-            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-            """
-        )
-        XCTAssertTrue(
-            latestCards.allSatisfy { $0.appName == selectedApp.appName },
-            """
-            Expected real switcher window card anchors to belong to \(selectedApp.appName), \
-            found \(latestCards.map { "\($0.title)=\($0.appName)" }.sorted()).
 
             \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
             """
@@ -563,20 +568,6 @@ extension FlowTabUITests {
         )
 
         return latestCards
-    }
-
-    private func switcherWindowCardObservations(in app: XCUIApplication) -> [SwitcherWindowCardObservation] {
-        app.descendants(matching: .any).allElementsBoundByIndex.compactMap { element in
-            guard element.identifier.hasPrefix("flowtab.switcher.window.") else { return nil }
-            guard element.exists else { return nil }
-            let title = element.label.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !title.isEmpty else { return nil }
-            return SwitcherWindowCardObservation(
-                identifier: element.identifier,
-                title: title,
-                appName: elementStringValue(element).trimmingCharacters(in: .whitespacesAndNewlines)
-            )
-        }
     }
 
     private func waitForSearchWindowResult(

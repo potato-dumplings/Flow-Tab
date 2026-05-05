@@ -800,12 +800,14 @@ extension FlowTabUITests {
             assertValue(of: homeRow, equals: "\(workflowApp.windowCount)w", timeout: 20)
 
             for title in workflowApp.expectedHomeWindowTitles {
-                XCTAssertTrue(
-                    app.staticTexts[title].waitForExistence(timeout: 12),
-                    "Missing window title for \(workflowApp.appName): \(title)"
+                assertHomeWindowTitle(
+                    title,
+                    in: app,
+                    timeout: 12,
+                    message: "Missing window title for \(workflowApp.appName): \(title)"
                 )
             }
-            assertStaticTextsAbsent(
+            assertHomeWindowTitlesAbsent(
                 workflow.otherExpectedHomeWindowTitles(excluding: workflowApp.appID),
                 in: app,
                 timeout: 12

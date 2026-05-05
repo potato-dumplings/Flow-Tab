@@ -113,11 +113,13 @@ extension FlowTabUITests {
         ) { identity, app in
             let fixtureAppTile = element(in: app, identifier: identity.switcherAppAccessibilityIdentifier)
             XCTAssertTrue(fixtureAppTile.waitForExistence(timeout: 8))
+            selectSwitcherApp(in: app, appID: identity.bundleIdentifier)
 
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
             app.typeKey(.downArrow, modifierFlags: [])
+            XCTAssertTrue(waitForSwitcherSummary(in: app, containing: "mode=windowCycle", timeout: 5))
 
-            assertSpaceFixtureWindowTitles(
+            assertSpaceFixtureSwitcherWindowCards(
                 expectedSpaceFixtureWorkflowWindowTitles(titlePrefix: "Workflow", windowCount: 3),
                 in: app
             )
@@ -248,7 +250,15 @@ extension FlowTabUITests {
         timeout: TimeInterval = 12
     ) {
         for title in expectedTitles {
-            XCTAssertTrue(app.staticTexts[title].waitForExistence(timeout: timeout), "Missing window title: \(title)")
+            assertHomeWindowTitle(title, in: app, timeout: timeout, message: "Missing window title: \(title)")
         }
+    }
+
+    private func assertSpaceFixtureSwitcherWindowCards(
+        _ expectedTitles: [String],
+        in app: XCUIApplication,
+        timeout: TimeInterval = 12
+    ) {
+        _ = waitForSwitcherWindowCards(in: app, expectedTitles: expectedTitles, timeout: timeout)
     }
 }
