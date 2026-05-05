@@ -72,6 +72,7 @@
 		B1C2D3E42F74000100B0D737 /* AppLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E32F74000100B0D737 /* AppLocalization.swift */; };
 		C20000012FBD000100B0D737 /* HomeWindowActivationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000112FBD000100B0D737 /* HomeWindowActivationController.swift */; };
 		C20000022FBD000100B0D737 /* HomeWindowRowButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000122FBD000100B0D737 /* HomeWindowRowButton.swift */; };
+		C30000012FBD100100B0D737 /* HomeRuntimeSnapshotService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000112FBD100100B0D737 /* HomeRuntimeSnapshotService.swift */; };
 		C10000012F75000100B0D737 /* AppFoundation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000112F75000100B0D737 /* AppFoundation.swift */; };
 		C10000022F75000100B0D737 /* HomeRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000122F75000100B0D737 /* HomeRootView.swift */; };
 		C10000032F75000100B0D737 /* HomeLandingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000132F75000100B0D737 /* HomeLandingView.swift */; };
@@ -214,6 +215,7 @@
 		B1C2D3E32F74000100B0D737 /* AppLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLocalization.swift; sourceTree = "<group>"; };
 		C20000112FBD000100B0D737 /* HomeWindowActivationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeWindowActivationController.swift; sourceTree = "<group>"; };
 		C20000122FBD000100B0D737 /* HomeWindowRowButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeWindowRowButton.swift; sourceTree = "<group>"; };
+		C30000112FBD100100B0D737 /* HomeRuntimeSnapshotService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeRuntimeSnapshotService.swift; sourceTree = "<group>"; };
 		C10000112F75000100B0D737 /* AppFoundation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppFoundation.swift; sourceTree = "<group>"; };
 		C10000122F75000100B0D737 /* HomeRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeRootView.swift; sourceTree = "<group>"; };
 		C10000132F75000100B0D737 /* HomeLandingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeLandingView.swift; sourceTree = "<group>"; };
@@ -513,6 +515,7 @@
 			isa = PBXGroup;
 			children = (
 				C10000132F75000100B0D737 /* HomeLandingView.swift */,
+				C30000112FBD100100B0D737 /* HomeRuntimeSnapshotService.swift */,
 				C20000112FBD000100B0D737 /* HomeWindowActivationController.swift */,
 				C20000122FBD000100B0D737 /* HomeWindowRowButton.swift */,
 			);
@@ -779,6 +782,7 @@
 				C10000052F75000100B0D737 /* HotkeySettingsCard.swift in Sources */,
 				C10000042F75000100B0D737 /* HomeChrome.swift in Sources */,
 				C10000032F75000100B0D737 /* HomeLandingView.swift in Sources */,
+				C30000012FBD100100B0D737 /* HomeRuntimeSnapshotService.swift in Sources */,
 				C20000012FBD000100B0D737 /* HomeWindowActivationController.swift in Sources */,
 				C20000022FBD000100B0D737 /* HomeWindowRowButton.swift in Sources */,
 				C10000022F75000100B0D737 /* HomeRootView.swift in Sources */,

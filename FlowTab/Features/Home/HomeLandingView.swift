@@ -5,11 +5,6 @@ import FlowTabCore
 
 @MainActor
 struct HomeLandingView: View {
-    private static let snapshotQueue = DispatchQueue(
-        label: "FlowTab.HomeLandingSnapshotQueue",
-        qos: .utility
-    )
-    private static let snapshotProvider = RuntimeSnapshotProvider()
     private static var cachedAppSummaries: [RuntimeHomeAppSummary] = []
     private static var cachedWindowsByAppID: [String: [WindowCandidate]] = [:]
     private static var cachedSelectedAppID: String?
@@ -301,7 +296,7 @@ struct HomeLandingView: View {
     private func noSwitchableWindowsSubtitle(for app: RuntimeHomeAppSummary) -> String {
         if
             accessibilityTrusted,
-            Self.snapshotProvider.isLikelyTransientAXRebuild(for: app.pid)
+            homeRuntimeSnapshotService.isLikelyTransientAXRebuild(for: app.pid)
         {
             return AppStrings.text(.homeWaitCacheUpdate, language: appLanguage)
         }
@@ -547,27 +542,15 @@ struct HomeLandingView: View {
     }
 
     private func fetchHomeAppSummariesOnBackground() async -> [RuntimeHomeAppSummary] {
-        await withCheckedContinuation { continuation in
-            Self.snapshotQueue.async {
-                continuation.resume(returning: Self.snapshotProvider.homeAppSummaries())
-            }
-        }
+        await homeRuntimeSnapshotService.homeAppSummaries()
     }
 
     private func fetchHomeAppSummaryOnBackground(appID: String) async -> RuntimeHomeAppSummary? {
-        await withCheckedContinuation { continuation in
-            Self.snapshotQueue.async {
-                continuation.resume(returning: Self.snapshotProvider.homeAppSummary(for: appID))
-            }
-        }
+        await homeRuntimeSnapshotService.homeAppSummary(for: appID)
     }
 
     private func fetchHomeAppSnapshotOnBackground(appID: String) async -> RuntimeHomeAppSnapshot? {
-        await withCheckedContinuation { continuation in
-            Self.snapshotQueue.async {
-                continuation.resume(returning: Self.snapshotProvider.homeAppSnapshot(for: appID))
-            }
-        }
+        await homeRuntimeSnapshotService.homeAppSnapshot(for: appID)
     }
 
     private func syncSelectedApp() {

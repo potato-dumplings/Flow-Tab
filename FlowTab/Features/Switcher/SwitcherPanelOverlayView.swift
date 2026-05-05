@@ -136,6 +136,16 @@ private struct CommandTabOverlay: View {
     let iconForApp: (AppSwitchCandidate) -> NSImage?
     @Environment(\.colorScheme) private var colorScheme
 
+    private struct SearchResultScrollRequest: Equatable {
+        let revision: UInt64
+        let resultID: String?
+        let isInputFocused: Bool
+    }
+
+    private struct SearchResultScrollProxy: @unchecked Sendable {
+        let proxy: ScrollViewProxy
+    }
+
     private var isWindowOnlyMode: Bool {
         overlayStyle == .windowOnly
     }
@@ -258,6 +268,14 @@ private struct CommandTabOverlay: View {
         return searchState.results[index].id
     }
 
+    private var searchResultScrollRequest: SearchResultScrollRequest {
+        SearchResultScrollRequest(
+            revision: searchResultScrollRevision,
+            resultID: selectedSearchResultID,
+            isInputFocused: searchState.isInputFocused
+        )
+    }
+
     private var searchHeaderHighlightItem: SearchHeaderHighlightItem? {
         guard isSearchMode else { return nil }
         switch searchState.scope {
@@ -300,14 +318,18 @@ private struct CommandTabOverlay: View {
         }
     }
 
-    private func scrollToSelectedSearchResult(using proxy: ScrollViewProxy) {
-        guard !searchState.isInputFocused else { return }
-        guard let selectedSearchResultID else { return }
-        onSearchResultScrollRequested(selectedSearchResultID)
+    @MainActor
+    private func scrollToSearchResult(
+        _ request: SearchResultScrollRequest,
+        using scrollProxy: SearchResultScrollProxy
+    ) {
+        guard !request.isInputFocused else { return }
+        guard let resultID = request.resultID else { return }
+        onSearchResultScrollRequested(resultID)
         var transaction = Transaction(animation: nil)
         transaction.disablesAnimations = true
         withTransaction(transaction) {
-            proxy.scrollTo(selectedSearchResultID, anchor: .center)
+            scrollProxy.proxy.scrollTo(resultID, anchor: .center)
         }
     }
 
@@ -437,6 +459,8 @@ private struct CommandTabOverlay: View {
                     SearchEmptyState(scope: .app)
                 } else {
                     ScrollViewReader { scrollProxy in
+                        let searchScrollProxy = SearchResultScrollProxy(proxy: scrollProxy)
+                        let scrollRequest = searchResultScrollRequest
                         ScrollView(.vertical, showsIndicators: true) {
                             LazyVStack(alignment: .leading, spacing: 8) {
                                 ForEach(searchAppItems) { item in
@@ -451,8 +475,8 @@ private struct CommandTabOverlay: View {
                             .padding(.vertical, 2)
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                        .task(id: searchResultScrollRevision) {
-                            scrollToSelectedSearchResult(using: scrollProxy)
+                        .task(id: scrollRequest) { @MainActor in
+                            scrollToSearchResult(scrollRequest, using: searchScrollProxy)
                         }
                     }
                 }
@@ -461,6 +485,8 @@ private struct CommandTabOverlay: View {
                     SearchEmptyState(scope: .window)
                 } else {
                     ScrollViewReader { scrollProxy in
+                        let searchScrollProxy = SearchResultScrollProxy(proxy: scrollProxy)
+                        let scrollRequest = searchResultScrollRequest
                         ScrollView(.vertical, showsIndicators: true) {
                             LazyVStack(alignment: .leading, spacing: 8) {
                                 ForEach(searchWindowItems) { item in
@@ -472,8 +498,8 @@ private struct CommandTabOverlay: View {
                             .padding(.vertical, 2)
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                        .task(id: searchResultScrollRevision) {
-                            scrollToSelectedSearchResult(using: scrollProxy)
+                        .task(id: scrollRequest) { @MainActor in
+                            scrollToSearchResult(scrollRequest, using: searchScrollProxy)
                         }
                     }
                 }
