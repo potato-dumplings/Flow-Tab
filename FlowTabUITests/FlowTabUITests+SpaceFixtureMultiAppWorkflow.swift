@@ -827,7 +827,7 @@ extension FlowTabUITests {
         \(reason)
 
         Build or refresh the shared multi-app fixture app variants with:
-          ./scripts/testing/build-space-fixture-workflow.sh --workflow-config \(SpaceFixtureMultiAppWorkflowDefaults.workflowSourceURL.path)
+          ./scripts/testing/build-space-fixture-workflow.sh --workflow-config \(scenarioSourceURL.path)
 
         Baseline resolved workflow path:
           \(SpaceFixtureMultiAppWorkflowDefaults.defaultResolvedWorkflowURL.path)
