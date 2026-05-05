@@ -1,4 +1,5 @@
 import AppKit
+import CoreGraphics
 import Foundation
 import XCTest
 
@@ -230,20 +231,21 @@ extension FlowTabUITests {
             RunLoop.current.run(until: Date().addingTimeInterval(0.4))
             app.typeText(targetWindowTitle)
 
-            let result = waitForSearchWindowResult(
+            guard let result = waitForSearchWindowResult(
                 in: app,
                 title: targetWindowTitle,
                 appName: targetApp.appName,
                 timeout: 8
-            )
-            XCTAssertNotNil(
-                result,
-                "FlowTab did not expose \(targetWindowTitle) as a real window-scope search result."
+            ) else { return }
+            let targetWindowNumber = try XCTUnwrap(
+                workflowCGWindowID(fromSearchResultIdentifier: result.identifier),
+                "Search result \(result.identifier) did not expose a CG window number."
             )
 
             confirmSwitcherSearchSelection(in: app, searchInput: searchInput)
             XCTAssertTrue(
-                waitForFocusedWorkflowWindow(
+                waitForFrontmostWorkflowWindow(
+                    windowNumber: targetWindowNumber,
                     title: targetWindowTitle,
                     app: targetApp,
                     timeout: 10
@@ -328,15 +330,15 @@ extension FlowTabUITests {
             RunLoop.current.run(until: Date().addingTimeInterval(0.4))
             app.typeText(targetWindowTitle)
 
-            let result = waitForSearchWindowResult(
+            guard let result = waitForSearchWindowResult(
                 in: app,
                 title: targetWindowTitle,
                 appName: targetApp.appName,
                 timeout: 8
-            )
-            XCTAssertNotNil(
-                result,
-                "FlowTab did not expose \(targetWindowTitle) as a fullscreen window-scope search result."
+            ) else { return }
+            let targetWindowNumber = try XCTUnwrap(
+                workflowCGWindowID(fromSearchResultIdentifier: result.identifier),
+                "Search result \(result.identifier) did not expose a CG window number."
             )
 
             confirmSwitcherSearchSelection(in: app, searchInput: searchInput)
@@ -345,7 +347,8 @@ extension FlowTabUITests {
                 "FlowTab panel remained visible after confirming the fullscreen window target."
             )
             XCTAssertTrue(
-                waitForFocusedWorkflowWindow(
+                waitForFrontmostWorkflowWindow(
+                    windowNumber: targetWindowNumber,
                     title: targetWindowTitle,
                     app: targetApp,
                     timeout: 12
@@ -390,6 +393,12 @@ extension FlowTabUITests {
         let titleIndex = fullscreenWindowIndex - 1
         guard workflowApp.expectedWindowTitles.indices.contains(titleIndex) else { return nil }
         return workflowApp.expectedWindowTitles[titleIndex]
+    }
+
+    private func workflowCGWindowID(fromSearchResultIdentifier identifier: String) -> CGWindowID? {
+        guard let rawWindowID = identifier.split(separator: "-").last else { return nil }
+        guard let windowID = UInt32(rawWindowID) else { return nil }
+        return CGWindowID(windowID)
     }
 
     private func validateSwitcherMultiAppWorkflow(
@@ -596,24 +605,45 @@ extension FlowTabUITests {
     }
 
     private func searchWindowResultObservations(in app: XCUIApplication) -> [SwitcherSearchWindowResultObservation] {
-        app.descendants(matching: .any).allElementsBoundByIndex.compactMap { element in
-            guard element.identifier.hasPrefix("flowtab.switcher.search.window.") else { return nil }
-            guard element.exists else { return nil }
-            let debugSummary = String(element.debugDescription.prefix(1_200))
-            let searchableText = [
-                element.label,
-                elementStringValue(element),
-                debugSummary
-            ]
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-            .joined(separator: "\n")
+        let hierarchyDescription = app.debugDescription
+        let lines = hierarchyDescription.components(separatedBy: .newlines)
+        let identifierPrefix = "flowtab.switcher.search.window."
+        let escapedPrefix = NSRegularExpression.escapedPattern(for: identifierPrefix)
+        let identifierPattern = "identifier: ['\"](" + escapedPrefix + "[^'\"]*)['\"]"
+        guard let identifierRegex = try? NSRegularExpression(pattern: identifierPattern) else {
+            return []
+        }
 
+        var seenIdentifiers: Set<String> = []
+        return lines.indices.compactMap { index in
+            guard let identifier = searchWindowResultIdentifier(in: lines[index], regex: identifierRegex) else {
+                return nil
+            }
+            guard seenIdentifiers.insert(identifier).inserted else { return nil }
+
+            let contextStart = max(0, index - 2)
+            let contextEnd = min(lines.count - 1, index + 6)
+            let searchableText = lines[contextStart...contextEnd]
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+                .joined(separator: "\n")
             return SwitcherSearchWindowResultObservation(
-                identifier: element.identifier,
+                identifier: identifier,
                 searchableText: searchableText
             )
         }
+    }
+
+    private func searchWindowResultIdentifier(
+        in line: String,
+        regex: NSRegularExpression
+    ) -> String? {
+        let range = NSRange(line.startIndex..<line.endIndex, in: line)
+        guard let match = regex.firstMatch(in: line, range: range),
+              let identifierRange = Range(match.range(at: 1), in: line) else {
+            return nil
+        }
+        return String(line[identifierRange])
     }
 
     private func confirmSwitcherSearchSelection(in app: XCUIApplication, searchInput: XCUIElement) {
