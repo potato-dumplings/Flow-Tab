@@ -495,6 +495,33 @@ extension FlowTabUITests {
         }
         element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
     }
+    func tapElementAfterScrollingIntoView(
+        _ element: XCUIElement,
+        in scrollContainer: XCUIElement,
+        timeout: TimeInterval
+    ) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        var attempt = 0
+        repeat {
+            if element.exists && element.isHittable {
+                element.tap()
+                return true
+            }
+
+            if scrollContainer.exists {
+                let deltaY: CGFloat = attempt < 12 ? 280 : -280
+                scrollContainer.scroll(byDeltaX: 0, deltaY: deltaY)
+                attempt = (attempt + 1) % 24
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+
+        if element.exists && element.isHittable {
+            element.tap()
+            return true
+        }
+        return false
+    }
     func assertLogVisibility(
         at logLevel: String,
         visibleIdentifiers: [String],

@@ -13,6 +13,8 @@ final class FlowTabUITests: XCTestCase {
         static let logsTabButton = "flowtab.sidebar.tab.logs"
         static let settingsTabButton = "flowtab.sidebar.tab.settings"
         static let homeTabContent = "flowtab.tab.home.content"
+        static let homeAppList = "flowtab.home.app.list"
+        static let homeWindowList = "flowtab.home.window.list"
         static let logsTabContent = "flowtab.tab.logs.content"
         static let settingsTabContent = "flowtab.tab.settings.content"
         static let permissionBanner = "flowtab.home.permission.banner"

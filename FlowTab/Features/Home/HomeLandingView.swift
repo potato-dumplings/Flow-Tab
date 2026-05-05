@@ -210,6 +210,7 @@ struct HomeLandingView: View {
                         }
                     }
                 }
+                .accessibilityIdentifier("flowtab.home.app.list")
                 .frame(minHeight: 180, maxHeight: 500)
             }
         }
@@ -257,6 +258,7 @@ struct HomeLandingView: View {
                         }
                     }
                 }
+                .accessibilityIdentifier("flowtab.home.window.list")
                 .frame(minHeight: 180, maxHeight: 500)
             } else if activeApp != nil {
                 HomeLayerRowView(
