@@ -88,7 +88,7 @@ struct RuntimeWindowRecord {
         if let cgBounds = cgWindow.bounds {
             lastKnownCGFrame = cgBounds
         }
-        let normalizedSpaceIDs = Array(Set(cgWindow.spaceIDs)).sorted()
+        let normalizedSpaceIDs = RuntimeWindowTopologyClassifier.normalizedSpaceIDs(cgWindow.spaceIDs)
         if !normalizedSpaceIDs.isEmpty {
             var recovery = spaceRecovery ?? RuntimeSpaceRecoveryState(
                 cgWindowID: cgWindow.id,

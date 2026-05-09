@@ -5,6 +5,7 @@ import Foundation
 @MainActor
 protocol SpaceFixtureWindowing: AnyObject {
     var plan: SpaceFixtureWindowPlan { get }
+    var applicationAccessibilityElement: Any { get }
     func show(isKey: Bool)
     func enterFullScreen()
     func updateWorkflowReadiness(windowTitles: [String])
@@ -16,6 +17,7 @@ final class SpaceFixtureWindowCoordinator {
     typealias WindowFactory = (SpaceFixtureWindowPlan) -> any SpaceFixtureWindowing
     typealias FullscreenScheduler = (Int, @escaping @MainActor () -> Void) -> Void
     typealias ActivationHandler = () -> Void
+    typealias ApplicationAccessibilityElementsPublisher = ([Any]) -> Void
 
     private static let desktopRefocusDelayMilliseconds = 1_200
 
@@ -24,6 +26,7 @@ final class SpaceFixtureWindowCoordinator {
     private let windowFactory: WindowFactory
     private let fullscreenScheduler: FullscreenScheduler
     private let activateApplication: ActivationHandler
+    private let applicationAccessibilityElementsPublisher: ApplicationAccessibilityElementsPublisher
 
     private(set) var windows: [any SpaceFixtureWindowing] = []
 
@@ -32,7 +35,8 @@ final class SpaceFixtureWindowCoordinator {
         visibleFrameProvider: VisibleFrameProvider? = nil,
         windowFactory: WindowFactory? = nil,
         fullscreenScheduler: FullscreenScheduler? = nil,
-        activateApplication: ActivationHandler? = nil
+        activateApplication: ActivationHandler? = nil,
+        applicationAccessibilityElementsPublisher: ApplicationAccessibilityElementsPublisher? = nil
     ) {
         self.configuration = configuration
         self.visibleFrameProvider = visibleFrameProvider ?? Self.defaultVisibleFrame
@@ -40,6 +44,10 @@ final class SpaceFixtureWindowCoordinator {
         self.fullscreenScheduler = fullscreenScheduler ?? Self.defaultFullscreenScheduler
         self.activateApplication = activateApplication ?? {
             NSApplication.shared.activate(ignoringOtherApps: true)
+        }
+        self.applicationAccessibilityElementsPublisher = applicationAccessibilityElementsPublisher ?? {
+            NSApplication.shared.setAccessibilityChildren($0)
+            NSApplication.shared.setAccessibilityWindows($0)
         }
     }
 
@@ -59,6 +67,7 @@ final class SpaceFixtureWindowCoordinator {
 
         activateApplication()
         windows.forEach { $0.updateWorkflowReadiness(windowTitles: windowTitles) }
+        publishApplicationAccessibilityElements()
 
         guard let fullscreenWindowIndex = configuration.fullscreenWindowIndex else { return }
         guard let fullscreenWindow = windows.first(where: { $0.plan.index == fullscreenWindowIndex }) else {
@@ -70,6 +79,7 @@ final class SpaceFixtureWindowCoordinator {
 
         fullscreenScheduler(configuration.enterFullscreenDelayMilliseconds) {
             fullscreenWindow.enterFullScreen()
+            self.publishApplicationAccessibilityElements()
 
             guard let desktopAnchorWindow else { return }
             // Keep the post-launch topology anchored on the normal desktop so
@@ -77,8 +87,17 @@ final class SpaceFixtureWindowCoordinator {
             self.fullscreenScheduler(Self.desktopRefocusDelayMilliseconds) {
                 self.activateApplication()
                 desktopAnchorWindow.show(isKey: true)
+                self.publishApplicationAccessibilityElements()
             }
         }
+    }
+
+    private func publishApplicationAccessibilityElements() {
+        guard configuration.publishesApplicationAccessibilityChildren else {
+            applicationAccessibilityElementsPublisher([])
+            return
+        }
+        applicationAccessibilityElementsPublisher(windows.map(\.applicationAccessibilityElement))
     }
 
     private static func defaultVisibleFrame() -> CGRect {

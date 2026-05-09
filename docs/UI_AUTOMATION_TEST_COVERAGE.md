@@ -1,6 +1,6 @@
 # UI 自动化测试覆盖清单（FlowTab）
 
-更新时间：2026-04-30
+更新时间：2026-05-09
 
 ## 目标与范围
 
@@ -10,9 +10,9 @@
 
 ## 覆盖总览（当前）
 
-- 用例总数：40
+- 用例总数：64
 - 覆盖域：启动导航、Home、权限提示、Logs、Settings、Switcher/Search、压测。
-- 当前状态：应用内可稳定自动化的核心场景已有覆盖，Settings 搜索默认范围的双向运行时生效路径、Home 真实窗口点击激活路径、Switcher 真实 app-scope 搜索激活路径、Settings 中 `Command + Tab` 接管触发与退出恢复路径、真实 edge-input fixture 下的同名/同尺寸同位置窗口和非 ASCII 长标题路径，以及真实 fixture app 的退出快捷键延迟终止路径已补齐。
+- 当前状态：应用内可稳定自动化的核心场景已有覆盖，Settings 搜索默认范围的双向运行时生效路径、Home 真实窗口点击激活路径、Switcher 真实 app-scope 搜索激活路径、Settings 中 `Command + Tab` 接管触发与退出恢复路径、真实 edge-input fixture 下的同名/同尺寸同位置窗口和非 ASCII 长标题路径、真实 fixture app 的退出快捷键延迟终止路径，以及 suppress app-level AX children 的 full-screen Space normal/fullscreen sibling roundtrip 路径已补齐。
 - 执行前提：大多数用例依赖 UI test launch arguments 控制权限状态、Mock Runtime、预置日志和重置偏好，以减少系统环境抖动。
 
 ## 用例详情（当前）
@@ -177,6 +177,16 @@
   场景：真实 multi-app fixture workflow 中使用 app scope 搜索 fixture app 的 bundle identity token。
   步骤：以 `app` 默认范围启动搜索态 switcher，输入目标 fixture app 的搜索 token，等待真实 `flowtab.switcher.search.app.*` 结果出现后按回车确认。
   验证：目标 fixture app 成为 frontmost app，证明真实 runtime 搜索结果可以按 app-scope 路径激活正确应用。
+
+- `testSwitcherPanelOptionTabWindowStateRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithoutAppAXWindows`
+  场景：同一个 fixture app 同时拥有 normal desktop window 和 full-screen Space-backed sibling，且 app-level AX children 被 suppress，验证 global Option+Tab 进入 app window state 后仍使用 runtime truth。
+  步骤：打开标准 switcher，选中目标 app，进入 window state，先选择 full-screen sibling 并确认；随后重新启动 FlowTab，再选择 normal sibling 并确认。
+  验证：两次确认后 frontmost bundle 均为目标 fixture app，且 frontmost CG window number 分别精确等于选中的 full-screen 与 normal `CGWindowID`。
+
+- `testSwitcherPanelWindowSearchRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithoutAppAXWindows`
+  场景：同一个非配合 fixture app 下 normal desktop sibling 和 full-screen Space sibling 都应该能被 window-scope search 找到并激活。
+  步骤：以 `window` 默认范围启动搜索态 switcher，先搜索 full-screen sibling 标题并确认；随后重新启动 FlowTab，再搜索 normal sibling 标题并确认。
+  验证：搜索结果携带真实 `CGWindowID`，确认后系统切到对应目标窗口所在 Space，frontmost CG window number 精确等于搜索结果中的目标窗口。
 
 - `testSwitcherPanelQuitShortcutKeepsRealFixtureAppUntilProcessTerminates`
   场景：用户在 switcher 标准模式选中真实 fixture app 后按默认退出快捷键。

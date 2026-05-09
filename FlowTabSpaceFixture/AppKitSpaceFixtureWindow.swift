@@ -7,6 +7,10 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
     private let contentView: SpaceFixtureWindowContentView
     private let window: NSWindow
 
+    var applicationAccessibilityElement: Any {
+        window
+    }
+
     init(plan: SpaceFixtureWindowPlan) {
         self.plan = plan
         let contentView = SpaceFixtureWindowContentView(plan: plan)
@@ -22,6 +26,7 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
         window.collectionBehavior = [.fullScreenPrimary]
         window.tabbingMode = .disallowed
         window.isReleasedWhenClosed = false
+        window.setAccessibilityElement(true)
         window.setFrame(plan.frame, display: false)
         window.contentView = contentView
 

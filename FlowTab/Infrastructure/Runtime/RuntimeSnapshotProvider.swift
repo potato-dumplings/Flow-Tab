@@ -13,6 +13,7 @@ final class RuntimeSnapshotProvider {
         let activationHandleID: String?
         let axWindow: AXUIElement?
         let frame: CGRect?
+        let spaceIDs: [Int]
         let allowsPublicAXRecovery: Bool
         let hasStickyBinding: Bool
         let lastConfirmationSource: WindowBindingConfirmationSource?
@@ -26,6 +27,7 @@ final class RuntimeSnapshotProvider {
             activationHandleID: String? = nil,
             axWindow: AXUIElement? = nil,
             frame: CGRect? = nil,
+            spaceIDs: [Int] = [],
             allowsPublicAXRecovery: Bool = false,
             hasStickyBinding: Bool = false,
             lastConfirmationSource: WindowBindingConfirmationSource? = nil
@@ -38,6 +40,7 @@ final class RuntimeSnapshotProvider {
             self.activationHandleID = activationHandleID
             self.axWindow = axWindow
             self.frame = frame
+            self.spaceIDs = RuntimeWindowTopologyClassifier.normalizedSpaceIDs(spaceIDs)
             self.allowsPublicAXRecovery = allowsPublicAXRecovery
             self.hasStickyBinding = hasStickyBinding
             self.lastConfirmationSource = lastConfirmationSource
@@ -99,6 +102,21 @@ final class RuntimeSnapshotProvider {
         let title: String
         let isMinimized: Bool
         let cgWindowID: CGWindowID?
+        let spaceIDs: [Int]
+
+        init(
+            windowID: String,
+            title: String,
+            isMinimized: Bool,
+            cgWindowID: CGWindowID?,
+            spaceIDs: [Int] = []
+        ) {
+            self.windowID = windowID
+            self.title = title
+            self.isMinimized = isMinimized
+            self.cgWindowID = cgWindowID
+            self.spaceIDs = RuntimeWindowTopologyClassifier.normalizedSpaceIDs(spaceIDs)
+        }
     }
 
     struct SnapshotAssemblyRow {
@@ -202,6 +220,7 @@ final class RuntimeSnapshotProvider {
                             isMinimized: $0.isMinimized,
                             ownerPID: $0.ownerPID,
                             cgWindowID: $0.cgWindowID,
+                            spaceIDs: $0.spaceIDs,
                             inferredTitleBarStyle: nil,
                             activationHandleID: $0.activationHandleID,
                             axWindow: $0.axWindow,
@@ -353,14 +372,20 @@ final class RuntimeSnapshotProvider {
         var windowsByPID: [pid_t: [WindowListEntry]] = [:]
         for app in runningApps {
             let appName = app.localizedName ?? app.bundleIdentifier ?? "pid:\(app.processIdentifier)"
-            let windowsFetchResult = AXWindowInspector.windowsFetchResult(for: app)
+            let cgWindows = cgWindowsByPID[app.processIdentifier] ?? []
+            let allCGWindows = allCGWindowsByPID[app.processIdentifier] ?? cgWindows
+            let shouldIncludeRemoteAXWindows = shouldIncludeRemoteAXWindows(
+                allCGWindows: allCGWindows
+            )
+            let windowsFetchResult = AXWindowInspector.windowsFetchResult(
+                for: app,
+                includeRemoteWindows: shouldIncludeRemoteAXWindows
+            )
             let windows = windowsFetchResult.windows
             AXLiveWindowRegistry.shared.refreshSnapshot(
                 forPID: app.processIdentifier,
                 windows: windows
             )
-            let cgWindows = cgWindowsByPID[app.processIdentifier] ?? []
-            let allCGWindows = allCGWindowsByPID[app.processIdentifier] ?? cgWindows
             RuntimeLog.info(
                 "AX",
                 "\(appName) rawWindows=\(windows.count) \(windowsFetchResult.logDetails)"
@@ -399,6 +424,16 @@ final class RuntimeSnapshotProvider {
             windowsByPID[app.processIdentifier] = resolvedEntries
         }
         return windowsByPID
+    }
+
+    private func shouldIncludeRemoteAXWindows(allCGWindows: [CGWindowEntry]) -> Bool {
+        allCGWindows.contains { window in
+            Self.cgWindowPassesValidityConstraints(window)
+                && (
+                    RuntimeWindowTopologyClassifier.hasOffDesktopSpace(spaceIDs: window.spaceIDs)
+                        || !window.isOnscreen
+                )
+        }
     }
 
     private func resolvedWindowEntries(
@@ -917,6 +952,8 @@ final class RuntimeSnapshotProvider {
                 isMinimized: $0.isMinimized,
                 cgWindowID: $0.cgWindowID,
                 frame: $0.frame,
+                spaceIDs: $0.spaceIDs,
+                hasActivationHandle: $0.activationHandleID != nil || $0.axWindow != nil,
                 lastConfirmationSource: $0.lastConfirmationSource
             )
         }

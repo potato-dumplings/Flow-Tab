@@ -47,6 +47,19 @@ final class SwitcherSessionTests: XCTestCase {
         XCTAssertEqual(session.selectedWindow?.id, "term-1")
     }
 
+    func testLeftRightCyclesWindowsInWindowLayer() {
+        var session = SwitcherSession(apps: sampleApps())
+
+        session.enterWindowCycleIfPossible()
+        XCTAssertEqual(session.selectedWindow?.id, "term-2")
+
+        session.handle(.leftArrow)
+        XCTAssertEqual(session.selectedWindow?.id, "term-1")
+
+        session.handle(.rightArrow)
+        XCTAssertEqual(session.selectedWindow?.id, "term-2")
+    }
+
     func testEnterWindowLayerRequiresAtLeastTwoWindows() {
         var session = SwitcherSession(apps: sampleApps(), triggerDirection: .backward)
 

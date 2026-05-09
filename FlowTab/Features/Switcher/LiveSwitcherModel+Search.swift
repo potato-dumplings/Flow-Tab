@@ -136,6 +136,7 @@ extension LiveSwitcherModel {
     @discardableResult
     func applySelectedSearchResultToSession() -> Bool {
         guard var session else { return false }
+        flushCurrentSearchComputationForCommit()
         guard let selected = searchViewState.selectedResult else { return false }
 
         switch selected.kind {
@@ -151,6 +152,13 @@ extension LiveSwitcherModel {
         _ = searchCoordinator.exit()
         publishSearchStateIfNeeded()
         return true
+    }
+
+    func flushCurrentSearchComputationForCommit() {
+        let shouldResetSelection = pendingSearchComputationTask != nil
+        cancelPendingSearchComputation()
+        searchCoordinator.rebuildResults(resetSelection: shouldResetSelection)
+        publishSearchStateIfNeeded()
     }
 
     func scheduleSearchComputation(resetSelection: Bool, debounced: Bool) {

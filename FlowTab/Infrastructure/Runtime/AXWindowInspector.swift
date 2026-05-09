@@ -28,11 +28,17 @@ enum AXWindowInspector {
     ) -> AXError
     static var cgWindowIDOverrideForTesting: ((AXUIElement) -> CGWindowID?)?
 
-    static func windows(for app: NSRunningApplication) -> [AXUIElement] {
-        windowsFetchResult(for: app).windows
+    static func windows(
+        for app: NSRunningApplication,
+        includeRemoteWindows: Bool = false
+    ) -> [AXUIElement] {
+        windowsFetchResult(for: app, includeRemoteWindows: includeRemoteWindows).windows
     }
 
-    static func windowsFetchResult(for app: NSRunningApplication) -> WindowsFetchResult {
+    static func windowsFetchResult(
+        for app: NSRunningApplication,
+        includeRemoteWindows: Bool = false
+    ) -> WindowsFetchResult {
         guard AccessibilityPermissionChecker.isTrusted() else {
             return WindowsFetchResult(
                 windows: [],
@@ -52,15 +58,24 @@ enum AXWindowInspector {
         let rawValueTypeDescription = cfTypeDescription(for: windowsValue)
         let rawArrayCount = rawArrayCount(from: windowsValue)
         guard error == .success, let windows = windowsValue as? [AXUIElement] else {
+            let remoteWindows = includeRemoteWindows
+                ? RuntimeAXRemoteWindowResolver.windows(forPID: app.processIdentifier)
+                : []
             return WindowsFetchResult(
-                windows: [],
+                windows: remoteWindows,
                 error: error,
                 rawValueTypeDescription: rawValueTypeDescription,
                 rawArrayCount: rawArrayCount
             )
         }
+        let remoteWindows = includeRemoteWindows
+            ? RuntimeAXRemoteWindowResolver.windows(forPID: app.processIdentifier)
+            : []
         return WindowsFetchResult(
-            windows: windows,
+            windows: RuntimeAXRemoteWindowResolver.mergedWindows(
+                publicWindows: windows,
+                remoteWindows: remoteWindows
+            ),
             error: error,
             rawValueTypeDescription: rawValueTypeDescription,
             rawArrayCount: rawArrayCount
@@ -161,6 +176,18 @@ enum AXWindowInspector {
             return nil
         }
         return role
+    }
+
+    static func subrole(for window: AXUIElement) -> String? {
+        var subroleValue: CFTypeRef?
+        guard
+            AXUIElementCopyAttributeValue(window, kAXSubroleAttribute as CFString, &subroleValue)
+                == .success,
+            let subrole = subroleValue as? String
+        else {
+            return nil
+        }
+        return subrole
     }
 
     static func isMinimized(_ window: AXUIElement) -> Bool {

@@ -176,7 +176,14 @@ extension FlowTabTests {
 
         withLaunchArgumentsForTesting(["FlowTab", "--flowtab-ui-open-switcher-search"]) {
             XCTAssertTrue(FlowTabTestLaunchOptions.opensSwitcherOnLaunch)
+            XCTAssertFalse(FlowTabTestLaunchOptions.opensInAppWindowSwitcherOnLaunch)
             XCTAssertTrue(FlowTabTestLaunchOptions.entersSearchOnLaunch)
+        }
+
+        withLaunchArgumentsForTesting(["FlowTab", "--flowtab-ui-open-in-app-window-switcher"]) {
+            XCTAssertTrue(FlowTabTestLaunchOptions.opensSwitcherOnLaunch)
+            XCTAssertTrue(FlowTabTestLaunchOptions.opensInAppWindowSwitcherOnLaunch)
+            XCTAssertFalse(FlowTabTestLaunchOptions.entersSearchOnLaunch)
         }
     }
 
@@ -190,6 +197,7 @@ extension FlowTabTests {
                 "--flowtab-ui-screen-trusted", "0",
                 "--flowtab-ui-seed-logs", "12",
                 "--flowtab-ui-runtime-log-level", "debug",
+                "--flowtab-ui-frontmost-bundle-id", "com.example.fixture.notes",
                 "--flowtab-ui-enable-verbose-logs",
                 "--flowtab-ui-record-hotkey-reload-diagnostics"
             ]
@@ -200,6 +208,10 @@ extension FlowTabTests {
             XCTAssertEqual(FlowTabTestLaunchOptions.screenCaptureTrustedOverride, false)
             XCTAssertEqual(FlowTabTestLaunchOptions.seededLogCount, 12)
             XCTAssertEqual(FlowTabTestLaunchOptions.runtimeLogLevelOverrideRawValue, "debug")
+            XCTAssertEqual(
+                FlowTabTestLaunchOptions.frontmostBundleIdentifierOverride,
+                "com.example.fixture.notes"
+            )
             XCTAssertTrue(FlowTabTestLaunchOptions.enablesVerboseRuntimeLogs)
             XCTAssertTrue(FlowTabTestLaunchOptions.recordsHotkeyReloadDiagnostics)
         }

@@ -28,6 +28,7 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
     let usesStaggeredLayout: Bool
     let enterFullscreenDelayMilliseconds: Int
     let preservesDesktopAfterFullscreen: Bool
+    let publishesApplicationAccessibilityChildren: Bool
     let terminationDelayMilliseconds: Int
     let workflowName: String?
     let workflowAppID: String?
@@ -50,6 +51,7 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
         usesStaggeredLayout: Bool,
         enterFullscreenDelayMilliseconds: Int,
         preservesDesktopAfterFullscreen: Bool,
+        publishesApplicationAccessibilityChildren: Bool = true,
         terminationDelayMilliseconds: Int = 0,
         workflowName: String? = nil,
         workflowAppID: String? = nil
@@ -59,6 +61,7 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
         self.usesStaggeredLayout = usesStaggeredLayout
         self.enterFullscreenDelayMilliseconds = enterFullscreenDelayMilliseconds
         self.preservesDesktopAfterFullscreen = preservesDesktopAfterFullscreen
+        self.publishesApplicationAccessibilityChildren = publishesApplicationAccessibilityChildren
         self.terminationDelayMilliseconds = max(0, terminationDelayMilliseconds)
         self.workflowName = workflowName
         self.workflowAppID = workflowAppID
@@ -71,6 +74,7 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
         usesStaggeredLayout: Bool,
         enterFullscreenDelayMilliseconds: Int,
         preservesDesktopAfterFullscreen: Bool,
+        publishesApplicationAccessibilityChildren: Bool = true,
         terminationDelayMilliseconds: Int = 0
     ) {
         let normalizedWindowCount = max(Self.minimumWindowCount, windowCount)
@@ -101,6 +105,7 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
             usesStaggeredLayout: usesStaggeredLayout,
             enterFullscreenDelayMilliseconds: max(0, enterFullscreenDelayMilliseconds),
             preservesDesktopAfterFullscreen: preservesDesktopAfterFullscreen,
+            publishesApplicationAccessibilityChildren: publishesApplicationAccessibilityChildren,
             terminationDelayMilliseconds: terminationDelayMilliseconds
         )
     }
@@ -141,6 +146,7 @@ extension SpaceFixtureLaunchConfiguration {
             usesStaggeredLayout: arguments.contains("--staggered-layout"),
             enterFullscreenDelayMilliseconds: normalizedDelayMilliseconds,
             preservesDesktopAfterFullscreen: arguments.contains("--preserve-desktop-after-fullscreen"),
+            publishesApplicationAccessibilityChildren: !arguments.contains("--suppress-app-accessibility-children"),
             terminationDelayMilliseconds: normalizedTerminationDelayMilliseconds
         )
     }
@@ -194,6 +200,7 @@ extension SpaceFixtureLaunchConfiguration {
                     ?? Self.defaultEnterFullscreenDelayMilliseconds
             ),
             preservesDesktopAfterFullscreen: arguments.contains("--preserve-desktop-after-fullscreen"),
+            publishesApplicationAccessibilityChildren: !arguments.contains("--suppress-app-accessibility-children"),
             terminationDelayMilliseconds: max(
                 0,
                 Self.intValue(after: "--terminate-delay-ms", in: arguments) ?? 0

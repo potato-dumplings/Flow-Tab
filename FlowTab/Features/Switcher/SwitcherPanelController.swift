@@ -261,6 +261,14 @@ final class SwitcherPanelController {
         return model.session != nil
     }
 
+    @discardableResult
+    func presentInAppWindowHotkeySessionForTesting(
+        triggerDirection: CycleDirection = .forward
+    ) -> Bool {
+        showInAppWindowSwitcher(direction: triggerDirection)
+        return model.session != nil
+    }
+
     func setModifierReleaseConfirmationSuppressedForTesting(_ suppressed: Bool) {
         suppressModifierReleaseConfirmationForTesting = suppressed
     }

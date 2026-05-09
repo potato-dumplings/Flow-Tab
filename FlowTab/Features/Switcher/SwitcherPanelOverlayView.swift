@@ -104,11 +104,14 @@ struct SwitcherPanelRootView: View {
         } else {
             previewSummary = "inactive"
         }
+        let selectedWindow = session.selectedWindow
 
         return [
             "apps=\(appsSummary)",
             "selected=\(session.selectedApp.id)",
             "mode=\(session.mode.debugName)",
+            "selectedWindow=\(selectedWindow?.id ?? "none")",
+            "selectedWindowTitle=\(selectedWindow?.title ?? "")",
             "preview=\(previewSummary)"
         ].joined(separator: ";")
     }

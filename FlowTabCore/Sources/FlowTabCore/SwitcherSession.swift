@@ -136,7 +136,11 @@ public struct SwitcherSession: Sendable {
             moveWindow(appID: appID, by: -1)
         case .upArrow:
             mode = .appCycle
-        case .downArrow, .leftArrow, .rightArrow:
+        case .leftArrow:
+            moveWindow(appID: appID, by: -1)
+        case .rightArrow:
+            moveWindow(appID: appID, by: +1)
+        case .downArrow:
             break
         }
     }

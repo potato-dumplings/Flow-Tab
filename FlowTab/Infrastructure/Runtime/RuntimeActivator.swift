@@ -12,8 +12,19 @@ final class RuntimeActivator {
         let preferredAXWindow: AXUIElement?
         let preferredActivationHandleID: String?
         let preferredCGWindowID: CGWindowID?
+        let spaceIDs: [Int]
         let allowsPublicAXRecovery: Bool
         let restoreIfMinimized: Bool
+
+        func targetCGWindowID(expectedPID: pid_t) -> CGWindowID? {
+            preferredCGWindowID ?? RuntimeActivator.cgWindowID(from: windowID, expectedPID: expectedPID)
+        }
+    }
+
+    private enum WindowFocusAttemptResult {
+        case verified
+        case focusedButUnverified
+        case noFocusRoute
     }
 
     var activateCurrentAppIfNeededOverride: ((NSRunningApplication) -> Bool)?
@@ -25,6 +36,7 @@ final class RuntimeActivator {
     var currentCGWindowsOverride: ((pid_t) -> [RuntimeSnapshotProvider.CGWindowEntry])?
     var axWindowFrameOverride: ((AXUIElement) -> CGRect?)?
     var axWindowTitleOverride: ((AXUIElement) -> String?)?
+    var focusCGWindowOverride: ((NSRunningApplication, CGWindowID) -> Bool)?
     var focusRecoveryRetryDelaysNanoseconds: [UInt64] = [50_000_000, 150_000_000]
 
     private var focusRecoveryTask: Task<Void, Never>?
@@ -69,18 +81,25 @@ final class RuntimeActivator {
         if activateCurrentAppIfNeeded(targetApp) {
             return
         }
+
+        let request = WindowFocusRequest(
+            windowID: windowID,
+            title: windowContext.title,
+            frame: windowContext.frame,
+            preferredAXWindow: windowContext.axWindow,
+            preferredActivationHandleID: windowContext.activationHandleID,
+            preferredCGWindowID: windowContext.cgWindowID,
+            spaceIDs: windowContext.spaceIDs,
+            allowsPublicAXRecovery: windowContext.allowsPublicAXRecovery,
+            restoreIfMinimized: restoreIfMinimized || windowContext.isMinimized
+        )
+        if request.targetCGWindowID(expectedPID: targetApp.processIdentifier) != nil {
+            self.focusWindow(request, in: targetApp)
+            return
+        }
+
         requestActivation(of: targetApp) { [weak self] _ in
             guard let self else { return }
-            let request = WindowFocusRequest(
-                windowID: windowID,
-                title: windowContext.title,
-                frame: windowContext.frame,
-                preferredAXWindow: windowContext.axWindow,
-                preferredActivationHandleID: windowContext.activationHandleID,
-                preferredCGWindowID: windowContext.cgWindowID,
-                allowsPublicAXRecovery: windowContext.allowsPublicAXRecovery,
-                restoreIfMinimized: restoreIfMinimized || windowContext.isMinimized
-            )
             self.focusWindow(request, in: targetApp)
         }
     }
@@ -97,35 +116,119 @@ final class RuntimeActivator {
             return true
         }
 
+        let cgFocusResult = attemptCGWindowFocus(request, in: app)
+        let cgFocusVerified: Bool
+        switch cgFocusResult {
+        case .verified:
+            cgFocusVerified = true
+        case .focusedButUnverified:
+            cgFocusVerified = false
+        case .noFocusRoute:
+            cgFocusVerified = false
+        }
+
         let windowFromRegistry = liveWindowRegistry.window(
             forWindowID: request.preferredActivationHandleID ?? request.windowID,
             expectedPID: app.processIdentifier
         )
-        if let directWindow = request.preferredAXWindow ?? windowFromRegistry,
-            focusAXWindow(directWindow, restoreIfMinimized: request.restoreIfMinimized, in: app)
-        {
+        if let directWindow = request.preferredAXWindow ?? windowFromRegistry {
+            switch attemptAXWindowFocus(directWindow, request: request, in: app) {
+            case .verified:
+                return true
+            case .focusedButUnverified:
+                return false
+            case .noFocusRoute:
+                if cgFocusVerified {
+                    return true
+                }
+            }
+        }
+
+        if cgFocusVerified {
             return true
         }
 
-        let windows = currentAXWindows(for: app)
-        guard !windows.isEmpty else { return false }
         guard request.allowsPublicAXRecovery else { return false }
 
-        let targetCGWindowID = request.preferredCGWindowID
-            ?? Self.cgWindowID(from: request.windowID, expectedPID: app.processIdentifier)
+        let targetCGWindowID = request.targetCGWindowID(expectedPID: app.processIdentifier)
+        let windows = currentAXWindows(
+            for: app,
+            includeRemoteWindows: RuntimeWindowTopologyClassifier.hasOffDesktopSpace(
+                spaceIDs: request.spaceIDs
+            )
+        )
+        guard !windows.isEmpty else { return false }
+
         if let matchedWindow = resolveAXWindow(
             matchingCGWindowID: targetCGWindowID,
             expectedTitle: request.title,
             expectedFrame: request.frame,
             windows: windows,
             in: app
-        ),
-            focusAXWindow(matchedWindow, restoreIfMinimized: request.restoreIfMinimized, in: app)
-        {
-            return true
+        ) {
+            switch attemptAXWindowFocus(matchedWindow, request: request, in: app) {
+            case .verified:
+                return true
+            case .focusedButUnverified, .noFocusRoute:
+                return false
+            }
         }
 
         return false
+    }
+
+    private func attemptAXWindowFocus(
+        _ window: AXUIElement,
+        request: WindowFocusRequest,
+        in app: NSRunningApplication
+    ) -> WindowFocusAttemptResult {
+        guard focusAXWindow(window, restoreIfMinimized: request.restoreIfMinimized, in: app) else {
+            return .noFocusRoute
+        }
+        guard focusAttemptVerified(request, in: app) else {
+            return .focusedButUnverified
+        }
+        return .verified
+    }
+
+    private func focusAttemptVerified(
+        _ request: WindowFocusRequest,
+        in app: NSRunningApplication
+    ) -> Bool {
+        guard !request.spaceIDs.isEmpty else {
+            return true
+        }
+
+        guard let targetCGWindowID = request.targetCGWindowID(expectedPID: app.processIdentifier) else {
+            return true
+        }
+
+        return targetCGWindowIsVisible(targetCGWindowID, in: app)
+    }
+
+    private func attemptCGWindowFocus(
+        _ request: WindowFocusRequest,
+        in app: NSRunningApplication
+    ) -> WindowFocusAttemptResult {
+        guard let targetCGWindowID = request.targetCGWindowID(expectedPID: app.processIdentifier) else {
+            return .noFocusRoute
+        }
+        guard focusCGWindow(targetCGWindowID, in: app) else {
+            return .noFocusRoute
+        }
+        return targetCGWindowIsVisible(targetCGWindowID, in: app) ? .verified : .focusedButUnverified
+    }
+
+    private func targetCGWindowIsVisible(
+        _ targetCGWindowID: CGWindowID?,
+        in app: NSRunningApplication
+    ) -> Bool {
+        guard let targetCGWindowID else { return true }
+        return currentCGWindows(forPID: app.processIdentifier).contains { window in
+            window.id == targetCGWindowID
+                && window.isOnscreen
+                && RuntimeSnapshotProvider.cgWindowPassesValidityConstraints(window)
+        }
     }
 
     private func scheduleFocusRecovery(for request: WindowFocusRequest, in app: NSRunningApplication) {
@@ -258,11 +361,35 @@ final class RuntimeActivator {
         return NSRunningApplication(processIdentifier: windowContext.ownerPID) ?? fallback
     }
 
-    private func currentAXWindows(for app: NSRunningApplication) -> [AXUIElement] {
+    private func currentAXWindows(
+        for app: NSRunningApplication,
+        includeRemoteWindows: Bool = false
+    ) -> [AXUIElement] {
         if let currentAXWindowsOverride {
             return currentAXWindowsOverride(app)
         }
-        return AXWindowInspector.windows(for: app)
+        return AXWindowInspector.windows(for: app, includeRemoteWindows: includeRemoteWindows)
+    }
+
+    private func focusCGWindow(
+        _ cgWindowID: CGWindowID,
+        in app: NSRunningApplication
+    ) -> Bool {
+        if let focusCGWindowOverride {
+            return focusCGWindowOverride(app, cgWindowID)
+        }
+        guard app.processIdentifier != ProcessInfo.processInfo.processIdentifier else {
+            return false
+        }
+        let didFocus = RuntimeCGWindowFocusBridge.focusWindow(
+            ownerPID: app.processIdentifier,
+            cgWindowID: cgWindowID
+        )
+        RuntimeLog.info(
+            "Activation",
+            "cg-window-focus \(didFocus ? "accepted" : "unavailable") pid=\(app.processIdentifier) windowID=\(cgWindowID)"
+        )
+        return didFocus
     }
 
     private func currentCGWindows(forPID pid: pid_t) -> [RuntimeSnapshotProvider.CGWindowEntry] {
@@ -348,7 +475,7 @@ final class RuntimeActivator {
         )?.window
     }
 
-    private static func cgWindowID(from windowID: String, expectedPID: pid_t) -> CGWindowID? {
+    nonisolated private static func cgWindowID(from windowID: String, expectedPID: pid_t) -> CGWindowID? {
         let parts = windowID.split(separator: ":")
         guard parts.count == 3 else { return nil }
         guard parts[0] == "cg" else { return nil }

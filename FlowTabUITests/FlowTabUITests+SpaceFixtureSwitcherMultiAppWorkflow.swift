@@ -3,7 +3,7 @@ import CoreGraphics
 import Foundation
 import XCTest
 
-private struct SwitcherSearchWindowResultObservation: Equatable {
+struct SwitcherSearchWindowResultObservation: Equatable {
     let identifier: String
     let searchableText: String
 
@@ -185,7 +185,7 @@ extension FlowTabUITests {
         }
     }
 
-    private func selectSwitcherWorkflowApp(
+    func selectSwitcherWorkflowApp(
         _ workflowApp: SpaceFixtureResolvedWorkflow.App,
         in app: XCUIApplication,
         diagnosticsSummary: XCUIElement,
@@ -358,7 +358,7 @@ extension FlowTabUITests {
         }
     }
 
-    private func configuredSwitcherSpaceFixtureWorkflow(
+    func configuredSwitcherSpaceFixtureWorkflow(
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) throws -> SpaceFixtureResolvedWorkflow {
         do {
@@ -388,14 +388,14 @@ extension FlowTabUITests {
         }
     }
 
-    private func fullscreenWindowTitle(in workflowApp: SpaceFixtureResolvedWorkflow.App) -> String? {
+    func fullscreenWindowTitle(in workflowApp: SpaceFixtureResolvedWorkflow.App) -> String? {
         guard let fullscreenWindowIndex = workflowApp.fullscreenWindowIndex else { return nil }
         let titleIndex = fullscreenWindowIndex - 1
         guard workflowApp.expectedWindowTitles.indices.contains(titleIndex) else { return nil }
         return workflowApp.expectedWindowTitles[titleIndex]
     }
 
-    private func workflowCGWindowID(fromSearchResultIdentifier identifier: String) -> CGWindowID? {
+    func workflowCGWindowID(fromSearchResultIdentifier identifier: String) -> CGWindowID? {
         guard let rawWindowID = identifier.split(separator: "-").last else { return nil }
         guard let windowID = UInt32(rawWindowID) else { return nil }
         return CGWindowID(windowID)
@@ -579,7 +579,7 @@ extension FlowTabUITests {
         return latestCards
     }
 
-    private func waitForSearchWindowResult(
+    func waitForSearchWindowResult(
         in app: XCUIApplication,
         title: String,
         appName: String,
@@ -646,7 +646,7 @@ extension FlowTabUITests {
         return String(line[identifierRange])
     }
 
-    private func confirmSwitcherSearchSelection(in app: XCUIApplication, searchInput: XCUIElement) {
+    func confirmSwitcherSearchSelection(in app: XCUIApplication, searchInput: XCUIElement) {
         app.typeText("\r")
         if !waitForNonExistence(searchInput, timeout: 1.2) {
             app.typeText("\r")
@@ -654,13 +654,13 @@ extension FlowTabUITests {
         XCTAssertTrue(waitForNonExistence(searchInput, timeout: 4))
     }
 
-    private func switcherAppStripSummary(
+    func switcherAppStripSummary(
         for workflowApp: SpaceFixtureResolvedWorkflow.App
     ) -> String {
         "\(workflowApp.identity.bundleIdentifier):\(workflowApp.windowCount)"
     }
 
-    private func waitForSwitcherAppsSummary(
+    func waitForSwitcherAppsSummary(
         _ diagnosticsSummaryElement: XCUIElement,
         toContain expectedEntry: String,
         timeout: TimeInterval
@@ -681,7 +681,7 @@ extension FlowTabUITests {
         return false
     }
 
-    private func switcherPreviewTitles(from diagnosticsSummaryElement: XCUIElement) -> [String] {
+    func switcherPreviewTitles(from diagnosticsSummaryElement: XCUIElement) -> [String] {
         let rawValue = switcherPanelDiagnosticsValue(diagnosticsSummaryElement, key: "preview")
         guard rawValue != "inactive" else { return [] }
         guard let separatorRange = rawValue.range(of: "::") else { return [] }
@@ -690,7 +690,7 @@ extension FlowTabUITests {
         return titles.split(separator: "|").map(String.init)
     }
 
-    private func switcherPanelDiagnosticsValue(
+    func switcherPanelDiagnosticsValue(
         _ diagnosticsSummaryElement: XCUIElement,
         key: String
     ) -> String {
@@ -718,7 +718,7 @@ extension FlowTabUITests {
         """
     }
 
-    private func switcherDebugSummary(
+    func switcherDebugSummary(
         _ app: XCUIApplication,
         diagnosticsSummary: XCUIElement
     ) -> String {

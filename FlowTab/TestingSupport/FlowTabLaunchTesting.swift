@@ -19,10 +19,19 @@ enum FlowTabTestLaunchOptions {
     static var opensSwitcherOnLaunch: Bool {
         arguments.contains("--flowtab-ui-open-switcher")
             || arguments.contains("--flowtab-ui-open-switcher-search")
+            || arguments.contains("--flowtab-ui-open-in-app-window-switcher")
+    }
+
+    static var opensInAppWindowSwitcherOnLaunch: Bool {
+        arguments.contains("--flowtab-ui-open-in-app-window-switcher")
     }
 
     static var entersSearchOnLaunch: Bool {
         arguments.contains("--flowtab-ui-open-switcher-search")
+    }
+
+    static var frontmostBundleIdentifierOverride: String? {
+        value(after: "--flowtab-ui-frontmost-bundle-id")
     }
 
     static var accessibilityTrustedOverride: Bool? {

@@ -139,6 +139,7 @@ extension RuntimeSnapshotProvider {
                         isMinimized: $0.isMinimized,
                         ownerPID: $0.ownerPID,
                         cgWindowID: $0.cgWindowID,
+                        spaceIDs: $0.spaceIDs,
                         inferredTitleBarStyle: nil,
                         activationHandleID: $0.activationHandleID,
                         axWindow: $0.axWindow,

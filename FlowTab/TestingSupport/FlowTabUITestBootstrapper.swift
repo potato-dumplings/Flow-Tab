@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 @MainActor
@@ -44,6 +45,14 @@ enum FlowTabUITestBootstrapper {
     }
 
     static func configurePanelControllerIfNeeded(panelController: SwitcherPanelController) {
+        if let bundleIdentifier = FlowTabTestLaunchOptions.frontmostBundleIdentifierOverride {
+            panelController.modelForTesting.frontmostApplicationOverride = {
+                NSRunningApplication
+                    .runningApplications(withBundleIdentifier: bundleIdentifier)
+                    .first { !$0.isTerminated }
+            }
+        }
+
         guard FlowTabTestLaunchOptions.enablesMockHotkeyEffects else { return }
 
         panelController.modelForTesting.terminateRequestOverride = { appID in
@@ -91,16 +100,18 @@ enum FlowTabUITestBootstrapper {
             let retrySleepNanoseconds: UInt64 = 150_000_000
             let maxAttempts = 20
             let requiredStableSnapshotCount = 2
-            var lastObservedAppIDs: [String] = []
+            var lastObservedSnapshotSignature: [String] = []
             var stableSnapshotCount = 0
 
             for attempt in 0..<maxAttempts {
-                if panelController.presentGlobalHotkeySessionForTesting() {
-                    let appIDs = panelController.modelForTesting.session?.apps.map(\.id) ?? []
-                    if appIDs == lastObservedAppIDs {
+                if presentLaunchSwitcher(panelController: panelController) {
+                    let snapshotSignature = launchSwitcherSnapshotSignature(
+                        panelController: panelController
+                    )
+                    if snapshotSignature == lastObservedSnapshotSignature {
                         stableSnapshotCount += 1
                     } else {
-                        lastObservedAppIDs = appIDs
+                        lastObservedSnapshotSignature = snapshotSignature
                         stableSnapshotCount = 1
                     }
 
@@ -113,7 +124,7 @@ enum FlowTabUITestBootstrapper {
 
                     panelController.cancelSelectionForTesting()
                 } else {
-                    lastObservedAppIDs = []
+                    lastObservedSnapshotSignature = []
                     stableSnapshotCount = 0
                 }
 
@@ -121,5 +132,24 @@ enum FlowTabUITestBootstrapper {
                 try? await Task.sleep(nanoseconds: retrySleepNanoseconds)
             }
         }
+    }
+
+    private static func presentLaunchSwitcher(panelController: SwitcherPanelController) -> Bool {
+        if FlowTabTestLaunchOptions.opensInAppWindowSwitcherOnLaunch {
+            return panelController.presentInAppWindowHotkeySessionForTesting()
+        }
+        return panelController.presentGlobalHotkeySessionForTesting()
+    }
+
+    private static func launchSwitcherSnapshotSignature(
+        panelController: SwitcherPanelController
+    ) -> [String] {
+        guard let session = panelController.modelForTesting.session else { return [] }
+        if FlowTabTestLaunchOptions.opensInAppWindowSwitcherOnLaunch {
+            return session.apps.flatMap { app in
+                [app.id] + app.windows.map(\.id)
+            }
+        }
+        return session.apps.map(\.id)
     }
 }

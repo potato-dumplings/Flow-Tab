@@ -4,6 +4,7 @@ import XCTest
 @MainActor
 private final class SpaceFixtureWindowSpy: SpaceFixtureWindowing {
     let plan: SpaceFixtureWindowPlan
+    let applicationAccessibilityElement: Any
 
     private(set) var showCalls: [Bool] = []
     private(set) var enterFullScreenCallCount = 0
@@ -11,6 +12,7 @@ private final class SpaceFixtureWindowSpy: SpaceFixtureWindowing {
 
     init(plan: SpaceFixtureWindowPlan) {
         self.plan = plan
+        self.applicationAccessibilityElement = "ax-element-\(plan.index)"
     }
 
     func show(isKey: Bool) {
@@ -42,6 +44,7 @@ extension FlowTabTests {
         var scheduledDelays: [Int] = []
         var scheduledActions: [(@MainActor () -> Void)] = []
         var activationCallCount = 0
+        var publishedAccessibilityElements: [[String]] = []
 
         let coordinator = SpaceFixtureWindowCoordinator(
             configuration: configuration,
@@ -57,6 +60,9 @@ extension FlowTabTests {
             },
             activateApplication: {
                 activationCallCount += 1
+            },
+            applicationAccessibilityElementsPublisher: { elements in
+                publishedAccessibilityElements.append(elements.compactMap { $0 as? String })
             }
         )
 
@@ -72,6 +78,7 @@ extension FlowTabTests {
         XCTAssertEqual(windowSpies[2].workflowReadyCalls, [["Fixture 1", "Fixture 2", "Fixture 3"]])
         XCTAssertEqual(activationCallCount, 1)
         XCTAssertEqual(scheduledDelays, [1200])
+        XCTAssertEqual(publishedAccessibilityElements, [["ax-element-1", "ax-element-2", "ax-element-3"]])
 
         scheduledActions[0]()
 
@@ -79,6 +86,13 @@ extension FlowTabTests {
         XCTAssertEqual(windowSpies[0].enterFullScreenCallCount, 0)
         XCTAssertEqual(windowSpies[2].enterFullScreenCallCount, 0)
         XCTAssertEqual(scheduledDelays, [1200, 1200])
+        XCTAssertEqual(
+            publishedAccessibilityElements,
+            [
+                ["ax-element-1", "ax-element-2", "ax-element-3"],
+                ["ax-element-1", "ax-element-2", "ax-element-3"]
+            ]
+        )
 
         scheduledActions[1]()
 
@@ -86,6 +100,48 @@ extension FlowTabTests {
         XCTAssertEqual(windowSpies[1].showCalls, [true])
         XCTAssertEqual(windowSpies[2].showCalls, [false])
         XCTAssertEqual(activationCallCount, 2)
+        XCTAssertEqual(
+            publishedAccessibilityElements,
+            [
+                ["ax-element-1", "ax-element-2", "ax-element-3"],
+                ["ax-element-1", "ax-element-2", "ax-element-3"],
+                ["ax-element-1", "ax-element-2", "ax-element-3"]
+            ]
+        )
+    }
+
+    @MainActor
+    func testSpaceFixtureWindowCoordinatorSuppressesApplicationAccessibilityChildrenWhenConfigured() {
+        let configuration = SpaceFixtureLaunchConfiguration(
+            windowCount: 2,
+            fullscreenWindowIndex: nil,
+            windowTitlePrefix: "Fixture",
+            usesStaggeredLayout: false,
+            enterFullscreenDelayMilliseconds: 500,
+            preservesDesktopAfterFullscreen: false,
+            publishesApplicationAccessibilityChildren: false
+        )
+
+        var windowSpies: [SpaceFixtureWindowSpy] = []
+        var publishedAccessibilityElements: [[String]] = []
+
+        let coordinator = SpaceFixtureWindowCoordinator(
+            configuration: configuration,
+            visibleFrameProvider: { CGRect(x: 0, y: 0, width: 1280, height: 800) },
+            windowFactory: { plan in
+                let spy = SpaceFixtureWindowSpy(plan: plan)
+                windowSpies.append(spy)
+                return spy
+            },
+            applicationAccessibilityElementsPublisher: { elements in
+                publishedAccessibilityElements.append(elements.compactMap { $0 as? String })
+            }
+        )
+
+        coordinator.launch()
+
+        XCTAssertEqual(windowSpies.count, 2)
+        XCTAssertEqual(publishedAccessibilityElements, [[]])
     }
 
     @MainActor

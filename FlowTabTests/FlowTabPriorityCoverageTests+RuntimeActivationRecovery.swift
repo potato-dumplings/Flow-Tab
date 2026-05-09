@@ -5,6 +5,444 @@ import XCTest
 
 extension FlowTabPriorityCoverageTests {
     @MainActor
+    func testRuntimeActivatorRetriesWhenAXFocusLeavesSpaceTargetOffscreen() async {
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let activator = RuntimeActivator()
+        activator.activateCurrentAppIfNeededOverride = { _ in false }
+        activator.requestActivationOverride = { app, completion in
+            completion?(app)
+        }
+
+        let targetFrame = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
+        let targetCGWindowID: CGWindowID = 245_101
+        let axWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
+
+        activator.focusRecoveryRetryDelaysNanoseconds = [20_000_000]
+        var focusCallCount = 0
+        activator.focusAXWindowOverride = { window, restoreIfMinimized, _ in
+            XCTAssertTrue(CFEqual(window, axWindow))
+            XCTAssertFalse(restoreIfMinimized)
+            focusCallCount += 1
+            return true
+        }
+
+        let verifiedVisibleTarget = expectation(description: "focus retry verifies target CG window onscreen")
+        var visibilityChecks: [Bool] = []
+        activator.currentCGWindowsOverride = { pid in
+            XCTAssertEqual(pid, currentApp.processIdentifier)
+            let isVisible = focusCallCount >= 2
+            visibilityChecks.append(isVisible)
+            if isVisible {
+                verifiedVisibleTarget.fulfill()
+            }
+            return [
+                RuntimeSnapshotProvider.CGWindowEntry(
+                    id: targetCGWindowID,
+                    title: "Fullscreen Target",
+                    bounds: targetFrame,
+                    isOnscreen: isVisible,
+                    alpha: 1.0,
+                    storeType: 1
+                )
+            ]
+        }
+
+        let windowID = "cg:\(currentApp.processIdentifier):\(targetCGWindowID)"
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windowsByID: [
+                windowID: RuntimeWindowContext(
+                    id: windowID,
+                    title: "Fullscreen Target",
+                    isMinimized: false,
+                    ownerPID: currentApp.processIdentifier,
+                    cgWindowID: targetCGWindowID,
+                    spaceIDs: [2],
+                    inferredTitleBarStyle: nil,
+                    axWindow: axWindow,
+                    frame: targetFrame,
+                    allowsPublicAXRecovery: true
+                )
+            ]
+        )
+
+        activator.activate(
+            target: .window(appID: appID, windowID: windowID, restoreIfMinimized: false),
+            contextsByID: [appID: context]
+        )
+
+        await fulfillment(of: [verifiedVisibleTarget], timeout: 1.0)
+        XCTAssertEqual(focusCallCount, 2)
+        XCTAssertEqual(visibilityChecks, [false, true])
+    }
+
+    @MainActor
+    func testRuntimeActivatorSkipsPublicActivationForCGOnlyOffscreenSpaceTargetWithoutRoute() {
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let activator = RuntimeActivator()
+        activator.activateCurrentAppIfNeededOverride = { _ in false }
+        activator.focusRecoveryRetryDelaysNanoseconds = []
+
+        var requestActivationCallCount = 0
+        activator.requestActivationOverride = { _, completion in
+            requestActivationCallCount += 1
+            completion?(currentApp)
+        }
+        activator.focusAXWindowOverride = { _, _, _ in
+            XCTFail("CG-only no-route activation should not synthesize an AX focus")
+            return true
+        }
+        activator.currentAXWindowsOverride = { _ in
+            XCTFail("CG-only no-route activation should not search AX windows without recovery permission")
+            return []
+        }
+
+        let targetFrame = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
+        let targetCGWindowID: CGWindowID = 245_202
+        var cgWindowReadCount = 0
+        activator.currentCGWindowsOverride = { pid in
+            XCTAssertEqual(pid, currentApp.processIdentifier)
+            cgWindowReadCount += 1
+            return [
+                RuntimeSnapshotProvider.CGWindowEntry(
+                    id: targetCGWindowID,
+                    title: "CG Only Target",
+                    bounds: targetFrame,
+                    isOnscreen: false,
+                    alpha: 1.0,
+                    storeType: 1
+                )
+            ]
+        }
+
+        let windowID = "cg:\(currentApp.processIdentifier):\(targetCGWindowID)"
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windowsByID: [
+                windowID: RuntimeWindowContext(
+                    id: windowID,
+                    title: "CG Only Target",
+                    isMinimized: false,
+                    ownerPID: currentApp.processIdentifier,
+                    cgWindowID: targetCGWindowID,
+                    spaceIDs: [2],
+                    inferredTitleBarStyle: nil,
+                    frame: targetFrame,
+                    allowsPublicAXRecovery: false
+                )
+            ]
+        )
+
+        activator.activate(
+            target: .window(appID: appID, windowID: windowID, restoreIfMinimized: false),
+            contextsByID: [appID: context]
+        )
+
+        XCTAssertEqual(requestActivationCallCount, 0)
+        XCTAssertEqual(cgWindowReadCount, 0)
+    }
+
+    @MainActor
+    func testRuntimeActivatorFocusesCGOnlySpaceTargetThroughCGWindowBridge() {
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let activator = RuntimeActivator()
+        activator.activateCurrentAppIfNeededOverride = { _ in false }
+        activator.focusRecoveryRetryDelaysNanoseconds = []
+
+        var requestActivationCallCount = 0
+        activator.requestActivationOverride = { _, completion in
+            requestActivationCallCount += 1
+            completion?(currentApp)
+        }
+        activator.currentAXWindowsOverride = { _ in
+            XCTFail("CG-only bridge activation should not need public AX window recovery")
+            return []
+        }
+        activator.focusAXWindowOverride = { _, _, _ in
+            XCTFail("CG-only bridge activation should not synthesize an AX focus")
+            return true
+        }
+
+        let targetFrame = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
+        let targetCGWindowID: CGWindowID = 245_303
+        var focusedCGWindowIDs: [CGWindowID] = []
+        activator.focusCGWindowOverride = { app, cgWindowID in
+            XCTAssertEqual(app.processIdentifier, currentApp.processIdentifier)
+            focusedCGWindowIDs.append(cgWindowID)
+            return true
+        }
+        activator.currentCGWindowsOverride = { pid in
+            XCTAssertEqual(pid, currentApp.processIdentifier)
+            return [
+                RuntimeSnapshotProvider.CGWindowEntry(
+                    id: targetCGWindowID,
+                    title: "CG Bridge Target",
+                    bounds: targetFrame,
+                    isOnscreen: true,
+                    alpha: 1.0,
+                    storeType: 1
+                )
+            ]
+        }
+
+        let windowID = "cg:\(currentApp.processIdentifier):\(targetCGWindowID)"
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windowsByID: [
+                windowID: RuntimeWindowContext(
+                    id: windowID,
+                    title: "CG Bridge Target",
+                    isMinimized: false,
+                    ownerPID: currentApp.processIdentifier,
+                    cgWindowID: targetCGWindowID,
+                    spaceIDs: [2],
+                    inferredTitleBarStyle: nil,
+                    frame: targetFrame,
+                    allowsPublicAXRecovery: true
+                )
+            ]
+        )
+
+        activator.activate(
+            target: .window(appID: appID, windowID: windowID, restoreIfMinimized: false),
+            contextsByID: [appID: context]
+        )
+
+        XCTAssertEqual(requestActivationCallCount, 0)
+        XCTAssertEqual(focusedCGWindowIDs, [targetCGWindowID])
+    }
+
+    @MainActor
+    func testRuntimeActivatorUsesCGWindowBridgeThenAXFocusForSpaceTargetWithHandle() {
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let activator = RuntimeActivator()
+        activator.activateCurrentAppIfNeededOverride = { _ in false }
+        activator.focusRecoveryRetryDelaysNanoseconds = []
+
+        var requestActivationCallCount = 0
+        activator.requestActivationOverride = { _, completion in
+            requestActivationCallCount += 1
+            completion?(currentApp)
+        }
+        let wrapperWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
+        var focusEvents: [String] = []
+        activator.focusAXWindowOverride = { window, restoreIfMinimized, _ in
+            XCTAssertTrue(CFEqual(window, wrapperWindow))
+            XCTAssertFalse(restoreIfMinimized)
+            focusEvents.append("ax")
+            return true
+        }
+
+        let targetFrame = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
+        let targetCGWindowID: CGWindowID = 245_909
+        var focusedCGWindowIDs: [CGWindowID] = []
+        activator.focusCGWindowOverride = { app, cgWindowID in
+            XCTAssertEqual(app.processIdentifier, currentApp.processIdentifier)
+            focusedCGWindowIDs.append(cgWindowID)
+            focusEvents.append("cg")
+            return true
+        }
+        activator.currentCGWindowsOverride = { pid in
+            XCTAssertEqual(pid, currentApp.processIdentifier)
+            return [
+                RuntimeSnapshotProvider.CGWindowEntry(
+                    id: targetCGWindowID,
+                    title: "Fullscreen Content",
+                    bounds: targetFrame,
+                    isOnscreen: true,
+                    alpha: 1.0,
+                    storeType: 1
+                )
+            ]
+        }
+
+        let windowID = "cg:\(currentApp.processIdentifier):\(targetCGWindowID)"
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windowsByID: [
+                windowID: RuntimeWindowContext(
+                    id: windowID,
+                    title: "Fullscreen Content",
+                    isMinimized: false,
+                    ownerPID: currentApp.processIdentifier,
+                    cgWindowID: targetCGWindowID,
+                    spaceIDs: [2],
+                    inferredTitleBarStyle: nil,
+                    activationHandleID: "ax:\(currentApp.processIdentifier):wrapper",
+                    axWindow: wrapperWindow,
+                    frame: targetFrame,
+                    allowsPublicAXRecovery: true
+                )
+            ]
+        )
+
+        activator.activate(
+            target: .window(appID: appID, windowID: windowID, restoreIfMinimized: false),
+            contextsByID: [appID: context]
+        )
+
+        XCTAssertEqual(requestActivationCallCount, 0)
+        XCTAssertEqual(focusedCGWindowIDs, [targetCGWindowID])
+        XCTAssertEqual(focusEvents, ["cg", "ax"])
+    }
+
+    @MainActor
+    func testRuntimeActivatorRetriesCGWindowBridgeUntilSpaceTargetBecomesVisible() async {
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let activator = RuntimeActivator()
+        activator.activateCurrentAppIfNeededOverride = { _ in false }
+        activator.focusRecoveryRetryDelaysNanoseconds = [20_000_000]
+
+        var requestActivationCallCount = 0
+        activator.requestActivationOverride = { _, completion in
+            requestActivationCallCount += 1
+            completion?(currentApp)
+        }
+
+        let targetFrame = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
+        let targetCGWindowID: CGWindowID = 245_404
+        var focusedCGWindowIDs: [CGWindowID] = []
+        activator.focusCGWindowOverride = { _, cgWindowID in
+            focusedCGWindowIDs.append(cgWindowID)
+            return true
+        }
+
+        let visibilitySettled = expectation(description: "cg bridge retry sees target window onscreen")
+        var cgWindowReadCount = 0
+        activator.currentCGWindowsOverride = { pid in
+            XCTAssertEqual(pid, currentApp.processIdentifier)
+            cgWindowReadCount += 1
+            let isVisible = cgWindowReadCount >= 2
+            if isVisible {
+                visibilitySettled.fulfill()
+            }
+            return [
+                RuntimeSnapshotProvider.CGWindowEntry(
+                    id: targetCGWindowID,
+                    title: "CG Bridge Target",
+                    bounds: targetFrame,
+                    isOnscreen: isVisible,
+                    alpha: 1.0,
+                    storeType: 1
+                )
+            ]
+        }
+
+        let windowID = "cg:\(currentApp.processIdentifier):\(targetCGWindowID)"
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windowsByID: [
+                windowID: RuntimeWindowContext(
+                    id: windowID,
+                    title: "CG Bridge Target",
+                    isMinimized: false,
+                    ownerPID: currentApp.processIdentifier,
+                    cgWindowID: targetCGWindowID,
+                    spaceIDs: [2],
+                    inferredTitleBarStyle: nil,
+                    frame: targetFrame,
+                    allowsPublicAXRecovery: true
+                )
+            ]
+        )
+
+        activator.activate(
+            target: .window(appID: appID, windowID: windowID, restoreIfMinimized: false),
+            contextsByID: [appID: context]
+        )
+
+        await fulfillment(of: [visibilitySettled], timeout: 1.0)
+        XCTAssertEqual(requestActivationCallCount, 0)
+        XCTAssertEqual(focusedCGWindowIDs, [targetCGWindowID, targetCGWindowID])
+        XCTAssertEqual(cgWindowReadCount, 2)
+    }
+
+    @MainActor
+    func testRuntimeActivatorFocusesCGOnlySpaceTargetThroughPublicAXRecovery() {
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let activator = RuntimeActivator()
+        activator.activateCurrentAppIfNeededOverride = { _ in false }
+
+        var requestActivationCallCount = 0
+        activator.requestActivationOverride = { app, completion in
+            requestActivationCallCount += 1
+            completion?(app)
+        }
+
+        let targetFrame = CGRect(x: 160, y: 140, width: 960, height: 680)
+        let targetCGWindowID: CGWindowID = 240_101
+        let recoveredWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
+        let recoveredPointer = Unmanaged.passUnretained(recoveredWindow).toOpaque()
+        activator.currentAXWindowsOverride = { _ in [recoveredWindow] }
+        activator.axWindowTitleOverride = { window in
+            guard Unmanaged.passUnretained(window).toOpaque() == recoveredPointer else { return nil }
+            return "Shared Doc"
+        }
+        activator.axWindowFrameOverride = { window in
+            guard Unmanaged.passUnretained(window).toOpaque() == recoveredPointer else { return nil }
+            return targetFrame
+        }
+        activator.currentCGWindowsOverride = { pid in
+            XCTAssertEqual(pid, currentApp.processIdentifier)
+            return [
+                RuntimeSnapshotProvider.CGWindowEntry(
+                    id: targetCGWindowID,
+                    title: "Shared Doc",
+                    bounds: targetFrame,
+                    isOnscreen: true,
+                    alpha: 1.0,
+                    storeType: 1
+                )
+            ]
+        }
+
+        var focusedWindowPointers: [UnsafeMutableRawPointer] = []
+        activator.focusAXWindowOverride = { window, restoreIfMinimized, _ in
+            XCTAssertFalse(restoreIfMinimized)
+            focusedWindowPointers.append(Unmanaged.passUnretained(window).toOpaque())
+            return true
+        }
+
+        let windowID = "cg:\(currentApp.processIdentifier):\(targetCGWindowID)"
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windowsByID: [
+                windowID: RuntimeWindowContext(
+                    id: windowID,
+                    title: "Shared Doc",
+                    isMinimized: false,
+                    ownerPID: currentApp.processIdentifier,
+                    cgWindowID: targetCGWindowID,
+                    spaceIDs: [1],
+                    inferredTitleBarStyle: nil,
+                    frame: targetFrame,
+                    allowsPublicAXRecovery: true
+                )
+            ]
+        )
+
+        activator.activate(
+            target: .window(appID: appID, windowID: windowID, restoreIfMinimized: false),
+            contextsByID: [appID: context]
+        )
+
+        XCTAssertEqual(requestActivationCallCount, 0)
+        XCTAssertEqual(focusedWindowPointers, [recoveredPointer])
+    }
+
+    @MainActor
     func testRuntimeActivatorRetriesWindowRecoveryAfterActivationWhenAXWindowsAppearLate() async {
         let currentApp = NSRunningApplication.current
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"

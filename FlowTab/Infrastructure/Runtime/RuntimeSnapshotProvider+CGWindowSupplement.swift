@@ -38,6 +38,7 @@ extension RuntimeSnapshotProvider {
                 cgWindowID: cgWindow.id,
                 axWindow: nil,
                 frame: cgWindow.bounds,
+                spaceIDs: cgWindow.spaceIDs,
                 allowsPublicAXRecovery: true,
                 hasStickyBinding: false,
                 lastConfirmationSource: nil
@@ -116,6 +117,8 @@ extension RuntimeSnapshotProvider {
         let isMinimized: Bool
         let cgWindowID: CGWindowID?
         let frame: CGRect?
+        let spaceIDs: [Int]
+        let hasActivationHandle: Bool
         let lastConfirmationSource: WindowBindingConfirmationSource?
 
         init(
@@ -124,6 +127,8 @@ extension RuntimeSnapshotProvider {
             isMinimized: Bool,
             cgWindowID: CGWindowID?,
             frame: CGRect? = nil,
+            spaceIDs: [Int] = [],
+            hasActivationHandle: Bool = false,
             lastConfirmationSource: WindowBindingConfirmationSource? = nil
         ) {
             self.windowID = windowID
@@ -131,6 +136,8 @@ extension RuntimeSnapshotProvider {
             self.isMinimized = isMinimized
             self.cgWindowID = cgWindowID
             self.frame = frame
+            self.spaceIDs = RuntimeWindowTopologyClassifier.normalizedSpaceIDs(spaceIDs)
+            self.hasActivationHandle = hasActivationHandle
             self.lastConfirmationSource = lastConfirmationSource
         }
     }
@@ -152,6 +159,7 @@ extension RuntimeSnapshotProvider {
                     cgWindowID: $0.cgWindowID,
                     axWindow: nil,
                     frame: $0.frame,
+                    spaceIDs: $0.spaceIDs,
                     lastConfirmationSource: $0.lastConfirmationSource
                 )
             },
@@ -176,6 +184,8 @@ extension RuntimeSnapshotProvider {
                 isMinimized: $0.isMinimized,
                 cgWindowID: $0.cgWindowID,
                 frame: $0.frame,
+                spaceIDs: $0.spaceIDs,
+                hasActivationHandle: $0.activationHandleID != nil || $0.axWindow != nil,
                 lastConfirmationSource: $0.lastConfirmationSource
             )
         }

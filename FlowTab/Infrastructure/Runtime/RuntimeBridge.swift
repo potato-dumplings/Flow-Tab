@@ -23,6 +23,9 @@ enum WindowBindingConfirmationSource: String {
     case stickyBinding
     case publicExactMatch
     case privateExactBridge
+    case fullscreenContentRebinding
+    case fullscreenContentFallbackBinding
+    case desktopSiblingBinding
 }
 
 struct RuntimeWindowContext {
@@ -31,6 +34,7 @@ struct RuntimeWindowContext {
     let isMinimized: Bool
     let ownerPID: pid_t
     var cgWindowID: CGWindowID?
+    let spaceIDs: [Int]
     var inferredTitleBarStyle: WindowTitleBarStyleGuess?
     var activationHandleID: String?
     var axWindow: AXUIElement? = nil
@@ -45,6 +49,7 @@ struct RuntimeWindowContext {
         isMinimized: Bool,
         ownerPID: pid_t = 0,
         cgWindowID: CGWindowID? = nil,
+        spaceIDs: [Int] = [],
         inferredTitleBarStyle: WindowTitleBarStyleGuess? = nil,
         activationHandleID: String? = nil,
         axWindow: AXUIElement? = nil,
@@ -58,6 +63,7 @@ struct RuntimeWindowContext {
         self.isMinimized = isMinimized
         self.ownerPID = ownerPID
         self.cgWindowID = cgWindowID
+        self.spaceIDs = RuntimeWindowTopologyClassifier.normalizedSpaceIDs(spaceIDs)
         self.inferredTitleBarStyle = inferredTitleBarStyle
         self.activationHandleID = activationHandleID
         self.axWindow = axWindow

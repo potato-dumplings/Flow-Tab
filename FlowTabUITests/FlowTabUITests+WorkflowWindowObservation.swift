@@ -108,8 +108,81 @@ extension FlowTabUITests {
         )
     }
 
+    func waitForExactFrontmostWorkflowCGWindow(
+        windowNumber: CGWindowID,
+        title: String,
+        app workflowApp: SpaceFixtureResolvedWorkflow.App,
+        timeout: TimeInterval
+    ) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        var latestFrontmostBundleIdentifier: String?
+        var latestWindowNumber: CGWindowID?
+        var latestTitle: String?
+        repeat {
+            latestFrontmostBundleIdentifier = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+            let latestCGWindow = topmostOnScreenCGWindow(
+                forBundleIdentifier: workflowApp.identity.bundleIdentifier
+            )
+            latestWindowNumber = latestCGWindow?.number
+            latestTitle = latestCGWindow?.title
+            if latestFrontmostBundleIdentifier == workflowApp.identity.bundleIdentifier,
+               latestCGWindow?.number == windowNumber {
+                return true
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+
+        XCTFail(
+            """
+            Expected exact frontmost CG window \(workflowApp.appName) / \(title) / \(windowNumber), \
+            found frontmost bundle \(latestFrontmostBundleIdentifier ?? "nil") \
+            with CG title \(latestTitle ?? "nil") \
+            and window number \(latestWindowNumber.map(String.init) ?? "nil").
+            """
+        )
+        return false
+    }
+
     private func frontmostCGWindowTitle(forPID pid: pid_t) -> String? {
         frontmostCGWindow(forPID: pid)?.title
+    }
+
+    private func topmostOnScreenCGWindow(
+        forBundleIdentifier bundleIdentifier: String
+    ) -> WorkflowCGWindowObservation? {
+        guard let runningApp = NSRunningApplication
+            .runningApplications(withBundleIdentifier: bundleIdentifier)
+            .first(where: { !$0.isTerminated })
+        else {
+            return nil
+        }
+        return topmostOnScreenCGWindow(forPID: runningApp.processIdentifier)
+    }
+
+    private func topmostOnScreenCGWindow(forPID pid: pid_t) -> WorkflowCGWindowObservation? {
+        guard let windows = CGWindowListCopyWindowInfo(
+            [.optionOnScreenOnly, .excludeDesktopElements],
+            kCGNullWindowID
+        ) as? [[String: Any]] else {
+            return nil
+        }
+
+        for window in windows {
+            guard cgWindowPID(window[kCGWindowOwnerPID as String]) == pid else {
+                continue
+            }
+            guard cgWindowPassesValidityConstraints(window) else { continue }
+            guard let number = cgWindowNumber(window[kCGWindowNumber as String]) else {
+                continue
+            }
+            let title = (window[kCGWindowName as String] as? String)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return WorkflowCGWindowObservation(
+                number: number,
+                title: title?.isEmpty == false ? title : nil
+            )
+        }
+        return nil
     }
 
     private func frontmostCGWindow(

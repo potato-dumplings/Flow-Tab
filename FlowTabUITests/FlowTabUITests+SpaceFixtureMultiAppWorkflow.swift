@@ -604,6 +604,7 @@ extension FlowTabUITests {
     func runRealSpaceFixtureMultiAppWorkflow(
         flowTabAdditionalArguments: [String] = [],
         waitsForFullscreenMarkers: Bool = true,
+        suppressesAppAccessibilityChildren: Bool = false,
         perform assertions: (SpaceFixtureResolvedWorkflow, XCUIApplication) throws -> Void
     ) throws {
         let workflow: SpaceFixtureResolvedWorkflow
@@ -625,6 +626,7 @@ extension FlowTabUITests {
             workflow,
             flowTabAdditionalArguments: flowTabAdditionalArguments,
             waitsForFullscreenMarkers: waitsForFullscreenMarkers,
+            suppressesAppAccessibilityChildren: suppressesAppAccessibilityChildren,
             perform: assertions
         )
     }
@@ -633,15 +635,29 @@ extension FlowTabUITests {
         _ workflow: SpaceFixtureResolvedWorkflow,
         flowTabAdditionalArguments: [String] = [],
         waitsForFullscreenMarkers: Bool = true,
+        suppressesAppAccessibilityChildren: Bool = false,
         perform assertions: (SpaceFixtureResolvedWorkflow, XCUIApplication) throws -> Void
     ) throws {
         terminateSpaceFixtureWorkflowAppsIfRunning(workflow.apps.map(\.identity))
         let fixtureApps = launchResolvedSpaceFixtureWorkflow(
             workflow,
-            waitsForFullscreenMarkers: waitsForFullscreenMarkers
+            waitsForFullscreenMarkers: waitsForFullscreenMarkers,
+            suppressesAppAccessibilityChildren: suppressesAppAccessibilityChildren
         )
         defer {
             terminateSpaceFixtureWorkflowApps(fixtureApps)
+        }
+
+        if suppressesAppAccessibilityChildren {
+            for workflowApp in workflow.apps {
+                XCTAssertTrue(
+                    waitForApplicationAXWindowsSuppressed(
+                        bundleIdentifier: workflowApp.identity.bundleIdentifier,
+                        timeout: 8
+                    ),
+                    "\(workflowApp.appName) still exposes application-level AX windows."
+                )
+            }
         }
 
         guard assertSpaceFixtureWorkflowPermissionsAvailable() else { return }
@@ -857,7 +873,8 @@ extension FlowTabUITests {
 
     private func launchResolvedSpaceFixtureWorkflow(
         _ workflow: SpaceFixtureResolvedWorkflow,
-        waitsForFullscreenMarkers: Bool
+        waitsForFullscreenMarkers: Bool,
+        suppressesAppAccessibilityChildren: Bool
     ) -> [XCUIApplication] {
         var launchedApps: [XCUIApplication] = []
 
@@ -870,6 +887,9 @@ extension FlowTabUITests {
                 "--enter-fullscreen-delay-ms", String(SpaceFixtureMultiAppWorkflowDefaults.enterFullscreenDelayMilliseconds),
                 "--preserve-desktop-after-fullscreen"
             ]
+            if suppressesAppAccessibilityChildren {
+                app.launchArguments += ["--suppress-app-accessibility-children"]
+            }
             launchSpaceFixtureApplicationAndWaitForForeground(app)
             waitForSpaceFixtureWorkflowToStabilize(
                 in: app,
