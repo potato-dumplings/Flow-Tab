@@ -104,7 +104,7 @@ extension FlowTabUITests {
                 message: "Control+Tab roundtrip must enter the second focused-window phase on the normal sibling."
             )
             let secondLogSnapshot = makeRuntimeLogFileSnapshot()
-            _ = try selectInAppWindow(
+            let fullscreenSelection = try selectInAppWindow(
                 title: fullscreenTitle,
                 in: app,
                 diagnosticsSummary: diagnosticsSummary,
@@ -118,8 +118,9 @@ extension FlowTabUITests {
 
             postFlowTabUITestSwitcherCommandAndWaitForDelivery(.confirm, traceLabel: "control.confirmFullscreen")
             XCTAssertTrue(waitForNonExistence(diagnosticsSummary, timeout: 4))
-            XCTAssertNotNil(
-                waitForFrontmostWorkflowSpaceCGWindow(
+            XCTAssertTrue(
+                waitForExactFrontmostWorkflowCGWindow(
+                    windowNumber: fullscreenSelection.windowNumber,
                     title: fullscreenTitle,
                     app: targetApp,
                     timeout: 12

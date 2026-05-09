@@ -94,7 +94,7 @@ extension FlowTabUITests {
                 diagnosticsSummary: diagnosticsSummary,
                 message: "Option+Tab roundtrip must enter the second window-state phase on the normal sibling."
             )
-            _ = try selectGlobalSwitcherWindow(
+            let fullscreenSelection = try selectGlobalSwitcherWindow(
                 title: fullscreenTitle,
                 in: app,
                 diagnosticsSummary: diagnosticsSummary
@@ -102,8 +102,9 @@ extension FlowTabUITests {
 
             postFlowTabUITestSwitcherCommandAndWaitForDelivery(.confirm, traceLabel: "option.confirmFullscreen")
             XCTAssertTrue(waitForNonExistence(diagnosticsSummary, timeout: 4))
-            XCTAssertNotNil(
-                waitForFrontmostWorkflowSpaceCGWindow(
+            XCTAssertTrue(
+                waitForExactFrontmostWorkflowCGWindow(
+                    windowNumber: fullscreenSelection.windowNumber,
                     title: fullscreenTitle,
                     app: targetApp,
                     timeout: 12
@@ -192,7 +193,7 @@ extension FlowTabUITests {
                 ),
                 "Window search second phase must open from the normal sibling's Space."
             )
-            _ = try searchAndSelectWorkflowWindow(
+            let fullscreenSelection = try searchAndSelectWorkflowWindow(
                 title: fullscreenTitle,
                 app: targetApp,
                 in: app
@@ -200,8 +201,9 @@ extension FlowTabUITests {
 
             postFlowTabUITestSwitcherCommandAndWaitForDelivery(.searchConfirm, traceLabel: "search.confirmFullscreen")
             XCTAssertTrue(waitForNonExistence(searchInput, timeout: 4))
-            XCTAssertNotNil(
-                waitForFrontmostWorkflowSpaceCGWindow(
+            XCTAssertTrue(
+                waitForExactFrontmostWorkflowCGWindow(
+                    windowNumber: fullscreenSelection.windowNumber,
                     title: fullscreenTitle,
                     app: targetApp,
                     timeout: 12
