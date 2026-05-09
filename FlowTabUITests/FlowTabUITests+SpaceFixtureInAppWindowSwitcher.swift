@@ -23,12 +23,47 @@ extension FlowTabUITests {
             workflow,
             flowTabAdditionalArguments: inAppSwitcherLaunchArguments(for: targetApp),
             waitsForFullscreenMarkers: false,
-            suppressesAppAccessibilityChildren: true
+            suppressesAppAccessibilityChildren: true,
+            validatesPermissionsBeforeFixtureLaunch: true,
+            preservesDesktopAfterFullscreen: false,
+            prelaunchesFlowTabBeforeFixture: true,
+            beforeFlowTabLaunch: { _ in
+                self.logWorkflowSpaceObservation("control.beforeFlowTabLaunch", app: targetApp)
+                _ = try XCTUnwrap(
+                    self.waitForFrontmostWorkflowSpaceCGWindow(
+                        title: fullscreenTitle,
+                        app: targetApp,
+                        timeout: 12
+                    ),
+                    "Control+Tab roundtrip must start with the fullscreen sibling frontmost."
+                )
+            },
+            flowTabLaunchTraceLabel: "control",
+            afterFlowTabLaunch: { _, _ in
+                self.logWorkflowSpaceObservation("control.afterFlowTabLaunch", app: targetApp)
+            }
         ) { _, app in
+            logWorkflowSpaceObservation("control.beforeTrigger", app: targetApp)
+            postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.inApp, traceLabel: "control")
             var diagnosticsSummary = assertInAppWindowSwitcherReady(for: targetApp, in: app)
+            logWorkflowSpaceObservation("control.afterPanelReady", app: targetApp)
+            XCTAssertTrue(
+                waitForActiveSpaceWorkflowCGWindow(
+                    title: fullscreenTitle,
+                    app: targetApp,
+                    timeout: 4
+                ),
+                "Control+Tab first phase must open from the fullscreen sibling's Space."
+            )
+            assertSwitcherSelectedWindowTitle(
+                fullscreenTitle,
+                in: app,
+                diagnosticsSummary: diagnosticsSummary,
+                message: "Control+Tab roundtrip must enter the first focused-window phase on the fullscreen sibling."
+            )
             let firstLogSnapshot = makeRuntimeLogFileSnapshot()
-            let fullscreenSelection = try selectInAppWindow(
-                title: fullscreenTitle,
+            let standardSelection = try selectInAppWindow(
+                title: standardTitle,
                 in: app,
                 diagnosticsSummary: diagnosticsSummary,
                 requiresControlTab: true
@@ -39,21 +74,38 @@ extension FlowTabUITests {
                 timeout: 8
             )
 
-            app.typeText("\r")
+            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.confirm, traceLabel: "control.confirmStandard")
             XCTAssertTrue(waitForNonExistence(diagnosticsSummary, timeout: 4))
             XCTAssertTrue(
                 waitForExactFrontmostWorkflowCGWindow(
-                    windowNumber: fullscreenSelection.windowNumber,
-                    title: fullscreenTitle,
+                    windowNumber: standardSelection.windowNumber,
+                    title: standardTitle,
                     app: targetApp,
                     timeout: 12
                 )
             )
+            logWorkflowSpaceObservation("control.afterStandardConfirm", app: targetApp)
 
             diagnosticsSummary = relaunchInAppWindowSwitcher(app, for: targetApp)
+            logWorkflowSpaceObservation("control.afterSecondPanelReady", app: targetApp)
+            XCTAssertTrue(
+                waitForExactFrontmostWorkflowCGWindow(
+                    windowNumber: standardSelection.windowNumber,
+                    title: standardTitle,
+                    app: targetApp,
+                    timeout: 4
+                ),
+                "Control+Tab second phase must open from the focused normal sibling."
+            )
+            assertSwitcherSelectedWindowTitle(
+                standardTitle,
+                in: app,
+                diagnosticsSummary: diagnosticsSummary,
+                message: "Control+Tab roundtrip must enter the second focused-window phase on the normal sibling."
+            )
             let secondLogSnapshot = makeRuntimeLogFileSnapshot()
-            let standardSelection = try selectInAppWindow(
-                title: standardTitle,
+            _ = try selectInAppWindow(
+                title: fullscreenTitle,
                 in: app,
                 diagnosticsSummary: diagnosticsSummary,
                 requiresControlTab: true
@@ -64,16 +116,16 @@ extension FlowTabUITests {
                 timeout: 8
             )
 
-            app.typeText("\r")
+            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.confirm, traceLabel: "control.confirmFullscreen")
             XCTAssertTrue(waitForNonExistence(diagnosticsSummary, timeout: 4))
-            XCTAssertTrue(
-                waitForExactFrontmostWorkflowCGWindow(
-                    windowNumber: standardSelection.windowNumber,
-                    title: standardTitle,
+            XCTAssertNotNil(
+                waitForFrontmostWorkflowSpaceCGWindow(
+                    title: fullscreenTitle,
                     app: targetApp,
                     timeout: 12
                 )
             )
+            logWorkflowSpaceObservation("control.afterFullscreenConfirm", app: targetApp)
         }
     }
 
@@ -105,7 +157,9 @@ extension FlowTabUITests {
         for workflowApp: SpaceFixtureResolvedWorkflow.App
     ) -> [String] {
         [
-            "--flowtab-ui-open-in-app-window-switcher",
+            "--flowtab-ui-listen-switcher-trigger",
+            "--flowtab-ui-suppress-home-on-launch",
+            "--flowtab-ui-suppress-panel-activation",
             "--flowtab-ui-frontmost-bundle-id", workflowApp.identity.bundleIdentifier,
             "--flowtab-ui-runtime-log-level", "DEBUG",
             "--flowtab-ui-enable-verbose-logs"
@@ -154,11 +208,14 @@ extension FlowTabUITests {
             return try inAppWindowSelection(title: latestTitle, windowID: latestWindowID)
         }
 
-        for _ in 0..<attempts {
-            app.typeKey(.tab, modifierFlags: .control)
+        for attempt in 0..<attempts {
+            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.inAppForward, traceLabel: "control.select")
             RunLoop.current.run(until: Date().addingTimeInterval(0.25))
             latestTitle = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selectedWindowTitle")
             latestWindowID = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selectedWindow")
+            logFlowTabUITestTrace(
+                "[control.selectAttempt.\(attempt + 1)] target=\(title) selected=\(latestTitle) windowID=\(latestWindowID)"
+            )
             if latestTitle == title {
                 return try inAppWindowSelection(title: latestTitle, windowID: latestWindowID)
             }
@@ -196,12 +253,9 @@ extension FlowTabUITests {
         _ app: XCUIApplication,
         for workflowApp: SpaceFixtureResolvedWorkflow.App
     ) -> XCUIElement {
-        if app.state == .runningForeground || app.state == .runningBackground {
-            app.terminate()
-            XCTAssertTrue(app.wait(for: .notRunning, timeout: 8))
-        }
-        launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 12))
+        XCTAssertTrue(app.state == .runningForeground || app.state == .runningBackground)
+        RunLoop.current.run(until: Date().addingTimeInterval(0.35))
+        postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.inApp, traceLabel: "control.reopen")
         return assertInAppWindowSwitcherReady(for: workflowApp, in: app)
     }
 

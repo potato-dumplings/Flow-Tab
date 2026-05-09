@@ -14,6 +14,7 @@ final class RuntimeSnapshotProvider {
         let axWindow: AXUIElement?
         let frame: CGRect?
         let spaceIDs: [Int]
+        let isOnscreen: Bool
         let allowsPublicAXRecovery: Bool
         let hasStickyBinding: Bool
         let lastConfirmationSource: WindowBindingConfirmationSource?
@@ -28,6 +29,7 @@ final class RuntimeSnapshotProvider {
             axWindow: AXUIElement? = nil,
             frame: CGRect? = nil,
             spaceIDs: [Int] = [],
+            isOnscreen: Bool = false,
             allowsPublicAXRecovery: Bool = false,
             hasStickyBinding: Bool = false,
             lastConfirmationSource: WindowBindingConfirmationSource? = nil
@@ -41,6 +43,7 @@ final class RuntimeSnapshotProvider {
             self.axWindow = axWindow
             self.frame = frame
             self.spaceIDs = RuntimeWindowTopologyClassifier.normalizedSpaceIDs(spaceIDs)
+            self.isOnscreen = isOnscreen
             self.allowsPublicAXRecovery = allowsPublicAXRecovery
             self.hasStickyBinding = hasStickyBinding
             self.lastConfirmationSource = lastConfirmationSource
@@ -345,7 +348,7 @@ final class RuntimeSnapshotProvider {
         rankByPID: [pid_t: Int]
     ) {
         cleanupWindowMappingState(for: runningApps)
-        AXLiveWindowRegistry.shared.rebind(runningApps)
+        AXLiveWindowRegistry.shared.prune(to: runningApps)
         let onScreenCGWindowsByPID = collectCGWindowsByPID()
         let allCGWindowsByPID = collectCGWindowsByPID(options: [.optionAll, .excludeDesktopElements])
         // Keep a single source of truth for window counting and selection: AX window list.
@@ -373,14 +376,25 @@ final class RuntimeSnapshotProvider {
         for app in runningApps {
             let appName = app.localizedName ?? app.bundleIdentifier ?? "pid:\(app.processIdentifier)"
             let cgWindows = cgWindowsByPID[app.processIdentifier] ?? []
-            let allCGWindows = allCGWindowsByPID[app.processIdentifier] ?? cgWindows
-            let shouldIncludeRemoteAXWindows = shouldIncludeRemoteAXWindows(
-                allCGWindows: allCGWindows
+            let allCGWindows = markCurrentOnscreenCGWindows(
+                allCGWindowsByPID[app.processIdentifier] ?? cgWindows,
+                onscreenCGWindows: cgWindows
             )
-            let windowsFetchResult = AXWindowInspector.windowsFetchResult(
+            let publicWindowsFetchResult = AXWindowInspector.windowsFetchResult(
                 for: app,
-                includeRemoteWindows: shouldIncludeRemoteAXWindows
+                includeRemoteWindows: false
             )
+            let publicSwitchableWindowCount = publicWindowsFetchResult.windows.filter {
+                AXWindowInspector.isSwitchable($0)
+            }.count
+            let shouldIncludeRemoteAXWindows = shouldIncludeRemoteAXWindows(
+                allCGWindows: allCGWindows,
+                publicSwitchableWindowCount: publicSwitchableWindowCount,
+                publicFetchSucceeded: publicWindowsFetchResult.error == .success
+            )
+            let windowsFetchResult = shouldIncludeRemoteAXWindows
+                ? AXWindowInspector.windowsFetchResult(for: app, includeRemoteWindows: true)
+                : publicWindowsFetchResult
             let windows = windowsFetchResult.windows
             AXLiveWindowRegistry.shared.refreshSnapshot(
                 forPID: app.processIdentifier,
@@ -426,13 +440,65 @@ final class RuntimeSnapshotProvider {
         return windowsByPID
     }
 
-    private func shouldIncludeRemoteAXWindows(allCGWindows: [CGWindowEntry]) -> Bool {
-        allCGWindows.contains { window in
-            Self.cgWindowPassesValidityConstraints(window)
-                && (
-                    RuntimeWindowTopologyClassifier.hasOffDesktopSpace(spaceIDs: window.spaceIDs)
-                        || !window.isOnscreen
-                )
+    private func shouldIncludeRemoteAXWindows(
+        allCGWindows: [CGWindowEntry],
+        publicSwitchableWindowCount: Int,
+        publicFetchSucceeded: Bool
+    ) -> Bool {
+        let userFacingCGWindows = userFacingCGWindowsForRemoteAXDecision(allCGWindows)
+        guard userFacingCGWindows.contains(where: { window in
+            RuntimeWindowTopologyClassifier.hasOffDesktopSpace(spaceIDs: window.spaceIDs)
+                || !window.isOnscreen
+        }) else {
+            return false
+        }
+        guard publicFetchSucceeded else { return true }
+        return publicSwitchableWindowCount < userFacingCGWindows.count
+    }
+
+    private func userFacingCGWindowsForRemoteAXDecision(
+        _ allCGWindows: [CGWindowEntry]
+    ) -> [CGWindowEntry] {
+        let validCGWindows = selectSupplementalOffSpaceCGWindows(
+            existingCGWindowIDs: [],
+            allCGWindows: allCGWindows
+        )
+        let fullscreenContentBounds = validCGWindows.compactMap { window -> CGRect? in
+            guard RuntimeWindowTopologyClassifier.isLikelyOffDesktopFullscreenContent(
+                bounds: window.bounds,
+                spaceIDs: window.spaceIDs
+            ) else { return nil }
+            return window.bounds
+        }
+        return validCGWindows.filter { window in
+            !RuntimeWindowTopologyClassifier.isLikelyDesktopWrapper(
+                bounds: window.bounds,
+                spaceIDs: window.spaceIDs,
+                fullscreenContentBounds: fullscreenContentBounds
+            )
+        }
+    }
+
+    private func markCurrentOnscreenCGWindows(
+        _ allCGWindows: [CGWindowEntry],
+        onscreenCGWindows: [CGWindowEntry]
+    ) -> [CGWindowEntry] {
+        let onscreenCGWindowIDs = Set(onscreenCGWindows.map(\.id))
+        guard !onscreenCGWindowIDs.isEmpty else { return allCGWindows }
+
+        return allCGWindows.map { window in
+            guard onscreenCGWindowIDs.contains(window.id), !window.isOnscreen else {
+                return window
+            }
+            return CGWindowEntry(
+                id: window.id,
+                title: window.title,
+                bounds: window.bounds,
+                isOnscreen: true,
+                alpha: window.alpha,
+                storeType: window.storeType,
+                spaceIDs: window.spaceIDs
+            )
         }
     }
 
@@ -893,6 +959,28 @@ final class RuntimeSnapshotProvider {
             pid: pid,
             appName: appName
         ).exactMatchesByAXWindowID
+    }
+
+    static func shouldIncludeRemoteAXWindowsForTesting(
+        allCGWindows: [CGWindowEntryForTesting],
+        publicSwitchableWindowCount: Int,
+        publicFetchSucceeded: Bool = true
+    ) -> Bool {
+        RuntimeSnapshotProvider().shouldIncludeRemoteAXWindows(
+            allCGWindows: allCGWindows.map {
+                CGWindowEntry(
+                    id: $0.id,
+                    title: $0.title,
+                    bounds: $0.bounds,
+                    isOnscreen: $0.isOnscreen,
+                    alpha: $0.alpha,
+                    storeType: $0.storeType,
+                    spaceIDs: $0.spaceIDs
+                )
+            },
+            publicSwitchableWindowCount: publicSwitchableWindowCount,
+            publicFetchSucceeded: publicFetchSucceeded
+        )
     }
 
     static func resolveWindowEntriesForTesting(

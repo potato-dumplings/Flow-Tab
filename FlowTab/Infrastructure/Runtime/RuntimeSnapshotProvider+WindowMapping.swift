@@ -107,6 +107,7 @@ extension RuntimeSnapshotProvider {
                 spaceIDs: knownCGWindowsByID[cgWindowID]?.spaceIDs
                     ?? record.spaceRecovery?.spaceIDs
                     ?? [],
+                isOnscreen: knownCGWindowsByID[cgWindowID]?.isOnscreen ?? false,
                 allowsPublicAXRecovery: true,
                 hasStickyBinding: true,
                 lastConfirmationSource: record.lastConfirmationSource
@@ -149,6 +150,7 @@ extension RuntimeSnapshotProvider {
                 axWindow: nil,
                 frame: record.displayFrame ?? cgWindow.bounds,
                 spaceIDs: normalizedSpaceIDs,
+                isOnscreen: cgWindow.isOnscreen,
                 allowsPublicAXRecovery: true,
                 hasStickyBinding: true,
                 lastConfirmationSource: record.lastConfirmationSource
@@ -193,6 +195,7 @@ extension RuntimeSnapshotProvider {
                 axWindow: nil,
                 frame: record?.displayFrame ?? cgWindow.bounds,
                 spaceIDs: normalizedSpaceIDs,
+                isOnscreen: cgWindow.isOnscreen,
                 allowsPublicAXRecovery: true,
                 hasStickyBinding: false,
                 lastConfirmationSource: nil
@@ -212,7 +215,22 @@ extension RuntimeSnapshotProvider {
             appName: appName
         )
 
-        return exactEntries + deduplicatedUnmatchedAXEntries
+        return orderWindowEntriesForPresentation(exactEntries + deduplicatedUnmatchedAXEntries)
+    }
+
+    private func orderWindowEntriesForPresentation(_ entries: [WindowListEntry]) -> [WindowListEntry] {
+        let orderedEntries = entries.enumerated().sorted { lhs, rhs in
+            let lhsHasActivationHandle = lhs.element.activationHandleID != nil || lhs.element.axWindow != nil
+            let rhsHasActivationHandle = rhs.element.activationHandleID != nil || rhs.element.axWindow != nil
+            if lhsHasActivationHandle != rhsHasActivationHandle {
+                return lhsHasActivationHandle
+            }
+            if lhs.element.isOnscreen != rhs.element.isOnscreen {
+                return lhs.element.isOnscreen
+            }
+            return lhs.offset < rhs.offset
+        }.map(\.element)
+        return orderedEntries
     }
 
     func resolveStableWindowMapping(

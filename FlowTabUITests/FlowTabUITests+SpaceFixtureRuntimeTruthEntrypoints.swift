@@ -19,36 +19,53 @@ extension FlowTabUITests {
 
         try runRealSpaceFixtureWorkflow(
             workflow,
-            flowTabAdditionalArguments: ["--flowtab-ui-open-switcher"],
+            flowTabAdditionalArguments: runtimeTruthSwitcherLaunchArguments(),
             waitsForFullscreenMarkers: false,
-            suppressesAppAccessibilityChildren: true
+            suppressesAppAccessibilityChildren: true,
+            validatesPermissionsBeforeFixtureLaunch: true,
+            preservesDesktopAfterFullscreen: false,
+            prelaunchesFlowTabBeforeFixture: true,
+            beforeFlowTabLaunch: { _ in
+                self.logWorkflowSpaceObservation("option.beforeFlowTabLaunch", app: targetApp)
+                _ = try XCTUnwrap(
+                    self.waitForFrontmostWorkflowSpaceCGWindow(
+                        title: fullscreenTitle,
+                        app: targetApp,
+                        timeout: 12
+                    ),
+                    "Option+Tab roundtrip must start with the fullscreen sibling frontmost."
+                )
+            },
+            flowTabLaunchTraceLabel: "option",
+            afterFlowTabLaunch: { _, _ in
+                self.logWorkflowSpaceObservation("option.afterFlowTabLaunch", app: targetApp)
+            }
         ) { _, app in
-            var diagnosticsSummary = assertGlobalSwitcherWindowStateReady(for: targetApp, in: app)
-            let fullscreenSelection = try selectGlobalSwitcherWindow(
-                title: fullscreenTitle,
-                in: app,
-                diagnosticsSummary: diagnosticsSummary
-            )
-
-            app.typeText("\r")
-            XCTAssertTrue(waitForNonExistence(diagnosticsSummary, timeout: 4))
+            logWorkflowSpaceObservation("option.beforeTrigger", app: targetApp)
+            postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.global, traceLabel: "option")
+            var diagnosticsSummary = try assertGlobalSwitcherWindowStateReady(for: targetApp, in: app)
+            logWorkflowSpaceObservation("option.afterWindowStateReady", app: targetApp)
             XCTAssertTrue(
-                waitForExactFrontmostWorkflowCGWindow(
-                    windowNumber: fullscreenSelection.windowNumber,
+                waitForActiveSpaceWorkflowCGWindow(
                     title: fullscreenTitle,
                     app: targetApp,
-                    timeout: 12
-                )
+                    timeout: 4
+                ),
+                "Option+Tab first window-state phase must open from the fullscreen sibling's Space."
             )
-
-            diagnosticsSummary = relaunchGlobalSwitcher(app, for: targetApp)
+            assertSwitcherSelectedWindowTitle(
+                fullscreenTitle,
+                in: app,
+                diagnosticsSummary: diagnosticsSummary,
+                message: "Option+Tab roundtrip must enter the first window-state phase on the fullscreen sibling."
+            )
             let standardSelection = try selectGlobalSwitcherWindow(
                 title: standardTitle,
                 in: app,
                 diagnosticsSummary: diagnosticsSummary
             )
 
-            app.typeText("\r")
+            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.confirm, traceLabel: "option.confirmStandard")
             XCTAssertTrue(waitForNonExistence(diagnosticsSummary, timeout: 4))
             XCTAssertTrue(
                 waitForExactFrontmostWorkflowCGWindow(
@@ -58,6 +75,41 @@ extension FlowTabUITests {
                     timeout: 12
                 )
             )
+            logWorkflowSpaceObservation("option.afterStandardConfirm", app: targetApp)
+
+            diagnosticsSummary = try relaunchGlobalSwitcher(app, for: targetApp)
+            logWorkflowSpaceObservation("option.afterSecondWindowStateReady", app: targetApp)
+            XCTAssertTrue(
+                waitForExactFrontmostWorkflowCGWindow(
+                    windowNumber: standardSelection.windowNumber,
+                    title: standardTitle,
+                    app: targetApp,
+                    timeout: 4
+                ),
+                "Option+Tab second window-state phase must open from the normal sibling's Space."
+            )
+            assertSwitcherSelectedWindowTitle(
+                standardTitle,
+                in: app,
+                diagnosticsSummary: diagnosticsSummary,
+                message: "Option+Tab roundtrip must enter the second window-state phase on the normal sibling."
+            )
+            _ = try selectGlobalSwitcherWindow(
+                title: fullscreenTitle,
+                in: app,
+                diagnosticsSummary: diagnosticsSummary
+            )
+
+            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.confirm, traceLabel: "option.confirmFullscreen")
+            XCTAssertTrue(waitForNonExistence(diagnosticsSummary, timeout: 4))
+            XCTAssertNotNil(
+                waitForFrontmostWorkflowSpaceCGWindow(
+                    title: fullscreenTitle,
+                    app: targetApp,
+                    timeout: 12
+                )
+            )
+            logWorkflowSpaceObservation("option.afterFullscreenConfirm", app: targetApp)
         }
     }
 
@@ -72,39 +124,53 @@ extension FlowTabUITests {
 
         try runRealSpaceFixtureWorkflow(
             workflow,
-            flowTabAdditionalArguments: [
-                "--flowtab-ui-open-switcher-search",
-                "-searchDefaultScope",
-                "window"
-            ],
+            flowTabAdditionalArguments: runtimeTruthSwitcherLaunchArguments(
+                additionalArguments: [
+                    "-searchDefaultScope",
+                    "window"
+                ]
+            ),
             waitsForFullscreenMarkers: false,
-            suppressesAppAccessibilityChildren: true
+            suppressesAppAccessibilityChildren: true,
+            validatesPermissionsBeforeFixtureLaunch: true,
+            preservesDesktopAfterFullscreen: false,
+            prelaunchesFlowTabBeforeFixture: true,
+            beforeFlowTabLaunch: { _ in
+                self.logWorkflowSpaceObservation("search.beforeFlowTabLaunch", app: targetApp)
+                _ = try XCTUnwrap(
+                    self.waitForFrontmostWorkflowSpaceCGWindow(
+                        title: fullscreenTitle,
+                        app: targetApp,
+                        timeout: 12
+                    ),
+                    "Window search roundtrip must start with the fullscreen sibling frontmost."
+                )
+            },
+            flowTabLaunchTraceLabel: "search",
+            afterFlowTabLaunch: { _, _ in
+                self.logWorkflowSpaceObservation("search.afterFlowTabLaunch", app: targetApp)
+            }
         ) { _, app in
+            logWorkflowSpaceObservation("search.beforeTrigger", app: targetApp)
+            postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.search, traceLabel: "search")
             var searchInput = assertWindowSearchReady(in: app)
-            let fullscreenSelection = try searchAndSelectWorkflowWindow(
-                title: fullscreenTitle,
-                app: targetApp,
-                in: app
-            )
-
-            confirmSwitcherSearchSelection(in: app, searchInput: searchInput)
+            logWorkflowSpaceObservation("search.afterSearchReady", app: targetApp)
             XCTAssertTrue(
-                waitForExactFrontmostWorkflowCGWindow(
-                    windowNumber: fullscreenSelection.windowNumber,
+                waitForActiveSpaceWorkflowCGWindow(
                     title: fullscreenTitle,
                     app: targetApp,
-                    timeout: 12
-                )
+                    timeout: 4
+                ),
+                "Window search first phase must open from the fullscreen sibling's Space."
             )
-
-            searchInput = relaunchWindowSearch(app)
             let standardSelection = try searchAndSelectWorkflowWindow(
                 title: standardTitle,
                 app: targetApp,
                 in: app
             )
 
-            confirmSwitcherSearchSelection(in: app, searchInput: searchInput)
+            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.searchConfirm, traceLabel: "search.confirmStandard")
+            XCTAssertTrue(waitForNonExistence(searchInput, timeout: 4))
             XCTAssertTrue(
                 waitForExactFrontmostWorkflowCGWindow(
                     windowNumber: standardSelection.windowNumber,
@@ -113,13 +179,42 @@ extension FlowTabUITests {
                     timeout: 12
                 )
             )
+            logWorkflowSpaceObservation("search.afterStandardConfirm", app: targetApp)
+
+            searchInput = relaunchWindowSearch(app)
+            logWorkflowSpaceObservation("search.afterSecondSearchReady", app: targetApp)
+            XCTAssertTrue(
+                waitForExactFrontmostWorkflowCGWindow(
+                    windowNumber: standardSelection.windowNumber,
+                    title: standardTitle,
+                    app: targetApp,
+                    timeout: 4
+                ),
+                "Window search second phase must open from the normal sibling's Space."
+            )
+            _ = try searchAndSelectWorkflowWindow(
+                title: fullscreenTitle,
+                app: targetApp,
+                in: app
+            )
+
+            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.searchConfirm, traceLabel: "search.confirmFullscreen")
+            XCTAssertTrue(waitForNonExistence(searchInput, timeout: 4))
+            XCTAssertNotNil(
+                waitForFrontmostWorkflowSpaceCGWindow(
+                    title: fullscreenTitle,
+                    app: targetApp,
+                    timeout: 12
+                )
+            )
+            logWorkflowSpaceObservation("search.afterFullscreenConfirm", app: targetApp)
         }
     }
 
     private func assertGlobalSwitcherWindowStateReady(
         for workflowApp: SpaceFixtureResolvedWorkflow.App,
         in app: XCUIApplication
-    ) -> XCUIElement {
+    ) throws -> XCUIElement {
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
         XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
         XCTAssertTrue(
@@ -130,9 +225,23 @@ extension FlowTabUITests {
             )
         )
 
-        selectSwitcherWorkflowApp(workflowApp, in: app, diagnosticsSummary: diagnosticsSummary)
+        logFlowTabUITestTrace(
+            "[selectWorkflowApp.direct] target=\(workflowApp.identity.bundleIdentifier) selected=\(switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selected"))"
+        )
+        try postFlowTabUITestSelectSwitcherAppAndWaitForDelivery(
+            bundleIdentifier: workflowApp.identity.bundleIdentifier,
+            traceLabel: "option.selectApp"
+        )
+        assertSwitcherSelectedApp(
+            workflowApp,
+            in: app,
+            diagnosticsSummary: diagnosticsSummary,
+            stage: "before entering Option+Tab window state"
+        )
 
-        app.typeKey(.downArrow, modifierFlags: [])
+        logWorkflowSpaceObservation("option.beforeEnterWindowState", app: workflowApp)
+        postFlowTabUITestSwitcherCommandAndWaitForDelivery(.advanceDown, traceLabel: "option.enterWindowState")
+        logWorkflowSpaceObservation("option.afterEnterWindowState", app: workflowApp)
         XCTAssertTrue(
             waitForSwitcherDiagnosticsValue(
                 diagnosticsSummary,
@@ -145,6 +254,12 @@ extension FlowTabUITests {
 
             \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
             """
+        )
+        assertSwitcherSelectedApp(
+            workflowApp,
+            in: app,
+            diagnosticsSummary: diagnosticsSummary,
+            stage: "after entering Option+Tab window state"
         )
         XCTAssertTrue(
             waitForSwitcherPreviewTitles(
@@ -161,6 +276,28 @@ extension FlowTabUITests {
         return diagnosticsSummary
     }
 
+    private func assertSwitcherSelectedApp(
+        _ workflowApp: SpaceFixtureResolvedWorkflow.App,
+        in app: XCUIApplication,
+        diagnosticsSummary: XCUIElement,
+        stage: String
+    ) {
+        XCTAssertTrue(
+            waitForSwitcherDiagnosticsValue(
+                diagnosticsSummary,
+                key: "selected",
+                toEqual: workflowApp.identity.bundleIdentifier,
+                timeout: 4
+            ),
+            """
+            Option+Tab selected the wrong app \(stage). Expected \
+            \(workflowApp.identity.bundleIdentifier).
+
+            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
+            """
+        )
+    }
+
     private func selectGlobalSwitcherWindow(
         title: String,
         in app: XCUIApplication,
@@ -174,11 +311,14 @@ extension FlowTabUITests {
             return try runtimeTruthWindowSelection(title: latestTitle, windowID: latestWindowID)
         }
 
-        for _ in 0..<attempts {
-            app.typeKey(.rightArrow, modifierFlags: [])
+        for attempt in 0..<attempts {
+            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.advanceRight, traceLabel: "option.selectWindow")
             RunLoop.current.run(until: Date().addingTimeInterval(0.25))
             latestTitle = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selectedWindowTitle")
             latestWindowID = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selectedWindow")
+            logFlowTabUITestTrace(
+                "[option.selectAttempt.\(attempt + 1)] target=\(title) selected=\(latestTitle) windowID=\(latestWindowID)"
+            )
             if latestTitle == title {
                 return try runtimeTruthWindowSelection(title: latestTitle, windowID: latestWindowID)
             }
@@ -200,7 +340,7 @@ extension FlowTabUITests {
         in app: XCUIApplication
     ) throws -> RuntimeTruthWindowSelection {
         RunLoop.current.run(until: Date().addingTimeInterval(0.4))
-        app.typeText(title)
+        try postFlowTabUITestSwitcherSearchQueryAndWaitForDelivery(title, traceLabel: "search.query")
 
         let result = try XCTUnwrap(
             waitForSearchWindowResult(
@@ -241,26 +381,32 @@ extension FlowTabUITests {
         return workflowApp.expectedWindowTitles.first { $0 != fullscreenTitle }
     }
 
+    private func runtimeTruthSwitcherLaunchArguments(
+        additionalArguments: [String] = []
+    ) -> [String] {
+        [
+            "--flowtab-ui-listen-switcher-trigger",
+            "--flowtab-ui-suppress-home-on-launch",
+            "--flowtab-ui-suppress-panel-activation",
+            "--flowtab-ui-runtime-log-level", "DEBUG",
+            "--flowtab-ui-enable-verbose-logs",
+            "-windowLayerAutoEnterDelay", "30.0"
+        ] + FlowTabUITestSwitcherCommandPayload.launchArguments + additionalArguments
+    }
+
     private func relaunchGlobalSwitcher(
         _ app: XCUIApplication,
         for workflowApp: SpaceFixtureResolvedWorkflow.App
-    ) -> XCUIElement {
-        relaunchFlowTabUITestApplication(app)
-        return assertGlobalSwitcherWindowStateReady(for: workflowApp, in: app)
+    ) throws -> XCUIElement {
+        XCTAssertTrue(app.state == .runningForeground || app.state == .runningBackground)
+        postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.global, traceLabel: "option.relaunch")
+        return try assertGlobalSwitcherWindowStateReady(for: workflowApp, in: app)
     }
 
     private func relaunchWindowSearch(_ app: XCUIApplication) -> XCUIElement {
-        relaunchFlowTabUITestApplication(app)
+        XCTAssertTrue(app.state == .runningForeground || app.state == .runningBackground)
+        postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.search, traceLabel: "search.relaunch")
         return assertWindowSearchReady(in: app)
-    }
-
-    private func relaunchFlowTabUITestApplication(_ app: XCUIApplication) {
-        if app.state == .runningForeground || app.state == .runningBackground {
-            app.terminate()
-            XCTAssertTrue(app.wait(for: .notRunning, timeout: 8))
-        }
-        launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 12))
     }
 
     private func assertWindowSearchReady(in app: XCUIApplication) -> XCUIElement {
@@ -280,6 +426,22 @@ extension FlowTabUITests {
         let deadline = Date().addingTimeInterval(timeout)
         repeat {
             if switcherPanelDiagnosticsValue(diagnosticsSummary, key: key).hasPrefix(expectedValuePrefix) {
+                return true
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+        return false
+    }
+
+    private func waitForSwitcherDiagnosticsValue(
+        _ diagnosticsSummary: XCUIElement,
+        key: String,
+        toEqual expectedValue: String,
+        timeout: TimeInterval
+    ) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if switcherPanelDiagnosticsValue(diagnosticsSummary, key: key) == expectedValue {
                 return true
             }
             RunLoop.current.run(until: Date().addingTimeInterval(0.1))

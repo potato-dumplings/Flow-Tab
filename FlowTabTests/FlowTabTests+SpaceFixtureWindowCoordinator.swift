@@ -111,6 +111,124 @@ extension FlowTabTests {
     }
 
     @MainActor
+    func testSpaceFixtureWindowCoordinatorLeavesFullscreenFocusUntouchedWhenDesktopPreservationDisabled() {
+        let configuration = SpaceFixtureLaunchConfiguration(
+            windowCount: 3,
+            fullscreenWindowIndex: 2,
+            windowTitlePrefix: "Fixture",
+            usesStaggeredLayout: true,
+            enterFullscreenDelayMilliseconds: 800,
+            preservesDesktopAfterFullscreen: false
+        )
+
+        var windowSpies: [SpaceFixtureWindowSpy] = []
+        var scheduledDelays: [Int] = []
+        var scheduledActions: [(@MainActor () -> Void)] = []
+        var activationCallCount = 0
+        var publishedAccessibilityElements: [[String]] = []
+
+        let coordinator = SpaceFixtureWindowCoordinator(
+            configuration: configuration,
+            visibleFrameProvider: { CGRect(x: 0, y: 0, width: 1440, height: 900) },
+            windowFactory: { plan in
+                let spy = SpaceFixtureWindowSpy(plan: plan)
+                windowSpies.append(spy)
+                return spy
+            },
+            fullscreenScheduler: { delay, action in
+                scheduledDelays.append(delay)
+                scheduledActions.append(action)
+            },
+            activateApplication: {
+                activationCallCount += 1
+            },
+            applicationAccessibilityElementsPublisher: { elements in
+                publishedAccessibilityElements.append(elements.compactMap { $0 as? String })
+            }
+        )
+
+        coordinator.launch()
+
+        XCTAssertEqual(windowSpies.count, 3)
+        XCTAssertEqual(windowSpies[0].showCalls, [false])
+        XCTAssertEqual(windowSpies[1].showCalls, [true])
+        XCTAssertEqual(windowSpies[2].showCalls, [false])
+        XCTAssertEqual(activationCallCount, 1)
+        XCTAssertEqual(scheduledDelays, [800])
+
+        scheduledActions[0]()
+
+        XCTAssertEqual(windowSpies[1].enterFullScreenCallCount, 1)
+        XCTAssertEqual(windowSpies[0].showCalls, [false])
+        XCTAssertEqual(windowSpies[1].showCalls, [true])
+        XCTAssertEqual(windowSpies[2].showCalls, [false])
+        XCTAssertEqual(activationCallCount, 1)
+        XCTAssertEqual(
+            publishedAccessibilityElements,
+            [
+                ["ax-element-1", "ax-element-2", "ax-element-3"],
+                ["ax-element-1", "ax-element-2", "ax-element-3"]
+            ]
+        )
+    }
+
+    @MainActor
+    func testSpaceFixtureWindowCoordinatorDelaysAccessibilitySuppressionUntilAfterFullscreenTransition() {
+        let configuration = SpaceFixtureLaunchConfiguration(
+            windowCount: 2,
+            fullscreenWindowIndex: 2,
+            windowTitlePrefix: "Fixture",
+            usesStaggeredLayout: true,
+            enterFullscreenDelayMilliseconds: 4_000,
+            preservesDesktopAfterFullscreen: false,
+            publishesApplicationAccessibilityChildren: false
+        )
+
+        var windowSpies: [SpaceFixtureWindowSpy] = []
+        var scheduledDelays: [Int] = []
+        var scheduledActions: [(@MainActor () -> Void)] = []
+        var publishedAccessibilityElements: [[String]] = []
+
+        let coordinator = SpaceFixtureWindowCoordinator(
+            configuration: configuration,
+            visibleFrameProvider: { CGRect(x: 0, y: 0, width: 1280, height: 800) },
+            windowFactory: { plan in
+                let spy = SpaceFixtureWindowSpy(plan: plan)
+                windowSpies.append(spy)
+                return spy
+            },
+            fullscreenScheduler: { delay, action in
+                scheduledDelays.append(delay)
+                scheduledActions.append(action)
+            },
+            applicationAccessibilityElementsPublisher: { elements in
+                publishedAccessibilityElements.append(elements.compactMap { $0 as? String })
+            }
+        )
+
+        coordinator.launch()
+
+        XCTAssertEqual(scheduledDelays, [4_000, 12_000])
+        XCTAssertEqual(publishedAccessibilityElements, [["ax-element-1", "ax-element-2"]])
+
+        scheduledActions[0]()
+
+        XCTAssertEqual(windowSpies[1].enterFullScreenCallCount, 1)
+        XCTAssertEqual(publishedAccessibilityElements, [
+            ["ax-element-1", "ax-element-2"],
+            ["ax-element-1", "ax-element-2"]
+        ])
+
+        scheduledActions[1]()
+
+        XCTAssertEqual(publishedAccessibilityElements, [
+            ["ax-element-1", "ax-element-2"],
+            ["ax-element-1", "ax-element-2"],
+            []
+        ])
+    }
+
+    @MainActor
     func testSpaceFixtureWindowCoordinatorSuppressesApplicationAccessibilityChildrenWhenConfigured() {
         let configuration = SpaceFixtureLaunchConfiguration(
             windowCount: 2,
@@ -123,6 +241,8 @@ extension FlowTabTests {
         )
 
         var windowSpies: [SpaceFixtureWindowSpy] = []
+        var scheduledDelays: [Int] = []
+        var scheduledActions: [(@MainActor () -> Void)] = []
         var publishedAccessibilityElements: [[String]] = []
 
         let coordinator = SpaceFixtureWindowCoordinator(
@@ -133,6 +253,10 @@ extension FlowTabTests {
                 windowSpies.append(spy)
                 return spy
             },
+            fullscreenScheduler: { delay, action in
+                scheduledDelays.append(delay)
+                scheduledActions.append(action)
+            },
             applicationAccessibilityElementsPublisher: { elements in
                 publishedAccessibilityElements.append(elements.compactMap { $0 as? String })
             }
@@ -141,7 +265,12 @@ extension FlowTabTests {
         coordinator.launch()
 
         XCTAssertEqual(windowSpies.count, 2)
-        XCTAssertEqual(publishedAccessibilityElements, [[]])
+        XCTAssertEqual(publishedAccessibilityElements, [["ax-element-1", "ax-element-2"]])
+        XCTAssertEqual(scheduledDelays, [5000])
+
+        scheduledActions[0]()
+
+        XCTAssertEqual(publishedAccessibilityElements, [["ax-element-1", "ax-element-2"], []])
     }
 
     @MainActor

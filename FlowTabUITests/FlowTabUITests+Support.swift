@@ -1,5 +1,4 @@
 import AppKit
-import ApplicationServices
 import Foundation
 import XCTest
 
@@ -101,30 +100,161 @@ private func shouldActivateFlowTabUITestApplicationAfterLaunch(
 
 func launchFlowTabUITestApplication(
     _ app: XCUIApplication,
-    environment: [String: String] = ProcessInfo.processInfo.environment
+    environment: [String: String] = ProcessInfo.processInfo.environment,
+    traceLabel: String? = nil
 ) {
+    logFlowTabUITestLaunchTrace(traceLabel, phase: "before app.launch")
     app.launch()
+    logFlowTabUITestLaunchTrace(traceLabel, phase: "after app.launch")
     if shouldActivateFlowTabUITestApplicationAfterLaunch(environment: environment) {
+        logFlowTabUITestLaunchTrace(traceLabel, phase: "before app.activate")
         app.activate()
         _ = app.wait(for: .runningForeground, timeout: 12)
+        logFlowTabUITestLaunchTrace(traceLabel, phase: "after app.activate")
     }
 }
 
 func waitForFlowTabUITestApplicationToBecomeReady(
     _ app: XCUIApplication,
     timeout: TimeInterval,
-    environment: [String: String] = ProcessInfo.processInfo.environment
+    environment: [String: String] = ProcessInfo.processInfo.environment,
+    traceLabel: String? = nil
 ) -> Bool {
+    logFlowTabUITestLaunchTrace(traceLabel, phase: "before wait runningForeground")
     if app.wait(for: .runningForeground, timeout: timeout) {
+        logFlowTabUITestLaunchTrace(traceLabel, phase: "after wait runningForeground")
         return true
     }
 
     guard shouldActivateFlowTabUITestApplicationAfterLaunch(environment: environment) else {
+        logFlowTabUITestLaunchTrace(traceLabel, phase: "wait failed without activation fallback")
         return false
     }
 
+    logFlowTabUITestLaunchTrace(traceLabel, phase: "before fallback app.activate")
     app.activate()
-    return app.wait(for: .runningForeground, timeout: min(timeout, 4))
+    let becameReady = app.wait(for: .runningForeground, timeout: min(timeout, 4))
+    logFlowTabUITestLaunchTrace(traceLabel, phase: "after fallback app.activate")
+    return becameReady
+}
+
+private func logFlowTabUITestLaunchTrace(_ label: String?, phase: String) {
+    guard let label else { return }
+    let frontmost = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "nil"
+    logFlowTabUITestTrace("[\(label)] \(phase) frontmost=\(frontmost)")
+}
+
+func logFlowTabUITestTrace(_ message: String) {
+    let line = "[FlowTabUITests][SpaceTrace] \(message)\n"
+    if let data = line.data(using: .utf8) {
+        FileHandle.standardError.write(data)
+    }
+}
+
+enum FlowTabUITestSwitcherTrigger {
+    case global
+    case inApp
+    case search
+
+    var notificationName: Notification.Name {
+        switch self {
+        case .global:
+            return Notification.Name("io.github.potato-dumplings.flowtab.ui-test.open-global-switcher")
+        case .inApp:
+            return Notification.Name("io.github.potato-dumplings.flowtab.ui-test.open-in-app-window-switcher")
+        case .search:
+            return Notification.Name("io.github.potato-dumplings.flowtab.ui-test.open-window-search")
+        }
+    }
+}
+
+enum FlowTabUITestSwitcherCommand {
+    case inAppForward
+    case advanceDown
+    case advanceRight
+    case searchQuery
+    case selectApp
+    case searchConfirm
+    case confirm
+
+    var notificationName: Notification.Name {
+        switch self {
+        case .inAppForward:
+            return Notification.Name(
+                "io.github.potato-dumplings.flowtab.ui-test.switcher-command.in-app-forward"
+            )
+        case .advanceDown:
+            return Notification.Name(
+                "io.github.potato-dumplings.flowtab.ui-test.switcher-command.advance-down"
+            )
+        case .advanceRight:
+            return Notification.Name(
+                "io.github.potato-dumplings.flowtab.ui-test.switcher-command.advance-right"
+            )
+        case .searchQuery:
+            return Notification.Name(
+                "io.github.potato-dumplings.flowtab.ui-test.switcher-command.search-query"
+            )
+        case .selectApp:
+            return Notification.Name(
+                "io.github.potato-dumplings.flowtab.ui-test.switcher-command.select-app"
+            )
+        case .searchConfirm:
+            return Notification.Name(
+                "io.github.potato-dumplings.flowtab.ui-test.switcher-command.search-confirm"
+            )
+        case .confirm:
+            return Notification.Name(
+                "io.github.potato-dumplings.flowtab.ui-test.switcher-command.confirm"
+            )
+        }
+    }
+}
+
+enum FlowTabUITestSwitcherCommandPayload {
+    static let url: URL = FileManager.default.temporaryDirectory
+        .appendingPathComponent("flowtab-uitest-switcher-command-\(UUID().uuidString).txt")
+
+    static var launchArguments: [String] {
+        [
+            "--flowtab-ui-switcher-command-payload-path",
+            url.path
+        ]
+    }
+
+    static func write(_ value: String) throws {
+        try value.write(to: url, atomically: true, encoding: .utf8)
+    }
+}
+
+func postFlowTabUITestSwitcherTrigger(
+    _ trigger: FlowTabUITestSwitcherTrigger,
+    traceLabel: String
+) {
+    logFlowTabUITestLaunchTrace(traceLabel, phase: "before notification \(trigger)")
+    CFNotificationCenterPostNotification(
+        CFNotificationCenterGetDarwinNotifyCenter(),
+        CFNotificationName(trigger.notificationName.rawValue as CFString),
+        nil,
+        nil,
+        true
+    )
+    logFlowTabUITestLaunchTrace(traceLabel, phase: "after notification \(trigger)")
+}
+
+func postFlowTabUITestSwitcherCommand(
+    _ command: FlowTabUITestSwitcherCommand,
+    traceLabel: String
+) {
+    logFlowTabUITestLaunchTrace(traceLabel, phase: "before command notification \(command)")
+    CFNotificationCenterPostNotification(
+        CFNotificationCenterGetDarwinNotifyCenter(),
+        CFNotificationName(command.notificationName.rawValue as CFString),
+        nil,
+        nil,
+        true
+    )
+    logFlowTabUITestLaunchTrace(traceLabel, phase: "after command notification \(command)")
 }
 
 func terminateFlowTabUITestApplicationIfRunning(
@@ -150,6 +280,64 @@ extension FlowTabUITests {
     func makeApp(additionalArguments: [String] = []) -> XCUIApplication {
         makeFlowTabUITestApplication(additionalArguments: additionalArguments)
     }
+    func postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+        _ trigger: FlowTabUITestSwitcherTrigger,
+        traceLabel: String,
+        timeout: TimeInterval = 4
+    ) {
+        let logSnapshot = makeRuntimeLogFileSnapshot()
+        postFlowTabUITestSwitcherTrigger(trigger, traceLabel: traceLabel)
+        waitForRuntimeLogFiles(
+            containing: [
+                "completed switcher trigger notification name=\(trigger.notificationName.rawValue) presented=1"
+            ],
+            since: logSnapshot,
+            timeout: timeout
+        )
+    }
+
+    func postFlowTabUITestSwitcherCommandAndWaitForDelivery(
+        _ command: FlowTabUITestSwitcherCommand,
+        traceLabel: String,
+        timeout: TimeInterval = 4
+    ) {
+        let logSnapshot = makeRuntimeLogFileSnapshot()
+        postFlowTabUITestSwitcherCommand(command, traceLabel: traceLabel)
+        waitForRuntimeLogFiles(
+            containing: [
+                "completed switcher command notification name=\(command.notificationName.rawValue)"
+            ],
+            since: logSnapshot,
+            timeout: timeout
+        )
+    }
+
+    func postFlowTabUITestSwitcherSearchQueryAndWaitForDelivery(
+        _ query: String,
+        traceLabel: String,
+        timeout: TimeInterval = 4
+    ) throws {
+        try FlowTabUITestSwitcherCommandPayload.write(query)
+        postFlowTabUITestSwitcherCommandAndWaitForDelivery(
+            .searchQuery,
+            traceLabel: traceLabel,
+            timeout: timeout
+        )
+    }
+
+    func postFlowTabUITestSelectSwitcherAppAndWaitForDelivery(
+        bundleIdentifier: String,
+        traceLabel: String,
+        timeout: TimeInterval = 4
+    ) throws {
+        try FlowTabUITestSwitcherCommandPayload.write(bundleIdentifier)
+        postFlowTabUITestSwitcherCommandAndWaitForDelivery(
+            .selectApp,
+            traceLabel: traceLabel,
+            timeout: timeout
+        )
+    }
+
     func settingsReminderToggle(in app: XCUIApplication) -> XCUIElement {
         toggleElement(in: app, identifier: Identifier.permissionReminderSwitch)
     }

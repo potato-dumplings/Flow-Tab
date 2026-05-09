@@ -31,6 +31,74 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
+    func testRuntimeSnapshotProviderSkipsRemoteAXScanWhenPublicAXAlreadyCoversRealCGWindows() {
+        let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
+        let desktopSiblingBounds = CGRect(x: 160, y: 140, width: 960, height: 680)
+
+        let shouldScanRemoteAX = RuntimeSnapshotProvider.shouldIncludeRemoteAXWindowsForTesting(
+            allCGWindows: [
+                .init(
+                    id: 240_101,
+                    title: "Notes Inbox",
+                    bounds: desktopSiblingBounds,
+                    isOnscreen: false,
+                    spaceIDs: [1]
+                ),
+                .init(
+                    id: 240_001,
+                    title: nil,
+                    bounds: fullscreenBounds,
+                    isOnscreen: true,
+                    spaceIDs: [1]
+                ),
+                .init(
+                    id: 243_747,
+                    title: "Notes Focus",
+                    bounds: fullscreenBounds,
+                    isOnscreen: true,
+                    spaceIDs: [11_679]
+                )
+            ],
+            publicSwitchableWindowCount: 2
+        )
+
+        XCTAssertFalse(shouldScanRemoteAX)
+    }
+
+    func testRuntimeSnapshotProviderUsesRemoteAXScanWhenPublicAXMissesRealCGWindow() {
+        let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
+        let desktopSiblingBounds = CGRect(x: 160, y: 140, width: 960, height: 680)
+
+        let shouldScanRemoteAX = RuntimeSnapshotProvider.shouldIncludeRemoteAXWindowsForTesting(
+            allCGWindows: [
+                .init(
+                    id: 240_101,
+                    title: "Notes Inbox",
+                    bounds: desktopSiblingBounds,
+                    isOnscreen: false,
+                    spaceIDs: [1]
+                ),
+                .init(
+                    id: 240_001,
+                    title: nil,
+                    bounds: fullscreenBounds,
+                    isOnscreen: true,
+                    spaceIDs: [1]
+                ),
+                .init(
+                    id: 243_747,
+                    title: "Notes Focus",
+                    bounds: fullscreenBounds,
+                    isOnscreen: true,
+                    spaceIDs: [11_679]
+                )
+            ],
+            publicSwitchableWindowCount: 1
+        )
+
+        XCTAssertTrue(shouldScanRemoteAX)
+    }
+
     func testRuntimeSnapshotProviderRebindsFullscreenWrapperAXMatchToOffDesktopContent() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
 
@@ -343,6 +411,83 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(entries.map(\.spaceIDs), [[1], [11_679]])
         XCTAssertEqual(entries.map(\.hasActivationHandle), [true, true])
         XCTAssertEqual(entries.map(\.lastConfirmationSource), [.publicExactMatch, .privateExactBridge])
+    }
+
+    func testRuntimeSnapshotProviderOrdersVisibleFullscreenSiblingBeforeHiddenDesktopSibling() {
+        let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
+        let desktopSiblingBounds = CGRect(x: 160, y: 140, width: 960, height: 680)
+
+        let entries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+            axWindows: [
+                .init(
+                    id: "ax:18405:0",
+                    index: 0,
+                    title: "Notes Inbox",
+                    bounds: desktopSiblingBounds,
+                    bridgedCGWindowID: 240_101
+                ),
+                .init(
+                    id: "ax:18405:947",
+                    index: 947,
+                    title: "Notes Focus",
+                    bounds: fullscreenBounds,
+                    bridgedCGWindowID: 243_747
+                )
+            ],
+            cgWindows: [
+                .init(
+                    id: 240_101,
+                    title: "Notes Inbox",
+                    bounds: desktopSiblingBounds,
+                    isOnscreen: false,
+                    spaceIDs: [1]
+                ),
+                .init(
+                    id: 240_001,
+                    title: "Notes Focus",
+                    bounds: fullscreenBounds,
+                    isOnscreen: false,
+                    spaceIDs: [1]
+                ),
+                .init(
+                    id: 243_747,
+                    title: "Notes Focus",
+                    bounds: fullscreenBounds,
+                    isOnscreen: true,
+                    spaceIDs: [11_679]
+                )
+            ],
+            pid: 18_405,
+            appName: "Notes Fixture"
+        )
+
+        XCTAssertEqual(entries.map(\.cgWindowID), [243_747, 240_101])
+        XCTAssertEqual(entries.map(\.title), ["Notes Focus", "Notes Inbox"])
+        XCTAssertEqual(entries.map(\.spaceIDs), [[11_679], [1]])
+        XCTAssertEqual(entries.map(\.hasActivationHandle), [true, true])
+
+        let windows = entries.enumerated().map { index, entry in
+            WindowCandidate(
+                id: entry.windowID,
+                title: entry.title,
+                isMinimized: false,
+                lastActiveAt: Double(100 - index)
+            )
+        }
+        var session = SwitcherSession(
+            apps: [
+                AppSwitchCandidate(
+                    id: "com.example.fixture.notes",
+                    displayName: "Notes Fixture",
+                    groupID: "notes",
+                    lastActiveAt: 100,
+                    windows: windows
+                )
+            ]
+        )
+
+        XCTAssertTrue(session.enterWindowCycle(allowSingleWindow: false))
+        XCTAssertEqual(session.selectedWindow?.title, "Notes Focus")
     }
 
     func testRuntimeAXRemoteWindowResolverDeduplicatesRemoteWindowsByCGWindowID() {

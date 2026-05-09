@@ -178,14 +178,19 @@
   步骤：以 `app` 默认范围启动搜索态 switcher，输入目标 fixture app 的搜索 token，等待真实 `flowtab.switcher.search.app.*` 结果出现后按回车确认。
   验证：目标 fixture app 成为 frontmost app，证明真实 runtime 搜索结果可以按 app-scope 路径激活正确应用。
 
+- `testInAppWindowSwitcherControlTabRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithoutAppAXWindows`
+  场景：同一个 fixture app 同时拥有 normal desktop window 和 full-screen Space-backed sibling，且 app-level AX children 被 suppress，验证 Control+Tab 的 focused-window session 与全局入口使用同一套 runtime window truth。
+  步骤：fixture 先让目标 app 处于 full-screen sibling 所在 Space；启动 In-App window switcher 后按 `Control + Tab` 选择 normal sibling 并确认；随后从 normal sibling 起点重新启动 FlowTab，再按 `Control + Tab` 选择 full-screen sibling 并确认。
+  验证：两次确认后 frontmost bundle 均为目标 fixture app，且 frontmost CG window number 分别精确等于选中的 normal 与 full-screen `CGWindowID`。
+
 - `testSwitcherPanelOptionTabWindowStateRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithoutAppAXWindows`
   场景：同一个 fixture app 同时拥有 normal desktop window 和 full-screen Space-backed sibling，且 app-level AX children 被 suppress，验证 global Option+Tab 进入 app window state 后仍使用 runtime truth。
-  步骤：打开标准 switcher，选中目标 app，进入 window state，先选择 full-screen sibling 并确认；随后重新启动 FlowTab，再选择 normal sibling 并确认。
-  验证：两次确认后 frontmost bundle 均为目标 fixture app，且 frontmost CG window number 分别精确等于选中的 full-screen 与 normal `CGWindowID`。
+  步骤：fixture 先让目标 app 处于 full-screen sibling 所在 Space；打开标准 switcher，选中目标 app，进入 window state，先选择 normal sibling 并确认；随后重新启动 FlowTab，再选择 full-screen sibling 并确认。
+  验证：两次确认后 frontmost bundle 均为目标 fixture app，且 frontmost CG window number 分别精确等于选中的 normal 与 full-screen `CGWindowID`。
 
 - `testSwitcherPanelWindowSearchRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithoutAppAXWindows`
   场景：同一个非配合 fixture app 下 normal desktop sibling 和 full-screen Space sibling 都应该能被 window-scope search 找到并激活。
-  步骤：以 `window` 默认范围启动搜索态 switcher，先搜索 full-screen sibling 标题并确认；随后重新启动 FlowTab，再搜索 normal sibling 标题并确认。
+  步骤：fixture 先让目标 app 处于 full-screen sibling 所在 Space；以 `window` 默认范围启动搜索态 switcher，先搜索 normal sibling 标题并确认；随后重新启动 FlowTab，再搜索 full-screen sibling 标题并确认。
   验证：搜索结果携带真实 `CGWindowID`，确认后系统切到对应目标窗口所在 Space，frontmost CG window number 精确等于搜索结果中的目标窗口。
 
 - `testSwitcherPanelQuitShortcutKeepsRealFixtureAppUntilProcessTerminates`

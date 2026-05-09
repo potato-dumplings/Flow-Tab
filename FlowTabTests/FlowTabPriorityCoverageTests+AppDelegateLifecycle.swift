@@ -91,6 +91,79 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testAppDelegateLaunchCanSuppressHomeWindowForUITestTriggerListener() async {
+        guard let userDefaults = makeIsolatedUserDefaults() else { return }
+
+        let previousHooks = AppDelegate.testHooks
+        let previousActivationOverride = AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride
+        let previousAXTrusted = AccessibilityPermissionChecker.isTrustedOverrideForTesting
+        let previousAXRequest = AccessibilityPermissionChecker.requestPermissionOverrideForTesting
+        let previousLaunchArguments = FlowTabTestLaunchOptions.argumentsOverrideForTesting
+        let previousSelectedTab = HomeTabState.shared.selectedTab
+        let hotkeyFactory = SpyHotkeyMonitorFactory()
+        let takeoverController = SpyCommandTabTakeoverController()
+        let stressRunner = SpyStressRunner()
+        defer {
+            AppDelegate.testHooks = previousHooks
+            AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride = previousActivationOverride
+            AccessibilityPermissionChecker.isTrustedOverrideForTesting = previousAXTrusted
+            AccessibilityPermissionChecker.requestPermissionOverrideForTesting = previousAXRequest
+            FlowTabTestLaunchOptions.argumentsOverrideForTesting = previousLaunchArguments
+            HomeTabState.shared.selectedTab = previousSelectedTab
+            clearIsolatedUserDefaults(userDefaults)
+        }
+
+        let openHome = expectation(description: "home stays closed")
+        openHome.isInverted = true
+        HomeTabState.shared.selectedTab = .settings
+        FlowTabTestLaunchOptions.argumentsOverrideForTesting = [
+            "FlowTab",
+            "--flowtab-ui-listen-switcher-trigger",
+            "--flowtab-ui-suppress-home-on-launch"
+        ]
+        AccessibilityPermissionChecker.isTrustedOverrideForTesting = { true }
+        AccessibilityPermissionChecker.requestPermissionOverrideForTesting = {
+            XCTFail("Launch with trusted accessibility should not prompt")
+            return true
+        }
+        AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride = {
+            openHome.fulfill()
+        }
+        AppDelegate.testHooks = AppDelegate.TestHooks(
+            userDefaults: userDefaults,
+            makePanelController: nil,
+            makeHotkeyMonitor: { configuration, signature, forwardHotkeyID, backwardHotkeyID in
+                hotkeyFactory.make(
+                    configuration: configuration,
+                    signature: signature,
+                    forwardHotkeyID: forwardHotkeyID,
+                    backwardHotkeyID: backwardHotkeyID
+                )
+            },
+            commandTabTakeoverController: takeoverController,
+            stressRunner: stressRunner
+        )
+
+        let delegate = AppDelegate()
+        delegate.applicationDidFinishLaunching(
+            Notification(name: NSApplication.didFinishLaunchingNotification)
+        )
+
+        await fulfillment(of: [openHome], timeout: 0.25)
+        XCTAssertEqual(HomeTabState.shared.selectedTab, .settings)
+        XCTAssertTrue(delegate.hasPanelControllerForTesting)
+        XCTAssertTrue(delegate.hasMainHotkeyMonitorForTesting)
+        XCTAssertTrue(delegate.hasInAppHotkeyMonitorForTesting)
+        XCTAssertTrue(delegate.hasHotkeyObserverForTesting)
+        XCTAssertTrue(delegate.hasAppVisibilityObserverForTesting)
+        XCTAssertTrue(delegate.hasLanguageObserverForTesting)
+        XCTAssertTrue(delegate.hasStatusItemForTesting)
+        XCTAssertEqual(stressRunner.startCallCount, 1)
+        XCTAssertEqual(takeoverController.reconcileCalls, [false])
+        XCTAssertEqual(hotkeyFactory.records.map(\.signature), [0x46544142, 0x4654574E])
+    }
+
+    @MainActor
     func testAppDelegateLaunchSkipsAccessibilityPromptWhenAlreadyPromptedOrReminderDisabled() {
         guard let userDefaults = makeIsolatedUserDefaults() else { return }
 

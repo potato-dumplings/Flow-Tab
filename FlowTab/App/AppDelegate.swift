@@ -32,7 +32,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         installStatusItem()
         requestAccessibilityPermissionIfNeeded()
-        AppWindowCoordinator.openHome()
+        if !FlowTabTestLaunchOptions.suppressesHomeWindowOnLaunch {
+            AppWindowCoordinator.openHome()
+        }
         resolvedStressRunner.startIfNeeded()
         FlowTabUITestBootstrapper.presentInitialUIIfNeeded(panelController: panelController)
     }

@@ -22,6 +22,18 @@ enum FlowTabTestLaunchOptions {
             || arguments.contains("--flowtab-ui-open-in-app-window-switcher")
     }
 
+    static var listensForSwitcherTriggerNotifications: Bool {
+        arguments.contains("--flowtab-ui-listen-switcher-trigger")
+    }
+
+    static var suppressesHomeWindowOnLaunch: Bool {
+        arguments.contains("--flowtab-ui-suppress-home-on-launch")
+    }
+
+    static var suppressesPanelApplicationActivation: Bool {
+        arguments.contains("--flowtab-ui-suppress-panel-activation")
+    }
+
     static var opensInAppWindowSwitcherOnLaunch: Bool {
         arguments.contains("--flowtab-ui-open-in-app-window-switcher")
     }
@@ -32,6 +44,10 @@ enum FlowTabTestLaunchOptions {
 
     static var frontmostBundleIdentifierOverride: String? {
         value(after: "--flowtab-ui-frontmost-bundle-id")
+    }
+
+    static var switcherCommandPayloadPath: String? {
+        value(after: "--flowtab-ui-switcher-command-payload-path")
     }
 
     static var accessibilityTrustedOverride: Bool? {
@@ -76,7 +92,7 @@ enum FlowTabTestLaunchOptions {
     }
 
     static var showsSwitcherDiagnostics: Bool {
-        isRunningUITests && opensSwitcherOnLaunch
+        isRunningUITests && (opensSwitcherOnLaunch || listensForSwitcherTriggerNotifications)
     }
 
     static var tabSwitchStressDurationSeconds: Double {

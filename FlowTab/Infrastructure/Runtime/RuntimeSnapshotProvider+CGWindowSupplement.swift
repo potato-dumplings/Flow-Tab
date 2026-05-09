@@ -39,6 +39,7 @@ extension RuntimeSnapshotProvider {
                 axWindow: nil,
                 frame: cgWindow.bounds,
                 spaceIDs: cgWindow.spaceIDs,
+                isOnscreen: cgWindow.isOnscreen,
                 allowsPublicAXRecovery: true,
                 hasStickyBinding: false,
                 lastConfirmationSource: nil

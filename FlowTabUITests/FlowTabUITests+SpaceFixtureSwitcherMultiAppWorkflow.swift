@@ -191,8 +191,12 @@ extension FlowTabUITests {
         diagnosticsSummary: XCUIElement,
         maxMoves: Int = 40
     ) {
-        for _ in 0..<maxMoves {
-            if switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selected")
+        for attempt in 0..<maxMoves {
+            let selectedAppID = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selected")
+            logFlowTabUITestTrace(
+                "[selectWorkflowApp.\(attempt + 1)] target=\(workflowApp.identity.bundleIdentifier) selected=\(selectedAppID)"
+            )
+            if selectedAppID
                 == workflowApp.identity.bundleIdentifier {
                 return
             }
@@ -688,6 +692,39 @@ extension FlowTabUITests {
         let titles = rawValue[separatorRange.upperBound...]
         guard !titles.isEmpty else { return [] }
         return titles.split(separator: "|").map(String.init)
+    }
+
+    func assertSwitcherSelectedWindowTitle(
+        _ expectedTitle: String,
+        in app: XCUIApplication,
+        diagnosticsSummary: XCUIElement,
+        timeout: TimeInterval = 4,
+        message: String
+    ) {
+        let deadline = Date().addingTimeInterval(timeout)
+        var latestTitle = switcherPanelDiagnosticsValue(
+            diagnosticsSummary,
+            key: "selectedWindowTitle"
+        )
+        repeat {
+            if latestTitle == expectedTitle {
+                return
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+            latestTitle = switcherPanelDiagnosticsValue(
+                diagnosticsSummary,
+                key: "selectedWindowTitle"
+            )
+        } while Date() < deadline
+
+        XCTFail(
+            """
+            \(message)
+            Expected selected window title \(expectedTitle), found \(latestTitle).
+
+            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
+            """
+        )
     }
 
     func switcherPanelDiagnosticsValue(

@@ -7,6 +7,7 @@ private enum FlowTabUITestCGWindowDefaults {
     static let minimumValidWindowWidth: CGFloat = 80
     static let minimumValidWindowHeight: CGFloat = 60
     static let minimumValidWindowArea: CGFloat = 20_000
+    static let fullscreenSpaceWindowScreenCoverageRatio: CGFloat = 0.8
     static let visibleAlphaThreshold = 0.001
     static let standardBufferedStoreType = 1
 }
@@ -14,6 +15,7 @@ private enum FlowTabUITestCGWindowDefaults {
 struct WorkflowCGWindowObservation: Equatable {
     let number: CGWindowID
     let title: String?
+    let frame: CGRect?
 
     func matches(number expectedNumber: CGWindowID?, title expectedTitle: String?) -> Bool {
         if let expectedNumber, number == expectedNumber {
@@ -23,6 +25,25 @@ struct WorkflowCGWindowObservation: Equatable {
             return true
         }
         return false
+    }
+
+    func matchesWorkflowSpaceWindow(title expectedTitle: String) -> Bool {
+        if title == expectedTitle {
+            return true
+        }
+        return title == nil && isFullscreenSpaceSized
+    }
+
+    var isFullscreenSpaceSized: Bool {
+        guard let frame else { return false }
+        guard let largestScreenFrame = NSScreen.screens
+            .map({ $0.frame.standardized })
+            .max(by: { ($0.width * $0.height) < ($1.width * $1.height) })
+        else {
+            return false
+        }
+        return frame.width >= largestScreenFrame.width * FlowTabUITestCGWindowDefaults.fullscreenSpaceWindowScreenCoverageRatio
+            && frame.height >= largestScreenFrame.height * FlowTabUITestCGWindowDefaults.fullscreenSpaceWindowScreenCoverageRatio
     }
 }
 
@@ -143,6 +164,179 @@ extension FlowTabUITests {
         return false
     }
 
+    func waitForFrontmostWorkflowSpaceCGWindow(
+        title: String,
+        app workflowApp: SpaceFixtureResolvedWorkflow.App,
+        timeout: TimeInterval
+    ) -> WorkflowCGWindowObservation? {
+        let deadline = Date().addingTimeInterval(timeout)
+        var latestFrontmostBundleIdentifier: String?
+        var latestWindowNumber: CGWindowID?
+        var latestTitle: String?
+        var latestFrame: CGRect?
+        repeat {
+            latestFrontmostBundleIdentifier = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+            let latestCGWindow = topmostOnScreenCGWindow(
+                forBundleIdentifier: workflowApp.identity.bundleIdentifier
+            )
+            latestWindowNumber = latestCGWindow?.number
+            latestTitle = latestCGWindow?.title
+            latestFrame = latestCGWindow?.frame
+
+            if latestFrontmostBundleIdentifier == workflowApp.identity.bundleIdentifier,
+               let latestCGWindow,
+               latestCGWindow.matchesWorkflowSpaceWindow(title: title) {
+                return latestCGWindow
+            }
+
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+
+        XCTFail(
+            """
+            Expected frontmost workflow Space window \(workflowApp.appName) / \(title), \
+            found frontmost bundle \(latestFrontmostBundleIdentifier ?? "nil") \
+            with CG title \(latestTitle ?? "nil") \
+            window number \(latestWindowNumber.map(String.init) ?? "nil") \
+            and frame \(workflowCGFrameDescription(latestFrame)).
+            """
+        )
+        return nil
+    }
+
+    func waitForActiveSpaceWorkflowCGWindow(
+        windowNumber: CGWindowID,
+        title: String,
+        app workflowApp: SpaceFixtureResolvedWorkflow.App,
+        timeout: TimeInterval
+    ) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        var latestWindowNumber: CGWindowID?
+        var latestTitle: String?
+        repeat {
+            let latestCGWindow = topmostOnScreenCGWindow(
+                forBundleIdentifier: workflowApp.identity.bundleIdentifier
+            )
+            latestWindowNumber = latestCGWindow?.number
+            latestTitle = latestCGWindow?.title
+            if latestCGWindow?.number == windowNumber {
+                return true
+            }
+
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+
+        XCTFail(
+            """
+            Expected active-space CG window \(workflowApp.appName) / \(title) / \(windowNumber), \
+            found CG title \(latestTitle ?? "nil") \
+            and window number \(latestWindowNumber.map(String.init) ?? "nil").
+            """
+        )
+        return false
+    }
+
+    func waitForActiveSpaceWorkflowCGWindow(
+        title: String,
+        app workflowApp: SpaceFixtureResolvedWorkflow.App,
+        timeout: TimeInterval
+    ) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        var latestWindowNumber: CGWindowID?
+        var latestTitle: String?
+        var latestFrame: CGRect?
+        repeat {
+            let latestCGWindow = topmostOnScreenCGWindow(
+                forBundleIdentifier: workflowApp.identity.bundleIdentifier
+            )
+            latestWindowNumber = latestCGWindow?.number
+            latestTitle = latestCGWindow?.title
+            latestFrame = latestCGWindow?.frame
+            if let latestCGWindow,
+               latestCGWindow.matchesWorkflowSpaceWindow(title: title) {
+                return true
+            }
+
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+
+        XCTFail(
+            """
+            Expected active-space CG window \(workflowApp.appName) / \(title), \
+            found CG title \(latestTitle ?? "nil") \
+            window number \(latestWindowNumber.map(String.init) ?? "nil") \
+            and frame \(workflowCGFrameDescription(latestFrame)).
+            """
+        )
+        return false
+    }
+
+    func waitForTopmostWorkflowCGWindow(
+        title: String,
+        app workflowApp: SpaceFixtureResolvedWorkflow.App,
+        timeout: TimeInterval
+    ) -> WorkflowCGWindowObservation? {
+        let deadline = Date().addingTimeInterval(timeout)
+        var latestFrontmostBundleIdentifier: String?
+        var latestWindowNumber: CGWindowID?
+        var latestTitle: String?
+        repeat {
+            latestFrontmostBundleIdentifier = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+            let latestCGWindow = topmostOnScreenCGWindow(
+                forBundleIdentifier: workflowApp.identity.bundleIdentifier
+            )
+            latestWindowNumber = latestCGWindow?.number
+            latestTitle = latestCGWindow?.title
+            if latestFrontmostBundleIdentifier == workflowApp.identity.bundleIdentifier,
+               latestCGWindow != nil,
+               (
+                   latestCGWindow?.title == title
+                       || workflowWindowTitleIsObservable(title, app: workflowApp)
+               ) {
+                return latestCGWindow
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+
+        XCTFail(
+            """
+            Expected topmost CG window \(workflowApp.appName) / \(title), \
+            found frontmost bundle \(latestFrontmostBundleIdentifier ?? "nil") \
+            with CG title \(latestTitle ?? "nil") \
+            and window number \(latestWindowNumber.map(String.init) ?? "nil").
+            """
+        )
+        return nil
+    }
+
+    func logWorkflowSpaceObservation(
+        _ stage: String,
+        app workflowApp: SpaceFixtureResolvedWorkflow.App
+    ) {
+        logFlowTabUITestTrace(workflowSpaceObservationDescription(stage, app: workflowApp))
+    }
+
+    func workflowSpaceObservationDescription(
+        _ stage: String,
+        app workflowApp: SpaceFixtureResolvedWorkflow.App
+    ) -> String {
+        let frontmost = NSWorkspace.shared.frontmostApplication?.bundleIdentifier ?? "nil"
+        let activeTitle = activeWindowTitle(forBundleIdentifier: workflowApp.identity.bundleIdentifier) ?? "nil"
+        let onScreenWindows = workflowCGWindowDebugDescriptions(
+            bundleIdentifier: workflowApp.identity.bundleIdentifier,
+            options: [.optionOnScreenOnly, .excludeDesktopElements]
+        )
+        let allWindows = workflowCGWindowDebugDescriptions(
+            bundleIdentifier: workflowApp.identity.bundleIdentifier,
+            options: [.optionAll, .excludeDesktopElements]
+        )
+        return """
+        [\(stage)] frontmost=\(frontmost) target=\(workflowApp.identity.bundleIdentifier) \
+        activeTitle=\(activeTitle) onScreen=[\(onScreenWindows.joined(separator: ";"))] \
+        all=[\(allWindows.joined(separator: ";"))]
+        """
+    }
+
     private func frontmostCGWindowTitle(forPID pid: pid_t) -> String? {
         frontmostCGWindow(forPID: pid)?.title
     }
@@ -175,14 +369,43 @@ extension FlowTabUITests {
             guard let number = cgWindowNumber(window[kCGWindowNumber as String]) else {
                 continue
             }
+            let frame = cgWindowFrame(window)
             let title = (window[kCGWindowName as String] as? String)?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             return WorkflowCGWindowObservation(
                 number: number,
-                title: title?.isEmpty == false ? title : nil
+                title: title?.isEmpty == false ? title : nil,
+                frame: frame
             )
         }
         return nil
+    }
+
+    private func workflowCGWindowDebugDescriptions(
+        bundleIdentifier: String,
+        options: CGWindowListOption
+    ) -> [String] {
+        guard let runningApp = NSRunningApplication
+            .runningApplications(withBundleIdentifier: bundleIdentifier)
+            .first(where: { !$0.isTerminated })
+        else {
+            return ["pid=nil"]
+        }
+        guard let windows = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
+            return ["windows=nil"]
+        }
+
+        return windows.compactMap { window -> String? in
+            guard cgWindowPID(window[kCGWindowOwnerPID as String]) == runningApp.processIdentifier else {
+                return nil
+            }
+            guard cgWindowPassesValidityConstraints(window) else { return nil }
+            let number = cgWindowNumber(window[kCGWindowNumber as String]).map(String.init) ?? "nil"
+            let title = (window[kCGWindowName as String] as? String)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let frame = workflowCGFrameDescription(cgWindowFrame(window))
+            return "\(number):\(title?.isEmpty == false ? title! : "nil")@\(frame)"
+        }
     }
 
     private func frontmostCGWindow(
@@ -241,7 +464,8 @@ extension FlowTabUITests {
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             let observation = WorkflowCGWindowObservation(
                 number: number,
-                title: title?.isEmpty == false ? title : nil
+                title: title?.isEmpty == false ? title : nil,
+                frame: cgWindowFrame(window)
             )
             if observation.matches(number: expectedWindowNumber, title: expectedTitle) {
                 return observation
@@ -286,6 +510,17 @@ extension FlowTabUITests {
             return false
         }
         return bounds.width * bounds.height >= FlowTabUITestCGWindowDefaults.minimumValidWindowArea
+    }
+
+    private func cgWindowFrame(_ window: [String: Any]) -> CGRect? {
+        (window[kCGWindowBounds as String] as? [String: Any])
+            .flatMap { CGRect(dictionaryRepresentation: $0 as CFDictionary) }?
+            .standardized
+    }
+
+    private func workflowCGFrameDescription(_ frame: CGRect?) -> String {
+        guard let frame else { return "nil" }
+        return "\(Int(frame.origin.x)),\(Int(frame.origin.y)),\(Int(frame.width))x\(Int(frame.height))"
     }
 
     private func cgWindowNumber(_ value: Any?) -> CGWindowID? {

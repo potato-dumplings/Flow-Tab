@@ -19,6 +19,8 @@ final class SpaceFixtureWindowCoordinator {
     typealias ActivationHandler = () -> Void
     typealias ApplicationAccessibilityElementsPublisher = ([Any]) -> Void
 
+    private static let defaultApplicationAccessibilitySuppressionDelayMilliseconds = 5_000
+    private static let fullscreenAccessibilitySuppressionSettleDelayMilliseconds = 8_000
     private static let desktopRefocusDelayMilliseconds = 1_200
 
     private let configuration: SpaceFixtureLaunchConfiguration
@@ -29,6 +31,7 @@ final class SpaceFixtureWindowCoordinator {
     private let applicationAccessibilityElementsPublisher: ApplicationAccessibilityElementsPublisher
 
     private(set) var windows: [any SpaceFixtureWindowing] = []
+    private var suppressesApplicationAccessibilityElements = false
 
     init(
         configuration: SpaceFixtureLaunchConfiguration,
@@ -69,8 +72,12 @@ final class SpaceFixtureWindowCoordinator {
         windows.forEach { $0.updateWorkflowReadiness(windowTitles: windowTitles) }
         publishApplicationAccessibilityElements()
 
-        guard let fullscreenWindowIndex = configuration.fullscreenWindowIndex else { return }
+        guard let fullscreenWindowIndex = configuration.fullscreenWindowIndex else {
+            scheduleApplicationAccessibilitySuppressionIfNeeded()
+            return
+        }
         guard let fullscreenWindow = windows.first(where: { $0.plan.index == fullscreenWindowIndex }) else {
+            scheduleApplicationAccessibilitySuppressionIfNeeded()
             return
         }
         let desktopAnchorWindow = configuration.preservesDesktopAfterFullscreen
@@ -81,7 +88,10 @@ final class SpaceFixtureWindowCoordinator {
             fullscreenWindow.enterFullScreen()
             self.publishApplicationAccessibilityElements()
 
-            guard let desktopAnchorWindow else { return }
+            guard let desktopAnchorWindow else {
+                return
+            }
+
             // Keep the post-launch topology anchored on the normal desktop so
             // runtime sampling can still observe the app's non-fullscreen windows.
             self.fullscreenScheduler(Self.desktopRefocusDelayMilliseconds) {
@@ -90,14 +100,34 @@ final class SpaceFixtureWindowCoordinator {
                 self.publishApplicationAccessibilityElements()
             }
         }
+        scheduleApplicationAccessibilitySuppressionIfNeeded()
     }
 
     private func publishApplicationAccessibilityElements() {
-        guard configuration.publishesApplicationAccessibilityChildren else {
+        guard !suppressesApplicationAccessibilityElements else {
             applicationAccessibilityElementsPublisher([])
             return
         }
         applicationAccessibilityElementsPublisher(windows.map(\.applicationAccessibilityElement))
+    }
+
+    private func scheduleApplicationAccessibilitySuppressionIfNeeded() {
+        guard !configuration.publishesApplicationAccessibilityChildren else { return }
+        fullscreenScheduler(applicationAccessibilitySuppressionDelayMilliseconds()) {
+            self.suppressesApplicationAccessibilityElements = true
+            self.publishApplicationAccessibilityElements()
+        }
+    }
+
+    private func applicationAccessibilitySuppressionDelayMilliseconds() -> Int {
+        guard configuration.fullscreenWindowIndex != nil else {
+            return Self.defaultApplicationAccessibilitySuppressionDelayMilliseconds
+        }
+        return max(
+            Self.defaultApplicationAccessibilitySuppressionDelayMilliseconds,
+            configuration.enterFullscreenDelayMilliseconds
+                + Self.fullscreenAccessibilitySuppressionSettleDelayMilliseconds
+        )
     }
 
     private static func defaultVisibleFrame() -> CGRect {

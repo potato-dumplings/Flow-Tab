@@ -198,6 +198,7 @@ extension FlowTabTests {
                 "--flowtab-ui-seed-logs", "12",
                 "--flowtab-ui-runtime-log-level", "debug",
                 "--flowtab-ui-frontmost-bundle-id", "com.example.fixture.notes",
+                "--flowtab-ui-suppress-home-on-launch",
                 "--flowtab-ui-enable-verbose-logs",
                 "--flowtab-ui-record-hotkey-reload-diagnostics"
             ]
@@ -212,6 +213,7 @@ extension FlowTabTests {
                 FlowTabTestLaunchOptions.frontmostBundleIdentifierOverride,
                 "com.example.fixture.notes"
             )
+            XCTAssertTrue(FlowTabTestLaunchOptions.suppressesHomeWindowOnLaunch)
             XCTAssertTrue(FlowTabTestLaunchOptions.enablesVerboseRuntimeLogs)
             XCTAssertTrue(FlowTabTestLaunchOptions.recordsHotkeyReloadDiagnostics)
         }

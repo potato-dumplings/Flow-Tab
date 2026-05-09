@@ -605,6 +605,11 @@ extension FlowTabUITests {
         flowTabAdditionalArguments: [String] = [],
         waitsForFullscreenMarkers: Bool = true,
         suppressesAppAccessibilityChildren: Bool = false,
+        validatesPermissionsBeforeFixtureLaunch: Bool = false,
+        preservesDesktopAfterFullscreen: Bool = true,
+        prelaunchesFlowTabBeforeFixture: Bool = false,
+        flowTabLaunchTraceLabel: String? = nil,
+        afterFlowTabLaunch: ((SpaceFixtureResolvedWorkflow, XCUIApplication) throws -> Void)? = nil,
         perform assertions: (SpaceFixtureResolvedWorkflow, XCUIApplication) throws -> Void
     ) throws {
         let workflow: SpaceFixtureResolvedWorkflow
@@ -627,6 +632,11 @@ extension FlowTabUITests {
             flowTabAdditionalArguments: flowTabAdditionalArguments,
             waitsForFullscreenMarkers: waitsForFullscreenMarkers,
             suppressesAppAccessibilityChildren: suppressesAppAccessibilityChildren,
+            validatesPermissionsBeforeFixtureLaunch: validatesPermissionsBeforeFixtureLaunch,
+            preservesDesktopAfterFullscreen: preservesDesktopAfterFullscreen,
+            prelaunchesFlowTabBeforeFixture: prelaunchesFlowTabBeforeFixture,
+            flowTabLaunchTraceLabel: flowTabLaunchTraceLabel,
+            afterFlowTabLaunch: afterFlowTabLaunch,
             perform: assertions
         )
     }
@@ -636,19 +646,55 @@ extension FlowTabUITests {
         flowTabAdditionalArguments: [String] = [],
         waitsForFullscreenMarkers: Bool = true,
         suppressesAppAccessibilityChildren: Bool = false,
+        validatesPermissionsBeforeFixtureLaunch: Bool = false,
+        preservesDesktopAfterFullscreen: Bool = true,
+        prelaunchesFlowTabBeforeFixture: Bool = false,
+        beforeFlowTabLaunch: ((SpaceFixtureResolvedWorkflow) throws -> Void)? = nil,
+        flowTabLaunchTraceLabel: String? = nil,
+        afterFlowTabLaunch: ((SpaceFixtureResolvedWorkflow, XCUIApplication) throws -> Void)? = nil,
         perform assertions: (SpaceFixtureResolvedWorkflow, XCUIApplication) throws -> Void
     ) throws {
         terminateSpaceFixtureWorkflowAppsIfRunning(workflow.apps.map(\.identity))
+        if validatesPermissionsBeforeFixtureLaunch {
+            guard assertSpaceFixtureWorkflowPermissionsAvailable() else { return }
+        }
+
+        var flowTabAppForCleanup: XCUIApplication?
+        defer {
+            if let app = flowTabAppForCleanup,
+               app.state == .runningForeground || app.state == .runningBackground {
+                app.terminate()
+            }
+        }
+
+        let prelaunchedFlowTabApp: XCUIApplication?
+        if prelaunchesFlowTabBeforeFixture {
+            let app = makeRealRuntimeFlowTabApp(additionalArguments: flowTabAdditionalArguments)
+            launchFlowTabUITestApplication(app, traceLabel: flowTabLaunchTraceLabel)
+            XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(
+                app,
+                timeout: 12,
+                traceLabel: flowTabLaunchTraceLabel
+            ))
+            prelaunchedFlowTabApp = app
+            flowTabAppForCleanup = app
+        } else {
+            prelaunchedFlowTabApp = nil
+        }
+
         let fixtureApps = launchResolvedSpaceFixtureWorkflow(
             workflow,
             waitsForFullscreenMarkers: waitsForFullscreenMarkers,
-            suppressesAppAccessibilityChildren: suppressesAppAccessibilityChildren
+            suppressesAppAccessibilityChildren: suppressesAppAccessibilityChildren,
+            preservesDesktopAfterFullscreen: preservesDesktopAfterFullscreen
         )
+        logFullscreenWorkflowSpaceObservations("workflow.afterFixtureLaunch", workflow: workflow)
         defer {
             terminateSpaceFixtureWorkflowApps(fixtureApps)
         }
 
         if suppressesAppAccessibilityChildren {
+            logFullscreenWorkflowSpaceObservations("workflow.beforeAXSuppressionCheck", workflow: workflow)
             for workflowApp in workflow.apps {
                 XCTAssertTrue(
                     waitForApplicationAXWindowsSuppressed(
@@ -658,19 +704,34 @@ extension FlowTabUITests {
                     "\(workflowApp.appName) still exposes application-level AX windows."
                 )
             }
+            logFullscreenWorkflowSpaceObservations("workflow.afterAXSuppressionCheck", workflow: workflow)
         }
 
-        guard assertSpaceFixtureWorkflowPermissionsAvailable() else { return }
-
-        let app = makeRealRuntimeFlowTabApp(additionalArguments: flowTabAdditionalArguments)
-        launchFlowTabUITestApplication(app)
-        defer {
-            if app.state == .runningForeground || app.state == .runningBackground {
-                app.terminate()
-            }
+        if !validatesPermissionsBeforeFixtureLaunch {
+            logFullscreenWorkflowSpaceObservations("workflow.beforePermissionCheck", workflow: workflow)
+            guard assertSpaceFixtureWorkflowPermissionsAvailable() else { return }
+            logFullscreenWorkflowSpaceObservations("workflow.afterPermissionCheck", workflow: workflow)
         }
 
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 12))
+        logFullscreenWorkflowSpaceObservations("workflow.beforeBeforeFlowTabLaunch", workflow: workflow)
+        try beforeFlowTabLaunch?(workflow)
+        logFullscreenWorkflowSpaceObservations("workflow.afterBeforeFlowTabLaunch", workflow: workflow)
+
+        let app: XCUIApplication
+        if let prelaunchedFlowTabApp {
+            app = prelaunchedFlowTabApp
+        } else {
+            app = makeRealRuntimeFlowTabApp(additionalArguments: flowTabAdditionalArguments)
+            launchFlowTabUITestApplication(app, traceLabel: flowTabLaunchTraceLabel)
+            flowTabAppForCleanup = app
+            try afterFlowTabLaunch?(workflow, app)
+
+            XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(
+                app,
+                timeout: 12,
+                traceLabel: flowTabLaunchTraceLabel
+            ))
+        }
         try assertions(workflow, app)
     }
 
@@ -874,7 +935,8 @@ extension FlowTabUITests {
     private func launchResolvedSpaceFixtureWorkflow(
         _ workflow: SpaceFixtureResolvedWorkflow,
         waitsForFullscreenMarkers: Bool,
-        suppressesAppAccessibilityChildren: Bool
+        suppressesAppAccessibilityChildren: Bool,
+        preservesDesktopAfterFullscreen: Bool
     ) -> [XCUIApplication] {
         var launchedApps: [XCUIApplication] = []
 
@@ -884,29 +946,62 @@ extension FlowTabUITests {
                 "--workflow-config", workflow.workflowURL.path,
                 "--workflow-app-id", workflowApp.appID,
                 "--staggered-layout",
-                "--enter-fullscreen-delay-ms", String(SpaceFixtureMultiAppWorkflowDefaults.enterFullscreenDelayMilliseconds),
-                "--preserve-desktop-after-fullscreen"
+                "--enter-fullscreen-delay-ms", String(SpaceFixtureMultiAppWorkflowDefaults.enterFullscreenDelayMilliseconds)
             ]
+            if preservesDesktopAfterFullscreen {
+                app.launchArguments += ["--preserve-desktop-after-fullscreen"]
+            }
             if suppressesAppAccessibilityChildren {
                 app.launchArguments += ["--suppress-app-accessibility-children"]
             }
+            if workflowApp.fullscreenWindowIndex != nil {
+                logWorkflowSpaceObservation("workflow.beforeLaunch.\(workflowApp.appID)", app: workflowApp)
+            }
             launchSpaceFixtureApplicationAndWaitForForeground(app)
+            if workflowApp.fullscreenWindowIndex != nil {
+                logWorkflowSpaceObservation("workflow.afterForeground.\(workflowApp.appID)", app: workflowApp)
+            }
             waitForSpaceFixtureWorkflowToStabilize(
                 in: app,
                 expectedWindowTitles: workflowApp.expectedWindowTitles,
                 fullscreenWindowIndex: waitsForFullscreenMarkers ? workflowApp.fullscreenWindowIndex : nil,
                 settleTimeout: 0
             )
+            if workflowApp.fullscreenWindowIndex != nil {
+                logWorkflowSpaceObservation("workflow.afterStabilize.\(workflowApp.appID)", app: workflowApp)
+            }
             launchedApps.append(app)
         }
 
-        RunLoop.current.run(until: Date().addingTimeInterval(workflow.settleTimeout))
-        if let desktopAnchorIndex = workflow.apps.firstIndex(where: { $0.fullscreenWindowIndex == nil }) {
+        let settleDeadline = Date().addingTimeInterval(workflow.settleTimeout)
+        var settleTick = 0
+        while Date() < settleDeadline {
+            let nextTick = Date().addingTimeInterval(min(1, settleDeadline.timeIntervalSinceNow))
+            RunLoop.current.run(until: nextTick)
+            settleTick += 1
+            logFullscreenWorkflowSpaceObservations("workflow.settle.\(settleTick)s", workflow: workflow)
+        }
+        logFullscreenWorkflowSpaceObservations("workflow.afterSettle", workflow: workflow)
+        if
+            preservesDesktopAfterFullscreen,
+            let desktopAnchorIndex = workflow.apps.firstIndex(where: { $0.fullscreenWindowIndex == nil })
+        {
             let desktopAnchorApp = launchedApps[desktopAnchorIndex]
+            logFullscreenWorkflowSpaceObservations("workflow.beforeDesktopAnchorActivate", workflow: workflow)
             desktopAnchorApp.activate()
             _ = desktopAnchorApp.wait(for: .runningForeground, timeout: 5)
+            logFullscreenWorkflowSpaceObservations("workflow.afterDesktopAnchorActivate", workflow: workflow)
         }
         return launchedApps
+    }
+
+    private func logFullscreenWorkflowSpaceObservations(
+        _ stage: String,
+        workflow: SpaceFixtureResolvedWorkflow
+    ) {
+        for workflowApp in workflow.apps where workflowApp.fullscreenWindowIndex != nil {
+            logWorkflowSpaceObservation("\(stage).\(workflowApp.appID)", app: workflowApp)
+        }
     }
 
     private func terminateSpaceFixtureWorkflowAppsIfRunning(_ identities: [SpaceFixtureAppIdentity]) {
