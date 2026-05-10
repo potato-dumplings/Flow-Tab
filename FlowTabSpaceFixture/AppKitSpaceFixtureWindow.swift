@@ -79,6 +79,8 @@ private final class NoisyCGSiblingWindowSet {
         let suffix: String
         let height: CGFloat
         let insetFromTop: CGFloat
+        let horizontalInset: CGFloat
+        let exposesAccessibilityElement: Bool
     }
 
     private let plan: SpaceFixtureWindowPlan
@@ -102,11 +104,13 @@ private final class NoisyCGSiblingWindowSet {
         noisySiblingSpecs().map { spec in
             let window = NSWindow(
                 contentRect: frame(for: spec, hostFrame: hostWindow.frame),
-                styleMask: [.borderless],
+                styleMask: spec.exposesAccessibilityElement ? [.titled] : [.borderless],
                 backing: .buffered,
                 defer: false
             )
             window.title = ""
+            window.titleVisibility = .hidden
+            window.titlebarAppearsTransparent = true
             window.identifier = NSUserInterfaceItemIdentifier(
                 "\(plan.windowAccessibilityIdentifier).noisy-cg-sibling.\(spec.suffix)"
             )
@@ -114,10 +118,11 @@ private final class NoisyCGSiblingWindowSet {
             window.backgroundColor = .windowBackgroundColor
             window.isOpaque = true
             window.alphaValue = 1
+            window.ignoresMouseEvents = true
             window.isReleasedWhenClosed = false
             window.hidesOnDeactivate = false
             window.canHide = false
-            window.setAccessibilityElement(false)
+            window.setAccessibilityElement(spec.exposesAccessibilityElement)
             return window
         }
     }
@@ -132,17 +137,64 @@ private final class NoisyCGSiblingWindowSet {
         let normalizedHostFrame = hostFrame.standardized
         let height = min(spec.height, max(80, normalizedHostFrame.height / 4))
         return CGRect(
-            x: normalizedHostFrame.minX,
+            x: normalizedHostFrame.minX + spec.horizontalInset,
             y: normalizedHostFrame.maxY - spec.insetFromTop - height,
-            width: normalizedHostFrame.width,
+            width: max(80, normalizedHostFrame.width - (spec.horizontalInset * 2)),
             height: height
         )
     }
 
     private func noisySiblingSpecs() -> [Spec] {
         [
-            Spec(suffix: "toolbar", height: 80, insetFromTop: 80),
-            Spec(suffix: "wrapper", height: 165, insetFromTop: 0)
+            Spec(
+                suffix: "titlebar",
+                height: 37,
+                insetFromTop: 0,
+                horizontalInset: 0,
+                exposesAccessibilityElement: false
+            ),
+            Spec(
+                suffix: "toolbar",
+                height: 41,
+                insetFromTop: 37,
+                horizontalInset: 0,
+                exposesAccessibilityElement: false
+            ),
+            Spec(
+                suffix: "omnibox",
+                height: 80,
+                insetFromTop: 78,
+                horizontalInset: 0,
+                exposesAccessibilityElement: false
+            ),
+            Spec(
+                suffix: "content-wrapper",
+                height: 165,
+                insetFromTop: 37,
+                horizontalInset: 0,
+                exposesAccessibilityElement: true
+            ),
+            Spec(
+                suffix: "content-plane",
+                height: 520,
+                insetFromTop: 158,
+                horizontalInset: 0,
+                exposesAccessibilityElement: false
+            ),
+            Spec(
+                suffix: "preview-overlay",
+                height: 418,
+                insetFromTop: 63,
+                horizontalInset: 96,
+                exposesAccessibilityElement: false
+            ),
+            Spec(
+                suffix: "floating-strip",
+                height: 80,
+                insetFromTop: 202,
+                horizontalInset: 160,
+                exposesAccessibilityElement: false
+            )
         ]
     }
 }

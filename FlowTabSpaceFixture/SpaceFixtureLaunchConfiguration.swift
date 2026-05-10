@@ -53,7 +53,13 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
     }
 
     var fullscreenWindowIndex: Int? {
-        windows.firstIndex(where: \.isFullscreenTarget).map { $0 + 1 }
+        fullscreenWindowIndices.first
+    }
+
+    var fullscreenWindowIndices: [Int] {
+        windows.indices.compactMap { index in
+            windows[index].isFullscreenTarget ? index + 1 : nil
+        }
     }
 
     var windowTitles: [String] {

@@ -12,7 +12,7 @@
           "title": "Chrome Window 1",
           "mode": "standard",
           "tabs": [
-            { "title": "Normal Tab", "isSelected": true },
+            { "title": "Chrome Normal Tab", "isSelected": true },
             { "title": "Background Tab", "isSelected": false }
           ]
         },
@@ -21,8 +21,25 @@
           "mode": "fullscreen",
           "noisyCGSiblings": true,
           "tabs": [
-            { "title": "Fullscreen Tab", "isSelected": true },
+            { "title": "Chrome Fullscreen Tab", "isSelected": true },
             { "title": "Secondary Tab", "isSelected": false }
+          ]
+        },
+        {
+          "title": "Chrome Window 3",
+          "mode": "fullscreen",
+          "noisyCGSiblings": true,
+          "tabs": [
+            { "title": "Chrome Second Fullscreen Tab", "isSelected": true },
+            { "title": "Background Fullscreen Tab", "isSelected": false }
+          ]
+        },
+        {
+          "title": "Chrome Window 4",
+          "mode": "standard",
+          "tabs": [
+            { "title": "Chrome Incognito Tab", "isSelected": true },
+            { "title": "Background Incognito Tab", "isSelected": false }
           ]
         }
       ]

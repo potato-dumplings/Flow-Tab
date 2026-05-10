@@ -22,6 +22,7 @@ final class SpaceFixtureWindowCoordinator {
     private static let defaultApplicationAccessibilitySuppressionDelayMilliseconds = 5_000
     private static let fullscreenAccessibilitySuppressionSettleDelayMilliseconds = 8_000
     private static let desktopRefocusDelayMilliseconds = 1_200
+    private static let additionalFullscreenTransitionSpacingMilliseconds = 1_400
 
     private let configuration: SpaceFixtureLaunchConfiguration
     private let visibleFrameProvider: VisibleFrameProvider
@@ -72,16 +73,64 @@ final class SpaceFixtureWindowCoordinator {
         windows.forEach { $0.updateWorkflowReadiness(windowTitles: windowTitles) }
         publishApplicationAccessibilityElements()
 
-        guard let fullscreenWindowIndex = configuration.fullscreenWindowIndex else {
+        guard !configuration.fullscreenWindowIndices.isEmpty else {
             scheduleApplicationAccessibilitySuppressionIfNeeded()
             return
         }
-        guard let fullscreenWindow = windows.first(where: { $0.plan.index == fullscreenWindowIndex }) else {
+        let fullscreenWindows = orderedFullscreenWindowsForTransition()
+        guard !fullscreenWindows.isEmpty else {
             scheduleApplicationAccessibilitySuppressionIfNeeded()
             return
         }
+        scheduleFullscreenTransitions(fullscreenWindows)
+        scheduleApplicationAccessibilitySuppressionIfNeeded()
+    }
+
+    private func orderedFullscreenWindowsForTransition() -> [any SpaceFixtureWindowing] {
+        let fullscreenWindows = windows.filter(\.plan.isFullscreenTarget)
+        guard
+            fullscreenWindows.count > 1,
+            let primaryFullscreenIndex = configuration.fullscreenWindowIndex,
+            let primaryWindow = fullscreenWindows.first(where: { $0.plan.index == primaryFullscreenIndex })
+        else {
+            return fullscreenWindows
+        }
+
+        return fullscreenWindows.filter { $0.plan.index != primaryFullscreenIndex } + [primaryWindow]
+    }
+
+    private func scheduleFullscreenTransitions(_ fullscreenWindows: [any SpaceFixtureWindowing]) {
+        if fullscreenWindows.count == 1, let fullscreenWindow = fullscreenWindows.first {
+            scheduleSingleFullscreenTransition(fullscreenWindow)
+            return
+        }
+
+        for (offset, fullscreenWindow) in fullscreenWindows.enumerated() {
+            fullscreenScheduler(fullscreenTransitionDelayMilliseconds(offset: offset)) {
+                self.activateApplication()
+                fullscreenWindow.show(isKey: true)
+                fullscreenWindow.enterFullScreen()
+                self.publishApplicationAccessibilityElements()
+            }
+        }
+
+        guard
+            configuration.preservesDesktopAfterFullscreen,
+            let desktopAnchorWindow = windows.first(where: { !$0.plan.isFullscreenTarget })
+        else {
+            return
+        }
+
+        fullscreenScheduler(lastFullscreenTransitionDelayMilliseconds() + Self.desktopRefocusDelayMilliseconds) {
+            self.activateApplication()
+            desktopAnchorWindow.show(isKey: true)
+            self.publishApplicationAccessibilityElements()
+        }
+    }
+
+    private func scheduleSingleFullscreenTransition(_ fullscreenWindow: any SpaceFixtureWindowing) {
         let desktopAnchorWindow = configuration.preservesDesktopAfterFullscreen
-            ? windows.first(where: { $0.plan.index != fullscreenWindowIndex })
+            ? windows.first(where: { $0.plan.index != fullscreenWindow.plan.index })
             : nil
 
         fullscreenScheduler(configuration.enterFullscreenDelayMilliseconds) {
@@ -100,7 +149,6 @@ final class SpaceFixtureWindowCoordinator {
                 self.publishApplicationAccessibilityElements()
             }
         }
-        scheduleApplicationAccessibilitySuppressionIfNeeded()
     }
 
     private func publishApplicationAccessibilityElements() {
@@ -120,14 +168,25 @@ final class SpaceFixtureWindowCoordinator {
     }
 
     private func applicationAccessibilitySuppressionDelayMilliseconds() -> Int {
-        guard configuration.fullscreenWindowIndex != nil else {
+        guard !configuration.fullscreenWindowIndices.isEmpty else {
             return Self.defaultApplicationAccessibilitySuppressionDelayMilliseconds
         }
         return max(
             Self.defaultApplicationAccessibilitySuppressionDelayMilliseconds,
-            configuration.enterFullscreenDelayMilliseconds
+            lastFullscreenTransitionDelayMilliseconds()
                 + Self.fullscreenAccessibilitySuppressionSettleDelayMilliseconds
         )
+    }
+
+    private func lastFullscreenTransitionDelayMilliseconds() -> Int {
+        fullscreenTransitionDelayMilliseconds(
+            offset: max(0, configuration.fullscreenWindowIndices.count - 1)
+        )
+    }
+
+    private func fullscreenTransitionDelayMilliseconds(offset: Int) -> Int {
+        configuration.enterFullscreenDelayMilliseconds
+            + max(0, offset) * Self.additionalFullscreenTransitionSpacingMilliseconds
     }
 
     private static func defaultVisibleFrame() -> CGRect {

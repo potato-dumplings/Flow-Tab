@@ -489,10 +489,10 @@ extension FlowTabUITests {
             )
         }
 
-        guard workflow.apps[0].windowCount == 2 else {
+        guard workflow.apps[0].windowCount >= 2 else {
             throw XCTSkip(
                 multiAppWorkflowSetupMessage(
-                    reason: "Resolved workflow must contain exactly two windows for this runtime-truth scenario.",
+                    reason: "Resolved workflow must contain at least two windows for this runtime-truth scenario.",
                     scenarioSourceURL: scenarioSourceURL
                 )
             )
