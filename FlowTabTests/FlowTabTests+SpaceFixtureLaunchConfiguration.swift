@@ -109,6 +109,7 @@ extension FlowTabTests {
                     {
                       "title": "Chrome Window 2",
                       "mode": "fullscreen",
+                      "noisyCGSiblings": true,
                       "tabs": [
                         { "title": "Mail", "isSelected": false },
                         { "title": "Calendar", "isSelected": true }
@@ -136,6 +137,7 @@ extension FlowTabTests {
 
         XCTAssertEqual(configuration.workflowName, "multi-app-space-topology")
         XCTAssertEqual(configuration.workflowAppID, "chrome")
+        XCTAssertEqual(configuration.workflowAppName, "Chrome Fixture")
         XCTAssertEqual(configuration.windowCount, 2)
         XCTAssertEqual(configuration.windowTitles, ["Docs", "Calendar"])
         XCTAssertEqual(configuration.fullscreenWindowIndex, 2)
@@ -145,6 +147,8 @@ extension FlowTabTests {
         XCTAssertTrue(configuration.preservesDesktopAfterFullscreen)
         XCTAssertFalse(configuration.publishesApplicationAccessibilityChildren)
         XCTAssertEqual(configuration.windows[0].configuredTitle, "Chrome Window 1")
+        XCTAssertFalse(configuration.windows[0].noisyCGSiblings)
+        XCTAssertTrue(configuration.windows[1].noisyCGSiblings)
         XCTAssertEqual(configuration.windows[0].tabs.map(\.title), ["Docs", "PR"])
         XCTAssertEqual(configuration.windows[0].tabs.map(\.isSelected), [true, false])
         XCTAssertEqual(configuration.windows[1].tabs.map(\.isSelected), [false, true])
@@ -233,13 +237,15 @@ extension FlowTabTests {
                     tabs: [
                         SpaceFixtureConfiguredTab(title: "Mail", identifier: "tab-1", isSelected: false),
                         SpaceFixtureConfiguredTab(title: "Calendar", identifier: "tab-2", isSelected: true)
-                    ]
+                    ],
+                    noisyCGSiblings: true
                 )
             ],
             windowTitlePrefix: SpaceFixtureLaunchConfiguration.defaultWindowTitlePrefix,
             usesStaggeredLayout: false,
             enterFullscreenDelayMilliseconds: 400,
-            preservesDesktopAfterFullscreen: false
+            preservesDesktopAfterFullscreen: false,
+            workflowAppName: "Chrome Fixture"
         )
 
         let plans = SpaceFixtureWindowPlanner.makePlans(
@@ -248,6 +254,8 @@ extension FlowTabTests {
         )
 
         XCTAssertEqual(plans.map(\.title), ["Docs", "Calendar"])
+        XCTAssertEqual(plans.map(\.fixtureAppName), ["Chrome Fixture", "Chrome Fixture"])
+        XCTAssertEqual(plans.map(\.noisyCGSiblings), [false, true])
         XCTAssertEqual(plans[0].subtitleText, "Chrome Window 1")
         XCTAssertEqual(plans[0].tabs.map(\.title), ["Docs", "PR"])
         XCTAssertEqual(plans[1].modeText, "Fullscreen Target")

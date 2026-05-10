@@ -619,12 +619,47 @@ extension RuntimeSnapshotProvider {
         cgWindows: [CGWindowEntry],
         appName: String?
     ) -> AXWindowEntry? {
+        recoverAXWindowFromPublicSourcesWithDiagnostics(
+            targetCGWindowID: targetCGWindowID,
+            expectedTitle: expectedTitle,
+            expectedFrame: expectedFrame,
+            windows: windows,
+            cgWindows: cgWindows,
+            appName: appName
+        )?.window
+    }
+
+    struct AXWindowRecoveryDiagnosticResult {
+        let window: AXWindowEntry
+        let reason: String
+    }
+
+    static func recoverAXWindowFromPublicSourcesWithDiagnostics(
+        targetCGWindowID: CGWindowID?,
+        expectedTitle: String,
+        expectedFrame: CGRect?,
+        windows: [AXWindowEntry],
+        cgWindows: [CGWindowEntry],
+        appName: String?
+    ) -> AXWindowRecoveryDiagnosticResult? {
+        RuntimeLog.info(
+            "Activation",
+            "ax-recovery candidates app=\(runtimeAXRecoveryLogValue(appName)) targetCG=\(targetCGWindowID.map(String.init) ?? "nil") expectedTitle=\(runtimeAXRecoveryLogValue(expectedTitle)) expectedFrame=\(runtimeAXRecoveryFrameDescription(expectedFrame)) ax=\(runtimeAXRecoveryAXWindowSummary(windows)) cg=\(runtimeAXRecoveryCGWindowSummary(cgWindows, targetCGWindowID: targetCGWindowID))"
+        )
+
         if let targetCGWindowID {
             let exactBridgeMatches = windows.filter {
                 AXWindowInspector.cgWindowID(for: $0.window) == targetCGWindowID
             }
+            RuntimeLog.info(
+                "Activation",
+                "ax-recovery exact-bridge targetCG=\(targetCGWindowID) matches=\(exactBridgeMatches.count) ids=\(runtimeAXRecoveryWindowIDs(exactBridgeMatches))"
+            )
             if exactBridgeMatches.count == 1 {
-                return exactBridgeMatches[0]
+                return AXWindowRecoveryDiagnosticResult(
+                    window: exactBridgeMatches[0],
+                    reason: "exact-bridge"
+                )
             }
         }
 
@@ -634,26 +669,45 @@ extension RuntimeSnapshotProvider {
                 cgWindows: cgWindows,
                 appName: appName
             )
+            RuntimeLog.info(
+                "Activation",
+                "ax-recovery public-assignments targetCG=\(targetCGWindowID) matches=\(runtimeAXRecoveryAssignmentSummary(matchedWindowIDs))"
+            )
             if
                 let matchedWindowID = matchedWindowIDs.first(where: { $0.value == targetCGWindowID })?.key,
                 let matchedWindow = windows.first(where: { $0.id == matchedWindowID })
             {
-                return matchedWindow
+                return AXWindowRecoveryDiagnosticResult(
+                    window: matchedWindow,
+                    reason: "public-assignment"
+                )
             }
+        } else if let targetCGWindowID {
+            RuntimeLog.info(
+                "Activation",
+                "ax-recovery target-cg-not-current targetCG=\(targetCGWindowID)"
+            )
         }
 
-        return publicUniqueAXWindowMatch(
+        let publicFallback = publicUniqueAXWindowMatch(
             expectedTitle: expectedTitle,
             expectedFrame: expectedFrame,
             windows: windows
         )
+        if publicFallback == nil {
+            RuntimeLog.info(
+                "Activation",
+                "ax-recovery no-public-match targetCG=\(targetCGWindowID.map(String.init) ?? "nil")"
+            )
+        }
+        return publicFallback
     }
 
     private static func publicUniqueAXWindowMatch(
         expectedTitle: String,
         expectedFrame: CGRect?,
         windows: [AXWindowEntry]
-    ) -> AXWindowEntry? {
+    ) -> AXWindowRecoveryDiagnosticResult? {
         let normalizedExpectedTitle = normalizedRuntimeWindowTitle(expectedTitle)
         if let normalizedExpectedTitle {
             let exactTitleAndFrameMatches = windows.filter { window in
@@ -666,8 +720,15 @@ extension RuntimeSnapshotProvider {
                 guard let expectedFrame, let windowFrame = window.frame else { return true }
                 return RuntimeWindowTopologyClassifier.framesApproximatelyMatch(windowFrame, expectedFrame)
             }
+            RuntimeLog.info(
+                "Activation",
+                "ax-recovery public-fallback title-frame matches=\(exactTitleAndFrameMatches.count) ids=\(runtimeAXRecoveryWindowIDs(exactTitleAndFrameMatches))"
+            )
             if exactTitleAndFrameMatches.count == 1 {
-                return exactTitleAndFrameMatches[0]
+                return AXWindowRecoveryDiagnosticResult(
+                    window: exactTitleAndFrameMatches[0],
+                    reason: "title-frame"
+                )
             }
 
             let exactTitleMatches = windows.filter { window in
@@ -676,8 +737,15 @@ extension RuntimeSnapshotProvider {
                 }
                 return windowTitle.caseInsensitiveCompare(normalizedExpectedTitle) == .orderedSame
             }
+            RuntimeLog.info(
+                "Activation",
+                "ax-recovery public-fallback title matches=\(exactTitleMatches.count) ids=\(runtimeAXRecoveryWindowIDs(exactTitleMatches))"
+            )
             if exactTitleMatches.count == 1 {
-                return exactTitleMatches[0]
+                return AXWindowRecoveryDiagnosticResult(
+                    window: exactTitleMatches[0],
+                    reason: "title"
+                )
             }
         }
 
@@ -686,8 +754,15 @@ extension RuntimeSnapshotProvider {
                 guard let windowFrame = window.frame else { return false }
                 return RuntimeWindowTopologyClassifier.framesApproximatelyMatch(windowFrame, expectedFrame)
             }
+            RuntimeLog.info(
+                "Activation",
+                "ax-recovery public-fallback frame matches=\(exactFrameMatches.count) ids=\(runtimeAXRecoveryWindowIDs(exactFrameMatches))"
+            )
             if exactFrameMatches.count == 1 {
-                return exactFrameMatches[0]
+                return AXWindowRecoveryDiagnosticResult(
+                    window: exactFrameMatches[0],
+                    reason: "frame"
+                )
             }
         }
 
@@ -756,6 +831,70 @@ private func runtimeSupplementalCGWindowTitle(
     normalizedRuntimeWindowTitle(cgWindow.title)
         ?? normalizedRuntimeWindowTitle(appName)
         ?? appName
+}
+
+private func runtimeAXRecoveryAXWindowSummary(
+    _ windows: [RuntimeSnapshotProvider.AXWindowEntry]
+) -> String {
+    let sample = windows.prefix(12).map { window in
+        let bridgedCGWindowID = AXWindowInspector.cgWindowID(for: window.window).map(String.init) ?? "nil"
+        let title = runtimeAXRecoveryLogValue(window.sourceTitle ?? window.title)
+        let role = runtimeAXRecoveryLogValue(AXWindowInspector.role(for: window.window))
+        let subrole = runtimeAXRecoveryLogValue(AXWindowInspector.subrole(for: window.window))
+        return "\(window.id):idx=\(window.index):title=\(title):cg=\(bridgedCGWindowID):frame=\(runtimeAXRecoveryFrameDescription(window.frame)):min=\(window.isMinimized ? 1 : 0):role=\(role):subrole=\(subrole)"
+    }.joined(separator: ",")
+    return "count=\(windows.count) sample=[\(sample)]"
+}
+
+private func runtimeAXRecoveryCGWindowSummary(
+    _ windows: [RuntimeSnapshotProvider.CGWindowEntry],
+    targetCGWindowID: CGWindowID?
+) -> String {
+    let sample = windows.prefix(12).map { window in
+        let marker = window.id == targetCGWindowID ? "*" : ""
+        let title = runtimeAXRecoveryLogValue(window.title)
+        let onscreen = window.isOnscreen ? "on" : "off"
+        let alpha = String(format: "%.2f", window.alpha)
+        return "\(marker)\(window.id):title=\(title):\(onscreen):alpha=\(alpha):store=\(window.storeType):spaces=\(window.spaceIDs):frame=\(runtimeAXRecoveryFrameDescription(window.bounds))"
+    }.joined(separator: ",")
+    return "count=\(windows.count) sample=[\(sample)]"
+}
+
+private func runtimeAXRecoveryWindowIDs(
+    _ windows: [RuntimeSnapshotProvider.AXWindowEntry]
+) -> String {
+    windows
+        .map { window in
+            let bridgedCGWindowID = AXWindowInspector.cgWindowID(for: window.window).map(String.init) ?? "nil"
+            return "\(window.id)(cg=\(bridgedCGWindowID),title=\(runtimeAXRecoveryLogValue(window.sourceTitle ?? window.title)),frame=\(runtimeAXRecoveryFrameDescription(window.frame)))"
+        }
+        .joined(separator: ",")
+}
+
+private func runtimeAXRecoveryAssignmentSummary(_ assignments: [String: CGWindowID]) -> String {
+    assignments
+        .sorted { lhs, rhs in
+            if lhs.key == rhs.key {
+                return lhs.value < rhs.value
+            }
+            return lhs.key < rhs.key
+        }
+        .map { "\($0.key)->\($0.value)" }
+        .joined(separator: ",")
+}
+
+private func runtimeAXRecoveryFrameDescription(_ frame: CGRect?) -> String {
+    guard let frame else { return "nil" }
+    return "\(Int(frame.origin.x)),\(Int(frame.origin.y)),\(Int(frame.size.width))x\(Int(frame.size.height))"
+}
+
+private func runtimeAXRecoveryLogValue(_ value: String?) -> String {
+    guard let value else { return "nil" }
+    let trimmed = value
+        .replacingOccurrences(of: "\n", with: " ")
+        .replacingOccurrences(of: "\r", with: " ")
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? "empty" : trimmed
 }
 
 private func resolveStableWindowTitle(

@@ -36,6 +36,7 @@ extension FlowTabTests {
             index: 1,
             totalWindowCount: 1,
             configuredTitle: "Chrome Window",
+            fixtureAppName: "Chrome Fixture",
             title: "Mail",
             frame: CGRect(x: 20, y: 30, width: 960, height: 640),
             isFullscreenTarget: true,

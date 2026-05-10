@@ -47,6 +47,7 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
     let terminationDelayMilliseconds: Int
     let workflowName: String?
     let workflowAppID: String?
+    let workflowAppName: String?
 
     var windowCount: Int {
         windows.count
@@ -75,7 +76,8 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
         publishesApplicationAccessibilityChildren: Bool = true,
         terminationDelayMilliseconds: Int = 0,
         workflowName: String? = nil,
-        workflowAppID: String? = nil
+        workflowAppID: String? = nil,
+        workflowAppName: String? = nil
     ) {
         self.windows = windows
         self.windowTitlePrefix = windowTitlePrefix
@@ -86,6 +88,7 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
         self.terminationDelayMilliseconds = max(0, terminationDelayMilliseconds)
         self.workflowName = workflowName
         self.workflowAppID = workflowAppID
+        self.workflowAppName = workflowAppName
     }
 
     init(
@@ -228,7 +231,8 @@ extension SpaceFixtureLaunchConfiguration {
                 Self.intValue(after: "--terminate-delay-ms", in: arguments) ?? 0
             ),
             workflowName: workflowConfiguration.workflowName,
-            workflowAppID: appConfiguration.appID
+            workflowAppID: appConfiguration.appID,
+            workflowAppName: appConfiguration.appName
         )
     }
 

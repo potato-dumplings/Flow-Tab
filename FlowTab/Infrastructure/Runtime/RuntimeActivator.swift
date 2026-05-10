@@ -25,6 +25,17 @@ final class RuntimeActivator {
         case verified
         case focusedButUnverified
         case noFocusRoute
+
+        var debugName: String {
+            switch self {
+            case .verified:
+                return "verified"
+            case .focusedButUnverified:
+                return "focusedButUnverified"
+            case .noFocusRoute:
+                return "noFocusRoute"
+            }
+        }
     }
 
     var activateCurrentAppIfNeededOverride: ((NSRunningApplication) -> Bool)?
@@ -93,6 +104,10 @@ final class RuntimeActivator {
             allowsPublicAXRecovery: windowContext.allowsPublicAXRecovery,
             restoreIfMinimized: restoreIfMinimized || windowContext.isMinimized
         )
+        RuntimeLog.info(
+            "Activation",
+            "window-request appID=\(appID) pid=\(targetApp.processIdentifier) windowID=\(windowID) title=\(runtimeActivationLogValue(windowContext.title)) cg=\(windowContext.cgWindowID.map(String.init) ?? "nil") handle=\(windowContext.activationHandleID ?? "nil") ax=\(windowContext.axWindow == nil ? 0 : 1) spaces=\(windowContext.spaceIDs) frame=\(runtimeActivationFrameDescription(windowContext.frame)) restore=\(request.restoreIfMinimized) sticky=\(windowContext.hasStickyBinding) source=\(windowContext.lastConfirmationSource?.rawValue ?? "nil")"
+        )
         if request.targetCGWindowID(expectedPID: targetApp.processIdentifier) != nil {
             self.focusWindow(request, in: targetApp)
             return
@@ -117,6 +132,10 @@ final class RuntimeActivator {
         }
 
         let cgFocusResult = attemptCGWindowFocus(request, in: app)
+        RuntimeLog.info(
+            "Activation",
+            "focus-attempt route=cg result=\(cgFocusResult.debugName) pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(request.targetCGWindowID(expectedPID: app.processIdentifier).map(String.init) ?? "nil") frontmost=\(runtimeActivationFrontmostDescription())"
+        )
         let cgFocusVerified: Bool
         switch cgFocusResult {
         case .verified:
@@ -132,7 +151,17 @@ final class RuntimeActivator {
             expectedPID: app.processIdentifier
         )
         if let directWindow = request.preferredAXWindow ?? windowFromRegistry {
-            switch attemptAXWindowFocus(directWindow, request: request, in: app) {
+            let axFocusResult = attemptAXWindowFocus(
+                directWindow,
+                route: "direct",
+                request: request,
+                in: app
+            )
+            RuntimeLog.info(
+                "Activation",
+                "focus-attempt route=ax-direct result=\(axFocusResult.debugName) pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(request.targetCGWindowID(expectedPID: app.processIdentifier).map(String.init) ?? "nil")"
+            )
+            switch axFocusResult {
             case .verified:
                 return true
             case .focusedButUnverified:
@@ -151,13 +180,28 @@ final class RuntimeActivator {
         guard request.allowsPublicAXRecovery else { return false }
 
         let targetCGWindowID = request.targetCGWindowID(expectedPID: app.processIdentifier)
+        let includeRemoteWindows = RuntimeWindowTopologyClassifier.hasOffDesktopSpace(
+            spaceIDs: request.spaceIDs
+        )
+        RuntimeLog.info(
+            "Activation",
+            "ax-recovery scan pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID.map(String.init) ?? "nil") includeRemote=\(includeRemoteWindows ? 1 : 0) spaces=\(request.spaceIDs) expectedTitle=\(runtimeActivationLogValue(request.title)) expectedFrame=\(runtimeActivationFrameDescription(request.frame))"
+        )
         let windows = currentAXWindows(
             for: app,
-            includeRemoteWindows: RuntimeWindowTopologyClassifier.hasOffDesktopSpace(
-                spaceIDs: request.spaceIDs
-            )
+            includeRemoteWindows: includeRemoteWindows
         )
-        guard !windows.isEmpty else { return false }
+        RuntimeLog.info(
+            "Activation",
+            "ax-recovery fetched pid=\(app.processIdentifier) windowID=\(request.windowID) count=\(windows.count)"
+        )
+        guard !windows.isEmpty else {
+            RuntimeLog.info(
+                "Activation",
+                "ax-recovery no-candidates pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID.map(String.init) ?? "nil")"
+            )
+            return false
+        }
 
         if let matchedWindow = resolveAXWindow(
             matchingCGWindowID: targetCGWindowID,
@@ -166,7 +210,17 @@ final class RuntimeActivator {
             windows: windows,
             in: app
         ) {
-            switch attemptAXWindowFocus(matchedWindow, request: request, in: app) {
+            let axFocusResult = attemptAXWindowFocus(
+                matchedWindow,
+                route: "public-recovery",
+                request: request,
+                in: app
+            )
+            RuntimeLog.info(
+                "Activation",
+                "focus-attempt route=ax-public-recovery result=\(axFocusResult.debugName) pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID.map(String.init) ?? "nil")"
+            )
+            switch axFocusResult {
             case .verified:
                 return true
             case .focusedButUnverified, .noFocusRoute:
@@ -174,36 +228,64 @@ final class RuntimeActivator {
             }
         }
 
+        RuntimeLog.info(
+            "Activation",
+            "ax-recovery no-match pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID.map(String.init) ?? "nil")"
+        )
         return false
     }
 
     private func attemptAXWindowFocus(
         _ window: AXUIElement,
+        route: String,
         request: WindowFocusRequest,
         in app: NSRunningApplication
     ) -> WindowFocusAttemptResult {
         guard focusAXWindow(window, restoreIfMinimized: request.restoreIfMinimized, in: app) else {
+            RuntimeLog.info(
+                "Activation",
+                "ax-focus \(route) action-unavailable pid=\(app.processIdentifier) windowID=\(request.windowID)"
+            )
             return .noFocusRoute
         }
-        guard focusAttemptVerified(request, in: app) else {
+        guard verifyFocusAttempt(request, route: "ax-\(route)", in: app) else {
             return .focusedButUnverified
         }
         return .verified
     }
 
-    private func focusAttemptVerified(
+    private func verifyFocusAttempt(
         _ request: WindowFocusRequest,
+        route: String,
         in app: NSRunningApplication
     ) -> Bool {
         guard !request.spaceIDs.isEmpty else {
+            RuntimeLog.info(
+                "Activation",
+                "focus-verify route=\(route) skipped=empty-spaces pid=\(app.processIdentifier) windowID=\(request.windowID)"
+            )
             return true
         }
 
         guard let targetCGWindowID = request.targetCGWindowID(expectedPID: app.processIdentifier) else {
+            RuntimeLog.info(
+                "Activation",
+                "focus-verify route=\(route) skipped=no-target-cg pid=\(app.processIdentifier) windowID=\(request.windowID)"
+            )
             return true
         }
 
-        return targetCGWindowIsVisible(targetCGWindowID, in: app)
+        let currentWindows = currentCGWindows(forPID: app.processIdentifier)
+        let isVisible = targetCGWindowIsVisible(
+            targetCGWindowID,
+            in: app,
+            currentWindows: currentWindows
+        )
+        RuntimeLog.info(
+            "Activation",
+            "focus-verify route=\(route) pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID) visible=\(isVisible ? 1 : 0) windows=\(runtimeActivationCGWindowSummary(currentWindows, targetCGWindowID: targetCGWindowID))"
+        )
+        return isVisible
     }
 
     private func attemptCGWindowFocus(
@@ -216,15 +298,37 @@ final class RuntimeActivator {
         guard focusCGWindow(targetCGWindowID, in: app) else {
             return .noFocusRoute
         }
-        return targetCGWindowIsVisible(targetCGWindowID, in: app) ? .verified : .focusedButUnverified
+        let currentWindows = currentCGWindows(forPID: app.processIdentifier)
+        let isVisible = targetCGWindowIsVisible(
+            targetCGWindowID,
+            in: app,
+            currentWindows: currentWindows
+        )
+        RuntimeLog.info(
+            "Activation",
+            "cg-window-focus verify pid=\(app.processIdentifier) targetCG=\(targetCGWindowID) visible=\(isVisible ? 1 : 0) windows=\(runtimeActivationCGWindowSummary(currentWindows, targetCGWindowID: targetCGWindowID))"
+        )
+        return isVisible ? .verified : .focusedButUnverified
     }
 
     private func targetCGWindowIsVisible(
         _ targetCGWindowID: CGWindowID?,
         in app: NSRunningApplication
     ) -> Bool {
+        targetCGWindowIsVisible(
+            targetCGWindowID,
+            in: app,
+            currentWindows: currentCGWindows(forPID: app.processIdentifier)
+        )
+    }
+
+    private func targetCGWindowIsVisible(
+        _ targetCGWindowID: CGWindowID?,
+        in _: NSRunningApplication,
+        currentWindows: [RuntimeSnapshotProvider.CGWindowEntry]
+    ) -> Bool {
         guard let targetCGWindowID else { return true }
-        return currentCGWindows(forPID: app.processIdentifier).contains { window in
+        return currentWindows.contains { window in
             window.id == targetCGWindowID
                 && window.isOnscreen
                 && RuntimeSnapshotProvider.cgWindowPassesValidityConstraints(window)
@@ -235,19 +339,35 @@ final class RuntimeActivator {
         guard !focusRecoveryRetryDelaysNanoseconds.isEmpty else { return }
         focusRecoveryTask?.cancel()
         let retryDelays = focusRecoveryRetryDelaysNanoseconds
+        RuntimeLog.info(
+            "Activation",
+            "focus-recovery scheduled pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(request.targetCGWindowID(expectedPID: app.processIdentifier).map(String.init) ?? "nil") delaysNs=\(retryDelays)"
+        )
         focusRecoveryTask = Task { @MainActor [weak self] in
             guard let self else { return }
             defer { self.focusRecoveryTask = nil }
 
-            for delay in retryDelays {
+            for (attemptIndex, delay) in retryDelays.enumerated() {
                 if delay > 0 {
                     try? await Task.sleep(nanoseconds: delay)
                 }
                 guard !Task.isCancelled else { return }
+                RuntimeLog.info(
+                    "Activation",
+                    "focus-recovery attempt=\(attemptIndex + 1) pid=\(app.processIdentifier) windowID=\(request.windowID)"
+                )
                 if self.attemptWindowFocus(request, in: app) {
+                    RuntimeLog.info(
+                        "Activation",
+                        "focus-recovery verified attempt=\(attemptIndex + 1) pid=\(app.processIdentifier) windowID=\(request.windowID)"
+                    )
                     return
                 }
             }
+            RuntimeLog.info(
+                "Activation",
+                "focus-recovery exhausted pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(request.targetCGWindowID(expectedPID: app.processIdentifier).map(String.init) ?? "nil")"
+            )
         }
     }
 
@@ -465,14 +585,21 @@ final class RuntimeActivator {
                 frame: axWindowFrame(for: window)
             )
         }
-        return RuntimeSnapshotProvider.recoverAXWindowFromPublicSources(
+        guard let recovery = RuntimeSnapshotProvider.recoverAXWindowFromPublicSourcesWithDiagnostics(
             targetCGWindowID: targetCGWindowID,
             expectedTitle: expectedTitle,
             expectedFrame: expectedFrame,
             windows: axEntries,
             cgWindows: cgWindows,
             appName: app.localizedName ?? app.bundleIdentifier
-        )?.window
+        ) else {
+            return nil
+        }
+        RuntimeLog.info(
+            "Activation",
+            "ax-recovery selected pid=\(app.processIdentifier) reason=\(recovery.reason) axID=\(recovery.window.id) title=\(runtimeActivationLogValue(recovery.window.sourceTitle ?? recovery.window.title)) bridgedCG=\(AXWindowInspector.cgWindowID(for: recovery.window.window).map(String.init) ?? "nil") frame=\(runtimeActivationFrameDescription(recovery.window.frame)) role=\(AXWindowInspector.role(for: recovery.window.window) ?? "nil") subrole=\(AXWindowInspector.subrole(for: recovery.window.window) ?? "nil")"
+        )
+        return recovery.window.window
     }
 
     nonisolated private static func cgWindowID(from windowID: String, expectedPID: pid_t) -> CGWindowID? {
@@ -484,4 +611,37 @@ final class RuntimeActivator {
         return CGWindowID(rawWindowID)
     }
 
+}
+
+private func runtimeActivationFrontmostDescription() -> String {
+    guard let app = NSWorkspace.shared.frontmostApplication else { return "nil" }
+    return "\(app.bundleIdentifier ?? "nil"):\(app.processIdentifier)"
+}
+
+private func runtimeActivationCGWindowSummary(
+    _ windows: [RuntimeSnapshotProvider.CGWindowEntry],
+    targetCGWindowID: CGWindowID
+) -> String {
+    let firstOnscreen = windows.first(where: { $0.isOnscreen }).map { window in
+        "\(window.id):\(runtimeActivationLogValue(window.title ?? "nil"))"
+    } ?? "nil"
+    let sample = windows.prefix(10).map { window in
+        let marker = window.id == targetCGWindowID ? "*" : ""
+        let onscreen = window.isOnscreen ? "on" : "off"
+        let title = runtimeActivationLogValue(window.title ?? "nil")
+        return "\(marker)\(window.id):\(title):\(onscreen):\(runtimeActivationFrameDescription(window.bounds))"
+    }.joined(separator: ",")
+    return "firstOnscreen=\(firstOnscreen) all=[\(sample)]"
+}
+
+private func runtimeActivationFrameDescription(_ frame: CGRect?) -> String {
+    guard let frame else { return "nil" }
+    return "\(Int(frame.origin.x)),\(Int(frame.origin.y)),\(Int(frame.size.width))x\(Int(frame.size.height))"
+}
+
+private func runtimeActivationLogValue(_ value: String) -> String {
+    value
+        .replacingOccurrences(of: "\n", with: " ")
+        .replacingOccurrences(of: "\r", with: " ")
+        .trimmingCharacters(in: .whitespacesAndNewlines)
 }

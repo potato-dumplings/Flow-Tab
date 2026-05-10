@@ -5,7 +5,7 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
     let plan: SpaceFixtureWindowPlan
 
     private let contentView: SpaceFixtureWindowContentView
-    private let window: NSWindow
+    private let window: ChromeLikeSpaceFixtureWindow
     private let noisyCGSiblings: NoisyCGSiblingWindowSet?
 
     var applicationAccessibilityElement: Any {
@@ -16,7 +16,7 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
         self.plan = plan
         let contentView = SpaceFixtureWindowContentView(plan: plan)
 
-        let window = NSWindow(
+        let window = ChromeLikeSpaceFixtureWindow(
             contentRect: plan.frame,
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
@@ -46,6 +46,8 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
     }
 
     func enterFullScreen() {
+        suppressNoisyFullScreenContentAccessibilityIfNeeded()
+        showNoisyCGSiblingsIfNeeded()
         window.toggleFullScreen(nil)
         showNoisyCGSiblingsIfNeeded(after: 2.5)
     }
@@ -71,16 +73,59 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
         }
     }
 
+    private func suppressNoisyFullScreenContentAccessibilityIfNeeded() {
+        guard plan.noisyCGSiblings, plan.isFullscreenTarget else { return }
+        window.suppressAccessibilityExposure()
+    }
+
+}
+
+@MainActor
+private final class ChromeLikeSpaceFixtureWindow: NSWindow {
+    private var suppressesAccessibilityExposure = false
+
+    func suppressAccessibilityExposure() {
+        suppressesAccessibilityExposure = true
+        setAccessibilityElement(false)
+        setAccessibilityChildren([])
+        setAccessibilityWindows([])
+    }
+
+    override func isAccessibilityElement() -> Bool {
+        suppressesAccessibilityExposure ? false : super.isAccessibilityElement()
+    }
+
+    override func accessibilityRole() -> NSAccessibility.Role? {
+        suppressesAccessibilityExposure ? nil : super.accessibilityRole()
+    }
+
+    override func accessibilitySubrole() -> NSAccessibility.Subrole? {
+        suppressesAccessibilityExposure ? nil : super.accessibilitySubrole()
+    }
+
+    override func accessibilityChildren() -> [Any]? {
+        suppressesAccessibilityExposure ? [] : super.accessibilityChildren()
+    }
 }
 
 @MainActor
 private final class NoisyCGSiblingWindowSet {
+    private enum ChromeLikeLayout {
+        static let titlebarHeight: CGFloat = 37
+        static let toolbarHeight: CGFloat = 41
+        static let tabStripHeight: CGFloat = 80
+        static let chromeStackHeight = titlebarHeight + toolbarHeight + tabStripHeight
+    }
+
     private struct Spec {
         let suffix: String
+        let title: String?
         let height: CGFloat
         let insetFromTop: CGFloat
         let horizontalInset: CGFloat
+        let usesTitledWindow: Bool
         let exposesAccessibilityElement: Bool
+        let ignoresCycle: Bool
     }
 
     private let plan: SpaceFixtureWindowPlan
@@ -104,17 +149,19 @@ private final class NoisyCGSiblingWindowSet {
         noisySiblingSpecs().map { spec in
             let window = NSWindow(
                 contentRect: frame(for: spec, hostFrame: hostWindow.frame),
-                styleMask: spec.exposesAccessibilityElement ? [.titled] : [.borderless],
+                styleMask: spec.usesTitledWindow ? [.titled] : [.borderless],
                 backing: .buffered,
                 defer: false
             )
-            window.title = ""
-            window.titleVisibility = .hidden
+            window.title = spec.title ?? ""
+            window.titleVisibility = spec.title == nil ? .hidden : .visible
             window.titlebarAppearsTransparent = true
             window.identifier = NSUserInterfaceItemIdentifier(
                 "\(plan.windowAccessibilityIdentifier).noisy-cg-sibling.\(spec.suffix)"
             )
-            window.collectionBehavior = [.fullScreenAuxiliary, .ignoresCycle]
+            window.collectionBehavior = spec.ignoresCycle
+                ? [.fullScreenAuxiliary, .ignoresCycle]
+                : [.fullScreenAuxiliary]
             window.backgroundColor = .windowBackgroundColor
             window.isOpaque = true
             window.alphaValue = 1
@@ -145,55 +192,77 @@ private final class NoisyCGSiblingWindowSet {
     }
 
     private func noisySiblingSpecs() -> [Spec] {
-        [
+        let appNameTitle = plan.fixtureAppName ?? plan.title
+        return [
             Spec(
                 suffix: "titlebar",
-                height: 37,
+                title: appNameTitle,
+                height: ChromeLikeLayout.titlebarHeight,
                 insetFromTop: 0,
                 horizontalInset: 0,
-                exposesAccessibilityElement: false
+                usesTitledWindow: false,
+                exposesAccessibilityElement: true,
+                ignoresCycle: true
             ),
             Spec(
                 suffix: "toolbar",
-                height: 41,
-                insetFromTop: 37,
+                title: appNameTitle,
+                height: ChromeLikeLayout.toolbarHeight,
+                insetFromTop: ChromeLikeLayout.titlebarHeight,
                 horizontalInset: 0,
-                exposesAccessibilityElement: false
+                usesTitledWindow: false,
+                exposesAccessibilityElement: true,
+                ignoresCycle: true
             ),
             Spec(
                 suffix: "omnibox",
-                height: 80,
-                insetFromTop: 78,
+                title: appNameTitle,
+                height: ChromeLikeLayout.tabStripHeight,
+                insetFromTop: ChromeLikeLayout.titlebarHeight + ChromeLikeLayout.toolbarHeight,
                 horizontalInset: 0,
-                exposesAccessibilityElement: false
+                usesTitledWindow: false,
+                exposesAccessibilityElement: true,
+                ignoresCycle: true
             ),
             Spec(
                 suffix: "content-wrapper",
+                title: appNameTitle,
                 height: 165,
-                insetFromTop: 37,
+                insetFromTop: ChromeLikeLayout.titlebarHeight,
                 horizontalInset: 0,
-                exposesAccessibilityElement: true
+                usesTitledWindow: true,
+                exposesAccessibilityElement: true,
+                ignoresCycle: false
             ),
             Spec(
                 suffix: "content-plane",
+                title: appNameTitle,
                 height: 520,
-                insetFromTop: 158,
+                insetFromTop: ChromeLikeLayout.chromeStackHeight,
                 horizontalInset: 0,
-                exposesAccessibilityElement: false
+                usesTitledWindow: true,
+                exposesAccessibilityElement: true,
+                ignoresCycle: false
             ),
             Spec(
                 suffix: "preview-overlay",
+                title: nil,
                 height: 418,
                 insetFromTop: 63,
                 horizontalInset: 96,
-                exposesAccessibilityElement: false
+                usesTitledWindow: false,
+                exposesAccessibilityElement: false,
+                ignoresCycle: true
             ),
             Spec(
                 suffix: "floating-strip",
+                title: nil,
                 height: 80,
                 insetFromTop: 202,
                 horizontalInset: 160,
-                exposesAccessibilityElement: false
+                usesTitledWindow: false,
+                exposesAccessibilityElement: false,
+                ignoresCycle: true
             )
         ]
     }

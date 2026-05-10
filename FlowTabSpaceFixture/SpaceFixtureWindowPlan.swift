@@ -15,6 +15,7 @@ struct SpaceFixtureWindowPlan: Equatable {
     let index: Int
     let totalWindowCount: Int
     let configuredTitle: String
+    let fixtureAppName: String?
     let title: String
     let frame: CGRect
     let isFullscreenTarget: Bool
@@ -99,6 +100,7 @@ enum SpaceFixtureWindowPlanner {
                 index: index,
                 totalWindowCount: configuration.windowCount,
                 configuredTitle: configuredWindow.configuredTitle,
+                fixtureAppName: configuration.workflowAppName,
                 title: configuredWindow.windowTitle,
                 frame: CGRect(origin: origin, size: defaultWindowSize),
                 isFullscreenTarget: configuredWindow.isFullscreenTarget,

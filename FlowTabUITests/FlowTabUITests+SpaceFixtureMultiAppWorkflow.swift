@@ -123,6 +123,38 @@ struct SpaceFixtureResolvedWorkflow: Equatable {
         let expectedWindowTitles: [String]
         var expectedHomeWindowTitles: [String] = []
         let fullscreenWindowIndex: Int?
+        let fullscreenWindowTitles: [String]
+
+        init(
+            appID: String,
+            appName: String,
+            identity: SpaceFixtureAppIdentity,
+            launchOrder: Int,
+            windowCount: Int,
+            expectedWindowTitles: [String],
+            expectedHomeWindowTitles: [String] = [],
+            fullscreenWindowIndex: Int?,
+            fullscreenWindowTitles: [String]? = nil
+        ) {
+            self.appID = appID
+            self.appName = appName
+            self.identity = identity
+            self.launchOrder = launchOrder
+            self.windowCount = windowCount
+            self.expectedWindowTitles = expectedWindowTitles
+            self.expectedHomeWindowTitles = expectedHomeWindowTitles
+            self.fullscreenWindowIndex = fullscreenWindowIndex
+            if let fullscreenWindowTitles {
+                self.fullscreenWindowTitles = fullscreenWindowTitles
+            } else if let fullscreenWindowIndex {
+                let titleIndex = fullscreenWindowIndex - 1
+                self.fullscreenWindowTitles = expectedWindowTitles.indices.contains(titleIndex)
+                    ? [expectedWindowTitles[titleIndex]]
+                    : []
+            } else {
+                self.fullscreenWindowTitles = []
+            }
+        }
 
         var isFullscreenOnlyInHome: Bool {
             fullscreenWindowIndex != nil && expectedHomeWindowTitles.isEmpty
@@ -192,7 +224,10 @@ struct SpaceFixtureResolvedWorkflow: Equatable {
                     windowCount: app.windows.count,
                     expectedWindowTitles: app.windows.map(\.resolvedTitle),
                     expectedHomeWindowTitles: app.windows.compactMap(\.homeResolvedTitle),
-                    fullscreenWindowIndex: app.windows.firstIndex(where: { $0.mode == .fullscreen }).map { $0 + 1 }
+                    fullscreenWindowIndex: app.windows.firstIndex(where: { $0.mode == .fullscreen }).map { $0 + 1 },
+                    fullscreenWindowTitles: app.windows
+                        .filter { $0.mode == .fullscreen }
+                        .map(\.resolvedTitle)
                 )
             }
             .sorted {
