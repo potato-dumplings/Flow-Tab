@@ -271,6 +271,37 @@ extension FlowTabUITests {
         return false
     }
 
+    func waitForWorkflowSpaceContainingCGWindow(
+        title: String,
+        app workflowApp: SpaceFixtureResolvedWorkflow.App,
+        timeout: TimeInterval
+    ) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        var latestDescriptions: [String] = []
+        repeat {
+            let observations = workflowCGWindowObservations(
+                bundleIdentifier: workflowApp.identity.bundleIdentifier,
+                options: [.optionOnScreenOnly, .excludeDesktopElements]
+            )
+            latestDescriptions = observations.map { observation in
+                "\(observation.number):\(observation.title ?? "nil")@\(workflowCGFrameDescription(observation.frame))"
+            }
+            if observations.contains(where: { $0.matchesWorkflowSpaceWindow(title: title) }) {
+                return true
+            }
+
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+
+        XCTFail(
+            """
+            Expected active workflow Space to contain \(workflowApp.appName) / \(title), \
+            found CG windows [\(latestDescriptions.joined(separator: ";"))].
+            """
+        )
+        return false
+    }
+
     func waitForTopmostWorkflowCGWindow(
         title: String,
         app workflowApp: SpaceFixtureResolvedWorkflow.App,
@@ -385,26 +416,43 @@ extension FlowTabUITests {
         bundleIdentifier: String,
         options: CGWindowListOption
     ) -> [String] {
+        workflowCGWindowObservations(
+            bundleIdentifier: bundleIdentifier,
+            options: options
+        ).map { observation in
+            "\(observation.number):\(observation.title ?? "nil")@\(workflowCGFrameDescription(observation.frame))"
+        }
+    }
+
+    private func workflowCGWindowObservations(
+        bundleIdentifier: String,
+        options: CGWindowListOption
+    ) -> [WorkflowCGWindowObservation] {
         guard let runningApp = NSRunningApplication
             .runningApplications(withBundleIdentifier: bundleIdentifier)
             .first(where: { !$0.isTerminated })
         else {
-            return ["pid=nil"]
+            return []
         }
         guard let windows = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
-            return ["windows=nil"]
+            return []
         }
 
-        return windows.compactMap { window -> String? in
+        return windows.compactMap { window -> WorkflowCGWindowObservation? in
             guard cgWindowPID(window[kCGWindowOwnerPID as String]) == runningApp.processIdentifier else {
                 return nil
             }
             guard cgWindowPassesValidityConstraints(window) else { return nil }
-            let number = cgWindowNumber(window[kCGWindowNumber as String]).map(String.init) ?? "nil"
+            guard let number = cgWindowNumber(window[kCGWindowNumber as String]) else {
+                return nil
+            }
             let title = (window[kCGWindowName as String] as? String)?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
-            let frame = workflowCGFrameDescription(cgWindowFrame(window))
-            return "\(number):\(title?.isEmpty == false ? title! : "nil")@\(frame)"
+            return WorkflowCGWindowObservation(
+                number: number,
+                title: title?.isEmpty == false ? title : nil,
+                frame: cgWindowFrame(window)
+            )
         }
     }
 

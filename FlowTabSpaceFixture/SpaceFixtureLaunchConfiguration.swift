@@ -11,6 +11,21 @@ struct SpaceFixtureConfiguredWindow: Equatable {
     let windowTitle: String
     let mode: SpaceFixtureWindowMode
     let tabs: [SpaceFixtureConfiguredTab]
+    let noisyCGSiblings: Bool
+
+    init(
+        configuredTitle: String,
+        windowTitle: String,
+        mode: SpaceFixtureWindowMode,
+        tabs: [SpaceFixtureConfiguredTab],
+        noisyCGSiblings: Bool = false
+    ) {
+        self.configuredTitle = configuredTitle
+        self.windowTitle = windowTitle
+        self.mode = mode
+        self.tabs = tabs
+        self.noisyCGSiblings = noisyCGSiblings
+    }
 
     var isFullscreenTarget: Bool {
         mode == .fullscreen
@@ -95,7 +110,8 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
                 configuredTitle: title,
                 windowTitle: title,
                 mode: normalizedFullscreenWindowIndex == index ? .fullscreen : .standard,
-                tabs: []
+                tabs: [],
+                noisyCGSiblings: false
             )
         }
 
@@ -224,7 +240,8 @@ extension SpaceFixtureLaunchConfiguration {
                 configuredTitle: configuredTitle,
                 windowTitle: windowTitle,
                 mode: window.mode,
-                tabs: normalizedTabs
+                tabs: normalizedTabs,
+                noisyCGSiblings: window.noisyCGSiblings
             )
         }
     }

@@ -19,6 +19,7 @@ struct SpaceFixtureWindowPlan: Equatable {
     let frame: CGRect
     let isFullscreenTarget: Bool
     let tabs: [SpaceFixtureConfiguredTab]
+    let noisyCGSiblings: Bool
 
     var rootAccessibilityIdentifier: String {
         "flowtab.spacefixture.window.root.\(index)"
@@ -101,7 +102,8 @@ enum SpaceFixtureWindowPlanner {
                 title: configuredWindow.windowTitle,
                 frame: CGRect(origin: origin, size: defaultWindowSize),
                 isFullscreenTarget: configuredWindow.isFullscreenTarget,
-                tabs: configuredWindow.tabs
+                tabs: configuredWindow.tabs,
+                noisyCGSiblings: configuredWindow.noisyCGSiblings
             )
         }
     }

@@ -1,3 +1,4 @@
+import AppKit
 import CoreGraphics
 import XCTest
 
@@ -29,6 +30,26 @@ private final class SpaceFixtureWindowSpy: SpaceFixtureWindowing {
 }
 
 extension FlowTabTests {
+    @MainActor
+    func testAppKitSpaceFixtureWindowDisablesStateRestoration() {
+        let plan = SpaceFixtureWindowPlan(
+            index: 1,
+            totalWindowCount: 1,
+            configuredTitle: "Chrome Window",
+            title: "Mail",
+            frame: CGRect(x: 20, y: 30, width: 960, height: 640),
+            isFullscreenTarget: true,
+            tabs: [],
+            noisyCGSiblings: false
+        )
+
+        let fixtureWindow = AppKitSpaceFixtureWindow(plan: plan)
+        let window = fixtureWindow.applicationAccessibilityElement as? NSWindow
+
+        XCTAssertNotNil(window)
+        XCTAssertFalse(window?.isRestorable ?? true)
+    }
+
     @MainActor
     func testSpaceFixtureWindowCoordinatorLaunchesWindowsAndSchedulesFullscreenTarget() {
         let configuration = SpaceFixtureLaunchConfiguration(

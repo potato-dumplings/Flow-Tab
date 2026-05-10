@@ -12,6 +12,26 @@ private struct InAppWindowSelection: Equatable {
 extension FlowTabUITests {
     func testInAppWindowSwitcherControlTabRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithoutAppAXWindows() throws {
         let workflow = try configuredSwitcherSpaceFixtureWorkflow()
+        try runInAppWindowSwitcherControlTabRoundTrip(
+            workflow,
+            traceLabel: "control"
+        )
+    }
+
+    func testInAppWindowSwitcherControlTabRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithNoisyCGSiblingsWithoutAppAXWindows() throws {
+        let workflow = try configuredNoisyCGSiblingsSwitcherSpaceFixtureWorkflow()
+        try runInAppWindowSwitcherControlTabRoundTrip(
+            workflow,
+            traceLabel: "control.noisy",
+            allowsNoisyCGSiblings: true
+        )
+    }
+
+    private func runInAppWindowSwitcherControlTabRoundTrip(
+        _ workflow: SpaceFixtureResolvedWorkflow,
+        traceLabel: String,
+        allowsNoisyCGSiblings: Bool = false
+    ) throws {
         let targetApp = try XCTUnwrap(
             workflow.apps.first { fullscreenWindowTitle(in: $0) != nil },
             "Switcher workflow must include an app with a fullscreen fixture window"
@@ -28,27 +48,44 @@ extension FlowTabUITests {
             preservesDesktopAfterFullscreen: false,
             prelaunchesFlowTabBeforeFixture: true,
             beforeFlowTabLaunch: { _ in
-                self.logWorkflowSpaceObservation("control.beforeFlowTabLaunch", app: targetApp)
-                _ = try XCTUnwrap(
-                    self.waitForFrontmostWorkflowSpaceCGWindow(
-                        title: fullscreenTitle,
-                        app: targetApp,
-                        timeout: 12
-                    ),
-                    "Control+Tab roundtrip must start with the fullscreen sibling frontmost."
-                )
+                self.logWorkflowSpaceObservation("\(traceLabel).beforeFlowTabLaunch", app: targetApp)
+                if allowsNoisyCGSiblings {
+                    XCTAssertTrue(
+                        self.waitForWorkflowSpaceContainingCGWindow(
+                            title: fullscreenTitle,
+                            app: targetApp,
+                            timeout: 12
+                        ),
+                        "Control+Tab noisy roundtrip must start on a Space containing the fullscreen sibling."
+                    )
+                } else {
+                    _ = try XCTUnwrap(
+                        self.waitForFrontmostWorkflowSpaceCGWindow(
+                            title: fullscreenTitle,
+                            app: targetApp,
+                            timeout: 12
+                        ),
+                        "Control+Tab roundtrip must start with the fullscreen sibling frontmost."
+                    )
+                }
             },
-            flowTabLaunchTraceLabel: "control",
+            flowTabLaunchTraceLabel: traceLabel,
             afterFlowTabLaunch: { _, _ in
-                self.logWorkflowSpaceObservation("control.afterFlowTabLaunch", app: targetApp)
+                self.logWorkflowSpaceObservation("\(traceLabel).afterFlowTabLaunch", app: targetApp)
             }
         ) { _, app in
-            logWorkflowSpaceObservation("control.beforeTrigger", app: targetApp)
-            postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.inApp, traceLabel: "control")
+            logWorkflowSpaceObservation("\(traceLabel).beforeTrigger", app: targetApp)
+            postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.inApp, traceLabel: traceLabel)
             var diagnosticsSummary = assertInAppWindowSwitcherReady(for: targetApp, in: app)
-            logWorkflowSpaceObservation("control.afterPanelReady", app: targetApp)
+            logWorkflowSpaceObservation("\(traceLabel).afterPanelReady", app: targetApp)
             XCTAssertTrue(
-                waitForActiveSpaceWorkflowCGWindow(
+                allowsNoisyCGSiblings
+                    ? waitForWorkflowSpaceContainingCGWindow(
+                        title: fullscreenTitle,
+                        app: targetApp,
+                        timeout: 4
+                    )
+                    : waitForActiveSpaceWorkflowCGWindow(
                     title: fullscreenTitle,
                     app: targetApp,
                     timeout: 4
@@ -74,7 +111,7 @@ extension FlowTabUITests {
                 timeout: 8
             )
 
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.confirm, traceLabel: "control.confirmStandard")
+            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.confirm, traceLabel: "\(traceLabel).confirmStandard")
             XCTAssertTrue(waitForNonExistence(diagnosticsSummary, timeout: 4))
             XCTAssertTrue(
                 waitForExactFrontmostWorkflowCGWindow(
@@ -84,10 +121,10 @@ extension FlowTabUITests {
                     timeout: 12
                 )
             )
-            logWorkflowSpaceObservation("control.afterStandardConfirm", app: targetApp)
+            logWorkflowSpaceObservation("\(traceLabel).afterStandardConfirm", app: targetApp)
 
             diagnosticsSummary = relaunchInAppWindowSwitcher(app, for: targetApp)
-            logWorkflowSpaceObservation("control.afterSecondPanelReady", app: targetApp)
+            logWorkflowSpaceObservation("\(traceLabel).afterSecondPanelReady", app: targetApp)
             XCTAssertTrue(
                 waitForExactFrontmostWorkflowCGWindow(
                     windowNumber: standardSelection.windowNumber,
@@ -116,7 +153,7 @@ extension FlowTabUITests {
                 timeout: 8
             )
 
-            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.confirm, traceLabel: "control.confirmFullscreen")
+            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.confirm, traceLabel: "\(traceLabel).confirmFullscreen")
             XCTAssertTrue(waitForNonExistence(diagnosticsSummary, timeout: 4))
             XCTAssertTrue(
                 waitForExactFrontmostWorkflowCGWindow(
@@ -126,7 +163,7 @@ extension FlowTabUITests {
                     timeout: 12
                 )
             )
-            logWorkflowSpaceObservation("control.afterFullscreenConfirm", app: targetApp)
+            logWorkflowSpaceObservation("\(traceLabel).afterFullscreenConfirm", app: targetApp)
         }
     }
 

@@ -26,6 +26,13 @@ enum SpaceFixtureMultiAppWorkflowDefaults {
             .appendingPathComponent("space-fixture-switcher-multi-app-workflow.json")
     }
 
+    static var noisyCGSiblingsSwitcherWorkflowSourceURL: URL {
+        repositoryRootURL
+            .appendingPathComponent("docs", isDirectory: true)
+            .appendingPathComponent("fixtures", isDirectory: true)
+            .appendingPathComponent("space-fixture-switcher-noisy-cg-siblings-workflow.json")
+    }
+
     static var defaultResolvedWorkflowURL: URL {
         repositoryRootURL
             .appendingPathComponent(".build-local", isDirectory: true)
@@ -238,6 +245,7 @@ struct SpaceFixtureResolvedWorkflowWindowDocument: Codable {
     let title: String
     let mode: SpaceFixtureResolvedWorkflowWindowMode
     let tabs: [SpaceFixtureResolvedWorkflowTabDocument]
+    let noisyCGSiblings: Bool?
 
     var resolvedTitle: String {
         if let selectedTitle = tabs.first(where: \.isSelected)?.trimmedTitle, !selectedTitle.isEmpty {

@@ -58,4 +58,12 @@ final class SpaceFixtureAppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         true
     }
+
+    func application(_ app: NSApplication, shouldSaveApplicationState coder: NSCoder) -> Bool {
+        false
+    }
+
+    func application(_ app: NSApplication, shouldRestoreApplicationState coder: NSCoder) -> Bool {
+        false
+    }
 }

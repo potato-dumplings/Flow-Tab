@@ -392,6 +392,36 @@ extension FlowTabUITests {
         }
     }
 
+    func configuredNoisyCGSiblingsSwitcherSpaceFixtureWorkflow(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) throws -> SpaceFixtureResolvedWorkflow {
+        do {
+            let installedWorkflow = try SpaceFixtureResolvedWorkflow.configured(environment: environment)
+            let workflow = try resolveSpaceFixtureWorkflowScenario(
+                sourceWorkflowURL: SpaceFixtureMultiAppWorkflowDefaults.noisyCGSiblingsSwitcherWorkflowSourceURL,
+                using: installedWorkflow
+            )
+            try validateSwitcherMultiAppWorkflow(workflow)
+            return workflow
+        } catch let error as SpaceFixtureMultiAppWorkflowError {
+            switch error {
+            case .missingWorkflowPath, .workflowScenarioMissingAppVariant, .workflowScenarioBundleIdentifierMismatch:
+                throw XCTSkip(
+                    multiAppWorkflowSetupMessage(
+                        reason: error.localizedDescription,
+                        scenarioSourceURL: SpaceFixtureMultiAppWorkflowDefaults.noisyCGSiblingsSwitcherWorkflowSourceURL
+                    )
+                )
+            default:
+                XCTFail(error.localizedDescription)
+                throw error
+            }
+        } catch {
+            XCTFail(error.localizedDescription)
+            throw error
+        }
+    }
+
     func fullscreenWindowTitle(in workflowApp: SpaceFixtureResolvedWorkflow.App) -> String? {
         guard let fullscreenWindowIndex = workflowApp.fullscreenWindowIndex else { return nil }
         let titleIndex = fullscreenWindowIndex - 1
