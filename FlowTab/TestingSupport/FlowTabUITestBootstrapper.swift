@@ -234,7 +234,7 @@ enum FlowTabUITestBootstrapper {
 
                     if stableSnapshotCount >= requiredStableSnapshotCount {
                         if FlowTabTestLaunchOptions.entersSearchOnLaunch {
-                            _ = panelController.modelForTesting.enterSearchMode()
+                            _ = panelController.enterSearchModeIfPossible()
                         }
                         return
                     }
@@ -349,7 +349,7 @@ private final class SwitcherTriggerNotificationObserver: NSObject {
             return panelController.presentInAppWindowHotkeySessionForTesting()
         case .search:
             guard panelController.presentGlobalHotkeySessionForTesting() else { return false }
-            _ = panelController.modelForTesting.enterSearchMode()
+            _ = panelController.enterSearchModeIfPossible()
             return true
         }
     }

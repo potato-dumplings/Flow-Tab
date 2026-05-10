@@ -510,6 +510,47 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testUITestSearchLaunchUsesControllerSearchSizingPath() async {
+        await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
+            let previousLaunchArguments = FlowTabTestLaunchOptions.argumentsOverrideForTesting
+            FlowTabTestLaunchOptions.argumentsOverrideForTesting = [
+                "--flowtab-ui-open-switcher-search"
+            ]
+            defer {
+                FlowTabTestLaunchOptions.argumentsOverrideForTesting = previousLaunchArguments
+            }
+
+            let controller = SwitcherPanelController()
+            let apps = searchScenarioApps()
+            controller.modelForTesting.snapshotProviderOverride = {
+                RuntimeSnapshot(apps: apps, contextsByID: [:])
+            }
+
+            FlowTabUITestBootstrapper.presentInitialUIIfNeeded(panelController: controller)
+
+            let expectedSearchHeight = CGFloat(62 + apps.count * 40 + 58)
+            let deadline = DispatchTime.now().uptimeNanoseconds + 2_000_000_000
+            while DispatchTime.now().uptimeNanoseconds < deadline {
+                if
+                    controller.modelForTesting.isSearchActive,
+                    abs(controller.panelContentSizeForTesting.height - expectedSearchHeight) <= 0.001
+                {
+                    break
+                }
+                try? await Task.sleep(nanoseconds: 50_000_000)
+            }
+
+            XCTAssertTrue(controller.modelForTesting.isSearchActive)
+            XCTAssertEqual(
+                controller.panelContentSizeForTesting.height,
+                expectedSearchHeight,
+                accuracy: 0.001
+            )
+            controller.cancelSelectionForTesting()
+        }
+    }
+
+    @MainActor
     func testSwitcherPanelControllerMarkedTextPassesSearchShortcutKeysThrough() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
             let controller = SwitcherPanelController()
