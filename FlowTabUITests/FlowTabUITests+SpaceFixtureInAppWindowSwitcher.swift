@@ -11,7 +11,9 @@ private struct InAppWindowSelection: Equatable {
 
 extension FlowTabUITests {
     func testInAppWindowSwitcherControlTabRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithoutAppAXWindows() throws {
-        let workflow = try configuredSwitcherSpaceFixtureWorkflow()
+        let workflow = try configuredSwitcherRuntimeTruthWorkflow(
+            sourceWorkflowURL: SpaceFixtureMultiAppWorkflowDefaults.controlTabRuntimeTruthWorkflowSourceURL
+        )
         try runInAppWindowSwitcherControlTabRoundTrip(
             workflow,
             traceLabel: "control"
@@ -19,7 +21,9 @@ extension FlowTabUITests {
     }
 
     func testInAppWindowSwitcherControlTabRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithNoisyCGSiblingsWithoutAppAXWindows() throws {
-        let workflow = try configuredNoisyCGSiblingsSwitcherSpaceFixtureWorkflow()
+        let workflow = try configuredSwitcherRuntimeTruthWorkflow(
+            sourceWorkflowURL: SpaceFixtureMultiAppWorkflowDefaults.controlTabNoisyRuntimeTruthWorkflowSourceURL
+        )
         try runInAppWindowSwitcherControlTabRoundTrip(
             workflow,
             traceLabel: "control.noisy",

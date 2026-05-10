@@ -9,7 +9,9 @@ private struct RuntimeTruthWindowSelection: Equatable {
 
 extension FlowTabUITests {
     func testSwitcherPanelOptionTabWindowStateRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithoutAppAXWindows() throws {
-        let workflow = try configuredSwitcherSpaceFixtureWorkflow()
+        let workflow = try configuredSwitcherRuntimeTruthWorkflow(
+            sourceWorkflowURL: SpaceFixtureMultiAppWorkflowDefaults.optionTabWindowStateRuntimeTruthWorkflowSourceURL
+        )
         try runSwitcherPanelOptionTabWindowStateRoundTrip(
             workflow,
             traceLabel: "option"
@@ -17,7 +19,9 @@ extension FlowTabUITests {
     }
 
     func testSwitcherPanelOptionTabWindowStateRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithNoisyCGSiblingsWithoutAppAXWindows() throws {
-        let workflow = try configuredNoisyCGSiblingsSwitcherSpaceFixtureWorkflow()
+        let workflow = try configuredSwitcherRuntimeTruthWorkflow(
+            sourceWorkflowURL: SpaceFixtureMultiAppWorkflowDefaults.optionTabWindowStateNoisyRuntimeTruthWorkflowSourceURL
+        )
         try runSwitcherPanelOptionTabWindowStateRoundTrip(
             workflow,
             traceLabel: "option.noisy",
@@ -164,7 +168,9 @@ extension FlowTabUITests {
     }
 
     func testSwitcherPanelWindowSearchRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithoutAppAXWindows() throws {
-        let workflow = try configuredSwitcherSpaceFixtureWorkflow()
+        let workflow = try configuredSwitcherRuntimeTruthWorkflow(
+            sourceWorkflowURL: SpaceFixtureMultiAppWorkflowDefaults.windowSearchRuntimeTruthWorkflowSourceURL
+        )
         try runSwitcherPanelWindowSearchRoundTrip(
             workflow,
             traceLabel: "search"
@@ -172,7 +178,9 @@ extension FlowTabUITests {
     }
 
     func testSwitcherPanelWindowSearchRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithNoisyCGSiblingsWithoutAppAXWindows() throws {
-        let workflow = try configuredNoisyCGSiblingsSwitcherSpaceFixtureWorkflow()
+        let workflow = try configuredSwitcherRuntimeTruthWorkflow(
+            sourceWorkflowURL: SpaceFixtureMultiAppWorkflowDefaults.windowSearchNoisyRuntimeTruthWorkflowSourceURL
+        )
         try runSwitcherPanelWindowSearchRoundTrip(
             workflow,
             traceLabel: "search.noisy",
@@ -198,7 +206,8 @@ extension FlowTabUITests {
                 additionalArguments: [
                     "-searchDefaultScope",
                     "window"
-                ]
+                ],
+                suppressesPanelActivation: false
             ),
             waitsForFullscreenMarkers: false,
             suppressesAppAccessibilityChildren: true,
@@ -552,16 +561,22 @@ extension FlowTabUITests {
     }
 
     private func runtimeTruthSwitcherLaunchArguments(
-        additionalArguments: [String] = []
+        additionalArguments: [String] = [],
+        suppressesPanelActivation: Bool = true
     ) -> [String] {
-        [
+        var arguments = [
             "--flowtab-ui-listen-switcher-trigger",
             "--flowtab-ui-suppress-home-on-launch",
-            "--flowtab-ui-suppress-panel-activation",
             "--flowtab-ui-runtime-log-level", "DEBUG",
             "--flowtab-ui-enable-verbose-logs",
             "-windowLayerAutoEnterDelay", "30.0"
         ] + FlowTabUITestSwitcherCommandPayload.launchArguments + additionalArguments
+
+        if suppressesPanelActivation {
+            arguments.append("--flowtab-ui-suppress-panel-activation")
+        }
+
+        return arguments
     }
 
     private func relaunchGlobalSwitcher(

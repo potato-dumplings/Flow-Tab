@@ -26,11 +26,28 @@ enum SpaceFixtureMultiAppWorkflowDefaults {
             .appendingPathComponent("space-fixture-switcher-multi-app-workflow.json")
     }
 
-    static var noisyCGSiblingsSwitcherWorkflowSourceURL: URL {
-        repositoryRootURL
-            .appendingPathComponent("docs", isDirectory: true)
-            .appendingPathComponent("fixtures", isDirectory: true)
-            .appendingPathComponent("space-fixture-switcher-noisy-cg-siblings-workflow.json")
+    static var controlTabRuntimeTruthWorkflowSourceURL: URL {
+        switcherRuntimeTruthWorkflowSourceURL(named: "space-fixture-control-tab-fullscreen-sibling-workflow.json")
+    }
+
+    static var controlTabNoisyRuntimeTruthWorkflowSourceURL: URL {
+        switcherRuntimeTruthWorkflowSourceURL(named: "space-fixture-control-tab-noisy-cg-siblings-workflow.json")
+    }
+
+    static var optionTabWindowStateRuntimeTruthWorkflowSourceURL: URL {
+        switcherRuntimeTruthWorkflowSourceURL(named: "space-fixture-option-tab-window-state-fullscreen-sibling-workflow.json")
+    }
+
+    static var optionTabWindowStateNoisyRuntimeTruthWorkflowSourceURL: URL {
+        switcherRuntimeTruthWorkflowSourceURL(named: "space-fixture-option-tab-window-state-noisy-cg-siblings-workflow.json")
+    }
+
+    static var windowSearchRuntimeTruthWorkflowSourceURL: URL {
+        switcherRuntimeTruthWorkflowSourceURL(named: "space-fixture-window-search-fullscreen-sibling-workflow.json")
+    }
+
+    static var windowSearchNoisyRuntimeTruthWorkflowSourceURL: URL {
+        switcherRuntimeTruthWorkflowSourceURL(named: "space-fixture-window-search-noisy-cg-siblings-workflow.json")
     }
 
     static var defaultResolvedWorkflowURL: URL {
@@ -45,6 +62,13 @@ enum SpaceFixtureMultiAppWorkflowDefaults {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
+    }
+
+    private static func switcherRuntimeTruthWorkflowSourceURL(named filename: String) -> URL {
+        repositoryRootURL
+            .appendingPathComponent("docs", isDirectory: true)
+            .appendingPathComponent("fixtures", isDirectory: true)
+            .appendingPathComponent(filename)
     }
 }
 

@@ -392,16 +392,17 @@ extension FlowTabUITests {
         }
     }
 
-    func configuredNoisyCGSiblingsSwitcherSpaceFixtureWorkflow(
+    func configuredSwitcherRuntimeTruthWorkflow(
+        sourceWorkflowURL: URL,
         environment: [String: String] = ProcessInfo.processInfo.environment
     ) throws -> SpaceFixtureResolvedWorkflow {
         do {
             let installedWorkflow = try SpaceFixtureResolvedWorkflow.configured(environment: environment)
             let workflow = try resolveSpaceFixtureWorkflowScenario(
-                sourceWorkflowURL: SpaceFixtureMultiAppWorkflowDefaults.noisyCGSiblingsSwitcherWorkflowSourceURL,
+                sourceWorkflowURL: sourceWorkflowURL,
                 using: installedWorkflow
             )
-            try validateSwitcherMultiAppWorkflow(workflow)
+            try validateSwitcherRuntimeTruthWorkflow(workflow, scenarioSourceURL: sourceWorkflowURL)
             return workflow
         } catch let error as SpaceFixtureMultiAppWorkflowError {
             switch error {
@@ -409,7 +410,7 @@ extension FlowTabUITests {
                 throw XCTSkip(
                     multiAppWorkflowSetupMessage(
                         reason: error.localizedDescription,
-                        scenarioSourceURL: SpaceFixtureMultiAppWorkflowDefaults.noisyCGSiblingsSwitcherWorkflowSourceURL
+                        scenarioSourceURL: sourceWorkflowURL
                     )
                 )
             default:
@@ -470,6 +471,47 @@ extension FlowTabUITests {
                 multiAppWorkflowSetupMessage(
                     reason: "Resolved workflow does not define unique resolved window titles for switcher isolation assertions.",
                     scenarioSourceURL: SpaceFixtureMultiAppWorkflowDefaults.switcherWorkflowSourceURL
+                )
+            )
+        }
+    }
+
+    private func validateSwitcherRuntimeTruthWorkflow(
+        _ workflow: SpaceFixtureResolvedWorkflow,
+        scenarioSourceURL: URL
+    ) throws {
+        guard workflow.apps.count == 1 else {
+            throw XCTSkip(
+                multiAppWorkflowSetupMessage(
+                    reason: "Resolved workflow must contain exactly one fixture app for this runtime-truth scenario.",
+                    scenarioSourceURL: scenarioSourceURL
+                )
+            )
+        }
+
+        guard workflow.apps[0].windowCount == 2 else {
+            throw XCTSkip(
+                multiAppWorkflowSetupMessage(
+                    reason: "Resolved workflow must contain exactly two windows for this runtime-truth scenario.",
+                    scenarioSourceURL: scenarioSourceURL
+                )
+            )
+        }
+
+        guard workflow.apps[0].fullscreenWindowIndex != nil else {
+            throw XCTSkip(
+                multiAppWorkflowSetupMessage(
+                    reason: "Resolved workflow is missing the fullscreen sibling for this runtime-truth scenario.",
+                    scenarioSourceURL: scenarioSourceURL
+                )
+            )
+        }
+
+        guard workflow.hasUniqueExpectedWindowTitles else {
+            throw XCTSkip(
+                multiAppWorkflowSetupMessage(
+                    reason: "Resolved workflow does not define unique window titles for this runtime-truth scenario.",
+                    scenarioSourceURL: scenarioSourceURL
                 )
             )
         }

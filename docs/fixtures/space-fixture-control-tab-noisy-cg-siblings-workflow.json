@@ -1,0 +1,31 @@
+{
+  "workflowName": "control-tab-noisy-cg-siblings",
+  "settleTimeoutMs": 12000,
+  "apps": [
+    {
+      "appID": "chrome",
+      "appName": "Chrome Fixture",
+      "bundleId": "com.example.fixture.chrome",
+      "launchOrder": 1,
+      "windows": [
+        {
+          "title": "Chrome Window 1",
+          "mode": "standard",
+          "tabs": [
+            { "title": "Normal Tab", "isSelected": true },
+            { "title": "Background Tab", "isSelected": false }
+          ]
+        },
+        {
+          "title": "Chrome Window 2",
+          "mode": "fullscreen",
+          "noisyCGSiblings": true,
+          "tabs": [
+            { "title": "Fullscreen Tab", "isSelected": true },
+            { "title": "Secondary Tab", "isSelected": false }
+          ]
+        }
+      ]
+    }
+  ]
+}
