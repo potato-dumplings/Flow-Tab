@@ -296,6 +296,7 @@ extension SwitcherPanelController {
         panel.collectionBehavior = SwitcherPanelWindowConfiguration.presentationCollectionBehavior()
         activeHotkeySessionKind = nil
         activePresentationScreen = nil
+        lastSearchLayoutSizingLogSummary = nil
         ignoreActiveSpaceChangesUntil = 0
         suppressApplicationActivationUntil = 0
         lastCommittedTabAdvanceTimestamp = nil
@@ -362,9 +363,27 @@ extension SwitcherPanelController {
         let height: CGFloat
 
         if model.isSearchActive {
-            let visibleRows = max(1, min(model.searchResultCount, searchResultVisibleRowLimit))
-            let desiredHeight = searchHeaderHeight + CGFloat(visibleRows) * searchResultRowHeight + 58
+            let visibleRows = SwitcherPanelLayoutMetrics.Search.visibleRowCount(
+                for: model.searchResultCount
+            )
+            let listHeight = SwitcherPanelLayoutMetrics.Search.resultListHeight(
+                visibleRowCount: visibleRows,
+                resultRowHeight: model.searchLayoutMeasurements.resultRowHeight
+            )
+            let desiredHeight = SwitcherPanelLayoutMetrics.Search.panelHeight(
+                visibleRowCount: visibleRows,
+                measurements: model.searchLayoutMeasurements
+            )
             height = min(maxHeight, max(minimumPanelHeight, desiredHeight))
+            logSearchLayoutSizing(
+                resultCount: model.searchResultCount,
+                visibleRows: visibleRows,
+                measurements: model.searchLayoutMeasurements,
+                listHeight: listHeight,
+                neededPanelHeight: desiredHeight,
+                finalPanelHeight: height,
+                maxHeight: maxHeight
+            )
             let targetSize = NSSize(width: width, height: height)
             if panel.contentRect(forFrameRect: panel.frame).size != targetSize {
                 panel.setContentSize(targetSize)
@@ -375,7 +394,7 @@ extension SwitcherPanelController {
         if model.isPreviewLayerMode {
             let gridLayout = resolveAppGridLayout(
                 appCount: model.appCount,
-                availableWidth: max(1, width - overlayHorizontalInset),
+                availableWidth: max(1, width - SwitcherPanelLayoutMetrics.horizontalInset),
                 maxTileSize: previewLayerAppTileSize
             )
             let previewSectionHeight = resolvedStandardPreviewSectionHeight(
@@ -383,10 +402,10 @@ extension SwitcherPanelController {
                 itemCount: model.previewWindowCount
             )
             let desiredHeight =
-                standardOverlayOuterPadding * 2
-                + standardOverlayInnerVerticalPadding * 2
+                SwitcherPanelLayoutMetrics.rootPadding * 2
+                + SwitcherPanelLayoutMetrics.bodyVerticalPadding * 2
                 + gridLayout.gridHeight
-                + standardOverlaySectionSpacing
+                + SwitcherPanelLayoutMetrics.bodySpacing
                 + previewSectionHeight
             height = min(maxHeight, max(minimumPanelHeight, desiredHeight))
             model.updateAppGridLayout(
@@ -397,7 +416,7 @@ extension SwitcherPanelController {
         } else {
             let gridLayout = resolveAppGridLayout(
                 appCount: model.appCount,
-                availableWidth: max(1, width - overlayHorizontalInset),
+                availableWidth: max(1, width - SwitcherPanelLayoutMetrics.horizontalInset),
                 maxTileSize: appLayerMaxAdaptiveTileSize
             )
             let searchHeaderHeight = searchFeatureEnabled ? appLayerSearchHeaderExtraHeight : 0
@@ -420,7 +439,7 @@ extension SwitcherPanelController {
         let count = max(itemCount, 1)
         let availableWidth = max(
             1,
-            panelWidth - overlayHorizontalInset - standardPreviewWidthAdjustment
+            panelWidth - SwitcherPanelLayoutMetrics.horizontalInset - standardPreviewWidthAdjustment
         )
         let totalSpacing = standardPreviewCardSpacing * CGFloat(max(count - 1, 0))
         let rawCardWidth = (availableWidth - totalSpacing) / CGFloat(count)
@@ -441,7 +460,35 @@ extension SwitcherPanelController {
         let stripWidth =
             CGFloat(count) * maxTileSize
             + CGFloat(max(count - 1, 0)) * spacing
-        return max(appLayerMinimumWidth, stripWidth + overlayHorizontalInset)
+        return max(appLayerMinimumWidth, stripWidth + SwitcherPanelLayoutMetrics.horizontalInset)
+    }
+
+    func logSearchLayoutSizing(
+        resultCount: Int,
+        visibleRows: Int,
+        measurements: SwitcherSearchLayoutMeasurements,
+        listHeight: CGFloat,
+        neededPanelHeight: CGFloat,
+        finalPanelHeight: CGFloat,
+        maxHeight: CGFloat
+    ) {
+        let summary = [
+            "resultCount=\(resultCount)",
+            "visibleRows=\(visibleRows)",
+            "header=\(formatLayoutPoint(measurements.presentationHeaderHeight))",
+            "row=\(formatLayoutPoint(measurements.resultRowHeight))",
+            "listHeight=\(formatLayoutPoint(listHeight))",
+            "neededPanelHeight=\(formatLayoutPoint(neededPanelHeight))",
+            "finalPanelHeight=\(formatLayoutPoint(finalPanelHeight))",
+            "maxHeight=\(formatLayoutPoint(maxHeight))"
+        ].joined(separator: " ")
+        guard lastSearchLayoutSizingLogSummary != summary else { return }
+        lastSearchLayoutSizingLogSummary = summary
+        RuntimeDiagnostics.shared.log(
+            level: .info,
+            category: "SwitcherLayout",
+            message: "searchPanelSizing \(summary)"
+        )
     }
 
     struct AppGridLayout {

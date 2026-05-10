@@ -55,12 +55,8 @@ final class SwitcherPanelController {
     let panelScreenMargin: CGFloat = 80
     let windowOnlyOverlayScreenMargin: CGFloat = 20
     let appLayerMinimumWidth: CGFloat = 440
-    let overlayHorizontalInset: CGFloat = 64
     let appLayerStaticHeight: CGFloat = 56
     let appLayerSearchHeaderExtraHeight: CGFloat = 68
-    let standardOverlayOuterPadding: CGFloat = 16
-    let standardOverlayInnerVerticalPadding: CGFloat = 14
-    let standardOverlaySectionSpacing: CGFloat = 12
     let standardPreviewSectionMinimumHeight: CGFloat = 130
     let standardPreviewSectionMaximumHeight: CGFloat = 220
     let standardPreviewCardMinimumWidth: CGFloat = 120
@@ -73,9 +69,6 @@ final class SwitcherPanelController {
     let appLayerMaxAdaptiveTileSize: CGFloat = 90
     let maxAppTileSpacing: CGFloat = 10
     let minAppTileSize: CGFloat = 1
-    let searchResultRowHeight: CGFloat = 40
-    let searchResultVisibleRowLimit: Int = 8
-    let searchHeaderHeight: CGFloat = 62
     var activeHotkeySessionKind: HotkeySessionKind?
     var activePresentationScreen: NSScreen?
     var terminateSelectedAppTask: Task<Void, Never>?
@@ -92,6 +85,7 @@ final class SwitcherPanelController {
     var windowLayerPresentationDelayOverride: TimeInterval?
     var hideNonPanelWindowsOverride: (() -> Void)?
     var activateApplicationIgnoringOtherAppsOverride: (() -> Void)?
+    var lastSearchLayoutSizingLogSummary: String?
 
     var searchFeatureEnabled: Bool {
         SearchInteractionPreferencesStore.loadIsEnabled()

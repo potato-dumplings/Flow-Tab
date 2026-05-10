@@ -2,6 +2,72 @@ import AppKit
 import SwiftUI
 import FlowTabCore
 
+struct SwitcherSearchLayoutMeasurements: Equatable {
+    let presentationHeaderHeight: CGFloat
+    let resultRowHeight: CGFloat
+}
+
+enum SwitcherPanelLayoutMetrics {
+    static let rootPadding: CGFloat = 16
+    static let bodyHorizontalPadding: CGFloat = 16
+    static let bodyVerticalPadding: CGFloat = 14
+    static let bodySpacing: CGFloat = 12
+
+    static var horizontalInset: CGFloat {
+        rootPadding * 2 + bodyHorizontalPadding * 2
+    }
+
+    enum Search {
+        static let fallbackPresentationHeaderHeight: CGFloat = 46
+        static let fallbackResultRowHeight: CGFloat = 40
+        static let resultRowSpacing: CGFloat = 8
+        static let resultListPadding: CGFloat = 2
+        static let visibleRowLimit = 8
+
+        static func visibleRowCount(for resultCount: Int) -> Int {
+            max(1, min(resultCount, visibleRowLimit))
+        }
+
+        static func resultListHeight(
+            visibleRowCount: Int,
+            resultRowHeight: CGFloat = fallbackResultRowHeight
+        ) -> CGFloat {
+            let rowCount = max(1, visibleRowCount)
+            return CGFloat(rowCount) * resultRowHeight
+                + CGFloat(max(rowCount - 1, 0)) * resultRowSpacing
+                + resultListPadding * 2
+        }
+
+        static func panelHeight(
+            visibleRowCount: Int,
+            measurements: SwitcherSearchLayoutMeasurements = .fallback
+        ) -> CGFloat {
+            SwitcherPanelLayoutMetrics.rootPadding * 2
+                + SwitcherPanelLayoutMetrics.bodyVerticalPadding * 2
+                + measurements.presentationHeaderHeight
+                + SwitcherPanelLayoutMetrics.bodySpacing
+                + resultListHeight(
+                    visibleRowCount: visibleRowCount,
+                    resultRowHeight: measurements.resultRowHeight
+                )
+        }
+    }
+}
+
+extension SwitcherSearchLayoutMeasurements {
+    static let fallback = SwitcherSearchLayoutMeasurements(
+        presentationHeaderHeight: SwitcherPanelLayoutMetrics.Search.fallbackPresentationHeaderHeight,
+        resultRowHeight: SwitcherPanelLayoutMetrics.Search.fallbackResultRowHeight
+    )
+
+    var normalized: SwitcherSearchLayoutMeasurements {
+        SwitcherSearchLayoutMeasurements(
+            presentationHeaderHeight: max(1, presentationHeaderHeight),
+            resultRowHeight: max(1, resultRowHeight)
+        )
+    }
+}
+
 struct SearchInputHeader: View {
     let query: String
     let scope: SwitcherSearchScope

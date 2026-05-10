@@ -41,6 +41,7 @@ final class LiveSwitcherModel: ObservableObject {
     @Published var overlayStyle: SwitcherOverlayStyle = .appAndWindow
     @Published var searchViewState: SwitcherSearchViewState = .inactive
     @Published var searchResultScrollRevision: UInt64 = 0
+    @Published var searchLayoutMeasurements: SwitcherSearchLayoutMeasurements = .fallback
     @Published var terminatingAppID: String?
 
     let snapshotProvider = RuntimeSnapshotProvider()
@@ -110,6 +111,18 @@ final class LiveSwitcherModel: ObservableObject {
         let normalizedHeight = max(130, min(220, height))
         guard previewSectionHeight != normalizedHeight else { return }
         previewSectionHeight = normalizedHeight
+    }
+
+    func updateSearchLayoutMeasurements(_ measurements: SwitcherSearchLayoutMeasurements) {
+        let normalized = measurements.normalized
+        guard searchLayoutMeasurements.differsVisibly(from: normalized) else { return }
+        searchLayoutMeasurements = normalized
+        RuntimeDiagnostics.shared.log(
+            level: .info,
+            category: "SwitcherLayout",
+            message: "measuredSearchLayout header=\(formatLayoutPoint(normalized.presentationHeaderHeight)) row=\(formatLayoutPoint(normalized.resultRowHeight)) fallbackHeader=\(formatLayoutPoint(SwitcherSearchLayoutMeasurements.fallback.presentationHeaderHeight)) fallbackRow=\(formatLayoutPoint(SwitcherSearchLayoutMeasurements.fallback.resultRowHeight))"
+        )
+        onSearchStateChanged?()
     }
 
     var isPreviewLayerMode: Bool {
@@ -561,4 +574,15 @@ final class LiveSwitcherModel: ObservableObject {
         return NSRunningApplication(processIdentifier: pid) != nil
     }
 
+}
+
+private extension SwitcherSearchLayoutMeasurements {
+    func differsVisibly(from other: SwitcherSearchLayoutMeasurements) -> Bool {
+        abs(presentationHeaderHeight - other.presentationHeaderHeight) > 0.5
+            || abs(resultRowHeight - other.resultRowHeight) > 0.5
+    }
+}
+
+func formatLayoutPoint(_ value: CGFloat) -> String {
+    String(format: "%.2f", Double(value))
 }

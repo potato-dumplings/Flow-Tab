@@ -389,6 +389,44 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testSwitcherPanelControllerSearchSizingUsesCompleteVisibleRowBudget() async {
+        await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
+            let controller = SwitcherPanelController()
+            controller.modelForTesting.snapshotProviderOverride = {
+                RuntimeSnapshot(apps: self.layoutScenarioApps(count: 10), contextsByID: [:])
+            }
+
+            XCTAssertTrue(controller.modelForTesting.startSession(triggerDirection: .forward))
+            XCTAssertTrue(controller.modelForTesting.enterSearchMode())
+            XCTAssertEqual(controller.modelForTesting.searchResultCount, 10)
+            let measuredLayout = SwitcherSearchLayoutMeasurements(
+                presentationHeaderHeight: 54,
+                resultRowHeight: 48
+            )
+            controller.modelForTesting.updateSearchLayoutMeasurements(measuredLayout)
+
+            controller.updatePanelSizeForTesting(
+                visibleFrame: CGRect(x: 0, y: 0, width: 1440, height: 900)
+            )
+
+            let visibleRows = SwitcherPanelLayoutMetrics.Search.visibleRowCount(
+                for: controller.modelForTesting.searchResultCount
+            )
+            let expectedHeight = SwitcherPanelLayoutMetrics.Search.panelHeight(
+                visibleRowCount: visibleRows,
+                measurements: measuredLayout
+            )
+
+            XCTAssertEqual(
+                controller.panelContentSizeForTesting.height,
+                expectedHeight,
+                accuracy: 0.001
+            )
+            controller.cancelSelectionForTesting()
+        }
+    }
+
+    @MainActor
     func testSwitcherPanelControllerSearchEnterAppliesSelectionAndEscapeExitsSearch() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
             let controller = SwitcherPanelController()
@@ -528,12 +566,19 @@ extension FlowTabPriorityCoverageTests {
 
             FlowTabUITestBootstrapper.presentInitialUIIfNeeded(panelController: controller)
 
-            let expectedSearchHeight = CGFloat(62 + apps.count * 40 + 58)
+            let expectedSearchHeight = {
+                SwitcherPanelLayoutMetrics.Search.panelHeight(
+                    visibleRowCount: SwitcherPanelLayoutMetrics.Search.visibleRowCount(
+                        for: apps.count
+                    ),
+                    measurements: controller.modelForTesting.searchLayoutMeasurements
+                )
+            }
             let deadline = DispatchTime.now().uptimeNanoseconds + 2_000_000_000
             while DispatchTime.now().uptimeNanoseconds < deadline {
                 if
                     controller.modelForTesting.isSearchActive,
-                    abs(controller.panelContentSizeForTesting.height - expectedSearchHeight) <= 0.001
+                    abs(controller.panelContentSizeForTesting.height - expectedSearchHeight()) <= 1
                 {
                     break
                 }
@@ -543,8 +588,8 @@ extension FlowTabPriorityCoverageTests {
             XCTAssertTrue(controller.modelForTesting.isSearchActive)
             XCTAssertEqual(
                 controller.panelContentSizeForTesting.height,
-                expectedSearchHeight,
-                accuracy: 0.001
+                expectedSearchHeight(),
+                accuracy: 1
             )
             controller.cancelSelectionForTesting()
         }

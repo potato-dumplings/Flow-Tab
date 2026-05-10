@@ -38,6 +38,7 @@ struct SwitcherPanelRootView: View {
                     windowPreviewItems: windowPreviewItems,
                     searchState: model.searchViewState,
                     searchResultScrollRevision: model.searchResultScrollRevision,
+                    searchLayoutMeasurements: model.searchLayoutMeasurements,
                     searchAppItems: model.searchAppItems(),
                     searchWindowItems: model.searchWindowItems(),
                     onSearchInputChanged: { query, cursorPosition in
@@ -45,6 +46,11 @@ struct SwitcherPanelRootView: View {
                     },
                     onSearchMarkedTextChanged: { hasMarkedText in
                         model.updateSearchInputMarkedTextState(hasMarkedText)
+                    },
+                    onSearchLayoutMeasured: { measurements in
+                        Task { @MainActor in
+                            model.updateSearchLayoutMeasurements(measurements)
+                        }
                     },
                     searchFeatureEnabled: searchEnabled,
                     searchDefaultScope: searchDefaultScope,
@@ -59,7 +65,7 @@ struct SwitcherPanelRootView: View {
                         model.icon(for: app)
                     }
                 )
-                .padding(16)
+                .padding(SwitcherPanelLayoutMetrics.rootPadding)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -125,10 +131,12 @@ private struct CommandTabOverlay: View {
     let windowPreviewItems: [WindowPreviewItem]
     let searchState: SwitcherSearchViewState
     let searchResultScrollRevision: UInt64
+    let searchLayoutMeasurements: SwitcherSearchLayoutMeasurements
     let searchAppItems: [SearchAppResultItem]
     let searchWindowItems: [SearchWindowResultItem]
     let onSearchInputChanged: (String, Int) -> Void
     let onSearchMarkedTextChanged: (Bool) -> Void
+    let onSearchLayoutMeasured: (SwitcherSearchLayoutMeasurements) -> Void
     let searchFeatureEnabled: Bool
     let searchDefaultScope: SwitcherSearchScope
     let selectedApp: AppSwitchCandidate?
@@ -279,6 +287,16 @@ private struct CommandTabOverlay: View {
         )
     }
 
+    private var searchResultViewportHeight: CGFloat {
+        let visibleRows = SwitcherPanelLayoutMetrics.Search.visibleRowCount(
+            for: searchState.results.count
+        )
+        return SwitcherPanelLayoutMetrics.Search.resultListHeight(
+            visibleRowCount: visibleRows,
+            resultRowHeight: searchLayoutMeasurements.resultRowHeight
+        )
+    }
+
     private var searchHeaderHighlightItem: SearchHeaderHighlightItem? {
         guard isSearchMode else { return nil }
         switch searchState.scope {
@@ -423,14 +441,14 @@ private struct CommandTabOverlay: View {
 
     @ViewBuilder
     private var standardOverlayBody: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: SwitcherPanelLayoutMetrics.bodySpacing) {
             standardOverlaySearchHeader
             standardOverlayAppStrip
             standardOverlayPreviewSection
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .padding(.horizontal, SwitcherPanelLayoutMetrics.bodyHorizontalPadding)
+        .padding(.vertical, SwitcherPanelLayoutMetrics.bodyVerticalPadding)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(colorScheme == .dark ? Color.black : Color.white)
@@ -444,7 +462,7 @@ private struct CommandTabOverlay: View {
 
     @ViewBuilder
     private var searchOverlayBody: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: SwitcherPanelLayoutMetrics.bodySpacing) {
             SearchPresentationHeader(
                 query: searchState.query,
                 cursorPosition: searchState.queryCursorPosition,
@@ -456,61 +474,68 @@ private struct CommandTabOverlay: View {
                 onSearchMarkedTextChanged: onSearchMarkedTextChanged
             )
             .accessibilityIdentifier("flowtab.switcher.search")
+            .background(SearchLayoutSizeReader(target: .header))
 
             if searchState.scope == .app {
                 if searchAppItems.isEmpty {
                     SearchEmptyState(scope: .app)
+                        .frame(height: searchResultViewportHeight)
                 } else {
                     ScrollViewReader { scrollProxy in
                         let searchScrollProxy = SearchResultScrollProxy(proxy: scrollProxy)
                         let scrollRequest = searchResultScrollRequest
                         ScrollView(.vertical, showsIndicators: true) {
-                            LazyVStack(alignment: .leading, spacing: 8) {
+                            LazyVStack(alignment: .leading, spacing: SwitcherPanelLayoutMetrics.Search.resultRowSpacing) {
                                 ForEach(searchAppItems) { item in
                                     SearchAppRow(
                                         item: item,
                                         icon: iconForApp(item.app)
                                     )
                                     .id(item.id)
+                                    .background(SearchLayoutSizeReader(target: .row))
                                 }
                             }
                             .padding(.horizontal, 2)
-                            .padding(.vertical, 2)
+                            .padding(.vertical, SwitcherPanelLayoutMetrics.Search.resultListPadding)
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         .task(id: scrollRequest) { @MainActor in
                             scrollToSearchResult(scrollRequest, using: searchScrollProxy)
                         }
                     }
+                    .frame(height: searchResultViewportHeight)
                 }
             } else {
                 if searchWindowItems.isEmpty {
                     SearchEmptyState(scope: .window)
+                        .frame(height: searchResultViewportHeight)
                 } else {
                     ScrollViewReader { scrollProxy in
                         let searchScrollProxy = SearchResultScrollProxy(proxy: scrollProxy)
                         let scrollRequest = searchResultScrollRequest
                         ScrollView(.vertical, showsIndicators: true) {
-                            LazyVStack(alignment: .leading, spacing: 8) {
+                            LazyVStack(alignment: .leading, spacing: SwitcherPanelLayoutMetrics.Search.resultRowSpacing) {
                                 ForEach(searchWindowItems) { item in
                                     SearchWindowRow(item: item)
                                         .id(item.id)
+                                        .background(SearchLayoutSizeReader(target: .row))
                                 }
                             }
                             .padding(.horizontal, 2)
-                            .padding(.vertical, 2)
+                            .padding(.vertical, SwitcherPanelLayoutMetrics.Search.resultListPadding)
                         }
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                         .task(id: scrollRequest) { @MainActor in
                             scrollToSearchResult(scrollRequest, using: searchScrollProxy)
                         }
                     }
+                    .frame(height: searchResultViewportHeight)
                 }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .padding(.horizontal, SwitcherPanelLayoutMetrics.bodyHorizontalPadding)
+        .padding(.vertical, SwitcherPanelLayoutMetrics.bodyVerticalPadding)
         .background(
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .fill(colorScheme == .dark ? Color.black : Color.white)
@@ -580,6 +605,70 @@ private struct CommandTabOverlay: View {
             } else {
                 standardOverlayBody
             }
+        }
+        .onPreferenceChange(SearchLayoutMeasurementPreferenceKey.self) { measurement in
+            guard let measurements = measurement.measurements else { return }
+            onSearchLayoutMeasured(measurements)
+        }
+    }
+}
+
+private enum SearchLayoutMeasurementTarget {
+    case header
+    case row
+}
+
+private struct SearchLayoutMeasurement: Equatable {
+    var headerHeight: CGFloat? = nil
+    var rowHeight: CGFloat? = nil
+
+    var measurements: SwitcherSearchLayoutMeasurements? {
+        guard let headerHeight, let rowHeight else { return nil }
+        return SwitcherSearchLayoutMeasurements(
+            presentationHeaderHeight: headerHeight,
+            resultRowHeight: rowHeight
+        )
+    }
+
+    mutating func merge(_ other: SearchLayoutMeasurement) {
+        if let otherHeaderHeight = other.headerHeight {
+            headerHeight = max(headerHeight ?? 0, otherHeaderHeight)
+        }
+        if let otherRowHeight = other.rowHeight {
+            rowHeight = max(rowHeight ?? 0, otherRowHeight)
+        }
+    }
+}
+
+private struct SearchLayoutMeasurementPreferenceKey: PreferenceKey {
+    static let defaultValue = SearchLayoutMeasurement()
+
+    static func reduce(
+        value: inout SearchLayoutMeasurement,
+        nextValue: () -> SearchLayoutMeasurement
+    ) {
+        value.merge(nextValue())
+    }
+}
+
+private struct SearchLayoutSizeReader: View {
+    let target: SearchLayoutMeasurementTarget
+
+    var body: some View {
+        GeometryReader { proxy in
+            Color.clear.preference(
+                key: SearchLayoutMeasurementPreferenceKey.self,
+                value: measurement(size: proxy.size)
+            )
+        }
+    }
+
+    private func measurement(size: CGSize) -> SearchLayoutMeasurement {
+        switch target {
+        case .header:
+            return SearchLayoutMeasurement(headerHeight: size.height)
+        case .row:
+            return SearchLayoutMeasurement(rowHeight: size.height)
         }
     }
 }
