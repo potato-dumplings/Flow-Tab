@@ -115,6 +115,18 @@ extension FlowTabUITests {
                     message: "Control+Tab roundtrip must enter the first focused-window phase on the fullscreen sibling."
                 )
             }
+
+            if allowsNoisyCGSiblings {
+                try runNoisyInAppWindowSwitcherControlTabRoundTrip(
+                    app: app,
+                    targetApp: targetApp,
+                    diagnosticsSummary: diagnosticsSummary,
+                    primaryFullscreenTitle: fullscreenTitle,
+                    traceLabel: traceLabel
+                )
+                return
+            }
+
             let firstLogSnapshot = makeRuntimeLogFileSnapshot()
             let standardSelection = try selectInAppWindow(
                 title: standardTitle,
@@ -198,6 +210,123 @@ extension FlowTabUITests {
         }
     }
 
+    private func runNoisyInAppWindowSwitcherControlTabRoundTrip(
+        app: XCUIApplication,
+        targetApp: SpaceFixtureResolvedWorkflow.App,
+        diagnosticsSummary initialDiagnosticsSummary: XCUIElement,
+        primaryFullscreenTitle: String,
+        traceLabel: String
+    ) throws {
+        let standardTitles = standardWindowTitles(in: targetApp)
+        let normalOneTitle = try XCTUnwrap(
+            standardTitles.first,
+            "Noisy Control+Tab workflow must include the first normal window."
+        )
+        let normalTwoTitle = try XCTUnwrap(
+            standardTitles.dropFirst().first,
+            "Noisy Control+Tab workflow must include a second normal window."
+        )
+        let fullscreenTwoTitle = try XCTUnwrap(
+            targetApp.fullscreenWindowTitles.dropFirst().first,
+            "Noisy Control+Tab workflow must include a second fullscreen window."
+        )
+
+        XCTAssertTrue(
+            waitForExactNoisyWorkflowPreviewTitles(
+                initialDiagnosticsSummary,
+                for: targetApp,
+                timeout: 4
+            ),
+            """
+            Noisy Control+Tab must expose exactly the four user windows, without CG-only fullscreen hosts.
+            \(switcherDebugSummary(app, diagnosticsSummary: initialDiagnosticsSummary))
+            """
+        )
+        assertSwitcherSelectedWindowTitle(
+            primaryFullscreenTitle,
+            in: app,
+            diagnosticsSummary: initialDiagnosticsSummary,
+            message: "Noisy Control+Tab must start from the primary fullscreen window."
+        )
+
+        var diagnosticsSummary = initialDiagnosticsSummary
+        var currentSelection: InAppWindowSelection?
+        let phases: [(title: String, trace: String)] = [
+            (normalOneTitle, "normal1"),
+            (primaryFullscreenTitle, "fullscreen1"),
+            (normalTwoTitle, "normal2"),
+            (fullscreenTwoTitle, "fullscreen2")
+        ]
+
+        for (index, phase) in phases.enumerated() {
+            if index > 0 {
+                diagnosticsSummary = relaunchInAppWindowSwitcher(
+                    app,
+                    for: targetApp,
+                    allowsNoisyCGSiblings: true
+                )
+                XCTAssertTrue(
+                    waitForExactNoisyWorkflowPreviewTitles(
+                        diagnosticsSummary,
+                        for: targetApp,
+                        timeout: 4
+                    ),
+                    """
+                    Noisy Control+Tab reopened with unexpected window entries before \(phase.trace).
+                    \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
+                    """
+                )
+                if let currentSelection {
+                    XCTAssertTrue(
+                        waitForExactFrontmostWorkflowCGWindow(
+                            windowNumber: currentSelection.windowNumber,
+                            title: currentSelection.title,
+                            app: targetApp,
+                            timeout: 4
+                        ),
+                        "Noisy Control+Tab \(phase.trace) phase must reopen from \(currentSelection.title)."
+                    )
+                    assertSwitcherSelectedWindowTitle(
+                        currentSelection.title,
+                        in: app,
+                        diagnosticsSummary: diagnosticsSummary,
+                        message: "Noisy Control+Tab must keep the focused-window identity before \(phase.trace)."
+                    )
+                }
+            }
+
+            let logSnapshot = makeRuntimeLogFileSnapshot()
+            let selection = try selectInAppWindow(
+                title: phase.title,
+                in: app,
+                diagnosticsSummary: diagnosticsSummary,
+                requiresControlTab: true
+            )
+            waitForRuntimeLogFiles(
+                containing: ["inAppHotkeyPressed dir=forward panelVisible=1", "advance key=tabForward"],
+                since: logSnapshot,
+                timeout: 8
+            )
+
+            postFlowTabUITestSwitcherCommandAndWaitForDelivery(
+                .confirm,
+                traceLabel: "\(traceLabel).confirm.\(phase.trace)"
+            )
+            XCTAssertTrue(waitForNonExistence(diagnosticsSummary, timeout: 4))
+            XCTAssertTrue(
+                waitForExactFrontmostWorkflowCGWindow(
+                    windowNumber: selection.windowNumber,
+                    title: phase.title,
+                    app: targetApp,
+                    timeout: 12
+                ),
+                "Noisy Control+Tab must activate the exact \(phase.title) CG window selected in \(phase.trace)."
+            )
+            currentSelection = selection
+            logWorkflowSpaceObservation("\(traceLabel).afterConfirm.\(phase.trace)", app: targetApp)
+        }
+    }
+
     func waitForApplicationAXWindowsSuppressed(
         bundleIdentifier: String,
         timeout: TimeInterval
@@ -238,8 +367,32 @@ extension FlowTabUITests {
     private func firstStandardWindowTitle(
         in workflowApp: SpaceFixtureResolvedWorkflow.App
     ) -> String? {
-        let fullscreenTitle = fullscreenWindowTitle(in: workflowApp)
-        return workflowApp.expectedWindowTitles.first { $0 != fullscreenTitle }
+        standardWindowTitles(in: workflowApp).first
+    }
+
+    private func standardWindowTitles(
+        in workflowApp: SpaceFixtureResolvedWorkflow.App
+    ) -> [String] {
+        let fullscreenTitles = Set(workflowApp.fullscreenWindowTitles)
+        return workflowApp.expectedWindowTitles.filter { !fullscreenTitles.contains($0) }
+    }
+
+    private func waitForExactNoisyWorkflowPreviewTitles(
+        _ diagnosticsSummary: XCUIElement,
+        for workflowApp: SpaceFixtureResolvedWorkflow.App,
+        timeout: TimeInterval
+    ) -> Bool {
+        let expectedTitles = Set(workflowApp.expectedWindowTitles)
+        let expectedCount = workflowApp.expectedWindowTitles.count
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            let previewTitles = switcherPreviewTitles(from: diagnosticsSummary)
+            if previewTitles.count == expectedCount && Set(previewTitles) == expectedTitles {
+                return true
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+        return false
     }
 
     private func assertInAppWindowSwitcherReady(
@@ -273,13 +426,13 @@ extension FlowTabUITests {
         )
         if allowsNoisyCGSiblings {
             XCTAssertTrue(
-                waitForNoisyFullscreenWorkflowPreviewTitles(
+                waitForExactNoisyWorkflowPreviewTitles(
                     diagnosticsSummary,
                     for: workflowApp,
                     timeout: 8
                 ),
                 """
-                Control+Tab noisy window state did not include the required real windows.
+                Control+Tab noisy window state did not expose exactly the expected user windows.
                 \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
                 """
             )

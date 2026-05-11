@@ -509,6 +509,96 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testLiveSwitcherModelStartFocusedAppWindowSessionSelectsFocusedWindowIdentityOverWindowOrdering() {
+        let model = LiveSwitcherModel()
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let normalFrame = CGRect(x: 120, y: 120, width: 1_100, height: 800)
+        let incognitoFrame = CGRect(x: 180, y: 160, width: 1_100, height: 800)
+        let fullscreenFrame = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
+        let windows = [
+            WindowCandidate(
+                id: "incognito",
+                title: "Chrome Incognito Tab",
+                isMinimized: false,
+                lastActiveAt: 40
+            ),
+            WindowCandidate(
+                id: "normal",
+                title: "Chrome Normal Tab",
+                isMinimized: false,
+                lastActiveAt: 30
+            ),
+            WindowCandidate(
+                id: "fullscreen",
+                title: "Chrome Fullscreen Tab",
+                isMinimized: false,
+                lastActiveAt: 20
+            )
+        ]
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windowsByID: [
+                "incognito": RuntimeWindowContext(
+                    id: "incognito",
+                    title: "Chrome Incognito Tab",
+                    isMinimized: false,
+                    ownerPID: currentApp.processIdentifier,
+                    cgWindowID: 151_552,
+                    frame: incognitoFrame
+                ),
+                "normal": RuntimeWindowContext(
+                    id: "normal",
+                    title: "Chrome Normal Tab",
+                    isMinimized: false,
+                    ownerPID: currentApp.processIdentifier,
+                    cgWindowID: 151_549,
+                    frame: normalFrame
+                ),
+                "fullscreen": RuntimeWindowContext(
+                    id: "fullscreen",
+                    title: "Chrome Fullscreen Tab",
+                    isMinimized: false,
+                    ownerPID: currentApp.processIdentifier,
+                    cgWindowID: 151_560,
+                    frame: fullscreenFrame
+                )
+            ]
+        )
+
+        model.frontmostApplicationOverride = { currentApp }
+        model.snapshotProviderOverride = {
+            RuntimeSnapshot(
+                apps: [
+                    AppSwitchCandidate(
+                        id: appID,
+                        displayName: "Chrome Fixture",
+                        groupID: "chrome",
+                        lastActiveAt: 100,
+                        windows: windows
+                    )
+                ],
+                contextsByID: [appID: context]
+            )
+        }
+        model.focusedWindowIdentityOverride = { _ in
+            RuntimeFocusedWindowIdentity(
+                cgWindowID: 151_549,
+                title: "Chrome Normal Tab",
+                frame: normalFrame
+            )
+        }
+
+        XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
+
+        XCTAssertEqual(model.session?.mode, .windowCycle(appID: appID))
+        XCTAssertEqual(model.session?.selectedWindow?.id, "normal")
+        model.handle(.tabForward)
+        XCTAssertEqual(model.session?.selectedWindow?.id, "fullscreen")
+    }
+
+    @MainActor
     func testLiveSwitcherModelAutoEnterWindowLayerSuppressesImmediateReentryAfterManualExit() {
         let model = LiveSwitcherModel()
         model.snapshotProviderOverride = {

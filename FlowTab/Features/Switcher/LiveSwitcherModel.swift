@@ -1,8 +1,15 @@
 import AppKit
+import ApplicationServices
 import Carbon
 import CoreGraphics
 import SwiftUI
 import FlowTabCore
+
+struct RuntimeFocusedWindowIdentity {
+    let cgWindowID: CGWindowID?
+    let title: String?
+    let frame: CGRect?
+}
 
 @MainActor
 final class LiveSwitcherModel: ObservableObject {
@@ -58,6 +65,7 @@ final class LiveSwitcherModel: ObservableObject {
     var onSearchResultScrollRequestForTesting: ((String) -> Void)?
     var snapshotProviderOverride: (() -> RuntimeSnapshot)?
     var frontmostApplicationOverride: (() -> NSRunningApplication?)?
+    var focusedWindowIdentityOverride: ((NSRunningApplication) -> RuntimeFocusedWindowIdentity?)?
     var activationOverride: ((ActivationTarget, [String: RuntimeAppContext]) -> Void)?
     var terminateRequestOverride: ((String) -> (sent: Bool, pid: pid_t))?
     var isProcessRunningOverride: ((pid_t) -> Bool)?
@@ -208,9 +216,24 @@ final class LiveSwitcherModel: ObservableObject {
             triggerDirection: triggerDirection,
             rememberedWindowIDByAppID: rememberedWindowIDByAppID
         )
-        guard rebuiltSession.enterWindowCycle(allowSingleWindow: true) else {
-            resetSessionState()
-            return false
+
+        let focusedWindowSelected: Bool
+        if let focusedWindowID = focusedWindowIDForWindowSession(
+            app: appCandidate,
+            context: context
+        ) {
+            focusedWindowSelected = rebuiltSession.selectWindow(
+                appID: frontmostAppID,
+                windowID: focusedWindowID
+            )
+        } else {
+            focusedWindowSelected = false
+        }
+        if !focusedWindowSelected {
+            guard rebuiltSession.enterWindowCycle(allowSingleWindow: true) else {
+                resetSessionState()
+                return false
+            }
         }
 
         session = rebuiltSession
@@ -572,6 +595,112 @@ final class LiveSwitcherModel: ObservableObject {
             return isProcessRunningOverride(pid)
         }
         return NSRunningApplication(processIdentifier: pid) != nil
+    }
+
+    private func focusedWindowIDForWindowSession(
+        app: AppSwitchCandidate,
+        context: RuntimeAppContext
+    ) -> String? {
+        guard let identity = focusedWindowIdentity(for: context.runningApp) else {
+            return nil
+        }
+        return focusedWindowID(matching: identity, app: app, context: context)
+    }
+
+    private func focusedWindowIdentity(
+        for app: NSRunningApplication
+    ) -> RuntimeFocusedWindowIdentity? {
+        if let focusedWindowIdentityOverride {
+            return focusedWindowIdentityOverride(app)
+        }
+        guard AccessibilityPermissionChecker.isTrusted() else {
+            return nil
+        }
+
+        let appElement = AXUIElementCreateApplication(app.processIdentifier)
+        var focusedWindowValue: CFTypeRef?
+        guard
+            AXUIElementCopyAttributeValue(
+                appElement,
+                kAXFocusedWindowAttribute as CFString,
+                &focusedWindowValue
+            ) == .success,
+            let rawFocusedWindow = focusedWindowValue,
+            CFGetTypeID(rawFocusedWindow) == AXUIElementGetTypeID()
+        else {
+            return nil
+        }
+
+        let focusedWindow = unsafeBitCast(rawFocusedWindow, to: AXUIElement.self)
+        return RuntimeFocusedWindowIdentity(
+            cgWindowID: AXWindowInspector.cgWindowID(for: focusedWindow),
+            title: AXWindowInspector.title(for: focusedWindow),
+            frame: AXWindowInspector.frame(for: focusedWindow)
+        )
+    }
+
+    private func focusedWindowID(
+        matching identity: RuntimeFocusedWindowIdentity,
+        app: AppSwitchCandidate,
+        context: RuntimeAppContext
+    ) -> String? {
+        let appWindowIDs = Set(app.windows.map(\.id))
+        let eligibleWindows = context.windowsByID.values.filter { window in
+            appWindowIDs.contains(window.id)
+        }
+
+        if let cgWindowID = identity.cgWindowID {
+            let cgMatches = eligibleWindows.filter { $0.cgWindowID == cgWindowID }
+            if let focusedWindowID = singleFocusedWindowID(from: cgMatches) {
+                return focusedWindowID
+            }
+        }
+
+        let title = normalizedRuntimeWindowTitle(identity.title)
+        let frame = identity.frame?.standardized
+        guard title != nil || frame != nil else { return nil }
+
+        let semanticMatches = eligibleWindows.filter { window in
+            let titleMatches: Bool
+            if let title {
+                titleMatches = runtimeWindowTitle(window.title, matches: title)
+            } else {
+                titleMatches = false
+            }
+
+            let frameMatches: Bool
+            if let frame, let windowFrame = window.frame {
+                frameMatches = RuntimeWindowTopologyClassifier.framesApproximatelyMatch(
+                    windowFrame,
+                    frame
+                )
+            } else {
+                frameMatches = false
+            }
+
+            switch (title, frame) {
+            case (.some, .some):
+                return titleMatches && frameMatches
+            case (.some, .none):
+                return titleMatches
+            case (.none, .some):
+                return frameMatches
+            case (.none, .none):
+                return false
+            }
+        }
+        return singleFocusedWindowID(from: semanticMatches)
+    }
+
+    private func singleFocusedWindowID(from windows: [RuntimeWindowContext]) -> String? {
+        windows.count == 1 ? windows[0].id : nil
+    }
+
+    private func runtimeWindowTitle(_ candidateTitle: String, matches focusedTitle: String) -> Bool {
+        guard let candidateTitle = normalizedRuntimeWindowTitle(candidateTitle) else {
+            return false
+        }
+        return candidateTitle.caseInsensitiveCompare(focusedTitle) == .orderedSame
     }
 
 }

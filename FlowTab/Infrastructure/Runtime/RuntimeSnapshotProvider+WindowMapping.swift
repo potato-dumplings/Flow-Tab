@@ -57,6 +57,11 @@ extension RuntimeSnapshotProvider {
             pid: pid,
             appName: appName
         )
+        let cgWindowOrderByID = Dictionary(
+            uniqueKeysWithValues: mappingResolution.validCGWindows.enumerated().map { offset, window in
+                (window.id, offset)
+            }
+        )
         let knownCGWindowsByID = mappingResolution.knownCGWindowsByID
         let fullscreenContentBounds = mappingResolution.validCGWindows.compactMap { cgWindow -> CGRect? in
             guard RuntimeWindowTopologyClassifier.isLikelyOffDesktopFullscreenContent(
@@ -208,25 +213,204 @@ extension RuntimeSnapshotProvider {
             )
         }
 
-        let unmatchedAXEntries = stickyCGEntries + unmatchedCGEntries
+        let rawUnmatchedAXEntries = stickyCGEntries + unmatchedCGEntries
+        let hostFilteredUnmatchedAXEntries = filterFullscreenHostArtifactEntries(
+            rawUnmatchedAXEntries,
+            allEntries: exactEntries + rawUnmatchedAXEntries,
+            knownCGWindowsByID: knownCGWindowsByID,
+            appName: appName,
+            hasFullscreenTopology: !fullscreenContentBounds.isEmpty,
+            stage: "pre-dedupe"
+        )
+        let prefilteredUnmatchedAXEntries = filterFullscreenSiblingArtifactEntries(
+            hostFilteredUnmatchedAXEntries,
+            allEntries: exactEntries + hostFilteredUnmatchedAXEntries,
+            knownCGWindowsByID: knownCGWindowsByID,
+            appName: appName,
+            hasFullscreenTopology: !fullscreenContentBounds.isEmpty,
+            stage: "pre-dedupe"
+        )
         let deduplicatedUnmatchedAXEntries = deduplicateUnmatchedAXEntriesBySpace(
-            unmatchedAXEntries,
+            prefilteredUnmatchedAXEntries,
             knownCGWindowsByID: knownCGWindowsByID,
             appName: appName
         )
 
-        return orderWindowEntriesForPresentation(exactEntries + deduplicatedUnmatchedAXEntries)
+        let hostFilteredPresentationEntries = filterFullscreenHostArtifactEntries(
+            exactEntries + deduplicatedUnmatchedAXEntries,
+            allEntries: exactEntries + rawUnmatchedAXEntries,
+            knownCGWindowsByID: knownCGWindowsByID,
+            appName: appName,
+            hasFullscreenTopology: !fullscreenContentBounds.isEmpty,
+            stage: "presentation"
+        )
+        let presentationEntries = filterFullscreenSiblingArtifactEntries(
+            hostFilteredPresentationEntries,
+            allEntries: hostFilteredPresentationEntries,
+            knownCGWindowsByID: knownCGWindowsByID,
+            appName: appName,
+            hasFullscreenTopology: !fullscreenContentBounds.isEmpty,
+            stage: "presentation"
+        )
+
+        return orderWindowEntriesForPresentation(
+            presentationEntries,
+            prioritizesOnscreen: !fullscreenContentBounds.isEmpty,
+            cgWindowOrderByID: cgWindowOrderByID,
+            knownCGWindowsByID: knownCGWindowsByID,
+            appName: appName
+        )
     }
 
-    private func orderWindowEntriesForPresentation(_ entries: [WindowListEntry]) -> [WindowListEntry] {
+    private func filterFullscreenHostArtifactEntries(
+        _ entries: [WindowListEntry],
+        allEntries: [WindowListEntry],
+        knownCGWindowsByID: [CGWindowID: CGWindowEntry],
+        appName: String,
+        hasFullscreenTopology: Bool,
+        stage: String
+    ) -> [WindowListEntry] {
+        guard hasFullscreenTopology, !entries.isEmpty else { return entries }
+
+        let activationSurfaces = allEntries.filter {
+            runtimeWindowEntryLooksLikeAXBackedFullscreenContentSurface(
+                $0,
+                knownCGWindowsByID: knownCGWindowsByID,
+                appName: appName
+            )
+        }
+        guard !activationSurfaces.isEmpty else { return entries }
+
+        var droppedCount = 0
+        let filteredEntries = entries.filter { entry in
+            let isArtifact = runtimeWindowEntryLooksLikeFullscreenHostArtifact(
+                entry,
+                activationSurfaces: activationSurfaces,
+                knownCGWindowsByID: knownCGWindowsByID,
+                appName: appName
+            )
+            if isArtifact {
+                droppedCount += 1
+            }
+            return !isArtifact
+        }
+
+        if droppedCount > 0 {
+            RuntimeLog.info(
+                "AXMatch",
+                "\(appName) filtered-fullscreen-host-artifacts stage=\(stage) dropped=\(droppedCount)"
+            )
+        }
+        return filteredEntries
+    }
+
+    private func filterFullscreenSiblingArtifactEntries(
+        _ entries: [WindowListEntry],
+        allEntries: [WindowListEntry],
+        knownCGWindowsByID: [CGWindowID: CGWindowEntry],
+        appName: String,
+        hasFullscreenTopology: Bool,
+        stage: String
+    ) -> [WindowListEntry] {
+        guard hasFullscreenTopology, !entries.isEmpty else { return entries }
+
+        let strongTitles = Set(
+            allEntries.compactMap { entry -> String? in
+                guard runtimeWindowEntryLooksLikeStrongUserWindow(
+                    entry,
+                    knownCGWindowsByID: knownCGWindowsByID,
+                    appName: appName
+                ) else {
+                    return nil
+                }
+                return runtimeNormalizedTitleKey(entry.title)
+            }
+        )
+        guard !strongTitles.isEmpty else { return entries }
+
+        var droppedCount = 0
+        let filteredEntries = entries.filter { entry in
+            let isArtifact = runtimeWindowEntryLooksLikeFullscreenSiblingArtifact(
+                entry,
+                knownCGWindowsByID: knownCGWindowsByID,
+                appName: appName,
+                strongTitles: strongTitles
+            )
+            if isArtifact {
+                droppedCount += 1
+            }
+            return !isArtifact
+        }
+
+        if droppedCount > 0 {
+            RuntimeLog.info(
+                "AXMatch",
+                "\(appName) filtered-fullscreen-sibling-artifacts stage=\(stage) dropped=\(droppedCount)"
+            )
+        }
+        return filteredEntries
+    }
+
+    private func orderWindowEntriesForPresentation(
+        _ entries: [WindowListEntry],
+        prioritizesOnscreen: Bool = false,
+        cgWindowOrderByID: [CGWindowID: Int] = [:],
+        knownCGWindowsByID: [CGWindowID: CGWindowEntry] = [:],
+        appName: String = ""
+    ) -> [WindowListEntry] {
+        let hasRelatedFullscreenTopology = prioritizesOnscreen
+            || knownCGWindowsByID.values.contains { cgWindow in
+                RuntimeWindowTopologyClassifier.hasOffDesktopSpace(spaceIDs: cgWindow.spaceIDs)
+                    && runtimeWindowBoundsLookLikeFullscreenContentSurface(cgWindow.bounds)
+            }
+        let hasOnscreenPrimarySurface = entries.contains { entry in
+            entry.isOnscreen
+                && !runtimeWindowEntryLooksLikeDesktopFullscreenSiblingSurface(
+                    entry,
+                    knownCGWindowsByID: knownCGWindowsByID,
+                    appName: appName
+                )
+        }
         let orderedEntries = entries.enumerated().sorted { lhs, rhs in
             let lhsHasActivationHandle = lhs.element.activationHandleID != nil || lhs.element.axWindow != nil
             let rhsHasActivationHandle = rhs.element.activationHandleID != nil || rhs.element.axWindow != nil
+            if prioritizesOnscreen, lhs.element.isOnscreen != rhs.element.isOnscreen {
+                return lhs.element.isOnscreen
+            }
+            if hasRelatedFullscreenTopology, hasOnscreenPrimarySurface {
+                let lhsLooksLikeSibling = runtimeWindowEntryLooksLikeDesktopFullscreenSiblingSurface(
+                    lhs.element,
+                    knownCGWindowsByID: knownCGWindowsByID,
+                    appName: appName
+                )
+                let rhsLooksLikeSibling = runtimeWindowEntryLooksLikeDesktopFullscreenSiblingSurface(
+                    rhs.element,
+                    knownCGWindowsByID: knownCGWindowsByID,
+                    appName: appName
+                )
+                if lhsLooksLikeSibling != rhsLooksLikeSibling {
+                    return !lhsLooksLikeSibling
+                }
+            }
             if lhsHasActivationHandle != rhsHasActivationHandle {
                 return lhsHasActivationHandle
             }
-            if lhs.element.isOnscreen != rhs.element.isOnscreen {
+            if !prioritizesOnscreen, lhs.element.isOnscreen != rhs.element.isOnscreen {
                 return lhs.element.isOnscreen
+            }
+            if lhs.element.isOnscreen == rhs.element.isOnscreen {
+                let lhsOrder = lhs.element.cgWindowID.flatMap { cgWindowOrderByID[$0] }
+                let rhsOrder = rhs.element.cgWindowID.flatMap { cgWindowOrderByID[$0] }
+                switch (lhsOrder, rhsOrder) {
+                case let (lhsOrder?, rhsOrder?) where lhsOrder != rhsOrder:
+                    return lhsOrder < rhsOrder
+                case (_?, nil):
+                    return true
+                case (nil, _?):
+                    return false
+                default:
+                    break
+                }
             }
             return lhs.offset < rhs.offset
         }.map(\.element)
@@ -768,6 +952,210 @@ extension RuntimeSnapshotProvider {
 
         return nil
     }
+}
+
+private let runtimeFullscreenSiblingArtifactMinimumWidth: CGFloat = 500
+private let runtimeFullscreenSiblingArtifactMaximumHeight: CGFloat = 560
+private let runtimeFullscreenContentSiblingMinimumWidth: CGFloat = 900
+private let runtimeFullscreenContentSiblingMinimumHeight: CGFloat = 600
+private let runtimeFullscreenContentSiblingOriginTolerance: CGFloat = 90
+private let runtimeFullscreenContentSiblingTopInsetLimit: CGFloat = 260
+
+private func runtimeWindowEntryLooksLikeFullscreenHostArtifact(
+    _ entry: RuntimeSnapshotProvider.WindowListEntry,
+    activationSurfaces: [RuntimeSnapshotProvider.WindowListEntry],
+    knownCGWindowsByID: [CGWindowID: RuntimeSnapshotProvider.CGWindowEntry],
+    appName: String
+) -> Bool {
+    guard RuntimeWindowTopologyClassifier.hasOffDesktopSpace(spaceIDs: entry.spaceIDs) else { return false }
+    guard let hostBounds = runtimeWindowEntryBounds(entry, knownCGWindowsByID: knownCGWindowsByID)?.standardized else {
+        return false
+    }
+    guard RuntimeWindowTopologyClassifier.isLikelyFullscreenContent(bounds: hostBounds) else {
+        return false
+    }
+
+    return activationSurfaces.contains { activationSurface in
+        guard activationSurface.cgWindowID != entry.cgWindowID else { return false }
+        guard runtimeWindowTitlesCanRepresentSameFullscreenSurface(
+            entry.title,
+            activationSurface.title,
+            appName: appName
+        ) else {
+            return false
+        }
+        guard let contentBounds = runtimeWindowEntryBounds(
+            activationSurface,
+            knownCGWindowsByID: knownCGWindowsByID
+        )?.standardized else {
+            return false
+        }
+        return runtimeFullscreenHostBounds(hostBounds, containContentSurfaceBounds: contentBounds)
+    }
+}
+
+private func runtimeWindowEntryLooksLikeAXBackedFullscreenContentSurface(
+    _ entry: RuntimeSnapshotProvider.WindowListEntry,
+    knownCGWindowsByID: [CGWindowID: RuntimeSnapshotProvider.CGWindowEntry],
+    appName: String
+) -> Bool {
+    guard entry.activationHandleID != nil || entry.axWindow != nil else { return false }
+    guard !runtimeTitleLooksLikeAppNameFallback(entry.title, appName: appName) else { return false }
+    return runtimeWindowEntryLooksLikeStrongUserWindow(
+        entry,
+        knownCGWindowsByID: knownCGWindowsByID,
+        appName: appName
+    )
+}
+
+private func runtimeWindowEntryLooksLikeDesktopFullscreenSiblingSurface(
+    _ entry: RuntimeSnapshotProvider.WindowListEntry,
+    knownCGWindowsByID: [CGWindowID: RuntimeSnapshotProvider.CGWindowEntry],
+    appName: String
+) -> Bool {
+    guard entry.isOnscreen else { return false }
+    let bounds = runtimeWindowEntryBounds(entry, knownCGWindowsByID: knownCGWindowsByID)
+    guard runtimeWindowBoundsLookLikeFullscreenContentSurface(bounds) else {
+        return false
+    }
+    let currentSpaceIDs = entry.cgWindowID.flatMap { knownCGWindowsByID[$0]?.spaceIDs } ?? entry.spaceIDs
+    guard RuntimeWindowTopologyClassifier.isDesktopOnlySpaceWindow(spaceIDs: currentSpaceIDs) else {
+        return false
+    }
+
+    return knownCGWindowsByID.values.contains { cgWindow in
+        guard cgWindow.id != entry.cgWindowID else { return false }
+        guard RuntimeWindowTopologyClassifier.hasOffDesktopSpace(spaceIDs: cgWindow.spaceIDs) else {
+            return false
+        }
+        guard let relatedBounds = cgWindow.bounds else { return false }
+        guard runtimeWindowBoundsLookLikeFullscreenContentSurface(relatedBounds) else {
+            return false
+        }
+        if let bounds, RuntimeWindowTopologyClassifier.framesApproximatelyMatch(bounds, relatedBounds) {
+            return true
+        }
+        return runtimeWindowTitlesCanRepresentSameFullscreenSurface(
+            entry.title,
+            cgWindow.title,
+            appName: appName
+        )
+    }
+}
+
+private func runtimeWindowBoundsLookLikeFullscreenContentSurface(_ bounds: CGRect?) -> Bool {
+    if RuntimeWindowTopologyClassifier.isLikelyFullscreenContent(bounds: bounds) {
+        return true
+    }
+    guard let bounds = bounds?.standardized else { return false }
+    guard bounds.width >= runtimeFullscreenContentSiblingMinimumWidth else { return false }
+    guard bounds.height >= runtimeFullscreenContentSiblingMinimumHeight else { return false }
+    guard abs(bounds.minX) <= runtimeFullscreenContentSiblingOriginTolerance else { return false }
+    return bounds.minY >= 0 && bounds.minY <= runtimeFullscreenContentSiblingTopInsetLimit
+}
+
+private func runtimeWindowEntryLooksLikeFullscreenSiblingArtifact(
+    _ entry: RuntimeSnapshotProvider.WindowListEntry,
+    knownCGWindowsByID: [CGWindowID: RuntimeSnapshotProvider.CGWindowEntry],
+    appName: String,
+    strongTitles: Set<String>
+) -> Bool {
+    guard runtimeWindowEntryLooksLikeShallowFullscreenSibling(entry, knownCGWindowsByID: knownCGWindowsByID) else {
+        return false
+    }
+
+    if runtimeTitleLooksLikeAppNameFallback(entry.title, appName: appName) {
+        return true
+    }
+
+    guard let titleKey = runtimeNormalizedTitleKey(entry.title) else { return false }
+    return strongTitles.contains(titleKey)
+        && !runtimeWindowEntryLooksLikeStrongUserWindow(
+            entry,
+            knownCGWindowsByID: knownCGWindowsByID,
+            appName: appName
+        )
+}
+
+private func runtimeWindowEntryLooksLikeStrongUserWindow(
+    _ entry: RuntimeSnapshotProvider.WindowListEntry,
+    knownCGWindowsByID: [CGWindowID: RuntimeSnapshotProvider.CGWindowEntry],
+    appName: String
+) -> Bool {
+    let bounds = runtimeWindowEntryBounds(entry, knownCGWindowsByID: knownCGWindowsByID)
+    if RuntimeWindowTopologyClassifier.isLikelyFullscreenContent(bounds: bounds) {
+        return true
+    }
+
+    guard !runtimeTitleLooksLikeAppNameFallback(entry.title, appName: appName) else {
+        return false
+    }
+    guard let bounds = bounds?.standardized else { return false }
+    return bounds.width >= runtimeFullscreenSiblingArtifactMinimumWidth
+        && bounds.height > runtimeFullscreenSiblingArtifactMaximumHeight
+}
+
+private func runtimeWindowEntryLooksLikeShallowFullscreenSibling(
+    _ entry: RuntimeSnapshotProvider.WindowListEntry,
+    knownCGWindowsByID: [CGWindowID: RuntimeSnapshotProvider.CGWindowEntry]
+) -> Bool {
+    guard let bounds = runtimeWindowEntryBounds(entry, knownCGWindowsByID: knownCGWindowsByID)?.standardized else {
+        return false
+    }
+    guard !RuntimeWindowTopologyClassifier.isLikelyFullscreenContent(bounds: bounds) else {
+        return false
+    }
+    return bounds.width >= runtimeFullscreenSiblingArtifactMinimumWidth
+        && bounds.height <= runtimeFullscreenSiblingArtifactMaximumHeight
+}
+
+private func runtimeWindowEntryBounds(
+    _ entry: RuntimeSnapshotProvider.WindowListEntry,
+    knownCGWindowsByID: [CGWindowID: RuntimeSnapshotProvider.CGWindowEntry]
+) -> CGRect? {
+    if let cgWindowID = entry.cgWindowID,
+        let cgBounds = knownCGWindowsByID[cgWindowID]?.bounds
+    {
+        return cgBounds
+    }
+    return entry.frame
+}
+
+private func runtimeWindowTitlesCanRepresentSameFullscreenSurface(
+    _ lhs: String?,
+    _ rhs: String?,
+    appName: String
+) -> Bool {
+    let leftLooksLikeAppFallback = runtimeTitleLooksLikeAppNameFallback(lhs, appName: appName)
+    let rightLooksLikeAppFallback = runtimeTitleLooksLikeAppNameFallback(rhs, appName: appName)
+    let left = leftLooksLikeAppFallback ? nil : runtimeNormalizedTitleKey(lhs)
+    let right = rightLooksLikeAppFallback ? nil : runtimeNormalizedTitleKey(rhs)
+    switch (left, right) {
+    case let (left?, right?):
+        return left == right
+    case (nil, _?):
+        return true
+    default:
+        return false
+    }
+}
+
+private func runtimeFullscreenHostBounds(
+    _ hostBounds: CGRect,
+    containContentSurfaceBounds contentBounds: CGRect
+) -> Bool {
+    guard contentBounds.width >= hostBounds.width * 0.7 else { return false }
+    guard contentBounds.height >= hostBounds.height * 0.45 else { return false }
+    guard contentBounds.height <= hostBounds.height else { return false }
+    guard abs(contentBounds.minX - hostBounds.minX) <= 120 else { return false }
+    guard contentBounds.minY >= hostBounds.minY else { return false }
+    guard contentBounds.maxY <= hostBounds.maxY + 80 else { return false }
+    return contentBounds.minY > hostBounds.minY + 20
+        || contentBounds.height < hostBounds.height - 40
+}
+
+private func runtimeNormalizedTitleKey(_ title: String?) -> String? {
+    normalizedRuntimeWindowTitle(title)?.lowercased()
 }
 
 private func runtimeKnownCGWindowsByID(

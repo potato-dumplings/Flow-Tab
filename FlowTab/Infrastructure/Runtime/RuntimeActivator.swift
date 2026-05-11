@@ -21,7 +21,7 @@ final class RuntimeActivator {
         }
     }
 
-    private enum WindowFocusAttemptResult {
+    private enum WindowFocusAttemptResult: Equatable {
         case verified
         case focusedButUnverified
         case noFocusRoute
@@ -206,32 +206,68 @@ final class RuntimeActivator {
             "Activation",
             "ax-recovery fetched pid=\(app.processIdentifier) windowID=\(request.windowID) count=\(windows.count)"
         )
-        guard !windows.isEmpty else {
+        if windows.isEmpty {
             RuntimeLog.info(
                 "Activation",
                 "ax-recovery no-candidates pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID.map(String.init) ?? "nil")"
             )
-            return false
+        } else {
+            if let matchedWindow = resolveAXWindow(
+                matchingCGWindowID: targetCGWindowID,
+                expectedTitle: request.title,
+                expectedFrame: request.frame,
+                windows: windows,
+                in: app
+            ) {
+                let axFocusResult = attemptAXWindowFocus(
+                    matchedWindow,
+                    route: "public-recovery",
+                    request: request,
+                    in: app
+                )
+                RuntimeLog.info(
+                    "Activation",
+                    "focus-attempt route=ax-public-recovery result=\(axFocusResult.debugName) pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID.map(String.init) ?? "nil")"
+                )
+                switch axFocusResult {
+                case .verified:
+                    return true
+                case .focusedButUnverified, .noFocusRoute:
+                    return false
+                }
+            }
+
+            if let relatedAXFocusResult = attemptRelatedAXWindowFocus(
+                request,
+                publicWindows: windows,
+                in: app
+            ) {
+                RuntimeLog.info(
+                    "Activation",
+                    "focus-attempt route=ax-related result=\(relatedAXFocusResult.debugName) pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID.map(String.init) ?? "nil")"
+                )
+                if relatedAXFocusResult == .verified {
+                    return true
+                }
+            }
         }
 
-        if let matchedWindow = resolveAXWindow(
-            matchingCGWindowID: targetCGWindowID,
-            expectedTitle: request.title,
-            expectedFrame: request.frame,
-            windows: windows,
-            in: app
-        ) {
-            let axFocusResult = attemptAXWindowFocus(
-                matchedWindow,
-                route: "public-recovery",
-                request: request,
-                in: app
-            )
+        if let sameSpaceCGFocusResult = attemptSameSpaceCGWindowFocus(request, in: app) {
             RuntimeLog.info(
                 "Activation",
-                "focus-attempt route=ax-public-recovery result=\(axFocusResult.debugName) pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID.map(String.init) ?? "nil")"
+                "focus-attempt route=cg-same-space result=\(sameSpaceCGFocusResult.debugName) pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID.map(String.init) ?? "nil")"
             )
-            switch axFocusResult {
+            if sameSpaceCGFocusResult == .verified {
+                return true
+            }
+        }
+
+        if let relatedCGFocusResult = attemptRelatedCGWindowFocus(request, in: app) {
+            RuntimeLog.info(
+                "Activation",
+                "focus-attempt route=cg-related result=\(relatedCGFocusResult.debugName) pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID.map(String.init) ?? "nil")"
+            )
+            switch relatedCGFocusResult {
             case .verified:
                 return true
             case .focusedButUnverified, .noFocusRoute:
@@ -318,6 +354,168 @@ final class RuntimeActivator {
         RuntimeLog.info(
             "Activation",
             "cg-window-focus verify pid=\(app.processIdentifier) targetCG=\(targetCGWindowID) visible=\(isVisible ? 1 : 0) windows=\(runtimeActivationCGWindowSummary(currentWindows, targetCGWindowID: targetCGWindowID))"
+        )
+        return isVisible ? .verified : .focusedButUnverified
+    }
+
+    private func attemptRelatedAXWindowFocus(
+        _ request: WindowFocusRequest,
+        publicWindows: [AXUIElement],
+        in app: NSRunningApplication
+    ) -> WindowFocusAttemptResult? {
+        guard RuntimeWindowTopologyClassifier.hasOffDesktopSpace(spaceIDs: request.spaceIDs) else {
+            return nil
+        }
+        guard let targetCGWindowID = request.targetCGWindowID(expectedPID: app.processIdentifier) else {
+            return nil
+        }
+        let currentWindows = currentCGWindows(forPID: app.processIdentifier)
+        guard
+            let targetWindow = currentWindows.first(where: { $0.id == targetCGWindowID }),
+            runtimeCGWindowLooksLikeFullscreenActivationTarget(targetWindow)
+        else {
+            return nil
+        }
+
+        let candidates = publicWindows.compactMap { window -> AXUIElement? in
+            guard let cgWindowID = AXWindowInspector.cgWindowID(for: window) else { return nil }
+            guard cgWindowID != targetCGWindowID else { return nil }
+            guard
+                let cgWindow = currentWindows.first(where: { $0.id == cgWindowID }),
+                RuntimeSnapshotProvider.cgWindowPassesValidityConstraints(cgWindow)
+            else {
+                return nil
+            }
+            guard runtimeCGWindowSharesOffDesktopSpace(cgWindow, with: targetWindow) else {
+                return nil
+            }
+            guard runtimeCGWindowLooksLikeRelatedFullscreenAXSurface(
+                cgWindow,
+                targetFrame: targetWindow.bounds ?? request.frame
+            ) else {
+                return nil
+            }
+            return window
+        }
+        let candidateIDs = candidates.compactMap { AXWindowInspector.cgWindowID(for: $0) }
+        RuntimeLog.info(
+            "Activation",
+            "ax-related candidates pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID) count=\(candidates.count) ids=\(candidateIDs.map(String.init).joined(separator: ","))"
+        )
+        guard candidates.count == 1, let candidate = candidates.first else {
+            return nil
+        }
+        let result = attemptAXWindowFocus(
+            candidate,
+            route: "related",
+            request: request,
+            in: app
+        )
+        RuntimeLog.info(
+            "Activation",
+            "ax-related verify pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID) candidateCG=\(AXWindowInspector.cgWindowID(for: candidate).map(String.init) ?? "nil") result=\(result.debugName)"
+        )
+        return result
+    }
+
+    private func attemptSameSpaceCGWindowFocus(
+        _ request: WindowFocusRequest,
+        in app: NSRunningApplication
+    ) -> WindowFocusAttemptResult? {
+        guard RuntimeWindowTopologyClassifier.hasOffDesktopSpace(spaceIDs: request.spaceIDs) else {
+            return nil
+        }
+        guard let targetCGWindowID = request.targetCGWindowID(expectedPID: app.processIdentifier) else {
+            return nil
+        }
+
+        let currentWindows = currentCGWindows(forPID: app.processIdentifier)
+        guard
+            let targetWindow = currentWindows.first(where: { $0.id == targetCGWindowID }),
+            runtimeCGWindowLooksLikeFullscreenActivationTarget(targetWindow)
+        else {
+            return nil
+        }
+
+        let candidates = currentWindows.filter { window in
+            guard window.id != targetCGWindowID else { return false }
+            guard runtimeCGWindowSharesOffDesktopSpace(window, with: targetWindow) else {
+                return false
+            }
+            return runtimeCGWindowLooksLikeSameSpaceActivationSurface(
+                window,
+                targetFrame: targetWindow.bounds ?? request.frame
+            )
+        }
+        RuntimeLog.info(
+            "Activation",
+            "cg-same-space candidates pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID) count=\(candidates.count) ids=\(candidates.map { String($0.id) }.joined(separator: ","))"
+        )
+        guard !candidates.isEmpty else { return nil }
+
+        for candidate in candidates.sorted(by: runtimeCGSameSpaceActivationCandidateSort) {
+            guard focusCGWindow(candidate.id, in: app) else { continue }
+            let windowsAfterFocus = currentCGWindows(forPID: app.processIdentifier)
+            let isVisible = targetCGWindowIsVisible(
+                targetCGWindowID,
+                in: app,
+                currentWindows: windowsAfterFocus
+            )
+            RuntimeLog.info(
+                "Activation",
+                "cg-same-space verify pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID) candidateCG=\(candidate.id) visible=\(isVisible ? 1 : 0) windows=\(runtimeActivationCGWindowSummary(windowsAfterFocus, targetCGWindowID: targetCGWindowID))"
+            )
+            if isVisible {
+                return .verified
+            }
+        }
+        return .focusedButUnverified
+    }
+
+    private func attemptRelatedCGWindowFocus(
+        _ request: WindowFocusRequest,
+        in app: NSRunningApplication
+    ) -> WindowFocusAttemptResult? {
+        guard RuntimeWindowTopologyClassifier.hasOffDesktopSpace(spaceIDs: request.spaceIDs) else {
+            return nil
+        }
+        guard let targetCGWindowID = request.targetCGWindowID(expectedPID: app.processIdentifier) else {
+            return nil
+        }
+        guard let expectedTitle = normalizedRuntimeWindowTitle(request.title) else {
+            return nil
+        }
+
+        let currentWindows = currentCGWindows(forPID: app.processIdentifier)
+        let candidates = currentWindows.filter { window in
+            guard window.id != targetCGWindowID else { return false }
+            guard RuntimeSnapshotProvider.cgWindowPassesValidityConstraints(window) else { return false }
+            guard !RuntimeWindowTopologyClassifier.isLikelyFullscreenContent(bounds: window.bounds) else {
+                return false
+            }
+            guard let title = normalizedRuntimeWindowTitle(window.title) else { return false }
+            return title.caseInsensitiveCompare(expectedTitle) == .orderedSame
+        }
+        RuntimeLog.info(
+            "Activation",
+            "cg-related candidates pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID) count=\(candidates.count) ids=\(candidates.map { String($0.id) }.joined(separator: ","))"
+        )
+        guard candidates.count == 1, let candidate = candidates.first else {
+            return nil
+        }
+        guard focusCGWindow(candidate.id, in: app) else {
+            return .noFocusRoute
+        }
+
+        let windowsAfterFocus = currentCGWindows(forPID: app.processIdentifier)
+        let isVisible = targetCGWindowIsVisible(
+            targetCGWindowID,
+            in: app,
+            currentWindows: windowsAfterFocus
+        )
+        RuntimeLog.info(
+            "Activation",
+            "cg-related verify pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID) relatedCG=\(candidate.id) visible=\(isVisible ? 1 : 0) windows=\(runtimeActivationCGWindowSummary(windowsAfterFocus, targetCGWindowID: targetCGWindowID))"
         )
         return isVisible ? .verified : .focusedButUnverified
     }
@@ -536,12 +734,14 @@ final class RuntimeActivator {
             return []
         }
 
-        return rawList.compactMap { item in
+        var windowIDs: [CGWindowID] = []
+        let windows: [RuntimeSnapshotProvider.CGWindowEntry] = rawList.compactMap { item in
             guard let ownerPID = item[kCGWindowOwnerPID as String] as? pid_t, ownerPID == pid else {
                 return nil
             }
             guard let layer = item[kCGWindowLayer as String] as? Int, layer == 0 else { return nil }
             guard let windowNumber = item[kCGWindowNumber as String] as? NSNumber else { return nil }
+            let cgWindowID = CGWindowID(windowNumber.uint32Value)
 
             let title = (item[kCGWindowName as String] as? String)?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -551,13 +751,27 @@ final class RuntimeActivator {
             let isOnscreen = (item[kCGWindowIsOnscreen as String] as? NSNumber)?.boolValue ?? false
             let alpha = (item[kCGWindowAlpha as String] as? NSNumber)?.doubleValue ?? 1.0
             let storeType = (item[kCGWindowStoreType as String] as? NSNumber)?.intValue ?? 1
+            windowIDs.append(cgWindowID)
             return RuntimeSnapshotProvider.CGWindowEntry(
-                id: CGWindowID(windowNumber.uint32Value),
+                id: cgWindowID,
                 title: title,
                 bounds: bounds,
                 isOnscreen: isOnscreen,
                 alpha: alpha,
                 storeType: storeType
+            )
+        }
+        let spaceIDsByWindowID = RuntimeCGSpaceInspector.spaceIDsByWindowID(windowIDs)
+        guard !spaceIDsByWindowID.isEmpty else { return windows }
+        return windows.map { window in
+            RuntimeSnapshotProvider.CGWindowEntry(
+                id: window.id,
+                title: window.title,
+                bounds: window.bounds,
+                isOnscreen: window.isOnscreen,
+                alpha: window.alpha,
+                storeType: window.storeType,
+                spaceIDs: spaceIDsByWindowID[window.id] ?? window.spaceIDs
             )
         }
     }
@@ -655,4 +869,87 @@ private func runtimeActivationLogValue(_ value: String) -> String {
         .replacingOccurrences(of: "\n", with: " ")
         .replacingOccurrences(of: "\r", with: " ")
         .trimmingCharacters(in: .whitespacesAndNewlines)
+}
+
+private func runtimeCGWindowLooksLikeFullscreenActivationTarget(
+    _ window: RuntimeSnapshotProvider.CGWindowEntry
+) -> Bool {
+    RuntimeWindowTopologyClassifier.hasOffDesktopSpace(spaceIDs: window.spaceIDs)
+        && RuntimeWindowTopologyClassifier.isLikelyFullscreenContent(bounds: window.bounds)
+}
+
+private func runtimeCGWindowSharesOffDesktopSpace(
+    _ lhs: RuntimeSnapshotProvider.CGWindowEntry,
+    with rhs: RuntimeSnapshotProvider.CGWindowEntry
+) -> Bool {
+    let lhsSpaceIDs = Set(
+        RuntimeWindowTopologyClassifier.normalizedSpaceIDs(lhs.spaceIDs)
+            .filter { $0 != RuntimeWindowTopologyClassifier.desktopSpaceID }
+    )
+    guard !lhsSpaceIDs.isEmpty else { return false }
+    let rhsSpaceIDs = Set(
+        RuntimeWindowTopologyClassifier.normalizedSpaceIDs(rhs.spaceIDs)
+            .filter { $0 != RuntimeWindowTopologyClassifier.desktopSpaceID }
+    )
+    guard !rhsSpaceIDs.isEmpty else { return false }
+    return !lhsSpaceIDs.isDisjoint(with: rhsSpaceIDs)
+}
+
+private func runtimeCGWindowLooksLikeRelatedFullscreenAXSurface(
+    _ window: RuntimeSnapshotProvider.CGWindowEntry,
+    targetFrame: CGRect?
+) -> Bool {
+    guard
+        let bounds = window.bounds?.standardized,
+        let targetFrame = targetFrame?.standardized,
+        RuntimeWindowTopologyClassifier.isLikelyFullscreenContent(bounds: targetFrame)
+    else {
+        return false
+    }
+    guard bounds.width >= targetFrame.width * 0.7 else { return false }
+    guard bounds.height > 0, bounds.height <= targetFrame.height * 0.6 else { return false }
+    guard abs(bounds.minX - targetFrame.minX) <= 90 else { return false }
+    guard bounds.minY >= targetFrame.minY else { return false }
+    guard bounds.minY <= targetFrame.minY + targetFrame.height * 0.6 else { return false }
+    return true
+}
+
+private func runtimeCGWindowLooksLikeSameSpaceActivationSurface(
+    _ window: RuntimeSnapshotProvider.CGWindowEntry,
+    targetFrame: CGRect?
+) -> Bool {
+    guard window.storeType == 1 else { return false }
+    guard
+        let bounds = window.bounds?.standardized,
+        let targetFrame = targetFrame?.standardized,
+        RuntimeWindowTopologyClassifier.isLikelyFullscreenContent(bounds: targetFrame)
+    else {
+        return false
+    }
+    guard !RuntimeWindowTopologyClassifier.isLikelyFullscreenContent(bounds: bounds) else {
+        return false
+    }
+    guard bounds.width >= targetFrame.width * 0.5 else { return false }
+    guard bounds.height > 0, bounds.height <= targetFrame.height * 0.6 else { return false }
+    guard abs(bounds.minX - targetFrame.minX) <= 120 else { return false }
+    guard bounds.minY >= targetFrame.minY else { return false }
+    guard bounds.minY <= targetFrame.minY + targetFrame.height * 0.7 else { return false }
+    return true
+}
+
+private func runtimeCGSameSpaceActivationCandidateSort(
+    _ lhs: RuntimeSnapshotProvider.CGWindowEntry,
+    _ rhs: RuntimeSnapshotProvider.CGWindowEntry
+) -> Bool {
+    let lhsArea = runtimeCGWindowArea(lhs)
+    let rhsArea = runtimeCGWindowArea(rhs)
+    if lhsArea != rhsArea {
+        return lhsArea > rhsArea
+    }
+    return lhs.id < rhs.id
+}
+
+private func runtimeCGWindowArea(_ window: RuntimeSnapshotProvider.CGWindowEntry) -> CGFloat {
+    guard let bounds = window.bounds?.standardized else { return 0 }
+    return bounds.width * bounds.height
 }

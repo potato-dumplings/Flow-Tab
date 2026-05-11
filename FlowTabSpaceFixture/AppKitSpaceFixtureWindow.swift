@@ -123,6 +123,7 @@ private final class NoisyCGSiblingWindowSet {
         let height: CGFloat
         let insetFromTop: CGFloat
         let horizontalInset: CGFloat
+        let fillsRemainingHeight: Bool
         let usesTitledWindow: Bool
         let exposesAccessibilityElement: Bool
         let ignoresCycle: Bool
@@ -147,13 +148,18 @@ private final class NoisyCGSiblingWindowSet {
 
     private func makeWindows(around hostWindow: NSWindow) -> [NSWindow] {
         noisySiblingSpecs().map { spec in
-            let window = NSWindow(
+            let window = NoisyCGSiblingWindow(
                 contentRect: frame(for: spec, hostFrame: hostWindow.frame),
                 styleMask: spec.usesTitledWindow ? [.titled] : [.borderless],
                 backing: .buffered,
-                defer: false
+                defer: false,
+                exposesAccessibilityElement: spec.exposesAccessibilityElement,
+                accessibilityTitle: spec.title
             )
             window.title = spec.title ?? ""
+            if let title = spec.title {
+                window.setAccessibilityTitle(title)
+            }
             window.titleVisibility = spec.title == nil ? .hidden : .visible
             window.titlebarAppearsTransparent = true
             window.identifier = NSUserInterfaceItemIdentifier(
@@ -182,7 +188,9 @@ private final class NoisyCGSiblingWindowSet {
 
     private func frame(for spec: Spec, hostFrame: CGRect) -> CGRect {
         let normalizedHostFrame = hostFrame.standardized
-        let height = min(spec.height, max(80, normalizedHostFrame.height / 4))
+        let height = spec.fillsRemainingHeight
+            ? max(80, normalizedHostFrame.height - spec.insetFromTop)
+            : min(spec.height, max(80, normalizedHostFrame.height / 4))
         return CGRect(
             x: normalizedHostFrame.minX + spec.horizontalInset,
             y: normalizedHostFrame.maxY - spec.insetFromTop - height,
@@ -200,8 +208,9 @@ private final class NoisyCGSiblingWindowSet {
                 height: ChromeLikeLayout.titlebarHeight,
                 insetFromTop: 0,
                 horizontalInset: 0,
+                fillsRemainingHeight: false,
                 usesTitledWindow: false,
-                exposesAccessibilityElement: true,
+                exposesAccessibilityElement: false,
                 ignoresCycle: true
             ),
             Spec(
@@ -210,8 +219,9 @@ private final class NoisyCGSiblingWindowSet {
                 height: ChromeLikeLayout.toolbarHeight,
                 insetFromTop: ChromeLikeLayout.titlebarHeight,
                 horizontalInset: 0,
+                fillsRemainingHeight: false,
                 usesTitledWindow: false,
-                exposesAccessibilityElement: true,
+                exposesAccessibilityElement: false,
                 ignoresCycle: true
             ),
             Spec(
@@ -220,28 +230,31 @@ private final class NoisyCGSiblingWindowSet {
                 height: ChromeLikeLayout.tabStripHeight,
                 insetFromTop: ChromeLikeLayout.titlebarHeight + ChromeLikeLayout.toolbarHeight,
                 horizontalInset: 0,
+                fillsRemainingHeight: false,
                 usesTitledWindow: false,
-                exposesAccessibilityElement: true,
+                exposesAccessibilityElement: false,
                 ignoresCycle: true
             ),
             Spec(
-                suffix: "content-wrapper",
-                title: appNameTitle,
-                height: 165,
-                insetFromTop: ChromeLikeLayout.titlebarHeight,
+                suffix: "content-plane",
+                title: plan.title,
+                height: 0,
+                insetFromTop: ChromeLikeLayout.chromeStackHeight,
                 horizontalInset: 0,
+                fillsRemainingHeight: true,
                 usesTitledWindow: true,
                 exposesAccessibilityElement: true,
                 ignoresCycle: false
             ),
             Spec(
-                suffix: "content-plane",
-                title: appNameTitle,
-                height: 520,
-                insetFromTop: ChromeLikeLayout.chromeStackHeight,
+                suffix: "content-wrapper",
+                title: plan.title,
+                height: 165,
+                insetFromTop: ChromeLikeLayout.titlebarHeight,
                 horizontalInset: 0,
-                usesTitledWindow: true,
-                exposesAccessibilityElement: true,
+                fillsRemainingHeight: false,
+                usesTitledWindow: false,
+                exposesAccessibilityElement: false,
                 ignoresCycle: false
             ),
             Spec(
@@ -250,6 +263,7 @@ private final class NoisyCGSiblingWindowSet {
                 height: 418,
                 insetFromTop: 63,
                 horizontalInset: 96,
+                fillsRemainingHeight: false,
                 usesTitledWindow: false,
                 exposesAccessibilityElement: false,
                 ignoresCycle: true
@@ -260,10 +274,55 @@ private final class NoisyCGSiblingWindowSet {
                 height: 80,
                 insetFromTop: 202,
                 horizontalInset: 160,
+                fillsRemainingHeight: false,
                 usesTitledWindow: false,
                 exposesAccessibilityElement: false,
                 ignoresCycle: true
             )
         ]
+    }
+}
+
+@MainActor
+private final class NoisyCGSiblingWindow: NSWindow {
+    private let exposesAccessibilityElementFlag: Bool
+    private let accessibilityTitleOverride: String?
+
+    init(
+        contentRect: NSRect,
+        styleMask style: NSWindow.StyleMask,
+        backing backingStoreType: NSWindow.BackingStoreType,
+        defer flag: Bool,
+        exposesAccessibilityElement: Bool,
+        accessibilityTitle: String?
+    ) {
+        self.exposesAccessibilityElementFlag = exposesAccessibilityElement
+        self.accessibilityTitleOverride = accessibilityTitle
+        super.init(
+            contentRect: contentRect,
+            styleMask: style,
+            backing: backingStoreType,
+            defer: flag
+        )
+    }
+
+    override func isAccessibilityElement() -> Bool {
+        exposesAccessibilityElementFlag ? super.isAccessibilityElement() : false
+    }
+
+    override func accessibilityRole() -> NSAccessibility.Role? {
+        exposesAccessibilityElementFlag ? super.accessibilityRole() : nil
+    }
+
+    override func accessibilitySubrole() -> NSAccessibility.Subrole? {
+        exposesAccessibilityElementFlag ? super.accessibilitySubrole() : nil
+    }
+
+    override func accessibilityTitle() -> String? {
+        accessibilityTitleOverride ?? super.accessibilityTitle()
+    }
+
+    override func accessibilityChildren() -> [Any]? {
+        exposesAccessibilityElementFlag ? super.accessibilityChildren() : []
     }
 }

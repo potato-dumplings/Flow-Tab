@@ -554,6 +554,323 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(mergedEntries.first?.lastConfirmationSource, .stickyBinding)
     }
 
+    func testRuntimeSnapshotProviderWindowListFiltersFullscreenSiblingArtifactsAroundNoisyWindows() {
+        let appName = "Chrome Fixture"
+        let normalFrame = CGRect(x: 384, y: 258, width: 960, height: 640)
+        let incognitoFrame = CGRect(x: 492, y: 354, width: 960, height: 640)
+        let fullscreenFrame = CGRect(x: 0, y: 37, width: 1_728, height: 1_080)
+        let fullscreenContentFrame = CGRect(x: 0, y: 158, width: 1_728, height: 959)
+        let fullscreenBandFrame = CGRect(x: 0, y: 74, width: 1_728, height: 165)
+
+        let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+            axWindows: [
+                .init(
+                    id: "ax:chrome:normal",
+                    index: 0,
+                    title: "Chrome Normal Tab",
+                    bounds: normalFrame,
+                    bridgedCGWindowID: 147_870
+                ),
+                .init(
+                    id: "ax:chrome:incognito",
+                    index: 1,
+                    title: "Chrome Incognito Tab",
+                    bounds: incognitoFrame,
+                    bridgedCGWindowID: 147_873
+                ),
+                .init(
+                    id: "ax:chrome:fullscreen-host",
+                    index: 2,
+                    title: "Chrome Fullscreen Tab",
+                    bounds: fullscreenFrame,
+                    bridgedCGWindowID: 147_871
+                ),
+                .init(
+                    id: "ax:chrome:second-fullscreen-host",
+                    index: 3,
+                    title: "Chrome Second Fullscreen Tab",
+                    bounds: fullscreenFrame,
+                    bridgedCGWindowID: 147_872
+                ),
+                .init(
+                    id: "ax:chrome:fullscreen-content",
+                    index: 4,
+                    title: "Chrome Fullscreen Tab",
+                    bounds: fullscreenContentFrame,
+                    bridgedCGWindowID: 147_910
+                ),
+                .init(
+                    id: "ax:chrome:second-fullscreen-content",
+                    index: 5,
+                    title: "Chrome Second Fullscreen Tab",
+                    bounds: fullscreenContentFrame,
+                    bridgedCGWindowID: 147_911
+                ),
+                .init(
+                    id: "ax:chrome:desktop-helper",
+                    index: 6,
+                    title: appName,
+                    bounds: fullscreenBandFrame,
+                    bridgedCGWindowID: 147_881
+                )
+            ],
+            cgWindows: [
+                .init(
+                    id: 147_870,
+                    title: "Chrome Normal Tab",
+                    bounds: normalFrame,
+                    isOnscreen: false,
+                    spaceIDs: [1]
+                ),
+                .init(
+                    id: 147_873,
+                    title: "Chrome Incognito Tab",
+                    bounds: incognitoFrame,
+                    isOnscreen: false,
+                    spaceIDs: [1]
+                ),
+                .init(
+                    id: 147_871,
+                    title: "Chrome Fullscreen Tab",
+                    bounds: fullscreenFrame,
+                    isOnscreen: true,
+                    spaceIDs: [7_006]
+                ),
+                .init(
+                    id: 147_872,
+                    title: "Chrome Second Fullscreen Tab",
+                    bounds: fullscreenFrame,
+                    isOnscreen: false,
+                    spaceIDs: [7_002]
+                ),
+                .init(
+                    id: 147_881,
+                    title: appName,
+                    bounds: fullscreenBandFrame,
+                    isOnscreen: false,
+                    spaceIDs: [1]
+                ),
+                .init(
+                    id: 147_909,
+                    title: appName,
+                    bounds: fullscreenBandFrame,
+                    isOnscreen: true,
+                    spaceIDs: [7_002]
+                ),
+                .init(
+                    id: 147_910,
+                    title: "Chrome Fullscreen Tab",
+                    bounds: fullscreenContentFrame,
+                    isOnscreen: true,
+                    spaceIDs: [7_006]
+                ),
+                .init(
+                    id: 147_911,
+                    title: "Chrome Second Fullscreen Tab",
+                    bounds: fullscreenContentFrame,
+                    isOnscreen: false,
+                    spaceIDs: [1]
+                ),
+                .init(
+                    id: 147_884,
+                    title: nil,
+                    bounds: CGRect(x: 160, y: 239, width: 1_408, height: 80),
+                    isOnscreen: false,
+                    spaceIDs: [1]
+                )
+            ],
+            previousMatches: [
+                "ax:chrome:normal": 147_870,
+                "ax:chrome:fullscreen-host": 147_871,
+                "ax:chrome:second-fullscreen-host": 147_872,
+                "ax:chrome:incognito": 147_873,
+                "ax:chrome:fullscreen-content": 147_910,
+                "ax:chrome:second-fullscreen-content": 147_911
+            ],
+            previousAXWindowIDs: [
+                "ax:chrome:normal",
+                "ax:chrome:fullscreen-host",
+                "ax:chrome:second-fullscreen-host",
+                "ax:chrome:incognito",
+                "ax:chrome:fullscreen-content",
+                "ax:chrome:second-fullscreen-content"
+            ],
+            previousCGWindowIDs: [147_870, 147_871, 147_872, 147_873, 147_910, 147_911],
+            pid: 20_596,
+            appName: appName
+        )
+
+        XCTAssertEqual(
+            mergedEntries.map(\.title),
+            [
+                "Chrome Fullscreen Tab",
+                "Chrome Normal Tab",
+                "Chrome Incognito Tab",
+                "Chrome Second Fullscreen Tab"
+            ]
+        )
+        XCTAssertEqual(
+            mergedEntries.compactMap(\.cgWindowID),
+            [147_910, 147_870, 147_873, 147_911]
+        )
+        XCTAssertTrue(
+            mergedEntries.filter { $0.title.contains("Fullscreen") }.allSatisfy {
+                $0.hasActivationHandle
+            }
+        )
+        XCTAssertFalse(mergedEntries.contains { $0.title == appName })
+    }
+
+    func testRuntimeSnapshotProviderWindowListOrdersOnscreenWindowsByCGZOrderInFullscreenTopology() {
+        let appName = "Chrome Fixture"
+        let normalFrame = CGRect(x: 384, y: 258, width: 960, height: 640)
+        let incognitoFrame = CGRect(x: 492, y: 354, width: 960, height: 640)
+        let fullscreenFrame = CGRect(x: 0, y: 37, width: 1_728, height: 1_080)
+
+        let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+            axWindows: [
+                .init(
+                    id: "ax:chrome:normal",
+                    index: 0,
+                    title: "Chrome Normal Tab",
+                    bounds: normalFrame,
+                    bridgedCGWindowID: 151_139
+                ),
+                .init(
+                    id: "ax:chrome:incognito",
+                    index: 1,
+                    title: "Chrome Incognito Tab",
+                    bounds: incognitoFrame,
+                    bridgedCGWindowID: 151_142
+                ),
+                .init(
+                    id: "ax:chrome:fullscreen",
+                    index: 2,
+                    title: "Chrome Fullscreen Tab",
+                    bounds: fullscreenFrame,
+                    bridgedCGWindowID: 151_178
+                )
+            ],
+            cgWindows: [
+                .init(
+                    id: 151_142,
+                    title: "Chrome Incognito Tab",
+                    bounds: incognitoFrame,
+                    isOnscreen: true,
+                    spaceIDs: [1]
+                ),
+                .init(
+                    id: 151_139,
+                    title: "Chrome Normal Tab",
+                    bounds: normalFrame,
+                    isOnscreen: true,
+                    spaceIDs: [1]
+                ),
+                .init(
+                    id: 151_178,
+                    title: "Chrome Fullscreen Tab",
+                    bounds: fullscreenFrame,
+                    isOnscreen: false,
+                    spaceIDs: [7_177]
+                )
+            ],
+            pid: 64_785,
+            appName: appName
+        )
+
+        XCTAssertEqual(
+            mergedEntries.compactMap(\.cgWindowID),
+            [151_142, 151_139, 151_178]
+        )
+        XCTAssertEqual(mergedEntries.first?.title, "Chrome Incognito Tab")
+    }
+
+    func testRuntimeSnapshotProviderWindowListKeepsDesktopFullscreenSiblingsBehindNormalSurfaces() {
+        let appName = "Chrome Fixture"
+        let normalFrame = CGRect(x: 384, y: 258, width: 960, height: 640)
+        let incognitoFrame = CGRect(x: 492, y: 354, width: 960, height: 640)
+        let fullscreenHostFrame = CGRect(x: 0, y: 37, width: 1_728, height: 1_080)
+        let fullscreenContentFrame = CGRect(x: 0, y: 195, width: 1_728, height: 922)
+
+        let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+            axWindows: [
+                .init(
+                    id: "ax:chrome:normal",
+                    index: 0,
+                    title: "Chrome Normal Tab",
+                    bounds: normalFrame,
+                    bridgedCGWindowID: 151_321
+                ),
+                .init(
+                    id: "ax:chrome:incognito",
+                    index: 1,
+                    title: "Chrome Incognito Tab",
+                    bounds: incognitoFrame,
+                    bridgedCGWindowID: 151_324
+                ),
+                .init(
+                    id: "ax:chrome:second-fullscreen-content",
+                    index: 2,
+                    title: "Chrome Second Fullscreen Tab",
+                    bounds: fullscreenContentFrame,
+                    bridgedCGWindowID: 151_332
+                ),
+                .init(
+                    id: "ax:chrome:fullscreen-content",
+                    index: 3,
+                    title: "Chrome Fullscreen Tab",
+                    bounds: fullscreenContentFrame,
+                    bridgedCGWindowID: 151_360
+                )
+            ],
+            cgWindows: [
+                .init(
+                    id: 151_332,
+                    title: "Chrome Second Fullscreen Tab",
+                    bounds: fullscreenContentFrame,
+                    isOnscreen: true,
+                    spaceIDs: [1]
+                ),
+                .init(
+                    id: 151_321,
+                    title: "Chrome Normal Tab",
+                    bounds: normalFrame,
+                    isOnscreen: true,
+                    spaceIDs: [1]
+                ),
+                .init(
+                    id: 151_324,
+                    title: "Chrome Incognito Tab",
+                    bounds: incognitoFrame,
+                    isOnscreen: true,
+                    spaceIDs: [1]
+                ),
+                .init(
+                    id: 151_323,
+                    title: "Chrome Second Fullscreen Tab",
+                    bounds: fullscreenHostFrame,
+                    isOnscreen: false,
+                    spaceIDs: [7_185]
+                ),
+                .init(
+                    id: 151_360,
+                    title: "Chrome Fullscreen Tab",
+                    bounds: fullscreenContentFrame,
+                    isOnscreen: false,
+                    spaceIDs: [7_189]
+                )
+            ],
+            pid: 67_097,
+            appName: appName
+        )
+
+        XCTAssertEqual(
+            mergedEntries.compactMap(\.cgWindowID),
+            [151_321, 151_324, 151_332, 151_360]
+        )
+        XCTAssertEqual(mergedEntries.first?.title, "Chrome Normal Tab")
+    }
+
     func testRuntimeSnapshotProviderWindowListKeepsStickyCGEntriesBoundToSpaceOneDuringTransientAXRebuild() {
         let provider = RuntimeSnapshotProvider()
         let pid: pid_t = 18_405
