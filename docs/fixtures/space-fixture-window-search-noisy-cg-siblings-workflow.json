@@ -20,6 +20,7 @@
           "title": "Chrome Window 2",
           "mode": "fullscreen",
           "noisyCGSiblings": true,
+          "publishesApplicationAXWindow": false,
           "tabs": [
             { "title": "Chrome Fullscreen Tab", "isSelected": true },
             { "title": "Secondary Tab", "isSelected": false }
@@ -29,6 +30,7 @@
           "title": "Chrome Window 3",
           "mode": "fullscreen",
           "noisyCGSiblings": true,
+          "publishesApplicationAXWindow": false,
           "tabs": [
             { "title": "Chrome Second Fullscreen Tab", "isSelected": true },
             { "title": "Background Fullscreen Tab", "isSelected": false }

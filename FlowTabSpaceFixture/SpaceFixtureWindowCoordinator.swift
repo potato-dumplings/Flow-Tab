@@ -156,7 +156,11 @@ final class SpaceFixtureWindowCoordinator {
             applicationAccessibilityElementsPublisher([])
             return
         }
-        applicationAccessibilityElementsPublisher(windows.map(\.applicationAccessibilityElement))
+        applicationAccessibilityElementsPublisher(
+            windows
+                .filter(\.plan.publishesApplicationAXWindow)
+                .map(\.applicationAccessibilityElement)
+        )
     }
 
     private func scheduleApplicationAccessibilitySuppressionIfNeeded() {

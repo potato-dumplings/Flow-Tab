@@ -106,7 +106,7 @@ final class RuntimeActivator {
         )
         RuntimeLog.info(
             "Activation",
-            "window-request appID=\(appID) pid=\(targetApp.processIdentifier) windowID=\(windowID) title=\(runtimeActivationLogValue(windowContext.title)) cg=\(windowContext.cgWindowID.map(String.init) ?? "nil") handle=\(windowContext.activationHandleID ?? "nil") ax=\(windowContext.axWindow == nil ? 0 : 1) spaces=\(windowContext.spaceIDs) frame=\(runtimeActivationFrameDescription(windowContext.frame)) restore=\(request.restoreIfMinimized) sticky=\(windowContext.hasStickyBinding) source=\(windowContext.lastConfirmationSource?.rawValue ?? "nil")"
+            "window-request appID=\(appID) pid=\(targetApp.processIdentifier) windowID=\(windowID) title=\(runtimeActivationLogValue(windowContext.title)) cg=\(windowContext.cgWindowID.map(String.init) ?? "nil") handle=\(windowContext.activationHandleID ?? "nil") ax=\(windowContext.axWindow == nil ? 0 : 1) fallbackAX=0 spaces=\(windowContext.spaceIDs) frame=\(runtimeActivationFrameDescription(windowContext.frame)) restore=\(request.restoreIfMinimized) sticky=\(windowContext.hasStickyBinding) source=\(windowContext.lastConfirmationSource?.rawValue ?? "nil") publicAXRecovery=\(windowContext.allowsPublicAXRecovery ? 1 : 0)"
         )
         if request.targetCGWindowID(expectedPID: targetApp.processIdentifier) != nil {
             self.focusWindow(request, in: targetApp)
@@ -171,13 +171,24 @@ final class RuntimeActivator {
                     return true
                 }
             }
+        } else {
+            RuntimeLog.info(
+                "Activation",
+                "ax-direct unavailable pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(request.targetCGWindowID(expectedPID: app.processIdentifier).map(String.init) ?? "nil") handle=\(request.preferredActivationHandleID ?? "nil") preferredAX=0 registryAX=0"
+            )
         }
 
         if cgFocusVerified {
             return true
         }
 
-        guard request.allowsPublicAXRecovery else { return false }
+        guard request.allowsPublicAXRecovery else {
+            RuntimeLog.info(
+                "Activation",
+                "ax-recovery skipped pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(request.targetCGWindowID(expectedPID: app.processIdentifier).map(String.init) ?? "nil") reason=disabled"
+            )
+            return false
+        }
 
         let targetCGWindowID = request.targetCGWindowID(expectedPID: app.processIdentifier)
         let includeRemoteWindows = RuntimeWindowTopologyClassifier.hasOffDesktopSpace(

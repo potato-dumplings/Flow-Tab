@@ -426,6 +426,16 @@ final class RuntimeSnapshotProvider {
                     frame: AXWindowInspector.frame(for: window)
                 )
             }
+            logChromeLikeTopologySnapshot(
+                appName: appName,
+                pid: app.processIdentifier,
+                publicWindowsFetchResult: publicWindowsFetchResult,
+                finalWindowsFetchResult: windowsFetchResult,
+                includeRemoteAXWindows: shouldIncludeRemoteAXWindows,
+                publicSwitchableWindowCount: publicSwitchableWindowCount,
+                axWindows: axEntries,
+                cgWindows: allCGWindows
+            )
 
             let resolvedEntries = resolvedWindowEntries(
                 axWindows: axEntries,
@@ -435,6 +445,12 @@ final class RuntimeSnapshotProvider {
             )
             guard !resolvedEntries.isEmpty else { continue }
             RuntimeLog.info("AX", "\(appName) switchableWindows=\(resolvedEntries.count)")
+            logResolvedWindowEntrySummary(
+                appName: appName,
+                pid: app.processIdentifier,
+                axWindowCount: axEntries.count,
+                entries: resolvedEntries
+            )
             windowsByPID[app.processIdentifier] = resolvedEntries
         }
         return windowsByPID

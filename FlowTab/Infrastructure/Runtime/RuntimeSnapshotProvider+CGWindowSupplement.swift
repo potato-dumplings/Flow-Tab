@@ -215,4 +215,103 @@ extension RuntimeSnapshotProvider {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? nil : trimmed
     }
+
+    func logChromeLikeTopologySnapshot(
+        appName: String,
+        pid: pid_t,
+        publicWindowsFetchResult: AXWindowInspector.WindowsFetchResult,
+        finalWindowsFetchResult: AXWindowInspector.WindowsFetchResult,
+        includeRemoteAXWindows: Bool,
+        publicSwitchableWindowCount: Int,
+        axWindows: [AXWindowEntry],
+        cgWindows: [CGWindowEntry]
+    ) {
+        RuntimeLog.info(
+            "Snapshot",
+            "chrome-topology app=\(runtimeSnapshotLogValue(appName)) pid=\(pid) publicSwitchableAX=\(publicSwitchableWindowCount) publicFetch=[\(publicWindowsFetchResult.logDetails)] includeRemoteAX=\(includeRemoteAXWindows ? 1 : 0) finalFetch=[\(finalWindowsFetchResult.logDetails)] ax=[\(runtimeSnapshotAXWindowSummary(axWindows))] cg=[\(runtimeSnapshotCGWindowSummary(cgWindows))]"
+        )
+    }
+
+    func logResolvedWindowEntrySummary(
+        appName: String,
+        pid: pid_t,
+        axWindowCount: Int,
+        entries: [WindowListEntry]
+    ) {
+        let cgOnlyCount = entries.filter { $0.activationHandleID == nil && $0.axWindow == nil }.count
+        guard entries.count != axWindowCount || cgOnlyCount > 0 else { return }
+
+        let stickyCount = entries.filter(\.hasStickyBinding).count
+        RuntimeLog.info(
+            "Snapshot",
+            "window-entries app=\(runtimeSnapshotLogValue(appName)) pid=\(pid) ax=\(axWindowCount) entries=\(entries.count) cgOnly=\(cgOnlyCount) sticky=\(stickyCount) detail=[\(runtimeSnapshotWindowEntrySummary(entries))]"
+        )
+    }
+}
+
+private func runtimeSnapshotAXWindowSummary(
+    _ windows: [RuntimeSnapshotProvider.AXWindowEntry],
+    limit: Int = 12
+) -> String {
+    guard !windows.isEmpty else { return "empty" }
+    let sample = windows.prefix(limit).map { window in
+        let bridgeCG = AXWindowInspector.cgWindowID(for: window.window).map(String.init) ?? "nil"
+        return "\(window.id):\(runtimeSnapshotLogValue(window.sourceTitle ?? window.title)):frame=\(runtimeSnapshotFrameDescription(window.frame)):bridgeCG=\(bridgeCG)"
+    }.joined(separator: ",")
+    return runtimeSnapshotSampleDescription(sample: sample, count: windows.count, limit: limit)
+}
+
+private func runtimeSnapshotCGWindowSummary(
+    _ windows: [RuntimeSnapshotProvider.CGWindowEntry],
+    limit: Int = 16
+) -> String {
+    guard !windows.isEmpty else { return "empty" }
+    let sample = windows.prefix(limit).map { window in
+        let onscreen = window.isOnscreen ? "on" : "off"
+        let spaces = window.spaceIDs.isEmpty ? "[]" : "[\(window.spaceIDs.map(String.init).joined(separator: ","))]"
+        return "\(window.id):\(runtimeSnapshotLogValue(window.title ?? "nil")):\(onscreen):spaces=\(spaces):frame=\(runtimeSnapshotFrameDescription(window.bounds))"
+    }.joined(separator: ",")
+    return runtimeSnapshotSampleDescription(sample: sample, count: windows.count, limit: limit)
+}
+
+private func runtimeSnapshotWindowEntrySummary(
+    _ entries: [RuntimeSnapshotProvider.WindowListEntry],
+    limit: Int = 16
+) -> String {
+    guard !entries.isEmpty else { return "empty" }
+    let sample = entries.prefix(limit).enumerated().map { index, entry in
+        let route: String
+        if entry.activationHandleID != nil || entry.axWindow != nil {
+            route = "ax"
+        } else if entry.hasStickyBinding {
+            route = "sticky-cg"
+        } else {
+            route = "cg"
+        }
+        let cg = entry.cgWindowID.map(String.init) ?? "nil"
+        let spaces = entry.spaceIDs.isEmpty
+            ? "[]"
+            : "[\(entry.spaceIDs.map(String.init).joined(separator: ","))]"
+        let onscreen = entry.isOnscreen ? "on" : "off"
+        let sticky = entry.hasStickyBinding ? 1 : 0
+        let source = entry.lastConfirmationSource?.rawValue ?? "nil"
+        return "\(index):\(runtimeSnapshotLogValue(entry.title)):cg=\(cg):route=\(route):sticky=\(sticky):source=\(source):spaces=\(spaces):\(onscreen):frame=\(runtimeSnapshotFrameDescription(entry.frame))"
+    }.joined(separator: ",")
+    return runtimeSnapshotSampleDescription(sample: sample, count: entries.count, limit: limit)
+}
+
+private func runtimeSnapshotSampleDescription(sample: String, count: Int, limit: Int) -> String {
+    count > limit ? "\(sample),...+\(count - limit)" : sample
+}
+
+private func runtimeSnapshotFrameDescription(_ frame: CGRect?) -> String {
+    guard let frame else { return "nil" }
+    return "\(Int(frame.origin.x)),\(Int(frame.origin.y)),\(Int(frame.size.width))x\(Int(frame.size.height))"
+}
+
+private func runtimeSnapshotLogValue(_ value: String) -> String {
+    value
+        .replacingOccurrences(of: "\n", with: " ")
+        .replacingOccurrences(of: "\r", with: " ")
+        .trimmingCharacters(in: .whitespacesAndNewlines)
 }
