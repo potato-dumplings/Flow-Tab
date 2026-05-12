@@ -175,10 +175,12 @@ focus-attempt route=ax-direct result=verified ... targetCG=<target>
 不同机器和当前 Space 状态下，验证通过的第一条 route 可能不同。测试不要求逐字
 固定某一条 route，但必须证明最终目标是同一个具体 CGWindowID。
 
-## Control+Tab 当前窗口身份
+## 当前窗口身份和窗口 recency
 
 Control+Tab in-app window switcher 有一个额外问题：面板重新打开时，起点必须是
-用户当前实际 focused 的窗口，而不是 presentation order 的第一个窗口。
+用户当前实际 focused 的窗口，而不是 presentation order 的第一个窗口。Option+Tab
+也有相同的业务目标，但不能直接把当前真实 focused window 当成任意 app 的窗口态
+起点；global app switcher 进入 window state 前，用户可能选的是另一个 app。
 
 当前实现中，`LiveSwitcherModel.startFocusedAppWindowSession` 会：
 
@@ -194,16 +196,32 @@ Control+Tab in-app window switcher 有一个额外问题：面板重新打开时
 从 `Chrome Normal Tab` 重新打开 Control+Tab 时，面板仍然从 `Chrome Normal Tab`
 开始。
 
-相关回归覆盖在 `FlowTabPriorityCoverageTests+SessionAndPanelSearch.swift`：
+Option+Tab 使用 app-local 的窗口 recency overlay：
+
+1. FlowTab 成功激活某个具体窗口后，记录 app identity、stable window identity 和
+   timestamp。
+2. 打开 switcher 时，只刷新当前 frontmost app 里能精确匹配的 focused/runtime
+   window。
+3. snapshot 组装窗口列表时，只把该 app 自己的 recency overlay 到
+   `WindowCandidate.lastActiveAt`。
+4. 进入任意 app 的 window cycle 时，只看该 app 自己的窗口 recency；如果用户在
+   global app switcher 里选择 B app，A app 的当前 focused window 不会污染 B app。
+5. 没有可靠 recency 记录时，才回退到当前 runtime snapshot 的 presentation order。
+
+相关回归覆盖在 `FlowTabPriorityCoverageTests+SessionAndPanelSearch.swift` 和
+`FlowTabPriorityCoverageTests+WindowRecency.swift`：
 
 - `testLiveSwitcherModelStartFocusedAppWindowSessionSelectsFocusedWindowIdentityOverWindowOrdering`
+- `testLiveSwitcherModelGlobalSnapshotRecencyUsesOnlySelectedAppsOwnWindowEvidence`
+- `testLiveSwitcherModelRecordsFrontmostRuntimeWindowWhenAXFocusedWindowUnavailable`
+- `testRuntimeWindowRecencyTrackerOrdersRecordedWindowsBeforeFallbackInRecencyOrder`
 
 ## 必须证明的 Round Trip
 
 Noisy 测试不只证明 “能从 full-screen 切到 normal” 或 “能从 normal 切到某个
 full-screen”。当前 UI 回归要求 4 个业务窗口都能独立被选择并激活。
 
-Control+Tab 的最小链路是：
+最小链路是：
 
 ```text
 fullscreen1 -> normal1
@@ -212,10 +230,22 @@ fullscreen1 -> normal2
 normal2     -> fullscreen2
 ```
 
+Option+Tab 的窗口态必须先从 global app switcher 选中目标 app，再进入该 app 的
+window state，之后完成同一条链路。该入口的 Noisy 回归按阶段验证越来越长的
+recency prefix：
+
+```text
+stage 1: fullscreen1
+stage 2: normal1, fullscreen1
+stage 3: fullscreen1, normal1, normal2
+stage 4: normal2, fullscreen1, normal1, fullscreen2
+```
+
 每一步都必须验证：
 
 - 面板里 exactly 4 个用户窗口 title。
 - 当前 selected window 是上一步真实 focused 的窗口。
+- Option+Tab window state 的已观测窗口 prefix 符合本阶段 recency 预期。
 - 目标 selected item 的 title 符合本阶段目标。
 - 目标 selected item 携带的 CGWindowID 属于该业务窗口。
 - confirm 后 exact frontmost CGWindowID 等于刚才选择的 CGWindowID。
@@ -228,7 +258,7 @@ normal2     -> fullscreen2
 当前 noisy topology 需要在三个入口下维持同一套 runtime truth：
 
 - Option+Tab：global app/window switcher 必须看到同样的 4 个业务窗口，并能完成
-  full-screen/normal round trip。
+  app 选择、进入 window state、四窗口 round trip 和分阶段 recency prefix 断言。
 - Window search：window-scope search 结果必须绑定具体业务窗口，而不是 app row
   或 noisy sibling。
 - Control+Tab：in-app focused-window session 必须从真实 focused window 开始，

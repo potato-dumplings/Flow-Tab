@@ -79,6 +79,60 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(session.selectedWindow?.id, "normal")
     }
 
+    func testRuntimeWindowRecencyTrackerOrdersRecordedWindowsBeforeFallbackInRecencyOrder() {
+        var now: TimeInterval = 500
+        let tracker = RuntimeWindowRecencyTracker(clock: { now })
+        let currentApp = NSRunningApplication.current
+        let appID = "com.example.fixture.chrome"
+        let windows = [
+            WindowCandidate(id: "incognito", title: "Chrome Incognito Tab", isMinimized: false, lastActiveAt: 40),
+            WindowCandidate(id: "second-fullscreen", title: "Chrome Second Fullscreen Tab", isMinimized: false, lastActiveAt: 30),
+            WindowCandidate(id: "fullscreen", title: "Chrome Fullscreen Tab", isMinimized: false, lastActiveAt: 20),
+            WindowCandidate(id: "normal", title: "Chrome Normal Tab", isMinimized: false, lastActiveAt: 10)
+        ]
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windowsByID: Dictionary(uniqueKeysWithValues: windows.enumerated().map { index, window in
+                (
+                    window.id,
+                    RuntimeWindowContext(
+                        id: window.id,
+                        title: window.title,
+                        isMinimized: false,
+                        ownerPID: currentApp.processIdentifier,
+                        cgWindowID: CGWindowID(170_000 + index)
+                    )
+                )
+            })
+        )
+
+        now = 800
+        tracker.record(appID: appID, windowID: "fullscreen", context: context)
+        now = 900
+        tracker.record(appID: appID, windowID: "normal", context: context)
+
+        let updatedSnapshot = tracker.snapshotWithRecencyApplied(
+            RuntimeSnapshot(
+                apps: [
+                    AppSwitchCandidate(
+                        id: appID,
+                        displayName: "Chrome Fixture",
+                        groupID: "chrome",
+                        lastActiveAt: 100,
+                        windows: windows
+                    )
+                ],
+                contextsByID: [appID: context]
+            )
+        )
+
+        XCTAssertEqual(
+            updatedSnapshot.apps.first?.windows.map(\.id),
+            ["normal", "fullscreen", "incognito", "second-fullscreen"]
+        )
+    }
+
     @MainActor
     func testLiveSwitcherModelGlobalSnapshotRecencyUsesOnlySelectedAppsOwnWindowEvidence() {
         let model = LiveSwitcherModel()
@@ -209,5 +263,79 @@ extension FlowTabPriorityCoverageTests {
         model.handle(.downArrow)
         XCTAssertEqual(model.session?.mode, .windowCycle(appID: currentAppID))
         XCTAssertEqual(model.session?.selectedWindow?.id, "current-focused")
+    }
+
+    @MainActor
+    func testLiveSwitcherModelRecordsFrontmostRuntimeWindowWhenAXFocusedWindowUnavailable() {
+        let model = LiveSwitcherModel()
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let initialWindows = [
+            WindowCandidate(id: "fullscreen", title: "Chrome Fullscreen Tab", isMinimized: false, lastActiveAt: 30),
+            WindowCandidate(id: "incognito", title: "Chrome Incognito Tab", isMinimized: false, lastActiveAt: 20),
+            WindowCandidate(id: "normal", title: "Chrome Normal Tab", isMinimized: false, lastActiveAt: 10)
+        ]
+        let reorderedWindows = [
+            WindowCandidate(id: "incognito", title: "Chrome Incognito Tab", isMinimized: false, lastActiveAt: 30),
+            WindowCandidate(id: "fullscreen", title: "Chrome Fullscreen Tab", isMinimized: false, lastActiveAt: 20),
+            WindowCandidate(id: "normal", title: "Chrome Normal Tab", isMinimized: false, lastActiveAt: 10)
+        ]
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windowsByID: [
+                "fullscreen": RuntimeWindowContext(
+                    id: "fullscreen",
+                    title: "Chrome Fullscreen Tab",
+                    isMinimized: false,
+                    ownerPID: currentApp.processIdentifier,
+                    cgWindowID: 30
+                ),
+                "incognito": RuntimeWindowContext(
+                    id: "incognito",
+                    title: "Chrome Incognito Tab",
+                    isMinimized: false,
+                    ownerPID: currentApp.processIdentifier,
+                    cgWindowID: 20
+                ),
+                "normal": RuntimeWindowContext(
+                    id: "normal",
+                    title: "Chrome Normal Tab",
+                    isMinimized: false,
+                    ownerPID: currentApp.processIdentifier,
+                    cgWindowID: 10
+                )
+            ]
+        )
+
+        var snapshotWindows = initialWindows
+        var frontmostRuntimeWindowID: String? = "fullscreen"
+        model.frontmostApplicationOverride = { currentApp }
+        model.focusedWindowIdentityOverride = { _ in nil }
+        model.frontmostRuntimeWindowIDOverride = { _, _, _ in frontmostRuntimeWindowID }
+        model.snapshotProviderOverride = {
+            RuntimeSnapshot(
+                apps: [
+                    AppSwitchCandidate(
+                        id: appID,
+                        displayName: "Chrome Fixture",
+                        groupID: "chrome",
+                        lastActiveAt: 100,
+                        windows: snapshotWindows
+                    )
+                ],
+                contextsByID: [appID: context]
+            )
+        }
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        XCTAssertEqual(model.session?.apps.first?.windows.map(\.id), ["fullscreen", "incognito", "normal"])
+
+        model.windowRecencyTracker.record(appID: appID, windowID: "normal", context: context)
+        frontmostRuntimeWindowID = "normal"
+        snapshotWindows = reorderedWindows
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        XCTAssertEqual(model.session?.apps.first?.windows.map(\.id), ["normal", "fullscreen", "incognito"])
     }
 }

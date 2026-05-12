@@ -24,11 +24,38 @@ extension FlowTabUITests {
 
         var diagnosticsSummary = initialDiagnosticsSummary
         var expectedCurrentSelection: RuntimeTruthWindowSelection?
-        let phases: [(currentTitle: String, targetTitle: String, trace: String)] = [
-            (primaryFullscreenTitle, normalOneTitle, "normal1"),
-            (normalOneTitle, primaryFullscreenTitle, "fullscreen1"),
-            (primaryFullscreenTitle, normalTwoTitle, "normal2"),
-            (normalTwoTitle, fullscreenTwoTitle, "fullscreen2")
+        let phases: [
+            (
+                currentTitle: String,
+                targetTitle: String,
+                expectedPrefix: [String],
+                trace: String
+            )
+        ] = [
+            (
+                primaryFullscreenTitle,
+                normalOneTitle,
+                [primaryFullscreenTitle],
+                "normal1"
+            ),
+            (
+                normalOneTitle,
+                primaryFullscreenTitle,
+                [normalOneTitle, primaryFullscreenTitle],
+                "fullscreen1"
+            ),
+            (
+                primaryFullscreenTitle,
+                normalTwoTitle,
+                [primaryFullscreenTitle, normalOneTitle, normalTwoTitle],
+                "normal2"
+            ),
+            (
+                normalTwoTitle,
+                fullscreenTwoTitle,
+                [normalTwoTitle, primaryFullscreenTitle, normalOneTitle, fullscreenTwoTitle],
+                "fullscreen2"
+            )
         ]
 
         for (index, phase) in phases.enumerated() {
@@ -53,17 +80,20 @@ extension FlowTabUITests {
                 \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
                 """
             )
-            _ = try assertOptionTabWindowStateCurrentSelection(
+            let currentSelection = try assertOptionTabWindowStateCurrentSelection(
                 phase.currentTitle,
                 expectedSelection: expectedCurrentSelection,
+                expectedPrefix: phase.expectedPrefix,
                 app: app,
                 diagnosticsSummary: diagnosticsSummary,
                 traceLabel: traceLabel,
                 phaseTrace: phase.trace
             )
 
-            let selection = try selectGlobalSwitcherWindow(
+            let selection = try selectNoisyOptionTabWindow(
+                currentSelection: currentSelection,
                 title: phase.targetTitle,
+                expectedPrefix: phase.expectedPrefix,
                 in: app,
                 diagnosticsSummary: diagnosticsSummary,
                 traceLabel: "\(traceLabel).\(phase.trace)"
@@ -91,6 +121,7 @@ extension FlowTabUITests {
     private func assertOptionTabWindowStateCurrentSelection(
         _ expectedTitle: String,
         expectedSelection: RuntimeTruthWindowSelection?,
+        expectedPrefix: [String],
         app: XCUIApplication,
         diagnosticsSummary: XCUIElement,
         traceLabel: String,
@@ -114,6 +145,11 @@ extension FlowTabUITests {
         logFlowTabUITestTrace(
             "[\(traceLabel).current.\(phaseTrace)] selected=\(latestTitle) windowID=\(latestWindowID)"
         )
+        XCTAssertEqual(
+            Array(expectedPrefix.prefix(1)),
+            [selection.title],
+            "Noisy Option+Tab \(phaseTrace) phase must start with the first expected app-local recency window."
+        )
         if let expectedSelection {
             XCTAssertEqual(
                 selection,
@@ -126,6 +162,79 @@ extension FlowTabUITests {
             )
         }
         return selection
+    }
+
+    private func selectNoisyOptionTabWindow(
+        currentSelection: RuntimeTruthWindowSelection,
+        title: String,
+        expectedPrefix: [String],
+        in app: XCUIApplication,
+        diagnosticsSummary: XCUIElement,
+        traceLabel: String
+    ) throws -> RuntimeTruthWindowSelection {
+        var observedPrefix = [currentSelection.title]
+        let attempts = max(1, switcherPreviewTitles(from: diagnosticsSummary).count + 3)
+        var latestTitle = currentSelection.title
+        var latestWindowID = "cg:\(currentSelection.windowNumber)"
+
+        if latestTitle == title {
+            assertNoisyOptionTabObservedPrefix(
+                observedPrefix,
+                expectedPrefix: expectedPrefix,
+                traceLabel: traceLabel
+            )
+            return currentSelection
+        }
+
+        for attempt in 0..<attempts {
+            postFlowTabUITestSwitcherCommandAndWaitForDelivery(
+                .advanceRight,
+                traceLabel: "\(traceLabel).selectWindow"
+            )
+            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+            latestTitle = switcherPanelDiagnosticsValue(
+                diagnosticsSummary,
+                key: "selectedWindowTitle"
+            )
+            latestWindowID = switcherPanelDiagnosticsValue(
+                diagnosticsSummary,
+                key: "selectedWindow"
+            )
+            observedPrefix.append(latestTitle)
+            logFlowTabUITestTrace(
+                "[\(traceLabel).selectAttempt.\(attempt + 1)] target=\(title) selected=\(latestTitle) windowID=\(latestWindowID)"
+            )
+            assertNoisyOptionTabObservedPrefix(
+                observedPrefix,
+                expectedPrefix: expectedPrefix,
+                traceLabel: traceLabel
+            )
+            if latestTitle == title {
+                return try runtimeTruthWindowSelection(title: latestTitle, windowID: latestWindowID)
+            }
+        }
+
+        XCTFail(
+            """
+            Option+Tab window state did not select \(title).
+
+            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
+            """
+        )
+        return try runtimeTruthWindowSelection(title: latestTitle, windowID: latestWindowID)
+    }
+
+    private func assertNoisyOptionTabObservedPrefix(
+        _ observedPrefix: [String],
+        expectedPrefix: [String],
+        traceLabel: String
+    ) {
+        let prefixLength = min(observedPrefix.count, expectedPrefix.count)
+        XCTAssertEqual(
+            Array(observedPrefix.prefix(prefixLength)),
+            Array(expectedPrefix.prefix(prefixLength)),
+            "Noisy Option+Tab \(traceLabel) window order must follow app-local recency before fallback."
+        )
     }
 
     private func waitForExactNoisyOptionTabPreviewTitles(

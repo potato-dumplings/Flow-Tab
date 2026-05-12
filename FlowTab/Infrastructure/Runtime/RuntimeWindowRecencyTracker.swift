@@ -136,7 +136,12 @@ final class RuntimeWindowRecencyTracker {
                 .map { index, pair in (pair.key, index + 1) }
         )
         let baseLastActiveAt = app.windows.map(\.lastActiveAt).max() ?? app.lastActiveAt
-        let windows = app.windows.map { window in
+        let originalIndexByWindowID = Dictionary(
+            uniqueKeysWithValues: app.windows.enumerated().map { index, window in
+                (window.id, index)
+            }
+        )
+        let windowsWithRecency = app.windows.map { window in
             guard let rank = recencyRankByWindowID[window.id] else {
                 return window
             }
@@ -146,6 +151,24 @@ final class RuntimeWindowRecencyTracker {
                 isMinimized: window.isMinimized,
                 lastActiveAt: baseLastActiveAt + TimeInterval(rank)
             )
+        }
+        let windows = windowsWithRecency.sorted { lhs, rhs in
+            let lhsRank = recencyRankByWindowID[lhs.id]
+            let rhsRank = recencyRankByWindowID[rhs.id]
+            switch (lhsRank, rhsRank) {
+            case let (.some(lhsRank), .some(rhsRank)):
+                if lhsRank != rhsRank {
+                    return lhsRank > rhsRank
+                }
+            case (.some, .none):
+                return true
+            case (.none, .some):
+                return false
+            case (.none, .none):
+                break
+            }
+            return (originalIndexByWindowID[lhs.id] ?? .max)
+                < (originalIndexByWindowID[rhs.id] ?? .max)
         }
         return AppSwitchCandidate(
             id: app.id,

@@ -188,6 +188,11 @@
   步骤：fixture 先让目标 app 处于 full-screen sibling 所在 Space；打开标准 switcher，选中目标 app，进入 window state，先选择 normal sibling 并确认；随后重新启动 FlowTab，再选择 full-screen sibling 并确认。
   验证：两次确认后 frontmost bundle 均为目标 fixture app，且 frontmost CG window number 分别精确等于选中的 normal 与 full-screen `CGWindowID`。
 
+- `testSwitcherPanelOptionTabWindowStateRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithNoisyCGSiblingsWithoutAppAXWindows`
+  场景：Chrome-like noisy topology 下，global Option+Tab 必须先选中目标 app，再进入该 app 的 window state，并使用 app-local recency 而不是其他 app 的当前 focused window。
+  步骤：fixture 先让目标 app 处于 first full-screen sibling 所在 Space；每一阶段都从 global app switcher 选中目标 app、进入 window state，再依次完成 `fullscreen1 -> normal1 -> fullscreen1 -> normal2 -> fullscreen2`。
+  验证：第一阶段只断言首个窗口，第二阶段断言前两个，第三阶段断言前三个，第四阶段断言四个；每次确认后 frontmost CG window number 精确等于选中的目标窗口。
+
 - `testSwitcherPanelWindowSearchRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithoutAppAXWindows`
   场景：同一个非配合 fixture app 下 normal desktop sibling 和 full-screen Space sibling 都应该能被 window-scope search 找到并激活。
   步骤：fixture 先让目标 app 处于 full-screen sibling 所在 Space；以 `window` 默认范围启动搜索态 switcher，先搜索 normal sibling 标题并确认；随后重新启动 FlowTab，再搜索 full-screen sibling 标题并确认。

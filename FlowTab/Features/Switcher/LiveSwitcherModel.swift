@@ -67,6 +67,11 @@ final class LiveSwitcherModel: ObservableObject {
     var snapshotProviderOverride: (() -> RuntimeSnapshot)?
     var frontmostApplicationOverride: (() -> NSRunningApplication?)?
     var focusedWindowIdentityOverride: ((NSRunningApplication) -> RuntimeFocusedWindowIdentity?)?
+    var frontmostRuntimeWindowIDOverride: ((
+        NSRunningApplication,
+        AppSwitchCandidate,
+        RuntimeAppContext
+    ) -> String?)?
     var activationOverride: ((ActivationTarget, [String: RuntimeAppContext]) -> Void)?
     var terminateRequestOverride: ((String) -> (sent: Bool, pid: pid_t))?
     var isProcessRunningOverride: ((pid_t) -> Bool)?
@@ -595,11 +600,20 @@ final class LiveSwitcherModel: ObservableObject {
             ?? "pid:\(frontmostApp.processIdentifier)"
         guard
             let app = snapshot.apps.first(where: { $0.id == frontmostAppID }),
-            let context = snapshot.contextsByID[frontmostAppID],
-            let focusedWindowID = focusedWindowIDForWindowSession(app: app, context: context)
+            let context = snapshot.contextsByID[frontmostAppID]
         else {
             return
         }
+        let focusedWindowID = focusedWindowIDForWindowSession(
+            app: app,
+            context: context,
+            runningApp: frontmostApp
+        ) ?? frontmostRuntimeWindowIDForWindowSession(
+            frontmostApp: frontmostApp,
+            app: app,
+            context: context
+        )
+        guard let focusedWindowID else { return }
         windowRecencyTracker.record(
             appID: frontmostAppID,
             windowID: focusedWindowID,
@@ -634,12 +648,47 @@ final class LiveSwitcherModel: ObservableObject {
 
     private func focusedWindowIDForWindowSession(
         app: AppSwitchCandidate,
-        context: RuntimeAppContext
+        context: RuntimeAppContext,
+        runningApp: NSRunningApplication? = nil
     ) -> String? {
-        guard let identity = focusedWindowIdentity(for: context.runningApp) else {
+        guard let identity = focusedWindowIdentity(for: runningApp ?? context.runningApp) else {
             return nil
         }
         return focusedWindowID(matching: identity, app: app, context: context)
+    }
+
+    private func frontmostRuntimeWindowIDForWindowSession(
+        frontmostApp: NSRunningApplication,
+        app: AppSwitchCandidate,
+        context: RuntimeAppContext
+    ) -> String? {
+        if let frontmostRuntimeWindowIDOverride {
+            return frontmostRuntimeWindowIDOverride(frontmostApp, app, context)
+        }
+
+        let frontmostPID = frontmostApp.processIdentifier
+        let appWindowIDs = Set(app.windows.map(\.id))
+        var windowIDsByCGWindowID: [CGWindowID: [String]] = [:]
+        for window in context.windowsByID.values {
+            guard appWindowIDs.contains(window.id), let cgWindowID = window.cgWindowID else {
+                continue
+            }
+            let ownerPID = window.ownerPID == 0
+                ? context.runningApp.processIdentifier
+                : window.ownerPID
+            guard ownerPID == frontmostPID else { continue }
+            windowIDsByCGWindowID[cgWindowID, default: []].append(window.id)
+        }
+        guard !windowIDsByCGWindowID.isEmpty else { return nil }
+
+        let cgWindows = snapshotProvider.collectCGWindowsByPID()[frontmostPID] ?? []
+        for cgWindow in cgWindows where RuntimeSnapshotProvider.cgWindowPassesValidityConstraints(cgWindow) {
+            guard let windowIDs = windowIDsByCGWindowID[cgWindow.id], windowIDs.count == 1 else {
+                continue
+            }
+            return windowIDs[0]
+        }
+        return nil
     }
 
     private func focusedWindowIdentity(

@@ -30,6 +30,12 @@ struct RuntimeWindowMappingResolution {
     }
 }
 
+private func runtimeWindowEntryUsesDesktopSpace(
+    _ entry: RuntimeSnapshotProvider.WindowListEntry
+) -> Bool {
+    RuntimeWindowTopologyClassifier.isDesktopOnlySpaceWindow(spaceIDs: entry.spaceIDs)
+}
+
 private let runtimeAXRebuildGraceMissingSnapshotLimit = 3
 
 extension RuntimeSnapshotProvider {
@@ -378,6 +384,13 @@ extension RuntimeSnapshotProvider {
                 return lhs.element.isOnscreen
             }
             if hasRelatedFullscreenTopology, hasOnscreenPrimarySurface {
+                if !lhs.element.isOnscreen, !rhs.element.isOnscreen {
+                    let lhsIsDesktop = runtimeWindowEntryUsesDesktopSpace(lhs.element)
+                    let rhsIsDesktop = runtimeWindowEntryUsesDesktopSpace(rhs.element)
+                    if lhsIsDesktop != rhsIsDesktop {
+                        return lhsIsDesktop
+                    }
+                }
                 let lhsLooksLikeSibling = runtimeWindowEntryLooksLikeDesktopFullscreenSiblingSurface(
                     lhs.element,
                     knownCGWindowsByID: knownCGWindowsByID,

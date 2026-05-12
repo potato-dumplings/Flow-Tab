@@ -785,6 +785,92 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(mergedEntries.first?.title, "Chrome Incognito Tab")
     }
 
+    func testRuntimeSnapshotProviderWindowListKeepsDesktopWindowsBeforeOffscreenFullscreenFallback() {
+        let appName = "Chrome Fixture"
+        let normalFrame = CGRect(x: 384, y: 258, width: 960, height: 640)
+        let incognitoFrame = CGRect(x: 492, y: 354, width: 960, height: 640)
+        let fullscreenContentFrame = CGRect(x: 0, y: 195, width: 1_728, height: 922)
+
+        let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+            axWindows: [
+                .init(
+                    id: "ax:chrome:normal",
+                    index: 0,
+                    title: "Chrome Normal Tab",
+                    bounds: normalFrame,
+                    bridgedCGWindowID: 151_401
+                ),
+                .init(
+                    id: "ax:chrome:incognito",
+                    index: 1,
+                    title: "Chrome Incognito Tab",
+                    bounds: incognitoFrame,
+                    bridgedCGWindowID: 151_402
+                ),
+                .init(
+                    id: "ax:chrome:fullscreen-content",
+                    index: 2,
+                    title: "Chrome Fullscreen Tab",
+                    bounds: fullscreenContentFrame,
+                    bridgedCGWindowID: 151_403
+                ),
+                .init(
+                    id: "ax:chrome:second-fullscreen-content",
+                    index: 3,
+                    title: "Chrome Second Fullscreen Tab",
+                    bounds: fullscreenContentFrame,
+                    bridgedCGWindowID: 151_404
+                )
+            ],
+            cgWindows: [
+                .init(
+                    id: 151_403,
+                    title: "Chrome Fullscreen Tab",
+                    bounds: fullscreenContentFrame,
+                    isOnscreen: true,
+                    spaceIDs: [7_006]
+                ),
+                .init(
+                    id: 151_404,
+                    title: "Chrome Second Fullscreen Tab",
+                    bounds: fullscreenContentFrame,
+                    isOnscreen: false,
+                    spaceIDs: [7_002]
+                ),
+                .init(
+                    id: 151_401,
+                    title: "Chrome Normal Tab",
+                    bounds: normalFrame,
+                    isOnscreen: false,
+                    spaceIDs: [1]
+                ),
+                .init(
+                    id: 151_402,
+                    title: "Chrome Incognito Tab",
+                    bounds: incognitoFrame,
+                    isOnscreen: false,
+                    spaceIDs: [1]
+                )
+            ],
+            pid: 67_097,
+            appName: appName
+        )
+
+        XCTAssertEqual(
+            mergedEntries.map(\.title),
+            [
+                "Chrome Fullscreen Tab",
+                "Chrome Normal Tab",
+                "Chrome Incognito Tab",
+                "Chrome Second Fullscreen Tab"
+            ]
+        )
+        XCTAssertEqual(
+            mergedEntries.compactMap(\.cgWindowID),
+            [151_403, 151_401, 151_402, 151_404]
+        )
+    }
+
     func testRuntimeSnapshotProviderWindowListKeepsDesktopFullscreenSiblingsBehindNormalSurfaces() {
         let appName = "Chrome Fixture"
         let normalFrame = CGRect(x: 384, y: 258, width: 960, height: 640)
