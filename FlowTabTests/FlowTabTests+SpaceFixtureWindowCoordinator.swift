@@ -9,6 +9,7 @@ private final class SpaceFixtureWindowSpy: SpaceFixtureWindowing {
 
     private(set) var showCalls: [Bool] = []
     private(set) var enterFullScreenCallCount = 0
+    private(set) var enterFullScreenCompletions: [(@MainActor () -> Void)] = []
     private(set) var workflowReadyCalls: [[String]] = []
 
     init(plan: SpaceFixtureWindowPlan) {
@@ -20,12 +21,18 @@ private final class SpaceFixtureWindowSpy: SpaceFixtureWindowing {
         showCalls.append(isKey)
     }
 
-    func enterFullScreen() {
+    func enterFullScreen(completion: @escaping @MainActor () -> Void) {
         enterFullScreenCallCount += 1
+        enterFullScreenCompletions.append(completion)
     }
 
     func updateWorkflowReadiness(windowTitles: [String]) {
         workflowReadyCalls.append(windowTitles)
+    }
+
+    func completeFullScreenTransition(at index: Int = 0) {
+        let completion = enterFullScreenCompletions.remove(at: index)
+        completion()
     }
 }
 
@@ -107,6 +114,16 @@ extension FlowTabTests {
         XCTAssertEqual(windowSpies[1].enterFullScreenCallCount, 1)
         XCTAssertEqual(windowSpies[0].enterFullScreenCallCount, 0)
         XCTAssertEqual(windowSpies[2].enterFullScreenCallCount, 0)
+        XCTAssertEqual(scheduledDelays, [1200])
+        XCTAssertEqual(
+            publishedAccessibilityElements,
+            [
+                ["ax-element-1", "ax-element-2", "ax-element-3"]
+            ]
+        )
+
+        windowSpies[1].completeFullScreenTransition()
+
         XCTAssertEqual(scheduledDelays, [1200, 1200])
         XCTAssertEqual(
             publishedAccessibilityElements,
@@ -188,6 +205,15 @@ extension FlowTabTests {
         XCTAssertEqual(
             publishedAccessibilityElements,
             [
+                ["ax-element-1", "ax-element-2", "ax-element-3"]
+            ]
+        )
+
+        windowSpies[1].completeFullScreenTransition()
+
+        XCTAssertEqual(
+            publishedAccessibilityElements,
+            [
                 ["ax-element-1", "ax-element-2", "ax-element-3"],
                 ["ax-element-1", "ax-element-2", "ax-element-3"]
             ]
@@ -253,7 +279,7 @@ extension FlowTabTests {
         coordinator.launch()
 
         XCTAssertEqual(windowSpies.map(\.showCalls), [[false], [true], [false]])
-        XCTAssertEqual(scheduledDelays, [1_000, 2_400, 10_400])
+        XCTAssertEqual(scheduledDelays, [1_000])
         XCTAssertEqual(publishedAccessibilityElements, [["ax-element-1", "ax-element-2", "ax-element-3"]])
         XCTAssertEqual(activationCallCount, 1)
 
@@ -264,11 +290,27 @@ extension FlowTabTests {
         XCTAssertEqual(windowSpies[1].enterFullScreenCallCount, 0)
         XCTAssertEqual(activationCallCount, 2)
 
+        windowSpies[2].completeFullScreenTransition()
+
+        XCTAssertEqual(scheduledDelays, [1_000, 1_400])
+        XCTAssertEqual(publishedAccessibilityElements, [
+            ["ax-element-1", "ax-element-2", "ax-element-3"],
+            ["ax-element-1", "ax-element-2", "ax-element-3"]
+        ])
+
         scheduledActions[1]()
 
         XCTAssertEqual(windowSpies[1].showCalls, [true, true])
         XCTAssertEqual(windowSpies[1].enterFullScreenCallCount, 1)
         XCTAssertEqual(activationCallCount, 3)
+        XCTAssertEqual(publishedAccessibilityElements, [
+            ["ax-element-1", "ax-element-2", "ax-element-3"],
+            ["ax-element-1", "ax-element-2", "ax-element-3"]
+        ])
+
+        windowSpies[1].completeFullScreenTransition()
+
+        XCTAssertEqual(scheduledDelays, [1_000, 1_400, 8_000])
         XCTAssertEqual(publishedAccessibilityElements, [
             ["ax-element-1", "ax-element-2", "ax-element-3"],
             ["ax-element-1", "ax-element-2", "ax-element-3"],
@@ -321,12 +363,19 @@ extension FlowTabTests {
 
         coordinator.launch()
 
-        XCTAssertEqual(scheduledDelays, [4_000, 12_000])
+        XCTAssertEqual(scheduledDelays, [4_000])
         XCTAssertEqual(publishedAccessibilityElements, [["ax-element-1", "ax-element-2"]])
 
         scheduledActions[0]()
 
         XCTAssertEqual(windowSpies[1].enterFullScreenCallCount, 1)
+        XCTAssertEqual(publishedAccessibilityElements, [
+            ["ax-element-1", "ax-element-2"]
+        ])
+
+        windowSpies[1].completeFullScreenTransition()
+
+        XCTAssertEqual(scheduledDelays, [4_000, 8_000])
         XCTAssertEqual(publishedAccessibilityElements, [
             ["ax-element-1", "ax-element-2"],
             ["ax-element-1", "ax-element-2"]

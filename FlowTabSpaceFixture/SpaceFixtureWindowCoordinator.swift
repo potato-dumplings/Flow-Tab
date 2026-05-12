@@ -7,7 +7,7 @@ protocol SpaceFixtureWindowing: AnyObject {
     var plan: SpaceFixtureWindowPlan { get }
     var applicationAccessibilityElement: Any { get }
     func show(isKey: Bool)
-    func enterFullScreen()
+    func enterFullScreen(completion: @escaping @MainActor () -> Void)
     func updateWorkflowReadiness(windowTitles: [String])
 }
 
@@ -83,7 +83,6 @@ final class SpaceFixtureWindowCoordinator {
             return
         }
         scheduleFullscreenTransitions(fullscreenWindows)
-        scheduleApplicationAccessibilitySuppressionIfNeeded()
     }
 
     private func orderedFullscreenWindowsForTransition() -> [any SpaceFixtureWindowing] {
@@ -100,55 +99,67 @@ final class SpaceFixtureWindowCoordinator {
     }
 
     private func scheduleFullscreenTransitions(_ fullscreenWindows: [any SpaceFixtureWindowing]) {
-        if fullscreenWindows.count == 1, let fullscreenWindow = fullscreenWindows.first {
-            scheduleSingleFullscreenTransition(fullscreenWindow)
+        let desktopAnchorWindow = configuration.preservesDesktopAfterFullscreen
+            ? windows.first(where: { !$0.plan.isFullscreenTarget })
+            : nil
+
+        scheduleFullscreenTransition(
+            fullscreenWindows,
+            currentIndex: 0,
+            delayMilliseconds: configuration.enterFullscreenDelayMilliseconds,
+            desktopAnchorWindow: desktopAnchorWindow
+        )
+    }
+
+    private func scheduleFullscreenTransition(
+        _ fullscreenWindows: [any SpaceFixtureWindowing],
+        currentIndex: Int,
+        delayMilliseconds: Int,
+        desktopAnchorWindow: (any SpaceFixtureWindowing)?
+    ) {
+        guard fullscreenWindows.indices.contains(currentIndex) else {
+            scheduleDesktopRefocusIfNeeded(desktopAnchorWindow)
+            scheduleApplicationAccessibilitySuppressionAfterFullscreenSettleIfNeeded()
             return
         }
 
-        for (offset, fullscreenWindow) in fullscreenWindows.enumerated() {
-            fullscreenScheduler(fullscreenTransitionDelayMilliseconds(offset: offset)) {
+        let fullscreenWindow = fullscreenWindows[currentIndex]
+        fullscreenScheduler(delayMilliseconds) {
+            if fullscreenWindows.count > 1 {
                 self.activateApplication()
                 fullscreenWindow.show(isKey: true)
-                fullscreenWindow.enterFullScreen()
+            }
+            fullscreenWindow.enterFullScreen {
+                let nextIndex = currentIndex + 1
                 self.publishApplicationAccessibilityElements()
+                self.scheduleFullscreenTransition(
+                    fullscreenWindows,
+                    currentIndex: nextIndex,
+                    delayMilliseconds: Self.additionalFullscreenTransitionSpacingMilliseconds,
+                    desktopAnchorWindow: desktopAnchorWindow
+                )
             }
         }
+    }
 
-        guard
-            configuration.preservesDesktopAfterFullscreen,
-            let desktopAnchorWindow = windows.first(where: { !$0.plan.isFullscreenTarget })
-        else {
-            return
-        }
+    private func scheduleDesktopRefocusIfNeeded(_ desktopAnchorWindow: (any SpaceFixtureWindowing)?) {
+        guard let desktopAnchorWindow else { return }
 
-        fullscreenScheduler(lastFullscreenTransitionDelayMilliseconds() + Self.desktopRefocusDelayMilliseconds) {
+        fullscreenScheduler(Self.desktopRefocusDelayMilliseconds) {
             self.activateApplication()
             desktopAnchorWindow.show(isKey: true)
             self.publishApplicationAccessibilityElements()
         }
     }
 
-    private func scheduleSingleFullscreenTransition(_ fullscreenWindow: any SpaceFixtureWindowing) {
-        let desktopAnchorWindow = configuration.preservesDesktopAfterFullscreen
-            ? windows.first(where: { $0.plan.index != fullscreenWindow.plan.index })
-            : nil
-
-        fullscreenScheduler(configuration.enterFullscreenDelayMilliseconds) {
-            fullscreenWindow.enterFullScreen()
-            self.publishApplicationAccessibilityElements()
-
-            guard let desktopAnchorWindow else {
-                return
-            }
-
-            // Keep the post-launch topology anchored on the normal desktop so
-            // runtime sampling can still observe the app's non-fullscreen windows.
-            self.fullscreenScheduler(Self.desktopRefocusDelayMilliseconds) {
-                self.activateApplication()
-                desktopAnchorWindow.show(isKey: true)
-                self.publishApplicationAccessibilityElements()
-            }
+    private func scheduleApplicationAccessibilitySuppressionAfterFullscreenSettleIfNeeded() {
+        guard !configuration.fullscreenWindowIndices.isEmpty else {
+            scheduleApplicationAccessibilitySuppressionIfNeeded()
+            return
         }
+        scheduleApplicationAccessibilitySuppressionIfNeeded(
+            delayMilliseconds: Self.fullscreenAccessibilitySuppressionSettleDelayMilliseconds
+        )
     }
 
     private func publishApplicationAccessibilityElements() {
@@ -163,9 +174,9 @@ final class SpaceFixtureWindowCoordinator {
         )
     }
 
-    private func scheduleApplicationAccessibilitySuppressionIfNeeded() {
+    private func scheduleApplicationAccessibilitySuppressionIfNeeded(delayMilliseconds: Int? = nil) {
         guard !configuration.publishesApplicationAccessibilityChildren else { return }
-        fullscreenScheduler(applicationAccessibilitySuppressionDelayMilliseconds()) {
+        fullscreenScheduler(delayMilliseconds ?? applicationAccessibilitySuppressionDelayMilliseconds()) {
             self.suppressesApplicationAccessibilityElements = true
             self.publishApplicationAccessibilityElements()
         }

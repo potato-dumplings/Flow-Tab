@@ -2,11 +2,13 @@ import AppKit
 
 final class SpaceFixtureWindowContentView: NSView {
     private let plan: SpaceFixtureWindowPlan
+    private let contentTopInset: CGFloat
     private let workflowReadyLabel = NSTextField(labelWithString: SpaceFixtureWorkflowStatus.launchingText)
     private let workflowSummaryLabel = NSTextField(labelWithString: "")
 
-    init(plan: SpaceFixtureWindowPlan) {
+    init(plan: SpaceFixtureWindowPlan, contentTopInset: CGFloat = 32) {
         self.plan = plan
+        self.contentTopInset = contentTopInset
         super.init(frame: .zero)
         configureView()
     }
@@ -58,7 +60,7 @@ final class SpaceFixtureWindowContentView: NSView {
 
         addSubview(stackView)
         NSLayoutConstraint.activate([
-            stackView.topAnchor.constraint(equalTo: topAnchor, constant: 32),
+            stackView.topAnchor.constraint(equalTo: topAnchor, constant: contentTopInset),
             stackView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 32),
             stackView.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -32),
             stackView.bottomAnchor.constraint(lessThanOrEqualTo: bottomAnchor, constant: -32)

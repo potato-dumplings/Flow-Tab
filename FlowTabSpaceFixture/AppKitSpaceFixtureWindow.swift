@@ -7,6 +7,7 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
     private let contentView: SpaceFixtureWindowContentView
     private let window: ChromeLikeSpaceFixtureWindow
     private let noisyCGSiblings: NoisyCGSiblingWindowSet?
+    private var fullScreenObservationToken: NSObjectProtocol?
 
     var applicationAccessibilityElement: Any {
         window
@@ -45,37 +46,50 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
         window.orderFrontRegardless()
     }
 
-    func enterFullScreen() {
+    func enterFullScreen(completion: @escaping @MainActor () -> Void) {
         suppressNoisyFullScreenContentAccessibilityIfNeeded()
-        showNoisyCGSiblingsIfNeeded()
+        installFullScreenCompletionObserver(completion: completion)
         window.toggleFullScreen(nil)
-        showNoisyCGSiblingsIfNeeded(after: 2.5)
     }
 
     func updateWorkflowReadiness(windowTitles: [String]) {
         contentView.updateWorkflowReadiness(windowTitles: windowTitles)
+        noisyCGSiblings?.updateWorkflowReadiness(windowTitles: windowTitles)
     }
 
-    private func showNoisyCGSiblingsIfNeeded(after delay: TimeInterval = 0) {
+    private func showNoisyCGSiblingsIfNeeded() {
         guard let noisyCGSiblings else { return }
-        let action = { [weak self] in
-            guard let self else { return }
-            noisyCGSiblings.show(around: self.window)
-        }
-        guard delay > 0 else {
-            action()
-            return
-        }
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-            Task { @MainActor in
-                action()
-            }
-        }
+        noisyCGSiblings.show(around: window)
     }
 
     private func suppressNoisyFullScreenContentAccessibilityIfNeeded() {
         guard plan.noisyCGSiblings, plan.isFullscreenTarget else { return }
         window.suppressAccessibilityExposure()
+    }
+
+    private func installFullScreenCompletionObserver(completion: @escaping @MainActor () -> Void) {
+        if let fullScreenObservationToken {
+            NotificationCenter.default.removeObserver(fullScreenObservationToken)
+            self.fullScreenObservationToken = nil
+        }
+
+        var token: NSObjectProtocol?
+        token = NotificationCenter.default.addObserver(
+            forName: NSWindow.didEnterFullScreenNotification,
+            object: window,
+            queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                if let token {
+                    NotificationCenter.default.removeObserver(token)
+                }
+                self.fullScreenObservationToken = nil
+                self.showNoisyCGSiblingsIfNeeded()
+                completion()
+            }
+        }
+        fullScreenObservationToken = token
     }
 
 }
@@ -115,6 +129,7 @@ private final class NoisyCGSiblingWindowSet {
         static let toolbarHeight: CGFloat = 41
         static let tabStripHeight: CGFloat = 80
         static let chromeStackHeight = titlebarHeight + toolbarHeight + tabStripHeight
+        static let contentPlaneTopInset: CGFloat = 72
     }
 
     private struct Spec {
@@ -127,10 +142,13 @@ private final class NoisyCGSiblingWindowSet {
         let usesTitledWindow: Bool
         let exposesAccessibilityElement: Bool
         let ignoresCycle: Bool
+        let rendersFixtureContent: Bool
     }
 
     private let plan: SpaceFixtureWindowPlan
     private var windows: [NSWindow] = []
+    private var contentViews: [SpaceFixtureWindowContentView] = []
+    private var currentWorkflowWindowTitles: [String] = []
 
     init(plan: SpaceFixtureWindowPlan) {
         self.plan = plan
@@ -146,8 +164,16 @@ private final class NoisyCGSiblingWindowSet {
         }
     }
 
+    func updateWorkflowReadiness(windowTitles: [String]) {
+        currentWorkflowWindowTitles = windowTitles
+        for contentView in contentViews {
+            contentView.updateWorkflowReadiness(windowTitles: windowTitles)
+        }
+    }
+
     private func makeWindows(around hostWindow: NSWindow) -> [NSWindow] {
-        noisySiblingSpecs().map { spec in
+        contentViews = []
+        return noisySiblingSpecs().map { spec in
             let window = NoisyCGSiblingWindow(
                 contentRect: frame(for: spec, hostFrame: hostWindow.frame),
                 styleMask: spec.usesTitledWindow ? [.titled] : [.borderless],
@@ -176,6 +202,17 @@ private final class NoisyCGSiblingWindowSet {
             window.hidesOnDeactivate = false
             window.canHide = false
             window.setAccessibilityElement(spec.exposesAccessibilityElement)
+            if spec.rendersFixtureContent {
+                let contentView = SpaceFixtureWindowContentView(
+                    plan: plan,
+                    contentTopInset: ChromeLikeLayout.contentPlaneTopInset
+                )
+                if !currentWorkflowWindowTitles.isEmpty {
+                    contentView.updateWorkflowReadiness(windowTitles: currentWorkflowWindowTitles)
+                }
+                window.contentView = contentView
+                contentViews.append(contentView)
+            }
             return window
         }
     }
@@ -211,7 +248,8 @@ private final class NoisyCGSiblingWindowSet {
                 fillsRemainingHeight: false,
                 usesTitledWindow: false,
                 exposesAccessibilityElement: false,
-                ignoresCycle: true
+                ignoresCycle: true,
+                rendersFixtureContent: false
             ),
             Spec(
                 suffix: "toolbar",
@@ -222,7 +260,8 @@ private final class NoisyCGSiblingWindowSet {
                 fillsRemainingHeight: false,
                 usesTitledWindow: false,
                 exposesAccessibilityElement: false,
-                ignoresCycle: true
+                ignoresCycle: true,
+                rendersFixtureContent: false
             ),
             Spec(
                 suffix: "omnibox",
@@ -233,7 +272,8 @@ private final class NoisyCGSiblingWindowSet {
                 fillsRemainingHeight: false,
                 usesTitledWindow: false,
                 exposesAccessibilityElement: false,
-                ignoresCycle: true
+                ignoresCycle: true,
+                rendersFixtureContent: false
             ),
             Spec(
                 suffix: "content-plane",
@@ -244,7 +284,8 @@ private final class NoisyCGSiblingWindowSet {
                 fillsRemainingHeight: true,
                 usesTitledWindow: true,
                 exposesAccessibilityElement: true,
-                ignoresCycle: false
+                ignoresCycle: false,
+                rendersFixtureContent: true
             ),
             Spec(
                 suffix: "content-wrapper",
@@ -255,7 +296,8 @@ private final class NoisyCGSiblingWindowSet {
                 fillsRemainingHeight: false,
                 usesTitledWindow: false,
                 exposesAccessibilityElement: false,
-                ignoresCycle: false
+                ignoresCycle: false,
+                rendersFixtureContent: false
             ),
             Spec(
                 suffix: "preview-overlay",
@@ -266,7 +308,8 @@ private final class NoisyCGSiblingWindowSet {
                 fillsRemainingHeight: false,
                 usesTitledWindow: false,
                 exposesAccessibilityElement: false,
-                ignoresCycle: true
+                ignoresCycle: true,
+                rendersFixtureContent: false
             ),
             Spec(
                 suffix: "floating-strip",
@@ -277,7 +320,8 @@ private final class NoisyCGSiblingWindowSet {
                 fillsRemainingHeight: false,
                 usesTitledWindow: false,
                 exposesAccessibilityElement: false,
-                ignoresCycle: true
+                ignoresCycle: true,
+                rendersFixtureContent: false
             )
         ]
     }
