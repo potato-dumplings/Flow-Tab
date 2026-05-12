@@ -55,6 +55,7 @@ final class LiveSwitcherModel: ObservableObject {
     let activator = RuntimeActivator()
     let iconProvider = AppIconProvider()
     let searchCoordinator = SwitcherSearchCoordinator()
+    let windowRecencyTracker = RuntimeWindowRecencyTracker()
     let previewImageCache = BoundedImageCache(
         countLimit: 64,
         totalCostLimit: 160 * 1_024 * 1_024
@@ -92,7 +93,18 @@ final class LiveSwitcherModel: ObservableObject {
     var searchComputationRevision: UInt64 = 0
     var searchDebounceNanoseconds: UInt64 = 20_000_000
 
-    init() {}
+    init() {
+        activator.windowFocusVerifiedHandler = { [weak self] appID, windowID, ownerPID, cgWindowID, title, frame in
+            self?.windowRecencyTracker.record(
+                appID: appID,
+                windowID: windowID,
+                ownerPID: ownerPID,
+                cgWindowID: cgWindowID,
+                title: title,
+                frame: frame
+            )
+        }
+    }
 
     var appCount: Int {
         session?.apps.count ?? 0
@@ -193,7 +205,7 @@ final class LiveSwitcherModel: ObservableObject {
 
         let frontmostAppID = frontmostApp.bundleIdentifier
             ?? "pid:\(frontmostApp.processIdentifier)"
-        let snapshot = makeSnapshot()
+        let snapshot = snapshotWithWindowRecencyApplied(makeSnapshot())
         guard
             let appCandidate = snapshot.apps.first(where: { $0.id == frontmostAppID }),
             let context = snapshot.contextsByID[frontmostAppID]
@@ -323,7 +335,7 @@ final class LiveSwitcherModel: ObservableObject {
     ) -> Bool {
         let previousSearchState = preserveSearchState ? searchViewState : .inactive
         cancelPendingSearchComputation()
-        let snapshot = makeSnapshot()
+        let snapshot = snapshotWithWindowRecencyApplied(makeSnapshot())
         guard !snapshot.apps.isEmpty else {
             resetSessionState()
             return false
@@ -570,6 +582,29 @@ final class LiveSwitcherModel: ObservableObject {
             return snapshotProviderOverride()
         }
         return snapshotProvider.snapshot()
+    }
+
+    func snapshotWithWindowRecencyApplied(_ snapshot: RuntimeSnapshot) -> RuntimeSnapshot {
+        recordFrontmostFocusedWindowRecency(in: snapshot)
+        return windowRecencyTracker.snapshotWithRecencyApplied(snapshot)
+    }
+
+    private func recordFrontmostFocusedWindowRecency(in snapshot: RuntimeSnapshot) {
+        guard let frontmostApp = resolveFrontmostApplication() else { return }
+        let frontmostAppID = frontmostApp.bundleIdentifier
+            ?? "pid:\(frontmostApp.processIdentifier)"
+        guard
+            let app = snapshot.apps.first(where: { $0.id == frontmostAppID }),
+            let context = snapshot.contextsByID[frontmostAppID],
+            let focusedWindowID = focusedWindowIDForWindowSession(app: app, context: context)
+        else {
+            return
+        }
+        windowRecencyTracker.record(
+            appID: frontmostAppID,
+            windowID: focusedWindowID,
+            context: context
+        )
     }
 
     func resolveFrontmostApplication() -> NSRunningApplication? {

@@ -63,6 +63,7 @@
 		B10011112F76000100B0D737 /* FlowTabPriorityCoverageTests+CoverageGaps.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001112F76000100B0D737 /* FlowTabPriorityCoverageTests+CoverageGaps.swift */; };
 		B10011122F76000100B0D737 /* FlowTabPriorityCoverageTests+AsyncSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001122F76000100B0D737 /* FlowTabPriorityCoverageTests+AsyncSupport.swift */; };
 		B10011132F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeSpaceClassification.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001132F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeSpaceClassification.swift */; };
+		B10011142F76000100B0D737 /* FlowTabPriorityCoverageTests+WindowRecency.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001142F76000100B0D737 /* FlowTabPriorityCoverageTests+WindowRecency.swift */; };
 		B10012012F76000100B0D737 /* FlowTabUITests+HomeAndLogs.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002012F76000100B0D737 /* FlowTabUITests+HomeAndLogs.swift */; };
 		B10012022F76000100B0D737 /* FlowTabUITests+Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002022F76000100B0D737 /* FlowTabUITests+Settings.swift */; };
 		B10012032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift */; };
@@ -73,6 +74,7 @@
 		B21012012FC0000100B0D737 /* FlowTabUITests+WorkflowWindowObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B21002012FC0000100B0D737 /* FlowTabUITests+WorkflowWindowObservation.swift */; };
 		B22012012FC1000100B0D737 /* FlowTabUITests+SpaceFixtureInAppWindowSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = B22002012FC1000100B0D737 /* FlowTabUITests+SpaceFixtureInAppWindowSwitcher.swift */; };
 		B23012012FC2000100B0D737 /* FlowTabUITests+SpaceFixtureRuntimeTruthEntrypoints.swift in Sources */ = {isa = PBXBuildFile; fileRef = B23002012FC2000100B0D737 /* FlowTabUITests+SpaceFixtureRuntimeTruthEntrypoints.swift */; };
+		B24012012FC3000100B0D737 /* FlowTabUITests+SpaceFixtureOptionTabNoisyRoundTrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = B24002012FC3000100B0D737 /* FlowTabUITests+SpaceFixtureOptionTabNoisyRoundTrip.swift */; };
 		B1C2D3E42F74000100B0D737 /* AppLocalization.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1C2D3E32F74000100B0D737 /* AppLocalization.swift */; };
 		C20000012FBD000100B0D737 /* HomeWindowActivationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000112FBD000100B0D737 /* HomeWindowActivationController.swift */; };
 		C20000022FBD000100B0D737 /* HomeWindowRowButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000122FBD000100B0D737 /* HomeWindowRowButton.swift */; };
@@ -109,6 +111,8 @@
 		F4D5E6F735AB000100B0D737 /* RuntimeCGSpaceInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4D5E6F835AB000100B0D737 /* RuntimeCGSpaceInspector.swift */; };
 		F6E7A8BE35AC000100B0D737 /* RuntimeSnapshotProvider+SpaceTopologyMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7A8BD35AC000100B0D737 /* RuntimeSnapshotProvider+SpaceTopologyMapping.swift */; };
 		F6E7A8BC35AC000100B0D737 /* RuntimeWindowSpaceClassification.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7A8BB35AC000100B0D737 /* RuntimeWindowSpaceClassification.swift */; };
+		F6E7A8C035AC000100B0D737 /* RuntimeWindowRecencyTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7A8BF35AC000100B0D737 /* RuntimeWindowRecencyTracker.swift */; };
+		F6E7A8C235AC000100B0D737 /* RuntimeWindowFocusRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7A8C135AC000100B0D737 /* RuntimeWindowFocusRequest.swift */; };
 		F7A8B9C235AD000100B0D737 /* RuntimeCGWindowFocusBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7A8B9C135AD000100B0D737 /* RuntimeCGWindowFocusBridge.swift */; };
 		F8A9B0C335AE000100B0D737 /* RuntimeAXRemoteWindowResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A9B0C235AE000100B0D737 /* RuntimeAXRemoteWindowResolver.swift */; };
 		F50001012F90000100B0D737 /* FlowTabSpaceFixtureApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000022F90000100B0D737 /* FlowTabSpaceFixtureApp.swift */; };
@@ -214,6 +218,7 @@
 		B10001112F76000100B0D737 /* FlowTabPriorityCoverageTests+CoverageGaps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+CoverageGaps.swift"; sourceTree = "<group>"; };
 		B10001122F76000100B0D737 /* FlowTabPriorityCoverageTests+AsyncSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+AsyncSupport.swift"; sourceTree = "<group>"; };
 		B10001132F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeSpaceClassification.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+RuntimeSpaceClassification.swift"; sourceTree = "<group>"; };
+		B10001142F76000100B0D737 /* FlowTabPriorityCoverageTests+WindowRecency.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+WindowRecency.swift"; sourceTree = "<group>"; };
 		B10002012F76000100B0D737 /* FlowTabUITests+HomeAndLogs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+HomeAndLogs.swift"; sourceTree = "<group>"; };
 		B10002022F76000100B0D737 /* FlowTabUITests+Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+Settings.swift"; sourceTree = "<group>"; };
 		B10002032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SwitcherAndSearch.swift"; sourceTree = "<group>"; };
@@ -224,6 +229,7 @@
 		B21002012FC0000100B0D737 /* FlowTabUITests+WorkflowWindowObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+WorkflowWindowObservation.swift"; sourceTree = "<group>"; };
 		B22002012FC1000100B0D737 /* FlowTabUITests+SpaceFixtureInAppWindowSwitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureInAppWindowSwitcher.swift"; sourceTree = "<group>"; };
 		B23002012FC2000100B0D737 /* FlowTabUITests+SpaceFixtureRuntimeTruthEntrypoints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureRuntimeTruthEntrypoints.swift"; sourceTree = "<group>"; };
+		B24002012FC3000100B0D737 /* FlowTabUITests+SpaceFixtureOptionTabNoisyRoundTrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureOptionTabNoisyRoundTrip.swift"; sourceTree = "<group>"; };
 		B1C2D3E32F74000100B0D737 /* AppLocalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLocalization.swift; sourceTree = "<group>"; };
 		C20000112FBD000100B0D737 /* HomeWindowActivationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeWindowActivationController.swift; sourceTree = "<group>"; };
 		C20000122FBD000100B0D737 /* HomeWindowRowButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeWindowRowButton.swift; sourceTree = "<group>"; };
@@ -281,6 +287,8 @@
 		F50000172FA1000100B0D737 /* FlowTabUITests+SpaceFixtureEdgeInputsWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureEdgeInputsWorkflow.swift"; sourceTree = "<group>"; };
 		F50000182FA1000100B0D737 /* FlowTabUITests+SpaceFixtureEdgeInputsAssertions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureEdgeInputsAssertions.swift"; sourceTree = "<group>"; };
 		F6E7A8B935AC000100B0D737 /* RuntimeWindowRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowRecord.swift; sourceTree = "<group>"; };
+		F6E7A8BF35AC000100B0D737 /* RuntimeWindowRecencyTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowRecencyTracker.swift; sourceTree = "<group>"; };
+		F6E7A8C135AC000100B0D737 /* RuntimeWindowFocusRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowFocusRequest.swift; sourceTree = "<group>"; };
 		F7A1000135B7000100B0D737 /* SigningDefaults.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = SigningDefaults.xcconfig; sourceTree = "<group>"; };
 		F7A1000235B7000100B0D737 /* LocalSigning.example.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "LocalSigning.example.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -384,6 +392,7 @@
 				B10001112F76000100B0D737 /* FlowTabPriorityCoverageTests+CoverageGaps.swift */,
 				B10001122F76000100B0D737 /* FlowTabPriorityCoverageTests+AsyncSupport.swift */,
 				B10001132F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeSpaceClassification.swift */,
+				B10001142F76000100B0D737 /* FlowTabPriorityCoverageTests+WindowRecency.swift */,
 				B100010D2F76000100B0D737 /* FlowTabPriorityCoverageTests+Support.swift */,
 				B100010E2F76000100B0D737 /* FlowTabPriorityCoverageTests+TestDoubles.swift */,
 				B100010F2F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeActivationRecovery.swift */,
@@ -410,6 +419,7 @@
 				F50000162FA1000100B0D737 /* FlowTabUITests+SpaceFixtureSwitcherMultiAppWorkflow.swift */,
 				B22002012FC1000100B0D737 /* FlowTabUITests+SpaceFixtureInAppWindowSwitcher.swift */,
 				B23002012FC2000100B0D737 /* FlowTabUITests+SpaceFixtureRuntimeTruthEntrypoints.swift */,
+				B24002012FC3000100B0D737 /* FlowTabUITests+SpaceFixtureOptionTabNoisyRoundTrip.swift */,
 				F50000172FA1000100B0D737 /* FlowTabUITests+SpaceFixtureEdgeInputsWorkflow.swift */,
 				F50000182FA1000100B0D737 /* FlowTabUITests+SpaceFixtureEdgeInputsAssertions.swift */,
 				F50000142F90000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflowConfiguration.swift */,
@@ -499,6 +509,8 @@
 				F3C4D5E52FA2000100B0D737 /* RuntimeSnapshotProvider+WindowMapping.swift */,
 				F6E7A8BD35AC000100B0D737 /* RuntimeSnapshotProvider+SpaceTopologyMapping.swift */,
 				F6E7A8B935AC000100B0D737 /* RuntimeWindowRecord.swift */,
+				F6E7A8BF35AC000100B0D737 /* RuntimeWindowRecencyTracker.swift */,
+				F6E7A8C135AC000100B0D737 /* RuntimeWindowFocusRequest.swift */,
 				F6E7A8BB35AC000100B0D737 /* RuntimeWindowSpaceClassification.swift */,
 				A1B2C4342F73000100B0D737 /* RuntimeActivator.swift */,
 				A1B2C4352F73000100B0D737 /* AXLiveWindowRegistry.swift */,
@@ -829,6 +841,8 @@
 				F3C4D5E62FA2000100B0D737 /* RuntimeSnapshotProvider+WindowMapping.swift in Sources */,
 				F6E7A8BE35AC000100B0D737 /* RuntimeSnapshotProvider+SpaceTopologyMapping.swift in Sources */,
 				F6E7A8BA35AC000100B0D737 /* RuntimeWindowRecord.swift in Sources */,
+				F6E7A8C035AC000100B0D737 /* RuntimeWindowRecencyTracker.swift in Sources */,
+				F6E7A8C235AC000100B0D737 /* RuntimeWindowFocusRequest.swift in Sources */,
 				F6E7A8BC35AC000100B0D737 /* RuntimeWindowSpaceClassification.swift in Sources */,
 				A1B2C43D2F73000100B0D737 /* RuntimeActivator.swift in Sources */,
 				A1B2C43E2F73000100B0D737 /* AXLiveWindowRegistry.swift in Sources */,
@@ -887,6 +901,7 @@
 				B10011112F76000100B0D737 /* FlowTabPriorityCoverageTests+CoverageGaps.swift in Sources */,
 				B10011122F76000100B0D737 /* FlowTabPriorityCoverageTests+AsyncSupport.swift in Sources */,
 				B10011132F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeSpaceClassification.swift in Sources */,
+				B10011142F76000100B0D737 /* FlowTabPriorityCoverageTests+WindowRecency.swift in Sources */,
 				B100110D2F76000100B0D737 /* FlowTabPriorityCoverageTests+Support.swift in Sources */,
 				B100110E2F76000100B0D737 /* FlowTabPriorityCoverageTests+TestDoubles.swift in Sources */,
 				B100110F2F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeActivationRecovery.swift in Sources */,
@@ -920,6 +935,7 @@
 				F50001152FA1000100B0D737 /* FlowTabUITests+SpaceFixtureSwitcherMultiAppWorkflow.swift in Sources */,
 				B22012012FC1000100B0D737 /* FlowTabUITests+SpaceFixtureInAppWindowSwitcher.swift in Sources */,
 				B23012012FC2000100B0D737 /* FlowTabUITests+SpaceFixtureRuntimeTruthEntrypoints.swift in Sources */,
+				B24012012FC3000100B0D737 /* FlowTabUITests+SpaceFixtureOptionTabNoisyRoundTrip.swift in Sources */,
 				F50001162FA1000100B0D737 /* FlowTabUITests+SpaceFixtureEdgeInputsWorkflow.swift in Sources */,
 				F50001172FA1000100B0D737 /* FlowTabUITests+SpaceFixtureEdgeInputsAssertions.swift in Sources */,
 				F50001132F90000100B0D737 /* FlowTabUITests+SpaceFixtureWorkflowConfiguration.swift in Sources */,

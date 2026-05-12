@@ -2,7 +2,7 @@ import AppKit
 import CoreGraphics
 import XCTest
 
-private struct RuntimeTruthWindowSelection: Equatable {
+struct RuntimeTruthWindowSelection: Equatable {
     let title: String
     let windowNumber: CGWindowID
 }
@@ -84,36 +84,32 @@ extension FlowTabUITests {
                 traceLabel: traceLabel,
                 allowsNoisyCGSiblings: allowsNoisyCGSiblings
             )
+            if allowsNoisyCGSiblings {
+                try runNoisyOptionTabWindowStateRoundTrip(
+                    app: app,
+                    targetApp: targetApp,
+                    initialDiagnosticsSummary: diagnosticsSummary,
+                    primaryFullscreenTitle: fullscreenTitle,
+                    traceLabel: traceLabel
+                )
+                return
+            }
+
             logWorkflowSpaceObservation("\(traceLabel).afterWindowStateReady", app: targetApp)
             XCTAssertTrue(
-                allowsNoisyCGSiblings
-                    ? waitForWorkflowSpaceContainingCGWindow(
-                        title: fullscreenTitle,
-                        app: targetApp,
-                        timeout: 4
-                    )
-                    : waitForActiveSpaceWorkflowCGWindow(
+                waitForActiveSpaceWorkflowCGWindow(
                     title: fullscreenTitle,
                     app: targetApp,
                     timeout: 4
                 ),
                 "Option+Tab first window-state phase must open from the fullscreen sibling's Space."
             )
-            if allowsNoisyCGSiblings {
-                assertSwitcherSelectedWindowTitle(
-                    oneOf: Set(targetApp.fullscreenWindowTitles),
-                    in: app,
-                    diagnosticsSummary: diagnosticsSummary,
-                    message: "Option+Tab roundtrip must enter the first window-state phase on a real fullscreen sibling."
-                )
-            } else {
-                assertSwitcherSelectedWindowTitle(
-                    fullscreenTitle,
-                    in: app,
-                    diagnosticsSummary: diagnosticsSummary,
-                    message: "Option+Tab roundtrip must enter the first window-state phase on the fullscreen sibling."
-                )
-            }
+            assertSwitcherSelectedWindowTitle(
+                fullscreenTitle,
+                in: app,
+                diagnosticsSummary: diagnosticsSummary,
+                message: "Option+Tab roundtrip must enter the first window-state phase on the fullscreen sibling."
+            )
             let standardSelection = try selectGlobalSwitcherWindow(
                 title: standardTitle,
                 in: app,
@@ -619,7 +615,7 @@ extension FlowTabUITests {
         return false
     }
 
-    private func selectGlobalSwitcherWindow(
+    func selectGlobalSwitcherWindow(
         title: String,
         in app: XCUIApplication,
         diagnosticsSummary: XCUIElement,
@@ -713,7 +709,7 @@ extension FlowTabUITests {
         )
     }
 
-    private func runtimeTruthWindowSelection(
+    func runtimeTruthWindowSelection(
         title: String,
         windowID: String
     ) throws -> RuntimeTruthWindowSelection {
@@ -733,7 +729,7 @@ extension FlowTabUITests {
         standardWorkflowWindowTitles(in: workflowApp).first
     }
 
-    private func standardWorkflowWindowTitles(
+    func standardWorkflowWindowTitles(
         in workflowApp: SpaceFixtureResolvedWorkflow.App
     ) -> [String] {
         let fullscreenTitles = Set(workflowApp.fullscreenWindowTitles)
@@ -759,7 +755,7 @@ extension FlowTabUITests {
         return arguments
     }
 
-    private func relaunchGlobalSwitcher(
+    func relaunchGlobalSwitcher(
         _ app: XCUIApplication,
         for workflowApp: SpaceFixtureResolvedWorkflow.App,
         traceLabel: String,

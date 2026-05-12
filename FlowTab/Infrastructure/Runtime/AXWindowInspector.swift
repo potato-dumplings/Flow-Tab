@@ -27,6 +27,7 @@ enum AXWindowInspector {
         UnsafeMutablePointer<CGWindowID>
     ) -> AXError
     static var cgWindowIDOverrideForTesting: ((AXUIElement) -> CGWindowID?)?
+    static var remoteWindowsResolverOverrideForTesting: ((pid_t) -> [AXUIElement])?
 
     static func windows(
         for app: NSRunningApplication,
@@ -58,9 +59,10 @@ enum AXWindowInspector {
         let rawValueTypeDescription = cfTypeDescription(for: windowsValue)
         let rawArrayCount = rawArrayCount(from: windowsValue)
         guard error == .success, let windows = windowsValue as? [AXUIElement] else {
-            let remoteWindows = includeRemoteWindows
-                ? RuntimeAXRemoteWindowResolver.windows(forPID: app.processIdentifier)
-                : []
+            let remoteWindows = remoteWindows(
+                forPID: app.processIdentifier,
+                includeRemoteWindows: includeRemoteWindows
+            )
             return WindowsFetchResult(
                 windows: remoteWindows,
                 error: error,
@@ -68,9 +70,10 @@ enum AXWindowInspector {
                 rawArrayCount: rawArrayCount
             )
         }
-        let remoteWindows = includeRemoteWindows
-            ? RuntimeAXRemoteWindowResolver.windows(forPID: app.processIdentifier)
-            : []
+        let remoteWindows = remoteWindows(
+            forPID: app.processIdentifier,
+            includeRemoteWindows: includeRemoteWindows
+        )
         return WindowsFetchResult(
             windows: RuntimeAXRemoteWindowResolver.mergedWindows(
                 publicWindows: windows,
@@ -80,6 +83,26 @@ enum AXWindowInspector {
             rawValueTypeDescription: rawValueTypeDescription,
             rawArrayCount: rawArrayCount
         )
+    }
+
+    private static func remoteWindows(
+        forPID pid: pid_t,
+        includeRemoteWindows: Bool
+    ) -> [AXUIElement] {
+        guard includeRemoteWindows else { return [] }
+        guard !Thread.isMainThread else {
+            return remoteWindowsOnCurrentThread(forPID: pid)
+        }
+        return DispatchQueue.main.sync {
+            remoteWindowsOnCurrentThread(forPID: pid)
+        }
+    }
+
+    private static func remoteWindowsOnCurrentThread(forPID pid: pid_t) -> [AXUIElement] {
+        if let remoteWindowsResolverOverrideForTesting {
+            return remoteWindowsResolverOverrideForTesting(pid)
+        }
+        return RuntimeAXRemoteWindowResolver.windows(forPID: pid)
     }
 
     static func makeWindowID(pid: pid_t, index: Int) -> String {

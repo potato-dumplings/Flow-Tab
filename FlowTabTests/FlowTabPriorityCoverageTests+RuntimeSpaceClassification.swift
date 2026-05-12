@@ -521,4 +521,37 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(CFEqual(merged[0], publicWindow))
         XCTAssertTrue(CFEqual(merged[1], remoteTarget))
     }
+
+    func testAXWindowInspectorResolvesRemoteWindowsOnMainThreadWhenRequestedFromBackground() async {
+        let previousTrustedOverride = AccessibilityPermissionChecker.isTrustedOverrideForTesting
+        let previousRemoteOverride = AXWindowInspector.remoteWindowsResolverOverrideForTesting
+        let lock = NSLock()
+        var resolverThreadIsMain: Bool?
+        AccessibilityPermissionChecker.isTrustedOverrideForTesting = { true }
+        AXWindowInspector.remoteWindowsResolverOverrideForTesting = { _ in
+            lock.lock()
+            resolverThreadIsMain = Thread.isMainThread
+            lock.unlock()
+            return []
+        }
+        defer {
+            AccessibilityPermissionChecker.isTrustedOverrideForTesting = previousTrustedOverride
+            AXWindowInspector.remoteWindowsResolverOverrideForTesting = previousRemoteOverride
+        }
+
+        await withCheckedContinuation { continuation in
+            DispatchQueue(label: "FlowTabTests.AXBackgroundRemoteResolution").async {
+                _ = AXWindowInspector.windowsFetchResult(
+                    for: NSRunningApplication.current,
+                    includeRemoteWindows: true
+                )
+                continuation.resume()
+            }
+        }
+
+        lock.lock()
+        let resolvedOnMain = resolverThreadIsMain
+        lock.unlock()
+        XCTAssertEqual(resolvedOnMain, true)
+    }
 }
