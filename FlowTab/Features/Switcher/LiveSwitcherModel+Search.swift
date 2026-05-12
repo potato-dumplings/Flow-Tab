@@ -56,6 +56,13 @@ extension LiveSwitcherModel {
     }
 
     @discardableResult
+    func selectSearchResult(withID id: String) -> Bool {
+        let changed = searchCoordinator.selectResult(withID: id)
+        publishSearchStateIfNeeded()
+        return changed
+    }
+
+    @discardableResult
     func stepSearchSelectionDown() -> Bool {
         if searchViewState.isInputFocused {
             return focusSearchResults()

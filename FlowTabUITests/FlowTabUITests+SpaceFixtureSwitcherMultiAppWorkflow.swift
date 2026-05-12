@@ -6,9 +6,44 @@ import XCTest
 struct SwitcherSearchWindowResultObservation: Equatable {
     let identifier: String
     let searchableText: String
+    let resultID: String?
+    let title: String?
+    let appName: String?
+    let appID: String?
+    let windowID: String?
+
+    init(
+        identifier: String,
+        searchableText: String,
+        resultID: String? = nil,
+        title: String? = nil,
+        appName: String? = nil,
+        appID: String? = nil,
+        windowID: String? = nil
+    ) {
+        self.identifier = identifier
+        self.searchableText = searchableText
+        self.resultID = resultID
+        self.title = title
+        self.appName = appName
+        self.appID = appID
+        self.windowID = windowID
+    }
+
+    var windowNumber: CGWindowID? {
+        if let windowID, let rawWindowID = windowID.split(separator: ":").last, let parsed = UInt32(rawWindowID) {
+            return CGWindowID(parsed)
+        }
+        guard let rawWindowID = identifier.split(separator: "-").last else { return nil }
+        guard let parsed = UInt32(rawWindowID) else { return nil }
+        return CGWindowID(parsed)
+    }
 
     func matches(title: String, appName: String) -> Bool {
-        searchableText.localizedCaseInsensitiveContains(title)
+        if let observedTitle = self.title, let observedAppName = self.appName {
+            return observedTitle == title && observedAppName == appName
+        }
+        return searchableText.localizedCaseInsensitiveContains(title)
             && searchableText.localizedCaseInsensitiveContains(appName)
     }
 }
@@ -242,7 +277,7 @@ extension FlowTabUITests {
                 timeout: 8
             ) else { return }
             let targetWindowNumber = try XCTUnwrap(
-                workflowCGWindowID(fromSearchResultIdentifier: result.identifier),
+                result.windowNumber,
                 "Search result \(result.identifier) did not expose a CG window number."
             )
 
@@ -341,7 +376,7 @@ extension FlowTabUITests {
                 timeout: 8
             ) else { return }
             let targetWindowNumber = try XCTUnwrap(
-                workflowCGWindowID(fromSearchResultIdentifier: result.identifier),
+                result.windowNumber,
                 "Search result \(result.identifier) did not expose a CG window number."
             )
 
@@ -425,12 +460,6 @@ extension FlowTabUITests {
 
     func fullscreenWindowTitle(in workflowApp: SpaceFixtureResolvedWorkflow.App) -> String? {
         workflowApp.fullscreenWindowTitles.first
-    }
-
-    func workflowCGWindowID(fromSearchResultIdentifier identifier: String) -> CGWindowID? {
-        guard let rawWindowID = identifier.split(separator: "-").last else { return nil }
-        guard let windowID = UInt32(rawWindowID) else { return nil }
-        return CGWindowID(windowID)
     }
 
     private func validateSwitcherMultiAppWorkflow(
@@ -677,42 +706,49 @@ extension FlowTabUITests {
         return nil
     }
 
-    func waitForSearchWindowResult(
-        in app: XCUIApplication,
-        matching titles: [String],
-        appName: String,
-        bundleIdentifier: String? = nil,
-        timeout: TimeInterval
-    ) -> (result: SwitcherSearchWindowResultObservation, title: String)? {
-        let deadline = Date().addingTimeInterval(timeout)
-        var latestResults: [SwitcherSearchWindowResultObservation] = []
-        let fallbackIdentifierFragment = bundleIdentifier
-            .map { "window-\($0.replacingOccurrences(of: ".", with: "-"))-cg-" }
-        repeat {
-            latestResults = searchWindowResultObservations(in: app)
-            for title in titles {
-                if let result = latestResults.first(where: { $0.matches(title: title, appName: appName) }) {
-                    return (result: result, title: title)
-                }
-            }
-            if let fallbackIdentifierFragment,
-               let result = latestResults.first(where: { $0.identifier.contains(fallbackIdentifierFragment) }),
-               let title = titles.first {
-                return (result: result, title: title)
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        XCTFail(
-            """
-            Expected a window-scope search result for \(appName) / \(titles), \
-            found \(latestResults.map(\.identifier).sorted()).
-            """
-        )
-        return nil
+    private func searchWindowResultObservations(in app: XCUIApplication) -> [SwitcherSearchWindowResultObservation] {
+        let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
+        let diagnosticResults = searchWindowResultObservations(from: diagnosticsSummary)
+        if !diagnosticResults.isEmpty {
+            return diagnosticResults
+        }
+        return searchWindowResultObservationsFromHierarchy(in: app)
     }
 
-    private func searchWindowResultObservations(in app: XCUIApplication) -> [SwitcherSearchWindowResultObservation] {
+    private func searchWindowResultObservations(
+        from diagnosticsSummaryElement: XCUIElement
+    ) -> [SwitcherSearchWindowResultObservation] {
+        let rawValue = switcherPanelDiagnosticsValue(diagnosticsSummaryElement, key: "searchResults")
+        guard !rawValue.isEmpty, rawValue != "inactive" else { return [] }
+
+        var seenResultIDs: Set<String> = []
+        return rawValue
+            .split(separator: "|", omittingEmptySubsequences: true)
+            .compactMap { entry -> SwitcherSearchWindowResultObservation? in
+                let fields = entry.split(separator: ",", omittingEmptySubsequences: false)
+                guard fields.count == 6 else { return nil }
+                guard fields[1] == "window" else { return nil }
+
+                let resultID = switcherDiagnosticsUnescaped(fields[0])
+                guard seenResultIDs.insert(resultID).inserted else { return nil }
+                let appID = switcherDiagnosticsUnescaped(fields[2])
+                let windowID = switcherDiagnosticsUnescaped(fields[3])
+                let title = switcherDiagnosticsUnescaped(fields[4])
+                let appName = switcherDiagnosticsUnescaped(fields[5])
+                let identifier = "flowtab.switcher.search.window.\(searchResultAccessibilitySlug(resultID))"
+                return SwitcherSearchWindowResultObservation(
+                    identifier: identifier,
+                    searchableText: [title, appName, appID, windowID].joined(separator: "\n"),
+                    resultID: resultID,
+                    title: title,
+                    appName: appName,
+                    appID: appID,
+                    windowID: windowID
+                )
+            }
+    }
+
+    private func searchWindowResultObservationsFromHierarchy(in app: XCUIApplication) -> [SwitcherSearchWindowResultObservation] {
         let hierarchyDescription = app.debugDescription
         let lines = hierarchyDescription.components(separatedBy: .newlines)
         let identifierPrefix = "flowtab.switcher.search.window."
@@ -752,6 +788,23 @@ extension FlowTabUITests {
             return nil
         }
         return String(line[identifierRange])
+    }
+
+    private func switcherDiagnosticsUnescaped(_ value: Substring) -> String {
+        let rawValue = String(value)
+        return rawValue.removingPercentEncoding ?? rawValue
+    }
+
+    private func searchResultAccessibilitySlug(_ value: String) -> String {
+        let replaced = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(
+                of: #"[^a-z0-9]+"#,
+                with: "-",
+                options: .regularExpression
+            )
+            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+        return replaced.isEmpty ? "item" : replaced
     }
 
     func confirmSwitcherSearchSelection(in app: XCUIApplication, searchInput: XCUIElement) {
@@ -900,6 +953,26 @@ extension FlowTabUITests {
     ) -> String? {
         let previewTitles = Set(switcherPreviewTitles(from: diagnosticsSummary))
         return workflowApp.fullscreenWindowTitles.first { previewTitles.contains($0) }
+    }
+
+    func waitForSwitcherSearchSelectedResult(
+        _ expectedResultID: String,
+        diagnosticsSummary: XCUIElement,
+        timeout: TimeInterval
+    ) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            let latestValue = switcherPanelDiagnosticsValue(
+                diagnosticsSummary,
+                key: "searchSelectedResult"
+            )
+            let decoded = latestValue.removingPercentEncoding ?? latestValue
+            if decoded == expectedResultID {
+                return true
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+        return false
     }
 
     func switcherPanelDiagnosticsValue(

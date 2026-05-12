@@ -293,6 +293,15 @@ final class SwitcherSearchCoordinator {
     }
 
     @discardableResult
+    func selectResult(withID id: String) -> Bool {
+        guard state.isActive else { return false }
+        guard let index = state.results.firstIndex(where: { $0.id == id }) else { return false }
+        state.isInputFocused = false
+        state.selectedResultIndex = index
+        return true
+    }
+
+    @discardableResult
     func appendQueryText(_ value: String) -> Bool {
         guard appendQueryTextWithoutRebuild(value) else { return false }
         scheduleRebuild(resetSelection: true, debounced: true)

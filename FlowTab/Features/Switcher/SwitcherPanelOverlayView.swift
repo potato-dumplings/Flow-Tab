@@ -118,9 +118,43 @@ struct SwitcherPanelRootView: View {
             "mode=\(session.mode.debugName)",
             "selectedWindow=\(selectedWindow?.id ?? "none")",
             "selectedWindowTitle=\(selectedWindow?.title ?? "")",
-            "preview=\(previewSummary)"
+            "preview=\(previewSummary)",
+            "searchScope=\(model.searchViewState.isActive ? model.searchViewState.scope.rawValue : "inactive")",
+            "searchSelectedResult=\(diagnosticsEscaped(model.searchViewState.selectedResult?.id ?? "none"))",
+            "searchResults=\(searchResultsDiagnosticsSummary)"
         ].joined(separator: ";")
     }
+
+    private var searchResultsDiagnosticsSummary: String {
+        guard model.searchViewState.isActive else { return "inactive" }
+        return model.searchViewState.results
+            .map { result in
+                let kindFields: [String]
+                switch result.kind {
+                case .app(let appID):
+                    kindFields = ["app", diagnosticsEscaped(appID), ""]
+                case .window(let appID, let windowID):
+                    kindFields = ["window", diagnosticsEscaped(appID), diagnosticsEscaped(windowID)]
+                }
+                return ([
+                    diagnosticsEscaped(result.id)
+                ] + kindFields + [
+                    diagnosticsEscaped(result.primaryText),
+                    diagnosticsEscaped(result.secondaryText ?? "")
+                ]).joined(separator: ",")
+            }
+            .joined(separator: "|")
+    }
+
+    private func diagnosticsEscaped(_ value: String) -> String {
+        value.addingPercentEncoding(withAllowedCharacters: Self.diagnosticsAllowedCharacters) ?? ""
+    }
+
+    private static let diagnosticsAllowedCharacters: CharacterSet = {
+        var allowed = CharacterSet.alphanumerics
+        allowed.insert(charactersIn: "-._~")
+        return allowed
+    }()
 }
 
 private struct CommandTabOverlay: View {

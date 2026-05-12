@@ -286,6 +286,18 @@ extension FlowTabUITests {
                 ),
                 "Window search first phase must open from the fullscreen sibling's Space."
             )
+
+            if allowsNoisyCGSiblings {
+                try runNoisyWindowSearchRoundTrip(
+                    app: app,
+                    targetApp: targetApp,
+                    initialSearchInput: searchInput,
+                    primaryFullscreenTitle: fullscreenTitle,
+                    traceLabel: traceLabel
+                )
+                return
+            }
+
             let standardSelection = try searchAndSelectWorkflowWindow(
                 title: standardTitle,
                 app: targetApp,
@@ -324,20 +336,12 @@ extension FlowTabUITests {
                 ),
                 "Window search second phase must open from the normal sibling's Space."
             )
-            let fullscreenSelection = allowsNoisyCGSiblings
-                ? try searchAndSelectWorkflowWindow(
-                    matching: targetApp.fullscreenWindowTitles,
-                    query: "Fullscreen Tab",
-                    app: targetApp,
-                    in: app,
-                    traceLabel: traceLabel
-                )
-                : try searchAndSelectWorkflowWindow(
-                    title: fullscreenTitle,
-                    app: targetApp,
-                    in: app,
-                    traceLabel: traceLabel
-                )
+            let fullscreenSelection = try searchAndSelectWorkflowWindow(
+                title: fullscreenTitle,
+                app: targetApp,
+                in: app,
+                traceLabel: traceLabel
+            )
 
             postFlowTabUITestSwitcherCommandAndWaitForDelivery(.searchConfirm, traceLabel: "\(traceLabel).confirmFullscreen")
             XCTAssertTrue(waitForNonExistence(searchInput, timeout: 4))
@@ -350,6 +354,86 @@ extension FlowTabUITests {
                 )
             )
             logWorkflowSpaceObservation("\(traceLabel).afterFullscreenConfirm", app: targetApp)
+        }
+    }
+
+    private func runNoisyWindowSearchRoundTrip(
+        app: XCUIApplication,
+        targetApp: SpaceFixtureResolvedWorkflow.App,
+        initialSearchInput: XCUIElement,
+        primaryFullscreenTitle: String,
+        traceLabel: String
+    ) throws {
+        let standardTitles = standardWorkflowWindowTitles(in: targetApp)
+        let normalOneTitle = try XCTUnwrap(
+            standardTitles.first,
+            "Noisy window search workflow must include the first normal window."
+        )
+        let normalTwoTitle = try XCTUnwrap(
+            standardTitles.dropFirst().first,
+            "Noisy window search workflow must include a second normal window."
+        )
+        let fullscreenTwoTitle = try XCTUnwrap(
+            targetApp.fullscreenWindowTitles.dropFirst().first,
+            "Noisy window search workflow must include a second fullscreen window."
+        )
+
+        var searchInput = initialSearchInput
+        var currentSelection: RuntimeTruthWindowSelection?
+        let phases: [(title: String, trace: String)] = [
+            (normalOneTitle, "normal1"),
+            (primaryFullscreenTitle, "fullscreen1"),
+            (normalTwoTitle, "normal2"),
+            (fullscreenTwoTitle, "fullscreen2")
+        ]
+
+        for (index, phase) in phases.enumerated() {
+            if index > 0 {
+                searchInput = relaunchWindowSearch(app, traceLabel: traceLabel)
+                let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
+                assertWindowSearchDataUsesWorkflowWindowCount(
+                    for: targetApp,
+                    in: app,
+                    diagnosticsSummary: diagnosticsSummary,
+                    stage: "before \(phase.trace) search query",
+                    allowsNoisyCGSiblings: true
+                )
+                if let currentSelection {
+                    XCTAssertTrue(
+                        waitForExactFrontmostWorkflowCGWindow(
+                            windowNumber: currentSelection.windowNumber,
+                            title: currentSelection.title,
+                            app: targetApp,
+                            timeout: 4
+                        ),
+                        "Noisy window search \(phase.trace) phase must reopen from \(currentSelection.title)."
+                    )
+                }
+            }
+
+            let selection = try searchAndSelectWorkflowWindow(
+                title: phase.title,
+                app: targetApp,
+                in: app,
+                traceLabel: "\(traceLabel).\(phase.trace)"
+            )
+
+            postFlowTabUITestSwitcherCommandAndWaitForDelivery(
+                .searchConfirm,
+                traceLabel: "\(traceLabel).confirm.\(phase.trace)"
+            )
+            XCTAssertTrue(waitForNonExistence(searchInput, timeout: 4))
+            XCTAssertTrue(
+                waitForExactFrontmostWorkflowCGWindow(
+                    windowNumber: selection.windowNumber,
+                    title: phase.title,
+                    app: targetApp,
+                    timeout: 12
+                ),
+                "Noisy window search must activate the exact \(phase.title) CG window selected in \(phase.trace)."
+            )
+            currentSelection = selection
+            logWorkflowSpaceObservation("\(traceLabel).afterConfirm.\(phase.trace)", app: targetApp)
         }
     }
 
@@ -590,41 +674,42 @@ extension FlowTabUITests {
             )
         )
         let windowNumber = try XCTUnwrap(
-            workflowCGWindowID(fromSearchResultIdentifier: result.identifier),
+            result.windowNumber,
             "Search result \(result.identifier) did not expose a CG window number."
         )
+        try selectSearchResultForConfirmation(result, in: app, traceLabel: traceLabel)
         return RuntimeTruthWindowSelection(
             title: title,
             windowNumber: windowNumber
         )
     }
 
-    private func searchAndSelectWorkflowWindow(
-        matching titles: [String],
-        query: String,
-        app workflowApp: SpaceFixtureResolvedWorkflow.App,
+    private func selectSearchResultForConfirmation(
+        _ result: SwitcherSearchWindowResultObservation,
         in app: XCUIApplication,
         traceLabel: String
-    ) throws -> RuntimeTruthWindowSelection {
-        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
-        try postFlowTabUITestSwitcherSearchQueryAndWaitForDelivery(query, traceLabel: "\(traceLabel).query")
+    ) throws {
+        let resultID = try XCTUnwrap(
+            result.resultID,
+            "Search result \(result.identifier) did not expose a stable result id."
+        )
+        try postFlowTabUITestSelectSearchResultAndWaitForDelivery(
+            resultID: resultID,
+            traceLabel: "\(traceLabel).selectSearchResult"
+        )
 
-        let match = try XCTUnwrap(
-            waitForSearchWindowResult(
-                in: app,
-                matching: titles,
-                appName: workflowApp.appName,
-                bundleIdentifier: workflowApp.identity.bundleIdentifier,
-                timeout: 8
-            )
-        )
-        let windowNumber = try XCTUnwrap(
-            workflowCGWindowID(fromSearchResultIdentifier: match.result.identifier),
-            "Search result \(match.result.identifier) did not expose a CG window number."
-        )
-        return RuntimeTruthWindowSelection(
-            title: match.title,
-            windowNumber: windowNumber
+        let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
+        XCTAssertTrue(
+            waitForSwitcherSearchSelectedResult(
+                resultID,
+                diagnosticsSummary: diagnosticsSummary,
+                timeout: 2
+            ),
+            """
+            Search result command did not select \(resultID).
+
+            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
+            """
         )
     }
 
@@ -645,8 +730,14 @@ extension FlowTabUITests {
     private func firstStandardWorkflowWindowTitle(
         in workflowApp: SpaceFixtureResolvedWorkflow.App
     ) -> String? {
-        let fullscreenTitle = fullscreenWindowTitle(in: workflowApp)
-        return workflowApp.expectedWindowTitles.first { $0 != fullscreenTitle }
+        standardWorkflowWindowTitles(in: workflowApp).first
+    }
+
+    private func standardWorkflowWindowTitles(
+        in workflowApp: SpaceFixtureResolvedWorkflow.App
+    ) -> [String] {
+        let fullscreenTitles = Set(workflowApp.fullscreenWindowTitles)
+        return workflowApp.expectedWindowTitles.filter { !fullscreenTitles.contains($0) }
     }
 
     private func runtimeTruthSwitcherLaunchArguments(

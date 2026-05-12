@@ -29,6 +29,9 @@ enum FlowTabUITestBootstrapper {
         static let selectApp = Notification.Name(
             "io.github.potato-dumplings.flowtab.ui-test.switcher-command.select-app"
         )
+        static let selectSearchResult = Notification.Name(
+            "io.github.potato-dumplings.flowtab.ui-test.switcher-command.select-search-result"
+        )
         static let searchConfirm = Notification.Name(
             "io.github.potato-dumplings.flowtab.ui-test.switcher-command.search-confirm"
         )
@@ -167,6 +170,11 @@ enum FlowTabUITestBootstrapper {
                 name: SwitcherCommandNotification.selectApp,
                 panelController: panelController,
                 command: .selectApp
+            ),
+            SwitcherCommandNotificationObserver(
+                name: SwitcherCommandNotification.selectSearchResult,
+                panelController: panelController,
+                command: .selectSearchResult
             ),
             SwitcherCommandNotificationObserver(
                 name: SwitcherCommandNotification.searchConfirm,
@@ -362,6 +370,7 @@ private final class SwitcherCommandNotificationObserver: NSObject {
         case advanceRight
         case searchQuery
         case selectApp
+        case selectSearchResult
         case searchConfirm
         case confirm
     }
@@ -464,6 +473,21 @@ private final class SwitcherCommandNotificationObserver: NSObject {
             panelController.syncPanelAccessibilityAnchors()
             panelController.updatePanelSize()
             RuntimeLog.info("UITest", "select app command applied appID=\(appID)")
+        case .selectSearchResult:
+            guard
+                let resultID = switcherCommandPayload()?
+                    .trimmingCharacters(in: .whitespacesAndNewlines),
+                !resultID.isEmpty
+            else {
+                return
+            }
+            guard panelController.modelForTesting.selectSearchResult(withID: resultID) else {
+                RuntimeLog.info("UITest", "select search result command missed resultID=\(resultID)")
+                return
+            }
+            panelController.syncPanelAccessibilityAnchors()
+            panelController.updatePanelSize()
+            RuntimeLog.info("UITest", "select search result command applied resultID=\(resultID)")
         case .searchConfirm:
             if panelController.modelForTesting.isSearchActive {
                 guard panelController.modelForTesting.applySelectedSearchResultToSession() else {

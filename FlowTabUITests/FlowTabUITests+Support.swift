@@ -174,6 +174,7 @@ enum FlowTabUITestSwitcherCommand {
     case advanceRight
     case searchQuery
     case selectApp
+    case selectSearchResult
     case searchConfirm
     case confirm
 
@@ -198,6 +199,10 @@ enum FlowTabUITestSwitcherCommand {
         case .selectApp:
             return Notification.Name(
                 "io.github.potato-dumplings.flowtab.ui-test.switcher-command.select-app"
+            )
+        case .selectSearchResult:
+            return Notification.Name(
+                "io.github.potato-dumplings.flowtab.ui-test.switcher-command.select-search-result"
             )
         case .searchConfirm:
             return Notification.Name(
@@ -333,6 +338,19 @@ extension FlowTabUITests {
         try FlowTabUITestSwitcherCommandPayload.write(bundleIdentifier)
         postFlowTabUITestSwitcherCommandAndWaitForDelivery(
             .selectApp,
+            traceLabel: traceLabel,
+            timeout: timeout
+        )
+    }
+
+    func postFlowTabUITestSelectSearchResultAndWaitForDelivery(
+        resultID: String,
+        traceLabel: String,
+        timeout: TimeInterval = 4
+    ) throws {
+        try FlowTabUITestSwitcherCommandPayload.write(resultID)
+        postFlowTabUITestSwitcherCommandAndWaitForDelivery(
+            .selectSearchResult,
             traceLabel: traceLabel,
             timeout: timeout
         )
