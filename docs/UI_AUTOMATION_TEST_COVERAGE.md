@@ -61,6 +61,11 @@
   步骤：进入 `Home`，选择带有多个标准窗口的真实 fixture app，再点击其中一个非默认窗口行。
   验证：目标 fixture app 成为 frontmost app，且 frontmost CG window number 等于被点击 Home 窗口行暴露的真实 window id，证明不会误激活同 app 的其他窗口或其他 app 窗口。
 
+- `testHomeWindowListUsesSeededWindowRecency`
+  场景：Home 的用户可点击窗口列表必须使用与 switcher 相同的 app-local recency，而不是 runtime snapshot 的原始 presentation order。
+  步骤：使用 Mock Runtime 启动 Home，并为 `Mock Mail` 预置 `Draft` 窗口 recency。
+  验证：选择 `Mock Mail` 后，前两个窗口行按 `Draft, Inbox` 渲染，证明 Home 候选列表消费共享窗口 recency overlay。
+
 ### Logs
 
 - `testLogsPageShowsSeededLogsAndClearRemovesOutput`

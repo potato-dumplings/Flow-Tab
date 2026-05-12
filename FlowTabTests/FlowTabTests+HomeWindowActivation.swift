@@ -134,6 +134,34 @@ extension FlowTabTests {
         )
     }
 
+    func testHomeRuntimeSnapshotServiceAppliesWindowRecencyToHomeCandidates() async {
+        await withLaunchArgumentsForTesting(["FlowTab", "--flowtab-ui-mock-runtime"]) {
+            let tracker = RuntimeWindowRecencyTracker()
+            let provider = RuntimeSnapshotProvider()
+            let appID = "com.flowtab.mock.mail"
+            guard let baselineSnapshot = provider.homeAppSnapshot(for: appID) else {
+                XCTFail("Expected mock Home snapshot for \(appID)")
+                return
+            }
+            tracker.record(
+                appID: appID,
+                windowID: "mock-mail-draft",
+                context: baselineSnapshot.context
+            )
+            let service = HomeRuntimeSnapshotService(
+                snapshotProvider: provider,
+                windowRecencyTracker: tracker
+            )
+
+            let orderedSnapshot = await service.homeAppSnapshot(for: appID)
+
+            XCTAssertEqual(
+                orderedSnapshot?.candidate.windows.map(\.id),
+                ["mock-mail-draft", "mock-mail-inbox"]
+            )
+        }
+    }
+
     private func makeHomeActivationSnapshot(
         appID: String,
         windows: [WindowCandidate]

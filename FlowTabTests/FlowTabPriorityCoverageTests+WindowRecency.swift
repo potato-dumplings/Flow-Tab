@@ -133,9 +133,66 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
+    func testRuntimeWindowRecencyTrackerAppliesSameOrderingToHomeSnapshots() {
+        var now: TimeInterval = 500
+        let tracker = RuntimeWindowRecencyTracker(clock: { now })
+        let currentApp = NSRunningApplication.current
+        let appID = "com.example.fixture.home"
+        let windows = [
+            WindowCandidate(id: "first", title: "First Window", isMinimized: false, lastActiveAt: 40),
+            WindowCandidate(id: "second", title: "Second Window", isMinimized: false, lastActiveAt: 30),
+            WindowCandidate(id: "third", title: "Third Window", isMinimized: false, lastActiveAt: 20)
+        ]
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windowsByID: Dictionary(uniqueKeysWithValues: windows.enumerated().map { index, window in
+                (
+                    window.id,
+                    RuntimeWindowContext(
+                        id: window.id,
+                        title: window.title,
+                        isMinimized: false,
+                        ownerPID: currentApp.processIdentifier,
+                        cgWindowID: CGWindowID(180_000 + index)
+                    )
+                )
+            })
+        )
+        let snapshot = RuntimeHomeAppSnapshot(
+            summary: RuntimeHomeAppSummary(
+                appID: appID,
+                displayName: "Home Fixture",
+                groupID: "home",
+                lastActiveAt: 100,
+                windowCount: windows.count,
+                pid: currentApp.processIdentifier
+            ),
+            candidate: AppSwitchCandidate(
+                id: appID,
+                displayName: "Home Fixture",
+                groupID: "home",
+                lastActiveAt: 100,
+                windows: windows
+            ),
+            context: context
+        )
+
+        now = 800
+        tracker.record(appID: appID, windowID: "second", context: context)
+
+        let updatedSnapshot = tracker.homeSnapshotWithRecencyApplied(snapshot)
+
+        XCTAssertEqual(
+            updatedSnapshot.candidate.windows.map(\.id),
+            ["second", "first", "third"]
+        )
+        XCTAssertEqual(updatedSnapshot.summary.windowCount, 3)
+    }
+
     @MainActor
     func testLiveSwitcherModelGlobalSnapshotRecencyUsesOnlySelectedAppsOwnWindowEvidence() {
-        let model = LiveSwitcherModel()
+        let model = LiveSwitcherModel(windowRecencyTracker: RuntimeWindowRecencyTracker())
         let currentApp = NSRunningApplication.current
         let currentAppID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let otherAppID = "com.example.other"
@@ -267,7 +324,7 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testLiveSwitcherModelRecordsFrontmostRuntimeWindowWhenAXFocusedWindowUnavailable() {
-        let model = LiveSwitcherModel()
+        let model = LiveSwitcherModel(windowRecencyTracker: RuntimeWindowRecencyTracker())
         let currentApp = NSRunningApplication.current
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let initialWindows = [

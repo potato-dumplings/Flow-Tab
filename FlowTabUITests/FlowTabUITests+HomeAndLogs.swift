@@ -59,6 +59,52 @@ extension FlowTabUITests {
         XCTAssertFalse(element(in: app, identifier: Identifier.permissionBanner).exists)
     }
 
+    func testHomeWindowListUsesSeededWindowRecency() throws {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-seed-window-recency-app-id",
+                "com.flowtab.mock.mail",
+                "--flowtab-ui-seed-window-recency-window-id",
+                "mock-mail-draft",
+                "--flowtab-ui-ax-trusted",
+                "YES",
+                "--flowtab-ui-screen-trusted",
+                "YES",
+                "-showPermissionReminder",
+                "NO"
+            ]
+        )
+        launchFlowTabUITestApplication(app)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
+        XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5))
+        XCTAssertTrue(
+            tapFirstHittable(
+                in: app.buttons.matching(identifier: "flowtab.home.app.com-flowtab-mock-mail"),
+                timeout: 5
+            )
+        )
+
+        let deadline = Date().addingTimeInterval(8)
+        var visibleWindowTitles: [String] = []
+        repeat {
+            visibleWindowTitles = homeWindowRows(in: app).map(\.label)
+            if visibleWindowTitles.count >= 2,
+               visibleWindowTitles.contains("Draft"),
+               visibleWindowTitles.contains("Inbox") {
+                break
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+
+        XCTAssertEqual(
+            Array(visibleWindowTitles.prefix(2)),
+            ["Draft", "Inbox"],
+            "Home window candidates should use app-local recency before fallback order."
+        )
+    }
+
     func testPermissionReminderTogglePersistsAcrossRelaunch() throws {
         let firstLaunchApp = makeApp(
             additionalArguments: [

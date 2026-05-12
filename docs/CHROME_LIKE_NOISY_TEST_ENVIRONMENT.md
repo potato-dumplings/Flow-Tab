@@ -196,7 +196,10 @@ Control+Tab in-app window switcher 有一个额外问题：面板重新打开时
 从 `Chrome Normal Tab` 重新打开 Control+Tab 时，面板仍然从 `Chrome Normal Tab`
 开始。
 
-Option+Tab 使用 app-local 的窗口 recency overlay：
+FlowTab 对用户可选择、可激活的窗口候选列表使用 app-local 的窗口 recency overlay。
+这包括 Switcher 的 Option+Tab/Control+Tab 窗口态，也包括 Home 的窗口列表；原始
+runtime snapshot 和诊断输出仍保留 runtime 自身的 presentation order，作为没有
+可靠 recency 时的 fallback 证据。
 
 1. FlowTab 成功激活某个具体窗口后，记录 app identity、stable window identity 和
    timestamp。
@@ -209,10 +212,15 @@ Option+Tab 使用 app-local 的窗口 recency overlay：
 5. 没有可靠 recency 记录时，才回退到当前 runtime snapshot 的 presentation order。
 
 相关回归覆盖在 `FlowTabPriorityCoverageTests+SessionAndPanelSearch.swift` 和
-`FlowTabPriorityCoverageTests+WindowRecency.swift`：
+`FlowTabPriorityCoverageTests+WindowRecency.swift`，Home 的候选列表排序另由
+`FlowTabTests+HomeWindowActivation.swift` 和
+`FlowTabUITests+HomeAndLogs.swift` 覆盖：
 
 - `testLiveSwitcherModelStartFocusedAppWindowSessionSelectsFocusedWindowIdentityOverWindowOrdering`
 - `testLiveSwitcherModelGlobalSnapshotRecencyUsesOnlySelectedAppsOwnWindowEvidence`
+- `testRuntimeWindowRecencyTrackerAppliesSameOrderingToHomeSnapshots`
+- `testHomeRuntimeSnapshotServiceAppliesWindowRecencyToHomeCandidates`
+- `testHomeWindowListUsesSeededWindowRecency`
 - `testLiveSwitcherModelRecordsFrontmostRuntimeWindowWhenAXFocusedWindowUnavailable`
 - `testRuntimeWindowRecencyTrackerOrdersRecordedWindowsBeforeFallbackInRecencyOrder`
 

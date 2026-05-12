@@ -55,7 +55,7 @@ final class LiveSwitcherModel: ObservableObject {
     let activator = RuntimeActivator()
     let iconProvider = AppIconProvider()
     let searchCoordinator = SwitcherSearchCoordinator()
-    let windowRecencyTracker = RuntimeWindowRecencyTracker()
+    let windowRecencyTracker: RuntimeWindowRecencyTracker
     let previewImageCache = BoundedImageCache(
         countLimit: 64,
         totalCostLimit: 160 * 1_024 * 1_024
@@ -98,9 +98,10 @@ final class LiveSwitcherModel: ObservableObject {
     var searchComputationRevision: UInt64 = 0
     var searchDebounceNanoseconds: UInt64 = 20_000_000
 
-    init() {
-        activator.windowFocusVerifiedHandler = { [weak self] appID, windowID, ownerPID, cgWindowID, title, frame in
-            self?.windowRecencyTracker.record(
+    init(windowRecencyTracker: RuntimeWindowRecencyTracker = .shared) {
+        self.windowRecencyTracker = windowRecencyTracker
+        activator.windowFocusVerifiedHandler = { [windowRecencyTracker] appID, windowID, ownerPID, cgWindowID, title, frame in
+            windowRecencyTracker.record(
                 appID: appID,
                 windowID: windowID,
                 ownerPID: ownerPID,

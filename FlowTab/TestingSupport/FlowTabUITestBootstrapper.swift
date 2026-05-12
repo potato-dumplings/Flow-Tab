@@ -41,6 +41,10 @@ enum FlowTabUITestBootstrapper {
     }
 
     static func prepareIfNeeded(userDefaults: UserDefaults = .standard) {
+        if FlowTabTestLaunchOptions.isRunningUITests {
+            RuntimeWindowRecencyTracker.shared.removeAll()
+        }
+
         if FlowTabTestLaunchOptions.resetsUserDefaultsOnLaunch {
             AppPreferenceKeys.allKeys.forEach { userDefaults.removeObject(forKey: $0) }
             userDefaults.removeObject(forKey: CommandTabTakeoverController.takeoverMarkerKey)
@@ -62,6 +66,7 @@ enum FlowTabUITestBootstrapper {
         }
 
         installHotkeyReloadDiagnosticsIfNeeded()
+        seedWindowRecencyIfNeeded()
 
         if let seededLogCount = FlowTabTestLaunchOptions.seededLogCount {
             RuntimeDiagnostics.shared.clear()
@@ -77,6 +82,27 @@ enum FlowTabUITestBootstrapper {
                 }
             }
         }
+    }
+
+    private static func seedWindowRecencyIfNeeded() {
+        guard let seed = FlowTabTestLaunchOptions.seededWindowRecency else { return }
+        let provider = RuntimeSnapshotProvider()
+        guard let snapshot = provider.homeAppSnapshot(for: seed.appID) else {
+            RuntimeLog.info(
+                "UITest",
+                "failed to seed window recency appID=\(seed.appID) windowID=\(seed.windowID) reason=missing_snapshot"
+            )
+            return
+        }
+        RuntimeWindowRecencyTracker.shared.record(
+            appID: seed.appID,
+            windowID: seed.windowID,
+            context: snapshot.context
+        )
+        RuntimeLog.info(
+            "UITest",
+            "seeded window recency appID=\(seed.appID) windowID=\(seed.windowID)"
+        )
     }
 
     static func configurePanelControllerIfNeeded(panelController: SwitcherPanelController) {

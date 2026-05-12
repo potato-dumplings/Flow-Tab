@@ -397,6 +397,38 @@ AX 通知应被视为“某个应用发生了变化”的脏信号，而不是�
 - 不因为启动时暂时匹配不上 AX 就把仍可通过 Space 找回的窗口直接丢掉。
 - 让主窗口切换路径始终服务于“可切换可展示”。
 
+## 用户窗口候选列表排序契约
+
+任何会展示给用户选择、或会被用户提交后激活的窗口候选列表，都必须使用同一套
+app-local recency 规则。这个约束覆盖但不限于：
+
+- global switcher 选中 app 后进入的 window state。
+- in-app window switcher。
+- Home 的 app window list。
+- window-scope search 结果里可直接激活的窗口条目。
+
+接入新入口时，不要直接拿 `RuntimeSnapshotProvider` 输出的 `candidate.windows`
+原始顺序作为 UI 顺序或提交顺序。先经过 `RuntimeWindowRecencyTracker.shared` 的
+recency overlay，再交给 UI、session 或 activation target resolution。若新入口的
+数据形态不是 `RuntimeSnapshot` 或 `RuntimeHomeAppSnapshot`，应在
+`RuntimeWindowRecencyTracker` 增加共享 adapter，而不是在入口本地重新实现排序。
+
+排序规则是：
+
+1. FlowTab 成功激活某个具体窗口后，记录 app identity、stable window identity、
+   `CGWindowID`、title/frame 语义证据和 timestamp。
+2. 打开可选择窗口候选列表时，只允许刷新当前 frontmost app 中能够精确匹配的
+   focused/runtime window recency。
+3. 对每个 app 单独 overlay 自己的 recency；A app 当前 focused window 不允许影响
+   B app 的窗口候选顺序。
+4. 已记录且仍能可靠匹配的窗口排在 fallback 窗口之前；多个已记录窗口按最近激活优先。
+5. 没有可靠 recency 记录、或记录无法匹配当前候选时，才回退到 runtime snapshot 的
+   原始 presentation order。
+
+唯一例外是 raw runtime snapshot、日志和诊断视图。这些输出可以保留底层
+presentation order，用来解释系统当前给 FlowTab 的输入；它们不能直接代表用户候选
+列表的最终展示顺序。
+
 ## 提交流程
 
 用户在 `window-layer` 提交某个窗口时，按以下顺序执行：

@@ -19,6 +19,7 @@ final class HomeWindowActivationController {
         preferencesProvider: @escaping () -> SwitcherPreferences = {
             SwitcherBehaviorPreferencesStore.loadSwitcherPreferences()
         },
+        windowRecencyTracker: RuntimeWindowRecencyTracker = .shared,
         activationHandler: ((ActivationTarget, [String: RuntimeAppContext]) -> Void)? = nil
     ) {
         self.snapshotProvider = snapshotProvider
@@ -28,6 +29,16 @@ final class HomeWindowActivationController {
             self.activationHandler = activationHandler
         } else {
             let runtimeActivator = RuntimeActivator()
+            runtimeActivator.windowFocusVerifiedHandler = { appID, windowID, ownerPID, cgWindowID, title, frame in
+                windowRecencyTracker.record(
+                    appID: appID,
+                    windowID: windowID,
+                    ownerPID: ownerPID,
+                    cgWindowID: cgWindowID,
+                    title: title,
+                    frame: frame
+                )
+            }
             self.activationHandler = { target, contextsByID in
                 runtimeActivator.activate(target: target, contextsByID: contextsByID)
             }

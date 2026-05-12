@@ -45,6 +45,17 @@ FlowTab 当前有三种面板：
 - 在应用面板中的窗口面板放开主修饰键：确认当前高亮窗口，并将该窗口切到前台。
 - 在独立窗口面板放开主修饰键：确认当前高亮窗口，并将该窗口切到前台。
 
+### 2.3) 窗口候选列表排序契约
+
+凡是展示给用户选择、或用户提交后会激活的窗口候选列表，都必须使用同一套
+app-local window recency 规则。新增入口时不要直接展示 runtime snapshot 的原始
+`candidate.windows` 顺序；应先通过 `RuntimeWindowRecencyTracker.shared` overlay
+可可靠匹配的窗口 recency，再回退到 runtime presentation order。
+
+当前覆盖入口包括应用面板进入的 window state、独立窗口面板、Home 窗口列表，以及
+window-scope search 的可激活窗口结果。详细规则见
+`docs/RUNTIME_AX_CG_SPACE_WINDOW_MAPPING.md` 的“用户窗口候选列表排序契约”。
+
 ### 3) 自定义快捷键与结束应用
 
 - 可在应用内 `监控页面 -> 偏好` 自定义：

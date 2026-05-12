@@ -9,7 +9,16 @@ final class HomeRuntimeSnapshotService: @unchecked Sendable {
         label: "FlowTab.HomeRuntimeSnapshotService",
         qos: .utility
     )
-    private let snapshotProvider = RuntimeSnapshotProvider()
+    private let snapshotProvider: RuntimeSnapshotProvider
+    private let windowRecencyTracker: RuntimeWindowRecencyTracker
+
+    init(
+        snapshotProvider: RuntimeSnapshotProvider = RuntimeSnapshotProvider(),
+        windowRecencyTracker: RuntimeWindowRecencyTracker = .shared
+    ) {
+        self.snapshotProvider = snapshotProvider
+        self.windowRecencyTracker = windowRecencyTracker
+    }
 
     func homeAppSummaries() async -> [RuntimeHomeAppSummary] {
         await withCheckedContinuation { continuation in
@@ -30,7 +39,10 @@ final class HomeRuntimeSnapshotService: @unchecked Sendable {
     func homeAppSnapshot(for appID: String) async -> RuntimeHomeAppSnapshot? {
         await withCheckedContinuation { continuation in
             snapshotQueue.async { [self] in
-                continuation.resume(returning: snapshotProvider.homeAppSnapshot(for: appID))
+                let snapshot = snapshotProvider.homeAppSnapshot(for: appID)
+                continuation.resume(
+                    returning: snapshot.map(windowRecencyTracker.homeSnapshotWithRecencyApplied)
+                )
             }
         }
     }

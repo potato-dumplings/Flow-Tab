@@ -67,6 +67,16 @@ enum FlowTabTestLaunchOptions {
         value(after: "--flowtab-ui-mock-runtime-variant")
     }
 
+    static var seededWindowRecency: (appID: String, windowID: String)? {
+        guard
+            let appID = value(after: "--flowtab-ui-seed-window-recency-app-id"),
+            let windowID = value(after: "--flowtab-ui-seed-window-recency-window-id")
+        else {
+            return nil
+        }
+        return (appID, windowID)
+    }
+
     static var runtimeLogLevelOverrideRawValue: String? {
         value(after: "--flowtab-ui-runtime-log-level")
     }

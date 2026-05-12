@@ -339,6 +339,14 @@ extension FlowTabTests {
         }
         body()
     }
+    func withLaunchArgumentsForTesting(_ arguments: [String], _ body: () async -> Void) async {
+        let previousArguments = FlowTabTestLaunchOptions.argumentsOverrideForTesting
+        FlowTabTestLaunchOptions.argumentsOverrideForTesting = arguments
+        defer {
+            FlowTabTestLaunchOptions.argumentsOverrideForTesting = previousArguments
+        }
+        await body()
+    }
     func makeIsolatedUserDefaults() -> UserDefaults? {
         let suiteName = "FlowTabTests.\(UUID().uuidString)"
         guard let userDefaults = UserDefaults(suiteName: suiteName) else {

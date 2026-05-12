@@ -2,7 +2,9 @@ import CoreGraphics
 import Foundation
 import FlowTabCore
 
-final class RuntimeWindowRecencyTracker {
+final class RuntimeWindowRecencyTracker: @unchecked Sendable {
+    static let shared = RuntimeWindowRecencyTracker()
+
     private struct Record {
         let appID: String
         let windowID: String
@@ -33,6 +35,7 @@ final class RuntimeWindowRecencyTracker {
 
     private let clock: () -> TimeInterval
     private let maxRecordsPerApp: Int
+    private let lock = NSLock()
     private var recordsByAppID: [String: [Record]] = [:]
 
     init(
@@ -60,6 +63,8 @@ final class RuntimeWindowRecencyTracker {
             frame: frame?.standardized,
             timestamp: clock()
         )
+        lock.lock()
+        defer { lock.unlock() }
         upsert(record)
     }
 
@@ -76,15 +81,51 @@ final class RuntimeWindowRecencyTracker {
     }
 
     func snapshotWithRecencyApplied(_ snapshot: RuntimeSnapshot) -> RuntimeSnapshot {
-        RuntimeSnapshot(
+        let recordsByAppID = recordsSnapshot()
+        return RuntimeSnapshot(
             apps: snapshot.apps.map { app in
                 guard let context = snapshot.contextsByID[app.id] else {
                     return app
                 }
-                return appWithRecencyApplied(app, context: context)
+                return appWithRecencyApplied(
+                    app,
+                    context: context,
+                    records: recordsByAppID[app.id] ?? []
+                )
             },
             contextsByID: snapshot.contextsByID
         )
+    }
+
+    func homeSnapshotWithRecencyApplied(
+        _ snapshot: RuntimeHomeAppSnapshot
+    ) -> RuntimeHomeAppSnapshot {
+        let orderedSnapshot = snapshotWithRecencyApplied(
+            RuntimeSnapshot(
+                apps: [snapshot.candidate],
+                contextsByID: [snapshot.context.appID: snapshot.context]
+            )
+        )
+        guard let candidate = orderedSnapshot.apps.first else {
+            return snapshot
+        }
+        return RuntimeHomeAppSnapshot(
+            summary: snapshot.summary,
+            candidate: candidate,
+            context: snapshot.context
+        )
+    }
+
+    func removeAll() {
+        lock.lock()
+        recordsByAppID.removeAll()
+        lock.unlock()
+    }
+
+    private func recordsSnapshot() -> [String: [Record]] {
+        lock.lock()
+        defer { lock.unlock() }
+        return recordsByAppID
     }
 
     private func upsert(_ record: Record) {
@@ -106,9 +147,10 @@ final class RuntimeWindowRecencyTracker {
 
     private func appWithRecencyApplied(
         _ app: AppSwitchCandidate,
-        context: RuntimeAppContext
+        context: RuntimeAppContext,
+        records: [Record]
     ) -> AppSwitchCandidate {
-        guard let records = recordsByAppID[app.id], !records.isEmpty else {
+        guard !records.isEmpty else {
             return app
         }
 
