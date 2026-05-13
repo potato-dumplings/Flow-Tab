@@ -69,7 +69,10 @@ extension FlowTabTests {
             var capturedTarget: ActivationTarget?
             var capturedContextsByID: [String: RuntimeAppContext] = [:]
             let controller = HomeWindowActivationController(
-                snapshotProvider: RuntimeSnapshotProvider(),
+                snapshotService: RuntimeSnapshotService(
+                    label: "FlowTabTests.HomeActivation.RuntimeSnapshotService",
+                    snapshotProvider: RuntimeSnapshotProvider()
+                ),
                 preferencesProvider: { .default },
                 activationHandler: { target, contextsByID in
                     capturedTarget = target
@@ -115,7 +118,6 @@ extension FlowTabTests {
         var capturedTarget: ActivationTarget?
 
         let controller = HomeWindowActivationController(
-            snapshotProvider: RuntimeSnapshotProvider(),
             preferencesProvider: { .default },
             activationHandler: { target, _ in
                 capturedTarget = target

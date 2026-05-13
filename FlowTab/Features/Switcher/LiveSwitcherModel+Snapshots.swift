@@ -173,8 +173,9 @@ extension LiveSwitcherModel {
 
                 let startMs = Self.monotonicMilliseconds()
                 let snapshotProvider = self.backgroundFullSnapshotProviderOverride
+                let snapshotService = self.runtimeSnapshotService
                 DispatchQueue.global(qos: .utility).async {
-                    let snapshot = snapshotProvider?() ?? RuntimeSnapshotProvider().snapshot()
+                    let snapshot = snapshotProvider?() ?? snapshotService.snapshot()
                     let snapshotReadMs = Self.monotonicMilliseconds()
                     Task { @MainActor [weak self] in
                         self?.completeBackgroundFullSnapshotRefresh(
@@ -252,6 +253,7 @@ extension LiveSwitcherModel {
         selectedAppWindowSnapshotPendingAppID = targetAppID
         let startMs = Self.monotonicMilliseconds()
         let providerOverride = selectedAppSnapshotProviderOverride
+        let snapshotService = runtimeSnapshotService
         let recencyTracker = windowRecencyTracker
 
         RuntimeLog.debug(
@@ -260,10 +262,11 @@ extension LiveSwitcherModel {
         )
 
         DispatchQueue.global(qos: .userInitiated).async {
-            let snapshot = providerOverride?(targetAppID)
-                ?? RuntimeSnapshotProvider().homeAppSnapshot(for: targetAppID)
-            let orderedSnapshot = snapshot.map {
-                recencyTracker.homeSnapshotWithRecencyApplied($0)
+            let orderedSnapshot: RuntimeHomeAppSnapshot?
+            if let overrideSnapshot = providerOverride?(targetAppID) {
+                orderedSnapshot = recencyTracker.homeSnapshotWithRecencyApplied(overrideSnapshot)
+            } else {
+                orderedSnapshot = snapshotService.homeAppSnapshotSynchronously(for: targetAppID)
             }
             let snapshotReadMs = Self.monotonicMilliseconds()
             Task { @MainActor [weak self] in
@@ -390,8 +393,8 @@ extension LiveSwitcherModel {
             source = "override"
             snapshot = snapshotProviderOverride()
         } else {
-            source = "runtimeProvider"
-            snapshot = snapshotProvider.snapshot()
+            source = "runtimeSnapshotService"
+            snapshot = runtimeSnapshotService.snapshot()
         }
         let durationMs = Self.monotonicMilliseconds() - startMs
         logMakeSnapshot(source: source, snapshot: snapshot, durationMs: durationMs)
@@ -409,8 +412,8 @@ extension LiveSwitcherModel {
             source = "override"
             snapshot = snapshotProviderOverride()
         } else {
-            source = "lightweightRuntimeProvider"
-            snapshot = snapshotProvider.lightweightAppSnapshot()
+            source = "runtimeSnapshotService.lightweight"
+            snapshot = runtimeSnapshotService.lightweightAppSnapshot()
         }
         let durationMs = Self.monotonicMilliseconds() - startMs
         logMakeSnapshot(source: source, snapshot: snapshot, durationMs: durationMs)

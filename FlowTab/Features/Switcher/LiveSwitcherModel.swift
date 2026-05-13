@@ -51,7 +51,7 @@ final class LiveSwitcherModel: ObservableObject {
     @Published var searchLayoutMeasurements: SwitcherSearchLayoutMeasurements = .fallback
     @Published var terminatingAppID: String?
 
-    let snapshotProvider = RuntimeSnapshotProvider()
+    let runtimeSnapshotService: any RuntimeSnapshotServing
     let activator = RuntimeActivator()
     let iconProvider = AppIconProvider()
     let searchCoordinator = SwitcherSearchCoordinator()
@@ -117,8 +117,12 @@ final class LiveSwitcherModel: ObservableObject {
     var searchComputationRevision: UInt64 = 0
     var searchDebounceNanoseconds: UInt64 = 20_000_000
 
-    init(windowRecencyTracker: RuntimeWindowRecencyTracker = .shared) {
+    init(
+        windowRecencyTracker: RuntimeWindowRecencyTracker = .shared,
+        snapshotService: any RuntimeSnapshotServing = sharedRuntimeSnapshotService
+    ) {
         self.windowRecencyTracker = windowRecencyTracker
+        runtimeSnapshotService = snapshotService
         activator.windowFocusVerifiedHandler = { [windowRecencyTracker] appID, windowID, ownerPID, cgWindowID, title, frame in
             windowRecencyTracker.record(
                 appID: appID,
@@ -684,7 +688,7 @@ final class LiveSwitcherModel: ObservableObject {
         }
         guard !windowIDsByCGWindowID.isEmpty else { return nil }
 
-        let cgWindows = snapshotProvider.collectCGWindowsByPID()[frontmostPID] ?? []
+        let cgWindows = runtimeSnapshotService.currentCGWindowsByPID()[frontmostPID] ?? []
         for cgWindow in cgWindows where RuntimeSnapshotProvider.cgWindowPassesValidityConstraints(cgWindow) {
             guard let windowIDs = windowIDsByCGWindowID[cgWindow.id], windowIDs.count == 1 else {
                 continue

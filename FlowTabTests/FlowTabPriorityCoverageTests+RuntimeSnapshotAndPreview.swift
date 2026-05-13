@@ -1008,6 +1008,86 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(provider.isLikelyTransientAXRebuild(for: pid))
     }
 
+    func testRuntimeSnapshotProviderWindowListKeepsMultipleStickySpaceOneEntriesWhenAXReturnsSubsetFromFullscreenSpace() {
+        let provider = RuntimeSnapshotProvider()
+        let pid: pid_t = 18_405
+        let appName = "Google Chrome"
+        let desktopBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
+        let fullscreenBoundsA = CGRect(x: 0, y: 124, width: 1_728, height: 993)
+        let fullscreenBoundsB = CGRect(x: 0, y: 158, width: 1_728, height: 959)
+
+        func title(for index: Int) -> String {
+            "Chrome Window \(index)"
+        }
+
+        func bounds(for index: Int) -> CGRect {
+            switch index {
+            case 18:
+                return fullscreenBoundsA
+            case 19:
+                return fullscreenBoundsB
+            default:
+                return desktopBounds
+            }
+        }
+
+        func spaceIDs(for index: Int) -> [Int] {
+            switch index {
+            case 18:
+                return [6_380]
+            case 19:
+                return [6_371]
+            default:
+                return [1]
+            }
+        }
+
+        func cgWindow(for index: Int, isOnscreen: Bool) -> RuntimeSnapshotProvider.CGWindowEntry {
+            RuntimeSnapshotProvider.CGWindowEntry(
+                id: CGWindowID(240_000 + index),
+                title: title(for: index),
+                bounds: bounds(for: index),
+                isOnscreen: isOnscreen,
+                alpha: 1.0,
+                storeType: 1,
+                spaceIDs: spaceIDs(for: index)
+            )
+        }
+
+        func axWindow(for index: Int) -> RuntimeSnapshotProvider.AXWindowEntry {
+            RuntimeSnapshotProvider.AXWindowEntry(
+                index: index,
+                id: "ax:18405:\(index)",
+                title: title(for: index),
+                sourceTitle: title(for: index),
+                isMinimized: false,
+                window: AXUIElementCreateApplication(pid + pid_t(index) + 1),
+                frame: bounds(for: index)
+            )
+        }
+
+        let initialEntries = provider.resolvedStableWindowEntries(
+            axWindows: (0..<20).map(axWindow),
+            cgWindows: (0..<20).map { cgWindow(for: $0, isOnscreen: true) },
+            pid: pid,
+            appName: appName
+        )
+        XCTAssertEqual(initialEntries.count, 20)
+
+        let fullscreenSpaceEntries = provider.resolvedStableWindowEntries(
+            axWindows: [17, 18, 19].map(axWindow),
+            cgWindows: (0..<20).map { cgWindow(for: $0, isOnscreen: false) },
+            pid: pid,
+            appName: appName
+        )
+
+        XCTAssertEqual(fullscreenSpaceEntries.count, 20)
+        XCTAssertEqual(
+            Set(fullscreenSpaceEntries.compactMap(\.cgWindowID)),
+            Set((0..<20).map { CGWindowID(240_000 + $0) })
+        )
+    }
+
     func testRuntimeSnapshotProviderWindowListHidesStickyCGEntriesBoundToSpaceOneAfterAXRebuildGraceRetriesExhausted() {
         let provider = RuntimeSnapshotProvider()
         let pid: pid_t = 18_405

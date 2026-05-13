@@ -126,6 +126,58 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testLiveSwitcherModelSelectedAppWindowSnapshotUsesSharedRuntimeSnapshotService() async {
+        let appID = "com.example.shared-runtime-source"
+        let runningApp = NSRunningApplication.current
+        let appOnlyCandidate = AppSwitchCandidate(
+            id: appID,
+            displayName: "Shared Runtime Source",
+            groupID: "shared-runtime-source",
+            lastActiveAt: 100,
+            windows: []
+        )
+        let windows = [
+            WindowCandidate(id: "shared-window-1", title: "Shared One", isMinimized: false, lastActiveAt: 20),
+            WindowCandidate(id: "shared-window-2", title: "Shared Two", isMinimized: false, lastActiveAt: 10)
+        ]
+        let windowCandidate = AppSwitchCandidate(
+            id: appID,
+            displayName: "Shared Runtime Source",
+            groupID: "shared-runtime-source",
+            lastActiveAt: 100,
+            windows: windows
+        )
+        let context = makeRuntimeAppContext(appID: appID, runningApp: runningApp, windows: windows)
+        let selectedSnapshot = RuntimeHomeAppSnapshot(
+            summary: RuntimeHomeAppSummary(
+                appID: appID,
+                displayName: "Shared Runtime Source",
+                groupID: "shared-runtime-source",
+                lastActiveAt: 100,
+                windowCount: windows.count,
+                pid: runningApp.processIdentifier
+            ),
+            candidate: windowCandidate,
+            context: context
+        )
+        let snapshotService = RecordingRuntimeSnapshotService(
+            homeSnapshotsByAppID: [appID: selectedSnapshot]
+        )
+        let model = LiveSwitcherModel(snapshotService: snapshotService)
+        model.backgroundFullSnapshotRefreshEnabled = false
+        model.fastAppSnapshotProviderOverride = {
+            RuntimeSnapshot(apps: [appOnlyCandidate], contextsByID: [:])
+        }
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        XCTAssertTrue(model.scheduleSelectedAppWindowSnapshotIfNeeded(for: appID))
+
+        try? await Task.sleep(nanoseconds: 80_000_000)
+        XCTAssertEqual(snapshotService.recordedHomeAppIDs(), [appID])
+        XCTAssertEqual(model.session?.selectedApp.windows.map(\.id), ["shared-window-1", "shared-window-2"])
+    }
+
+    @MainActor
     func testSwitcherPanelControllerDownArrowInAppCycleEntersWindowLayer() {
         let controller = SwitcherPanelController()
         controller.modelForTesting.snapshotProviderOverride = {
@@ -652,4 +704,55 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(previewLayerFrame.midX, appLayerFrame.midX, accuracy: 0.5)
     }
 
+}
+
+private final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable {
+    private let lock = NSLock()
+    private let homeSnapshotsByAppID: [String: RuntimeHomeAppSnapshot]
+    private var requestedHomeAppIDs: [String] = []
+
+    init(homeSnapshotsByAppID: [String: RuntimeHomeAppSnapshot]) {
+        self.homeSnapshotsByAppID = homeSnapshotsByAppID
+    }
+
+    func recordedHomeAppIDs() -> [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return requestedHomeAppIDs
+    }
+
+    func snapshot() -> RuntimeSnapshot {
+        RuntimeSnapshot(apps: [], contextsByID: [:])
+    }
+
+    func lightweightAppSnapshot() -> RuntimeSnapshot {
+        RuntimeSnapshot(apps: [], contextsByID: [:])
+    }
+
+    func homeAppSummaries() async -> [RuntimeHomeAppSummary] {
+        homeSnapshotsByAppID.values.map(\.summary)
+    }
+
+    func homeAppSummary(for appID: String) async -> RuntimeHomeAppSummary? {
+        homeSnapshotsByAppID[appID]?.summary
+    }
+
+    func homeAppSnapshot(for appID: String) async -> RuntimeHomeAppSnapshot? {
+        homeAppSnapshotSynchronously(for: appID)
+    }
+
+    func homeAppSnapshotSynchronously(for appID: String) -> RuntimeHomeAppSnapshot? {
+        lock.lock()
+        requestedHomeAppIDs.append(appID)
+        lock.unlock()
+        return homeSnapshotsByAppID[appID]
+    }
+
+    func currentCGWindowsByPID() -> [pid_t: [RuntimeSnapshotProvider.CGWindowEntry]] {
+        [:]
+    }
+
+    func isLikelyTransientAXRebuild(for pid: pid_t) -> Bool {
+        false
+    }
 }

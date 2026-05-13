@@ -742,6 +742,11 @@ extension RuntimeSnapshotProvider {
                 continue
             }
             let spaceKey = normalizedSpaceIDs.map(String.init).joined(separator: ",")
+            if entry.hasStickyBinding {
+                seenSpaceKeys.insert(spaceKey)
+                deduplicatedEntries.append(entry)
+                continue
+            }
             if seenSpaceKeys.insert(spaceKey).inserted {
                 deduplicatedEntries.append(entry)
             } else {

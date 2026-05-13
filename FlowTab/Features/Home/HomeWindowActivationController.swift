@@ -10,19 +10,19 @@ final class HomeWindowActivationController {
 
     static let shared = HomeWindowActivationController()
 
-    private let snapshotProvider: RuntimeSnapshotProvider
+    private let snapshotService: any RuntimeSnapshotServing
     private let preferencesProvider: () -> SwitcherPreferences
     private let activationHandler: (ActivationTarget, [String: RuntimeAppContext]) -> Void
 
     init(
-        snapshotProvider: RuntimeSnapshotProvider = RuntimeSnapshotProvider(),
+        snapshotService: any RuntimeSnapshotServing = sharedRuntimeSnapshotService,
         preferencesProvider: @escaping () -> SwitcherPreferences = {
             SwitcherBehaviorPreferencesStore.loadSwitcherPreferences()
         },
         windowRecencyTracker: RuntimeWindowRecencyTracker = .shared,
         activationHandler: ((ActivationTarget, [String: RuntimeAppContext]) -> Void)? = nil
     ) {
-        self.snapshotProvider = snapshotProvider
+        self.snapshotService = snapshotService
         self.preferencesProvider = preferencesProvider
 
         if let activationHandler {
@@ -50,7 +50,7 @@ final class HomeWindowActivationController {
         windowID: String,
         snapshot: RuntimeHomeAppSnapshot? = nil
     ) {
-        let resolvedSnapshot = snapshot ?? snapshotProvider.homeAppSnapshot(for: appID)
+        let resolvedSnapshot = snapshot ?? snapshotService.homeAppSnapshotSynchronously(for: appID)
         guard let request = Self.makeActivationRequest(
             snapshot: resolvedSnapshot,
             appID: appID,
