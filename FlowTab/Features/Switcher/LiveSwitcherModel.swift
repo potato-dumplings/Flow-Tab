@@ -65,6 +65,7 @@ final class LiveSwitcherModel: ObservableObject {
     var onSessionLayoutChanged: (() -> Void)?
     var onSearchResultScrollRequestForTesting: ((String) -> Void)?
     var snapshotProviderOverride: (() -> RuntimeSnapshot)?
+    var fastAppSnapshotProviderOverride: (() -> RuntimeSnapshot)?
     var frontmostApplicationOverride: (() -> NSRunningApplication?)?
     var focusedWindowIdentityOverride: ((NSRunningApplication) -> RuntimeFocusedWindowIdentity?)?
     var frontmostRuntimeWindowIDOverride: ((
@@ -95,6 +96,8 @@ final class LiveSwitcherModel: ObservableObject {
     var pendingSearchComputationTask: Task<Void, Never>?
     var pendingTerminateRefreshTask: Task<Void, Never>?
     var pendingTerminateRequest: PendingTerminateRequest?
+    var backgroundFullSnapshotRefreshGeneration: UInt64 = 0
+    var backgroundFullSnapshotRefreshEnabled = true
     var searchComputationRevision: UInt64 = 0
     var searchDebounceNanoseconds: UInt64 = 20_000_000
 
@@ -196,30 +199,60 @@ final class LiveSwitcherModel: ObservableObject {
         clearTerminateSelectedAppAnimation()
         overlayStyle = .appAndWindow
         titleBarStyleInferenceEnabled = false
-        return loadSnapshot(triggerDirection: triggerDirection, preferredSelectedAppID: nil)
+        guard loadFastAppSnapshot(triggerDirection: triggerDirection, preferredSelectedAppID: nil) else {
+            return false
+        }
+        scheduleBackgroundFullSnapshotRefresh(triggerDirection: triggerDirection)
+        return true
     }
 
     func startFocusedAppWindowSession(triggerDirection: CycleDirection) -> Bool {
+        let startMs = Self.monotonicMilliseconds()
         cancelPendingTerminateRefresh()
         clearTerminateSelectedAppAnimation()
         overlayStyle = .windowOnly
         titleBarStyleInferenceEnabled = true
         guard let frontmostApp = resolveFrontmostApplication() else {
+            logStartFocusedWindowSessionNoFrontmost(startMs: startMs)
             resetSessionState()
             return false
         }
+        let frontmostReadyMs = Self.monotonicMilliseconds()
 
         let frontmostAppID = frontmostApp.bundleIdentifier
             ?? "pid:\(frontmostApp.processIdentifier)"
-        let snapshot = snapshotWithWindowRecencyApplied(makeSnapshot())
+        let rawSnapshot = makeSnapshot()
+        let snapshotReadMs = Self.monotonicMilliseconds()
+        let snapshot = snapshotWithWindowRecencyApplied(rawSnapshot)
+        let recencyAppliedMs = Self.monotonicMilliseconds()
         guard
             let appCandidate = snapshot.apps.first(where: { $0.id == frontmostAppID }),
             let context = snapshot.contextsByID[frontmostAppID]
         else {
+            let failedMs = Self.monotonicMilliseconds()
+            logStartFocusedWindowSession(
+                result: "missingFrontmostApp",
+                frontmostAppID: frontmostAppID,
+                frontmostReadyMs: frontmostReadyMs,
+                snapshotReadMs: snapshotReadMs,
+                recencyAppliedMs: recencyAppliedMs,
+                completeMs: failedMs,
+                startMs: startMs
+            )
             resetSessionState()
             return false
         }
         guard !appCandidate.windows.isEmpty else {
+            let failedMs = Self.monotonicMilliseconds()
+            logStartFocusedWindowSession(
+                result: "noWindows",
+                frontmostAppID: frontmostAppID,
+                frontmostReadyMs: frontmostReadyMs,
+                snapshotReadMs: snapshotReadMs,
+                recencyAppliedMs: recencyAppliedMs,
+                completeMs: failedMs,
+                startMs: startMs
+            )
             resetSessionState()
             return false
         }
@@ -255,8 +288,19 @@ final class LiveSwitcherModel: ObservableObject {
         }
 
         session = rebuiltSession
-        searchCoordinator.rebuildIndex(with: rebuiltSession.apps)
+        _ = searchCoordinator.exit()
         publishSearchStateIfNeeded()
+        let completeMs = Self.monotonicMilliseconds()
+        logStartFocusedWindowSession(
+            result: "ready",
+            frontmostAppID: frontmostAppID,
+            frontmostReadyMs: frontmostReadyMs,
+            snapshotReadMs: snapshotReadMs,
+            recencyAppliedMs: recencyAppliedMs,
+            completeMs: completeMs,
+            startMs: startMs,
+            windows: appCandidate.windows.count
+        )
         return true
     }
 
@@ -331,62 +375,6 @@ final class LiveSwitcherModel: ObservableObject {
             }
             self.pendingTerminateRefreshTask = nil
         }
-    }
-
-    func loadSnapshot(
-        triggerDirection: CycleDirection,
-        preferredSelectedAppID: String?,
-        animateAppStripUpdate _: Bool = false,
-        preserveSearchState: Bool = false
-    ) -> Bool {
-        let previousSearchState = preserveSearchState ? searchViewState : .inactive
-        cancelPendingSearchComputation()
-        let snapshot = snapshotWithWindowRecencyApplied(makeSnapshot())
-        guard !snapshot.apps.isEmpty else {
-            resetSessionState()
-            return false
-        }
-
-        runtimeContextsByID = snapshot.contextsByID
-        clearPreviewSnapshotState()
-        autoEnterSuppressedAppID = nil
-        let preferences = SwitcherBehaviorPreferencesStore.loadSwitcherPreferences()
-        var rebuiltSession = SwitcherSession(
-            apps: snapshot.apps,
-            preferences: preferences,
-            triggerDirection: triggerDirection,
-            rememberedWindowIDByAppID: rememberedWindowIDByAppID
-        )
-
-        if
-            let preferredSelectedAppID,
-            rebuiltSession.apps.contains(where: { $0.id == preferredSelectedAppID })
-        {
-            for _ in 0..<rebuiltSession.apps.count {
-                if rebuiltSession.selectedApp.id == preferredSelectedAppID {
-                    break
-                }
-                rebuiltSession.handle(.tabForward)
-            }
-        }
-
-        session = rebuiltSession
-        if
-            let pendingTerminateRequest,
-            !rebuiltSession.apps.contains(where: { $0.id == pendingTerminateRequest.appID })
-        {
-            self.pendingTerminateRequest = nil
-            if terminatingAppID == pendingTerminateRequest.appID {
-                self.terminatingAppID = nil
-            }
-        }
-        if let terminatingAppID, !rebuiltSession.apps.contains(where: { $0.id == terminatingAppID }) {
-            self.terminatingAppID = nil
-        }
-        searchCoordinator.rebuildIndex(with: rebuiltSession.apps)
-        restoreSearchStateAfterSnapshotRefreshIfNeeded(previousSearchState)
-        publishSearchStateIfNeeded()
-        return true
     }
 
     func restoreSearchStateAfterSnapshotRefreshIfNeeded(
@@ -528,6 +516,7 @@ final class LiveSwitcherModel: ObservableObject {
         guard var session else { return }
         let target = session.commitSelection()
         rememberedWindowIDByAppID = session.rememberedWindowIDByAppID
+        invalidateBackgroundFullSnapshotRefresh()
         cancelPendingTerminateRefresh()
         clearTerminateSelectedAppAnimation()
         cancelPendingSearchComputation()
@@ -554,6 +543,7 @@ final class LiveSwitcherModel: ObservableObject {
     }
 
     func resetSessionState() {
+        invalidateBackgroundFullSnapshotRefresh()
         cancelPendingTerminateRefresh()
         cancelPendingSearchComputation()
         session = nil
@@ -581,13 +571,6 @@ final class LiveSwitcherModel: ObservableObject {
     func cancelPendingTerminateRefresh() {
         pendingTerminateRefreshTask?.cancel()
         pendingTerminateRefreshTask = nil
-    }
-
-    func makeSnapshot() -> RuntimeSnapshot {
-        if let snapshotProviderOverride {
-            return snapshotProviderOverride()
-        }
-        return snapshotProvider.snapshot()
     }
 
     func snapshotWithWindowRecencyApplied(_ snapshot: RuntimeSnapshot) -> RuntimeSnapshot {

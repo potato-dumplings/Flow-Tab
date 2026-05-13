@@ -60,6 +60,11 @@ struct WindowPreviewItem: Identifiable {
     let isSelected: Bool
 }
 
+struct WindowPreviewPageSummary {
+    let itemCount: Int
+    let selectedIndex: Int?
+}
+
 struct SearchAppResultItem: Identifiable {
     let id: String
     let app: AppSwitchCandidate

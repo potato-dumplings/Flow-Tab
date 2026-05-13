@@ -5,6 +5,9 @@ import SwiftUI
 import FlowTabCore
 
 extension LiveSwitcherModel {
+    private static let eagerWindowPreviewCaptureLimit = 24
+    private static let eagerWindowPreviewCaptureRadius = 6
+
     func handleSessionPreviewSnapshotLifecycle(_ session: SwitcherSession) {
         guard case .windowCycle(let appID) = session.mode else { return }
         freezeWindowPreviewSnapshotIfNeeded(for: appID, session: session)
@@ -20,14 +23,40 @@ extension LiveSwitcherModel {
         for appID: String,
         session: SwitcherSession? = nil
     ) {
-        guard !previewSnapshotFrozenAppIDs.contains(appID) else { return }
         let resolvedSession = session ?? self.session
         guard let app = resolvedSession?.apps.first(where: { $0.id == appID }) else { return }
+        let selectedIndex = resolvedSession?.selectedWindowIndexByAppID[appID] ?? 0
+        let windowsToCapture = app.windows.count > Self.eagerWindowPreviewCaptureLimit
+            ? []
+            : eagerPreviewWindows(for: app, selectedIndex: selectedIndex)
+        if windowsToCapture.count == app.windows.count, previewSnapshotFrozenAppIDs.contains(appID) {
+            return
+        }
 
-        for window in app.windows {
+        for window in windowsToCapture {
             _ = previewData(for: appID, window: window)
         }
-        previewSnapshotFrozenAppIDs.insert(appID)
+        if windowsToCapture.count == app.windows.count {
+            previewSnapshotFrozenAppIDs.insert(appID)
+        }
+    }
+
+    func windowPreviewPageSummary() -> WindowPreviewPageSummary {
+        guard let session else {
+            return WindowPreviewPageSummary(itemCount: 0, selectedIndex: nil)
+        }
+        guard case .windowCycle(let appID) = session.mode else {
+            return WindowPreviewPageSummary(itemCount: 0, selectedIndex: nil)
+        }
+        guard let app = session.apps.first(where: { $0.id == appID }) else {
+            return WindowPreviewPageSummary(itemCount: 0, selectedIndex: nil)
+        }
+        let selectedIndex = session.selectedWindowIndexByAppID[appID]
+            .map { min(max(0, $0), max(app.windows.count - 1, 0)) }
+        return WindowPreviewPageSummary(
+            itemCount: app.windows.count,
+            selectedIndex: selectedIndex
+        )
     }
 
     func shouldBumpSearchResultScrollRevision(
@@ -119,18 +148,29 @@ extension LiveSwitcherModel {
         )
     }
 
-    func windowPreviewItems() -> [WindowPreviewItem] {
+    func windowPreviewItems(visibleRange: Range<Int>? = nil) -> [WindowPreviewItem] {
         guard let session else { return [] }
         guard case .windowCycle(let appID) = session.mode else { return [] }
         guard let app = session.apps.first(where: { $0.id == appID }) else { return [] }
 
         let selectedIndex = session.selectedWindowIndexByAppID[appID] ?? 0
-        return app.windows.enumerated().map { index, window in
+        let indexedWindows = indexedPreviewWindows(for: app, visibleRange: visibleRange)
+        let eagerlyCapturedWindowIDs: Set<String>
+        if visibleRange != nil {
+            eagerlyCapturedWindowIDs = Set(indexedWindows.map { $0.window.id })
+        } else {
+            eagerlyCapturedWindowIDs = Set(
+                eagerPreviewWindows(for: app, selectedIndex: selectedIndex).map(\.id)
+            )
+        }
+        return indexedWindows.map { index, window in
             let title = window.title.trimmingCharacters(in: .whitespacesAndNewlines)
             let fallbackTitle = overlayStyle == .windowOnly
                 ? "Window \(index + 1)"
                 : app.displayName
-            let preview = previewData(for: appID, window: window)
+            let preview = eagerlyCapturedWindowIDs.contains(window.id)
+                ? previewData(for: appID, window: window)
+                : (image: nil, titleBarStyle: nil)
             return WindowPreviewItem(
                 id: window.id,
                 title: title.isEmpty ? fallbackTitle : title,
@@ -139,6 +179,38 @@ extension LiveSwitcherModel {
                 isSelected: index == selectedIndex
             )
         }
+    }
+
+    private func indexedPreviewWindows(
+        for app: AppSwitchCandidate,
+        visibleRange: Range<Int>?
+    ) -> [(index: Int, window: WindowCandidate)] {
+        guard let visibleRange else {
+            return app.windows.enumerated().map { (index: $0.offset, window: $0.element) }
+        }
+        let lowerBound = min(max(0, visibleRange.lowerBound), app.windows.count)
+        let upperBound = min(max(lowerBound, visibleRange.upperBound), app.windows.count)
+        guard lowerBound < upperBound else { return [] }
+        return app.windows[lowerBound..<upperBound].enumerated().map {
+            (index: lowerBound + $0.offset, window: $0.element)
+        }
+    }
+
+    private func eagerPreviewWindows(
+        for app: AppSwitchCandidate,
+        selectedIndex: Int
+    ) -> [WindowCandidate] {
+        guard app.windows.count > Self.eagerWindowPreviewCaptureLimit else {
+            return app.windows
+        }
+
+        let boundedSelectedIndex = min(max(0, selectedIndex), app.windows.count - 1)
+        let lowerBound = max(0, boundedSelectedIndex - Self.eagerWindowPreviewCaptureRadius)
+        let upperBound = min(
+            app.windows.count - 1,
+            boundedSelectedIndex + Self.eagerWindowPreviewCaptureRadius
+        )
+        return Array(app.windows[lowerBound...upperBound])
     }
 
     func windowPreviewSnapshotForTesting() -> [(

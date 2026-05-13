@@ -29,13 +29,19 @@ struct SwitcherPanelRootView: View {
     var body: some View {
         ZStack {
             if let session = model.session {
-                let windowPreviewItems = model.windowPreviewItems()
+                let windowPreviewItems = model.overlayStyle == .windowOnly
+                    ? model.windowPreviewItems()
+                    : []
                 CommandTabOverlay(
                     session: session,
                     overlayStyle: model.overlayStyle,
                     isPreviewLayer: model.isPreviewLayerMode,
                     previewSectionHeight: model.previewSectionHeight,
                     windowPreviewItems: windowPreviewItems,
+                    standardWindowPreviewSummary: model.windowPreviewPageSummary(),
+                    standardWindowPreviewItemsForRange: { range in
+                        model.windowPreviewItems(visibleRange: range)
+                    },
                     searchState: model.searchViewState,
                     searchResultScrollRevision: model.searchResultScrollRevision,
                     searchLayoutMeasurements: model.searchLayoutMeasurements,
@@ -163,6 +169,8 @@ private struct CommandTabOverlay: View {
     let isPreviewLayer: Bool
     let previewSectionHeight: CGFloat
     let windowPreviewItems: [WindowPreviewItem]
+    let standardWindowPreviewSummary: WindowPreviewPageSummary
+    let standardWindowPreviewItemsForRange: (Range<Int>) -> [WindowPreviewItem]
     let searchState: SwitcherSearchViewState
     let searchResultScrollRevision: UInt64
     let searchLayoutMeasurements: SwitcherSearchLayoutMeasurements
@@ -205,14 +213,6 @@ private struct CommandTabOverlay: View {
 
     private var showsSearchHeaderInStandardOverlay: Bool {
         searchFeatureEnabled && !isPreviewLayer
-    }
-
-    private func previewCardWidth(availableWidth: CGFloat, itemCount: Int) -> CGFloat {
-        let count = max(itemCount, 1)
-        let spacing: CGFloat = 12
-        let totalSpacing = spacing * CGFloat(max(count - 1, 0))
-        let rawWidth = (availableWidth - totalSpacing) / CGFloat(count)
-        return max(120, min(360, rawWidth))
     }
 
     private func previewCardHeight(for cardWidth: CGFloat) -> CGFloat {
@@ -303,10 +303,6 @@ private struct CommandTabOverlay: View {
         )
     }
 
-    private var selectedWindowPreviewID: String? {
-        windowPreviewItems.first(where: \.isSelected)?.id
-    }
-
     private var selectedSearchResultID: String? {
         guard !searchState.results.isEmpty else { return nil }
         let index = min(max(searchState.selectedResultIndex, 0), searchState.results.count - 1)
@@ -364,15 +360,6 @@ private struct CommandTabOverlay: View {
     private func switcherWindowAccessibilityIdentifier(_ preview: WindowPreviewItem) -> String {
         SwitcherAccessibilityIdentifiers.window(id: preview.id)
     }
-    private func scrollToSelectedPreview(using proxy: ScrollViewProxy) {
-        guard let selectedWindowPreviewID else { return }
-        var transaction = Transaction(animation: nil)
-        transaction.disablesAnimations = true
-        withTransaction(transaction) {
-            proxy.scrollTo(selectedWindowPreviewID, anchor: .center)
-        }
-    }
-
     @MainActor
     private func scrollToSearchResult(
         _ request: SearchResultScrollRequest,
@@ -433,41 +420,48 @@ private struct CommandTabOverlay: View {
     private var standardOverlayPreviewSection: some View {
         if isPreviewLayer {
             GeometryReader { proxy in
-                let cardWidth = previewCardWidth(
-                    availableWidth: max(0, proxy.size.width - 4),
-                    itemCount: windowPreviewItems.count
+                let page = SwitcherWindowPreviewPaging.page(
+                    itemCount: standardWindowPreviewSummary.itemCount,
+                    selectedIndex: standardWindowPreviewSummary.selectedIndex,
+                    availableWidth: max(0, proxy.size.width - 4)
+                )
+                let pageItems = standardWindowPreviewItemsForRange(page.visibleRange)
+                let cardWidth = SwitcherWindowPreviewPaging.cardWidth(
+                    cardAreaWidth: page.cardAreaWidth,
+                    visibleCount: pageItems.count
                 )
                 let cardHeight = previewCardHeight(for: cardWidth)
 
-                ScrollViewReader { scrollProxy in
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            ForEach(windowPreviewItems) { preview in
-                                WindowPreviewCard(
-                                    image: preview.image,
-                                    title: preview.title,
-                                    appIcon: selectedApp.flatMap(iconForApp),
-                                    isSelected: preview.isSelected,
-                                    width: cardWidth,
-                                    height: cardHeight
-                                )
-                                .accessibilityElement(children: .ignore)
-                                .accessibilityLabel(Text(preview.title))
-                                .accessibilityValue(Text(selectedApp?.displayName ?? ""))
-                                .accessibilityIdentifier(switcherWindowAccessibilityIdentifier(preview))
-                                .id(preview.id)
-                            }
+                HStack(spacing: SwitcherWindowPreviewPaging.indicatorSpacing) {
+                    if page.showsNavigationIndicators {
+                        WindowPreviewPageIndicator(direction: .previous, isVisible: page.hasPreviousPage)
+                    }
+
+                    HStack(spacing: SwitcherWindowPreviewPaging.itemSpacing) {
+                        ForEach(pageItems) { preview in
+                            WindowPreviewCard(
+                                image: preview.image,
+                                title: preview.title,
+                                appIcon: selectedApp.flatMap(iconForApp),
+                                isSelected: preview.isSelected,
+                                width: cardWidth,
+                                height: cardHeight
+                            )
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel(Text(preview.title))
+                            .accessibilityValue(Text(selectedApp?.displayName ?? ""))
+                            .accessibilityIdentifier(switcherWindowAccessibilityIdentifier(preview))
+                            .id(preview.id)
                         }
-                        .padding(.horizontal, 2)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .onAppear {
-                        scrollToSelectedPreview(using: scrollProxy)
-                    }
-                    .onChange(of: selectedWindowPreviewID) { _ in
-                        scrollToSelectedPreview(using: scrollProxy)
+                    .frame(maxWidth: .infinity, alignment: .center)
+
+                    if page.showsNavigationIndicators {
+                        WindowPreviewPageIndicator(direction: .next, isVisible: page.hasNextPage)
                     }
                 }
+                .padding(.horizontal, 2)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             }
             .frame(height: previewSectionHeight)
         }

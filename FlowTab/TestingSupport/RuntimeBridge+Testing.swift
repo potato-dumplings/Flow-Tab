@@ -132,6 +132,23 @@ extension RuntimeSnapshotProvider {
                     rank: 0
                 )
             ]
+        case "single-app-many-windows":
+            let windows = (0..<100).map { index in
+                WindowCandidate(
+                    id: String(format: "mock-many-window-%02d", index),
+                    title: String(format: "Many Window %02d", index),
+                    isMinimized: false,
+                    lastActiveAt: TimeInterval(400 - index)
+                )
+            }
+            return [
+                (
+                    appID: "com.flowtab.mock.many-windows",
+                    name: "Mock Many Windows",
+                    windows: windows,
+                    rank: 0
+                )
+            ]
         case "focused-current-app":
             let currentAppID = Bundle.main.bundleIdentifier
                 ?? "pid:\(ProcessInfo.processInfo.processIdentifier)"

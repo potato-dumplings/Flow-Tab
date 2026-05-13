@@ -1,0 +1,166 @@
+import Foundation
+import FlowTabCore
+
+extension LiveSwitcherModel {
+    static func monotonicMilliseconds() -> Double {
+        ProcessInfo.processInfo.systemUptime * 1_000
+    }
+
+    func logStartFocusedWindowSessionNoFrontmost(startMs: Double) {
+        let failedMs = Self.monotonicMilliseconds() - startMs
+        RuntimeLog.debug(
+            "Snapshot",
+            Self.snapshotLogLine(
+                "startFocusedWindowSession",
+                fields: [
+                    ("result", "noFrontmostApp"),
+                    ("totalMs", Self.formatMilliseconds(failedMs))
+                ]
+            )
+        )
+    }
+
+    func logStartFocusedWindowSession(
+        result: String,
+        frontmostAppID: String,
+        frontmostReadyMs: Double,
+        snapshotReadMs: Double,
+        recencyAppliedMs: Double,
+        completeMs: Double,
+        startMs: Double,
+        windows: Int? = nil
+    ) {
+        RuntimeLog.debug(
+            "Snapshot",
+            Self.snapshotLogLine(
+                "startFocusedWindowSession",
+                fields: startFocusedWindowSessionLogFields(
+                    result: result,
+                    frontmostAppID: frontmostAppID,
+                    frontmostReadyMs: frontmostReadyMs,
+                    snapshotReadMs: snapshotReadMs,
+                    recencyAppliedMs: recencyAppliedMs,
+                    completeMs: completeMs,
+                    startMs: startMs,
+                    windows: windows
+                )
+            )
+        )
+    }
+
+    func logLoadSnapshotEmpty(
+        event: String = "loadSnapshot",
+        triggerDirection: CycleDirection,
+        snapshotReadMs: Double,
+        recencyAppliedMs: Double,
+        startMs: Double
+    ) {
+        RuntimeLog.debug(
+            "Snapshot",
+            Self.snapshotLogLine(
+                event,
+                fields: [
+                    ("result", "empty"),
+                    ("trigger", triggerDirection.debugName),
+                    ("snapshotMs", Self.formatMilliseconds(snapshotReadMs - startMs)),
+                    ("recencyMs", Self.formatMilliseconds(recencyAppliedMs - snapshotReadMs)),
+                    ("totalMs", Self.formatMilliseconds(recencyAppliedMs - startMs))
+                ]
+            )
+        )
+    }
+
+    func logLoadSnapshotReady(
+        event: String = "loadSnapshot",
+        triggerDirection: CycleDirection,
+        snapshot: RuntimeSnapshot,
+        snapshotReadMs: Double,
+        recencyAppliedMs: Double,
+        sessionReadyMs: Double,
+        indexReadyMs: Double,
+        completeMs: Double,
+        startMs: Double
+    ) {
+        RuntimeLog.debug(
+            "Snapshot",
+            Self.snapshotLogLine(
+                event,
+                fields: [
+                    ("result", "ready"),
+                    ("trigger", triggerDirection.debugName),
+                    ("apps", "\(snapshot.apps.count)"),
+                    ("windows", "\(snapshot.apps.reduce(0) { $0 + $1.windows.count })"),
+                    ("snapshotMs", Self.formatMilliseconds(snapshotReadMs - startMs)),
+                    ("recencyMs", Self.formatMilliseconds(recencyAppliedMs - snapshotReadMs)),
+                    ("sessionBuildMs", Self.formatMilliseconds(sessionReadyMs - recencyAppliedMs)),
+                    ("indexMs", Self.formatMilliseconds(indexReadyMs - sessionReadyMs)),
+                    ("publishMs", Self.formatMilliseconds(completeMs - indexReadyMs)),
+                    ("totalMs", Self.formatMilliseconds(completeMs - startMs))
+                ]
+            )
+        )
+    }
+
+    func logBackgroundFullSnapshotRefresh(result: String, startMs: Double) {
+        RuntimeLog.debug(
+            "Snapshot",
+            Self.snapshotLogLine(
+                "backgroundFullSnapshotRefresh",
+                fields: [
+                    ("result", result),
+                    ("totalMs", Self.formatMilliseconds(Self.monotonicMilliseconds() - startMs))
+                ]
+            )
+        )
+    }
+
+    func logMakeSnapshot(source: String, snapshot: RuntimeSnapshot, durationMs: Double) {
+        RuntimeLog.debug(
+            "Snapshot",
+            Self.snapshotLogLine(
+                "makeSnapshot",
+                fields: [
+                    ("source", source),
+                    ("apps", "\(snapshot.apps.count)"),
+                    ("windows", "\(snapshot.apps.reduce(0) { $0 + $1.windows.count })"),
+                    ("durationMs", Self.formatMilliseconds(durationMs))
+                ]
+            )
+        )
+    }
+
+    private func startFocusedWindowSessionLogFields(
+        result: String,
+        frontmostAppID: String,
+        frontmostReadyMs: Double,
+        snapshotReadMs: Double,
+        recencyAppliedMs: Double,
+        completeMs: Double,
+        startMs: Double,
+        windows: Int?
+    ) -> [(String, String)] {
+        var fields: [(String, String)] = [
+            ("result", result),
+            ("appID", frontmostAppID)
+        ]
+        if let windows {
+            fields.append(("windows", "\(windows)"))
+        }
+        fields.append(contentsOf: [
+            ("frontmostMs", Self.formatMilliseconds(frontmostReadyMs - startMs)),
+            ("snapshotMs", Self.formatMilliseconds(snapshotReadMs - frontmostReadyMs)),
+            ("recencyMs", Self.formatMilliseconds(recencyAppliedMs - snapshotReadMs)),
+            ("sessionBuildMs", Self.formatMilliseconds(completeMs - recencyAppliedMs)),
+            ("totalMs", Self.formatMilliseconds(completeMs - startMs))
+        ])
+        return fields
+    }
+
+    private static func formatMilliseconds(_ value: Double) -> String {
+        String(format: "%.3f", value)
+    }
+
+    private static func snapshotLogLine(_ prefix: String, fields: [(String, String)]) -> String {
+        ([prefix] + fields.map { "\($0.0)=\($0.1)" }).joined(separator: " ")
+    }
+}

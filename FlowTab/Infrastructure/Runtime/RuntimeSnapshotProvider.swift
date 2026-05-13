@@ -130,17 +130,42 @@ final class RuntimeSnapshotProvider {
     var windowMappingStateByPID: [pid_t: RuntimeWindowMappingState] = [:]
 
     func snapshot() -> RuntimeSnapshot {
+        let startMs = RuntimePerformanceClock.monotonicMilliseconds()
         if let uiTestRuntimeDataset = Self.uiTestRuntimeDataset() {
+            let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
+            logSnapshotTiming(
+                "provider",
+                fields: [
+                    ("result", "uiTestDataset"),
+                    ("apps", "\(uiTestRuntimeDataset.snapshot.apps.count)"),
+                    ("windows", "\(uiTestRuntimeDataset.snapshot.apps.reduce(0) { $0 + $1.windows.count })"),
+                    ("totalMs", formatSnapshotMilliseconds(completeMs - startMs))
+                ]
+            )
             return uiTestRuntimeDataset.snapshot
         }
+        let runningAppsStartMs = RuntimePerformanceClock.monotonicMilliseconds()
         let runningApps = filteredRunningApplications()
+        let runningAppsReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
 
         guard !runningApps.isEmpty else {
+            logSnapshotTiming(
+                "provider",
+                fields: [
+                    ("result", "empty"),
+                    ("reason", "noRunningApps"),
+                    ("runningAppsMs", formatSnapshotMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
+                    ("totalMs", formatSnapshotMilliseconds(runningAppsReadyMs - startMs))
+                ]
+            )
             return RuntimeSnapshot(apps: [], contextsByID: [:])
         }
 
         RuntimeLog.info("Snapshot", "runningApps=\(runningApps.count)")
+        let windowDataStartMs = RuntimePerformanceClock.monotonicMilliseconds()
         let windowData = collectWindowData(for: runningApps)
+        let windowDataReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let selectionStartMs = windowDataReadyMs
         let appsGroupedByBaseID = groupedAppsByBaseID(runningApps)
         let selectedApps = selectPrimaryApps(
             from: runningApps,
@@ -165,12 +190,28 @@ final class RuntimeSnapshotProvider {
             windowsByPID: mergedWindowsByPrimaryPID,
             hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
         )
+        let selectionReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         RuntimeLog.info(
             "Snapshot",
             "selectedApps=\(selectedApps.count) appLayerCandidates=\(appLayerCandidates.count) hideMinimized=\(hideMinimizedAppsFromAppLayer)"
         )
 
         guard !appLayerCandidates.isEmpty else {
+            let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
+            logSnapshotTiming(
+                "provider",
+                fields: [
+                    ("result", "empty"),
+                    ("reason", "noAppLayerCandidates"),
+                    ("runningApps", "\(runningApps.count)"),
+                    ("selectedApps", "\(selectedApps.count)"),
+                    ("windows", "\(windowData.windowsByPID.values.reduce(0) { $0 + $1.count })"),
+                    ("runningAppsMs", formatSnapshotMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
+                    ("windowDataMs", formatSnapshotMilliseconds(windowDataReadyMs - windowDataStartMs)),
+                    ("selectionMs", formatSnapshotMilliseconds(selectionReadyMs - selectionStartMs)),
+                    ("totalMs", formatSnapshotMilliseconds(completeMs - startMs))
+                ]
+            )
             return RuntimeSnapshot(apps: [], contextsByID: [:])
         }
         let now = Date.timeIntervalSinceReferenceDate
@@ -178,6 +219,7 @@ final class RuntimeSnapshotProvider {
         var rows: [(candidate: AppSwitchCandidate, context: RuntimeAppContext)] = []
         rows.reserveCapacity(appLayerCandidates.count)
 
+        let rowsStartMs = RuntimePerformanceClock.monotonicMilliseconds()
         for (index, app) in appLayerCandidates.enumerated() {
             let pid = app.processIdentifier
             let baseAppID = Self.baseAppID(for: app)
@@ -242,6 +284,7 @@ final class RuntimeSnapshotProvider {
             )
             rows.append((candidate, context))
         }
+        let rowsReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
 
         rows.sort { lhs, rhs in
             if lhs.candidate.lastActiveAt == rhs.candidate.lastActiveAt {
@@ -259,6 +302,25 @@ final class RuntimeSnapshotProvider {
             }
             contextsByID[row.context.appID] = row.context
         }
+        let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
+
+        logSnapshotTiming(
+            "provider",
+            fields: [
+                ("result", "ready"),
+                ("runningApps", "\(runningApps.count)"),
+                ("selectedApps", "\(selectedApps.count)"),
+                ("appLayerCandidates", "\(appLayerCandidates.count)"),
+                ("windows", "\(rows.reduce(0) { $0 + $1.candidate.windows.count })"),
+                ("contexts", "\(contextsByID.count)"),
+                ("runningAppsMs", formatSnapshotMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
+                ("windowDataMs", formatSnapshotMilliseconds(windowDataReadyMs - windowDataStartMs)),
+                ("selectionMs", formatSnapshotMilliseconds(selectionReadyMs - selectionStartMs)),
+                ("rowsMs", formatSnapshotMilliseconds(rowsReadyMs - rowsStartMs)),
+                ("sortContextMs", formatSnapshotMilliseconds(completeMs - rowsReadyMs)),
+                ("totalMs", formatSnapshotMilliseconds(completeMs - startMs))
+            ]
+        )
 
         return RuntimeSnapshot(
             apps: rows.map(\.candidate),
@@ -347,18 +409,44 @@ final class RuntimeSnapshotProvider {
         windowsByPID: [pid_t: [WindowListEntry]],
         rankByPID: [pid_t: Int]
     ) {
+        let startMs = RuntimePerformanceClock.monotonicMilliseconds()
         cleanupWindowMappingState(for: runningApps)
+        let cleanupReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         AXLiveWindowRegistry.shared.prune(to: runningApps)
+        let pruneReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let onScreenCGWindowsByPID = collectCGWindowsByPID()
+        let onScreenCGReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let allCGWindowsByPID = collectCGWindowsByPID(options: [.optionAll, .excludeDesktopElements])
+        let allCGReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let axWindowsByPID = collectAXWindowData(
+            for: runningApps,
+            cgWindowsByPID: onScreenCGWindowsByPID,
+            allCGWindowsByPID: allCGWindowsByPID
+        )
+        let axReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let rankByPID = collectAppRankByPID(for: runningApps)
+        let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
+        logSnapshotTiming(
+            "collectWindowData",
+            fields: [
+                ("apps", "\(runningApps.count)"),
+                ("onscreenCGWindows", "\(onScreenCGWindowsByPID.values.reduce(0) { $0 + $1.count })"),
+                ("allCGWindows", "\(allCGWindowsByPID.values.reduce(0) { $0 + $1.count })"),
+                ("windowPIDs", "\(axWindowsByPID.count)"),
+                ("rankPIDs", "\(rankByPID.count)"),
+                ("cleanupMs", formatSnapshotMilliseconds(cleanupReadyMs - startMs)),
+                ("registryPruneMs", formatSnapshotMilliseconds(pruneReadyMs - cleanupReadyMs)),
+                ("onscreenCGMs", formatSnapshotMilliseconds(onScreenCGReadyMs - pruneReadyMs)),
+                ("allCGMs", formatSnapshotMilliseconds(allCGReadyMs - onScreenCGReadyMs)),
+                ("axMs", formatSnapshotMilliseconds(axReadyMs - allCGReadyMs)),
+                ("rankMs", formatSnapshotMilliseconds(completeMs - axReadyMs)),
+                ("totalMs", formatSnapshotMilliseconds(completeMs - startMs))
+            ]
+        )
         // Keep a single source of truth for window counting and selection: AX window list.
         return (
-            windowsByPID: collectAXWindowData(
-                for: runningApps,
-                cgWindowsByPID: onScreenCGWindowsByPID,
-                allCGWindowsByPID: allCGWindowsByPID
-            ),
-            rankByPID: collectAppRankByPID(for: runningApps)
+            windowsByPID: axWindowsByPID,
+            rankByPID: rankByPID
         )
     }
 
@@ -367,39 +455,58 @@ final class RuntimeSnapshotProvider {
         cgWindowsByPID: [pid_t: [CGWindowEntry]],
         allCGWindowsByPID: [pid_t: [CGWindowEntry]] = [:]
     ) -> [pid_t: [WindowListEntry]] {
+        let startMs = RuntimePerformanceClock.monotonicMilliseconds()
         guard AccessibilityPermissionChecker.isTrusted() else {
             RuntimeLog.info("AX", "not trusted; all app windows will be reported as 0")
+            logSnapshotTiming(
+                "collectAXWindowData",
+                fields: [
+                    ("result", "notTrusted"),
+                    ("apps", "\(runningApps.count)"),
+                    ("totalMs", formatSnapshotMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))
+                ]
+            )
             return [:]
         }
 
         var windowsByPID: [pid_t: [WindowListEntry]] = [:]
+        var totalRawWindows = 0
+        var totalSwitchableWindows = 0
+        var totalResolvedWindows = 0
         for app in runningApps {
+            let appStartMs = RuntimePerformanceClock.monotonicMilliseconds()
             let appName = app.localizedName ?? app.bundleIdentifier ?? "pid:\(app.processIdentifier)"
             let cgWindows = cgWindowsByPID[app.processIdentifier] ?? []
             let allCGWindows = markCurrentOnscreenCGWindows(
                 allCGWindowsByPID[app.processIdentifier] ?? cgWindows,
                 onscreenCGWindows: cgWindows
             )
+            let cgReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
             let publicWindowsFetchResult = AXWindowInspector.windowsFetchResult(
                 for: app,
                 includeRemoteWindows: false
             )
+            let publicFetchReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
             let publicSwitchableWindowCount = publicWindowsFetchResult.windows.filter {
                 AXWindowInspector.isSwitchable($0)
             }.count
+            let publicSwitchableReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
             let shouldIncludeRemoteAXWindows = shouldIncludeRemoteAXWindows(
                 allCGWindows: allCGWindows,
                 publicSwitchableWindowCount: publicSwitchableWindowCount,
                 publicFetchSucceeded: publicWindowsFetchResult.error == .success
             )
+            let remoteDecisionReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
             let windowsFetchResult = shouldIncludeRemoteAXWindows
                 ? AXWindowInspector.windowsFetchResult(for: app, includeRemoteWindows: true)
                 : publicWindowsFetchResult
             let windows = windowsFetchResult.windows
+            let finalFetchReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
             AXLiveWindowRegistry.shared.refreshSnapshot(
                 forPID: app.processIdentifier,
                 windows: windows
             )
+            let registryReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
             RuntimeLog.info(
                 "AX",
                 "\(appName) rawWindows=\(windows.count) \(windowsFetchResult.logDetails)"
@@ -426,6 +533,7 @@ final class RuntimeSnapshotProvider {
                     frame: AXWindowInspector.frame(for: window)
                 )
             }
+            let axInspectReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
             logChromeLikeTopologySnapshot(
                 appName: appName,
                 pid: app.processIdentifier,
@@ -436,12 +544,45 @@ final class RuntimeSnapshotProvider {
                 axWindows: axEntries,
                 cgWindows: allCGWindows
             )
+            let topologyLogReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
 
             let resolvedEntries = resolvedWindowEntries(
                 axWindows: axEntries,
                 cgWindows: allCGWindows,
                 pid: app.processIdentifier,
                 appName: appName
+            )
+            let resolveReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+            totalRawWindows += windows.count
+            totalSwitchableWindows += axEntries.count
+            totalResolvedWindows += resolvedEntries.count
+            logSnapshotTiming(
+                "collectAXApp",
+                fields: [
+                    ("appID", logAppIdentifier(app)),
+                    ("pid", "\(app.processIdentifier)"),
+                    ("name", logAppName(appName)),
+                    ("cgOnscreen", "\(cgWindows.count)"),
+                    ("cgAll", "\(allCGWindows.count)"),
+                    ("rawAX", "\(windows.count)"),
+                    ("publicRawAX", "\(publicWindowsFetchResult.windows.count)"),
+                    ("publicSwitchableAX", "\(publicSwitchableWindowCount)"),
+                    ("switchableAX", "\(axEntries.count)"),
+                    ("resolved", "\(resolvedEntries.count)"),
+                    ("includeRemote", shouldIncludeRemoteAXWindows ? "1" : "0"),
+                    ("publicError", "\(publicWindowsFetchResult.error.rawValue)"),
+                    ("finalError", "\(windowsFetchResult.error.rawValue)"),
+                    ("cgPrepMs", formatSnapshotMilliseconds(cgReadyMs - appStartMs)),
+                    ("publicFetchMs", formatSnapshotMilliseconds(publicFetchReadyMs - cgReadyMs)),
+                    ("publicSwitchableMs", formatSnapshotMilliseconds(publicSwitchableReadyMs - publicFetchReadyMs)),
+                    ("remoteDecisionMs", formatSnapshotMilliseconds(remoteDecisionReadyMs - publicSwitchableReadyMs)),
+                    ("finalFetchMs", formatSnapshotMilliseconds(finalFetchReadyMs - remoteDecisionReadyMs)),
+                    ("registryMs", formatSnapshotMilliseconds(registryReadyMs - finalFetchReadyMs)),
+                    ("axInspectMs", formatSnapshotMilliseconds(axInspectReadyMs - registryReadyMs)),
+                    ("topologyLogMs", formatSnapshotMilliseconds(topologyLogReadyMs - axInspectReadyMs)),
+                    ("resolveMs", formatSnapshotMilliseconds(resolveReadyMs - topologyLogReadyMs)),
+                    ("totalMs", formatSnapshotMilliseconds(resolveReadyMs - appStartMs))
+                ]
             )
             guard !resolvedEntries.isEmpty else { continue }
             RuntimeLog.info("AX", "\(appName) switchableWindows=\(resolvedEntries.count)")
@@ -453,6 +594,18 @@ final class RuntimeSnapshotProvider {
             )
             windowsByPID[app.processIdentifier] = resolvedEntries
         }
+        logSnapshotTiming(
+            "collectAXWindowData",
+            fields: [
+                ("result", "ready"),
+                ("apps", "\(runningApps.count)"),
+                ("appsWithWindows", "\(windowsByPID.count)"),
+                ("rawAX", "\(totalRawWindows)"),
+                ("switchableAX", "\(totalSwitchableWindows)"),
+                ("resolved", "\(totalResolvedWindows)"),
+                ("totalMs", formatSnapshotMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))
+            ]
+        )
         return windowsByPID
     }
 
@@ -624,11 +777,21 @@ final class RuntimeSnapshotProvider {
     func collectCGWindowsByPID(
         options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
     ) -> [pid_t: [CGWindowEntry]] {
+        let startMs = RuntimePerformanceClock.monotonicMilliseconds()
         guard
             let rawList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]]
         else {
+            logSnapshotTiming(
+                "collectCGWindows",
+                fields: [
+                    ("result", "copyFailed"),
+                    ("scope", options.contains(.optionOnScreenOnly) ? "onscreen" : "all"),
+                    ("totalMs", formatSnapshotMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))
+                ]
+            )
             return [:]
         }
+        let copyReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
 
         var windowsByPID: [pid_t: [CGWindowEntry]] = [:]
         var windowIDs: [CGWindowID] = []
@@ -658,7 +821,25 @@ final class RuntimeSnapshotProvider {
                 )
             )
         }
+        let parseReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let spaceIDsByWindowID = RuntimeCGSpaceInspector.spaceIDsByWindowID(windowIDs)
+        let spaceReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let scope = options.contains(.optionOnScreenOnly) ? "onscreen" : "all"
+        logSnapshotTiming(
+            "collectCGWindows",
+            fields: [
+                ("result", "ready"),
+                ("scope", scope),
+                ("raw", "\(rawList.count)"),
+                ("accepted", "\(windowIDs.count)"),
+                ("pids", "\(windowsByPID.count)"),
+                ("spaceIDs", "\(spaceIDsByWindowID.count)"),
+                ("copyMs", formatSnapshotMilliseconds(copyReadyMs - startMs)),
+                ("parseMs", formatSnapshotMilliseconds(parseReadyMs - copyReadyMs)),
+                ("spaceMs", formatSnapshotMilliseconds(spaceReadyMs - parseReadyMs)),
+                ("totalMs", formatSnapshotMilliseconds(spaceReadyMs - startMs))
+            ]
+        )
         guard !spaceIDsByWindowID.isEmpty else { return windowsByPID }
 
         return Dictionary(uniqueKeysWithValues: windowsByPID.map { pid, windows in
@@ -813,11 +994,26 @@ final class RuntimeSnapshotProvider {
     }
 
     func collectAppRankByPID(for runningApps: [NSRunningApplication]) -> [pid_t: Int] {
+        let startMs = RuntimePerformanceClock.monotonicMilliseconds()
         let fallbackRankByPID = collectWindowStackRankByPID()
-        return SystemAppMRUTracker.shared.rankByPID(
+        let fallbackReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let rankByPID = SystemAppMRUTracker.shared.rankByPID(
             for: runningApps,
             fallbackRankByPID: fallbackRankByPID
         )
+        let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
+        logSnapshotTiming(
+            "collectAppRank",
+            fields: [
+                ("apps", "\(runningApps.count)"),
+                ("fallbackPIDs", "\(fallbackRankByPID.count)"),
+                ("rankedPIDs", "\(rankByPID.count)"),
+                ("fallbackMs", formatSnapshotMilliseconds(fallbackReadyMs - startMs)),
+                ("systemMRUMs", formatSnapshotMilliseconds(completeMs - fallbackReadyMs)),
+                ("totalMs", formatSnapshotMilliseconds(completeMs - startMs))
+            ]
+        )
+        return rankByPID
     }
 
     private func collectWindowStackRankByPID() -> [pid_t: Int] {

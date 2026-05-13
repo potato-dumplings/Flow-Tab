@@ -342,6 +342,8 @@ final class SwitcherPanelController {
 
 enum SwitcherAccessibilityIdentifiers {
     static let testingSummary = "flowtab.testing.switcher.summary"
+    static let previousWindowPage = "flowtab.switcher.window-page.previous"
+    static let nextWindowPage = "flowtab.switcher.window-page.next"
 
     static func app(id: String) -> String {
         "flowtab.switcher.app.\(id.flowTabAccessibilitySlug)"

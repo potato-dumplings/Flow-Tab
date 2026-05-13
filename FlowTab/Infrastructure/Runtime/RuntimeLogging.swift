@@ -548,6 +548,10 @@ enum RuntimeLog {
         RuntimeDiagnostics.shared.log(level: level, category: category, message: message())
     }
 
+    static func debug(_ category: String, _ message: @autoclosure () -> String) {
+        emit(level: .debug, category: category, message: message())
+    }
+
     static func info(_ category: String, _ message: @autoclosure () -> String) {
         emit(level: .info, category: category, message: message())
     }

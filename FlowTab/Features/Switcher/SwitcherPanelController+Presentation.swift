@@ -13,8 +13,8 @@ extension SwitcherPanelController {
         String(format: "%.3f", value)
     }
 
-    func logInputTrace(_ message: String) {
-        RuntimeLog.info("InputTrace", message)
+    func logInputTrace(_ message: @autoclosure () -> String) {
+        RuntimeLog.debug("InputTrace", message())
     }
 
     func logSearchTrace(_ message: String) {
@@ -150,63 +150,149 @@ extension SwitcherPanelController {
         scheduleModifierReleaseConfirmation(trigger: "presentation_recovered")
     }
     func show(direction: CycleDirection) {
+        let showStartMs = monotonicMilliseconds()
         guard model.startSession(triggerDirection: direction) else {
+            let failedMs = monotonicMilliseconds() - showStartMs
+            logInputTrace(
+                "show kind=global result=failed durationMs=\(formatMilliseconds(failedMs))"
+            )
             RuntimeLog.info("Session", "start failed: no apps")
             NSSound.beep()
             return
         }
+        let sessionReadyMs = monotonicMilliseconds()
         activeHotkeySessionKind = .globalAppSwitcher
         lastCommittedTabAdvanceTimestamp = nil
         RuntimeLog.info("Session", "start direction=\(direction.debugName) \(self.model.debugSelectionSummary())")
 
         let targetScreen = resolveActivePresentationScreen()
+        let screenReadyMs = monotonicMilliseconds()
         activePresentationScreen = targetScreen
         updatePanelSize(for: targetScreen)
+        let sizeReadyMs = monotonicMilliseconds()
         centerPanelOnActiveScreen(preferredScreen: targetScreen)
+        let centerReadyMs = monotonicMilliseconds()
         syncPanelAccessibilityAnchors()
+        let accessibilityReadyMs = monotonicMilliseconds()
         updatePanelPresentationLevel(trigger: "global_show")
+        let levelReadyMs = monotonicMilliseconds()
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
+        let firstOrderReadyMs = monotonicMilliseconds()
         hideNonPanelWindowsIfNeeded()
+        let hideReadyMs = monotonicMilliseconds()
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
+        let secondOrderReadyMs = monotonicMilliseconds()
         beginIgnoringActiveSpaceChanges(trigger: "global_show")
+        let ignoreReadyMs = monotonicMilliseconds()
         schedulePanelVisibilityRecovery(
             trigger: "global_show",
             attemptDelaysNanoseconds: initialPresentationRecoveryAttemptDelaysNs
         )
+        let recoveryReadyMs = monotonicMilliseconds()
         installEventMonitors()
+        let monitorReadyMs = monotonicMilliseconds()
         scheduleDelayedWindowLayerEntryIfNeeded()
+        let presentedMs = monotonicMilliseconds()
+        logPanelPresentationBreakdown(
+            kind: "global",
+            showStartMs: showStartMs,
+            sessionReadyMs: sessionReadyMs,
+            screenReadyMs: screenReadyMs,
+            sizeReadyMs: sizeReadyMs,
+            centerReadyMs: centerReadyMs,
+            accessibilityReadyMs: accessibilityReadyMs,
+            levelReadyMs: levelReadyMs,
+            firstOrderReadyMs: firstOrderReadyMs,
+            hideReadyMs: hideReadyMs,
+            secondOrderReadyMs: secondOrderReadyMs,
+            ignoreReadyMs: ignoreReadyMs,
+            recoveryReadyMs: recoveryReadyMs,
+            monitorReadyMs: monitorReadyMs,
+            autoEnterReadyMs: presentedMs
+        )
+        logInputTrace(
+            "show kind=global result=presented sessionMs=\(formatMilliseconds(sessionReadyMs - showStartMs)) totalMs=\(formatMilliseconds(presentedMs - showStartMs)) \(searchTraceStateSummary())"
+        )
+        schedulePanelVisibilityProbe(
+            kind: "global",
+            showStartMs: showStartMs,
+            presentedMs: presentedMs
+        )
     }
 
     func showInAppWindowSwitcher(direction: CycleDirection) {
+        let showStartMs = monotonicMilliseconds()
         guard model.startFocusedAppWindowSession(triggerDirection: direction) else {
+            let failedMs = monotonicMilliseconds() - showStartMs
+            logInputTrace(
+                "show kind=inApp result=failed durationMs=\(formatMilliseconds(failedMs))"
+            )
             RuntimeLog.info("Session", "start in-app window switch failed: no windows")
             NSSound.beep()
             return
         }
+        let sessionReadyMs = monotonicMilliseconds()
         activeHotkeySessionKind = .inAppWindowSwitcher
         lastCommittedTabAdvanceTimestamp = nil
         RuntimeLog.info("Session", "start in-app direction=\(direction.debugName) \(self.model.debugSelectionSummary())")
 
         let targetScreen = resolveActivePresentationScreen()
+        let screenReadyMs = monotonicMilliseconds()
         activePresentationScreen = targetScreen
         updatePanelSize(for: targetScreen)
+        let sizeReadyMs = monotonicMilliseconds()
         centerPanelOnActiveScreen(preferredScreen: targetScreen)
+        let centerReadyMs = monotonicMilliseconds()
         syncPanelAccessibilityAnchors()
+        let accessibilityReadyMs = monotonicMilliseconds()
         updatePanelPresentationLevel(trigger: "in_app_show")
+        let levelReadyMs = monotonicMilliseconds()
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
+        let firstOrderReadyMs = monotonicMilliseconds()
         hideNonPanelWindowsIfNeeded()
+        let hideReadyMs = monotonicMilliseconds()
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
+        let secondOrderReadyMs = monotonicMilliseconds()
         beginIgnoringActiveSpaceChanges(trigger: "in_app_show")
+        let ignoreReadyMs = monotonicMilliseconds()
         schedulePanelVisibilityRecovery(
             trigger: "in_app_show",
             attemptDelaysNanoseconds: initialPresentationRecoveryAttemptDelaysNs
         )
+        let recoveryReadyMs = monotonicMilliseconds()
         installEventMonitors()
+        let monitorReadyMs = monotonicMilliseconds()
         scheduleDelayedWindowLayerEntryIfNeeded()
+        let presentedMs = monotonicMilliseconds()
+        logPanelPresentationBreakdown(
+            kind: "inApp",
+            showStartMs: showStartMs,
+            sessionReadyMs: sessionReadyMs,
+            screenReadyMs: screenReadyMs,
+            sizeReadyMs: sizeReadyMs,
+            centerReadyMs: centerReadyMs,
+            accessibilityReadyMs: accessibilityReadyMs,
+            levelReadyMs: levelReadyMs,
+            firstOrderReadyMs: firstOrderReadyMs,
+            hideReadyMs: hideReadyMs,
+            secondOrderReadyMs: secondOrderReadyMs,
+            ignoreReadyMs: ignoreReadyMs,
+            recoveryReadyMs: recoveryReadyMs,
+            monitorReadyMs: monitorReadyMs,
+            autoEnterReadyMs: presentedMs
+        )
+        logInputTrace(
+            "show kind=inApp result=presented sessionMs=\(formatMilliseconds(sessionReadyMs - showStartMs)) totalMs=\(formatMilliseconds(presentedMs - showStartMs)) \(searchTraceStateSummary())"
+        )
+        schedulePanelVisibilityProbe(
+            kind: "inApp",
+            showStartMs: showStartMs,
+            presentedMs: presentedMs
+        )
     }
 
     func updatePanelPresentationLevel(

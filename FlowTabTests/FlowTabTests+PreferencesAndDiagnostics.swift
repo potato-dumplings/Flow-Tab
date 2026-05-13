@@ -384,12 +384,14 @@ extension FlowTabTests {
         await resetRuntimeLogsForTest()
 
         let marker = "RuntimeLogNoisy-\(UUID().uuidString)"
+        RuntimeLog.debug("InputTrace", "\(marker)-debug")
         RuntimeLog.info("InputTrace", "\(marker)-info")
         RuntimeLog.warning("InputTrace", "\(marker)-warning")
 
         let lines = await RuntimeDiagnostics.shared.readRecentLines(limit: 50, minimumLevel: .debug)
         let scopedLines = lines.filter { $0.contains(marker) }
 
+        XCTAssertFalse(scopedLines.contains(where: { $0.contains("\(marker)-debug") }))
         XCTAssertFalse(scopedLines.contains(where: { $0.contains("\(marker)-info") }))
         XCTAssertTrue(scopedLines.contains(where: { $0.contains("\(marker)-warning") }))
     }
@@ -416,11 +418,13 @@ extension FlowTabTests {
         await resetRuntimeLogsForTest()
 
         let marker = "RuntimeLogNormal-\(UUID().uuidString)"
+        RuntimeLog.debug("UnitTest", "\(marker)-debug")
         RuntimeLog.info("UnitTest", "\(marker)-info")
 
         let lines = await RuntimeDiagnostics.shared.readRecentLines(limit: 50, minimumLevel: .debug)
         let scopedLines = lines.filter { $0.contains(marker) }
 
+        XCTAssertTrue(scopedLines.contains(where: { $0.contains("\(marker)-debug") }))
         XCTAssertTrue(scopedLines.contains(where: { $0.contains("\(marker)-info") }))
     }
 

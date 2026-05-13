@@ -50,7 +50,9 @@ final class FlowTabUITests: XCTestCase {
         static let switcherSummary = "flowtab.testing.switcher.summary"
         static let switcherAppMockBrowser = "flowtab.switcher.app.com-flowtab-mock-browser"
         static let switcherAppMockMail = "flowtab.switcher.app.com-flowtab-mock-mail"
+        static let switcherAppMockManyWindows = "flowtab.switcher.app.com-flowtab-mock-many-windows"
         static let switcherAppMockMinimizedNotes = "flowtab.switcher.app.com-flowtab-mock-minimized-notes"
+        static let switcherNextWindowPage = "flowtab.switcher.window-page.next"
         static let switcherSearchInput = "flowtab.switcher.search.input"
         static let switcherSearchAppMockMail = "flowtab.switcher.search.app.com-flowtab-mock-mail"
         static let switcherSearchWindowMockMailInbox =

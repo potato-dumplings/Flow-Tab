@@ -363,4 +363,262 @@ extension FlowTabTests {
         XCTAssertFalse(runBaselineProbe(query: "文件助手", apps: apps, scope: .window).isEmpty)
     }
 
+    @MainActor
+    func testOptionTabFastStartPressureStaysUnderHundredMilliseconds() {
+        let apps = makeBenchmarkApps(appCount: 600, windowsPerApp: 1).map { app in
+            AppSwitchCandidate(
+                id: app.id,
+                displayName: app.displayName,
+                groupID: app.groupID,
+                lastActiveAt: app.lastActiveAt,
+                windows: []
+            )
+        }
+        let snapshot = RuntimeSnapshot(apps: apps, contextsByID: [:])
+        let model = LiveSwitcherModel()
+        model.frontmostApplicationOverride = { nil }
+        model.fastAppSnapshotProviderOverride = { snapshot }
+        var fullSnapshotCalls = 0
+        model.snapshotProviderOverride = {
+            fullSnapshotCalls += 1
+            Thread.sleep(forTimeInterval: 0.2)
+            return snapshot
+        }
+
+        let iterations = 120
+        var samples: [Double] = []
+        samples.reserveCapacity(iterations)
+        for _ in 0..<iterations {
+            let start = DispatchTime.now().uptimeNanoseconds
+            XCTAssertTrue(model.startSession(triggerDirection: .forward))
+            samples.append(Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000.0)
+            model.cancelSelection()
+        }
+
+        let summary = latencySummary(samples: samples)
+
+        print(
+            String(
+                format: "[OptionTabFastStartPressure] dataset=%d apps, iterations=%d, p50=%.2fms, p95=%.2fms, max=%.2fms, fullSnapshotCalls=%d",
+                apps.count,
+                iterations,
+                summary.p50,
+                summary.p95,
+                summary.max,
+                fullSnapshotCalls
+            )
+        )
+
+        XCTAssertEqual(fullSnapshotCalls, 0)
+        XCTAssertLessThan(summary.p95, 100)
+    }
+
+    @MainActor
+    func testOptionTabFastStartPressureIgnoresLargeFrontmostWindowSet() {
+        let selectedWindowCount = 1_000
+        let fullSnapshot = makeOptionTabWindowScaleSnapshot(
+            selectedWindowCount: selectedWindowCount,
+            extraAppCount: 120,
+            largeWindowAppIndex: 0,
+            includeRuntimeContexts: false
+        )
+        let fastSnapshot = appOnlySnapshot(from: fullSnapshot)
+        let model = LiveSwitcherModel()
+        model.frontmostApplicationOverride = { nil }
+        model.fastAppSnapshotProviderOverride = { fastSnapshot }
+        var fullSnapshotCalls = 0
+        model.snapshotProviderOverride = {
+            fullSnapshotCalls += 1
+            Thread.sleep(forTimeInterval: 0.2)
+            return fullSnapshot
+        }
+
+        let iterations = 80
+        var samples: [Double] = []
+        samples.reserveCapacity(iterations)
+        for _ in 0..<iterations {
+            let start = DispatchTime.now().uptimeNanoseconds
+            XCTAssertTrue(model.startSession(triggerDirection: .forward))
+            samples.append(Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000.0)
+            XCTAssertEqual(model.session?.selectedApp.windows.count ?? -1, 0)
+            model.cancelSelection()
+        }
+
+        let summary = latencySummary(samples: samples)
+        print(
+            String(
+                format: "[OptionTabFrontmostWindowScalePressure] apps=%d, frontmostWindows=%d, iterations=%d, p50=%.2fms, p95=%.2fms, max=%.2fms, fullSnapshotCalls=%d",
+                fullSnapshot.apps.count,
+                selectedWindowCount,
+                iterations,
+                summary.p50,
+                summary.p95,
+                summary.max,
+                fullSnapshotCalls
+            )
+        )
+
+        XCTAssertEqual(fullSnapshotCalls, 0)
+        XCTAssertLessThan(summary.p95, 100)
+    }
+
+    @MainActor
+    func testOptionTabWindowScalePressureKeepsBackgroundApplyAndPreviewCaptureBounded() {
+        let selectedWindowCount = 1_000
+        let fullSnapshot = makeOptionTabWindowScaleSnapshot(
+            selectedWindowCount: selectedWindowCount,
+            extraAppCount: 80,
+            largeWindowAppIndex: 1,
+            includeRuntimeContexts: true
+        )
+        let fastSnapshot = appOnlySnapshot(from: fullSnapshot)
+        let model = LiveSwitcherModel()
+        model.frontmostApplicationOverride = { nil }
+        model.backgroundFullSnapshotRefreshEnabled = false
+        model.fastAppSnapshotProviderOverride = { fastSnapshot }
+        var previewCaptureCalls = 0
+        model.previewCaptureOverride = { _, _, _, _ in
+            previewCaptureCalls += 1
+            return nil
+        }
+
+        let iterations = 60
+        var backgroundApplySamples: [Double] = []
+        var windowLayerEntrySamples: [Double] = []
+        var visiblePreviewItemSamples: [Double] = []
+        backgroundApplySamples.reserveCapacity(iterations)
+        windowLayerEntrySamples.reserveCapacity(iterations)
+        visiblePreviewItemSamples.reserveCapacity(iterations)
+        var visibleWindowCount = 0
+
+        for _ in 0..<iterations {
+            XCTAssertTrue(model.startSession(triggerDirection: .forward))
+            XCTAssertEqual(model.session?.selectedApp.windows.count ?? -1, 0)
+
+            let applyStart = DispatchTime.now().uptimeNanoseconds
+            let applyStartMs = LiveSwitcherModel.monotonicMilliseconds()
+            model.completeBackgroundFullSnapshotRefresh(
+                fullSnapshot,
+                triggerDirection: .forward,
+                generation: model.backgroundFullSnapshotRefreshGeneration,
+                startMs: applyStartMs,
+                snapshotReadMs: applyStartMs
+            )
+            backgroundApplySamples.append(
+                Double(DispatchTime.now().uptimeNanoseconds - applyStart) / 1_000_000.0
+            )
+            XCTAssertEqual(model.session?.selectedApp.windows.count ?? -1, selectedWindowCount)
+
+            let entryStart = DispatchTime.now().uptimeNanoseconds
+            XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
+            windowLayerEntrySamples.append(
+                Double(DispatchTime.now().uptimeNanoseconds - entryStart) / 1_000_000.0
+            )
+
+            let page = SwitcherWindowPreviewPaging.page(
+                itemCount: model.windowPreviewPageSummary().itemCount,
+                selectedIndex: model.windowPreviewPageSummary().selectedIndex,
+                availableWidth: 800
+            )
+            visibleWindowCount = page.visibleRange.count
+            let previewItemsStart = DispatchTime.now().uptimeNanoseconds
+            let previewItems = model.windowPreviewItems(visibleRange: page.visibleRange)
+            visiblePreviewItemSamples.append(
+                Double(DispatchTime.now().uptimeNanoseconds - previewItemsStart) / 1_000_000.0
+            )
+            XCTAssertEqual(previewItems.count, page.visibleRange.count)
+            XCTAssertLessThan(previewItems.count, selectedWindowCount)
+            model.cancelSelection()
+        }
+
+        let backgroundApply = latencySummary(samples: backgroundApplySamples)
+        let windowLayerEntry = latencySummary(samples: windowLayerEntrySamples)
+        let previewItems = latencySummary(samples: visiblePreviewItemSamples)
+        print(
+            String(
+                format: "[OptionTabWindowScalePressure] apps=%d, selectedWindows=%d, visibleWindows=%d, iterations=%d, applyP95=%.2fms, enterP95=%.2fms, previewItemsP95=%.2fms, previewCaptureCalls=%d",
+                fullSnapshot.apps.count,
+                selectedWindowCount,
+                visibleWindowCount,
+                iterations,
+                backgroundApply.p95,
+                windowLayerEntry.p95,
+                previewItems.p95,
+                previewCaptureCalls
+            )
+        )
+
+        XCTAssertLessThan(backgroundApply.p95, 50)
+        XCTAssertLessThan(windowLayerEntry.p95, 50)
+        XCTAssertLessThan(previewItems.p95, 50)
+        XCTAssertLessThanOrEqual(previewCaptureCalls, iterations * max(visibleWindowCount, 1))
+    }
+
+    private func makeOptionTabWindowScaleSnapshot(
+        selectedWindowCount: Int,
+        extraAppCount: Int,
+        largeWindowAppIndex: Int,
+        includeRuntimeContexts: Bool
+    ) -> RuntimeSnapshot {
+        let selectedWindows = (0..<selectedWindowCount).map { index in
+            WindowCandidate(
+                id: "frontmost-window-\(index)",
+                title: "Frontmost Document \(index)",
+                isMinimized: false,
+                lastActiveAt: TimeInterval(selectedWindowCount - index)
+            )
+        }
+        let largeWindowApp = AppSwitchCandidate(
+            id: "com.flowtab.pressure.frontmost",
+            displayName: "Frontmost Pressure App",
+            groupID: "pressure",
+            lastActiveAt: TimeInterval(selectedWindowCount + extraAppCount),
+            windows: selectedWindows
+        )
+        var apps = makeBenchmarkApps(appCount: extraAppCount, windowsPerApp: 1)
+        apps.insert(largeWindowApp, at: min(max(0, largeWindowAppIndex), apps.count))
+        guard includeRuntimeContexts else {
+            return RuntimeSnapshot(apps: apps, contextsByID: [:])
+        }
+
+        let runningApp = NSRunningApplication.current
+        let selectedWindowContexts = Dictionary(uniqueKeysWithValues: selectedWindows.enumerated().map { index, window in
+            (
+                window.id,
+                RuntimeWindowContext(
+                    id: window.id,
+                    title: window.title,
+                    isMinimized: window.isMinimized,
+                    ownerPID: runningApp.processIdentifier,
+                    cgWindowID: CGWindowID(10_000 + index),
+                    allowsPublicAXRecovery: true
+                )
+            )
+        })
+        let selectedContext = RuntimeAppContext(
+            appID: largeWindowApp.id,
+            runningApp: runningApp,
+            windowsByID: selectedWindowContexts
+        )
+        return RuntimeSnapshot(
+            apps: apps,
+            contextsByID: [largeWindowApp.id: selectedContext]
+        )
+    }
+
+    private func appOnlySnapshot(from snapshot: RuntimeSnapshot) -> RuntimeSnapshot {
+        RuntimeSnapshot(
+            apps: snapshot.apps.map { app in
+                AppSwitchCandidate(
+                    id: app.id,
+                    displayName: app.displayName,
+                    groupID: app.groupID,
+                    lastActiveAt: app.lastActiveAt,
+                    windows: []
+                )
+            },
+            contextsByID: [:]
+        )
+    }
+
 }

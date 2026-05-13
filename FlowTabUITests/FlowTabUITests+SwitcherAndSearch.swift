@@ -127,6 +127,43 @@ extension FlowTabUITests {
         XCTAssertTrue(segmentedResult.waitForExistence(timeout: 5))
     }
 
+    func testSwitcherWindowLayerPaginatesLargeMockWindowSet() throws {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-mock-runtime-variant",
+                "single-app-many-windows",
+                "--flowtab-ui-open-switcher",
+                "--flowtab-ui-listen-switcher-trigger",
+                "--flowtab-ui-runtime-log-level",
+                "DEBUG",
+                "--flowtab-ui-enable-verbose-logs",
+                "-showPermissionReminder",
+                "NO"
+            ] + FlowTabUITestSwitcherCommandPayload.launchArguments
+        )
+        launchFlowTabUITestApplication(app)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+        XCTAssertTrue(element(in: app, identifier: Identifier.switcherAppMockManyWindows).waitForExistence(timeout: 5))
+
+        postFlowTabUITestSwitcherCommandAndWaitForDelivery(.advanceDown, traceLabel: "many-window-page")
+
+        let firstWindowID = "flowtab.switcher.window.mock-many-window-00"
+        XCTAssertTrue(element(in: app, identifier: firstWindowID).waitForExistence(timeout: 5))
+        XCTAssertTrue(element(in: app, identifier: Identifier.switcherNextWindowPage).waitForExistence(timeout: 2))
+
+        let windowCards = switcherWindowCardObservations(in: app)
+        XCTAssertGreaterThan(windowCards.count, 0)
+        XCTAssertLessThan(windowCards.count, 20)
+        XCTAssertFalse(
+            app.descendants(matching: .any)
+                .matching(identifier: "flowtab.switcher.window.mock-many-window-25")
+                .firstMatch
+                .exists
+        )
+    }
+
     func testSearchPanelWrapFromLastResultScrollsBackToFirstResult() throws {
         let app = makeApp(
             additionalArguments: [

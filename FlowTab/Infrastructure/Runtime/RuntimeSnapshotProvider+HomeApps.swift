@@ -72,6 +72,112 @@ extension RuntimeSnapshotProvider {
         return summaries
     }
 
+    func lightweightAppSnapshot() -> RuntimeSnapshot {
+        let startMs = RuntimePerformanceClock.monotonicMilliseconds()
+        if let uiTestRuntimeDataset = Self.uiTestRuntimeDataset() {
+            logSnapshotTiming(
+                "lightweightAppSnapshot",
+                fields: [
+                    ("result", "uiTestDataset"),
+                    ("apps", "\(uiTestRuntimeDataset.snapshot.apps.count)"),
+                    ("windows", "\(uiTestRuntimeDataset.snapshot.apps.reduce(0) { $0 + $1.windows.count })"),
+                    ("totalMs", formatSnapshotMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))
+                ]
+            )
+            return uiTestRuntimeDataset.snapshot
+        }
+
+        let runningAppsStartMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let runningApps = filteredRunningApplications()
+        let runningAppsReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+        guard !runningApps.isEmpty else {
+            logSnapshotTiming(
+                "lightweightAppSnapshot",
+                fields: [
+                    ("result", "empty"),
+                    ("reason", "noRunningApps"),
+                    ("runningAppsMs", formatSnapshotMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
+                    ("totalMs", formatSnapshotMilliseconds(runningAppsReadyMs - startMs))
+                ]
+            )
+            return RuntimeSnapshot(apps: [], contextsByID: [:])
+        }
+
+        let rankStartMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let rankByPID = collectAppRankByPID(for: runningApps)
+        let rankReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let selectedApps = selectPrimaryApps(
+            from: runningApps,
+            windowCountByPID: [:],
+            rankByPID: rankByPID
+        )
+        let appsGroupedByBaseID = groupedAppsByBaseID(runningApps)
+        let selectionReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let now = Date.timeIntervalSinceReferenceDate
+
+        var rows: [(candidate: AppSwitchCandidate, context: RuntimeAppContext)] = []
+        rows.reserveCapacity(selectedApps.count)
+        for (index, app) in selectedApps.enumerated() {
+            let appID = Self.baseAppID(for: app)
+            let displayName = app.localizedName ?? appID
+            let appGroup = appsGroupedByBaseID[appID] ?? [app]
+            let rank = preferredRankForAppGroup(
+                appGroup,
+                rankByPID: rankByPID,
+                fallback: 10_000 + index
+            )
+            let candidate = AppSwitchCandidate(
+                id: appID,
+                displayName: displayName,
+                groupID: Self.groupID(for: app.bundleIdentifier, fallbackName: displayName),
+                lastActiveAt: now - Double(rank),
+                windows: []
+            )
+            let context = RuntimeAppContext(
+                appID: appID,
+                runningApp: app,
+                windowsByID: [:]
+            )
+            rows.append((candidate, context))
+        }
+
+        let rowsReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+        rows.sort { lhs, rhs in
+            if lhs.candidate.lastActiveAt == rhs.candidate.lastActiveAt {
+                return lhs.candidate.displayName.localizedCaseInsensitiveCompare(
+                    rhs.candidate.displayName
+                ) == .orderedAscending
+            }
+            return lhs.candidate.lastActiveAt > rhs.candidate.lastActiveAt
+        }
+
+        var contextsByID: [String: RuntimeAppContext] = [:]
+        for row in rows {
+            contextsByID[row.context.appID] = row.context
+        }
+        let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
+        logSnapshotTiming(
+            "lightweightAppSnapshot",
+            fields: [
+                ("result", rows.isEmpty ? "empty" : "ready"),
+                ("runningApps", "\(runningApps.count)"),
+                ("selectedApps", "\(selectedApps.count)"),
+                ("apps", "\(rows.count)"),
+                ("windows", "deferred"),
+                ("runningAppsMs", formatSnapshotMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
+                ("rankMs", formatSnapshotMilliseconds(rankReadyMs - rankStartMs)),
+                ("selectionMs", formatSnapshotMilliseconds(selectionReadyMs - rankReadyMs)),
+                ("rowsMs", formatSnapshotMilliseconds(rowsReadyMs - selectionReadyMs)),
+                ("sortContextMs", formatSnapshotMilliseconds(completeMs - rowsReadyMs)),
+                ("totalMs", formatSnapshotMilliseconds(completeMs - startMs))
+            ]
+        )
+        return RuntimeSnapshot(
+            apps: rows.map(\.candidate),
+            contextsByID: contextsByID
+        )
+    }
+
     func homeAppSnapshot(for appID: String) -> RuntimeHomeAppSnapshot? {
         if let uiTestRuntimeDataset = Self.uiTestRuntimeDataset() {
             return uiTestRuntimeDataset.snapshotsByAppID[appID]

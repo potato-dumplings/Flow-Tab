@@ -92,6 +92,40 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testSwitcherPanelControllerGlobalHotkeyStartsFromFastAppSnapshot() {
+        let controller = SwitcherPanelController()
+        let fastApps = searchScenarioApps().map { app in
+            AppSwitchCandidate(
+                id: app.id,
+                displayName: app.displayName,
+                groupID: app.groupID,
+                lastActiveAt: app.lastActiveAt,
+                windows: []
+            )
+        }
+        var fullSnapshotCalls = 0
+        controller.modelForTesting.frontmostApplicationOverride = { nil }
+        controller.modelForTesting.fastAppSnapshotProviderOverride = {
+            RuntimeSnapshot(apps: fastApps, contextsByID: [:])
+        }
+        controller.modelForTesting.snapshotProviderOverride = {
+            fullSnapshotCalls += 1
+            Thread.sleep(forTimeInterval: 0.2)
+            return RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
+        }
+
+        let start = DispatchTime.now().uptimeNanoseconds
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        let elapsedMs = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000.0
+
+        XCTAssertLessThan(elapsedMs, 100)
+        XCTAssertEqual(fullSnapshotCalls, 0)
+        XCTAssertEqual(controller.modelForTesting.session?.apps.count, fastApps.count)
+        XCTAssertEqual(controller.modelForTesting.session?.apps.first?.windows.count, 0)
+        controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
     func testSwitcherPanelControllerDownArrowInAppCycleEntersWindowLayer() {
         let controller = SwitcherPanelController()
         controller.modelForTesting.snapshotProviderOverride = {

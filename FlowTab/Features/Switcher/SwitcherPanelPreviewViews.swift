@@ -199,6 +199,43 @@ struct WindowOnlyPreviewCard: View {
     }
 }
 
+struct WindowPreviewPageIndicator: View {
+    enum Direction {
+        case previous
+        case next
+
+        var systemName: String {
+            switch self {
+            case .previous:
+                return "chevron.left"
+            case .next:
+                return "chevron.right"
+            }
+        }
+
+        var accessibilityIdentifier: String {
+            switch self {
+            case .previous:
+                return SwitcherAccessibilityIdentifiers.previousWindowPage
+            case .next:
+                return SwitcherAccessibilityIdentifiers.nextWindowPage
+            }
+        }
+    }
+
+    let direction: Direction
+    let isVisible: Bool
+
+    var body: some View {
+        Image(systemName: direction.systemName)
+            .font(.system(size: 18, weight: .semibold))
+            .foregroundStyle(Color.primary.opacity(isVisible ? 0.55 : 0))
+            .frame(width: SwitcherWindowPreviewPaging.indicatorWidth, height: 48)
+            .accessibilityHidden(!isVisible)
+            .accessibilityIdentifier(direction.accessibilityIdentifier)
+    }
+}
+
 extension AnyTransition {
     static var appQuitRemoval: AnyTransition {
         let removal = AnyTransition.opacity

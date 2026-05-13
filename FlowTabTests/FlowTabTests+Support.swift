@@ -328,6 +328,26 @@ extension FlowTabTests {
     func nanosToMilliseconds(_ nanos: UInt64) -> Double {
         Double(nanos) / 1_000_000.0
     }
+    func latencySummary(samples: [Double]) -> (p50: Double, p95: Double, max: Double) {
+        let sortedSamples = samples.sorted()
+        guard !sortedSamples.isEmpty else {
+            return (0, 0, 0)
+        }
+
+        func percentile(_ value: Double) -> Double {
+            let index = min(
+                sortedSamples.count - 1,
+                Int((Double(sortedSamples.count - 1) * value).rounded())
+            )
+            return sortedSamples[index]
+        }
+
+        return (
+            p50: percentile(0.50),
+            p95: percentile(0.95),
+            max: sortedSamples.last ?? 0
+        )
+    }
     func drainPendingSearchRebuild(on coordinator: SwitcherSearchCoordinator) {
         coordinator.flushPendingRebuild()
     }

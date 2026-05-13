@@ -593,6 +593,7 @@ final class OptionTabHotkeyMonitor {
         guard isPressedEvent || isReleasedEvent else {
             return passThroughStatus
         }
+        let eventReceivedMs = RuntimePerformanceClock.monotonicMilliseconds()
 
         var hotkeyID = EventHotKeyID()
         let status = GetEventParameter(
@@ -612,7 +613,8 @@ final class OptionTabHotkeyMonitor {
             signature: hotkeyID.signature,
             id: hotkeyID.id,
             isPressedEvent: isPressedEvent,
-            isReleasedEvent: isReleasedEvent
+            isReleasedEvent: isReleasedEvent,
+            eventReceivedMs: eventReceivedMs
         )
     }
 
@@ -626,7 +628,8 @@ final class OptionTabHotkeyMonitor {
             signature: signature ?? self.signature,
             id: id,
             isPressedEvent: phase == .pressed,
-            isReleasedEvent: phase == .released
+            isReleasedEvent: phase == .released,
+            eventReceivedMs: RuntimePerformanceClock.monotonicMilliseconds()
         )
     }
 
@@ -639,7 +642,8 @@ final class OptionTabHotkeyMonitor {
         signature: OSType,
         id: UInt32,
         isPressedEvent: Bool,
-        isReleasedEvent: Bool
+        isReleasedEvent: Bool,
+        eventReceivedMs: Double
     ) -> OSStatus {
         let passThroughStatus = OSStatus(eventNotHandledErr)
         guard signature == self.signature else {
@@ -648,26 +652,49 @@ final class OptionTabHotkeyMonitor {
             return passThroughStatus
         }
 
+        let phase: String
+        let direction: String
+        let callback: ((Bool) -> Void)?
+        let isBackward: Bool
         switch id {
         case forwardHotkeyID:
             if isPressedEvent {
-                onHotkeyPressed?(false)
+                phase = "pressed"
+                callback = onHotkeyPressed
             } else if isReleasedEvent {
-                onHotkeyReleased?(false)
+                phase = "released"
+                callback = onHotkeyReleased
             } else {
                 return passThroughStatus
             }
+            direction = "forward"
+            isBackward = false
         case backwardHotkeyID:
             if isPressedEvent {
-                onHotkeyPressed?(true)
+                phase = "pressed"
+                callback = onHotkeyPressed
             } else if isReleasedEvent {
-                onHotkeyReleased?(true)
+                phase = "released"
+                callback = onHotkeyReleased
             } else {
                 return passThroughStatus
             }
+            direction = "backward"
+            isBackward = true
         default:
             return passThroughStatus
         }
+        RuntimeLog.info(
+            "HotKey",
+            "dispatch phase=\(phase) dir=\(direction) id=\(id) nowMs=\(RuntimePerformanceClock.formatMilliseconds(eventReceivedMs))"
+        )
+        let callbackStartMs = RuntimePerformanceClock.monotonicMilliseconds()
+        callback?(isBackward)
+        let callbackEndMs = RuntimePerformanceClock.monotonicMilliseconds()
+        RuntimeLog.info(
+            "HotKey",
+            "dispatched phase=\(phase) dir=\(direction) id=\(id) callbackMs=\(RuntimePerformanceClock.formatMilliseconds(callbackEndMs - callbackStartMs)) totalMs=\(RuntimePerformanceClock.formatMilliseconds(callbackEndMs - eventReceivedMs))"
+        )
         return noErr
     }
 }
