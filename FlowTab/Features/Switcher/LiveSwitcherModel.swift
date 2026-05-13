@@ -84,6 +84,9 @@ final class LiveSwitcherModel: ObservableObject {
         String?,
         Bool
     ) -> (image: NSImage, resolvedWindowID: CGWindowID, titleBarStyle: WindowTitleBarStyleGuess?)?)?
+    var previewCaptureBatchOverride: ((
+        [RuntimeWindowPreviewProvider.CaptureRequest]
+    ) -> [RuntimeWindowPreviewProvider.CaptureResult?])?
     var terminateRefreshPollIntervalNs: UInt64 = 60_000_000
     var terminateRefreshTimeoutNs: UInt64 = 1_800_000_000
 

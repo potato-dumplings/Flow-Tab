@@ -188,8 +188,9 @@ Hotkey press
   -> 从固定序列切出当前页窗口
   -> 只为当前页窗口请求 preview
   -> cache hit 立即显示
-  -> cache miss 进入有上限的 capture 队列
-  -> 结果回来后原地更新窗口卡片
+  -> cache miss 进入有上限的 current-page capture batch
+  -> 同一个 batch 共享一次 SCShareableContent 查询
+  -> batch 结果提交后再展示当前页窗口卡片
   -> 当前页全部完成后，非当前页截图才可进入空闲阶段
 ```
 
@@ -251,6 +252,9 @@ visibleSlots = clamp(rawSlots, min: 6, max: 16)
 - 截图未准备好时，窗口卡片应显示明确的 fallback：app icon、窗口标题、loading 状态。
 - 只要 selected-app window metadata 准备好，就可以开始当前页截图预热。
 - capture 并发数需要压测决定，不应拍脑袋。建议初始值为 `min(visibleSlots, 4)`，只有在压测证明 p95 改善且 UI 不变卡时再提高。
+- 当前页 cache miss 应合并成一个 capture batch；batch 内共享一次 `SCShareableContent` 查询，再按受控并发执行每个窗口截图。
+- 当前页冷截图结果应按 batch 发布；batch 未提交前不要展示 fallback 窗口卡片，避免单卡或整页“翻面”。
+- 当前页 batch 即使全部失败，也必须提交完成状态并展示 fallback，不能让窗口层永久空白。
 - 当前页截图未完成前，不请求非当前页截图。
 - 当前页截图结果应被 session 内保活。即使 preview cache 发生驱逐，当前页卡片也应优先使用 session-pinned 图片，直到面板关闭或 session generation 失效。
 - 面板关闭、session 取消或 generation 变化后，应丢弃 session-pinned 图片和未开始的非当前页预热。
@@ -329,6 +333,8 @@ SLA 违背用 `WARN`：
 - selected-app 窗口数据返回后，auto-enter 保留原始 deadline。
 - selected-app 关键路径 pending 时，background full snapshot 被延后。
 - preview capture 请求数量只等于当前 visible page。
+- current-page runtime preview miss 合并为单个 batch，提交后再展示当前页。
+- batch preview capture 对同一页共享一次 shareable-content 查询模式。
 - full snapshot apply 时尽量保持当前选择不跳变。
 
 ### UI Tests

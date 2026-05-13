@@ -4,6 +4,19 @@ import Foundation
 import ScreenCaptureKit
 
 enum RuntimeWindowPreviewProvider {
+    struct CaptureRequest {
+        let preferredWindowID: CGWindowID?
+        let ownerPID: pid_t
+        let preferredTitle: String?
+        let inferTitleBarStyle: Bool
+    }
+
+    struct CaptureResult {
+        let image: NSImage
+        let resolvedWindowID: CGWindowID
+        let titleBarStyle: WindowTitleBarStyleGuess?
+    }
+
     private struct LiveCGWindowEntry {
         let id: CGWindowID
         let title: String?
@@ -25,6 +38,11 @@ enum RuntimeWindowPreviewProvider {
         }
     }
 
+    private struct PreparedCapture {
+        let request: CaptureRequest
+        let candidateIDs: [CGWindowID]
+    }
+
     private static var hasLoggedScreenCapturePermissionWarning = false
     private static let shareableContentLookupTimeout: TimeInterval = 1.0
     private static let screenshotCaptureTimeout: TimeInterval = 1.0
@@ -37,50 +55,107 @@ enum RuntimeWindowPreviewProvider {
         preferredTitle: String?,
         inferTitleBarStyle: Bool
     ) -> (image: NSImage, resolvedWindowID: CGWindowID, titleBarStyle: WindowTitleBarStyleGuess?)? {
+        let request = CaptureRequest(
+            preferredWindowID: preferredWindowID,
+            ownerPID: ownerPID,
+            preferredTitle: preferredTitle,
+            inferTitleBarStyle: inferTitleBarStyle
+        )
+        guard let result = captureWindowPreviews([request]).first ?? nil else {
+            return nil
+        }
+        return (
+            image: result.image,
+            resolvedWindowID: result.resolvedWindowID,
+            titleBarStyle: result.titleBarStyle
+        )
+    }
+
+    static func captureWindowPreviews(
+        _ requests: [CaptureRequest],
+        captureSemaphore: DispatchSemaphore? = nil
+    ) -> [CaptureResult?] {
+        guard !requests.isEmpty else { return [] }
         guard ScreenCapturePermissionChecker.hasScreenCapturePermission else {
             if !hasLoggedScreenCapturePermissionWarning {
                 RuntimeLog.info("Preview", "screen recording permission missing; window preview unavailable")
                 hasLoggedScreenCapturePermissionWarning = true
             }
-            return nil
+            return Array(repeating: nil, count: requests.count)
         }
 
-        let candidateIDs = candidateWindowIDs(
-            preferredWindowID: preferredWindowID,
-            ownerPID: ownerPID,
-            preferredTitle: preferredTitle
+        let liveWindowsByPID = Dictionary(
+            uniqueKeysWithValues: Set(requests.map(\.ownerPID)).map {
+                ($0, collectLiveCGWindows(ownerPID: $0))
+            }
         )
-        guard !candidateIDs.isEmpty else {
-            RuntimeLog.info(
-                "Preview",
-                "no candidate windows pid=\(ownerPID) preferredID=\(preferredWindowID.map(String.init) ?? "nil") title=\(preferredTitle ?? "<empty>")"
+        let preparedCaptures = requests.map { request in
+            let candidateIDs = candidateWindowIDs(
+                preferredWindowID: request.preferredWindowID,
+                preferredTitle: request.preferredTitle,
+                liveWindows: liveWindowsByPID[request.ownerPID] ?? []
             )
-            return nil
+            if candidateIDs.isEmpty {
+                RuntimeLog.info(
+                    "Preview",
+                    "no candidate windows pid=\(request.ownerPID) preferredID=\(request.preferredWindowID.map(String.init) ?? "nil") title=\(request.preferredTitle ?? "<empty>")"
+                )
+            }
+            return PreparedCapture(request: request, candidateIDs: candidateIDs)
         }
 
+        let onScreenWindowsOnly = shareableContentOnScreenOnly(
+            preferredWindowIDs: requests.map(\.preferredWindowID)
+        )
         let shareableWindowsByID = fetchShareableWindowsByID(
-            onScreenWindowsOnly: shareableContentOnScreenOnly(
-                preferredWindowID: preferredWindowID
-            )
+            onScreenWindowsOnly: onScreenWindowsOnly
         )
-        for candidateID in candidateIDs {
+
+        var results = Array<CaptureResult?>(repeating: nil, count: preparedCaptures.count)
+        let resultsLock = NSLock()
+        DispatchQueue.concurrentPerform(iterations: preparedCaptures.count) { index in
+            let preparedCapture = preparedCaptures[index]
+            guard !preparedCapture.candidateIDs.isEmpty else { return }
+            captureSemaphore?.wait()
+            defer { captureSemaphore?.signal() }
+            let result = captureWindowPreview(
+                preparedCapture,
+                shareableWindowsByID: shareableWindowsByID
+            )
+            resultsLock.lock()
+            results[index] = result
+            resultsLock.unlock()
+        }
+        return results
+    }
+
+    private static func captureWindowPreview(
+        _ preparedCapture: PreparedCapture,
+        shareableWindowsByID: [CGWindowID: SCWindow]
+    ) -> CaptureResult? {
+        for candidateID in preparedCapture.candidateIDs {
             guard let shareableWindow = shareableWindowsByID[candidateID] else { continue }
             guard let cgImage = captureWindow(shareableWindow: shareableWindow) else { continue }
-            let titleBarStyle = inferTitleBarStyle ? estimateTitleBarStyle(from: cgImage) : nil
+            let titleBarStyle = preparedCapture.request.inferTitleBarStyle
+                ? estimateTitleBarStyle(from: cgImage)
+                : nil
             let image = NSImage(
                 cgImage: cgImage,
                 size: NSSize(width: cgImage.width, height: cgImage.height)
             )
             RuntimeLog.info(
                 "Preview",
-                "capture success pid=\(ownerPID) windowID=\(candidateID) candidates=\(candidateIDs.count) titleBarStyle=\(titleBarStyle?.rawValue ?? "nil")"
+                "capture success pid=\(preparedCapture.request.ownerPID) windowID=\(candidateID) candidates=\(preparedCapture.candidateIDs.count) titleBarStyle=\(titleBarStyle?.rawValue ?? "nil")"
             )
-            return (image: image, resolvedWindowID: candidateID, titleBarStyle: titleBarStyle)
+            return CaptureResult(
+                image: image,
+                resolvedWindowID: candidateID,
+                titleBarStyle: titleBarStyle
+            )
         }
-
         RuntimeLog.info(
             "Preview",
-            "capture failed pid=\(ownerPID) preferredID=\(preferredWindowID.map(String.init) ?? "nil") title=\(preferredTitle ?? "<empty>") candidates=\(candidateIDs.map(String.init).joined(separator: ","))"
+            "capture failed pid=\(preparedCapture.request.ownerPID) preferredID=\(preparedCapture.request.preferredWindowID.map(String.init) ?? "nil") title=\(preparedCapture.request.preferredTitle ?? "<empty>") candidates=\(preparedCapture.candidateIDs.map(String.init).joined(separator: ","))"
         )
         return nil
     }
@@ -168,6 +243,14 @@ enum RuntimeWindowPreviewProvider {
 
     private static func shareableContentOnScreenOnly(preferredWindowID: CGWindowID?) -> Bool {
         preferredWindowID == nil
+    }
+
+    private static func shareableContentOnScreenOnly(
+        preferredWindowIDs: [CGWindowID?]
+    ) -> Bool {
+        preferredWindowIDs.allSatisfy {
+            shareableContentOnScreenOnly(preferredWindowID: $0)
+        }
     }
 
     private static func fetchShareableWindowsByID(
@@ -637,6 +720,12 @@ enum RuntimeWindowPreviewProvider {
         preferredWindowID: CGWindowID?
     ) -> Bool {
         shareableContentOnScreenOnly(preferredWindowID: preferredWindowID)
+    }
+
+    static func shareableContentOnScreenOnlyForTesting(
+        preferredWindowIDs: [CGWindowID?]
+    ) -> Bool {
+        shareableContentOnScreenOnly(preferredWindowIDs: preferredWindowIDs)
     }
 }
 

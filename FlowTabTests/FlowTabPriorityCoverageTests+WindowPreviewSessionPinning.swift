@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import XCTest
 @testable import FlowTab
 import FlowTabCore
@@ -199,5 +200,161 @@ extension FlowTabPriorityCoverageTests {
         let secondPage = model.windowPreviewSnapshotForTesting(visibleRange: secondVisibleRange)
         XCTAssertTrue(secondPage.allSatisfy(\.hasImage))
         XCTAssertEqual(captureCallCount, windows.count + secondVisibleRange.count)
+    }
+
+    @MainActor
+    func testLiveSwitcherModelRuntimeVisiblePreviewWaitsForBatchBeforeShowingPage() async {
+        let model = LiveSwitcherModel()
+        model.backgroundFullSnapshotRefreshEnabled = false
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let windows = (0..<6).map { index in
+            WindowCandidate(
+                id: String(format: "batched-preview-window-%02d", index),
+                title: String(format: "Batched Preview Window %02d", index),
+                isMinimized: false,
+                lastActiveAt: TimeInterval(1_000 - index)
+            )
+        }
+        let app = AppSwitchCandidate(
+            id: appID,
+            displayName: currentApp.localizedName ?? "Current App",
+            groupID: "current",
+            lastActiveAt: 1_000,
+            windows: windows
+        )
+        let context = makeRuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windows: windows
+        )
+        model.fastAppSnapshotProviderOverride = {
+            RuntimeSnapshot(apps: [app], contextsByID: [appID: context])
+        }
+
+        let batchStarted = expectation(description: "visible preview batch started")
+        let batchReleased = DispatchSemaphore(value: 0)
+        let batchStateLock = NSLock()
+        var batchCallCount = 0
+        var batchRequestTitles: [String] = []
+        model.previewCaptureBatchOverride = { requests in
+            batchStateLock.lock()
+            batchCallCount += 1
+            batchRequestTitles = requests.map { $0.preferredTitle ?? "" }
+            batchStateLock.unlock()
+            batchStarted.fulfill()
+            batchReleased.wait()
+            return requests.enumerated().map { index, _ in
+                RuntimeWindowPreviewProvider.CaptureResult(
+                    image: self.makeColorImage(color: .systemPurple),
+                    resolvedWindowID: CGWindowID(index + 1),
+                    titleBarStyle: nil
+                )
+            }
+        }
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
+
+        let visibleRange = 0..<6
+        let initialSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: visibleRange)
+        XCTAssertTrue(initialSnapshot.isEmpty)
+
+        await fulfillment(of: [batchStarted], timeout: 1.0)
+        batchStateLock.lock()
+        XCTAssertEqual(batchCallCount, 1)
+        XCTAssertEqual(batchRequestTitles, windows.map(\.title))
+        batchStateLock.unlock()
+
+        let batchPublished = expectation(description: "visible preview batch published")
+        var publishCount = 0
+        var cancellables: Set<AnyCancellable> = []
+        model.objectWillChange.sink {
+            publishCount += 1
+            if publishCount == 1 {
+                batchPublished.fulfill()
+            }
+        }.store(in: &cancellables)
+
+        batchReleased.signal()
+        await fulfillment(of: [batchPublished], timeout: 1.0)
+        XCTAssertEqual(publishCount, 1)
+
+        let completedSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: visibleRange)
+        XCTAssertEqual(completedSnapshot.count, visibleRange.count)
+        XCTAssertTrue(completedSnapshot.allSatisfy(\.hasImage))
+        batchStateLock.lock()
+        XCTAssertEqual(batchCallCount, 1)
+        batchStateLock.unlock()
+        XCTAssertEqual(cancellables.count, 1)
+    }
+
+    @MainActor
+    func testLiveSwitcherModelRuntimeVisiblePreviewShowsFallbackAfterBatchFailure() async {
+        let model = LiveSwitcherModel()
+        model.backgroundFullSnapshotRefreshEnabled = false
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let windows = (0..<4).map { index in
+            WindowCandidate(
+                id: String(format: "failed-batched-preview-window-%02d", index),
+                title: String(format: "Failed Batched Preview Window %02d", index),
+                isMinimized: false,
+                lastActiveAt: TimeInterval(1_000 - index)
+            )
+        }
+        let app = AppSwitchCandidate(
+            id: appID,
+            displayName: currentApp.localizedName ?? "Current App",
+            groupID: "current",
+            lastActiveAt: 1_000,
+            windows: windows
+        )
+        let context = makeRuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windows: windows
+        )
+        model.fastAppSnapshotProviderOverride = {
+            RuntimeSnapshot(apps: [app], contextsByID: [appID: context])
+        }
+
+        let batchStarted = expectation(description: "failed visible preview batch started")
+        let batchReleased = DispatchSemaphore(value: 0)
+        var batchCallCount = 0
+        model.previewCaptureBatchOverride = { requests in
+            batchCallCount += 1
+            batchStarted.fulfill()
+            batchReleased.wait()
+            return Array(repeating: nil, count: requests.count)
+        }
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
+
+        let visibleRange = 0..<4
+        let initialSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: visibleRange)
+        XCTAssertTrue(initialSnapshot.isEmpty)
+        await fulfillment(of: [batchStarted], timeout: 1.0)
+
+        let batchPublished = expectation(description: "failed visible preview batch published")
+        var publishCount = 0
+        var cancellables: Set<AnyCancellable> = []
+        model.objectWillChange.sink {
+            publishCount += 1
+            if publishCount == 1 {
+                batchPublished.fulfill()
+            }
+        }.store(in: &cancellables)
+
+        batchReleased.signal()
+        await fulfillment(of: [batchPublished], timeout: 1.0)
+        XCTAssertEqual(publishCount, 1)
+
+        let completedSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: visibleRange)
+        XCTAssertEqual(completedSnapshot.count, visibleRange.count)
+        XCTAssertTrue(completedSnapshot.allSatisfy { !$0.hasImage })
+        XCTAssertEqual(batchCallCount, 1)
+        XCTAssertEqual(cancellables.count, 1)
     }
 }

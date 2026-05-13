@@ -1360,6 +1360,19 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
+    func testRuntimeWindowPreviewProviderBatchShareableLookupUsesInclusiveModeForKnownWindowIDs() {
+        XCTAssertTrue(
+            RuntimeWindowPreviewProvider.shareableContentOnScreenOnlyForTesting(
+                preferredWindowIDs: [nil, nil]
+            )
+        )
+        XCTAssertFalse(
+            RuntimeWindowPreviewProvider.shareableContentOnScreenOnlyForTesting(
+                preferredWindowIDs: [nil, 243747, nil]
+            )
+        )
+    }
+
     func testRuntimeWindowPreviewProviderScaledPreviewSizeAndImageDownscaleBehavior() {
         let largeSize = RuntimeWindowPreviewProvider.scaledPreviewSizeForTesting(
             sourceWidth: 2_400,
