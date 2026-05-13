@@ -132,6 +132,8 @@ extension FlowTabUITests {
             additionalArguments: [
                 "--flowtab-ui-reset-defaults",
                 "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-mock-window-previews",
+                "--flowtab-ui-enable-mock-hotkey-effects",
                 "--flowtab-ui-mock-runtime-variant",
                 "single-app-many-windows",
                 "--flowtab-ui-open-switcher",
@@ -156,6 +158,14 @@ extension FlowTabUITests {
         let windowCards = switcherWindowCardObservations(in: app)
         XCTAssertGreaterThan(windowCards.count, 0)
         XCTAssertLessThan(windowCards.count, 20)
+        XCTAssertTrue(
+            windowCards.allSatisfy { $0.frame.width >= 100 },
+            "Expected current visible window cards to keep preview width, found \(windowCards.map { "\($0.identifier)=\($0.frame)" })"
+        )
+        XCTAssertTrue(
+            windowCards.allSatisfy(\.hasImage),
+            "Expected current visible window cards to expose mock screenshots, found \(windowCards.map { "\($0.identifier)=\($0.value)" })"
+        )
         XCTAssertFalse(
             app.descendants(matching: .any)
                 .matching(identifier: "flowtab.switcher.window.mock-many-window-25")

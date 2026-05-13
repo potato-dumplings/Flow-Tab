@@ -24,6 +24,42 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(narrowPage.hasNextPage)
     }
 
+    func testWindowPreviewPagingClampsVisibleSlotsToDesignRange() {
+        let narrowPage = SwitcherWindowPreviewPaging.page(
+            itemCount: 100,
+            selectedIndex: 0,
+            availableWidth: 520
+        )
+        let sixteenInchPage = SwitcherWindowPreviewPaging.page(
+            itemCount: 100,
+            selectedIndex: 0,
+            availableWidth: 1_728
+        )
+        let hugePage = SwitcherWindowPreviewPaging.page(
+            itemCount: 100,
+            selectedIndex: 0,
+            availableWidth: 4_000
+        )
+
+        XCTAssertEqual(narrowPage.visibleRange.count, 6)
+        XCTAssertEqual(sixteenInchPage.visibleRange.count, 10)
+        XCTAssertEqual(hugePage.visibleRange.count, 16)
+    }
+
+    func testWindowPreviewPagingPreferredAvailableWidthKeepsTargetCardWidthForResolvedSlots() {
+        let fourteenFortyWidth = SwitcherWindowPreviewPaging.preferredAvailableWidth(
+            itemCount: 100,
+            maximumAvailableWidth: 1_292
+        )
+        let sixteenInchWidth = SwitcherWindowPreviewPaging.preferredAvailableWidth(
+            itemCount: 100,
+            maximumAvailableWidth: 1_580
+        )
+
+        XCTAssertEqual(fourteenFortyWidth, 1_276, accuracy: 0.001)
+        XCTAssertEqual(sixteenInchWidth, 1_580, accuracy: 0.001)
+    }
+
     func testWindowPreviewPagingShowsSelectedWindowContainingPage() {
         let page = SwitcherWindowPreviewPaging.page(
             itemCount: 100,

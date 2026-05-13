@@ -12,6 +12,10 @@ enum FlowTabTestLaunchOptions {
         arguments.contains("--flowtab-ui-mock-runtime")
     }
 
+    static var usesMockWindowPreviews: Bool {
+        arguments.contains("--flowtab-ui-mock-window-previews")
+    }
+
     static var resetsUserDefaultsOnLaunch: Bool {
         arguments.contains("--flowtab-ui-reset-defaults")
     }

@@ -412,12 +412,17 @@ extension SwitcherPanelController {
     }
 
     func updatePanelSize(for preferredScreen: NSScreen? = nil) {
-        let visibleFrame = resolveSizingScreen(preferredScreen: preferredScreen)?.visibleFrame
+        let sizingScreen = resolveSizingScreen(preferredScreen: preferredScreen)
+        let visibleFrame = sizingScreen?.visibleFrame
             ?? CGRect(x: 0, y: 0, width: 1440, height: 900)
-        updatePanelSize(forVisibleFrame: visibleFrame)
+        updatePanelSize(forVisibleFrame: visibleFrame, recenterScreen: sizingScreen)
     }
 
     func updatePanelSize(forVisibleFrame visibleFrame: CGRect) {
+        updatePanelSize(forVisibleFrame: visibleFrame, recenterScreen: nil)
+    }
+
+    private func updatePanelSize(forVisibleFrame visibleFrame: CGRect, recenterScreen: NSScreen?) {
         if model.isWindowOnlyOverlay {
             let width = max(640, visibleFrame.width - windowOnlyOverlayScreenMargin)
             let height = max(360, visibleFrame.height - windowOnlyOverlayScreenMargin)
@@ -425,9 +430,7 @@ extension SwitcherPanelController {
                 width: min(visibleFrame.width, width),
                 height: min(visibleFrame.height, height)
             )
-            if panel.contentRect(forFrameRect: panel.frame).size != targetSize {
-                panel.setContentSize(targetSize)
-            }
+            setPanelContentSize(targetSize, recenterScreen: recenterScreen)
             return
         }
 
@@ -435,9 +438,10 @@ extension SwitcherPanelController {
         let maxHeight = max(minimumPanelHeight, visibleFrame.height - panelScreenMargin)
         let preferredWidth: CGFloat
         if model.isPreviewLayerMode {
-            preferredWidth = preferredAppStripWidth(
+            preferredWidth = preferredPreviewLayerWidth(
                 appCount: model.appCount,
-                maxTileSize: previewLayerAppTileSize
+                windowCount: model.previewWindowCount,
+                maxPanelWidth: maxWidth
             )
         } else {
             preferredWidth = preferredAppStripWidth(
@@ -471,9 +475,7 @@ extension SwitcherPanelController {
                 maxHeight: maxHeight
             )
             let targetSize = NSSize(width: width, height: height)
-            if panel.contentRect(forFrameRect: panel.frame).size != targetSize {
-                panel.setContentSize(targetSize)
-            }
+            setPanelContentSize(targetSize, recenterScreen: recenterScreen)
             return
         }
 
@@ -516,22 +518,34 @@ extension SwitcherPanelController {
         }
 
         let targetSize = NSSize(width: width, height: height)
-        if panel.contentRect(forFrameRect: panel.frame).size != targetSize {
-            panel.setContentSize(targetSize)
-        }
+        setPanelContentSize(targetSize, recenterScreen: recenterScreen)
+    }
+
+    private func setPanelContentSize(_ targetSize: NSSize, recenterScreen: NSScreen?) {
+        let currentSize = panel.contentRect(forFrameRect: panel.frame).size
+        guard currentSize != targetSize else { return }
+
+        let widthDidChange = currentSize.width != targetSize.width
+        panel.setContentSize(targetSize)
+
+        guard widthDidChange, isPanelPresented else { return }
+        centerPanelOnActiveScreen(preferredScreen: recenterScreen)
     }
 
     func resolvedStandardPreviewSectionHeight(panelWidth: CGFloat, itemCount: Int) -> CGFloat {
-        let count = max(itemCount, 1)
         let availableWidth = max(
             1,
             panelWidth - SwitcherPanelLayoutMetrics.horizontalInset - standardPreviewWidthAdjustment
         )
-        let totalSpacing = standardPreviewCardSpacing * CGFloat(max(count - 1, 0))
-        let rawCardWidth = (availableWidth - totalSpacing) / CGFloat(count)
-        let cardWidth = max(
-            standardPreviewCardMinimumWidth,
-            min(standardPreviewCardMaximumWidth, rawCardWidth)
+        let page = SwitcherWindowPreviewPaging.page(
+            itemCount: itemCount,
+            selectedIndex: 0,
+            availableWidth: availableWidth
+        )
+        let count = max(page.visibleRange.count, 1)
+        let cardWidth = SwitcherWindowPreviewPaging.cardWidth(
+            cardAreaWidth: page.cardAreaWidth,
+            visibleCount: count
         )
         let cardHeight = max(
             standardPreviewSectionMinimumHeight,
@@ -547,6 +561,30 @@ extension SwitcherPanelController {
             CGFloat(count) * maxTileSize
             + CGFloat(max(count - 1, 0)) * spacing
         return max(appLayerMinimumWidth, stripWidth + SwitcherPanelLayoutMetrics.horizontalInset)
+    }
+
+    func preferredPreviewLayerWidth(
+        appCount: Int,
+        windowCount: Int,
+        maxPanelWidth: CGFloat
+    ) -> CGFloat {
+        let appStripWidth = preferredAppStripWidth(
+            appCount: appCount,
+            maxTileSize: previewLayerAppTileSize
+        )
+        let maximumPreviewAvailableWidth = max(
+            1,
+            maxPanelWidth - SwitcherPanelLayoutMetrics.horizontalInset - standardPreviewWidthAdjustment
+        )
+        let previewAvailableWidth = SwitcherWindowPreviewPaging.preferredAvailableWidth(
+            itemCount: windowCount,
+            maximumAvailableWidth: maximumPreviewAvailableWidth
+        )
+        let previewPanelWidth =
+            previewAvailableWidth
+            + SwitcherPanelLayoutMetrics.horizontalInset
+            + standardPreviewWidthAdjustment
+        return max(appStripWidth, previewPanelWidth)
     }
 
     func logSearchLayoutSizing(

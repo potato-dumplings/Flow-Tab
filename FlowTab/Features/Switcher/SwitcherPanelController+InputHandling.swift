@@ -66,6 +66,8 @@ extension SwitcherPanelController {
             delayedWindowLayerTimer.invalidate()
             self.delayedWindowLayerTimer = nil
         }
+        delayedWindowLayerDeadlineMs = nil
+        delayedWindowLayerAppID = nil
     }
 
     func handleKeyDown(_ event: NSEvent) -> Bool {

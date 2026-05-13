@@ -106,6 +106,8 @@ enum FlowTabUITestBootstrapper {
     }
 
     static func configurePanelControllerIfNeeded(panelController: SwitcherPanelController) {
+        installMockWindowPreviewsIfNeeded(panelController: panelController)
+
         if let bundleIdentifier = FlowTabTestLaunchOptions.frontmostBundleIdentifierOverride {
             panelController.modelForTesting.frontmostApplicationOverride = {
                 NSRunningApplication
@@ -133,6 +135,52 @@ enum FlowTabUITestBootstrapper {
         panelController.modelForTesting.isProcessRunningOverride = { pid in
             FlowTabUITestMockRuntimeEffects.isProcessRunning(pid: pid)
         }
+    }
+
+    private static func installMockWindowPreviewsIfNeeded(
+        panelController: SwitcherPanelController
+    ) {
+        guard FlowTabTestLaunchOptions.usesMockWindowPreviews else { return }
+        panelController.modelForTesting.previewCaptureOverride = { cgWindowID, _, title, inferTitleBarStyle in
+            (
+                image: makeMockWindowPreviewImage(
+                    title: title ?? "Window",
+                    cgWindowID: cgWindowID
+                ),
+                resolvedWindowID: cgWindowID ?? stableMockWindowID(title: title),
+                titleBarStyle: inferTitleBarStyle ? .dark : nil
+            )
+        }
+    }
+
+    private static func makeMockWindowPreviewImage(
+        title: String,
+        cgWindowID: CGWindowID?
+    ) -> NSImage {
+        let size = NSSize(width: 240, height: 150)
+        let image = NSImage(size: size)
+        image.lockFocus()
+        let hueSeed = Double(abs(title.hashValue % 360)) / 360.0
+        NSColor(calibratedHue: hueSeed, saturation: 0.45, brightness: 0.82, alpha: 1).setFill()
+        NSBezierPath(rect: NSRect(origin: .zero, size: size)).fill()
+        NSColor.black.withAlphaComponent(0.24).setFill()
+        NSBezierPath(rect: NSRect(x: 0, y: size.height - 26, width: size.width, height: 26)).fill()
+        let label = cgWindowID.map { "CG \($0)" } ?? title
+        let attributes: [NSAttributedString.Key: Any] = [
+            .foregroundColor: NSColor.white,
+            .font: NSFont.systemFont(ofSize: 13, weight: .semibold)
+        ]
+        (label as NSString).draw(
+            in: NSRect(x: 12, y: size.height - 21, width: size.width - 24, height: 18),
+            withAttributes: attributes
+        )
+        image.unlockFocus()
+        return image
+    }
+
+    private static func stableMockWindowID(title: String?) -> CGWindowID {
+        let seed = UInt32(abs((title ?? "Window").hashValue % 100_000))
+        return CGWindowID(900_000 + seed)
     }
 
     private static func installSwitcherTriggerNotificationsIfNeeded(

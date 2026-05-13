@@ -141,6 +141,25 @@ extension FlowTabPriorityCoverageTests {
             )
         }
     }
+
+    func manyWindowLayoutApp(windowCount: Int) -> AppSwitchCandidate {
+        let windows = (0..<windowCount).map { index in
+            WindowCandidate(
+                id: String(format: "many-window-%02d", index),
+                title: String(format: "Many Window %02d", index),
+                isMinimized: false,
+                lastActiveAt: TimeInterval(1_000 - index)
+            )
+        }
+        return AppSwitchCandidate(
+            id: "com.example.many-windows",
+            displayName: "Many Windows",
+            groupID: "layout",
+            lastActiveAt: 1_000,
+            windows: windows
+        )
+    }
+
     func makeRuntimeAppContext(
         appID: String,
         runningApp: NSRunningApplication,

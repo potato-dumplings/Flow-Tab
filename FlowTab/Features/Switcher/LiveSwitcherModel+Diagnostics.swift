@@ -114,6 +114,41 @@ extension LiveSwitcherModel {
         )
     }
 
+    func logSelectedAppWindowSnapshot(
+        result: String,
+        appID: String,
+        snapshot: RuntimeHomeAppSnapshot?,
+        startMs: Double,
+        snapshotReadMs: Double,
+        applyEndMs: Double
+    ) {
+        let windowCount = snapshot?.candidate.windows.count ?? 0
+        let pidCount = snapshot.map { selectedSnapshot in
+            Set(selectedSnapshot.context.windowsByID.values.map { context in
+                if context.ownerPID == 0 {
+                    return selectedSnapshot.context.runningApp.processIdentifier
+                }
+                return context.ownerPID
+            }).count
+        } ?? 0
+        let totalMs = applyEndMs - startMs
+        let fields: [(String, String)] = [
+            ("result", result),
+            ("appID", appID),
+            ("pids", "\(pidCount)"),
+            ("windows", "\(windowCount)"),
+            ("snapshotMs", Self.formatMilliseconds(snapshotReadMs - startMs)),
+            ("applyMs", Self.formatMilliseconds(applyEndMs - snapshotReadMs)),
+            ("totalMs", Self.formatMilliseconds(totalMs))
+        ]
+        let message = Self.snapshotLogLine("selectedAppWindowSnapshot", fields: fields)
+        if totalMs > 100 {
+            RuntimeLog.warning("Snapshot", message)
+        } else {
+            RuntimeLog.debug("Snapshot", message)
+        }
+    }
+
     func logMakeSnapshot(source: String, snapshot: RuntimeSnapshot, durationMs: Double) {
         RuntimeLog.debug(
             "Snapshot",

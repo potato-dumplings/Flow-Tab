@@ -360,6 +360,31 @@ private struct CommandTabOverlay: View {
     private func switcherWindowAccessibilityIdentifier(_ preview: WindowPreviewItem) -> String {
         SwitcherAccessibilityIdentifiers.window(id: preview.id)
     }
+
+    private func switcherWindowPreviewImageAccessibilityIdentifier(_ preview: WindowPreviewItem) -> String {
+        SwitcherAccessibilityIdentifiers.windowPreviewImage(id: preview.id)
+    }
+
+    private func switcherWindowAccessibilityValue(_ preview: WindowPreviewItem) -> String {
+        let imageState = preview.image == nil ? "preview=fallback" : "preview=image"
+        guard let appName = selectedApp?.displayName, !appName.isEmpty else {
+            return imageState
+        }
+        return "\(appName), \(imageState)"
+    }
+
+    @ViewBuilder
+    private func windowPreviewImageMarker(for preview: WindowPreviewItem) -> some View {
+        if preview.image != nil {
+            Rectangle()
+                .fill(Color.primary.opacity(0.001))
+                .frame(width: 1, height: 1)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text("Preview image"))
+                .accessibilityIdentifier(switcherWindowPreviewImageAccessibilityIdentifier(preview))
+        }
+    }
+
     @MainActor
     private func scrollToSearchResult(
         _ request: SearchResultScrollRequest,
@@ -439,18 +464,21 @@ private struct CommandTabOverlay: View {
 
                     HStack(spacing: SwitcherWindowPreviewPaging.itemSpacing) {
                         ForEach(pageItems) { preview in
-                            WindowPreviewCard(
-                                image: preview.image,
-                                title: preview.title,
-                                appIcon: selectedApp.flatMap(iconForApp),
-                                isSelected: preview.isSelected,
-                                width: cardWidth,
-                                height: cardHeight
-                            )
-                            .accessibilityElement(children: .ignore)
-                            .accessibilityLabel(Text(preview.title))
-                            .accessibilityValue(Text(selectedApp?.displayName ?? ""))
-                            .accessibilityIdentifier(switcherWindowAccessibilityIdentifier(preview))
+                            ZStack(alignment: .topLeading) {
+                                WindowPreviewCard(
+                                    image: preview.image,
+                                    title: preview.title,
+                                    appIcon: selectedApp.flatMap(iconForApp),
+                                    isSelected: preview.isSelected,
+                                    width: cardWidth,
+                                    height: cardHeight
+                                )
+                                .accessibilityElement(children: .ignore)
+                                .accessibilityLabel(Text(preview.title))
+                                .accessibilityValue(Text(switcherWindowAccessibilityValue(preview)))
+                                .accessibilityIdentifier(switcherWindowAccessibilityIdentifier(preview))
+                                windowPreviewImageMarker(for: preview)
+                            }
                             .id(preview.id)
                         }
                     }
@@ -600,19 +628,22 @@ private struct CommandTabOverlay: View {
                     spacing: layout.rowSpacing
                 ) {
                     ForEach(windowPreviewItems) { preview in
-                        WindowOnlyPreviewCard(
-                            image: preview.image,
-                            title: preview.title,
-                            appIcon: selectedAppIcon,
-                            titleBarStyle: preview.titleBarStyle,
-                            isSelected: preview.isSelected,
-                            width: layout.cardWidth,
-                            height: layout.cardHeight
-                        )
-                        .accessibilityElement(children: .ignore)
-                        .accessibilityLabel(Text(preview.title))
-                        .accessibilityValue(Text(selectedApp?.displayName ?? ""))
-                        .accessibilityIdentifier(switcherWindowAccessibilityIdentifier(preview))
+                        ZStack(alignment: .topLeading) {
+                            WindowOnlyPreviewCard(
+                                image: preview.image,
+                                title: preview.title,
+                                appIcon: selectedAppIcon,
+                                titleBarStyle: preview.titleBarStyle,
+                                isSelected: preview.isSelected,
+                                width: layout.cardWidth,
+                                height: layout.cardHeight
+                            )
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityLabel(Text(preview.title))
+                            .accessibilityValue(Text(switcherWindowAccessibilityValue(preview)))
+                            .accessibilityIdentifier(switcherWindowAccessibilityIdentifier(preview))
+                            windowPreviewImageMarker(for: preview)
+                        }
                         .id(preview.id)
                     }
                 }

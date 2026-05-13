@@ -154,41 +154,104 @@ extension SwitcherPanelController {
         scheduleDelayedWindowLayerEntryIfNeeded()
     }
 
-    func scheduleDelayedWindowLayerEntryIfNeeded() {
+    func scheduleDelayedWindowLayerEntryIfNeeded(preservingDeadline: Bool = false) {
         if let delayedWindowLayerTimer {
             delayedWindowLayerTimer.invalidate()
             self.delayedWindowLayerTimer = nil
         }
-        guard autoEnterWindowLayerEnabled else { return }
+        guard autoEnterWindowLayerEnabled else {
+            clearDelayedWindowLayerEntryState()
+            return
+        }
         guard !model.isSearchActive else {
-            RuntimeLog.info("AutoEnter", "skip searchActive")
+            clearDelayedWindowLayerEntryState()
+            RuntimeLog.debug("AutoEnter", "skip searchActive")
             return
         }
 
         guard isPanelPresented else {
-            RuntimeLog.info("AutoEnter", "skip panelHidden")
+            clearDelayedWindowLayerEntryState()
+            RuntimeLog.debug("AutoEnter", "skip panelHidden")
             return
         }
-        guard model.canAutoEnterWindowLayer else {
-            RuntimeLog.info("AutoEnter", "skip \(self.model.debugSelectionSummary())")
+        guard let session = model.session, case .appCycle = session.mode else {
+            clearDelayedWindowLayerEntryState()
             return
         }
-        RuntimeLog.info("AutoEnter", "schedule delay=\(self.windowLayerPresentationDelay)s \(self.model.debugSelectionSummary())")
 
-        let timer = Timer(timeInterval: windowLayerPresentationDelay, repeats: false) { [weak self] _ in
+        let selectedAppID = session.selectedApp.id
+        let nowMs = monotonicMilliseconds()
+        if
+            !preservingDeadline
+                || delayedWindowLayerAppID != selectedAppID
+                || delayedWindowLayerDeadlineMs == nil
+        {
+            delayedWindowLayerAppID = selectedAppID
+            delayedWindowLayerDeadlineMs = nowMs + windowLayerPresentationDelay * 1_000
+        }
+
+        let deadlineMs = delayedWindowLayerDeadlineMs ?? nowMs
+        let requestedSnapshot = model.scheduleSelectedAppWindowSnapshotIfNeeded(for: selectedAppID)
+        guard model.canAutoEnterWindowLayer else {
+            RuntimeLog.debug(
+                "AutoEnter",
+                "pending appID=\(selectedAppID) requestedSnapshot=\(requestedSnapshot) deadlineMs=\(formatMilliseconds(deadlineMs)) \(self.model.debugSelectionSummary())"
+            )
+            return
+        }
+        let remainingDelay = max(0, (deadlineMs - nowMs) / 1_000)
+        RuntimeLog.debug(
+            "AutoEnter",
+            "schedule delay=\(remainingDelay)s deadlineMs=\(formatMilliseconds(deadlineMs)) \(self.model.debugSelectionSummary())"
+        )
+
+        guard remainingDelay > 0 else {
+            enterDelayedWindowLayerIfReady(reason: "deadlineElapsed")
+            return
+        }
+
+        let timer = Timer(timeInterval: remainingDelay, repeats: false) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                guard self.isPanelPresented else { return }
-                if self.model.autoEnterWindowLayerIfPossible() {
-                    RuntimeLog.info("AutoEnter", "entered window layer \(self.model.debugSelectionSummary())")
-                    self.updatePanelSize()
-                } else {
-                    RuntimeLog.info("AutoEnter", "timer fired but stay app layer \(self.model.debugSelectionSummary())")
-                }
+                self.enterDelayedWindowLayerIfReady(reason: "timer")
             }
         }
         RunLoop.main.add(timer, forMode: .common)
         delayedWindowLayerTimer = timer
+    }
+
+    func enterDelayedWindowLayerIfReady(reason: String) {
+        guard isPanelPresented else {
+            clearDelayedWindowLayerEntryState()
+            return
+        }
+        let nowMs = monotonicMilliseconds()
+        let deadlineMs = delayedWindowLayerDeadlineMs ?? nowMs
+        let overshootMs = max(0, nowMs - deadlineMs)
+        if model.autoEnterWindowLayerIfPossible() {
+            RuntimeLog.debug(
+                "AutoEnter",
+                "entered reason=\(reason) overshootMs=\(formatMilliseconds(overshootMs)) \(self.model.debugSelectionSummary())"
+            )
+            if overshootMs > 10 {
+                RuntimeLog.warning(
+                    "AutoEnter",
+                    "deadline overshootMs=\(formatMilliseconds(overshootMs)) \(self.model.debugSelectionSummary())"
+                )
+            }
+            clearDelayedWindowLayerEntryState()
+            updatePanelSize()
+        } else {
+            RuntimeLog.debug(
+                "AutoEnter",
+                "timer fired but stay app layer reason=\(reason) \(self.model.debugSelectionSummary())"
+            )
+        }
+    }
+
+    func clearDelayedWindowLayerEntryState() {
+        delayedWindowLayerDeadlineMs = nil
+        delayedWindowLayerAppID = nil
     }
 
     func terminateSelectedApp() {

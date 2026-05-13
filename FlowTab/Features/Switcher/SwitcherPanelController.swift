@@ -30,6 +30,8 @@ final class SwitcherPanelController {
     var pendingModifierReleaseConfirmationTask: Task<Void, Never>?
     var panelPresentationRecoveryTask: Task<Void, Never>?
     var delayedWindowLayerTimer: Timer?
+    var delayedWindowLayerDeadlineMs: Double?
+    var delayedWindowLayerAppID: String?
     var lastCommittedTabAdvanceTimestamp: TimeInterval?
     var ignoreHotkeyPressesUntil: TimeInterval = 0
     var ignoreActiveSpaceChangesUntil: TimeInterval = 0
@@ -59,9 +61,6 @@ final class SwitcherPanelController {
     let appLayerSearchHeaderExtraHeight: CGFloat = 68
     let standardPreviewSectionMinimumHeight: CGFloat = 130
     let standardPreviewSectionMaximumHeight: CGFloat = 220
-    let standardPreviewCardMinimumWidth: CGFloat = 120
-    let standardPreviewCardMaximumWidth: CGFloat = 360
-    let standardPreviewCardSpacing: CGFloat = 12
     let standardPreviewHeightRatio: CGFloat = 0.62
     let standardPreviewWidthAdjustment: CGFloat = 4
     let minimumPanelHeight: CGFloat = 140
@@ -151,6 +150,7 @@ final class SwitcherPanelController {
                 return
             }
             self.updatePanelSize()
+            self.scheduleDelayedWindowLayerEntryIfNeeded(preservingDeadline: true)
         }
 
         appDidResignActiveObserver = NotificationCenter.default.addObserver(
@@ -351,6 +351,10 @@ enum SwitcherAccessibilityIdentifiers {
 
     static func window(id: String) -> String {
         "flowtab.switcher.window.\(id.flowTabAccessibilitySlug)"
+    }
+
+    static func windowPreviewImage(id: String) -> String {
+        "flowtab.switcher.window-preview-image.\(id.flowTabAccessibilitySlug)"
     }
 }
 

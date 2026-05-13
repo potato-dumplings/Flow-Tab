@@ -36,8 +36,11 @@ enum SwitcherWindowPreviewPaging {
     static let itemSpacing: CGFloat = 12
     static let indicatorWidth: CGFloat = 28
     static let indicatorSpacing: CGFloat = 8
+    static let targetCardWidth: CGFloat = 140
+    static let minimumVisibleSlots = 6
+    static let maximumVisibleSlots = 16
 
-    private static let minCardWidth: CGFloat = 120
+    private static let minimumRenderedCardWidth: CGFloat = 36
     private static let maxCardWidth: CGFloat = 360
 
     static func page(
@@ -79,7 +82,27 @@ enum SwitcherWindowPreviewPaging {
         let count = max(visibleCount, 1)
         let totalSpacing = itemSpacing * CGFloat(max(count - 1, 0))
         let rawWidth = (cardAreaWidth - totalSpacing) / CGFloat(count)
-        return max(minCardWidth, min(maxCardWidth, rawWidth))
+        return max(minimumRenderedCardWidth, min(maxCardWidth, rawWidth))
+    }
+
+    static func preferredAvailableWidth(
+        itemCount: Int,
+        maximumAvailableWidth: CGFloat
+    ) -> CGFloat {
+        guard itemCount > 0 else { return 0 }
+        let maximumPage = page(
+            itemCount: itemCount,
+            selectedIndex: 0,
+            availableWidth: maximumAvailableWidth
+        )
+        let visibleCount = max(maximumPage.visibleRange.count, 1)
+        let cardAreaWidth =
+            CGFloat(visibleCount) * targetCardWidth
+            + CGFloat(max(visibleCount - 1, 0)) * itemSpacing
+        let indicatorReserve = maximumPage.showsNavigationIndicators
+            ? navigationIndicatorReserveWidth
+            : 0
+        return cardAreaWidth + indicatorReserve
     }
 
     private static var navigationIndicatorReserveWidth: CGFloat {
@@ -87,8 +110,8 @@ enum SwitcherWindowPreviewPaging {
     }
 
     private static func capacity(for availableWidth: CGFloat) -> Int {
-        guard availableWidth > 0 else { return 1 }
-        let capacity = floor((availableWidth + itemSpacing) / (minCardWidth + itemSpacing))
-        return max(1, Int(capacity))
+        guard availableWidth > 0 else { return minimumVisibleSlots }
+        let capacity = floor((availableWidth + itemSpacing) / (targetCardWidth + itemSpacing))
+        return min(maximumVisibleSlots, max(minimumVisibleSlots, Int(capacity)))
     }
 }

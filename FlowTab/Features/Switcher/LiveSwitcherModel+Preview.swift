@@ -16,6 +16,8 @@ extension LiveSwitcherModel {
     func clearPreviewSnapshotState() {
         previewImageCache.removeAll()
         previewCaptureAttemptedKeys = []
+        previewCaptureInFlightKeys = []
+        previewCaptureGeneration &+= 1
         previewSnapshotFrozenAppIDs = []
     }
 
@@ -79,7 +81,14 @@ extension LiveSwitcherModel {
         guard var windowContext = appContext.windowsByID[window.id] else {
             return (image: nil, titleBarStyle: nil)
         }
-        let previewCacheKey = "\(appID)#\(window.id)"
+        let ownerPID = windowContext.ownerPID == 0
+            ? appContext.runningApp.processIdentifier
+            : windowContext.ownerPID
+        let previewCacheKey = Self.previewCacheKey(
+            appID: appID,
+            ownerPID: ownerPID,
+            windowContext: windowContext
+        )
         if let cached = previewImageCache.image(forKey: previewCacheKey) {
             return (
                 image: cached,
@@ -94,57 +103,47 @@ extension LiveSwitcherModel {
             )
         }
         previewCaptureAttemptedKeys.insert(previewCacheKey)
-        let ownerPID = windowContext.ownerPID == 0
-            ? appContext.runningApp.processIdentifier
-            : windowContext.ownerPID
 
-        RuntimeLog.info(
-            "Preview",
-            "attempt appID=\(appID) pid=\(ownerPID) windowID=\(window.id) mappedCG=\(windowContext.cgWindowID.map(String.init) ?? "nil") title=\(windowContext.title)"
-        )
-        guard
-            let capture = {
-                if let previewCaptureOverride {
-                    return previewCaptureOverride(
-                        windowContext.cgWindowID,
-                        ownerPID,
-                        windowContext.title,
-                        titleBarStyleInferenceEnabled
-                    )
-                }
-                return RuntimeWindowPreviewProvider.captureWindowPreview(
-                    preferredWindowID: windowContext.cgWindowID,
-                    ownerPID: ownerPID,
-                    preferredTitle: windowContext.title,
-                    inferTitleBarStyle: titleBarStyleInferenceEnabled
+        if let previewCaptureOverride {
+            guard
+                let capture = previewCaptureOverride(
+                    windowContext.cgWindowID,
+                    ownerPID,
+                    windowContext.title,
+                    titleBarStyleInferenceEnabled
                 )
-            }()
-        else {
-            RuntimeLog.info("Preview", "attempt failed appID=\(appID) windowID=\(window.id)")
+            else {
+                RuntimeLog.debug("Preview", "attempt failed appID=\(appID) windowID=\(window.id)")
+                return (
+                    image: nil,
+                    titleBarStyle: titleBarStyleInferenceEnabled ? windowContext.inferredTitleBarStyle : nil
+                )
+            }
+            applyPreviewCapture(
+                capture,
+                appID: appID,
+                windowID: window.id,
+                ownerPID: ownerPID,
+                initialCacheKey: previewCacheKey
+            )
             return (
-                image: nil,
-                titleBarStyle: titleBarStyleInferenceEnabled ? windowContext.inferredTitleBarStyle : nil
+                image: capture.image,
+                titleBarStyle: titleBarStyleInferenceEnabled ? capture.titleBarStyle : nil
             )
         }
 
-        windowContext.cgWindowID = capture.resolvedWindowID
-        windowContext.inferredTitleBarStyle = capture.titleBarStyle
-        previewImageCache.insert(capture.image, forKey: previewCacheKey)
-        var windowsByID = appContext.windowsByID
-        windowsByID[window.id] = windowContext
-        appContext = RuntimeAppContext(
-            appID: appContext.appID,
-            runningApp: appContext.runningApp,
-            windowsByID: windowsByID
-        )
-        runtimeContextsByID[appID] = appContext
-        RuntimeLog.info(
-            "Preview",
-            "attempt success appID=\(appID) windowID=\(window.id) resolvedCG=\(capture.resolvedWindowID) titleBarStyle=\(capture.titleBarStyle?.rawValue ?? "nil")"
+        scheduleRuntimePreviewCapture(
+            appID: appID,
+            windowID: window.id,
+            ownerPID: ownerPID,
+            preferredWindowID: windowContext.cgWindowID,
+            preferredTitle: windowContext.title,
+            inferTitleBarStyle: titleBarStyleInferenceEnabled,
+            initialCacheKey: previewCacheKey
         )
         return (
-            image: capture.image,
-            titleBarStyle: titleBarStyleInferenceEnabled ? capture.titleBarStyle : nil
+            image: nil,
+            titleBarStyle: titleBarStyleInferenceEnabled ? windowContext.inferredTitleBarStyle : nil
         )
     }
 
@@ -179,6 +178,132 @@ extension LiveSwitcherModel {
                 isSelected: index == selectedIndex
             )
         }
+    }
+
+    private static func previewCacheKey(
+        appID: String,
+        ownerPID: pid_t,
+        windowContext: RuntimeWindowContext
+    ) -> String {
+        [
+            appID,
+            "pid:\(ownerPID)",
+            "cg:\(windowContext.cgWindowID.map(String.init) ?? "nil")",
+            "window:\(windowContext.id)",
+            "title:\(windowContext.title)"
+        ].joined(separator: "#")
+    }
+
+    private func scheduleRuntimePreviewCapture(
+        appID: String,
+        windowID: String,
+        ownerPID: pid_t,
+        preferredWindowID: CGWindowID?,
+        preferredTitle: String,
+        inferTitleBarStyle: Bool,
+        initialCacheKey: String
+    ) {
+        guard !previewCaptureInFlightKeys.contains(initialCacheKey) else { return }
+        previewCaptureInFlightKeys.insert(initialCacheKey)
+        let generation = previewCaptureGeneration
+        let semaphore = previewCaptureSemaphore
+        let startMs = Self.monotonicMilliseconds()
+        RuntimeLog.debug(
+            "Preview",
+            "capture scheduled appID=\(appID) pid=\(ownerPID) windowID=\(windowID) mappedCG=\(preferredWindowID.map(String.init) ?? "nil")"
+        )
+        DispatchQueue.global(qos: .userInitiated).async {
+            semaphore.wait()
+            let capture = RuntimeWindowPreviewProvider.captureWindowPreview(
+                preferredWindowID: preferredWindowID,
+                ownerPID: ownerPID,
+                preferredTitle: preferredTitle,
+                inferTitleBarStyle: inferTitleBarStyle
+            )
+            semaphore.signal()
+            let completeMs = Self.monotonicMilliseconds()
+            Task { @MainActor [weak self] in
+                self?.completeRuntimePreviewCapture(
+                    capture,
+                    appID: appID,
+                    windowID: windowID,
+                    ownerPID: ownerPID,
+                    initialCacheKey: initialCacheKey,
+                    generation: generation,
+                    startMs: startMs,
+                    completeMs: completeMs
+                )
+            }
+        }
+    }
+
+    private func completeRuntimePreviewCapture(
+        _ capture: (image: NSImage, resolvedWindowID: CGWindowID, titleBarStyle: WindowTitleBarStyleGuess?)?,
+        appID: String,
+        windowID: String,
+        ownerPID: pid_t,
+        initialCacheKey: String,
+        generation: UInt64,
+        startMs: Double,
+        completeMs: Double
+    ) {
+        previewCaptureInFlightKeys.remove(initialCacheKey)
+        guard generation == previewCaptureGeneration else {
+            RuntimeLog.debug("Preview", "capture stale appID=\(appID) windowID=\(windowID)")
+            return
+        }
+        guard let capture else {
+            RuntimeLog.debug(
+                "Preview",
+                "capture failed appID=\(appID) windowID=\(windowID) durationMs=\(Self.formatPreviewMilliseconds(completeMs - startMs))"
+            )
+            return
+        }
+        applyPreviewCapture(
+            capture,
+            appID: appID,
+            windowID: windowID,
+            ownerPID: ownerPID,
+            initialCacheKey: initialCacheKey
+        )
+        RuntimeLog.debug(
+            "Preview",
+            "capture success appID=\(appID) windowID=\(windowID) resolvedCG=\(capture.resolvedWindowID) titleBarStyle=\(capture.titleBarStyle?.rawValue ?? "nil") durationMs=\(Self.formatPreviewMilliseconds(completeMs - startMs))"
+        )
+        objectWillChange.send()
+    }
+
+    private func applyPreviewCapture(
+        _ capture: (image: NSImage, resolvedWindowID: CGWindowID, titleBarStyle: WindowTitleBarStyleGuess?),
+        appID: String,
+        windowID: String,
+        ownerPID: pid_t,
+        initialCacheKey: String
+    ) {
+        guard var appContext = runtimeContextsByID[appID] else { return }
+        guard var windowContext = appContext.windowsByID[windowID] else { return }
+        windowContext.cgWindowID = capture.resolvedWindowID
+        windowContext.inferredTitleBarStyle = capture.titleBarStyle
+        var windowsByID = appContext.windowsByID
+        windowsByID[windowID] = windowContext
+        appContext = RuntimeAppContext(
+            appID: appContext.appID,
+            runningApp: appContext.runningApp,
+            windowsByID: windowsByID
+        )
+        runtimeContextsByID[appID] = appContext
+        let resolvedCacheKey = Self.previewCacheKey(
+            appID: appID,
+            ownerPID: ownerPID,
+            windowContext: windowContext
+        )
+        previewImageCache.insert(capture.image, forKey: initialCacheKey)
+        previewImageCache.insert(capture.image, forKey: resolvedCacheKey)
+        previewCaptureAttemptedKeys.insert(resolvedCacheKey)
+    }
+
+    private static func formatPreviewMilliseconds(_ value: Double) -> String {
+        String(format: "%.3f", value)
     }
 
     private func indexedPreviewWindows(

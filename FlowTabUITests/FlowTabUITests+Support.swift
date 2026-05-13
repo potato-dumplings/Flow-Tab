@@ -69,6 +69,9 @@ private extension FlowTabUITestAppIdentity {
 struct SwitcherWindowCardObservation: Equatable {
     let identifier: String
     let title: String
+    let value: String
+    let frame: CGRect
+    let hasImage: Bool
 }
 
 private extension String {
@@ -531,17 +534,35 @@ extension FlowTabUITests {
         return app.descendants(matching: .any)
             .matching(NSPredicate(format: "identifier BEGINSWITH %@", "flowtab.switcher.window."))
             .allElementsBoundByIndex
-            .compactMap { element in
+            .compactMap { element -> SwitcherWindowCardObservation? in
                 guard element.exists else { return nil }
                 guard seenIdentifiers.insert(element.identifier).inserted else { return nil }
                 let title = element.label.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !title.isEmpty else { return nil }
+                let value = elementStringValue(element)
+                let imageMarker = self.element(
+                    in: app,
+                    identifier: previewImageIdentifier(for: element.identifier)
+                )
                 return SwitcherWindowCardObservation(
                     identifier: element.identifier,
-                    title: title
+                    title: title,
+                    value: value,
+                    frame: element.frame,
+                    hasImage: value.contains("preview=image") || imageMarker.exists
                 )
             }
     }
+
+    func previewImageIdentifier(for windowIdentifier: String) -> String {
+        let windowPrefix = "flowtab.switcher.window."
+        let imagePrefix = "flowtab.switcher.window-preview-image."
+        guard windowIdentifier.hasPrefix(windowPrefix) else {
+            return "\(imagePrefix)\(windowIdentifier)"
+        }
+        return imagePrefix + windowIdentifier.dropFirst(windowPrefix.count)
+    }
+
     func waitForSwitcherWindowCards(
         in app: XCUIApplication,
         expectedTitles: [String],

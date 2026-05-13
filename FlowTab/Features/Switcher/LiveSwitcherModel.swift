@@ -66,6 +66,8 @@ final class LiveSwitcherModel: ObservableObject {
     var onSearchResultScrollRequestForTesting: ((String) -> Void)?
     var snapshotProviderOverride: (() -> RuntimeSnapshot)?
     var fastAppSnapshotProviderOverride: (() -> RuntimeSnapshot)?
+    var selectedAppSnapshotProviderOverride: ((String) -> RuntimeHomeAppSnapshot?)?
+    var backgroundFullSnapshotProviderOverride: (() -> RuntimeSnapshot)?
     var frontmostApplicationOverride: (() -> NSRunningApplication?)?
     var focusedWindowIdentityOverride: ((NSRunningApplication) -> RuntimeFocusedWindowIdentity?)?
     var frontmostRuntimeWindowIDOverride: ((
@@ -89,6 +91,9 @@ final class LiveSwitcherModel: ObservableObject {
     var runtimeContextsByID: [String: RuntimeAppContext] = [:]
     var rememberedWindowIDByAppID: [String: String] = [:]
     var previewCaptureAttemptedKeys: Set<String> = []
+    var previewCaptureInFlightKeys: Set<String> = []
+    var previewCaptureGeneration: UInt64 = 0
+    let previewCaptureSemaphore = DispatchSemaphore(value: 4)
     var previewSnapshotFrozenAppIDs: Set<String> = []
     var autoEnterSuppressedAppID: String?
     var titleBarStyleInferenceEnabled = false
@@ -98,6 +103,8 @@ final class LiveSwitcherModel: ObservableObject {
     var pendingTerminateRequest: PendingTerminateRequest?
     var backgroundFullSnapshotRefreshGeneration: UInt64 = 0
     var backgroundFullSnapshotRefreshEnabled = true
+    var selectedAppWindowSnapshotGeneration: UInt64 = 0
+    var selectedAppWindowSnapshotPendingAppID: String?
     var searchComputationRevision: UInt64 = 0
     var searchDebounceNanoseconds: UInt64 = 20_000_000
 
@@ -196,6 +203,7 @@ final class LiveSwitcherModel: ObservableObject {
 
     func startSession(triggerDirection: CycleDirection) -> Bool {
         cancelPendingTerminateRefresh()
+        invalidateSelectedAppWindowSnapshot()
         clearTerminateSelectedAppAnimation()
         overlayStyle = .appAndWindow
         titleBarStyleInferenceEnabled = false
@@ -209,6 +217,7 @@ final class LiveSwitcherModel: ObservableObject {
     func startFocusedAppWindowSession(triggerDirection: CycleDirection) -> Bool {
         let startMs = Self.monotonicMilliseconds()
         cancelPendingTerminateRefresh()
+        invalidateSelectedAppWindowSnapshot()
         clearTerminateSelectedAppAnimation()
         overlayStyle = .windowOnly
         titleBarStyleInferenceEnabled = true
@@ -556,6 +565,7 @@ final class LiveSwitcherModel: ObservableObject {
     }
 
     func resetRuntimeState() {
+        invalidateSelectedAppWindowSnapshot()
         runtimeContextsByID = [:]
         clearPreviewSnapshotState()
         autoEnterSuppressedAppID = nil

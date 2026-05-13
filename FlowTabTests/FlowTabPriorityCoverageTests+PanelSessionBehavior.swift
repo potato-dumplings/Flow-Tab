@@ -391,6 +391,151 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testSwitcherPanelControllerDelayedAutoEnterPreservesDeadlineForLateSelectedAppSnapshot() async {
+        let controller = SwitcherPanelController()
+        let currentApp = NSRunningApplication.current
+        let appID = "com.example.deferred-window-snapshot"
+        let windows = [
+            WindowCandidate(id: "deferred-1", title: "Deferred One", isMinimized: false, lastActiveAt: 30),
+            WindowCandidate(id: "deferred-2", title: "Deferred Two", isMinimized: false, lastActiveAt: 20)
+        ]
+        let appOnlyCandidate = AppSwitchCandidate(
+            id: appID,
+            displayName: "Deferred Snapshot",
+            groupID: "deferred",
+            lastActiveAt: 100,
+            windows: []
+        )
+        let windowCandidate = AppSwitchCandidate(
+            id: appID,
+            displayName: "Deferred Snapshot",
+            groupID: "deferred",
+            lastActiveAt: 100,
+            windows: windows
+        )
+        let context = makeRuntimeAppContext(appID: appID, runningApp: currentApp, windows: windows)
+        let selectedSnapshot = RuntimeHomeAppSnapshot(
+            summary: RuntimeHomeAppSummary(
+                appID: appID,
+                displayName: "Deferred Snapshot",
+                groupID: "deferred",
+                lastActiveAt: 100,
+                windowCount: windows.count,
+                pid: currentApp.processIdentifier
+            ),
+            candidate: windowCandidate,
+            context: context
+        )
+        let requestsLock = NSLock()
+        var selectedSnapshotRequests: [String] = []
+
+        controller.windowLayerPresentationDelayOverride = 0.01
+        controller.modelForTesting.fastAppSnapshotProviderOverride = {
+            RuntimeSnapshot(apps: [appOnlyCandidate], contextsByID: [:])
+        }
+        controller.modelForTesting.snapshotProviderOverride = {
+            RuntimeSnapshot(apps: [appOnlyCandidate], contextsByID: [:])
+        }
+        controller.modelForTesting.selectedAppSnapshotProviderOverride = { requestedAppID in
+            requestsLock.lock()
+            selectedSnapshotRequests.append(requestedAppID)
+            requestsLock.unlock()
+            Thread.sleep(forTimeInterval: 0.04)
+            return selectedSnapshot
+        }
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        XCTAssertEqual(controller.modelForTesting.session?.selectedApp.windows.count, 0)
+
+        controller.scheduleDelayedWindowLayerEntryForTesting()
+
+        try? await Task.sleep(nanoseconds: 140_000_000)
+        requestsLock.lock()
+        let recordedRequests = selectedSnapshotRequests
+        requestsLock.unlock()
+        XCTAssertEqual(recordedRequests, [appID])
+        XCTAssertEqual(
+            controller.modelForTesting.session?.mode,
+            .windowCycle(appID: appID)
+        )
+        controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
+    func testLiveSwitcherModelDelaysBackgroundFullSnapshotWhileSelectedAppSnapshotIsPending() async {
+        let controller = SwitcherPanelController()
+        let currentApp = NSRunningApplication.current
+        let appID = "com.example.pending-window-snapshot"
+        let windows = [
+            WindowCandidate(id: "pending-1", title: "Pending One", isMinimized: false, lastActiveAt: 30),
+            WindowCandidate(id: "pending-2", title: "Pending Two", isMinimized: false, lastActiveAt: 20)
+        ]
+        let appOnlyCandidate = AppSwitchCandidate(
+            id: appID,
+            displayName: "Pending Snapshot",
+            groupID: "pending",
+            lastActiveAt: 100,
+            windows: []
+        )
+        let windowCandidate = AppSwitchCandidate(
+            id: appID,
+            displayName: "Pending Snapshot",
+            groupID: "pending",
+            lastActiveAt: 100,
+            windows: windows
+        )
+        let context = makeRuntimeAppContext(appID: appID, runningApp: currentApp, windows: windows)
+        let selectedSnapshot = RuntimeHomeAppSnapshot(
+            summary: RuntimeHomeAppSummary(
+                appID: appID,
+                displayName: "Pending Snapshot",
+                groupID: "pending",
+                lastActiveAt: 100,
+                windowCount: windows.count,
+                pid: currentApp.processIdentifier
+            ),
+            candidate: windowCandidate,
+            context: context
+        )
+        let lock = NSLock()
+        var backgroundFullSnapshotCalls = 0
+
+        controller.windowLayerPresentationDelayOverride = 0.01
+        controller.modelForTesting.fastAppSnapshotProviderOverride = {
+            RuntimeSnapshot(apps: [appOnlyCandidate], contextsByID: [:])
+        }
+        controller.modelForTesting.snapshotProviderOverride = {
+            RuntimeSnapshot(apps: [appOnlyCandidate], contextsByID: [:])
+        }
+        controller.modelForTesting.backgroundFullSnapshotProviderOverride = {
+            lock.lock()
+            backgroundFullSnapshotCalls += 1
+            lock.unlock()
+            return RuntimeSnapshot(apps: [windowCandidate], contextsByID: [appID: context])
+        }
+        controller.modelForTesting.selectedAppSnapshotProviderOverride = { _ in
+            Thread.sleep(forTimeInterval: 0.24)
+            return selectedSnapshot
+        }
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        controller.scheduleDelayedWindowLayerEntryForTesting()
+
+        try? await Task.sleep(nanoseconds: 190_000_000)
+        lock.lock()
+        let callsWhilePending = backgroundFullSnapshotCalls
+        lock.unlock()
+        XCTAssertEqual(callsWhilePending, 0)
+
+        try? await Task.sleep(nanoseconds: 260_000_000)
+        lock.lock()
+        let callsAfterPending = backgroundFullSnapshotCalls
+        lock.unlock()
+        XCTAssertGreaterThan(callsAfterPending, 0)
+        controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
     func testSwitcherPanelControllerShowSkipsHidingRegularWindowsWhileAppIsActive() {
         let controller = SwitcherPanelController()
         controller.modelForTesting.snapshotProviderOverride = {
@@ -462,6 +607,49 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(controller.modelForTesting.appGridSpacing, 10, accuracy: 0.001)
         XCTAssertLessThan(controller.modelForTesting.appGridTileSize, 90)
         XCTAssertEqual(controller.panelContentSizeForTesting.width, 1360, accuracy: 0.001)
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerPreviewLayerUsesWindowPreviewWidthForSingleAppManyWindows() {
+        let controller = SwitcherPanelController()
+        let app = manyWindowLayoutApp(windowCount: 100)
+        controller.modelForTesting.snapshotProviderOverride = {
+            RuntimeSnapshot(apps: [app], contextsByID: [:])
+        }
+
+        XCTAssertTrue(controller.modelForTesting.startSession(triggerDirection: .forward))
+        XCTAssertTrue(controller.modelForTesting.autoEnterWindowLayerIfPossible())
+
+        controller.updatePanelSizeForTesting(
+            visibleFrame: CGRect(x: 0, y: 0, width: 1440, height: 900)
+        )
+
+        XCTAssertEqual(controller.modelForTesting.appGridTileSize, 68, accuracy: 0.001)
+        XCTAssertEqual(controller.modelForTesting.appGridSpacing, 0, accuracy: 0.001)
+        XCTAssertEqual(controller.panelContentSizeForTesting.width, 1344, accuracy: 0.001)
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerRecentersPresentedPanelWhenPreviewLayerExpandsWidth() {
+        let controller = SwitcherPanelController()
+        let app = manyWindowLayoutApp(windowCount: 100)
+        let visibleFrame = CGRect(x: 0, y: 0, width: 1440, height: 900)
+        controller.modelForTesting.snapshotProviderOverride = {
+            RuntimeSnapshot(apps: [app], contextsByID: [:])
+        }
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+
+        controller.updatePanelSizeForTesting(visibleFrame: visibleFrame)
+        let appLayerFrame = controller.panel.frame
+
+        XCTAssertTrue(controller.modelForTesting.autoEnterWindowLayerIfPossible())
+
+        controller.updatePanelSizeForTesting(visibleFrame: visibleFrame)
+        let previewLayerFrame = controller.panel.frame
+
+        XCTAssertGreaterThan(previewLayerFrame.width, appLayerFrame.width)
+        XCTAssertEqual(previewLayerFrame.midX, appLayerFrame.midX, accuracy: 0.5)
     }
 
 }
