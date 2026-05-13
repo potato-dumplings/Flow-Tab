@@ -64,6 +64,49 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testSwitcherPanelVisibilityProbeIncludesContentStateForInAppSession() {
+        let controller = SwitcherPanelController()
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let windows = [
+            WindowCandidate(id: "front-1", title: "Inbox", isMinimized: false, lastActiveAt: 30),
+            WindowCandidate(id: "front-2", title: "Draft", isMinimized: false, lastActiveAt: 20)
+        ]
+        controller.modelForTesting.frontmostApplicationOverride = { currentApp }
+        controller.modelForTesting.snapshotProviderOverride = {
+            RuntimeSnapshot(
+                apps: [
+                    AppSwitchCandidate(
+                        id: appID,
+                        displayName: currentApp.localizedName ?? "Current App",
+                        groupID: "current",
+                        lastActiveAt: 100,
+                        windows: windows
+                    )
+                ],
+                contextsByID: [
+                    appID: self.makeRuntimeAppContext(
+                        appID: appID,
+                        runningApp: currentApp,
+                        windows: windows
+                    )
+                ]
+            )
+        }
+
+        XCTAssertTrue(controller.beginInAppWindowHotkeySessionForTesting())
+        let summary = controller.panelContentProbeSummary()
+
+        XCTAssertTrue(summary.contains("content=ready"))
+        XCTAssertTrue(summary.contains("overlay=windowOnly"))
+        XCTAssertTrue(summary.contains("mode=windowCycle(\(appID))"))
+        XCTAssertTrue(summary.contains("selectedAppID=\(appID)"))
+        XCTAssertTrue(summary.contains("selectedWindows=2"))
+        XCTAssertTrue(summary.contains("selectedWindowID=front-1"))
+        controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
     func testSwitcherPanelControllerGlobalHotkeyAdvanceAndReleaseCommitSession() async {
         let controller = SwitcherPanelController()
         controller.modelForTesting.snapshotProviderOverride = {
@@ -175,6 +218,49 @@ extension FlowTabPriorityCoverageTests {
         try? await Task.sleep(nanoseconds: 80_000_000)
         XCTAssertEqual(snapshotService.recordedHomeAppIDs(), [appID])
         XCTAssertEqual(model.session?.selectedApp.windows.map(\.id), ["shared-window-1", "shared-window-2"])
+    }
+
+    @MainActor
+    func testLiveSwitcherModelFocusedWindowSessionUsesFocusedRuntimeSnapshotSource() {
+        let runningApp = NSRunningApplication.current
+        let appID = runningApp.bundleIdentifier ?? "pid:\(runningApp.processIdentifier)"
+        let windows = [
+            WindowCandidate(id: "focused-window-1", title: "Focused One", isMinimized: false, lastActiveAt: 20),
+            WindowCandidate(id: "focused-window-2", title: "Focused Two", isMinimized: false, lastActiveAt: 10)
+        ]
+        let candidate = AppSwitchCandidate(
+            id: appID,
+            displayName: "Focused Runtime Source",
+            groupID: "focused-runtime-source",
+            lastActiveAt: 100,
+            windows: windows
+        )
+        let focusedSnapshot = RuntimeHomeAppSnapshot(
+            summary: RuntimeHomeAppSummary(
+                appID: appID,
+                displayName: "Focused Runtime Source",
+                groupID: "focused-runtime-source",
+                lastActiveAt: 100,
+                windowCount: windows.count,
+                pid: runningApp.processIdentifier
+            ),
+            candidate: candidate,
+            context: makeRuntimeAppContext(appID: appID, runningApp: runningApp, windows: windows)
+        )
+        let snapshotService = RecordingRuntimeSnapshotService(
+            focusedSnapshotsByPID: [runningApp.processIdentifier: focusedSnapshot]
+        )
+        let model = LiveSwitcherModel(snapshotService: snapshotService)
+        model.frontmostApplicationOverride = { runningApp }
+        model.focusedWindowIdentityOverride = { _ in nil }
+        model.frontmostRuntimeWindowIDOverride = { _, _, _ in nil }
+
+        XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
+
+        XCTAssertEqual(snapshotService.recordedFocusedPIDs(), [runningApp.processIdentifier])
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(model.session?.mode, .windowCycle(appID: appID))
+        XCTAssertEqual(model.session?.selectedApp.windows.map(\.id), ["focused-window-1", "focused-window-2"])
     }
 
     @MainActor
@@ -704,55 +790,4 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(previewLayerFrame.midX, appLayerFrame.midX, accuracy: 0.5)
     }
 
-}
-
-private final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable {
-    private let lock = NSLock()
-    private let homeSnapshotsByAppID: [String: RuntimeHomeAppSnapshot]
-    private var requestedHomeAppIDs: [String] = []
-
-    init(homeSnapshotsByAppID: [String: RuntimeHomeAppSnapshot]) {
-        self.homeSnapshotsByAppID = homeSnapshotsByAppID
-    }
-
-    func recordedHomeAppIDs() -> [String] {
-        lock.lock()
-        defer { lock.unlock() }
-        return requestedHomeAppIDs
-    }
-
-    func snapshot() -> RuntimeSnapshot {
-        RuntimeSnapshot(apps: [], contextsByID: [:])
-    }
-
-    func lightweightAppSnapshot() -> RuntimeSnapshot {
-        RuntimeSnapshot(apps: [], contextsByID: [:])
-    }
-
-    func homeAppSummaries() async -> [RuntimeHomeAppSummary] {
-        homeSnapshotsByAppID.values.map(\.summary)
-    }
-
-    func homeAppSummary(for appID: String) async -> RuntimeHomeAppSummary? {
-        homeSnapshotsByAppID[appID]?.summary
-    }
-
-    func homeAppSnapshot(for appID: String) async -> RuntimeHomeAppSnapshot? {
-        homeAppSnapshotSynchronously(for: appID)
-    }
-
-    func homeAppSnapshotSynchronously(for appID: String) -> RuntimeHomeAppSnapshot? {
-        lock.lock()
-        requestedHomeAppIDs.append(appID)
-        lock.unlock()
-        return homeSnapshotsByAppID[appID]
-    }
-
-    func currentCGWindowsByPID() -> [pid_t: [RuntimeSnapshotProvider.CGWindowEntry]] {
-        [:]
-    }
-
-    func isLikelyTransientAXRebuild(for pid: pid_t) -> Bool {
-        false
-    }
 }

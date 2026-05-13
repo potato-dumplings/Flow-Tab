@@ -71,6 +71,29 @@ struct SwitcherPanelRootView: View {
                         model.icon(for: app)
                     }
                 )
+                .onAppear {
+                    Self.logContentTrace(
+                        phase: "contentAppear",
+                        session: session,
+                        overlayStyle: model.overlayStyle,
+                        windowPreviewItems: windowPreviewItems,
+                        searchActive: model.searchViewState.isActive
+                    )
+                }
+                .onChange(
+                    of: Self.contentTraceSummary(
+                        session: session,
+                        overlayStyle: model.overlayStyle,
+                        windowPreviewItems: windowPreviewItems,
+                        searchActive: model.searchViewState.isActive
+                    )
+                ) { summary in
+                    Self.logContentTrace(
+                        phase: "contentUpdate",
+                        overlayStyle: model.overlayStyle,
+                        summary: summary
+                    )
+                }
                 .padding(SwitcherPanelLayoutMetrics.rootPadding)
             }
         }
@@ -154,6 +177,62 @@ struct SwitcherPanelRootView: View {
 
     private func diagnosticsEscaped(_ value: String) -> String {
         value.addingPercentEncoding(withAllowedCharacters: Self.diagnosticsAllowedCharacters) ?? ""
+    }
+
+    private static func logContentTrace(
+        phase: String,
+        session: SwitcherSession,
+        overlayStyle: SwitcherOverlayStyle,
+        windowPreviewItems: [WindowPreviewItem],
+        searchActive: Bool
+    ) {
+        logContentTrace(
+            phase: phase,
+            overlayStyle: overlayStyle,
+            summary: contentTraceSummary(
+                session: session,
+                overlayStyle: overlayStyle,
+                windowPreviewItems: windowPreviewItems,
+                searchActive: searchActive
+            )
+        )
+    }
+
+    private static func logContentTrace(
+        phase: String,
+        overlayStyle: SwitcherOverlayStyle,
+        summary: String
+    ) {
+        let nowMs = formatContentTraceMilliseconds(ProcessInfo.processInfo.systemUptime * 1_000)
+        RuntimeLog.debug(
+            "InputTrace",
+            "show kind=\(overlayStyle.contentTraceKind) phase=\(phase) nowMs=\(nowMs) \(summary)"
+        )
+    }
+
+    private static func contentTraceSummary(
+        session: SwitcherSession,
+        overlayStyle: SwitcherOverlayStyle,
+        windowPreviewItems: [WindowPreviewItem],
+        searchActive: Bool
+    ) -> String {
+        let previewImageCount = windowPreviewItems.reduce(0) { count, item in
+            count + (item.image == nil ? 0 : 1)
+        }
+        return [
+            "overlay=\(overlayStyle.debugName)",
+            "mode=\(session.mode.debugName)",
+            "selectedAppID=\(session.selectedApp.id)",
+            "selectedWindows=\(session.selectedApp.windows.count)",
+            "selectedWindowID=\(session.selectedWindow?.id ?? "none")",
+            "previewItems=\(windowPreviewItems.count)",
+            "previewImages=\(previewImageCount)",
+            "searchActive=\(searchActive ? 1 : 0)"
+        ].joined(separator: " ")
+    }
+
+    private static func formatContentTraceMilliseconds(_ value: Double) -> String {
+        String(format: "%.3f", value)
     }
 
     private static let diagnosticsAllowedCharacters: CharacterSet = {

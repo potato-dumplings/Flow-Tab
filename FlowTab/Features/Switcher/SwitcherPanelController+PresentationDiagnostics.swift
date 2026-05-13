@@ -90,7 +90,21 @@ extension SwitcherPanelController {
             + "occlusionVisible=\(occlusionVisible) "
             + "panelKey=\(panel.isKeyWindow ? 1 : 0) "
             + "appActive=\(isAppCurrentlyActive ? 1 : 0) "
-            + "frame=\(formatPanelProbeRect(panel.frame))"
+            + "frame=\(formatPanelProbeRect(panel.frame)) "
+            + panelContentProbeSummary()
+    }
+
+    func panelContentProbeSummary() -> String {
+        guard let session = model.session else {
+            return "content=empty"
+        }
+        let selectedWindowID = session.selectedWindow?.id ?? "none"
+        return "content=ready "
+            + "overlay=\(model.overlayStyle.debugName) "
+            + "mode=\(session.mode.debugName) "
+            + "selectedAppID=\(session.selectedApp.id) "
+            + "selectedWindows=\(session.selectedApp.windows.count) "
+            + "selectedWindowID=\(selectedWindowID)"
     }
 
     private func formatPanelProbeRect(_ rect: NSRect) -> String {

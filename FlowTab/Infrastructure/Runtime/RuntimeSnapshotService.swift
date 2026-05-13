@@ -10,6 +10,7 @@ protocol RuntimeSnapshotServing: Sendable {
     func homeAppSummary(for appID: String) async -> RuntimeHomeAppSummary?
     func homeAppSnapshot(for appID: String) async -> RuntimeHomeAppSnapshot?
     func homeAppSnapshotSynchronously(for appID: String) -> RuntimeHomeAppSnapshot?
+    func focusedAppSnapshot(processIdentifier pid: pid_t) -> RuntimeHomeAppSnapshot?
     func currentCGWindowsByPID() -> [pid_t: [RuntimeSnapshotProvider.CGWindowEntry]]
     func isLikelyTransientAXRebuild(for pid: pid_t) -> Bool
 }
@@ -71,6 +72,13 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
     func homeAppSnapshotSynchronously(for appID: String) -> RuntimeHomeAppSnapshot? {
         snapshotQueue.sync { [self] in
             let snapshot = snapshotProvider.homeAppSnapshot(for: appID)
+            return snapshot.map(windowRecencyTracker.homeSnapshotWithRecencyApplied)
+        }
+    }
+
+    func focusedAppSnapshot(processIdentifier pid: pid_t) -> RuntimeHomeAppSnapshot? {
+        snapshotQueue.sync { [self] in
+            let snapshot = snapshotProvider.focusedAppSnapshot(processIdentifier: pid)
             return snapshot.map(windowRecencyTracker.homeSnapshotWithRecencyApplied)
         }
     }

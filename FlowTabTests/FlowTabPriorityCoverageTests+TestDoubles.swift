@@ -78,3 +78,83 @@ final class SpyMRUTracker: MRUTracking {
         startCallCount += 1
     }
 }
+
+final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable {
+    private let lock = NSLock()
+    private let homeSnapshotsByAppID: [String: RuntimeHomeAppSnapshot]
+    private let focusedSnapshotsByPID: [pid_t: RuntimeHomeAppSnapshot]
+    private var requestedHomeAppIDs: [String] = []
+    private var requestedFocusedPIDs: [pid_t] = []
+    private var snapshotRequests = 0
+
+    init(
+        homeSnapshotsByAppID: [String: RuntimeHomeAppSnapshot] = [:],
+        focusedSnapshotsByPID: [pid_t: RuntimeHomeAppSnapshot] = [:]
+    ) {
+        self.homeSnapshotsByAppID = homeSnapshotsByAppID
+        self.focusedSnapshotsByPID = focusedSnapshotsByPID
+    }
+
+    func recordedHomeAppIDs() -> [String] {
+        lock.lock()
+        defer { lock.unlock() }
+        return requestedHomeAppIDs
+    }
+
+    func recordedFocusedPIDs() -> [pid_t] {
+        lock.lock()
+        defer { lock.unlock() }
+        return requestedFocusedPIDs
+    }
+
+    func snapshotRequestCount() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return snapshotRequests
+    }
+
+    func snapshot() -> RuntimeSnapshot {
+        lock.lock()
+        snapshotRequests += 1
+        lock.unlock()
+        return RuntimeSnapshot(apps: [], contextsByID: [:])
+    }
+
+    func lightweightAppSnapshot() -> RuntimeSnapshot {
+        RuntimeSnapshot(apps: [], contextsByID: [:])
+    }
+
+    func homeAppSummaries() async -> [RuntimeHomeAppSummary] {
+        homeSnapshotsByAppID.values.map(\.summary)
+    }
+
+    func homeAppSummary(for appID: String) async -> RuntimeHomeAppSummary? {
+        homeSnapshotsByAppID[appID]?.summary
+    }
+
+    func homeAppSnapshot(for appID: String) async -> RuntimeHomeAppSnapshot? {
+        homeAppSnapshotSynchronously(for: appID)
+    }
+
+    func homeAppSnapshotSynchronously(for appID: String) -> RuntimeHomeAppSnapshot? {
+        lock.lock()
+        requestedHomeAppIDs.append(appID)
+        lock.unlock()
+        return homeSnapshotsByAppID[appID]
+    }
+
+    func focusedAppSnapshot(processIdentifier pid: pid_t) -> RuntimeHomeAppSnapshot? {
+        lock.lock()
+        requestedFocusedPIDs.append(pid)
+        lock.unlock()
+        return focusedSnapshotsByPID[pid]
+    }
+
+    func currentCGWindowsByPID() -> [pid_t: [RuntimeSnapshotProvider.CGWindowEntry]] {
+        [:]
+    }
+
+    func isLikelyTransientAXRebuild(for pid: pid_t) -> Bool {
+        false
+    }
+}

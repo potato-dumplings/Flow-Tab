@@ -241,16 +241,30 @@ final class LiveSwitcherModel: ObservableObject {
         }
         let frontmostReadyMs = Self.monotonicMilliseconds()
 
-        let frontmostAppID = frontmostApp.bundleIdentifier
-            ?? "pid:\(frontmostApp.processIdentifier)"
-        let rawSnapshot = makeSnapshot()
-        let snapshotReadMs = Self.monotonicMilliseconds()
-        let snapshot = snapshotWithWindowRecencyApplied(rawSnapshot)
-        let recencyAppliedMs = Self.monotonicMilliseconds()
-        guard
-            let appCandidate = snapshot.apps.first(where: { $0.id == frontmostAppID }),
-            let context = snapshot.contextsByID[frontmostAppID]
-        else {
+        let frontmostAppID = RuntimeSnapshotProvider.baseAppID(for: frontmostApp)
+        let snapshotReadMs: Double
+        let recencyAppliedMs: Double
+        var resolvedAppCandidate: AppSwitchCandidate?
+        var resolvedContext: RuntimeAppContext?
+
+        if snapshotProviderOverride != nil {
+            let rawSnapshot = makeSnapshot()
+            snapshotReadMs = Self.monotonicMilliseconds()
+            let snapshot = snapshotWithWindowRecencyApplied(rawSnapshot)
+            recencyAppliedMs = Self.monotonicMilliseconds()
+            resolvedAppCandidate = snapshot.apps.first(where: { $0.id == frontmostAppID })
+            resolvedContext = snapshot.contextsByID[frontmostAppID]
+        } else {
+            let focusedSnapshot = runtimeSnapshotService.focusedAppSnapshot(
+                processIdentifier: frontmostApp.processIdentifier
+            )
+            snapshotReadMs = Self.monotonicMilliseconds()
+            recencyAppliedMs = snapshotReadMs
+            resolvedAppCandidate = focusedSnapshot?.candidate
+            resolvedContext = focusedSnapshot?.context
+        }
+
+        guard let appCandidate = resolvedAppCandidate, let context = resolvedContext else {
             let failedMs = Self.monotonicMilliseconds()
             logStartFocusedWindowSession(
                 result: "missingFrontmostApp",
@@ -264,6 +278,7 @@ final class LiveSwitcherModel: ObservableObject {
             resetSessionState()
             return false
         }
+        let sessionAppID = appCandidate.id
         guard !appCandidate.windows.isEmpty else {
             let failedMs = Self.monotonicMilliseconds()
             logStartFocusedWindowSession(
@@ -279,7 +294,7 @@ final class LiveSwitcherModel: ObservableObject {
             return false
         }
 
-        runtimeContextsByID = [frontmostAppID: context]
+        runtimeContextsByID = [sessionAppID: context]
         clearPreviewSnapshotState()
         autoEnterSuppressedAppID = nil
         let preferences = SwitcherBehaviorPreferencesStore.loadSwitcherPreferences()
@@ -296,7 +311,7 @@ final class LiveSwitcherModel: ObservableObject {
             context: context
         ) {
             focusedWindowSelected = rebuiltSession.selectWindow(
-                appID: frontmostAppID,
+                appID: sessionAppID,
                 windowID: focusedWindowID
             )
         } else {

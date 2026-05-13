@@ -212,12 +212,144 @@ extension RuntimeSnapshotProvider {
             return nil
         }
 
+        return makeHomeAppSnapshot(
+            appID: appID,
+            app: app,
+            appGroup: matchingApps,
+            windows: windows,
+            rankByPID: rankByPID,
+            rankFallback: 10_000
+        )
+    }
+
+    func focusedAppSnapshot(processIdentifier pid: pid_t) -> RuntimeHomeAppSnapshot? {
+        let startMs = RuntimePerformanceClock.monotonicMilliseconds()
+        if let uiTestRuntimeDataset = Self.uiTestRuntimeDataset() {
+            let snapshot = uiTestRuntimeDataset.snapshotsByAppID.values.first {
+                $0.summary.pid == pid
+            }
+            logSnapshotTiming(
+                "focusedAppSnapshot",
+                fields: [
+                    ("result", snapshot == nil ? "missingPID" : "uiTestDataset"),
+                    ("pid", "\(pid)"),
+                    ("windows", "\(snapshot?.candidate.windows.count ?? 0)"),
+                    ("totalMs", formatSnapshotMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))
+                ]
+            )
+            return snapshot
+        }
+
+        let runningAppsStartMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let runningApps = filteredRunningApplications()
+        let runningAppsReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+        guard let app = runningApps.first(where: { $0.processIdentifier == pid })
+            ?? NSRunningApplication(processIdentifier: pid)
+        else {
+            logSnapshotTiming(
+                "focusedAppSnapshot",
+                fields: [
+                    ("result", "missingRunningApp"),
+                    ("pid", "\(pid)"),
+                    ("knownApps", "\(runningApps.count)"),
+                    ("runningAppsMs", formatSnapshotMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
+                    ("totalMs", formatSnapshotMilliseconds(runningAppsReadyMs - startMs))
+                ]
+            )
+            return nil
+        }
+
+        cleanupWindowMappingState(for: runningApps)
+        AXLiveWindowRegistry.shared.prune(to: runningApps)
+        let cleanupReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let cgWindowsByPID = collectCGWindowsByPID()
+        let onScreenCGReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let allCGWindowsByPID = collectCGWindowsByPID(options: [.optionAll, .excludeDesktopElements])
+        let allCGReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let focusedApps = [app]
+        let windowsByPID = collectAXWindowData(
+            for: focusedApps,
+            cgWindowsByPID: cgWindowsByPID,
+            allCGWindowsByPID: allCGWindowsByPID
+        )
+        let axReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let rankByPID = [pid: 0]
+        let appID = Self.baseAppID(for: app)
+        let windows = mergedWindowEntries(
+            for: focusedApps,
+            windowsByPID: windowsByPID,
+            rankByPID: rankByPID
+        )
+        let rowsReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let hideMinimizedAppsFromAppLayer =
+            SwitcherBehaviorPreferencesStore.loadHideMinimizedAppsFromAppLayer()
+        if hideMinimizedAppsFromAppLayer && !windows.isEmpty && !windows.contains(where: { !$0.isMinimized }) {
+            let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
+            logSnapshotTiming(
+                "focusedAppSnapshot",
+                fields: [
+                    ("result", "minimizedOnly"),
+                    ("appID", appID),
+                    ("pid", "\(pid)"),
+                    ("windows", "\(windows.count)"),
+                    ("knownApps", "\(runningApps.count)"),
+                    ("axApps", "\(focusedApps.count)"),
+                    ("runningAppsMs", formatSnapshotMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
+                    ("cleanupMs", formatSnapshotMilliseconds(cleanupReadyMs - runningAppsReadyMs)),
+                    ("onscreenCGMs", formatSnapshotMilliseconds(onScreenCGReadyMs - cleanupReadyMs)),
+                    ("allCGMs", formatSnapshotMilliseconds(allCGReadyMs - onScreenCGReadyMs)),
+                    ("axMs", formatSnapshotMilliseconds(axReadyMs - allCGReadyMs)),
+                    ("rowsMs", formatSnapshotMilliseconds(rowsReadyMs - axReadyMs)),
+                    ("totalMs", formatSnapshotMilliseconds(completeMs - startMs))
+                ]
+            )
+            return nil
+        }
+
+        let snapshot = makeHomeAppSnapshot(
+            appID: appID,
+            app: app,
+            appGroup: focusedApps,
+            windows: windows,
+            rankByPID: rankByPID,
+            rankFallback: 0
+        )
+        let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
+        logSnapshotTiming(
+            "focusedAppSnapshot",
+            fields: [
+                ("result", snapshot.candidate.windows.isEmpty ? "empty" : "ready"),
+                ("appID", appID),
+                ("pid", "\(pid)"),
+                ("windows", "\(snapshot.candidate.windows.count)"),
+                ("knownApps", "\(runningApps.count)"),
+                ("axApps", "\(focusedApps.count)"),
+                ("runningAppsMs", formatSnapshotMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
+                ("cleanupMs", formatSnapshotMilliseconds(cleanupReadyMs - runningAppsReadyMs)),
+                ("onscreenCGMs", formatSnapshotMilliseconds(onScreenCGReadyMs - cleanupReadyMs)),
+                ("allCGMs", formatSnapshotMilliseconds(allCGReadyMs - onScreenCGReadyMs)),
+                ("axMs", formatSnapshotMilliseconds(axReadyMs - allCGReadyMs)),
+                ("rowsMs", formatSnapshotMilliseconds(rowsReadyMs - axReadyMs)),
+                ("totalMs", formatSnapshotMilliseconds(completeMs - startMs))
+            ]
+        )
+        return snapshot
+    }
+
+    private func makeHomeAppSnapshot(
+        appID: String,
+        app: NSRunningApplication,
+        appGroup: [NSRunningApplication],
+        windows: [WindowListEntry],
+        rankByPID: [pid_t: Int],
+        rankFallback: Int
+    ) -> RuntimeHomeAppSnapshot {
         let now = Date.timeIntervalSinceReferenceDate
         let displayName = app.localizedName ?? appID
         let rank = preferredRankForAppGroup(
-            matchingApps,
+            appGroup,
             rankByPID: rankByPID,
-            fallback: 10_000
+            fallback: rankFallback
         )
         let windowCandidates = windows.enumerated().map { entryIndex, entry in
             WindowCandidate(

@@ -50,6 +50,24 @@ extension CycleDirection {
 enum SwitcherOverlayStyle {
     case appAndWindow
     case windowOnly
+
+    var debugName: String {
+        switch self {
+        case .appAndWindow:
+            return "appAndWindow"
+        case .windowOnly:
+            return "windowOnly"
+        }
+    }
+
+    var contentTraceKind: String {
+        switch self {
+        case .appAndWindow:
+            return "global"
+        case .windowOnly:
+            return "inApp"
+        }
+    }
 }
 
 struct WindowPreviewItem: Identifiable {

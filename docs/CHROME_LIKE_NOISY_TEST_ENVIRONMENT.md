@@ -185,12 +185,15 @@ Control+Tab in-app window switcher 有一个额外问题：面板重新打开时
 当前实现中，`LiveSwitcherModel.startFocusedAppWindowSession` 会：
 
 1. 读取 frontmost app。
-2. 读取该 app 的 `AXFocusedWindow`。
-3. 优先用 focused AX window 的 CGWindowID 匹配 runtime window。
-4. 如果 CGWindowID 不可用或不匹配，再用 title + frame 做唯一匹配。
-5. 匹配成功时先调用 `SwitcherSession.selectWindow(appID:windowID:)`，再进入
+2. 通过 `RuntimeSnapshotService.focusedAppSnapshot(processIdentifier:)` 只为
+   frontmost app 构建窗口候选；这里仍会读取系统 CGWindowList 作为匹配材料，但 AX
+   window 枚举只针对当前 app，不走全量 app snapshot。
+3. 读取该 app 的 `AXFocusedWindow`。
+4. 优先用 focused AX window 的 CGWindowID 匹配 runtime window。
+5. 如果 CGWindowID 不可用或不匹配，再用 title + frame 做唯一匹配。
+6. 匹配成功时先调用 `SwitcherSession.selectWindow(appID:windowID:)`，再进入
    window cycle。
-6. 匹配失败时才回退到原来的 window-cycle 起点。
+7. 匹配失败时才回退到原来的 window-cycle 起点。
 
 这保证了 Noisy 场景里，即使 `Chrome Incognito Tab` 在 CG z-order 上排在前面，
 从 `Chrome Normal Tab` 重新打开 Control+Tab 时，面板仍然从 `Chrome Normal Tab`
@@ -203,8 +206,9 @@ runtime snapshot 和诊断输出仍保留 runtime 自身的 presentation order�
 
 1. FlowTab 成功激活某个具体窗口后，记录 app identity、stable window identity 和
    timestamp。
-2. 打开 switcher 时，只刷新当前 frontmost app 里能精确匹配的 focused/runtime
-   window。
+2. 打开 Control+Tab 时，只为当前 frontmost app 构建窗口 snapshot；打开
+   Option+Tab 并进入某个 app 的 window cycle 时，只刷新该 app 里能精确匹配的
+   focused/runtime window。
 3. snapshot 组装窗口列表时，只把该 app 自己的 recency overlay 到
    `WindowCandidate.lastActiveAt`。
 4. 进入任意 app 的 window cycle 时，只看该 app 自己的窗口 recency；如果用户在

@@ -594,8 +594,9 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertEqual(model.session?.mode, .windowCycle(appID: appID))
         XCTAssertEqual(model.session?.selectedWindow?.id, "normal")
+        XCTAssertEqual(model.session?.selectedApp.windows.map(\.id), ["normal", "incognito", "fullscreen"])
         model.handle(.tabForward)
-        XCTAssertEqual(model.session?.selectedWindow?.id, "fullscreen")
+        XCTAssertEqual(model.session?.selectedWindow?.id, "incognito")
     }
 
     @MainActor
