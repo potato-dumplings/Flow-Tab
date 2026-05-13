@@ -90,12 +90,7 @@ enum AXWindowInspector {
         includeRemoteWindows: Bool
     ) -> [AXUIElement] {
         guard includeRemoteWindows else { return [] }
-        guard !Thread.isMainThread else {
-            return remoteWindowsOnCurrentThread(forPID: pid)
-        }
-        return DispatchQueue.main.sync {
-            remoteWindowsOnCurrentThread(forPID: pid)
-        }
+        return remoteWindowsOnCurrentThread(forPID: pid)
     }
 
     private static func remoteWindowsOnCurrentThread(forPID pid: pid_t) -> [AXUIElement] {
