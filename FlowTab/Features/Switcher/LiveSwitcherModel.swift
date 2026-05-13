@@ -91,10 +91,16 @@ final class LiveSwitcherModel: ObservableObject {
     var runtimeContextsByID: [String: RuntimeAppContext] = [:]
     var rememberedWindowIDByAppID: [String: String] = [:]
     var previewCaptureAttemptedKeys: Set<String> = []
+    var previewCaptureFailedKeys: Set<String> = []
     var previewCaptureInFlightKeys: Set<String> = []
+    var previewImageReadyLoggedKeys: Set<String> = []
+    var previewSessionPinnedKeys: Set<String> = []
+    var previewSessionPinnedImagesByKey: [String: NSImage] = [:]
+    var previewDeferredCaptureScheduledAppIDs: Set<String> = []
     var previewCaptureGeneration: UInt64 = 0
     let previewCaptureSemaphore = DispatchSemaphore(value: 4)
-    var previewSnapshotFrozenAppIDs: Set<String> = []
+    var previewWindowSnapshotsByAppID: [String: [WindowCandidate]] = [:]
+    var lastWindowPreviewExposureLogSummary: String?
     var autoEnterSuppressedAppID: String?
     var titleBarStyleInferenceEnabled = false
     var searchInputHasMarkedText = false

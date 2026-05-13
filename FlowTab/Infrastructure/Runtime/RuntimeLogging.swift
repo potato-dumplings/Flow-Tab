@@ -552,6 +552,10 @@ enum RuntimeLog {
         emit(level: .debug, category: category, message: message())
     }
 
+    static func isDebugEnabled(for category: String) -> Bool {
+        shouldRecord(level: .debug, category: category)
+    }
+
     static func info(_ category: String, _ message: @autoclosure () -> String) {
         emit(level: .info, category: category, message: message())
     }

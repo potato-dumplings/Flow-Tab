@@ -5,42 +5,33 @@ import SwiftUI
 import FlowTabCore
 
 extension LiveSwitcherModel {
-    private static let eagerWindowPreviewCaptureLimit = 24
-    private static let eagerWindowPreviewCaptureRadius = 6
-
     func handleSessionPreviewSnapshotLifecycle(_ session: SwitcherSession) {
         guard case .windowCycle(let appID) = session.mode else { return }
-        freezeWindowPreviewSnapshotIfNeeded(for: appID, session: session)
+        freezeWindowPreviewOrderIfNeeded(for: appID, session: session)
     }
 
     func clearPreviewSnapshotState() {
         previewImageCache.removeAll()
         previewCaptureAttemptedKeys = []
+        previewCaptureFailedKeys = []
         previewCaptureInFlightKeys = []
+        previewImageReadyLoggedKeys = []
+        previewSessionPinnedKeys = []
+        previewSessionPinnedImagesByKey = [:]
+        previewDeferredCaptureScheduledAppIDs = []
         previewCaptureGeneration &+= 1
-        previewSnapshotFrozenAppIDs = []
+        previewWindowSnapshotsByAppID = [:]
+        lastWindowPreviewExposureLogSummary = nil
     }
 
-    func freezeWindowPreviewSnapshotIfNeeded(
+    func freezeWindowPreviewOrderIfNeeded(
         for appID: String,
         session: SwitcherSession? = nil
     ) {
+        guard previewWindowSnapshotsByAppID[appID] == nil else { return }
         let resolvedSession = session ?? self.session
         guard let app = resolvedSession?.apps.first(where: { $0.id == appID }) else { return }
-        let selectedIndex = resolvedSession?.selectedWindowIndexByAppID[appID] ?? 0
-        let windowsToCapture = app.windows.count > Self.eagerWindowPreviewCaptureLimit
-            ? []
-            : eagerPreviewWindows(for: app, selectedIndex: selectedIndex)
-        if windowsToCapture.count == app.windows.count, previewSnapshotFrozenAppIDs.contains(appID) {
-            return
-        }
-
-        for window in windowsToCapture {
-            _ = previewData(for: appID, window: window)
-        }
-        if windowsToCapture.count == app.windows.count {
-            previewSnapshotFrozenAppIDs.insert(appID)
-        }
+        previewWindowSnapshotsByAppID[appID] = app.windows
     }
 
     func windowPreviewPageSummary() -> WindowPreviewPageSummary {
@@ -53,10 +44,14 @@ extension LiveSwitcherModel {
         guard let app = session.apps.first(where: { $0.id == appID }) else {
             return WindowPreviewPageSummary(itemCount: 0, selectedIndex: nil)
         }
-        let selectedIndex = session.selectedWindowIndexByAppID[appID]
-            .map { min(max(0, $0), max(app.windows.count - 1, 0)) }
+        let previewWindows = frozenPreviewWindows(for: appID, fallbackApp: app)
+        let selectedIndex = selectedPreviewWindowIndex(
+            appID: appID,
+            session: session,
+            previewWindows: previewWindows
+        )
         return WindowPreviewPageSummary(
-            itemCount: app.windows.count,
+            itemCount: previewWindows.count,
             selectedIndex: selectedIndex
         )
     }
@@ -73,7 +68,9 @@ extension LiveSwitcherModel {
 
     func previewData(
         for appID: String,
-        window: WindowCandidate
+        window: WindowCandidate,
+        pinForSession: Bool = false,
+        captureQoS: DispatchQoS.QoSClass = .userInitiated
     ) -> (image: NSImage?, titleBarStyle: WindowTitleBarStyleGuess?) {
         guard var appContext = runtimeContextsByID[appID] else {
             return (image: nil, titleBarStyle: nil)
@@ -89,7 +86,33 @@ extension LiveSwitcherModel {
             ownerPID: ownerPID,
             windowContext: windowContext
         )
+        if pinForSession {
+            previewSessionPinnedKeys.insert(previewCacheKey)
+        }
+        if let pinned = previewSessionPinnedImagesByKey[previewCacheKey] {
+            logPreviewImageReadyOnce(
+                source: "pinned",
+                appID: appID,
+                windowID: window.id,
+                key: previewCacheKey,
+                cgWindowID: windowContext.cgWindowID
+            )
+            return (
+                image: pinned,
+                titleBarStyle: titleBarStyleInferenceEnabled ? windowContext.inferredTitleBarStyle : nil
+            )
+        }
         if let cached = previewImageCache.image(forKey: previewCacheKey) {
+            if pinForSession {
+                previewSessionPinnedImagesByKey[previewCacheKey] = cached
+            }
+            logPreviewImageReadyOnce(
+                source: "cache",
+                appID: appID,
+                windowID: window.id,
+                key: previewCacheKey,
+                cgWindowID: windowContext.cgWindowID
+            )
             return (
                 image: cached,
                 titleBarStyle: titleBarStyleInferenceEnabled ? windowContext.inferredTitleBarStyle : nil
@@ -97,10 +120,16 @@ extension LiveSwitcherModel {
         }
 
         if previewCaptureAttemptedKeys.contains(previewCacheKey) {
-            return (
-                image: nil,
-                titleBarStyle: titleBarStyleInferenceEnabled ? windowContext.inferredTitleBarStyle : nil
-            )
+            if pinForSession,
+               !previewCaptureInFlightKeys.contains(previewCacheKey),
+               !previewCaptureFailedKeys.contains(previewCacheKey) {
+                previewCaptureAttemptedKeys.remove(previewCacheKey)
+            } else {
+                return (
+                    image: nil,
+                    titleBarStyle: titleBarStyleInferenceEnabled ? windowContext.inferredTitleBarStyle : nil
+                )
+            }
         }
         previewCaptureAttemptedKeys.insert(previewCacheKey)
 
@@ -113,6 +142,7 @@ extension LiveSwitcherModel {
                     titleBarStyleInferenceEnabled
                 )
             else {
+                previewCaptureFailedKeys.insert(previewCacheKey)
                 RuntimeLog.debug("Preview", "attempt failed appID=\(appID) windowID=\(window.id)")
                 return (
                     image: nil,
@@ -125,6 +155,13 @@ extension LiveSwitcherModel {
                 windowID: window.id,
                 ownerPID: ownerPID,
                 initialCacheKey: previewCacheKey
+            )
+            logPreviewImageReadyOnce(
+                source: "override",
+                appID: appID,
+                windowID: window.id,
+                key: previewCacheKey,
+                cgWindowID: capture.resolvedWindowID
             )
             return (
                 image: capture.image,
@@ -139,7 +176,8 @@ extension LiveSwitcherModel {
             preferredWindowID: windowContext.cgWindowID,
             preferredTitle: windowContext.title,
             inferTitleBarStyle: titleBarStyleInferenceEnabled,
-            initialCacheKey: previewCacheKey
+            initialCacheKey: previewCacheKey,
+            qos: captureQoS
         )
         return (
             image: nil,
@@ -152,23 +190,29 @@ extension LiveSwitcherModel {
         guard case .windowCycle(let appID) = session.mode else { return [] }
         guard let app = session.apps.first(where: { $0.id == appID }) else { return [] }
 
-        let selectedIndex = session.selectedWindowIndexByAppID[appID] ?? 0
-        let indexedWindows = indexedPreviewWindows(for: app, visibleRange: visibleRange)
-        let eagerlyCapturedWindowIDs: Set<String>
-        if visibleRange != nil {
-            eagerlyCapturedWindowIDs = Set(indexedWindows.map { $0.window.id })
-        } else {
-            eagerlyCapturedWindowIDs = Set(
-                eagerPreviewWindows(for: app, selectedIndex: selectedIndex).map(\.id)
-            )
-        }
-        return indexedWindows.map { index, window in
+        let previewWindows = frozenPreviewWindows(for: appID, fallbackApp: app)
+        let selectedIndex = selectedPreviewWindowIndex(
+            appID: appID,
+            session: session,
+            previewWindows: previewWindows
+        ) ?? 0
+        let indexedWindows = indexedPreviewWindows(in: previewWindows, visibleRange: visibleRange)
+        let shouldRequestPreviews = visibleRange != nil || overlayStyle == .windowOnly
+        let previewCaptureWindowIDs = shouldRequestPreviews
+            ? Set(indexedWindows.map { $0.window.id })
+            : []
+        let items = indexedWindows.map { index, window in
             let title = window.title.trimmingCharacters(in: .whitespacesAndNewlines)
             let fallbackTitle = overlayStyle == .windowOnly
                 ? "Window \(index + 1)"
                 : app.displayName
-            let preview = eagerlyCapturedWindowIDs.contains(window.id)
-                ? previewData(for: appID, window: window)
+            let preview = previewCaptureWindowIDs.contains(window.id)
+                ? previewData(
+                    for: appID,
+                    window: window,
+                    pinForSession: true,
+                    captureQoS: .userInitiated
+                )
                 : (image: nil, titleBarStyle: nil)
             return WindowPreviewItem(
                 id: window.id,
@@ -178,6 +222,18 @@ extension LiveSwitcherModel {
                 isSelected: index == selectedIndex
             )
         }
+        scheduleDeferredPreviewCapturesIfNeeded(
+            appID: appID,
+            visibleRange: visibleRange,
+            visibleItems: items
+        )
+        logWindowPreviewExposure(
+            appID: appID,
+            selectedIndex: selectedIndex,
+            visibleRange: visibleRange,
+            items: items
+        )
+        return items
     }
 
     private static func previewCacheKey(
@@ -201,7 +257,8 @@ extension LiveSwitcherModel {
         preferredWindowID: CGWindowID?,
         preferredTitle: String,
         inferTitleBarStyle: Bool,
-        initialCacheKey: String
+        initialCacheKey: String,
+        qos: DispatchQoS.QoSClass
     ) {
         guard !previewCaptureInFlightKeys.contains(initialCacheKey) else { return }
         previewCaptureInFlightKeys.insert(initialCacheKey)
@@ -212,7 +269,7 @@ extension LiveSwitcherModel {
             "Preview",
             "capture scheduled appID=\(appID) pid=\(ownerPID) windowID=\(windowID) mappedCG=\(preferredWindowID.map(String.init) ?? "nil")"
         )
-        DispatchQueue.global(qos: .userInitiated).async {
+        DispatchQueue.global(qos: qos).async {
             semaphore.wait()
             let capture = RuntimeWindowPreviewProvider.captureWindowPreview(
                 preferredWindowID: preferredWindowID,
@@ -253,6 +310,7 @@ extension LiveSwitcherModel {
             return
         }
         guard let capture else {
+            previewCaptureFailedKeys.insert(initialCacheKey)
             RuntimeLog.debug(
                 "Preview",
                 "capture failed appID=\(appID) windowID=\(windowID) durationMs=\(Self.formatPreviewMilliseconds(completeMs - startMs))"
@@ -266,10 +324,13 @@ extension LiveSwitcherModel {
             ownerPID: ownerPID,
             initialCacheKey: initialCacheKey
         )
-        RuntimeLog.debug(
-            "Preview",
-            "capture success appID=\(appID) windowID=\(windowID) resolvedCG=\(capture.resolvedWindowID) titleBarStyle=\(capture.titleBarStyle?.rawValue ?? "nil") durationMs=\(Self.formatPreviewMilliseconds(completeMs - startMs))"
-        )
+        if RuntimeLog.isDebugEnabled(for: "Preview") {
+            RuntimeLog.debug(
+                "Preview",
+                "image ready source=capture appID=\(appID) windowID=\(windowID) resolvedCG=\(capture.resolvedWindowID) titleBarStyle=\(capture.titleBarStyle?.rawValue ?? "nil") durationMs=\(Self.formatPreviewMilliseconds(completeMs - startMs))"
+            )
+            previewImageReadyLoggedKeys.insert(initialCacheKey)
+        }
         objectWillChange.send()
     }
 
@@ -299,53 +360,172 @@ extension LiveSwitcherModel {
         )
         previewImageCache.insert(capture.image, forKey: initialCacheKey)
         previewImageCache.insert(capture.image, forKey: resolvedCacheKey)
+        previewCaptureFailedKeys.remove(initialCacheKey)
+        previewCaptureFailedKeys.remove(resolvedCacheKey)
+        pinPreviewImageIfNeeded(
+            capture.image,
+            initialCacheKey: initialCacheKey,
+            resolvedCacheKey: resolvedCacheKey
+        )
         previewCaptureAttemptedKeys.insert(resolvedCacheKey)
+    }
+
+    private func pinPreviewImageIfNeeded(
+        _ image: NSImage,
+        initialCacheKey: String,
+        resolvedCacheKey: String
+    ) {
+        guard
+            previewSessionPinnedKeys.contains(initialCacheKey)
+                || previewSessionPinnedKeys.contains(resolvedCacheKey)
+        else {
+            return
+        }
+        previewSessionPinnedKeys.insert(initialCacheKey)
+        previewSessionPinnedKeys.insert(resolvedCacheKey)
+        previewSessionPinnedImagesByKey[initialCacheKey] = image
+        previewSessionPinnedImagesByKey[resolvedCacheKey] = image
     }
 
     private static func formatPreviewMilliseconds(_ value: Double) -> String {
         String(format: "%.3f", value)
     }
 
+    private func logPreviewImageReadyOnce(
+        source: String,
+        appID: String,
+        windowID: String,
+        key: String,
+        cgWindowID: CGWindowID?
+    ) {
+        guard RuntimeLog.isDebugEnabled(for: "Preview") else { return }
+        guard !previewImageReadyLoggedKeys.contains(key) else { return }
+        previewImageReadyLoggedKeys.insert(key)
+        RuntimeLog.debug(
+            "Preview",
+            "image ready source=\(source) appID=\(appID) windowID=\(windowID) cg=\(cgWindowID.map(String.init) ?? "nil")"
+        )
+    }
+
+    private func logWindowPreviewExposure(
+        appID: String,
+        selectedIndex: Int,
+        visibleRange: Range<Int>?,
+        items: [WindowPreviewItem]
+    ) {
+        guard RuntimeLog.isDebugEnabled(for: "Preview") else { return }
+        let imageCount = items.reduce(0) { count, item in
+            count + (item.image == nil ? 0 : 1)
+        }
+        let rangeSummary = visibleRange.map { "\($0.lowerBound)..<\($0.upperBound)" } ?? "all"
+        let itemSummary = items.map { item in
+            let imageState = item.image == nil ? "fallback" : "image"
+            let selectedState = item.isSelected ? ":selected" : ""
+            return "\(item.id)=\(imageState)\(selectedState)"
+        }.joined(separator: "|")
+        let summary = [
+            "appID=\(appID)",
+            "range=\(rangeSummary)",
+            "selectedIndex=\(selectedIndex)",
+            "itemCount=\(items.count)",
+            "imageCount=\(imageCount)",
+            "items=\(itemSummary)"
+        ].joined(separator: " ")
+        guard lastWindowPreviewExposureLogSummary != summary else { return }
+        lastWindowPreviewExposureLogSummary = summary
+        RuntimeLog.debug("Preview", "display \(summary)")
+    }
+
+    private func frozenPreviewWindows(
+        for appID: String,
+        fallbackApp app: AppSwitchCandidate
+    ) -> [WindowCandidate] {
+        previewWindowSnapshotsByAppID[appID] ?? app.windows
+    }
+
+    private func selectedPreviewWindowIndex(
+        appID: String,
+        session: SwitcherSession,
+        previewWindows: [WindowCandidate]
+    ) -> Int? {
+        guard !previewWindows.isEmpty else { return nil }
+        if let selectedWindowID = session.selectedWindow?.id,
+           let index = previewWindows.firstIndex(where: { $0.id == selectedWindowID }) {
+            return index
+        }
+        return session.selectedWindowIndexByAppID[appID]
+            .map { min(max(0, $0), max(previewWindows.count - 1, 0)) }
+    }
+
     private func indexedPreviewWindows(
-        for app: AppSwitchCandidate,
+        in windows: [WindowCandidate],
         visibleRange: Range<Int>?
     ) -> [(index: Int, window: WindowCandidate)] {
         guard let visibleRange else {
-            return app.windows.enumerated().map { (index: $0.offset, window: $0.element) }
+            return windows.enumerated().map { (index: $0.offset, window: $0.element) }
         }
-        let lowerBound = min(max(0, visibleRange.lowerBound), app.windows.count)
-        let upperBound = min(max(lowerBound, visibleRange.upperBound), app.windows.count)
+        let lowerBound = min(max(0, visibleRange.lowerBound), windows.count)
+        let upperBound = min(max(lowerBound, visibleRange.upperBound), windows.count)
         guard lowerBound < upperBound else { return [] }
-        return app.windows[lowerBound..<upperBound].enumerated().map {
+        return windows[lowerBound..<upperBound].enumerated().map {
             (index: lowerBound + $0.offset, window: $0.element)
         }
     }
 
-    private func eagerPreviewWindows(
-        for app: AppSwitchCandidate,
-        selectedIndex: Int
-    ) -> [WindowCandidate] {
-        guard app.windows.count > Self.eagerWindowPreviewCaptureLimit else {
-            return app.windows
-        }
+    private func scheduleDeferredPreviewCapturesIfNeeded(
+        appID: String,
+        visibleRange: Range<Int>?,
+        visibleItems: [WindowPreviewItem]
+    ) {
+        guard visibleRange != nil else { return }
+        guard !visibleItems.isEmpty, visibleItems.allSatisfy({ $0.image != nil }) else { return }
+        guard !previewDeferredCaptureScheduledAppIDs.contains(appID) else { return }
+        previewDeferredCaptureScheduledAppIDs.insert(appID)
+        let generation = previewCaptureGeneration
+        let visibleWindowIDs = Set(visibleItems.map(\.id))
 
-        let boundedSelectedIndex = min(max(0, selectedIndex), app.windows.count - 1)
-        let lowerBound = max(0, boundedSelectedIndex - Self.eagerWindowPreviewCaptureRadius)
-        let upperBound = min(
-            app.windows.count - 1,
-            boundedSelectedIndex + Self.eagerWindowPreviewCaptureRadius
-        )
-        return Array(app.windows[lowerBound...upperBound])
+        DispatchQueue.main.async { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.startDeferredPreviewCaptures(
+                    appID: appID,
+                    excludingWindowIDs: visibleWindowIDs,
+                    generation: generation
+                )
+            }
+        }
     }
 
-    func windowPreviewSnapshotForTesting() -> [(
+    private func startDeferredPreviewCaptures(
+        appID: String,
+        excludingWindowIDs visibleWindowIDs: Set<String>,
+        generation: UInt64
+    ) {
+        guard generation == previewCaptureGeneration else { return }
+        guard let session else { return }
+        guard case .windowCycle(let windowLayerAppID) = session.mode, windowLayerAppID == appID else {
+            return
+        }
+        guard let app = session.apps.first(where: { $0.id == appID }) else { return }
+
+        let previewWindows = frozenPreviewWindows(for: appID, fallbackApp: app)
+        for window in previewWindows where !visibleWindowIDs.contains(window.id) {
+            _ = previewData(
+                for: appID,
+                window: window,
+                pinForSession: false,
+                captureQoS: .utility
+            )
+        }
+    }
+
+    func windowPreviewSnapshotForTesting(visibleRange: Range<Int>? = nil) -> [(
         id: String,
         title: String,
         hasImage: Bool,
         titleBarStyle: WindowTitleBarStyleGuess?,
         isSelected: Bool
     )] {
-        windowPreviewItems().map {
+        windowPreviewItems(visibleRange: visibleRange).map {
             (
                 id: $0.id,
                 title: $0.title,

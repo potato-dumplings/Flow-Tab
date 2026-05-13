@@ -339,7 +339,15 @@ extension LiveSwitcherModel {
         var apps = currentSession.apps
         apps[appIndex] = snapshot.candidate
         runtimeContextsByID[appID] = snapshot.context
-        clearPreviewSnapshotState()
+        let preservesWindowLayerPreview: Bool
+        if case .windowCycle(let windowLayerAppID) = currentSession.mode, windowLayerAppID == appID {
+            preservesWindowLayerPreview = true
+        } else {
+            preservesWindowLayerPreview = false
+        }
+        if !preservesWindowLayerPreview {
+            clearPreviewSnapshotState()
+        }
 
         var rebuiltSession = SwitcherSession(
             apps: apps,

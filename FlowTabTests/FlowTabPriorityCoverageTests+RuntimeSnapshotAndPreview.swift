@@ -1878,13 +1878,12 @@ extension FlowTabPriorityCoverageTests {
         }
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
-        XCTAssertEqual(captureCallCount, 2)
-
-        previewPhase = .invalidated
-
         let initialSnapshot = model.windowPreviewSnapshotForTesting()
         XCTAssertEqual(initialSnapshot.count, 2)
         XCTAssertTrue(initialSnapshot.allSatisfy(\.hasImage))
+        XCTAssertEqual(captureCallCount, 2)
+
+        previewPhase = .invalidated
 
         model.handle(.tabForward)
 
@@ -1897,11 +1896,10 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertNil(model.session)
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
-        XCTAssertEqual(captureCallCount, 4)
-
         let restartedSnapshot = model.windowPreviewSnapshotForTesting()
         XCTAssertEqual(restartedSnapshot.count, 2)
         XCTAssertTrue(restartedSnapshot.allSatisfy { !$0.hasImage })
+        XCTAssertEqual(captureCallCount, 4)
     }
 
 }
