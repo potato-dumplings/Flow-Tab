@@ -17,6 +17,13 @@ Use this reference when a change touches concurrency, permissions, logging, depe
 - Do not add production branches that exist only to satisfy UI tests. Put launch-time test hooks and overrides in `FlowTab/TestingSupport`.
 - When fixed-path UI automation behaves differently from normal app launch, check bundle path and code identity before changing production permission logic.
 
+## Runtime Activation Boundaries
+
+- For full-screen, cross-Space, Chrome-like noisy, or otherwise ambiguous window activation, FlowTab must keep its own target-window evidence: title, CGWindowID, frame, Space evidence, CG/AX reconciliation, activation route, and post-attempt verification that the selected CGWindowID becomes onscreen.
+- Do not use direct Space switching as a product fix, test pass condition, fixture workaround, or architecture proposal. This includes `ManagedDisplaySetCurrentSpace`, managed display Spaces APIs, `CopyManagedDisplaySpaces`, and other private routes that set the current Space instead of activating the selected window.
+- Do not use an app's Window menu or tab/window menu selection as a product fix, test pass condition, fixture workaround, or architecture proposal. Menu routing is app-specific and does not prove FlowTab can identify and activate the concrete user-selected window.
+- If a change touches activation or runtime topology, reject designs whose success signal is only "app became frontmost", "Space changed", or "menu item was selected"; the success signal must remain the selected window's concrete activation evidence.
+
 ## Logging
 
 - Prefer existing stable logs and observability points before adding new logging.
@@ -30,4 +37,3 @@ Use this reference when a change touches concurrency, permissions, logging, depe
 - Keep `FlowTabCore` free of AppKit, SwiftUI, ApplicationServices, ScreenCaptureKit, and test-only dependencies.
 - Prefer local helpers already present in the owning module over introducing a new abstraction.
 - When dependency direction is unclear, classify the code by responsibility first, then verify that dependency direction still points from app to core.
-

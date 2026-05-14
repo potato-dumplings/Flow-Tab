@@ -38,13 +38,16 @@ For no-edit work such as review, audit, root-cause triage, or performance analys
 9. Respect module boundaries and dependency direction.
    Put code in the lowest reasonable layer, avoid duplicated logic across modules, and do not break package boundaries just to land a quick fix.
 
-10. Extract repeated properties into shared constants.
+10. Use FlowTab-owned window identity and activation routes.
+   Do not solve window activation, full-screen, cross-Space, Chrome-like noisy topology, or test pass conditions by directly setting the current Space, using private managed display Spaces APIs such as `ManagedDisplaySetCurrentSpace` or `CopyManagedDisplaySpaces`, or selecting entries from an app's Window menu. These routes bypass FlowTab's window identity, CG/AX reconciliation, and activation-route evidence; the target window's own activation semantics and exact CGWindowID visibility must remain the proof.
+
+11. Extract repeated properties into shared constants.
    When the same property, spacing value, or behavior configuration is needed in more than two places, introduce a shared constant instead of repeating literals. For example, shared top, bottom, leading, and trailing spacing used by Home, Settings, and Logs should come from a constant.
 
-11. Enforce file-size guardrails.
+12. Enforce file-size guardrails.
    New source files should usually stay within 400 lines. Files between 400 and 800 lines must still have a clear single responsibility. Files over 800 lines are oversized and should be split instead of expanded. When changing an already oversized file, prefer extracting focused helpers, state, UI pieces, or services, and do not keep growing the file without also reducing or isolating responsibilities.
 
-12. Keep detailed project documentation under `docs/`.
+13. Keep detailed project documentation under `docs/`.
    Reserve repo root for entry documents such as `README*`, `AGENTS.md`, and top-level build or configuration files. Move development, testing, architecture, and other detailed project documents into `docs/`.
 
 ## Choose the Right Reference
