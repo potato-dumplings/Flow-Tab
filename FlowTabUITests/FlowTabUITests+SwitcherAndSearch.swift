@@ -127,6 +127,59 @@ extension FlowTabUITests {
         XCTAssertTrue(segmentedResult.waitForExistence(timeout: 5))
     }
 
+    func testSwitcherInitialPresentationStaleOcclusionDoesNotHardRecover() throws {
+        let logSnapshot = makeRuntimeLogFileSnapshot()
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-listen-switcher-trigger",
+                "--flowtab-ui-suppress-home-on-launch",
+                "--flowtab-ui-runtime-log-level",
+                "DEBUG",
+                "--flowtab-ui-enable-verbose-logs",
+                "--flowtab-ui-initial-panel-occlusion-stale-ms",
+                "260",
+                "-showPermissionReminder",
+                "NO"
+            ]
+        )
+        launchFlowTabUITestApplication(app)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+
+        postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+            .global,
+            traceLabel: "initial-stale-occlusion"
+        )
+        XCTAssertTrue(element(in: app, identifier: Identifier.switcherAppMockBrowser).waitForExistence(timeout: 5))
+
+        waitForRuntimeLogFiles(
+            containing: [
+                "initial panel occlusion stale released",
+                "presentationRecovery trigger=global_show action=complete"
+            ],
+            since: logSnapshot,
+            timeout: 8
+        )
+        let logContents = runtimeLogContentsSinceSnapshot(logSnapshot)
+        XCTAssertTrue(
+            logContents.contains("presentationRecovery trigger=global_show action=softAttempt"),
+            """
+            Initial stale occlusion should exercise the soft recovery path.
+            Runtime logs:
+            \(logContents)
+            """
+        )
+        XCTAssertFalse(
+            logContents.contains("presentationRecovery trigger=global_show action=attempt"),
+            """
+            Initial stale occlusion should not trigger a hard recovery/orderOut path.
+            Runtime logs:
+            \(logContents)
+            """
+        )
+    }
+
     func testSwitcherWindowLayerPaginatesLargeMockWindowSet() throws {
         let app = makeApp(
             additionalArguments: [

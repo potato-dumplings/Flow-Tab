@@ -6,6 +6,7 @@ enum FlowTabUITestBootstrapper {
     private static var hotkeyReloadDiagnosticsObserver: NSObjectProtocol?
     private static var switcherTriggerObservers: [SwitcherTriggerNotificationObserver] = []
     private static var switcherCommandObservers: [SwitcherCommandNotificationObserver] = []
+    private static var initialPanelOcclusionStaleGeneration = 0
 
     private enum SwitcherTriggerNotification {
         static let global = Notification.Name("io.github.potato-dumplings.flowtab.ui-test.open-global-switcher")
@@ -183,6 +184,32 @@ enum FlowTabUITestBootstrapper {
         return CGWindowID(900_000 + seed)
     }
 
+    fileprivate static func installInitialPanelOcclusionStaleOverrideIfNeeded(
+        panelController: SwitcherPanelController
+    ) {
+        guard let rawMilliseconds = FlowTabTestLaunchOptions.initialPanelOcclusionStaleMilliseconds else {
+            return
+        }
+        let milliseconds = max(1, min(rawMilliseconds, 5_000))
+        initialPanelOcclusionStaleGeneration += 1
+        let generation = initialPanelOcclusionStaleGeneration
+        panelController.panelOcclusionStateOverride = []
+        RuntimeLog.info(
+            "UITest",
+            "initial panel occlusion stale installed generation=\(generation) ms=\(milliseconds)"
+        )
+
+        Task { @MainActor [weak panelController] in
+            try? await Task.sleep(nanoseconds: UInt64(milliseconds) * 1_000_000)
+            guard generation == initialPanelOcclusionStaleGeneration else { return }
+            panelController?.panelOcclusionStateOverride = .visible
+            RuntimeLog.info(
+                "UITest",
+                "initial panel occlusion stale released generation=\(generation) ms=\(milliseconds)"
+            )
+        }
+    }
+
     private static func installSwitcherTriggerNotificationsIfNeeded(
         panelController: SwitcherPanelController
     ) {
@@ -334,6 +361,7 @@ enum FlowTabUITestBootstrapper {
     }
 
     private static func presentLaunchSwitcher(panelController: SwitcherPanelController) -> Bool {
+        installInitialPanelOcclusionStaleOverrideIfNeeded(panelController: panelController)
         if FlowTabTestLaunchOptions.opensInAppWindowSwitcherOnLaunch {
             return panelController.presentInAppWindowHotkeySessionForTesting()
         }
@@ -424,6 +452,9 @@ private final class SwitcherTriggerNotificationObserver: NSObject {
         _ trigger: Trigger,
         panelController: SwitcherPanelController
     ) -> Bool {
+        FlowTabUITestBootstrapper.installInitialPanelOcclusionStaleOverrideIfNeeded(
+            panelController: panelController
+        )
         switch trigger {
         case .global:
             return panelController.presentGlobalHotkeySessionForTesting()

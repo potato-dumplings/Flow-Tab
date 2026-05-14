@@ -71,6 +71,13 @@ enum FlowTabTestLaunchOptions {
         value(after: "--flowtab-ui-mock-runtime-variant")
     }
 
+    static var initialPanelOcclusionStaleMilliseconds: Int? {
+        guard let rawValue = value(after: "--flowtab-ui-initial-panel-occlusion-stale-ms") else {
+            return nil
+        }
+        return Int(rawValue)
+    }
+
     static var seededWindowRecency: (appID: String, windowID: String)? {
         guard
             let appID = value(after: "--flowtab-ui-seed-window-recency-app-id"),

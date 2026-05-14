@@ -12,6 +12,11 @@ final class SwitcherPanelController {
         case inAppWindowSwitcher
     }
 
+    enum PanelVisibilityRecoveryMode {
+        case softReorder
+        case hardReorder
+    }
+
     let model: LiveSwitcherModel
     let panel: SwitcherOverlayPanel
 

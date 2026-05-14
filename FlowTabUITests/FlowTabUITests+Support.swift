@@ -666,6 +666,9 @@ extension FlowTabUITests {
             "Missing runtime log markers \(missingMarkers) in \(logsDirectoryURL.path). Latest logs: \(latestValue)"
         )
     }
+    func runtimeLogContentsSinceSnapshot(_ snapshot: [String: UInt64]) -> String {
+        runtimeLogContents(since: snapshot)
+    }
     private func runtimeLogsDirectoryURL() -> URL {
         let fallbackURL = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
         let baseURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first

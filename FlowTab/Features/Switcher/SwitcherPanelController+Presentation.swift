@@ -47,7 +47,8 @@ extension SwitcherPanelController {
         trigger: String,
         attemptDelaysNanoseconds: [UInt64] = [50_000_000],
         cancelSessionOnFailure: Bool = false,
-        activateApplicationIfNeeded: Bool = true
+        activateApplicationIfNeeded: Bool = true,
+        recoveryMode: PanelVisibilityRecoveryMode = .hardReorder
     ) {
         panelPresentationRecoveryTask?.cancel()
         panelPresentationRecoveryTask = Task { @MainActor [weak self] in
@@ -72,12 +73,14 @@ extension SwitcherPanelController {
                     return
                 }
 
+                let attemptAction = recoveryMode == .softReorder ? "softAttempt" : "attempt"
                 self.logSearchTrace(
-                    "presentationRecovery trigger=\(trigger) action=attempt index=\(attemptIndex + 1)/\(delays.count) \(self.searchTraceStateSummary())"
+                    "presentationRecovery trigger=\(trigger) action=\(attemptAction) index=\(attemptIndex + 1)/\(delays.count) \(self.searchTraceStateSummary())"
                 )
                 await self.performPanelVisibilityRecoveryAttempt(
                     trigger: trigger,
-                    activateApplicationIfNeeded: activateApplicationIfNeeded
+                    activateApplicationIfNeeded: activateApplicationIfNeeded,
+                    recoveryMode: recoveryMode
                 )
 
                 guard !Task.isCancelled else { return }
@@ -111,8 +114,21 @@ extension SwitcherPanelController {
 
     func performPanelVisibilityRecoveryAttempt(
         trigger: String,
-        activateApplicationIfNeeded: Bool
+        activateApplicationIfNeeded: Bool,
+        recoveryMode: PanelVisibilityRecoveryMode = .hardReorder
     ) async {
+        guard recoveryMode == .hardReorder else {
+            updatePanelPresentationLevel(
+                trigger: "\(trigger)_soft_recovery",
+                behaviorMode: .allSpaces
+            )
+            centerPanelOnActiveScreen(preferredScreen: resolveActivePresentationScreen())
+            guard hasActivePresentationSession else { return }
+            panel.makeKeyAndOrderFront(nil)
+            panel.orderFrontRegardless()
+            return
+        }
+
         if activateApplicationIfNeeded {
             activateApplicationForPanelPresentationIfNeeded()
         }
@@ -188,7 +204,9 @@ extension SwitcherPanelController {
         let ignoreReadyMs = monotonicMilliseconds()
         schedulePanelVisibilityRecovery(
             trigger: "global_show",
-            attemptDelaysNanoseconds: initialPresentationRecoveryAttemptDelaysNs
+            attemptDelaysNanoseconds: initialPresentationRecoveryAttemptDelaysNs,
+            activateApplicationIfNeeded: false,
+            recoveryMode: .softReorder
         )
         let recoveryReadyMs = monotonicMilliseconds()
         installEventMonitors()
@@ -261,7 +279,9 @@ extension SwitcherPanelController {
         let ignoreReadyMs = monotonicMilliseconds()
         schedulePanelVisibilityRecovery(
             trigger: "in_app_show",
-            attemptDelaysNanoseconds: initialPresentationRecoveryAttemptDelaysNs
+            attemptDelaysNanoseconds: initialPresentationRecoveryAttemptDelaysNs,
+            activateApplicationIfNeeded: false,
+            recoveryMode: .softReorder
         )
         let recoveryReadyMs = monotonicMilliseconds()
         installEventMonitors()
