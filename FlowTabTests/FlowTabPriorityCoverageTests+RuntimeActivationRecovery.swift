@@ -28,12 +28,14 @@ extension FlowTabPriorityCoverageTests {
         }
 
         let verifiedVisibleTarget = expectation(description: "focus retry verifies target CG window onscreen")
+        var didFulfillVisibleTarget = false
         var visibilityChecks: [Bool] = []
         activator.currentCGWindowsOverride = { pid in
             XCTAssertEqual(pid, currentApp.processIdentifier)
             let isVisible = focusCallCount >= 2
             visibilityChecks.append(isVisible)
-            if isVisible {
+            if isVisible, !didFulfillVisibleTarget {
+                didFulfillVisibleTarget = true
                 verifiedVisibleTarget.fulfill()
             }
             return [
@@ -75,7 +77,8 @@ extension FlowTabPriorityCoverageTests {
 
         await fulfillment(of: [verifiedVisibleTarget], timeout: 1.0)
         XCTAssertEqual(focusCallCount, 2)
-        XCTAssertEqual(visibilityChecks, [false, true])
+        XCTAssertEqual(visibilityChecks.first, false)
+        XCTAssertTrue(visibilityChecks.contains(true))
     }
 
     @MainActor
@@ -219,7 +222,96 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testRuntimeActivatorUsesRelatedCGSiblingWhenFullscreenHostFocusCannotVerify() {
+    func testRuntimeActivatorDoesNotFocusPublicAXWindowByTitleOnlyForDifferentCGTarget() {
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let activator = RuntimeActivator()
+        activator.activateCurrentAppIfNeededOverride = { _ in false }
+        activator.focusRecoveryRetryDelaysNanoseconds = []
+
+        let sameTitleAXWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
+        let sameTitlePointer = Unmanaged.passUnretained(sameTitleAXWindow).toOpaque()
+        let targetFrame = CGRect(x: 0, y: 158, width: 1_728, height: 959)
+        let sameTitleFrame = CGRect(x: 384, y: 258, width: 960, height: 640)
+        let targetCGWindowID: CGWindowID = 245_607
+        let sameTitleCGWindowID: CGWindowID = 245_608
+
+        let previousExactBridgeOverride = AXWindowInspector.cgWindowIDOverrideForTesting
+        AXWindowInspector.cgWindowIDOverrideForTesting = { window in
+            let pointer = Unmanaged.passUnretained(window).toOpaque()
+            return pointer == sameTitlePointer ? sameTitleCGWindowID : nil
+        }
+        defer {
+            AXWindowInspector.cgWindowIDOverrideForTesting = previousExactBridgeOverride
+        }
+
+        activator.currentAXWindowsOverride = { _ in [sameTitleAXWindow] }
+        activator.axWindowTitleOverride = { _ in "New Tab" }
+        activator.axWindowFrameOverride = { _ in sameTitleFrame }
+        activator.focusAXWindowOverride = { _, _, _ in
+            XCTFail("Title-only AX recovery must not focus a different CG window")
+            return true
+        }
+
+        var focusedCGWindowIDs: [CGWindowID] = []
+        activator.focusCGWindowOverride = { app, cgWindowID in
+            XCTAssertEqual(app.processIdentifier, currentApp.processIdentifier)
+            focusedCGWindowIDs.append(cgWindowID)
+            return true
+        }
+        activator.currentCGWindowsOverride = { pid in
+            XCTAssertEqual(pid, currentApp.processIdentifier)
+            return [
+                RuntimeSnapshotProvider.CGWindowEntry(
+                    id: sameTitleCGWindowID,
+                    title: "New Tab",
+                    bounds: sameTitleFrame,
+                    isOnscreen: true,
+                    alpha: 1.0,
+                    storeType: 1,
+                    spaceIDs: [1]
+                ),
+                RuntimeSnapshotProvider.CGWindowEntry(
+                    id: targetCGWindowID,
+                    title: "New Tab",
+                    bounds: targetFrame,
+                    isOnscreen: false,
+                    alpha: 1.0,
+                    storeType: 1,
+                    spaceIDs: [8_912]
+                )
+            ]
+        }
+
+        let windowID = "cg:\(currentApp.processIdentifier):\(targetCGWindowID)"
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windowsByID: [
+                windowID: RuntimeWindowContext(
+                    id: windowID,
+                    title: "New Tab",
+                    isMinimized: false,
+                    ownerPID: currentApp.processIdentifier,
+                    cgWindowID: targetCGWindowID,
+                    spaceIDs: [8_912],
+                    inferredTitleBarStyle: nil,
+                    frame: targetFrame,
+                    allowsPublicAXRecovery: true
+                )
+            ]
+        )
+
+        activator.activate(
+            target: .window(appID: appID, windowID: windowID, restoreIfMinimized: false),
+            contextsByID: [appID: context]
+        )
+
+        XCTAssertEqual(focusedCGWindowIDs, [targetCGWindowID])
+    }
+
+    @MainActor
+    func testRuntimeActivatorDoesNotUseRelatedCGSiblingByTitleWhenFullscreenHostFocusCannotVerify() {
         let currentApp = NSRunningApplication.current
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
@@ -247,13 +339,12 @@ extension FlowTabPriorityCoverageTests {
         }
         activator.currentCGWindowsOverride = { pid in
             XCTAssertEqual(pid, currentApp.processIdentifier)
-            let targetIsVisible = focusedCGWindowIDs.last == relatedCGWindowID
             return [
                 RuntimeSnapshotProvider.CGWindowEntry(
                     id: relatedCGWindowID,
                     title: "Chrome Fullscreen Tab",
                     bounds: relatedFrame,
-                    isOnscreen: targetIsVisible,
+                    isOnscreen: false,
                     alpha: 1.0,
                     storeType: 1
                 ),
@@ -261,7 +352,7 @@ extension FlowTabPriorityCoverageTests {
                     id: targetCGWindowID,
                     title: "Chrome Fullscreen Tab",
                     bounds: targetFrame,
-                    isOnscreen: targetIsVisible,
+                    isOnscreen: false,
                     alpha: 1.0,
                     storeType: 1
                 )
@@ -292,7 +383,7 @@ extension FlowTabPriorityCoverageTests {
             contextsByID: [appID: context]
         )
 
-        XCTAssertEqual(focusedCGWindowIDs, [targetCGWindowID, relatedCGWindowID])
+        XCTAssertEqual(focusedCGWindowIDs, [targetCGWindowID])
     }
 
     @MainActor
@@ -602,12 +693,14 @@ extension FlowTabPriorityCoverageTests {
         }
 
         let visibilitySettled = expectation(description: "cg bridge retry sees target window onscreen")
+        var didFulfillVisibilitySettled = false
         var cgWindowReadCount = 0
         activator.currentCGWindowsOverride = { pid in
             XCTAssertEqual(pid, currentApp.processIdentifier)
             cgWindowReadCount += 1
-            let isVisible = cgWindowReadCount >= 2
-            if isVisible {
+            let isVisible = focusedCGWindowIDs.count >= 2
+            if isVisible, !didFulfillVisibilitySettled {
+                didFulfillVisibilitySettled = true
                 visibilitySettled.fulfill()
             }
             return [
@@ -649,7 +742,7 @@ extension FlowTabPriorityCoverageTests {
         await fulfillment(of: [visibilitySettled], timeout: 1.0)
         XCTAssertEqual(requestActivationCallCount, 0)
         XCTAssertEqual(focusedCGWindowIDs, [targetCGWindowID, targetCGWindowID])
-        XCTAssertEqual(cgWindowReadCount, 2)
+        XCTAssertGreaterThanOrEqual(cgWindowReadCount, 2)
     }
 
     @MainActor

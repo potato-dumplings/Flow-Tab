@@ -238,9 +238,9 @@ extension RuntimeSnapshotProvider {
         axWindowCount: Int,
         entries: [WindowListEntry]
     ) {
-        let cgOnlyCount = entries.filter { $0.activationHandleID == nil && $0.axWindow == nil }.count
-        guard entries.count != axWindowCount || cgOnlyCount > 0 else { return }
+        guard !entries.isEmpty else { return }
 
+        let cgOnlyCount = entries.filter { $0.activationHandleID == nil && $0.axWindow == nil }.count
         let stickyCount = entries.filter(\.hasStickyBinding).count
         RuntimeLog.info(
             "Snapshot",
@@ -280,22 +280,29 @@ private func runtimeSnapshotWindowEntrySummary(
 ) -> String {
     guard !entries.isEmpty else { return "empty" }
     let sample = entries.prefix(limit).enumerated().map { index, entry in
-        let route: String
-        if entry.activationHandleID != nil || entry.axWindow != nil {
-            route = "ax"
-        } else if entry.hasStickyBinding {
-            route = "sticky-cg"
-        } else {
-            route = "cg"
-        }
+        let mode = RuntimeWindowDiagnostics.displayMode(
+            frame: entry.frame,
+            spaceIDs: entry.spaceIDs,
+            confirmationSource: entry.lastConfirmationSource
+        )
+        let identity = RuntimeWindowDiagnostics.activationIdentity(
+            activationHandleID: entry.activationHandleID,
+            hasAXWindow: entry.axWindow != nil,
+            cgWindowID: entry.cgWindowID,
+            hasStickyBinding: entry.hasStickyBinding
+        )
         let cg = entry.cgWindowID.map(String.init) ?? "nil"
+        let handle = entry.activationHandleID ?? "nil"
         let spaces = entry.spaceIDs.isEmpty
             ? "[]"
             : "[\(entry.spaceIDs.map(String.init).joined(separator: ","))]"
         let onscreen = entry.isOnscreen ? "on" : "off"
+        let ax = entry.axWindow == nil ? 0 : 1
+        let minimized = entry.isMinimized ? 1 : 0
+        let publicAXRecovery = entry.allowsPublicAXRecovery ? 1 : 0
         let sticky = entry.hasStickyBinding ? 1 : 0
         let source = entry.lastConfirmationSource?.rawValue ?? "nil"
-        return "\(index):\(runtimeSnapshotLogValue(entry.title)):cg=\(cg):route=\(route):sticky=\(sticky):source=\(source):spaces=\(spaces):\(onscreen):frame=\(runtimeSnapshotFrameDescription(entry.frame))"
+        return "\(index):id=\(entry.windowID):title=\(runtimeSnapshotLogValue(entry.title)):mode=\(mode):identity=\(identity):handle=\(handle):ax=\(ax):cg=\(cg):sticky=\(sticky):source=\(source):publicAXRecovery=\(publicAXRecovery):spaces=\(spaces):\(onscreen):minimized=\(minimized):frame=\(runtimeSnapshotFrameDescription(entry.frame))"
     }.joined(separator: ",")
     return runtimeSnapshotSampleDescription(sample: sample, count: entries.count, limit: limit)
 }

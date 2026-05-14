@@ -8,6 +8,65 @@ enum RuntimeWindowSpaceClassification: Equatable {
     case mixed
 }
 
+enum RuntimeWindowDiagnostics {
+    static func displayMode(
+        frame: CGRect?,
+        spaceIDs: [Int],
+        confirmationSource: WindowBindingConfirmationSource?
+    ) -> String {
+        if isConfirmedFullscreenSource(confirmationSource) {
+            return "full-screen"
+        }
+        if RuntimeWindowTopologyClassifier.isLikelyOffDesktopFullscreenContent(
+            bounds: frame,
+            spaceIDs: spaceIDs
+        ) {
+            return "full-screen"
+        }
+        return "normal"
+    }
+
+    static func activationIdentity(
+        activationHandleID: String?,
+        hasAXWindow: Bool,
+        cgWindowID: CGWindowID?,
+        hasStickyBinding: Bool
+    ) -> String {
+        if let activationHandleID {
+            return "ax:\(activationHandleID)"
+        }
+        if hasAXWindow, let cgWindowID {
+            return "ax-object+cg:\(cgWindowID)"
+        }
+        if hasAXWindow {
+            return "ax-object"
+        }
+        if hasStickyBinding, let cgWindowID {
+            return "sticky-cg:\(cgWindowID)"
+        }
+        if let cgWindowID {
+            return "cg:\(cgWindowID)"
+        }
+        return "unknown"
+    }
+
+    private static func isConfirmedFullscreenSource(
+        _ source: WindowBindingConfirmationSource?
+    ) -> Bool {
+        switch source {
+        case .fullscreenContentRebinding,
+             .fullscreenContentFallbackBinding,
+             .desktopSiblingBinding:
+            return true
+        case .stickyBinding,
+             .publicExactMatch,
+             .privateExactBridge,
+             nil:
+            return false
+        }
+    }
+}
+
 enum RuntimeWindowTopologyClassifier {
     static let desktopSpaceID = 1
 

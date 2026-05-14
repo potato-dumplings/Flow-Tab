@@ -891,83 +891,10 @@ extension RuntimeSnapshotProvider {
             )
         }
 
-        let publicFallback = publicUniqueAXWindowMatch(
-            expectedTitle: expectedTitle,
-            expectedFrame: expectedFrame,
-            windows: windows
+        RuntimeLog.info(
+            "Activation",
+            "ax-recovery no-public-match targetCG=\(targetCGWindowID.map(String.init) ?? "nil")"
         )
-        if publicFallback == nil {
-            RuntimeLog.info(
-                "Activation",
-                "ax-recovery no-public-match targetCG=\(targetCGWindowID.map(String.init) ?? "nil")"
-            )
-        }
-        return publicFallback
-    }
-
-    private static func publicUniqueAXWindowMatch(
-        expectedTitle: String,
-        expectedFrame: CGRect?,
-        windows: [AXWindowEntry]
-    ) -> AXWindowRecoveryDiagnosticResult? {
-        let normalizedExpectedTitle = normalizedRuntimeWindowTitle(expectedTitle)
-        if let normalizedExpectedTitle {
-            let exactTitleAndFrameMatches = windows.filter { window in
-                guard
-                    let windowTitle = normalizedRuntimeWindowTitle(window.sourceTitle ?? window.title),
-                    windowTitle.caseInsensitiveCompare(normalizedExpectedTitle) == .orderedSame
-                else {
-                    return false
-                }
-                guard let expectedFrame, let windowFrame = window.frame else { return true }
-                return RuntimeWindowTopologyClassifier.framesApproximatelyMatch(windowFrame, expectedFrame)
-            }
-            RuntimeLog.info(
-                "Activation",
-                "ax-recovery public-fallback title-frame matches=\(exactTitleAndFrameMatches.count) ids=\(runtimeAXRecoveryWindowIDs(exactTitleAndFrameMatches))"
-            )
-            if exactTitleAndFrameMatches.count == 1 {
-                return AXWindowRecoveryDiagnosticResult(
-                    window: exactTitleAndFrameMatches[0],
-                    reason: "title-frame"
-                )
-            }
-
-            let exactTitleMatches = windows.filter { window in
-                guard let windowTitle = normalizedRuntimeWindowTitle(window.sourceTitle ?? window.title) else {
-                    return false
-                }
-                return windowTitle.caseInsensitiveCompare(normalizedExpectedTitle) == .orderedSame
-            }
-            RuntimeLog.info(
-                "Activation",
-                "ax-recovery public-fallback title matches=\(exactTitleMatches.count) ids=\(runtimeAXRecoveryWindowIDs(exactTitleMatches))"
-            )
-            if exactTitleMatches.count == 1 {
-                return AXWindowRecoveryDiagnosticResult(
-                    window: exactTitleMatches[0],
-                    reason: "title"
-                )
-            }
-        }
-
-        if let expectedFrame {
-            let exactFrameMatches = windows.filter { window in
-                guard let windowFrame = window.frame else { return false }
-                return RuntimeWindowTopologyClassifier.framesApproximatelyMatch(windowFrame, expectedFrame)
-            }
-            RuntimeLog.info(
-                "Activation",
-                "ax-recovery public-fallback frame matches=\(exactFrameMatches.count) ids=\(runtimeAXRecoveryWindowIDs(exactFrameMatches))"
-            )
-            if exactFrameMatches.count == 1 {
-                return AXWindowRecoveryDiagnosticResult(
-                    window: exactFrameMatches[0],
-                    reason: "frame"
-                )
-            }
-        }
-
         return nil
     }
 }
