@@ -118,12 +118,16 @@ final class RuntimeActivator {
     }
 
     private func focusWindow(_ request: WindowFocusRequest, in app: NSRunningApplication) {
-        guard !attemptWindowFocus(request, in: app) else { return }
+        guard !attemptWindowFocus(request, in: app, allowChromeInternalFocus: true) else { return }
         scheduleFocusRecovery(for: request, in: app)
     }
 
     @discardableResult
-    private func attemptWindowFocus(_ request: WindowFocusRequest, in app: NSRunningApplication) -> Bool {
+    private func attemptWindowFocus(
+        _ request: WindowFocusRequest,
+        in app: NSRunningApplication,
+        allowChromeInternalFocus: Bool
+    ) -> Bool {
         if let focusWindowOverride {
             focusWindowOverride(request.windowID, request.title, request.restoreIfMinimized, app)
             return reportWindowFocusVerified(request, in: app)
@@ -135,13 +139,17 @@ final class RuntimeActivator {
             "focus-attempt route=cg result=\(cgFocusResult.debugName) pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(request.targetCGWindowID(expectedPID: app.processIdentifier).map(String.init) ?? "nil") frontmost=\(runtimeActivationFrontmostDescription())"
         )
         let cgFocusVerified: Bool
+        let cgFocusWasAccepted: Bool
         switch cgFocusResult {
         case .verified:
             cgFocusVerified = true
+            cgFocusWasAccepted = true
         case .focusedButUnverified:
             cgFocusVerified = false
+            cgFocusWasAccepted = true
         case .noFocusRoute:
             cgFocusVerified = false
+            cgFocusWasAccepted = false
         }
 
         let windowFromRegistry = liveWindowRegistry.window(
@@ -163,6 +171,9 @@ final class RuntimeActivator {
             case .verified:
                 return reportWindowFocusVerified(request, in: app)
             case .focusedButUnverified:
+                if allowChromeInternalFocus, finishChromeInternalWindowFocusIfVerified(request, in: app) {
+                    return true
+                }
                 return false
             case .noFocusRoute:
                 if cgFocusVerified {
@@ -204,6 +215,17 @@ final class RuntimeActivator {
             "Activation",
             "ax-recovery fetched pid=\(app.processIdentifier) windowID=\(request.windowID) count=\(windows.count)"
         )
+        if cgFocusWasAccepted, targetCGWindowIsVisible(
+            targetCGWindowID,
+            in: app,
+            currentWindows: currentCGWindows(forPID: app.processIdentifier)
+        ) {
+            RuntimeLog.info(
+                "Activation",
+                "focus-attempt route=ax-recovery-visible result=verified pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID.map(String.init) ?? "nil")"
+            )
+            return reportWindowFocusVerified(request, in: app)
+        }
         if windows.isEmpty {
             RuntimeLog.info(
                 "Activation",
@@ -231,6 +253,9 @@ final class RuntimeActivator {
                 case .verified:
                     return reportWindowFocusVerified(request, in: app)
                 case .focusedButUnverified, .noFocusRoute:
+                    if allowChromeInternalFocus, finishChromeInternalWindowFocusIfVerified(request, in: app) {
+                        return true
+                    }
                     return false
                 }
             }
@@ -258,6 +283,10 @@ final class RuntimeActivator {
             if sameSpaceCGFocusResult == .verified {
                 return reportWindowFocusVerified(request, in: app)
             }
+        }
+
+        if allowChromeInternalFocus, finishChromeInternalWindowFocusIfVerified(request, in: app) {
+            return true
         }
 
         RuntimeLog.info(
@@ -457,6 +486,78 @@ final class RuntimeActivator {
         return .focusedButUnverified
     }
 
+    private func finishChromeInternalWindowFocusIfVerified(
+        _ request: WindowFocusRequest,
+        in app: NSRunningApplication
+    ) -> Bool {
+        guard let result = attemptChromeInternalWindowFocus(request, in: app) else {
+            return false
+        }
+        RuntimeLog.info(
+            "Activation",
+            "focus-attempt route=chrome-internal result=\(result.debugName) pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(request.targetCGWindowID(expectedPID: app.processIdentifier).map(String.init) ?? "nil")"
+        )
+        guard result == .verified else {
+            return false
+        }
+        return reportWindowFocusVerified(request, in: app)
+    }
+
+    private func attemptChromeInternalWindowFocus(
+        _ request: WindowFocusRequest,
+        in app: NSRunningApplication
+    ) -> WindowFocusAttemptResult? {
+        guard RuntimeChromeWindowFocusBridge.canAttempt(for: app) else {
+            return nil
+        }
+        guard let targetCGWindowID = request.targetCGWindowID(expectedPID: app.processIdentifier) else {
+            return nil
+        }
+        let currentWindows = currentCGWindows(forPID: app.processIdentifier)
+        if targetCGWindowIsVisible(
+            targetCGWindowID,
+            in: app,
+            currentWindows: currentWindows
+        ) {
+            return .verified
+        }
+
+        let query = RuntimeChromeWindowFocusBridge.candidateQuery(
+            expectedTitle: request.title,
+            expectedFrame: request.frame
+        )
+        let candidates = query.candidates
+        RuntimeLog.info(
+            "Activation",
+            "chrome-internal candidates pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID) chromeWindows=\(query.chromeWindowCount) count=\(candidates.count) error=\(runtimeActivationLogValue(query.error ?? "nil")) items=\(candidates.prefix(5).map(\.logDescription).joined(separator: ","))"
+        )
+        guard !candidates.isEmpty else {
+            return .noFocusRoute
+        }
+
+        guard let candidate = RuntimeChromeWindowFocusBridge.selectCandidate(
+            candidates,
+            targetCGWindowID: targetCGWindowID,
+            fallbackTitle: request.title,
+            fallbackFrame: request.frame,
+            currentCGWindows: currentWindows
+        ) else {
+            return .noFocusRoute
+        }
+        let focusResult = RuntimeChromeWindowFocusBridge.focusWindow(windowID: candidate.windowID)
+        RuntimeLog.info(
+            "Activation",
+            "chrome-internal focus pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID) candidate=\(candidate.windowID) accepted=\(focusResult.accepted ? 1 : 0) front=\(focusResult.frontWindowID.map(String.init) ?? "nil") error=\(runtimeActivationLogValue(focusResult.error ?? "nil"))"
+        )
+        guard focusResult.accepted else {
+            return .noFocusRoute
+        }
+        guard verifyFocusAttempt(request, route: "chrome-internal", in: app) else {
+            return .focusedButUnverified
+        }
+        return .verified
+    }
+
     private func targetCGWindowIsVisible(
         _ targetCGWindowID: CGWindowID?,
         in app: NSRunningApplication
@@ -502,7 +603,7 @@ final class RuntimeActivator {
                     "Activation",
                     "focus-recovery attempt=\(attemptIndex + 1) pid=\(app.processIdentifier) windowID=\(request.windowID)"
                 )
-                if self.attemptWindowFocus(request, in: app) {
+                if self.attemptWindowFocus(request, in: app, allowChromeInternalFocus: false) {
                     RuntimeLog.info(
                         "Activation",
                         "focus-recovery verified attempt=\(attemptIndex + 1) pid=\(app.processIdentifier) windowID=\(request.windowID)"

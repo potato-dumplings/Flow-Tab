@@ -443,6 +443,53 @@ presentation order，用来解释系统当前给 FlowTab 的输入；它们不�
 8. 对回读到的 AX 窗口再次调用 `_AXUIElementGetWindow`，重新确认 exact binding，并刷新 sticky binding。
 9. 若提交失败，则保留已有 sticky binding 或 `CG -> Space` 恢复状态，不因单次提交失败解绑。
 
+### 当前 RuntimeActivator 路线
+
+当前产品实现不直接设置当前 Space。提交成功的证明仍然是用户选择的目标
+`CGWindowID` 在提交后变为 `isOnscreen`，而不是 app 变 frontmost、Space ID
+变化，或某个菜单项被选中。
+
+`RuntimeActivator` 的通用路线按下面的证据顺序执行：
+
+1. 若目标有 `CGWindowID`，先通过 `RuntimeCGWindowFocusBridge` 请求系统聚焦该
+   CG window。
+2. 若有直接 AX handle 或 live registry handle，再走 AX raise/main/focused。
+3. 若允许 public AX recovery，扫描 public/remote AX windows，用目标
+   `CGWindowID`、title 与 frame 重新恢复 exact target。
+4. 如果 CG focus 已被系统接受，但首次 verify 时目标还不可见，则在 AX recovery
+   扫描后重新读取 CGWindowList；若目标 `CGWindowID` 已经 `isOnscreen`，直接报告
+   focus verified，并记录该 CG window。
+5. 对 full-screen topology，必要时再尝试 related AX surface 与 same-space CG
+   surface。
+6. 所有路线都必须回到同一个成功标准：目标 `CGWindowID` 变为 `isOnscreen`。
+
+### Chrome 内部窗口兜底
+
+Chrome 是当前已知的特殊应用：在 Chrome full-screen Space 中切回某些 normal
+Chrome window 时，系统 CG focus 可能返回 accepted，但 public AX 列表不给出目标
+AX handle，目标 `CGWindowID` 也不会立刻变为 `isOnscreen`。这会让通用路线停在
+sticky/CG-only 状态。
+
+为覆盖这个已确认形态，`RuntimeActivator` 在通用 CG/AX/recovery/same-space 路线
+未能 verify 之后，才允许对 `com.google.Chrome` 走 Chrome 内部窗口兜底：
+
+1. 通过 Apple Events 枚举 Chrome 自己的 `window id`、window name、active tab
+   title 与 bounds。该路线需要 macOS Automation 权限，并由 Info.plist 中的
+   `NSAppleEventsUsageDescription` 说明用途。
+2. 按 FlowTab 已有目标证据做候选评分：优先匹配 title/active tab title，其次匹配
+   frame/bounds。
+3. 若多个 Chrome 内部候选同分，使用当前 CGWindowList 中同 title、近似同 frame 的
+   sibling 顺序，把目标 `CGWindowID` 映射到同序号的 Chrome `window id`。这样只
+   尝试一个最可能候选，避免连续 focus 多个 Chrome 窗口导致来回跳。
+4. 对选中的 Chrome `window id` 执行 `set index ... to 1` 与 `activate`。
+5. Chrome 返回的 front window id 只说明 Chrome 接受了内部聚焦请求；FlowTab 仍然
+   必须重新 verify 目标 `CGWindowID` 是否 `isOnscreen`。只有 verify 成功才记录为
+   `focus verified`。
+
+这不是 Window menu 路线，也不是 Space switching 路线。它只发生在用户明确提交
+某个 Chrome 窗口之后，并且不改变 FlowTab 的窗口身份主锚点：最终成功证据仍然是
+用户选择的同一个 `CGWindowID`。
+
 ## 不会触发解绑的情况
 
 以下情况都不应主动解绑 sticky binding：

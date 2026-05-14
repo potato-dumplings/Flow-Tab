@@ -821,6 +821,85 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testRuntimeActivatorReportsCGOnlySpaceTargetVisibleAfterAXRecoveryScan() {
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let activator = RuntimeActivator()
+        activator.activateCurrentAppIfNeededOverride = { _ in false }
+        activator.focusRecoveryRetryDelaysNanoseconds = []
+
+        let targetFrame = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
+        let targetCGWindowID: CGWindowID = 245_505
+        var focusedCGWindowIDs: [CGWindowID] = []
+        activator.focusCGWindowOverride = { app, cgWindowID in
+            XCTAssertEqual(app.processIdentifier, currentApp.processIdentifier)
+            focusedCGWindowIDs.append(cgWindowID)
+            return true
+        }
+
+        var didScanAXRecovery = false
+        activator.currentAXWindowsOverride = { app in
+            XCTAssertEqual(app.processIdentifier, currentApp.processIdentifier)
+            didScanAXRecovery = true
+            return []
+        }
+        activator.focusAXWindowOverride = { _, _, _ in
+            XCTFail("CG-only target should verify once the target CG window becomes visible")
+            return true
+        }
+
+        var visibilityChecks: [Bool] = []
+        activator.currentCGWindowsOverride = { pid in
+            XCTAssertEqual(pid, currentApp.processIdentifier)
+            let isVisible = didScanAXRecovery
+            visibilityChecks.append(isVisible)
+            return [
+                RuntimeSnapshotProvider.CGWindowEntry(
+                    id: targetCGWindowID,
+                    title: "Late Visible Target",
+                    bounds: targetFrame,
+                    isOnscreen: isVisible,
+                    alpha: 1.0,
+                    storeType: 1
+                )
+            ]
+        }
+
+        var verifiedCGWindowIDs: [CGWindowID?] = []
+        activator.windowFocusVerifiedHandler = { _, _, _, cgWindowID, _, _ in
+            verifiedCGWindowIDs.append(cgWindowID)
+        }
+
+        let windowID = "cg:\(currentApp.processIdentifier):\(targetCGWindowID)"
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windowsByID: [
+                windowID: RuntimeWindowContext(
+                    id: windowID,
+                    title: "Late Visible Target",
+                    isMinimized: false,
+                    ownerPID: currentApp.processIdentifier,
+                    cgWindowID: targetCGWindowID,
+                    spaceIDs: [7_136],
+                    inferredTitleBarStyle: nil,
+                    frame: targetFrame,
+                    allowsPublicAXRecovery: true
+                )
+            ]
+        )
+
+        activator.activate(
+            target: .window(appID: appID, windowID: windowID, restoreIfMinimized: false),
+            contextsByID: [appID: context]
+        )
+
+        XCTAssertEqual(focusedCGWindowIDs, [targetCGWindowID])
+        XCTAssertEqual(visibilityChecks, [false, true])
+        XCTAssertEqual(verifiedCGWindowIDs, [targetCGWindowID])
+    }
+
+    @MainActor
     func testRuntimeActivatorRetriesWindowRecoveryAfterActivationWhenAXWindowsAppearLate() async {
         let currentApp = NSRunningApplication.current
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"

@@ -124,6 +124,7 @@
 		F6E7A8C235AC000100B0D737 /* RuntimeWindowFocusRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7A8C135AC000100B0D737 /* RuntimeWindowFocusRequest.swift */; };
 		F7A8B9C235AD000100B0D737 /* RuntimeCGWindowFocusBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7A8B9C135AD000100B0D737 /* RuntimeCGWindowFocusBridge.swift */; };
 		F8A9B0C335AE000100B0D737 /* RuntimeAXRemoteWindowResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A9B0C235AE000100B0D737 /* RuntimeAXRemoteWindowResolver.swift */; };
+		F9C0D1E235AF000100B0D737 /* RuntimeChromeWindowFocusBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9C0D1E135AF000100B0D737 /* RuntimeChromeWindowFocusBridge.swift */; };
 		F50001012F90000100B0D737 /* FlowTabSpaceFixtureApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000022F90000100B0D737 /* FlowTabSpaceFixtureApp.swift */; };
 		F50001022F90000100B0D737 /* SpaceFixtureAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000032F90000100B0D737 /* SpaceFixtureAppDelegate.swift */; };
 		F50001032F90000100B0D737 /* SpaceFixtureLaunchConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000042F90000100B0D737 /* SpaceFixtureLaunchConfiguration.swift */; };
@@ -286,6 +287,7 @@
 		F6E7A8BB35AC000100B0D737 /* RuntimeWindowSpaceClassification.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowSpaceClassification.swift; sourceTree = "<group>"; };
 		F7A8B9C135AD000100B0D737 /* RuntimeCGWindowFocusBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeCGWindowFocusBridge.swift; sourceTree = "<group>"; };
 		F8A9B0C235AE000100B0D737 /* RuntimeAXRemoteWindowResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeAXRemoteWindowResolver.swift; sourceTree = "<group>"; };
+		F9C0D1E135AF000100B0D737 /* RuntimeChromeWindowFocusBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeChromeWindowFocusBridge.swift; sourceTree = "<group>"; };
 		F50000012F90000100B0D737 /* FlowTabSpaceFixture.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FlowTabSpaceFixture.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F50000022F90000100B0D737 /* FlowTabSpaceFixtureApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTabSpaceFixtureApp.swift; sourceTree = "<group>"; };
 		F50000032F90000100B0D737 /* SpaceFixtureAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceFixtureAppDelegate.swift; sourceTree = "<group>"; };
@@ -546,6 +548,7 @@
 				A1B2C4382F73000100B0D737 /* AppIconProvider.swift */,
 				F4D5E6F835AB000100B0D737 /* RuntimeCGSpaceInspector.swift */,
 				F7A8B9C135AD000100B0D737 /* RuntimeCGWindowFocusBridge.swift */,
+				F9C0D1E135AF000100B0D737 /* RuntimeChromeWindowFocusBridge.swift */,
 				B26000012FE000100B0D737 /* RuntimePerformanceClock.swift */,
 				E1F100112B00000100B0D737 /* RuntimeLogging.swift */,
 			);
@@ -881,6 +884,7 @@
 				A1B2C4412F73000100B0D737 /* AppIconProvider.swift in Sources */,
 				F4D5E6F735AB000100B0D737 /* RuntimeCGSpaceInspector.swift in Sources */,
 				F7A8B9C235AD000100B0D737 /* RuntimeCGWindowFocusBridge.swift in Sources */,
+				F9C0D1E235AF000100B0D737 /* RuntimeChromeWindowFocusBridge.swift in Sources */,
 				B26010012FE000100B0D737 /* RuntimePerformanceClock.swift in Sources */,
 				A1B2C3F12F73000100B0D737 /* SwitcherPanelController.swift in Sources */,
 				A1B2C4112F73000100B0D737 /* SwitcherPanelWindowConfiguration.swift in Sources */,
@@ -1148,6 +1152,7 @@
 				EXECUTABLE_NAME = FlowTab;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Flow Tab";
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Flow Tab asks Google Chrome to bring the selected Chrome window to the front.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1179,6 +1184,7 @@
 				EXECUTABLE_NAME = FlowTab;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Flow Tab";
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Flow Tab asks Google Chrome to bring the selected Chrome window to the front.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
