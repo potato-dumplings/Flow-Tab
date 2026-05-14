@@ -3,38 +3,55 @@ import AppKit
 
 struct AppKitPermissionSettingsCardContent: NSViewRepresentable {
     @Binding var showPermissionReminder: Bool
+    @Binding var allowLaunchAtLogin: Bool
     let accessibilityTrusted: Bool
     let screenCaptureTrusted: Bool
+    let onLaunchAtLoginChanged: (Bool) -> Void
     let onAccessibilityAction: () -> Void
     let onScreenCaptureAction: () -> Void
 
     final class Coordinator {
         var showPermissionReminder: Binding<Bool>
+        var allowLaunchAtLogin: Binding<Bool>
+        var onLaunchAtLoginChanged: (Bool) -> Void
         var onAccessibilityAction: () -> Void
         var onScreenCaptureAction: () -> Void
 
         init(
             showPermissionReminder: Binding<Bool>,
+            allowLaunchAtLogin: Binding<Bool>,
+            onLaunchAtLoginChanged: @escaping (Bool) -> Void,
             onAccessibilityAction: @escaping () -> Void,
             onScreenCaptureAction: @escaping () -> Void
         ) {
             self.showPermissionReminder = showPermissionReminder
+            self.allowLaunchAtLogin = allowLaunchAtLogin
+            self.onLaunchAtLoginChanged = onLaunchAtLoginChanged
             self.onAccessibilityAction = onAccessibilityAction
             self.onScreenCaptureAction = onScreenCaptureAction
         }
 
         func update(
             showPermissionReminder: Binding<Bool>,
+            allowLaunchAtLogin: Binding<Bool>,
+            onLaunchAtLoginChanged: @escaping (Bool) -> Void,
             onAccessibilityAction: @escaping () -> Void,
             onScreenCaptureAction: @escaping () -> Void
         ) {
             self.showPermissionReminder = showPermissionReminder
+            self.allowLaunchAtLogin = allowLaunchAtLogin
+            self.onLaunchAtLoginChanged = onLaunchAtLoginChanged
             self.onAccessibilityAction = onAccessibilityAction
             self.onScreenCaptureAction = onScreenCaptureAction
         }
 
         func setShowPermissionReminder(_ value: Bool) {
             showPermissionReminder.wrappedValue = value
+        }
+
+        func setAllowLaunchAtLogin(_ value: Bool) {
+            allowLaunchAtLogin.wrappedValue = value
+            onLaunchAtLoginChanged(value)
         }
 
         func triggerAccessibilityAction() {
@@ -49,6 +66,8 @@ struct AppKitPermissionSettingsCardContent: NSViewRepresentable {
     func makeCoordinator() -> Coordinator {
         Coordinator(
             showPermissionReminder: $showPermissionReminder,
+            allowLaunchAtLogin: $allowLaunchAtLogin,
+            onLaunchAtLoginChanged: onLaunchAtLoginChanged,
             onAccessibilityAction: onAccessibilityAction,
             onScreenCaptureAction: onScreenCaptureAction
         )
@@ -71,6 +90,8 @@ struct AppKitPermissionSettingsCardContent: NSViewRepresentable {
     func updateNSView(_ nsView: PermissionSettingsCardAppKitView, context: Context) {
         context.coordinator.update(
             showPermissionReminder: $showPermissionReminder,
+            allowLaunchAtLogin: $allowLaunchAtLogin,
+            onLaunchAtLoginChanged: onLaunchAtLoginChanged,
             onAccessibilityAction: onAccessibilityAction,
             onScreenCaptureAction: onScreenCaptureAction
         )
@@ -78,6 +99,7 @@ struct AppKitPermissionSettingsCardContent: NSViewRepresentable {
         nsView.update(
             with: PermissionSettingsCardState(
                 showPermissionReminder: showPermissionReminder,
+                allowLaunchAtLogin: allowLaunchAtLogin,
                 accessibilityTrusted: accessibilityTrusted,
                 screenCaptureTrusted: screenCaptureTrusted
             )
@@ -86,6 +108,7 @@ struct AppKitPermissionSettingsCardContent: NSViewRepresentable {
 
     private func connect(_ view: PermissionSettingsCardAppKitView, coordinator: Coordinator) {
         view.onShowPermissionReminderChanged = { coordinator.setShowPermissionReminder($0) }
+        view.onAllowLaunchAtLoginChanged = { coordinator.setAllowLaunchAtLogin($0) }
         view.onAccessibilityAction = { coordinator.triggerAccessibilityAction() }
         view.onScreenCaptureAction = { coordinator.triggerScreenCaptureAction() }
     }
@@ -93,6 +116,7 @@ struct AppKitPermissionSettingsCardContent: NSViewRepresentable {
 
 struct PermissionSettingsCardState: Equatable {
     let showPermissionReminder: Bool
+    let allowLaunchAtLogin: Bool
     let accessibilityTrusted: Bool
     let screenCaptureTrusted: Bool
 
@@ -119,25 +143,26 @@ struct PermissionSettingsCardState: Equatable {
             ? AppStrings.text(.permissionScreenClose)
             : AppStrings.text(.permissionScreenRequest)
     }
+
 }
 
-private final class PermissionStatusActionRowView: NSView {
+private final class PermissionStatusControlRowView<Control: NSView>: NSView {
     let titleLabel = AppKitSettingsCardBaseView.makeStatusLabel()
     let detailLabel = AppKitSettingsCardBaseView.makeBodyLabel()
-    let actionButton: FlowGradientActionButton
+    let control: Control
     private let stackView = NSStackView()
     private let textStack = NSStackView()
+    private let controlWidth: CGFloat?
 
-    override init(frame frameRect: NSRect) {
-        actionButton = FlowGradientActionButton()
+    init(control: Control, controlWidth: CGFloat? = nil) {
+        self.control = control
+        self.controlWidth = controlWidth
         super.init(frame: .zero)
         buildViewHierarchy()
     }
 
     required init?(coder: NSCoder) {
-        actionButton = FlowGradientActionButton()
-        super.init(coder: coder)
-        buildViewHierarchy()
+        fatalError("init(coder:) has not been implemented")
     }
 
     private func buildViewHierarchy() {
@@ -170,8 +195,10 @@ private final class PermissionStatusActionRowView: NSView {
         addSubview(stackView)
         stackView.addArrangedSubview(textStack)
         stackView.addArrangedSubview(spacer)
-        stackView.addArrangedSubview(actionButton)
-        actionButton.widthAnchor.constraint(equalToConstant: 166).isActive = true
+        stackView.addArrangedSubview(control)
+        if let controlWidth {
+            control.widthAnchor.constraint(equalToConstant: controlWidth).isActive = true
+        }
 
         NSLayoutConstraint.activate([
             stackView.leadingAnchor.constraint(equalTo: leadingAnchor),
@@ -181,47 +208,57 @@ private final class PermissionStatusActionRowView: NSView {
         ])
     }
 
-    func update(text: String, detail: String, isGranted: Bool, buttonTitle: String) {
+    func update(text: String, detail: String, statusColor: NSColor) {
         titleLabel.stringValue = text
-        titleLabel.textColor = isGranted ? .systemGreen : .systemOrange
+        titleLabel.textColor = statusColor
         detailLabel.stringValue = detail
-        actionButton.update(
-            title: buttonTitle,
-            tone: isGranted ? .blueDominant : .grayDominant
-        )
     }
 }
 
 final class PermissionSettingsCardAppKitView: AppKitSettingsCardBaseView {
     var onShowPermissionReminderChanged: ((Bool) -> Void)?
+    var onAllowLaunchAtLoginChanged: ((Bool) -> Void)?
     var onAccessibilityAction: (() -> Void)?
     var onScreenCaptureAction: (() -> Void)?
 
     private let showPermissionReminderSwitch = NSSwitch()
-    private let accessibilityRow: PermissionStatusActionRowView
-    private let screenCaptureRow: PermissionStatusActionRowView
+    private let allowLaunchAtLoginSwitch = NSSwitch()
+    private let accessibilityRow: PermissionStatusControlRowView<FlowGradientActionButton>
+    private let screenCaptureRow: PermissionStatusControlRowView<FlowGradientActionButton>
     private var isApplyingState = false
     private var currentState: PermissionSettingsCardState?
 
     override init(frame frameRect: NSRect) {
-        accessibilityRow = PermissionStatusActionRowView()
-        screenCaptureRow = PermissionStatusActionRowView()
+        accessibilityRow = PermissionStatusControlRowView(
+            control: FlowGradientActionButton(),
+            controlWidth: 166
+        )
+        screenCaptureRow = PermissionStatusControlRowView(
+            control: FlowGradientActionButton(),
+            controlWidth: 166
+        )
         super.init(frame: frameRect)
-        accessibilityRow.actionButton.target = self
-        accessibilityRow.actionButton.action = #selector(handleAccessibilityAction)
-        screenCaptureRow.actionButton.target = self
-        screenCaptureRow.actionButton.action = #selector(handleScreenCaptureAction)
+        accessibilityRow.control.target = self
+        accessibilityRow.control.action = #selector(handleAccessibilityAction)
+        screenCaptureRow.control.target = self
+        screenCaptureRow.control.action = #selector(handleScreenCaptureAction)
         buildViewHierarchy()
     }
 
     required init?(coder: NSCoder) {
-        accessibilityRow = PermissionStatusActionRowView()
-        screenCaptureRow = PermissionStatusActionRowView()
+        accessibilityRow = PermissionStatusControlRowView(
+            control: FlowGradientActionButton(),
+            controlWidth: 166
+        )
+        screenCaptureRow = PermissionStatusControlRowView(
+            control: FlowGradientActionButton(),
+            controlWidth: 166
+        )
         super.init(coder: coder)
-        accessibilityRow.actionButton.target = self
-        accessibilityRow.actionButton.action = #selector(handleAccessibilityAction)
-        screenCaptureRow.actionButton.target = self
-        screenCaptureRow.actionButton.action = #selector(handleScreenCaptureAction)
+        accessibilityRow.control.target = self
+        accessibilityRow.control.action = #selector(handleAccessibilityAction)
+        screenCaptureRow.control.target = self
+        screenCaptureRow.control.action = #selector(handleScreenCaptureAction)
         buildViewHierarchy()
     }
 
@@ -231,19 +268,26 @@ final class PermissionSettingsCardAppKitView: AppKitSettingsCardBaseView {
 
         isApplyingState = true
         showPermissionReminderSwitch.state = state.showPermissionReminder ? .on : .off
+        allowLaunchAtLoginSwitch.state = state.allowLaunchAtLogin ? .on : .off
         isApplyingState = false
 
         accessibilityRow.update(
             text: state.accessibilityStatusText,
             detail: AppStrings.text(.permissionAccessibilityDetail),
-            isGranted: state.accessibilityTrusted,
-            buttonTitle: state.accessibilityButtonTitle
+            statusColor: state.accessibilityTrusted ? .systemGreen : .systemOrange
+        )
+        accessibilityRow.control.update(
+            title: state.accessibilityButtonTitle,
+            tone: state.accessibilityTrusted ? .blueDominant : .grayDominant
         )
         screenCaptureRow.update(
             text: state.screenCaptureStatusText,
             detail: AppStrings.text(.permissionScreenDetail),
-            isGranted: state.screenCaptureTrusted,
-            buttonTitle: state.screenCaptureButtonTitle
+            statusColor: state.screenCaptureTrusted ? .systemGreen : .systemOrange
+        )
+        screenCaptureRow.control.update(
+            title: state.screenCaptureButtonTitle,
+            tone: state.screenCaptureTrusted ? .blueDominant : .grayDominant
         )
         invalidateIntrinsicContentSize()
     }
@@ -251,16 +295,27 @@ final class PermissionSettingsCardAppKitView: AppKitSettingsCardBaseView {
     private func buildViewHierarchy() {
         showPermissionReminderSwitch.target = self
         showPermissionReminderSwitch.action = #selector(handleShowPermissionReminderChanged)
+        allowLaunchAtLoginSwitch.target = self
+        allowLaunchAtLoginSwitch.action = #selector(handleAllowLaunchAtLoginChanged)
+        allowLaunchAtLoginSwitch.setFlowTabTestingIdentifier(
+            "flowtab.settings.permission.launch-at-login"
+        )
         showPermissionReminderSwitch.setFlowTabTestingIdentifier(
             "flowtab.settings.permission.reminder"
         )
-        accessibilityRow.actionButton.setFlowTabTestingIdentifier(
+        accessibilityRow.control.setFlowTabTestingIdentifier(
             "flowtab.settings.permission.accessibility-action"
         )
-        screenCaptureRow.actionButton.setFlowTabTestingIdentifier(
+        screenCaptureRow.control.setFlowTabTestingIdentifier(
             "flowtab.settings.permission.screen-capture-action"
         )
 
+        addFullWidthArrangedSubview(
+            AppKitSettingsCardBaseView.makeControlRow(
+                title: AppStrings.text(.permissionLaunchAtLoginToggle),
+                control: allowLaunchAtLoginSwitch
+            )
+        )
         addFullWidthArrangedSubview(
             AppKitSettingsCardBaseView.makeControlRow(
                 title: AppStrings.text(.permissionHomeReminderToggle),
@@ -276,6 +331,11 @@ final class PermissionSettingsCardAppKitView: AppKitSettingsCardBaseView {
         onShowPermissionReminderChanged?(sender.state == .on)
     }
 
+    @objc private func handleAllowLaunchAtLoginChanged(_ sender: NSSwitch) {
+        guard !isApplyingState else { return }
+        onAllowLaunchAtLoginChanged?(sender.state == .on)
+    }
+
     @objc private func handleAccessibilityAction() {
         onAccessibilityAction?()
     }
@@ -284,4 +344,3 @@ final class PermissionSettingsCardAppKitView: AppKitSettingsCardBaseView {
         onScreenCaptureAction?()
     }
 }
-

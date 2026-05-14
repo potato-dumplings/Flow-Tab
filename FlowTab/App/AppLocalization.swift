@@ -133,6 +133,7 @@ enum AppStringKey: String {
     case permissionAccessibilityDetail
     case permissionScreenDetail
     case permissionHomeReminderToggle
+    case permissionLaunchAtLoginToggle
     case logsPageTitle
     case logsPageSubtitle
     case logsSectionTitle
@@ -245,6 +246,7 @@ enum AppStrings {
             .permissionAccessibilityDetail: "用于应用切换、应用内窗口切换和最小化窗口处理。",
             .permissionScreenDetail: "用于显示窗口真实预览画面；未授权时仅显示兜底信息。",
             .permissionHomeReminderToggle: "无权限时是否在首页提示获取权限",
+            .permissionLaunchAtLoginToggle: "允许开机启动 FlowTab",
             .logsPageTitle: "日志",
             .logsPageSubtitle: "运行日志查看与清理",
             .logsSectionTitle: "日志",
@@ -352,6 +354,7 @@ enum AppStrings {
             .permissionAccessibilityDetail: "Used for app switching, in-app window switching, and minimized-window handling.",
             .permissionScreenDetail: "Used for real window previews; fallback info is shown when not granted.",
             .permissionHomeReminderToggle: "Show Home reminder when permissions are missing",
+            .permissionLaunchAtLoginToggle: "Allow FlowTab to launch at login",
             .logsPageTitle: "Logs",
             .logsPageSubtitle: "View and clean runtime logs",
             .logsSectionTitle: "Logs",

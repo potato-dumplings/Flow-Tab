@@ -12,6 +12,7 @@ struct AppDelegateTestHooks {
     ) -> any HotkeyMonitoring)?
     var commandTabTakeoverController: (any CommandTabTakeoverControlling)?
     var stressRunner: (any TabSwitchStressRunning)?
+    var launchAtLoginManager: (any LaunchAtLoginManaging)? = nil
 }
 
 @MainActor
@@ -32,6 +33,10 @@ extension AppDelegate {
 
     var resolvedStressRunner: any TabSwitchStressRunning {
         Self.testHooks.stressRunner ?? TabSwitchStressRunner.shared
+    }
+
+    var resolvedLaunchAtLoginManager: any LaunchAtLoginManaging {
+        Self.testHooks.launchAtLoginManager ?? LaunchAtLoginController.shared
     }
 
     func makePanelController() -> SwitcherPanelController {

@@ -11,6 +11,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private lazy var commandTabTakeoverController: any CommandTabTakeoverControlling = {
         Self.testHooks.commandTabTakeoverController ?? CommandTabTakeoverController()
     }()
+    private lazy var launchAtLoginManager: any LaunchAtLoginManaging = {
+        resolvedLaunchAtLoginManager
+    }()
     private(set) var statusItem: NSStatusItem?
     private(set) var hotkeyObserver: NSObjectProtocol?
     private(set) var appVisibilityObserver: NSObjectProtocol?
@@ -20,6 +23,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Self.shared = self
         FlowTabUITestBootstrapper.prepareIfNeeded(userDefaults: resolvedUserDefaults)
         applyActivationPolicyFromPreferences()
+        syncLaunchAtLoginPreferenceOnLaunch()
 
         let panelController = makePanelController()
         self.panelController = panelController
@@ -72,6 +76,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotkeyMonitor?.stop()
         inAppWindowHotkeyMonitor?.stop()
         commandTabTakeoverController.restoreSystemShortcutsIfNeeded()
+    }
+
+    @discardableResult
+    func setLaunchAtLoginAllowed(_ allowed: Bool, source: String) -> LaunchAtLoginStatus {
+        do {
+            try launchAtLoginManager.reconcile(allowed: allowed)
+            let currentStatus = launchAtLoginManager.status
+            RuntimeLog.info(
+                "Permission",
+                "launchAtLogin allowed=\(allowed) status=\(currentStatus.logValue) source=\(source)"
+            )
+            return currentStatus
+        } catch {
+            let currentStatus = launchAtLoginManager.status
+            RuntimeLog.error(
+                "Permission",
+                "launchAtLogin failed allowed=\(allowed) status=\(currentStatus.logValue) source=\(source) error=\(error.localizedDescription)"
+            )
+            return currentStatus
+        }
     }
 
     func requestHotkeyReload(using request: HotkeyRegistrationRequest, source: String) {
@@ -285,6 +309,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             "App",
             "activationPolicy=\(showInCommandTab ? "regular" : "accessory")"
         )
+    }
+
+    private func syncLaunchAtLoginPreferenceOnLaunch() {
+        let allowed = LaunchAtLoginPreferencesStore.loadAllowLaunchAtLogin(
+            userDefaults: resolvedUserDefaults
+        )
+        setLaunchAtLoginAllowed(allowed, source: "launch")
     }
 
     private func installStatusItem() {

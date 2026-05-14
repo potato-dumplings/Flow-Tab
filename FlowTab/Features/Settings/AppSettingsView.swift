@@ -9,6 +9,8 @@ struct AppSettingsView: View {
     @AppStorage(AppPreferenceKeys.showInCommandTab)
     private var showInCommandTab = AppVisibilityPreferencesStore.defaultShowInCommandTab
     @AppStorage(AppPreferenceKeys.showPermissionReminder) private var showPermissionReminder = true
+    @AppStorage(AppPreferenceKeys.allowLaunchAtLogin)
+    private var allowLaunchAtLogin = LaunchAtLoginPreferencesStore.defaultAllowLaunchAtLogin
     @AppStorage(AppPreferenceKeys.themeMode) private var themeModeRaw = ThemePreferencesStore.defaultMode.rawValue
     @AppStorage(AppPreferenceKeys.appLanguage)
     private var appLanguageRaw = AppLanguagePreferencesStore.defaultLanguage.rawValue
@@ -45,6 +47,7 @@ struct AppSettingsView: View {
     @State private var windowLayerAutoEnterDelayText = ""
     @State private var didInitialize = false
     @State private var isWindowLayerAutoEnterDelayEditing = false
+    @State private var isApplyingLaunchAtLoginPreference = false
     @State private var lastNotifiedHotkeySignature = ""
 
     private var bundleIdentifier: String {
@@ -93,6 +96,7 @@ struct AppSettingsView: View {
                 autoRestoreMinimizedWindowOnSwitch: $autoRestoreMinimizedWindowOnSwitch,
                 hideMinimizedAppsFromAppLayer: $hideMinimizedAppsFromAppLayer,
                 showPermissionReminder: $showPermissionReminder,
+                allowLaunchAtLogin: $allowLaunchAtLogin,
                 searchEnabled: $searchEnabled,
                 searchDefaultScopeRaw: $searchDefaultScopeRaw,
                 hotkeyPrimaryModifierRaw: $hotkeyPrimaryModifierRaw,
@@ -111,6 +115,7 @@ struct AppSettingsView: View {
                 onMainHotkeyChanged: handleMainHotkeyChanged,
                 onQuitHotkeyChanged: handleQuitHotkeyChanged,
                 onInAppWindowHotkeyChanged: handleInAppWindowHotkeyChanged,
+                onLaunchAtLoginChanged: handleLaunchAtLoginChanged,
                 onAccessibilityAction: {
                     if accessibilityTrusted {
                         openAccessibilityPrivacySettings()
@@ -189,6 +194,7 @@ struct AppSettingsView: View {
         .accessibilityIdentifier("flowtab.tab.settings.content")
     }
 
+    @MainActor
     private func handleVisibilityChanged(_ active: Bool) {
         guard active else {
             cancelPermissionPolling()
@@ -291,6 +297,49 @@ struct AppSettingsView: View {
         screenCaptureTrusted = trusted
         if trusted {
             hasAttemptedScreenCapturePermissionRequest = false
+        }
+    }
+
+    @MainActor
+    private func handleLaunchAtLoginChanged(_ allowed: Bool) {
+        guard !isApplyingLaunchAtLoginPreference else { return }
+
+        let status: LaunchAtLoginStatus
+        if let appDelegate = AppDelegate.shared {
+            status = appDelegate.setLaunchAtLoginAllowed(allowed, source: "settings_view")
+        } else {
+            status = setLaunchAtLoginAllowedWithoutDelegate(allowed, source: "settings_view")
+        }
+
+        let resolvedAllowed = status.preferenceAllowedValue
+        guard resolvedAllowed != allowed else { return }
+
+        isApplyingLaunchAtLoginPreference = true
+        allowLaunchAtLogin = resolvedAllowed
+        DispatchQueue.main.async {
+            isApplyingLaunchAtLoginPreference = false
+        }
+    }
+
+    private func setLaunchAtLoginAllowedWithoutDelegate(
+        _ allowed: Bool,
+        source: String
+    ) -> LaunchAtLoginStatus {
+        do {
+            try LaunchAtLoginController.shared.reconcile(allowed: allowed)
+            let currentStatus = LaunchAtLoginController.shared.status
+            RuntimeLog.info(
+                "Permission",
+                "launchAtLogin allowed=\(allowed) status=\(currentStatus.logValue) source=\(source)"
+            )
+            return currentStatus
+        } catch {
+            let currentStatus = LaunchAtLoginController.shared.status
+            RuntimeLog.error(
+                "Permission",
+                "launchAtLogin failed allowed=\(allowed) status=\(currentStatus.logValue) source=\(source) error=\(error.localizedDescription)"
+            )
+            return currentStatus
         }
     }
 

@@ -10,6 +10,7 @@ struct AppKitSettingsPageState: Equatable {
     let autoRestoreMinimizedWindowOnSwitch: Bool
     let hideMinimizedAppsFromAppLayer: Bool
     let showPermissionReminder: Bool
+    let allowLaunchAtLogin: Bool
     let searchEnabled: Bool
     let searchDefaultScopeRaw: String
     let hotkeyPrimaryModifierRaw: String
@@ -150,6 +151,7 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
     @Binding var autoRestoreMinimizedWindowOnSwitch: Bool
     @Binding var hideMinimizedAppsFromAppLayer: Bool
     @Binding var showPermissionReminder: Bool
+    @Binding var allowLaunchAtLogin: Bool
     @Binding var searchEnabled: Bool
     @Binding var searchDefaultScopeRaw: String
     @Binding var hotkeyPrimaryModifierRaw: String
@@ -166,6 +168,7 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
     let onMainHotkeyChanged: (AppKitSettingsHotkeyRawValues) -> Void
     let onQuitHotkeyChanged: (AppKitSettingsHotkeyRawValues) -> Void
     let onInAppWindowHotkeyChanged: (AppKitSettingsHotkeyRawValues) -> Void
+    let onLaunchAtLoginChanged: (Bool) -> Void
     let onAccessibilityAction: () -> Void
     let onScreenCaptureAction: () -> Void
 
@@ -181,6 +184,7 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
         let autoRestoreMinimizedWindowOnSwitch = $autoRestoreMinimizedWindowOnSwitch
         let hideMinimizedAppsFromAppLayer = $hideMinimizedAppsFromAppLayer
         let showPermissionReminder = $showPermissionReminder
+        let allowLaunchAtLogin = $allowLaunchAtLogin
         let searchEnabled = $searchEnabled
         let searchDefaultScopeRaw = $searchDefaultScopeRaw
         let hotkeyPrimaryModifierRaw = $hotkeyPrimaryModifierRaw
@@ -240,6 +244,10 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
             onInAppWindowHotkeyChanged(values)
         }
         pageView.onShowPermissionReminderChanged = { showPermissionReminder.wrappedValue = $0 }
+        pageView.onAllowLaunchAtLoginChanged = {
+            allowLaunchAtLogin.wrappedValue = $0
+            onLaunchAtLoginChanged($0)
+        }
         pageView.onAccessibilityAction = onAccessibilityAction
         pageView.onScreenCaptureAction = onScreenCaptureAction
         nsView.update(
@@ -252,6 +260,7 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
                 autoRestoreMinimizedWindowOnSwitch: autoRestoreMinimizedWindowOnSwitch.wrappedValue,
                 hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer.wrappedValue,
                 showPermissionReminder: showPermissionReminder.wrappedValue,
+                allowLaunchAtLogin: allowLaunchAtLogin.wrappedValue,
                 searchEnabled: searchEnabled.wrappedValue,
                 searchDefaultScopeRaw: searchDefaultScopeRaw.wrappedValue,
                 hotkeyPrimaryModifierRaw: hotkeyPrimaryModifierRaw.wrappedValue,
@@ -286,6 +295,7 @@ final class AppKitSettingsPageView: NSView {
     var onInAppWindowPrimaryModifierChanged: ((String) -> Void)?
     var onInAppWindowMainKeyChanged: ((String) -> Void)?
     var onShowPermissionReminderChanged: ((Bool) -> Void)?
+    var onAllowLaunchAtLoginChanged: ((Bool) -> Void)?
     var onAccessibilityAction: (() -> Void)?
     var onScreenCaptureAction: (() -> Void)?
 
@@ -388,6 +398,7 @@ final class AppKitSettingsPageView: NSView {
         permissionContent.update(
             with: PermissionSettingsCardState(
                 showPermissionReminder: state.showPermissionReminder,
+                allowLaunchAtLogin: state.allowLaunchAtLogin,
                 accessibilityTrusted: state.accessibilityTrusted,
                 screenCaptureTrusted: state.screenCaptureTrusted
             )
@@ -529,6 +540,9 @@ final class AppKitSettingsPageView: NSView {
 
         permissionContent.onShowPermissionReminderChanged = { [weak self] in
             self?.onShowPermissionReminderChanged?($0)
+        }
+        permissionContent.onAllowLaunchAtLoginChanged = { [weak self] in
+            self?.onAllowLaunchAtLoginChanged?($0)
         }
         permissionContent.onAccessibilityAction = { [weak self] in
             self?.onAccessibilityAction?()

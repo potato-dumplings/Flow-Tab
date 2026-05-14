@@ -5,6 +5,7 @@ enum AppPreferenceKeys {
     static let showShortcutHint = "showShortcutHint"
     static let showInCommandTab = "showInCommandTab"
     static let showPermissionReminder = "showPermissionReminder"
+    static let allowLaunchAtLogin = "allowLaunchAtLogin"
     static let hasPromptedAccessibilityPermission = "hasPromptedAccessibilityPermission"
     static let hotkeyPrimaryModifier = "hotkeyPrimaryModifier"
     static let hotkeyMainKey = "hotkeyMainKey"
@@ -25,6 +26,7 @@ enum AppPreferenceKeys {
         showShortcutHint,
         showInCommandTab,
         showPermissionReminder,
+        allowLaunchAtLogin,
         hasPromptedAccessibilityPermission,
         hotkeyPrimaryModifier,
         hotkeyMainKey,
@@ -175,6 +177,17 @@ enum AppVisibilityPreferencesStore {
             return defaultShowInCommandTab
         }
         return userDefaults.bool(forKey: AppPreferenceKeys.showInCommandTab)
+    }
+}
+
+enum LaunchAtLoginPreferencesStore {
+    static let defaultAllowLaunchAtLogin = false
+
+    static func loadAllowLaunchAtLogin(userDefaults: UserDefaults = .standard) -> Bool {
+        guard userDefaults.object(forKey: AppPreferenceKeys.allowLaunchAtLogin) != nil else {
+            return defaultAllowLaunchAtLogin
+        }
+        return userDefaults.bool(forKey: AppPreferenceKeys.allowLaunchAtLogin)
     }
 }
 

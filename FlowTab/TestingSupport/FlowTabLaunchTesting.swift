@@ -100,6 +100,10 @@ enum FlowTabTestLaunchOptions {
         arguments.contains("--flowtab-ui-record-hotkey-reload-diagnostics")
     }
 
+    static var usesMockLaunchAtLoginService: Bool {
+        arguments.contains("--flowtab-ui-mock-launch-at-login-service")
+    }
+
     static var enablesMockHotkeyEffects: Bool {
         arguments.contains("--flowtab-ui-enable-mock-hotkey-effects")
     }

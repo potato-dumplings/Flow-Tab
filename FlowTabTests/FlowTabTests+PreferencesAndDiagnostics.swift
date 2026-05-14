@@ -49,6 +49,7 @@ extension FlowTabTests {
     func testPermissionSettingsCardStateUsesDeniedCopyWhenPermissionsMissing() {
         let state = PermissionSettingsCardState(
             showPermissionReminder: true,
+            allowLaunchAtLogin: false,
             accessibilityTrusted: false,
             screenCaptureTrusted: false
         )
@@ -62,6 +63,7 @@ extension FlowTabTests {
     func testPermissionSettingsCardStateUsesGrantedCopyWhenPermissionsPresent() {
         let state = PermissionSettingsCardState(
             showPermissionReminder: false,
+            allowLaunchAtLogin: true,
             accessibilityTrusted: true,
             screenCaptureTrusted: true
         )
