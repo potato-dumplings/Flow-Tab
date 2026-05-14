@@ -49,6 +49,8 @@ struct AppSettingsView: View {
     @State private var isWindowLayerAutoEnterDelayEditing = false
     @State private var isApplyingLaunchAtLoginPreference = false
     @State private var lastNotifiedHotkeySignature = ""
+    @State private var hiddenAppCount = AppVisibilityPreferencesStore.loadHiddenAppIDs().count
+    @State private var showsAppVisibilityManager = false
 
     private var bundleIdentifier: String {
         Bundle.main.bundleIdentifier ?? "unknown"
@@ -86,53 +88,66 @@ struct AppSettingsView: View {
         ZStack {
             HomeBackdropView()
 
-            AppKitSettingsPageContent(
-                isActive: isActive,
-                showShortcutHint: $showShortcutHint,
-                showInCommandTab: $showInCommandTab,
-                themeModeRaw: $themeModeRaw,
-                appLanguageRaw: $appLanguageRaw,
-                windowLayerAutoEnterDelayText: windowLayerAutoEnterDelayText,
-                autoRestoreMinimizedWindowOnSwitch: $autoRestoreMinimizedWindowOnSwitch,
-                hideMinimizedAppsFromAppLayer: $hideMinimizedAppsFromAppLayer,
-                showPermissionReminder: $showPermissionReminder,
-                allowLaunchAtLogin: $allowLaunchAtLogin,
-                searchEnabled: $searchEnabled,
-                searchDefaultScopeRaw: $searchDefaultScopeRaw,
-                hotkeyPrimaryModifierRaw: $hotkeyPrimaryModifierRaw,
-                hotkeyMainKeyRaw: $hotkeyMainKeyRaw,
-                hotkeyQuitKeyRaw: $hotkeyQuitKeyRaw,
-                inAppWindowHotkeyPrimaryModifierRaw: $inAppWindowHotkeyPrimaryModifierRaw,
-                inAppWindowHotkeyMainKeyRaw: $inAppWindowHotkeyMainKeyRaw,
-                commandTabTakeoverActive: commandTabTakeoverActive,
-                accessibilityTrusted: accessibilityTrusted,
-                screenCaptureTrusted: screenCaptureTrusted,
-                onWindowLayerAutoEnterDelayTextChanged: applyWindowLayerAutoEnterDelayText,
-                onWindowLayerAutoEnterDelayTextCommitted: commitWindowLayerAutoEnterDelayText,
-                onWindowLayerAutoEnterDelayEditingChanged: {
-                    isWindowLayerAutoEnterDelayEditing = $0
-                },
-                onMainHotkeyChanged: handleMainHotkeyChanged,
-                onQuitHotkeyChanged: handleQuitHotkeyChanged,
-                onInAppWindowHotkeyChanged: handleInAppWindowHotkeyChanged,
-                onLaunchAtLoginChanged: handleLaunchAtLoginChanged,
-                onAccessibilityAction: {
-                    if accessibilityTrusted {
-                        openAccessibilityPrivacySettings()
-                    } else {
-                        requestAccessibilityPermission()
-                    }
-                },
-                onScreenCaptureAction: {
-                    if screenCaptureTrusted {
-                        openScreenCapturePrivacySettings()
-                    } else {
-                        requestScreenCapturePermission()
-                    }
+            if showsAppVisibilityManager {
+                AppVisibilityManagerView {
+                    showsAppVisibilityManager = false
+                    refreshHiddenAppCount()
                 }
-            )
-            .id(appLanguageRaw)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            } else {
+                AppKitSettingsPageContent(
+                    isActive: isActive,
+                    showShortcutHint: $showShortcutHint,
+                    showInCommandTab: $showInCommandTab,
+                    themeModeRaw: $themeModeRaw,
+                    appLanguageRaw: $appLanguageRaw,
+                    windowLayerAutoEnterDelayText: windowLayerAutoEnterDelayText,
+                    autoRestoreMinimizedWindowOnSwitch: $autoRestoreMinimizedWindowOnSwitch,
+                    hideMinimizedAppsFromAppLayer: $hideMinimizedAppsFromAppLayer,
+                    showPermissionReminder: $showPermissionReminder,
+                    allowLaunchAtLogin: $allowLaunchAtLogin,
+                    searchEnabled: $searchEnabled,
+                    searchDefaultScopeRaw: $searchDefaultScopeRaw,
+                    hiddenAppCount: hiddenAppCount,
+                    hotkeyPrimaryModifierRaw: $hotkeyPrimaryModifierRaw,
+                    hotkeyMainKeyRaw: $hotkeyMainKeyRaw,
+                    hotkeyQuitKeyRaw: $hotkeyQuitKeyRaw,
+                    inAppWindowHotkeyPrimaryModifierRaw: $inAppWindowHotkeyPrimaryModifierRaw,
+                    inAppWindowHotkeyMainKeyRaw: $inAppWindowHotkeyMainKeyRaw,
+                    commandTabTakeoverActive: commandTabTakeoverActive,
+                    accessibilityTrusted: accessibilityTrusted,
+                    screenCaptureTrusted: screenCaptureTrusted,
+                    onWindowLayerAutoEnterDelayTextChanged: applyWindowLayerAutoEnterDelayText,
+                    onWindowLayerAutoEnterDelayTextCommitted: commitWindowLayerAutoEnterDelayText,
+                    onWindowLayerAutoEnterDelayEditingChanged: {
+                        isWindowLayerAutoEnterDelayEditing = $0
+                    },
+                    onMainHotkeyChanged: handleMainHotkeyChanged,
+                    onQuitHotkeyChanged: handleQuitHotkeyChanged,
+                    onInAppWindowHotkeyChanged: handleInAppWindowHotkeyChanged,
+                    onLaunchAtLoginChanged: handleLaunchAtLoginChanged,
+                    onManageAppVisibility: {
+                        refreshHiddenAppCount()
+                        showsAppVisibilityManager = true
+                    },
+                    onAccessibilityAction: {
+                        if accessibilityTrusted {
+                            openAccessibilityPrivacySettings()
+                        } else {
+                            requestAccessibilityPermission()
+                        }
+                    },
+                    onScreenCaptureAction: {
+                        if screenCaptureTrusted {
+                            openScreenCapturePrivacySettings()
+                        } else {
+                            requestScreenCapturePermission()
+                        }
+                    }
+                )
+                .id(appLanguageRaw)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onAppear {
@@ -186,6 +201,12 @@ struct AppSettingsView: View {
             for: UserDefaults.didChangeNotification
         )) { _ in
             handleStoredHotkeyDefaultsDidChange()
+            refreshHiddenAppCount()
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: .flowTabAppVisibilityPreferenceChanged
+        )) { _ in
+            refreshHiddenAppCount()
         }
         .onDisappear {
             cancelPermissionPolling()
@@ -580,6 +601,10 @@ struct AppSettingsView: View {
             "showInCommandTab=\(showInCommandTab)"
         )
         NotificationCenter.default.post(name: .flowTabAppVisibilityPreferenceChanged, object: nil)
+    }
+
+    private func refreshHiddenAppCount() {
+        hiddenAppCount = AppVisibilityPreferencesStore.loadHiddenAppIDs().count
     }
 
     private func notifyLanguagePreferenceChanged() {

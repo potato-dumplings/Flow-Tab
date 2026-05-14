@@ -13,6 +13,7 @@ struct AppKitSettingsPageState: Equatable {
     let allowLaunchAtLogin: Bool
     let searchEnabled: Bool
     let searchDefaultScopeRaw: String
+    let hiddenAppCount: Int
     let hotkeyPrimaryModifierRaw: String
     let hotkeyMainKeyRaw: String
     let hotkeyQuitKeyRaw: String
@@ -154,6 +155,7 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
     @Binding var allowLaunchAtLogin: Bool
     @Binding var searchEnabled: Bool
     @Binding var searchDefaultScopeRaw: String
+    let hiddenAppCount: Int
     @Binding var hotkeyPrimaryModifierRaw: String
     @Binding var hotkeyMainKeyRaw: String
     @Binding var hotkeyQuitKeyRaw: String
@@ -169,6 +171,7 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
     let onQuitHotkeyChanged: (AppKitSettingsHotkeyRawValues) -> Void
     let onInAppWindowHotkeyChanged: (AppKitSettingsHotkeyRawValues) -> Void
     let onLaunchAtLoginChanged: (Bool) -> Void
+    let onManageAppVisibility: () -> Void
     let onAccessibilityAction: () -> Void
     let onScreenCaptureAction: () -> Void
 
@@ -218,6 +221,7 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
         }
         pageView.onSearchEnabledChanged = { searchEnabled.wrappedValue = $0 }
         pageView.onSearchDefaultScopeChanged = { searchDefaultScopeRaw.wrappedValue = $0 }
+        pageView.onManageAppVisibility = onManageAppVisibility
         pageView.onHotkeyPrimaryModifierChanged = {
             hotkeyPrimaryModifierRaw.wrappedValue = $0
             let values = currentHotkeyValues()
@@ -263,6 +267,7 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
                 allowLaunchAtLogin: allowLaunchAtLogin.wrappedValue,
                 searchEnabled: searchEnabled.wrappedValue,
                 searchDefaultScopeRaw: searchDefaultScopeRaw.wrappedValue,
+                hiddenAppCount: hiddenAppCount,
                 hotkeyPrimaryModifierRaw: hotkeyPrimaryModifierRaw.wrappedValue,
                 hotkeyMainKeyRaw: hotkeyMainKeyRaw.wrappedValue,
                 hotkeyQuitKeyRaw: hotkeyQuitKeyRaw.wrappedValue,
@@ -289,6 +294,7 @@ final class AppKitSettingsPageView: NSView {
     var onHideMinimizedAppsFromAppLayerChanged: ((Bool) -> Void)?
     var onSearchEnabledChanged: ((Bool) -> Void)?
     var onSearchDefaultScopeChanged: ((String) -> Void)?
+    var onManageAppVisibility: (() -> Void)?
     var onHotkeyPrimaryModifierChanged: ((String) -> Void)?
     var onHotkeyMainKeyChanged: ((String) -> Void)?
     var onHotkeyQuitKeyChanged: ((String) -> Void)?
@@ -312,6 +318,7 @@ final class AppKitSettingsPageView: NSView {
     private let windowBehaviorContent = WindowBehaviorSettingsCardAppKitView()
     private let permissionContent = PermissionSettingsCardAppKitView()
     private let searchContent = SearchSettingsCardAppKitView()
+    private let appVisibilityContent = AppVisibilitySettingsCardAppKitView()
     private let hotkeyContent = HotkeySettingsCardAppKitView()
 
     private lazy var appearanceCard = AppKitSectionCardView(
@@ -333,6 +340,11 @@ final class AppKitSettingsPageView: NSView {
         title: AppStrings.text(.settingsCardSearchTitle),
         subtitle: AppStrings.text(.settingsCardSearchSubtitle),
         contentView: searchContent
+    )
+    private lazy var appVisibilityCard = AppKitSectionCardView(
+        title: AppStrings.text(.settingsCardAppVisibilityTitle),
+        subtitle: AppStrings.text(.settingsCardAppVisibilitySubtitle),
+        contentView: appVisibilityContent
     )
     private lazy var hotkeyCard = AppKitSectionCardView(
         title: AppStrings.text(.settingsCardHotkeyTitle),
@@ -384,6 +396,9 @@ final class AppKitSettingsPageView: NSView {
                 searchDefaultScopeRaw: state.searchDefaultScopeRaw
             )
         )
+        appVisibilityContent.update(
+            with: AppVisibilitySettingsCardState(hiddenAppCount: state.hiddenAppCount)
+        )
         hotkeyContent.update(
             with: HotkeySettingsCardState(
                 hotkeyPrimaryModifierRaw: state.hotkeyPrimaryModifierRaw,
@@ -407,6 +422,7 @@ final class AppKitSettingsPageView: NSView {
         windowBehaviorCard.invalidateIntrinsicContentSize()
         permissionCard.invalidateIntrinsicContentSize()
         searchCard.invalidateIntrinsicContentSize()
+        appVisibilityCard.invalidateIntrinsicContentSize()
         hotkeyCard.invalidateIntrinsicContentSize()
         invalidateIntrinsicContentSize()
     }
@@ -475,6 +491,7 @@ final class AppKitSettingsPageView: NSView {
         addCard(windowBehaviorCard, to: leftColumn)
         addCard(permissionCard, to: leftColumn)
         addCard(searchCard, to: rightColumn)
+        addCard(appVisibilityCard, to: rightColumn)
         addCard(hotkeyCard, to: rightColumn)
 
         NSLayoutConstraint.activate([
@@ -520,6 +537,9 @@ final class AppKitSettingsPageView: NSView {
         }
         searchContent.onSearchDefaultScopeChanged = { [weak self] in
             self?.onSearchDefaultScopeChanged?($0)
+        }
+        appVisibilityContent.onManageAppVisibility = { [weak self] in
+            self?.onManageAppVisibility?()
         }
 
         hotkeyContent.onHotkeyPrimaryModifierChanged = { [weak self] in

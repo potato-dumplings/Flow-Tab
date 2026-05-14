@@ -246,6 +246,57 @@ extension FlowTabTests {
         )
     }
 
+    @MainActor
+    func testHiddenAppIDsFilterSwitcherAppLayerAndSearchIndex() {
+        let defaults = UserDefaults.standard
+        let previousHiddenAppIDs = defaults.object(forKey: AppPreferenceKeys.hiddenAppIDs)
+        let previousSearchEnabled = defaults.object(forKey: AppPreferenceKeys.searchEnabled)
+        let previousSearchDefaultScope = defaults.object(forKey: AppPreferenceKeys.searchDefaultScope)
+        defer {
+            restoreUserDefaultsValue(
+                previousHiddenAppIDs,
+                forKey: AppPreferenceKeys.hiddenAppIDs,
+                userDefaults: defaults
+            )
+            restoreUserDefaultsValue(
+                previousSearchEnabled,
+                forKey: AppPreferenceKeys.searchEnabled,
+                userDefaults: defaults
+            )
+            restoreUserDefaultsValue(
+                previousSearchDefaultScope,
+                forKey: AppPreferenceKeys.searchDefaultScope,
+                userDefaults: defaults
+            )
+        }
+
+        defaults.set([" com.example.mail ", "com.example.mail", ""], forKey: AppPreferenceKeys.hiddenAppIDs)
+        defaults.set(true, forKey: AppPreferenceKeys.searchEnabled)
+        defaults.set(SwitcherSearchScope.app.rawValue, forKey: AppPreferenceKeys.searchDefaultScope)
+
+        let model = LiveSwitcherModel()
+        model.snapshotProviderOverride = {
+            RuntimeSnapshot(apps: self.terminateScenarioApps(), contextsByID: [:])
+        }
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        XCTAssertEqual(model.session?.apps.map(\.id), ["com.example.code", "com.example.browser"])
+        XCTAssertFalse(model.session?.apps.contains(where: { $0.id == "com.example.mail" }) ?? true)
+
+        XCTAssertTrue(model.enterSearchMode())
+        XCTAssertTrue(model.searchCoordinator.replaceQueryWithoutRebuild("Mail", cursorPosition: 4))
+        model.searchCoordinator.rebuildResults(resetSelection: true)
+        model.publishSearchStateIfNeeded()
+        XCTAssertTrue(model.searchViewState.results.isEmpty)
+
+        XCTAssertTrue(model.searchCoordinator.replaceQueryWithoutRebuild("Inbox", cursorPosition: 5))
+        XCTAssertTrue(model.toggleSearchScope())
+        model.searchCoordinator.rebuildResults(resetSelection: true)
+        model.publishSearchStateIfNeeded()
+        XCTAssertEqual(model.searchScope, .window)
+        XCTAssertTrue(model.searchViewState.results.isEmpty)
+    }
+
     func testSearchPerformanceWindowScope() {
         let apps = makeBenchmarkApps(appCount: 400, windowsPerApp: 25)
         let queries = benchmarkQueries()

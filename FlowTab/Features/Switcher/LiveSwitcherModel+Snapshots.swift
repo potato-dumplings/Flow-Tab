@@ -56,7 +56,9 @@ extension LiveSwitcherModel {
         logEvent: String,
         resetWhenEmpty: Bool
     ) -> Bool {
-        let snapshot = snapshotWithWindowRecencyApplied(rawSnapshot)
+        let snapshot = snapshotWithHiddenAppsFiltered(
+            snapshotWithWindowRecencyApplied(rawSnapshot)
+        )
         let recencyAppliedMs = Self.monotonicMilliseconds()
         guard !snapshot.apps.isEmpty else {
             logLoadSnapshotEmpty(

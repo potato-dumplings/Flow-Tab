@@ -40,4 +40,68 @@ final class PreferencesTests: XCTestCase {
             Set([.recentActiveWindow, .rememberLastSelectedWindow])
         )
     }
+
+    func testAppVisibilityFilterNormalizesHiddenAppIDs() {
+        let normalizedIDs = AppVisibilityFilter.normalizedHiddenAppIDs([
+            " com.example.mail ",
+            "",
+            "\n",
+            "com.example.mail",
+            "com.example.browser"
+        ])
+
+        XCTAssertEqual(normalizedIDs, ["com.example.browser", "com.example.mail"])
+    }
+
+    func testAppVisibilityFilterRemovesHiddenApps() {
+        let apps = [
+            AppSwitchCandidate(
+                id: "com.example.mail",
+                displayName: "Mail",
+                groupID: "office",
+                lastActiveAt: 300,
+                windows: [
+                    WindowCandidate(id: "mail-1", title: "Inbox", isMinimized: false, lastActiveAt: 300)
+                ]
+            ),
+            AppSwitchCandidate(
+                id: "com.example.browser",
+                displayName: "Browser",
+                groupID: "web",
+                lastActiveAt: 290,
+                windows: [
+                    WindowCandidate(id: "browser-1", title: "Docs", isMinimized: false, lastActiveAt: 290)
+                ]
+            )
+        ]
+        let filter = AppVisibilityFilter(hiddenAppIDs: ["com.example.mail"])
+
+        XCTAssertEqual(filter.filteredApps(apps).map(\.id), ["com.example.browser"])
+        XCTAssertFalse(filter.includes(appID: "com.example.mail"))
+        XCTAssertTrue(filter.includes(appID: "com.example.browser"))
+    }
+
+    func testAppVisibilityFilterRanksHiddenAppsAfterVisibleApps() {
+        let appIDs = [
+            "com.example.mail",
+            "com.example.browser",
+            "com.example.notes"
+        ]
+        let filter = AppVisibilityFilter(hiddenAppIDs: ["com.example.mail"])
+        let orderedAppIDs = appIDs.enumerated()
+            .sorted { lhs, rhs in
+                let lhsRank = filter.visibilitySortRank(appID: lhs.element)
+                let rhsRank = filter.visibilitySortRank(appID: rhs.element)
+                if lhsRank != rhsRank {
+                    return lhsRank < rhsRank
+                }
+                return lhs.offset < rhs.offset
+            }
+            .map(\.element)
+
+        XCTAssertEqual(orderedAppIDs, ["com.example.browser", "com.example.notes", "com.example.mail"])
+        XCTAssertTrue(filter.isHidden(appID: "com.example.mail"))
+        XCTAssertFalse(filter.isHidden(appID: "com.example.browser"))
+        XCTAssertEqual(filter.visibilitySortRank(appID: " "), 0)
+    }
 }

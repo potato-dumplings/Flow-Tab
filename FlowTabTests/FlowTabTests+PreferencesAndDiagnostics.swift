@@ -227,6 +227,67 @@ extension FlowTabTests {
     }
 
     @MainActor
+    func testAppVisibilityManagerShowsStoredHiddenAppIDsMissingFromInventory() async {
+        guard let userDefaults = makeIsolatedUserDefaults() else { return }
+        defer { clearIsolatedUserDefaults(userDefaults) }
+
+        let missingAppID = "com.flowtab.hidden.missing"
+        AppVisibilityPreferencesStore.saveHiddenAppIDs([missingAppID], userDefaults: userDefaults)
+
+        await withLaunchArgumentsForTesting(["FlowTab", "--flowtab-ui-mock-runtime"]) {
+            let model = AppVisibilityManagerModel(userDefaults: userDefaults)
+            model.filter = .hidden
+            model.reload()
+
+            let deadline = Date().addingTimeInterval(5)
+            while model.isLoading && Date() < deadline {
+                try? await Task.sleep(nanoseconds: 20_000_000)
+            }
+
+            XCTAssertFalse(model.isLoading)
+            XCTAssertEqual(model.hiddenCount, 1)
+            XCTAssertEqual(model.visibleApps.map(\.id), [missingAppID])
+            XCTAssertEqual(model.selectedApp?.id, missingAppID)
+        }
+    }
+
+    func testAppVisibilityIconStateRefreshesWhenAppSourceChanges() {
+        let firstApp = InstalledAppRecord(
+            id: "com.example.first",
+            displayName: "First",
+            bundleIdentifier: "com.example.first",
+            path: "/Applications/First.app",
+            isRunning: false
+        )
+        let secondApp = InstalledAppRecord(
+            id: "com.example.second",
+            displayName: "Second",
+            bundleIdentifier: "com.example.second",
+            path: "/Applications/Second.app",
+            isRunning: false
+        )
+
+        var resolvedAppIDs: [String] = []
+        let resolveIcon: (InstalledAppRecord) -> NSImage? = { app in
+            resolvedAppIDs.append(app.id)
+            return NSImage(size: NSSize(width: 1, height: 1))
+        }
+
+        var state = AppVisibilityIconState.resolved(for: firstApp, resolveIcon: resolveIcon)
+        XCTAssertEqual(resolvedAppIDs, [firstApp.id])
+        XCTAssertNotNil(state.icon(matching: AppVisibilityIconSourceKey(app: firstApp)))
+        XCTAssertNil(state.icon(matching: AppVisibilityIconSourceKey(app: secondApp)))
+
+        state.refreshIfNeeded(for: firstApp, resolveIcon: resolveIcon)
+        XCTAssertEqual(resolvedAppIDs, [firstApp.id])
+
+        state.refreshIfNeeded(for: secondApp, resolveIcon: resolveIcon)
+        XCTAssertEqual(resolvedAppIDs, [firstApp.id, secondApp.id])
+        XCTAssertNil(state.icon(matching: AppVisibilityIconSourceKey(app: firstApp)))
+        XCTAssertNotNil(state.icon(matching: AppVisibilityIconSourceKey(app: secondApp)))
+    }
+
+    @MainActor
     func testStatusItemOpenActionUnhidesAndRestoresFirstRegularWindow() {
         let panelWindow = TestAppWindow(isPanelWindow: true, isMiniaturized: true)
         let mainWindow = TestAppWindow(isPanelWindow: false, isMiniaturized: true)

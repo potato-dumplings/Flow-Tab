@@ -28,6 +28,7 @@ struct HomeLandingView: View {
     @State private var accessibilityTrusted = AccessibilityPermissionChecker.isTrusted()
     @State private var screenCaptureTrusted = ScreenCapturePermissionChecker.hasScreenCapturePermission
     @State private var appSummaries: [RuntimeHomeAppSummary] = []
+    @State private var hiddenAppIDs = AppVisibilityPreferencesStore.loadHiddenAppIDs()
     @State private var windowsByAppID: [String: [WindowCandidate]] = [:]
     @State private var homeSnapshotsByAppID: [String: RuntimeHomeAppSnapshot] = [:]
     @State private var selectedAppID: String?
@@ -55,6 +56,14 @@ struct HomeLandingView: View {
 
     private var appLanguage: AppLanguage {
         AppLanguagePreferencesStore.resolve(rawValue: appLanguageRaw)
+    }
+
+    private var appVisibilityPresentation: HomeAppVisibilityPresentation {
+        HomeAppVisibilityPresentation(hiddenAppIDs: hiddenAppIDs)
+    }
+
+    private var presentedAppSummaries: [RuntimeHomeAppSummary] {
+        appVisibilityPresentation.orderedAppSummaries(appSummaries)
     }
 
     private var permissionGuideMessage: String {
@@ -118,6 +127,11 @@ struct HomeLandingView: View {
             guard isActive else { return }
             refreshPermissionsIfNeeded(reason: "app_active")
             scheduleRefreshIfRunningAppsChanged(reason: "app_active")
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: .flowTabAppVisibilityPreferenceChanged
+        )) { _ in
+            refreshHomeAppVisibility()
         }
         .onDisappear {
             teardownActiveState()
@@ -188,7 +202,12 @@ struct HomeLandingView: View {
             } else {
                 ScrollView {
                     LazyVStack(spacing: 8) {
-                        ForEach(appSummaries) { app in
+                        ForEach(presentedAppSummaries) { app in
+                            let isHidden = appVisibilityPresentation.isHidden(appID: app.appID)
+                            let appIDSlug = app.appID.flowTabAccessibilitySlug
+                            let hiddenBadge = isHidden
+                                ? AppStrings.text(.homeAppNotShownBadge, language: appLanguage)
+                                : nil
                             Button {
                                 selectApp(app.appID)
                             } label: {
@@ -196,12 +215,17 @@ struct HomeLandingView: View {
                                     title: app.displayName,
                                     subtitle: app.appID,
                                     trailing: "\(app.windowCount)w",
+                                    badge: hiddenBadge,
+                                    badgeAccessibilityIdentifier: isHidden
+                                        ? "flowtab.home.app.hidden-badge.\(appIDSlug)"
+                                        : nil,
                                     isSelected: app.appID == currentSelectedAppID
                                 )
                             }
                             .buttonStyle(.plain)
-                            .accessibilityIdentifier("flowtab.home.app.\(app.appID.flowTabAccessibilitySlug)")
-                            .accessibilityValue("\(app.windowCount)w")
+                            .accessibilityIdentifier("flowtab.home.app.\(appIDSlug)")
+                            .accessibilityLabel(hiddenBadge.map { "\(app.displayName) \($0)" } ?? app.displayName)
+                            .accessibilityValue(isHidden ? "\(app.windowCount)w hidden" : "\(app.windowCount)w")
                         }
                     }
                 }
@@ -212,7 +236,8 @@ struct HomeLandingView: View {
     }
 
     private var windowLayerCard: some View {
-        let activeApp = appSummaries.first(where: { $0.appID == currentSelectedAppID }) ?? appSummaries.first
+        let activeApp = presentedAppSummaries.first(where: { $0.appID == currentSelectedAppID })
+            ?? presentedAppSummaries.first
         let activeWindows = activeApp.flatMap { windowsByAppID[$0.appID] } ?? []
 
         return HomeSectionCard(
@@ -278,7 +303,7 @@ struct HomeLandingView: View {
         if let selectedAppID, appSummaries.contains(where: { $0.appID == selectedAppID }) {
             return selectedAppID
         }
-        return appSummaries.first?.appID
+        return presentedAppSummaries.first?.appID
     }
 
     private func windowTitle(_ title: String, index: Int) -> String {
@@ -306,6 +331,7 @@ struct HomeLandingView: View {
     private func handleVisibilityChanged(_ active: Bool) {
         guard active else { return }
 
+        refreshHomeAppVisibility()
         restoreCachedStateIfNeeded()
         setupWindowMonitorIfNeeded()
         refreshPermissionsIfNeeded(reason: "appear")
@@ -350,6 +376,14 @@ struct HomeLandingView: View {
         }
         accessibilityTrusted = Self.cachedAccessibilityTrusted
         screenCaptureTrusted = Self.cachedScreenCaptureTrusted
+        syncSelectedApp()
+    }
+
+    private func refreshHomeAppVisibility() {
+        let latestHiddenAppIDs = AppVisibilityPreferencesStore.loadHiddenAppIDs()
+        guard latestHiddenAppIDs != hiddenAppIDs else { return }
+
+        hiddenAppIDs = latestHiddenAppIDs
         syncSelectedApp()
     }
 
@@ -708,43 +742,5 @@ private final class HomeWindowChangeMonitor {
         Task { @MainActor in
             context.monitor?.emitWindowChanged(for: context.appID)
         }
-    }
-}
-
-private struct HomeLayerRowView: View {
-    let title: String
-    let subtitle: String
-    let trailing: String
-    let isSelected: Bool
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-
-                if !subtitle.isEmpty {
-                    Text(subtitle)
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-            }
-
-            Spacer(minLength: 8)
-
-            Text(trailing)
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .fill(isSelected ? Color.accentColor.opacity(0.16) : Color.primary.opacity(0.04))
-        )
     }
 }

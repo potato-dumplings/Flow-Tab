@@ -35,6 +35,7 @@
 		A1B2C4172F73000100B0D737 /* LiveSwitcherModel+Types.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4072F73000100B0D737 /* LiveSwitcherModel+Types.swift */; };
 		B25010012FD000100B0D737 /* LiveSwitcherModel+Diagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = B25000012FD000100B0D737 /* LiveSwitcherModel+Diagnostics.swift */; };
 		B27010012FF000100B0D737 /* LiveSwitcherModel+Snapshots.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27000012FF000100B0D737 /* LiveSwitcherModel+Snapshots.swift */; };
+		A9V110022F91000100B0D737 /* LiveSwitcherModel+AppVisibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9V100022F91000100B0D737 /* LiveSwitcherModel+AppVisibility.swift */; };
 		B26010032FE000100B0D737 /* SwitcherPanelController+PresentationDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26000032FE000100B0D737 /* SwitcherPanelController+PresentationDiagnostics.swift */; };
 		A1B2C4182F73000100B0D737 /* SwitcherSearchCoordinator+Compute.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4082F73000100B0D737 /* SwitcherSearchCoordinator+Compute.swift */; };
 		A1B2C4192F73000100B0D737 /* SwitcherSearchCoordinator+Ranking.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4092F73000100B0D737 /* SwitcherSearchCoordinator+Ranking.swift */; };
@@ -51,6 +52,7 @@
 		A1B2C43F2F73000100B0D737 /* AXWindowInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4362F73000100B0D737 /* AXWindowInspector.swift */; };
 		A1B2C4402F73000100B0D737 /* RuntimeWindowPreviewProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4372F73000100B0D737 /* RuntimeWindowPreviewProvider.swift */; };
 		A1B2C4412F73000100B0D737 /* AppIconProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4382F73000100B0D737 /* AppIconProvider.swift */; };
+		A9V110012F91000100B0D737 /* AppInventoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9V100012F91000100B0D737 /* AppInventoryService.swift */; };
 		B10011012F76000100B0D737 /* FlowTabTests+CoreConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001012F76000100B0D737 /* FlowTabTests+CoreConfiguration.swift */; };
 		B10011022F76000100B0D737 /* FlowTabTests+RuntimeInteraction.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001022F76000100B0D737 /* FlowTabTests+RuntimeInteraction.swift */; };
 		B10011032F76000100B0D737 /* FlowTabTests+PreferencesAndDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001032F76000100B0D737 /* FlowTabTests+PreferencesAndDiagnostics.swift */; };
@@ -90,6 +92,8 @@
 		C20000012FBD000100B0D737 /* HomeWindowActivationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000112FBD000100B0D737 /* HomeWindowActivationController.swift */; };
 		C20000022FBD000100B0D737 /* HomeWindowRowButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = C20000122FBD000100B0D737 /* HomeWindowRowButton.swift */; };
 		C30000012FBD100100B0D737 /* HomeRuntimeSnapshotService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000112FBD100100B0D737 /* HomeRuntimeSnapshotService.swift */; };
+		C30000022FBD100100B0D737 /* HomeAppVisibilityPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000122FBD100100B0D737 /* HomeAppVisibilityPresentation.swift */; };
+		C30000032FBD100100B0D737 /* HomeLayerRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000132FBD100100B0D737 /* HomeLayerRowView.swift */; };
 		C10000012F75000100B0D737 /* AppFoundation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000112F75000100B0D737 /* AppFoundation.swift */; };
 		C10000022F75000100B0D737 /* HomeRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000122F75000100B0D737 /* HomeRootView.swift */; };
 		C10000032F75000100B0D737 /* HomeLandingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000132F75000100B0D737 /* HomeLandingView.swift */; };
@@ -102,6 +106,9 @@
 		C100000A2F75000100B0D737 /* AppearanceSettingsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100001A2F75000100B0D737 /* AppearanceSettingsCard.swift */; };
 		C100000B2F75000100B0D737 /* WindowBehaviorSettingsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100001B2F75000100B0D737 /* WindowBehaviorSettingsCard.swift */; };
 		C100000C2F75000100B0D737 /* SearchSettingsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100001C2F75000100B0D737 /* SearchSettingsCard.swift */; };
+		A9V110032F91000100B0D737 /* AppVisibilityManagerModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9V100032F91000100B0D737 /* AppVisibilityManagerModel.swift */; };
+		A9V110042F91000100B0D737 /* AppVisibilityManagerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9V100042F91000100B0D737 /* AppVisibilityManagerView.swift */; };
+		A9V110052F91000100B0D737 /* AppVisibilitySettingsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9V100052F91000100B0D737 /* AppVisibilitySettingsCard.swift */; };
 		C100000D2F75000100B0D737 /* PermissionSettingsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100001D2F75000100B0D737 /* PermissionSettingsCard.swift */; };
 		C100000E2F75000100B0D737 /* AppLogsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100001E2F75000100B0D737 /* AppLogsView.swift */; };
 		C100000F2F75000100B0D737 /* AppSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100001F2F75000100B0D737 /* AppSettingsView.swift */; };
@@ -203,6 +210,7 @@
 		A1B2C4072F73000100B0D737 /* LiveSwitcherModel+Types.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LiveSwitcherModel+Types.swift"; sourceTree = "<group>"; };
 		B25000012FD000100B0D737 /* LiveSwitcherModel+Diagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LiveSwitcherModel+Diagnostics.swift"; sourceTree = "<group>"; };
 		B27000012FF000100B0D737 /* LiveSwitcherModel+Snapshots.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LiveSwitcherModel+Snapshots.swift"; sourceTree = "<group>"; };
+		A9V100022F91000100B0D737 /* LiveSwitcherModel+AppVisibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LiveSwitcherModel+AppVisibility.swift"; sourceTree = "<group>"; };
 		B26000032FE000100B0D737 /* SwitcherPanelController+PresentationDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelController+PresentationDiagnostics.swift"; sourceTree = "<group>"; };
 		A1B2C4082F73000100B0D737 /* SwitcherSearchCoordinator+Compute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherSearchCoordinator+Compute.swift"; sourceTree = "<group>"; };
 		A1B2C4092F73000100B0D737 /* SwitcherSearchCoordinator+Ranking.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherSearchCoordinator+Ranking.swift"; sourceTree = "<group>"; };
@@ -219,6 +227,7 @@
 		A1B2C4362F73000100B0D737 /* AXWindowInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AXWindowInspector.swift; sourceTree = "<group>"; };
 		A1B2C4372F73000100B0D737 /* RuntimeWindowPreviewProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowPreviewProvider.swift; sourceTree = "<group>"; };
 		A1B2C4382F73000100B0D737 /* AppIconProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconProvider.swift; sourceTree = "<group>"; };
+		A9V100012F91000100B0D737 /* AppInventoryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppInventoryService.swift; sourceTree = "<group>"; };
 		B10001012F76000100B0D737 /* FlowTabTests+CoreConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+CoreConfiguration.swift"; sourceTree = "<group>"; };
 		B10001022F76000100B0D737 /* FlowTabTests+RuntimeInteraction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+RuntimeInteraction.swift"; sourceTree = "<group>"; };
 		B10001032F76000100B0D737 /* FlowTabTests+PreferencesAndDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+PreferencesAndDiagnostics.swift"; sourceTree = "<group>"; };
@@ -258,6 +267,8 @@
 		C20000112FBD000100B0D737 /* HomeWindowActivationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeWindowActivationController.swift; sourceTree = "<group>"; };
 		C20000122FBD000100B0D737 /* HomeWindowRowButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeWindowRowButton.swift; sourceTree = "<group>"; };
 		C30000112FBD100100B0D737 /* HomeRuntimeSnapshotService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeRuntimeSnapshotService.swift; sourceTree = "<group>"; };
+		C30000122FBD100100B0D737 /* HomeAppVisibilityPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeAppVisibilityPresentation.swift; sourceTree = "<group>"; };
+		C30000132FBD100100B0D737 /* HomeLayerRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeLayerRowView.swift; sourceTree = "<group>"; };
 		C10000112F75000100B0D737 /* AppFoundation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppFoundation.swift; sourceTree = "<group>"; };
 		C10000122F75000100B0D737 /* HomeRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeRootView.swift; sourceTree = "<group>"; };
 		C10000132F75000100B0D737 /* HomeLandingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeLandingView.swift; sourceTree = "<group>"; };
@@ -270,6 +281,9 @@
 		C100001A2F75000100B0D737 /* AppearanceSettingsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceSettingsCard.swift; sourceTree = "<group>"; };
 		C100001B2F75000100B0D737 /* WindowBehaviorSettingsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowBehaviorSettingsCard.swift; sourceTree = "<group>"; };
 		C100001C2F75000100B0D737 /* SearchSettingsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchSettingsCard.swift; sourceTree = "<group>"; };
+		A9V100032F91000100B0D737 /* AppVisibilityManagerModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppVisibilityManagerModel.swift; sourceTree = "<group>"; };
+		A9V100042F91000100B0D737 /* AppVisibilityManagerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppVisibilityManagerView.swift; sourceTree = "<group>"; };
+		A9V100052F91000100B0D737 /* AppVisibilitySettingsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppVisibilitySettingsCard.swift; sourceTree = "<group>"; };
 		C100001D2F75000100B0D737 /* PermissionSettingsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PermissionSettingsCard.swift; sourceTree = "<group>"; };
 		C100001E2F75000100B0D737 /* AppLogsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLogsView.swift; sourceTree = "<group>"; };
 		C100001F2F75000100B0D737 /* AppSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettingsView.swift; sourceTree = "<group>"; };
@@ -506,6 +520,7 @@
 				A1B2C4072F73000100B0D737 /* LiveSwitcherModel+Types.swift */,
 				B25000012FD000100B0D737 /* LiveSwitcherModel+Diagnostics.swift */,
 				B27000012FF000100B0D737 /* LiveSwitcherModel+Snapshots.swift */,
+				A9V100022F91000100B0D737 /* LiveSwitcherModel+AppVisibility.swift */,
 				A1B2C3E32F73000100B0D737 /* SwitcherPanelOverlayView.swift */,
 				B28000012FF100100B0D737 /* SwitcherWindowPreviewPaging.swift */,
 				A1B2C3E42F73000100B0D737 /* SwitcherPanelSearchBridge.swift */,
@@ -554,6 +569,7 @@
 				F8A9B0C235AE000100B0D737 /* RuntimeAXRemoteWindowResolver.swift */,
 				A1B2C4372F73000100B0D737 /* RuntimeWindowPreviewProvider.swift */,
 				A1B2C4382F73000100B0D737 /* AppIconProvider.swift */,
+				A9V100012F91000100B0D737 /* AppInventoryService.swift */,
 				F4D5E6F835AB000100B0D737 /* RuntimeCGSpaceInspector.swift */,
 				F7A8B9C135AD000100B0D737 /* RuntimeCGWindowFocusBridge.swift */,
 				F9C0D1E135AF000100B0D737 /* RuntimeChromeWindowFocusBridge.swift */,
@@ -590,6 +606,8 @@
 			isa = PBXGroup;
 			children = (
 				C10000132F75000100B0D737 /* HomeLandingView.swift */,
+				C30000122FBD100100B0D737 /* HomeAppVisibilityPresentation.swift */,
+				C30000132FBD100100B0D737 /* HomeLayerRowView.swift */,
 				C30000112FBD100100B0D737 /* HomeRuntimeSnapshotService.swift */,
 				C20000112FBD000100B0D737 /* HomeWindowActivationController.swift */,
 				C20000122FBD000100B0D737 /* HomeWindowRowButton.swift */,
@@ -614,6 +632,9 @@
 				C100001A2F75000100B0D737 /* AppearanceSettingsCard.swift */,
 				C100001B2F75000100B0D737 /* WindowBehaviorSettingsCard.swift */,
 				C100001C2F75000100B0D737 /* SearchSettingsCard.swift */,
+				A9V100032F91000100B0D737 /* AppVisibilityManagerModel.swift */,
+				A9V100042F91000100B0D737 /* AppVisibilityManagerView.swift */,
+				A9V100052F91000100B0D737 /* AppVisibilitySettingsCard.swift */,
 				C100001D2F75000100B0D737 /* PermissionSettingsCard.swift */,
 				C10000152F75000100B0D737 /* HotkeySettingsCard.swift */,
 				C10000182F75000100B0D737 /* AppKitSettingsCardChrome.swift */,
@@ -848,6 +869,9 @@
 				C100000E2F75000100B0D737 /* AppLogsView.swift in Sources */,
 				C100000D2F75000100B0D737 /* PermissionSettingsCard.swift in Sources */,
 				C100000C2F75000100B0D737 /* SearchSettingsCard.swift in Sources */,
+				A9V110032F91000100B0D737 /* AppVisibilityManagerModel.swift in Sources */,
+				A9V110042F91000100B0D737 /* AppVisibilityManagerView.swift in Sources */,
+				A9V110052F91000100B0D737 /* AppVisibilitySettingsCard.swift in Sources */,
 				C100000B2F75000100B0D737 /* WindowBehaviorSettingsCard.swift in Sources */,
 				C100000A2F75000100B0D737 /* AppearanceSettingsCard.swift in Sources */,
 				C10000092F75000100B0D737 /* AppKitSettingsPage.swift in Sources */,
@@ -857,6 +881,8 @@
 				C10000052F75000100B0D737 /* HotkeySettingsCard.swift in Sources */,
 				C10000042F75000100B0D737 /* HomeChrome.swift in Sources */,
 				C10000032F75000100B0D737 /* HomeLandingView.swift in Sources */,
+				C30000022FBD100100B0D737 /* HomeAppVisibilityPresentation.swift in Sources */,
+				C30000032FBD100100B0D737 /* HomeLayerRowView.swift in Sources */,
 				C30000012FBD100100B0D737 /* HomeRuntimeSnapshotService.swift in Sources */,
 				C20000012FBD000100B0D737 /* HomeWindowActivationController.swift in Sources */,
 				C20000022FBD000100B0D737 /* HomeWindowRowButton.swift in Sources */,
@@ -891,6 +917,7 @@
 				F8A9B0C335AE000100B0D737 /* RuntimeAXRemoteWindowResolver.swift in Sources */,
 				A1B2C4402F73000100B0D737 /* RuntimeWindowPreviewProvider.swift in Sources */,
 				A1B2C4412F73000100B0D737 /* AppIconProvider.swift in Sources */,
+				A9V110012F91000100B0D737 /* AppInventoryService.swift in Sources */,
 				F4D5E6F735AB000100B0D737 /* RuntimeCGSpaceInspector.swift in Sources */,
 				F7A8B9C235AD000100B0D737 /* RuntimeCGWindowFocusBridge.swift in Sources */,
 				F9C0D1E235AF000100B0D737 /* RuntimeChromeWindowFocusBridge.swift in Sources */,
@@ -907,6 +934,7 @@
 				A1B2C4172F73000100B0D737 /* LiveSwitcherModel+Types.swift in Sources */,
 				B25010012FD000100B0D737 /* LiveSwitcherModel+Diagnostics.swift in Sources */,
 				B27010012FF000100B0D737 /* LiveSwitcherModel+Snapshots.swift in Sources */,
+				A9V110022F91000100B0D737 /* LiveSwitcherModel+AppVisibility.swift in Sources */,
 				A1B2C3F32F73000100B0D737 /* SwitcherPanelOverlayView.swift in Sources */,
 				B28010012FF100100B0D737 /* SwitcherWindowPreviewPaging.swift in Sources */,
 				A1B2C3F42F73000100B0D737 /* SwitcherPanelSearchBridge.swift in Sources */,

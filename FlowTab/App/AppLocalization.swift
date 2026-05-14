@@ -80,6 +80,7 @@ enum AppStringKey: String {
     case homeConfirmAccessibility
     case homeNoWindowData
     case homeWaitCacheUpdate
+    case homeAppNotShownBadge
     case hotkeyCommandTabTakeoverActive
     case hotkeyCommandTabTakeoverInactive
     case hotkeyMainSummary
@@ -102,6 +103,8 @@ enum AppStringKey: String {
     case settingsCardPermissionSubtitle
     case settingsCardSearchTitle
     case settingsCardSearchSubtitle
+    case settingsCardAppVisibilityTitle
+    case settingsCardAppVisibilitySubtitle
     case settingsCardHotkeyTitle
     case settingsCardHotkeySubtitle
     case appearanceDescription
@@ -122,6 +125,26 @@ enum AppStringKey: String {
     case searchDefaultScope
     case searchScopeApp
     case searchScopeWindow
+    case appVisibilitySummary
+    case appVisibilityManage
+    case appVisibilityManagerTitle
+    case appVisibilityManagerSubtitle
+    case appVisibilityBack
+    case appVisibilitySearchPlaceholder
+    case appVisibilityFilterAll
+    case appVisibilityFilterHidden
+    case appVisibilityFilterRunning
+    case appVisibilityNoApps
+    case appVisibilityNoSelectionTitle
+    case appVisibilityNoSelectionSubtitle
+    case appVisibilityShowInSwitcher
+    case appVisibilityBundleID
+    case appVisibilityPath
+    case appVisibilityStatus
+    case appVisibilityStatusVisible
+    case appVisibilityStatusHidden
+    case appVisibilityEffectNote
+    case appVisibilityHiddenBadge
     case permissionAccessibilityGranted
     case permissionAccessibilityDenied
     case permissionAccessibilityClose
@@ -193,6 +216,7 @@ enum AppStrings {
             .homeConfirmAccessibility: "请确认辅助功能权限已授权",
             .homeNoWindowData: "暂无窗口数据",
             .homeWaitCacheUpdate: "等待缓存更新",
+            .homeAppNotShownBadge: "不展示",
             .hotkeyCommandTabTakeoverActive: "已接管系统 Command + Tab / Command + Shift + Tab，退出 FlowTab 后会自动恢复。",
             .hotkeyCommandTabTakeoverInactive: "检测到 Command + Tab 组合：FlowTab 会自动尝试接管系统 Command + Tab / Command + Shift + Tab。",
             .hotkeyMainSummary: "当前：{main}（{reverseLabel}：{reverse}），{quitLabel}：{quit}",
@@ -215,6 +239,8 @@ enum AppStrings {
             .settingsCardPermissionSubtitle: "辅助功能与屏幕录制",
             .settingsCardSearchTitle: "搜索",
             .settingsCardSearchSubtitle: "搜索开关、范围与交互说明",
+            .settingsCardAppVisibilityTitle: "应用可见性",
+            .settingsCardAppVisibilitySubtitle: "管理不出现在切换器中的应用",
             .settingsCardHotkeyTitle: "快捷键",
             .settingsCardHotkeySubtitle: "主切换与结束应用按键",
             .appearanceDescription: "关闭后 当前应用 将仅作为菜单栏辅助应用运行。",
@@ -235,6 +261,26 @@ enum AppStrings {
             .searchDefaultScope: "默认搜索范围",
             .searchScopeApp: "应用",
             .searchScopeWindow: "窗口",
+            .appVisibilitySummary: "已隐藏 {count} 个应用。隐藏后不会出现在 Option + Tab 应用层和搜索结果中。",
+            .appVisibilityManage: "管理",
+            .appVisibilityManagerTitle: "应用可见性",
+            .appVisibilityManagerSubtitle: "已隐藏 {count} 个应用",
+            .appVisibilityBack: "返回设置",
+            .appVisibilitySearchPlaceholder: "搜索应用、Bundle ID 或路径",
+            .appVisibilityFilterAll: "全部",
+            .appVisibilityFilterHidden: "已隐藏",
+            .appVisibilityFilterRunning: "运行中",
+            .appVisibilityNoApps: "没有匹配应用",
+            .appVisibilityNoSelectionTitle: "选择一个应用",
+            .appVisibilityNoSelectionSubtitle: "在左侧列表中选择应用后调整可见性。",
+            .appVisibilityShowInSwitcher: "在 FlowTab 切换器中显示",
+            .appVisibilityBundleID: "Bundle ID",
+            .appVisibilityPath: "路径",
+            .appVisibilityStatus: "状态",
+            .appVisibilityStatusVisible: "显示",
+            .appVisibilityStatusHidden: "已隐藏",
+            .appVisibilityEffectNote: "该设置影响全局 Option + Tab 应用面板、应用搜索以及对应窗口搜索结果。当前应用内的窗口切换不受影响。",
+            .appVisibilityHiddenBadge: "已隐藏",
             .permissionAccessibilityGranted: "辅助功能权限：已授权",
             .permissionAccessibilityDenied: "辅助功能权限：未授权",
             .permissionAccessibilityClose: "关闭辅助功能权限",
@@ -301,6 +347,7 @@ enum AppStrings {
             .homeConfirmAccessibility: "Please confirm Accessibility permission is granted",
             .homeNoWindowData: "No window data",
             .homeWaitCacheUpdate: "Waiting for cache update",
+            .homeAppNotShownBadge: "Not shown",
             .hotkeyCommandTabTakeoverActive: "System Command + Tab / Command + Shift + Tab is now taken over and will be restored after FlowTab exits.",
             .hotkeyCommandTabTakeoverInactive: "Command + Tab combination detected: FlowTab will try to take over system Command + Tab / Command + Shift + Tab.",
             .hotkeyMainSummary: "Current: {main} ({reverseLabel}: {reverse}), {quitLabel}: {quit}",
@@ -323,6 +370,8 @@ enum AppStrings {
             .settingsCardPermissionSubtitle: "Accessibility and Screen Recording",
             .settingsCardSearchTitle: "Search",
             .settingsCardSearchSubtitle: "Search switch, scope, and interaction",
+            .settingsCardAppVisibilityTitle: "App Visibility",
+            .settingsCardAppVisibilitySubtitle: "Manage apps hidden from the switcher",
             .settingsCardHotkeyTitle: "Hotkeys",
             .settingsCardHotkeySubtitle: "Main switch and quit app keys",
             .appearanceDescription: "When disabled, the app runs only as a menu bar helper.",
@@ -343,6 +392,26 @@ enum AppStrings {
             .searchDefaultScope: "Default search scope",
             .searchScopeApp: "App",
             .searchScopeWindow: "Window",
+            .appVisibilitySummary: "{count} apps hidden. Hidden apps do not appear in the Option + Tab app layer or search results.",
+            .appVisibilityManage: "Manage",
+            .appVisibilityManagerTitle: "App Visibility",
+            .appVisibilityManagerSubtitle: "{count} apps hidden",
+            .appVisibilityBack: "Back to Settings",
+            .appVisibilitySearchPlaceholder: "Search apps, bundle IDs, or paths",
+            .appVisibilityFilterAll: "All",
+            .appVisibilityFilterHidden: "Hidden",
+            .appVisibilityFilterRunning: "Running",
+            .appVisibilityNoApps: "No matching apps",
+            .appVisibilityNoSelectionTitle: "Select an app",
+            .appVisibilityNoSelectionSubtitle: "Choose an app from the list to adjust visibility.",
+            .appVisibilityShowInSwitcher: "Show in FlowTab switcher",
+            .appVisibilityBundleID: "Bundle ID",
+            .appVisibilityPath: "Path",
+            .appVisibilityStatus: "Status",
+            .appVisibilityStatusVisible: "Visible",
+            .appVisibilityStatusHidden: "Hidden",
+            .appVisibilityEffectNote: "This affects the global Option + Tab app layer, app search, and matching window search results. In-app window switching is not affected.",
+            .appVisibilityHiddenBadge: "Hidden",
             .permissionAccessibilityGranted: "Accessibility: Granted",
             .permissionAccessibilityDenied: "Accessibility: Not granted",
             .permissionAccessibilityClose: "Disable Accessibility permission",

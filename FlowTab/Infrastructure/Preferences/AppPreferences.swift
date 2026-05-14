@@ -7,6 +7,7 @@ enum AppPreferenceKeys {
     static let showPermissionReminder = "showPermissionReminder"
     static let allowLaunchAtLogin = "allowLaunchAtLogin"
     static let hasPromptedAccessibilityPermission = "hasPromptedAccessibilityPermission"
+    static let hiddenAppIDs = "hiddenAppIDs"
     static let hotkeyPrimaryModifier = "hotkeyPrimaryModifier"
     static let hotkeyMainKey = "hotkeyMainKey"
     static let hotkeyQuitKey = "hotkeyQuitKey"
@@ -28,6 +29,7 @@ enum AppPreferenceKeys {
         showPermissionReminder,
         allowLaunchAtLogin,
         hasPromptedAccessibilityPermission,
+        hiddenAppIDs,
         hotkeyPrimaryModifier,
         hotkeyMainKey,
         hotkeyQuitKey,
@@ -177,6 +179,44 @@ enum AppVisibilityPreferencesStore {
             return defaultShowInCommandTab
         }
         return userDefaults.bool(forKey: AppPreferenceKeys.showInCommandTab)
+    }
+
+    static func loadHiddenAppIDs(userDefaults: UserDefaults = .standard) -> Set<String> {
+        let rawIDs = userDefaults.stringArray(forKey: AppPreferenceKeys.hiddenAppIDs) ?? []
+        let normalizedIDs = AppVisibilityFilter.normalizedHiddenAppIDs(rawIDs)
+        if rawIDs != normalizedIDs {
+            userDefaults.set(normalizedIDs, forKey: AppPreferenceKeys.hiddenAppIDs)
+        }
+        return Set(normalizedIDs)
+    }
+
+    static func saveHiddenAppIDs(
+        _ hiddenAppIDs: Set<String>,
+        userDefaults: UserDefaults = .standard
+    ) {
+        userDefaults.set(
+            AppVisibilityFilter.normalizedHiddenAppIDs(Array(hiddenAppIDs)),
+            forKey: AppPreferenceKeys.hiddenAppIDs
+        )
+    }
+
+    static func setAppHidden(
+        _ isHidden: Bool,
+        appID: String,
+        userDefaults: UserDefaults = .standard
+    ) {
+        guard let normalizedAppID = AppVisibilityFilter.normalizedAppID(appID) else { return }
+        var hiddenAppIDs = loadHiddenAppIDs(userDefaults: userDefaults)
+        if isHidden {
+            hiddenAppIDs.insert(normalizedAppID)
+        } else {
+            hiddenAppIDs.remove(normalizedAppID)
+        }
+        saveHiddenAppIDs(hiddenAppIDs, userDefaults: userDefaults)
+    }
+
+    static func visibilityFilter(userDefaults: UserDefaults = .standard) -> AppVisibilityFilter {
+        AppVisibilityFilter(hiddenAppIDs: loadHiddenAppIDs(userDefaults: userDefaults))
     }
 }
 

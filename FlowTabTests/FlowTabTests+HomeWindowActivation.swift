@@ -164,6 +164,22 @@ extension FlowTabTests {
         }
     }
 
+    func testHomeAppVisibilityPresentationKeepsHiddenAppsLast() {
+        let summaries = [
+            makeHomeAppSummary(appID: "com.example.mail", displayName: "Mail", rank: 0),
+            makeHomeAppSummary(appID: "com.example.browser", displayName: "Browser", rank: 1),
+            makeHomeAppSummary(appID: "com.example.notes", displayName: "Notes", rank: 2)
+        ]
+        let presentation = HomeAppVisibilityPresentation(hiddenAppIDs: ["com.example.mail"])
+
+        XCTAssertEqual(
+            presentation.orderedAppSummaries(summaries).map(\.appID),
+            ["com.example.browser", "com.example.notes", "com.example.mail"]
+        )
+        XCTAssertTrue(presentation.isHidden(appID: "com.example.mail"))
+        XCTAssertFalse(presentation.isHidden(appID: "com.example.browser"))
+    }
+
     private func makeHomeActivationSnapshot(
         appID: String,
         windows: [WindowCandidate]
@@ -203,5 +219,20 @@ extension FlowTabTests {
             pid: runningApp.processIdentifier
         )
         return RuntimeHomeAppSnapshot(summary: summary, candidate: candidate, context: context)
+    }
+
+    private func makeHomeAppSummary(
+        appID: String,
+        displayName: String,
+        rank: Int
+    ) -> RuntimeHomeAppSummary {
+        RuntimeHomeAppSummary(
+            appID: appID,
+            displayName: displayName,
+            groupID: "fixture",
+            lastActiveAt: TimeInterval(300 - rank),
+            windowCount: 1,
+            pid: pid_t(12_000 + rank)
+        )
     }
 }

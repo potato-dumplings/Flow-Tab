@@ -119,6 +119,105 @@ extension FlowTabUITests {
         assertValue(of: element(in: firstLaunchApp, identifier: Identifier.settingsSearchDefaultScope), equals: "window")
     }
 
+    func testSettingsAppVisibilityHidesMockAppFromSwitcherAndSearch() throws {
+        let settingsApp = makeApp(
+            additionalArguments: appVisibilityRuntimeArguments(resetDefaults: true)
+        )
+        launchFlowTabUITestApplication(settingsApp)
+        openSettingsTab(in: settingsApp)
+
+        let manageButton = element(in: settingsApp, identifier: Identifier.settingsAppVisibilityManage)
+        XCTAssertTrue(manageButton.waitForExistence(timeout: 6))
+        tapElement(manageButton)
+        XCTAssertTrue(element(in: settingsApp, identifier: Identifier.settingsAppVisibilityManager).waitForExistence(timeout: 6))
+
+        let managerSearch = settingsApp.textFields.firstMatch
+        XCTAssertTrue(managerSearch.waitForExistence(timeout: 6))
+        tapElement(managerSearch)
+        settingsApp.typeText("Mail")
+
+        let mockMailRow = element(in: settingsApp, identifier: Identifier.settingsAppVisibilityMockMail)
+        XCTAssertTrue(mockMailRow.waitForExistence(timeout: 6))
+        tapElement(mockMailRow)
+
+        let showToggle = appVisibilityShowToggle(in: settingsApp)
+        setToggle(showToggle, to: false)
+        XCTAssertFalse(toggleIsOn(showToggle))
+        settingsApp.terminate()
+
+        let switcherApp = makeApp(
+            additionalArguments: appVisibilityRuntimeArguments(opensSwitcher: true)
+        )
+        launchFlowTabUITestApplication(switcherApp)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(switcherApp, timeout: 10))
+        XCTAssertTrue(element(in: switcherApp, identifier: Identifier.switcherAppMockBrowser).waitForExistence(timeout: 8))
+        XCTAssertTrue(
+            waitForNonExistence(
+                element(in: switcherApp, identifier: Identifier.switcherAppMockMail),
+                timeout: 2
+            )
+        )
+        switcherApp.terminate()
+
+        let searchApp = makeApp(
+            additionalArguments: appVisibilityRuntimeArguments(opensSearch: true)
+        )
+        launchFlowTabUITestApplication(searchApp)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(searchApp, timeout: 10))
+        XCTAssertTrue(element(in: searchApp, identifier: Identifier.switcherSearchInput).waitForExistence(timeout: 6))
+        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+        searchApp.typeText("Mail")
+        RunLoop.current.run(until: Date().addingTimeInterval(0.8))
+        XCTAssertFalse(element(in: searchApp, identifier: Identifier.switcherSearchAppMockMail).exists)
+    }
+
+    func testSettingsAppVisibilityHiddenFilterShowsStoredHiddenAppMissingFromInventory() throws {
+        let firstLaunchApp = makeApp(
+            additionalArguments: appVisibilityRuntimeArguments(resetDefaults: true)
+        )
+        launchFlowTabUITestApplication(firstLaunchApp)
+        openSettingsTab(in: firstLaunchApp)
+
+        let manageButton = element(in: firstLaunchApp, identifier: Identifier.settingsAppVisibilityManage)
+        XCTAssertTrue(manageButton.waitForExistence(timeout: 6))
+        tapElement(manageButton)
+        XCTAssertTrue(element(in: firstLaunchApp, identifier: Identifier.settingsAppVisibilityManager).waitForExistence(timeout: 6))
+
+        let managerSearch = firstLaunchApp.textFields.firstMatch
+        XCTAssertTrue(managerSearch.waitForExistence(timeout: 6))
+        tapElement(managerSearch)
+        firstLaunchApp.typeText("Mail")
+
+        let mockMailRow = element(in: firstLaunchApp, identifier: Identifier.settingsAppVisibilityMockMail)
+        XCTAssertTrue(mockMailRow.waitForExistence(timeout: 6))
+        tapElement(mockMailRow)
+
+        let showToggle = appVisibilityShowToggle(in: firstLaunchApp)
+        setToggle(showToggle, to: false)
+        XCTAssertFalse(toggleIsOn(showToggle))
+        firstLaunchApp.terminate()
+
+        let staleInventoryApp = makeApp(
+            additionalArguments: appVisibilityRuntimeArguments(
+                mockRuntimeVariant: "single-app-five-windows"
+            )
+        )
+        launchFlowTabUITestApplication(staleInventoryApp)
+        openSettingsTab(in: staleInventoryApp)
+
+        let staleManageButton = element(in: staleInventoryApp, identifier: Identifier.settingsAppVisibilityManage)
+        XCTAssertTrue(staleManageButton.waitForExistence(timeout: 6))
+        tapElement(staleManageButton)
+        XCTAssertTrue(element(in: staleInventoryApp, identifier: Identifier.settingsAppVisibilityManager).waitForExistence(timeout: 6))
+
+        tapAppVisibilityHiddenFilter(in: staleInventoryApp)
+
+        let staleHiddenRow = element(in: staleInventoryApp, identifier: Identifier.settingsAppVisibilityMockMail)
+        XCTAssertTrue(staleHiddenRow.waitForExistence(timeout: 6))
+        tapElement(staleHiddenRow)
+        XCTAssertFalse(toggleIsOn(appVisibilityShowToggle(in: staleInventoryApp)))
+    }
+
     private func launchMockSwitcherSearchFromUserPath() -> XCUIApplication {
         let app = makeApp(
             additionalArguments: [
@@ -140,5 +239,66 @@ extension FlowTabUITests {
         XCTAssertTrue(element(in: app, identifier: Identifier.switcherSearchInput).waitForExistence(timeout: 5))
         RunLoop.current.run(until: Date().addingTimeInterval(0.4))
         return app
+    }
+
+    private func appVisibilityRuntimeArguments(
+        resetDefaults: Bool = false,
+        opensSwitcher: Bool = false,
+        opensSearch: Bool = false,
+        mockRuntimeVariant: String? = nil
+    ) -> [String] {
+        var arguments: [String] = []
+        if resetDefaults {
+            arguments.append("--flowtab-ui-reset-defaults")
+        }
+        arguments += [
+            "--flowtab-ui-mock-runtime",
+            "-showPermissionReminder",
+            "NO",
+            "--flowtab-ui-ax-trusted",
+            "YES",
+            "--flowtab-ui-screen-trusted",
+            "YES"
+        ]
+        if opensSearch {
+            arguments.append("--flowtab-ui-open-switcher-search")
+        } else if opensSwitcher {
+            arguments.append("--flowtab-ui-open-switcher")
+        }
+        if let mockRuntimeVariant {
+            arguments += [
+                "--flowtab-ui-mock-runtime-variant",
+                mockRuntimeVariant
+            ]
+        }
+        return arguments
+    }
+
+    private func appVisibilityShowToggle(in app: XCUIApplication) -> XCUIElement {
+        let switchElement = app.switches.firstMatch
+        if switchElement.waitForExistence(timeout: 3) {
+            return switchElement
+        }
+        let checkBox = app.checkBoxes.firstMatch
+        XCTAssertTrue(checkBox.waitForExistence(timeout: 3))
+        return checkBox
+    }
+
+    private func tapAppVisibilityHiddenFilter(in app: XCUIApplication) {
+        let hiddenSegment = element(in: app, identifier: Identifier.settingsAppVisibilityFilterHidden)
+        if hiddenSegment.waitForExistence(timeout: 3) {
+            tapElement(hiddenSegment)
+            return
+        }
+
+        let hiddenChinese = app.buttons["已隐藏"].firstMatch
+        if hiddenChinese.waitForExistence(timeout: 2) {
+            tapElement(hiddenChinese)
+            return
+        }
+
+        let hiddenEnglish = app.buttons["Hidden"].firstMatch
+        XCTAssertTrue(hiddenEnglish.waitForExistence(timeout: 4))
+        tapElement(hiddenEnglish)
     }
 }

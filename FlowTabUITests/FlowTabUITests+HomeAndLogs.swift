@@ -105,6 +105,53 @@ extension FlowTabUITests {
         )
     }
 
+    func testHomeAppLayerMarksHiddenAppsAndSortsThemLast() throws {
+        let app = makeApp(
+            additionalArguments: homeAppVisibilityRuntimeArguments(resetDefaults: true)
+        )
+        launchFlowTabUITestApplication(app)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
+        openSettingsTab(in: app)
+
+        let manageButton = element(in: app, identifier: Identifier.settingsAppVisibilityManage)
+        XCTAssertTrue(manageButton.waitForExistence(timeout: 6))
+        tapElement(manageButton)
+        XCTAssertTrue(element(in: app, identifier: Identifier.settingsAppVisibilityManager).waitForExistence(timeout: 6))
+
+        let managerSearch = app.textFields.firstMatch
+        XCTAssertTrue(managerSearch.waitForExistence(timeout: 6))
+        tapElement(managerSearch)
+        app.typeText("Mail")
+
+        let mockMailRow = element(in: app, identifier: Identifier.settingsAppVisibilityMockMail)
+        XCTAssertTrue(mockMailRow.waitForExistence(timeout: 6))
+        tapElement(mockMailRow)
+
+        let showToggle = homeAppVisibilityShowToggle(in: app)
+        setToggle(showToggle, to: false)
+        XCTAssertFalse(toggleIsOn(showToggle))
+
+        XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5))
+        XCTAssertTrue(element(in: app, identifier: Identifier.homeTabContent).waitForExistence(timeout: 5))
+
+        let browserRow = element(in: app, identifier: Identifier.homeAppMockBrowser)
+        let mailRow = element(in: app, identifier: Identifier.homeAppMockMail)
+        XCTAssertTrue(browserRow.waitForExistence(timeout: 8))
+        XCTAssertTrue(mailRow.waitForExistence(timeout: 8))
+        XCTAssertLessThan(
+            browserRow.frame.minY,
+            mailRow.frame.minY,
+            "Home should keep hidden apps visible but place them after visible apps."
+        )
+        let mailRowDescription = "\(mailRow.label) \(elementStringValue(mailRow))"
+        XCTAssertTrue(
+            mailRowDescription.contains("不展示")
+                || mailRowDescription.contains("Not shown")
+                || mailRowDescription.contains("hidden"),
+            "Hidden Home app rows should expose the not-shown state for automation."
+        )
+    }
+
     func testPermissionReminderTogglePersistsAcrossRelaunch() throws {
         let firstLaunchApp = makeApp(
             additionalArguments: [
@@ -311,6 +358,33 @@ extension FlowTabUITests {
 
         let openDirectoryButton = app.buttons[Identifier.logsOpenDirectoryButton]
         XCTAssertTrue(openDirectoryButton.waitForExistence(timeout: 5))
+    }
+
+    private func homeAppVisibilityRuntimeArguments(resetDefaults: Bool = false) -> [String] {
+        var arguments: [String] = []
+        if resetDefaults {
+            arguments.append("--flowtab-ui-reset-defaults")
+        }
+        arguments += [
+            "--flowtab-ui-mock-runtime",
+            "-showPermissionReminder",
+            "NO",
+            "--flowtab-ui-ax-trusted",
+            "YES",
+            "--flowtab-ui-screen-trusted",
+            "YES"
+        ]
+        return arguments
+    }
+
+    private func homeAppVisibilityShowToggle(in app: XCUIApplication) -> XCUIElement {
+        let switchElement = app.switches.firstMatch
+        if switchElement.waitForExistence(timeout: 3) {
+            return switchElement
+        }
+        let checkBox = app.checkBoxes.firstMatch
+        XCTAssertTrue(checkBox.waitForExistence(timeout: 3))
+        return checkBox
     }
 
 }
