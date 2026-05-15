@@ -90,6 +90,9 @@ struct AppVisibilityManagerView: View {
                     Text(AppStrings.text(.appVisibilityBack))
                         .font(.system(size: 12, weight: .regular))
                 }
+                .padding(.vertical, 6)
+                .padding(.trailing, 8)
+                .flowTabInteractiveHitArea()
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
@@ -154,7 +157,9 @@ struct AppVisibilityManagerView: View {
                             .padding(2)
                     }
                 }
+                .flowTabInteractiveHitArea()
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .buttonStyle(.plain)
         .accessibilityIdentifier("flowtab.settings.app-visibility.filter.\(filter.id)")
     }
@@ -226,6 +231,7 @@ struct AppVisibilityManagerView: View {
             )
             .padding(.horizontal, 12)
             .frame(height: 55)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .background {
                 rowBackground(isSelected: app.id == model.selectedAppID)
             }
@@ -236,7 +242,7 @@ struct AppVisibilityManagerView: View {
                         .frame(height: 0.5)
                 }
             }
-            .contentShape(Rectangle())
+            .flowTabInteractiveHitArea()
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("flowtab.settings.app-visibility.app.\(app.id.flowTabAccessibilitySlug)")
@@ -409,7 +415,40 @@ private struct AppVisibilityListRow: View {
                 .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(Color.secondary.opacity(isSelected ? 0.88 : 0.62))
         }
-        .contentShape(Rectangle())
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct FlowTabInteractiveHitArea: ViewModifier {
+    @State private var didPushCursor = false
+
+    func body(content: Content) -> some View {
+        content
+            .contentShape(Rectangle())
+            .onHover { isHovering in
+                if isHovering {
+                    guard !didPushCursor else { return }
+                    NSCursor.pointingHand.push()
+                    didPushCursor = true
+                } else {
+                    popCursorIfNeeded()
+                }
+            }
+            .onDisappear {
+                popCursorIfNeeded()
+            }
+    }
+
+    private func popCursorIfNeeded() {
+        guard didPushCursor else { return }
+        NSCursor.pop()
+        didPushCursor = false
+    }
+}
+
+private extension View {
+    func flowTabInteractiveHitArea() -> some View {
+        modifier(FlowTabInteractiveHitArea())
     }
 }
 
