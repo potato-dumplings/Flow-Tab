@@ -343,7 +343,7 @@ final class AppKitSettingsPageView: NSView {
     )
     private lazy var appVisibilityCard = AppKitSectionCardView(
         title: AppStrings.text(.settingsCardAppVisibilityTitle),
-        subtitle: AppStrings.text(.settingsCardAppVisibilitySubtitle),
+        subtitle: nil,
         contentView: appVisibilityContent
     )
     private lazy var hotkeyCard = AppKitSectionCardView(
@@ -398,6 +398,9 @@ final class AppKitSettingsPageView: NSView {
         )
         appVisibilityContent.update(
             with: AppVisibilitySettingsCardState(hiddenAppCount: state.hiddenAppCount)
+        )
+        appVisibilityCard.updateTitleAccessory(
+            AppVisibilitySettingsCardState(hiddenAppCount: state.hiddenAppCount).statusText
         )
         hotkeyContent.update(
             with: HotkeySettingsCardState(

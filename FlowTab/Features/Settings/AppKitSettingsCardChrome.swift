@@ -107,14 +107,17 @@ extension NSAppearance {
 
 final class AppKitSectionCardView: NSView {
     private let stackView = NSStackView()
+    private let titleRow = NSStackView()
     private let titleLabel: NSTextField
     private let subtitleLabel: NSTextField
+    private let titleAccessoryLabel = NSTextField(labelWithString: "")
     private let verticalInset: CGFloat = 14
 
-    init(title: String, subtitle: String, contentView: NSView) {
+    init(title: String, subtitle: String?, contentView: NSView) {
         titleLabel = NSTextField(labelWithString: title)
-        subtitleLabel = NSTextField(labelWithString: subtitle)
+        subtitleLabel = NSTextField(labelWithString: subtitle ?? "")
         super.init(frame: .zero)
+        subtitleLabel.isHidden = subtitle?.isEmpty ?? true
         buildViewHierarchy(contentView: contentView)
     }
 
@@ -123,6 +126,12 @@ final class AppKitSectionCardView: NSView {
         subtitleLabel = NSTextField(labelWithString: "")
         super.init(coder: coder)
         buildViewHierarchy(contentView: NSView())
+    }
+
+    func updateTitleAccessory(_ text: String?) {
+        titleAccessoryLabel.stringValue = text ?? ""
+        titleAccessoryLabel.isHidden = text?.isEmpty ?? true
+        invalidateIntrinsicContentSize()
     }
 
     override func viewDidChangeEffectiveAppearance() {
@@ -152,6 +161,16 @@ final class AppKitSectionCardView: NSView {
         titleLabel.font = .systemFont(ofSize: 15, weight: .semibold)
         subtitleLabel.font = .systemFont(ofSize: 11)
         subtitleLabel.textColor = .secondaryLabelColor
+        titleAccessoryLabel.font = .systemFont(ofSize: 13)
+        titleAccessoryLabel.textColor = .secondaryLabelColor
+
+        titleRow.orientation = .horizontal
+        titleRow.alignment = .firstBaseline
+        titleRow.spacing = 12
+        titleRow.detachesHiddenViews = true
+        titleRow.translatesAutoresizingMaskIntoConstraints = false
+        titleRow.addArrangedSubview(titleLabel)
+        titleRow.addArrangedSubview(titleAccessoryLabel)
 
         stackView.orientation = .vertical
         stackView.alignment = .leading
@@ -160,9 +179,10 @@ final class AppKitSectionCardView: NSView {
         stackView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(stackView)
 
-        stackView.addArrangedSubview(titleLabel)
+        stackView.addArrangedSubview(titleRow)
         stackView.addArrangedSubview(subtitleLabel)
         stackView.addArrangedSubview(contentView)
+        titleRow.widthAnchor.constraint(lessThanOrEqualTo: stackView.widthAnchor).isActive = true
         contentView.translatesAutoresizingMaskIntoConstraints = false
         contentView.setContentHuggingPriority(.required, for: .vertical)
         contentView.setContentCompressionResistancePriority(.required, for: .vertical)
@@ -206,4 +226,3 @@ final class AppKitSectionCardView: NSView {
         layer.borderWidth = 1
     }
 }
-
