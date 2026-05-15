@@ -71,8 +71,8 @@ private struct HomeSidebar: View {
     private var themeModeRaw = ThemePreferencesStore.defaultMode.rawValue
     @AppStorage(AppPreferenceKeys.appLanguage)
     private var appLanguageRaw = AppLanguagePreferencesStore.defaultLanguage.rawValue
-    private let navIconColumnWidth: CGFloat = 26
-    private let navItemSpacing: CGFloat = 18
+    private let navIconColumnWidth: CGFloat = 24
+    private let navItemSpacing: CGFloat = 15
 
     private var colorScheme: ColorScheme {
         ThemePreferencesStore.resolve(rawValue: themeModeRaw)
@@ -87,8 +87,8 @@ private struct HomeSidebar: View {
 
     private var selectedItemBackgroundColor: Color {
         colorScheme == .dark
-            ? Color.accentColor.opacity(0.38)
-            : Color(red: 0.76, green: 0.83, blue: 0.95)
+            ? Color.accentColor.opacity(0.32)
+            : Color(red: 0.78, green: 0.85, blue: 0.97)
     }
 
     private var normalItemForegroundColor: Color {
@@ -126,24 +126,24 @@ private struct HomeSidebar: View {
         ZStack {
             sidebarBackgroundColor
 
-            VStack(alignment: .leading, spacing: 20) {
-                HStack(alignment: .center, spacing: 10) {
+            VStack(alignment: .leading, spacing: 17) {
+                HStack(alignment: .center, spacing: 9) {
                     Image(nsImage: NSApp.applicationIconImage)
                         .resizable()
                         .scaledToFit()
-                        .frame(width: 32, height: 32)
-                        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .frame(width: 28, height: 28)
+                        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
 
                     VStack(alignment: .leading, spacing: 0) {
                         Text("FlowTab")
-                            .font(.system(size: 21, weight: .bold))
+                            .font(.system(size: 20, weight: .semibold))
                             .lineLimit(1)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 10)
+                .padding(.horizontal, 9)
 
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 7) {
                     ForEach(items, id: \.tab) { item in
                         sidebarButton(
                             tab: item.tab,
@@ -157,10 +157,10 @@ private struct HomeSidebar: View {
 
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 18)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 17)
         }
-        .frame(width: 220)
+        .frame(width: 200)
     }
 
     @ViewBuilder
@@ -175,25 +175,25 @@ private struct HomeSidebar: View {
         } label: {
             HStack(spacing: navItemSpacing) {
                 Image(systemName: icon)
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.system(size: 17, weight: .medium))
                     .frame(width: navIconColumnWidth)
 
                 Text(title)
-                    .font(.system(size: 16, weight: .semibold))
-                    .tracking(appLanguage == .english ? 0 : 4)
+                    .font(.system(size: 15, weight: .medium))
+                    .tracking(appLanguage == .english ? 0 : 3)
                     .lineLimit(1)
 
                 Spacer(minLength: 0)
             }
             .foregroundStyle(isSelected ? selectedItemForegroundColor : normalItemForegroundColor)
-            .padding(.vertical, 12)
-            .padding(.horizontal, 16)
-            .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
+            .padding(.vertical, 10)
+            .padding(.horizontal, 14)
+            .frame(maxWidth: .infinity, minHeight: 47, alignment: .leading)
             .background(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(isSelected ? selectedItemBackgroundColor : Color.clear)
             )
-            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .buttonStyle(.plain)
         .frame(maxWidth: .infinity)

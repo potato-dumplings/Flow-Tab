@@ -20,25 +20,29 @@ struct AppVisibilityManagerView: View {
         colorScheme == .dark
     }
 
-    private var sidebarBackground: Color {
-        isDark ? Color(red: 0.10, green: 0.10, blue: 0.11) : Color(red: 0.95, green: 0.95, blue: 0.96)
+    private var paneBackground: Color {
+        isDark ? Color(red: 0.09, green: 0.09, blue: 0.10) : Color(red: 0.985, green: 0.986, blue: 0.99)
     }
 
     private var contentBackground: Color {
-        isDark ? Color.black : Color.white
-    }
-
-    private var selectedBackground: Color {
-        isDark ? Color.accentColor.opacity(0.36) : Color(red: 0.76, green: 0.83, blue: 0.95)
+        isDark ? Color.black : Color(red: 0.998, green: 0.998, blue: 1.0)
     }
 
     private var borderColor: Color {
-        isDark ? Color.white.opacity(0.12) : Color.black.opacity(0.12)
+        isDark ? Color.white.opacity(0.10) : Color.black.opacity(0.08)
+    }
+
+    private var groupedSurface: Color {
+        isDark ? Color.white.opacity(0.055) : Color.white.opacity(0.94)
+    }
+
+    private var rowSeparatorColor: Color {
+        isDark ? Color.white.opacity(0.05) : Color.black.opacity(0.045)
     }
 
     var body: some View {
         HStack(spacing: 0) {
-            sidebar
+            listPane
 
             Divider()
                 .overlay(borderColor)
@@ -60,21 +64,41 @@ struct AppVisibilityManagerView: View {
         .accessibilityIdentifier("flowtab.settings.app-visibility.manager")
     }
 
-    private var sidebar: some View {
-        VStack(alignment: .leading, spacing: 12) {
+    private var listPane: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            header
+            searchField
+            filterBar
+            appList
+        }
+        .padding(.horizontal, 18)
+        .padding(.top, 20)
+        .padding(.bottom, 18)
+        .frame(width: 372)
+        .frame(maxHeight: .infinity, alignment: .topLeading)
+        .background(paneBackground)
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 13) {
             Button {
                 onClose()
             } label: {
-                Label(AppStrings.text(.appVisibilityBack), systemImage: "chevron.left")
-                    .font(.system(size: 13, weight: .semibold))
+                HStack(spacing: 5) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text(AppStrings.text(.appVisibilityBack))
+                        .font(.system(size: 12, weight: .regular))
+                }
             }
             .buttonStyle(.plain)
             .foregroundStyle(.secondary)
             .accessibilityIdentifier("flowtab.settings.app-visibility.back")
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(AppStrings.text(.appVisibilityManagerTitle))
-                    .font(.system(size: 21, weight: .semibold))
+                    .font(.system(size: 23, weight: .semibold))
+                    .lineLimit(1)
                 Text(
                     AppStrings.text(
                         .appVisibilityManagerSubtitle,
@@ -83,28 +107,56 @@ struct AppVisibilityManagerView: View {
                 )
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
             }
+        }
+    }
 
-            searchField
-
-            Picker("", selection: $model.filter) {
-                ForEach(AppVisibilityManagerModel.Filter.allCases) { filter in
-                    Text(filter.title)
-                        .tag(filter)
-                        .accessibilityIdentifier("flowtab.settings.app-visibility.filter.\(filter.id)")
+    private var filterBar: some View {
+        let filters = AppVisibilityManagerModel.Filter.allCases
+        return HStack(spacing: 0) {
+            ForEach(Array(filters.enumerated()), id: \.element.id) { index, filter in
+                filterButton(filter)
+                if index < filters.count - 1 {
+                    Rectangle()
+                        .fill(rowSeparatorColor)
+                        .frame(width: 1, height: 17)
                 }
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .accessibilityIdentifier("flowtab.settings.app-visibility.filter")
-
-            appList
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 16)
-        .frame(width: 300)
-        .frame(maxHeight: .infinity, alignment: .topLeading)
-        .background(sidebarBackground)
+        .frame(height: 32)
+        .background(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(isDark ? Color.white.opacity(0.045) : Color.white.opacity(0.76))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .stroke(borderColor, lineWidth: 1)
+        )
+        .accessibilityIdentifier("flowtab.settings.app-visibility.filter")
+    }
+
+    private func filterButton(_ filter: AppVisibilityManagerModel.Filter) -> some View {
+        let isSelected = model.filter == filter
+        return Button {
+            model.filter = filter
+        } label: {
+            Text(filter.title)
+                .font(.system(size: 12, weight: isSelected ? .medium : .regular))
+                .lineLimit(1)
+                .padding(.vertical, 2)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .foregroundStyle(isSelected ? Color.accentColor : Color.primary.opacity(0.78))
+                .background {
+                    if isSelected {
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(Color.accentColor.opacity(isDark ? 0.14 : 0.055))
+                            .padding(2)
+                    }
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("flowtab.settings.app-visibility.filter.\(filter.id)")
     }
 
     private var searchField: some View {
@@ -116,13 +168,13 @@ struct AppVisibilityManagerView: View {
                 placeholder: AppStrings.text(.appVisibilitySearchPlaceholder),
                 accessibilityIdentifier: "flowtab.settings.app-visibility.search"
             )
-            .frame(height: 18)
+            .frame(height: 17)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 9)
+        .frame(height: 34)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(isDark ? Color.white.opacity(0.08) : Color.white.opacity(0.84))
+                .fill(groupedSurface)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -132,23 +184,26 @@ struct AppVisibilityManagerView: View {
 
     private var appList: some View {
         let visibleApps = model.visibleApps
-        return List(selection: $model.selectedAppID) {
-            ForEach(visibleApps) { app in
-                AppVisibilityListRow(
-                    app: app,
-                    isHidden: model.isHidden(app),
-                    isSelected: app.id == model.selectedAppID
-                )
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    model.selectedAppID = app.id
+        return ScrollView {
+            LazyVStack(spacing: 0) {
+                ForEach(Array(visibleApps.enumerated()), id: \.element.id) { index, app in
+                    appRowButton(
+                        app: app,
+                        isLast: index == visibleApps.count - 1
+                    )
                 }
-                .tag(app.id as String?)
-                .listRowBackground(app.id == model.selectedAppID ? selectedBackground : Color.clear)
-                .accessibilityIdentifier("flowtab.settings.app-visibility.app.\(app.id.flowTabAccessibilitySlug)")
             }
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
-        .listStyle(.sidebar)
+        .scrollIndicators(.visible)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(groupedSurface)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(borderColor, lineWidth: 1)
+        )
         .overlay {
             if model.isLoading {
                 ProgressView()
@@ -157,6 +212,49 @@ struct AppVisibilityManagerView: View {
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    private func appRowButton(app: InstalledAppRecord, isLast: Bool) -> some View {
+        Button {
+            model.selectedAppID = app.id
+        } label: {
+            AppVisibilityListRow(
+                app: app,
+                isHidden: model.isHidden(app),
+                isSelected: app.id == model.selectedAppID
+            )
+            .padding(.horizontal, 12)
+            .frame(height: 55)
+            .background {
+                rowBackground(isSelected: app.id == model.selectedAppID)
+            }
+            .overlay(alignment: .bottom) {
+                if !isLast {
+                    Rectangle()
+                        .fill(rowSeparatorColor)
+                        .frame(height: 0.5)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("flowtab.settings.app-visibility.app.\(app.id.flowTabAccessibilitySlug)")
+    }
+
+    @ViewBuilder
+    private func rowBackground(isSelected: Bool) -> some View {
+        if isSelected {
+            LinearGradient(
+                colors: [
+                    isDark ? Color.accentColor.opacity(0.24) : Color(red: 0.88, green: 0.93, blue: 1.0),
+                    isDark ? Color.accentColor.opacity(0.16) : Color(red: 0.92, green: 0.96, blue: 1.0)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        } else {
+            Color.clear
         }
     }
 
@@ -169,14 +267,16 @@ struct AppVisibilityManagerView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .padding(28)
+        .padding(.horizontal, 30)
+        .padding(.top, 60)
+        .padding(.bottom, 24)
     }
 
     private func appDetail(for app: InstalledAppRecord) -> some View {
         let isHidden = model.isHidden(app)
-        return VStack(alignment: .leading, spacing: 22) {
-            HStack(alignment: .center, spacing: 14) {
-                AppVisibilityIconView(app: app, size: 54)
+        return VStack(alignment: .leading, spacing: 23) {
+            HStack(alignment: .center, spacing: 16) {
+                AppVisibilityIconView(app: app, size: 62)
                     .id(AppVisibilityIconSourceKey(app: app).value)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(app.displayName)
@@ -191,20 +291,26 @@ struct AppVisibilityManagerView: View {
 
             Divider()
 
-            Toggle(
-                AppStrings.text(.appVisibilityShowInSwitcher),
-                isOn: Binding(
-                    get: { !isHidden },
-                    set: { model.setHidden(!$0, for: app.id) }
+            HStack(spacing: 14) {
+                Text(AppStrings.text(.appVisibilityShowInSwitcher))
+                    .font(.system(size: 14, weight: .medium))
+                Toggle(
+                    "",
+                    isOn: Binding(
+                        get: { !isHidden },
+                        set: { model.setHidden(!$0, for: app.id) }
+                    )
                 )
-            )
-            .toggleStyle(.switch)
-            .font(.system(size: 14, weight: .medium))
-            .accessibilityIdentifier("flowtab.settings.app-visibility.show-toggle")
+                .toggleStyle(.switch)
+                .labelsHidden()
+                .accessibilityIdentifier("flowtab.settings.app-visibility.show-toggle")
+            }
 
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 0) {
                 detailRow(title: AppStrings.text(.appVisibilityBundleID), value: app.bundleIdentifier ?? "-")
+                Divider().overlay(rowSeparatorColor)
                 detailRow(title: AppStrings.text(.appVisibilityPath), value: app.path ?? "-")
+                Divider().overlay(rowSeparatorColor)
                 detailRow(
                     title: AppStrings.text(.appVisibilityStatus),
                     value: isHidden
@@ -212,10 +318,21 @@ struct AppVisibilityManagerView: View {
                         : AppStrings.text(.appVisibilityStatusVisible)
                 )
             }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 5)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(groupedSurface)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(borderColor, lineWidth: 1)
+            )
 
             Text(AppStrings.text(.appVisibilityEffectNote))
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
+                .lineSpacing(2)
                 .fixedSize(horizontal: false, vertical: true)
 
             Spacer(minLength: 0)
@@ -223,16 +340,19 @@ struct AppVisibilityManagerView: View {
     }
 
     private func detailRow(title: String, value: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
+        HStack(alignment: .firstTextBaseline, spacing: 14) {
             Text(title)
                 .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.secondary)
-                .frame(width: 86, alignment: .leading)
+                .frame(width: 82, alignment: .leading)
             Text(value)
                 .font(.system(size: 12))
                 .textSelection(.enabled)
-                .lineLimit(2)
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .frame(maxWidth: .infinity, alignment: .trailing)
         }
+        .frame(minHeight: 38)
     }
 
     private var emptyDetail: some View {
@@ -263,30 +383,32 @@ private struct AppVisibilityListRow: View {
     let isSelected: Bool
 
     var body: some View {
-        HStack(spacing: 10) {
-            AppVisibilityIconView(app: app, size: 26)
+        HStack(spacing: 9) {
+            AppVisibilityIconView(app: app, size: 23)
                 .id(AppVisibilityIconSourceKey(app: app).value)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(app.displayName)
-                        .font(.system(size: 13, weight: .medium))
+                        .font(.system(size: 12.5, weight: .medium))
                         .lineLimit(1)
                     if isHidden {
                         Text(AppStrings.text(.appVisibilityHiddenBadge))
-                            .font(.system(size: 10, weight: .semibold))
+                            .font(.system(size: 9.5, weight: .medium))
                             .padding(.horizontal, 5)
                             .padding(.vertical, 1)
                             .background(Capsule().fill(Color.secondary.opacity(0.16)))
                     }
                 }
                 Text(app.subtitle)
-                    .font(.system(size: 11))
+                    .font(.system(size: 10.5))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
             Spacer(minLength: 0)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Color.secondary.opacity(isSelected ? 0.88 : 0.62))
         }
-        .padding(.vertical, 3)
         .contentShape(Rectangle())
     }
 }
