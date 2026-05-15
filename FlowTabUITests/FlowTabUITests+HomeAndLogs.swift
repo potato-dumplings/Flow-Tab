@@ -39,6 +39,54 @@ extension FlowTabUITests {
         XCTAssertTrue(element(in: app, identifier: Identifier.settingsTabContent).waitForExistence(timeout: 5))
     }
 
+    func testStatusItemReopensLastSelectedTabAfterWindowClose() throws {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-ax-trusted",
+                "YES",
+                "--flowtab-ui-screen-trusted",
+                "YES"
+            ]
+        )
+        launchFlowTabUITestApplication(app)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
+        openLogsTab(in: app)
+
+        app.typeKey("w", modifierFlags: .command)
+
+        XCTAssertNotEqual(app.state, .notRunning)
+        XCTAssertFalse(element(in: app, identifier: Identifier.logsTabContent).waitForExistence(timeout: 2))
+
+        flowTabStatusItem(in: app).tap()
+
+        XCTAssertTrue(element(in: app, identifier: Identifier.logsTabContent).waitForExistence(timeout: 8))
+    }
+
+    func testStatusItemSecondaryClickMenuQuitsApp() throws {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-ax-trusted",
+                "YES",
+                "--flowtab-ui-screen-trusted",
+                "YES"
+            ]
+        )
+        launchFlowTabUITestApplication(app)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
+
+        let statusItem = flowTabStatusItem(in: app)
+        XCUIElement.perform(withKeyModifiers: .control) {
+            statusItem.tap()
+        }
+        flowTabStatusMenuQuitItem(in: app).tap()
+
+        XCTAssertTrue(app.wait(for: .notRunning, timeout: 8))
+    }
+
     func testHomePermissionBannerHiddenWhenPermissionsGranted() throws {
         let app = makeApp(
             additionalArguments: [

@@ -56,6 +56,7 @@ enum AppStringKey: String {
     case menuOpenLogs
     case menuOpenSettings
     case menuOpenHome
+    case menuQuit
     case menuQuitFlowTab
     case tabHome
     case tabLogs
@@ -192,6 +193,7 @@ enum AppStrings {
             .menuOpenLogs: "打开日志",
             .menuOpenSettings: "打开设置",
             .menuOpenHome: "打开应用首页",
+            .menuQuit: "退出",
             .menuQuitFlowTab: "退出 FlowTab",
             .tabHome: "首页",
             .tabLogs: "日志",
@@ -243,9 +245,9 @@ enum AppStrings {
             .settingsCardAppVisibilitySubtitle: "管理不出现在切换器中的应用",
             .settingsCardHotkeyTitle: "快捷键",
             .settingsCardHotkeySubtitle: "主切换与结束应用按键",
-            .appearanceDescription: "关闭后 当前应用 将仅作为菜单栏辅助应用运行。",
+            .appearanceDescription: "关闭后，当前应用将仅作为菜单栏辅助应用运行。",
             .appearanceShowShortcutHint: "显示快捷键提示",
-            .appearanceShowAppWindow: "显示应用窗口",
+            .appearanceShowAppWindow: "像普通应用一样显示",
             .appearanceThemeMode: "主题模式",
             .appearanceLanguage: "语言",
             .languageSimplifiedChinese: "简体中文",
@@ -323,6 +325,7 @@ enum AppStrings {
             .menuOpenLogs: "Open Logs",
             .menuOpenSettings: "Open Settings",
             .menuOpenHome: "Open Home",
+            .menuQuit: "Quit",
             .menuQuitFlowTab: "Quit FlowTab",
             .tabHome: "Home",
             .tabLogs: "Logs",
@@ -374,9 +377,9 @@ enum AppStrings {
             .settingsCardAppVisibilitySubtitle: "Manage apps hidden from the switcher",
             .settingsCardHotkeyTitle: "Hotkeys",
             .settingsCardHotkeySubtitle: "Main switch and quit app keys",
-            .appearanceDescription: "When disabled, the app runs only as a menu bar helper.",
+            .appearanceDescription: "When turned off, this app runs only as a menu bar helper.",
             .appearanceShowShortcutHint: "Show shortcut hint",
-            .appearanceShowAppWindow: "Show app window",
+            .appearanceShowAppWindow: "Show like a regular app",
             .appearanceThemeMode: "Theme mode",
             .appearanceLanguage: "Language",
             .languageSimplifiedChinese: "Simplified Chinese",

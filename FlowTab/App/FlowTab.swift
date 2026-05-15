@@ -5,8 +5,6 @@ struct FlowTabApp: App {
     static var mruTracker: any MRUTracking = SystemAppMRUTracker.shared
 
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    private let appWindowWidth: CGFloat = 1120
-    private let appWindowHeight: CGFloat = 780
     @AppStorage(AppPreferenceKeys.appLanguage)
     private var appLanguageRaw = AppLanguagePreferencesStore.defaultLanguage.rawValue
 
@@ -22,15 +20,15 @@ struct FlowTabApp: App {
     var body: some Scene {
         WindowGroup("FlowTab") {
             HomeRootView()
-                .frame(minWidth: appWindowWidth, minHeight: appWindowHeight)
+                .frame(minWidth: AppWindowLayout.width, minHeight: AppWindowLayout.height)
                 .id(appLanguageRaw)
         }
-        .defaultSize(width: appWindowWidth, height: appWindowHeight)
+        .defaultSize(width: AppWindowLayout.width, height: AppWindowLayout.height)
         .windowStyle(.hiddenTitleBar)
 
         Settings {
             HomeRootView()
-                .frame(minWidth: appWindowWidth, minHeight: appWindowHeight)
+                .frame(minWidth: AppWindowLayout.width, minHeight: AppWindowLayout.height)
                 .id(appLanguageRaw)
         }
         .windowStyle(.hiddenTitleBar)

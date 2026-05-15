@@ -43,6 +43,15 @@ extension FlowTabTests {
             ),
             "终端 的窗口"
         )
+        XCTAssertEqual(AppStrings.text(.menuQuit, language: .simplifiedChinese), "退出")
+        XCTAssertEqual(
+            AppStrings.text(.appearanceShowAppWindow, language: .simplifiedChinese),
+            "像普通应用一样显示"
+        )
+        XCTAssertEqual(
+            AppStrings.text(.appearanceDescription, language: .simplifiedChinese),
+            "关闭后，当前应用将仅作为菜单栏辅助应用运行。"
+        )
         XCTAssertEqual(AppStrings.text(.tabSettings, language: .english), "Settings")
     }
 
@@ -209,6 +218,8 @@ extension FlowTabTests {
         guard let userDefaults = makeIsolatedUserDefaults() else { return }
         defer { clearIsolatedUserDefaults(userDefaults) }
 
+        XCTAssertFalse(AppVisibilityPreferencesStore.loadShowInCommandTab(userDefaults: userDefaults))
+        userDefaults.set(true, forKey: AppPreferenceKeys.showInCommandTab)
         XCTAssertTrue(AppVisibilityPreferencesStore.loadShowInCommandTab(userDefaults: userDefaults))
         userDefaults.set(false, forKey: AppPreferenceKeys.showInCommandTab)
         XCTAssertFalse(AppVisibilityPreferencesStore.loadShowInCommandTab(userDefaults: userDefaults))
@@ -334,6 +345,36 @@ extension FlowTabTests {
         XCTAssertEqual(panelWindow.deminiaturizeCallCount, 0)
         XCTAssertEqual(panelWindow.makeKeyAndOrderFrontCallCount, 0)
         XCTAssertEqual(panelWindow.orderFrontRegardlessCallCount, 0)
+    }
+
+    @MainActor
+    func testStatusItemOpenActionIgnoresStatusBarAndClosedWindows() {
+        let statusBarWindow = TestAppWindow(
+            isPanelWindow: false,
+            isMiniaturized: false,
+            flowTabWindowLevel: .statusBar
+        )
+        let closedMainWindow = TestAppWindow(
+            isPanelWindow: false,
+            isMiniaturized: false,
+            isVisible: false
+        )
+        let application = TestAppWindowApplication(
+            isHidden: false,
+            appWindows: [statusBarWindow, closedMainWindow]
+        )
+
+        let delegate = AppDelegate()
+        delegate.handleStatusItemOpenAction(application: application)
+
+        XCTAssertEqual(application.activateCallCount, 1)
+        XCTAssertEqual(application.lastActivateIgnoringOtherApps, true)
+        XCTAssertEqual(application.showSettingsWindowActionCount, 1)
+
+        XCTAssertEqual(statusBarWindow.makeKeyAndOrderFrontCallCount, 0)
+        XCTAssertEqual(statusBarWindow.orderFrontRegardlessCallCount, 0)
+        XCTAssertEqual(closedMainWindow.makeKeyAndOrderFrontCallCount, 0)
+        XCTAssertEqual(closedMainWindow.orderFrontRegardlessCallCount, 0)
     }
 
     @MainActor

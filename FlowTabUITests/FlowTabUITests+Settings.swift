@@ -24,6 +24,9 @@ extension FlowTabUITests {
         let showInCommandTabToggle = toggleElement(in: app, identifier: Identifier.settingsAppearanceShowInCommandTab)
         XCTAssertTrue(showShortcutHintToggle.waitForExistence(timeout: 5))
         XCTAssertTrue(showInCommandTabToggle.waitForExistence(timeout: 5))
+        XCTAssertFalse(toggleIsOn(showInCommandTabToggle))
+        XCTAssertTrue(app.staticTexts["像普通应用一样显示"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["关闭后，当前应用将仅作为菜单栏辅助应用运行。"].waitForExistence(timeout: 5))
 
         let targetShortcutHint = !toggleIsOn(showShortcutHintToggle)
         let targetShowInCommandTab = !toggleIsOn(showInCommandTabToggle)

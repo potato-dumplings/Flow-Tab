@@ -6,6 +6,7 @@ protocol AppWindowOpeningWindow: AnyObject {
     var isPanelWindow: Bool { get }
     var isMiniaturized: Bool { get }
     var isVisible: Bool { get }
+    var flowTabWindowLevel: NSWindow.Level { get }
     var flowTabWindowIdentifier: String? { get }
 
     func deminiaturize(_ sender: Any?)
@@ -22,9 +23,23 @@ protocol AppWindowOpeningApplication: AnyObject {
     func sendShowSettingsWindowAction() -> Bool
 }
 
+protocol AppActivationPolicyApplying: AnyObject {
+    var flowTabActivationPolicy: NSApplication.ActivationPolicy { get }
+
+    func setFlowTabActivationPolicy(_ policy: NSApplication.ActivationPolicy)
+}
+
+protocol AppTerminationRequesting: AnyObject {
+    func terminate(_ sender: Any?)
+}
+
 extension NSWindow: AppWindowOpeningWindow {
     var isPanelWindow: Bool {
         self is NSPanel
+    }
+
+    var flowTabWindowLevel: NSWindow.Level {
+        level
     }
 
     var flowTabWindowIdentifier: String? {
@@ -41,6 +56,18 @@ extension NSApplication: AppWindowOpeningApplication {
         sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
     }
 }
+
+extension NSApplication: AppActivationPolicyApplying {
+    var flowTabActivationPolicy: NSApplication.ActivationPolicy {
+        activationPolicy()
+    }
+
+    func setFlowTabActivationPolicy(_ policy: NSApplication.ActivationPolicy) {
+        setActivationPolicy(policy)
+    }
+}
+
+extension NSApplication: AppTerminationRequesting {}
 
 protocol MRUTracking {
     func startIfNeeded()
@@ -62,11 +89,19 @@ final class HomeTabState: ObservableObject {
     private init() {}
 }
 
+enum AppWindowLayout {
+    static let width: CGFloat = 1120
+    static let height: CGFloat = 780
+}
+
 enum AppWindowCoordinator {
     static let switcherPanelWindowIdentifier = "flowtab.window.switcher-panel"
+    static let homeWindowIdentifier = "flowtab.window.home"
 
     @MainActor
     static var activateMainWindowOrOpenHomeSceneOverride: (() -> Void)?
+    @MainActor
+    private static var appKitHomeWindow: NSWindow?
 
     static func openHome() {
         Task { @MainActor in
@@ -122,7 +157,11 @@ enum AppWindowCoordinator {
         if application.isHidden {
             application.unhide(nil)
         }
-        if let window = application.appWindows.first(where: { !$0.isPanelWindow }) {
+        if let window = application.appWindows.first(where: {
+            !$0.isPanelWindow
+                && ($0.isVisible || $0.isMiniaturized)
+                && $0.flowTabWindowLevel == .normal
+        }) {
             if window.isMiniaturized {
                 window.deminiaturize(nil)
             }
@@ -130,6 +169,52 @@ enum AppWindowCoordinator {
             window.orderFrontRegardless()
             return
         }
-        _ = application.sendShowSettingsWindowAction()
+        if let nsApplication = application as? NSApplication {
+            openAppKitHomeWindow(application: nsApplication)
+        } else {
+            _ = application.sendShowSettingsWindowAction()
+        }
+    }
+
+    @MainActor
+    private static func openAppKitHomeWindow(application: NSApplication) {
+        let window = appKitHomeWindow ?? makeAppKitHomeWindow()
+        appKitHomeWindow = window
+
+        application.activate(ignoringOtherApps: true)
+        if application.isHidden {
+            application.unhide(nil)
+        }
+        if window.isMiniaturized {
+            window.deminiaturize(nil)
+        }
+        window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
+    }
+
+    @MainActor
+    private static func makeAppKitHomeWindow() -> NSWindow {
+        let window = NSWindow(
+            contentRect: NSRect(
+                x: 0,
+                y: 0,
+                width: AppWindowLayout.width,
+                height: AppWindowLayout.height
+            ),
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
+            backing: .buffered,
+            defer: false
+        )
+        window.title = "FlowTab"
+        window.titleVisibility = .hidden
+        window.titlebarAppearsTransparent = true
+        window.identifier = NSUserInterfaceItemIdentifier(homeWindowIdentifier)
+        window.isReleasedWhenClosed = false
+        window.contentView = NSHostingView(
+            rootView: HomeRootView()
+                .frame(minWidth: AppWindowLayout.width, minHeight: AppWindowLayout.height)
+        )
+        window.center()
+        return window
     }
 }

@@ -9,6 +9,7 @@ final class TestAppWindow: AppWindowOpeningWindow {
     let isPanelWindow: Bool
     var isMiniaturized: Bool
     var isVisible: Bool
+    let flowTabWindowLevel: NSWindow.Level
     let flowTabWindowIdentifier: String?
 
     private(set) var deminiaturizeCallCount = 0
@@ -19,11 +20,13 @@ final class TestAppWindow: AppWindowOpeningWindow {
         isPanelWindow: Bool,
         isMiniaturized: Bool,
         isVisible: Bool = true,
+        flowTabWindowLevel: NSWindow.Level = .normal,
         flowTabWindowIdentifier: String? = nil
     ) {
         self.isPanelWindow = isPanelWindow
         self.isMiniaturized = isMiniaturized
         self.isVisible = isVisible
+        self.flowTabWindowLevel = flowTabWindowLevel
         self.flowTabWindowIdentifier = flowTabWindowIdentifier
     }
 
@@ -68,5 +71,27 @@ final class TestAppWindowApplication: AppWindowOpeningApplication {
     func sendShowSettingsWindowAction() -> Bool {
         showSettingsWindowActionCount += 1
         return true
+    }
+}
+
+final class TestActivationPolicyApplication: AppActivationPolicyApplying {
+    private(set) var appliedPolicies: [NSApplication.ActivationPolicy] = []
+    var flowTabActivationPolicy: NSApplication.ActivationPolicy
+
+    init(initialPolicy: NSApplication.ActivationPolicy = .regular) {
+        flowTabActivationPolicy = initialPolicy
+    }
+
+    func setFlowTabActivationPolicy(_ policy: NSApplication.ActivationPolicy) {
+        appliedPolicies.append(policy)
+        flowTabActivationPolicy = policy
+    }
+}
+
+final class TestTerminationApplication: AppTerminationRequesting {
+    private(set) var terminateCallCount = 0
+
+    func terminate(_ sender: Any?) {
+        terminateCallCount += 1
     }
 }

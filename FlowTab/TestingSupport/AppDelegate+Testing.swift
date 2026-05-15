@@ -2,17 +2,18 @@ import AppKit
 import Carbon
 
 struct AppDelegateTestHooks {
-    var userDefaults: UserDefaults?
-    var makePanelController: (() -> SwitcherPanelController)?
+    var userDefaults: UserDefaults? = nil
+    var makePanelController: (() -> SwitcherPanelController)? = nil
     var makeHotkeyMonitor: ((
         SwitcherHotkeyConfiguration,
         OSType,
         UInt32,
         UInt32
-    ) -> any HotkeyMonitoring)?
-    var commandTabTakeoverController: (any CommandTabTakeoverControlling)?
-    var stressRunner: (any TabSwitchStressRunning)?
+    ) -> any HotkeyMonitoring)? = nil
+    var commandTabTakeoverController: (any CommandTabTakeoverControlling)? = nil
+    var stressRunner: (any TabSwitchStressRunning)? = nil
     var launchAtLoginManager: (any LaunchAtLoginManaging)? = nil
+    var activationPolicyApplication: (any AppActivationPolicyApplying)? = nil
 }
 
 @MainActor
@@ -37,6 +38,10 @@ extension AppDelegate {
 
     var resolvedLaunchAtLoginManager: any LaunchAtLoginManaging {
         Self.testHooks.launchAtLoginManager ?? LaunchAtLoginController.shared
+    }
+
+    var resolvedActivationPolicyApplication: any AppActivationPolicyApplying {
+        Self.testHooks.activationPolicyApplication ?? NSApp
     }
 
     func makePanelController() -> SwitcherPanelController {

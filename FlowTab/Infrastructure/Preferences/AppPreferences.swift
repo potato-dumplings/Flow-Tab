@@ -172,7 +172,7 @@ enum ThemePreferencesStore {
 }
 
 enum AppVisibilityPreferencesStore {
-    static let defaultShowInCommandTab = true
+    static let defaultShowInCommandTab = false
 
     static func loadShowInCommandTab(userDefaults: UserDefaults = .standard) -> Bool {
         guard userDefaults.object(forKey: AppPreferenceKeys.showInCommandTab) != nil else {

@@ -4,6 +4,8 @@ import FlowTabCore
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     static weak var shared: AppDelegate?
+    static let statusItemIdentifier = "flowtab.status-item"
+    static let statusItemQuitMenuItemIdentifier = "flowtab.status-item.quit"
 
     private(set) var panelController: SwitcherPanelController?
     private(set) var hotkeyMonitor: (any HotkeyMonitoring)?
@@ -22,7 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         Self.shared = self
         FlowTabUITestBootstrapper.prepareIfNeeded(userDefaults: resolvedUserDefaults)
-        applyActivationPolicyFromPreferences()
+        applyActivationPolicyFromPreferences(application: resolvedActivationPolicyApplication)
         syncLaunchAtLoginPreferenceOnLaunch()
 
         let panelController = makePanelController()
@@ -37,7 +39,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         installStatusItem()
         requestAccessibilityPermissionIfNeeded()
         if !FlowTabTestLaunchOptions.suppressesHomeWindowOnLaunch {
-            AppWindowCoordinator.openHome()
+            HomeTabState.shared.selectedTab = .home
+            Task { @MainActor in
+                await Task.yield()
+                AppWindowCoordinator.activateMainWindowOrOpenHomeScene()
+            }
         }
         resolvedStressRunner.startIfNeeded()
         FlowTabUITestBootstrapper.presentInitialUIIfNeeded(panelController: panelController)
@@ -76,6 +82,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotkeyMonitor?.stop()
         inAppWindowHotkeyMonitor?.stop()
         commandTabTakeoverController.restoreSystemShortcutsIfNeeded()
+    }
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        false
     }
 
     @discardableResult
@@ -297,14 +307,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func applyActivationPolicyFromPreferences() {
+    func applyActivationPolicyFromPreferences() {
+        applyActivationPolicyFromPreferences(application: resolvedActivationPolicyApplication)
+    }
+
+    func applyActivationPolicyFromPreferences(application: any AppActivationPolicyApplying) {
         let showInCommandTab = AppVisibilityPreferencesStore.loadShowInCommandTab(
             userDefaults: resolvedUserDefaults
         )
         let targetPolicy: NSApplication.ActivationPolicy = showInCommandTab ? .regular : .accessory
-        guard NSApp.activationPolicy() != targetPolicy else { return }
+        guard application.flowTabActivationPolicy != targetPolicy else { return }
 
-        NSApp.setActivationPolicy(targetPolicy)
+        application.setFlowTabActivationPolicy(targetPolicy)
         RuntimeLog.info(
             "App",
             "activationPolicy=\(showInCommandTab ? "regular" : "accessory")"
@@ -332,20 +346,65 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             button.title = ""
             button.image = icon
             button.imagePosition = .imageOnly
+            button.toolTip = "FlowTab"
             button.setAccessibilityLabel("FlowTab")
+            button.setFlowTabTestingIdentifier(Self.statusItemIdentifier)
             button.target = self
-            button.action = #selector(openAppFromStatusItem)
-            button.sendAction(on: [.leftMouseUp])
+            button.action = #selector(handleStatusItemButtonAction(_:))
+            button.sendAction(on: [.leftMouseDown, .rightMouseDown])
         }
         statusItem = item
     }
 
     @objc
-    private func openAppFromStatusItem() {
-        handleStatusItemOpenAction(application: NSApp)
+    private func handleStatusItemButtonAction(_: NSStatusBarButton) {
+        if isStatusItemMenuEvent(NSApp.currentEvent) {
+            showStatusItemMenu()
+        } else {
+            handleStatusItemOpenAction(application: NSApp)
+        }
     }
 
     func handleStatusItemOpenAction(application: any AppWindowOpeningApplication) {
         AppWindowCoordinator.activateMainWindowOrOpenHomeScene(application: application)
+    }
+
+    func handleStatusItemQuitAction(application: any AppTerminationRequesting) {
+        application.terminate(nil)
+    }
+
+    func makeStatusItemMenu() -> NSMenu {
+        let menu = NSMenu()
+        let quitItem = NSMenuItem(
+            title: AppStrings.text(.menuQuit),
+            action: #selector(quitFromStatusItem),
+            keyEquivalent: ""
+        )
+        quitItem.target = self
+        quitItem.identifier = NSUserInterfaceItemIdentifier(Self.statusItemQuitMenuItemIdentifier)
+        menu.addItem(quitItem)
+        return menu
+    }
+
+    private func showStatusItemMenu() {
+        statusItem?.popUpMenu(makeStatusItemMenu())
+    }
+
+    private func isStatusItemMenuEvent(_ event: NSEvent?) -> Bool {
+        guard let event else { return false }
+
+        switch event.type {
+        case .rightMouseDown, .rightMouseUp:
+            return true
+        case .leftMouseDown, .leftMouseUp:
+            return event.modifierFlags.contains(.control)
+        default:
+            return false
+        }
+    }
+
+    @objc
+    private func quitFromStatusItem() {
+        handleStatusItemQuitAction(application: NSApp)
     }
 }
