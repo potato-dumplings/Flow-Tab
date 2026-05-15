@@ -420,7 +420,7 @@ chmod +x scripts/release/release-install.sh
 - 在受限沙箱环境中执行会因权限不足失败。
 - 可通过 `FLOWTAB_CODE_SIGN_IDENTITY` 指定本地签名身份，默认使用 `Apple Development`。
 
-## 生成 DMG（未签名）
+## 生成 DMG
 
 ```bash
 chmod +x scripts/release/release-dmg.sh
@@ -438,7 +438,9 @@ chmod +x scripts/release/release-dmg.sh
 - `--skip-build`：跳过构建，直接使用现有 `Release` 产物
 
 说明：
-- 这是未签名、未公证的 DMG，首次打开可能触发 Gatekeeper 提示。
+- DMG 内的 `Flow Tab.app` 会使用本机 `Apple Development` identity 手动签名并校验，签名来源同 `release-install.sh`：优先读取 `FLOWTAB_DEVELOPMENT_TEAM`，否则读取 `xcconfigs/LocalSigning.xcconfig`。
+- DMG 文件本身仍未签名、未公证，首次打开可能触发 Gatekeeper 提示。
+- 可通过 `FLOWTAB_CODE_SIGN_IDENTITY` 指定本地签名身份，默认使用 `Apple Development`。
 - 适合开源阶段给开发者测试使用，不等同于正式分发安装包。
 - 推荐 Release tag 命名：`flowtab-v<version>`（例如 `flowtab-v1.0.0`，兼容 `v1.0.0`）。
 - 推荐发布方式与 `openai/codex` 风格一致：tag 承载版本，下载资产名保持稳定平台后缀（不带版本号）。
