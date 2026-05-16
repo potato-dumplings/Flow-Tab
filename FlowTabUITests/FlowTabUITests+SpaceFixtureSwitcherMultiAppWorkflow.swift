@@ -104,7 +104,11 @@ extension FlowTabUITests {
 
         try runRealSpaceFixtureWorkflow(
             workflow,
-            flowTabAdditionalArguments: ["--flowtab-ui-open-switcher"]
+            flowTabAdditionalArguments: [
+                "--flowtab-ui-open-switcher",
+                "--flowtab-ui-listen-switcher-trigger",
+                "-windowLayerAutoEnterDelay", "30.0"
+            ] + FlowTabUITestSwitcherCommandPayload.launchArguments
         ) { workflow, app in
             let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
             XCTAssertTrue(
@@ -226,14 +230,24 @@ extension FlowTabUITests {
         diagnosticsSummary: XCUIElement,
         maxMoves: Int = 40
     ) {
+        if selectSwitcherWorkflowAppDirectly(workflowApp, diagnosticsSummary: diagnosticsSummary) {
+            return
+        }
+
         for attempt in 0..<maxMoves {
             let selectedAppID = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selected")
+            let selectedMode = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "mode")
             logFlowTabUITestTrace(
-                "[selectWorkflowApp.\(attempt + 1)] target=\(workflowApp.identity.bundleIdentifier) selected=\(selectedAppID)"
+                "[selectWorkflowApp.\(attempt + 1)] target=\(workflowApp.identity.bundleIdentifier) selected=\(selectedAppID) mode=\(selectedMode)"
             )
             if selectedAppID
                 == workflowApp.identity.bundleIdentifier {
                 return
+            }
+            if selectedMode.hasPrefix("windowCycle(") {
+                app.typeKey(.upArrow, modifierFlags: [])
+                RunLoop.current.run(until: Date().addingTimeInterval(0.12))
+                continue
             }
             app.typeKey(.rightArrow, modifierFlags: [])
             RunLoop.current.run(until: Date().addingTimeInterval(0.08))
@@ -246,6 +260,34 @@ extension FlowTabUITests {
             \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
             """
         )
+    }
+
+    private func selectSwitcherWorkflowAppDirectly(
+        _ workflowApp: SpaceFixtureResolvedWorkflow.App,
+        diagnosticsSummary: XCUIElement,
+        timeout: TimeInterval = 1.5
+    ) -> Bool {
+        do {
+            try FlowTabUITestSwitcherCommandPayload.write(workflowApp.identity.bundleIdentifier)
+        } catch {
+            return false
+        }
+
+        postFlowTabUITestSwitcherCommand(
+            .selectApp,
+            traceLabel: "selectWorkflowApp.direct.\(workflowApp.appID)"
+        )
+
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selected")
+                == workflowApp.identity.bundleIdentifier {
+                return true
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.08))
+        } while Date() < deadline
+
+        return false
     }
 
     func testSwitcherPanelWindowSearchFindsAndActivatesRealWorkflowWindow() throws {
