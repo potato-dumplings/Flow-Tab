@@ -39,11 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         installStatusItem()
         requestAccessibilityPermissionIfNeeded()
         if !FlowTabTestLaunchOptions.suppressesHomeWindowOnLaunch {
-            HomeTabState.shared.selectedTab = .home
-            Task { @MainActor in
-                await Task.yield()
-                AppWindowCoordinator.activateMainWindowOrOpenHomeScene()
-            }
+            AppWindowCoordinator.openHomeInCurrentProcess()
         }
         resolvedStressRunner.startIfNeeded()
         FlowTabUITestBootstrapper.presentInitialUIIfNeeded(panelController: panelController)

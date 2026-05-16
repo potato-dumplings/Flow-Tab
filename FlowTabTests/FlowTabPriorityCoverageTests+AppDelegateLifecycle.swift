@@ -22,7 +22,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testAppDelegateLaunchInstallsObserversPromptsAccessibilityAndStartsStressRunner() async {
+    func testAppDelegateLaunchInstallsObserversPromptsAccessibilityAndStartsStressRunner() {
         guard let userDefaults = makeIsolatedUserDefaults() else { return }
 
         let previousHooks = AppDelegate.testHooks
@@ -47,10 +47,10 @@ extension FlowTabPriorityCoverageTests {
             return false
         }
 
-        let openHome = expectation(description: "open home after launch")
+        var openHomeCallCount = 0
         HomeTabState.shared.selectedTab = .settings
         AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride = {
-            openHome.fulfill()
+            openHomeCallCount += 1
         }
         AppDelegate.testHooks = AppDelegate.TestHooks(
             userDefaults: userDefaults,
@@ -72,7 +72,7 @@ extension FlowTabPriorityCoverageTests {
             Notification(name: NSApplication.didFinishLaunchingNotification)
         )
 
-        await fulfillment(of: [openHome], timeout: 1.0)
+        XCTAssertEqual(openHomeCallCount, 1)
         XCTAssertEqual(HomeTabState.shared.selectedTab, .home)
         XCTAssertTrue(delegate.hasPanelControllerForTesting)
         XCTAssertTrue(delegate.hasMainHotkeyMonitorForTesting)
@@ -91,7 +91,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testAppDelegateLaunchCanSuppressHomeWindowForUITestTriggerListener() async {
+    func testAppDelegateLaunchCanSuppressHomeWindowForUITestTriggerListener() {
         guard let userDefaults = makeIsolatedUserDefaults() else { return }
 
         let previousHooks = AppDelegate.testHooks
@@ -113,8 +113,7 @@ extension FlowTabPriorityCoverageTests {
             clearIsolatedUserDefaults(userDefaults)
         }
 
-        let openHome = expectation(description: "home stays closed")
-        openHome.isInverted = true
+        var openHomeCallCount = 0
         HomeTabState.shared.selectedTab = .settings
         FlowTabTestLaunchOptions.argumentsOverrideForTesting = [
             "FlowTab",
@@ -127,7 +126,7 @@ extension FlowTabPriorityCoverageTests {
             return true
         }
         AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride = {
-            openHome.fulfill()
+            openHomeCallCount += 1
         }
         AppDelegate.testHooks = AppDelegate.TestHooks(
             userDefaults: userDefaults,
@@ -149,7 +148,7 @@ extension FlowTabPriorityCoverageTests {
             Notification(name: NSApplication.didFinishLaunchingNotification)
         )
 
-        await fulfillment(of: [openHome], timeout: 0.25)
+        XCTAssertEqual(openHomeCallCount, 0)
         XCTAssertEqual(HomeTabState.shared.selectedTab, .settings)
         XCTAssertTrue(delegate.hasPanelControllerForTesting)
         XCTAssertTrue(delegate.hasMainHotkeyMonitorForTesting)

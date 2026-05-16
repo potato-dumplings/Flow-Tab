@@ -104,30 +104,34 @@ enum AppWindowCoordinator {
     private static var appKitHomeWindow: NSWindow?
 
     static func openHome() {
-        Task { @MainActor in
-            if HomeTabState.shared.selectedTab != .home {
-                HomeTabState.shared.selectedTab = .home
-            }
-            activateMainWindowOrOpenHomeSceneForCurrentProcess()
-        }
+        open(.home)
     }
 
     static func openLogs() {
-        Task { @MainActor in
-            if HomeTabState.shared.selectedTab != .logs {
-                HomeTabState.shared.selectedTab = .logs
-            }
-            activateMainWindowOrOpenHomeSceneForCurrentProcess()
-        }
+        open(.logs)
     }
 
     static func openSettings() {
+        open(.settings)
+    }
+
+    private static func open(_ tab: HomeTab) {
         Task { @MainActor in
-            if HomeTabState.shared.selectedTab != .settings {
-                HomeTabState.shared.selectedTab = .settings
-            }
-            activateMainWindowOrOpenHomeSceneForCurrentProcess()
+            openInCurrentProcess(tab)
         }
+    }
+
+    @MainActor
+    static func openHomeInCurrentProcess() {
+        openInCurrentProcess(.home)
+    }
+
+    @MainActor
+    private static func openInCurrentProcess(_ tab: HomeTab) {
+        if HomeTabState.shared.selectedTab != tab {
+            HomeTabState.shared.selectedTab = tab
+        }
+        activateMainWindowOrOpenHomeSceneForCurrentProcess()
     }
 
     @MainActor
