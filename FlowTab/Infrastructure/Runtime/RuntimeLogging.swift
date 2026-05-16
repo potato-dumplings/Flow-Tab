@@ -48,6 +48,60 @@ enum RuntimeLogPreferencesStore {
     }
 }
 
+enum RuntimeLogCategory: String, CaseIterable, Identifiable {
+    case activation = "Activation"
+    case app = "App"
+    case autoEnter = "AutoEnter"
+    case ax = "AX"
+    case axMatch = "AXMatch"
+    case axObserver = "AXObserver"
+    case hotKey = "HotKey"
+    case inputTrace = "InputTrace"
+    case manual = "Manual"
+    case permission = "Permission"
+    case preview = "Preview"
+    case search = "Search"
+    case searchInput = "SearchInput"
+    case searchModel = "SearchModel"
+    case searchTrace = "SearchTrace"
+    case session = "Session"
+    case snapshot = "Snapshot"
+    case switcherLayout = "SwitcherLayout"
+    case uiTest = "UITest"
+
+    var id: String { rawValue }
+
+    var isVerboseOnlyBelowWarning: Bool {
+        switch self {
+        case .activation,
+             .autoEnter,
+             .ax,
+             .axMatch,
+             .axObserver,
+             .hotKey,
+             .inputTrace,
+             .manual,
+             .preview,
+             .search,
+             .searchInput,
+             .searchModel,
+             .searchTrace,
+             .session,
+             .snapshot,
+             .switcherLayout:
+            return true
+        case .app,
+             .permission,
+             .uiTest:
+            return false
+        }
+    }
+
+    static func resolve(_ category: String) -> RuntimeLogCategory? {
+        allCases.first { $0.rawValue == category }
+    }
+}
+
 final class RuntimeDiagnostics {
     static let shared = RuntimeDiagnostics()
     private static let timestampFormatter: DateFormatter = {
@@ -512,17 +566,6 @@ final class RuntimeLogFileStore {
 }
 
 enum RuntimeLog {
-    private static let noisyCategories: Set<String> = [
-        "InputTrace",
-        "AX",
-        "AXObserver",
-        "Snapshot",
-        "HotKey",
-        "Session",
-        "AutoEnter",
-        "Manual"
-    ]
-
     private static var isVerboseEnabled: Bool {
         UserDefaults.standard.bool(forKey: AppPreferenceKeys.enableVerboseDiagnostics)
     }
@@ -533,7 +576,7 @@ enum RuntimeLog {
 
     private static func shouldRecord(level: RuntimeLogLevel, category: String) -> Bool {
         guard level >= minimumLevel else { return false }
-        if noisyCategories.contains(category), !isVerboseEnabled {
+        if RuntimeLogCategory.resolve(category)?.isVerboseOnlyBelowWarning == true, !isVerboseEnabled {
             return level >= .warning
         }
         return true
@@ -548,7 +591,19 @@ enum RuntimeLog {
         RuntimeDiagnostics.shared.log(level: level, category: category, message: message())
     }
 
+    private static func emit(
+        level: RuntimeLogLevel,
+        category: RuntimeLogCategory,
+        message: @autoclosure () -> String
+    ) {
+        emit(level: level, category: category.rawValue, message: message())
+    }
+
     static func debug(_ category: String, _ message: @autoclosure () -> String) {
+        emit(level: .debug, category: category, message: message())
+    }
+
+    static func debug(_ category: RuntimeLogCategory, _ message: @autoclosure () -> String) {
         emit(level: .debug, category: category, message: message())
     }
 
@@ -556,7 +611,15 @@ enum RuntimeLog {
         shouldRecord(level: .debug, category: category)
     }
 
+    static func isDebugEnabled(for category: RuntimeLogCategory) -> Bool {
+        shouldRecord(level: .debug, category: category.rawValue)
+    }
+
     static func info(_ category: String, _ message: @autoclosure () -> String) {
+        emit(level: .info, category: category, message: message())
+    }
+
+    static func info(_ category: RuntimeLogCategory, _ message: @autoclosure () -> String) {
         emit(level: .info, category: category, message: message())
     }
 
@@ -564,7 +627,15 @@ enum RuntimeLog {
         emit(level: .warning, category: category, message: message())
     }
 
+    static func warning(_ category: RuntimeLogCategory, _ message: @autoclosure () -> String) {
+        emit(level: .warning, category: category, message: message())
+    }
+
     static func error(_ category: String, _ message: @autoclosure () -> String) {
+        emit(level: .error, category: category, message: message())
+    }
+
+    static func error(_ category: RuntimeLogCategory, _ message: @autoclosure () -> String) {
         emit(level: .error, category: category, message: message())
     }
 }

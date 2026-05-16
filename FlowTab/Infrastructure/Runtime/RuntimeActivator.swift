@@ -103,7 +103,7 @@ final class RuntimeActivator {
             hasStickyBinding: windowContext.hasStickyBinding
         )
         RuntimeLog.info(
-            "Activation",
+            .activation,
             "window-request appID=\(appID) pid=\(targetApp.processIdentifier) windowID=\(windowID) title=\(runtimeActivationLogValue(windowContext.title)) mode=\(mode) identity=\(identity) cg=\(windowContext.cgWindowID.map(String.init) ?? "nil") handle=\(windowContext.activationHandleID ?? "nil") ax=\(windowContext.axWindow == nil ? 0 : 1) fallbackAX=0 spaces=\(windowContext.spaceIDs) frame=\(runtimeActivationFrameDescription(windowContext.frame)) restore=\(request.restoreIfMinimized) sticky=\(windowContext.hasStickyBinding) source=\(windowContext.lastConfirmationSource?.rawValue ?? "nil") publicAXRecovery=\(windowContext.allowsPublicAXRecovery ? 1 : 0)"
         )
         if request.targetCGWindowID(expectedPID: targetApp.processIdentifier) != nil {
@@ -134,8 +134,8 @@ final class RuntimeActivator {
         }
 
         let cgFocusResult = attemptCGWindowFocus(request, in: app)
-        RuntimeLog.info(
-            "Activation",
+        RuntimeLog.debug(
+            .activation,
             "focus-attempt route=cg result=\(cgFocusResult.debugName) pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(request.targetCGWindowID(expectedPID: app.processIdentifier).map(String.init) ?? "nil") frontmost=\(runtimeActivationFrontmostDescription())"
         )
         let cgFocusVerified: Bool
@@ -163,8 +163,8 @@ final class RuntimeActivator {
                 request: request,
                 in: app
             )
-            RuntimeLog.info(
-                "Activation",
+            RuntimeLog.debug(
+                .activation,
                 "focus-attempt route=ax-direct result=\(axFocusResult.debugName) pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(request.targetCGWindowID(expectedPID: app.processIdentifier).map(String.init) ?? "nil")"
             )
             switch axFocusResult {
@@ -181,8 +181,8 @@ final class RuntimeActivator {
                 }
             }
         } else {
-            RuntimeLog.info(
-                "Activation",
+            RuntimeLog.debug(
+                .activation,
                 "ax-direct unavailable pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(request.targetCGWindowID(expectedPID: app.processIdentifier).map(String.init) ?? "nil") handle=\(request.preferredActivationHandleID ?? "nil") preferredAX=0 registryAX=0"
             )
         }
@@ -192,8 +192,8 @@ final class RuntimeActivator {
         }
 
         guard request.allowsPublicAXRecovery else {
-            RuntimeLog.info(
-                "Activation",
+            RuntimeLog.debug(
+                .activation,
                 "ax-recovery skipped pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(request.targetCGWindowID(expectedPID: app.processIdentifier).map(String.init) ?? "nil") reason=disabled"
             )
             return false
@@ -203,16 +203,16 @@ final class RuntimeActivator {
         let includeRemoteWindows = RuntimeWindowTopologyClassifier.hasOffDesktopSpace(
             spaceIDs: request.spaceIDs
         )
-        RuntimeLog.info(
-            "Activation",
+        RuntimeLog.debug(
+            .activation,
             "ax-recovery scan pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID.map(String.init) ?? "nil") includeRemote=\(includeRemoteWindows ? 1 : 0) spaces=\(request.spaceIDs) expectedTitle=\(runtimeActivationLogValue(request.title)) expectedFrame=\(runtimeActivationFrameDescription(request.frame))"
         )
         let windows = currentAXWindows(
             for: app,
             includeRemoteWindows: includeRemoteWindows
         )
-        RuntimeLog.info(
-            "Activation",
+        RuntimeLog.debug(
+            .activation,
             "ax-recovery fetched pid=\(app.processIdentifier) windowID=\(request.windowID) count=\(windows.count)"
         )
         if cgFocusWasAccepted, targetCGWindowIsVisible(
@@ -220,15 +220,15 @@ final class RuntimeActivator {
             in: app,
             currentWindows: currentCGWindows(forPID: app.processIdentifier)
         ) {
-            RuntimeLog.info(
-                "Activation",
+            RuntimeLog.debug(
+                .activation,
                 "focus-attempt route=ax-recovery-visible result=verified pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID.map(String.init) ?? "nil")"
             )
             return reportWindowFocusVerified(request, in: app)
         }
         if windows.isEmpty {
-            RuntimeLog.info(
-                "Activation",
+            RuntimeLog.debug(
+                .activation,
                 "ax-recovery no-candidates pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID.map(String.init) ?? "nil")"
             )
         } else {
@@ -245,8 +245,8 @@ final class RuntimeActivator {
                     request: request,
                     in: app
                 )
-                RuntimeLog.info(
-                    "Activation",
+                RuntimeLog.debug(
+                    .activation,
                     "focus-attempt route=ax-public-recovery result=\(axFocusResult.debugName) pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID.map(String.init) ?? "nil")"
                 )
                 switch axFocusResult {
@@ -265,8 +265,8 @@ final class RuntimeActivator {
                 publicWindows: windows,
                 in: app
             ) {
-                RuntimeLog.info(
-                    "Activation",
+                RuntimeLog.debug(
+                    .activation,
                     "focus-attempt route=ax-related result=\(relatedAXFocusResult.debugName) pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID.map(String.init) ?? "nil")"
                 )
                 if relatedAXFocusResult == .verified {
@@ -276,8 +276,8 @@ final class RuntimeActivator {
         }
 
         if let sameSpaceCGFocusResult = attemptSameSpaceCGWindowFocus(request, in: app) {
-            RuntimeLog.info(
-                "Activation",
+            RuntimeLog.debug(
+                .activation,
                 "focus-attempt route=cg-same-space result=\(sameSpaceCGFocusResult.debugName) pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID.map(String.init) ?? "nil")"
             )
             if sameSpaceCGFocusResult == .verified {
@@ -289,8 +289,8 @@ final class RuntimeActivator {
             return true
         }
 
-        RuntimeLog.info(
-            "Activation",
+        RuntimeLog.debug(
+            .activation,
             "ax-recovery no-match pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID.map(String.init) ?? "nil")"
         )
         return false
@@ -303,8 +303,8 @@ final class RuntimeActivator {
         in app: NSRunningApplication
     ) -> WindowFocusAttemptResult {
         guard focusAXWindow(window, restoreIfMinimized: request.restoreIfMinimized, in: app) else {
-            RuntimeLog.info(
-                "Activation",
+            RuntimeLog.debug(
+                .activation,
                 "ax-focus \(route) action-unavailable pid=\(app.processIdentifier) windowID=\(request.windowID)"
             )
             return .noFocusRoute
@@ -321,16 +321,16 @@ final class RuntimeActivator {
         in app: NSRunningApplication
     ) -> Bool {
         guard !request.spaceIDs.isEmpty else {
-            RuntimeLog.info(
-                "Activation",
+            RuntimeLog.debug(
+                .activation,
                 "focus-verify route=\(route) skipped=empty-spaces pid=\(app.processIdentifier) windowID=\(request.windowID)"
             )
             return true
         }
 
         guard let targetCGWindowID = request.targetCGWindowID(expectedPID: app.processIdentifier) else {
-            RuntimeLog.info(
-                "Activation",
+            RuntimeLog.debug(
+                .activation,
                 "focus-verify route=\(route) skipped=no-target-cg pid=\(app.processIdentifier) windowID=\(request.windowID)"
             )
             return true
@@ -342,8 +342,8 @@ final class RuntimeActivator {
             in: app,
             currentWindows: currentWindows
         )
-        RuntimeLog.info(
-            "Activation",
+        RuntimeLog.debug(
+            .activation,
             "focus-verify route=\(route) pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID) visible=\(isVisible ? 1 : 0) windows=\(runtimeActivationCGWindowSummary(currentWindows, targetCGWindowID: targetCGWindowID))"
         )
         return isVisible
@@ -365,8 +365,8 @@ final class RuntimeActivator {
             in: app,
             currentWindows: currentWindows
         )
-        RuntimeLog.info(
-            "Activation",
+        RuntimeLog.debug(
+            .activation,
             "cg-window-focus verify pid=\(app.processIdentifier) targetCG=\(targetCGWindowID) visible=\(isVisible ? 1 : 0) windows=\(runtimeActivationCGWindowSummary(currentWindows, targetCGWindowID: targetCGWindowID))"
         )
         return isVisible ? .verified : .focusedButUnverified
@@ -412,8 +412,8 @@ final class RuntimeActivator {
             return window
         }
         let candidateIDs = candidates.compactMap { AXWindowInspector.cgWindowID(for: $0) }
-        RuntimeLog.info(
-            "Activation",
+        RuntimeLog.debug(
+            .activation,
             "ax-related candidates pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID) count=\(candidates.count) ids=\(candidateIDs.map(String.init).joined(separator: ","))"
         )
         guard candidates.count == 1, let candidate = candidates.first else {
@@ -425,8 +425,8 @@ final class RuntimeActivator {
             request: request,
             in: app
         )
-        RuntimeLog.info(
-            "Activation",
+        RuntimeLog.debug(
+            .activation,
             "ax-related verify pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID) candidateCG=\(AXWindowInspector.cgWindowID(for: candidate).map(String.init) ?? "nil") result=\(result.debugName)"
         )
         return result
@@ -461,8 +461,8 @@ final class RuntimeActivator {
                 targetFrame: targetWindow.bounds ?? request.frame
             )
         }
-        RuntimeLog.info(
-            "Activation",
+        RuntimeLog.debug(
+            .activation,
             "cg-same-space candidates pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID) count=\(candidates.count) ids=\(candidates.map { String($0.id) }.joined(separator: ","))"
         )
         guard !candidates.isEmpty else { return nil }
@@ -475,8 +475,8 @@ final class RuntimeActivator {
                 in: app,
                 currentWindows: windowsAfterFocus
             )
-            RuntimeLog.info(
-                "Activation",
+            RuntimeLog.debug(
+                .activation,
                 "cg-same-space verify pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID) candidateCG=\(candidate.id) visible=\(isVisible ? 1 : 0) windows=\(runtimeActivationCGWindowSummary(windowsAfterFocus, targetCGWindowID: targetCGWindowID))"
             )
             if isVisible {
@@ -493,8 +493,8 @@ final class RuntimeActivator {
         guard let result = attemptChromeInternalWindowFocus(request, in: app) else {
             return false
         }
-        RuntimeLog.info(
-            "Activation",
+        RuntimeLog.debug(
+            .activation,
             "focus-attempt route=chrome-internal result=\(result.debugName) pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(request.targetCGWindowID(expectedPID: app.processIdentifier).map(String.init) ?? "nil")"
         )
         guard result == .verified else {
@@ -527,8 +527,8 @@ final class RuntimeActivator {
             expectedFrame: request.frame
         )
         let candidates = query.candidates
-        RuntimeLog.info(
-            "Activation",
+        RuntimeLog.debug(
+            .activation,
             "chrome-internal candidates pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID) chromeWindows=\(query.chromeWindowCount) count=\(candidates.count) error=\(runtimeActivationLogValue(query.error ?? "nil")) items=\(candidates.prefix(5).map(\.logDescription).joined(separator: ","))"
         )
         guard !candidates.isEmpty else {
@@ -545,8 +545,8 @@ final class RuntimeActivator {
             return .noFocusRoute
         }
         let focusResult = RuntimeChromeWindowFocusBridge.focusWindow(windowID: candidate.windowID)
-        RuntimeLog.info(
-            "Activation",
+        RuntimeLog.debug(
+            .activation,
             "chrome-internal focus pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID) candidate=\(candidate.windowID) accepted=\(focusResult.accepted ? 1 : 0) front=\(focusResult.frontWindowID.map(String.init) ?? "nil") error=\(runtimeActivationLogValue(focusResult.error ?? "nil"))"
         )
         guard focusResult.accepted else {
@@ -587,7 +587,7 @@ final class RuntimeActivator {
         focusRecoveryTask?.cancel()
         let retryDelays = focusRecoveryRetryDelaysNanoseconds
         RuntimeLog.info(
-            "Activation",
+            .activation,
             "focus-recovery scheduled pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(request.targetCGWindowID(expectedPID: app.processIdentifier).map(String.init) ?? "nil") delaysNs=\(retryDelays)"
         )
         focusRecoveryTask = Task { @MainActor [weak self] in
@@ -599,20 +599,20 @@ final class RuntimeActivator {
                     try? await Task.sleep(nanoseconds: delay)
                 }
                 guard !Task.isCancelled else { return }
-                RuntimeLog.info(
-                    "Activation",
+                RuntimeLog.debug(
+                    .activation,
                     "focus-recovery attempt=\(attemptIndex + 1) pid=\(app.processIdentifier) windowID=\(request.windowID)"
                 )
                 if self.attemptWindowFocus(request, in: app, allowChromeInternalFocus: false) {
                     RuntimeLog.info(
-                        "Activation",
+                        .activation,
                         "focus-recovery verified attempt=\(attemptIndex + 1) pid=\(app.processIdentifier) windowID=\(request.windowID)"
                     )
                     return
                 }
             }
-            RuntimeLog.info(
-                "Activation",
+            RuntimeLog.error(
+                .activation,
                 "focus-recovery exhausted pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(request.targetCGWindowID(expectedPID: app.processIdentifier).map(String.init) ?? "nil")"
             )
         }
@@ -640,7 +640,7 @@ final class RuntimeActivator {
         ) { openedApp, error in
             if let error {
                 RuntimeLog.info(
-                    "Activation",
+                    .activation,
                     "openApplication failed pid=\(app.processIdentifier) bundle=\(app.bundleIdentifier ?? "nil") error=\(error.localizedDescription)"
                 )
                 _ = app.activate()
@@ -752,8 +752,8 @@ final class RuntimeActivator {
             ownerPID: app.processIdentifier,
             cgWindowID: cgWindowID
         )
-        RuntimeLog.info(
-            "Activation",
+        RuntimeLog.debug(
+            .activation,
             "cg-window-focus \(didFocus ? "accepted" : "unavailable") pid=\(app.processIdentifier) windowID=\(cgWindowID)"
         )
         return didFocus
@@ -858,8 +858,8 @@ final class RuntimeActivator {
         ) else {
             return nil
         }
-        RuntimeLog.info(
-            "Activation",
+        RuntimeLog.debug(
+            .activation,
             "ax-recovery selected pid=\(app.processIdentifier) reason=\(recovery.reason) axID=\(recovery.window.id) title=\(runtimeActivationLogValue(recovery.window.sourceTitle ?? recovery.window.title)) bridgedCG=\(AXWindowInspector.cgWindowID(for: recovery.window.window).map(String.init) ?? "nil") frame=\(runtimeActivationFrameDescription(recovery.window.frame)) role=\(AXWindowInspector.role(for: recovery.window.window) ?? "nil") subrole=\(AXWindowInspector.subrole(for: recovery.window.window) ?? "nil")"
         )
         return recovery.window.window

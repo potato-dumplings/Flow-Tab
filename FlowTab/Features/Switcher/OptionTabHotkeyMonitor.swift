@@ -306,11 +306,11 @@ final class CommandTabTakeoverController {
         guard isTakeoverActive || userDefaults.bool(forKey: Self.takeoverMarkerKey) else { return }
         let success = setSystemCommandTabEnabled(true)
         if success {
-            RuntimeLog.info("HotKey", "system Command+Tab shortcuts restored")
+            RuntimeLog.info(.hotKey, "system Command+Tab shortcuts restored")
             isTakeoverActive = false
             userDefaults.set(false, forKey: Self.takeoverMarkerKey)
         } else {
-            RuntimeLog.info("HotKey", "failed to restore system Command+Tab shortcuts")
+            RuntimeLog.error(.hotKey, "failed to restore system Command+Tab shortcuts")
         }
     }
 
@@ -321,10 +321,10 @@ final class CommandTabTakeoverController {
 
         let success = setSystemCommandTabEnabled(true)
         if success {
-            RuntimeLog.info("HotKey", "recovered system Command+Tab shortcuts from previous abnormal exit")
+            RuntimeLog.info(.hotKey, "recovered system Command+Tab shortcuts from previous abnormal exit")
             userDefaults.set(false, forKey: Self.takeoverMarkerKey)
         } else {
-            RuntimeLog.info("HotKey", "failed to recover system Command+Tab shortcuts after abnormal exit")
+            RuntimeLog.error(.hotKey, "failed to recover system Command+Tab shortcuts after abnormal exit")
         }
     }
 
@@ -333,7 +333,7 @@ final class CommandTabTakeoverController {
 
         let success = setSystemCommandTabEnabled(false)
         if success {
-            RuntimeLog.info("HotKey", "system Command+Tab shortcuts disabled for FlowTab takeover")
+            RuntimeLog.info(.hotKey, "system Command+Tab shortcuts disabled for FlowTab takeover")
             isTakeoverActive = true
             userDefaults.set(true, forKey: Self.takeoverMarkerKey)
             return true
@@ -342,7 +342,7 @@ final class CommandTabTakeoverController {
         // Partial failures can leave system hotkeys in an unknown state.
         // Try to roll back immediately before falling back to non-takeover mode.
         _ = setSystemCommandTabEnabled(true)
-        RuntimeLog.info("HotKey", "failed to disable system Command+Tab shortcuts; takeover unavailable")
+        RuntimeLog.error(.hotKey, "failed to disable system Command+Tab shortcuts; takeover unavailable")
         isTakeoverActive = false
         userDefaults.set(false, forKey: Self.takeoverMarkerKey)
         return false
@@ -363,8 +363,8 @@ final class CommandTabTakeoverController {
             let status = setSymbolicHotKeyEnabled(hotKey.rawValue, isEnabled)
             if status != noErr {
                 hasFailure = true
-                RuntimeLog.info(
-                    "HotKey",
+                RuntimeLog.error(
+                    .hotKey,
                     "set symbolic hotkey failed id=\(hotKey.rawValue) enabled=\(isEnabled) status=\(status)"
                 )
             }
@@ -395,7 +395,7 @@ final class CommandTabTakeoverController {
             dlclose(handle)
         }
 
-        RuntimeLog.info("HotKey", "CGSSetSymbolicHotKeyEnabled symbol not found")
+        RuntimeLog.error(.hotKey, "CGSSetSymbolicHotKeyEnabled symbol not found")
         return nil
     }
 
@@ -546,12 +546,12 @@ final class OptionTabHotkeyMonitor {
             if hotkeyRegistrarOverride(id, keyCode, modifiers) {
                 registeredHotkeyIDs.insert(id)
                 RuntimeLog.info(
-                    "HotKey",
+                    .hotKey,
                     "register ok signature=\(self.signature) id=\(id) keyCode=\(keyCode) modifiers=\(modifiers)"
                 )
             } else {
-                RuntimeLog.info(
-                    "HotKey",
+                RuntimeLog.error(
+                    .hotKey,
                     "register failed signature=\(self.signature) id=\(id) keyCode=\(keyCode) modifiers=\(modifiers) status=test_override"
                 )
             }
@@ -574,12 +574,12 @@ final class OptionTabHotkeyMonitor {
             hotkeyRefs[id] = hotkeyRef
             registeredHotkeyIDs.insert(id)
             RuntimeLog.info(
-                "HotKey",
+                .hotKey,
                 "register ok signature=\(self.signature) id=\(id) keyCode=\(keyCode) modifiers=\(modifiers)"
             )
         } else {
-            RuntimeLog.info(
-                "HotKey",
+            RuntimeLog.error(
+                .hotKey,
                 "register failed signature=\(self.signature) id=\(id) keyCode=\(keyCode) modifiers=\(modifiers) status=\(status)"
             )
         }
@@ -684,15 +684,15 @@ final class OptionTabHotkeyMonitor {
         default:
             return passThroughStatus
         }
-        RuntimeLog.info(
-            "HotKey",
+        RuntimeLog.debug(
+            .hotKey,
             "dispatch phase=\(phase) dir=\(direction) id=\(id) nowMs=\(RuntimePerformanceClock.formatMilliseconds(eventReceivedMs))"
         )
         let callbackStartMs = RuntimePerformanceClock.monotonicMilliseconds()
         callback?(isBackward)
         let callbackEndMs = RuntimePerformanceClock.monotonicMilliseconds()
-        RuntimeLog.info(
-            "HotKey",
+        RuntimeLog.debug(
+            .hotKey,
             "dispatched phase=\(phase) dir=\(direction) id=\(id) callbackMs=\(RuntimePerformanceClock.formatMilliseconds(callbackEndMs - callbackStartMs)) totalMs=\(RuntimePerformanceClock.formatMilliseconds(callbackEndMs - eventReceivedMs))"
         )
         return noErr

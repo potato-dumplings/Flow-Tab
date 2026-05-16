@@ -149,7 +149,7 @@ extension SwitcherPanelController {
 
         cancelPendingModifierReleaseConfirmation()
         model.handle(keyInput)
-        RuntimeLog.info("Session", "advance key=\(keyInput.debugName) \(self.model.debugSelectionSummary())")
+        RuntimeLog.debug(.session, "advance key=\(keyInput.debugName) \(self.model.debugSelectionSummary())")
         updatePanelSize()
         scheduleDelayedWindowLayerEntryIfNeeded()
     }
@@ -165,13 +165,13 @@ extension SwitcherPanelController {
         }
         guard !model.isSearchActive else {
             clearDelayedWindowLayerEntryState()
-            RuntimeLog.debug("AutoEnter", "skip searchActive")
+            RuntimeLog.debug(.autoEnter, "skip searchActive")
             return
         }
 
         guard isPanelPresented else {
             clearDelayedWindowLayerEntryState()
-            RuntimeLog.debug("AutoEnter", "skip panelHidden")
+            RuntimeLog.debug(.autoEnter, "skip panelHidden")
             return
         }
         guard let session = model.session, case .appCycle = session.mode else {
@@ -194,14 +194,14 @@ extension SwitcherPanelController {
         let requestedSnapshot = model.scheduleSelectedAppWindowSnapshotIfNeeded(for: selectedAppID)
         guard model.canAutoEnterWindowLayer else {
             RuntimeLog.debug(
-                "AutoEnter",
+                .autoEnter,
                 "pending appID=\(selectedAppID) requestedSnapshot=\(requestedSnapshot) deadlineMs=\(formatMilliseconds(deadlineMs)) \(self.model.debugSelectionSummary())"
             )
             return
         }
         let remainingDelay = max(0, (deadlineMs - nowMs) / 1_000)
         RuntimeLog.debug(
-            "AutoEnter",
+            .autoEnter,
             "schedule delay=\(remainingDelay)s deadlineMs=\(formatMilliseconds(deadlineMs)) \(self.model.debugSelectionSummary())"
         )
 
@@ -230,12 +230,12 @@ extension SwitcherPanelController {
         let overshootMs = max(0, nowMs - deadlineMs)
         if model.autoEnterWindowLayerIfPossible() {
             RuntimeLog.debug(
-                "AutoEnter",
+                .autoEnter,
                 "entered reason=\(reason) overshootMs=\(formatMilliseconds(overshootMs)) \(self.model.debugSelectionSummary())"
             )
             if overshootMs > 10 {
                 RuntimeLog.warning(
-                    "AutoEnter",
+                    .autoEnter,
                     "deadline overshootMs=\(formatMilliseconds(overshootMs)) \(self.model.debugSelectionSummary())"
                 )
             }
@@ -243,7 +243,7 @@ extension SwitcherPanelController {
             updatePanelSize()
         } else {
             RuntimeLog.debug(
-                "AutoEnter",
+                .autoEnter,
                 "timer fired but stay app layer reason=\(reason) \(self.model.debugSelectionSummary())"
             )
         }
@@ -272,15 +272,15 @@ extension SwitcherPanelController {
             switch self.model.terminateSelectedApp() {
             case .notHandled:
                 self.model.clearTerminateSelectedAppAnimation()
-                RuntimeLog.info("Session", "terminate selected app ignored")
+                RuntimeLog.info(.session, "terminate selected app ignored")
                 NSSound.beep()
             case .updatedSession:
-                RuntimeLog.info("Session", "terminate selected app \(self.model.debugSelectionSummary())")
+                RuntimeLog.info(.session, "terminate selected app \(self.model.debugSelectionSummary())")
                 self.updatePanelSize()
                 self.scheduleDelayedWindowLayerEntryIfNeeded()
             case .sessionEnded:
                 self.model.clearTerminateSelectedAppAnimation()
-                RuntimeLog.info("Session", "terminate selected app ended session")
+                RuntimeLog.info(.session, "terminate selected app ended session")
                 self.endPresentationSession()
             }
         }

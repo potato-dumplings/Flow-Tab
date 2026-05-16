@@ -213,8 +213,8 @@ extension RuntimeSnapshotProvider {
             )
         }
         if hiddenProvisionalCGOnlyCount > 0 {
-            RuntimeLog.info(
-                "AXMatch",
+            RuntimeLog.debug(
+                .axMatch,
                 "\(appName) hidden-provisional-cg windows=\(hiddenProvisionalCGOnlyCount)"
             )
         }
@@ -302,8 +302,8 @@ extension RuntimeSnapshotProvider {
         }
 
         if droppedCount > 0 {
-            RuntimeLog.info(
-                "AXMatch",
+            RuntimeLog.debug(
+                .axMatch,
                 "\(appName) filtered-fullscreen-host-artifacts stage=\(stage) dropped=\(droppedCount)"
             )
         }
@@ -349,8 +349,8 @@ extension RuntimeSnapshotProvider {
         }
 
         if droppedCount > 0 {
-            RuntimeLog.info(
-                "AXMatch",
+            RuntimeLog.debug(
+                .axMatch,
                 "\(appName) filtered-fullscreen-sibling-artifacts stage=\(stage) dropped=\(droppedCount)"
             )
         }
@@ -663,13 +663,13 @@ extension RuntimeSnapshotProvider {
         let unmatchedAXCount = max(0, axWindows.count - exactMatchesByAXWindowID.count)
         let unmatchedCGCount = max(0, validCGWindows.count - Set(exactMatchesByAXWindowID.values).count)
         let stickyCount = windowRecordsByCGWindowID.values.filter(\.hasStickyBinding).count
-        RuntimeLog.info(
-            "AXMatch",
+        RuntimeLog.debug(
+            .axMatch,
             "\(appName) records=\(windowRecordsByCGWindowID.count) sticky=\(stickyCount) exact=\(exactMatchesByAXWindowID.count) unmatchedAX=\(unmatchedAXCount) unmatchedCG=\(unmatchedCGCount)"
         )
         if allowSpaceOneWithoutCurrentAXHandle {
-            RuntimeLog.info(
-                "AXMatch",
+            RuntimeLog.debug(
+                .axMatch,
                 "\(appName) transient-ax-rebuild suspected; keeping space-1 windows missingAXSnapshots=\(consecutiveSnapshotsWithoutAXWindows)/\(runtimeAXRebuildGraceMissingSnapshotLimit)"
             )
         }
@@ -755,8 +755,8 @@ extension RuntimeSnapshotProvider {
         }
 
         if droppedCount > 0 {
-            RuntimeLog.info(
-                "AXMatch",
+            RuntimeLog.debug(
+                .axMatch,
                 "\(appName) dedupe-unmatched-ax-by-space dropped=\(droppedCount)"
             )
         }
@@ -844,8 +844,8 @@ extension RuntimeSnapshotProvider {
         cgWindows: [CGWindowEntry],
         appName: String?
     ) -> AXWindowRecoveryDiagnosticResult? {
-        RuntimeLog.info(
-            "Activation",
+        RuntimeLog.debug(
+            .activation,
             "ax-recovery candidates app=\(runtimeAXRecoveryLogValue(appName)) targetCG=\(targetCGWindowID.map(String.init) ?? "nil") expectedTitle=\(runtimeAXRecoveryLogValue(expectedTitle)) expectedFrame=\(runtimeAXRecoveryFrameDescription(expectedFrame)) ax=\(runtimeAXRecoveryAXWindowSummary(windows)) cg=\(runtimeAXRecoveryCGWindowSummary(cgWindows, targetCGWindowID: targetCGWindowID))"
         )
 
@@ -853,8 +853,8 @@ extension RuntimeSnapshotProvider {
             let exactBridgeMatches = windows.filter {
                 AXWindowInspector.cgWindowID(for: $0.window) == targetCGWindowID
             }
-            RuntimeLog.info(
-                "Activation",
+            RuntimeLog.debug(
+                .activation,
                 "ax-recovery exact-bridge targetCG=\(targetCGWindowID) matches=\(exactBridgeMatches.count) ids=\(runtimeAXRecoveryWindowIDs(exactBridgeMatches))"
             )
             if exactBridgeMatches.count == 1 {
@@ -871,8 +871,8 @@ extension RuntimeSnapshotProvider {
                 cgWindows: cgWindows,
                 appName: appName
             )
-            RuntimeLog.info(
-                "Activation",
+            RuntimeLog.debug(
+                .activation,
                 "ax-recovery public-assignments targetCG=\(targetCGWindowID) matches=\(runtimeAXRecoveryAssignmentSummary(matchedWindowIDs))"
             )
             if
@@ -885,14 +885,14 @@ extension RuntimeSnapshotProvider {
                 )
             }
         } else if let targetCGWindowID {
-            RuntimeLog.info(
-                "Activation",
+            RuntimeLog.debug(
+                .activation,
                 "ax-recovery target-cg-not-current targetCG=\(targetCGWindowID)"
             )
         }
 
-        RuntimeLog.info(
-            "Activation",
+        RuntimeLog.debug(
+            .activation,
             "ax-recovery no-public-match targetCG=\(targetCGWindowID.map(String.init) ?? "nil")"
         )
         return nil
@@ -1258,7 +1258,7 @@ private func resolveStableWindowTitle(
     if let normalizedRefreshedAXTitle,
         !runtimeTitleLooksLikeAppNameFallback(normalizedRefreshedAXTitle, appName: appName)
     {
-        RuntimeLog.info("AX", "\(appName) untitled[\(fallbackIndex)] recovered-from-ax")
+        RuntimeLog.info(.ax, "\(appName) untitled[\(fallbackIndex)] recovered-from-ax")
         return normalizedRefreshedAXTitle
     }
 
@@ -1272,6 +1272,6 @@ private func resolveStableWindowTitle(
         return normalizedSourceTitle
     }
 
-    RuntimeLog.info("AX", "\(appName) untitled[\(fallbackIndex)] use app-name fallback")
+    RuntimeLog.info(.ax, "\(appName) untitled[\(fallbackIndex)] use app-name fallback")
     return appName
 }

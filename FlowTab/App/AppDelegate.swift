@@ -94,14 +94,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             try launchAtLoginManager.reconcile(allowed: allowed)
             let currentStatus = launchAtLoginManager.status
             RuntimeLog.info(
-                "Permission",
+                .permission,
                 "launchAtLogin allowed=\(allowed) status=\(currentStatus.logValue) source=\(source)"
             )
             return currentStatus
         } catch {
             let currentStatus = launchAtLoginManager.status
             RuntimeLog.error(
-                "Permission",
+                .permission,
                 "launchAtLogin failed allowed=\(allowed) status=\(currentStatus.logValue) source=\(source) error=\(error.localizedDescription)"
             )
             return currentStatus
@@ -110,7 +110,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func requestHotkeyReload(using request: HotkeyRegistrationRequest, source: String) {
         RuntimeLog.info(
-            "HotKey",
+            .hotKey,
             "re-register requested source=\(source) requestID=\(request.requestID.uuidString) main=\(request.mainConfiguration.mainShortcutText) inApp=\(request.inAppWindowConfiguration.mainShortcutText)"
         )
         applyHotkeyReload(request, source: source)
@@ -128,7 +128,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func applyHotkeyReload(_ request: HotkeyRegistrationRequest, source: String) {
         RuntimeLog.info(
-            "HotKey",
+            .hotKey,
             "re-register applying source=\(source) requestID=\(request.requestID.uuidString)"
         )
         setupHotkeyMonitors(using: request)
@@ -152,7 +152,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 mainKey: hotkeyConfiguration.mainKey,
                 quitKey: hotkeyConfiguration.quitKey
             )
-            RuntimeLog.info("HotKey", "fallback to Option+Tab because Command+Tab takeover failed")
+            RuntimeLog.info(.hotKey, "fallback to Option+Tab because Command+Tab takeover failed")
         }
 
         let monitor = makeHotkeyMonitor(
@@ -163,20 +163,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         monitor.onHotkeyPressed = { [weak panelController] isBackward in
             panelController?.handleGlobalHotkey(isBackward: isBackward)
-            RuntimeLog.info(
-                "HotKey",
+            RuntimeLog.debug(
+                .hotKey,
                 isBackward ? "HotKey Backward" : "HotKey Forward"
             )
         }
         monitor.onHotkeyReleased = { [weak panelController] isBackward in
             panelController?.handleGlobalHotkeyReleased()
-            RuntimeLog.info(
-                "HotKey",
+            RuntimeLog.debug(
+                .hotKey,
                 isBackward ? "HotKey Backward Released" : "HotKey Forward Released"
             )
         }
         RuntimeLog.info(
-            "HotKey",
+            .hotKey,
             "register main=\(hotkeyConfiguration.mainShortcutText) backward=\(hotkeyConfiguration.backwardShortcutText) quit=\(hotkeyConfiguration.quitShortcutText)"
         )
         hotkeyMonitor = monitor
@@ -191,7 +191,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             mainConfiguration.primaryModifier == inAppConfiguration.primaryModifier
                 && mainConfiguration.mainKey == inAppConfiguration.mainKey
         {
-            RuntimeLog.info("HotKey", "skip register in-app window hotkey due conflict with main shortcut")
+            RuntimeLog.info(.hotKey, "skip register in-app window hotkey due conflict with main shortcut")
             inAppWindowHotkeyMonitor = nil
             return
         }
@@ -204,17 +204,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         monitor.onHotkeyPressed = { [weak panelController] isBackward in
             panelController?.handleInAppWindowHotkey(isBackward: isBackward)
-            RuntimeLog.info(
-                "HotKey",
+            RuntimeLog.debug(
+                .hotKey,
                 isBackward ? "InApp Window Backward" : "InApp Window Forward"
             )
         }
         monitor.onHotkeyReleased = { [weak panelController] _ in
             panelController?.handleInAppWindowHotkeyReleased()
-            RuntimeLog.info("HotKey", "InApp Window Released")
+            RuntimeLog.debug(.hotKey, "InApp Window Released")
         }
         RuntimeLog.info(
-            "HotKey",
+            .hotKey,
             "register in-app main=\(inAppConfiguration.mainShortcutText) backward=\(inAppConfiguration.backwardShortcutText)"
         )
         inAppWindowHotkeyMonitor = monitor
@@ -235,13 +235,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 guard let self else { return }
                 if Self.shared !== self {
                     if let postedRequest {
-                        RuntimeLog.info(
-                            "HotKey",
+                        RuntimeLog.debug(
+                            .hotKey,
                             "re-register ignored source=notification_stale_delegate requestID=\(postedRequest.requestID.uuidString)"
                         )
                     } else {
-                        RuntimeLog.info(
-                            "HotKey",
+                        RuntimeLog.warning(
+                            .hotKey,
                             "re-register ignored source=notification_stale_delegate requestID=missing_payload"
                         )
                     }
@@ -249,27 +249,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
                 if sendingDelegateID == ObjectIdentifier(self) {
                     if let postedRequest {
-                        RuntimeLog.info(
-                            "HotKey",
+                        RuntimeLog.debug(
+                            .hotKey,
                             "re-register ignored source=notification_self requestID=\(postedRequest.requestID.uuidString)"
                         )
                     } else {
-                        RuntimeLog.info(
-                            "HotKey",
+                        RuntimeLog.warning(
+                            .hotKey,
                             "re-register ignored source=notification_self requestID=missing_payload"
                         )
                     }
                     return
                 }
                 guard let postedRequest else {
-                    RuntimeLog.info(
-                        "HotKey",
+                    RuntimeLog.warning(
+                        .hotKey,
                         "re-register ignored source=notification_missing_payload"
                     )
                     return
                 }
                 RuntimeLog.info(
-                    "HotKey",
+                    .hotKey,
                     "re-register requested source=notification_payload requestID=\(postedRequest.requestID.uuidString) main=\(postedRequest.mainConfiguration.mainShortcutText) inApp=\(postedRequest.inAppWindowConfiguration.mainShortcutText)"
                 )
                 self.applyHotkeyReload(postedRequest, source: "notification_payload")
@@ -320,7 +320,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         application.setFlowTabActivationPolicy(targetPolicy)
         RuntimeLog.info(
-            "App",
+            .app,
             "activationPolicy=\(showInCommandTab ? "regular" : "accessory")"
         )
     }

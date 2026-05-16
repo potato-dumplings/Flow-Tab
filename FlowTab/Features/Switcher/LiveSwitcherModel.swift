@@ -166,10 +166,9 @@ final class LiveSwitcherModel: ObservableObject {
         let normalized = measurements.normalized
         guard searchLayoutMeasurements.differsVisibly(from: normalized) else { return }
         searchLayoutMeasurements = normalized
-        RuntimeDiagnostics.shared.log(
-            level: .info,
-            category: "SwitcherLayout",
-            message: "measuredSearchLayout header=\(formatLayoutPoint(normalized.presentationHeaderHeight)) row=\(formatLayoutPoint(normalized.resultRowHeight)) fallbackHeader=\(formatLayoutPoint(SwitcherSearchLayoutMeasurements.fallback.presentationHeaderHeight)) fallbackRow=\(formatLayoutPoint(SwitcherSearchLayoutMeasurements.fallback.resultRowHeight))"
+        RuntimeLog.debug(
+            .switcherLayout,
+            "measuredSearchLayout header=\(formatLayoutPoint(normalized.presentationHeaderHeight)) row=\(formatLayoutPoint(normalized.resultRowHeight)) fallbackHeader=\(formatLayoutPoint(SwitcherSearchLayoutMeasurements.fallback.presentationHeaderHeight)) fallbackRow=\(formatLayoutPoint(SwitcherSearchLayoutMeasurements.fallback.resultRowHeight))"
         )
         onSearchStateChanged?()
     }
@@ -351,11 +350,12 @@ final class LiveSwitcherModel: ObservableObject {
         let preferredSelectedAppID = preferredAppIDAfterRemovingSelectedApp(from: currentSession)
         let terminatingPID = terminateRequest.pid
         let sent = terminateRequest.sent
-        RuntimeLog.info(
-            "Session",
-            "terminate request app=\(selectedApp.displayName) appID=\(selectedApp.id) sent=\(sent)"
-        )
-        guard sent else { return .notHandled }
+        let terminateLogMessage = "terminate request app=\(selectedApp.displayName) appID=\(selectedApp.id) sent=\(sent)"
+        guard sent else {
+            RuntimeLog.error(.session, terminateLogMessage)
+            return .notHandled
+        }
+        RuntimeLog.info(.session, terminateLogMessage)
 
         let request = PendingTerminateRequest(
             appID: selectedApp.id,
@@ -402,8 +402,8 @@ final class LiveSwitcherModel: ObservableObject {
                 self.pendingTerminateRefreshTask = nil
                 return
             }
-            RuntimeLog.info(
-                "Session",
+            RuntimeLog.error(
+                .session,
                 "terminate post-refresh timeout appID=\(request.appID) pid=\(request.pid)"
             )
             self.pendingTerminateRequest = nil
@@ -468,7 +468,7 @@ final class LiveSwitcherModel: ObservableObject {
             preserveSearchState: searchViewState.isActive
         )
         RuntimeLog.info(
-            "Session",
+            .session,
             "terminate post-refresh reason=\(reason) appID=\(appID) pid=\(pid) refreshed=\(refreshed)"
         )
         if matchesPending, let pendingRequest, terminatingAppID == pendingRequest.appID {

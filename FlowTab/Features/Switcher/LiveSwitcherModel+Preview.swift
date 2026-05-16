@@ -204,7 +204,7 @@ extension LiveSwitcherModel {
                 )
             else {
                 previewCaptureFailedKeys.insert(previewCacheKey)
-                RuntimeLog.debug("Preview", "attempt failed appID=\(appID) windowID=\(window.id)")
+                RuntimeLog.debug(.preview, "attempt failed appID=\(appID) windowID=\(window.id)")
                 return ResolvedPreviewData(
                     preview: (
                         image: nil,
@@ -397,7 +397,7 @@ extension LiveSwitcherModel {
             previewCaptureInFlightKeys.remove(pendingCapture.initialCacheKey)
         }
         guard generation == previewCaptureGeneration else {
-            RuntimeLog.debug("Preview", "capture batch stale count=\(pendingCaptures.count)")
+            RuntimeLog.debug(.preview, "capture batch stale count=\(pendingCaptures.count)")
             return
         }
         var completedCount = 0
@@ -535,7 +535,7 @@ extension LiveSwitcherModel {
         ].joined(separator: " ")
         guard lastWindowPreviewExposureLogSummary != summary else { return }
         lastWindowPreviewExposureLogSummary = summary
-        RuntimeLog.debug("Preview", "display \(summary)")
+        RuntimeLog.debug(.preview, "display \(summary)")
     }
 
     private func frozenPreviewWindows(

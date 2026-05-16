@@ -16,10 +16,9 @@ extension LiveSwitcherModel {
         let defaultScope = SearchInteractionPreferencesStore.loadDefaultScope()
         let changed = searchCoordinator.activate(defaultScope: defaultScope)
         publishSearchStateIfNeeded()
-        RuntimeDiagnostics.shared.log(
-            level: .info,
-            category: "SearchModel",
-            message: "enterSearchMode changed=\(changed ? 1 : 0) scope=\(defaultScope.rawValue) appCount=\(session.apps.count) inputFocused=\(searchViewState.isInputFocused ? 1 : 0)"
+        RuntimeLog.debug(
+            .searchModel,
+            "enterSearchMode changed=\(changed ? 1 : 0) scope=\(defaultScope.rawValue) appCount=\(session.apps.count) inputFocused=\(searchViewState.isInputFocused ? 1 : 0)"
         )
         return changed
     }
@@ -95,10 +94,9 @@ extension LiveSwitcherModel {
         )
         guard changed else { return }
         publishSearchStateIfNeeded()
-        RuntimeDiagnostics.shared.log(
-            level: .info,
-            category: "SearchModel",
-            message: "synchronizeSearchInput query=\(query.debugDescription) cursor=\(cursorPosition) previousQuery=\(previousQuery.debugDescription) active=\(searchViewState.isActive ? 1 : 0) inputFocused=\(searchViewState.isInputFocused ? 1 : 0)"
+        RuntimeLog.debug(
+            .searchModel,
+            "synchronizeSearchInput query=\(query.debugDescription) cursor=\(cursorPosition) previousQuery=\(previousQuery.debugDescription) active=\(searchViewState.isActive ? 1 : 0) inputFocused=\(searchViewState.isInputFocused ? 1 : 0)"
         )
         guard previousQuery != searchCoordinator.state.query else { return }
         scheduleSearchComputation(resetSelection: true, debounced: true)
@@ -108,10 +106,9 @@ extension LiveSwitcherModel {
         let nextValue = searchViewState.isActive ? hasMarkedText : false
         guard searchInputHasMarkedText != nextValue else { return }
         searchInputHasMarkedText = nextValue
-        RuntimeDiagnostics.shared.log(
-            level: .info,
-            category: "SearchModel",
-            message: "markedText changed=\(nextValue ? 1 : 0) active=\(searchViewState.isActive ? 1 : 0) inputFocused=\(searchViewState.isInputFocused ? 1 : 0) query=\(searchViewState.query.debugDescription)"
+        RuntimeLog.debug(
+            .searchModel,
+            "markedText changed=\(nextValue ? 1 : 0) active=\(searchViewState.isActive ? 1 : 0) inputFocused=\(searchViewState.isInputFocused ? 1 : 0) query=\(searchViewState.query.debugDescription)"
         )
     }
 

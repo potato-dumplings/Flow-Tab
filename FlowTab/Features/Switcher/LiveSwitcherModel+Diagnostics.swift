@@ -143,9 +143,9 @@ extension LiveSwitcherModel {
         ]
         let message = Self.snapshotLogLine("selectedAppWindowSnapshot", fields: fields)
         if totalMs > 100 {
-            RuntimeLog.warning("Snapshot", message)
+            RuntimeLog.warning(.snapshot, message)
         } else {
-            RuntimeLog.debug("Snapshot", message)
+            RuntimeLog.debug(.snapshot, message)
         }
     }
 

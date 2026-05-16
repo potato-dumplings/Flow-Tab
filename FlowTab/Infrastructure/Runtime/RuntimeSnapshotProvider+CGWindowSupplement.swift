@@ -45,8 +45,8 @@ extension RuntimeSnapshotProvider {
                 lastConfirmationSource: nil
             )
         }
-        RuntimeLog.info(
-            "AX",
+        RuntimeLog.debug(
+            .ax,
             "\(appName) unmatched-cg windows=\(cgOnlyEntries.count)"
         )
         return entries + cgOnlyEntries
@@ -226,8 +226,8 @@ extension RuntimeSnapshotProvider {
         axWindows: [AXWindowEntry],
         cgWindows: [CGWindowEntry]
     ) {
-        RuntimeLog.info(
-            "Snapshot",
+        RuntimeLog.debug(
+            .snapshot,
             "chrome-topology app=\(runtimeSnapshotLogValue(appName)) pid=\(pid) publicSwitchableAX=\(publicSwitchableWindowCount) publicFetch=[\(publicWindowsFetchResult.logDetails)] includeRemoteAX=\(includeRemoteAXWindows ? 1 : 0) finalFetch=[\(finalWindowsFetchResult.logDetails)] ax=[\(runtimeSnapshotAXWindowSummary(axWindows))] cg=[\(runtimeSnapshotCGWindowSummary(cgWindows))]"
         )
     }
@@ -242,8 +242,8 @@ extension RuntimeSnapshotProvider {
 
         let cgOnlyCount = entries.filter { $0.activationHandleID == nil && $0.axWindow == nil }.count
         let stickyCount = entries.filter(\.hasStickyBinding).count
-        RuntimeLog.info(
-            "Snapshot",
+        RuntimeLog.debug(
+            .snapshot,
             "window-entries app=\(runtimeSnapshotLogValue(appName)) pid=\(pid) ax=\(axWindowCount) entries=\(entries.count) cgOnly=\(cgOnlyCount) sticky=\(stickyCount) detail=[\(runtimeSnapshotWindowEntrySummary(entries))]"
         )
     }

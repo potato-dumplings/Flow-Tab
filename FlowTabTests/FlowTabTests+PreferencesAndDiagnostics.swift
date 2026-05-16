@@ -500,6 +500,42 @@ extension FlowTabTests {
         XCTAssertTrue(scopedLines.contains(where: { $0.contains("\(marker)-warning") }))
     }
 
+    func testRuntimeLogTypedNoisyCategorySuppressesDebugAndInfoWhenVerboseDisabled() async {
+        let defaults = UserDefaults.standard
+        let previousVerbose = defaults.object(forKey: AppPreferenceKeys.enableVerboseDiagnostics)
+        let previousLevel = defaults.object(forKey: AppPreferenceKeys.runtimeLogLevel)
+        defer {
+            restoreUserDefaultsValue(
+                previousVerbose,
+                forKey: AppPreferenceKeys.enableVerboseDiagnostics,
+                userDefaults: defaults
+            )
+            restoreUserDefaultsValue(
+                previousLevel,
+                forKey: AppPreferenceKeys.runtimeLogLevel,
+                userDefaults: defaults
+            )
+        }
+
+        defaults.set(false, forKey: AppPreferenceKeys.enableVerboseDiagnostics)
+        defaults.set(RuntimeLogLevel.debug.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
+        await resetRuntimeLogsForTest()
+
+        let marker = "RuntimeLogTypedNoisy-\(UUID().uuidString)"
+        RuntimeLog.debug(.activation, "\(marker)-debug")
+        RuntimeLog.info(.activation, "\(marker)-info")
+        RuntimeLog.warning(.activation, "\(marker)-warning")
+        RuntimeLog.error(.activation, "\(marker)-error")
+
+        let lines = await RuntimeDiagnostics.shared.readRecentLines(limit: 50, minimumLevel: .debug)
+        let scopedLines = lines.filter { $0.contains(marker) }
+
+        XCTAssertFalse(scopedLines.contains(where: { $0.contains("\(marker)-debug") }))
+        XCTAssertFalse(scopedLines.contains(where: { $0.contains("\(marker)-info") }))
+        XCTAssertTrue(scopedLines.contains(where: { $0.contains("\(marker)-warning") }))
+        XCTAssertTrue(scopedLines.contains(where: { $0.contains("\(marker)-error") }))
+    }
+
     func testRuntimeLogNonNoisyCategoryAllowsInfoWhenMinimumLevelAllows() async {
         let defaults = UserDefaults.standard
         let previousVerbose = defaults.object(forKey: AppPreferenceKeys.enableVerboseDiagnostics)
@@ -530,6 +566,36 @@ extension FlowTabTests {
 
         XCTAssertTrue(scopedLines.contains(where: { $0.contains("\(marker)-debug") }))
         XCTAssertTrue(scopedLines.contains(where: { $0.contains("\(marker)-info") }))
+    }
+
+    func testRuntimeLogPermissionWarningRecordsWithoutVerboseDiagnostics() async {
+        let defaults = UserDefaults.standard
+        let previousVerbose = defaults.object(forKey: AppPreferenceKeys.enableVerboseDiagnostics)
+        let previousLevel = defaults.object(forKey: AppPreferenceKeys.runtimeLogLevel)
+        defer {
+            restoreUserDefaultsValue(
+                previousVerbose,
+                forKey: AppPreferenceKeys.enableVerboseDiagnostics,
+                userDefaults: defaults
+            )
+            restoreUserDefaultsValue(
+                previousLevel,
+                forKey: AppPreferenceKeys.runtimeLogLevel,
+                userDefaults: defaults
+            )
+        }
+
+        defaults.set(false, forKey: AppPreferenceKeys.enableVerboseDiagnostics)
+        defaults.set(RuntimeLogLevel.debug.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
+        await resetRuntimeLogsForTest()
+
+        let marker = "RuntimeLogPermission-\(UUID().uuidString)"
+        RuntimeLog.warning(.permission, "\(marker)-permission-missing")
+
+        let lines = await RuntimeDiagnostics.shared.readRecentLines(limit: 50, minimumLevel: .debug)
+        let scopedLines = lines.filter { $0.contains(marker) }
+
+        XCTAssertTrue(scopedLines.contains(where: { $0.contains("\(marker)-permission-missing") }))
     }
 
 }

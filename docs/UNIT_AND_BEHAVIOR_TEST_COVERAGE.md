@@ -567,10 +567,20 @@
   步骤：关闭 verbose、设置最低日志级别为 `debug`，再写入 `InputTrace` 分类的 `info` 和 `warning`。
   验证：结果中只保留 `warning`，`info` 被抑制。
 
+- `testRuntimeLogTypedNoisyCategorySuppressesDebugAndInfoWhenVerboseDisabled`
+  场景：使用统一分类入口的 noisy 日志也要遵守 verbose 过滤。
+  步骤：关闭 verbose、设置最低日志级别为 `debug`，再向 `Activation` 分类写入 `debug/info/warning/error`。
+  验证：结果中只保留 `warning/error`，`debug/info` 被抑制。
+
 - `testRuntimeLogNonNoisyCategoryAllowsInfoWhenMinimumLevelAllows`
   场景：普通分类不应被额外静音。
   步骤：同样关闭 verbose 并把最低级别设为 `debug`，再写入普通分类 `info` 日志。
   验证：读取结果中能看到该 `info` 日志。
+
+- `testRuntimeLogPermissionWarningRecordsWithoutVerboseDiagnostics`
+  场景：权限缺失类警告不应依赖 verbose diagnostics。
+  步骤：关闭 verbose、设置最低日志级别为 `debug`，再向 `Permission` 分类写入 `warning`。
+  验证：读取结果中能看到权限警告日志。
 
 - `testRuntimeLogIntegrationFiltersDeltasAndClearsEntries`
   场景：运行时日志需要在同一链路中支持写入、过滤、增量读取和清空。
@@ -814,6 +824,11 @@
   场景：两个热键中只有一个注册成功。
   步骤：开启监视器后执行 `stop()`。
   验证：只会注销真正注册成功的热键，并移除事件处理器。
+
+- `testOptionTabHotkeyMonitorRegistrationFailureLogsError`
+  场景：热键注册最终失败应按 `error` 级别记录。
+  步骤：注入总是失败的热键注册器并开启监视器，再按 `error` 下限读取运行时日志。
+  验证：前进和后退两个热键注册失败都会出现在 `[ERROR] [HotKey]` 日志中。
 
 ### FlowTabPriorityCoverage / AppDelegate 启动与热键注册行为测试
 

@@ -806,4 +806,50 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(monitor.isEventHandlerInstalledForTesting)
     }
 
+    func testOptionTabHotkeyMonitorRegistrationFailureLogsError() async {
+        let defaults = UserDefaults.standard
+        let previousVerbose = defaults.object(forKey: AppPreferenceKeys.enableVerboseDiagnostics)
+        let previousLevel = defaults.object(forKey: AppPreferenceKeys.runtimeLogLevel)
+        defer {
+            restoreUserDefaultsValue(
+                previousVerbose,
+                forKey: AppPreferenceKeys.enableVerboseDiagnostics,
+                userDefaults: defaults
+            )
+            restoreUserDefaultsValue(
+                previousLevel,
+                forKey: AppPreferenceKeys.runtimeLogLevel,
+                userDefaults: defaults
+            )
+            RuntimeDiagnostics.shared.clear()
+        }
+
+        defaults.set(false, forKey: AppPreferenceKeys.enableVerboseDiagnostics)
+        defaults.set(RuntimeLogLevel.debug.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
+        RuntimeDiagnostics.shared.clear()
+        _ = await RuntimeDiagnostics.shared.makeReadSnapshot()
+
+        var registerCalls: [UInt32] = []
+        let monitor = OptionTabHotkeyMonitor(
+            signature: 0x54455354,
+            forwardHotkeyID: 11,
+            backwardHotkeyID: 22,
+            startsMonitoring: true,
+            handlerInstallerOverride: { true },
+            hotkeyRegistrarOverride: { id, _, _ in
+                registerCalls.append(id)
+                return false
+            }
+        )
+        defer { monitor.stop() }
+
+        let lines = await RuntimeDiagnostics.shared.readRecentLines(limit: 20, minimumLevel: .error)
+        let registerFailureLines = lines.filter {
+            $0.contains("[ERROR] [HotKey] register failed signature=1413829460")
+        }
+
+        XCTAssertEqual(registerCalls, [11, 22])
+        XCTAssertEqual(registerFailureLines.count, 2)
+    }
+
 }

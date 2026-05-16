@@ -32,7 +32,7 @@ extension SwitcherSearchCoordinator {
                 )
                 if cachedEntry.topResults.isEmpty {
                     RuntimeLog.warning(
-                        "Search",
+                        .search,
                         "scope=app query=\"\(query.normalized)\" source=cache matched=\(cachedEntry.matchedIndexes.count) topResults=0"
                     )
                 }
@@ -63,8 +63,8 @@ extension SwitcherSearchCoordinator {
                         topResultLimit: Self.appTopResultLimit
                     )
                     if !ranked.topRanked.isEmpty {
-                        RuntimeLog.warning(
-                            "Search",
+                        RuntimeLog.info(
+                            .search,
                             "scope=app query=\"\(query.normalized)\" recallFallback=fullScan initialCandidates=\(boundedCandidateIndexes.count) totalEntries=\(input.appEntries.count) recoveredResults=\(ranked.topRanked.count)"
                         )
                     }
@@ -130,7 +130,7 @@ extension SwitcherSearchCoordinator {
                 )
                 if cachedEntry.topResults.isEmpty {
                     RuntimeLog.warning(
-                        "Search",
+                        .search,
                         "scope=window query=\"\(query.normalized)\" source=cache matched=\(cachedEntry.matchedIndexes.count) topResults=0"
                     )
                 }
@@ -161,8 +161,8 @@ extension SwitcherSearchCoordinator {
                         topResultLimit: Self.windowTopResultLimit
                     )
                     if !ranked.topRanked.isEmpty {
-                        RuntimeLog.warning(
-                            "Search",
+                        RuntimeLog.info(
+                            .search,
                             "scope=window query=\"\(query.normalized)\" recallFallback=fullScan initialCandidates=\(boundedCandidateIndexes.count) totalEntries=\(input.windowEntries.count) recoveredResults=\(ranked.topRanked.count)"
                         )
                     }
@@ -313,7 +313,7 @@ extension SwitcherSearchCoordinator {
         rawIdentifierContainsCount: Int
     ) {
         RuntimeLog.warning(
-            "Search",
+            .search,
             "scope=\(scope.rawValue) query=\"\(query.normalized)\" compact=\"\(query.compact)\" terms=\(query.terms) coarseCandidates=\(coarseCandidateCount) candidateIndexes=\(candidateCount) boundedCandidates=\(boundedCandidateCount) matched=\(matchedCount) topResults=\(topResultCount) rawIdentifierContains=\(rawIdentifierContainsCount)"
         )
     }

@@ -11,8 +11,8 @@ extension LiveSwitcherModel {
 
         let visibleAppIDs = Set(filteredApps.map(\.id))
         let filteredContexts = snapshot.contextsByID.filter { visibleAppIDs.contains($0.key) }
-        RuntimeLog.info(
-            "Snapshot",
+        RuntimeLog.debug(
+            .snapshot,
             "hiddenAppFilter hidden=\(visibilityFilter.hiddenAppIDs.count) before=\(snapshot.apps.count) after=\(filteredApps.count)"
         )
         return RuntimeSnapshot(

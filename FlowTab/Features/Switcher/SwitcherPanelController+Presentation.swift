@@ -14,11 +14,11 @@ extension SwitcherPanelController {
     }
 
     func logInputTrace(_ message: @autoclosure () -> String) {
-        RuntimeLog.debug("InputTrace", message())
+        RuntimeLog.debug(.inputTrace, message())
     }
 
     func logSearchTrace(_ message: String) {
-        RuntimeDiagnostics.shared.log(level: .info, category: "SearchTrace", message: message)
+        RuntimeLog.debug(.searchTrace, message)
     }
 
     func panelFirstResponderDebugName() -> String {
@@ -172,14 +172,14 @@ extension SwitcherPanelController {
             logInputTrace(
                 "show kind=global result=failed durationMs=\(formatMilliseconds(failedMs))"
             )
-            RuntimeLog.info("Session", "start failed: no apps")
+            RuntimeLog.info(.session, "start failed: no apps")
             NSSound.beep()
             return
         }
         let sessionReadyMs = monotonicMilliseconds()
         activeHotkeySessionKind = .globalAppSwitcher
         lastCommittedTabAdvanceTimestamp = nil
-        RuntimeLog.info("Session", "start direction=\(direction.debugName) \(self.model.debugSelectionSummary())")
+        RuntimeLog.info(.session, "start direction=\(direction.debugName) \(self.model.debugSelectionSummary())")
 
         let targetScreen = resolveActivePresentationScreen()
         let screenReadyMs = monotonicMilliseconds()
@@ -247,14 +247,14 @@ extension SwitcherPanelController {
             logInputTrace(
                 "show kind=inApp result=failed durationMs=\(formatMilliseconds(failedMs))"
             )
-            RuntimeLog.info("Session", "start in-app window switch failed: no windows")
+            RuntimeLog.info(.session, "start in-app window switch failed: no windows")
             NSSound.beep()
             return
         }
         let sessionReadyMs = monotonicMilliseconds()
         activeHotkeySessionKind = .inAppWindowSwitcher
         lastCommittedTabAdvanceTimestamp = nil
-        RuntimeLog.info("Session", "start in-app direction=\(direction.debugName) \(self.model.debugSelectionSummary())")
+        RuntimeLog.info(.session, "start in-app direction=\(direction.debugName) \(self.model.debugSelectionSummary())")
 
         let targetScreen = resolveActivePresentationScreen()
         let screenReadyMs = monotonicMilliseconds()
@@ -628,10 +628,9 @@ extension SwitcherPanelController {
         ].joined(separator: " ")
         guard lastSearchLayoutSizingLogSummary != summary else { return }
         lastSearchLayoutSizingLogSummary = summary
-        RuntimeDiagnostics.shared.log(
-            level: .info,
-            category: "SwitcherLayout",
-            message: "searchPanelSizing \(summary)"
+        RuntimeLog.debug(
+            .switcherLayout,
+            "searchPanelSizing \(summary)"
         )
     }
 

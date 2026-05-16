@@ -210,7 +210,7 @@ struct SearchSystemTextInputBridge: NSViewRepresentable {
         }
 
         private static func logSearchInput(_ message: String) {
-            RuntimeDiagnostics.shared.log(level: .info, category: "SearchInput", message: message)
+            RuntimeLog.debug(.searchInput, message)
         }
 
         private static func responderName(_ responder: NSResponder?) -> String {

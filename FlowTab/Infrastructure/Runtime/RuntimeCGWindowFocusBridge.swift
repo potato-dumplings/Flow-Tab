@@ -40,8 +40,8 @@ enum RuntimeCGWindowFocusBridge {
             api.setFrontProcessWithOptions(pointer, cgWindowID, userGeneratedFocusMode)
         }
         guard frontProcessResult == .success else {
-            RuntimeLog.info(
-                "Activation",
+            RuntimeLog.debug(
+                .activation,
                 "cg-window-focus set-front failed pid=\(ownerPID) windowID=\(cgWindowID) error=\(frontProcessResult.rawValue)"
             )
             return false
@@ -53,8 +53,8 @@ enum RuntimeCGWindowFocusBridge {
             api: api
         )
         if !keyWindowResult {
-            RuntimeLog.info(
-                "Activation",
+            RuntimeLog.debug(
+                .activation,
                 "cg-window-focus key-event failed pid=\(ownerPID) windowID=\(cgWindowID)"
             )
         }

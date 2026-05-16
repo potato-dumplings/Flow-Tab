@@ -3,7 +3,7 @@ import Foundation
 
 extension RuntimeSnapshotProvider {
     func logSnapshotTiming(_ event: String, fields: [(String, String)]) {
-        RuntimeLog.debug("Snapshot", Self.snapshotTimingLine(event, fields: fields))
+        RuntimeLog.debug(.snapshot, Self.snapshotTimingLine(event, fields: fields))
     }
 
     static func snapshotTimingLine(_ event: String, fields: [(String, String)]) -> String {

@@ -256,7 +256,7 @@ struct AppSettingsView: View {
         accessibilityPermissionPollTask?.cancel()
         let trusted = AccessibilityPermissionChecker.requestPermission()
         RuntimeLog.info(
-            "Permission",
+            .permission,
             "prompt requested immediateTrusted=\(trusted) bundle=\(bundleIdentifier) path=\(bundlePath)"
         )
         refreshAccessibilityStatus()
@@ -269,7 +269,7 @@ struct AppSettingsView: View {
         screenCapturePollTask?.cancel()
         let trusted = ScreenCapturePermissionChecker.requestScreenCapturePermission()
         RuntimeLog.info(
-            "Preview",
+            .permission,
             "screenCapture prompt requested immediateTrusted=\(trusted) bundle=\(bundleIdentifier) path=\(bundlePath)"
         )
         refreshScreenCaptureStatus()
@@ -360,14 +360,14 @@ struct AppSettingsView: View {
             try LaunchAtLoginController.shared.reconcile(allowed: allowed)
             let currentStatus = LaunchAtLoginController.shared.status
             RuntimeLog.info(
-                "Permission",
+                .permission,
                 "launchAtLogin allowed=\(allowed) status=\(currentStatus.logValue) source=\(source)"
             )
             return currentStatus
         } catch {
             let currentStatus = LaunchAtLoginController.shared.status
             RuntimeLog.error(
-                "Permission",
+                .permission,
                 "launchAtLogin failed allowed=\(allowed) status=\(currentStatus.logValue) source=\(source) error=\(error.localizedDescription)"
             )
             return currentStatus
@@ -577,14 +577,14 @@ struct AppSettingsView: View {
         lastNotifiedHotkeySignature = hotkeyRequestSignature(request)
         persistHotkeyRegistrationRequest(request)
         RuntimeLog.info(
-            "HotKey",
+            .hotKey,
             "updated main=\(request.mainConfiguration.mainShortcutText) backward=\(request.mainConfiguration.backwardShortcutText) quit=\(request.mainConfiguration.quitShortcutText) inApp=\(request.inAppWindowConfiguration.mainShortcutText) inAppBackward=\(request.inAppWindowConfiguration.backwardShortcutText)"
         )
         if let appDelegate = AppDelegate.shared {
             appDelegate.requestHotkeyReload(using: request, source: "settings_view")
         } else {
             RuntimeLog.info(
-                "HotKey",
+                .hotKey,
                 "re-register requested source=settings_view requestID=\(request.requestID.uuidString) action=notification_only"
             )
             NotificationCenter.default.post(
@@ -607,7 +607,7 @@ struct AppSettingsView: View {
 
     private func notifyAppVisibilityPreferenceChanged() {
         RuntimeLog.info(
-            "App",
+            .app,
             "showInCommandTab=\(showInCommandTab)"
         )
         NotificationCenter.default.post(name: .flowTabAppVisibilityPreferenceChanged, object: nil)
@@ -618,7 +618,7 @@ struct AppSettingsView: View {
     }
 
     private func notifyLanguagePreferenceChanged() {
-        RuntimeLog.info("App", "language=\(appLanguageRaw)")
+        RuntimeLog.info(.app, "language=\(appLanguageRaw)")
         NotificationCenter.default.post(name: .flowTabLanguagePreferenceChanged, object: nil)
     }
 
@@ -629,15 +629,15 @@ struct AppSettingsView: View {
                 refreshAccessibilityStatus()
                 if accessibilityTrusted {
                     RuntimeLog.info(
-                        "Permission",
+                        .permission,
                         "trusted=true after prompt bundle=\(bundleIdentifier) path=\(bundlePath)"
                     )
                     accessibilityPermissionPollTask = nil
                     return
                 }
             }
-            RuntimeLog.info(
-                "Permission",
+            RuntimeLog.warning(
+                .permission,
                 "still untrusted after waiting 20s bundle=\(bundleIdentifier) path=\(bundlePath)"
             )
             accessibilityPermissionPollTask = nil
@@ -651,15 +651,15 @@ struct AppSettingsView: View {
                 refreshScreenCaptureStatus()
                 if screenCaptureTrusted {
                     RuntimeLog.info(
-                        "Preview",
+                        .permission,
                         "screenCapture trusted=true after prompt bundle=\(bundleIdentifier) path=\(bundlePath)"
                     )
                     screenCapturePollTask = nil
                     return
                 }
             }
-            RuntimeLog.info(
-                "Preview",
+            RuntimeLog.warning(
+                .permission,
                 "screenCapture still untrusted after waiting 20s bundle=\(bundleIdentifier) path=\(bundlePath)"
             )
             screenCapturePollTask = nil

@@ -136,7 +136,7 @@ extension SwitcherPanelController {
         }
         cancelPendingModifierReleaseConfirmation()
         updatePanelSize()
-        RuntimeLog.info("Session", "enter search mode")
+        RuntimeLog.info(.session, "enter search mode")
         logSearchTrace("enterSearchMode action=entered \(searchTraceStateSummary())")
         return true
     }

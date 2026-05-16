@@ -78,7 +78,7 @@ enum RuntimeWindowPreviewProvider {
         guard !requests.isEmpty else { return [] }
         guard ScreenCapturePermissionChecker.hasScreenCapturePermission else {
             if !hasLoggedScreenCapturePermissionWarning {
-                RuntimeLog.info("Preview", "screen recording permission missing; window preview unavailable")
+                RuntimeLog.warning(.permission, "screen recording permission missing; window preview unavailable")
                 hasLoggedScreenCapturePermissionWarning = true
             }
             return Array(repeating: nil, count: requests.count)
@@ -96,8 +96,8 @@ enum RuntimeWindowPreviewProvider {
                 liveWindows: liveWindowsByPID[request.ownerPID] ?? []
             )
             if candidateIDs.isEmpty {
-                RuntimeLog.info(
-                    "Preview",
+                RuntimeLog.debug(
+                    .preview,
                     "no candidate windows pid=\(request.ownerPID) preferredID=\(request.preferredWindowID.map(String.init) ?? "nil") title=\(request.preferredTitle ?? "<empty>")"
                 )
             }
@@ -143,8 +143,8 @@ enum RuntimeWindowPreviewProvider {
                 cgImage: cgImage,
                 size: NSSize(width: cgImage.width, height: cgImage.height)
             )
-            RuntimeLog.info(
-                "Preview",
+            RuntimeLog.debug(
+                .preview,
                 "capture success pid=\(preparedCapture.request.ownerPID) windowID=\(candidateID) candidates=\(preparedCapture.candidateIDs.count) titleBarStyle=\(titleBarStyle?.rawValue ?? "nil")"
             )
             return CaptureResult(
@@ -153,8 +153,8 @@ enum RuntimeWindowPreviewProvider {
                 titleBarStyle: titleBarStyle
             )
         }
-        RuntimeLog.info(
-            "Preview",
+        RuntimeLog.error(
+            .preview,
             "capture failed pid=\(preparedCapture.request.ownerPID) preferredID=\(preparedCapture.request.preferredWindowID.map(String.init) ?? "nil") title=\(preparedCapture.request.preferredTitle ?? "<empty>") candidates=\(preparedCapture.candidateIDs.map(String.init).joined(separator: ","))"
         )
         return nil
@@ -270,11 +270,11 @@ enum RuntimeWindowPreviewProvider {
 
         let timeoutDate = DispatchTime.now() + shareableContentLookupTimeout
         guard semaphore.wait(timeout: timeoutDate) == .success else {
-            RuntimeLog.info("Preview", "shareable-content lookup timed out")
+            RuntimeLog.warning(.preview, "shareable-content lookup timed out")
             return [:]
         }
         if let capturedError {
-            RuntimeLog.info("Preview", "shareable-content lookup failed error=\(capturedError.localizedDescription)")
+            RuntimeLog.error(.preview, "shareable-content lookup failed error=\(capturedError.localizedDescription)")
             return [:]
         }
         guard let shareableContent else { return [:] }
@@ -324,12 +324,12 @@ enum RuntimeWindowPreviewProvider {
 
         let timeoutDate = DispatchTime.now() + screenshotCaptureTimeout
         guard semaphore.wait(timeout: timeoutDate) == .success else {
-            RuntimeLog.info("Preview", "screenshot capture timed out windowID=\(shareableWindow.windowID)")
+            RuntimeLog.warning(.preview, "screenshot capture timed out windowID=\(shareableWindow.windowID)")
             return nil
         }
         if let capturedError {
-            RuntimeLog.info(
-                "Preview",
+            RuntimeLog.debug(
+                .preview,
                 "screenshot capture failed windowID=\(shareableWindow.windowID) error=\(capturedError.localizedDescription)"
             )
         }
@@ -346,7 +346,7 @@ enum RuntimeWindowPreviewProvider {
                 [.boundsIgnoreFraming, .bestResolution]
             )
         else {
-            RuntimeLog.info("Preview", "legacy capture failed windowID=\(windowID)")
+            RuntimeLog.debug(.preview, "legacy capture failed windowID=\(windowID)")
             return nil
         }
         return normalizedPreviewImageIfNeeded(image)

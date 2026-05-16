@@ -503,7 +503,7 @@ extension RuntimeSnapshotProvider {
                 hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
             ) else {
                 let appName = app.localizedName ?? app.bundleIdentifier ?? "pid:\(app.processIdentifier)"
-                RuntimeLog.info("Snapshot", "skip minimized-only app=\(appName) pid=\(app.processIdentifier)")
+                RuntimeLog.debug(.snapshot, "skip minimized-only app=\(appName) pid=\(app.processIdentifier)")
                 return false
             }
             return true
@@ -535,7 +535,7 @@ extension RuntimeSnapshotProvider {
                 hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
             ) else {
                 let appName = app.localizedName ?? app.bundleIdentifier ?? "pid:\(app.processIdentifier)"
-                RuntimeLog.info("Snapshot", "skip minimized-only app=\(appName) pid=\(app.processIdentifier)")
+                RuntimeLog.debug(.snapshot, "skip minimized-only app=\(appName) pid=\(app.processIdentifier)")
                 return false
             }
             return true

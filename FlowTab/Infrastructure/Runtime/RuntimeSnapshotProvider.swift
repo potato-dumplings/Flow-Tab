@@ -161,7 +161,7 @@ final class RuntimeSnapshotProvider {
             return RuntimeSnapshot(apps: [], contextsByID: [:])
         }
 
-        RuntimeLog.info("Snapshot", "runningApps=\(runningApps.count)")
+        RuntimeLog.debug(.snapshot, "runningApps=\(runningApps.count)")
         let windowDataStartMs = RuntimePerformanceClock.monotonicMilliseconds()
         let windowData = collectWindowData(for: runningApps)
         let windowDataReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
@@ -191,8 +191,8 @@ final class RuntimeSnapshotProvider {
             hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
         )
         let selectionReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        RuntimeLog.info(
-            "Snapshot",
+        RuntimeLog.debug(
+            .snapshot,
             "selectedApps=\(selectedApps.count) appLayerCandidates=\(appLayerCandidates.count) hideMinimized=\(hideMinimizedAppsFromAppLayer)"
         )
 
@@ -228,8 +228,8 @@ final class RuntimeSnapshotProvider {
             let displayName = app.localizedName ?? baseAppID
 
             let windows = mergedWindowsByPrimaryPID[pid] ?? []
-            RuntimeLog.info(
-                "Snapshot",
+            RuntimeLog.debug(
+                .snapshot,
                 "\(displayName) pid=\(pid) appID=\(appID) windows=\(windows.count)"
             )
             let windowCandidates = windows.enumerated().map { entryIndex, entry in
@@ -298,7 +298,7 @@ final class RuntimeSnapshotProvider {
         var contextsByID: [String: RuntimeAppContext] = [:]
         for row in rows {
             if contextsByID[row.context.appID] != nil {
-                RuntimeLog.info("Snapshot", "duplicate appID fallback overwrite=\(row.context.appID)")
+                RuntimeLog.debug(.snapshot, "duplicate appID fallback overwrite=\(row.context.appID)")
             }
             contextsByID[row.context.appID] = row.context
         }
@@ -457,7 +457,7 @@ final class RuntimeSnapshotProvider {
     ) -> [pid_t: [WindowListEntry]] {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
         guard AccessibilityPermissionChecker.isTrusted() else {
-            RuntimeLog.info("AX", "not trusted; all app windows will be reported as 0")
+            RuntimeLog.warning(.ax, "not trusted; all app windows will be reported as 0")
             logSnapshotTiming(
                 "collectAXWindowData",
                 fields: [
@@ -507,15 +507,15 @@ final class RuntimeSnapshotProvider {
                 windows: windows
             )
             let registryReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-            RuntimeLog.info(
-                "AX",
+            RuntimeLog.debug(
+                .ax,
                 "\(appName) rawWindows=\(windows.count) \(windowsFetchResult.logDetails)"
             )
 
             let axEntries = windows.enumerated().compactMap { index, window -> AXWindowEntry? in
                 guard AXWindowInspector.isSwitchable(window) else {
                     let role = AXWindowInspector.role(for: window) ?? "unknown"
-                    RuntimeLog.info("AX", "\(appName) skip[\(index)] role=\(role)")
+                    RuntimeLog.debug(.ax, "\(appName) skip[\(index)] role=\(role)")
                     return nil
                 }
                 let windowID = AXWindowInspector.makeWindowID(
@@ -585,7 +585,7 @@ final class RuntimeSnapshotProvider {
                 ]
             )
             guard !resolvedEntries.isEmpty else { continue }
-            RuntimeLog.info("AX", "\(appName) switchableWindows=\(resolvedEntries.count)")
+            RuntimeLog.debug(.ax, "\(appName) switchableWindows=\(resolvedEntries.count)")
             logResolvedWindowEntrySummary(
                 appName: appName,
                 pid: app.processIdentifier,
@@ -715,7 +715,7 @@ final class RuntimeSnapshotProvider {
         if let refreshedAXTitle = normalizedRefreshedAXTitle,
             !isAppNameFallbackTitle(refreshedAXTitle, appName: appName)
         {
-            RuntimeLog.info("AX", "\(appName) untitled[\(fallbackIndex)] recovered-from-ax")
+            RuntimeLog.info(.ax, "\(appName) untitled[\(fallbackIndex)] recovered-from-ax")
             return refreshedAXTitle
         }
 
@@ -729,7 +729,7 @@ final class RuntimeSnapshotProvider {
             return sourceTitle
         }
 
-        RuntimeLog.info("AX", "\(appName) untitled[\(fallbackIndex)] use app-name fallback")
+        RuntimeLog.info(.ax, "\(appName) untitled[\(fallbackIndex)] use app-name fallback")
         return appName
     }
 
@@ -747,7 +747,7 @@ final class RuntimeSnapshotProvider {
 
     func collectAXWindowStats(for runningApps: [NSRunningApplication]) -> [pid_t: AXWindowStats] {
         guard AccessibilityPermissionChecker.isTrusted() else {
-            RuntimeLog.info("AX", "not trusted; all app windows will be reported as 0")
+            RuntimeLog.warning(.ax, "not trusted; all app windows will be reported as 0")
             return [:]
         }
 
@@ -1350,8 +1350,8 @@ final class RuntimeSnapshotProvider {
             selected.append(primary)
 
             let droppedPIDs = sorted.dropFirst().map(\.processIdentifier)
-            RuntimeLog.info(
-                "Snapshot",
+            RuntimeLog.debug(
+                .snapshot,
                 "dedupe baseAppID=\(baseAppID) keepPID=\(primary.processIdentifier) dropPIDs=\(droppedPIDs)"
             )
         }
@@ -1392,8 +1392,8 @@ final class RuntimeSnapshotProvider {
             selected.append(primary)
 
             let droppedPIDs = sorted.dropFirst().map(\.processIdentifier)
-            RuntimeLog.info(
-                "Snapshot",
+            RuntimeLog.debug(
+                .snapshot,
                 "dedupe baseAppID=\(baseAppID) keepPID=\(primary.processIdentifier) dropPIDs=\(droppedPIDs)"
             )
         }
