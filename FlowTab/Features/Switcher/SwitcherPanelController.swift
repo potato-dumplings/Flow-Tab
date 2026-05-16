@@ -51,6 +51,8 @@ final class SwitcherPanelController {
     let modifierReleaseConfirmationSampleCount: Int = 2
     let postFinishHotkeyIgnoreWindow: TimeInterval = 0.02
     let activeSpaceChangeIgnoreWindow: TimeInterval = 0.35
+    let terminateInterruptionProtectionWindow: TimeInterval = 5.0
+    let postTerminateRefreshInterruptionProtectionWindow: TimeInterval = 0.5
     let initialPresentationVisibilityGraceWindow: TimeInterval = 0.35
     let activeSpaceMigrationActivationSuppressionWindow: TimeInterval = 0.5
     let interruptionPresentationRecoveryAttemptDelaysNs: [UInt64] = [
@@ -79,6 +81,7 @@ final class SwitcherPanelController {
     var activeHotkeySessionKind: HotkeySessionKind?
     var activePresentationScreen: NSScreen?
     var terminateSelectedAppTask: Task<Void, Never>?
+    var terminateInterruptionProtectionUntil: TimeInterval = 0
     var suppressModifierReleaseConfirmationForTesting = false
 
     var panelVisibilityOverride: Bool?
@@ -199,7 +202,7 @@ final class SwitcherPanelController {
             let appID = app.bundleIdentifier ?? "pid:\(app.processIdentifier)"
             let pid = app.processIdentifier
             Task { @MainActor [weak self] in
-                self?.model.handleApplicationTerminated(appID: appID, pid: pid)
+                self?.handleWorkspaceApplicationTerminated(appID: appID, pid: pid)
             }
         }
         panelOcclusionObserver = NotificationCenter.default.addObserver(
@@ -309,6 +312,10 @@ final class SwitcherPanelController {
 
     func handlePanelDidResignKeyForTesting() {
         handlePanelDidResignKey()
+    }
+
+    func handleWorkspaceApplicationTerminatedForTesting(appID: String, pid: pid_t) {
+        handleWorkspaceApplicationTerminated(appID: appID, pid: pid)
     }
 
     func syncPanelAccessibilityAnchors() {

@@ -431,22 +431,25 @@ final class LiveSwitcherModel: ObservableObject {
         scheduleSearchComputation(resetSelection: true, debounced: false)
     }
 
-    func handleWorkspaceApplicationDidTerminate(_ notification: Notification) {
+    @discardableResult
+    func handleWorkspaceApplicationDidTerminate(_ notification: Notification) -> Bool {
         guard
             let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
         else {
-            return
+            return false
         }
         let appID = app.bundleIdentifier ?? "pid:\(app.processIdentifier)"
-        handleApplicationTerminated(appID: appID, pid: app.processIdentifier)
+        return handleApplicationTerminated(appID: appID, pid: app.processIdentifier)
     }
 
-    func handleApplicationTerminated(appID: String, pid: pid_t) {
+    @discardableResult
+    func handleApplicationTerminated(appID: String, pid: pid_t) -> Bool {
         refreshSessionAfterTerminatedApplication(appID: appID, pid: pid, reason: "workspace_notification")
     }
 
-    func refreshSessionAfterTerminatedApplication(appID: String, pid: pid_t, reason: String) {
-        guard session != nil else { return }
+    @discardableResult
+    func refreshSessionAfterTerminatedApplication(appID: String, pid: pid_t, reason: String) -> Bool {
+        guard session != nil else { return false }
 
         let pendingRequest = pendingTerminateRequest
         let matchesPending = pendingRequest?.matches(appID: appID, pid: pid) == true
@@ -455,7 +458,7 @@ final class LiveSwitcherModel: ObservableObject {
             $0.runningApp.processIdentifier == pid
         }
         guard matchesPending || appPresentInSessionByID || appPresentInSessionByPID else {
-            return
+            return false
         }
 
         if matchesPending {
@@ -475,6 +478,7 @@ final class LiveSwitcherModel: ObservableObject {
             terminatingAppID = nil
         }
         onSessionLayoutChanged?()
+        return refreshed
     }
 
     func preferredAppIDAfterRemovingSelectedApp(from session: SwitcherSession) -> String? {

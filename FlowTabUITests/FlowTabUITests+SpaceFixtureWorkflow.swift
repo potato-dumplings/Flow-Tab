@@ -59,8 +59,9 @@ extension FlowTabUITests {
                 "--flowtab-ui-open-switcher",
                 "--flowtab-ui-runtime-log-level",
                 "DEBUG",
-                "--flowtab-ui-enable-verbose-logs"
-            ]
+                "--flowtab-ui-enable-verbose-logs",
+                "--flowtab-ui-listen-switcher-trigger"
+            ] + FlowTabUITestSwitcherCommandPayload.launchArguments
         )
         launchFlowTabUITestApplication(app)
         defer {
@@ -73,7 +74,10 @@ extension FlowTabUITests {
 
         let fixtureAppTile = element(in: app, identifier: identity.switcherAppAccessibilityIdentifier)
         XCTAssertTrue(fixtureAppTile.waitForExistence(timeout: 12))
-        selectSwitcherApp(in: app, appID: identity.bundleIdentifier)
+        try postFlowTabUITestSelectSwitcherAppAndWaitForDelivery(
+            bundleIdentifier: identity.bundleIdentifier,
+            traceLabel: "quitFixture.selectApp"
+        )
         XCTAssertTrue(waitForSwitcherSummary(in: app, containing: "selected=\(identity.bundleIdentifier)", timeout: 5))
 
         let logSnapshot = makeRuntimeLogFileSnapshot()
@@ -109,11 +113,21 @@ extension FlowTabUITests {
 
     func testSwitcherPanelShowsRealSpaceFixtureWorkflowWindowCards() throws {
         runRealSpaceFixtureWorkflow(
-            flowTabAdditionalArguments: ["--flowtab-ui-open-switcher"]
+            flowTabAdditionalArguments: [
+                "--flowtab-ui-open-switcher",
+                "--flowtab-ui-runtime-log-level",
+                "DEBUG",
+                "--flowtab-ui-enable-verbose-logs",
+                "--flowtab-ui-listen-switcher-trigger"
+            ] + FlowTabUITestSwitcherCommandPayload.launchArguments
         ) { identity, app in
             let fixtureAppTile = element(in: app, identifier: identity.switcherAppAccessibilityIdentifier)
             XCTAssertTrue(fixtureAppTile.waitForExistence(timeout: 8))
-            selectSwitcherApp(in: app, appID: identity.bundleIdentifier)
+            selectSwitcherAppDirectly(
+                in: app,
+                appID: identity.bundleIdentifier,
+                traceLabel: "workflowWindowCards.selectApp"
+            )
 
             RunLoop.current.run(until: Date().addingTimeInterval(0.2))
             app.typeKey(.downArrow, modifierFlags: [])
@@ -126,20 +140,24 @@ extension FlowTabUITests {
         }
     }
 
-    private func selectSwitcherApp(
+    private func selectSwitcherAppDirectly(
         in app: XCUIApplication,
         appID: String,
-        maxMoves: Int = 40
+        traceLabel: String,
+        timeout: TimeInterval = 4
     ) {
-        for _ in 0..<maxMoves {
-            if switcherSummary(in: app).contains("selected=\(appID)") {
-                return
-            }
-            app.typeKey(.rightArrow, modifierFlags: [])
-            RunLoop.current.run(until: Date().addingTimeInterval(0.08))
+        do {
+            try postFlowTabUITestSelectSwitcherAppAndWaitForDelivery(
+                bundleIdentifier: appID,
+                traceLabel: traceLabel,
+                timeout: timeout
+            )
+        } catch {
+            XCTFail("Failed to select switcher app \(appID): \(error)")
+            return
         }
 
-        XCTFail("Failed to select switcher app \(appID). Latest summary: \(switcherSummary(in: app))")
+        XCTAssertTrue(waitForSwitcherSummary(in: app, containing: "selected=\(appID)", timeout: timeout))
     }
 
     private func waitForSwitcherSummary(

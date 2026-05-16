@@ -246,6 +246,9 @@ extension SwitcherPanelController {
             logSearchTrace("systemInterruption trigger=activeSpaceDidChange action=ignored reason=graceWindow \(searchTraceStateSummary())")
             return
         }
+        if handleProtectedTerminateSystemInterruption(trigger: "activeSpaceDidChange") {
+            return
+        }
         guard let sessionKind = activeHotkeySessionKind else {
             cancelSelectionForSystemInterruption(trigger: "activeSpaceDidChange")
             return
@@ -295,7 +298,21 @@ extension SwitcherPanelController {
         handleRecoverableSystemInterruption(trigger: "panelDidResignKey")
     }
 
+    func handleWorkspaceApplicationTerminated(appID: String, pid: pid_t) {
+        let refreshed = model.handleApplicationTerminated(appID: appID, pid: pid)
+        guard refreshed else { return }
+        beginTerminateInterruptionProtection(
+            trigger: "terminate_refresh",
+            duration: postTerminateRefreshInterruptionProtectionWindow,
+            extendExisting: false
+        )
+        beginIgnoringActiveSpaceChanges(trigger: "terminate_refresh")
+    }
+
     func handleRecoverableSystemInterruption(trigger: String) {
+        if handleProtectedTerminateSystemInterruption(trigger: trigger) {
+            return
+        }
         guard let sessionKind = activeHotkeySessionKind else {
             cancelSelectionForSystemInterruption(trigger: trigger)
             return
@@ -317,6 +334,20 @@ extension SwitcherPanelController {
             attemptDelaysNanoseconds: interruptionPresentationRecoveryAttemptDelaysNs,
             cancelSessionOnFailure: true
         )
+    }
+
+    func handleProtectedTerminateSystemInterruption(trigger: String) -> Bool {
+        guard shouldProtectTerminateSystemInterruption() else { return false }
+        logSearchTrace(
+            "systemInterruption trigger=\(trigger) action=recover reason=terminateInFlight \(searchTraceStateSummary())"
+        )
+        schedulePanelVisibilityRecovery(
+            trigger: "\(trigger)_terminate",
+            attemptDelaysNanoseconds: interruptionPresentationRecoveryAttemptDelaysNs,
+            cancelSessionOnFailure: false,
+            activateApplicationIfNeeded: trigger != "activeSpaceDidChange"
+        )
+        return true
     }
 
     func cancelSelectionForSystemInterruption(trigger: String) {

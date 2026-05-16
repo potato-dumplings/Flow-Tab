@@ -29,7 +29,8 @@ extension SwitcherPanelController {
     func searchTraceStateSummary() -> String {
         let now = ProcessInfo.processInfo.systemUptime
         let activeSpaceIgnoreMs = max(0, (ignoreActiveSpaceChangesUntil - now) * 1_000)
-        return "panelVisible=\(isPanelPresented ? 1 : 0) panelKey=\(panel.isKeyWindow ? 1 : 0) appActive=\(isAppCurrentlyActive ? 1 : 0) searchActive=\(model.isSearchActive ? 1 : 0) inputFocused=\(model.isSearchInputFocused ? 1 : 0) marked=\(model.hasMarkedSearchText ? 1 : 0) firstResponder=\(panelFirstResponderDebugName()) activeSpaceIgnoreMs=\(formatMilliseconds(activeSpaceIgnoreMs))"
+        let terminateProtectionMs = max(0, (terminateInterruptionProtectionUntil - now) * 1_000)
+        return "panelVisible=\(isPanelPresented ? 1 : 0) panelKey=\(panel.isKeyWindow ? 1 : 0) appActive=\(isAppCurrentlyActive ? 1 : 0) searchActive=\(model.isSearchActive ? 1 : 0) inputFocused=\(model.isSearchInputFocused ? 1 : 0) marked=\(model.hasMarkedSearchText ? 1 : 0) firstResponder=\(panelFirstResponderDebugName()) activeSpaceIgnoreMs=\(formatMilliseconds(activeSpaceIgnoreMs)) terminateProtectionMs=\(formatMilliseconds(terminateProtectionMs))"
     }
 
     func beginIgnoringActiveSpaceChanges(trigger: String) {
@@ -41,6 +42,26 @@ extension SwitcherPanelController {
 
     func shouldIgnoreActiveSpaceDidChange() -> Bool {
         ProcessInfo.processInfo.systemUptime < ignoreActiveSpaceChangesUntil
+    }
+
+    func beginTerminateInterruptionProtection(
+        trigger: String,
+        duration: TimeInterval? = nil,
+        extendExisting: Bool = true
+    ) {
+        let protectionWindow = duration ?? terminateInterruptionProtectionWindow
+        let protectionUntil = ProcessInfo.processInfo.systemUptime + protectionWindow
+        terminateInterruptionProtectionUntil = extendExisting
+            ? max(terminateInterruptionProtectionUntil, protectionUntil)
+            : protectionUntil
+        logSearchTrace(
+            "terminateInterruptionProtection trigger=\(trigger) durationMs=\(formatMilliseconds(protectionWindow * 1_000)) \(searchTraceStateSummary())"
+        )
+    }
+
+    func shouldProtectTerminateSystemInterruption() -> Bool {
+        ProcessInfo.processInfo.systemUptime < terminateInterruptionProtectionUntil
+            && model.session != nil
     }
 
     func schedulePanelVisibilityRecovery(
@@ -401,6 +422,7 @@ extension SwitcherPanelController {
         activePresentationScreen = nil
         lastSearchLayoutSizingLogSummary = nil
         ignoreActiveSpaceChangesUntil = 0
+        terminateInterruptionProtectionUntil = 0
         suppressApplicationActivationUntil = 0
         lastCommittedTabAdvanceTimestamp = nil
         if panelVisibilityOverride != nil {

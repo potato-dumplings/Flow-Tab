@@ -428,6 +428,73 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testSwitcherPanelControllerTerminateRefreshIgnoresFollowUpActiveSpaceChangeAfterModifierRelease() async {
+        let controller = SwitcherPanelController()
+        let initialApps = terminateScenarioApps()
+        var snapshotReadCount = 0
+        var terminatedAppID: String?
+        controller.modelForTesting.snapshotProviderOverride = {
+            defer { snapshotReadCount += 1 }
+            guard snapshotReadCount > 0, let terminatedAppID else {
+                return RuntimeSnapshot(apps: initialApps, contextsByID: [:])
+            }
+            return RuntimeSnapshot(
+                apps: initialApps.filter { $0.id != terminatedAppID },
+                contextsByID: [:]
+            )
+        }
+        controller.globalPrimaryModifierPressedOverride = false
+        controller.globalMainKeyPressedOverride = false
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        terminatedAppID = controller.modelForTesting.selectedApp?.id
+        guard let terminatedAppID else {
+            XCTFail("Expected selected app before terminate refresh")
+            return
+        }
+        XCTAssertEqual(controller.modelForTesting.selectedApp?.id, terminatedAppID)
+
+        controller.handleWorkspaceApplicationTerminatedForTesting(appID: terminatedAppID, pid: 42_300)
+
+        XCTAssertNotNil(controller.modelForTesting.session)
+        XCTAssertFalse(controller.modelForTesting.session?.apps.contains { $0.id == terminatedAppID } ?? true)
+
+        controller.handleActiveSpaceDidChangeForTesting()
+
+        XCTAssertNotNil(controller.modelForTesting.session)
+        XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
+        controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerTerminateRequestProtectsPanelResignAfterModifierRelease() async {
+        let controller = SwitcherPanelController()
+        controller.modelForTesting.snapshotProviderOverride = {
+            RuntimeSnapshot(apps: self.terminateScenarioApps(), contextsByID: [:])
+        }
+        controller.modelForTesting.terminateRequestOverride = { _ in
+            (sent: true, pid: 42_301)
+        }
+        controller.modelForTesting.isProcessRunningOverride = { _ in true }
+        controller.globalPrimaryModifierPressedOverride = false
+        controller.globalMainKeyPressedOverride = false
+        controller.appIsActiveOverride = false
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        let selectedAppID = controller.modelForTesting.selectedApp?.id
+
+        controller.terminateSelectedApp()
+        try? await Task.sleep(nanoseconds: 120_000_000)
+
+        XCTAssertEqual(controller.modelForTesting.terminatingAppID, selectedAppID)
+        controller.handlePanelDidResignKeyForTesting()
+
+        XCTAssertNotNil(controller.modelForTesting.session)
+        XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
+        controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
     func testSwitcherPanelControllerRecoverableOcclusionKeepsSessionVisible() async {
         let occlusionController = SwitcherPanelController()
         occlusionController.modelForTesting.snapshotProviderOverride = {

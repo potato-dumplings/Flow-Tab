@@ -275,6 +275,7 @@ extension SwitcherPanelController {
                 RuntimeLog.info(.session, "terminate selected app ignored")
                 NSSound.beep()
             case .updatedSession:
+                self.beginTerminateInterruptionProtection(trigger: "terminate_selected_app")
                 RuntimeLog.info(.session, "terminate selected app \(self.model.debugSelectionSummary())")
                 self.updatePanelSize()
                 self.scheduleDelayedWindowLayerEntryIfNeeded()
