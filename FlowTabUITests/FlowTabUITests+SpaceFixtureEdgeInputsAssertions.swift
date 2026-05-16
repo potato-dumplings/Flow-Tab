@@ -10,24 +10,55 @@ struct EdgeWorkflowWindowCardObservation: Equatable {
 extension FlowTabUITests {
     func selectEdgeWorkflowAppInSwitcherAppLayer(
         _ targetApp: SpaceFixtureResolvedWorkflow.App,
-        workflow: SpaceFixtureResolvedWorkflow,
         app: XCUIApplication,
         diagnosticsSummary: XCUIElement,
         timeout: TimeInterval
     ) -> Bool {
+        let appTile = element(in: app, identifier: targetApp.identity.switcherAppAccessibilityIdentifier)
         XCTAssertTrue(
-            element(in: app, identifier: targetApp.identity.switcherAppAccessibilityIdentifier)
-                .waitForExistence(timeout: timeout)
+            appTile.waitForExistence(timeout: timeout),
+            """
+            Edge workflow app \(targetApp.appName) was not exposed in the switcher app layer.
+
+            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
+            """
         )
 
-        selectSwitcherWorkflowApp(
-            targetApp,
-            in: app,
-            diagnosticsSummary: diagnosticsSummary,
-            maxMoves: max(40, workflow.apps.count * 4)
+        do {
+            try FlowTabUITestSwitcherCommandPayload.write(targetApp.identity.bundleIdentifier)
+        } catch {
+            XCTFail("Failed to write edge workflow switcher select-app payload: \(error)")
+            return false
+        }
+        postFlowTabUITestSwitcherCommand(
+            .selectApp,
+            traceLabel: "edgeInputs.selectApp.\(targetApp.appID)"
         )
 
-        return switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selected") == targetApp.identity.bundleIdentifier
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selected")
+                == targetApp.identity.bundleIdentifier {
+                return true
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+
+        let latestCards = edgeSwitcherWindowCardObservations(in: app)
+        XCTFail(
+            """
+            Switcher direct app selection did not settle on \(targetApp.appName).
+
+            target=\(targetApp.identity.bundleIdentifier)
+            selected=\(switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selected"))
+            mode=\(switcherPanelDiagnosticsValue(diagnosticsSummary, key: "mode"))
+            preview=\(switcherPreviewTitles(from: diagnosticsSummary).sorted())
+            windowCards=\(latestCards.map { "\($0.title)=\($0.identifier)" }.sorted())
+
+            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
+            """
+        )
+        return false
     }
 
     func waitForEdgeSwitcherWindowCards(

@@ -32,14 +32,16 @@ extension FlowTabUITests {
 
         try runRealSpaceFixtureEdgeInputsWorkflow(
             workflow,
-            flowTabAdditionalArguments: ["--flowtab-ui-open-switcher"]
+            flowTabAdditionalArguments: [
+                "--flowtab-ui-open-switcher",
+                "--flowtab-ui-listen-switcher-trigger"
+            ] + FlowTabUITestSwitcherCommandPayload.launchArguments
         ) { workflow, app in
             let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
             XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
             XCTAssertTrue(
                 selectEdgeWorkflowAppInSwitcherAppLayer(
                     targetApp,
-                    workflow: workflow,
                     app: app,
                     diagnosticsSummary: diagnosticsSummary,
                     timeout: 10
