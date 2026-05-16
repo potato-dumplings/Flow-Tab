@@ -295,14 +295,17 @@ extension FlowTabPriorityCoverageTests {
         model.snapshotProviderOverride = { snapshot }
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
-        let globalWindowIDs = model.session?.apps.first(where: { $0.id == appID })?.windows.map(\.id)
+        let globalWindowIDs = model.session?.apps.first(where: { $0.id == appID })?.windows.map(\.id) ?? []
         model.cancelSelection()
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
-        let focusedWindowIDs = model.session?.apps.first?.windows.map(\.id)
+        let focusedWindowIDs = model.session?.apps.first?.windows.map(\.id) ?? []
+        let expectedWindowIDs: Set<String> = ["cg:\(pid):243747", "cg:\(pid):240101"]
 
-        XCTAssertEqual(globalWindowIDs, focusedWindowIDs)
-        XCTAssertEqual(focusedWindowIDs, ["cg:\(pid):243747", "cg:\(pid):240101"])
-        XCTAssertFalse(focusedWindowIDs?.contains("cg:\(pid):240001") == true)
+        XCTAssertEqual(Set(globalWindowIDs), expectedWindowIDs)
+        XCTAssertEqual(Set(focusedWindowIDs), expectedWindowIDs)
+        XCTAssertEqual(globalWindowIDs.count, expectedWindowIDs.count)
+        XCTAssertEqual(focusedWindowIDs.count, expectedWindowIDs.count)
+        XCTAssertFalse(focusedWindowIDs.contains("cg:\(pid):240001"))
         XCTAssertEqual(model.session?.mode, .windowCycle(appID: appID))
     }
 
