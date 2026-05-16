@@ -20,18 +20,14 @@ extension FlowTabUITests {
                 .waitForExistence(timeout: timeout)
         )
 
-        let deadline = Date().addingTimeInterval(timeout)
-        var moves = 0
-        repeat {
-            if edgeSwitcherPanelDiagnosticsValue(diagnosticsSummary, key: "selected") == targetApp.identity.bundleIdentifier {
-                return true
-            }
-            app.typeKey(.rightArrow, modifierFlags: [])
-            moves += 1
-            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
-        } while Date() < deadline && moves <= workflow.apps.count + 2
+        selectSwitcherWorkflowApp(
+            targetApp,
+            in: app,
+            diagnosticsSummary: diagnosticsSummary,
+            maxMoves: max(40, workflow.apps.count * 4)
+        )
 
-        return edgeSwitcherPanelDiagnosticsValue(diagnosticsSummary, key: "selected") == targetApp.identity.bundleIdentifier
+        return switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selected") == targetApp.identity.bundleIdentifier
     }
 
     func waitForEdgeSwitcherWindowCards(
@@ -169,19 +165,6 @@ extension FlowTabUITests {
             .allElementsBoundByIndex
     }
 
-    private func edgeSwitcherPanelDiagnosticsValue(
-        _ diagnosticsSummaryElement: XCUIElement,
-        key: String
-    ) -> String {
-        let prefix = "\(key)="
-        for source in [elementStringValue(diagnosticsSummaryElement), diagnosticsSummaryElement.debugDescription] {
-            guard let valueStart = source.range(of: prefix)?.upperBound else { continue }
-            let remaining = source[valueStart...]
-            guard let valueEnd = remaining.firstIndex(of: ";") else { return String(remaining) }
-            return String(remaining[..<valueEnd])
-        }
-        return ""
-    }
 }
 
 private extension String {
