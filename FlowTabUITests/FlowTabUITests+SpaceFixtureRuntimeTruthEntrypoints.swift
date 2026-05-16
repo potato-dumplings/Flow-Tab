@@ -595,26 +595,6 @@ extension FlowTabUITests {
         }
     }
 
-    private func waitForSwitcherAppEntry(
-        _ diagnosticsSummary: XCUIElement,
-        bundleIdentifier: String,
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        repeat {
-            let entries = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "apps")
-                .split(separator: "|")
-                .map(String.init)
-            if entries.contains(where: { entry in
-                entry.split(separator: ":", maxSplits: 1).first.map(String.init) == bundleIdentifier
-            }) {
-                return true
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-        return false
-    }
-
     func selectGlobalSwitcherWindow(
         title: String,
         in app: XCUIApplication,
