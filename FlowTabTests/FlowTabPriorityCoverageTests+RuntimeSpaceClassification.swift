@@ -356,9 +356,18 @@ extension FlowTabPriorityCoverageTests {
             appName: "Google Chrome"
         )
 
-        XCTAssertEqual(entries.map(\.cgWindowID), [243_747, 240_101])
-        XCTAssertEqual(entries.map(\.lastConfirmationSource), [.fullscreenContentRebinding, .desktopSiblingBinding])
-        XCTAssertEqual(entries.map(\.spaceIDs), [[11_679], [1]])
+        let entriesByCGWindowID = Dictionary(
+            uniqueKeysWithValues: entries.compactMap { entry -> (CGWindowID, RuntimeSnapshotProvider.SupplementalMergeEntryForTesting)? in
+                guard let cgWindowID = entry.cgWindowID else { return nil }
+                return (cgWindowID, entry)
+            }
+        )
+
+        XCTAssertEqual(Set(entriesByCGWindowID.keys), [243_747, 240_101])
+        XCTAssertEqual(entriesByCGWindowID[243_747]?.lastConfirmationSource, .fullscreenContentRebinding)
+        XCTAssertEqual(entriesByCGWindowID[240_101]?.lastConfirmationSource, .desktopSiblingBinding)
+        XCTAssertEqual(entriesByCGWindowID[243_747]?.spaceIDs, [11_679])
+        XCTAssertEqual(entriesByCGWindowID[240_101]?.spaceIDs, [1])
     }
 
     func testRuntimeSnapshotProviderBindsRemoteAXWindowToOffDesktopCGContent() {
