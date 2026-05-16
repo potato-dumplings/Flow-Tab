@@ -27,4 +27,22 @@ extension FlowTabPriorityCoverageTests {
 
         return lines
     }
+
+    @MainActor
+    func waitForHotkeyReplaySuppressionToEnd(
+        panelController: SwitcherPanelController,
+        timeoutNanoseconds: UInt64 = 1_000_000_000,
+        pollIntervalNanoseconds: UInt64 = 10_000_000
+    ) async -> Bool {
+        let deadline = DispatchTime.now().uptimeNanoseconds + timeoutNanoseconds
+
+        repeat {
+            if !panelController.suppressHotkeyReplayUntilReleaseForTesting {
+                return true
+            }
+            try? await Task.sleep(nanoseconds: pollIntervalNanoseconds)
+        } while DispatchTime.now().uptimeNanoseconds < deadline
+
+        return !panelController.suppressHotkeyReplayUntilReleaseForTesting
+    }
 }

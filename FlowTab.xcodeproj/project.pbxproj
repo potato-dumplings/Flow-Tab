@@ -28,6 +28,7 @@
 		B28010012FF100100B0D737 /* SwitcherWindowPreviewPaging.swift in Sources */ = {isa = PBXBuildFile; fileRef = B28000012FF100100B0D737 /* SwitcherWindowPreviewPaging.swift */; };
 		A1B2C4112F73000100B0D737 /* SwitcherPanelWindowConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4012F73000100B0D737 /* SwitcherPanelWindowConfiguration.swift */; };
 		A1B2C4122F73000100B0D737 /* SwitcherPanelController+Presentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4022F73000100B0D737 /* SwitcherPanelController+Presentation.swift */; };
+		B32010012FF6000100B0D737 /* SwitcherPanelController+InitialVisibilityRecovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = B32000012FF6000100B0D737 /* SwitcherPanelController+InitialVisibilityRecovery.swift */; };
 		A1B2C4132F73000100B0D737 /* SwitcherPanelController+InputHandling.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4032F73000100B0D737 /* SwitcherPanelController+InputHandling.swift */; };
 		A1B2C4142F73000100B0D737 /* SwitcherPanelController+Hotkeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4042F73000100B0D737 /* SwitcherPanelController+Hotkeys.swift */; };
 		A1B2C4152F73000100B0D737 /* LiveSwitcherModel+Preview.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4052F73000100B0D737 /* LiveSwitcherModel+Preview.swift */; };
@@ -205,6 +206,7 @@
 		B28000012FF100100B0D737 /* SwitcherWindowPreviewPaging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherWindowPreviewPaging.swift; sourceTree = "<group>"; };
 		A1B2C4012F73000100B0D737 /* SwitcherPanelWindowConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherPanelWindowConfiguration.swift; sourceTree = "<group>"; };
 		A1B2C4022F73000100B0D737 /* SwitcherPanelController+Presentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelController+Presentation.swift"; sourceTree = "<group>"; };
+		B32000012FF6000100B0D737 /* SwitcherPanelController+InitialVisibilityRecovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelController+InitialVisibilityRecovery.swift"; sourceTree = "<group>"; };
 		A1B2C4032F73000100B0D737 /* SwitcherPanelController+InputHandling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelController+InputHandling.swift"; sourceTree = "<group>"; };
 		A1B2C4042F73000100B0D737 /* SwitcherPanelController+Hotkeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelController+Hotkeys.swift"; sourceTree = "<group>"; };
 		A1B2C4052F73000100B0D737 /* LiveSwitcherModel+Preview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LiveSwitcherModel+Preview.swift"; sourceTree = "<group>"; };
@@ -517,6 +519,7 @@
 				A1B2C4012F73000100B0D737 /* SwitcherPanelWindowConfiguration.swift */,
 				A1B2C3E12F73000100B0D737 /* SwitcherPanelController.swift */,
 				A1B2C4022F73000100B0D737 /* SwitcherPanelController+Presentation.swift */,
+				B32000012FF6000100B0D737 /* SwitcherPanelController+InitialVisibilityRecovery.swift */,
 				B26000032FE000100B0D737 /* SwitcherPanelController+PresentationDiagnostics.swift */,
 				A1B2C4032F73000100B0D737 /* SwitcherPanelController+InputHandling.swift */,
 				A1B2C4042F73000100B0D737 /* SwitcherPanelController+Hotkeys.swift */,
@@ -931,6 +934,7 @@
 				A1B2C3F12F73000100B0D737 /* SwitcherPanelController.swift in Sources */,
 				A1B2C4112F73000100B0D737 /* SwitcherPanelWindowConfiguration.swift in Sources */,
 				A1B2C4122F73000100B0D737 /* SwitcherPanelController+Presentation.swift in Sources */,
+				B32010012FF6000100B0D737 /* SwitcherPanelController+InitialVisibilityRecovery.swift in Sources */,
 				B26010032FE000100B0D737 /* SwitcherPanelController+PresentationDiagnostics.swift in Sources */,
 				A1B2C4132F73000100B0D737 /* SwitcherPanelController+InputHandling.swift in Sources */,
 				A1B2C4142F73000100B0D737 /* SwitcherPanelController+Hotkeys.swift in Sources */,

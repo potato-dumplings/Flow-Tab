@@ -404,8 +404,8 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertNil(controller.modelForTesting.session)
         XCTAssertTrue(controller.suppressHotkeyReplayUntilReleaseForTesting)
 
-        try? await Task.sleep(nanoseconds: 80_000_000)
-        XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
+        let notificationSuppressionEnded = await waitForHotkeyReplaySuppressionToEnd(panelController: controller)
+        XCTAssertTrue(notificationSuppressionEnded)
     }
 
     @MainActor
@@ -423,8 +423,8 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertNil(controller.modelForTesting.session)
         XCTAssertTrue(controller.suppressHotkeyReplayUntilReleaseForTesting)
 
-        try? await Task.sleep(nanoseconds: 80_000_000)
-        XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
+        let activeSpaceSuppressionEnded = await waitForHotkeyReplaySuppressionToEnd(panelController: controller)
+        XCTAssertTrue(activeSpaceSuppressionEnded)
     }
 
     @MainActor
@@ -465,8 +465,8 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertNil(controller.modelForTesting.session)
         XCTAssertTrue(controller.suppressHotkeyReplayUntilReleaseForTesting)
 
-        try? await Task.sleep(nanoseconds: 80_000_000)
-        XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
+        let activeSpaceSuppressionEnded = await waitForHotkeyReplaySuppressionToEnd(panelController: controller)
+        XCTAssertTrue(activeSpaceSuppressionEnded)
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
         controller.panelOcclusionStateOverride = []
@@ -475,8 +475,8 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertNil(controller.modelForTesting.session)
         XCTAssertTrue(controller.suppressHotkeyReplayUntilReleaseForTesting)
 
-        try? await Task.sleep(nanoseconds: 80_000_000)
-        XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
+        let occlusionSuppressionEnded = await waitForHotkeyReplaySuppressionToEnd(panelController: controller)
+        XCTAssertTrue(occlusionSuppressionEnded)
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
         controller.appIsActiveOverride = false

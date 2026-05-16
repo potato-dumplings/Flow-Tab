@@ -40,6 +40,9 @@ final class SwitcherPanelController {
     var lastCommittedTabAdvanceTimestamp: TimeInterval?
     var ignoreHotkeyPressesUntil: TimeInterval = 0
     var ignoreActiveSpaceChangesUntil: TimeInterval = 0
+    var initialPresentationVisibilityGeneration = 0
+    var initialPresentationVisibilityDeadline: TimeInterval = 0
+    var initialPresentationVisibilityTrigger: String?
     var suppressApplicationActivationUntil: TimeInterval = 0
     var windowLayerPresentationDelay: TimeInterval {
         windowLayerPresentationDelayOverride ?? WindowLayerPreferencesStore.loadAutoEnterDelay()
@@ -48,8 +51,8 @@ final class SwitcherPanelController {
     let modifierReleaseConfirmationSampleCount: Int = 2
     let postFinishHotkeyIgnoreWindow: TimeInterval = 0.02
     let activeSpaceChangeIgnoreWindow: TimeInterval = 0.35
+    let initialPresentationVisibilityGraceWindow: TimeInterval = 0.35
     let activeSpaceMigrationActivationSuppressionWindow: TimeInterval = 0.5
-    let initialPresentationRecoveryAttemptDelaysNs: [UInt64] = [50_000_000, 150_000_000]
     let interruptionPresentationRecoveryAttemptDelaysNs: [UInt64] = [
         0,
         50_000_000,

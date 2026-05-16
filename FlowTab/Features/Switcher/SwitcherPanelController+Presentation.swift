@@ -202,11 +202,9 @@ extension SwitcherPanelController {
         let secondOrderReadyMs = monotonicMilliseconds()
         beginIgnoringActiveSpaceChanges(trigger: "global_show")
         let ignoreReadyMs = monotonicMilliseconds()
-        schedulePanelVisibilityRecovery(
+        scheduleInitialPanelVisibilityRecovery(
             trigger: "global_show",
-            attemptDelaysNanoseconds: initialPresentationRecoveryAttemptDelaysNs,
-            activateApplicationIfNeeded: false,
-            recoveryMode: .softReorder
+            activateApplicationIfNeeded: false
         )
         let recoveryReadyMs = monotonicMilliseconds()
         installEventMonitors()
@@ -277,11 +275,9 @@ extension SwitcherPanelController {
         let secondOrderReadyMs = monotonicMilliseconds()
         beginIgnoringActiveSpaceChanges(trigger: "in_app_show")
         let ignoreReadyMs = monotonicMilliseconds()
-        schedulePanelVisibilityRecovery(
+        scheduleInitialPanelVisibilityRecovery(
             trigger: "in_app_show",
-            attemptDelaysNanoseconds: initialPresentationRecoveryAttemptDelaysNs,
-            activateApplicationIfNeeded: false,
-            recoveryMode: .softReorder
+            activateApplicationIfNeeded: false
         )
         let recoveryReadyMs = monotonicMilliseconds()
         installEventMonitors()
@@ -395,6 +391,7 @@ extension SwitcherPanelController {
         guard isPanelPresented || hasActivePresentationSession else { return }
         panelPresentationRecoveryTask?.cancel()
         panelPresentationRecoveryTask = nil
+        clearInitialPresentationVisibilityTracking(invalidate: true)
         removeEventMonitors()
         panel.orderOut(nil)
         panel.updateSwitcherAccessibilityApps([])

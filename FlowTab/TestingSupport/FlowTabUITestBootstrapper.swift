@@ -203,6 +203,7 @@ enum FlowTabUITestBootstrapper {
             try? await Task.sleep(nanoseconds: UInt64(milliseconds) * 1_000_000)
             guard generation == initialPanelOcclusionStaleGeneration else { return }
             panelController?.panelOcclusionStateOverride = .visible
+            panelController?.handlePanelOcclusionStateDidChangeForTesting()
             RuntimeLog.info(
                 "UITest",
                 "initial panel occlusion stale released generation=\(generation) ms=\(milliseconds)"
