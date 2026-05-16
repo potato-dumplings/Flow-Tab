@@ -330,17 +330,20 @@ extension RuntimeSnapshotProvider {
                 groupID: "mock",
                 lastActiveAt: -Double(max(definition.rank, 0)),
                 windowCount: definition.windows.count,
-                pid: FlowTabTestLaunchOptions.enablesMockHotkeyEffects
-                    ? FlowTabUITestMockRuntimeEffects.pid(for: definition.appID)
-                    : pid_t(10_000 + index)
+                pid: uiTestSummaryPID(
+                    for: definition,
+                    runningApp: runningApp,
+                    fallbackIndex: index
+                )
             )
         }
 
         let contextsByAppID = Dictionary(
             uniqueKeysWithValues: appDefinitions.map { definition in
-                let ownerPID = FlowTabTestLaunchOptions.enablesMockHotkeyEffects
-                    ? FlowTabUITestMockRuntimeEffects.pid(for: definition.appID)
-                    : runningApp.processIdentifier
+                let ownerPID = uiTestContextOwnerPID(
+                    for: definition,
+                    runningApp: runningApp
+                )
                 let windowContexts = Dictionary(uniqueKeysWithValues: definition.windows.map { window in
                     (
                         window.id,
@@ -404,6 +407,32 @@ extension RuntimeSnapshotProvider {
             summaries: summaries,
             snapshotsByAppID: snapshotsByAppID
         )
+    }
+
+    private static func uiTestSummaryPID(
+        for definition: UITestAppDefinition,
+        runningApp: NSRunningApplication,
+        fallbackIndex: Int
+    ) -> pid_t {
+        if definition.appID == baseAppID(for: runningApp) {
+            return runningApp.processIdentifier
+        }
+        if FlowTabTestLaunchOptions.enablesMockHotkeyEffects {
+            return FlowTabUITestMockRuntimeEffects.pid(for: definition.appID)
+        }
+        return pid_t(10_000 + fallbackIndex)
+    }
+
+    private static func uiTestContextOwnerPID(
+        for definition: UITestAppDefinition,
+        runningApp: NSRunningApplication
+    ) -> pid_t {
+        if definition.appID == baseAppID(for: runningApp) {
+            return runningApp.processIdentifier
+        }
+        return FlowTabTestLaunchOptions.enablesMockHotkeyEffects
+            ? FlowTabUITestMockRuntimeEffects.pid(for: definition.appID)
+            : runningApp.processIdentifier
     }
 
     private static func mockCGWindowID(from windowID: String) -> CGWindowID? {

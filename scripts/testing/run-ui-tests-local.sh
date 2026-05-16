@@ -11,12 +11,16 @@ MODULE_CACHE_ROOT="${BUILD_ROOT}/module-cache"
 PACKAGE_CACHE_PATH="${BUILD_ROOT}/source-packages"
 USER_HOME="${HOME}"
 DEFAULT_UI_TEST_APP_PATH="${USER_HOME}/Applications/Flow Tab UITest.app"
+SPACE_FIXTURE_BUILD_SCRIPT="${ROOT_DIR}/scripts/testing/build-space-fixture-workflow.sh"
+SPACE_FIXTURE_BASELINE_WORKFLOW="${ROOT_DIR}/docs/fixtures/space-fixture-home-multi-app-workflow.json"
+SPACE_FIXTURE_BASELINE_RESOLVED_PATH="${ROOT_DIR}/.build-local/space-fixture-workflow/variants/resolved-workflow.json"
 
 ACTION="test"
 ACTION_SET=false
 HAS_CUSTOM_TEST_FILTER=false
 HAS_CODE_SIGNING_OVERRIDE=false
 USE_STABLE_UI_TEST_APP=true
+PREPARE_SPACE_FIXTURES=true
 UI_TEST_APP_PATH="${FLOWTAB_UI_TEST_APP_PATH:-${DEFAULT_UI_TEST_APP_PATH}}"
 declare -a EXTRA_ARGS=()
 
@@ -43,9 +47,73 @@ Examples:
   ./scripts/testing/run-ui-tests-local.sh -only-testing:FlowTabUITests/FlowTabUITests/testHomePageSelectingMockAppUpdatesWindowList
   ./scripts/testing/run-ui-tests-local.sh --ui-test-app-path ~/Applications/Flow\ Tab\ UITest.app
   ./scripts/testing/run-ui-tests-local.sh --no-ui-test-app
+  ./scripts/testing/run-ui-tests-local.sh --skip-space-fixtures
   ./scripts/testing/run-ui-tests-local.sh build-for-testing
   ./scripts/testing/run-ui-tests-local.sh test-without-building -only-testing:FlowTabUITests
 EOF
+}
+
+ensure_space_fixture_variants() {
+  local check_output
+
+  if check_output="$(/usr/bin/python3 - "${SPACE_FIXTURE_BASELINE_RESOLVED_PATH}" <<'PY'
+import json
+import os
+import sys
+
+resolved_path = sys.argv[1]
+expected_workflow = "multi-app-home-window-counts"
+expected_apps = {
+    "finder": "com.example.fixture.finder",
+    "chrome": "com.example.fixture.chrome",
+    "notes": "com.example.fixture.notes",
+}
+
+try:
+    with open(resolved_path, encoding="utf-8") as handle:
+        workflow = json.load(handle)
+except FileNotFoundError:
+    print(f"missing {resolved_path}")
+    raise SystemExit(1)
+except json.JSONDecodeError as error:
+    print(f"invalid JSON in {resolved_path}: {error}")
+    raise SystemExit(1)
+
+workflow_name = workflow.get("workflowName")
+if workflow_name != expected_workflow:
+    print(f"resolved workflow is {workflow_name!r}, expected {expected_workflow!r}")
+    raise SystemExit(1)
+
+apps = workflow.get("apps")
+if not isinstance(apps, list):
+    print("resolved workflow apps field is missing or invalid")
+    raise SystemExit(1)
+
+apps_by_id = {str(app.get("appID", "")).strip(): app for app in apps}
+for app_id, expected_bundle_id in expected_apps.items():
+    app = apps_by_id.get(app_id)
+    if app is None:
+        print(f"missing fixture app {app_id}")
+        raise SystemExit(1)
+
+    bundle_id = str(app.get("bundleId", "")).strip()
+    if bundle_id != expected_bundle_id:
+        print(f"fixture app {app_id} has bundle id {bundle_id!r}, expected {expected_bundle_id!r}")
+        raise SystemExit(1)
+
+    app_path = str(app.get("appPath", "")).strip()
+    if not app_path or not os.path.isdir(app_path):
+        print(f"fixture app {app_id} path is missing: {app_path}")
+        raise SystemExit(1)
+PY
+  )"; then
+    echo "Space fixture variants: ready (${SPACE_FIXTURE_BASELINE_RESOLVED_PATH})"
+    return
+  fi
+
+  echo "Space fixture variants: ${check_output}"
+  echo "Space fixture variants: rebuilding shared app variants from ${SPACE_FIXTURE_BASELINE_WORKFLOW}"
+  "${SPACE_FIXTURE_BUILD_SCRIPT}" --workflow-config "${SPACE_FIXTURE_BASELINE_WORKFLOW}"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -60,6 +128,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --no-ui-test-app)
       USE_STABLE_UI_TEST_APP=false
+      shift
+      ;;
+    --skip-space-fixtures)
+      PREPARE_SPACE_FIXTURES=false
       shift
       ;;
     test|build-for-testing|test-without-building)
@@ -137,6 +209,17 @@ if [[ "${HAS_CODE_SIGNING_OVERRIDE}" == true ]]; then
   echo "Code signing for build products: caller override"
 else
   echo "Code signing for build products: disabled"
+fi
+if [[ "${ACTION}" != "build-for-testing" ]]; then
+  if [[ "${PREPARE_SPACE_FIXTURES}" == true ]]; then
+    echo "Space fixture preparation: enabled"
+  else
+    echo "Space fixture preparation: skipped"
+  fi
+fi
+
+if [[ "${ACTION}" != "build-for-testing" && "${PREPARE_SPACE_FIXTURES}" == true ]]; then
+  ensure_space_fixture_variants
 fi
 
 XCODEBUILD_CMD=(
