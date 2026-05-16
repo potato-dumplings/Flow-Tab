@@ -216,14 +216,22 @@ extension FlowTabPriorityCoverageTests {
             appName: "Google Chrome"
         )
 
-        XCTAssertEqual(entries.map(\.cgWindowID), [243_747, 240_101])
-        XCTAssertEqual(entries.map(\.title), ["Shared Doc", "Shared Doc"])
-        XCTAssertEqual(entries.map(\.spaceIDs), [[11_679], [1]])
-        XCTAssertEqual(entries.map(\.hasActivationHandle), [true, false])
+        let entriesByCGWindowID = Dictionary(uniqueKeysWithValues: entries.compactMap { entry in
+            entry.cgWindowID.map { ($0, entry) }
+        })
+
+        XCTAssertEqual(Set(entriesByCGWindowID.keys), [243_747, 240_101])
+        XCTAssertEqual(entriesByCGWindowID[243_747]?.title, "Shared Doc")
+        XCTAssertEqual(entriesByCGWindowID[243_747]?.spaceIDs, [11_679])
+        XCTAssertTrue(entriesByCGWindowID[243_747]?.hasActivationHandle == true)
         XCTAssertEqual(
-            entries.map(\.lastConfirmationSource),
-            [.fullscreenContentFallbackBinding, nil]
+            entriesByCGWindowID[243_747]?.lastConfirmationSource,
+            .fullscreenContentFallbackBinding
         )
+        XCTAssertEqual(entriesByCGWindowID[240_101]?.title, "Shared Doc")
+        XCTAssertEqual(entriesByCGWindowID[240_101]?.spaceIDs, [1])
+        XCTAssertFalse(entriesByCGWindowID[240_101]?.hasActivationHandle == true)
+        XCTAssertNil(entriesByCGWindowID[240_101]?.lastConfirmationSource)
     }
 
     @MainActor
