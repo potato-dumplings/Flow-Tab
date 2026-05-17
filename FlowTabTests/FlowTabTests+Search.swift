@@ -327,6 +327,75 @@ extension FlowTabTests {
         XCTAssertTrue(model.searchViewState.results.isEmpty)
     }
 
+    @MainActor
+    func testShowInCommandTabFiltersCurrentAppFromSwitcherAppLayerAndSearchIndex() {
+        let defaults = UserDefaults.standard
+        let previousHiddenAppIDs = defaults.object(forKey: AppPreferenceKeys.hiddenAppIDs)
+        let previousShowInCommandTab = defaults.object(forKey: AppPreferenceKeys.showInCommandTab)
+        let previousSearchEnabled = defaults.object(forKey: AppPreferenceKeys.searchEnabled)
+        let previousSearchDefaultScope = defaults.object(forKey: AppPreferenceKeys.searchDefaultScope)
+        defer {
+            restoreUserDefaultsValue(
+                previousHiddenAppIDs,
+                forKey: AppPreferenceKeys.hiddenAppIDs,
+                userDefaults: defaults
+            )
+            restoreUserDefaultsValue(
+                previousShowInCommandTab,
+                forKey: AppPreferenceKeys.showInCommandTab,
+                userDefaults: defaults
+            )
+            restoreUserDefaultsValue(
+                previousSearchEnabled,
+                forKey: AppPreferenceKeys.searchEnabled,
+                userDefaults: defaults
+            )
+            restoreUserDefaultsValue(
+                previousSearchDefaultScope,
+                forKey: AppPreferenceKeys.searchDefaultScope,
+                userDefaults: defaults
+            )
+        }
+
+        let currentAppID = Bundle.main.bundleIdentifier ?? "pid:\(ProcessInfo.processInfo.processIdentifier)"
+        defaults.removeObject(forKey: AppPreferenceKeys.hiddenAppIDs)
+        defaults.set(false, forKey: AppPreferenceKeys.showInCommandTab)
+        defaults.set(true, forKey: AppPreferenceKeys.searchEnabled)
+        defaults.set(SwitcherSearchScope.app.rawValue, forKey: AppPreferenceKeys.searchDefaultScope)
+
+        let currentApp = AppSwitchCandidate(
+            id: currentAppID,
+            displayName: "FlowTab",
+            groupID: "flowtab",
+            lastActiveAt: 400,
+            windows: [
+                WindowCandidate(id: "flowtab-home", title: "FlowTab Home", isMinimized: false, lastActiveAt: 400)
+            ]
+        )
+        let browserApp = AppSwitchCandidate(
+            id: "com.example.browser",
+            displayName: "Browser",
+            groupID: "browser",
+            lastActiveAt: 300,
+            windows: [
+                WindowCandidate(id: "browser-main", title: "Browser Main", isMinimized: false, lastActiveAt: 300)
+            ]
+        )
+        let model = LiveSwitcherModel()
+        model.snapshotProviderOverride = {
+            RuntimeSnapshot(apps: [currentApp, browserApp], contextsByID: [:])
+        }
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        XCTAssertEqual(model.session?.apps.map(\.id), ["com.example.browser"])
+
+        XCTAssertTrue(model.enterSearchMode())
+        XCTAssertTrue(model.searchCoordinator.replaceQueryWithoutRebuild("FlowTab", cursorPosition: 7))
+        model.searchCoordinator.rebuildResults(resetSelection: true)
+        model.publishSearchStateIfNeeded()
+        XCTAssertTrue(model.searchViewState.results.isEmpty)
+    }
+
     func testSearchPerformanceWindowScope() {
         let apps = makeBenchmarkApps(appCount: 400, windowsPerApp: 25)
         let queries = benchmarkQueries()

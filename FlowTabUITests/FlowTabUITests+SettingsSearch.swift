@@ -197,6 +197,34 @@ extension FlowTabUITests {
         )
     }
 
+    func testSettingsCurrentAppActivationPolicyAppearsAsHiddenApp() throws {
+        let app = makeApp(
+            additionalArguments: appVisibilityRuntimeArguments(resetDefaults: true)
+        )
+        launchFlowTabUITestApplication(app)
+        openSettingsTab(in: app)
+
+        let showInCommandTabToggle = toggleElement(
+            in: app,
+            identifier: Identifier.settingsAppearanceShowInCommandTab
+        )
+        XCTAssertTrue(showInCommandTabToggle.waitForExistence(timeout: 6))
+        XCTAssertFalse(toggleIsOn(showInCommandTabToggle))
+        XCTAssertTrue(app.staticTexts["已隐藏 1 个应用"].waitForExistence(timeout: 6))
+
+        let manageButton = element(in: app, identifier: Identifier.settingsAppVisibilityManage)
+        XCTAssertTrue(manageButton.waitForExistence(timeout: 6))
+        tapElement(manageButton)
+        XCTAssertTrue(element(in: app, identifier: Identifier.settingsAppVisibilityManager).waitForExistence(timeout: 6))
+
+        tapAppVisibilityHiddenFilter(in: app)
+
+        let currentAppRow = element(in: app, identifier: Identifier.settingsAppVisibilityCurrentApp)
+        XCTAssertTrue(currentAppRow.waitForExistence(timeout: 6))
+        tapElement(currentAppRow)
+        XCTAssertFalse(toggleIsOn(appVisibilityShowToggle(in: app)))
+    }
+
     func testSettingsAppVisibilityHiddenFilterShowsStoredHiddenAppMissingFromInventory() throws {
         let firstLaunchApp = makeApp(
             additionalArguments: appVisibilityRuntimeArguments(resetDefaults: true)

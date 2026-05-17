@@ -177,6 +177,21 @@ struct AppSettingsView: View {
         WindowLayerPreferencesStore.normalizedAutoEnterDelay(windowLayerAutoEnterDelayRaw)
     }
 
+    private var showInCommandTabPreference: Binding<Bool> {
+        Binding(
+            get: { showInCommandTab },
+            set: { newValue in
+                guard showInCommandTab != newValue else { return }
+                AppVisibilityPreferencesStore.setAppHidden(
+                    !newValue,
+                    appID: AppVisibilityPreferencesStore.currentAppID()
+                )
+                showInCommandTab = AppVisibilityPreferencesStore.loadShowInCommandTab()
+                refreshHiddenAppCount()
+            }
+        )
+    }
+
     var body: some View {
         ZStack {
             HomeBackdropView()
@@ -184,7 +199,7 @@ struct AppSettingsView: View {
             AppKitSettingsPageContent(
                 isActive: isActive && !showsAppVisibilityManager,
                 showShortcutHint: $showShortcutHint,
-                showInCommandTab: $showInCommandTab,
+                showInCommandTab: showInCommandTabPreference,
                 themeModeRaw: $themeModeRaw,
                 appLanguageRaw: $appLanguageRaw,
                 windowLayerAutoEnterDelayText: windowLayerAutoEnterDelayText,
@@ -706,6 +721,7 @@ struct AppSettingsView: View {
     }
 
     private func notifyAppVisibilityPreferenceChanged() {
+        refreshHiddenAppCount()
         RuntimeLog.info(
             .app,
             "showInCommandTab=\(showInCommandTab)"

@@ -330,11 +330,36 @@ extension FlowTabTests {
     }
 
     @MainActor
+    func testCurrentAppActivationPolicyProjectsIntoHiddenAppIDs() {
+        guard let userDefaults = makeIsolatedUserDefaults() else { return }
+        defer { clearIsolatedUserDefaults(userDefaults) }
+
+        let currentAppID = Bundle.main.bundleIdentifier ?? "pid:\(ProcessInfo.processInfo.processIdentifier)"
+
+        userDefaults.set(false, forKey: AppPreferenceKeys.showInCommandTab)
+        let hiddenModel = AppVisibilityManagerModel(userDefaults: userDefaults)
+
+        XCTAssertTrue(hiddenModel.hiddenAppIDs.contains(currentAppID))
+        XCTAssertEqual(hiddenModel.hiddenCount, 1)
+
+        hiddenModel.setHidden(false, for: currentAppID)
+        XCTAssertTrue(AppVisibilityPreferencesStore.loadShowInCommandTab(userDefaults: userDefaults))
+        XCTAssertFalse(hiddenModel.hiddenAppIDs.contains(currentAppID))
+        XCTAssertEqual(hiddenModel.hiddenCount, 0)
+
+        hiddenModel.setHidden(true, for: currentAppID)
+        XCTAssertFalse(AppVisibilityPreferencesStore.loadShowInCommandTab(userDefaults: userDefaults))
+        XCTAssertTrue(hiddenModel.hiddenAppIDs.contains(currentAppID))
+        XCTAssertEqual(hiddenModel.hiddenCount, 1)
+    }
+
+    @MainActor
     func testAppVisibilityManagerShowsStoredHiddenAppIDsMissingFromInventory() async {
         guard let userDefaults = makeIsolatedUserDefaults() else { return }
         defer { clearIsolatedUserDefaults(userDefaults) }
 
         let missingAppID = "com.flowtab.hidden.missing"
+        userDefaults.set(true, forKey: AppPreferenceKeys.showInCommandTab)
         AppVisibilityPreferencesStore.saveHiddenAppIDs([missingAppID], userDefaults: userDefaults)
 
         await withLaunchArgumentsForTesting(["FlowTab", "--flowtab-ui-mock-runtime"]) {

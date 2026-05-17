@@ -174,6 +174,10 @@ enum ThemePreferencesStore {
 enum AppVisibilityPreferencesStore {
     static let defaultShowInCommandTab = false
 
+    static func currentAppID() -> String {
+        Bundle.main.bundleIdentifier ?? "pid:\(ProcessInfo.processInfo.processIdentifier)"
+    }
+
     static func loadShowInCommandTab(userDefaults: UserDefaults = .standard) -> Bool {
         guard userDefaults.object(forKey: AppPreferenceKeys.showInCommandTab) != nil else {
             return defaultShowInCommandTab
@@ -182,6 +186,18 @@ enum AppVisibilityPreferencesStore {
     }
 
     static func loadHiddenAppIDs(userDefaults: UserDefaults = .standard) -> Set<String> {
+        let hiddenAppIDs = loadStoredHiddenAppIDs(userDefaults: userDefaults)
+        let effectiveHiddenAppIDs = hiddenAppIDsWithCurrentAppPolicy(
+            hiddenAppIDs,
+            userDefaults: userDefaults
+        )
+        if effectiveHiddenAppIDs != hiddenAppIDs {
+            saveStoredHiddenAppIDs(effectiveHiddenAppIDs, userDefaults: userDefaults)
+        }
+        return effectiveHiddenAppIDs
+    }
+
+    private static func loadStoredHiddenAppIDs(userDefaults: UserDefaults) -> Set<String> {
         let rawIDs = userDefaults.stringArray(forKey: AppPreferenceKeys.hiddenAppIDs) ?? []
         let normalizedIDs = AppVisibilityFilter.normalizedHiddenAppIDs(rawIDs)
         if rawIDs != normalizedIDs {
@@ -193,6 +209,16 @@ enum AppVisibilityPreferencesStore {
     static func saveHiddenAppIDs(
         _ hiddenAppIDs: Set<String>,
         userDefaults: UserDefaults = .standard
+    ) {
+        saveStoredHiddenAppIDs(
+            hiddenAppIDsWithCurrentAppPolicy(hiddenAppIDs, userDefaults: userDefaults),
+            userDefaults: userDefaults
+        )
+    }
+
+    private static func saveStoredHiddenAppIDs(
+        _ hiddenAppIDs: Set<String>,
+        userDefaults: UserDefaults
     ) {
         userDefaults.set(
             AppVisibilityFilter.normalizedHiddenAppIDs(Array(hiddenAppIDs)),
@@ -206,7 +232,10 @@ enum AppVisibilityPreferencesStore {
         userDefaults: UserDefaults = .standard
     ) {
         guard let normalizedAppID = AppVisibilityFilter.normalizedAppID(appID) else { return }
-        var hiddenAppIDs = loadHiddenAppIDs(userDefaults: userDefaults)
+        var hiddenAppIDs = loadStoredHiddenAppIDs(userDefaults: userDefaults)
+        if isCurrentAppID(normalizedAppID) {
+            userDefaults.set(!isHidden, forKey: AppPreferenceKeys.showInCommandTab)
+        }
         if isHidden {
             hiddenAppIDs.insert(normalizedAppID)
         } else {
@@ -217,6 +246,29 @@ enum AppVisibilityPreferencesStore {
 
     static func visibilityFilter(userDefaults: UserDefaults = .standard) -> AppVisibilityFilter {
         AppVisibilityFilter(hiddenAppIDs: loadHiddenAppIDs(userDefaults: userDefaults))
+    }
+
+    private static func hiddenAppIDsWithCurrentAppPolicy(
+        _ hiddenAppIDs: Set<String>,
+        userDefaults: UserDefaults
+    ) -> Set<String> {
+        var effectiveHiddenAppIDs = hiddenAppIDs
+        let normalizedCurrentAppID = AppVisibilityFilter.normalizedAppID(currentAppID())
+        guard let normalizedCurrentAppID else { return effectiveHiddenAppIDs }
+
+        if loadShowInCommandTab(userDefaults: userDefaults) {
+            effectiveHiddenAppIDs.remove(normalizedCurrentAppID)
+        } else {
+            effectiveHiddenAppIDs.insert(normalizedCurrentAppID)
+        }
+        return effectiveHiddenAppIDs
+    }
+
+    private static func isCurrentAppID(_ appID: String) -> Bool {
+        guard let normalizedCurrentAppID = AppVisibilityFilter.normalizedAppID(currentAppID()) else {
+            return false
+        }
+        return appID == normalizedCurrentAppID
     }
 }
 
