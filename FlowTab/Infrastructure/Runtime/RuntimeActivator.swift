@@ -147,6 +147,10 @@ final class RuntimeActivator {
 
     private func focusWindow(_ request: WindowFocusRequest, in app: NSRunningApplication) {
         guard request.allowsAnyActivationRoute else {
+            if bindingAllowsChromeInternalActivationBypass(request, in: app) {
+                _ = finishChromeInternalWindowFocusIfVerified(request, in: app)
+                return
+            }
             RuntimeLog.debug(
                 .activation,
                 "focus-attempt skipped pid=\(app.processIdentifier) windowID=\(request.windowID) reason=binding_action_disallowed allowedActions=\(activationAllowedActionsDescription(request.bindingAllowedActions))"
@@ -155,6 +159,38 @@ final class RuntimeActivator {
         }
         guard !attemptWindowFocus(request, in: app, allowChromeInternalFocus: true) else { return }
         scheduleFocusRecovery(for: request, in: app)
+    }
+
+    private func bindingAllowsChromeInternalActivationBypass(
+        _ request: WindowFocusRequest,
+        in app: NSRunningApplication
+    ) -> Bool {
+        guard request.bindingConfidence != .ambiguous else { return false }
+        guard request.targetCGWindowID(expectedPID: app.processIdentifier) != nil else {
+            return false
+        }
+        return RuntimeChromeWindowFocusBridge.scriptableBrowserSpec(for: app) != nil
+    }
+
+    private func bindingAllowsChromeInternalActivationRoute(
+        _ request: WindowFocusRequest,
+        in app: NSRunningApplication
+    ) -> Bool {
+        if request.bindingAllowedActions.contains(.useForCGActivationFallback) {
+            return true
+        }
+        if bindingAllowsChromeInternalActivationBypass(request, in: app) {
+            RuntimeLog.debug(
+                .activation,
+                "focus-attempt route=chrome-internal allowed pid=\(app.processIdentifier) windowID=\(request.windowID) reason=chrome_binding_bypass confidence=\(request.bindingConfidence.rawValue) allowedActions=\(activationAllowedActionsDescription(request.bindingAllowedActions))"
+            )
+            return true
+        }
+        RuntimeLog.debug(
+            .activation,
+            "focus-attempt route=chrome-internal skipped pid=\(app.processIdentifier) windowID=\(request.windowID) reason=binding_action_disallowed requiredAction=\(WindowBindingAction.useForCGActivationFallback.rawValue) allowedActions=\(activationAllowedActionsDescription(request.bindingAllowedActions))"
+        )
+        return false
     }
 
     @discardableResult
@@ -579,12 +615,7 @@ final class RuntimeActivator {
         _ request: WindowFocusRequest,
         in app: NSRunningApplication
     ) -> Bool {
-        guard bindingAllowsActivationAction(
-            .useForCGActivationFallback,
-            route: "chrome-internal",
-            request: request,
-            app: app
-        ) else {
+        guard bindingAllowsChromeInternalActivationRoute(request, in: app) else {
             return false
         }
         guard let result = attemptChromeInternalWindowFocus(request, in: app) else {
