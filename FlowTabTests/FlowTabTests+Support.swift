@@ -6,6 +6,23 @@ import FlowTabCore
 import Carbon
 
 extension FlowTabTests {
+    @MainActor
+    func waitUntil(
+        _ description: String,
+        timeout: TimeInterval = 1.0,
+        pollIntervalNanoseconds: UInt64 = 5_000_000,
+        predicate: @MainActor @escaping () -> Bool
+    ) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if predicate() {
+                return true
+            }
+            try? await Task.sleep(nanoseconds: pollIntervalNanoseconds)
+        }
+        return predicate()
+    }
+
     func searchSampleApps() -> [AppSwitchCandidate] {
         [
             AppSwitchCandidate(
@@ -351,19 +368,39 @@ extension FlowTabTests {
     func drainPendingSearchRebuild(on coordinator: SwitcherSearchCoordinator) {
         coordinator.flushPendingRebuild()
     }
-    func withLaunchArgumentsForTesting(_ arguments: [String], _ body: () -> Void) {
+    func withLaunchArgumentsForTesting(
+        _ arguments: [String],
+        environment: [String: String]? = [
+            FlowTabTestLaunchOptions.uiTestingEnvironmentKey:
+                FlowTabTestLaunchOptions.uiTestingEnvironmentValue
+        ],
+        _ body: () -> Void
+    ) {
         let previousArguments = FlowTabTestLaunchOptions.argumentsOverrideForTesting
+        let previousEnvironment = FlowTabTestLaunchOptions.environmentOverrideForTesting
         FlowTabTestLaunchOptions.argumentsOverrideForTesting = arguments
+        FlowTabTestLaunchOptions.environmentOverrideForTesting = environment
         defer {
             FlowTabTestLaunchOptions.argumentsOverrideForTesting = previousArguments
+            FlowTabTestLaunchOptions.environmentOverrideForTesting = previousEnvironment
         }
         body()
     }
-    func withLaunchArgumentsForTesting(_ arguments: [String], _ body: () async -> Void) async {
+    func withLaunchArgumentsForTesting(
+        _ arguments: [String],
+        environment: [String: String]? = [
+            FlowTabTestLaunchOptions.uiTestingEnvironmentKey:
+                FlowTabTestLaunchOptions.uiTestingEnvironmentValue
+        ],
+        _ body: () async -> Void
+    ) async {
         let previousArguments = FlowTabTestLaunchOptions.argumentsOverrideForTesting
+        let previousEnvironment = FlowTabTestLaunchOptions.environmentOverrideForTesting
         FlowTabTestLaunchOptions.argumentsOverrideForTesting = arguments
+        FlowTabTestLaunchOptions.environmentOverrideForTesting = environment
         defer {
             FlowTabTestLaunchOptions.argumentsOverrideForTesting = previousArguments
+            FlowTabTestLaunchOptions.environmentOverrideForTesting = previousEnvironment
         }
         await body()
     }

@@ -139,37 +139,44 @@ extension LiveSwitcherModel {
         guard snapshotProviderOverride == nil || backgroundFullSnapshotProviderOverride != nil else { return }
 
         backgroundFullSnapshotRefreshGeneration &+= 1
-        let generation = backgroundFullSnapshotRefreshGeneration
-        scheduleBackgroundFullSnapshotRefreshWork(
+        let request = BackgroundFullSnapshotRefreshRequest(
             triggerDirection: triggerDirection,
-            generation: generation,
-            scheduledMs: Self.monotonicMilliseconds()
+            generation: backgroundFullSnapshotRefreshGeneration,
+            scheduledMs: Self.monotonicMilliseconds(),
+            reason: .startSession
+        )
+        scheduleBackgroundFullSnapshotRefreshWork(
+            request
         )
     }
 
     private func scheduleBackgroundFullSnapshotRefreshWork(
-        triggerDirection: CycleDirection,
-        generation: UInt64,
-        scheduledMs: Double
+        _ request: BackgroundFullSnapshotRefreshRequest,
+        delay: DispatchTimeInterval? = nil
     ) {
-        let delay: DispatchTimeInterval = .milliseconds(150)
-        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + delay) { [weak self] in
+        let refreshDelay = delay ?? backgroundFullSnapshotRefreshDelay
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + refreshDelay) { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                guard generation == self.backgroundFullSnapshotRefreshGeneration else {
-                    self.logBackgroundFullSnapshotRefresh(result: "staleBeforeStart", startMs: scheduledMs)
+                guard request.generation == self.backgroundFullSnapshotRefreshGeneration else {
+                    self.logBackgroundFullSnapshotRefresh(
+                        result: "staleBeforeStart",
+                        startMs: request.scheduledMs,
+                        generation: request.generation,
+                        reason: request.reason,
+                        triggerDirection: request.triggerDirection
+                    )
                     return
                 }
                 if let pendingAppID = self.selectedAppWindowSnapshotPendingAppID {
                     self.logBackgroundFullSnapshotRefresh(
                         result: "deferredSelectedAppPending:\(pendingAppID)",
-                        startMs: scheduledMs
+                        startMs: request.scheduledMs,
+                        generation: request.generation,
+                        reason: request.reason,
+                        triggerDirection: request.triggerDirection
                     )
-                    self.scheduleBackgroundFullSnapshotRefreshWork(
-                        triggerDirection: triggerDirection,
-                        generation: generation,
-                        scheduledMs: scheduledMs
-                    )
+                    self.deferredBackgroundFullSnapshotRefreshRequest = request
                     return
                 }
 
@@ -182,8 +189,9 @@ extension LiveSwitcherModel {
                     Task { @MainActor [weak self] in
                         self?.completeBackgroundFullSnapshotRefresh(
                             snapshot,
-                            triggerDirection: triggerDirection,
-                            generation: generation,
+                            triggerDirection: request.triggerDirection,
+                            generation: request.generation,
+                            reason: request.reason,
                             startMs: startMs,
                             snapshotReadMs: snapshotReadMs
                         )
@@ -197,19 +205,38 @@ extension LiveSwitcherModel {
         _ rawSnapshot: RuntimeSnapshot,
         triggerDirection: CycleDirection,
         generation: UInt64,
+        reason: SnapshotInvalidationReason = .startSession,
         startMs: Double,
         snapshotReadMs: Double
     ) {
         guard generation == backgroundFullSnapshotRefreshGeneration else {
-            logBackgroundFullSnapshotRefresh(result: "stale", startMs: startMs)
+            logBackgroundFullSnapshotRefresh(
+                result: "stale",
+                startMs: startMs,
+                generation: generation,
+                reason: reason,
+                triggerDirection: triggerDirection
+            )
             return
         }
         guard let currentSession = session, overlayStyle == .appAndWindow else {
-            logBackgroundFullSnapshotRefresh(result: "inactive", startMs: startMs)
+            logBackgroundFullSnapshotRefresh(
+                result: "inactive",
+                startMs: startMs,
+                generation: generation,
+                reason: reason,
+                triggerDirection: triggerDirection
+            )
             return
         }
         guard case .appCycle = currentSession.mode else {
-            logBackgroundFullSnapshotRefresh(result: "nonAppCycle", startMs: startMs)
+            logBackgroundFullSnapshotRefresh(
+                result: "nonAppCycle",
+                startMs: startMs,
+                generation: generation,
+                reason: reason,
+                triggerDirection: triggerDirection
+            )
             return
         }
 
@@ -228,15 +255,28 @@ extension LiveSwitcherModel {
         )
         logBackgroundFullSnapshotRefresh(
             result: applied ? "applied" : "empty",
-            startMs: startMs
+            startMs: startMs,
+            generation: generation,
+            reason: reason,
+            triggerDirection: triggerDirection,
+            applyGeneration: backgroundFullSnapshotRefreshGeneration
         )
         if applied {
             onSessionLayoutChanged?()
         }
     }
 
-    func invalidateBackgroundFullSnapshotRefresh() {
+    func invalidateBackgroundFullSnapshotRefresh(
+        reason: SnapshotInvalidationReason = .explicitBackgroundRefreshInvalidation
+    ) {
         backgroundFullSnapshotRefreshGeneration &+= 1
+        let clearedDeferredRequest = deferredBackgroundFullSnapshotRefreshRequest != nil
+        deferredBackgroundFullSnapshotRefreshRequest = nil
+        recordSnapshotInvalidation(
+            reason: reason,
+            scope: .backgroundFullSnapshot,
+            clearedDeferredBackgroundRequest: clearedDeferredRequest
+        )
     }
 
     @discardableResult
@@ -294,6 +334,7 @@ extension LiveSwitcherModel {
         defer {
             if selectedAppWindowSnapshotPendingAppID == appID {
                 selectedAppWindowSnapshotPendingAppID = nil
+                resumeDeferredBackgroundFullSnapshotRefreshIfReady()
             }
         }
         guard generation == selectedAppWindowSnapshotGeneration else {
@@ -382,9 +423,51 @@ extension LiveSwitcherModel {
         onSessionLayoutChanged?()
     }
 
-    func invalidateSelectedAppWindowSnapshot() {
+    func invalidateSelectedAppWindowSnapshot(
+        reason: SnapshotInvalidationReason = .explicitSelectedAppWindowInvalidation
+    ) {
         selectedAppWindowSnapshotGeneration &+= 1
         selectedAppWindowSnapshotPendingAppID = nil
+        let clearedDeferredRequest = deferredBackgroundFullSnapshotRefreshRequest != nil
+        deferredBackgroundFullSnapshotRefreshRequest = nil
+        recordSnapshotInvalidation(
+            reason: reason,
+            scope: .selectedAppWindowSnapshot,
+            clearedDeferredBackgroundRequest: clearedDeferredRequest
+        )
+    }
+
+    func recordSnapshotInvalidation(
+        reason: SnapshotInvalidationReason,
+        scope: SnapshotInvalidationScope,
+        clearedDeferredBackgroundRequest: Bool
+    ) {
+        let record = SnapshotInvalidationRecord(
+            reason: reason,
+            scope: scope,
+            backgroundGeneration: backgroundFullSnapshotRefreshGeneration,
+            selectedAppWindowGeneration: selectedAppWindowSnapshotGeneration,
+            clearedDeferredBackgroundRequest: clearedDeferredBackgroundRequest
+        )
+        lastSnapshotInvalidationRecord = record
+        RuntimeLog.debug(.snapshot, record.logMessage)
+    }
+
+    private func resumeDeferredBackgroundFullSnapshotRefreshIfReady() {
+        guard selectedAppWindowSnapshotPendingAppID == nil else { return }
+        guard let request = deferredBackgroundFullSnapshotRefreshRequest else { return }
+        deferredBackgroundFullSnapshotRefreshRequest = nil
+        guard request.generation == backgroundFullSnapshotRefreshGeneration else {
+            logBackgroundFullSnapshotRefresh(
+                result: "staleDeferred",
+                startMs: request.scheduledMs,
+                generation: request.generation,
+                reason: request.reason,
+                triggerDirection: request.triggerDirection
+            )
+            return
+        }
+        scheduleBackgroundFullSnapshotRefreshWork(request, delay: .nanoseconds(0))
     }
 
     func makeSnapshot() -> RuntimeSnapshot {

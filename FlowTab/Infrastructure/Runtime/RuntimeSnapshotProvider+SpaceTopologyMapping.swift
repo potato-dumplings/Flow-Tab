@@ -194,7 +194,23 @@ extension RuntimeSnapshotProvider {
         assignedCGWindowIDs: Set<CGWindowID>,
         appName: String
     ) -> [String: CGWindowID] {
-        guard !axWindows.isEmpty else { return [:] }
+        resolveFullscreenContentFallbackBindingsWithDiagnostics(
+            axWindows: axWindows,
+            cgWindows: cgWindows,
+            assignedCGWindowIDs: assignedCGWindowIDs,
+            appName: appName
+        ).matches
+    }
+
+    static func resolveFullscreenContentFallbackBindingsWithDiagnostics(
+        axWindows: [AXWindowEntry],
+        cgWindows: [CGWindowEntry],
+        assignedCGWindowIDs: Set<CGWindowID>,
+        appName: String
+    ) -> RuntimeWindowAssignmentMatchResult {
+        guard !axWindows.isEmpty else {
+            return RuntimeWindowAssignmentMatchResult(matches: [:], bindingDiagnostics: [])
+        }
         let contentCGWindows = cgWindows.filter {
             !assignedCGWindowIDs.contains($0.id)
                 && RuntimeWindowTopologyClassifier.isLikelyOffDesktopFullscreenContent(
@@ -202,7 +218,9 @@ extension RuntimeSnapshotProvider {
                     spaceIDs: $0.spaceIDs
                 )
         }
-        guard !contentCGWindows.isEmpty else { return [:] }
+        guard !contentCGWindows.isEmpty else {
+            return RuntimeWindowAssignmentMatchResult(matches: [:], bindingDiagnostics: [])
+        }
 
         var candidateCGIDsByAXWindowID: [String: Set<CGWindowID>] = [:]
         var candidateAXWindowIDsByCGWindowID: [CGWindowID: Set<String>] = [:]
@@ -269,7 +287,49 @@ extension RuntimeSnapshotProvider {
             matches[axWindow.id] = cgWindow.id
         }
 
-        return matches
+        let bindingDiagnostics = fullscreenTopologyAmbiguousDiagnostics(
+            candidateCGIDsByAXWindowID: candidateCGIDsByAXWindowID,
+            candidateAXWindowIDsByCGWindowID: candidateAXWindowIDsByCGWindowID,
+            matchedByWindowID: matches
+        )
+        for diagnostic in bindingDiagnostics {
+            RuntimeLog.debug(
+                .axMatch,
+                "binding-assignment fullscreen-topology ambiguous ax=\(diagnostic.axWindowID ?? "nil") candidates=\(diagnostic.candidateCount) candidateCG=\(diagnostic.cgWindowID.map(String.init) ?? "nil") allowedActions=\(diagnostic.allowedActions.map(\.rawValue).sorted().joined(separator: ","))"
+            )
+        }
+        return RuntimeWindowAssignmentMatchResult(
+            matches: matches,
+            bindingDiagnostics: bindingDiagnostics
+        )
+    }
+}
+
+private func fullscreenTopologyAmbiguousDiagnostics(
+    candidateCGIDsByAXWindowID: [String: Set<CGWindowID>],
+    candidateAXWindowIDsByCGWindowID: [CGWindowID: Set<String>],
+    matchedByWindowID: [String: CGWindowID]
+) -> [WindowBindingDiagnostic] {
+    candidateCGIDsByAXWindowID.compactMap { axWindowID, candidateCGWindowIDs in
+        guard matchedByWindowID[axWindowID] == nil else { return nil }
+        guard !candidateCGWindowIDs.isEmpty else { return nil }
+        let candidateCount = candidateCGWindowIDs.count
+        let conflictedCGCount = candidateCGWindowIDs.filter {
+            (candidateAXWindowIDsByCGWindowID[$0]?.count ?? 0) > 1
+        }.count
+        return WindowBindingDiagnostic(
+            stableWindowID: axWindowID,
+            axWindowID: axWindowID,
+            cgWindowID: candidateCount == 1 ? candidateCGWindowIDs.first : nil,
+            confidence: .ambiguous,
+            source: .fullscreenContentFallbackBinding,
+            reason: .fullscreenTopologyAmbiguous,
+            candidateCount: max(candidateCount, conflictedCGCount),
+            allowedActions: WindowBindingConfidence.ambiguous.allowedActions
+        )
+    }
+    .sorted { lhs, rhs in
+        lhs.stableWindowID < rhs.stableWindowID
     }
 }
 

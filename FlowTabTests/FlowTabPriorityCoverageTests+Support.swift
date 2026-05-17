@@ -163,7 +163,8 @@ extension FlowTabPriorityCoverageTests {
     func makeRuntimeAppContext(
         appID: String,
         runningApp: NSRunningApplication,
-        windows: [WindowCandidate]
+        windows: [WindowCandidate],
+        lastConfirmationSource: WindowBindingConfirmationSource? = nil
     ) -> RuntimeAppContext {
         let windowsByID = Dictionary(
             uniqueKeysWithValues: windows.map { window in
@@ -175,7 +176,8 @@ extension FlowTabPriorityCoverageTests {
                         isMinimized: window.isMinimized,
                         ownerPID: runningApp.processIdentifier,
                         cgWindowID: nil,
-                        inferredTitleBarStyle: nil
+                        inferredTitleBarStyle: nil,
+                        lastConfirmationSource: lastConfirmationSource
                     )
                 )
             }

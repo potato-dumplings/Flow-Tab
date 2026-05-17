@@ -8,6 +8,7 @@ extension SwitcherPanelController {
         initialPresentationVisibilityDeadline = ProcessInfo.processInfo.systemUptime
             + initialPresentationVisibilityGraceWindow
         initialPresentationVisibilityTrigger = trigger
+        panelVisibilityRecoveryState = .presenting(trigger: trigger, generation: generation)
         logSearchTrace(
             "presentationRecovery trigger=\(trigger) action=trackInitialVisibility generation=\(generation) graceMs=\(formatMilliseconds(initialPresentationVisibilityGraceWindow * 1_000)) \(searchTraceStateSummary())"
         )
@@ -53,10 +54,15 @@ extension SwitcherPanelController {
         guard isPanelVisibleToUser else { return false }
 
         let resolvedTrigger = trigger ?? initialPresentationVisibilityTrigger ?? "panel_visible"
+        let completedGeneration = generation ?? initialPresentationVisibilityGeneration
         clearInitialPresentationVisibilityTracking()
+        panelVisibilityRecoveryState = .visibleConfirmed(
+            trigger: resolvedTrigger,
+            generation: completedGeneration,
+            reason: reason
+        )
         if cancelRecoveryTask {
-            panelPresentationRecoveryTask?.cancel()
-            panelPresentationRecoveryTask = nil
+            cancelPanelPresentationRecoveryTask()
         }
         logSearchTrace(
             "presentationRecovery trigger=\(resolvedTrigger) action=complete reason=\(reason) \(searchTraceStateSummary())"
@@ -70,10 +76,11 @@ extension SwitcherPanelController {
         trigger: String,
         activateApplicationIfNeeded: Bool = false
     ) {
-        panelPresentationRecoveryTask?.cancel()
+        let recoveryGeneration = beginPanelPresentationRecoveryTask()
         let generation = beginInitialPresentationVisibilityTracking(trigger: trigger)
         panelPresentationRecoveryTask = Task { @MainActor [weak self] in
             guard let self else { return }
+            guard self.isPanelPresentationRecoveryGenerationCurrent(recoveryGeneration) else { return }
             guard self.isInitialPresentationVisibilityGenerationCurrent(generation) else { return }
 
             if self.completeInitialPresentationVisibilityIfVisible(
@@ -82,26 +89,41 @@ extension SwitcherPanelController {
                 reason: "alreadyVisible",
                 cancelRecoveryTask: false
             ) {
-                self.panelPresentationRecoveryTask = nil
+                self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
                 return
             }
 
+            self.panelVisibilityRecoveryState = .suspectedHidden(
+                trigger: trigger,
+                generation: generation
+            )
             self.logSearchTrace(
-                "presentationRecovery trigger=\(trigger) action=softAttempt generation=\(generation) \(self.searchTraceStateSummary())"
+                "presentationRecovery trigger=\(trigger) action=softAttempt generation=\(generation) recoveryGeneration=\(recoveryGeneration) \(self.searchTraceStateSummary())"
+            )
+            self.panelVisibilityRecoveryState = .recovering(
+                trigger: trigger,
+                generation: generation,
+                attempt: 1,
+                totalAttempts: 1,
+                mode: .softReorder
             )
             await self.performPanelVisibilityRecoveryAttempt(
                 trigger: trigger,
                 activateApplicationIfNeeded: activateApplicationIfNeeded,
-                recoveryMode: .softReorder
+                recoveryMode: .softReorder,
+                generation: recoveryGeneration,
+                attempt: 1,
+                totalAttempts: 1
             )
 
             guard !Task.isCancelled else { return }
+            guard self.isPanelPresentationRecoveryGenerationCurrent(recoveryGeneration) else { return }
             guard self.hasActivePresentationSession else {
-                self.panelPresentationRecoveryTask = nil
+                self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
                 return
             }
             guard self.isInitialPresentationVisibilityGenerationCurrent(generation) else {
-                self.panelPresentationRecoveryTask = nil
+                self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
                 return
             }
 
@@ -111,7 +133,7 @@ extension SwitcherPanelController {
                 reason: "recovered",
                 cancelRecoveryTask: false
             ) {
-                self.panelPresentationRecoveryTask = nil
+                self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
                 return
             }
 
@@ -124,12 +146,13 @@ extension SwitcherPanelController {
             }
 
             guard !Task.isCancelled else { return }
+            guard self.isPanelPresentationRecoveryGenerationCurrent(recoveryGeneration) else { return }
             guard self.hasActivePresentationSession else {
-                self.panelPresentationRecoveryTask = nil
+                self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
                 return
             }
             guard self.isInitialPresentationVisibilityGenerationCurrent(generation) else {
-                self.panelPresentationRecoveryTask = nil
+                self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
                 return
             }
 
@@ -139,14 +162,19 @@ extension SwitcherPanelController {
                 reason: "deadlineVisible",
                 cancelRecoveryTask: false
             ) {
-                self.panelPresentationRecoveryTask = nil
+                self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
                 return
             }
 
-            self.panelPresentationRecoveryTask = nil
+            self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
             self.clearInitialPresentationVisibilityTracking()
+            self.panelVisibilityRecoveryState = .failed(
+                trigger: trigger,
+                generation: generation,
+                reason: "visibilityDeadline"
+            )
             self.logSearchTrace(
-                "presentationRecovery trigger=\(trigger) action=failed reason=visibilityDeadline generation=\(generation) \(self.searchTraceStateSummary())"
+                "presentationRecovery trigger=\(trigger) action=failed reason=visibilityDeadline generation=\(generation) recoveryGeneration=\(recoveryGeneration) \(self.searchTraceStateSummary())"
             )
             self.handleRecoverableSystemInterruption(trigger: "\(trigger)_visibilityDeadline")
         }

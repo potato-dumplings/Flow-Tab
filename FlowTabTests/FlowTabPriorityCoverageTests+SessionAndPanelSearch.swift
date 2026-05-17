@@ -357,7 +357,10 @@ extension FlowTabPriorityCoverageTests {
             controller.updatePanelSizeForTesting(
                 visibleFrame: CGRect(x: 0, y: 0, width: 1440, height: 900)
             )
-            try? await Task.sleep(nanoseconds: 200_000_000)
+            let didLoadSearchResults = await waitUntil("search results available after entering search mode") {
+                controller.modelForTesting.searchResultCount > 0
+            }
+            XCTAssertTrue(didLoadSearchResults)
 
             guard let firstResultID = controller.modelForTesting.searchViewState.results.first?.id else {
                 XCTFail("Expected search results after entering search mode")
@@ -366,12 +369,10 @@ extension FlowTabPriorityCoverageTests {
             }
 
             XCTAssertTrue(controller.handleKeyDownForTesting(Self.makeKeyDownEvent(keyCode: 125)))
-            try? await Task.sleep(nanoseconds: 50_000_000)
 
             let moveCountToLastResult = max(0, controller.modelForTesting.searchResultCount - 1)
             for _ in 0..<moveCountToLastResult {
                 XCTAssertTrue(controller.handleKeyDownForTesting(Self.makeKeyDownEvent(keyCode: 125)))
-                try? await Task.sleep(nanoseconds: 50_000_000)
             }
 
             XCTAssertEqual(
@@ -380,7 +381,11 @@ extension FlowTabPriorityCoverageTests {
             )
 
             XCTAssertTrue(controller.handleKeyDownForTesting(Self.makeKeyDownEvent(keyCode: 125)))
-            try? await Task.sleep(nanoseconds: 50_000_000)
+            let didWrapToFirstResult = await waitUntil("search wrap scroll request returns to first result") {
+                controller.modelForTesting.searchViewState.selectedResultIndex == 0
+                    && scrollRequests.last == firstResultID
+            }
+            XCTAssertTrue(didWrapToFirstResult)
 
             XCTAssertEqual(controller.modelForTesting.searchViewState.selectedResultIndex, 0)
             XCTAssertEqual(scrollRequests.last, firstResultID)
@@ -509,97 +514,6 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testLiveSwitcherModelStartFocusedAppWindowSessionSelectsFocusedWindowIdentityOverWindowOrdering() {
-        let model = LiveSwitcherModel()
-        let currentApp = NSRunningApplication.current
-        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
-        let normalFrame = CGRect(x: 120, y: 120, width: 1_100, height: 800)
-        let incognitoFrame = CGRect(x: 180, y: 160, width: 1_100, height: 800)
-        let fullscreenFrame = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
-        let windows = [
-            WindowCandidate(
-                id: "incognito",
-                title: "Chrome Incognito Tab",
-                isMinimized: false,
-                lastActiveAt: 40
-            ),
-            WindowCandidate(
-                id: "normal",
-                title: "Chrome Normal Tab",
-                isMinimized: false,
-                lastActiveAt: 30
-            ),
-            WindowCandidate(
-                id: "fullscreen",
-                title: "Chrome Fullscreen Tab",
-                isMinimized: false,
-                lastActiveAt: 20
-            )
-        ]
-        let context = RuntimeAppContext(
-            appID: appID,
-            runningApp: currentApp,
-            windowsByID: [
-                "incognito": RuntimeWindowContext(
-                    id: "incognito",
-                    title: "Chrome Incognito Tab",
-                    isMinimized: false,
-                    ownerPID: currentApp.processIdentifier,
-                    cgWindowID: 151_552,
-                    frame: incognitoFrame
-                ),
-                "normal": RuntimeWindowContext(
-                    id: "normal",
-                    title: "Chrome Normal Tab",
-                    isMinimized: false,
-                    ownerPID: currentApp.processIdentifier,
-                    cgWindowID: 151_549,
-                    frame: normalFrame
-                ),
-                "fullscreen": RuntimeWindowContext(
-                    id: "fullscreen",
-                    title: "Chrome Fullscreen Tab",
-                    isMinimized: false,
-                    ownerPID: currentApp.processIdentifier,
-                    cgWindowID: 151_560,
-                    frame: fullscreenFrame
-                )
-            ]
-        )
-
-        model.frontmostApplicationOverride = { currentApp }
-        model.snapshotProviderOverride = {
-            RuntimeSnapshot(
-                apps: [
-                    AppSwitchCandidate(
-                        id: appID,
-                        displayName: "Chrome Fixture",
-                        groupID: "chrome",
-                        lastActiveAt: 100,
-                        windows: windows
-                    )
-                ],
-                contextsByID: [appID: context]
-            )
-        }
-        model.focusedWindowIdentityOverride = { _ in
-            RuntimeFocusedWindowIdentity(
-                cgWindowID: 151_549,
-                title: "Chrome Normal Tab",
-                frame: normalFrame
-            )
-        }
-
-        XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
-
-        XCTAssertEqual(model.session?.mode, .windowCycle(appID: appID))
-        XCTAssertEqual(model.session?.selectedWindow?.id, "normal")
-        XCTAssertEqual(model.session?.selectedApp.windows.map(\.id), ["normal", "incognito", "fullscreen"])
-        model.handle(.tabForward)
-        XCTAssertEqual(model.session?.selectedWindow?.id, "incognito")
-    }
-
-    @MainActor
     func testLiveSwitcherModelAutoEnterWindowLayerSuppressesImmediateReentryAfterManualExit() {
         let model = LiveSwitcherModel()
         model.snapshotProviderOverride = {
@@ -642,11 +556,17 @@ extension FlowTabPriorityCoverageTests {
     func testUITestSearchLaunchUsesControllerSearchSizingPath() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
             let previousLaunchArguments = FlowTabTestLaunchOptions.argumentsOverrideForTesting
+            let previousLaunchEnvironment = FlowTabTestLaunchOptions.environmentOverrideForTesting
             FlowTabTestLaunchOptions.argumentsOverrideForTesting = [
                 "--flowtab-ui-open-switcher-search"
             ]
+            FlowTabTestLaunchOptions.environmentOverrideForTesting = [
+                FlowTabTestLaunchOptions.uiTestingEnvironmentKey:
+                    FlowTabTestLaunchOptions.uiTestingEnvironmentValue
+            ]
             defer {
                 FlowTabTestLaunchOptions.argumentsOverrideForTesting = previousLaunchArguments
+                FlowTabTestLaunchOptions.environmentOverrideForTesting = previousLaunchEnvironment
             }
 
             let controller = SwitcherPanelController()
@@ -665,16 +585,11 @@ extension FlowTabPriorityCoverageTests {
                     measurements: controller.modelForTesting.searchLayoutMeasurements
                 )
             }
-            let deadline = DispatchTime.now().uptimeNanoseconds + 2_000_000_000
-            while DispatchTime.now().uptimeNanoseconds < deadline {
-                if
-                    controller.modelForTesting.isSearchActive,
-                    abs(controller.panelContentSizeForTesting.height - expectedSearchHeight()) <= 1
-                {
-                    break
-                }
-                try? await Task.sleep(nanoseconds: 50_000_000)
+            let didReachExpectedSearchHeight = await waitUntil("initial UI search sizing reaches expected height") {
+                controller.modelForTesting.isSearchActive
+                    && abs(controller.panelContentSizeForTesting.height - expectedSearchHeight()) <= 1
             }
+            XCTAssertTrue(didReachExpectedSearchHeight)
 
             XCTAssertTrue(controller.modelForTesting.isSearchActive)
             XCTAssertEqual(
@@ -732,7 +647,6 @@ extension FlowTabPriorityCoverageTests {
         )
 
         XCTAssertTrue(handled)
-        try? await Task.sleep(nanoseconds: 120_000_000)
         XCTAssertEqual(controller.modelForTesting.terminatingAppID, selectedAppID)
         XCTAssertNotNil(controller.modelForTesting.session)
         controller.modelForTesting.cancelSelection()
@@ -776,7 +690,6 @@ extension FlowTabPriorityCoverageTests {
             XCTAssertTrue(handled)
 
             await fulfillment(of: [layoutRefreshed], timeout: 1.0)
-            try? await Task.sleep(nanoseconds: 120_000_000)
 
             XCTAssertNotNil(controller.modelForTesting.session)
             XCTAssertEqual(controller.modelForTesting.appCount, 2)

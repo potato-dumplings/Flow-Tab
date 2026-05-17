@@ -4,6 +4,23 @@ import CoreGraphics
 import SwiftUI
 import FlowTabCore
 
+enum PreviewCaptureFailureReason: String, Equatable {
+    case permissionDenied
+    case windowNotFound
+    case screenCaptureUnavailable
+    case transientSystemError
+    case cancelledByNewerGeneration
+    case bindingActionDisallowed
+}
+
+enum PreviewCaptureState: Equatable {
+    case notRequested
+    case queued(generation: UInt64)
+    case inFlight(generation: UInt64)
+    case succeeded(cacheKey: String, generation: UInt64)
+    case failed(reason: PreviewCaptureFailureReason, retryAfterGeneration: UInt64?)
+}
+
 extension LiveSwitcherModel {
     private struct PendingPreviewCapture {
         let appID: String
@@ -40,6 +57,7 @@ extension LiveSwitcherModel {
         previewCaptureAttemptedKeys = []
         previewCaptureFailedKeys = []
         previewCaptureInFlightKeys = []
+        previewCaptureStatesByKey = [:]
         previewImageReadyLoggedKeys = []
         previewSessionPinnedKeys = []
         previewSessionPinnedImagesByKey = [:]
@@ -135,10 +153,34 @@ extension LiveSwitcherModel {
             ownerPID: ownerPID,
             windowContext: windowContext
         )
+        guard windowContext.bindingAllowedActions.contains(.capturePreview) else {
+            previewCaptureAttemptedKeys.insert(previewCacheKey)
+            previewCaptureFailedKeys.insert(previewCacheKey)
+            previewCaptureStatesByKey[previewCacheKey] = .failed(
+                reason: .bindingActionDisallowed,
+                retryAfterGeneration: nil
+            )
+            RuntimeLog.debug(
+                .preview,
+                "capture skipped appID=\(appID) windowID=\(window.id) reason=binding_action_disallowed confidence=\(windowContext.bindingConfidence.rawValue) allowedActions=\(Self.previewAllowedActionsDescription(windowContext.bindingAllowedActions))"
+            )
+            return ResolvedPreviewData(
+                preview: (
+                    image: nil,
+                    titleBarStyle: titleBarStyleInferenceEnabled ? windowContext.inferredTitleBarStyle : nil
+                ),
+                pendingCapture: nil,
+                isWaitingForCaptureCommit: false
+            )
+        }
         if pinForSession {
             previewSessionPinnedKeys.insert(previewCacheKey)
         }
         if let pinned = previewSessionPinnedImagesByKey[previewCacheKey] {
+            previewCaptureStatesByKey[previewCacheKey] = .succeeded(
+                cacheKey: previewCacheKey,
+                generation: previewCaptureGeneration
+            )
             logPreviewImageReadyOnce(
                 source: "pinned",
                 appID: appID,
@@ -156,6 +198,10 @@ extension LiveSwitcherModel {
             )
         }
         if let cached = previewImageCache.image(forKey: previewCacheKey) {
+            previewCaptureStatesByKey[previewCacheKey] = .succeeded(
+                cacheKey: previewCacheKey,
+                generation: previewCaptureGeneration
+            )
             if pinForSession {
                 previewSessionPinnedImagesByKey[previewCacheKey] = cached
             }
@@ -177,9 +223,12 @@ extension LiveSwitcherModel {
         }
 
         if previewCaptureAttemptedKeys.contains(previewCacheKey) {
-            if pinForSession,
-               !previewCaptureInFlightKeys.contains(previewCacheKey),
-               !previewCaptureFailedKeys.contains(previewCacheKey) {
+            if shouldRetryPreviewCapture(previewCacheKey) {
+                previewCaptureAttemptedKeys.remove(previewCacheKey)
+                previewCaptureFailedKeys.remove(previewCacheKey)
+            } else if pinForSession,
+                      !previewCaptureInFlightKeys.contains(previewCacheKey),
+                      !previewCaptureFailedKeys.contains(previewCacheKey) {
                 previewCaptureAttemptedKeys.remove(previewCacheKey)
             } else {
                 return ResolvedPreviewData(
@@ -193,6 +242,7 @@ extension LiveSwitcherModel {
             }
         }
         previewCaptureAttemptedKeys.insert(previewCacheKey)
+        previewCaptureStatesByKey[previewCacheKey] = .queued(generation: previewCaptureGeneration)
 
         if let previewCaptureOverride {
             guard
@@ -204,6 +254,10 @@ extension LiveSwitcherModel {
                 )
             else {
                 previewCaptureFailedKeys.insert(previewCacheKey)
+                previewCaptureStatesByKey[previewCacheKey] = .failed(
+                    reason: .transientSystemError,
+                    retryAfterGeneration: previewCaptureGeneration &+ 1
+                )
                 RuntimeLog.debug(.preview, "attempt failed appID=\(appID) windowID=\(window.id)")
                 return ResolvedPreviewData(
                     preview: (
@@ -249,6 +303,7 @@ extension LiveSwitcherModel {
             )
         }
         previewCaptureInFlightKeys.insert(previewCacheKey)
+        previewCaptureStatesByKey[previewCacheKey] = .inFlight(generation: previewCaptureGeneration)
         let pendingCapture = PendingPreviewCapture(
             appID: appID,
             windowID: window.id,
@@ -347,8 +402,7 @@ extension LiveSwitcherModel {
             appID,
             "pid:\(ownerPID)",
             "cg:\(windowContext.cgWindowID.map(String.init) ?? "nil")",
-            "window:\(windowContext.id)",
-            "title:\(windowContext.title)"
+            "window:\(windowContext.id)"
         ].joined(separator: "#")
     }
 
@@ -360,6 +414,7 @@ extension LiveSwitcherModel {
         let generation = previewCaptureGeneration
         let semaphore = previewCaptureSemaphore
         let batchOverride = previewCaptureBatchOverride
+        let batchOutcomeOverride = previewCaptureBatchOutcomeOverride
         let requests = pendingCaptures.map(\.providerRequest)
         let startMs = Self.monotonicMilliseconds()
         for pendingCapture in pendingCaptures {
@@ -369,14 +424,24 @@ extension LiveSwitcherModel {
             )
         }
         DispatchQueue.global(qos: qos).async {
-            let captures = batchOverride?(requests) ?? RuntimeWindowPreviewProvider.captureWindowPreviews(
-                requests,
-                captureSemaphore: semaphore
-            )
+            let outcomes: [RuntimeWindowPreviewProvider.CaptureOutcome]
+            if let batchOutcomeOverride {
+                outcomes = batchOutcomeOverride(requests)
+            } else if let batchOverride {
+                outcomes = batchOverride(requests).map { capture in
+                    capture.map(RuntimeWindowPreviewProvider.CaptureOutcome.success)
+                        ?? .failure(.transientSystemError)
+                }
+            } else {
+                outcomes = RuntimeWindowPreviewProvider.captureWindowPreviewOutcomes(
+                    requests,
+                    captureSemaphore: semaphore
+                )
+            }
             let completeMs = Self.monotonicMilliseconds()
             Task { @MainActor [weak self] in
                 self?.completeRuntimePreviewCaptureBatch(
-                    captures,
+                    outcomes,
                     pendingCaptures: pendingCaptures,
                     generation: generation,
                     startMs: startMs,
@@ -387,7 +452,7 @@ extension LiveSwitcherModel {
     }
 
     private func completeRuntimePreviewCaptureBatch(
-        _ captures: [RuntimeWindowPreviewProvider.CaptureResult?],
+        _ outcomes: [RuntimeWindowPreviewProvider.CaptureOutcome],
         pendingCaptures: [PendingPreviewCapture],
         generation: UInt64,
         startMs: Double,
@@ -397,18 +462,37 @@ extension LiveSwitcherModel {
             previewCaptureInFlightKeys.remove(pendingCapture.initialCacheKey)
         }
         guard generation == previewCaptureGeneration else {
+            for pendingCapture in pendingCaptures
+                where previewCaptureStatesByKey[pendingCapture.initialCacheKey] != nil
+            {
+                previewCaptureStatesByKey[pendingCapture.initialCacheKey] = .failed(
+                    reason: .cancelledByNewerGeneration,
+                    retryAfterGeneration: previewCaptureGeneration
+                )
+            }
             RuntimeLog.debug(.preview, "capture batch stale count=\(pendingCaptures.count)")
             return
         }
         var completedCount = 0
         for (index, pendingCapture) in pendingCaptures.enumerated() {
-            let capture = captures.indices.contains(index) ? captures[index] : nil
+            let outcome = outcomes.indices.contains(index)
+                ? outcomes[index]
+                : .failure(.transientSystemError)
+            let capture = outcome.result
             completedCount += 1
             guard let capture else {
+                let failureReason = Self.previewFailureReason(from: outcome.failureReason)
                 previewCaptureFailedKeys.insert(pendingCapture.initialCacheKey)
+                previewCaptureStatesByKey[pendingCapture.initialCacheKey] = .failed(
+                    reason: failureReason,
+                    retryAfterGeneration: Self.previewRetryGeneration(
+                        for: failureReason,
+                        generation: generation
+                    )
+                )
                 RuntimeLog.debug(
                     "Preview",
-                    "capture failed appID=\(pendingCapture.appID) windowID=\(pendingCapture.windowID) durationMs=\(Self.formatPreviewMilliseconds(completeMs - startMs))"
+                    "capture failed appID=\(pendingCapture.appID) windowID=\(pendingCapture.windowID) reason=\(failureReason.rawValue) durationMs=\(Self.formatPreviewMilliseconds(completeMs - startMs))"
                 )
                 continue
             }
@@ -434,6 +518,44 @@ extension LiveSwitcherModel {
         if completedCount > 0 {
             objectWillChange.send()
         }
+    }
+
+    private static func previewFailureReason(
+        from providerReason: RuntimeWindowPreviewProvider.CaptureFailureReason?
+    ) -> PreviewCaptureFailureReason {
+        switch providerReason {
+        case .permissionDenied:
+            return .permissionDenied
+        case .windowNotFound:
+            return .windowNotFound
+        case .screenCaptureUnavailable:
+            return .screenCaptureUnavailable
+        case .transientSystemError, nil:
+            return .transientSystemError
+        }
+    }
+
+    private static func previewRetryGeneration(
+        for reason: PreviewCaptureFailureReason,
+        generation: UInt64
+    ) -> UInt64? {
+        switch reason {
+        case .permissionDenied, .bindingActionDisallowed:
+            return nil
+        case .windowNotFound, .screenCaptureUnavailable, .transientSystemError:
+            return generation &+ 1
+        case .cancelledByNewerGeneration:
+            return generation
+        }
+    }
+
+    private static func previewAllowedActionsDescription(
+        _ allowedActions: Set<WindowBindingAction>
+    ) -> String {
+        allowedActions
+            .map(\.rawValue)
+            .sorted()
+            .joined(separator: ",")
     }
 
     private func applyPreviewCapture(
@@ -464,12 +586,27 @@ extension LiveSwitcherModel {
         previewImageCache.insert(capture.image, forKey: resolvedCacheKey)
         previewCaptureFailedKeys.remove(initialCacheKey)
         previewCaptureFailedKeys.remove(resolvedCacheKey)
+        previewCaptureStatesByKey[initialCacheKey] = .succeeded(
+            cacheKey: resolvedCacheKey,
+            generation: previewCaptureGeneration
+        )
+        previewCaptureStatesByKey[resolvedCacheKey] = .succeeded(
+            cacheKey: resolvedCacheKey,
+            generation: previewCaptureGeneration
+        )
         pinPreviewImageIfNeeded(
             capture.image,
             initialCacheKey: initialCacheKey,
             resolvedCacheKey: resolvedCacheKey
         )
         previewCaptureAttemptedKeys.insert(resolvedCacheKey)
+    }
+
+    private func shouldRetryPreviewCapture(_ cacheKey: String) -> Bool {
+        guard case let .failed(_, retryAfterGeneration?) = previewCaptureStatesByKey[cacheKey] else {
+            return false
+        }
+        return retryAfterGeneration <= previewCaptureGeneration
     }
 
     private func pinPreviewImageIfNeeded(
@@ -640,6 +777,10 @@ extension LiveSwitcherModel {
                 isSelected: $0.isSelected
             )
         }
+    }
+
+    func previewCaptureStatesForTesting() -> [String: PreviewCaptureState] {
+        previewCaptureStatesByKey
     }
 
     var selectedApp: AppSwitchCandidate? {

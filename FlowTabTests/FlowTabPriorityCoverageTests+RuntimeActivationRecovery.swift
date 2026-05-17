@@ -4,6 +4,248 @@ import XCTest
 @testable import FlowTab
 
 extension FlowTabPriorityCoverageTests {
+    func testChromeFocusBridgeScriptUsesNamedPropagationDelay() {
+        let script = RuntimeChromeWindowFocusBridge.focusWindowScriptForTesting(windowID: 12_345)
+
+        XCTAssertEqual(
+            RuntimeChromeWindowFocusBridge.scriptStatePropagationDelaySecondsForTesting,
+            0.05
+        )
+        XCTAssertTrue(script.contains("set targetWindowID to 12345"))
+        XCTAssertEqual(script.components(separatedBy: "delay 0.05").count - 1, 2)
+        XCTAssertFalse(script.contains("delay 0.050"))
+    }
+
+    func testChromeFocusBridgeUsesScriptableBrowserSpecForScripts() {
+        let chromeSpec = RuntimeChromeWindowFocusBridge.scriptableBrowserSpec(
+            forBundleIdentifier: "com.google.Chrome"
+        )
+
+        XCTAssertEqual(chromeSpec, .chrome)
+        XCTAssertNil(
+            RuntimeChromeWindowFocusBridge.scriptableBrowserSpec(
+                forBundleIdentifier: "com.example.unsupported-browser"
+            )
+        )
+        XCTAssertTrue(
+            RuntimeChromeWindowFocusBridge.focusWindowScriptForTesting(
+                windowID: 12_345,
+                bundleIdentifier: "com.google.Chrome"
+            )?.contains("tell application id \"com.google.Chrome\"") ?? false
+        )
+        XCTAssertTrue(
+            RuntimeChromeWindowFocusBridge.windowListScriptForTesting(
+                bundleIdentifier: "com.google.Chrome"
+            )?.contains("tell application id \"com.google.Chrome\"") ?? false
+        )
+        XCTAssertNil(
+            RuntimeChromeWindowFocusBridge.focusWindowScriptForTesting(
+                windowID: 12_345,
+                bundleIdentifier: "com.example.unsupported-browser"
+            )
+        )
+    }
+
+    func testChromeFocusBridgeCandidateDecisionRejectsCloseCandidates() {
+        let frame = CGRect(x: 0, y: 40, width: 1_200, height: 800)
+        let candidates = [
+            RuntimeChromeWindowFocusBridge.Candidate(
+                windowID: 31,
+                name: "Inbox - Gmail",
+                activeTabTitle: "Inbox - Gmail",
+                bounds: frame,
+                titleAffinity: 0,
+                geometryDistance: 12
+            ),
+            RuntimeChromeWindowFocusBridge.Candidate(
+                windowID: 44,
+                name: "Inbox - Gmail",
+                activeTabTitle: "Inbox - Gmail",
+                bounds: frame.offsetBy(dx: 3, dy: 0),
+                titleAffinity: 0,
+                geometryDistance: 15
+            )
+        ]
+
+        let decision = RuntimeChromeWindowFocusBridge.candidateDecision(
+            candidates,
+            targetCGWindowID: 456,
+            fallbackTitle: "Inbox - Gmail",
+            fallbackFrame: frame,
+            currentCGWindows: []
+        )
+
+        guard case let .ambiguous(ambiguousCandidates, reason) = decision else {
+            return XCTFail("Expected close Chrome candidates to remain ambiguous")
+        }
+        XCTAssertEqual(reason, "insufficient-score-separation")
+        XCTAssertEqual(ambiguousCandidates.map(\.windowID), [31, 44])
+        XCTAssertNil(
+            RuntimeChromeWindowFocusBridge.selectCandidate(
+                candidates,
+                targetCGWindowID: 456,
+                fallbackTitle: "Inbox - Gmail",
+                fallbackFrame: frame,
+                currentCGWindows: []
+            )
+        )
+    }
+
+    func testChromeFocusBridgeCandidateDecisionSelectsClearCandidate() {
+        let frame = CGRect(x: 0, y: 40, width: 1_200, height: 800)
+        let clearCandidate = RuntimeChromeWindowFocusBridge.Candidate(
+            windowID: 31,
+            name: "Inbox - Gmail",
+            activeTabTitle: "Inbox - Gmail",
+            bounds: frame,
+            titleAffinity: 0,
+            geometryDistance: 12
+        )
+        let weakCandidate = RuntimeChromeWindowFocusBridge.Candidate(
+            windowID: 44,
+            name: "Calendar",
+            activeTabTitle: "Calendar",
+            bounds: frame.offsetBy(dx: 320, dy: 0),
+            titleAffinity: 2,
+            geometryDistance: 320
+        )
+
+        let decision = RuntimeChromeWindowFocusBridge.candidateDecision(
+            [clearCandidate, weakCandidate],
+            targetCGWindowID: 456,
+            fallbackTitle: "Inbox - Gmail",
+            fallbackFrame: frame,
+            currentCGWindows: []
+        )
+
+        guard case let .selected(candidate, confidence) = decision else {
+            return XCTFail("Expected clear Chrome candidate to be selected")
+        }
+        XCTAssertEqual(candidate.windowID, 31)
+        XCTAssertEqual(confidence, .uniqueStrongSignals)
+    }
+
+    func testChromeFocusBridgeCandidateDecisionReportsQueryErrorAsUnavailable() {
+        let query = RuntimeChromeWindowFocusBridge.CandidateQuery(
+            candidates: [],
+            chromeWindowCount: 0,
+            error: "apple-event-not-authorized"
+        )
+
+        let decision = RuntimeChromeWindowFocusBridge.candidateDecision(
+            query,
+            targetCGWindowID: 456,
+            fallbackTitle: "Inbox - Gmail",
+            fallbackFrame: CGRect(x: 0, y: 40, width: 1_200, height: 800),
+            currentCGWindows: []
+        )
+
+        guard case let .unavailable(reason) = decision else {
+            return XCTFail("Expected Chrome candidate query error to become unavailable decision")
+        }
+        XCTAssertEqual(reason, "candidate-query-error:apple-event-not-authorized")
+        XCTAssertTrue(decision.logDescription.contains("unavailable:reason="))
+        XCTAssertTrue(decision.logDescription.contains("apple-event-not-authorized"))
+    }
+
+    func testChromeFocusBridgeCandidateDecisionUsesTargetOrdinalForScoreTies() {
+        let frame = CGRect(x: 0, y: 40, width: 1_200, height: 800)
+        let candidates = [
+            RuntimeChromeWindowFocusBridge.Candidate(
+                windowID: 31,
+                name: "Inbox - Gmail",
+                activeTabTitle: "Inbox - Gmail",
+                bounds: frame,
+                titleAffinity: 0,
+                geometryDistance: 12
+            ),
+            RuntimeChromeWindowFocusBridge.Candidate(
+                windowID: 44,
+                name: "Inbox - Gmail",
+                activeTabTitle: "Inbox - Gmail",
+                bounds: frame,
+                titleAffinity: 0,
+                geometryDistance: 12
+            )
+        ]
+        let cgWindows = [
+            RuntimeSnapshotProvider.CGWindowEntry(
+                id: 455,
+                title: "Inbox - Gmail",
+                bounds: frame,
+                isOnscreen: false,
+                alpha: 1,
+                storeType: 1
+            ),
+            RuntimeSnapshotProvider.CGWindowEntry(
+                id: 456,
+                title: "Inbox - Gmail",
+                bounds: frame,
+                isOnscreen: false,
+                alpha: 1,
+                storeType: 1
+            )
+        ]
+
+        let decision = RuntimeChromeWindowFocusBridge.candidateDecision(
+            candidates,
+            targetCGWindowID: 456,
+            fallbackTitle: "Inbox - Gmail",
+            fallbackFrame: frame,
+            currentCGWindows: cgWindows
+        )
+
+        guard case let .selected(candidate, confidence) = decision else {
+            return XCTFail("Expected target ordinal to resolve the score tie")
+        }
+        XCTAssertEqual(candidate.windowID, 44)
+        XCTAssertEqual(confidence, .targetOrdinalTieBreak)
+    }
+
+    @MainActor
+    func testRuntimeActivatorActivationConfirmationPolicyWrapsRetryDelays() {
+        let activator = RuntimeActivator()
+
+        XCTAssertEqual(
+            activator.activationConfirmationPolicy,
+            .defaultFocusRecovery
+        )
+        XCTAssertTrue(activator.activationConfirmationPolicy.isEnabled)
+
+        activator.focusRecoveryRetryDelaysNanoseconds = [1, 2, 3]
+        XCTAssertEqual(
+            activator.activationConfirmationPolicy,
+            ActivationConfirmationPolicy(retryDelaysNanoseconds: [1, 2, 3])
+        )
+
+        activator.activationConfirmationPolicy = ActivationConfirmationPolicy(
+            retryDelaysNanoseconds: []
+        )
+        XCTAssertTrue(activator.focusRecoveryRetryDelaysNanoseconds.isEmpty)
+        XCTAssertFalse(activator.activationConfirmationPolicy.isEnabled)
+    }
+
+    func testRuntimeCGWindowFocusBridgeClassifiesStructuredResults() {
+        XCTAssertTrue(RuntimeCGWindowFocusBridge.FocusResult.accepted.isAccepted)
+        XCTAssertTrue(RuntimeCGWindowFocusBridge.FocusResult.acceptedKeyEventFailed.isAccepted)
+        XCTAssertFalse(RuntimeCGWindowFocusBridge.FocusResult.symbolUnavailable.isAccepted)
+        XCTAssertFalse(RuntimeCGWindowFocusBridge.FocusResult.processLookupFailed(-600).isAccepted)
+        XCTAssertFalse(RuntimeCGWindowFocusBridge.FocusResult.setFrontFailed(1000).isAccepted)
+
+        XCTAssertEqual(
+            RuntimeCGWindowFocusBridge.FocusResult.acceptedKeyEventFailed.debugName,
+            "acceptedKeyEventFailed"
+        )
+        XCTAssertEqual(
+            RuntimeCGWindowFocusBridge.FocusResult.processLookupFailed(-600).debugName,
+            "processLookupFailed(-600)"
+        )
+        XCTAssertEqual(
+            RuntimeCGWindowFocusBridge.FocusResult.setFrontFailed(1000).debugName,
+            "setFrontFailed(1000)"
+        )
+    }
+
     @MainActor
     func testRuntimeActivatorRetriesWhenAXFocusLeavesSpaceTargetOffscreen() async {
         let currentApp = NSRunningApplication.current
@@ -65,7 +307,8 @@ extension FlowTabPriorityCoverageTests {
                     inferredTitleBarStyle: nil,
                     axWindow: axWindow,
                     frame: targetFrame,
-                    allowsPublicAXRecovery: true
+                    allowsPublicAXRecovery: true,
+                    lastConfirmationSource: .publicExactMatch
                 )
             ]
         )
@@ -150,6 +393,473 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testRuntimeActivatorSkipsActivationWhenBindingDisallowsActivationActions() {
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let activator = RuntimeActivator()
+        activator.activateCurrentAppIfNeededOverride = { _ in false }
+        activator.focusRecoveryRetryDelaysNanoseconds = [20_000_000]
+
+        var requestActivationCallCount = 0
+        activator.requestActivationOverride = { _, completion in
+            requestActivationCallCount += 1
+            completion?(currentApp)
+        }
+        activator.focusCGWindowOverride = { _, _ in
+            XCTFail("Ambiguous binding must not use CG activation fallback")
+            return true
+        }
+        activator.focusAXWindowOverride = { _, _, _ in
+            XCTFail("Ambiguous binding must not use AX activation")
+            return true
+        }
+        activator.currentAXWindowsOverride = { _ in
+            XCTFail("Ambiguous binding must not enter AX recovery")
+            return []
+        }
+        activator.currentCGWindowsOverride = { _ in
+            XCTFail("Ambiguous binding must not read CG focus state")
+            return []
+        }
+
+        let targetCGWindowID: CGWindowID = 245_250
+        let windowID = "cg:\(currentApp.processIdentifier):\(targetCGWindowID)"
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windowsByID: [
+                windowID: RuntimeWindowContext(
+                    id: windowID,
+                    title: "Ambiguous Target",
+                    isMinimized: false,
+                    ownerPID: currentApp.processIdentifier,
+                    cgWindowID: targetCGWindowID,
+                    axWindow: AXUIElementCreateApplication(currentApp.processIdentifier),
+                    allowsPublicAXRecovery: true,
+                    bindingConfidenceOverride: .ambiguous,
+                    bindingCandidateCount: 2
+                )
+            ]
+        )
+
+        activator.activate(
+            target: .window(appID: appID, windowID: windowID, restoreIfMinimized: false),
+            contextsByID: [appID: context]
+        )
+
+        XCTAssertEqual(requestActivationCallCount, 0)
+    }
+
+    @MainActor
+    func testRuntimeActivatorUsesCGFallbackButSkipsDirectAXForInferredBinding() {
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let activator = RuntimeActivator()
+        activator.activateCurrentAppIfNeededOverride = { _ in false }
+        activator.focusRecoveryRetryDelaysNanoseconds = []
+
+        let axWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
+        activator.focusAXWindowOverride = { _, _, _ in
+            XCTFail("Inferred binding must not reuse stored direct AX handle")
+            return true
+        }
+
+        let targetCGWindowID: CGWindowID = 245_251
+        var focusedCGWindowIDs: [CGWindowID] = []
+        activator.focusCGWindowOverride = { app, cgWindowID in
+            XCTAssertEqual(app.processIdentifier, currentApp.processIdentifier)
+            focusedCGWindowIDs.append(cgWindowID)
+            return true
+        }
+        activator.currentCGWindowsOverride = { pid in
+            XCTAssertEqual(pid, currentApp.processIdentifier)
+            return [
+                RuntimeSnapshotProvider.CGWindowEntry(
+                    id: targetCGWindowID,
+                    title: "Inferred Target",
+                    bounds: CGRect(x: 0, y: 40, width: 960, height: 640),
+                    isOnscreen: true,
+                    alpha: 1.0,
+                    storeType: 1
+                )
+            ]
+        }
+
+        let windowID = "cg:\(currentApp.processIdentifier):\(targetCGWindowID)"
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windowsByID: [
+                windowID: RuntimeWindowContext(
+                    id: windowID,
+                    title: "Inferred Target",
+                    isMinimized: false,
+                    ownerPID: currentApp.processIdentifier,
+                    cgWindowID: targetCGWindowID,
+                    activationHandleID: "ax:\(currentApp.processIdentifier):inferred",
+                    axWindow: axWindow,
+                    allowsPublicAXRecovery: true,
+                    bindingConfidenceOverride: .inferred,
+                    bindingCandidateCount: 1
+                )
+            ]
+        )
+
+        activator.activate(
+            target: .window(appID: appID, windowID: windowID, restoreIfMinimized: false),
+            contextsByID: [appID: context]
+        )
+
+        XCTAssertEqual(focusedCGWindowIDs, [targetCGWindowID])
+    }
+
+    @MainActor
+    func testRuntimeActivatorAllowsDirectAXFallbackForStickyBindingWithExactCGReadback() {
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let activator = RuntimeActivator()
+        activator.activateCurrentAppIfNeededOverride = { _ in false }
+        activator.focusRecoveryRetryDelaysNanoseconds = []
+
+        let targetAXWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
+        let targetPointer = Unmanaged.passUnretained(targetAXWindow).toOpaque()
+        let targetCGWindowID: CGWindowID = 245_254
+        let previousExactBridgeOverride = AXWindowInspector.cgWindowIDOverrideForTesting
+        AXWindowInspector.cgWindowIDOverrideForTesting = { window in
+            let pointer = Unmanaged.passUnretained(window).toOpaque()
+            return pointer == targetPointer ? targetCGWindowID : previousExactBridgeOverride?(window)
+        }
+        defer {
+            AXWindowInspector.cgWindowIDOverrideForTesting = previousExactBridgeOverride
+        }
+
+        var focusedCGWindowIDs: [CGWindowID] = []
+        activator.focusCGWindowOverride = { app, cgWindowID in
+            XCTAssertEqual(app.processIdentifier, currentApp.processIdentifier)
+            focusedCGWindowIDs.append(cgWindowID)
+            return true
+        }
+
+        var focusedAXWindowPointers: [UnsafeMutableRawPointer] = []
+        activator.focusAXWindowOverride = { window, restoreIfMinimized, _ in
+            XCTAssertFalse(restoreIfMinimized)
+            focusedAXWindowPointers.append(Unmanaged.passUnretained(window).toOpaque())
+            return true
+        }
+        activator.focusedAXWindowOverride = { _ in targetAXWindow }
+        activator.currentCGWindowsOverride = { pid in
+            XCTAssertEqual(pid, currentApp.processIdentifier)
+            return [
+                RuntimeSnapshotProvider.CGWindowEntry(
+                    id: targetCGWindowID,
+                    title: "Sticky Target",
+                    bounds: CGRect(x: 0, y: 40, width: 960, height: 640),
+                    isOnscreen: !focusedAXWindowPointers.isEmpty,
+                    alpha: 1.0,
+                    storeType: 1,
+                    spaceIDs: [1]
+                )
+            ]
+        }
+
+        var verifiedAllowedActions: [Set<WindowBindingAction>] = []
+        activator.windowFocusVerifiedHandler = { _, _, _, _, _, _, allowedActions in
+            verifiedAllowedActions.append(allowedActions)
+        }
+
+        let windowID = "cg:\(currentApp.processIdentifier):\(targetCGWindowID)"
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windowsByID: [
+                windowID: RuntimeWindowContext(
+                    id: windowID,
+                    title: "Sticky Target",
+                    isMinimized: false,
+                    ownerPID: currentApp.processIdentifier,
+                    cgWindowID: targetCGWindowID,
+                    spaceIDs: [1],
+                    activationHandleID: "ax:\(currentApp.processIdentifier):sticky-target",
+                    axWindow: targetAXWindow,
+                    allowsPublicAXRecovery: false,
+                    hasStickyBinding: true,
+                    lastConfirmationSource: .stickyBinding
+                )
+            ]
+        )
+
+        activator.activate(
+            target: .window(appID: appID, windowID: windowID, restoreIfMinimized: false),
+            contextsByID: [appID: context]
+        )
+
+        XCTAssertEqual(focusedCGWindowIDs, [targetCGWindowID])
+        XCTAssertEqual(focusedAXWindowPointers, [targetPointer])
+        XCTAssertEqual(verifiedAllowedActions.count, 1)
+        XCTAssertFalse(verifiedAllowedActions[0].contains(.useForAXActivation))
+        XCTAssertFalse(verifiedAllowedActions[0].contains(.updateRecency))
+    }
+
+    @MainActor
+    func testRuntimeActivatorRejectsDirectAXFallbackForStickyBindingWithMismatchedCGReadback() {
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let activator = RuntimeActivator()
+        activator.activateCurrentAppIfNeededOverride = { _ in false }
+        activator.focusRecoveryRetryDelaysNanoseconds = []
+
+        let staleAXWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
+        let stalePointer = Unmanaged.passUnretained(staleAXWindow).toOpaque()
+        let targetCGWindowID: CGWindowID = 245_255
+        let staleCGWindowID: CGWindowID = 245_256
+        let previousExactBridgeOverride = AXWindowInspector.cgWindowIDOverrideForTesting
+        AXWindowInspector.cgWindowIDOverrideForTesting = { window in
+            let pointer = Unmanaged.passUnretained(window).toOpaque()
+            return pointer == stalePointer ? staleCGWindowID : previousExactBridgeOverride?(window)
+        }
+        defer {
+            AXWindowInspector.cgWindowIDOverrideForTesting = previousExactBridgeOverride
+        }
+
+        var focusedCGWindowIDs: [CGWindowID] = []
+        activator.focusCGWindowOverride = { app, cgWindowID in
+            XCTAssertEqual(app.processIdentifier, currentApp.processIdentifier)
+            focusedCGWindowIDs.append(cgWindowID)
+            return true
+        }
+        activator.focusAXWindowOverride = { _, _, _ in
+            XCTFail("Sticky AX fallback must not focus a handle that bridges to another CG window")
+            return true
+        }
+        activator.currentCGWindowsOverride = { pid in
+            XCTAssertEqual(pid, currentApp.processIdentifier)
+            return [
+                RuntimeSnapshotProvider.CGWindowEntry(
+                    id: targetCGWindowID,
+                    title: "Sticky Target",
+                    bounds: CGRect(x: 0, y: 40, width: 960, height: 640),
+                    isOnscreen: false,
+                    alpha: 1.0,
+                    storeType: 1,
+                    spaceIDs: [1]
+                )
+            ]
+        }
+
+        let windowID = "cg:\(currentApp.processIdentifier):\(targetCGWindowID)"
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windowsByID: [
+                windowID: RuntimeWindowContext(
+                    id: windowID,
+                    title: "Sticky Target",
+                    isMinimized: false,
+                    ownerPID: currentApp.processIdentifier,
+                    cgWindowID: targetCGWindowID,
+                    spaceIDs: [1],
+                    activationHandleID: "ax:\(currentApp.processIdentifier):stale-sticky-target",
+                    axWindow: staleAXWindow,
+                    allowsPublicAXRecovery: false,
+                    hasStickyBinding: true,
+                    lastConfirmationSource: .stickyBinding
+                )
+            ]
+        )
+
+        activator.activate(
+            target: .window(appID: appID, windowID: windowID, restoreIfMinimized: false),
+            contextsByID: [appID: context]
+        )
+
+        XCTAssertEqual(focusedCGWindowIDs, [targetCGWindowID])
+    }
+
+    @MainActor
+    func testRuntimeActivatorReportsBindingReadbackMismatchWhenFocusCannotVerifyTargetCG() {
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let activator = RuntimeActivator()
+        activator.activateCurrentAppIfNeededOverride = { _ in false }
+        activator.focusRecoveryRetryDelaysNanoseconds = []
+
+        let axWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
+        activator.focusCGWindowOverride = { _, _ in false }
+        activator.focusAXWindowOverride = { window, _, _ in
+            XCTAssertTrue(CFEqual(window, axWindow))
+            return true
+        }
+
+        let targetCGWindowID: CGWindowID = 245_252
+        activator.currentCGWindowsOverride = { pid in
+            XCTAssertEqual(pid, currentApp.processIdentifier)
+            return [
+                RuntimeSnapshotProvider.CGWindowEntry(
+                    id: targetCGWindowID,
+                    title: "Readback Target",
+                    bounds: CGRect(x: 0, y: 40, width: 960, height: 640),
+                    isOnscreen: false,
+                    alpha: 1.0,
+                    storeType: 1
+                ),
+                RuntimeSnapshotProvider.CGWindowEntry(
+                    id: 245_253,
+                    title: "Visible Other",
+                    bounds: CGRect(x: 40, y: 80, width: 800, height: 600),
+                    isOnscreen: true,
+                    alpha: 1.0,
+                    storeType: 1
+                )
+            ]
+        }
+
+        var verifiedFocuses: [CGWindowID?] = []
+        activator.windowFocusVerifiedHandler = { _, _, _, cgWindowID, _, _, _ in
+            verifiedFocuses.append(cgWindowID)
+        }
+        var mismatchDiagnostics: [WindowBindingReadbackDiagnostic] = []
+        activator.windowFocusReadbackMismatchHandler = {
+            mismatchDiagnostics.append($0)
+        }
+
+        let windowID = "cg:\(currentApp.processIdentifier):\(targetCGWindowID)"
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windowsByID: [
+                windowID: RuntimeWindowContext(
+                    id: windowID,
+                    title: "Readback Target",
+                    isMinimized: false,
+                    ownerPID: currentApp.processIdentifier,
+                    cgWindowID: targetCGWindowID,
+                    spaceIDs: [1],
+                    activationHandleID: "ax:\(currentApp.processIdentifier):readback",
+                    axWindow: axWindow,
+                    lastConfirmationSource: .publicExactMatch
+                )
+            ]
+        )
+
+        activator.activate(
+            target: .window(appID: appID, windowID: windowID, restoreIfMinimized: false),
+            contextsByID: [appID: context]
+        )
+
+        XCTAssertTrue(verifiedFocuses.isEmpty)
+        XCTAssertEqual(mismatchDiagnostics.count, 1)
+        XCTAssertEqual(mismatchDiagnostics.first?.appID, appID)
+        XCTAssertEqual(mismatchDiagnostics.first?.windowID, windowID)
+        XCTAssertEqual(mismatchDiagnostics.first?.route, "ax-direct")
+        XCTAssertEqual(mismatchDiagnostics.first?.reason, .targetCGNotVisible)
+        XCTAssertEqual(mismatchDiagnostics.first?.targetCGWindowID, targetCGWindowID)
+        XCTAssertEqual(mismatchDiagnostics.first?.visibleCGWindowIDs, [245_253])
+        XCTAssertEqual(mismatchDiagnostics.first?.bindingConfidence, .exact)
+        XCTAssertTrue(
+            mismatchDiagnostics.first?.allowedActions.contains(.updateStickyHistory) == true
+        )
+    }
+
+    @MainActor
+    func testRuntimeActivatorReportsFocusedAXCGWindowMismatchWhenVisibleTargetIsNotFocused() {
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let activator = RuntimeActivator()
+        activator.activateCurrentAppIfNeededOverride = { _ in false }
+        activator.focusRecoveryRetryDelaysNanoseconds = []
+
+        let targetAXWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
+        let focusedAXWindow = AXUIElementCreateApplication(currentApp.processIdentifier + 1)
+        let targetCGWindowID: CGWindowID = 245_262
+        let focusedCGWindowID: CGWindowID = 245_263
+        let previousCGWindowIDOverride = AXWindowInspector.cgWindowIDOverrideForTesting
+        AXWindowInspector.cgWindowIDOverrideForTesting = { window in
+            if CFEqual(window, targetAXWindow) {
+                return targetCGWindowID
+            }
+            if CFEqual(window, focusedAXWindow) {
+                return focusedCGWindowID
+            }
+            return previousCGWindowIDOverride?(window)
+        }
+        defer {
+            AXWindowInspector.cgWindowIDOverrideForTesting = previousCGWindowIDOverride
+        }
+
+        activator.focusCGWindowOverride = { _, _ in false }
+        activator.focusAXWindowOverride = { window, _, _ in
+            XCTAssertTrue(CFEqual(window, targetAXWindow))
+            return true
+        }
+        activator.focusedAXWindowOverride = { _ in focusedAXWindow }
+        activator.currentCGWindowsOverride = { pid in
+            XCTAssertEqual(pid, currentApp.processIdentifier)
+            return [
+                RuntimeSnapshotProvider.CGWindowEntry(
+                    id: targetCGWindowID,
+                    title: "Visible Target",
+                    bounds: CGRect(x: 0, y: 40, width: 960, height: 640),
+                    isOnscreen: true,
+                    alpha: 1.0,
+                    storeType: 1,
+                    spaceIDs: [1]
+                ),
+                RuntimeSnapshotProvider.CGWindowEntry(
+                    id: focusedCGWindowID,
+                    title: "Focused Other",
+                    bounds: CGRect(x: 40, y: 80, width: 800, height: 600),
+                    isOnscreen: true,
+                    alpha: 1.0,
+                    storeType: 1,
+                    spaceIDs: [1]
+                )
+            ]
+        }
+
+        var verifiedFocuses: [CGWindowID?] = []
+        activator.windowFocusVerifiedHandler = { _, _, _, cgWindowID, _, _, _ in
+            verifiedFocuses.append(cgWindowID)
+        }
+        var mismatchDiagnostics: [WindowBindingReadbackDiagnostic] = []
+        activator.windowFocusReadbackMismatchHandler = {
+            mismatchDiagnostics.append($0)
+        }
+
+        let windowID = "cg:\(currentApp.processIdentifier):\(targetCGWindowID)"
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windowsByID: [
+                windowID: RuntimeWindowContext(
+                    id: windowID,
+                    title: "Visible Target",
+                    isMinimized: false,
+                    ownerPID: currentApp.processIdentifier,
+                    cgWindowID: targetCGWindowID,
+                    spaceIDs: [1],
+                    activationHandleID: "ax:\(currentApp.processIdentifier):focused-mismatch",
+                    axWindow: targetAXWindow,
+                    allowsPublicAXRecovery: false,
+                    lastConfirmationSource: .publicExactMatch
+                )
+            ]
+        )
+
+        activator.activate(
+            target: .window(appID: appID, windowID: windowID, restoreIfMinimized: false),
+            contextsByID: [appID: context]
+        )
+
+        XCTAssertTrue(verifiedFocuses.isEmpty)
+        XCTAssertEqual(mismatchDiagnostics.count, 1)
+        XCTAssertEqual(mismatchDiagnostics.first?.route, "ax-direct")
+        XCTAssertEqual(mismatchDiagnostics.first?.reason, .focusedAXCGWindowMismatch)
+        XCTAssertEqual(mismatchDiagnostics.first?.targetCGWindowID, targetCGWindowID)
+        XCTAssertEqual(mismatchDiagnostics.first?.focusedCGWindowID, focusedCGWindowID)
+        XCTAssertEqual(mismatchDiagnostics.first?.visibleCGWindowIDs, [targetCGWindowID, focusedCGWindowID])
+    }
+
+    @MainActor
     func testRuntimeActivatorFocusesCGOnlySpaceTargetThroughCGWindowBridge() {
         let currentApp = NSRunningApplication.current
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
@@ -207,7 +917,9 @@ extension FlowTabPriorityCoverageTests {
                     spaceIDs: [2],
                     inferredTitleBarStyle: nil,
                     frame: targetFrame,
-                    allowsPublicAXRecovery: true
+                    allowsPublicAXRecovery: true,
+                    bindingConfidenceOverride: .inferred,
+                    bindingCandidateCount: 1
                 )
             ]
         )
@@ -297,7 +1009,9 @@ extension FlowTabPriorityCoverageTests {
                     spaceIDs: [8_912],
                     inferredTitleBarStyle: nil,
                     frame: targetFrame,
-                    allowsPublicAXRecovery: true
+                    allowsPublicAXRecovery: true,
+                    bindingConfidenceOverride: .inferred,
+                    bindingCandidateCount: 1
                 )
             ]
         )
@@ -373,7 +1087,9 @@ extension FlowTabPriorityCoverageTests {
                     spaceIDs: [7_104],
                     inferredTitleBarStyle: nil,
                     frame: targetFrame,
-                    allowsPublicAXRecovery: true
+                    allowsPublicAXRecovery: true,
+                    bindingConfidenceOverride: .inferred,
+                    bindingCandidateCount: 1
                 )
             ]
         )
@@ -495,7 +1211,9 @@ extension FlowTabPriorityCoverageTests {
                     spaceIDs: [7_120],
                     inferredTitleBarStyle: nil,
                     frame: targetFrame,
-                    allowsPublicAXRecovery: true
+                    allowsPublicAXRecovery: true,
+                    bindingConfidenceOverride: .inferred,
+                    bindingCandidateCount: 1
                 )
             ]
         )
@@ -581,7 +1299,9 @@ extension FlowTabPriorityCoverageTests {
                     spaceIDs: [7_128],
                     inferredTitleBarStyle: nil,
                     frame: targetFrame,
-                    allowsPublicAXRecovery: true
+                    allowsPublicAXRecovery: true,
+                    bindingConfidenceOverride: .inferred,
+                    bindingCandidateCount: 1
                 )
             ]
         )
@@ -655,7 +1375,8 @@ extension FlowTabPriorityCoverageTests {
                     activationHandleID: "ax:\(currentApp.processIdentifier):wrapper",
                     axWindow: wrapperWindow,
                     frame: targetFrame,
-                    allowsPublicAXRecovery: true
+                    allowsPublicAXRecovery: true,
+                    lastConfirmationSource: .publicExactMatch
                 )
             ]
         )
@@ -729,7 +1450,9 @@ extension FlowTabPriorityCoverageTests {
                     spaceIDs: [2],
                     inferredTitleBarStyle: nil,
                     frame: targetFrame,
-                    allowsPublicAXRecovery: true
+                    allowsPublicAXRecovery: true,
+                    bindingConfidenceOverride: .inferred,
+                    bindingCandidateCount: 1
                 )
             ]
         )
@@ -806,7 +1529,9 @@ extension FlowTabPriorityCoverageTests {
                     spaceIDs: [1],
                     inferredTitleBarStyle: nil,
                     frame: targetFrame,
-                    allowsPublicAXRecovery: true
+                    allowsPublicAXRecovery: true,
+                    bindingConfidenceOverride: .inferred,
+                    bindingCandidateCount: 1
                 )
             ]
         )
@@ -866,7 +1591,7 @@ extension FlowTabPriorityCoverageTests {
         }
 
         var verifiedCGWindowIDs: [CGWindowID?] = []
-        activator.windowFocusVerifiedHandler = { _, _, _, cgWindowID, _, _ in
+        activator.windowFocusVerifiedHandler = { _, _, _, cgWindowID, _, _, _ in
             verifiedCGWindowIDs.append(cgWindowID)
         }
 
@@ -884,7 +1609,9 @@ extension FlowTabPriorityCoverageTests {
                     spaceIDs: [7_136],
                     inferredTitleBarStyle: nil,
                     frame: targetFrame,
-                    allowsPublicAXRecovery: true
+                    allowsPublicAXRecovery: true,
+                    bindingConfidenceOverride: .inferred,
+                    bindingCandidateCount: 1
                 )
             ]
         )
@@ -977,7 +1704,8 @@ extension FlowTabPriorityCoverageTests {
                     inferredTitleBarStyle: nil,
                     axWindow: staleWindow,
                     frame: targetFrame,
-                    allowsPublicAXRecovery: true
+                    allowsPublicAXRecovery: true,
+                    lastConfirmationSource: .publicExactMatch
                 )
             ]
         )

@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 
 extension FlowTabUITests {
@@ -108,49 +109,65 @@ extension FlowTabUITests {
     }
 
     func testHomeWindowListUsesSeededWindowRecency() throws {
-        let app = makeApp(
-            additionalArguments: [
-                "--flowtab-ui-reset-defaults",
-                "--flowtab-ui-mock-runtime",
-                "--flowtab-ui-seed-window-recency-app-id",
-                "com.flowtab.mock.mail",
-                "--flowtab-ui-seed-window-recency-window-id",
-                "mock-mail-draft",
-                "--flowtab-ui-ax-trusted",
-                "YES",
-                "--flowtab-ui-screen-trusted",
-                "YES",
-                "-showPermissionReminder",
-                "NO"
-            ]
-        )
-        launchFlowTabUITestApplication(app)
-        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
-        XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5))
-        XCTAssertTrue(
-            tapFirstHittable(
-                in: app.buttons.matching(identifier: "flowtab.home.app.com-flowtab-mock-mail"),
-                timeout: 5
+        let workflow = try configuredHomeWindowRecencyWorkflow()
+
+        try runRealSpaceFixtureWorkflow(
+            workflow,
+            waitsForFullscreenMarkers: false
+        ) { workflow, app in
+            let targetApp = try XCTUnwrap(
+                workflow.apps.first { $0.appID == "chrome" },
+                "Home recency workflow must include the Chrome fixture app."
             )
-        )
+            let targetWindowTitle = "Draft"
+            let fallbackWindowTitle = "Inbox"
 
-        let deadline = Date().addingTimeInterval(8)
-        var visibleWindowTitles: [String] = []
-        repeat {
-            visibleWindowTitles = homeWindowRows(in: app).map(\.label)
-            if visibleWindowTitles.count >= 2,
-               visibleWindowTitles.contains("Draft"),
-               visibleWindowTitles.contains("Inbox") {
-                break
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
+            XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 10))
+            XCTAssertNotEqual(
+                NSWorkspace.shared.frontmostApplication?.bundleIdentifier,
+                targetApp.identity.bundleIdentifier,
+                "Home recency scenario must start outside the target fixture app."
+            )
 
-        XCTAssertEqual(
-            Array(visibleWindowTitles.prefix(2)),
-            ["Draft", "Inbox"],
-            "Home window candidates should use app-local recency before fallback order."
-        )
+            let homeAppRow = app.buttons
+                .matching(identifier: targetApp.identity.homeAppAccessibilityIdentifier)
+                .firstMatch
+            XCTAssertTrue(
+                homeAppRow.waitForExistence(timeout: 20),
+                "FlowTab did not surface \(targetApp.appName) on the home page."
+            )
+            tapElement(homeAppRow)
+
+            let targetWindowRow = try XCTUnwrap(
+                waitForHomeWindowRow(in: app, title: targetWindowTitle, timeout: 12),
+                "FlowTab did not expose a Home window row for \(targetApp.appName) / \(targetWindowTitle)."
+            )
+            let targetWindowNumber = try XCTUnwrap(
+                cgWindowNumber(fromHomeWindowRowIdentifier: targetWindowRow.identifier),
+                "Home window row did not expose a CG window identifier: \(targetWindowRow.identifier)"
+            )
+            targetWindowRow.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+
+            XCTAssertTrue(
+                waitForFrontmostWorkflowWindow(
+                    windowNumber: targetWindowNumber,
+                    title: targetWindowTitle,
+                    app: targetApp,
+                    timeout: 10
+                ),
+                "Clicking the Home window row did not activate the real \(targetWindowTitle) fixture window."
+            )
+
+            app.activate()
+            XCTAssertTrue(app.wait(for: .runningForeground, timeout: 10))
+            XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 10))
+            tapElement(homeAppRow)
+
+            XCTAssertTrue(
+                waitForHomeWindowTitleOrder([targetWindowTitle, fallbackWindowTitle], in: app, timeout: 12),
+                "Home window candidates should use real app-local recency before fallback order."
+            )
+        }
     }
 
     func testHomeAppLayerMarksHiddenAppsAndSortsThemLast() throws {
@@ -406,6 +423,69 @@ extension FlowTabUITests {
 
         let openDirectoryButton = app.buttons[Identifier.logsOpenDirectoryButton]
         XCTAssertTrue(openDirectoryButton.waitForExistence(timeout: 5))
+    }
+
+    private func configuredHomeWindowRecencyWorkflow() throws -> SpaceFixtureResolvedWorkflow {
+        do {
+            let installedWorkflow = try SpaceFixtureResolvedWorkflow.configured()
+            return try resolveSpaceFixtureWorkflowScenario(
+                sourceWorkflowURL: SpaceFixtureMultiAppWorkflowDefaults.homeWindowRecencyWorkflowSourceURL,
+                using: installedWorkflow
+            )
+        } catch let error as SpaceFixtureMultiAppWorkflowError {
+            switch error {
+            case .missingWorkflowPath, .workflowScenarioMissingAppVariant, .workflowScenarioBundleIdentifierMismatch:
+                throw XCTSkip(
+                    multiAppWorkflowSetupMessage(
+                        reason: error.localizedDescription,
+                        scenarioSourceURL: SpaceFixtureMultiAppWorkflowDefaults.homeWindowRecencyWorkflowSourceURL
+                    )
+                )
+            default:
+                XCTFail(error.localizedDescription)
+                throw error
+            }
+        } catch {
+            XCTFail(error.localizedDescription)
+            throw error
+        }
+    }
+
+    private func waitForHomeWindowTitleOrder(
+        _ expectedTitles: [String],
+        in app: XCUIApplication,
+        timeout: TimeInterval
+    ) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        var latestWindowTitles: [String] = []
+        repeat {
+            latestWindowTitles = homeWindowRows(in: app).map(\.label)
+            if Array(latestWindowTitles.prefix(expectedTitles.count)) == expectedTitles {
+                return true
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+
+        XCTFail("Expected Home window order \(expectedTitles), found \(latestWindowTitles).")
+        return false
+    }
+
+    private func cgWindowNumber(fromHomeWindowRowIdentifier identifier: String) -> CGWindowID? {
+        let prefix = "flowtab.home.window.cg-"
+        guard identifier.hasPrefix(prefix) else { return nil }
+
+        let readableComponent = identifier
+            .dropFirst(prefix.count)
+            .split(separator: ".id-", maxSplits: 1)
+            .first
+        let tokens = readableComponent?.split(separator: "-") ?? []
+        guard let windowNumberToken = tokens.last,
+              let windowNumber = UInt32(windowNumberToken)
+        else {
+            return nil
+        }
+
+        return CGWindowID(windowNumber)
     }
 
     private func homeAppVisibilityRuntimeArguments(resetDefaults: Bool = false) -> [String] {

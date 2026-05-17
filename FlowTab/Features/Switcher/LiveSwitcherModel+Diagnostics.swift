@@ -101,16 +101,27 @@ extension LiveSwitcherModel {
         )
     }
 
-    func logBackgroundFullSnapshotRefresh(result: String, startMs: Double) {
+    func logBackgroundFullSnapshotRefresh(
+        result: String,
+        startMs: Double,
+        generation: UInt64,
+        reason: SnapshotInvalidationReason,
+        triggerDirection: CycleDirection,
+        applyGeneration: UInt64? = nil
+    ) {
+        let diagnostic = BackgroundFullSnapshotRefreshDiagnostic(
+            result: result,
+            generation: generation,
+            currentGeneration: backgroundFullSnapshotRefreshGeneration,
+            reason: reason,
+            trigger: triggerDirection.debugName,
+            applyGeneration: applyGeneration,
+            totalMs: Self.formatMilliseconds(Self.monotonicMilliseconds() - startMs)
+        )
+        lastBackgroundFullSnapshotRefreshDiagnostic = diagnostic
         RuntimeLog.debug(
             "Snapshot",
-            Self.snapshotLogLine(
-                "backgroundFullSnapshotRefresh",
-                fields: [
-                    ("result", result),
-                    ("totalMs", Self.formatMilliseconds(Self.monotonicMilliseconds() - startMs))
-                ]
-            )
+            diagnostic.logMessage
         )
     }
 

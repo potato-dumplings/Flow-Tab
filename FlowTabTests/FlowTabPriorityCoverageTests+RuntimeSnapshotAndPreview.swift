@@ -6,6 +6,167 @@ import XCTest
 import FlowTabCore
 
 extension FlowTabPriorityCoverageTests {
+    func testWindowBindingSourcesExposeExplicitConfidence() {
+        XCTAssertEqual(WindowBindingConfirmationSource.publicExactMatch.bindingConfidence, .exact)
+        XCTAssertEqual(WindowBindingConfirmationSource.privateExactBridge.bindingConfidence, .exact)
+        XCTAssertEqual(WindowBindingConfirmationSource.stickyBinding.bindingConfidence, .sticky)
+        XCTAssertEqual(WindowBindingConfirmationSource.fullscreenContentRebinding.bindingConfidence, .inferred)
+        XCTAssertEqual(WindowBindingConfirmationSource.fullscreenContentFallbackBinding.bindingConfidence, .inferred)
+        XCTAssertEqual(WindowBindingConfirmationSource.desktopSiblingBinding.bindingConfidence, .inferred)
+
+        let provisionalEntry = RuntimeSnapshotProvider.WindowListEntry(
+            windowID: "cg:42:101",
+            title: "Draft",
+            isMinimized: false,
+            cgWindowID: 101
+        )
+        XCTAssertEqual(provisionalEntry.bindingConfidence, .provisional)
+
+        let stickyEntry = RuntimeSnapshotProvider.WindowListEntry(
+            windowID: "cg:42:102",
+            title: "Inbox",
+            isMinimized: false,
+            cgWindowID: 102,
+            hasStickyBinding: true
+        )
+        XCTAssertEqual(stickyEntry.bindingConfidence, .sticky)
+
+        let context = RuntimeWindowContext(
+            id: "cg:42:103",
+            title: "Report",
+            isMinimized: false,
+            cgWindowID: 103,
+            hasStickyBinding: true,
+            lastConfirmationSource: .privateExactBridge
+        )
+        XCTAssertEqual(context.bindingConfidence, .exact)
+        XCTAssertEqual(
+            WindowBindingConfidence.exact.allowedActions,
+            [
+                .exposeInSwitcher,
+                .useForAXActivation,
+                .useForCGActivationFallback,
+                .updateStickyHistory,
+                .updateRecency,
+                .capturePreview
+            ]
+        )
+        XCTAssertFalse(WindowBindingConfidence.sticky.allowedActions.contains(.updateStickyHistory))
+        XCTAssertFalse(WindowBindingConfidence.inferred.allowedActions.contains(.updateRecency))
+        XCTAssertEqual(
+            WindowBindingConfidence.provisional.allowedActions,
+            [.exposeInSwitcher, .capturePreview]
+        )
+        XCTAssertEqual(WindowBindingConfidence.ambiguous.allowedActions, [.quarantineOnly])
+        XCTAssertTrue(
+            WindowBindingDiagnostic(
+                stableWindowID: "ambiguous",
+                axWindowID: nil,
+                cgWindowID: nil,
+                confidence: .ambiguous,
+                source: nil,
+                reason: nil,
+                candidateCount: 2,
+                allowedActions: WindowBindingConfidence.ambiguous.allowedActions
+            ).isQuarantined
+        )
+        XCTAssertEqual(context.bindingDiagnostic.confidence, .exact)
+        XCTAssertEqual(context.bindingDiagnostic.source, .privateExactBridge)
+        XCTAssertTrue(context.bindingDiagnostic.allowedActions.contains(.useForAXActivation))
+        XCTAssertEqual(provisionalEntry.bindingDiagnostic.confidence, .provisional)
+        XCTAssertFalse(provisionalEntry.bindingDiagnostic.allowedActions.contains(.useForAXActivation))
+
+        let ambiguousEntry = RuntimeSnapshotProvider.WindowListEntry(
+            windowID: "cg:42:104",
+            title: "Ambiguous",
+            isMinimized: false,
+            cgWindowID: 104,
+            bindingConfidenceOverride: .ambiguous,
+            bindingCandidateCount: 2
+        )
+        XCTAssertEqual(ambiguousEntry.bindingConfidence, .ambiguous)
+        XCTAssertEqual(ambiguousEntry.bindingDiagnostic.candidateCount, 2)
+        XCTAssertTrue(ambiguousEntry.bindingDiagnostic.isQuarantined)
+
+        let ambiguousContext = RuntimeWindowContext(
+            id: "cg:42:105",
+            title: "Ambiguous Context",
+            isMinimized: false,
+            cgWindowID: 105,
+            bindingConfidenceOverride: .ambiguous,
+            bindingCandidateCount: 2
+        )
+        XCTAssertEqual(ambiguousContext.bindingConfidence, .ambiguous)
+        XCTAssertEqual(ambiguousContext.bindingDiagnostic.candidateCount, 2)
+        XCTAssertFalse(ambiguousContext.bindingAllowedActions.contains(.capturePreview))
+    }
+
+    func testRuntimeWindowRecordOnlyExactMatchesUpdateStickyHistory() {
+        let currentApp = NSRunningApplication.current
+        let cgWindow = RuntimeSnapshotProvider.CGWindowEntry(
+            id: 24_501,
+            title: "Fullscreen Candidate",
+            bounds: CGRect(x: 40, y: 80, width: 960, height: 640),
+            isOnscreen: true,
+            alpha: 1.0,
+            storeType: 1,
+            spaceIDs: [8_401]
+        )
+        let inferredAXWindow = RuntimeSnapshotProvider.AXWindowEntry(
+            index: 0,
+            id: "ax:\(currentApp.processIdentifier):inferred",
+            title: "Fullscreen Candidate",
+            sourceTitle: "Fullscreen Candidate",
+            isMinimized: false,
+            window: AXUIElementCreateApplication(currentApp.processIdentifier),
+            frame: cgWindow.bounds
+        )
+        var record = RuntimeWindowRecord(
+            cgWindowID: cgWindow.id,
+            stableWindowID: "cg:\(currentApp.processIdentifier):\(cgWindow.id)",
+            firstSeenAt: 10
+        )
+
+        record.applyExactMatch(
+            axWindow: inferredAXWindow,
+            resolvedTitle: "Fullscreen Candidate",
+            confirmationSource: .fullscreenContentFallbackBinding,
+            observedAt: 11,
+            matchedCGWindow: cgWindow
+        )
+
+        XCTAssertEqual(record.currentAXWindowID, inferredAXWindow.id)
+        XCTAssertEqual(record.lastConfirmationSource, .fullscreenContentFallbackBinding)
+        XCTAssertEqual(record.bindingConfidence, .inferred)
+        XCTAssertNil(record.lastExactAXWindowID)
+        XCTAssertNil(record.lastExactAXWindow)
+        XCTAssertNil(record.lastExactConfirmedAt)
+
+        let exactAXWindow = RuntimeSnapshotProvider.AXWindowEntry(
+            index: 1,
+            id: "ax:\(currentApp.processIdentifier):exact",
+            title: "Fullscreen Candidate",
+            sourceTitle: "Fullscreen Candidate",
+            isMinimized: false,
+            window: AXUIElementCreateApplication(currentApp.processIdentifier),
+            frame: cgWindow.bounds
+        )
+        record.applyExactMatch(
+            axWindow: exactAXWindow,
+            resolvedTitle: "Fullscreen Candidate",
+            confirmationSource: .publicExactMatch,
+            observedAt: 12,
+            matchedCGWindow: cgWindow
+        )
+
+        XCTAssertEqual(record.currentAXWindowID, exactAXWindow.id)
+        XCTAssertEqual(record.lastConfirmationSource, .publicExactMatch)
+        XCTAssertEqual(record.bindingConfidence, .exact)
+        XCTAssertEqual(record.lastExactAXWindowID, exactAXWindow.id)
+        XCTAssertNotNil(record.lastExactAXWindow)
+        XCTAssertEqual(record.lastExactConfirmedAt, 12)
+    }
+
     func testRuntimeSnapshotProviderAssemblySelectsPrimaryRowsAndFiltersMinimizedOnlyApps() {
         let rows = RuntimeSnapshotProvider.assembleSnapshotRowsForTesting(
             apps: [
@@ -1145,6 +1306,64 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(provider.isLikelyTransientAXRebuild(for: pid))
     }
 
+    func testRuntimeSnapshotProviderPartialRemoteAXScanDoesNotConsumeMissingAXGrace() {
+        let provider = RuntimeSnapshotProvider()
+        let pid: pid_t = 18_405
+        let appName = "Google Chrome"
+        let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
+        let cgWindows = [
+            RuntimeSnapshotProvider.CGWindowEntry(
+                id: 243_747,
+                title: "Recovered Window",
+                bounds: fullscreenBounds,
+                isOnscreen: false,
+                alpha: 1.0,
+                storeType: 1,
+                spaceIDs: [1]
+            )
+        ]
+        let initialAXWindows = [
+            RuntimeSnapshotProvider.AXWindowEntry(
+                index: 0,
+                id: "ax:18405:0",
+                title: "Recovered Window",
+                sourceTitle: "Recovered Window",
+                isMinimized: false,
+                window: AXUIElementCreateApplication(90_003),
+                frame: fullscreenBounds
+            )
+        ]
+
+        _ = provider.resolvedStableWindowEntries(
+            axWindows: initialAXWindows,
+            cgWindows: cgWindows,
+            pid: pid,
+            appName: appName
+        )
+
+        for _ in 0..<5 {
+            let partialEntries = provider.resolvedStableWindowEntries(
+                axWindows: [],
+                cgWindows: cgWindows,
+                pid: pid,
+                appName: appName,
+                remoteScanCompleteness: .partialTimedOut(scanned: 24, maximum: 1_000)
+            )
+            XCTAssertEqual(partialEntries.map(\.windowID), ["cg:18405:243747"])
+            XCTAssertFalse(provider.isLikelyTransientAXRebuild(for: pid))
+        }
+
+        let firstAuthoritativeMissingEntries = provider.resolvedStableWindowEntries(
+            axWindows: [],
+            cgWindows: cgWindows,
+            pid: pid,
+            appName: appName,
+            remoteScanCompleteness: .complete(scanned: 1_000)
+        )
+        XCTAssertEqual(firstAuthoritativeMissingEntries.map(\.windowID), ["cg:18405:243747"])
+        XCTAssertTrue(provider.isLikelyTransientAXRebuild(for: pid))
+    }
+
     func testRuntimeSnapshotProviderWindowListKeepsStickyMatchesWhenAXTitlesChange() {
         let provider = RuntimeSnapshotProvider()
         let pid: pid_t = 18405
@@ -1453,6 +1672,86 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
+    func testRuntimeWindowPreviewProviderBridgeClassifiesLateCallbacksAfterTimeout() {
+        XCTAssertEqual(
+            RuntimeWindowPreviewProvider.screenCaptureBridgeLateCallbackFailureForTesting(),
+            .callbackReturnedAfterTimeout
+        )
+    }
+
+    func testRuntimeWindowPreviewProviderBridgeKeepsNearDeadlineCompletion() {
+        XCTAssertTrue(
+            RuntimeWindowPreviewProvider.screenCaptureBridgeUsesCompletedValueBeforeTimeoutMarkForTesting()
+        )
+    }
+
+    func testRuntimeWindowPreviewProviderOutcomesClassifyPermissionDenied() {
+        let previousOverride = ScreenCapturePermissionChecker.hasPermissionOverrideForTesting
+        ScreenCapturePermissionChecker.hasPermissionOverrideForTesting = { false }
+        defer {
+            ScreenCapturePermissionChecker.hasPermissionOverrideForTesting = previousOverride
+        }
+
+        let outcomes = RuntimeWindowPreviewProvider.captureWindowPreviewOutcomes([
+            RuntimeWindowPreviewProvider.CaptureRequest(
+                preferredWindowID: 243_747,
+                ownerPID: ProcessInfo.processInfo.processIdentifier,
+                preferredTitle: "Inbox",
+                inferTitleBarStyle: false
+            )
+        ])
+
+        XCTAssertEqual(outcomes.count, 1)
+        XCTAssertNil(outcomes[0].result)
+        XCTAssertEqual(outcomes[0].failureReason, .permissionDenied)
+    }
+
+    func testRuntimeWindowPreviewProviderOutcomesClassifyMissingWindowBeforeShareableLookup() {
+        let previousOverride = ScreenCapturePermissionChecker.hasPermissionOverrideForTesting
+        ScreenCapturePermissionChecker.hasPermissionOverrideForTesting = { true }
+        defer {
+            ScreenCapturePermissionChecker.hasPermissionOverrideForTesting = previousOverride
+        }
+
+        let outcomes = RuntimeWindowPreviewProvider.captureWindowPreviewOutcomes([
+            RuntimeWindowPreviewProvider.CaptureRequest(
+                preferredWindowID: nil,
+                ownerPID: 987_654,
+                preferredTitle: "Missing Preview Window",
+                inferTitleBarStyle: false
+            )
+        ])
+
+        XCTAssertEqual(outcomes.count, 1)
+        XCTAssertNil(outcomes[0].result)
+        XCTAssertEqual(outcomes[0].failureReason, .windowNotFound)
+    }
+
+    func testRuntimeWindowPreviewProviderUsesNamedCaptureConcurrencyPolicy() {
+        let policy = RuntimeWindowPreviewProvider.captureConcurrencyPolicyForTesting()
+
+        XCTAssertEqual(policy, .default)
+        XCTAssertEqual(policy.maxConcurrentCaptures, 4)
+        XCTAssertGreaterThan(policy.maxConcurrentCaptures, 0)
+        XCTAssertEqual(
+            RuntimeWindowPreviewProvider.captureWorkerCountForTesting(requestCount: 1),
+            1
+        )
+        XCTAssertEqual(
+            RuntimeWindowPreviewProvider.captureWorkerCountForTesting(requestCount: 12),
+            policy.maxConcurrentCaptures
+        )
+        XCTAssertEqual(
+            RuntimeWindowPreviewProvider.captureWorkerCountForTesting(
+                requestCount: 12,
+                concurrencyPolicy: RuntimeWindowPreviewProvider.CaptureConcurrencyPolicy(
+                    maxConcurrentCaptures: 2
+                )
+            ),
+            2
+        )
+    }
+
     func testRuntimeWindowPreviewProviderScaledPreviewSizeAndImageDownscaleBehavior() {
         let largeSize = RuntimeWindowPreviewProvider.scaledPreviewSizeForTesting(
             sourceWidth: 2_400,
@@ -1570,6 +1869,152 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertNil(assignments["ax:200:2"], "Ambiguous windows should remain unbound")
         XCTAssertNil(assignments["ax:200:0"], "Windows without a title hit should remain unbound")
+    }
+
+    func testRuntimeSnapshotProviderResolveCGWindowAssignmentsReportsAmbiguousDiagnostics() {
+        let axWindows: [RuntimeSnapshotProvider.AXWindowEntryForTesting] = [
+            .init(
+                id: "ax:300:0",
+                index: 0,
+                title: "Document",
+                bounds: CGRect(x: 100, y: 100, width: 800, height: 500)
+            )
+        ]
+        let cgWindows: [RuntimeSnapshotProvider.CGWindowEntryForTesting] = [
+            .init(
+                id: 31,
+                title: "Document",
+                bounds: CGRect(x: 100, y: 100, width: 800, height: 500)
+            ),
+            .init(
+                id: 32,
+                title: "Document",
+                bounds: CGRect(x: 100, y: 100, width: 800, height: 500)
+            )
+        ]
+
+        let assignments = RuntimeSnapshotProvider.resolveCGWindowAssignmentsForTesting(
+            axWindows: axWindows,
+            cgWindows: cgWindows
+        )
+        let diagnostics = RuntimeSnapshotProvider.resolveCGWindowAssignmentDiagnosticsForTesting(
+            axWindows: axWindows,
+            cgWindows: cgWindows
+        )
+
+        XCTAssertTrue(assignments.isEmpty)
+        XCTAssertEqual(diagnostics.count, 1)
+        XCTAssertEqual(diagnostics.first?.stableWindowID, "ax:300:0")
+        XCTAssertEqual(diagnostics.first?.axWindowID, "ax:300:0")
+        XCTAssertNil(diagnostics.first?.cgWindowID)
+        XCTAssertEqual(diagnostics.first?.confidence, .ambiguous)
+        XCTAssertNil(diagnostics.first?.source)
+        XCTAssertEqual(diagnostics.first?.reason, .publicAssignmentAmbiguous)
+        XCTAssertEqual(diagnostics.first?.candidateCount, 2)
+        XCTAssertEqual(diagnostics.first?.allowedActions, WindowBindingConfidence.ambiguous.allowedActions)
+        XCTAssertTrue(diagnostics.first?.isQuarantined == true)
+    }
+
+    func testRuntimeSnapshotProviderPrivateExactBridgeConflictWithStickyBindingReportsDiagnosticAndUsesExactTarget() {
+        let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
+        let axWindows: [RuntimeSnapshotProvider.AXWindowEntryForTesting] = [
+            .init(
+                id: "ax:100:0",
+                index: 0,
+                title: "百度一下，你就知道",
+                bounds: fullscreenBounds,
+                bridgedCGWindowID: 202
+            )
+        ]
+        let cgWindows: [RuntimeSnapshotProvider.CGWindowEntryForTesting] = [
+            .init(id: 101, title: "百度一下，你就知道", bounds: fullscreenBounds),
+            .init(id: 202, title: "百度一下，你就知道", bounds: fullscreenBounds)
+        ]
+
+        let assignments = RuntimeSnapshotProvider.resolveCGWindowAssignmentsForTesting(
+            axWindows: axWindows,
+            cgWindows: cgWindows,
+            previousMatches: ["ax:100:0": 101],
+            previousAXWindowIDs: ["ax:100:0"],
+            previousCGWindowIDs: [101],
+            pid: 100,
+            appName: "Google Chrome"
+        )
+        let diagnostics = RuntimeSnapshotProvider.resolveCGWindowAssignmentDiagnosticsForTesting(
+            axWindows: axWindows,
+            cgWindows: cgWindows,
+            previousMatches: ["ax:100:0": 101],
+            previousAXWindowIDs: ["ax:100:0"],
+            previousCGWindowIDs: [101],
+            pid: 100,
+            appName: "Google Chrome"
+        )
+        let conflictDiagnostic = diagnostics.first {
+            $0.reason == .privateExactBridgeConflictsWithStickyBinding
+        }
+
+        XCTAssertEqual(assignments["ax:100:0"], 202)
+        XCTAssertEqual(conflictDiagnostic?.stableWindowID, "cg:100:101")
+        XCTAssertEqual(conflictDiagnostic?.axWindowID, "ax:100:0")
+        XCTAssertEqual(conflictDiagnostic?.cgWindowID, 202)
+        XCTAssertEqual(conflictDiagnostic?.confidence, .ambiguous)
+        XCTAssertEqual(conflictDiagnostic?.source, .privateExactBridge)
+        XCTAssertEqual(conflictDiagnostic?.candidateCount, 2)
+        XCTAssertEqual(conflictDiagnostic?.allowedActions, WindowBindingConfidence.ambiguous.allowedActions)
+        XCTAssertTrue(conflictDiagnostic?.isQuarantined == true)
+    }
+
+    func testRuntimeSnapshotProviderReportsAmbiguousFullscreenTopologyFallbackDiagnostics() {
+        let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
+        let axWindows: [RuntimeSnapshotProvider.AXWindowEntryForTesting] = [
+            .init(
+                id: "ax:400:0",
+                index: 0,
+                bounds: fullscreenBounds
+            )
+        ]
+        let cgWindows: [RuntimeSnapshotProvider.CGWindowEntryForTesting] = [
+            .init(
+                id: 401,
+                title: nil,
+                bounds: fullscreenBounds,
+                isOnscreen: false,
+                spaceIDs: [12_001]
+            ),
+            .init(
+                id: 402,
+                title: nil,
+                bounds: fullscreenBounds,
+                isOnscreen: false,
+                spaceIDs: [12_001]
+            )
+        ]
+
+        let assignments = RuntimeSnapshotProvider.resolveCGWindowAssignmentsForTesting(
+            axWindows: axWindows,
+            cgWindows: cgWindows,
+            pid: 400,
+            appName: "Google Chrome"
+        )
+        let diagnostics = RuntimeSnapshotProvider.resolveCGWindowAssignmentDiagnosticsForTesting(
+            axWindows: axWindows,
+            cgWindows: cgWindows,
+            pid: 400,
+            appName: "Google Chrome"
+        )
+        let topologyDiagnostic = diagnostics.first {
+            $0.reason == .fullscreenTopologyAmbiguous
+        }
+
+        XCTAssertTrue(assignments.isEmpty)
+        XCTAssertEqual(topologyDiagnostic?.stableWindowID, "ax:400:0")
+        XCTAssertEqual(topologyDiagnostic?.axWindowID, "ax:400:0")
+        XCTAssertNil(topologyDiagnostic?.cgWindowID)
+        XCTAssertEqual(topologyDiagnostic?.confidence, .ambiguous)
+        XCTAssertEqual(topologyDiagnostic?.source, .fullscreenContentFallbackBinding)
+        XCTAssertEqual(topologyDiagnostic?.candidateCount, 2)
+        XCTAssertEqual(topologyDiagnostic?.allowedActions, WindowBindingConfidence.ambiguous.allowedActions)
+        XCTAssertTrue(topologyDiagnostic?.isQuarantined == true)
     }
 
     func testRuntimeSnapshotProviderResolveCGWindowAssignmentsBindsSingleNewUnmatchedPairFromDelta() {
@@ -1807,6 +2252,21 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
+    func testAXWindowInspectorWindowsFetchLogDetailsIncludesRemoteScanCompleteness() {
+        let details = AXWindowInspectorForTesting.windowsFetchLogDetails(
+            error: .success,
+            rawValueTypeDescription: "CFArray",
+            rawArrayCount: 1,
+            decodedCount: 1,
+            remoteScanCompleteness: .partialTimedOut(scanned: 24, maximum: 1_000)
+        )
+
+        XCTAssertEqual(
+            details,
+            "fetchError=0 rawValueType=CFArray rawArrayCount=1 decodedCount=1 remoteScan=partialTimedOut scanned=24 maximum=1000"
+        )
+    }
+
     func testAXWindowInspectorWindowsFetchLogDetailsUsesNilRawArrayCountWhenMissing() {
         let details = AXWindowInspectorForTesting.windowsFetchLogDetails(
             error: .success,
@@ -1819,6 +2279,77 @@ extension FlowTabPriorityCoverageTests {
             details,
             "fetchError=0 rawValueType=nil rawArrayCount=nil decodedCount=0"
         )
+    }
+
+    func testAXTypedExtractionDecodesPointAndSizeValues() {
+        var point = CGPoint(x: 12, y: 34)
+        var size = CGSize(width: 56, height: 78)
+        guard
+            let pointValue = AXValueCreate(.cgPoint, &point),
+            let sizeValue = AXValueCreate(.cgSize, &size)
+        else {
+            XCTFail("Expected AXValue fixtures")
+            return
+        }
+
+        switch AXWindowInspectorForTesting.point(
+            from: pointValue,
+            attribute: kAXPositionAttribute as CFString
+        ) {
+        case .success(let decodedPoint):
+            XCTAssertEqual(decodedPoint, point)
+        case .failure(let error):
+            XCTFail("Expected point extraction to succeed, got \(error)")
+        }
+
+        switch AXWindowInspectorForTesting.size(
+            from: sizeValue,
+            attribute: kAXSizeAttribute as CFString
+        ) {
+        case .success(let decodedSize):
+            XCTAssertEqual(decodedSize, size)
+        case .failure(let error):
+            XCTFail("Expected size extraction to succeed, got \(error)")
+        }
+    }
+
+    func testAXTypedExtractionReportsTypeMismatchWithoutTrapping() {
+        var size = CGSize(width: 56, height: 78)
+        guard let sizeValue = AXValueCreate(.cgSize, &size) else {
+            XCTFail("Expected AXValue fixture")
+            return
+        }
+
+        switch AXWindowInspectorForTesting.point(
+            from: sizeValue,
+            attribute: kAXPositionAttribute as CFString
+        ) {
+        case .success(let point):
+            XCTFail("Expected point extraction to reject size value, got \(point)")
+        case .failure(let error):
+            XCTAssertTrue(String(describing: error).contains("expected=AXValue<CGPoint>"))
+        }
+
+        switch AXWindowInspectorForTesting.axElement(
+            from: "not-a-window" as CFString,
+            attribute: kAXFocusedWindowAttribute as CFString
+        ) {
+        case .success:
+            XCTFail("Expected AXUIElement extraction to reject CFString")
+        case .failure(let error):
+            XCTAssertEqual(
+                String(describing: error),
+                "typeMismatch attribute=AXFocusedWindow expected=AXUIElement actual=CFString"
+            )
+        }
+    }
+
+    func testAXTypedExtractionCountsRawCFArraysWithoutUnsafeCastAtCallSite() {
+        let array = ["a", "b"] as NSArray
+
+        XCTAssertEqual(AXWindowInspectorForTesting.rawArrayCount(from: array), 2)
+        XCTAssertEqual(AXWindowInspectorForTesting.typeDescription(for: array), "CFArray")
+        XCTAssertNil(AXWindowInspectorForTesting.rawArrayCount(from: "not-array" as CFString))
     }
 
     func testRuntimeWindowPreviewProviderPreferredCaptureSourceSizeUsesContentRectPixelScale() {
@@ -1917,6 +2448,82 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testLiveSwitcherModelPreviewCacheIdentityIgnoresTitleChanges() {
+        let model = LiveSwitcherModel()
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let windows = [
+            WindowCandidate(id: "front-1", title: "Inbox", isMinimized: false, lastActiveAt: 30)
+        ]
+        let context = makeRuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windows: windows
+        )
+
+        model.frontmostApplicationOverride = { currentApp }
+        model.snapshotProviderOverride = {
+            RuntimeSnapshot(
+                apps: [
+                    AppSwitchCandidate(
+                        id: appID,
+                        displayName: currentApp.localizedName ?? "Current App",
+                        groupID: "current",
+                        lastActiveAt: 100,
+                        windows: windows
+                    )
+                ],
+                contextsByID: [appID: context]
+            )
+        }
+
+        var captureCallCount = 0
+        model.previewCaptureOverride = { _, _, _, _ in
+            captureCallCount += 1
+            return (
+                image: self.makeColorImage(color: .black),
+                resolvedWindowID: 24_001,
+                titleBarStyle: nil
+            )
+        }
+
+        XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
+        let initialSnapshot = model.windowPreviewSnapshotForTesting()
+        XCTAssertEqual(captureCallCount, 1)
+        XCTAssertTrue(initialSnapshot.first?.hasImage == true)
+
+        guard let capturedContext = model.runtimeContextsByID[appID],
+              var windowContext = capturedContext.windowsByID["front-1"]
+        else {
+            return XCTFail("Expected runtime context after preview capture")
+        }
+        windowContext = RuntimeWindowContext(
+            id: windowContext.id,
+            title: "Inbox - Edited",
+            isMinimized: windowContext.isMinimized,
+            ownerPID: windowContext.ownerPID,
+            cgWindowID: windowContext.cgWindowID,
+            spaceIDs: windowContext.spaceIDs,
+            inferredTitleBarStyle: windowContext.inferredTitleBarStyle,
+            activationHandleID: windowContext.activationHandleID,
+            axWindow: windowContext.axWindow,
+            frame: windowContext.frame,
+            allowsPublicAXRecovery: windowContext.allowsPublicAXRecovery,
+            hasStickyBinding: windowContext.hasStickyBinding,
+            lastConfirmationSource: windowContext.lastConfirmationSource
+        )
+        model.runtimeContextsByID[appID] = RuntimeAppContext(
+            appID: capturedContext.appID,
+            runningApp: capturedContext.runningApp,
+            windowsByID: ["front-1": windowContext]
+        )
+
+        let updatedTitleSnapshot = model.windowPreviewSnapshotForTesting()
+        XCTAssertEqual(captureCallCount, 1)
+        XCTAssertTrue(updatedTitleSnapshot.first?.hasImage == true)
+    }
+
+    @MainActor
     func testLiveSwitcherModelFocusedWindowSessionFreezesPreviewSnapshotUntilSessionEnds() {
         let model = LiveSwitcherModel()
         let currentApp = NSRunningApplication.current
@@ -1993,6 +2600,136 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(restartedSnapshot.count, 2)
         XCTAssertTrue(restartedSnapshot.allSatisfy { !$0.hasImage })
         XCTAssertEqual(captureCallCount, 4)
+    }
+
+    @MainActor
+    func testLiveSwitcherModelPreviewCaptureFailureStateRetriesNextGeneration() {
+        let model = LiveSwitcherModel()
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let windows = [
+            WindowCandidate(id: "front-1", title: "Inbox", isMinimized: false, lastActiveAt: 30)
+        ]
+        let context = makeRuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windows: windows
+        )
+
+        model.frontmostApplicationOverride = { currentApp }
+        model.snapshotProviderOverride = {
+            RuntimeSnapshot(
+                apps: [
+                    AppSwitchCandidate(
+                        id: appID,
+                        displayName: currentApp.localizedName ?? "Current App",
+                        groupID: "current",
+                        lastActiveAt: 100,
+                        windows: windows
+                    )
+                ],
+                contextsByID: [appID: context]
+            )
+        }
+
+        var captureCallCount = 0
+        model.previewCaptureOverride = { _, _, _, _ in
+            captureCallCount += 1
+            return nil
+        }
+
+        XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
+
+        let firstSnapshot = model.windowPreviewSnapshotForTesting()
+        XCTAssertEqual(firstSnapshot.count, 1)
+        XCTAssertFalse(firstSnapshot[0].hasImage)
+        XCTAssertEqual(captureCallCount, 1)
+        guard
+            case let .failed(reason, retryAfterGeneration?) =
+                model.previewCaptureStatesForTesting().values.first
+        else {
+            return XCTFail("Expected transient preview failure state")
+        }
+        XCTAssertEqual(reason, .transientSystemError)
+        XCTAssertEqual(retryAfterGeneration, model.previewCaptureGeneration + 1)
+
+        _ = model.windowPreviewSnapshotForTesting()
+        XCTAssertEqual(captureCallCount, 1)
+
+        model.previewCaptureGeneration &+= 1
+        _ = model.windowPreviewSnapshotForTesting()
+        XCTAssertEqual(captureCallCount, 2)
+    }
+
+    @MainActor
+    func testLiveSwitcherModelPreviewCaptureSkipsBindingWithoutCaptureAction() {
+        let model = LiveSwitcherModel()
+        model.backgroundFullSnapshotRefreshEnabled = false
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let window = WindowCandidate(
+            id: "ambiguous-window",
+            title: "Ambiguous Window",
+            isMinimized: false,
+            lastActiveAt: 30
+        )
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windowsByID: [
+                window.id: RuntimeWindowContext(
+                    id: window.id,
+                    title: window.title,
+                    isMinimized: window.isMinimized,
+                    ownerPID: currentApp.processIdentifier,
+                    cgWindowID: 24_701,
+                    bindingConfidenceOverride: .ambiguous,
+                    bindingCandidateCount: 2
+                )
+            ]
+        )
+
+        model.frontmostApplicationOverride = { currentApp }
+        model.snapshotProviderOverride = {
+            RuntimeSnapshot(
+                apps: [
+                    AppSwitchCandidate(
+                        id: appID,
+                        displayName: currentApp.localizedName ?? "Current App",
+                        groupID: "current",
+                        lastActiveAt: 100,
+                        windows: [window]
+                    )
+                ],
+                contextsByID: [appID: context]
+            )
+        }
+
+        var captureCallCount = 0
+        model.previewCaptureOverride = { _, _, _, _ in
+            captureCallCount += 1
+            return (
+                image: self.makeColorImage(color: .black),
+                resolvedWindowID: 24_701,
+                titleBarStyle: nil
+            )
+        }
+
+        XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
+
+        let snapshot = model.windowPreviewSnapshotForTesting()
+
+        XCTAssertEqual(snapshot.count, 1)
+        XCTAssertFalse(snapshot[0].hasImage)
+        XCTAssertEqual(captureCallCount, 0)
+        guard
+            case let .failed(reason, retryAfterGeneration) =
+                model.previewCaptureStatesForTesting().values.first
+        else {
+            return XCTFail("Expected binding action preview failure state")
+        }
+        XCTAssertEqual(reason, .bindingActionDisallowed)
+        XCTAssertNil(retryAfterGeneration)
     }
 
 }

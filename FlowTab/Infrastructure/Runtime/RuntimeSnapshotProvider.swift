@@ -18,6 +18,39 @@ final class RuntimeSnapshotProvider {
         let allowsPublicAXRecovery: Bool
         let hasStickyBinding: Bool
         let lastConfirmationSource: WindowBindingConfirmationSource?
+        let bindingConfidenceOverride: WindowBindingConfidence?
+        let bindingCandidateCount: Int
+        let spaceEvidence: RuntimeSpaceEvidence?
+
+        var bindingConfidence: WindowBindingConfidence {
+            if let bindingConfidenceOverride {
+                return bindingConfidenceOverride
+            }
+            if let lastConfirmationSource {
+                return lastConfirmationSource.bindingConfidence
+            }
+            if hasStickyBinding {
+                return .sticky
+            }
+            return .provisional
+        }
+
+        var bindingAllowedActions: Set<WindowBindingAction> {
+            bindingConfidence.allowedActions
+        }
+
+        var bindingDiagnostic: WindowBindingDiagnostic {
+            WindowBindingDiagnostic(
+                stableWindowID: windowID,
+                axWindowID: activationHandleID,
+                cgWindowID: cgWindowID,
+                confidence: bindingConfidence,
+                source: lastConfirmationSource,
+                reason: nil,
+                candidateCount: bindingCandidateCount,
+                allowedActions: bindingAllowedActions
+            )
+        }
 
         init(
             windowID: String,
@@ -32,7 +65,10 @@ final class RuntimeSnapshotProvider {
             isOnscreen: Bool = false,
             allowsPublicAXRecovery: Bool = false,
             hasStickyBinding: Bool = false,
-            lastConfirmationSource: WindowBindingConfirmationSource? = nil
+            lastConfirmationSource: WindowBindingConfirmationSource? = nil,
+            bindingConfidenceOverride: WindowBindingConfidence? = nil,
+            bindingCandidateCount: Int? = nil,
+            spaceEvidence: RuntimeSpaceEvidence? = nil
         ) {
             self.windowID = windowID
             self.title = title
@@ -42,11 +78,22 @@ final class RuntimeSnapshotProvider {
             self.activationHandleID = activationHandleID
             self.axWindow = axWindow
             self.frame = frame
-            self.spaceIDs = RuntimeWindowTopologyClassifier.normalizedSpaceIDs(spaceIDs)
+            let normalizedSpaceIDs = RuntimeWindowTopologyClassifier.normalizedSpaceIDs(spaceIDs)
+            self.spaceIDs = normalizedSpaceIDs
             self.isOnscreen = isOnscreen
             self.allowsPublicAXRecovery = allowsPublicAXRecovery
             self.hasStickyBinding = hasStickyBinding
             self.lastConfirmationSource = lastConfirmationSource
+            self.bindingConfidenceOverride = bindingConfidenceOverride
+            self.bindingCandidateCount = bindingCandidateCount ?? (cgWindowID == nil ? 0 : 1)
+            self.spaceEvidence = spaceEvidence ?? cgWindowID.map {
+                RuntimeWindowTopologyClassifier.spaceEvidence(
+                    cgWindowID: $0,
+                    spaceIDs: normalizedSpaceIDs,
+                    bounds: frame,
+                    source: "window-list-entry"
+                )
+            }
         }
     }
 
@@ -272,7 +319,10 @@ final class RuntimeSnapshotProvider {
                             frame: $0.frame,
                             allowsPublicAXRecovery: $0.allowsPublicAXRecovery,
                             hasStickyBinding: $0.hasStickyBinding,
-                            lastConfirmationSource: $0.lastConfirmationSource
+                            lastConfirmationSource: $0.lastConfirmationSource,
+                            bindingConfidenceOverride: $0.bindingConfidenceOverride,
+                            bindingCandidateCount: $0.bindingCandidateCount,
+                            spaceEvidence: $0.spaceEvidence
                         )
                     )
                 }
@@ -550,7 +600,8 @@ final class RuntimeSnapshotProvider {
                 axWindows: axEntries,
                 cgWindows: allCGWindows,
                 pid: app.processIdentifier,
-                appName: appName
+                appName: appName,
+                remoteScanCompleteness: windowsFetchResult.remoteScanCompleteness
             )
             let resolveReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
             totalRawWindows += windows.count
@@ -675,13 +726,15 @@ final class RuntimeSnapshotProvider {
         axWindows: [AXWindowEntry],
         cgWindows: [CGWindowEntry],
         pid: pid_t,
-        appName: String
+        appName: String,
+        remoteScanCompleteness: RuntimeAXRemoteWindowResolver.RemoteScanCompleteness? = nil
     ) -> [WindowListEntry] {
         resolvedStableWindowEntries(
             axWindows: axWindows,
             cgWindows: cgWindows,
             pid: pid,
-            appName: appName
+            appName: appName,
+            remoteScanCompleteness: remoteScanCompleteness
         )
     }
 
@@ -866,8 +919,24 @@ final class RuntimeSnapshotProvider {
         appName: String? = nil,
         previousMatches: [String: CGWindowID] = [:]
     ) -> [String: CGWindowID] {
+        matchCGWindowAssignmentsWithDiagnostics(
+            axWindows: axWindows,
+            cgWindows: cgWindows,
+            appName: appName,
+            previousMatches: previousMatches
+        ).matches
+    }
+
+    static func matchCGWindowAssignmentsWithDiagnostics(
+        axWindows: [AXWindowEntry],
+        cgWindows: [CGWindowEntry],
+        appName: String? = nil,
+        previousMatches: [String: CGWindowID] = [:]
+    ) -> RuntimeWindowAssignmentMatchResult {
         _ = previousMatches
-        guard !axWindows.isEmpty, !cgWindows.isEmpty else { return [:] }
+        guard !axWindows.isEmpty, !cgWindows.isEmpty else {
+            return RuntimeWindowAssignmentMatchResult(matches: [:], bindingDiagnostics: [])
+        }
 
         var candidateCGIDsByAXWindowID: [String: Set<CGWindowID>] = [:]
         var candidateAXWindowIDsByCGWindowID: [CGWindowID: Set<String>] = [:]
@@ -938,7 +1007,50 @@ final class RuntimeSnapshotProvider {
             }
         }
 
-        return matchedByWindowID
+        let bindingDiagnostics = unresolvedAssignmentDiagnostics(
+            remainingCGIDsByAXWindowID: remainingCGIDsByAXWindowID,
+            remainingAXIDsByCGWindowID: remainingAXIDsByCGWindowID,
+            matchedByWindowID: matchedByWindowID
+        )
+        for diagnostic in bindingDiagnostics {
+            RuntimeLog.debug(
+                .axMatch,
+                "binding-assignment ambiguous ax=\(diagnostic.axWindowID ?? "nil") candidates=\(diagnostic.candidateCount) candidateCG=\(diagnostic.cgWindowID.map(String.init) ?? "nil") allowedActions=\(diagnostic.allowedActions.map(\.rawValue).sorted().joined(separator: ","))"
+            )
+        }
+        return RuntimeWindowAssignmentMatchResult(
+            matches: matchedByWindowID,
+            bindingDiagnostics: bindingDiagnostics
+        )
+    }
+
+    private static func unresolvedAssignmentDiagnostics(
+        remainingCGIDsByAXWindowID: [String: Set<CGWindowID>],
+        remainingAXIDsByCGWindowID: [CGWindowID: Set<String>],
+        matchedByWindowID: [String: CGWindowID]
+    ) -> [WindowBindingDiagnostic] {
+        remainingCGIDsByAXWindowID.compactMap { axWindowID, candidateCGWindowIDs in
+            guard matchedByWindowID[axWindowID] == nil else { return nil }
+            guard !candidateCGWindowIDs.isEmpty else { return nil }
+            let candidateCount = candidateCGWindowIDs.count
+            let conflictedCGCount = candidateCGWindowIDs.filter {
+                (remainingAXIDsByCGWindowID[$0]?.count ?? 0) > 1
+            }.count
+            let totalCandidateCount = max(candidateCount, conflictedCGCount)
+            return WindowBindingDiagnostic(
+                stableWindowID: axWindowID,
+                axWindowID: axWindowID,
+                cgWindowID: candidateCount == 1 ? candidateCGWindowIDs.first : nil,
+                confidence: .ambiguous,
+                source: nil,
+                reason: .publicAssignmentAmbiguous,
+                candidateCount: totalCandidateCount,
+                allowedActions: WindowBindingConfidence.ambiguous.allowedActions
+            )
+        }
+        .sorted { lhs, rhs in
+            lhs.stableWindowID < rhs.stableWindowID
+        }
     }
 
     private static func normalizedMatchingTitle(_ title: String?) -> String? {
@@ -1171,6 +1283,59 @@ final class RuntimeSnapshotProvider {
             pid: pid,
             appName: appName
         ).exactMatchesByAXWindowID
+    }
+
+    static func resolveCGWindowAssignmentDiagnosticsForTesting(
+        axWindows: [AXWindowEntryForTesting],
+        cgWindows: [CGWindowEntryForTesting],
+        previousMatches: [String: CGWindowID] = [:],
+        previousAXWindowIDs: Set<String> = [],
+        previousCGWindowIDs: Set<CGWindowID> = [],
+        pid: pid_t = 100,
+        appName: String = "FlowTab Test"
+    ) -> [WindowBindingDiagnostic] {
+        let provider = RuntimeSnapshotProvider()
+        provider.windowMappingStateByPID[pid] = windowMappingStateForTesting(
+            previousMatches: previousMatches,
+            previousAXWindowIDs: previousAXWindowIDs,
+            previousCGWindowIDs: previousCGWindowIDs,
+            pid: pid
+        )
+        let axEntries = axWindows.map {
+            AXWindowEntry(
+                index: $0.index,
+                id: $0.id,
+                title: $0.title ?? "",
+                sourceTitle: $0.title,
+                isMinimized: false,
+                window: AXUIElementCreateApplication(pid + pid_t($0.index) + 1),
+                frame: $0.bounds
+            )
+        }
+        let previousExactBridgeOverride = AXWindowInspector.cgWindowIDOverrideForTesting
+        AXWindowInspector.cgWindowIDOverrideForTesting = exactBridgeOverrideForTesting(
+            axEntries: axEntries,
+            requestedWindowIDsByAXWindowID: requestedWindowIDsByAXWindowIDForTesting(axWindows)
+        )
+        defer {
+            AXWindowInspector.cgWindowIDOverrideForTesting = previousExactBridgeOverride
+        }
+        return provider.resolveStableWindowMapping(
+            axWindows: axEntries,
+            cgWindows: cgWindows.map {
+                CGWindowEntry(
+                    id: $0.id,
+                    title: $0.title,
+                    bounds: $0.bounds,
+                    isOnscreen: $0.isOnscreen,
+                    alpha: $0.alpha,
+                    storeType: $0.storeType,
+                    spaceIDs: $0.spaceIDs
+                )
+            },
+            pid: pid,
+            appName: appName
+        ).bindingDiagnostics
     }
 
     static func shouldIncludeRemoteAXWindowsForTesting(

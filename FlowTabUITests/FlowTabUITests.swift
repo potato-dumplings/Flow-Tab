@@ -17,8 +17,8 @@ final class FlowTabUITests: XCTestCase {
         static let settingsTabButton = "flowtab.sidebar.tab.settings"
         static let homeTabContent = "flowtab.tab.home.content"
         static let homeAppList = "flowtab.home.app.list"
-        static let homeAppMockBrowser = "flowtab.home.app.com-flowtab-mock-browser"
-        static let homeAppMockMail = "flowtab.home.app.com-flowtab-mock-mail"
+        static let homeAppMockBrowser = "flowtab.home.app.\("com.flowtab.mock.browser".flowTabUITestAccessibilityIdentifierComponent)"
+        static let homeAppMockMail = "flowtab.home.app.\("com.flowtab.mock.mail".flowTabUITestAccessibilityIdentifierComponent)"
         static let homeWindowList = "flowtab.home.window.list"
         static let logsTabContent = "flowtab.tab.logs.content"
         static let settingsTabContent = "flowtab.tab.settings.content"
@@ -49,7 +49,7 @@ final class FlowTabUITests: XCTestCase {
         static let settingsAppVisibilitySearch = "flowtab.settings.app-visibility.search"
         static let settingsAppVisibilityFilterHidden = "flowtab.settings.app-visibility.filter.hidden"
         static let settingsAppVisibilityShowToggle = "flowtab.settings.app-visibility.show-toggle"
-        static let settingsAppVisibilityMockMail = "flowtab.settings.app-visibility.app.com-flowtab-mock-mail"
+        static let settingsAppVisibilityMockMail = "flowtab.settings.app-visibility.app.\("com.flowtab.mock.mail".flowTabUITestAccessibilityIdentifierComponent)"
         static let settingsPermissionAccessibilityAction = "flowtab.settings.permission.accessibility-action"
         static let settingsPermissionScreenCaptureAction = "flowtab.settings.permission.screen-capture-action"
         static let settingsPermissionLaunchAtLogin = "flowtab.settings.permission.launch-at-login"
@@ -62,15 +62,15 @@ final class FlowTabUITests: XCTestCase {
         static let statusItem = "flowtab.status-item"
         static let statusItemQuit = "flowtab.status-item.quit"
         static let switcherSummary = "flowtab.testing.switcher.summary"
-        static let switcherAppMockBrowser = "flowtab.switcher.app.com-flowtab-mock-browser"
-        static let switcherAppMockMail = "flowtab.switcher.app.com-flowtab-mock-mail"
-        static let switcherAppMockManyWindows = "flowtab.switcher.app.com-flowtab-mock-many-windows"
-        static let switcherAppMockMinimizedNotes = "flowtab.switcher.app.com-flowtab-mock-minimized-notes"
+        static let switcherAppMockBrowser = "flowtab.switcher.app.\("com.flowtab.mock.browser".flowTabUITestAccessibilityIdentifierComponent)"
+        static let switcherAppMockMail = "flowtab.switcher.app.\("com.flowtab.mock.mail".flowTabUITestAccessibilityIdentifierComponent)"
+        static let switcherAppMockManyWindows = "flowtab.switcher.app.\("com.flowtab.mock.many-windows".flowTabUITestAccessibilityIdentifierComponent)"
+        static let switcherAppMockMinimizedNotes = "flowtab.switcher.app.\("com.flowtab.mock.minimized-notes".flowTabUITestAccessibilityIdentifierComponent)"
         static let switcherNextWindowPage = "flowtab.switcher.window-page.next"
         static let switcherSearchInput = "flowtab.switcher.search.input"
-        static let switcherSearchAppMockMail = "flowtab.switcher.search.app.com-flowtab-mock-mail"
+        static let switcherSearchAppMockMail = "flowtab.switcher.search.app.\("com.flowtab.mock.mail".flowTabUITestAccessibilityIdentifierComponent)"
         static let switcherSearchWindowMockMailInbox =
-            "flowtab.switcher.search.window.window-com-flowtab-mock-mail-mock-mail-inbox"
+            "flowtab.switcher.search.window.\("window:com.flowtab.mock.mail#mock-mail-inbox".flowTabUITestAccessibilityIdentifierComponent)"
     }
 
     override func setUpWithError() throws {
@@ -128,5 +128,43 @@ final class FlowTabUITests: XCTestCase {
 
     private func isUITestMockAppID(_ appID: String) -> Bool {
         appID.hasPrefix("com.flowtab.mock.") || appID == "com.xxx.test" || appID == "com.xxx.csgo"
+    }
+}
+
+extension String {
+    var flowTabUITestAccessibilitySlug: String {
+        let replaced = flowTabUITestAccessibilityStableSource
+            .lowercased()
+            .replacingOccurrences(
+                of: #"[^a-z0-9]+"#,
+                with: "-",
+                options: .regularExpression
+            )
+            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+        return replaced.isEmpty ? "item" : replaced
+    }
+
+    var flowTabUITestAccessibilityIdentifierComponent: String {
+        "\(flowTabUITestAccessibilitySlug).id-\(Self.flowTabUITestAccessibilityDigest(flowTabUITestAccessibilityStableSource))"
+    }
+
+    private var flowTabUITestAccessibilityStableSource: String {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "item" : trimmed
+    }
+
+    private static func flowTabUITestAccessibilityDigest(_ value: String) -> String {
+        let digest = flowTabUITestAccessibilityHash64(value) & 0xffff_ffff
+        return String(format: "%08llx", digest)
+    }
+
+    private static func flowTabUITestAccessibilityHash64(_ value: String) -> UInt64 {
+        let prime: UInt64 = 1_099_511_628_211
+        var hash: UInt64 = 14_695_981_039_346_656_037
+        for byte in value.utf8 {
+            hash ^= UInt64(byte)
+            hash = hash &* prime
+        }
+        return hash
     }
 }

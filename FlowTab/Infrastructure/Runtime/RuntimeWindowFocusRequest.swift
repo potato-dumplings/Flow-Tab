@@ -13,7 +13,14 @@ struct RuntimeWindowFocusRequest {
     let preferredCGWindowID: CGWindowID?
     let spaceIDs: [Int]
     let allowsPublicAXRecovery: Bool
+    let bindingConfidence: WindowBindingConfidence
+    let bindingAllowedActions: Set<WindowBindingAction>
     let restoreIfMinimized: Bool
+
+    var allowsAnyActivationRoute: Bool {
+        bindingAllowedActions.contains(.useForAXActivation)
+            || bindingAllowedActions.contains(.useForCGActivationFallback)
+    }
 
     func targetCGWindowID(expectedPID: pid_t) -> CGWindowID? {
         preferredCGWindowID ?? RuntimeActivator.cgWindowID(from: windowID, expectedPID: expectedPID)
@@ -21,6 +28,24 @@ struct RuntimeWindowFocusRequest {
 }
 
 typealias WindowFocusRequest = RuntimeWindowFocusRequest
+
+enum WindowBindingReadbackMismatchReason: String, Equatable {
+    case targetCGNotVisible
+    case focusedAXCGWindowMismatch
+}
+
+struct WindowBindingReadbackDiagnostic: Equatable {
+    let appID: String
+    let windowID: String
+    let ownerPID: pid_t
+    let route: String
+    let reason: WindowBindingReadbackMismatchReason
+    let targetCGWindowID: CGWindowID?
+    let focusedCGWindowID: CGWindowID?
+    let visibleCGWindowIDs: [CGWindowID]
+    let bindingConfidence: WindowBindingConfidence
+    let allowedActions: Set<WindowBindingAction>
+}
 
 extension RuntimeActivator {
     @discardableResult
@@ -31,7 +56,8 @@ extension RuntimeActivator {
             request.ownerPID,
             request.targetCGWindowID(expectedPID: app.processIdentifier),
             request.title,
-            request.frame
+            request.frame,
+            request.bindingAllowedActions
         )
         return true
     }

@@ -60,6 +60,7 @@ enum RuntimeLogCategory: String, CaseIterable, Identifiable {
     case manual = "Manual"
     case permission = "Permission"
     case preview = "Preview"
+    case recency = "Recency"
     case search = "Search"
     case searchInput = "SearchInput"
     case searchModel = "SearchModel"
@@ -82,6 +83,7 @@ enum RuntimeLogCategory: String, CaseIterable, Identifiable {
              .inputTrace,
              .manual,
              .preview,
+             .recency,
              .search,
              .searchInput,
              .searchModel,

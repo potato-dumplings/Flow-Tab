@@ -29,14 +29,15 @@ final class HomeWindowActivationController {
             self.activationHandler = activationHandler
         } else {
             let runtimeActivator = RuntimeActivator()
-            runtimeActivator.windowFocusVerifiedHandler = { appID, windowID, ownerPID, cgWindowID, title, frame in
-                windowRecencyTracker.record(
+            runtimeActivator.windowFocusVerifiedHandler = { appID, windowID, ownerPID, cgWindowID, title, frame, allowedActions in
+                windowRecencyTracker.recordVerifiedFocus(
                     appID: appID,
                     windowID: windowID,
                     ownerPID: ownerPID,
                     cgWindowID: cgWindowID,
                     title: title,
-                    frame: frame
+                    frame: frame,
+                    allowedActions: allowedActions
                 )
             }
             self.activationHandler = { target, contextsByID in

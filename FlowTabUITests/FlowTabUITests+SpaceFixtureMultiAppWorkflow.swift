@@ -19,6 +19,13 @@ enum SpaceFixtureMultiAppWorkflowDefaults {
             .appendingPathComponent("space-fixture-home-fullscreen-only-workflow.json")
     }
 
+    static var homeWindowRecencyWorkflowSourceURL: URL {
+        repositoryRootURL
+            .appendingPathComponent("docs", isDirectory: true)
+            .appendingPathComponent("fixtures", isDirectory: true)
+            .appendingPathComponent("space-fixture-home-window-recency-workflow.json")
+    }
+
     static var switcherWorkflowSourceURL: URL {
         repositoryRootURL
             .appendingPathComponent("docs", isDirectory: true)
@@ -942,7 +949,12 @@ extension FlowTabUITests {
             XCTAssertTrue(rowExists, "FlowTab did not surface \(workflowApp.appName) on the home page")
             let appList = app.scrollViews.matching(identifier: Identifier.homeAppList).firstMatch
             XCTAssertTrue(
-                tapElementAfterScrollingIntoView(homeRow, in: appList, timeout: 8),
+                tapElementAfterScrollingIntoView(
+                    homeRow,
+                    in: appList,
+                    fallbackScrollContainers: app.scrollViews.allElementsBoundByIndex,
+                    timeout: 8
+                ),
                 "FlowTab surfaced \(workflowApp.appName) on the home page, but its row never became hittable"
             )
             assertValue(of: homeRow, equals: "\(workflowApp.windowCount)w", timeout: 20)

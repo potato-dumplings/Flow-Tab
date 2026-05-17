@@ -495,7 +495,10 @@ extension FlowTabUITests {
             waitForRuntimeLogFiles(
                 containing: [
                     "mock terminate request appID=com.flowtab.mock.browser",
-                    "terminate request app=Mock Browser appID=com.flowtab.mock.browser sent=true",
+                    "terminate request app=Mock Browser appID=com.flowtab.mock.browser sent=true"
+                ],
+                containingOneOf: [
+                    "terminate post-refresh reason=initial_process_check appID=com.flowtab.mock.browser",
                     "terminate post-refresh reason=poll appID=com.flowtab.mock.browser"
                 ],
                 since: logSnapshot,

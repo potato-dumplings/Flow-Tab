@@ -340,7 +340,8 @@ extension FlowTabPriorityCoverageTests {
             runningApp: currentApp,
             windows: [
                 WindowCandidate(id: "mail-1", title: "Inbox", isMinimized: true, lastActiveAt: 10)
-            ]
+            ],
+            lastConfirmationSource: .publicExactMatch
         )
         activator.activate(
             target: .window(appID: appID, windowID: "mail-1", restoreIfMinimized: false),
@@ -476,7 +477,8 @@ extension FlowTabPriorityCoverageTests {
                     cgWindowID: targetCGWindowID,
                     inferredTitleBarStyle: nil,
                     frame: targetFrame,
-                    allowsPublicAXRecovery: true
+                    allowsPublicAXRecovery: true,
+                    lastConfirmationSource: .publicExactMatch
                 )
             ]
         )
@@ -566,7 +568,8 @@ extension FlowTabPriorityCoverageTests {
                     cgWindowID: targetCGWindowID,
                     inferredTitleBarStyle: nil,
                     frame: targetFrame,
-                    allowsPublicAXRecovery: true
+                    allowsPublicAXRecovery: true,
+                    lastConfirmationSource: .privateExactBridge
                 )
             ]
         )
@@ -660,7 +663,8 @@ extension FlowTabPriorityCoverageTests {
                     cgWindowID: 240_029,
                     inferredTitleBarStyle: nil,
                     frame: fullscreenFrame,
-                    allowsPublicAXRecovery: true
+                    allowsPublicAXRecovery: true,
+                    lastConfirmationSource: .publicExactMatch
                 )
             ]
         )
@@ -720,7 +724,16 @@ extension FlowTabPriorityCoverageTests {
             XCTAssertTrue(model.enterSearchMode())
             model.synchronizeSearchInput(query: "bro", cursorPosition: 3)
 
-            try? await Task.sleep(nanoseconds: 120_000_000)
+            let didApplyInitialSearch = await waitUntil(
+                "initial search query applies before termination refresh",
+                timeoutNanoseconds: 1_000_000_000,
+                pollIntervalNanoseconds: 10_000_000
+            ) {
+                model.isSearchActive
+                    && model.searchViewState.query == "bro"
+                    && model.searchResultCount >= 1
+            }
+            XCTAssertTrue(didApplyInitialSearch)
             XCTAssertTrue(model.isSearchActive)
             XCTAssertEqual(model.searchViewState.query, "bro")
 
@@ -730,7 +743,18 @@ extension FlowTabPriorityCoverageTests {
             model.handleApplicationTerminated(appID: "com.example.code", pid: 42_300)
 
             await fulfillment(of: [layoutRefreshed], timeout: 1.0)
-            try? await Task.sleep(nanoseconds: 120_000_000)
+            let didPreserveSearchAfterRefresh = await waitUntil(
+                "termination refresh preserves active search results",
+                timeoutNanoseconds: 1_000_000_000,
+                pollIntervalNanoseconds: 10_000_000
+            ) {
+                model.appCount == 2
+                    && model.isSearchActive
+                    && model.searchViewState.scope == .app
+                    && model.searchViewState.query == "bro"
+                    && model.searchResultCount >= 1
+            }
+            XCTAssertTrue(didPreserveSearchAfterRefresh)
 
             XCTAssertEqual(model.appCount, 2)
             XCTAssertTrue(model.isSearchActive)

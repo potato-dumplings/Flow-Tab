@@ -242,20 +242,50 @@ extension FlowTabUITests {
             \(switcherDebugSummary(app, diagnosticsSummary: initialDiagnosticsSummary))
             """
         )
-        assertSwitcherSelectedWindowTitle(
+        let initialSelection = try assertNoisyInAppWindowSwitcherCurrentSelection(
             primaryFullscreenTitle,
-            in: app,
+            expectedSelection: nil,
+            expectedPrefix: [primaryFullscreenTitle],
+            app: app,
             diagnosticsSummary: initialDiagnosticsSummary,
-            message: "Noisy Control+Tab must start from the primary fullscreen window."
+            traceLabel: traceLabel,
+            phaseTrace: "initial"
         )
 
         var diagnosticsSummary = initialDiagnosticsSummary
-        var currentSelection: InAppWindowSelection?
-        let phases: [(title: String, trace: String)] = [
-            (normalOneTitle, "normal1"),
-            (primaryFullscreenTitle, "fullscreen1"),
-            (normalTwoTitle, "normal2"),
-            (fullscreenTwoTitle, "fullscreen2")
+        var currentSelection = initialSelection
+        let phases: [
+            (
+                currentTitle: String,
+                targetTitle: String,
+                expectedPrefix: [String],
+                trace: String
+            )
+        ] = [
+            (
+                primaryFullscreenTitle,
+                normalOneTitle,
+                [primaryFullscreenTitle],
+                "normal1"
+            ),
+            (
+                normalOneTitle,
+                primaryFullscreenTitle,
+                [normalOneTitle, primaryFullscreenTitle],
+                "fullscreen1"
+            ),
+            (
+                primaryFullscreenTitle,
+                normalTwoTitle,
+                [primaryFullscreenTitle, normalOneTitle, normalTwoTitle],
+                "normal2"
+            ),
+            (
+                normalTwoTitle,
+                fullscreenTwoTitle,
+                [normalTwoTitle, primaryFullscreenTitle, normalOneTitle, fullscreenTwoTitle],
+                "fullscreen2"
+            )
         ]
 
         for (index, phase) in phases.enumerated() {
@@ -276,31 +306,34 @@ extension FlowTabUITests {
                     \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
                     """
                 )
-                if let currentSelection {
-                    XCTAssertTrue(
-                        waitForExactFrontmostWorkflowCGWindow(
-                            windowNumber: currentSelection.windowNumber,
-                            title: currentSelection.title,
-                            app: targetApp,
-                            timeout: 4
-                        ),
-                        "Noisy Control+Tab \(phase.trace) phase must reopen from \(currentSelection.title)."
-                    )
-                    assertSwitcherSelectedWindowTitle(
-                        currentSelection.title,
-                        in: app,
-                        diagnosticsSummary: diagnosticsSummary,
-                        message: "Noisy Control+Tab must keep the focused-window identity before \(phase.trace)."
-                    )
-                }
+                XCTAssertTrue(
+                    waitForExactFrontmostWorkflowCGWindow(
+                        windowNumber: currentSelection.windowNumber,
+                        title: currentSelection.title,
+                        app: targetApp,
+                        timeout: 4
+                    ),
+                    "Noisy Control+Tab \(phase.trace) phase must reopen from \(currentSelection.title)."
+                )
+                currentSelection = try assertNoisyInAppWindowSwitcherCurrentSelection(
+                    phase.currentTitle,
+                    expectedSelection: currentSelection,
+                    expectedPrefix: phase.expectedPrefix,
+                    app: app,
+                    diagnosticsSummary: diagnosticsSummary,
+                    traceLabel: traceLabel,
+                    phaseTrace: phase.trace
+                )
             }
 
             let logSnapshot = makeRuntimeLogFileSnapshot()
-            let selection = try selectInAppWindow(
-                title: phase.title,
+            let selection = try selectNoisyInAppWindow(
+                currentSelection: currentSelection,
+                title: phase.targetTitle,
+                expectedPrefix: phase.expectedPrefix,
                 in: app,
                 diagnosticsSummary: diagnosticsSummary,
-                requiresControlTab: true
+                traceLabel: "\(traceLabel).\(phase.trace)"
             )
             waitForRuntimeLogFiles(
                 containing: ["inAppHotkeyPressed dir=forward panelVisible=1", "advance key=tabForward"],
@@ -316,11 +349,11 @@ extension FlowTabUITests {
             XCTAssertTrue(
                 waitForExactFrontmostWorkflowCGWindow(
                     windowNumber: selection.windowNumber,
-                    title: phase.title,
+                    title: phase.targetTitle,
                     app: targetApp,
                     timeout: 12
                 ),
-                "Noisy Control+Tab must activate the exact \(phase.title) CG window selected in \(phase.trace)."
+                "Noisy Control+Tab must activate the exact \(phase.targetTitle) CG window selected in \(phase.trace)."
             )
             currentSelection = selection
             logWorkflowSpaceObservation("\(traceLabel).afterConfirm.\(phase.trace)", app: targetApp)
@@ -440,6 +473,115 @@ extension FlowTabUITests {
             XCTAssertEqual(Set(switcherPreviewTitles(from: diagnosticsSummary)), Set(workflowApp.expectedWindowTitles))
         }
         return diagnosticsSummary
+    }
+
+    private func assertNoisyInAppWindowSwitcherCurrentSelection(
+        _ expectedTitle: String,
+        expectedSelection: InAppWindowSelection?,
+        expectedPrefix: [String],
+        app: XCUIApplication,
+        diagnosticsSummary: XCUIElement,
+        traceLabel: String,
+        phaseTrace: String
+    ) throws -> InAppWindowSelection {
+        assertSwitcherSelectedWindowTitle(
+            expectedTitle,
+            in: app,
+            diagnosticsSummary: diagnosticsSummary,
+            message: "Noisy Control+Tab \(phaseTrace) phase must enter window state on \(expectedTitle)."
+        )
+        let latestTitle = switcherPanelDiagnosticsValue(
+            diagnosticsSummary,
+            key: "selectedWindowTitle"
+        )
+        let latestWindowID = switcherPanelDiagnosticsValue(
+            diagnosticsSummary,
+            key: "selectedWindow"
+        )
+        let selection = try inAppWindowSelection(title: latestTitle, windowID: latestWindowID)
+        logFlowTabUITestTrace(
+            "[\(traceLabel).current.\(phaseTrace)] selected=\(latestTitle) windowID=\(latestWindowID)"
+        )
+        XCTAssertEqual(
+            Array(expectedPrefix.prefix(1)),
+            [selection.title],
+            "Noisy Control+Tab \(phaseTrace) phase must start with the first expected app-local recency window."
+        )
+        if let expectedSelection {
+            XCTAssertEqual(
+                selection,
+                expectedSelection,
+                """
+                Noisy Control+Tab \(phaseTrace) phase must reopen from the previously activated window.
+                Expected \(expectedSelection.title) / \(expectedSelection.windowNumber), \
+                found \(selection.title) / \(selection.windowNumber).
+                """
+            )
+        }
+        return selection
+    }
+
+    private func selectNoisyInAppWindow(
+        currentSelection: InAppWindowSelection,
+        title: String,
+        expectedPrefix: [String],
+        in app: XCUIApplication,
+        diagnosticsSummary: XCUIElement,
+        traceLabel: String
+    ) throws -> InAppWindowSelection {
+        var observedPrefix = [currentSelection.title]
+        let attempts = workflowWindowCycleAttemptCount(diagnosticsSummary)
+        var latestTitle = currentSelection.title
+        var latestWindowID = currentSelection.windowID
+
+        if latestTitle == title {
+            assertNoisyInAppObservedPrefix(
+                observedPrefix,
+                expectedPrefix: expectedPrefix,
+                traceLabel: traceLabel
+            )
+            return currentSelection
+        }
+
+        for attempt in 0..<attempts {
+            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.inAppForward, traceLabel: "control.select")
+            RunLoop.current.run(until: Date().addingTimeInterval(0.25))
+            latestTitle = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selectedWindowTitle")
+            latestWindowID = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selectedWindow")
+            observedPrefix.append(latestTitle)
+            logFlowTabUITestTrace(
+                "[\(traceLabel).selectAttempt.\(attempt + 1)] target=\(title) selected=\(latestTitle) windowID=\(latestWindowID)"
+            )
+            assertNoisyInAppObservedPrefix(
+                observedPrefix,
+                expectedPrefix: expectedPrefix,
+                traceLabel: traceLabel
+            )
+            if latestTitle == title {
+                return try inAppWindowSelection(title: latestTitle, windowID: latestWindowID)
+            }
+        }
+
+        XCTFail(
+            """
+            Noisy Control+Tab did not select \(title).
+            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
+            """
+        )
+        return try inAppWindowSelection(title: latestTitle, windowID: latestWindowID)
+    }
+
+    private func assertNoisyInAppObservedPrefix(
+        _ observedPrefix: [String],
+        expectedPrefix: [String],
+        traceLabel: String
+    ) {
+        let prefixLength = min(observedPrefix.count, expectedPrefix.count)
+        XCTAssertEqual(
+            Array(observedPrefix.prefix(prefixLength)),
+            Array(expectedPrefix.prefix(prefixLength)),
+            "Noisy Control+Tab \(traceLabel) window order must follow app-local recency before fallback."
+        )
     }
 
     private func selectInAppWindow(

@@ -8,6 +8,49 @@ enum RuntimeWindowSpaceClassification: Equatable {
     case mixed
 }
 
+enum RuntimeSpaceEvidenceConfidence: String, Equatable {
+    case observed
+    case inferredFromTopology
+    case inferredFromFullscreenGeometry
+    case stale
+}
+
+struct RuntimeSpaceEvidence: Equatable {
+    let cgWindowID: CGWindowID
+    let spaceIDs: Set<Int>
+    let confidence: RuntimeSpaceEvidenceConfidence
+    let displayID: CGDirectDisplayID?
+    let source: String
+
+    var canConfirmExactBinding: Bool {
+        false
+    }
+
+    var allowsPublicAXRecovery: Bool {
+        confidence != .stale
+    }
+}
+
+struct RuntimeWindowTopologyPolicy: Equatable {
+    let desktopSpaceID: Int
+    let fullscreenMinimumWidth: CGFloat
+    let fullscreenMinimumHeight: CGFloat
+    let fullscreenOriginTolerance: CGFloat
+    let fullscreenTopInsetLimit: CGFloat
+    let frameMatchOriginTolerance: CGFloat
+    let frameMatchSizeTolerance: CGFloat
+
+    static let `default` = RuntimeWindowTopologyPolicy(
+        desktopSpaceID: 1,
+        fullscreenMinimumWidth: 900,
+        fullscreenMinimumHeight: 600,
+        fullscreenOriginTolerance: 90,
+        fullscreenTopInsetLimit: 180,
+        frameMatchOriginTolerance: 24,
+        frameMatchSizeTolerance: 40
+    )
+}
+
 enum RuntimeWindowDiagnostics {
     static func displayMode(
         frame: CGRect?,
@@ -68,14 +111,10 @@ enum RuntimeWindowDiagnostics {
 }
 
 enum RuntimeWindowTopologyClassifier {
-    static let desktopSpaceID = 1
-
-    private static let fullscreenMinimumWidth: CGFloat = 900
-    private static let fullscreenMinimumHeight: CGFloat = 600
-    private static let fullscreenOriginTolerance: CGFloat = 90
-    private static let fullscreenTopInsetLimit: CGFloat = 180
-    private static let frameMatchOriginTolerance: CGFloat = 24
-    private static let frameMatchSizeTolerance: CGFloat = 40
+    static let policy: RuntimeWindowTopologyPolicy = .default
+    static var desktopSpaceID: Int {
+        policy.desktopSpaceID
+    }
 
     static func normalizedSpaceIDs(_ spaceIDs: [Int]) -> [Int] {
         Array(Set(spaceIDs.filter { $0 > 0 })).sorted()
@@ -108,10 +147,10 @@ enum RuntimeWindowTopologyClassifier {
 
     static func isLikelyFullscreenContent(bounds: CGRect?) -> Bool {
         guard let bounds = bounds?.standardized else { return false }
-        guard bounds.width >= fullscreenMinimumWidth else { return false }
-        guard bounds.height >= fullscreenMinimumHeight else { return false }
-        guard abs(bounds.minX) <= fullscreenOriginTolerance else { return false }
-        return bounds.minY >= 0 && bounds.minY <= fullscreenTopInsetLimit
+        guard bounds.width >= policy.fullscreenMinimumWidth else { return false }
+        guard bounds.height >= policy.fullscreenMinimumHeight else { return false }
+        guard abs(bounds.minX) <= policy.fullscreenOriginTolerance else { return false }
+        return bounds.minY >= 0 && bounds.minY <= policy.fullscreenTopInsetLimit
     }
 
     static func isLikelyOffDesktopFullscreenContent(
@@ -119,6 +158,36 @@ enum RuntimeWindowTopologyClassifier {
         spaceIDs: [Int]
     ) -> Bool {
         hasOffDesktopSpace(spaceIDs: spaceIDs) && isLikelyFullscreenContent(bounds: bounds)
+    }
+
+    static func spaceEvidence(
+        cgWindowID: CGWindowID,
+        spaceIDs: [Int],
+        bounds: CGRect?,
+        displayID: CGDirectDisplayID? = nil,
+        source: String
+    ) -> RuntimeSpaceEvidence {
+        let normalizedSpaceIDs = normalizedSpaceIDs(spaceIDs)
+        let confidence: RuntimeSpaceEvidenceConfidence
+        if normalizedSpaceIDs.isEmpty {
+            confidence = .stale
+        } else if isLikelyOffDesktopFullscreenContent(
+            bounds: bounds,
+            spaceIDs: normalizedSpaceIDs
+        ) {
+            confidence = .inferredFromFullscreenGeometry
+        } else if hasOffDesktopSpace(spaceIDs: normalizedSpaceIDs) {
+            confidence = .inferredFromTopology
+        } else {
+            confidence = .observed
+        }
+        return RuntimeSpaceEvidence(
+            cgWindowID: cgWindowID,
+            spaceIDs: Set(normalizedSpaceIDs),
+            confidence: confidence,
+            displayID: displayID,
+            source: source
+        )
     }
 
     static func isLikelyDesktopWrapper(
@@ -140,9 +209,9 @@ enum RuntimeWindowTopologyClassifier {
         guard left.width > 0, left.height > 0, right.width > 0, right.height > 0 else {
             return false
         }
-        return abs(left.minX - right.minX) <= frameMatchOriginTolerance
-            && abs(left.minY - right.minY) <= frameMatchOriginTolerance
-            && abs(left.width - right.width) <= frameMatchSizeTolerance
-            && abs(left.height - right.height) <= frameMatchSizeTolerance
+        return abs(left.minX - right.minX) <= policy.frameMatchOriginTolerance
+            && abs(left.minY - right.minY) <= policy.frameMatchOriginTolerance
+            && abs(left.width - right.width) <= policy.frameMatchSizeTolerance
+            && abs(left.height - right.height) <= policy.frameMatchSizeTolerance
     }
 }

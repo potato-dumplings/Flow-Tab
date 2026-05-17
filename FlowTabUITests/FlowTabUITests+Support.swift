@@ -4,6 +4,7 @@ import XCTest
 
 private enum FlowTabUITestAppEnvironmentKey {
     static let appPath = "FLOWTAB_UI_TEST_APP_PATH"
+    static let uiTesting = "FLOWTAB_UI_TESTING"
 }
 
 private enum FlowTabUITestAppDefaults {
@@ -91,6 +92,7 @@ func makeFlowTabUITestApplication(
     } else {
         app = XCUIApplication()
     }
+    app.launchEnvironment[FlowTabUITestAppEnvironmentKey.uiTesting] = "1"
     app.launchArguments += additionalArguments
     return app
 }
@@ -430,22 +432,23 @@ extension FlowTabUITests {
         return element.label
     }
     func homeWindowRows(in app: XCUIApplication) -> [XCUIElement] {
-        let buttonRows = app.buttons.allElementsBoundByIndex.filter {
-            $0.exists && $0.identifier.hasPrefix("flowtab.home.window.")
-        }
+        let rowIdentifierPrefix = "flowtab.home.window."
+        let rowPredicate = NSPredicate(format: "identifier BEGINSWITH %@", rowIdentifierPrefix)
+        let buttonRows = app.buttons
+            .matching(rowPredicate)
+            .allElementsBoundByIndex
         if !buttonRows.isEmpty {
             return buttonRows
         }
 
-        return app.descendants(matching: .any).allElementsBoundByIndex.filter {
-            $0.exists && $0.identifier.hasPrefix("flowtab.home.window.")
-        }
+        return app.descendants(matching: .any)
+            .matching(rowPredicate)
+            .allElementsBoundByIndex
     }
     func homeWindowRow(_ row: XCUIElement, contains title: String) -> Bool {
         [
             row.label,
-            elementStringValue(row),
-            String(row.debugDescription.prefix(1_200))
+            elementStringValue(row)
         ]
         .contains { source in
             source.localizedCaseInsensitiveContains(title)
@@ -666,6 +669,32 @@ extension FlowTabUITests {
             "Missing runtime log markers \(missingMarkers) in \(logsDirectoryURL.path). Latest logs: \(latestValue)"
         )
     }
+    func waitForRuntimeLogFiles(
+        containing requiredMarkers: [String],
+        containingOneOf alternativeMarkers: [String],
+        since snapshot: [String: UInt64],
+        timeout: TimeInterval = 8
+    ) {
+        let deadline = Date().addingTimeInterval(timeout)
+        let logsDirectoryURL = runtimeLogsDirectoryURL()
+        var latestValue = ""
+        repeat {
+            latestValue = runtimeLogContents(since: snapshot)
+            if
+                requiredMarkers.allSatisfy({ latestValue.contains($0) }),
+                alternativeMarkers.contains(where: { latestValue.contains($0) })
+            {
+                return
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        } while Date() < deadline
+
+        let missingRequiredMarkers = requiredMarkers.filter { !latestValue.contains($0) }
+        let missingAlternativeMarkers = alternativeMarkers.filter { !latestValue.contains($0) }
+        XCTFail(
+            "Missing runtime log markers required=\(missingRequiredMarkers) anyOf=\(missingAlternativeMarkers) in \(logsDirectoryURL.path). Latest logs: \(latestValue)"
+        )
+    }
     func runtimeLogContentsSinceSnapshot(_ snapshot: [String: UInt64]) -> String {
         runtimeLogContents(since: snapshot)
     }
@@ -728,6 +757,7 @@ extension FlowTabUITests {
     func tapElementAfterScrollingIntoView(
         _ element: XCUIElement,
         in scrollContainer: XCUIElement,
+        fallbackScrollContainers: [XCUIElement] = [],
         timeout: TimeInterval
     ) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
@@ -737,14 +767,14 @@ extension FlowTabUITests {
                 element.tap()
                 return true
             }
-            if element.exists && elementFrame(element, isVisibleIn: scrollContainer) {
-                element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-                return true
-            }
 
-            if scrollContainer.exists {
-                let deltaY: CGFloat = attempt < 12 ? 280 : -280
-                scrollContainer.scroll(byDeltaX: 0, deltaY: deltaY)
+            if let container = scrollContainerForElement(
+                element,
+                preferredContainer: scrollContainer,
+                fallbackContainers: fallbackScrollContainers
+            ) {
+                let deltaY = scrollDeltaY(for: element, in: container, attempt: attempt)
+                container.scroll(byDeltaX: 0, deltaY: deltaY)
                 attempt = (attempt + 1) % 24
             }
             RunLoop.current.run(until: Date().addingTimeInterval(0.1))
@@ -754,27 +784,58 @@ extension FlowTabUITests {
             element.tap()
             return true
         }
-        if element.exists && elementFrame(element, isVisibleIn: scrollContainer) {
-            element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-            return true
-        }
-        if element.exists {
-            element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-            return true
-        }
         return false
     }
-    private func elementFrame(_ element: XCUIElement, isVisibleIn container: XCUIElement) -> Bool {
-        guard container.exists else { return false }
+    private func scrollContainerForElement(
+        _ element: XCUIElement,
+        preferredContainer: XCUIElement,
+        fallbackContainers: [XCUIElement]
+    ) -> XCUIElement? {
+        if preferredContainer.exists {
+            return preferredContainer
+        }
+        guard element.exists else { return nil }
         let elementFrame = element.frame
-        guard !elementFrame.isEmpty, !elementFrame.isNull, !elementFrame.isInfinite else {
-            return false
-        }
+        guard isUsableFrame(elementFrame) else { return nil }
+
+        return fallbackContainers
+            .filter { $0.exists && isUsableFrame($0.frame) }
+            .filter { candidate in
+                candidate.frame.minX <= elementFrame.midX && candidate.frame.maxX >= elementFrame.midX
+            }
+            .min { lhs, rhs in
+                let lhsFrame = lhs.frame
+                let rhsFrame = rhs.frame
+                let lhsArea = lhsFrame.width * lhsFrame.height
+                let rhsArea = rhsFrame.width * rhsFrame.height
+                return lhsArea < rhsArea
+            }
+    }
+    private func scrollDeltaY(
+        for element: XCUIElement,
+        in container: XCUIElement,
+        attempt: Int
+    ) -> CGFloat {
+        let elementFrame = element.frame
         let containerFrame = container.frame
-        guard !containerFrame.isEmpty, !containerFrame.isNull, !containerFrame.isInfinite else {
-            return false
+        guard isUsableFrame(elementFrame), isUsableFrame(containerFrame) else {
+            return attempt.isMultiple(of: 2) ? 280 : -280
         }
-        return elementFrame.intersects(containerFrame.insetBy(dx: -2, dy: -2))
+
+        let distance: CGFloat
+        if elementFrame.maxY > containerFrame.maxY {
+            distance = elementFrame.maxY - containerFrame.maxY
+        } else if elementFrame.minY < containerFrame.minY {
+            distance = elementFrame.minY - containerFrame.minY
+        } else {
+            distance = elementFrame.midY - containerFrame.midY
+        }
+        let magnitude = min(max(abs(distance), 160), 520)
+        let directedDelta = distance >= 0 ? magnitude : -magnitude
+        return attempt.isMultiple(of: 2) ? directedDelta : -directedDelta
+    }
+    private func isUsableFrame(_ frame: CGRect) -> Bool {
+        !frame.isEmpty && !frame.isNull && !frame.isInfinite
     }
     func assertLogVisibility(
         at logLevel: String,

@@ -754,7 +754,7 @@ extension FlowTabUITests {
         if !diagnosticResults.isEmpty {
             return diagnosticResults
         }
-        return searchWindowResultObservationsFromHierarchy(in: app)
+        return searchWindowResultObservationsFromElements(in: app)
     }
 
     private func searchWindowResultObservations(
@@ -777,7 +777,7 @@ extension FlowTabUITests {
                 let windowID = switcherDiagnosticsUnescaped(fields[3])
                 let title = switcherDiagnosticsUnescaped(fields[4])
                 let appName = switcherDiagnosticsUnescaped(fields[5])
-                let identifier = "flowtab.switcher.search.window.\(searchResultAccessibilitySlug(resultID))"
+                let identifier = "flowtab.switcher.search.window.\(resultID.flowTabUITestAccessibilityIdentifierComponent)"
                 return SwitcherSearchWindowResultObservation(
                     identifier: identifier,
                     searchableText: [title, appName, appID, windowID].joined(separator: "\n"),
@@ -790,63 +790,31 @@ extension FlowTabUITests {
             }
     }
 
-    private func searchWindowResultObservationsFromHierarchy(in app: XCUIApplication) -> [SwitcherSearchWindowResultObservation] {
-        let hierarchyDescription = app.debugDescription
-        let lines = hierarchyDescription.components(separatedBy: .newlines)
+    private func searchWindowResultObservationsFromElements(in app: XCUIApplication) -> [SwitcherSearchWindowResultObservation] {
         let identifierPrefix = "flowtab.switcher.search.window."
-        let escapedPrefix = NSRegularExpression.escapedPattern(for: identifierPrefix)
-        let identifierPattern = "identifier: ['\"](" + escapedPrefix + "[^'\"]*)['\"]"
-        guard let identifierRegex = try? NSRegularExpression(pattern: identifierPattern) else {
-            return []
-        }
-
         var seenIdentifiers: Set<String> = []
-        return lines.indices.compactMap { index in
-            guard let identifier = searchWindowResultIdentifier(in: lines[index], regex: identifierRegex) else {
-                return nil
+        return app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", identifierPrefix))
+            .allElementsBoundByIndex
+            .compactMap { element -> SwitcherSearchWindowResultObservation? in
+                guard element.exists else { return nil }
+                let identifier = element.identifier
+                guard seenIdentifiers.insert(identifier).inserted else { return nil }
+
+                let searchableText = [element.label, elementStringValue(element)]
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+                    .joined(separator: "\n")
+                return SwitcherSearchWindowResultObservation(
+                    identifier: identifier,
+                    searchableText: searchableText
+                )
             }
-            guard seenIdentifiers.insert(identifier).inserted else { return nil }
-
-            let contextStart = max(0, index - 2)
-            let contextEnd = min(lines.count - 1, index + 6)
-            let searchableText = lines[contextStart...contextEnd]
-                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-                .filter { !$0.isEmpty }
-                .joined(separator: "\n")
-            return SwitcherSearchWindowResultObservation(
-                identifier: identifier,
-                searchableText: searchableText
-            )
-        }
-    }
-
-    private func searchWindowResultIdentifier(
-        in line: String,
-        regex: NSRegularExpression
-    ) -> String? {
-        let range = NSRange(line.startIndex..<line.endIndex, in: line)
-        guard let match = regex.firstMatch(in: line, range: range),
-              let identifierRange = Range(match.range(at: 1), in: line) else {
-            return nil
-        }
-        return String(line[identifierRange])
     }
 
     private func switcherDiagnosticsUnescaped(_ value: Substring) -> String {
         let rawValue = String(value)
         return rawValue.removingPercentEncoding ?? rawValue
-    }
-
-    private func searchResultAccessibilitySlug(_ value: String) -> String {
-        let replaced = value.trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-            .replacingOccurrences(
-                of: #"[^a-z0-9]+"#,
-                with: "-",
-                options: .regularExpression
-            )
-            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
-        return replaced.isEmpty ? "item" : replaced
     }
 
     func confirmSwitcherSearchSelection(in app: XCUIApplication, searchInput: XCUIElement) {
@@ -1042,13 +1010,11 @@ extension FlowTabUITests {
         key: String
     ) -> String {
         let prefix = "\(key)="
-        for source in [elementStringValue(diagnosticsSummaryElement), diagnosticsSummaryElement.debugDescription] {
-            guard let valueStart = source.range(of: prefix)?.upperBound else { continue }
-            let remaining = source[valueStart...]
-            guard let valueEnd = remaining.firstIndex(of: ";") else { return String(remaining) }
-            return String(remaining[..<valueEnd])
-        }
-        return ""
+        let source = elementStringValue(diagnosticsSummaryElement)
+        guard let valueStart = source.range(of: prefix)?.upperBound else { return "" }
+        let remaining = source[valueStart...]
+        guard let valueEnd = remaining.firstIndex(of: ";") else { return String(remaining) }
+        return String(remaining[..<valueEnd])
     }
 
     private func switcherPanelDiagnosticsDebugSummary(_ diagnosticsSummaryElement: XCUIElement) -> String {

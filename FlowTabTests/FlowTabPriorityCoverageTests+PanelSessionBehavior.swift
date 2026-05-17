@@ -51,7 +51,10 @@ extension FlowTabPriorityCoverageTests {
         controller.inAppPrimaryModifierPressedOverride = false
         controller.handleInAppWindowHotkeyReleased()
 
-        try? await Task.sleep(nanoseconds: 120_000_000)
+        let didCommitInAppRelease = await waitUntil("in-app hotkey release commits selection") {
+            controller.modelForTesting.session == nil && activatedTarget != nil
+        }
+        XCTAssertTrue(didCommitInAppRelease)
         XCTAssertNil(controller.modelForTesting.session)
         XCTAssertEqual(
             activatedTarget,
@@ -129,9 +132,130 @@ extension FlowTabPriorityCoverageTests {
         controller.globalPrimaryModifierPressedOverride = false
         controller.handleGlobalHotkeyReleased()
 
-        try? await Task.sleep(nanoseconds: 120_000_000)
+        let didCommitGlobalRelease = await waitUntil("global hotkey release commits selection") {
+            controller.modelForTesting.session == nil && activatedTarget != nil
+        }
+        XCTAssertTrue(didCommitGlobalRelease)
         XCTAssertNil(controller.modelForTesting.session)
         XCTAssertNotNil(activatedTarget)
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerReleaseConfirmationGenerationInvalidatesCanceledTask() {
+        let controller = SwitcherPanelController()
+        controller.modelForTesting.snapshotProviderOverride = {
+            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
+        }
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        controller.globalPrimaryModifierPressedOverride = false
+
+        controller.scheduleModifierReleaseConfirmation(trigger: "generation_first")
+        let firstGeneration = controller.modifierReleaseConfirmationGeneration
+        XCTAssertNotNil(controller.pendingModifierReleaseConfirmationTask)
+        XCTAssertEqual(
+            controller.modifierReleaseState,
+            .releaseObserved(trigger: "generation_first", generation: firstGeneration)
+        )
+
+        controller.cancelPendingModifierReleaseConfirmation()
+        XCTAssertNil(controller.pendingModifierReleaseConfirmationTask)
+        XCTAssertEqual(controller.modifierReleaseConfirmationGeneration, firstGeneration + 1)
+        XCTAssertEqual(
+            controller.modifierReleaseState,
+            .canceled(reason: .explicitCancel, generation: firstGeneration)
+        )
+
+        controller.scheduleModifierReleaseConfirmation(trigger: "generation_second")
+        let secondGeneration = controller.modifierReleaseConfirmationGeneration
+        XCTAssertNotNil(controller.pendingModifierReleaseConfirmationTask)
+        XCTAssertEqual(
+            controller.modifierReleaseState,
+            .releaseObserved(trigger: "generation_second", generation: secondGeneration)
+        )
+
+        controller.clearPendingModifierReleaseConfirmationTaskIfCurrent(firstGeneration)
+        XCTAssertNotNil(controller.pendingModifierReleaseConfirmationTask)
+        XCTAssertEqual(
+            controller.modifierReleaseState,
+            .releaseObserved(trigger: "generation_second", generation: secondGeneration)
+        )
+
+        XCTAssertEqual(controller.modifierReleaseConfirmationGeneration, secondGeneration)
+        controller.cancelPendingModifierReleaseConfirmation()
+        XCTAssertNil(controller.pendingModifierReleaseConfirmationTask)
+        controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerModifierReleaseConfirmationPolicyOwnsTimingConstants() {
+        let controller = SwitcherPanelController()
+
+        XCTAssertEqual(controller.modifierReleaseConfirmationPolicy, .default)
+        XCTAssertEqual(controller.modifierReleaseConfirmationSampleIntervalNs, 25_000_000)
+        XCTAssertEqual(controller.modifierReleaseConfirmationSampleCount, 2)
+        XCTAssertEqual(controller.postFinishHotkeyIgnoreWindow, 0.02)
+        XCTAssertEqual(controller.modifierReleaseState, .idle)
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerHotkeyReplaySuppressionUsesReleaseStateGeneration() async {
+        let controller = SwitcherPanelController()
+        controller.globalPrimaryModifierPressedOverride = false
+        controller.globalMainKeyPressedOverride = false
+
+        controller.beginHotkeyReplaySuppressionUntilRelease(
+            for: .globalAppSwitcher,
+            trigger: "state_machine"
+        )
+
+        let generation = controller.modifierReleaseConfirmationGeneration
+        XCTAssertTrue(controller.suppressHotkeyReplayUntilReleaseForTesting)
+        XCTAssertEqual(
+            controller.modifierReleaseState,
+            .replaySuppression(trigger: "state_machine", generation: generation, releasedSamples: 0)
+        )
+
+        let didEndSuppression = await waitForHotkeyReplaySuppressionToEnd(panelController: controller)
+        XCTAssertTrue(didEndSuppression)
+        XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
+        XCTAssertEqual(
+            controller.modifierReleaseState,
+            .replaySuppressionEnded(trigger: "state_machine", generation: generation)
+        )
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerPresentationSessionGenerationTracksSessionLifecycle() {
+        let controller = SwitcherPanelController()
+        controller.modelForTesting.snapshotProviderOverride = {
+            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
+        }
+
+        XCTAssertEqual(controller.presentationSessionGeneration, 0)
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        let firstSessionGeneration = controller.presentationSessionGeneration
+        XCTAssertEqual(firstSessionGeneration, 1)
+        XCTAssertTrue(controller.isPresentationSessionGenerationCurrent(firstSessionGeneration))
+
+        controller.globalPrimaryModifierPressedOverride = false
+        controller.scheduleModifierReleaseConfirmation(trigger: "session_generation")
+        let releaseGeneration = controller.modifierReleaseConfirmationGeneration
+        XCTAssertNotNil(controller.pendingModifierReleaseConfirmationTask)
+
+        controller.cancelSelectionForTesting()
+
+        XCTAssertNil(controller.pendingModifierReleaseConfirmationTask)
+        XCTAssertFalse(controller.isPresentationSessionGenerationCurrent(firstSessionGeneration))
+        XCTAssertEqual(controller.presentationSessionGeneration, firstSessionGeneration + 1)
+        XCTAssertEqual(
+            controller.modifierReleaseState,
+            .canceled(reason: .explicitCancel, generation: releaseGeneration)
+        )
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        XCTAssertEqual(controller.presentationSessionGeneration, firstSessionGeneration + 2)
+        controller.cancelSelectionForTesting()
     }
 
     @MainActor
@@ -215,7 +339,14 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertTrue(model.scheduleSelectedAppWindowSnapshotIfNeeded(for: appID))
 
-        try? await Task.sleep(nanoseconds: 80_000_000)
+        let didLoadSelectedAppSnapshot = await waitUntil(
+            "selected app window snapshot loads from shared runtime snapshot service",
+            timeoutNanoseconds: 1_000_000_000,
+            pollIntervalNanoseconds: 10_000_000
+        ) {
+            model.session?.selectedApp.windows.map(\.id) == ["shared-window-1", "shared-window-2"]
+        }
+        XCTAssertTrue(didLoadSelectedAppSnapshot)
         XCTAssertEqual(snapshotService.recordedHomeAppIDs(), [appID])
         XCTAssertEqual(model.session?.selectedApp.windows.map(\.id), ["shared-window-1", "shared-window-2"])
     }
@@ -299,7 +430,14 @@ extension FlowTabPriorityCoverageTests {
             Self.makeFlagsChangedEvent(keyCode: UInt16(kVK_Option))
         )
 
-        try? await Task.sleep(nanoseconds: 120_000_000)
+        let didEndSession = await waitUntil(
+            "flags changed release confirmation ends session",
+            timeoutNanoseconds: 1_000_000_000,
+            pollIntervalNanoseconds: 10_000_000
+        ) {
+            controller.modelForTesting.session == nil
+        }
+        XCTAssertTrue(didEndSession)
         XCTAssertNil(controller.modelForTesting.session)
     }
 
@@ -345,7 +483,14 @@ extension FlowTabPriorityCoverageTests {
 
         controller.handleActiveSpaceDidChangeForTesting()
 
-        try? await Task.sleep(nanoseconds: 220_000_000)
+        let didRecoverVisibility = await waitUntil(
+            "active space recovery confirms panel visible",
+            timeoutNanoseconds: 1_000_000_000,
+            pollIntervalNanoseconds: 10_000_000
+        ) {
+            controller.lastPanelVisibilityRecoveryDiagnostic?.after.userVisible == true
+        }
+        XCTAssertTrue(didRecoverVisibility)
         XCTAssertNotNil(controller.modelForTesting.session)
         XCTAssertEqual(activateCallCount, 0)
         XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
@@ -378,7 +523,14 @@ extension FlowTabPriorityCoverageTests {
             object: nil
         )
 
-        try? await Task.sleep(nanoseconds: 260_000_000)
+        let didRecoverVisibility = await waitUntil(
+            "active space notification recovery confirms panel visible",
+            timeoutNanoseconds: 1_000_000_000,
+            pollIntervalNanoseconds: 10_000_000
+        ) {
+            controller.lastPanelVisibilityRecoveryDiagnostic?.after.userVisible == true
+        }
+        XCTAssertTrue(didRecoverVisibility)
         XCTAssertNotNil(controller.modelForTesting.session)
         XCTAssertEqual(activateCallCount, 0)
         XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
@@ -400,7 +552,14 @@ extension FlowTabPriorityCoverageTests {
             object: nil
         )
 
-        try? await Task.sleep(nanoseconds: 40_000_000)
+        let didCancelSession = await waitUntil(
+            "active space notification cancels session after modifier release",
+            timeoutNanoseconds: 1_000_000_000,
+            pollIntervalNanoseconds: 10_000_000
+        ) {
+            controller.modelForTesting.session == nil
+        }
+        XCTAssertTrue(didCancelSession)
         XCTAssertNil(controller.modelForTesting.session)
         XCTAssertTrue(controller.suppressHotkeyReplayUntilReleaseForTesting)
 
@@ -484,7 +643,15 @@ extension FlowTabPriorityCoverageTests {
         let selectedAppID = controller.modelForTesting.selectedApp?.id
 
         controller.terminateSelectedApp()
-        try? await Task.sleep(nanoseconds: 120_000_000)
+        let didEnterTerminateProtection = await waitUntil(
+            "terminate request enters interruption protection before panel resign",
+            timeoutNanoseconds: 1_000_000_000,
+            pollIntervalNanoseconds: 10_000_000
+        ) {
+            controller.modelForTesting.terminatingAppID == selectedAppID
+                && controller.shouldProtectTerminateSystemInterruption()
+        }
+        XCTAssertTrue(didEnterTerminateProtection)
 
         XCTAssertEqual(controller.modelForTesting.terminatingAppID, selectedAppID)
         controller.handlePanelDidResignKeyForTesting()
@@ -512,7 +679,14 @@ extension FlowTabPriorityCoverageTests {
 
         occlusionController.handlePanelOcclusionStateDidChangeForTesting()
 
-        try? await Task.sleep(nanoseconds: 220_000_000)
+        let didRecoverVisibility = await waitUntil(
+            "recoverable occlusion confirms panel visible",
+            timeoutNanoseconds: 1_000_000_000,
+            pollIntervalNanoseconds: 10_000_000
+        ) {
+            occlusionController.lastPanelVisibilityRecoveryDiagnostic?.after.userVisible == true
+        }
+        XCTAssertTrue(didRecoverVisibility)
         XCTAssertNotNil(occlusionController.modelForTesting.session)
         XCTAssertFalse(occlusionController.suppressHotkeyReplayUntilReleaseForTesting)
     }
@@ -565,7 +739,17 @@ extension FlowTabPriorityCoverageTests {
 
         controller.scheduleDelayedWindowLayerEntryForTesting()
 
-        try? await Task.sleep(nanoseconds: 80_000_000)
+        let didEnterWindowLayer = await waitUntil(
+            "configured delayed auto-enter switches to window layer",
+            timeoutNanoseconds: 1_000_000_000,
+            pollIntervalNanoseconds: 10_000_000
+        ) {
+            guard case .windowCycle = controller.modelForTesting.session?.mode else {
+                return false
+            }
+            return true
+        }
+        XCTAssertTrue(didEnterWindowLayer)
         XCTAssertEqual(
             controller.modelForTesting.session?.mode,
             .windowCycle(appID: controller.modelForTesting.selectedApp?.id ?? "")
@@ -586,7 +770,17 @@ extension FlowTabPriorityCoverageTests {
 
             controller.scheduleDelayedWindowLayerEntryForTesting()
 
-            try? await Task.sleep(nanoseconds: 80_000_000)
+            let didEnterWindowLayer = await waitUntil(
+                "preference delayed auto-enter switches to window layer",
+                timeoutNanoseconds: 1_000_000_000,
+                pollIntervalNanoseconds: 10_000_000
+            ) {
+                guard case .windowCycle = controller.modelForTesting.session?.mode else {
+                    return false
+                }
+                return true
+            }
+            XCTAssertTrue(didEnterWindowLayer)
             XCTAssertEqual(
                 controller.modelForTesting.session?.mode,
                 .windowCycle(appID: controller.modelForTesting.selectedApp?.id ?? "")
@@ -654,7 +848,18 @@ extension FlowTabPriorityCoverageTests {
 
         controller.scheduleDelayedWindowLayerEntryForTesting()
 
-        try? await Task.sleep(nanoseconds: 140_000_000)
+        let didPreserveDeadline = await waitUntil(
+            "delayed auto-enter waits for late selected app snapshot before switching",
+            timeoutNanoseconds: 1_000_000_000,
+            pollIntervalNanoseconds: 10_000_000
+        ) {
+            requestsLock.lock()
+            let recordedRequests = selectedSnapshotRequests
+            requestsLock.unlock()
+            return recordedRequests == [appID]
+                && controller.modelForTesting.session?.mode == .windowCycle(appID: appID)
+        }
+        XCTAssertTrue(didPreserveDeadline)
         requestsLock.lock()
         let recordedRequests = selectedSnapshotRequests
         requestsLock.unlock()
@@ -704,8 +909,14 @@ extension FlowTabPriorityCoverageTests {
         )
         let lock = NSLock()
         var backgroundFullSnapshotCalls = 0
+        func backgroundCallCount() -> Int {
+            lock.lock()
+            defer { lock.unlock() }
+            return backgroundFullSnapshotCalls
+        }
 
         controller.windowLayerPresentationDelayOverride = 0.01
+        controller.modelForTesting.backgroundFullSnapshotRefreshDelay = .milliseconds(20)
         controller.modelForTesting.fastAppSnapshotProviderOverride = {
             RuntimeSnapshot(apps: [appOnlyCandidate], contextsByID: [:])
         }
@@ -719,24 +930,31 @@ extension FlowTabPriorityCoverageTests {
             return RuntimeSnapshot(apps: [windowCandidate], contextsByID: [appID: context])
         }
         controller.modelForTesting.selectedAppSnapshotProviderOverride = { _ in
-            Thread.sleep(forTimeInterval: 0.24)
+            Thread.sleep(forTimeInterval: 0.08)
             return selectedSnapshot
         }
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
         controller.scheduleDelayedWindowLayerEntryForTesting()
 
-        try? await Task.sleep(nanoseconds: 190_000_000)
-        lock.lock()
-        let callsWhilePending = backgroundFullSnapshotCalls
-        lock.unlock()
-        XCTAssertEqual(callsWhilePending, 0)
+        let deferredWhilePending = await waitUntil(
+            "background full snapshot deferred while selected app snapshot is pending",
+            timeoutNanoseconds: 1_000_000_000,
+            pollIntervalNanoseconds: 10_000_000
+        ) {
+            controller.modelForTesting.deferredBackgroundFullSnapshotRefreshRequest != nil
+                && backgroundCallCount() == 0
+        }
+        XCTAssertTrue(deferredWhilePending)
 
-        try? await Task.sleep(nanoseconds: 260_000_000)
-        lock.lock()
-        let callsAfterPending = backgroundFullSnapshotCalls
-        lock.unlock()
-        XCTAssertGreaterThan(callsAfterPending, 0)
+        let resumedAfterPendingSnapshot = await waitUntil(
+            "background full snapshot resumes after selected app snapshot completes",
+            timeoutNanoseconds: 1_000_000_000,
+            pollIntervalNanoseconds: 10_000_000
+        ) {
+            backgroundCallCount() > 0
+        }
+        XCTAssertTrue(resumedAfterPendingSnapshot)
         controller.cancelSelectionForTesting()
     }
 

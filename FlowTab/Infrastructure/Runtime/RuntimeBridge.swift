@@ -26,6 +26,95 @@ enum WindowBindingConfirmationSource: String {
     case fullscreenContentRebinding
     case fullscreenContentFallbackBinding
     case desktopSiblingBinding
+
+    var bindingConfidence: WindowBindingConfidence {
+        switch self {
+        case .publicExactMatch, .privateExactBridge:
+            .exact
+        case .stickyBinding:
+            .sticky
+        case .fullscreenContentRebinding,
+             .fullscreenContentFallbackBinding,
+             .desktopSiblingBinding:
+            .inferred
+        }
+    }
+}
+
+enum WindowBindingConfidence: String {
+    case exact
+    case sticky
+    case inferred
+    case provisional
+    case ambiguous
+}
+
+enum WindowBindingAction: String, Hashable {
+    case exposeInSwitcher
+    case useForAXActivation
+    case useForCGActivationFallback
+    case updateStickyHistory
+    case updateRecency
+    case capturePreview
+    case quarantineOnly
+}
+
+enum WindowBindingDiagnosticReason: String {
+    case publicAssignmentAmbiguous
+    case privateExactBridgeConflictsWithStickyBinding
+    case fullscreenTopologyAmbiguous
+}
+
+extension WindowBindingConfidence {
+    var allowedActions: Set<WindowBindingAction> {
+        switch self {
+        case .exact:
+            [
+                .exposeInSwitcher,
+                .useForAXActivation,
+                .useForCGActivationFallback,
+                .updateStickyHistory,
+                .updateRecency,
+                .capturePreview
+            ]
+        case .sticky:
+            [
+                .exposeInSwitcher,
+                .useForCGActivationFallback,
+                .capturePreview
+            ]
+        case .inferred:
+            [
+                .exposeInSwitcher,
+                .useForCGActivationFallback,
+                .capturePreview
+            ]
+        case .provisional:
+            [
+                .exposeInSwitcher,
+                .capturePreview
+            ]
+        case .ambiguous:
+            [
+                .quarantineOnly
+            ]
+        }
+    }
+}
+
+struct WindowBindingDiagnostic: Equatable {
+    let stableWindowID: String
+    let axWindowID: String?
+    let cgWindowID: CGWindowID?
+    let confidence: WindowBindingConfidence
+    let source: WindowBindingConfirmationSource?
+    let reason: WindowBindingDiagnosticReason?
+    let candidateCount: Int
+    let allowedActions: Set<WindowBindingAction>
+
+    var isQuarantined: Bool {
+        allowedActions == [.quarantineOnly]
+    }
 }
 
 struct RuntimeWindowContext {
@@ -42,6 +131,39 @@ struct RuntimeWindowContext {
     let allowsPublicAXRecovery: Bool
     let hasStickyBinding: Bool
     let lastConfirmationSource: WindowBindingConfirmationSource?
+    let bindingConfidenceOverride: WindowBindingConfidence?
+    let bindingCandidateCount: Int
+    let spaceEvidence: RuntimeSpaceEvidence?
+
+    var bindingConfidence: WindowBindingConfidence {
+        if let bindingConfidenceOverride {
+            return bindingConfidenceOverride
+        }
+        if let lastConfirmationSource {
+            return lastConfirmationSource.bindingConfidence
+        }
+        if hasStickyBinding {
+            return .sticky
+        }
+        return .provisional
+    }
+
+    var bindingAllowedActions: Set<WindowBindingAction> {
+        bindingConfidence.allowedActions
+    }
+
+    var bindingDiagnostic: WindowBindingDiagnostic {
+        WindowBindingDiagnostic(
+            stableWindowID: id,
+            axWindowID: activationHandleID,
+            cgWindowID: cgWindowID,
+            confidence: bindingConfidence,
+            source: lastConfirmationSource,
+            reason: nil,
+            candidateCount: bindingCandidateCount,
+            allowedActions: bindingAllowedActions
+        )
+    }
 
     init(
         id: String,
@@ -56,14 +178,18 @@ struct RuntimeWindowContext {
         frame: CGRect? = nil,
         allowsPublicAXRecovery: Bool = false,
         hasStickyBinding: Bool = false,
-        lastConfirmationSource: WindowBindingConfirmationSource? = nil
+        lastConfirmationSource: WindowBindingConfirmationSource? = nil,
+        bindingConfidenceOverride: WindowBindingConfidence? = nil,
+        bindingCandidateCount: Int? = nil,
+        spaceEvidence: RuntimeSpaceEvidence? = nil
     ) {
         self.id = id
         self.title = title
         self.isMinimized = isMinimized
         self.ownerPID = ownerPID
         self.cgWindowID = cgWindowID
-        self.spaceIDs = RuntimeWindowTopologyClassifier.normalizedSpaceIDs(spaceIDs)
+        let normalizedSpaceIDs = RuntimeWindowTopologyClassifier.normalizedSpaceIDs(spaceIDs)
+        self.spaceIDs = normalizedSpaceIDs
         self.inferredTitleBarStyle = inferredTitleBarStyle
         self.activationHandleID = activationHandleID
         self.axWindow = axWindow
@@ -71,6 +197,16 @@ struct RuntimeWindowContext {
         self.allowsPublicAXRecovery = allowsPublicAXRecovery
         self.hasStickyBinding = hasStickyBinding
         self.lastConfirmationSource = lastConfirmationSource
+        self.bindingConfidenceOverride = bindingConfidenceOverride
+        self.bindingCandidateCount = bindingCandidateCount ?? (cgWindowID == nil ? 0 : 1)
+        self.spaceEvidence = spaceEvidence ?? cgWindowID.map {
+            RuntimeWindowTopologyClassifier.spaceEvidence(
+                cgWindowID: $0,
+                spaceIDs: normalizedSpaceIDs,
+                bounds: frame,
+                source: "runtime-window-context"
+            )
+        }
     }
 }
 

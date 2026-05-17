@@ -99,6 +99,7 @@ extension FlowTabPriorityCoverageTests {
         let previousAXTrusted = AccessibilityPermissionChecker.isTrustedOverrideForTesting
         let previousAXRequest = AccessibilityPermissionChecker.requestPermissionOverrideForTesting
         let previousLaunchArguments = FlowTabTestLaunchOptions.argumentsOverrideForTesting
+        let previousLaunchEnvironment = FlowTabTestLaunchOptions.environmentOverrideForTesting
         let previousSelectedTab = HomeTabState.shared.selectedTab
         let hotkeyFactory = SpyHotkeyMonitorFactory()
         let takeoverController = SpyCommandTabTakeoverController()
@@ -109,6 +110,7 @@ extension FlowTabPriorityCoverageTests {
             AccessibilityPermissionChecker.isTrustedOverrideForTesting = previousAXTrusted
             AccessibilityPermissionChecker.requestPermissionOverrideForTesting = previousAXRequest
             FlowTabTestLaunchOptions.argumentsOverrideForTesting = previousLaunchArguments
+            FlowTabTestLaunchOptions.environmentOverrideForTesting = previousLaunchEnvironment
             HomeTabState.shared.selectedTab = previousSelectedTab
             clearIsolatedUserDefaults(userDefaults)
         }
@@ -119,6 +121,10 @@ extension FlowTabPriorityCoverageTests {
             "FlowTab",
             "--flowtab-ui-listen-switcher-trigger",
             "--flowtab-ui-suppress-home-on-launch"
+        ]
+        FlowTabTestLaunchOptions.environmentOverrideForTesting = [
+            FlowTabTestLaunchOptions.uiTestingEnvironmentKey:
+                FlowTabTestLaunchOptions.uiTestingEnvironmentValue
         ]
         AccessibilityPermissionChecker.isTrustedOverrideForTesting = { true }
         AccessibilityPermissionChecker.requestPermissionOverrideForTesting = {
@@ -349,7 +355,14 @@ extension FlowTabPriorityCoverageTests {
             userInfo: request.notificationUserInfo
         )
 
-        try? await Task.sleep(nanoseconds: 120_000_000)
+        let didRegisterNewHotkeys = await waitUntil(
+            "notification hotkey reload registers replacement monitors",
+            timeoutNanoseconds: 1_000_000_000,
+            pollIntervalNanoseconds: 10_000_000
+        ) {
+            hotkeyFactory.records.count >= baselineRecordCount + 2
+        }
+        XCTAssertTrue(didRegisterNewHotkeys)
 
         let newRecords = Array(hotkeyFactory.records.dropFirst(baselineRecordCount))
         XCTAssertEqual(newRecords.count, 2)
@@ -440,7 +453,14 @@ extension FlowTabPriorityCoverageTests {
         )
         appDelegate.requestHotkeyReload(using: request, source: "test_direct")
 
-        try? await Task.sleep(nanoseconds: 120_000_000)
+        let didRegisterNewHotkeys = await waitUntil(
+            "direct hotkey reload registers replacement monitors",
+            timeoutNanoseconds: 1_000_000_000,
+            pollIntervalNanoseconds: 10_000_000
+        ) {
+            hotkeyFactory.records.count >= baselineRecordCount + 2
+        }
+        XCTAssertTrue(didRegisterNewHotkeys)
 
         let newRecords = Array(hotkeyFactory.records.dropFirst(baselineRecordCount))
         XCTAssertEqual(newRecords.count, 2)
@@ -736,6 +756,7 @@ extension FlowTabPriorityCoverageTests {
         let previousAXTrusted = AccessibilityPermissionChecker.isTrustedOverrideForTesting
         let previousAXRequest = AccessibilityPermissionChecker.requestPermissionOverrideForTesting
         let previousLaunchArguments = FlowTabTestLaunchOptions.argumentsOverrideForTesting
+        let previousLaunchEnvironment = FlowTabTestLaunchOptions.environmentOverrideForTesting
         let standardDefaults = UserDefaults.standard
         let previousSearchEnabled = standardDefaults.object(forKey: AppPreferenceKeys.searchEnabled)
         let previousSearchDefaultScope = standardDefaults.object(forKey: AppPreferenceKeys.searchDefaultScope)
@@ -754,6 +775,7 @@ extension FlowTabPriorityCoverageTests {
             AccessibilityPermissionChecker.isTrustedOverrideForTesting = previousAXTrusted
             AccessibilityPermissionChecker.requestPermissionOverrideForTesting = previousAXRequest
             FlowTabTestLaunchOptions.argumentsOverrideForTesting = previousLaunchArguments
+            FlowTabTestLaunchOptions.environmentOverrideForTesting = previousLaunchEnvironment
             restoreUserDefaultsValue(
                 previousSearchEnabled,
                 forKey: AppPreferenceKeys.searchEnabled,
@@ -793,6 +815,10 @@ extension FlowTabPriorityCoverageTests {
             "--flowtab-ui-runtime-log-level", "warn",
             "--flowtab-ui-seed-logs", "3",
             "--flowtab-ui-open-switcher-search"
+        ]
+        FlowTabTestLaunchOptions.environmentOverrideForTesting = [
+            FlowTabTestLaunchOptions.uiTestingEnvironmentKey:
+                FlowTabTestLaunchOptions.uiTestingEnvironmentValue
         ]
         standardDefaults.set(true, forKey: AppPreferenceKeys.searchEnabled)
         standardDefaults.set(
@@ -854,6 +880,7 @@ extension FlowTabPriorityCoverageTests {
         let previousAXTrusted = AccessibilityPermissionChecker.isTrustedOverrideForTesting
         let previousAXRequest = AccessibilityPermissionChecker.requestPermissionOverrideForTesting
         let previousLaunchArguments = FlowTabTestLaunchOptions.argumentsOverrideForTesting
+        let previousLaunchEnvironment = FlowTabTestLaunchOptions.environmentOverrideForTesting
         let hotkeyFactory = SpyHotkeyMonitorFactory()
         let panelController = SwitcherPanelController()
         var delegate: AppDelegate?
@@ -869,6 +896,7 @@ extension FlowTabPriorityCoverageTests {
             AccessibilityPermissionChecker.isTrustedOverrideForTesting = previousAXTrusted
             AccessibilityPermissionChecker.requestPermissionOverrideForTesting = previousAXRequest
             FlowTabTestLaunchOptions.argumentsOverrideForTesting = previousLaunchArguments
+            FlowTabTestLaunchOptions.environmentOverrideForTesting = previousLaunchEnvironment
             clearIsolatedUserDefaults(userDefaults)
         }
 
@@ -887,6 +915,10 @@ extension FlowTabPriorityCoverageTests {
         FlowTabTestLaunchOptions.argumentsOverrideForTesting = [
             "FlowTab",
             "--flowtab-ui-open-switcher"
+        ]
+        FlowTabTestLaunchOptions.environmentOverrideForTesting = [
+            FlowTabTestLaunchOptions.uiTestingEnvironmentKey:
+                FlowTabTestLaunchOptions.uiTestingEnvironmentValue
         ]
         AccessibilityPermissionChecker.isTrustedOverrideForTesting = { true }
         AccessibilityPermissionChecker.requestPermissionOverrideForTesting = { true }
@@ -911,7 +943,16 @@ extension FlowTabPriorityCoverageTests {
         appDelegate.applicationDidFinishLaunching(
             Notification(name: NSApplication.didFinishLaunchingNotification)
         )
-        try? await Task.sleep(nanoseconds: 650_000_000)
+        let didOpenSeededSwitcher = await waitUntil(
+            "launch open switcher loads seeded multi-app snapshot",
+            timeoutNanoseconds: 2_000_000_000,
+            pollIntervalNanoseconds: 25_000_000
+        ) {
+            snapshotCallCount >= 3
+                && panelController.modelForTesting.appCount == multiAppSnapshot.count
+                && panelController.modelForTesting.session?.apps.map(\.id) == multiAppSnapshot.map(\.id)
+        }
+        XCTAssertTrue(didOpenSeededSwitcher)
 
         XCTAssertGreaterThanOrEqual(snapshotCallCount, 3)
         XCTAssertEqual(panelController.modelForTesting.appCount, multiAppSnapshot.count)
@@ -933,6 +974,7 @@ extension FlowTabPriorityCoverageTests {
         let previousAXTrusted = AccessibilityPermissionChecker.isTrustedOverrideForTesting
         let previousAXRequest = AccessibilityPermissionChecker.requestPermissionOverrideForTesting
         let previousLaunchArguments = FlowTabTestLaunchOptions.argumentsOverrideForTesting
+        let previousLaunchEnvironment = FlowTabTestLaunchOptions.environmentOverrideForTesting
         let hotkeyFactory = SpyHotkeyMonitorFactory()
         let panelController = SwitcherPanelController()
         var delegate: AppDelegate?
@@ -946,6 +988,7 @@ extension FlowTabPriorityCoverageTests {
             AccessibilityPermissionChecker.isTrustedOverrideForTesting = previousAXTrusted
             AccessibilityPermissionChecker.requestPermissionOverrideForTesting = previousAXRequest
             FlowTabTestLaunchOptions.argumentsOverrideForTesting = previousLaunchArguments
+            FlowTabTestLaunchOptions.environmentOverrideForTesting = previousLaunchEnvironment
             RuntimeDiagnostics.shared.clear()
             clearIsolatedUserDefaults(userDefaults)
         }
@@ -965,6 +1008,10 @@ extension FlowTabPriorityCoverageTests {
             "FlowTab",
             "--flowtab-ui-open-switcher",
             "--flowtab-ui-seed-logs", "0"
+        ]
+        FlowTabTestLaunchOptions.environmentOverrideForTesting = [
+            FlowTabTestLaunchOptions.uiTestingEnvironmentKey:
+                FlowTabTestLaunchOptions.uiTestingEnvironmentValue
         ]
         AccessibilityPermissionChecker.isTrustedOverrideForTesting = { true }
         AccessibilityPermissionChecker.requestPermissionOverrideForTesting = { true }
@@ -989,7 +1036,14 @@ extension FlowTabPriorityCoverageTests {
         appDelegate.applicationDidFinishLaunching(
             Notification(name: NSApplication.didFinishLaunchingNotification)
         )
-        try? await Task.sleep(nanoseconds: 420_000_000)
+        let didFinishLaunchBootstrap = await waitUntil(
+            "launch open switcher without results finishes bootstrap",
+            timeoutNanoseconds: 2_000_000_000,
+            pollIntervalNanoseconds: 25_000_000
+        ) {
+            hotkeyFactory.records.count == 2
+        }
+        XCTAssertTrue(didFinishLaunchBootstrap)
 
         XCTAssertNil(panelController.modelForTesting.session)
         XCTAssertFalse(panelController.modelForTesting.isSearchActive)

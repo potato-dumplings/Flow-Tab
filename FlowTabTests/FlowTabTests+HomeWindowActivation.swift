@@ -145,10 +145,20 @@ extension FlowTabTests {
                 XCTFail("Expected mock Home snapshot for \(appID)")
                 return
             }
+            guard let draftWindow = baselineSnapshot.context.windowsByID["mock-mail-draft"] else {
+                XCTFail("Expected mock mail draft context")
+                return
+            }
             tracker.record(
                 appID: appID,
                 windowID: "mock-mail-draft",
-                context: baselineSnapshot.context
+                ownerPID: draftWindow.ownerPID == 0
+                    ? baselineSnapshot.context.runningApp.processIdentifier
+                    : draftWindow.ownerPID,
+                cgWindowID: draftWindow.cgWindowID,
+                title: draftWindow.title,
+                frame: draftWindow.frame,
+                allowedActions: WindowBindingConfidence.exact.allowedActions
             )
             let service = HomeRuntimeSnapshotService(
                 snapshotProvider: provider,

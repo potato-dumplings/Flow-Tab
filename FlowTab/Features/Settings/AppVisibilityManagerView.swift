@@ -245,7 +245,7 @@ struct AppVisibilityManagerView: View {
             .flowTabInteractiveHitArea()
         }
         .buttonStyle(.plain)
-        .accessibilityIdentifier("flowtab.settings.app-visibility.app.\(app.id.flowTabAccessibilitySlug)")
+        .accessibilityIdentifier("flowtab.settings.app-visibility.app.\(app.id.flowTabAccessibilityIdentifierComponent)")
     }
 
     @ViewBuilder

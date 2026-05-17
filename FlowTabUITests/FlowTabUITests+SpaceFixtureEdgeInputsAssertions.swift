@@ -132,16 +132,22 @@ extension FlowTabUITests {
         }
     }
 
-    func edgeWorkflowAccessibilityIdentifierFragment(
+    func edgeWorkflowSearchWindowIdentifierAppFragment(
         for workflowApp: SpaceFixtureResolvedWorkflow.App
     ) -> String {
-        workflowApp.identity.bundleIdentifier.edgeWorkflowAccessibilitySlug
+        let resultIDPrefix = "window:\(workflowApp.identity.bundleIdentifier)#"
+        return "\(resultIDPrefix.flowTabUITestAccessibilitySlug)-"
     }
 
     func edgeWorkflowCGWindowID(
         fromSearchResultIdentifier identifier: String
     ) -> CGWindowID? {
-        guard let rawWindowID = identifier.split(separator: "-").last else { return nil }
+        let prefix = "flowtab.switcher.search.window."
+        let component = identifier.hasPrefix(prefix)
+            ? identifier.dropFirst(prefix.count)
+            : Substring(identifier)
+        let readableComponent = component.split(separator: ".id-", maxSplits: 1).first ?? component
+        guard let rawWindowID = readableComponent.split(separator: "-").last else { return nil }
         guard let windowID = UInt32(rawWindowID) else { return nil }
         return CGWindowID(windowID)
     }
@@ -196,18 +202,4 @@ extension FlowTabUITests {
             .allElementsBoundByIndex
     }
 
-}
-
-private extension String {
-    var edgeWorkflowAccessibilitySlug: String {
-        let replaced = trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-            .replacingOccurrences(
-                of: #"[^a-z0-9]+"#,
-                with: "-",
-                options: .regularExpression
-            )
-            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
-        return replaced.isEmpty ? "item" : replaced
-    }
 }

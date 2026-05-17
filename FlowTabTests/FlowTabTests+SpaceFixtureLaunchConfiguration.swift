@@ -14,6 +14,45 @@ extension FlowTabTests {
         XCTAssertEqual(" -._ ".flowTabAccessibilitySlug, "item")
     }
 
+    func testFlowTabAccessibilityIdentifierComponentKeepsReadableSlug() {
+        XCTAssertTrue(
+            "Com.Example Chrome_Fixture".flowTabAccessibilityIdentifierComponent
+                .hasPrefix("com-example-chrome-fixture.id-")
+        )
+    }
+
+    func testFlowTabAccessibilityIdentifierComponentSeparatesSlugCollisions() {
+        XCTAssertNotEqual(
+            "a b".flowTabAccessibilityIdentifierComponent,
+            "a-b".flowTabAccessibilityIdentifierComponent
+        )
+        XCTAssertNotEqual(
+            "你好".flowTabAccessibilityIdentifierComponent,
+            "世界".flowTabAccessibilityIdentifierComponent
+        )
+    }
+
+    func testMockWindowIDGenerationIsDeterministicForSameTitle() {
+        let first = FlowTabUITestBootstrapper.deterministicMockWindowIDForTesting(title: "Inbox - Gmail")
+        let second = FlowTabUITestBootstrapper.deterministicMockWindowIDForTesting(title: "Inbox - Gmail")
+
+        XCTAssertEqual(first, second)
+    }
+
+    func testMockWindowIDGenerationNormalizesMissingAndBlankTitles() {
+        let missing = FlowTabUITestBootstrapper.deterministicMockWindowIDForTesting(title: nil)
+        let blank = FlowTabUITestBootstrapper.deterministicMockWindowIDForTesting(title: "   ")
+
+        XCTAssertEqual(missing, blank)
+    }
+
+    func testMockWindowIDGenerationSeparatesRepresentativeTitles() {
+        let inbox = FlowTabUITestBootstrapper.deterministicMockWindowIDForTesting(title: "Inbox - Gmail")
+        let calendar = FlowTabUITestBootstrapper.deterministicMockWindowIDForTesting(title: "Calendar - Work")
+
+        XCTAssertNotEqual(inbox, calendar)
+    }
+
     func testSpaceFixtureLaunchConfigurationUsesDefaultsWhenArgumentsAreMissing() {
         let configuration = SpaceFixtureLaunchConfiguration(arguments: ["FlowTabSpaceFixture"])
 

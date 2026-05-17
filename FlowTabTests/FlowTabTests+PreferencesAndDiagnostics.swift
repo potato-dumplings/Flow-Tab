@@ -83,10 +83,102 @@ extension FlowTabTests {
         XCTAssertEqual(state.screenCaptureButtonTitle, AppStrings.text(.permissionScreenClose))
     }
 
+    func testPermissionPollingPolicyBuildsTimeoutDescriptionFromCurrentLimits() {
+        let policy = PermissionPollingPolicy.default
+
+        XCTAssertEqual(policy.intervalNanoseconds, 500_000_000)
+        XCTAssertEqual(policy.attemptLimit, 40)
+        XCTAssertEqual(policy.timeoutSeconds, 20)
+        XCTAssertEqual(policy.timeoutDescription, "20s")
+    }
+
+    func testPermissionPollingTaskRegistryTracksMultipleTargets() {
+        var registry = PermissionPollingTaskRegistry()
+
+        registry.markStarted(.accessibility)
+        registry.markStarted(.screenCapture)
+        registry.markStarted(.accessibility)
+
+        XCTAssertTrue(registry.isActive(.accessibility))
+        XCTAssertTrue(registry.isActive(.screenCapture))
+        XCTAssertEqual(registry.activeTargets, [.accessibility, .screenCapture])
+
+        registry.markStopped(.accessibility)
+
+        XCTAssertFalse(registry.isActive(.accessibility))
+        XCTAssertTrue(registry.isActive(.screenCapture))
+
+        registry.markAllStopped()
+
+        XCTAssertTrue(registry.activeTargets.isEmpty)
+    }
+
+    func testPermissionPollingDiagnosticIncludesAttemptElapsedAndFinalState() {
+        let diagnostic = PermissionPollingDiagnostic(
+            target: .screenCapture,
+            attempt: 40,
+            attemptLimit: 40,
+            elapsedMs: 20_000,
+            finalPermissionGranted: false,
+            timeoutDescription: "20s",
+            bundleIdentifier: "io.github.flowtab.tests",
+            bundlePath: "/Applications/FlowTab.app",
+            action: .timeout
+        )
+
+        XCTAssertTrue(diagnostic.logMessage.contains("target=screenCapture"))
+        XCTAssertTrue(diagnostic.logMessage.contains("action=timeout"))
+        XCTAssertTrue(diagnostic.logMessage.contains("attempt=40/40"))
+        XCTAssertTrue(diagnostic.logMessage.contains("elapsedMs=20000.000"))
+        XCTAssertTrue(diagnostic.logMessage.contains("finalPermissionGranted=false"))
+        XCTAssertTrue(diagnostic.logMessage.contains("timeout=20s"))
+    }
+
+    @MainActor
+    func testHotkeyTakeoverInactiveStatusShowsAfterConfirmationDelay() {
+        let view = HotkeySettingsCardAppKitView(takeoverInactiveDisplayDelay: 0.01)
+        let statusLabel: NSTextField? = descendant(
+            in: view,
+            identifier: "flowtab.settings.hotkey.main-takeover-status"
+        )
+
+        view.update(with: makeHotkeySettingsState(commandTabTakeoverActive: false))
+
+        XCTAssertTrue(waitForRunLoopCondition(timeout: 0.5) {
+            statusLabel?.isHidden == false
+        })
+        XCTAssertEqual(statusLabel?.stringValue, AppStrings.text(.hotkeyCommandTabTakeoverInactive))
+    }
+
+    @MainActor
+    func testHotkeyTakeoverInactiveDelayDoesNotShowStaleStatusAfterRecovery() {
+        let view = HotkeySettingsCardAppKitView(takeoverInactiveDisplayDelay: 0.01)
+        let statusLabel: NSTextField? = descendant(
+            in: view,
+            identifier: "flowtab.settings.hotkey.main-takeover-status"
+        )
+
+        view.update(with: makeHotkeySettingsState(commandTabTakeoverActive: false))
+        view.update(with: makeHotkeySettingsState(commandTabTakeoverActive: true))
+
+        XCTAssertTrue(waitForRunLoopCondition(timeout: 0.5) {
+            statusLabel?.stringValue == AppStrings.text(.hotkeyCommandTabTakeoverActive)
+        })
+        XCTAssertEqual(statusLabel?.stringValue, AppStrings.text(.hotkeyCommandTabTakeoverActive))
+        XCTAssertFalse(statusLabel?.isHidden ?? true)
+    }
+
     func testRuntimeLogLevelOrderingUsesPriority() {
         XCTAssertLessThan(RuntimeLogLevel.debug, .info)
         XCTAssertLessThan(RuntimeLogLevel.info, .warning)
         XCTAssertLessThan(RuntimeLogLevel.warning, .error)
+    }
+
+    func testDiagnosticsRefreshPolicyOwnsRuntimeLogsRefreshCadence() {
+        let policy = DiagnosticsRefreshPolicy.runtimeLogs
+
+        XCTAssertEqual(policy.intervalNanoseconds, 1_000_000_000)
+        XCTAssertEqual(policy.lineLimit, 300)
     }
 
     func testRuntimeLogPreferencesLoadPersistsDefaultForInvalidValue() {
@@ -250,10 +342,14 @@ extension FlowTabTests {
             model.filter = .hidden
             model.reload()
 
-            let deadline = Date().addingTimeInterval(5)
-            while model.isLoading && Date() < deadline {
-                try? await Task.sleep(nanoseconds: 20_000_000)
+            let didFinishLoading = await waitUntil(
+                "app visibility manager finishes loading hidden missing app ids",
+                timeout: 5.0,
+                pollIntervalNanoseconds: 20_000_000
+            ) {
+                !model.isLoading
             }
+            XCTAssertTrue(didFinishLoading)
 
             XCTAssertFalse(model.isLoading)
             XCTAssertEqual(model.hiddenCount, 1)
@@ -596,6 +692,48 @@ extension FlowTabTests {
         let scopedLines = lines.filter { $0.contains(marker) }
 
         XCTAssertTrue(scopedLines.contains(where: { $0.contains("\(marker)-permission-missing") }))
+    }
+
+    private func makeHotkeySettingsState(commandTabTakeoverActive: Bool) -> HotkeySettingsCardState {
+        HotkeySettingsCardState(
+            hotkeyPrimaryModifierRaw: SwitcherPrimaryModifier.command.rawValue,
+            hotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
+            hotkeyQuitKeyRaw: SwitcherHotkeyKey.q.rawValue,
+            inAppWindowHotkeyPrimaryModifierRaw: SwitcherPrimaryModifier.option.rawValue,
+            inAppWindowHotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
+            commandTabTakeoverActive: commandTabTakeoverActive,
+            accessibilityTrusted: true
+        )
+    }
+
+    private func descendant<T: NSView>(
+        in view: NSView,
+        identifier: String,
+        as type: T.Type = T.self
+    ) -> T? {
+        if view.identifier?.rawValue == identifier {
+            return view as? T
+        }
+        for subview in view.subviews {
+            if let match: T = descendant(in: subview, identifier: identifier, as: type) {
+                return match
+            }
+        }
+        return nil
+    }
+
+    private func waitForRunLoopCondition(
+        timeout: TimeInterval,
+        predicate: () -> Bool
+    ) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if predicate() {
+                return true
+            }
+            RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.005))
+        }
+        return predicate()
     }
 
 }

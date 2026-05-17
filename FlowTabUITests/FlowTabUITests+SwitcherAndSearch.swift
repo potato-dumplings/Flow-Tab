@@ -45,7 +45,7 @@ extension FlowTabUITests {
         app.typeText("测")
 
         let chineseResult = app.descendants(matching: .any)
-            .matching(identifier: "flowtab.switcher.search.app.com-xxx-test")
+            .matching(identifier: "flowtab.switcher.search.app.\("com.xxx.test".flowTabUITestAccessibilityIdentifierComponent)")
             .firstMatch
         XCTAssertTrue(chineseResult.waitForExistence(timeout: 5))
     }
@@ -69,7 +69,7 @@ extension FlowTabUITests {
         app.typeText("cs")
 
         let chineseResult = app.descendants(matching: .any)
-            .matching(identifier: "flowtab.switcher.search.app.com-xxx-test")
+            .matching(identifier: "flowtab.switcher.search.app.\("com.xxx.test".flowTabUITestAccessibilityIdentifierComponent)")
             .firstMatch
         XCTAssertTrue(chineseResult.waitForExistence(timeout: 5))
     }
@@ -93,12 +93,12 @@ extension FlowTabUITests {
         app.typeText("cs")
 
         let csgoResult = app.descendants(matching: .any)
-            .matching(identifier: "flowtab.switcher.search.app.com-xxx-csgo")
+            .matching(identifier: "flowtab.switcher.search.app.\("com.xxx.csgo".flowTabUITestAccessibilityIdentifierComponent)")
             .firstMatch
         XCTAssertTrue(csgoResult.waitForExistence(timeout: 5))
 
         let chineseResult = app.descendants(matching: .any)
-            .matching(identifier: "flowtab.switcher.search.app.com-xxx-test")
+            .matching(identifier: "flowtab.switcher.search.app.\("com.xxx.test".flowTabUITestAccessibilityIdentifierComponent)")
             .firstMatch
         XCTAssertTrue(chineseResult.waitForExistence(timeout: 5))
     }
@@ -122,7 +122,7 @@ extension FlowTabUITests {
         app.typeText("文件助手")
 
         let segmentedResult = app.descendants(matching: .any)
-            .matching(identifier: "flowtab.switcher.search.app.com-flowtab-mock-file-transfer-assistant")
+            .matching(identifier: "flowtab.switcher.search.app.\("com.flowtab.mock.file-transfer-assistant".flowTabUITestAccessibilityIdentifierComponent)")
             .firstMatch
         XCTAssertTrue(segmentedResult.waitForExistence(timeout: 5))
     }
@@ -204,7 +204,7 @@ extension FlowTabUITests {
 
         postFlowTabUITestSwitcherCommandAndWaitForDelivery(.advanceDown, traceLabel: "many-window-page")
 
-        let firstWindowID = "flowtab.switcher.window.mock-many-window-00"
+        let firstWindowID = "flowtab.switcher.window.\("mock-many-window-00".flowTabUITestAccessibilityIdentifierComponent)"
         XCTAssertTrue(element(in: app, identifier: firstWindowID).waitForExistence(timeout: 5))
         XCTAssertTrue(element(in: app, identifier: Identifier.switcherNextWindowPage).waitForExistence(timeout: 2))
 
@@ -221,7 +221,7 @@ extension FlowTabUITests {
         )
         XCTAssertFalse(
             app.descendants(matching: .any)
-                .matching(identifier: "flowtab.switcher.window.mock-many-window-25")
+                .matching(identifier: "flowtab.switcher.window.\("mock-many-window-25".flowTabUITestAccessibilityIdentifierComponent)")
                 .firstMatch
                 .exists
         )
@@ -244,8 +244,8 @@ extension FlowTabUITests {
 
         XCTAssertTrue(element(in: app, identifier: Identifier.switcherSearchInput).waitForExistence(timeout: 5))
 
-        let firstResultIdentifier = "flowtab.switcher.search.app.com-flowtab-mock-wrap-01"
-        let lastResultIdentifier = "flowtab.switcher.search.app.com-flowtab-mock-wrap-10"
+        let firstResultIdentifier = "flowtab.switcher.search.app.\("com.flowtab.mock.wrap.01".flowTabUITestAccessibilityIdentifierComponent)"
+        let lastResultIdentifier = "flowtab.switcher.search.app.\("com.flowtab.mock.wrap.10".flowTabUITestAccessibilityIdentifierComponent)"
 
         RunLoop.current.run(until: Date().addingTimeInterval(0.4))
         app.typeKey(.downArrow, modifierFlags: [])

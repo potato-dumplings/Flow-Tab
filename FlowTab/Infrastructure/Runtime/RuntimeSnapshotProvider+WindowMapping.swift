@@ -21,6 +21,7 @@ struct RuntimeWindowMappingResolution {
     let windowRecordsByCGWindowID: [CGWindowID: RuntimeWindowRecord]
     let validCGWindows: [RuntimeSnapshotProvider.CGWindowEntry]
     let allowSpaceOneWithoutCurrentAXHandle: Bool
+    let bindingDiagnostics: [WindowBindingDiagnostic]
 
     var knownCGWindowsByID: [CGWindowID: RuntimeSnapshotProvider.CGWindowEntry] {
         runtimeKnownCGWindowsByID(
@@ -37,6 +38,11 @@ private func runtimeWindowEntryUsesDesktopSpace(
 }
 
 private let runtimeAXRebuildGraceMissingSnapshotLimit = 3
+
+struct RuntimeWindowAssignmentMatchResult {
+    let matches: [String: CGWindowID]
+    let bindingDiagnostics: [WindowBindingDiagnostic]
+}
 
 extension RuntimeSnapshotProvider {
     func isLikelyTransientAXRebuild(for pid: pid_t) -> Bool {
@@ -55,13 +61,15 @@ extension RuntimeSnapshotProvider {
         axWindows: [AXWindowEntry],
         cgWindows: [CGWindowEntry],
         pid: pid_t,
-        appName: String
+        appName: String,
+        remoteScanCompleteness: RuntimeAXRemoteWindowResolver.RemoteScanCompleteness? = nil
     ) -> [WindowListEntry] {
         let mappingResolution = resolveStableWindowMapping(
             axWindows: axWindows,
             cgWindows: cgWindows,
             pid: pid,
-            appName: appName
+            appName: appName,
+            remoteScanCompleteness: remoteScanCompleteness
         )
         let cgWindowOrderByID = Dictionary(
             uniqueKeysWithValues: mappingResolution.validCGWindows.enumerated().map { offset, window in
@@ -106,6 +114,16 @@ extension RuntimeSnapshotProvider {
                 fallbackIndex: axEntry.index,
                 refreshedAXTitle: refreshedAXTitle
             )
+            let entryFrame = axEntry.frame ?? record.displayFrame
+            let entrySpaceIDs = knownCGWindowsByID[cgWindowID]?.spaceIDs
+                ?? record.spaceRecovery?.spaceIDs
+                ?? []
+            let spaceEvidence = RuntimeWindowTopologyClassifier.spaceEvidence(
+                cgWindowID: cgWindowID,
+                spaceIDs: entrySpaceIDs,
+                bounds: entryFrame,
+                source: "window-mapping-exact"
+            )
             return WindowListEntry(
                 windowID: record.stableWindowID,
                 title: title,
@@ -114,14 +132,13 @@ extension RuntimeSnapshotProvider {
                 cgWindowID: cgWindowID,
                 activationHandleID: axEntry.id,
                 axWindow: axEntry.window,
-                frame: axEntry.frame ?? record.displayFrame,
-                spaceIDs: knownCGWindowsByID[cgWindowID]?.spaceIDs
-                    ?? record.spaceRecovery?.spaceIDs
-                    ?? [],
+                frame: entryFrame,
+                spaceIDs: entrySpaceIDs,
                 isOnscreen: knownCGWindowsByID[cgWindowID]?.isOnscreen ?? false,
-                allowsPublicAXRecovery: true,
+                allowsPublicAXRecovery: spaceEvidence.allowsPublicAXRecovery,
                 hasStickyBinding: true,
-                lastConfirmationSource: record.lastConfirmationSource
+                lastConfirmationSource: record.lastConfirmationSource,
+                spaceEvidence: spaceEvidence
             )
         }
 
@@ -138,6 +155,13 @@ extension RuntimeSnapshotProvider {
                 ?? record.spaceRecovery?.spaceIDs
                 ?? cgWindow.spaceIDs
             let normalizedSpaceIDs = RuntimeWindowTopologyClassifier.normalizedSpaceIDs(rawSpaceIDs)
+            let entryFrame = record.displayFrame ?? cgWindow.bounds
+            let spaceEvidence = RuntimeWindowTopologyClassifier.spaceEvidence(
+                cgWindowID: cgWindow.id,
+                spaceIDs: normalizedSpaceIDs,
+                bounds: entryFrame,
+                source: "window-mapping-sticky-cg"
+            )
             guard runtimeWindowCanBeExposedWithoutCurrentAXHandle(
                 spaceIDs: normalizedSpaceIDs,
                 isLikelyDesktopWrapper: RuntimeWindowTopologyClassifier.isLikelyDesktopWrapper(
@@ -159,12 +183,13 @@ extension RuntimeSnapshotProvider {
                 cgWindowID: cgWindow.id,
                 activationHandleID: nil,
                 axWindow: nil,
-                frame: record.displayFrame ?? cgWindow.bounds,
+                frame: entryFrame,
                 spaceIDs: normalizedSpaceIDs,
                 isOnscreen: cgWindow.isOnscreen,
-                allowsPublicAXRecovery: true,
+                allowsPublicAXRecovery: spaceEvidence.allowsPublicAXRecovery,
                 hasStickyBinding: true,
-                lastConfirmationSource: record.lastConfirmationSource
+                lastConfirmationSource: record.lastConfirmationSource,
+                spaceEvidence: spaceEvidence
             )
         }
 
@@ -182,6 +207,13 @@ extension RuntimeSnapshotProvider {
                 hiddenProvisionalCGOnlyCount += 1
                 return nil
             }
+            let entryFrame = record?.displayFrame ?? cgWindow.bounds
+            let spaceEvidence = RuntimeWindowTopologyClassifier.spaceEvidence(
+                cgWindowID: cgWindow.id,
+                spaceIDs: normalizedSpaceIDs,
+                bounds: entryFrame,
+                source: "window-mapping-provisional-cg"
+            )
             guard runtimeWindowCanBeExposedWithoutCurrentAXHandle(
                 spaceIDs: normalizedSpaceIDs,
                 isLikelyDesktopWrapper: RuntimeWindowTopologyClassifier.isLikelyDesktopWrapper(
@@ -204,12 +236,13 @@ extension RuntimeSnapshotProvider {
                 cgWindowID: cgWindow.id,
                 activationHandleID: nil,
                 axWindow: nil,
-                frame: record?.displayFrame ?? cgWindow.bounds,
+                frame: entryFrame,
                 spaceIDs: normalizedSpaceIDs,
                 isOnscreen: cgWindow.isOnscreen,
-                allowsPublicAXRecovery: true,
+                allowsPublicAXRecovery: spaceEvidence.allowsPublicAXRecovery,
                 hasStickyBinding: false,
-                lastConfirmationSource: nil
+                lastConfirmationSource: nil,
+                spaceEvidence: spaceEvidence
             )
         }
         if hiddenProvisionalCGOnlyCount > 0 {
@@ -434,7 +467,8 @@ extension RuntimeSnapshotProvider {
         axWindows: [AXWindowEntry],
         cgWindows: [CGWindowEntry],
         pid: pid_t,
-        appName: String
+        appName: String,
+        remoteScanCompleteness: RuntimeAXRemoteWindowResolver.RemoteScanCompleteness? = nil
     ) -> RuntimeWindowMappingResolution {
         let validCGWindows = selectSupplementalOffSpaceCGWindows(
             existingCGWindowIDs: [],
@@ -445,15 +479,27 @@ extension RuntimeSnapshotProvider {
         let previousState = windowMappingStateByPID[pid] ?? RuntimeWindowMappingState()
         let observedAt = Date.timeIntervalSinceReferenceDate
         let hasAXWindowsInCurrentSnapshot = !axWindows.isEmpty
+        let axWindowAbsenceIsAuthoritative = Self.axWindowAbsenceIsAuthoritative(
+            remoteScanCompleteness: remoteScanCompleteness
+        )
         let hasObservedAXWindowHandle = previousState.hasObservedAXWindowHandle || hasAXWindowsInCurrentSnapshot
-        let consecutiveSnapshotsWithoutAXWindows = hasAXWindowsInCurrentSnapshot
-            ? 0
-            : previousState.consecutiveSnapshotsWithoutAXWindows + 1
+        let consecutiveSnapshotsWithoutAXWindows: Int
+        if hasAXWindowsInCurrentSnapshot {
+            consecutiveSnapshotsWithoutAXWindows = 0
+        } else if axWindowAbsenceIsAuthoritative {
+            consecutiveSnapshotsWithoutAXWindows = previousState.consecutiveSnapshotsWithoutAXWindows + 1
+        } else {
+            consecutiveSnapshotsWithoutAXWindows = previousState.consecutiveSnapshotsWithoutAXWindows
+        }
         let allowSpaceOneWithoutCurrentAXHandle = hasObservedAXWindowHandle
             && !hasAXWindowsInCurrentSnapshot
-            && consecutiveSnapshotsWithoutAXWindows <= runtimeAXRebuildGraceMissingSnapshotLimit
+            && (
+                !axWindowAbsenceIsAuthoritative
+                    || consecutiveSnapshotsWithoutAXWindows <= runtimeAXRebuildGraceMissingSnapshotLimit
+            )
 
         var windowRecordsByCGWindowID = previousState.windowRecordsByCGWindowID
+        var bindingDiagnostics: [WindowBindingDiagnostic] = []
         for cgWindow in validCGWindows {
             var record = windowRecordsByCGWindowID[cgWindow.id]
                 ?? RuntimeWindowRecord(
@@ -487,6 +533,20 @@ extension RuntimeSnapshotProvider {
             )
 
             if let reusedAXWindow {
+                if let diagnostic = Self.stickyBindingConflictDiagnostic(
+                    record: record,
+                    reusedAXWindow: reusedAXWindow,
+                    validCGWindowIDs: validCGWindowIDs
+                ) {
+                    bindingDiagnostics.append(diagnostic)
+                    RuntimeLog.debug(
+                        .axMatch,
+                        "binding-assignment conflict reason=\(diagnostic.reason?.rawValue ?? "unknown") ax=\(reusedAXWindow.id) stickyCG=\(cgWindowID) exactCG=\(diagnostic.cgWindowID.map(String.init) ?? "nil") allowedActions=\(diagnostic.allowedActions.map(\.rawValue).sorted().joined(separator: ","))"
+                    )
+                    record.updateFallbackDisplayStateIfNeeded()
+                    windowRecordsByCGWindowID[cgWindowID] = record
+                    continue
+                }
                 let resolvedTitle = resolveStableWindowTitle(
                     sourceTitle: reusedAXWindow.sourceTitle,
                     matchedCGTitle: knownCGWindowsByID[cgWindowID]?.title ?? record.displayTitle,
@@ -514,11 +574,13 @@ extension RuntimeSnapshotProvider {
         let unresolvedCGWindows = validCGWindows.filter { cgWindow in
             windowRecordsByCGWindowID[cgWindow.id]?.hasCurrentActivationHandle != true
         }
-        let publicMatches = Self.matchCGWindowAssignments(
+        let publicAssignmentResult = Self.matchCGWindowAssignmentsWithDiagnostics(
             axWindows: unresolvedAXWindows,
             cgWindows: unresolvedCGWindows,
             appName: appName
         )
+        let publicMatches = publicAssignmentResult.matches
+        bindingDiagnostics.append(contentsOf: publicAssignmentResult.bindingDiagnostics)
         let publicMatchResolution = Self.resolveFullscreenContentRebindings(
             matches: publicMatches,
             axWindows: unresolvedAXWindows,
@@ -611,13 +673,15 @@ extension RuntimeSnapshotProvider {
         let remainingAXWindowsForContentFallback = axWindows.filter {
             exactMatchesByAXWindowID[$0.id] == nil
         }
+        let fullscreenContentFallbackResult = Self.resolveFullscreenContentFallbackBindingsWithDiagnostics(
+            axWindows: remainingAXWindowsForContentFallback,
+            cgWindows: validCGWindows,
+            assignedCGWindowIDs: Set(exactMatchesByAXWindowID.values),
+            appName: appName
+        )
+        bindingDiagnostics.append(contentsOf: fullscreenContentFallbackResult.bindingDiagnostics)
         applyExactMatches(
-            Self.resolveFullscreenContentFallbackBindings(
-                axWindows: remainingAXWindowsForContentFallback,
-                cgWindows: validCGWindows,
-                assignedCGWindowIDs: Set(exactMatchesByAXWindowID.values),
-                appName: appName
-            ),
+            fullscreenContentFallbackResult.matches,
             source: .fullscreenContentFallbackBinding,
             pid: pid,
             currentAXWindowsByID: currentAXWindowsByID,
@@ -645,12 +709,20 @@ extension RuntimeSnapshotProvider {
         }
         let currentAXToCG = exactMatchesByAXWindowID
         let currentCGToAX = Dictionary(uniqueKeysWithValues: currentAXToCG.map { ($1, $0) })
+        let lastAXWindowIDs: Set<String>
+        if hasAXWindowsInCurrentSnapshot {
+            lastAXWindowIDs = Set(axWindows.map(\.id))
+        } else if axWindowAbsenceIsAuthoritative {
+            lastAXWindowIDs = []
+        } else {
+            lastAXWindowIDs = previousState.lastAXWindowIDs
+        }
         let nextState = RuntimeWindowMappingState(
             windowRecordsByCGWindowID: windowRecordsByCGWindowID,
             currentAXToCG: currentAXToCG,
             currentCGToAX: currentCGToAX,
             validCGWindowIDs: validCGWindowIDs,
-            lastAXWindowIDs: Set(axWindows.map(\.id)),
+            lastAXWindowIDs: lastAXWindowIDs,
             hasObservedAXWindowHandle: hasObservedAXWindowHandle,
             consecutiveSnapshotsWithoutAXWindows: consecutiveSnapshotsWithoutAXWindows
         )
@@ -668,17 +740,36 @@ extension RuntimeSnapshotProvider {
             "\(appName) records=\(windowRecordsByCGWindowID.count) sticky=\(stickyCount) exact=\(exactMatchesByAXWindowID.count) unmatchedAX=\(unmatchedAXCount) unmatchedCG=\(unmatchedCGCount)"
         )
         if allowSpaceOneWithoutCurrentAXHandle {
-            RuntimeLog.debug(
-                .axMatch,
-                "\(appName) transient-ax-rebuild suspected; keeping space-1 windows missingAXSnapshots=\(consecutiveSnapshotsWithoutAXWindows)/\(runtimeAXRebuildGraceMissingSnapshotLimit)"
-            )
+            if !axWindowAbsenceIsAuthoritative, let remoteScanCompleteness {
+                RuntimeLog.debug(
+                    .axMatch,
+                    "\(appName) remote-ax-scan-incomplete; keeping space-1 windows remoteScan=\(AXWindowInspector.remoteScanLogDescription(remoteScanCompleteness))"
+                )
+            } else {
+                RuntimeLog.debug(
+                    .axMatch,
+                    "\(appName) transient-ax-rebuild suspected; keeping space-1 windows missingAXSnapshots=\(consecutiveSnapshotsWithoutAXWindows)/\(runtimeAXRebuildGraceMissingSnapshotLimit)"
+                )
+            }
         }
         return RuntimeWindowMappingResolution(
             exactMatchesByAXWindowID: exactMatchesByAXWindowID,
             windowRecordsByCGWindowID: windowRecordsByCGWindowID,
             validCGWindows: validCGWindows,
-            allowSpaceOneWithoutCurrentAXHandle: allowSpaceOneWithoutCurrentAXHandle
+            allowSpaceOneWithoutCurrentAXHandle: allowSpaceOneWithoutCurrentAXHandle,
+            bindingDiagnostics: bindingDiagnostics
         )
+    }
+
+    private static func axWindowAbsenceIsAuthoritative(
+        remoteScanCompleteness: RuntimeAXRemoteWindowResolver.RemoteScanCompleteness?
+    ) -> Bool {
+        switch remoteScanCompleteness {
+        case nil, .some(.complete(_)):
+            true
+        case .some(.partialTimedOut(_, _)), .some(.unavailable):
+            false
+        }
     }
 
     private func applyExactMatches(
@@ -788,6 +879,32 @@ extension RuntimeSnapshotProvider {
             // the current snapshot refresh title/frame in binding state.
             return true
         }
+    }
+
+    private static func stickyBindingConflictDiagnostic(
+        record: RuntimeWindowRecord,
+        reusedAXWindow: AXWindowEntry,
+        validCGWindowIDs: Set<CGWindowID>
+    ) -> WindowBindingDiagnostic? {
+        guard let exactCGWindowID = AXWindowInspector.cgWindowID(for: reusedAXWindow.window) else {
+            return nil
+        }
+        guard validCGWindowIDs.contains(exactCGWindowID) else {
+            return nil
+        }
+        guard exactCGWindowID != record.cgWindowID else {
+            return nil
+        }
+        return WindowBindingDiagnostic(
+            stableWindowID: record.stableWindowID,
+            axWindowID: reusedAXWindow.id,
+            cgWindowID: exactCGWindowID,
+            confidence: .ambiguous,
+            source: .privateExactBridge,
+            reason: .privateExactBridgeConflictsWithStickyBinding,
+            candidateCount: 2,
+            allowedActions: WindowBindingConfidence.ambiguous.allowedActions
+        )
     }
 
     private static func resolvePrivateExactBridgeMatches(

@@ -71,9 +71,14 @@ extension SwitcherPanelController {
         activateApplicationIfNeeded: Bool = true,
         recoveryMode: PanelVisibilityRecoveryMode = .hardReorder
     ) {
-        panelPresentationRecoveryTask?.cancel()
+        let recoveryGeneration = beginPanelPresentationRecoveryTask()
+        panelVisibilityRecoveryState = .suspectedHidden(
+            trigger: trigger,
+            generation: recoveryGeneration
+        )
         panelPresentationRecoveryTask = Task { @MainActor [weak self] in
             guard let self else { return }
+            guard self.isPanelPresentationRecoveryGenerationCurrent(recoveryGeneration) else { return }
             let delays = attemptDelaysNanoseconds.isEmpty ? [UInt64(0)] : attemptDelaysNanoseconds
 
             for (attemptIndex, delayNanoseconds) in delays.enumerated() {
@@ -81,63 +86,129 @@ extension SwitcherPanelController {
                     try? await Task.sleep(nanoseconds: delayNanoseconds)
                 }
                 guard !Task.isCancelled else { return }
+                guard self.isPanelPresentationRecoveryGenerationCurrent(recoveryGeneration) else { return }
                 guard self.hasActivePresentationSession else {
-                    self.panelPresentationRecoveryTask = nil
+                    self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
                     return
                 }
                 if self.isPanelVisibleToUser {
-                    self.logSearchTrace(
-                        "presentationRecovery trigger=\(trigger) action=complete reason=alreadyVisible attempt=\(attemptIndex + 1)/\(delays.count) \(self.searchTraceStateSummary())"
+                    self.panelVisibilityRecoveryState = .visibleConfirmed(
+                        trigger: trigger,
+                        generation: recoveryGeneration,
+                        reason: "alreadyVisible"
                     )
-                    self.panelPresentationRecoveryTask = nil
+                    self.logSearchTrace(
+                        "presentationRecovery trigger=\(trigger) action=complete reason=alreadyVisible generation=\(recoveryGeneration) attempt=\(attemptIndex + 1)/\(delays.count) \(self.searchTraceStateSummary())"
+                    )
+                    self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
                     self.scheduleModifierReleaseConfirmationAfterRecoveredPresentationIfNeeded(trigger: trigger)
                     return
                 }
 
                 let attemptAction = recoveryMode == .softReorder ? "softAttempt" : "attempt"
+                self.panelVisibilityRecoveryState = .recovering(
+                    trigger: trigger,
+                    generation: recoveryGeneration,
+                    attempt: attemptIndex + 1,
+                    totalAttempts: delays.count,
+                    mode: recoveryMode
+                )
                 self.logSearchTrace(
-                    "presentationRecovery trigger=\(trigger) action=\(attemptAction) index=\(attemptIndex + 1)/\(delays.count) \(self.searchTraceStateSummary())"
+                    "presentationRecovery trigger=\(trigger) action=\(attemptAction) generation=\(recoveryGeneration) index=\(attemptIndex + 1)/\(delays.count) \(self.searchTraceStateSummary())"
                 )
                 await self.performPanelVisibilityRecoveryAttempt(
                     trigger: trigger,
                     activateApplicationIfNeeded: activateApplicationIfNeeded,
-                    recoveryMode: recoveryMode
+                    recoveryMode: recoveryMode,
+                    generation: recoveryGeneration,
+                    attempt: attemptIndex + 1,
+                    totalAttempts: delays.count
                 )
 
                 guard !Task.isCancelled else { return }
+                guard self.isPanelPresentationRecoveryGenerationCurrent(recoveryGeneration) else { return }
                 guard self.hasActivePresentationSession else {
-                    self.panelPresentationRecoveryTask = nil
+                    self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
                     return
                 }
                 if self.isPanelVisibleToUser {
+                    self.panelVisibilityRecoveryState = .visibleConfirmed(
+                        trigger: trigger,
+                        generation: recoveryGeneration,
+                        reason: "recovered"
+                    )
                     self.updatePanelPresentationLevel(
                         trigger: "\(trigger)_steady",
                         behaviorMode: .allSpaces
                     )
                     self.logSearchTrace(
-                        "presentationRecovery trigger=\(trigger) action=complete reason=recovered attempt=\(attemptIndex + 1)/\(delays.count) \(self.searchTraceStateSummary())"
+                        "presentationRecovery trigger=\(trigger) action=complete reason=recovered generation=\(recoveryGeneration) attempt=\(attemptIndex + 1)/\(delays.count) \(self.searchTraceStateSummary())"
                     )
-                    self.panelPresentationRecoveryTask = nil
+                    self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
                     self.scheduleModifierReleaseConfirmationAfterRecoveredPresentationIfNeeded(trigger: trigger)
                     return
                 }
             }
 
-            self.panelPresentationRecoveryTask = nil
+            self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
             guard cancelSessionOnFailure else { return }
             guard self.hasActivePresentationSession else { return }
+            guard self.isPanelPresentationRecoveryGenerationCurrent(recoveryGeneration) else { return }
+            self.panelVisibilityRecoveryState = .failed(
+                trigger: trigger,
+                generation: recoveryGeneration,
+                reason: "attemptsExhausted"
+            )
             self.logSearchTrace(
-                "presentationRecovery trigger=\(trigger) action=failed \(self.searchTraceStateSummary())"
+                "presentationRecovery trigger=\(trigger) action=failed generation=\(recoveryGeneration) \(self.searchTraceStateSummary())"
             )
             self.cancelSelectionForSystemInterruption(trigger: trigger)
         }
     }
 
+    @discardableResult
+    func beginPanelPresentationRecoveryTask() -> Int {
+        panelPresentationRecoveryTask?.cancel()
+        panelPresentationRecoveryGeneration += 1
+        return panelPresentationRecoveryGeneration
+    }
+
+    func cancelPanelPresentationRecoveryTask() {
+        panelPresentationRecoveryTask?.cancel()
+        panelPresentationRecoveryGeneration += 1
+        panelPresentationRecoveryTask = nil
+    }
+
+    func clearPanelPresentationRecoveryTaskIfCurrent(_ generation: Int) {
+        guard isPanelPresentationRecoveryGenerationCurrent(generation) else { return }
+        panelPresentationRecoveryTask = nil
+    }
+
+    func isPanelPresentationRecoveryGenerationCurrent(_ generation: Int) -> Bool {
+        generation == panelPresentationRecoveryGeneration
+    }
+
     func performPanelVisibilityRecoveryAttempt(
         trigger: String,
         activateApplicationIfNeeded: Bool,
-        recoveryMode: PanelVisibilityRecoveryMode = .hardReorder
+        recoveryMode: PanelVisibilityRecoveryMode = .hardReorder,
+        generation: Int? = nil,
+        attempt: Int? = nil,
+        totalAttempts: Int? = nil
     ) async {
+        let beforeSnapshot = panelVisibilitySnapshot()
+        defer {
+            recordPanelVisibilityRecoveryDiagnostic(
+                trigger: trigger,
+                generation: generation,
+                attempt: attempt,
+                totalAttempts: totalAttempts,
+                mode: recoveryMode,
+                before: beforeSnapshot,
+                after: panelVisibilitySnapshot()
+            )
+        }
+
         guard recoveryMode == .hardReorder else {
             updatePanelPresentationLevel(
                 trigger: "\(trigger)_soft_recovery",
@@ -198,7 +269,7 @@ extension SwitcherPanelController {
             return
         }
         let sessionReadyMs = monotonicMilliseconds()
-        activeHotkeySessionKind = .globalAppSwitcher
+        beginPresentationSession(kind: .globalAppSwitcher, trigger: "global_show")
         lastCommittedTabAdvanceTimestamp = nil
         RuntimeLog.info(.session, "start direction=\(direction.debugName) \(self.model.debugSelectionSummary())")
 
@@ -271,7 +342,7 @@ extension SwitcherPanelController {
             return
         }
         let sessionReadyMs = monotonicMilliseconds()
-        activeHotkeySessionKind = .inAppWindowSwitcher
+        beginPresentationSession(kind: .inAppWindowSwitcher, trigger: "in_app_show")
         lastCommittedTabAdvanceTimestamp = nil
         RuntimeLog.info(.session, "start in-app direction=\(direction.debugName) \(self.model.debugSelectionSummary())")
 
@@ -410,8 +481,8 @@ extension SwitcherPanelController {
 
     func endPresentationSession() {
         guard isPanelPresented || hasActivePresentationSession else { return }
-        panelPresentationRecoveryTask?.cancel()
-        panelPresentationRecoveryTask = nil
+        invalidatePresentationSessionGeneration(trigger: "endPresentationSession")
+        cancelPanelPresentationRecoveryTask()
         clearInitialPresentationVisibilityTracking(invalidate: true)
         removeEventMonitors()
         panel.orderOut(nil)
@@ -425,9 +496,29 @@ extension SwitcherPanelController {
         terminateInterruptionProtectionUntil = 0
         suppressApplicationActivationUntil = 0
         lastCommittedTabAdvanceTimestamp = nil
+        panelVisibilityRecoveryState = .idle
         if panelVisibilityOverride != nil {
             panelVisibilityOverride = false
         }
+    }
+
+    func beginPresentationSession(kind: HotkeySessionKind, trigger: String) {
+        presentationSessionGeneration += 1
+        activeHotkeySessionKind = kind
+        logInputTrace(
+            "presentationSession trigger=\(trigger) action=begin kind=\(kind) generation=\(presentationSessionGeneration)"
+        )
+    }
+
+    func invalidatePresentationSessionGeneration(trigger: String) {
+        presentationSessionGeneration += 1
+        logInputTrace(
+            "presentationSession trigger=\(trigger) action=invalidate generation=\(presentationSessionGeneration)"
+        )
+    }
+
+    func isPresentationSessionGenerationCurrent(_ generation: Int) -> Bool {
+        generation == presentationSessionGeneration
     }
 
     func finishSelection() {

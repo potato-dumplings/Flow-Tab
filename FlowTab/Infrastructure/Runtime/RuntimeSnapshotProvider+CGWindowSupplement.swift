@@ -302,7 +302,8 @@ private func runtimeSnapshotWindowEntrySummary(
         let publicAXRecovery = entry.allowsPublicAXRecovery ? 1 : 0
         let sticky = entry.hasStickyBinding ? 1 : 0
         let source = entry.lastConfirmationSource?.rawValue ?? "nil"
-        return "\(index):id=\(entry.windowID):title=\(runtimeSnapshotLogValue(entry.title)):mode=\(mode):identity=\(identity):handle=\(handle):ax=\(ax):cg=\(cg):sticky=\(sticky):source=\(source):publicAXRecovery=\(publicAXRecovery):spaces=\(spaces):\(onscreen):minimized=\(minimized):frame=\(runtimeSnapshotFrameDescription(entry.frame))"
+        let spaceEvidence = entry.spaceEvidence?.confidence.rawValue ?? "nil"
+        return "\(index):id=\(entry.windowID):title=\(runtimeSnapshotLogValue(entry.title)):mode=\(mode):identity=\(identity):handle=\(handle):ax=\(ax):cg=\(cg):sticky=\(sticky):source=\(source):spaceEvidence=\(spaceEvidence):publicAXRecovery=\(publicAXRecovery):spaces=\(spaces):\(onscreen):minimized=\(minimized):frame=\(runtimeSnapshotFrameDescription(entry.frame))"
     }.joined(separator: ",")
     return runtimeSnapshotSampleDescription(sample: sample, count: entries.count, limit: limit)
 }

@@ -149,6 +149,7 @@ final class SwitcherSearchCoordinator {
     var windowInvertedIndex = ScopeInvertedIndex(termPostings: [:], bigramPostings: [:])
     var pendingRebuildWorkItem: DispatchWorkItem?
     var pendingRebuildResetSelection: Bool = false
+    var pendingRebuildGeneration: UInt64 = 0
     static let scopeMatchCacheEntryLimit: Int = 32
     static let shortQueryCacheEntryLimit: Int = 12
     static let appTopResultLimit: Int = 300
@@ -400,6 +401,7 @@ final class SwitcherSearchCoordinator {
         guard pendingRebuildWorkItem != nil else { return }
         pendingRebuildWorkItem?.cancel()
         pendingRebuildWorkItem = nil
+        pendingRebuildGeneration &+= 1
         let resetSelection = pendingRebuildResetSelection
         pendingRebuildResetSelection = false
         rebuildResults(resetSelection: resetSelection)
@@ -438,15 +440,19 @@ final class SwitcherSearchCoordinator {
         pendingRebuildWorkItem?.cancel()
         pendingRebuildWorkItem = nil
         pendingRebuildResetSelection = false
+        pendingRebuildGeneration &+= 1
     }
 
     func scheduleRebuild(resetSelection: Bool, debounced: Bool) {
         guard state.isActive else { return }
         pendingRebuildResetSelection = pendingRebuildResetSelection || resetSelection
         pendingRebuildWorkItem?.cancel()
+        pendingRebuildGeneration &+= 1
+        let scheduledGeneration = pendingRebuildGeneration
 
         let workItem = DispatchWorkItem { [weak self] in
             guard let self else { return }
+            guard self.pendingRebuildGeneration == scheduledGeneration else { return }
             let shouldResetSelection = self.pendingRebuildResetSelection
             self.pendingRebuildResetSelection = false
             self.pendingRebuildWorkItem = nil

@@ -161,7 +161,7 @@ enum FlowTabUITestBootstrapper {
         let size = NSSize(width: 240, height: 150)
         let image = NSImage(size: size)
         image.lockFocus()
-        let hueSeed = Double(abs(title.hashValue % 360)) / 360.0
+        let hueSeed = Double(Self.deterministicHash64(title) % 360) / 360.0
         NSColor(calibratedHue: hueSeed, saturation: 0.45, brightness: 0.82, alpha: 1).setFill()
         NSBezierPath(rect: NSRect(origin: .zero, size: size)).fill()
         NSColor.black.withAlphaComponent(0.24).setFill()
@@ -179,9 +179,28 @@ enum FlowTabUITestBootstrapper {
         return image
     }
 
-    private static func stableMockWindowID(title: String?) -> CGWindowID {
-        let seed = UInt32(abs((title ?? "Window").hashValue % 100_000))
+    nonisolated static func deterministicMockWindowIDForTesting(title: String?) -> CGWindowID {
+        stableMockWindowID(title: title)
+    }
+
+    nonisolated private static func stableMockWindowID(title: String?) -> CGWindowID {
+        let seed = UInt32(Self.deterministicHash64(normalizedMockWindowTitle(title)) % 100_000)
         return CGWindowID(900_000 + seed)
+    }
+
+    nonisolated private static func deterministicHash64(_ value: String) -> UInt64 {
+        let prime: UInt64 = 1_099_511_628_211
+        var hash: UInt64 = 14_695_981_039_346_656_037
+        for byte in value.utf8 {
+            hash ^= UInt64(byte)
+            hash = hash &* prime
+        }
+        return hash
+    }
+
+    nonisolated private static func normalizedMockWindowTitle(_ title: String?) -> String {
+        let normalized = (title ?? "Window").trimmingCharacters(in: .whitespacesAndNewlines)
+        return normalized.isEmpty ? "Window" : normalized
     }
 
     fileprivate static func installInitialPanelOcclusionStaleOverrideIfNeeded(

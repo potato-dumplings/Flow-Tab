@@ -2,21 +2,100 @@ import AppKit
 import Foundation
 
 struct RuntimeChromeWindowFocusBridge {
+    private static let scriptStatePropagationDelaySeconds: TimeInterval = 0.05
+    private static let candidateGeometryMatchThreshold: Double = 220
+    private static let strongCandidateGeometryMatchThreshold: Double = 80
+    private static let candidateScoreTieTolerance = 0.001
+    private static let candidateMinimumScoreSeparation: Double = 80
+
+    struct ScriptableBrowserSpec: Equatable {
+        let bundleIdentifier: String
+        let appleScriptApplicationID: String
+        let debugName: String
+
+        static let chrome = ScriptableBrowserSpec(
+            bundleIdentifier: "com.google.Chrome",
+            appleScriptApplicationID: "com.google.Chrome",
+            debugName: "chrome"
+        )
+    }
+
     struct CandidateQuery {
         let candidates: [Candidate]
         let chromeWindowCount: Int
         let error: String?
     }
 
-    struct Candidate {
+    struct Candidate: Equatable {
         let windowID: Int64
         let name: String
         let activeTabTitle: String
         let bounds: CGRect
+        let titleAffinity: Int
+        let geometryDistance: Double
+        let matchedTitle: Bool
+        let matchedGeometry: Bool
         let score: Double
 
+        init(
+            windowID: Int64,
+            name: String,
+            activeTabTitle: String,
+            bounds: CGRect,
+            titleAffinity: Int,
+            geometryDistance: Double
+        ) {
+            self.windowID = windowID
+            self.name = name
+            self.activeTabTitle = activeTabTitle
+            self.bounds = bounds
+            self.titleAffinity = titleAffinity
+            self.geometryDistance = geometryDistance
+            matchedTitle = titleAffinity == 0
+            matchedGeometry = geometryDistance <= RuntimeChromeWindowFocusBridge.candidateGeometryMatchThreshold
+            score = Double(titleAffinity * 1000) + geometryDistance
+        }
+
+        var hasStrongSignals: Bool {
+            matchedTitle
+                && geometryDistance <= RuntimeChromeWindowFocusBridge.strongCandidateGeometryMatchThreshold
+        }
+
         var logDescription: String {
-            "\(windowID):score=\(String(format: "%.1f", score)):name=\(chromeActivationLogValue(name)):tab=\(chromeActivationLogValue(activeTabTitle)):frame=\(chromeActivationFrameDescription(bounds))"
+            "\(windowID):score=\(String(format: "%.1f", score)):titleAffinity=\(titleAffinity):geometry=\(String(format: "%.1f", geometryDistance)):title=\(matchedTitle ? 1 : 0):frame=\(matchedGeometry ? 1 : 0):name=\(chromeActivationLogValue(name)):tab=\(chromeActivationLogValue(activeTabTitle)):frame=\(chromeActivationFrameDescription(bounds))"
+        }
+    }
+
+    enum CandidateConfidence: String {
+        case singleCandidate
+        case uniqueStrongSignals
+        case separatedScore
+        case targetOrdinalTieBreak
+    }
+
+    enum CandidateDecision: Equatable {
+        case selected(candidate: Candidate, confidence: CandidateConfidence)
+        case ambiguous(candidates: [Candidate], reason: String)
+        case unavailable(reason: String)
+
+        var selectedCandidate: Candidate? {
+            switch self {
+            case let .selected(candidate, _):
+                candidate
+            case .ambiguous, .unavailable:
+                nil
+            }
+        }
+
+        var logDescription: String {
+            switch self {
+            case let .selected(candidate, confidence):
+                "selected:\(candidate.windowID):confidence=\(confidence.rawValue)"
+            case let .ambiguous(candidates, reason):
+                "ambiguous:reason=\(reason):candidates=\(candidates.prefix(5).map(\.logDescription).joined(separator: ","))"
+            case let .unavailable(reason):
+                "unavailable:reason=\(chromeActivationLogValue(reason))"
+            }
         }
     }
 
@@ -33,8 +112,23 @@ struct RuntimeChromeWindowFocusBridge {
         let bounds: CGRect
     }
 
+    private static let supportedBrowserSpecs: [ScriptableBrowserSpec] = [
+        .chrome
+    ]
+
     static func canAttempt(for app: NSRunningApplication) -> Bool {
-        app.bundleIdentifier == "com.google.Chrome"
+        scriptableBrowserSpec(for: app) != nil
+    }
+
+    static func scriptableBrowserSpec(for app: NSRunningApplication) -> ScriptableBrowserSpec? {
+        guard let bundleIdentifier = app.bundleIdentifier else { return nil }
+        return scriptableBrowserSpec(forBundleIdentifier: bundleIdentifier)
+    }
+
+    static func scriptableBrowserSpec(
+        forBundleIdentifier bundleIdentifier: String
+    ) -> ScriptableBrowserSpec? {
+        supportedBrowserSpecs.first { $0.bundleIdentifier == bundleIdentifier }
     }
 
     static func candidates(
@@ -51,7 +145,19 @@ struct RuntimeChromeWindowFocusBridge {
         expectedTitle: String,
         expectedFrame: CGRect?
     ) -> CandidateQuery {
-        let listResult = chromeWindows()
+        candidateQuery(
+            browser: .chrome,
+            expectedTitle: expectedTitle,
+            expectedFrame: expectedFrame
+        )
+    }
+
+    static func candidateQuery(
+        browser: ScriptableBrowserSpec,
+        expectedTitle: String,
+        expectedFrame: CGRect?
+    ) -> CandidateQuery {
+        let listResult = chromeWindows(browser: browser)
         let candidates = listResult.windows
             .compactMap { window -> Candidate? in
                 let titleAffinity = chromeTitleAffinity(
@@ -63,7 +169,7 @@ struct RuntimeChromeWindowFocusBridge {
                     expectedFrame: expectedFrame,
                     chromeBounds: window.bounds
                 )
-                guard titleAffinity <= 1 || geometryDistance <= 220 else {
+                guard titleAffinity <= 1 || geometryDistance <= candidateGeometryMatchThreshold else {
                     return nil
                 }
                 return Candidate(
@@ -71,7 +177,8 @@ struct RuntimeChromeWindowFocusBridge {
                     name: window.name,
                     activeTabTitle: window.activeTabTitle,
                     bounds: window.bounds,
-                    score: Double(titleAffinity * 1000) + geometryDistance
+                    titleAffinity: titleAffinity,
+                    geometryDistance: geometryDistance
                 )
             }
             .sorted { lhs, rhs in
@@ -88,18 +195,14 @@ struct RuntimeChromeWindowFocusBridge {
     }
 
     static func focusWindow(windowID: Int64) -> FocusResult {
-        let script = """
-        tell application id "com.google.Chrome"
-            set targetWindowID to \(windowID)
-            set index of window id targetWindowID to 1
-            activate
-            delay 0.05
-            set index of window id targetWindowID to 1
-            delay 0.05
-            return id of front window as text
-        end tell
-        """
-        let result = execute(script)
+        focusWindow(windowID: windowID, browser: .chrome)
+    }
+
+    static func focusWindow(
+        windowID: Int64,
+        browser: ScriptableBrowserSpec
+    ) -> FocusResult {
+        let result = execute(focusWindowScript(windowID: windowID, browser: browser))
         if let error = result.error {
             return FocusResult(accepted: false, frontWindowID: nil, error: error)
         }
@@ -111,6 +214,50 @@ struct RuntimeChromeWindowFocusBridge {
         )
     }
 
+    static var scriptStatePropagationDelaySecondsForTesting: TimeInterval {
+        scriptStatePropagationDelaySeconds
+    }
+
+    static func focusWindowScriptForTesting(windowID: Int64) -> String {
+        focusWindowScript(windowID: windowID, browser: .chrome)
+    }
+
+    static func focusWindowScriptForTesting(
+        windowID: Int64,
+        bundleIdentifier: String
+    ) -> String? {
+        guard let browser = scriptableBrowserSpec(forBundleIdentifier: bundleIdentifier) else {
+            return nil
+        }
+        return focusWindowScript(windowID: windowID, browser: browser)
+    }
+
+    static func windowListScriptForTesting(bundleIdentifier: String) -> String? {
+        guard let browser = scriptableBrowserSpec(forBundleIdentifier: bundleIdentifier) else {
+            return nil
+        }
+        return windowListScript(browser: browser)
+    }
+
+    private static func focusWindowScript(
+        windowID: Int64,
+        browser: ScriptableBrowserSpec
+    ) -> String {
+        let propagationDelay = chromeScriptDelayLiteral(scriptStatePropagationDelaySeconds)
+        let script = """
+        tell application id "\(browser.appleScriptApplicationID)"
+            set targetWindowID to \(windowID)
+            set index of window id targetWindowID to 1
+            activate
+            delay \(propagationDelay)
+            set index of window id targetWindowID to 1
+            delay \(propagationDelay)
+            return id of front window as text
+        end tell
+        """
+        return script
+    }
+
     static func selectCandidate(
         _ candidates: [Candidate],
         targetCGWindowID: CGWindowID,
@@ -118,45 +265,90 @@ struct RuntimeChromeWindowFocusBridge {
         fallbackFrame: CGRect?,
         currentCGWindows: [RuntimeSnapshotProvider.CGWindowEntry]
     ) -> Candidate? {
-        guard let firstCandidate = candidates.first else { return nil }
-        let bestScore = firstCandidate.score
-        let bestCandidates = candidates.filter { abs($0.score - bestScore) < 0.001 }
-        guard bestCandidates.count > 1 else { return firstCandidate }
-
-        guard
-            let targetIndex = chromeTargetOrdinal(
-                targetCGWindowID: targetCGWindowID,
-                fallbackTitle: fallbackTitle,
-                fallbackFrame: fallbackFrame,
-                currentCGWindows: currentCGWindows
-            ),
-            targetIndex < bestCandidates.count
-        else {
-            return firstCandidate
-        }
-        return bestCandidates[targetIndex]
+        candidateDecision(
+            candidates,
+            targetCGWindowID: targetCGWindowID,
+            fallbackTitle: fallbackTitle,
+            fallbackFrame: fallbackFrame,
+            currentCGWindows: currentCGWindows
+        ).selectedCandidate
     }
 
-    private static func chromeWindows() -> (windows: [ChromeWindow], error: String?) {
-        let script = """
-        set rowSeparator to ASCII character 30
-        set fieldSeparator to ASCII character 31
-        set output to ""
-        tell application id "com.google.Chrome"
-            repeat with chromeWindow in every window
-                set windowBounds to bounds of chromeWindow
-                set output to output & (id of chromeWindow as text) & fieldSeparator
-                set output to output & (name of chromeWindow as text) & fieldSeparator
-                set output to output & (title of active tab of chromeWindow as text) & fieldSeparator
-                set output to output & (item 1 of windowBounds as text) & fieldSeparator
-                set output to output & (item 2 of windowBounds as text) & fieldSeparator
-                set output to output & (item 3 of windowBounds as text) & fieldSeparator
-                set output to output & (item 4 of windowBounds as text) & rowSeparator
-            end repeat
-        end tell
-        return output
-        """
-        let result = execute(script)
+    static func candidateDecision(
+        _ query: CandidateQuery,
+        targetCGWindowID: CGWindowID,
+        fallbackTitle: String,
+        fallbackFrame: CGRect?,
+        currentCGWindows: [RuntimeSnapshotProvider.CGWindowEntry]
+    ) -> CandidateDecision {
+        if let error = query.error {
+            return .unavailable(reason: "candidate-query-error:\(error)")
+        }
+        return candidateDecision(
+            query.candidates,
+            targetCGWindowID: targetCGWindowID,
+            fallbackTitle: fallbackTitle,
+            fallbackFrame: fallbackFrame,
+            currentCGWindows: currentCGWindows
+        )
+    }
+
+    static func candidateDecision(
+        _ candidates: [Candidate],
+        targetCGWindowID: CGWindowID,
+        fallbackTitle: String,
+        fallbackFrame: CGRect?,
+        currentCGWindows: [RuntimeSnapshotProvider.CGWindowEntry]
+    ) -> CandidateDecision {
+        guard let firstCandidate = candidates.first else {
+            return .unavailable(reason: "no-candidates")
+        }
+        guard candidates.count > 1 else {
+            return .selected(candidate: firstCandidate, confidence: .singleCandidate)
+        }
+
+        let strongCandidates = candidates.filter(\.hasStrongSignals)
+        if strongCandidates.count == 1, let candidate = strongCandidates.first {
+            return .selected(candidate: candidate, confidence: .uniqueStrongSignals)
+        }
+
+        let bestScore = firstCandidate.score
+        let bestCandidates = candidates.filter {
+            abs($0.score - bestScore) <= candidateScoreTieTolerance
+        }
+        if bestCandidates.count > 1 {
+            guard
+                let targetIndex = chromeTargetOrdinal(
+                    targetCGWindowID: targetCGWindowID,
+                    fallbackTitle: fallbackTitle,
+                    fallbackFrame: fallbackFrame,
+                    currentCGWindows: currentCGWindows
+                ),
+                targetIndex < bestCandidates.count
+            else {
+                return .ambiguous(candidates: bestCandidates, reason: "score-tie")
+            }
+            return .selected(
+                candidate: bestCandidates[targetIndex],
+                confidence: .targetOrdinalTieBreak
+            )
+        }
+
+        let secondCandidate = candidates[1]
+        guard secondCandidate.score - firstCandidate.score >= candidateMinimumScoreSeparation else {
+            return .ambiguous(
+                candidates: Array(candidates.prefix(2)),
+                reason: "insufficient-score-separation"
+            )
+        }
+
+        return .selected(candidate: firstCandidate, confidence: .separatedScore)
+    }
+
+    private static func chromeWindows(
+        browser: ScriptableBrowserSpec
+    ) -> (windows: [ChromeWindow], error: String?) {
+        let result = execute(windowListScript(browser: browser))
         guard result.error == nil else {
             return ([], result.error)
         }
@@ -196,6 +388,28 @@ struct RuntimeChromeWindowFocusBridge {
         return (windows, nil)
     }
 
+    private static func windowListScript(browser: ScriptableBrowserSpec) -> String {
+        let script = """
+        set rowSeparator to ASCII character 30
+        set fieldSeparator to ASCII character 31
+        set output to ""
+        tell application id "\(browser.appleScriptApplicationID)"
+            repeat with chromeWindow in every window
+                set windowBounds to bounds of chromeWindow
+                set output to output & (id of chromeWindow as text) & fieldSeparator
+                set output to output & (name of chromeWindow as text) & fieldSeparator
+                set output to output & (title of active tab of chromeWindow as text) & fieldSeparator
+                set output to output & (item 1 of windowBounds as text) & fieldSeparator
+                set output to output & (item 2 of windowBounds as text) & fieldSeparator
+                set output to output & (item 3 of windowBounds as text) & fieldSeparator
+                set output to output & (item 4 of windowBounds as text) & rowSeparator
+            end repeat
+        end tell
+        return output
+        """
+        return script
+    }
+
     private static func execute(_ source: String) -> (value: String?, error: String?) {
         guard let script = NSAppleScript(source: source) else {
             return (nil, "compile-failed")
@@ -206,6 +420,10 @@ struct RuntimeChromeWindowFocusBridge {
             return (nil, String(describing: errorInfo))
         }
         return (descriptor.stringValue, nil)
+    }
+
+    private static func chromeScriptDelayLiteral(_ value: TimeInterval) -> String {
+        String(format: "%.2f", value)
     }
 
     private static func chromeTitleAffinity(

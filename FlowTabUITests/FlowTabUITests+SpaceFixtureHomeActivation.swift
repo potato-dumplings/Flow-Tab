@@ -59,7 +59,11 @@ extension FlowTabUITests {
         let prefix = "flowtab.home.window.cg-"
         guard identifier.hasPrefix(prefix) else { return nil }
 
-        let tokens = identifier.dropFirst(prefix.count).split(separator: "-")
+        let readableComponent = identifier
+            .dropFirst(prefix.count)
+            .split(separator: ".id-", maxSplits: 1)
+            .first
+        let tokens = readableComponent?.split(separator: "-") ?? []
         guard let windowNumberToken = tokens.last,
               let windowNumber = UInt32(windowNumberToken)
         else {

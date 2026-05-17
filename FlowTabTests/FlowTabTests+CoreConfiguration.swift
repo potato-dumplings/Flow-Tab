@@ -237,6 +237,40 @@ extension FlowTabTests {
         }
     }
 
+    func testFlowTabTestLaunchOptionsIgnoreUITestArgumentsWithoutEnvironmentSentinel() {
+        withLaunchArgumentsForTesting(
+            [
+                "FlowTab",
+                "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-open-switcher-search",
+                "--flowtab-ui-ax-trusted", "true",
+                "--flowtab-ui-screen-trusted", "false",
+                "--flowtab-ui-seed-logs", "7"
+            ],
+            environment: [:]
+        ) {
+            XCTAssertFalse(FlowTabTestLaunchOptions.isRunningUITests)
+            XCTAssertFalse(FlowTabTestLaunchOptions.usesMockRuntimeSnapshot)
+            XCTAssertFalse(FlowTabTestLaunchOptions.resetsUserDefaultsOnLaunch)
+            XCTAssertFalse(FlowTabTestLaunchOptions.opensSwitcherOnLaunch)
+            XCTAssertFalse(FlowTabTestLaunchOptions.entersSearchOnLaunch)
+            XCTAssertNil(FlowTabTestLaunchOptions.accessibilityTrustedOverride)
+            XCTAssertNil(FlowTabTestLaunchOptions.screenCaptureTrustedOverride)
+            XCTAssertNil(FlowTabTestLaunchOptions.seededLogCount)
+        }
+
+        withLaunchArgumentsForTesting(
+            ["FlowTab", "--flowtab-ui-unknown"],
+            environment: [
+                FlowTabTestLaunchOptions.uiTestingEnvironmentKey:
+                    FlowTabTestLaunchOptions.uiTestingEnvironmentValue
+            ]
+        ) {
+            XCTAssertFalse(FlowTabTestLaunchOptions.isRunningUITests)
+        }
+    }
+
     func testPermissionCheckersRespectLaunchOptionOverrides() {
         let previousAXTrusted = AccessibilityPermissionChecker.isTrustedOverrideForTesting
         let previousAXRequest = AccessibilityPermissionChecker.requestPermissionOverrideForTesting
@@ -598,7 +632,8 @@ extension FlowTabTests {
                     isMinimized: false,
                     cgWindowID: nil,
                     inferredTitleBarStyle: nil,
-                    axWindow: liveHandle
+                    axWindow: liveHandle,
+                    lastConfirmationSource: .publicExactMatch
                 )
             ]
         )

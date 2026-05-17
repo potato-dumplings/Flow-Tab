@@ -58,6 +58,33 @@ struct RuntimeWindowRecord {
         lastExactAXWindowID != nil || lastExactAXWindow != nil || lastConfirmationSource != nil
     }
 
+    var bindingConfidence: WindowBindingConfidence {
+        if let lastConfirmationSource {
+            return lastConfirmationSource.bindingConfidence
+        }
+        if hasStickyBinding {
+            return .sticky
+        }
+        return .provisional
+    }
+
+    var bindingAllowedActions: Set<WindowBindingAction> {
+        bindingConfidence.allowedActions
+    }
+
+    var bindingDiagnostic: WindowBindingDiagnostic {
+        WindowBindingDiagnostic(
+            stableWindowID: stableWindowID,
+            axWindowID: currentAXWindowID ?? lastExactAXWindowID,
+            cgWindowID: cgWindowID,
+            confidence: bindingConfidence,
+            source: lastConfirmationSource,
+            reason: nil,
+            candidateCount: 1,
+            allowedActions: bindingAllowedActions
+        )
+    }
+
     var hasCurrentActivationHandle: Bool {
         currentAXAttachment != nil
     }
@@ -124,6 +151,8 @@ struct RuntimeWindowRecord {
         observedAt: TimeInterval,
         matchedCGWindow: RuntimeSnapshotProvider.CGWindowEntry?
     ) {
+        let previousSource = lastConfirmationSource
+        let previousConfidence = bindingConfidence
         if let matchedCGWindow {
             refreshCGState(from: matchedCGWindow, observedAt: observedAt)
         } else {
@@ -137,11 +166,28 @@ struct RuntimeWindowRecord {
             frame: axWindow.frame,
             isMinimized: axWindow.isMinimized
         )
-        lastExactAXWindowID = axWindow.id
-        lastExactAXWindow = axWindow.window
         lastKnownDisplayTitle = currentAXAttachment?.title ?? lastKnownDisplayTitle
         lastConfirmationSource = confirmationSource
-        lastExactConfirmedAt = observedAt
+        let allowsStickyHistoryUpdate = confirmationSource.bindingConfidence
+            .allowedActions
+            .contains(.updateStickyHistory)
+        if allowsStickyHistoryUpdate {
+            lastExactAXWindowID = axWindow.id
+            lastExactAXWindow = axWindow.window
+            lastExactConfirmedAt = observedAt
+        } else {
+            RuntimeLog.debug(
+                .axMatch,
+                "sticky-history-update skipped windowID=\(stableWindowID) cg=\(cgWindowID) ax=\(axWindow.id) source=\(confirmationSource.rawValue) confidence=\(confirmationSource.bindingConfidence.rawValue)"
+            )
+        }
+        let currentConfidence = bindingConfidence
+        if previousSource != confirmationSource || previousConfidence != currentConfidence {
+            RuntimeLog.debug(
+                .axMatch,
+                "binding-confidence-change windowID=\(stableWindowID) cg=\(cgWindowID) ax=\(axWindow.id) confidence=\(previousConfidence.rawValue)->\(currentConfidence.rawValue) source=\(previousSource?.rawValue ?? "none")->\(confirmationSource.rawValue)"
+            )
+        }
     }
 
     func synthesizedKnownCGWindowEntry() -> RuntimeSnapshotProvider.CGWindowEntry? {

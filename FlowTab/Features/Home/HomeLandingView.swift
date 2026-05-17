@@ -204,7 +204,7 @@ struct HomeLandingView: View {
                     LazyVStack(spacing: 8) {
                         ForEach(presentedAppSummaries) { app in
                             let isHidden = appVisibilityPresentation.isHidden(appID: app.appID)
-                            let appIDSlug = app.appID.flowTabAccessibilitySlug
+                            let appIDComponent = app.appID.flowTabAccessibilityIdentifierComponent
                             let hiddenBadge = isHidden
                                 ? AppStrings.text(.homeAppNotShownBadge, language: appLanguage)
                                 : nil
@@ -217,13 +217,13 @@ struct HomeLandingView: View {
                                     trailing: "\(app.windowCount)w",
                                     badge: hiddenBadge,
                                     badgeAccessibilityIdentifier: isHidden
-                                        ? "flowtab.home.app.hidden-badge.\(appIDSlug)"
+                                        ? "flowtab.home.app.hidden-badge.\(appIDComponent)"
                                         : nil,
                                     isSelected: app.appID == currentSelectedAppID
                                 )
                             }
                             .buttonStyle(.plain)
-                            .accessibilityIdentifier("flowtab.home.app.\(appIDSlug)")
+                            .accessibilityIdentifier("flowtab.home.app.\(appIDComponent)")
                             .accessibilityLabel(hiddenBadge.map { "\(app.displayName) \($0)" } ?? app.displayName)
                             .accessibilityValue(isHidden ? "\(app.windowCount)w hidden" : "\(app.windowCount)w")
                         }
@@ -269,7 +269,7 @@ struct HomeLandingView: View {
                                 title: windowTitle(window.title, index: index),
                                 trailing: windowIdentifier(window.id),
                                 isSelected: index == 0,
-                                accessibilityIdentifier: "flowtab.home.window.\(window.id.flowTabAccessibilitySlug)"
+                                accessibilityIdentifier: "flowtab.home.window.\(window.id.flowTabAccessibilityIdentifierComponent)"
                             ) {
                                 activateWindow(activeApp.appID, windowID: window.id)
                             }

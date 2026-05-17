@@ -11,6 +11,44 @@ struct RuntimeFocusedWindowIdentity {
     let frame: CGRect?
 }
 
+struct TerminateRefreshPollingDiagnostic: Equatable {
+    enum Action: String, Equatable {
+        case refresh
+        case timeout
+        case canceled
+    }
+
+    enum ProcessState: String, Equatable {
+        case running
+        case exited
+        case unknown
+    }
+
+    let appID: String
+    let pid: pid_t
+    let appInstanceGeneration: UInt64
+    let attempt: Int
+    let maxAttempts: Int
+    let elapsedMs: Double
+    let finalProcessState: ProcessState
+    let reason: String
+    let action: Action
+
+    var logMessage: String {
+        [
+            "terminate poll",
+            "action=\(action.rawValue)",
+            "reason=\(reason)",
+            "appID=\(appID)",
+            "pid=\(pid)",
+            "appInstanceGeneration=\(appInstanceGeneration)",
+            "attempt=\(attempt)/\(maxAttempts)",
+            "elapsedMs=\(String(format: "%.3f", elapsedMs))",
+            "finalProcessState=\(finalProcessState.rawValue)"
+        ].joined(separator: " ")
+    }
+}
+
 @MainActor
 final class LiveSwitcherModel: ObservableObject {
     enum TerminateSelectedAppResult {
@@ -20,12 +58,123 @@ final class LiveSwitcherModel: ObservableObject {
     }
 
     struct PendingTerminateRequest: Equatable {
-        let appID: String
-        let pid: pid_t
+        struct AppInstanceIdentity: Equatable {
+            let appID: String
+            let pid: pid_t
+            let generation: UInt64
+
+            func matchesTerminatedInstance(appID: String, pid: pid_t) -> Bool {
+                self.appID == appID && self.pid == pid
+            }
+        }
+
+        let appInstance: AppInstanceIdentity
         let preferredSelectedAppID: String?
 
-        func matches(appID: String, pid: pid_t) -> Bool {
-            self.pid == pid || self.appID == appID
+        var appID: String {
+            appInstance.appID
+        }
+
+        var pid: pid_t {
+            appInstance.pid
+        }
+
+        var generation: UInt64 {
+            appInstance.generation
+        }
+
+        init(
+            appID: String,
+            pid: pid_t,
+            generation: UInt64,
+            preferredSelectedAppID: String?
+        ) {
+            appInstance = AppInstanceIdentity(
+                appID: appID,
+                pid: pid,
+                generation: generation
+            )
+            self.preferredSelectedAppID = preferredSelectedAppID
+        }
+
+        func matchesTerminatedInstance(appID: String, pid: pid_t) -> Bool {
+            appInstance.matchesTerminatedInstance(appID: appID, pid: pid)
+        }
+    }
+
+    struct BackgroundFullSnapshotRefreshRequest {
+        let triggerDirection: CycleDirection
+        let generation: UInt64
+        let scheduledMs: Double
+        let reason: SnapshotInvalidationReason
+
+        init(
+            triggerDirection: CycleDirection,
+            generation: UInt64,
+            scheduledMs: Double,
+            reason: SnapshotInvalidationReason = .startSession
+        ) {
+            self.triggerDirection = triggerDirection
+            self.generation = generation
+            self.scheduledMs = scheduledMs
+            self.reason = reason
+        }
+    }
+
+    enum SnapshotInvalidationReason: String, Equatable {
+        case startSession
+        case startFocusedWindowSession
+        case commitSelection
+        case resetSession
+        case resetRuntimeState
+        case explicitBackgroundRefreshInvalidation
+        case explicitSelectedAppWindowInvalidation
+    }
+
+    enum SnapshotInvalidationScope: String, Equatable {
+        case backgroundFullSnapshot
+        case selectedAppWindowSnapshot
+    }
+
+    struct SnapshotInvalidationRecord: Equatable {
+        let reason: SnapshotInvalidationReason
+        let scope: SnapshotInvalidationScope
+        let backgroundGeneration: UInt64
+        let selectedAppWindowGeneration: UInt64
+        let clearedDeferredBackgroundRequest: Bool
+
+        var logMessage: String {
+            [
+                "snapshotInvalidation",
+                "scope=\(scope.rawValue)",
+                "reason=\(reason.rawValue)",
+                "backgroundGeneration=\(backgroundGeneration)",
+                "selectedAppWindowGeneration=\(selectedAppWindowGeneration)",
+                "clearedDeferredBackgroundRequest=\(clearedDeferredBackgroundRequest ? 1 : 0)"
+            ].joined(separator: " ")
+        }
+    }
+
+    struct BackgroundFullSnapshotRefreshDiagnostic: Equatable {
+        let result: String
+        let generation: UInt64
+        let currentGeneration: UInt64
+        let reason: SnapshotInvalidationReason
+        let trigger: String
+        let applyGeneration: UInt64?
+        let totalMs: String
+
+        var logMessage: String {
+            [
+                "backgroundFullSnapshotRefresh",
+                "result=\(result)",
+                "generation=\(generation)",
+                "currentGeneration=\(currentGeneration)",
+                "reason=\(reason.rawValue)",
+                "trigger=\(trigger)",
+                "applyGeneration=\(applyGeneration.map(String.init) ?? "nil")",
+                "totalMs=\(totalMs)"
+            ].joined(separator: " ")
         }
     }
 
@@ -87,6 +236,9 @@ final class LiveSwitcherModel: ObservableObject {
     var previewCaptureBatchOverride: ((
         [RuntimeWindowPreviewProvider.CaptureRequest]
     ) -> [RuntimeWindowPreviewProvider.CaptureResult?])?
+    var previewCaptureBatchOutcomeOverride: ((
+        [RuntimeWindowPreviewProvider.CaptureRequest]
+    ) -> [RuntimeWindowPreviewProvider.CaptureOutcome])?
     var terminateRefreshPollIntervalNs: UInt64 = 60_000_000
     var terminateRefreshTimeoutNs: UInt64 = 1_800_000_000
 
@@ -96,6 +248,7 @@ final class LiveSwitcherModel: ObservableObject {
     var previewCaptureAttemptedKeys: Set<String> = []
     var previewCaptureFailedKeys: Set<String> = []
     var previewCaptureInFlightKeys: Set<String> = []
+    var previewCaptureStatesByKey: [String: PreviewCaptureState] = [:]
     var previewImageReadyLoggedKeys: Set<String> = []
     var previewSessionPinnedKeys: Set<String> = []
     var previewSessionPinnedImagesByKey: [String: NSImage] = [:]
@@ -110,10 +263,16 @@ final class LiveSwitcherModel: ObservableObject {
     var pendingSearchComputationTask: Task<Void, Never>?
     var pendingTerminateRefreshTask: Task<Void, Never>?
     var pendingTerminateRequest: PendingTerminateRequest?
+    var lastTerminateRefreshPollingDiagnostic: TerminateRefreshPollingDiagnostic?
+    var terminateAppInstanceGeneration: UInt64 = 0
     var backgroundFullSnapshotRefreshGeneration: UInt64 = 0
     var backgroundFullSnapshotRefreshEnabled = true
+    var backgroundFullSnapshotRefreshDelay: DispatchTimeInterval = .milliseconds(150)
+    var deferredBackgroundFullSnapshotRefreshRequest: BackgroundFullSnapshotRefreshRequest?
     var selectedAppWindowSnapshotGeneration: UInt64 = 0
     var selectedAppWindowSnapshotPendingAppID: String?
+    var lastSnapshotInvalidationRecord: SnapshotInvalidationRecord?
+    var lastBackgroundFullSnapshotRefreshDiagnostic: BackgroundFullSnapshotRefreshDiagnostic?
     var searchComputationRevision: UInt64 = 0
     var searchDebounceNanoseconds: UInt64 = 20_000_000
 
@@ -123,14 +282,15 @@ final class LiveSwitcherModel: ObservableObject {
     ) {
         self.windowRecencyTracker = windowRecencyTracker
         runtimeSnapshotService = snapshotService
-        activator.windowFocusVerifiedHandler = { [windowRecencyTracker] appID, windowID, ownerPID, cgWindowID, title, frame in
-            windowRecencyTracker.record(
+        activator.windowFocusVerifiedHandler = { [windowRecencyTracker] appID, windowID, ownerPID, cgWindowID, title, frame, allowedActions in
+            windowRecencyTracker.recordVerifiedFocus(
                 appID: appID,
                 windowID: windowID,
                 ownerPID: ownerPID,
                 cgWindowID: cgWindowID,
                 title: title,
-                frame: frame
+                frame: frame,
+                allowedActions: allowedActions
             )
         }
     }
@@ -215,7 +375,7 @@ final class LiveSwitcherModel: ObservableObject {
 
     func startSession(triggerDirection: CycleDirection) -> Bool {
         cancelPendingTerminateRefresh()
-        invalidateSelectedAppWindowSnapshot()
+        invalidateSelectedAppWindowSnapshot(reason: .startSession)
         clearTerminateSelectedAppAnimation()
         overlayStyle = .appAndWindow
         titleBarStyleInferenceEnabled = false
@@ -229,7 +389,7 @@ final class LiveSwitcherModel: ObservableObject {
     func startFocusedAppWindowSession(triggerDirection: CycleDirection) -> Bool {
         let startMs = Self.monotonicMilliseconds()
         cancelPendingTerminateRefresh()
-        invalidateSelectedAppWindowSnapshot()
+        invalidateSelectedAppWindowSnapshot(reason: .startFocusedWindowSession)
         clearTerminateSelectedAppAnimation()
         overlayStyle = .windowOnly
         titleBarStyleInferenceEnabled = true
@@ -258,9 +418,16 @@ final class LiveSwitcherModel: ObservableObject {
                 processIdentifier: frontmostApp.processIdentifier
             )
             snapshotReadMs = Self.monotonicMilliseconds()
-            recencyAppliedMs = snapshotReadMs
-            resolvedAppCandidate = focusedSnapshot?.candidate
-            resolvedContext = focusedSnapshot?.context
+            let snapshot = focusedSnapshot.map {
+                homeSnapshotWithWindowRecencyApplied(
+                    $0,
+                    appID: frontmostAppID,
+                    frontmostApp: frontmostApp
+                )
+            }
+            recencyAppliedMs = Self.monotonicMilliseconds()
+            resolvedAppCandidate = snapshot?.candidate
+            resolvedContext = snapshot?.context
         }
 
         guard let appCandidate = resolvedAppCandidate, let context = resolvedContext else {
@@ -357,9 +524,11 @@ final class LiveSwitcherModel: ObservableObject {
         }
         RuntimeLog.info(.session, terminateLogMessage)
 
+        terminateAppInstanceGeneration &+= 1
         let request = PendingTerminateRequest(
             appID: selectedApp.id,
             pid: terminatingPID,
+            generation: terminateAppInstanceGeneration,
             preferredSelectedAppID: preferredSelectedAppID
         )
         pendingTerminateRequest = request
@@ -371,15 +540,57 @@ final class LiveSwitcherModel: ObservableObject {
     func schedulePostTerminateRefresh(for request: PendingTerminateRequest) {
         cancelPendingTerminateRefresh()
         let maxAttempts = max(1, Int(terminateRefreshTimeoutNs / terminateRefreshPollIntervalNs))
+        let startMs = Self.monotonicMilliseconds()
         pendingTerminateRefreshTask = Task { @MainActor [weak self] in
             guard let self else { return }
-            for _ in 0..<maxAttempts {
+            guard self.session != nil, self.pendingTerminateRequest == request else {
+                self.recordTerminateRefreshPollingDiagnostic(
+                    request: request,
+                    attempt: 0,
+                    maxAttempts: maxAttempts,
+                    startMs: startMs,
+                    finalProcessState: .unknown,
+                    reason: "request_stale",
+                    action: .canceled
+                )
+                self.pendingTerminateRefreshTask = nil
+                return
+            }
+            if !self.isProcessRunning(request.pid) {
+                self.recordTerminateRefreshPollingDiagnostic(
+                    request: request,
+                    attempt: 0,
+                    maxAttempts: maxAttempts,
+                    startMs: startMs,
+                    finalProcessState: .exited,
+                    reason: "initial_process_check",
+                    action: .refresh
+                )
+                self.refreshSessionAfterTerminatedApplication(
+                    appID: request.appID,
+                    pid: request.pid,
+                    reason: "initial_process_check"
+                )
+                self.pendingTerminateRefreshTask = nil
+                return
+            }
+
+            for attempt in 1...maxAttempts {
                 try? await Task.sleep(nanoseconds: self.terminateRefreshPollIntervalNs)
                 guard !Task.isCancelled else { return }
                 guard self.session != nil else { break }
                 guard self.pendingTerminateRequest == request else { break }
 
                 guard !self.isProcessRunning(request.pid) else { continue }
+                self.recordTerminateRefreshPollingDiagnostic(
+                    request: request,
+                    attempt: attempt,
+                    maxAttempts: maxAttempts,
+                    startMs: startMs,
+                    finalProcessState: .exited,
+                    reason: "poll",
+                    action: .refresh
+                )
                 self.refreshSessionAfterTerminatedApplication(
                     appID: request.appID,
                     pid: request.pid,
@@ -390,10 +601,28 @@ final class LiveSwitcherModel: ObservableObject {
             }
 
             guard self.pendingTerminateRequest == request else {
+                self.recordTerminateRefreshPollingDiagnostic(
+                    request: request,
+                    attempt: maxAttempts,
+                    maxAttempts: maxAttempts,
+                    startMs: startMs,
+                    finalProcessState: .unknown,
+                    reason: "request_changed",
+                    action: .canceled
+                )
                 self.pendingTerminateRefreshTask = nil
                 return
             }
             if !self.isProcessRunning(request.pid) {
+                self.recordTerminateRefreshPollingDiagnostic(
+                    request: request,
+                    attempt: maxAttempts,
+                    maxAttempts: maxAttempts,
+                    startMs: startMs,
+                    finalProcessState: .exited,
+                    reason: "poll_timeout_final_check",
+                    action: .refresh
+                )
                 self.refreshSessionAfterTerminatedApplication(
                     appID: request.appID,
                     pid: request.pid,
@@ -402,15 +631,48 @@ final class LiveSwitcherModel: ObservableObject {
                 self.pendingTerminateRefreshTask = nil
                 return
             }
-            RuntimeLog.error(
-                .session,
-                "terminate post-refresh timeout appID=\(request.appID) pid=\(request.pid)"
+            self.recordTerminateRefreshPollingDiagnostic(
+                request: request,
+                attempt: maxAttempts,
+                maxAttempts: maxAttempts,
+                startMs: startMs,
+                finalProcessState: .running,
+                reason: "timeout",
+                action: .timeout
             )
             self.pendingTerminateRequest = nil
             if self.terminatingAppID == request.appID {
                 self.terminatingAppID = nil
             }
             self.pendingTerminateRefreshTask = nil
+        }
+    }
+
+    func recordTerminateRefreshPollingDiagnostic(
+        request: PendingTerminateRequest,
+        attempt: Int,
+        maxAttempts: Int,
+        startMs: Double,
+        finalProcessState: TerminateRefreshPollingDiagnostic.ProcessState,
+        reason: String,
+        action: TerminateRefreshPollingDiagnostic.Action
+    ) {
+        let diagnostic = TerminateRefreshPollingDiagnostic(
+            appID: request.appID,
+            pid: request.pid,
+            appInstanceGeneration: request.generation,
+            attempt: attempt,
+            maxAttempts: maxAttempts,
+            elapsedMs: max(0, Self.monotonicMilliseconds() - startMs),
+            finalProcessState: finalProcessState,
+            reason: reason,
+            action: action
+        )
+        lastTerminateRefreshPollingDiagnostic = diagnostic
+        if action == .timeout {
+            RuntimeLog.error(.session, diagnostic.logMessage)
+        } else {
+            RuntimeLog.info(.session, diagnostic.logMessage)
         }
     }
 
@@ -452,7 +714,7 @@ final class LiveSwitcherModel: ObservableObject {
         guard session != nil else { return false }
 
         let pendingRequest = pendingTerminateRequest
-        let matchesPending = pendingRequest?.matches(appID: appID, pid: pid) == true
+        let matchesPending = pendingRequest?.matchesTerminatedInstance(appID: appID, pid: pid) == true
         let appPresentInSessionByID = session?.apps.contains(where: { $0.id == appID }) == true
         let appPresentInSessionByPID = runtimeContextsByID.values.contains {
             $0.runningApp.processIdentifier == pid
@@ -466,13 +728,13 @@ final class LiveSwitcherModel: ObservableObject {
         }
         let refreshed = loadSnapshot(
             triggerDirection: .forward,
-            preferredSelectedAppID: pendingRequest?.preferredSelectedAppID,
+            preferredSelectedAppID: matchesPending ? pendingRequest?.preferredSelectedAppID : nil,
             animateAppStripUpdate: true,
             preserveSearchState: searchViewState.isActive
         )
         RuntimeLog.info(
             .session,
-            "terminate post-refresh reason=\(reason) appID=\(appID) pid=\(pid) refreshed=\(refreshed)"
+            "terminate post-refresh reason=\(reason) appID=\(appID) pid=\(pid) matchedPending=\(matchesPending ? 1 : 0) pendingGeneration=\(pendingRequest?.generation.description ?? "nil") refreshed=\(refreshed)"
         )
         if matchesPending, let pendingRequest, terminatingAppID == pendingRequest.appID {
             terminatingAppID = nil
@@ -557,7 +819,7 @@ final class LiveSwitcherModel: ObservableObject {
         guard var session else { return }
         let target = session.commitSelection()
         rememberedWindowIDByAppID = session.rememberedWindowIDByAppID
-        invalidateBackgroundFullSnapshotRefresh()
+        invalidateBackgroundFullSnapshotRefresh(reason: .commitSelection)
         cancelPendingTerminateRefresh()
         clearTerminateSelectedAppAnimation()
         cancelPendingSearchComputation()
@@ -584,7 +846,7 @@ final class LiveSwitcherModel: ObservableObject {
     }
 
     func resetSessionState() {
-        invalidateBackgroundFullSnapshotRefresh()
+        invalidateBackgroundFullSnapshotRefresh(reason: .resetSession)
         cancelPendingTerminateRefresh()
         cancelPendingSearchComputation()
         session = nil
@@ -597,7 +859,7 @@ final class LiveSwitcherModel: ObservableObject {
     }
 
     func resetRuntimeState() {
-        invalidateSelectedAppWindowSnapshot()
+        invalidateSelectedAppWindowSnapshot(reason: .resetRuntimeState)
         runtimeContextsByID = [:]
         clearPreviewSnapshotState()
         autoEnterSuppressedAppID = nil
@@ -620,6 +882,20 @@ final class LiveSwitcherModel: ObservableObject {
         return windowRecencyTracker.snapshotWithRecencyApplied(snapshot)
     }
 
+    private func homeSnapshotWithWindowRecencyApplied(
+        _ snapshot: RuntimeHomeAppSnapshot,
+        appID: String,
+        frontmostApp: NSRunningApplication
+    ) -> RuntimeHomeAppSnapshot {
+        recordFrontmostFocusedWindowRecency(
+            appID: appID,
+            app: snapshot.candidate,
+            context: snapshot.context,
+            runningApp: frontmostApp
+        )
+        return windowRecencyTracker.homeSnapshotWithRecencyApplied(snapshot)
+    }
+
     private func recordFrontmostFocusedWindowRecency(in snapshot: RuntimeSnapshot) {
         guard let frontmostApp = resolveFrontmostApplication() else { return }
         let frontmostAppID = frontmostApp.bundleIdentifier
@@ -630,18 +906,32 @@ final class LiveSwitcherModel: ObservableObject {
         else {
             return
         }
-        let focusedWindowID = focusedWindowIDForWindowSession(
+        recordFrontmostFocusedWindowRecency(
+            appID: frontmostAppID,
             app: app,
             context: context,
             runningApp: frontmostApp
+        )
+    }
+
+    private func recordFrontmostFocusedWindowRecency(
+        appID: String,
+        app: AppSwitchCandidate,
+        context: RuntimeAppContext,
+        runningApp: NSRunningApplication
+    ) {
+        let focusedWindowID = focusedWindowIDForWindowSession(
+            app: app,
+            context: context,
+            runningApp: runningApp
         ) ?? frontmostRuntimeWindowIDForWindowSession(
-            frontmostApp: frontmostApp,
+            frontmostApp: runningApp,
             app: app,
             context: context
         )
         guard let focusedWindowID else { return }
-        windowRecencyTracker.record(
-            appID: frontmostAppID,
+        windowRecencyTracker.recordVerifiedFocus(
+            appID: appID,
             windowID: focusedWindowID,
             context: context
         )
@@ -728,20 +1018,13 @@ final class LiveSwitcherModel: ObservableObject {
         }
 
         let appElement = AXUIElementCreateApplication(app.processIdentifier)
-        var focusedWindowValue: CFTypeRef?
-        guard
-            AXUIElementCopyAttributeValue(
-                appElement,
-                kAXFocusedWindowAttribute as CFString,
-                &focusedWindowValue
-            ) == .success,
-            let rawFocusedWindow = focusedWindowValue,
-            CFGetTypeID(rawFocusedWindow) == AXUIElementGetTypeID()
-        else {
+        guard case .success(let focusedWindow) = AXTypedAttributeReader.elementAttribute(
+            appElement,
+            kAXFocusedWindowAttribute as CFString
+        ) else {
             return nil
         }
 
-        let focusedWindow = unsafeBitCast(rawFocusedWindow, to: AXUIElement.self)
         return RuntimeFocusedWindowIdentity(
             cgWindowID: AXWindowInspector.cgWindowID(for: focusedWindow),
             title: AXWindowInspector.title(for: focusedWindow),

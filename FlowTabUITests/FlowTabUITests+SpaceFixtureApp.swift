@@ -14,15 +14,15 @@ struct SpaceFixtureAppIdentity: Equatable {
     let appURL: URL?
 
     var homeAppAccessibilityIdentifier: String {
-        "flowtab.home.app.\(bundleIdentifier.spaceFixtureAccessibilitySlug)"
+        "flowtab.home.app.\(bundleIdentifier.flowTabUITestAccessibilityIdentifierComponent)"
     }
 
     var switcherAppAccessibilityIdentifier: String {
-        "flowtab.switcher.app.\(bundleIdentifier.spaceFixtureAccessibilitySlug)"
+        "flowtab.switcher.app.\(bundleIdentifier.flowTabUITestAccessibilityIdentifierComponent)"
     }
 
     var switcherSearchAppAccessibilityIdentifier: String {
-        "flowtab.switcher.search.app.\(bundleIdentifier.spaceFixtureAccessibilitySlug)"
+        "flowtab.switcher.search.app.\(bundleIdentifier.flowTabUITestAccessibilityIdentifierComponent)"
     }
 
     var switcherSearchQuery: String {
@@ -70,17 +70,6 @@ private extension String {
         trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    var spaceFixtureAccessibilitySlug: String {
-        let replaced = trimmedSpaceFixtureValue
-            .lowercased()
-            .replacingOccurrences(
-                of: #"[^a-z0-9]+"#,
-                with: "-",
-                options: .regularExpression
-            )
-            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
-        return replaced.isEmpty ? "item" : replaced
-    }
 }
 
 extension FlowTabUITests {
@@ -286,7 +275,7 @@ extension FlowTabUITests {
         XCTAssertEqual(identity.bundleIdentifier, "com.example.chrome.fixture")
         XCTAssertEqual(
             identity.homeAppAccessibilityIdentifier,
-            "flowtab.home.app.com-example-chrome-fixture"
+            "flowtab.home.app.\("com.example.chrome.fixture".flowTabUITestAccessibilityIdentifierComponent)"
         )
     }
 
@@ -297,7 +286,7 @@ extension FlowTabUITests {
         XCTAssertEqual(identity.bundleIdentifier, SpaceFixtureAppIdentity.defaultBundleIdentifier)
         XCTAssertEqual(
             identity.homeAppAccessibilityIdentifier,
-            "flowtab.home.app.io-github-potato-dumplings-flowtab-spacefixture"
+            "flowtab.home.app.\(SpaceFixtureAppIdentity.defaultBundleIdentifier.flowTabUITestAccessibilityIdentifierComponent)"
         )
     }
 

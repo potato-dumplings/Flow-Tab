@@ -215,18 +215,19 @@ runtime snapshot 和诊断输出仍保留 runtime 自身的 presentation order�
    global app switcher 里选择 B app，A app 的当前 focused window 不会污染 B app。
 5. 没有可靠 recency 记录时，才回退到当前 runtime snapshot 的 presentation order。
 
-相关回归覆盖在 `FlowTabPriorityCoverageTests+SessionAndPanelSearch.swift` 和
-`FlowTabPriorityCoverageTests+WindowRecency.swift`，Home 的候选列表排序另由
-`FlowTabTests+HomeWindowActivation.swift` 和
+相关低层回归覆盖在 `FlowTabPriorityCoverageTests+WindowRecency.swift`，真实
+Chrome-like Noisy 拓扑由 `FlowTabUITests+SpaceFixtureInAppWindowSwitcher.swift`
+里的 `space-fixture-control-tab-noisy-cg-siblings-workflow.json` 工作流覆盖。
+Home 的候选列表排序另由 `FlowTabTests+HomeWindowActivation.swift` 和
 `FlowTabUITests+HomeAndLogs.swift` 覆盖：
 
-- `testLiveSwitcherModelStartFocusedAppWindowSessionSelectsFocusedWindowIdentityOverWindowOrdering`
 - `testLiveSwitcherModelGlobalSnapshotRecencyUsesOnlySelectedAppsOwnWindowEvidence`
 - `testRuntimeWindowRecencyTrackerAppliesSameOrderingToHomeSnapshots`
 - `testHomeRuntimeSnapshotServiceAppliesWindowRecencyToHomeCandidates`
 - `testHomeWindowListUsesSeededWindowRecency`
 - `testLiveSwitcherModelRecordsFrontmostRuntimeWindowWhenAXFocusedWindowUnavailable`
 - `testRuntimeWindowRecencyTrackerOrdersRecordedWindowsBeforeFallbackInRecencyOrder`
+- `testInAppWindowSwitcherControlTabRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithNoisyCGSiblingsWithoutAppAXWindows`
 
 ## 必须证明的 Round Trip
 
@@ -335,7 +336,8 @@ menu 只适用于部分 app 和部分菜单结构。它们不能证明 FlowTab �
   -only-testing:FlowTabTests/FlowTabPriorityCoverageTests/testRuntimeSnapshotProviderWindowListFiltersFullscreenSiblingArtifactsAroundNoisyWindows \
   -only-testing:FlowTabTests/FlowTabPriorityCoverageTests/testRuntimeSnapshotProviderWindowListOrdersOnscreenWindowsByCGZOrderInFullscreenTopology \
   -only-testing:FlowTabTests/FlowTabPriorityCoverageTests/testRuntimeSnapshotProviderWindowListKeepsDesktopFullscreenSiblingsBehindNormalSurfaces \
-  -only-testing:FlowTabTests/FlowTabPriorityCoverageTests/testLiveSwitcherModelStartFocusedAppWindowSessionSelectsFocusedWindowIdentityOverWindowOrdering
+  -only-testing:FlowTabTests/FlowTabPriorityCoverageTests/testLiveSwitcherModelRecordsFocusedStickyWindowAsVerifiedFocusRecency \
+  -only-testing:FlowTabTests/FlowTabPriorityCoverageTests/testLiveSwitcherModelFocusedRuntimeSnapshotRecordsFocusedStickyWindowBeforeOrdering
 ```
 
 再刷新固定路径 UI test app：

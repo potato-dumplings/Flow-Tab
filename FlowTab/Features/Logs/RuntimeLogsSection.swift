@@ -1,15 +1,31 @@
 import SwiftUI
 import AppKit
 
+struct DiagnosticsRefreshPolicy: Equatable {
+    var intervalNanoseconds: UInt64
+    var lineLimit: Int
+
+    static let runtimeLogs = DiagnosticsRefreshPolicy(
+        intervalNanoseconds: 1_000_000_000,
+        lineLimit: 300
+    )
+}
+
 @MainActor
 private final class RuntimeLogLinesViewModel: ObservableObject {
     @Published private(set) var lines: [String] = []
 
     private static var persistedClearSnapshot: RuntimeLogFileStore.ReadSnapshot?
 
-    private let lineLimit = 300
-    private let refreshIntervalNs: UInt64 = 1_000_000_000
+    private let refreshPolicy: DiagnosticsRefreshPolicy = .runtimeLogs
+    private var lineLimit: Int {
+        refreshPolicy.lineLimit
+    }
+    private var refreshIntervalNs: UInt64 {
+        refreshPolicy.intervalNanoseconds
+    }
     private var refreshTask: Task<Void, Never>?
+    private var refreshGeneration: UInt64 = 0
 
     private var clearSnapshot: RuntimeLogFileStore.ReadSnapshot? {
         get { Self.persistedClearSnapshot }
@@ -18,48 +34,55 @@ private final class RuntimeLogLinesViewModel: ObservableObject {
 
     func start(minimumLevel: RuntimeLogLevel) {
         stop()
+        refreshGeneration &+= 1
+        let generation = refreshGeneration
         refreshTask = Task { [weak self] in
             guard let self else { return }
-            await self.reload(minimumLevel: minimumLevel)
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: refreshIntervalNs)
-                await self.reload(minimumLevel: minimumLevel)
-            }
+            await self.runRefreshLoop(minimumLevel: minimumLevel, generation: generation)
         }
     }
 
     func clearDisplayedOutput(minimumLevel: RuntimeLogLevel) {
         stop()
         lines = []
+        refreshGeneration &+= 1
+        let generation = refreshGeneration
         refreshTask = Task { [weak self] in
             guard let self else { return }
             let snapshot = await RuntimeDiagnostics.shared.makeReadSnapshot()
             guard !Task.isCancelled else { return }
+            guard generation == self.refreshGeneration else { return }
             self.clearSnapshot = snapshot
-            await self.reload(minimumLevel: minimumLevel)
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: refreshIntervalNs)
-                await self.reload(minimumLevel: minimumLevel)
-            }
+            await self.runRefreshLoop(minimumLevel: minimumLevel, generation: generation)
         }
     }
 
     func stop() {
         refreshTask?.cancel()
         refreshTask = nil
+        refreshGeneration &+= 1
     }
 
     deinit {
         refreshTask?.cancel()
     }
 
-    private func reload(minimumLevel: RuntimeLogLevel) async {
+    private func runRefreshLoop(minimumLevel: RuntimeLogLevel, generation: UInt64) async {
+        await reload(minimumLevel: minimumLevel, generation: generation)
+        while !Task.isCancelled, generation == refreshGeneration {
+            try? await Task.sleep(nanoseconds: refreshIntervalNs)
+            await reload(minimumLevel: minimumLevel, generation: generation)
+        }
+    }
+
+    private func reload(minimumLevel: RuntimeLogLevel, generation: UInt64) async {
         let nextLines = await RuntimeDiagnostics.shared.readRecentLines(
             limit: lineLimit,
             minimumLevel: minimumLevel,
             since: clearSnapshot
         )
         guard !Task.isCancelled else { return }
+        guard generation == refreshGeneration else { return }
         lines = nextLines
     }
 }

@@ -384,7 +384,8 @@ extension RuntimeSnapshotProvider {
                         frame: $0.frame,
                         allowsPublicAXRecovery: $0.allowsPublicAXRecovery,
                         hasStickyBinding: $0.hasStickyBinding,
-                        lastConfirmationSource: $0.lastConfirmationSource
+                        lastConfirmationSource: $0.lastConfirmationSource,
+                        spaceEvidence: $0.spaceEvidence
                     )
                 )
             }

@@ -91,8 +91,8 @@ extension FlowTabUITests {
                 expectedCount: expectedSharedCount,
                 timeout: 8
             )
-            let finderIdentifierFragment = edgeWorkflowAccessibilityIdentifierFragment(for: finderApp)
-            let chromeIdentifierFragment = edgeWorkflowAccessibilityIdentifierFragment(for: chromeApp)
+            let finderIdentifierFragment = edgeWorkflowSearchWindowIdentifierAppFragment(for: finderApp)
+            let chromeIdentifierFragment = edgeWorkflowSearchWindowIdentifierAppFragment(for: chromeApp)
 
             XCTAssertEqual(Set(results).count, expectedSharedCount)
             XCTAssertEqual(
@@ -130,7 +130,7 @@ extension FlowTabUITests {
 
             let results = waitForEdgeSearchWindowResultIdentifiers(
                 in: app,
-                identifierFragment: edgeWorkflowAccessibilityIdentifierFragment(for: targetApp),
+                identifierFragment: edgeWorkflowSearchWindowIdentifierAppFragment(for: targetApp),
                 expectedCount: 1,
                 timeout: 8
             )

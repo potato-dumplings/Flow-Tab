@@ -65,6 +65,64 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testLiveSwitcherModelLargeWindowPreviewBatchStaysBoundedToVisiblePageAndProviderPolicy() async {
+        let model = LiveSwitcherModel()
+        model.backgroundFullSnapshotRefreshEnabled = false
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let windows = (0..<1_000).map { index in
+            WindowCandidate(
+                id: String(format: "large-preview-window-%04d", index),
+                title: String(format: "Large Preview Window %04d", index),
+                isMinimized: false,
+                lastActiveAt: TimeInterval(10_000 - index)
+            )
+        }
+        let app = AppSwitchCandidate(
+            id: appID,
+            displayName: currentApp.localizedName ?? "Current App",
+            groupID: "current",
+            lastActiveAt: 10_000,
+            windows: windows
+        )
+        let context = makeRuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windows: windows
+        )
+        model.fastAppSnapshotProviderOverride = {
+            RuntimeSnapshot(apps: [app], contextsByID: [appID: context])
+        }
+
+        let visibleBatchStarted = expectation(description: "large visible preview batch started")
+        let batchStateLock = NSLock()
+        var batchRequestCounts: [Int] = []
+        model.previewCaptureBatchOutcomeOverride = { requests in
+            batchStateLock.lock()
+            batchRequestCounts.append(requests.count)
+            batchStateLock.unlock()
+            visibleBatchStarted.fulfill()
+            return Array(repeating: .failure(.transientSystemError), count: requests.count)
+        }
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
+
+        let visibleRange = 240..<256
+        let initialSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: visibleRange)
+        XCTAssertTrue(initialSnapshot.isEmpty)
+
+        await fulfillment(of: [visibleBatchStarted], timeout: 1.0)
+        batchStateLock.lock()
+        XCTAssertEqual(batchRequestCounts, [visibleRange.count])
+        batchStateLock.unlock()
+        XCTAssertEqual(
+            RuntimeWindowPreviewProvider.captureWorkerCountForTesting(requestCount: windows.count),
+            RuntimeWindowPreviewProvider.captureConcurrencyPolicyForTesting().maxConcurrentCaptures
+        )
+    }
+
+    @MainActor
     func testLiveSwitcherModelPinnedVisiblePreviewSurvivesCacheEvictionUntilSessionEnds() {
         let model = LiveSwitcherModel()
         model.backgroundFullSnapshotRefreshEnabled = false
@@ -354,6 +412,79 @@ extension FlowTabPriorityCoverageTests {
         let completedSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: visibleRange)
         XCTAssertEqual(completedSnapshot.count, visibleRange.count)
         XCTAssertTrue(completedSnapshot.allSatisfy { !$0.hasImage })
+        XCTAssertEqual(batchCallCount, 1)
+        XCTAssertEqual(cancellables.count, 1)
+    }
+
+    @MainActor
+    func testLiveSwitcherModelPreviewBatchFailureUsesProviderReasonForRetryState() async {
+        let model = LiveSwitcherModel()
+        model.backgroundFullSnapshotRefreshEnabled = false
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let windows = (0..<3).map { index in
+            WindowCandidate(
+                id: String(format: "provider-failed-preview-window-%02d", index),
+                title: String(format: "Provider Failed Preview Window %02d", index),
+                isMinimized: false,
+                lastActiveAt: TimeInterval(1_000 - index)
+            )
+        }
+        let app = AppSwitchCandidate(
+            id: appID,
+            displayName: currentApp.localizedName ?? "Current App",
+            groupID: "current",
+            lastActiveAt: 1_000,
+            windows: windows
+        )
+        let context = makeRuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windows: windows
+        )
+        model.fastAppSnapshotProviderOverride = {
+            RuntimeSnapshot(apps: [app], contextsByID: [appID: context])
+        }
+
+        var batchCallCount = 0
+        model.previewCaptureBatchOutcomeOverride = { requests in
+            batchCallCount += 1
+            return Array(repeating: .failure(.permissionDenied), count: requests.count)
+        }
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
+
+        let visibleRange = 0..<3
+        let batchPublished = expectation(description: "provider failure preview batch published")
+        var publishCount = 0
+        var cancellables: Set<AnyCancellable> = []
+        model.objectWillChange.sink {
+            publishCount += 1
+            if publishCount == 1 {
+                batchPublished.fulfill()
+            }
+        }.store(in: &cancellables)
+
+        let initialSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: visibleRange)
+        XCTAssertTrue(initialSnapshot.isEmpty)
+
+        await fulfillment(of: [batchPublished], timeout: 1.0)
+
+        let completedSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: visibleRange)
+        XCTAssertEqual(completedSnapshot.count, visibleRange.count)
+        XCTAssertTrue(completedSnapshot.allSatisfy { !$0.hasImage })
+        XCTAssertEqual(batchCallCount, 1)
+
+        let failedStates = model.previewCaptureStatesForTesting().values.compactMap { state -> (PreviewCaptureFailureReason, UInt64?)? in
+            guard case let .failed(reason, retryAfterGeneration) = state else { return nil }
+            return (reason, retryAfterGeneration)
+        }
+        XCTAssertEqual(failedStates.count, windows.count)
+        XCTAssertTrue(failedStates.allSatisfy { $0.0 == .permissionDenied })
+        XCTAssertTrue(failedStates.allSatisfy { $0.1 == nil })
+
+        _ = model.windowPreviewSnapshotForTesting(visibleRange: visibleRange)
         XCTAssertEqual(batchCallCount, 1)
         XCTAssertEqual(cancellables.count, 1)
     }

@@ -305,7 +305,7 @@ struct SearchAppRow: View {
                     lineWidth: item.isSelected ? 1.4 : 1
                 )
         )
-        .accessibilityIdentifier("flowtab.switcher.search.app.\(item.app.id.flowTabAccessibilitySlug)")
+        .accessibilityIdentifier("flowtab.switcher.search.app.\(item.app.id.flowTabAccessibilityIdentifierComponent)")
     }
 }
 
@@ -369,6 +369,6 @@ struct SearchWindowRow: View {
                     lineWidth: item.isSelected ? 1.4 : 1
                 )
         )
-        .accessibilityIdentifier("flowtab.switcher.search.window.\(item.id.flowTabAccessibilitySlug)")
+        .accessibilityIdentifier("flowtab.switcher.search.window.\(item.id.flowTabAccessibilityIdentifierComponent)")
     }
 }

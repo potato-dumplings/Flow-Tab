@@ -388,32 +388,56 @@ extension SwitcherPanelController {
         trigger: String
     ) {
         suppressHotkeyReplayTask?.cancel()
+        modifierReleaseConfirmationGeneration += 1
+        let generation = modifierReleaseConfirmationGeneration
         suppressHotkeyReplayUntilRelease = true
+        modifierReleaseState = .replaySuppression(
+            trigger: trigger,
+            generation: generation,
+            releasedSamples: 0
+        )
         logInputTrace(
-            "hotkeyReplaySuppression start trigger=\(trigger) nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
+            "hotkeyReplaySuppression start trigger=\(trigger) generation=\(generation) nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
         )
         suppressHotkeyReplayTask = Task { @MainActor [weak self] in
             guard let self else { return }
+            guard self.isModifierReleaseConfirmationGenerationCurrent(generation) else { return }
             var releasedSampleCount = 0
             while true {
                 try? await Task.sleep(nanoseconds: self.modifierReleaseConfirmationSampleIntervalNs)
                 guard !Task.isCancelled else { return }
+                guard self.isModifierReleaseConfirmationGenerationCurrent(generation) else { return }
                 let hasPressedHotkeyInputs = sessionKinds.contains { sessionKind in
                     self.isPrimaryModifierPressedInHardwareState(for: sessionKind)
                         || self.isSessionMainKeyPressedInHardwareState(for: sessionKind)
                 }
                 if hasPressedHotkeyInputs {
                     releasedSampleCount = 0
+                    self.modifierReleaseState = .replaySuppression(
+                        trigger: trigger,
+                        generation: generation,
+                        releasedSamples: 0
+                    )
                     continue
                 }
                 releasedSampleCount += 1
+                self.modifierReleaseState = .replaySuppression(
+                    trigger: trigger,
+                    generation: generation,
+                    releasedSamples: releasedSampleCount
+                )
                 if releasedSampleCount < self.modifierReleaseConfirmationSampleCount {
                     continue
                 }
+                guard self.isModifierReleaseConfirmationGenerationCurrent(generation) else { return }
                 self.suppressHotkeyReplayUntilRelease = false
-                self.suppressHotkeyReplayTask = nil
+                self.clearHotkeyReplaySuppressionTaskIfCurrent(generation)
+                self.modifierReleaseState = .replaySuppressionEnded(
+                    trigger: trigger,
+                    generation: generation
+                )
                 self.logInputTrace(
-                    "hotkeyReplaySuppression end trigger=\(trigger) nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
+                    "hotkeyReplaySuppression end trigger=\(trigger) generation=\(generation) nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
                 )
                 return
             }
@@ -422,6 +446,10 @@ extension SwitcherPanelController {
 
     func scheduleModifierReleaseConfirmation(trigger: String) {
         guard !suppressModifierReleaseConfirmationForTesting else {
+            modifierReleaseState = .canceled(
+                reason: .suppressedForTesting,
+                generation: modifierReleaseConfirmationGeneration
+            )
             logInputTrace(
                 "releaseConfirm suppressed trigger=\(trigger) nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
             )
@@ -437,54 +465,94 @@ extension SwitcherPanelController {
             "releaseConfirm start trigger=\(trigger) nowMs=\(formatMilliseconds(monotonicMilliseconds())) intervalMs=\(formatMilliseconds(Double(modifierReleaseConfirmationSampleIntervalNs) / 1_000_000)) samples=\(modifierReleaseConfirmationSampleCount)"
         )
 
+        modifierReleaseConfirmationGeneration += 1
+        let generation = modifierReleaseConfirmationGeneration
+        let sessionGeneration = presentationSessionGeneration
+        modifierReleaseState = .releaseObserved(trigger: trigger, generation: generation)
         pendingModifierReleaseConfirmationTask = Task { @MainActor [weak self] in
             guard let self else { return }
+            guard self.isModifierReleaseConfirmationGenerationCurrent(generation) else { return }
+            guard self.isPresentationSessionGenerationCurrent(sessionGeneration) else {
+                self.modifierReleaseState = .canceled(reason: .sessionChanged, generation: generation)
+                self.logInputTrace(
+                    "releaseConfirm stop trigger=\(trigger) reason=sessionChanged generation=\(generation) sessionGeneration=\(sessionGeneration) currentSessionGeneration=\(self.presentationSessionGeneration) nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
+                )
+                self.clearPendingModifierReleaseConfirmationTaskIfCurrent(generation)
+                return
+            }
             var releasedSampleCount = 0
 
             while true {
                 try? await Task.sleep(nanoseconds: self.modifierReleaseConfirmationSampleIntervalNs)
                 guard !Task.isCancelled else { return }
-                guard self.isPanelPresented else {
+                guard self.isModifierReleaseConfirmationGenerationCurrent(generation) else { return }
+                guard self.isPresentationSessionGenerationCurrent(sessionGeneration) else {
+                    self.modifierReleaseState = .canceled(reason: .sessionChanged, generation: generation)
                     self.logInputTrace(
-                        "releaseConfirm stop trigger=\(trigger) reason=panelHidden nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
+                        "releaseConfirm stop trigger=\(trigger) reason=sessionChanged generation=\(generation) sessionGeneration=\(sessionGeneration) currentSessionGeneration=\(self.presentationSessionGeneration) nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
                     )
-                    self.pendingModifierReleaseConfirmationTask = nil
+                    self.clearPendingModifierReleaseConfirmationTaskIfCurrent(generation)
+                    return
+                }
+                guard self.isPanelPresented else {
+                    self.modifierReleaseState = .canceled(reason: .panelHidden, generation: generation)
+                    self.logInputTrace(
+                        "releaseConfirm stop trigger=\(trigger) reason=panelHidden generation=\(generation) nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
+                    )
+                    self.clearPendingModifierReleaseConfirmationTaskIfCurrent(generation)
                     return
                 }
                 guard !self.model.isSearchActive else {
+                    self.modifierReleaseState = .canceled(reason: .searchActive, generation: generation)
                     self.logInputTrace(
-                        "releaseConfirm stop trigger=\(trigger) reason=searchActive nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
+                        "releaseConfirm stop trigger=\(trigger) reason=searchActive generation=\(generation) nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
                     )
                     self.logSearchTrace(
-                        "releaseConfirm trigger=\(trigger) action=stop reason=searchActive \(self.searchTraceStateSummary())"
+                        "releaseConfirm trigger=\(trigger) action=stop reason=searchActive generation=\(generation) \(self.searchTraceStateSummary())"
                     )
-                    self.pendingModifierReleaseConfirmationTask = nil
+                    self.clearPendingModifierReleaseConfirmationTaskIfCurrent(generation)
                     return
                 }
 
                 if self.isPrimaryModifierLikelyPressed() {
                     if releasedSampleCount > 0 {
                         self.logInputTrace(
-                            "releaseConfirm reset trigger=\(trigger) releasedSamples=\(releasedSampleCount) nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
+                            "releaseConfirm reset trigger=\(trigger) generation=\(generation) releasedSamples=\(releasedSampleCount) nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
                         )
                     }
                     releasedSampleCount = 0
+                    self.modifierReleaseState = .pressed(generation: generation)
                     continue
                 }
                 releasedSampleCount += 1
+                self.modifierReleaseState = .confirming(
+                    trigger: trigger,
+                    generation: generation,
+                    releasedSamples: releasedSampleCount
+                )
                 self.logInputTrace(
-                    "releaseConfirm sample trigger=\(trigger) releasedSamples=\(releasedSampleCount)/\(self.modifierReleaseConfirmationSampleCount) nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
+                    "releaseConfirm sample trigger=\(trigger) generation=\(generation) releasedSamples=\(releasedSampleCount)/\(self.modifierReleaseConfirmationSampleCount) nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
                 )
                 if releasedSampleCount < self.modifierReleaseConfirmationSampleCount {
                     continue
                 }
 
-                self.pendingModifierReleaseConfirmationTask = nil
+                guard self.isModifierReleaseConfirmationGenerationCurrent(generation) else { return }
+                guard self.isPresentationSessionGenerationCurrent(sessionGeneration) else {
+                    self.modifierReleaseState = .canceled(reason: .sessionChanged, generation: generation)
+                    self.logInputTrace(
+                        "releaseConfirm stop trigger=\(trigger) reason=sessionChanged generation=\(generation) sessionGeneration=\(sessionGeneration) currentSessionGeneration=\(self.presentationSessionGeneration) nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
+                    )
+                    self.clearPendingModifierReleaseConfirmationTaskIfCurrent(generation)
+                    return
+                }
+                self.clearPendingModifierReleaseConfirmationTaskIfCurrent(generation)
+                self.modifierReleaseState = .confirmed(trigger: trigger, generation: generation)
                 self.logInputTrace(
-                    "releaseConfirm confirmed trigger=\(trigger) action=finishSelection nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
+                    "releaseConfirm confirmed trigger=\(trigger) action=finishSelection generation=\(generation) sessionGeneration=\(sessionGeneration) nowMs=\(self.formatMilliseconds(self.monotonicMilliseconds()))"
                 )
                 self.logSearchTrace(
-                    "releaseConfirm trigger=\(trigger) action=confirmed \(self.searchTraceStateSummary())"
+                    "releaseConfirm trigger=\(trigger) action=confirmed generation=\(generation) sessionGeneration=\(sessionGeneration) \(self.searchTraceStateSummary())"
                 )
                 self.finishSelection()
                 return
@@ -495,10 +563,29 @@ extension SwitcherPanelController {
     func cancelPendingModifierReleaseConfirmation() {
         guard let pendingModifierReleaseConfirmationTask else { return }
         logInputTrace(
-            "releaseConfirm canceled nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
+            "releaseConfirm canceled generation=\(modifierReleaseConfirmationGeneration) nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
         )
         pendingModifierReleaseConfirmationTask.cancel()
+        modifierReleaseState = .canceled(
+            reason: .explicitCancel,
+            generation: modifierReleaseConfirmationGeneration
+        )
+        modifierReleaseConfirmationGeneration += 1
         self.pendingModifierReleaseConfirmationTask = nil
+    }
+
+    func clearPendingModifierReleaseConfirmationTaskIfCurrent(_ generation: Int) {
+        guard isModifierReleaseConfirmationGenerationCurrent(generation) else { return }
+        pendingModifierReleaseConfirmationTask = nil
+    }
+
+    func clearHotkeyReplaySuppressionTaskIfCurrent(_ generation: Int) {
+        guard isModifierReleaseConfirmationGenerationCurrent(generation) else { return }
+        suppressHotkeyReplayTask = nil
+    }
+
+    func isModifierReleaseConfirmationGenerationCurrent(_ generation: Int) -> Bool {
+        generation == modifierReleaseConfirmationGeneration
     }
 
     func isPrimaryModifierFlagsEvent(_ event: NSEvent) -> Bool {

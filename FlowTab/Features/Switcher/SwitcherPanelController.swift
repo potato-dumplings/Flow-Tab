@@ -4,6 +4,82 @@ import CoreGraphics
 import SwiftUI
 import FlowTabCore
 
+struct PanelVisibilityRecoveryPolicy: Equatable {
+    var initialPresentationGraceWindow: TimeInterval
+    var interruptionAttemptDelaysNanoseconds: [UInt64]
+    var hardReorderDelayNanoseconds: UInt64
+
+    static let `default` = PanelVisibilityRecoveryPolicy(
+        initialPresentationGraceWindow: 0.35,
+        interruptionAttemptDelaysNanoseconds: [
+            0,
+            50_000_000,
+            150_000_000,
+            300_000_000
+        ],
+        hardReorderDelayNanoseconds: 10_000_000
+    )
+}
+
+struct ModifierReleaseConfirmationPolicy: Equatable {
+    var sampleIntervalNanoseconds: UInt64
+    var requiredReleasedSampleCount: Int
+    var postFinishHotkeyIgnoreWindow: TimeInterval
+
+    static let `default` = ModifierReleaseConfirmationPolicy(
+        sampleIntervalNanoseconds: 25_000_000,
+        requiredReleasedSampleCount: 2,
+        postFinishHotkeyIgnoreWindow: 0.02
+    )
+}
+
+struct PanelVisibilitySnapshot: Equatable {
+    let panelPresented: Bool
+    let userVisible: Bool
+    let occlusionVisible: Bool
+    let panelKey: Bool
+    let appActive: Bool
+    let searchActive: Bool
+    let inputFocused: Bool
+    let firstResponder: String
+
+    var logFields: String {
+        "panelVisible=\(panelPresented ? 1 : 0) "
+            + "userVisible=\(userVisible ? 1 : 0) "
+            + "occlusionVisible=\(occlusionVisible ? 1 : 0) "
+            + "panelKey=\(panelKey ? 1 : 0) "
+            + "appActive=\(appActive ? 1 : 0) "
+            + "searchActive=\(searchActive ? 1 : 0) "
+            + "inputFocused=\(inputFocused ? 1 : 0) "
+            + "firstResponder=\(firstResponder)"
+    }
+}
+
+struct PanelVisibilityRecoveryDiagnostic: Equatable {
+    let trigger: String
+    let generation: Int?
+    let attempt: Int?
+    let totalAttempts: Int?
+    let mode: SwitcherPanelController.PanelVisibilityRecoveryMode
+    let before: PanelVisibilitySnapshot
+    let after: PanelVisibilitySnapshot
+
+    var logMessage: String {
+        var fields = [
+            "presentationRecovery",
+            "trigger=\(trigger)",
+            "action=visibilityReadback",
+            "mode=\(mode.debugName)",
+            "generation=\(generation.map(String.init) ?? "nil")"
+        ]
+        if let attempt, let totalAttempts {
+            fields.append("attempt=\(attempt)/\(totalAttempts)")
+        }
+        fields.append("before{\(before.logFields)}")
+        fields.append("after{\(after.logFields)}")
+        return fields.joined(separator: " ")
+    }
+}
 
 @MainActor
 final class SwitcherPanelController {
@@ -12,9 +88,52 @@ final class SwitcherPanelController {
         case inAppWindowSwitcher
     }
 
-    enum PanelVisibilityRecoveryMode {
+    enum PanelVisibilityRecoveryMode: Equatable {
         case softReorder
         case hardReorder
+
+        var debugName: String {
+            switch self {
+            case .softReorder:
+                "softReorder"
+            case .hardReorder:
+                "hardReorder"
+            }
+        }
+    }
+
+    enum PanelVisibilityRecoveryState: Equatable {
+        case idle
+        case presenting(trigger: String, generation: Int)
+        case visibleConfirmed(trigger: String, generation: Int, reason: String)
+        case suspectedHidden(trigger: String, generation: Int)
+        case recovering(
+            trigger: String,
+            generation: Int,
+            attempt: Int,
+            totalAttempts: Int,
+            mode: PanelVisibilityRecoveryMode
+        )
+        case failed(trigger: String, generation: Int, reason: String)
+    }
+
+    enum ModifierReleaseCancellationReason: String, Equatable {
+        case suppressedForTesting
+        case explicitCancel
+        case panelHidden
+        case searchActive
+        case sessionChanged
+    }
+
+    enum ModifierReleaseState: Equatable {
+        case idle
+        case pressed(generation: Int)
+        case releaseObserved(trigger: String, generation: Int)
+        case confirming(trigger: String, generation: Int, releasedSamples: Int)
+        case confirmed(trigger: String, generation: Int)
+        case replaySuppression(trigger: String, generation: Int, releasedSamples: Int)
+        case replaySuppressionEnded(trigger: String, generation: Int)
+        case canceled(reason: ModifierReleaseCancellationReason, generation: Int)
     }
 
     let model: LiveSwitcherModel
@@ -33,7 +152,13 @@ final class SwitcherPanelController {
     var suppressHotkeyReplayUntilRelease = false
     var suppressHotkeyReplayTask: Task<Void, Never>?
     var pendingModifierReleaseConfirmationTask: Task<Void, Never>?
+    var modifierReleaseConfirmationGeneration = 0
+    var modifierReleaseState: ModifierReleaseState = .idle
+    var presentationSessionGeneration = 0
     var panelPresentationRecoveryTask: Task<Void, Never>?
+    var panelPresentationRecoveryGeneration = 0
+    var panelVisibilityRecoveryState: PanelVisibilityRecoveryState = .idle
+    var lastPanelVisibilityRecoveryDiagnostic: PanelVisibilityRecoveryDiagnostic?
     var delayedWindowLayerTimer: Timer?
     var delayedWindowLayerDeadlineMs: Double?
     var delayedWindowLayerAppID: String?
@@ -47,21 +172,30 @@ final class SwitcherPanelController {
     var windowLayerPresentationDelay: TimeInterval {
         windowLayerPresentationDelayOverride ?? WindowLayerPreferencesStore.loadAutoEnterDelay()
     }
-    let modifierReleaseConfirmationSampleIntervalNs: UInt64 = 25_000_000
-    let modifierReleaseConfirmationSampleCount: Int = 2
-    let postFinishHotkeyIgnoreWindow: TimeInterval = 0.02
+    let modifierReleaseConfirmationPolicy: ModifierReleaseConfirmationPolicy = .default
+    var modifierReleaseConfirmationSampleIntervalNs: UInt64 {
+        modifierReleaseConfirmationPolicy.sampleIntervalNanoseconds
+    }
+    var modifierReleaseConfirmationSampleCount: Int {
+        modifierReleaseConfirmationPolicy.requiredReleasedSampleCount
+    }
+    var postFinishHotkeyIgnoreWindow: TimeInterval {
+        modifierReleaseConfirmationPolicy.postFinishHotkeyIgnoreWindow
+    }
     let activeSpaceChangeIgnoreWindow: TimeInterval = 0.35
     let terminateInterruptionProtectionWindow: TimeInterval = 5.0
     let postTerminateRefreshInterruptionProtectionWindow: TimeInterval = 0.5
-    let initialPresentationVisibilityGraceWindow: TimeInterval = 0.35
+    let panelVisibilityRecoveryPolicy: PanelVisibilityRecoveryPolicy = .default
+    var initialPresentationVisibilityGraceWindow: TimeInterval {
+        panelVisibilityRecoveryPolicy.initialPresentationGraceWindow
+    }
     let activeSpaceMigrationActivationSuppressionWindow: TimeInterval = 0.5
-    let interruptionPresentationRecoveryAttemptDelaysNs: [UInt64] = [
-        0,
-        50_000_000,
-        150_000_000,
-        300_000_000
-    ]
-    let panelPresentationRecoveryReorderDelayNs: UInt64 = 10_000_000
+    var interruptionPresentationRecoveryAttemptDelaysNs: [UInt64] {
+        panelVisibilityRecoveryPolicy.interruptionAttemptDelaysNanoseconds
+    }
+    var panelPresentationRecoveryReorderDelayNs: UInt64 {
+        panelVisibilityRecoveryPolicy.hardReorderDelayNanoseconds
+    }
     let autoEnterWindowLayerEnabled = true
     let tabAdvanceMinimumInterval: TimeInterval = 0.016
     let panelScreenMargin: CGFloat = 80
@@ -239,7 +373,7 @@ final class SwitcherPanelController {
         triggerDirection: CycleDirection = .forward
     ) -> Bool {
         guard model.startSession(triggerDirection: triggerDirection) else { return false }
-        activeHotkeySessionKind = .globalAppSwitcher
+        beginPresentationSession(kind: .globalAppSwitcher, trigger: "testing_global_show")
         lastCommittedTabAdvanceTimestamp = nil
         panelVisibilityOverride = true
         updatePanelPresentationLevel(trigger: "testing_global_show")
@@ -251,7 +385,7 @@ final class SwitcherPanelController {
         triggerDirection: CycleDirection = .forward
     ) -> Bool {
         guard model.startFocusedAppWindowSession(triggerDirection: triggerDirection) else { return false }
-        activeHotkeySessionKind = .inAppWindowSwitcher
+        beginPresentationSession(kind: .inAppWindowSwitcher, trigger: "testing_in_app_show")
         lastCommittedTabAdvanceTimestamp = nil
         panelVisibilityOverride = true
         updatePanelPresentationLevel(trigger: "testing_in_app_show")
@@ -361,15 +495,15 @@ enum SwitcherAccessibilityIdentifiers {
     static let nextWindowPage = "flowtab.switcher.window-page.next"
 
     static func app(id: String) -> String {
-        "flowtab.switcher.app.\(id.flowTabAccessibilitySlug)"
+        "flowtab.switcher.app.\(id.flowTabAccessibilityIdentifierComponent)"
     }
 
     static func window(id: String) -> String {
-        "flowtab.switcher.window.\(id.flowTabAccessibilitySlug)"
+        "flowtab.switcher.window.\(id.flowTabAccessibilityIdentifierComponent)"
     }
 
     static func windowPreviewImage(id: String) -> String {
-        "flowtab.switcher.window-preview-image.\(id.flowTabAccessibilitySlug)"
+        "flowtab.switcher.window-preview-image.\(id.flowTabAccessibilityIdentifierComponent)"
     }
 }
 

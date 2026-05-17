@@ -4,6 +4,38 @@ import Darwin
 import Foundation
 
 enum RuntimeCGWindowFocusBridge {
+    enum FocusResult: Equatable {
+        case accepted
+        case acceptedKeyEventFailed
+        case symbolUnavailable
+        case processLookupFailed(OSStatus)
+        case setFrontFailed(Int32)
+
+        var isAccepted: Bool {
+            switch self {
+            case .accepted, .acceptedKeyEventFailed:
+                true
+            case .symbolUnavailable, .processLookupFailed, .setFrontFailed:
+                false
+            }
+        }
+
+        var debugName: String {
+            switch self {
+            case .accepted:
+                "accepted"
+            case .acceptedKeyEventFailed:
+                "acceptedKeyEventFailed"
+            case .symbolUnavailable:
+                "symbolUnavailable"
+            case .processLookupFailed(let status):
+                "processLookupFailed(\(status))"
+            case .setFrontFailed(let error):
+                "setFrontFailed(\(error))"
+            }
+        }
+    }
+
     private typealias GetProcessForPIDFn = @convention(c) (
         pid_t,
         UnsafeMutablePointer<ProcessSerialNumber>
@@ -29,22 +61,39 @@ enum RuntimeCGWindowFocusBridge {
     private static let keyWindowIDOffset = 0x3C
 
     static func focusWindow(ownerPID: pid_t, cgWindowID: CGWindowID) -> Bool {
-        guard let api = runtimeAPI else { return false }
+        focusWindowDetailed(ownerPID: ownerPID, cgWindowID: cgWindowID).isAccepted
+    }
+
+    static func focusWindowDetailed(ownerPID: pid_t, cgWindowID: CGWindowID) -> FocusResult {
+        guard let api = runtimeAPI else {
+            RuntimeLog.debug(
+                .activation,
+                "cg-window-focus bridge result=\(FocusResult.symbolUnavailable.debugName) pid=\(ownerPID) windowID=\(cgWindowID)"
+            )
+            return .symbolUnavailable
+        }
 
         var processSerialNumber = ProcessSerialNumber()
-        guard api.getProcessForPID(ownerPID, &processSerialNumber) == noErr else {
-            return false
+        let processLookupStatus = api.getProcessForPID(ownerPID, &processSerialNumber)
+        guard processLookupStatus == noErr else {
+            let result = FocusResult.processLookupFailed(processLookupStatus)
+            RuntimeLog.debug(
+                .activation,
+                "cg-window-focus bridge result=\(result.debugName) pid=\(ownerPID) windowID=\(cgWindowID)"
+            )
+            return result
         }
 
         let frontProcessResult = withUnsafeMutablePointer(to: &processSerialNumber) { pointer in
             api.setFrontProcessWithOptions(pointer, cgWindowID, userGeneratedFocusMode)
         }
         guard frontProcessResult == .success else {
+            let result = FocusResult.setFrontFailed(frontProcessResult.rawValue)
             RuntimeLog.debug(
                 .activation,
-                "cg-window-focus set-front failed pid=\(ownerPID) windowID=\(cgWindowID) error=\(frontProcessResult.rawValue)"
+                "cg-window-focus bridge result=\(result.debugName) pid=\(ownerPID) windowID=\(cgWindowID)"
             )
-            return false
+            return result
         }
 
         let keyWindowResult = postKeyWindowEvent(
@@ -55,10 +104,11 @@ enum RuntimeCGWindowFocusBridge {
         if !keyWindowResult {
             RuntimeLog.debug(
                 .activation,
-                "cg-window-focus key-event failed pid=\(ownerPID) windowID=\(cgWindowID)"
+                "cg-window-focus bridge result=\(FocusResult.acceptedKeyEventFailed.debugName) pid=\(ownerPID) windowID=\(cgWindowID)"
             )
+            return .acceptedKeyEventFailed
         }
-        return true
+        return .accepted
     }
 
     private static func postKeyWindowEvent(

@@ -3,19 +3,221 @@ import ApplicationServices
 import Darwin
 import Foundation
 
+enum AXExtractionError: Error, CustomStringConvertible {
+    case attributeUnavailable(attribute: String, code: AXError)
+    case typeMismatch(attribute: String, expected: String, actual: String)
+    case invalidAXValue(attribute: String)
+
+    var description: String {
+        switch self {
+        case .attributeUnavailable(let attribute, let code):
+            return "attributeUnavailable attribute=\(attribute) code=\(code.rawValue)"
+        case .typeMismatch(let attribute, let expected, let actual):
+            return "typeMismatch attribute=\(attribute) expected=\(expected) actual=\(actual)"
+        case .invalidAXValue(let attribute):
+            return "invalidAXValue attribute=\(attribute)"
+        }
+    }
+}
+
+enum AXTypedAttributeReader {
+    static func copiedAttribute(
+        _ element: AXUIElement,
+        _ attribute: CFString
+    ) -> Result<CFTypeRef, AXExtractionError> {
+        var value: CFTypeRef?
+        let error = AXUIElementCopyAttributeValue(element, attribute, &value)
+        guard error == .success else {
+            return .failure(
+                .attributeUnavailable(attribute: attributeName(attribute), code: error)
+            )
+        }
+        guard let value else {
+            return .failure(.invalidAXValue(attribute: attributeName(attribute)))
+        }
+        return .success(value)
+    }
+
+    static func elementAttribute(
+        _ element: AXUIElement,
+        _ attribute: CFString
+    ) -> Result<AXUIElement, AXExtractionError> {
+        switch copiedAttribute(element, attribute) {
+        case .success(let rawValue):
+            return axElement(from: rawValue, attribute: attribute)
+        case .failure(let error):
+            return .failure(error)
+        }
+    }
+
+    static func pointAttribute(
+        _ element: AXUIElement,
+        _ attribute: CFString
+    ) -> Result<CGPoint, AXExtractionError> {
+        switch copiedAttribute(element, attribute) {
+        case .success(let rawValue):
+            return point(from: rawValue, attribute: attribute)
+        case .failure(let error):
+            return .failure(error)
+        }
+    }
+
+    static func sizeAttribute(
+        _ element: AXUIElement,
+        _ attribute: CFString
+    ) -> Result<CGSize, AXExtractionError> {
+        switch copiedAttribute(element, attribute) {
+        case .success(let rawValue):
+            return size(from: rawValue, attribute: attribute)
+        case .failure(let error):
+            return .failure(error)
+        }
+    }
+
+    static func axElement(
+        from rawValue: CFTypeRef?,
+        attribute: CFString
+    ) -> Result<AXUIElement, AXExtractionError> {
+        guard let rawValue else {
+            return .failure(.invalidAXValue(attribute: attributeName(attribute)))
+        }
+        guard CFGetTypeID(rawValue) == AXUIElementGetTypeID() else {
+            return .failure(
+                .typeMismatch(
+                    attribute: attributeName(attribute),
+                    expected: "AXUIElement",
+                    actual: typeDescription(for: rawValue)
+                )
+            )
+        }
+        // CF-backed AX types cannot be conditionally downcast; the CFTypeID check is the safety boundary.
+        let element = unsafeBitCast(rawValue, to: AXUIElement.self)
+        return .success(element)
+    }
+
+    static func point(
+        from rawValue: CFTypeRef?,
+        attribute: CFString
+    ) -> Result<CGPoint, AXExtractionError> {
+        switch axValue(from: rawValue, attribute: attribute, expected: "AXValue<CGPoint>") {
+        case .success(let axValue):
+            guard AXValueGetType(axValue) == .cgPoint else {
+                return .failure(
+                    .typeMismatch(
+                        attribute: attributeName(attribute),
+                        expected: "AXValue<CGPoint>",
+                        actual: "AXValue<\(AXValueGetType(axValue))>"
+                    )
+                )
+            }
+            var point = CGPoint.zero
+            guard AXValueGetValue(axValue, .cgPoint, &point) else {
+                return .failure(.invalidAXValue(attribute: attributeName(attribute)))
+            }
+            return .success(point)
+        case .failure(let error):
+            return .failure(error)
+        }
+    }
+
+    static func size(
+        from rawValue: CFTypeRef?,
+        attribute: CFString
+    ) -> Result<CGSize, AXExtractionError> {
+        switch axValue(from: rawValue, attribute: attribute, expected: "AXValue<CGSize>") {
+        case .success(let axValue):
+            guard AXValueGetType(axValue) == .cgSize else {
+                return .failure(
+                    .typeMismatch(
+                        attribute: attributeName(attribute),
+                        expected: "AXValue<CGSize>",
+                        actual: "AXValue<\(AXValueGetType(axValue))>"
+                    )
+                )
+            }
+            var size = CGSize.zero
+            guard AXValueGetValue(axValue, .cgSize, &size) else {
+                return .failure(.invalidAXValue(attribute: attributeName(attribute)))
+            }
+            return .success(size)
+        case .failure(let error):
+            return .failure(error)
+        }
+    }
+
+    static func rawArrayCount(from rawValue: CFTypeRef?) -> Int? {
+        guard let rawValue else { return nil }
+        guard CFGetTypeID(rawValue) == CFArrayGetTypeID() else { return nil }
+        return (rawValue as? NSArray)?.count
+    }
+
+    static func typeDescription(for rawValue: CFTypeRef?) -> String {
+        guard let rawValue else { return "nil" }
+        let typeID = CFGetTypeID(rawValue)
+        switch typeID {
+        case CFArrayGetTypeID():
+            return "CFArray"
+        case AXUIElementGetTypeID():
+            return "AXUIElement"
+        case AXValueGetTypeID():
+            return "AXValue"
+        case CFStringGetTypeID():
+            return "CFString"
+        case CFAttributedStringGetTypeID():
+            return "CFAttributedString"
+        case CFDictionaryGetTypeID():
+            return "CFDictionary"
+        case CFBooleanGetTypeID():
+            return "CFBoolean"
+        case CFNumberGetTypeID():
+            return "CFNumber"
+        default:
+            return "typeID=\(typeID)"
+        }
+    }
+
+    private static func axValue(
+        from rawValue: CFTypeRef?,
+        attribute: CFString,
+        expected: String
+    ) -> Result<AXValue, AXExtractionError> {
+        guard let rawValue else {
+            return .failure(.invalidAXValue(attribute: attributeName(attribute)))
+        }
+        guard CFGetTypeID(rawValue) == AXValueGetTypeID() else {
+            return .failure(
+                .typeMismatch(
+                    attribute: attributeName(attribute),
+                    expected: expected,
+                    actual: typeDescription(for: rawValue)
+                )
+            )
+        }
+        // CF-backed AX types cannot be conditionally downcast; the CFTypeID check is the safety boundary.
+        let axValue = unsafeBitCast(rawValue, to: AXValue.self)
+        return .success(axValue)
+    }
+
+    private static func attributeName(_ attribute: CFString) -> String {
+        attribute as String
+    }
+}
+
 enum AXWindowInspector {
     struct WindowsFetchResult {
         let windows: [AXUIElement]
         let error: AXError
         let rawValueTypeDescription: String
         let rawArrayCount: Int?
+        let remoteScanCompleteness: RuntimeAXRemoteWindowResolver.RemoteScanCompleteness?
 
         var logDetails: String {
             AXWindowInspector.windowsFetchLogDetails(
                 error: error,
                 rawValueTypeDescription: rawValueTypeDescription,
                 rawArrayCount: rawArrayCount,
-                decodedCount: windows.count
+                decodedCount: windows.count,
+                remoteScanCompleteness: remoteScanCompleteness
             )
         }
     }
@@ -28,6 +230,7 @@ enum AXWindowInspector {
     ) -> AXError
     static var cgWindowIDOverrideForTesting: ((AXUIElement) -> CGWindowID?)?
     static var remoteWindowsResolverOverrideForTesting: ((pid_t) -> [AXUIElement])?
+    static var remoteWindowScanResultOverrideForTesting: ((pid_t) -> RuntimeAXRemoteWindowResolver.WindowScanResult)?
 
     static func windows(
         for app: NSRunningApplication,
@@ -45,7 +248,8 @@ enum AXWindowInspector {
                 windows: [],
                 error: .apiDisabled,
                 rawValueTypeDescription: "nil",
-                rawArrayCount: nil
+                rawArrayCount: nil,
+                remoteScanCompleteness: nil
             )
         }
 
@@ -56,48 +260,59 @@ enum AXWindowInspector {
             kAXWindowsAttribute as CFString,
             &windowsValue
         )
-        let rawValueTypeDescription = cfTypeDescription(for: windowsValue)
-        let rawArrayCount = rawArrayCount(from: windowsValue)
+        let rawValueTypeDescription = AXTypedAttributeReader.typeDescription(for: windowsValue)
+        let rawArrayCount = AXTypedAttributeReader.rawArrayCount(from: windowsValue)
         guard error == .success, let windows = windowsValue as? [AXUIElement] else {
-            let remoteWindows = remoteWindows(
+            let remoteScanResult = remoteWindowScanResult(
                 forPID: app.processIdentifier,
                 includeRemoteWindows: includeRemoteWindows
             )
             return WindowsFetchResult(
-                windows: remoteWindows,
+                windows: remoteScanResult?.windows ?? [],
                 error: error,
                 rawValueTypeDescription: rawValueTypeDescription,
-                rawArrayCount: rawArrayCount
+                rawArrayCount: rawArrayCount,
+                remoteScanCompleteness: remoteScanResult?.completeness
             )
         }
-        let remoteWindows = remoteWindows(
+        let remoteScanResult = remoteWindowScanResult(
             forPID: app.processIdentifier,
             includeRemoteWindows: includeRemoteWindows
         )
         return WindowsFetchResult(
             windows: RuntimeAXRemoteWindowResolver.mergedWindows(
                 publicWindows: windows,
-                remoteWindows: remoteWindows
+                remoteWindows: remoteScanResult?.windows ?? []
             ),
             error: error,
             rawValueTypeDescription: rawValueTypeDescription,
-            rawArrayCount: rawArrayCount
+            rawArrayCount: rawArrayCount,
+            remoteScanCompleteness: remoteScanResult?.completeness
         )
     }
 
-    private static func remoteWindows(
+    private static func remoteWindowScanResult(
         forPID pid: pid_t,
         includeRemoteWindows: Bool
-    ) -> [AXUIElement] {
-        guard includeRemoteWindows else { return [] }
-        return remoteWindowsOnCurrentThread(forPID: pid)
+    ) -> RuntimeAXRemoteWindowResolver.WindowScanResult? {
+        guard includeRemoteWindows else { return nil }
+        return remoteWindowScanResultOnCurrentThread(forPID: pid)
     }
 
-    private static func remoteWindowsOnCurrentThread(forPID pid: pid_t) -> [AXUIElement] {
-        if let remoteWindowsResolverOverrideForTesting {
-            return remoteWindowsResolverOverrideForTesting(pid)
+    private static func remoteWindowScanResultOnCurrentThread(
+        forPID pid: pid_t
+    ) -> RuntimeAXRemoteWindowResolver.WindowScanResult {
+        if let remoteWindowScanResultOverrideForTesting {
+            return remoteWindowScanResultOverrideForTesting(pid)
         }
-        return RuntimeAXRemoteWindowResolver.windows(forPID: pid)
+        if let remoteWindowsResolverOverrideForTesting {
+            let windows = remoteWindowsResolverOverrideForTesting(pid)
+            return RuntimeAXRemoteWindowResolver.WindowScanResult(
+                windows: windows,
+                completeness: .complete(scanned: windows.count)
+            )
+        }
+        return RuntimeAXRemoteWindowResolver.windowScanResult(forPID: pid)
     }
 
     static func makeWindowID(pid: pid_t, index: Int) -> String {
@@ -119,23 +334,13 @@ enum AXWindowInspector {
     static func title(for window: AXUIElement) -> String? {
         let titleFromAX = title(from: window, attribute: kAXTitleAttribute as CFString)
 
-        var titleElementValue: CFTypeRef?
-        guard
-            AXUIElementCopyAttributeValue(
-                window,
-                kAXTitleUIElementAttribute as CFString,
-                &titleElementValue
-            ) == .success
-        else {
+        let titleElementResult = AXTypedAttributeReader.elementAttribute(
+            window,
+            kAXTitleUIElementAttribute as CFString
+        )
+        guard case .success(let titleElement) = titleElementResult else {
             return preferredWindowTitle(candidates: [titleFromAX])
         }
-        guard let rawTitleElement = titleElementValue else {
-            return preferredWindowTitle(candidates: [titleFromAX])
-        }
-        guard CFGetTypeID(rawTitleElement) == AXUIElementGetTypeID() else {
-            return preferredWindowTitle(candidates: [titleFromAX])
-        }
-        let titleElement = unsafeBitCast(rawTitleElement, to: AXUIElement.self)
         let titleFromTitleElementValue = title(
             from: titleElement,
             attribute: kAXValueAttribute as CFString
@@ -224,49 +429,41 @@ enum AXWindowInspector {
         error: AXError,
         rawValueTypeDescription: String,
         rawArrayCount: Int?,
-        decodedCount: Int
+        decodedCount: Int,
+        remoteScanCompleteness: RuntimeAXRemoteWindowResolver.RemoteScanCompleteness? = nil
     ) -> String {
         let rawArrayCountDescription = rawArrayCount.map(String.init) ?? "nil"
-        return "fetchError=\(error.rawValue) rawValueType=\(rawValueTypeDescription) rawArrayCount=\(rawArrayCountDescription) decodedCount=\(decodedCount)"
+        let baseDetails = "fetchError=\(error.rawValue) rawValueType=\(rawValueTypeDescription) rawArrayCount=\(rawArrayCountDescription) decodedCount=\(decodedCount)"
+        guard let remoteScanCompleteness else { return baseDetails }
+        return "\(baseDetails) remoteScan=\(remoteScanLogDescription(remoteScanCompleteness))"
+    }
+
+    static func remoteScanLogDescription(
+        _ completeness: RuntimeAXRemoteWindowResolver.RemoteScanCompleteness
+    ) -> String {
+        switch completeness {
+        case .unavailable:
+            return "unavailable"
+        case .complete(let scanned):
+            return "complete scanned=\(scanned)"
+        case .partialTimedOut(let scanned, let maximum):
+            return "partialTimedOut scanned=\(scanned) maximum=\(maximum)"
+        }
     }
 
     private static func pointValue(for window: AXUIElement, attribute: CFString) -> CGPoint? {
-        var value: CFTypeRef?
-        guard
-            AXUIElementCopyAttributeValue(window, attribute, &value) == .success,
-            let rawValue = value,
-            CFGetTypeID(rawValue) == AXValueGetTypeID()
-        else {
-            return nil
-        }
-        let axValue = rawValue as! AXValue
-        guard
-            AXValueGetType(axValue) == .cgPoint
-        else {
-            return nil
-        }
-        var point = CGPoint.zero
-        guard AXValueGetValue(axValue, .cgPoint, &point) else { return nil }
+        guard case .success(let point) = AXTypedAttributeReader.pointAttribute(
+            window,
+            attribute
+        ) else { return nil }
         return point
     }
 
     private static func sizeValue(for window: AXUIElement, attribute: CFString) -> CGSize? {
-        var value: CFTypeRef?
-        guard
-            AXUIElementCopyAttributeValue(window, attribute, &value) == .success,
-            let rawValue = value,
-            CFGetTypeID(rawValue) == AXValueGetTypeID()
-        else {
-            return nil
-        }
-        let axValue = rawValue as! AXValue
-        guard
-            AXValueGetType(axValue) == .cgSize
-        else {
-            return nil
-        }
-        var size = CGSize.zero
-        guard AXValueGetValue(axValue, .cgSize, &size) else { return nil }
+        guard case .success(let size) = AXTypedAttributeReader.sizeAttribute(
+            window,
+            attribute
+        ) else { return nil }
         return size
     }
 
@@ -309,38 +506,6 @@ enum AXWindowInspector {
             score += 50
         }
         return score
-    }
-
-    private static func rawArrayCount(from rawValue: CFTypeRef?) -> Int? {
-        guard let rawValue else { return nil }
-        guard CFGetTypeID(rawValue) == CFArrayGetTypeID() else { return nil }
-        let array = unsafeBitCast(rawValue, to: CFArray.self)
-        return CFArrayGetCount(array)
-    }
-
-    private static func cfTypeDescription(for rawValue: CFTypeRef?) -> String {
-        guard let rawValue else { return "nil" }
-        let typeID = CFGetTypeID(rawValue)
-        switch typeID {
-        case CFArrayGetTypeID():
-            return "CFArray"
-        case AXUIElementGetTypeID():
-            return "AXUIElement"
-        case AXValueGetTypeID():
-            return "AXValue"
-        case CFStringGetTypeID():
-            return "CFString"
-        case CFAttributedStringGetTypeID():
-            return "CFAttributedString"
-        case CFDictionaryGetTypeID():
-            return "CFDictionary"
-        case CFBooleanGetTypeID():
-            return "CFBoolean"
-        case CFNumberGetTypeID():
-            return "CFNumber"
-        default:
-            return "typeID=\(typeID)"
-        }
     }
 
     private static let exactBridgeFunction: AXUIElementGetWindowFn? = {
@@ -409,13 +574,50 @@ enum AXWindowInspectorForTesting {
         error: AXError,
         rawValueTypeDescription: String,
         rawArrayCount: Int?,
-        decodedCount: Int
+        decodedCount: Int,
+        remoteScanCompleteness: RuntimeAXRemoteWindowResolver.RemoteScanCompleteness? = nil
     ) -> String {
         AXWindowInspector.windowsFetchLogDetails(
             error: error,
             rawValueTypeDescription: rawValueTypeDescription,
             rawArrayCount: rawArrayCount,
-            decodedCount: decodedCount
+            decodedCount: decodedCount,
+            remoteScanCompleteness: remoteScanCompleteness
         )
+    }
+
+    static func remoteScanLogDescription(
+        _ completeness: RuntimeAXRemoteWindowResolver.RemoteScanCompleteness
+    ) -> String {
+        AXWindowInspector.remoteScanLogDescription(completeness)
+    }
+
+    static func axElement(
+        from rawValue: CFTypeRef?,
+        attribute: CFString
+    ) -> Result<AXUIElement, AXExtractionError> {
+        AXTypedAttributeReader.axElement(from: rawValue, attribute: attribute)
+    }
+
+    static func point(
+        from rawValue: CFTypeRef?,
+        attribute: CFString
+    ) -> Result<CGPoint, AXExtractionError> {
+        AXTypedAttributeReader.point(from: rawValue, attribute: attribute)
+    }
+
+    static func size(
+        from rawValue: CFTypeRef?,
+        attribute: CFString
+    ) -> Result<CGSize, AXExtractionError> {
+        AXTypedAttributeReader.size(from: rawValue, attribute: attribute)
+    }
+
+    static func rawArrayCount(from rawValue: CFTypeRef?) -> Int? {
+        AXTypedAttributeReader.rawArrayCount(from: rawValue)
+    }
+
+    static func typeDescription(for rawValue: CFTypeRef?) -> String {
+        AXTypedAttributeReader.typeDescription(for: rawValue)
     }
 }

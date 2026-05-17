@@ -107,6 +107,41 @@ extension SwitcherPanelController {
             + "selectedWindowID=\(selectedWindowID)"
     }
 
+    func panelVisibilitySnapshot() -> PanelVisibilitySnapshot {
+        PanelVisibilitySnapshot(
+            panelPresented: isPanelPresented,
+            userVisible: isPanelVisibleToUser,
+            occlusionVisible: resolvedPanelOcclusionState.contains(.visible),
+            panelKey: panel.isKeyWindow,
+            appActive: isAppCurrentlyActive,
+            searchActive: model.isSearchActive,
+            inputFocused: model.isSearchInputFocused,
+            firstResponder: panelFirstResponderDebugName()
+        )
+    }
+
+    func recordPanelVisibilityRecoveryDiagnostic(
+        trigger: String,
+        generation: Int?,
+        attempt: Int?,
+        totalAttempts: Int?,
+        mode: PanelVisibilityRecoveryMode,
+        before: PanelVisibilitySnapshot,
+        after: PanelVisibilitySnapshot
+    ) {
+        let diagnostic = PanelVisibilityRecoveryDiagnostic(
+            trigger: trigger,
+            generation: generation,
+            attempt: attempt,
+            totalAttempts: totalAttempts,
+            mode: mode,
+            before: before,
+            after: after
+        )
+        lastPanelVisibilityRecoveryDiagnostic = diagnostic
+        logSearchTrace(diagnostic.logMessage)
+    }
+
     private func formatPanelProbeRect(_ rect: NSRect) -> String {
         let x = formatMilliseconds(rect.origin.x)
         let y = formatMilliseconds(rect.origin.y)

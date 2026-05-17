@@ -4,6 +4,21 @@ import Foundation
 import ScreenCaptureKit
 
 enum RuntimeWindowPreviewProvider {
+    enum ScreenCaptureBridgeFailure: String, Equatable {
+        case permissionDenied
+        case timedOut
+        case callbackReturnedAfterTimeout
+        case returnedError
+        case missingContent
+    }
+
+    enum CaptureFailureReason: String, Equatable {
+        case permissionDenied
+        case windowNotFound
+        case screenCaptureUnavailable
+        case transientSystemError
+    }
+
     struct CaptureRequest {
         let preferredWindowID: CGWindowID?
         let ownerPID: pid_t
@@ -15,6 +30,25 @@ enum RuntimeWindowPreviewProvider {
         let image: NSImage
         let resolvedWindowID: CGWindowID
         let titleBarStyle: WindowTitleBarStyleGuess?
+    }
+
+    struct CaptureOutcome {
+        let result: CaptureResult?
+        let failureReason: CaptureFailureReason?
+
+        static func success(_ result: CaptureResult) -> CaptureOutcome {
+            CaptureOutcome(result: result, failureReason: nil)
+        }
+
+        static func failure(_ reason: CaptureFailureReason) -> CaptureOutcome {
+            CaptureOutcome(result: nil, failureReason: reason)
+        }
+    }
+
+    struct CaptureConcurrencyPolicy: Equatable {
+        let maxConcurrentCaptures: Int
+
+        static let `default` = CaptureConcurrencyPolicy(maxConcurrentCaptures: 4)
     }
 
     private struct LiveCGWindowEntry {
@@ -41,6 +75,46 @@ enum RuntimeWindowPreviewProvider {
     private struct PreparedCapture {
         let request: CaptureRequest
         let candidateIDs: [CGWindowID]
+    }
+
+    private struct ShareableWindowLookup {
+        let windowsByID: [CGWindowID: SCWindow]
+        let failureReason: CaptureFailureReason?
+    }
+
+    private final class ScreenCaptureBridgeState<Value> {
+        private let lock = NSLock()
+        private var didTimeOut = false
+        private var completion: (value: Value?, error: Error?)?
+
+        func complete(value: Value?, error: Error?) -> ScreenCaptureBridgeFailure? {
+            lock.lock()
+            defer { lock.unlock() }
+
+            if didTimeOut {
+                return .callbackReturnedAfterTimeout
+            }
+            completion = (value, error)
+            return nil
+        }
+
+        func markTimedOutIfUncompleted() -> Bool {
+            lock.lock()
+            defer { lock.unlock() }
+
+            if completion != nil {
+                return false
+            }
+            didTimeOut = true
+            return true
+        }
+
+        func completed() -> (value: Value?, error: Error?) {
+            lock.lock()
+            defer { lock.unlock() }
+
+            return completion ?? (nil, nil)
+        }
     }
 
     private static var hasLoggedScreenCapturePermissionWarning = false
@@ -73,15 +147,31 @@ enum RuntimeWindowPreviewProvider {
 
     static func captureWindowPreviews(
         _ requests: [CaptureRequest],
-        captureSemaphore: DispatchSemaphore? = nil
+        captureSemaphore: DispatchSemaphore? = nil,
+        concurrencyPolicy: CaptureConcurrencyPolicy = .default
     ) -> [CaptureResult?] {
+        captureWindowPreviewOutcomes(
+            requests,
+            captureSemaphore: captureSemaphore,
+            concurrencyPolicy: concurrencyPolicy
+        ).map(\.result)
+    }
+
+    static func captureWindowPreviewOutcomes(
+        _ requests: [CaptureRequest],
+        captureSemaphore: DispatchSemaphore? = nil,
+        concurrencyPolicy: CaptureConcurrencyPolicy = .default
+    ) -> [CaptureOutcome] {
         guard !requests.isEmpty else { return [] }
         guard ScreenCapturePermissionChecker.hasScreenCapturePermission else {
             if !hasLoggedScreenCapturePermissionWarning {
-                RuntimeLog.warning(.permission, "screen recording permission missing; window preview unavailable")
+                RuntimeLog.warning(
+                    .permission,
+                    "screen recording permission missing; window preview unavailable reason=\(ScreenCaptureBridgeFailure.permissionDenied.rawValue)"
+                )
                 hasLoggedScreenCapturePermissionWarning = true
             }
-            return Array(repeating: nil, count: requests.count)
+            return Array(repeating: .failure(.permissionDenied), count: requests.count)
         }
 
         let liveWindowsByPID = Dictionary(
@@ -104,37 +194,85 @@ enum RuntimeWindowPreviewProvider {
             return PreparedCapture(request: request, candidateIDs: candidateIDs)
         }
 
+        guard preparedCaptures.contains(where: { !$0.candidateIDs.isEmpty }) else {
+            return Array(repeating: .failure(.windowNotFound), count: preparedCaptures.count)
+        }
+
         let onScreenWindowsOnly = shareableContentOnScreenOnly(
             preferredWindowIDs: requests.map(\.preferredWindowID)
         )
-        let shareableWindowsByID = fetchShareableWindowsByID(
+        let shareableWindowLookup = fetchShareableWindowsByID(
             onScreenWindowsOnly: onScreenWindowsOnly
         )
 
-        var results = Array<CaptureResult?>(repeating: nil, count: preparedCaptures.count)
+        var outcomes = Array<CaptureOutcome>(
+            repeating: .failure(.transientSystemError),
+            count: preparedCaptures.count
+        )
         let resultsLock = NSLock()
-        DispatchQueue.concurrentPerform(iterations: preparedCaptures.count) { index in
-            let preparedCapture = preparedCaptures[index]
-            guard !preparedCapture.candidateIDs.isEmpty else { return }
-            captureSemaphore?.wait()
-            defer { captureSemaphore?.signal() }
-            let result = captureWindowPreview(
-                preparedCapture,
-                shareableWindowsByID: shareableWindowsByID
-            )
-            resultsLock.lock()
-            results[index] = result
-            resultsLock.unlock()
+        let indexLock = NSLock()
+        var nextIndex = 0
+        let workerCount = captureWorkerCount(
+            requestCount: preparedCaptures.count,
+            concurrencyPolicy: concurrencyPolicy
+        )
+        let group = DispatchGroup()
+
+        for _ in 0..<workerCount {
+            group.enter()
+            previewCaptureWorkerQueue.async {
+                defer { group.leave() }
+                while true {
+                    indexLock.lock()
+                    let index = nextIndex
+                    nextIndex += 1
+                    indexLock.unlock()
+
+                    guard index < preparedCaptures.count else { return }
+                    let preparedCapture = preparedCaptures[index]
+                    let outcome: CaptureOutcome
+                    if preparedCapture.candidateIDs.isEmpty {
+                        outcome = .failure(.windowNotFound)
+                    } else {
+                        captureSemaphore?.wait()
+                        outcome = captureWindowPreviewOutcome(
+                            preparedCapture,
+                            shareableWindowLookup: shareableWindowLookup
+                        )
+                        captureSemaphore?.signal()
+                    }
+
+                    resultsLock.lock()
+                    outcomes[index] = outcome
+                    resultsLock.unlock()
+                }
+            }
         }
-        return results
+        group.wait()
+        return outcomes
     }
 
-    private static func captureWindowPreview(
+    private static let previewCaptureWorkerQueue = DispatchQueue(
+        label: "FlowTab.preview.capture.worker",
+        qos: .userInitiated,
+        attributes: .concurrent
+    )
+
+    private static func captureWorkerCount(
+        requestCount: Int,
+        concurrencyPolicy: CaptureConcurrencyPolicy
+    ) -> Int {
+        min(requestCount, max(1, concurrencyPolicy.maxConcurrentCaptures))
+    }
+
+    private static func captureWindowPreviewOutcome(
         _ preparedCapture: PreparedCapture,
-        shareableWindowsByID: [CGWindowID: SCWindow]
-    ) -> CaptureResult? {
+        shareableWindowLookup: ShareableWindowLookup
+    ) -> CaptureOutcome {
+        var sawShareableCandidate = false
         for candidateID in preparedCapture.candidateIDs {
-            guard let shareableWindow = shareableWindowsByID[candidateID] else { continue }
+            guard let shareableWindow = shareableWindowLookup.windowsByID[candidateID] else { continue }
+            sawShareableCandidate = true
             guard let cgImage = captureWindow(shareableWindow: shareableWindow) else { continue }
             let titleBarStyle = preparedCapture.request.inferTitleBarStyle
                 ? estimateTitleBarStyle(from: cgImage)
@@ -147,17 +285,21 @@ enum RuntimeWindowPreviewProvider {
                 .preview,
                 "capture success pid=\(preparedCapture.request.ownerPID) windowID=\(candidateID) candidates=\(preparedCapture.candidateIDs.count) titleBarStyle=\(titleBarStyle?.rawValue ?? "nil")"
             )
-            return CaptureResult(
-                image: image,
-                resolvedWindowID: candidateID,
-                titleBarStyle: titleBarStyle
+            return .success(
+                CaptureResult(
+                    image: image,
+                    resolvedWindowID: candidateID,
+                    titleBarStyle: titleBarStyle
+                )
             )
         }
+        let failureReason = shareableWindowLookup.failureReason
+            ?? (sawShareableCandidate ? .transientSystemError : .windowNotFound)
         RuntimeLog.error(
             .preview,
-            "capture failed pid=\(preparedCapture.request.ownerPID) preferredID=\(preparedCapture.request.preferredWindowID.map(String.init) ?? "nil") title=\(preparedCapture.request.preferredTitle ?? "<empty>") candidates=\(preparedCapture.candidateIDs.map(String.init).joined(separator: ","))"
+            "capture failed pid=\(preparedCapture.request.ownerPID) preferredID=\(preparedCapture.request.preferredWindowID.map(String.init) ?? "nil") title=\(preparedCapture.request.preferredTitle ?? "<empty>") candidates=\(preparedCapture.candidateIDs.map(String.init).joined(separator: ",")) reason=\(failureReason.rawValue)"
         )
-        return nil
+        return .failure(failureReason)
     }
 
     private static func candidateWindowIDs(
@@ -255,36 +397,54 @@ enum RuntimeWindowPreviewProvider {
 
     private static func fetchShareableWindowsByID(
         onScreenWindowsOnly: Bool
-    ) -> [CGWindowID: SCWindow] {
-        var shareableContent: SCShareableContent?
-        var capturedError: Error?
+    ) -> ShareableWindowLookup {
+        let bridgeState = ScreenCaptureBridgeState<SCShareableContent>()
         let semaphore = DispatchSemaphore(value: 0)
         SCShareableContent.getExcludingDesktopWindows(
             true,
             onScreenWindowsOnly: onScreenWindowsOnly
         ) { content, error in
-            shareableContent = content
-            capturedError = error
+            if bridgeState.complete(value: content, error: error) == .callbackReturnedAfterTimeout {
+                RuntimeLog.debug(
+                    .preview,
+                    "shareable-content callback returned after timeout reason=\(ScreenCaptureBridgeFailure.callbackReturnedAfterTimeout.rawValue)"
+                )
+            }
             semaphore.signal()
         }
 
         let timeoutDate = DispatchTime.now() + shareableContentLookupTimeout
-        guard semaphore.wait(timeout: timeoutDate) == .success else {
-            RuntimeLog.warning(.preview, "shareable-content lookup timed out")
-            return [:]
+        let waitResult = semaphore.wait(timeout: timeoutDate)
+        if waitResult != .success, bridgeState.markTimedOutIfUncompleted() {
+            RuntimeLog.warning(
+                .preview,
+                "shareable-content lookup timed out reason=\(ScreenCaptureBridgeFailure.timedOut.rawValue)"
+            )
+            return ShareableWindowLookup(windowsByID: [:], failureReason: .screenCaptureUnavailable)
         }
-        if let capturedError {
-            RuntimeLog.error(.preview, "shareable-content lookup failed error=\(capturedError.localizedDescription)")
-            return [:]
+
+        let completion = bridgeState.completed()
+        if let capturedError = completion.error {
+            RuntimeLog.error(
+                .preview,
+                "shareable-content lookup failed reason=\(ScreenCaptureBridgeFailure.returnedError.rawValue) error=\(capturedError.localizedDescription)"
+            )
+            return ShareableWindowLookup(windowsByID: [:], failureReason: .screenCaptureUnavailable)
         }
-        guard let shareableContent else { return [:] }
+        guard let shareableContent = completion.value else {
+            RuntimeLog.debug(
+                .preview,
+                "shareable-content lookup returned no content reason=\(ScreenCaptureBridgeFailure.missingContent.rawValue)"
+            )
+            return ShareableWindowLookup(windowsByID: [:], failureReason: .screenCaptureUnavailable)
+        }
 
         var windowsByID: [CGWindowID: SCWindow] = [:]
         windowsByID.reserveCapacity(shareableContent.windows.count)
         for window in shareableContent.windows {
             windowsByID[window.windowID] = window
         }
-        return windowsByID
+        return ShareableWindowLookup(windowsByID: windowsByID, failureReason: nil)
     }
 
     private static func captureWindow(shareableWindow: SCWindow) -> CGImage? {
@@ -313,27 +473,42 @@ enum RuntimeWindowPreviewProvider {
         configuration.showsCursor = false
         configuration.ignoreShadowsSingleWindow = true
 
-        var capturedImage: CGImage?
-        var capturedError: Error?
+        let bridgeState = ScreenCaptureBridgeState<CGImage>()
         let semaphore = DispatchSemaphore(value: 0)
         SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration) { image, error in
-            capturedImage = image
-            capturedError = error
+            if bridgeState.complete(value: image, error: error) == .callbackReturnedAfterTimeout {
+                RuntimeLog.debug(
+                    .preview,
+                    "screenshot capture callback returned after timeout windowID=\(shareableWindow.windowID) reason=\(ScreenCaptureBridgeFailure.callbackReturnedAfterTimeout.rawValue)"
+                )
+            }
             semaphore.signal()
         }
 
         let timeoutDate = DispatchTime.now() + screenshotCaptureTimeout
-        guard semaphore.wait(timeout: timeoutDate) == .success else {
-            RuntimeLog.warning(.preview, "screenshot capture timed out windowID=\(shareableWindow.windowID)")
+        let waitResult = semaphore.wait(timeout: timeoutDate)
+        if waitResult != .success, bridgeState.markTimedOutIfUncompleted() {
+            RuntimeLog.warning(
+                .preview,
+                "screenshot capture timed out windowID=\(shareableWindow.windowID) reason=\(ScreenCaptureBridgeFailure.timedOut.rawValue)"
+            )
             return nil
         }
-        if let capturedError {
+
+        let completion = bridgeState.completed()
+        if let capturedError = completion.error {
             RuntimeLog.debug(
                 .preview,
-                "screenshot capture failed windowID=\(shareableWindow.windowID) error=\(capturedError.localizedDescription)"
+                "screenshot capture failed windowID=\(shareableWindow.windowID) reason=\(ScreenCaptureBridgeFailure.returnedError.rawValue) error=\(capturedError.localizedDescription)"
             )
         }
-        guard let capturedImage else { return nil }
+        guard let capturedImage = completion.value else {
+            RuntimeLog.debug(
+                .preview,
+                "screenshot capture returned no image windowID=\(shareableWindow.windowID) reason=\(ScreenCaptureBridgeFailure.missingContent.rawValue)"
+            )
+            return nil
+        }
         return normalizedPreviewImageIfNeeded(capturedImage)
     }
 
@@ -726,6 +901,33 @@ enum RuntimeWindowPreviewProvider {
         preferredWindowIDs: [CGWindowID?]
     ) -> Bool {
         shareableContentOnScreenOnly(preferredWindowIDs: preferredWindowIDs)
+    }
+
+    static func captureConcurrencyPolicyForTesting() -> CaptureConcurrencyPolicy {
+        .default
+    }
+
+    static func captureWorkerCountForTesting(
+        requestCount: Int,
+        concurrencyPolicy: CaptureConcurrencyPolicy = .default
+    ) -> Int {
+        captureWorkerCount(
+            requestCount: requestCount,
+            concurrencyPolicy: concurrencyPolicy
+        )
+    }
+
+    static func screenCaptureBridgeLateCallbackFailureForTesting() -> ScreenCaptureBridgeFailure? {
+        let state = ScreenCaptureBridgeState<Int>()
+        _ = state.markTimedOutIfUncompleted()
+        return state.complete(value: 1, error: nil)
+    }
+
+    static func screenCaptureBridgeUsesCompletedValueBeforeTimeoutMarkForTesting() -> Bool {
+        let state = ScreenCaptureBridgeState<Int>()
+        _ = state.complete(value: 42, error: nil)
+        let didMarkTimedOut = state.markTimedOutIfUncompleted()
+        return !didMarkTimedOut && state.completed().value == 42
     }
 }
 

@@ -16,6 +16,26 @@ extension FlowTabTests {
         XCTAssertEqual(coordinator.state.results.map(\.primaryText), ["Safari"])
     }
 
+    func testSearchDebouncedRebuildIgnoresStaleGeneration() {
+        let coordinator = SwitcherSearchCoordinator()
+        coordinator.rebuildIndex(with: searchSampleApps())
+        XCTAssertTrue(coordinator.activate(defaultScope: .app))
+
+        XCTAssertTrue(coordinator.appendQueryText("fari"))
+        let pendingRebuild = coordinator.pendingRebuildWorkItem
+        coordinator.pendingRebuildGeneration &+= 1
+
+        pendingRebuild?.perform()
+
+        XCTAssertNotNil(coordinator.pendingRebuildWorkItem)
+        XCTAssertNotEqual(coordinator.state.results.map(\.primaryText), ["Safari"])
+
+        coordinator.flushPendingRebuild()
+
+        XCTAssertNil(coordinator.pendingRebuildWorkItem)
+        XCTAssertEqual(coordinator.state.results.map(\.primaryText), ["Safari"])
+    }
+
     func testSearchMatchesCamelCaseAppBySegmentedWords() {
         let coordinator = SwitcherSearchCoordinator()
         coordinator.rebuildIndex(with: searchSampleApps())
@@ -511,6 +531,107 @@ extension FlowTabTests {
 
         XCTAssertEqual(fullSnapshotCalls, 0)
         XCTAssertLessThan(summary.p95, 100)
+    }
+
+    @MainActor
+    func testLiveSwitcherModelSnapshotInvalidationRecordTracksReasonAndScope() {
+        let model = LiveSwitcherModel()
+        model.deferredBackgroundFullSnapshotRefreshRequest = LiveSwitcherModel.BackgroundFullSnapshotRefreshRequest(
+            triggerDirection: .forward,
+            generation: model.backgroundFullSnapshotRefreshGeneration,
+            scheduledMs: 10
+        )
+
+        model.invalidateBackgroundFullSnapshotRefresh(reason: .commitSelection)
+
+        XCTAssertEqual(model.lastSnapshotInvalidationRecord?.reason, .commitSelection)
+        XCTAssertEqual(model.lastSnapshotInvalidationRecord?.scope, .backgroundFullSnapshot)
+        XCTAssertEqual(model.lastSnapshotInvalidationRecord?.backgroundGeneration, 1)
+        XCTAssertEqual(model.lastSnapshotInvalidationRecord?.selectedAppWindowGeneration, 0)
+        XCTAssertEqual(model.lastSnapshotInvalidationRecord?.clearedDeferredBackgroundRequest, true)
+        XCTAssertTrue(
+            model.lastSnapshotInvalidationRecord?.logMessage.contains("reason=commitSelection") ?? false
+        )
+
+        model.deferredBackgroundFullSnapshotRefreshRequest = LiveSwitcherModel.BackgroundFullSnapshotRefreshRequest(
+            triggerDirection: .forward,
+            generation: model.backgroundFullSnapshotRefreshGeneration,
+            scheduledMs: 20
+        )
+
+        model.invalidateSelectedAppWindowSnapshot(reason: .resetRuntimeState)
+
+        XCTAssertEqual(model.lastSnapshotInvalidationRecord?.reason, .resetRuntimeState)
+        XCTAssertEqual(model.lastSnapshotInvalidationRecord?.scope, .selectedAppWindowSnapshot)
+        XCTAssertEqual(model.lastSnapshotInvalidationRecord?.backgroundGeneration, 1)
+        XCTAssertEqual(model.lastSnapshotInvalidationRecord?.selectedAppWindowGeneration, 1)
+        XCTAssertEqual(model.lastSnapshotInvalidationRecord?.clearedDeferredBackgroundRequest, true)
+    }
+
+    @MainActor
+    func testLiveSwitcherModelBackgroundRefreshDiagnosticTracksGenerationReasonAndApplyGeneration() {
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let fastApp = AppSwitchCandidate(
+            id: appID,
+            displayName: currentApp.localizedName ?? "Current App",
+            groupID: "current",
+            lastActiveAt: 100,
+            windows: []
+        )
+        let fullApp = AppSwitchCandidate(
+            id: appID,
+            displayName: currentApp.localizedName ?? "Current App",
+            groupID: "current",
+            lastActiveAt: 100,
+            windows: [
+                WindowCandidate(
+                    id: "window-1",
+                    title: "Window 1",
+                    isMinimized: false,
+                    lastActiveAt: 100
+                )
+            ]
+        )
+        let fullContext = RuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windowsByID: [
+                "window-1": RuntimeWindowContext(
+                    id: "window-1",
+                    title: "Window 1",
+                    isMinimized: false,
+                    ownerPID: currentApp.processIdentifier
+                )
+            ]
+        )
+        let model = LiveSwitcherModel()
+        model.backgroundFullSnapshotRefreshEnabled = false
+        model.fastAppSnapshotProviderOverride = {
+            RuntimeSnapshot(apps: [fastApp], contextsByID: [appID: fullContext])
+        }
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        let generation = model.backgroundFullSnapshotRefreshGeneration
+        let startMs = LiveSwitcherModel.monotonicMilliseconds()
+        model.completeBackgroundFullSnapshotRefresh(
+            RuntimeSnapshot(apps: [fullApp], contextsByID: [appID: fullContext]),
+            triggerDirection: .forward,
+            generation: generation,
+            reason: .startSession,
+            startMs: startMs,
+            snapshotReadMs: startMs
+        )
+
+        let diagnostic = model.lastBackgroundFullSnapshotRefreshDiagnostic
+        XCTAssertEqual(diagnostic?.result, "applied")
+        XCTAssertEqual(diagnostic?.generation, generation)
+        XCTAssertEqual(diagnostic?.currentGeneration, generation)
+        XCTAssertEqual(diagnostic?.reason, .startSession)
+        XCTAssertEqual(diagnostic?.trigger, CycleDirection.forward.debugName)
+        XCTAssertEqual(diagnostic?.applyGeneration, generation)
+        XCTAssertTrue(diagnostic?.logMessage.contains("reason=startSession") ?? false)
+        XCTAssertTrue(diagnostic?.logMessage.contains("applyGeneration=\(generation)") ?? false)
     }
 
     @MainActor

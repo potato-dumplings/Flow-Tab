@@ -186,7 +186,20 @@ enum FrontmostWindowInspector {
                 failureReason: "focused_window_unavailable"
             )
         }
-        let focusedWindow = focusedWindowValue as! AXUIElement
+        guard case .success(let focusedWindow) = AXTypedAttributeReader.axElement(
+            from: focusedWindowValue,
+            attribute: kAXFocusedWindowAttribute as CFString
+        ) else {
+            return Inspection(
+                axTrusted: true,
+                appName: appName,
+                pid: app.processIdentifier,
+                focusedWindowAvailable: false,
+                focusedWindowTitle: nil,
+                fullScreenDetected: false,
+                failureReason: "focused_window_type_mismatch"
+            )
+        }
 
         var titleValue: CFTypeRef?
         let focusedWindowTitle: String?
