@@ -1,3 +1,4 @@
+import AppKit
 import XCTest
 
 extension FlowTabUITests {
@@ -169,6 +170,31 @@ extension FlowTabUITests {
         searchApp.typeText("Mail")
         RunLoop.current.run(until: Date().addingTimeInterval(0.8))
         XCTAssertFalse(element(in: searchApp, identifier: Identifier.switcherSearchAppMockMail).exists)
+    }
+
+    func testSettingsAppVisibilitySearchUsesSharedPinyinMatching() throws {
+        let app = makeApp(
+            additionalArguments: appVisibilityRuntimeArguments(resetDefaults: true)
+        )
+        launchFlowTabUITestApplication(app)
+        openSettingsTab(in: app)
+
+        let manageButton = element(in: app, identifier: Identifier.settingsAppVisibilityManage)
+        XCTAssertTrue(manageButton.waitForExistence(timeout: 6))
+        tapElement(manageButton)
+        XCTAssertTrue(element(in: app, identifier: Identifier.settingsAppVisibilityManager).waitForExistence(timeout: 6))
+
+        let managerSearch = app.textFields.firstMatch
+        XCTAssertTrue(managerSearch.waitForExistence(timeout: 6))
+        tapElement(managerSearch)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString("ceshi", forType: .string)
+        app.typeKey("v", modifierFlags: .command)
+
+        XCTAssertTrue(
+            element(in: app, identifier: Identifier.settingsAppVisibilityChineseTest)
+                .waitForExistence(timeout: 6)
+        )
     }
 
     func testSettingsAppVisibilityHiddenFilterShowsStoredHiddenAppMissingFromInventory() throws {

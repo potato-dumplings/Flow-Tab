@@ -50,6 +50,7 @@ final class FlowTabUITests: XCTestCase {
         static let settingsAppVisibilityFilterHidden = "flowtab.settings.app-visibility.filter.hidden"
         static let settingsAppVisibilityShowToggle = "flowtab.settings.app-visibility.show-toggle"
         static let settingsAppVisibilityMockMail = "flowtab.settings.app-visibility.app.\("com.flowtab.mock.mail".flowTabUITestAccessibilityIdentifierComponent)"
+        static let settingsAppVisibilityChineseTest = "flowtab.settings.app-visibility.app.\("com.xxx.test".flowTabUITestAccessibilityIdentifierComponent)"
         static let settingsPermissionAccessibilityAction = "flowtab.settings.permission.accessibility-action"
         static let settingsPermissionScreenCaptureAction = "flowtab.settings.permission.screen-capture-action"
         static let settingsPermissionLaunchAtLogin = "flowtab.settings.permission.launch-at-login"

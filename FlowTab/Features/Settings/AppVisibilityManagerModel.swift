@@ -1,4 +1,5 @@
 import Foundation
+import FlowTabCore
 
 @MainActor
 final class AppVisibilityManagerModel: ObservableObject {
@@ -43,11 +44,27 @@ final class AppVisibilityManagerModel: ObservableObject {
 
     var visibleApps: [InstalledAppRecord] {
         let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        return managedApps.filter { app in
-            guard matchesFilter(app) else { return false }
-            guard !trimmedQuery.isEmpty else { return true }
-            return matchesQuery(trimmedQuery, app: app)
+        let filteredApps = managedApps.enumerated().filter { _, app in
+            matchesFilter(app)
         }
+        guard !trimmedQuery.isEmpty else {
+            return filteredApps.map(\.element)
+        }
+
+        let searchKey = SearchTextMatcher.buildKey(from: trimmedQuery)
+        return filteredApps.compactMap { offset, app -> (app: InstalledAppRecord, score: Int, order: Int)? in
+            guard let score = matchScore(query: searchKey, rawQuery: trimmedQuery, app: app) else {
+                return nil
+            }
+            return (app, score, offset)
+        }
+        .sorted { lhs, rhs in
+            if lhs.score != rhs.score {
+                return lhs.score < rhs.score
+            }
+            return lhs.order < rhs.order
+        }
+        .map(\.app)
     }
 
     var hiddenCount: Int {
@@ -126,15 +143,23 @@ final class AppVisibilityManagerModel: ObservableObject {
         }
     }
 
-    private func matchesQuery(_ query: String, app: InstalledAppRecord) -> Bool {
-        let haystacks = [
-            app.displayName,
-            app.bundleIdentifier ?? "",
-            app.path ?? "",
-            app.id
-        ]
-        return haystacks.contains {
-            $0.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) != nil
+    private func matchScore(
+        query: SearchTextMatcher.Key,
+        rawQuery: String,
+        app: InstalledAppRecord
+    ) -> Int? {
+        let identifier = app.bundleIdentifier ?? app.id
+        let index = SearchTextMatcher.buildIndex(for: app.displayName, identifier: identifier)
+        let appScore = SearchTextMatcher.matchScore(query: query, in: index)
+        return SearchTextMatcher.bestScore(appScore, pathMatchScore(rawQuery, app: app))
+    }
+
+    private func pathMatchScore(_ query: String, app: InstalledAppRecord) -> Int? {
+        guard let path = app.path else { return nil }
+        guard let range = path.range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) else {
+            return nil
         }
+        let distance = path.distance(from: path.startIndex, to: range.lowerBound)
+        return 200 + distance
     }
 }

@@ -161,6 +161,16 @@ extension FlowTabTests {
         XCTAssertEqual(coordinator.state.results.map(\.primaryText), ["Visual Studio Code"])
     }
 
+    func testSearchMatchesEnglishCodeLikeSubsequence() {
+        let coordinator = SwitcherSearchCoordinator()
+        coordinator.rebuildIndex(with: searchSampleApps())
+        XCTAssertTrue(coordinator.activate(defaultScope: .app))
+
+        XCTAssertTrue(coordinator.appendQueryText("vce"))
+        drainPendingSearchRebuild(on: coordinator)
+        XCTAssertEqual(coordinator.state.results.map(\.primaryText), ["Visual Studio Code"])
+    }
+
     func testSearchMatchesByBundleIDButNotGenericComPrefix() {
         let coordinator = SwitcherSearchCoordinator()
         coordinator.rebuildIndex(with: searchSampleApps())
@@ -328,11 +338,11 @@ extension FlowTabTests {
         }
 
         let rounds = 3
+        let queryCoordinator = SwitcherSearchCoordinator()
+        queryCoordinator.rebuildIndex(with: apps)
+        _ = queryCoordinator.activate(defaultScope: .window)
         let queryNanos = measureNanos {
-            let coordinator = SwitcherSearchCoordinator()
-            coordinator.rebuildIndex(with: apps)
-            _ = coordinator.activate(defaultScope: .window)
-            runBaselineQueries(queries, on: coordinator, rounds: rounds)
+            runBaselineQueries(queries, on: queryCoordinator, rounds: rounds)
         }
         let buildMs = nanosToMilliseconds(buildNanos)
         let queryMs = nanosToMilliseconds(queryNanos)
@@ -366,11 +376,11 @@ extension FlowTabTests {
             coordinator.rebuildIndex(with: apps)
         }
 
+        let queryCoordinator = SwitcherSearchCoordinator()
+        queryCoordinator.rebuildIndex(with: apps)
+        _ = queryCoordinator.activate(defaultScope: .window)
         let queryNanos = measureNanos {
-            let coordinator = SwitcherSearchCoordinator()
-            coordinator.rebuildIndex(with: apps)
-            _ = coordinator.activate(defaultScope: .window)
-            runBaselineQueries(queries, on: coordinator, rounds: rounds)
+            runBaselineQueries(queries, on: queryCoordinator, rounds: rounds)
         }
 
         let buildMs = nanosToMilliseconds(buildNanos)
@@ -405,11 +415,11 @@ extension FlowTabTests {
             coordinator.rebuildIndex(with: apps)
         }
 
+        let queryCoordinator = SwitcherSearchCoordinator()
+        queryCoordinator.rebuildIndex(with: apps)
+        _ = queryCoordinator.activate(defaultScope: .window)
         let queryNanos = measureNanos {
-            let coordinator = SwitcherSearchCoordinator()
-            coordinator.rebuildIndex(with: apps)
-            _ = coordinator.activate(defaultScope: .window)
-            runBaselineQueries(queries, on: coordinator, rounds: rounds)
+            runBaselineQueries(queries, on: queryCoordinator, rounds: rounds)
         }
 
         let buildMs = nanosToMilliseconds(buildNanos)

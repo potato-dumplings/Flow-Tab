@@ -103,6 +103,30 @@ extension FlowTabUITests {
         XCTAssertTrue(chineseResult.waitForExistence(timeout: 5))
     }
 
+    func testSearchPanelCodeLikeSubsequenceShowsMockResult() throws {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-open-switcher-search",
+                "-showPermissionReminder",
+                "NO"
+            ]
+        )
+        launchFlowTabUITestApplication(app)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+
+        XCTAssertTrue(element(in: app, identifier: Identifier.switcherSearchInput).waitForExistence(timeout: 5))
+
+        RunLoop.current.run(until: Date().addingTimeInterval(0.4))
+        app.typeText("cgo")
+
+        let csgoResult = app.descendants(matching: .any)
+            .matching(identifier: "flowtab.switcher.search.app.\("com.xxx.csgo".flowTabUITestAccessibilityIdentifierComponent)")
+            .firstMatch
+        XCTAssertTrue(csgoResult.waitForExistence(timeout: 5))
+    }
+
     func testSearchPanelSegmentedChineseQueryShowsCompoundMockResult() throws {
         let app = makeApp(
             additionalArguments: [

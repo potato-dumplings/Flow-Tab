@@ -607,28 +607,28 @@ gh release create "${TAG}" release/"${TAG}"/flowtab-universal2-apple-darwin.dmg 
 
 ### 最近一次快速基线（A-only）
 
-执行时间：`2026-03-29`
+执行时间：`2026-05-17`
 
 执行命令：
 ```bash
-xcodebuild \
-  -project FlowTab.xcodeproj \
-  -scheme FlowTab \
-  -destination "platform=macOS,arch=$(uname -m)" \
+./scripts/testing/run-flowtabtests-local.sh \
   -only-testing:FlowTabTests/FlowTabTests/testSearchPerformanceWindowScope \
   -only-testing:FlowTabTests/FlowTabTests/testSearchPressureWindowScopeUnified \
-  test
+  -only-testing:FlowTabTests/FlowTabTests/testSearchPressureWindowScopeSegmentedQueries
 ```
 
-数据集（两条用例一致）：
+数据集（以上用例一致）：
 - `400 apps x 25 windows = 10,000 windows`
 - `rounds = 3`
-- `queries = 120`
+- unified query set：`queries = 132`
+- segmented query set：`queries = 66`
 
 结果：
-- `testSearchPerformanceWindowScope`：`build=844.84ms`，`query=1630.67ms`，`throughput=73.59 qps`，用例总耗时 `3.334s`
-- `testSearchPressureWindowScopeUnified`：`build=828.06ms`，`query=1618.97ms`，`throughput=74.12 qps`，用例总耗时 `3.289s`
+- `testSearchPerformanceWindowScope`：`build=2489.17ms`，`query=1105.75ms`，`throughput=119.38 qps`
+- `testSearchPressureWindowScopeUnified`：`build=2265.44ms`，`query=1099.34ms`，`throughput=120.07 qps`
+- `testSearchPressureWindowScopeSegmentedQueries`：`build=2415.58ms`，`query=265.31ms`，`queries=66`，`throughput=248.77 qps`
 
 说明：
 - 该基线用于快速回归检查（算法路径与吞吐）。
+- `build` 单独度量索引构建；`query` 仅度量已建索引后的查询序列，不包含 `rebuildIndex(with:)`。
 - 完整发布前压测仍需按上文要求补齐 `30s` 的 `%CPU/RSS` 采样与 `avg/p95/max` 对比。

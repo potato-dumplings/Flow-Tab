@@ -60,25 +60,9 @@ enum SwitcherSearchEscapeAction: Sendable {
 }
 
 final class SwitcherSearchCoordinator {
-    struct SearchKey: Sendable {
-        let normalized: String
-        let compact: String
-        let terms: [String]
-    }
-
-    struct SearchIndex: Sendable {
-        let normalized: String
-        let compact: String
-        let terms: [String]
-        let latinNormalized: String
-        let latinCompact: String
-        let latinTerms: [String]
-        let initials: String
-        let uppercaseAbbreviation: String
-        let identifierTerms: [String]
-        let coarseTerms: [String]
-        let coarseBigrams: [String]
-    }
+    typealias SearchKey = SearchTextMatcher.Key
+    typealias SearchIndex = SearchTextMatcher.Index
+    typealias RankedResult = SearchTextMatcher.RankedResult
 
     struct AppEntry: Sendable {
         let appID: String
@@ -93,11 +77,6 @@ final class SwitcherSearchCoordinator {
         let windowTitle: String
         let windowSearchIndex: SearchIndex
         let appSearchIndex: SearchIndex
-    }
-
-    struct RankedResult: Sendable {
-        let score: Int
-        let order: Int
     }
 
     struct QueryCacheEntry: Sendable {
@@ -162,7 +141,6 @@ final class SwitcherSearchCoordinator {
     static let longQueryMatchedIndexesLimit: Int = 2_000
     static let shortQueryThreshold: Int = 2
     static let queryDebounceNanoseconds: UInt64 = 10_000_000
-    static let ignoredBundleIDTokens: Set<String> = ["com", "org", "net", "io", "app", "www"]
 
     // Search happens on every key press, so we pre-normalize source text once per session.
     func rebuildIndex(with apps: [AppSwitchCandidate]) {
@@ -203,21 +181,7 @@ final class SwitcherSearchCoordinator {
         appInvertedIndex = Self.buildScopeInvertedIndex(from: appEntries.map(\.searchIndex))
         windowInvertedIndex = Self.buildScopeInvertedIndex(
             from: windowEntries.map { window in
-                let mergedTerms = Set(window.windowSearchIndex.coarseTerms).union(window.appSearchIndex.coarseTerms)
-                let mergedBigrams = Set(window.windowSearchIndex.coarseBigrams).union(window.appSearchIndex.coarseBigrams)
-                return SearchIndex(
-                    normalized: window.windowSearchIndex.normalized,
-                    compact: window.windowSearchIndex.compact,
-                    terms: window.windowSearchIndex.terms,
-                    latinNormalized: window.windowSearchIndex.latinNormalized,
-                    latinCompact: window.windowSearchIndex.latinCompact,
-                    latinTerms: window.windowSearchIndex.latinTerms,
-                    initials: window.windowSearchIndex.initials,
-                    uppercaseAbbreviation: window.windowSearchIndex.uppercaseAbbreviation,
-                    identifierTerms: window.windowSearchIndex.identifierTerms,
-                    coarseTerms: Array(mergedTerms),
-                    coarseBigrams: Array(mergedBigrams)
-                )
+                window.windowSearchIndex.mergingCoarseTerms(with: window.appSearchIndex)
             }
         )
         appMatchCache = nil
