@@ -217,6 +217,46 @@ extension FlowTabUITests {
         )
     }
 
+    func testHomeAppLayerHidesZeroWindowNestedAppsFromMockWeChatTopology() throws {
+        var launchArguments = homeAppVisibilityRuntimeArguments(resetDefaults: true)
+        launchArguments += [
+            "--flowtab-ui-mock-runtime-variant",
+            "nested-zero-window-apps"
+        ]
+
+        let app = makeApp(additionalArguments: launchArguments)
+        launchFlowTabUITestApplication(app)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
+        XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5))
+        XCTAssertTrue(element(in: app, identifier: Identifier.homeTabContent).waitForExistence(timeout: 5))
+
+        let hostWeChatRow = element(in: app, identifier: Identifier.homeAppWeChat)
+        let nestedAppExRow = element(in: app, identifier: Identifier.homeAppNestedWeChatAppEx)
+        let nestedMiniProgramRow = element(in: app, identifier: Identifier.homeAppNestedMiniProgram)
+        let topLevelZeroWindowRow = element(in: app, identifier: Identifier.homeAppTopLevelZeroWindow)
+
+        XCTAssertTrue(hostWeChatRow.waitForExistence(timeout: 8))
+        XCTAssertTrue(topLevelZeroWindowRow.waitForExistence(timeout: 8))
+        tapElement(hostWeChatRow)
+        assertHomeWindowTitle("微信", in: app, timeout: 6)
+        assertHomeWindowTitle("微信（窗口）", in: app, timeout: 6)
+        assertHomeWindowTitle("Mock Mini Program Window", in: app, timeout: 6)
+
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = "Home app layer nested zero-window topology"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+
+        XCTAssertFalse(
+            nestedAppExRow.waitForExistence(timeout: 2),
+            "Home should hide zero-window nested app rows when the outer host app is already visible."
+        )
+        XCTAssertFalse(
+            nestedMiniProgramRow.exists,
+            "Home should hide deeper zero-window nested app rows while keeping ordinary top-level 0w apps visible."
+        )
+    }
+
     func testPermissionReminderTogglePersistsAcrossRelaunch() throws {
         let firstLaunchApp = makeApp(
             additionalArguments: [

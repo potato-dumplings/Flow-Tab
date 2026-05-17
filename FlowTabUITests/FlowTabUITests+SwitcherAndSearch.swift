@@ -204,6 +204,95 @@ extension FlowTabUITests {
         )
     }
 
+    func testOptionTabSwitcherHidesZeroWindowNestedAppsFromMockWeChatTopology() throws {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-mock-runtime-variant",
+                "nested-zero-window-apps",
+                "--flowtab-ui-enable-mock-hotkey-effects",
+                "--flowtab-ui-listen-switcher-trigger",
+                "--flowtab-ui-runtime-log-level",
+                "DEBUG",
+                "--flowtab-ui-enable-verbose-logs",
+                "-showPermissionReminder",
+                "NO",
+                "--flowtab-ui-ax-trusted",
+                "YES",
+                "--flowtab-ui-screen-trusted",
+                "YES"
+            ] + FlowTabUITestSwitcherCommandPayload.launchArguments
+        )
+        launchFlowTabUITestApplication(app)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+
+        let hostWeChatRow = element(in: app, identifier: Identifier.switcherAppWeChat)
+        let topLevelZeroWindowRow = element(in: app, identifier: Identifier.switcherAppTopLevelZeroWindow)
+        let logSnapshot = makeRuntimeLogFileSnapshot()
+        try FlowTabUITestSwitcherCommandPayload.write("com.tencent.xinWeChat")
+
+        app.activate()
+        XCUIElement.perform(withKeyModifiers: .option) {
+            app.typeKey(.tab, modifierFlags: .option)
+
+            XCTAssertTrue(
+                hostWeChatRow.waitForExistence(timeout: 8),
+                "Option+Tab should open the switcher with the outer WeChat app row."
+            )
+            XCTAssertTrue(
+                topLevelZeroWindowRow.waitForExistence(timeout: 8),
+                "The nested-app filter must not hide ordinary top-level 0w apps."
+            )
+            let switcherAppIdentifiers = Set(
+                app.descendants(matching: .any)
+                    .matching(NSPredicate(format: "identifier BEGINSWITH %@", "flowtab.switcher.app."))
+                    .allElementsBoundByIndex
+                    .map(\.identifier)
+            )
+            XCTAssertFalse(
+                switcherAppIdentifiers.contains(Identifier.switcherAppNestedWeChatAppEx),
+                """
+                The switcher app layer should hide zero-window helper apps nested in a visible host app bundle.
+                Switcher app identifiers: \(switcherAppIdentifiers.sorted())
+                """
+            )
+            XCTAssertFalse(
+                switcherAppIdentifiers.contains(Identifier.switcherAppNestedMiniProgram),
+                """
+                The switcher app layer should hide deeper zero-window helper apps nested in a visible host app bundle.
+                Switcher app identifiers: \(switcherAppIdentifiers.sorted())
+                """
+            )
+
+            postFlowTabUITestSwitcherCommandAndWaitForDelivery(.selectApp, traceLabel: "nestedTopology.selectWeChat")
+            app.typeKey(.downArrow, modifierFlags: [])
+            _ = waitForSwitcherWindowCards(
+                in: app,
+                expectedTitles: [
+                    "微信",
+                    "微信（窗口）",
+                    "Mock Mini Program Window"
+                ],
+                timeout: 6
+            )
+
+            let screenshot = XCTAttachment(screenshot: app.screenshot())
+            screenshot.name = "Option Tab switcher nested zero-window topology"
+            screenshot.lifetime = .keepAlways
+            add(screenshot)
+        }
+
+        waitForRuntimeLogFiles(
+            containing: [
+                "hotkeyPressed dir=forward panelVisible=0 action=show",
+                "HotKey Forward"
+            ],
+            since: logSnapshot,
+            timeout: 10
+        )
+    }
+
     func testSwitcherWindowLayerPaginatesLargeMockWindowSet() throws {
         let app = makeApp(
             additionalArguments: [

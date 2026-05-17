@@ -78,6 +78,7 @@
 		B30011012FF300100B0D737 /* FlowTabPriorityCoverageTests+WindowPreviewSessionPinning.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30001012FF300100B0D737 /* FlowTabPriorityCoverageTests+WindowPreviewSessionPinning.swift */; };
 		B31011012FF400100B0D737 /* FlowTabPriorityCoverageTests+StatusItemLifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31001012FF400100B0D737 /* FlowTabPriorityCoverageTests+StatusItemLifecycle.swift */; };
 		B33011012FF700100B0D737 /* FlowTabPriorityCoverageTests+InitialVisibilityPressure.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33001012FF700100B0D737 /* FlowTabPriorityCoverageTests+InitialVisibilityPressure.swift */; };
+		B34011012FF800100B0D737 /* FlowTabPriorityCoverageTests+NestedAppPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B34001012FF800100B0D737 /* FlowTabPriorityCoverageTests+NestedAppPresentation.swift */; };
 		F7B8C9D435B8000100B0D737 /* FlowTabTests+LaunchAtLogin.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7B8C9D335B8000100B0D737 /* FlowTabTests+LaunchAtLogin.swift */; };
 		B10012012F76000100B0D737 /* FlowTabUITests+HomeAndLogs.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002012F76000100B0D737 /* FlowTabUITests+HomeAndLogs.swift */; };
 		B10012022F76000100B0D737 /* FlowTabUITests+Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002022F76000100B0D737 /* FlowTabUITests+Settings.swift */; };
@@ -257,6 +258,7 @@
 		B30001012FF300100B0D737 /* FlowTabPriorityCoverageTests+WindowPreviewSessionPinning.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+WindowPreviewSessionPinning.swift"; sourceTree = "<group>"; };
 		B31001012FF400100B0D737 /* FlowTabPriorityCoverageTests+StatusItemLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+StatusItemLifecycle.swift"; sourceTree = "<group>"; };
 		B33001012FF700100B0D737 /* FlowTabPriorityCoverageTests+InitialVisibilityPressure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+InitialVisibilityPressure.swift"; sourceTree = "<group>"; };
+		B34001012FF800100B0D737 /* FlowTabPriorityCoverageTests+NestedAppPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+NestedAppPresentation.swift"; sourceTree = "<group>"; };
 		F7B8C9D335B8000100B0D737 /* FlowTabTests+LaunchAtLogin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+LaunchAtLogin.swift"; sourceTree = "<group>"; };
 		B10002012F76000100B0D737 /* FlowTabUITests+HomeAndLogs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+HomeAndLogs.swift"; sourceTree = "<group>"; };
 		B10002022F76000100B0D737 /* FlowTabUITests+Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+Settings.swift"; sourceTree = "<group>"; };
@@ -446,6 +448,7 @@
 				B30001012FF300100B0D737 /* FlowTabPriorityCoverageTests+WindowPreviewSessionPinning.swift */,
 				B31001012FF400100B0D737 /* FlowTabPriorityCoverageTests+StatusItemLifecycle.swift */,
 				B33001012FF700100B0D737 /* FlowTabPriorityCoverageTests+InitialVisibilityPressure.swift */,
+				B34001012FF800100B0D737 /* FlowTabPriorityCoverageTests+NestedAppPresentation.swift */,
 				B100010D2F76000100B0D737 /* FlowTabPriorityCoverageTests+Support.swift */,
 				B100010E2F76000100B0D737 /* FlowTabPriorityCoverageTests+TestDoubles.swift */,
 				B100010F2F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeActivationRecovery.swift */,
@@ -996,6 +999,7 @@
 				B30011012FF300100B0D737 /* FlowTabPriorityCoverageTests+WindowPreviewSessionPinning.swift in Sources */,
 				B31011012FF400100B0D737 /* FlowTabPriorityCoverageTests+StatusItemLifecycle.swift in Sources */,
 				B33011012FF700100B0D737 /* FlowTabPriorityCoverageTests+InitialVisibilityPressure.swift in Sources */,
+				B34011012FF800100B0D737 /* FlowTabPriorityCoverageTests+NestedAppPresentation.swift in Sources */,
 				B100110D2F76000100B0D737 /* FlowTabPriorityCoverageTests+Support.swift in Sources */,
 				B100110E2F76000100B0D737 /* FlowTabPriorityCoverageTests+TestDoubles.swift in Sources */,
 				B100110F2F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeActivationRecovery.swift in Sources */,

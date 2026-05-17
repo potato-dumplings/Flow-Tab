@@ -77,7 +77,8 @@ extension RuntimeSnapshotProvider {
         appID: String,
         name: String,
         windows: [WindowCandidate],
-        rank: Int
+        rank: Int,
+        bundleURL: URL?
     )
 
     private static func uiTestAppDefinitions(
@@ -99,7 +100,8 @@ extension RuntimeSnapshotProvider {
                             lastActiveAt: lastActiveAt
                         )
                     ],
-                    rank: item - 1
+                    rank: item - 1,
+                    bundleURL: nil
                 )
             }
         case "single-app-five-windows":
@@ -129,7 +131,8 @@ extension RuntimeSnapshotProvider {
                             lastActiveAt: 296
                         )
                     ],
-                    rank: 0
+                    rank: 0,
+                    bundleURL: nil
                 )
             ]
         case "single-app-many-windows":
@@ -146,7 +149,8 @@ extension RuntimeSnapshotProvider {
                     appID: "com.flowtab.mock.many-windows",
                     name: "Mock Many Windows",
                     windows: windows,
-                    rank: 0
+                    rank: 0,
+                    bundleURL: nil
                 )
             ]
         case "focused-current-app":
@@ -171,7 +175,8 @@ extension RuntimeSnapshotProvider {
                             lastActiveAt: 299
                         )
                     ],
-                    rank: 0
+                    rank: 0,
+                    bundleURL: nil
                 )
             ]
         case "minimized-window-behavior":
@@ -183,7 +188,8 @@ extension RuntimeSnapshotProvider {
                         WindowCandidate(id: "mock-mail-inbox", title: "Inbox", isMinimized: false, lastActiveAt: 300),
                         WindowCandidate(id: "mock-mail-draft", title: "Draft", isMinimized: false, lastActiveAt: 299)
                     ],
-                    rank: 0
+                    rank: 0,
+                    bundleURL: nil
                 ),
                 (
                     appID: "com.flowtab.mock.minimized-notes",
@@ -202,7 +208,53 @@ extension RuntimeSnapshotProvider {
                             lastActiveAt: 289
                         )
                     ],
-                    rank: 1
+                    rank: 1,
+                    bundleURL: nil
+                )
+            ]
+        case "nested-zero-window-apps":
+            return [
+                (
+                    appID: "com.tencent.xinWeChat",
+                    name: "WeChat",
+                    windows: [
+                        WindowCandidate(id: "mock-wechat-main", title: "微信", isMinimized: false, lastActiveAt: 300),
+                        WindowCandidate(
+                            id: "mock-wechat-app-ex-window",
+                            title: "微信（窗口）",
+                            isMinimized: false,
+                            lastActiveAt: 299
+                        ),
+                        WindowCandidate(
+                            id: "mock-wechat-mini-program",
+                            title: "Mock Mini Program Window",
+                            isMinimized: false,
+                            lastActiveAt: 298
+                        )
+                    ],
+                    rank: 0,
+                    bundleURL: URL(fileURLWithPath: "/Applications/WeChat.app")
+                ),
+                (
+                    appID: "com.tencent.flue.WeChatAppEx",
+                    name: "WeChat",
+                    windows: [],
+                    rank: 1,
+                    bundleURL: URL(fileURLWithPath: "/Applications/WeChat.app/Contents/MacOS/WeChatAppEx.app")
+                ),
+                (
+                    appID: "com.tencent.flue.WeApp",
+                    name: "Mini Program",
+                    windows: [],
+                    rank: 2,
+                    bundleURL: URL(fileURLWithPath: "/Applications/WeChat.app/Contents/MacOS/WeChatAppEx.app/Contents/Frameworks/WeChatAppEx Framework.framework/Versions/C/Helpers/WeApp.app")
+                ),
+                (
+                    appID: "com.flowtab.mock.top-level-zero-window",
+                    name: "Mock Top Level Zero Window",
+                    windows: [],
+                    rank: 3,
+                    bundleURL: URL(fileURLWithPath: "/Applications/Mock Top Level Zero Window.app")
                 )
             ]
         case "single-app-five-windows-cg-offspace":
@@ -217,7 +269,8 @@ extension RuntimeSnapshotProvider {
                         WindowCandidate(id: "cg:100:243679", title: "Window #4", isMinimized: false, lastActiveAt: 297),
                         WindowCandidate(id: "cg:100:240029", title: "Window #5", isMinimized: false, lastActiveAt: 296)
                     ],
-                    rank: 0
+                    rank: 0,
+                    bundleURL: nil
                 )
             ]
         case "single-app-five-windows-cg-offspace-titled":
@@ -232,7 +285,8 @@ extension RuntimeSnapshotProvider {
                         WindowCandidate(id: "cg:100:243679", title: "Fullscreen 4", isMinimized: false, lastActiveAt: 297),
                         WindowCandidate(id: "cg:100:240029", title: "Fullscreen 5", isMinimized: false, lastActiveAt: 296)
                     ],
-                    rank: 0
+                    rank: 0,
+                    bundleURL: nil
                 )
             ]
         default:
@@ -244,7 +298,8 @@ extension RuntimeSnapshotProvider {
                         WindowCandidate(id: "mock-mail-inbox", title: "Inbox", isMinimized: false, lastActiveAt: 300),
                         WindowCandidate(id: "mock-mail-draft", title: "Draft", isMinimized: false, lastActiveAt: 299)
                     ],
-                    rank: 0
+                    rank: 0,
+                    bundleURL: nil
                 ),
                 (
                     appID: "com.flowtab.mock.browser",
@@ -252,7 +307,8 @@ extension RuntimeSnapshotProvider {
                     windows: [
                         WindowCandidate(id: "mock-browser-docs", title: "Docs", isMinimized: false, lastActiveAt: 290)
                     ],
-                    rank: 1
+                    rank: 1,
+                    bundleURL: nil
                 ),
                 (
                     appID: "com.flowtab.mock.flow-search",
@@ -265,7 +321,8 @@ extension RuntimeSnapshotProvider {
                             lastActiveAt: 285
                         )
                     ],
-                    rank: 2
+                    rank: 2,
+                    bundleURL: nil
                 ),
                 (
                     appID: "com.xxx.test",
@@ -273,7 +330,8 @@ extension RuntimeSnapshotProvider {
                     windows: [
                         WindowCandidate(id: "mock-test-cases", title: "用例", isMinimized: false, lastActiveAt: 280)
                     ],
-                    rank: 3
+                    rank: 3,
+                    bundleURL: nil
                 ),
                 (
                     appID: "com.xxx.csgo",
@@ -281,7 +339,8 @@ extension RuntimeSnapshotProvider {
                     windows: [
                         WindowCandidate(id: "mock-csgo-dust2", title: "Dust2", isMinimized: false, lastActiveAt: 270)
                     ],
-                    rank: 4
+                    rank: 4,
+                    bundleURL: nil
                 ),
                 (
                     appID: "com.flowtab.mock.file-transfer-assistant",
@@ -294,7 +353,8 @@ extension RuntimeSnapshotProvider {
                             lastActiveAt: 260
                         )
                     ],
-                    rank: 5
+                    rank: 5,
+                    bundleURL: nil
                 )
             ]
         }
@@ -304,13 +364,20 @@ extension RuntimeSnapshotProvider {
         guard FlowTabTestLaunchOptions.usesMockRuntimeSnapshot else { return nil }
 
         let runningApp = NSRunningApplication.current
-        let appDefinitions = uiTestAppDefinitions(variant: FlowTabTestLaunchOptions.mockRuntimeVariant)
+        let availableAppDefinitions = uiTestAppDefinitions(variant: FlowTabTestLaunchOptions.mockRuntimeVariant)
             .filter { definition in
                 !FlowTabTestLaunchOptions.enablesMockHotkeyEffects
                     || !FlowTabUITestMockRuntimeEffects.isTerminated(appID: definition.appID)
             }
+        let candidateAppBundlePaths = Set(
+            availableAppDefinitions.compactMap { standardizedAppBundlePath(for: $0.bundleURL) }
+        )
+        let appDefinitions = availableAppDefinitions
             .filter { definition in
-                shouldIncludeUITestAppDefinitionInAppLayer(definition)
+                shouldIncludeUITestAppDefinitionInAppLayer(
+                    definition,
+                    candidateAppBundlePaths: candidateAppBundlePaths
+                )
             }
 
         let candidates = appDefinitions.map { definition in
@@ -444,11 +511,19 @@ extension RuntimeSnapshotProvider {
     }
 
     private static func shouldIncludeUITestAppDefinitionInAppLayer(
-        _ definition: UITestAppDefinition
+        _ definition: UITestAppDefinition,
+        candidateAppBundlePaths: Set<String>
     ) -> Bool {
         let hideMinimizedAppsFromAppLayer =
             SwitcherBehaviorPreferencesStore.loadHideMinimizedAppsFromAppLayer()
         let hasVisibleWindow = definition.windows.contains { !$0.isMinimized }
+        guard !shouldHideZeroWindowNestedApp(
+            hasWindows: !definition.windows.isEmpty,
+            bundleURL: definition.bundleURL,
+            candidateAppBundlePaths: candidateAppBundlePaths
+        ) else {
+            return false
+        }
         return shouldIncludeAppInAppLayer(
             hasWindows: !definition.windows.isEmpty,
             hasVisibleWindow: hasVisibleWindow,

@@ -11,7 +11,24 @@ private enum FlowTabUITestAppDefaults {
     static let defaultBundleIdentifier = "io.github.potato-dumplings.flowtab"
 
     static var installedAppURL: URL {
-        URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)
+        let sandboxHomeURL = installedAppURL(homeDirectory: NSHomeDirectory())
+        if FileManager.default.fileExists(atPath: sandboxHomeURL.path) {
+            return sandboxHomeURL
+        }
+
+        guard let accountHomeDirectory = NSHomeDirectoryForUser(NSUserName()) else {
+            return sandboxHomeURL
+        }
+        let accountHomeURL = installedAppURL(homeDirectory: accountHomeDirectory)
+        if FileManager.default.fileExists(atPath: accountHomeURL.path) {
+            return accountHomeURL
+        }
+
+        return sandboxHomeURL
+    }
+
+    private static func installedAppURL(homeDirectory: String) -> URL {
+        URL(fileURLWithPath: homeDirectory, isDirectory: true)
             .appendingPathComponent("Applications", isDirectory: true)
             .appendingPathComponent("Flow Tab UITest.app", isDirectory: true)
     }

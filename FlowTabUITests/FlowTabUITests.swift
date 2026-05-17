@@ -19,6 +19,13 @@ final class FlowTabUITests: XCTestCase {
         static let homeAppList = "flowtab.home.app.list"
         static let homeAppMockBrowser = "flowtab.home.app.\("com.flowtab.mock.browser".flowTabUITestAccessibilityIdentifierComponent)"
         static let homeAppMockMail = "flowtab.home.app.\("com.flowtab.mock.mail".flowTabUITestAccessibilityIdentifierComponent)"
+        static let homeAppWeChat = "flowtab.home.app.\("com.tencent.xinWeChat".flowTabUITestAccessibilityIdentifierComponent)"
+        static let homeAppNestedWeChatAppEx =
+            "flowtab.home.app.\("com.tencent.flue.WeChatAppEx".flowTabUITestAccessibilityIdentifierComponent)"
+        static let homeAppNestedMiniProgram =
+            "flowtab.home.app.\("com.tencent.flue.WeApp".flowTabUITestAccessibilityIdentifierComponent)"
+        static let homeAppTopLevelZeroWindow =
+            "flowtab.home.app.\("com.flowtab.mock.top-level-zero-window".flowTabUITestAccessibilityIdentifierComponent)"
         static let homeWindowList = "flowtab.home.window.list"
         static let logsTabContent = "flowtab.tab.logs.content"
         static let settingsTabContent = "flowtab.tab.settings.content"
@@ -69,6 +76,13 @@ final class FlowTabUITests: XCTestCase {
         static let switcherAppMockMail = "flowtab.switcher.app.\("com.flowtab.mock.mail".flowTabUITestAccessibilityIdentifierComponent)"
         static let switcherAppMockManyWindows = "flowtab.switcher.app.\("com.flowtab.mock.many-windows".flowTabUITestAccessibilityIdentifierComponent)"
         static let switcherAppMockMinimizedNotes = "flowtab.switcher.app.\("com.flowtab.mock.minimized-notes".flowTabUITestAccessibilityIdentifierComponent)"
+        static let switcherAppWeChat = "flowtab.switcher.app.\("com.tencent.xinWeChat".flowTabUITestAccessibilityIdentifierComponent)"
+        static let switcherAppNestedWeChatAppEx =
+            "flowtab.switcher.app.\("com.tencent.flue.WeChatAppEx".flowTabUITestAccessibilityIdentifierComponent)"
+        static let switcherAppNestedMiniProgram =
+            "flowtab.switcher.app.\("com.tencent.flue.WeApp".flowTabUITestAccessibilityIdentifierComponent)"
+        static let switcherAppTopLevelZeroWindow =
+            "flowtab.switcher.app.\("com.flowtab.mock.top-level-zero-window".flowTabUITestAccessibilityIdentifierComponent)"
         static let switcherNextWindowPage = "flowtab.switcher.window-page.next"
         static let switcherSearchInput = "flowtab.switcher.search.input"
         static let switcherSearchAppMockMail = "flowtab.switcher.search.app.\("com.flowtab.mock.mail".flowTabUITestAccessibilityIdentifierComponent)"
