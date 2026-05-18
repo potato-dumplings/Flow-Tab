@@ -91,6 +91,7 @@ enum SwitcherPanelWindowConfiguration {
 
     static let styleMask: NSWindow.StyleMask = [.borderless, .nonactivatingPanel]
     static let level: NSWindow.Level = .statusBar
+    static let sharingType: NSWindow.SharingType = .none
     static let fallbackPresentationLevel = NSWindow.Level(
         rawValue: Int(CGShieldingWindowLevel()) + 1
     )

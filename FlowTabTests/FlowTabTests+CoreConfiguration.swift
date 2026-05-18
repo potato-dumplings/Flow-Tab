@@ -770,6 +770,7 @@ extension FlowTabTests {
         let styleMask = SwitcherPanelWindowConfiguration.styleMask
 
         XCTAssertEqual(SwitcherPanelWindowConfiguration.level, .statusBar)
+        XCTAssertEqual(SwitcherPanelWindowConfiguration.sharingType, .none)
         XCTAssertTrue(styleMask.contains(.borderless))
         XCTAssertTrue(styleMask.contains(.nonactivatingPanel))
         XCTAssertTrue(behavior.contains(.canJoinAllSpaces))

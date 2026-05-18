@@ -270,6 +270,7 @@ final class SwitcherPanelController {
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = false
+        panel.sharingType = SwitcherPanelWindowConfiguration.sharingType
         panel.becomesKeyOnlyIfNeeded = false
         panel.identifier = NSUserInterfaceItemIdentifier(AppWindowCoordinator.switcherPanelWindowIdentifier)
         panel.level = SwitcherPanelWindowConfiguration.level
