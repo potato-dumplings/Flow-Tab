@@ -2,7 +2,7 @@ import Foundation
 import FlowTabCore
 
 extension LiveSwitcherModel {
-    static func monotonicMilliseconds() -> Double {
+    nonisolated static func monotonicMilliseconds() -> Double {
         ProcessInfo.processInfo.systemUptime * 1_000
     }
 

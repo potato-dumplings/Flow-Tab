@@ -10,7 +10,7 @@ extension FlowTabPriorityCoverageTests {
         let model = LiveSwitcherModel()
         model.backgroundFullSnapshotRefreshEnabled = false
         let currentApp = NSRunningApplication.current
-        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let appID = "com.flowtab.tests.preview-preheat"
         let windows = (0..<20).map { index in
             WindowCandidate(
                 id: String(format: "preview-window-%02d", index),
@@ -69,7 +69,7 @@ extension FlowTabPriorityCoverageTests {
         let model = LiveSwitcherModel()
         model.backgroundFullSnapshotRefreshEnabled = false
         let currentApp = NSRunningApplication.current
-        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let appID = "com.flowtab.tests.large-preview"
         let windows = (0..<1_000).map { index in
             WindowCandidate(
                 id: String(format: "large-preview-window-%04d", index),

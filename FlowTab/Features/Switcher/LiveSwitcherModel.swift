@@ -205,6 +205,7 @@ final class LiveSwitcherModel: ObservableObject {
     let iconProvider = AppIconProvider()
     let searchCoordinator = SwitcherSearchCoordinator()
     let windowRecencyTracker: RuntimeWindowRecencyTracker
+    var previewProviderResolver = WindowPreviewProviderResolver.default
     let previewImageCache = BoundedImageCache(
         countLimit: 64,
         totalCostLimit: 160 * 1_024 * 1_024

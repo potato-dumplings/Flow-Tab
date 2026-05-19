@@ -52,6 +52,8 @@
 		A1B2C43E2F73000100B0D737 /* AXLiveWindowRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4352F73000100B0D737 /* AXLiveWindowRegistry.swift */; };
 		A1B2C43F2F73000100B0D737 /* AXWindowInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4362F73000100B0D737 /* AXWindowInspector.swift */; };
 		A1B2C4402F73000100B0D737 /* RuntimeWindowPreviewProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4372F73000100B0D737 /* RuntimeWindowPreviewProvider.swift */; };
+		D2A0001235B9000100B0D737 /* WindowPreviewProviderResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2A0001135B9000100B0D737 /* WindowPreviewProviderResolver.swift */; };
+		D2A0002235B9000100B0D737 /* TerminalWindowPreviewProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2A0002135B9000100B0D737 /* TerminalWindowPreviewProvider.swift */; };
 		A1B2C4412F73000100B0D737 /* AppIconProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4382F73000100B0D737 /* AppIconProvider.swift */; };
 		A9V110012F91000100B0D737 /* AppInventoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9V100012F91000100B0D737 /* AppInventoryService.swift */; };
 		B10011012F76000100B0D737 /* FlowTabTests+CoreConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001012F76000100B0D737 /* FlowTabTests+CoreConfiguration.swift */; };
@@ -76,6 +78,7 @@
 		B10011142F76000100B0D737 /* FlowTabPriorityCoverageTests+WindowRecency.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001142F76000100B0D737 /* FlowTabPriorityCoverageTests+WindowRecency.swift */; };
 		B29011012FF200100B0D737 /* FlowTabPriorityCoverageTests+WindowPreviewPaging.swift in Sources */ = {isa = PBXBuildFile; fileRef = B29001012FF200100B0D737 /* FlowTabPriorityCoverageTests+WindowPreviewPaging.swift */; };
 		B30011012FF300100B0D737 /* FlowTabPriorityCoverageTests+WindowPreviewSessionPinning.swift in Sources */ = {isa = PBXBuildFile; fileRef = B30001012FF300100B0D737 /* FlowTabPriorityCoverageTests+WindowPreviewSessionPinning.swift */; };
+		D2A0003235B9000100B0D737 /* FlowTabPriorityCoverageTests+WindowPreviewProviders.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2A0003135B9000100B0D737 /* FlowTabPriorityCoverageTests+WindowPreviewProviders.swift */; };
 		B31011012FF400100B0D737 /* FlowTabPriorityCoverageTests+StatusItemLifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31001012FF400100B0D737 /* FlowTabPriorityCoverageTests+StatusItemLifecycle.swift */; };
 		B33011012FF700100B0D737 /* FlowTabPriorityCoverageTests+InitialVisibilityPressure.swift in Sources */ = {isa = PBXBuildFile; fileRef = B33001012FF700100B0D737 /* FlowTabPriorityCoverageTests+InitialVisibilityPressure.swift */; };
 		B34011012FF800100B0D737 /* FlowTabPriorityCoverageTests+NestedAppPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = B34001012FF800100B0D737 /* FlowTabPriorityCoverageTests+NestedAppPresentation.swift */; };
@@ -232,6 +235,8 @@
 		A1B2C4352F73000100B0D737 /* AXLiveWindowRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AXLiveWindowRegistry.swift; sourceTree = "<group>"; };
 		A1B2C4362F73000100B0D737 /* AXWindowInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AXWindowInspector.swift; sourceTree = "<group>"; };
 		A1B2C4372F73000100B0D737 /* RuntimeWindowPreviewProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowPreviewProvider.swift; sourceTree = "<group>"; };
+		D2A0001135B9000100B0D737 /* WindowPreviewProviderResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowPreviewProviderResolver.swift; sourceTree = "<group>"; };
+		D2A0002135B9000100B0D737 /* TerminalWindowPreviewProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalWindowPreviewProvider.swift; sourceTree = "<group>"; };
 		A1B2C4382F73000100B0D737 /* AppIconProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconProvider.swift; sourceTree = "<group>"; };
 		A9V100012F91000100B0D737 /* AppInventoryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppInventoryService.swift; sourceTree = "<group>"; };
 		B10001012F76000100B0D737 /* FlowTabTests+CoreConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+CoreConfiguration.swift"; sourceTree = "<group>"; };
@@ -256,6 +261,7 @@
 		B10001142F76000100B0D737 /* FlowTabPriorityCoverageTests+WindowRecency.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+WindowRecency.swift"; sourceTree = "<group>"; };
 		B29001012FF200100B0D737 /* FlowTabPriorityCoverageTests+WindowPreviewPaging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+WindowPreviewPaging.swift"; sourceTree = "<group>"; };
 		B30001012FF300100B0D737 /* FlowTabPriorityCoverageTests+WindowPreviewSessionPinning.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+WindowPreviewSessionPinning.swift"; sourceTree = "<group>"; };
+		D2A0003135B9000100B0D737 /* FlowTabPriorityCoverageTests+WindowPreviewProviders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+WindowPreviewProviders.swift"; sourceTree = "<group>"; };
 		B31001012FF400100B0D737 /* FlowTabPriorityCoverageTests+StatusItemLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+StatusItemLifecycle.swift"; sourceTree = "<group>"; };
 		B33001012FF700100B0D737 /* FlowTabPriorityCoverageTests+InitialVisibilityPressure.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+InitialVisibilityPressure.swift"; sourceTree = "<group>"; };
 		B34001012FF800100B0D737 /* FlowTabPriorityCoverageTests+NestedAppPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+NestedAppPresentation.swift"; sourceTree = "<group>"; };
@@ -446,6 +452,7 @@
 				B10001142F76000100B0D737 /* FlowTabPriorityCoverageTests+WindowRecency.swift */,
 				B29001012FF200100B0D737 /* FlowTabPriorityCoverageTests+WindowPreviewPaging.swift */,
 				B30001012FF300100B0D737 /* FlowTabPriorityCoverageTests+WindowPreviewSessionPinning.swift */,
+				D2A0003135B9000100B0D737 /* FlowTabPriorityCoverageTests+WindowPreviewProviders.swift */,
 				B31001012FF400100B0D737 /* FlowTabPriorityCoverageTests+StatusItemLifecycle.swift */,
 				B33001012FF700100B0D737 /* FlowTabPriorityCoverageTests+InitialVisibilityPressure.swift */,
 				B34001012FF800100B0D737 /* FlowTabPriorityCoverageTests+NestedAppPresentation.swift */,
@@ -583,6 +590,8 @@
 				A1B2C4362F73000100B0D737 /* AXWindowInspector.swift */,
 				F8A9B0C235AE000100B0D737 /* RuntimeAXRemoteWindowResolver.swift */,
 				A1B2C4372F73000100B0D737 /* RuntimeWindowPreviewProvider.swift */,
+				D2A0001135B9000100B0D737 /* WindowPreviewProviderResolver.swift */,
+				D2A0002135B9000100B0D737 /* TerminalWindowPreviewProvider.swift */,
 				A1B2C4382F73000100B0D737 /* AppIconProvider.swift */,
 				A9V100012F91000100B0D737 /* AppInventoryService.swift */,
 				F4D5E6F835AB000100B0D737 /* RuntimeCGSpaceInspector.swift */,
@@ -931,6 +940,8 @@
 				A1B2C43F2F73000100B0D737 /* AXWindowInspector.swift in Sources */,
 				F8A9B0C335AE000100B0D737 /* RuntimeAXRemoteWindowResolver.swift in Sources */,
 				A1B2C4402F73000100B0D737 /* RuntimeWindowPreviewProvider.swift in Sources */,
+				D2A0001235B9000100B0D737 /* WindowPreviewProviderResolver.swift in Sources */,
+				D2A0002235B9000100B0D737 /* TerminalWindowPreviewProvider.swift in Sources */,
 				A1B2C4412F73000100B0D737 /* AppIconProvider.swift in Sources */,
 				A9V110012F91000100B0D737 /* AppInventoryService.swift in Sources */,
 				F4D5E6F735AB000100B0D737 /* RuntimeCGSpaceInspector.swift in Sources */,
@@ -997,6 +1008,7 @@
 				B10011142F76000100B0D737 /* FlowTabPriorityCoverageTests+WindowRecency.swift in Sources */,
 				B29011012FF200100B0D737 /* FlowTabPriorityCoverageTests+WindowPreviewPaging.swift in Sources */,
 				B30011012FF300100B0D737 /* FlowTabPriorityCoverageTests+WindowPreviewSessionPinning.swift in Sources */,
+				D2A0003235B9000100B0D737 /* FlowTabPriorityCoverageTests+WindowPreviewProviders.swift in Sources */,
 				B31011012FF400100B0D737 /* FlowTabPriorityCoverageTests+StatusItemLifecycle.swift in Sources */,
 				B33011012FF700100B0D737 /* FlowTabPriorityCoverageTests+InitialVisibilityPressure.swift in Sources */,
 				B34011012FF800100B0D737 /* FlowTabPriorityCoverageTests+NestedAppPresentation.swift in Sources */,
@@ -1212,7 +1224,7 @@
 				EXECUTABLE_NAME = FlowTab;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Flow Tab";
-				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Flow Tab asks Google Chrome to bring the selected Chrome window to the front.";
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Flow Tab uses automation to read supported app window and tab details and bring selected windows to the front.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1244,7 +1256,7 @@
 				EXECUTABLE_NAME = FlowTab;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Flow Tab";
-				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Flow Tab asks Google Chrome to bring the selected Chrome window to the front.";
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Flow Tab uses automation to read supported app window and tab details and bring selected windows to the front.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

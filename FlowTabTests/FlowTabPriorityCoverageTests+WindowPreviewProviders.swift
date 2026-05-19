@@ -1,0 +1,619 @@
+import AppKit
+import Combine
+import XCTest
+@testable import FlowTab
+import FlowTabCore
+
+extension FlowTabPriorityCoverageTests {
+    func testWindowPreviewResolverUsesSpecialProviderBeforeGeneric() async {
+        let specialProvider = FakeSpecialWindowPreviewProvider(
+            supportedAppID: "com.apple.Terminal",
+            result: .success(
+                image: makeColorImage(color: .systemGreen),
+                resolvedWindowID: nil,
+                titleBarStyle: .dark,
+                source: .special(appID: "com.apple.Terminal")
+            )
+        )
+        let genericProvider = FakeGenericWindowPreviewProvider(
+            result: .failure(.transientSystemError)
+        )
+        let resolver = WindowPreviewProviderResolver(
+            specialProviders: [specialProvider],
+            genericProvider: genericProvider
+        )
+
+        let results = await resolver.previewOutcomes(
+            for: [makePreviewRequest(appID: "com.apple.Terminal")],
+            captureSemaphore: nil
+        )
+
+        XCTAssertEqual(specialProvider.callCount, 1)
+        XCTAssertEqual(genericProvider.callCount, 0)
+        XCTAssertEqual(results.first?.source, .special(appID: "com.apple.Terminal"))
+        XCTAssertNotNil(results.first?.image)
+    }
+
+    func testWindowPreviewResolverFallsBackToGenericProviderWhenNoSpecialProviderMatches() async {
+        let specialProvider = FakeSpecialWindowPreviewProvider(
+            supportedAppID: "com.apple.Terminal",
+            result: .failure(.specialProviderUnavailable)
+        )
+        let genericProvider = FakeGenericWindowPreviewProvider(
+            result: .success(
+                image: makeColorImage(color: .systemBlue),
+                resolvedWindowID: 24_001,
+                titleBarStyle: .light,
+                source: .genericScreenshot
+            )
+        )
+        let resolver = WindowPreviewProviderResolver(
+            specialProviders: [specialProvider],
+            genericProvider: genericProvider
+        )
+
+        let results = await resolver.previewOutcomes(
+            for: [makePreviewRequest(appID: "com.example.Editor")],
+            captureSemaphore: nil
+        )
+
+        XCTAssertEqual(specialProvider.callCount, 0)
+        XCTAssertEqual(genericProvider.callCount, 1)
+        XCTAssertEqual(results.first?.source, .genericScreenshot)
+        XCTAssertEqual(results.first?.resolvedWindowID, 24_001)
+        XCTAssertNotNil(results.first?.image)
+    }
+
+    func testTerminalPreviewRendererCreatesImageForContents() {
+        let image = renderTerminalPreview(
+            contents: "DONE Compiled successfully\nhttp://127.0.0.1:8080/",
+            style: .default,
+            fallbackTitle: "Build"
+        )
+
+        XCTAssertNotNil(cgImage(from: image))
+    }
+
+    func testTerminalPreviewRendererCreatesImageForEmptyContents() {
+        let image = renderTerminalPreview(
+            contents: "",
+            style: .default,
+            fallbackTitle: "Shell"
+        )
+
+        XCTAssertNotNil(cgImage(from: image))
+    }
+
+    func testTerminalPreviewRendererWrapsLongLogicalLines() {
+        let image = renderTerminalPreview(
+            contents: String(repeating: "W", count: 400),
+            style: TerminalPreviewStyle(
+                backgroundColor: .black,
+                normalTextColor: .white,
+                fontName: nil,
+                fontSize: 18
+            )
+        )
+
+        XCTAssertGreaterThan(textRowClusterCount(from: image), 1)
+    }
+
+    func testTerminalPreviewRendererUsesContentsBeforeFallbackWhenTrailingRowsAreBlank() {
+        let image = renderTerminalPreview(
+            contents: "X" + String(repeating: "\n", count: 80),
+            style: TerminalPreviewStyle(
+                backgroundColor: .black,
+                normalTextColor: .white,
+                fontName: nil,
+                fontSize: 18
+            ),
+            fallbackTitle: String(repeating: "W", count: 80)
+        )
+
+        XCTAssertNotNil(image)
+        XCTAssertLessThan(textInkWidth(from: image), 80)
+    }
+
+
+    func testTerminalPreviewProviderMatchesAXIndexToTerminalSnapshot() async {
+        let currentApp = NSRunningApplication.current
+        let adapter = FakeTerminalScriptingAdapter(
+            result: .success([
+                makeTerminalSnapshot(
+                    flatIndex: 0,
+                    title: "Server",
+                    contents: "first",
+                    backgroundColor: NSColor(calibratedRed: 1, green: 0, blue: 0, alpha: 1)
+                ),
+                makeTerminalSnapshot(
+                    flatIndex: 1,
+                    title: "Shell",
+                    contents: "second",
+                    backgroundColor: NSColor(calibratedRed: 0, green: 0, blue: 1, alpha: 1)
+                )
+            ])
+        )
+        let provider = TerminalWindowPreviewProvider(adapter: adapter)
+        let request = makePreviewRequest(
+            appID: "com.apple.Terminal",
+            windowID: "cg:\(currentApp.processIdentifier):24242",
+            title: "Runtime Terminal Window",
+            activationHandleID: AXWindowInspector.makeWindowID(
+                pid: currentApp.processIdentifier,
+                index: 1
+            )
+        )
+
+        let result = await provider.preview(for: request)
+
+        XCTAssertEqual(adapter.callCount, 1)
+        XCTAssertEqual(result.source, .special(appID: "com.apple.Terminal"))
+        XCTAssertNotNil(result.image)
+        let color = sampledBackgroundColor(from: result.image)
+        XCTAssertGreaterThan(color?.blueComponent ?? 0, 0.8)
+        XCTAssertLessThan(color?.redComponent ?? 1, 0.2)
+    }
+
+    func testTerminalPreviewProviderPrefersTerminalWindowIDWhenAXIndexIncludesHelpTag() async {
+        let currentApp = NSRunningApplication.current
+        let adapter = FakeTerminalScriptingAdapter(
+            result: .success([
+                makeTerminalSnapshot(
+                    flatIndex: 0,
+                    title: "Session",
+                    contents: "session",
+                    terminalWindowID: 19_828,
+                    windowTitle: "session-viewer",
+                    backgroundColor: NSColor(calibratedRed: 1, green: 0, blue: 0, alpha: 1)
+                ),
+                makeTerminalSnapshot(
+                    flatIndex: 1,
+                    title: "Build",
+                    contents: "build",
+                    terminalWindowID: 138_245,
+                    windowTitle: "fed-template-administrative-inspection",
+                    backgroundColor: NSColor(calibratedRed: 0, green: 1, blue: 0, alpha: 1)
+                ),
+                makeTerminalSnapshot(
+                    flatIndex: 2,
+                    title: "Shell",
+                    contents: "shell",
+                    terminalWindowID: 245_444,
+                    windowTitle: "FlowTabApp — -bash — 190×44",
+                    backgroundColor: NSColor(calibratedRed: 0, green: 0, blue: 1, alpha: 1)
+                )
+            ])
+        )
+        let provider = TerminalWindowPreviewProvider(adapter: adapter)
+        let request = makePreviewRequest(
+            appID: "com.apple.Terminal",
+            windowID: "cg:\(currentApp.processIdentifier):245444",
+            title: "FlowTabApp — -bash — 190×44",
+            cgWindowID: 245_444,
+            activationHandleID: AXWindowInspector.makeWindowID(
+                pid: currentApp.processIdentifier,
+                index: 3
+            )
+        )
+
+        let result = await provider.preview(for: request)
+
+        XCTAssertEqual(adapter.callCount, 1)
+        XCTAssertEqual(result.source, .special(appID: "com.apple.Terminal"))
+        XCTAssertNotNil(result.image)
+        let color = sampledBackgroundColor(from: result.image)
+        XCTAssertGreaterThan(color?.blueComponent ?? 0, 0.8)
+        XCTAssertLessThan(color?.redComponent ?? 1, 0.2)
+    }
+
+    func testTerminalPreviewProviderReadsTerminalStateOnceForBatch() async {
+        let currentApp = NSRunningApplication.current
+        let adapter = FakeTerminalScriptingAdapter(
+            result: .success([
+                makeTerminalSnapshot(flatIndex: 0, title: "Server", contents: "first"),
+                makeTerminalSnapshot(flatIndex: 1, title: "Shell", contents: "second")
+            ])
+        )
+        let provider = TerminalWindowPreviewProvider(adapter: adapter)
+        let requests = [
+            makePreviewRequest(
+                appID: "com.apple.Terminal",
+                windowID: AXWindowInspector.makeWindowID(
+                    pid: currentApp.processIdentifier,
+                    index: 0
+                ),
+                title: "Server"
+            ),
+            makePreviewRequest(
+                appID: "com.apple.Terminal",
+                windowID: AXWindowInspector.makeWindowID(
+                    pid: currentApp.processIdentifier,
+                    index: 1
+                ),
+                title: "Shell"
+            )
+        ]
+
+        let results = await provider.previews(for: requests)
+
+        XCTAssertEqual(adapter.callCount, 1)
+        XCTAssertEqual(results.count, 2)
+        XCTAssertTrue(results.allSatisfy { $0.image != nil })
+        XCTAssertTrue(results.allSatisfy { $0.source == .special(appID: "com.apple.Terminal") })
+    }
+
+    func testTerminalPreviewProviderReturnsStructuredPermissionFailure() async {
+        let adapter = FakeTerminalScriptingAdapter(result: .failure(.permissionDenied))
+        let provider = TerminalWindowPreviewProvider(adapter: adapter)
+
+        let result = await provider.preview(
+            for: makePreviewRequest(appID: "com.apple.Terminal")
+        )
+
+        XCTAssertNil(result.image)
+        XCTAssertEqual(result.failureReason, .permissionDenied)
+        XCTAssertNil(result.source)
+    }
+
+    @MainActor
+    func testLiveSwitcherModelUsesPreviewProviderResolverForTerminalPreview() async {
+        let model = LiveSwitcherModel()
+        model.backgroundFullSnapshotRefreshEnabled = false
+        let currentApp = NSRunningApplication.current
+        let appID = "com.apple.Terminal"
+        let windows = [
+            WindowCandidate(
+                id: AXWindowInspector.makeWindowID(pid: currentApp.processIdentifier, index: 0),
+                title: "Server",
+                isMinimized: false,
+                lastActiveAt: 30
+            ),
+            WindowCandidate(
+                id: AXWindowInspector.makeWindowID(pid: currentApp.processIdentifier, index: 1),
+                title: "Shell",
+                isMinimized: false,
+                lastActiveAt: 20
+            )
+        ]
+        let app = AppSwitchCandidate(
+            id: appID,
+            displayName: "Terminal",
+            groupID: "terminal",
+            lastActiveAt: 100,
+            windows: windows
+        )
+        let context = makeRuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windows: windows
+        )
+        let specialProvider = FakeSpecialWindowPreviewProvider(
+            supportedAppID: appID,
+            result: .success(
+                image: makeColorImage(color: .systemGreen),
+                resolvedWindowID: nil,
+                titleBarStyle: .dark,
+                source: .special(appID: appID)
+            )
+        )
+        let genericProvider = FakeGenericWindowPreviewProvider(
+            result: .failure(.transientSystemError)
+        )
+        model.previewProviderResolver = WindowPreviewProviderResolver(
+            specialProviders: [specialProvider],
+            genericProvider: genericProvider
+        )
+        model.fastAppSnapshotProviderOverride = {
+            RuntimeSnapshot(apps: [app], contextsByID: [appID: context])
+        }
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
+
+        let published = expectation(description: "terminal preview provider published results")
+        var cancellables: Set<AnyCancellable> = []
+        model.objectWillChange.sink {
+            published.fulfill()
+        }.store(in: &cancellables)
+
+        let initialSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: 0..<2)
+        XCTAssertTrue(initialSnapshot.isEmpty)
+
+        await fulfillment(of: [published], timeout: 1.0)
+
+        let completedSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: 0..<2)
+        XCTAssertEqual(completedSnapshot.count, 2)
+        XCTAssertTrue(completedSnapshot.allSatisfy(\.hasImage))
+        XCTAssertEqual(specialProvider.callCount, 2)
+        XCTAssertEqual(genericProvider.callCount, 0)
+        XCTAssertEqual(cancellables.count, 1)
+    }
+
+    @MainActor
+    func testLiveSwitcherModelUsesFallbackWhenTerminalProviderFails() async {
+        let model = LiveSwitcherModel()
+        model.backgroundFullSnapshotRefreshEnabled = false
+        let currentApp = NSRunningApplication.current
+        let appID = "com.apple.Terminal"
+        let windows = [
+            WindowCandidate(
+                id: AXWindowInspector.makeWindowID(pid: currentApp.processIdentifier, index: 0),
+                title: "Server",
+                isMinimized: false,
+                lastActiveAt: 30
+            ),
+            WindowCandidate(
+                id: AXWindowInspector.makeWindowID(pid: currentApp.processIdentifier, index: 1),
+                title: "Shell",
+                isMinimized: false,
+                lastActiveAt: 20
+            )
+        ]
+        let app = AppSwitchCandidate(
+            id: appID,
+            displayName: "Terminal",
+            groupID: "terminal",
+            lastActiveAt: 100,
+            windows: windows
+        )
+        let context = makeRuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windows: windows
+        )
+        let specialProvider = FakeSpecialWindowPreviewProvider(
+            supportedAppID: appID,
+            result: .failure(.specialProviderUnavailable)
+        )
+        let genericProvider = FakeGenericWindowPreviewProvider(
+            result: .success(
+                image: makeColorImage(color: .systemRed),
+                resolvedWindowID: 24_002,
+                titleBarStyle: nil,
+                source: .genericScreenshot
+            )
+        )
+        model.previewProviderResolver = WindowPreviewProviderResolver(
+            specialProviders: [specialProvider],
+            genericProvider: genericProvider
+        )
+        model.fastAppSnapshotProviderOverride = {
+            RuntimeSnapshot(apps: [app], contextsByID: [appID: context])
+        }
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
+
+        let published = expectation(description: "terminal preview failure published")
+        var cancellables: Set<AnyCancellable> = []
+        model.objectWillChange.sink {
+            published.fulfill()
+        }.store(in: &cancellables)
+
+        let initialSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: 0..<1)
+        XCTAssertTrue(initialSnapshot.isEmpty)
+
+        await fulfillment(of: [published], timeout: 1.0)
+
+        let completedSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: 0..<1)
+        XCTAssertEqual(completedSnapshot.count, 1)
+        XCTAssertFalse(completedSnapshot[0].hasImage)
+        XCTAssertEqual(specialProvider.callCount, 1)
+        XCTAssertEqual(genericProvider.callCount, 0)
+        guard
+            case let .failed(reason, retryAfterGeneration?) =
+                model.previewCaptureStatesForTesting().values.first
+        else {
+            return XCTFail("Expected terminal provider failure state")
+        }
+        XCTAssertEqual(reason, .specialProviderUnavailable)
+        XCTAssertEqual(retryAfterGeneration, model.previewCaptureGeneration + 1)
+        XCTAssertEqual(cancellables.count, 1)
+    }
+
+    private func makePreviewRequest(
+        appID: String,
+        windowID: String? = nil,
+        title: String = "Window",
+        cgWindowID: CGWindowID? = 24_000,
+        activationHandleID: String? = nil
+    ) -> WindowPreviewRequest {
+        let currentApp = NSRunningApplication.current
+        let windowContext = RuntimeWindowContext(
+            id: windowID ?? "window-1",
+            title: title,
+            isMinimized: false,
+            ownerPID: currentApp.processIdentifier,
+            cgWindowID: cgWindowID,
+            activationHandleID: activationHandleID
+        )
+        return WindowPreviewRequest(
+            appID: appID,
+            bundleIdentifier: appID,
+            ownerPID: currentApp.processIdentifier,
+            windowID: windowContext.id,
+            preferredCGWindowID: windowContext.cgWindowID,
+            preferredTitle: windowContext.title,
+            inferTitleBarStyle: true,
+            activationHandleID: windowContext.activationHandleID
+        )
+    }
+
+    private func renderTerminalPreview(
+        contents: String,
+        style: TerminalPreviewStyle = .default,
+        fallbackTitle: String? = nil
+    ) -> NSImage? {
+        let snapshot = makeTerminalSnapshot(
+            flatIndex: 0,
+            title: fallbackTitle ?? "Terminal",
+            contents: contents,
+            style: style
+        )
+        return TerminalPreviewRenderer.render(snapshot: snapshot, fallbackTitle: fallbackTitle)
+    }
+
+    private func makeTerminalSnapshot(
+        flatIndex: Int,
+        title: String,
+        contents: String,
+        terminalWindowID: CGWindowID? = nil,
+        windowTitle: String = "",
+        backgroundColor: NSColor = .black,
+        style: TerminalPreviewStyle? = nil
+    ) -> TerminalTabSnapshot {
+        TerminalTabSnapshot(
+            flatIndex: flatIndex,
+            terminalWindowID: terminalWindowID,
+            windowTitle: windowTitle,
+            customTitle: title,
+            contents: contents,
+            style: style ?? TerminalPreviewStyle(
+                backgroundColor: backgroundColor,
+                normalTextColor: .white,
+                fontName: nil,
+                fontSize: 13
+            )
+        )
+    }
+
+    private func cgImage(from image: NSImage?) -> CGImage? {
+        guard let image else { return nil }
+        var rect = NSRect(origin: .zero, size: image.size)
+        return image.cgImage(forProposedRect: &rect, context: nil, hints: nil)
+    }
+
+    private func sampledBackgroundColor(from image: NSImage?) -> NSColor? {
+        guard let cgImage = cgImage(from: image) else { return nil }
+        let bitmap = NSBitmapImageRep(cgImage: cgImage)
+        return bitmap.colorAt(x: 2, y: 2)?.usingColorSpace(.deviceRGB)
+    }
+
+    private func textRowClusterCount(from image: NSImage?) -> Int {
+        guard let cgImage = cgImage(from: image) else { return 0 }
+        let bitmap = NSBitmapImageRep(cgImage: cgImage)
+        var clusters = 0
+        var isInsideCluster = false
+
+        for y in 0..<bitmap.pixelsHigh {
+            var rowHasText = false
+            for x in stride(from: 0, to: bitmap.pixelsWide, by: 2) {
+                guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else {
+                    continue
+                }
+                if color.redComponent + color.greenComponent + color.blueComponent > 1.5 {
+                    rowHasText = true
+                    break
+                }
+            }
+
+            if rowHasText, !isInsideCluster {
+                clusters += 1
+                isInsideCluster = true
+            } else if !rowHasText {
+                isInsideCluster = false
+            }
+        }
+
+        return clusters
+    }
+
+    private func textInkWidth(from image: NSImage?) -> Int {
+        guard let cgImage = cgImage(from: image) else { return 0 }
+        let bitmap = NSBitmapImageRep(cgImage: cgImage)
+        var minX = Int.max
+        var maxX = 0
+
+        for y in 0..<bitmap.pixelsHigh {
+            for x in 0..<bitmap.pixelsWide {
+                guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else {
+                    continue
+                }
+                if color.redComponent + color.greenComponent + color.blueComponent > 1.5 {
+                    minX = min(minX, x)
+                    maxX = max(maxX, x)
+                }
+            }
+        }
+
+        return minX == Int.max ? 0 : maxX - minX + 1
+    }
+}
+
+private final class FakeSpecialWindowPreviewProvider: SpecialWindowPreviewProviding {
+    private let supportedAppID: String
+    private let result: WindowPreviewResult
+    private let lock = NSLock()
+    private var calls: [WindowPreviewRequest] = []
+
+    init(supportedAppID: String, result: WindowPreviewResult) {
+        self.supportedAppID = supportedAppID
+        self.result = result
+    }
+
+    var callCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return calls.count
+    }
+
+    func supports(_ request: WindowPreviewRequest) -> Bool {
+        request.appID == supportedAppID
+    }
+
+    func previews(for requests: [WindowPreviewRequest]) async -> [WindowPreviewResult] {
+        lock.lock()
+        calls.append(contentsOf: requests)
+        lock.unlock()
+        return Array(repeating: result, count: requests.count)
+    }
+}
+
+private final class FakeGenericWindowPreviewProvider: GenericWindowPreviewProviding {
+    private let result: WindowPreviewResult
+    private let lock = NSLock()
+    private var batches: [[WindowPreviewRequest]] = []
+
+    init(result: WindowPreviewResult) {
+        self.result = result
+    }
+
+    var callCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return batches.count
+    }
+
+    func previews(
+        for requests: [WindowPreviewRequest],
+        captureSemaphore: DispatchSemaphore?
+    ) async -> [WindowPreviewResult] {
+        lock.lock()
+        batches.append(requests)
+        lock.unlock()
+        return Array(repeating: result, count: requests.count)
+    }
+}
+
+private final class FakeTerminalScriptingAdapter: TerminalScriptingSnapshotProviding {
+    private let result: Result<[TerminalTabSnapshot], TerminalScriptingSnapshotError>
+    private let lock = NSLock()
+    private var calls: [pid_t] = []
+
+    init(result: Result<[TerminalTabSnapshot], TerminalScriptingSnapshotError>) {
+        self.result = result
+    }
+
+    var callCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return calls.count
+    }
+
+    func tabSnapshots(ownerPID: pid_t) -> Result<[TerminalTabSnapshot], TerminalScriptingSnapshotError> {
+        lock.lock()
+        calls.append(ownerPID)
+        lock.unlock()
+        return result
+    }
+}
