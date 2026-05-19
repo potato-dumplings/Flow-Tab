@@ -84,7 +84,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertNotNil(cgImage(from: image))
     }
 
-    func testTerminalPreviewRendererWrapsLongLogicalLines() {
+    func testTerminalPreviewRendererWrapsLongLogicalLinesToKnownTerminalGrid() {
         let image = renderTerminalPreview(
             contents: String(repeating: "W", count: 400),
             style: TerminalPreviewStyle(
@@ -92,10 +92,56 @@ extension FlowTabPriorityCoverageTests {
                 normalTextColor: .white,
                 fontName: nil,
                 fontSize: 18
-            )
+            ),
+            columnCount: 80,
+            rowCount: 24,
+            windowFrame: CGRect(x: 0, y: 0, width: 960, height: 640)
         )
 
         XCTAssertGreaterThan(textRowClusterCount(from: image), 1)
+    }
+
+    func testTerminalPreviewRendererUsesDynamicTerminalGridAndWindowAspect() {
+        let scenarios: [(name: String, columns: Int, rows: Int, frame: CGRect)] = [
+            ("standard 80x24", 80, 24, CGRect(x: 0, y: 0, width: 960, height: 640)),
+            ("wide 132x30", 132, 30, CGRect(x: 0, y: 0, width: 1440, height: 900)),
+            ("large 190x44", 190, 44, CGRect(x: 0, y: 0, width: 2048, height: 1282))
+        ]
+        let leftText = "DONE Compiled successfully in 3201ms"
+        let rightAlignedText = "下午10:07:38"
+
+        for scenario in scenarios {
+            let spacing = max(
+                1,
+                scenario.columns
+                    - terminalDisplayColumnCount(leftText)
+                    - terminalDisplayColumnCount(rightAlignedText)
+            )
+            let image = renderTerminalPreview(
+                contents: leftText + String(repeating: " ", count: spacing) + rightAlignedText,
+                style: TerminalPreviewStyle(
+                    backgroundColor: .black,
+                    normalTextColor: .white,
+                    fontName: nil,
+                    fontSize: 13
+                ),
+                columnCount: scenario.columns,
+                rowCount: scenario.rows,
+                windowFrame: scenario.frame
+            )
+            let metrics = textInkMetrics(from: image)
+            let imageSize = image?.size ?? .zero
+            let imageAspect = Double(imageSize.width / max(1, imageSize.height))
+            let frameAspect = Double(scenario.frame.width / scenario.frame.height)
+
+            XCTAssertEqual(metrics.rowClusters, 1, scenario.name)
+            XCTAssertLessThanOrEqual(
+                Int(imageSize.width) - metrics.maxX,
+                24,
+                scenario.name
+            )
+            XCTAssertEqual(imageAspect, frameAspect, accuracy: 0.01, scenario.name)
+        }
     }
 
     func testTerminalPreviewRendererUsesContentsBeforeFallbackWhenTrailingRowsAreBlank() {
@@ -434,6 +480,7 @@ extension FlowTabPriorityCoverageTests {
             windowID: windowContext.id,
             preferredCGWindowID: windowContext.cgWindowID,
             preferredTitle: windowContext.title,
+            windowFrame: windowContext.frame,
             inferTitleBarStyle: true,
             activationHandleID: windowContext.activationHandleID
         )
@@ -442,15 +489,24 @@ extension FlowTabPriorityCoverageTests {
     private func renderTerminalPreview(
         contents: String,
         style: TerminalPreviewStyle = .default,
-        fallbackTitle: String? = nil
+        fallbackTitle: String? = nil,
+        columnCount: Int? = nil,
+        rowCount: Int? = nil,
+        windowFrame: CGRect? = nil
     ) -> NSImage? {
         let snapshot = makeTerminalSnapshot(
             flatIndex: 0,
             title: fallbackTitle ?? "Terminal",
             contents: contents,
-            style: style
+            style: style,
+            columnCount: columnCount,
+            rowCount: rowCount
         )
-        return TerminalPreviewRenderer.render(snapshot: snapshot, fallbackTitle: fallbackTitle)
+        return TerminalPreviewRenderer.render(
+            snapshot: snapshot,
+            fallbackTitle: fallbackTitle,
+            windowFrame: windowFrame
+        )
     }
 
     private func makeTerminalSnapshot(
@@ -460,7 +516,9 @@ extension FlowTabPriorityCoverageTests {
         terminalWindowID: CGWindowID? = nil,
         windowTitle: String = "",
         backgroundColor: NSColor = .black,
-        style: TerminalPreviewStyle? = nil
+        style: TerminalPreviewStyle? = nil,
+        columnCount: Int? = nil,
+        rowCount: Int? = nil
     ) -> TerminalTabSnapshot {
         TerminalTabSnapshot(
             flatIndex: flatIndex,
@@ -468,6 +526,8 @@ extension FlowTabPriorityCoverageTests {
             windowTitle: windowTitle,
             customTitle: title,
             contents: contents,
+            columnCount: columnCount,
+            rowCount: rowCount,
             style: style ?? TerminalPreviewStyle(
                 backgroundColor: backgroundColor,
                 normalTextColor: .white,
@@ -490,23 +550,49 @@ extension FlowTabPriorityCoverageTests {
     }
 
     private func textRowClusterCount(from image: NSImage?) -> Int {
-        guard let cgImage = cgImage(from: image) else { return 0 }
+        textInkMetrics(from: image).rowClusters
+    }
+
+    private func textInkWidth(from image: NSImage?) -> Int {
+        let bounds = textInkBounds(from: image)
+        return bounds.minX == Int.max ? 0 : bounds.maxX - bounds.minX + 1
+    }
+
+    private func textInkBounds(from image: NSImage?) -> (minX: Int, maxX: Int) {
+        let metrics = textInkMetrics(from: image)
+        return (metrics.minX, metrics.maxX)
+    }
+
+    private func textInkMetrics(from image: NSImage?) -> (minX: Int, maxX: Int, rowClusters: Int) {
+        guard let cgImage = cgImage(from: image) else { return (Int.max, 0, 0) }
         let bitmap = NSBitmapImageRep(cgImage: cgImage)
+        guard
+            bitmap.bitsPerSample == 8,
+            bitmap.samplesPerPixel >= 3,
+            !bitmap.isPlanar,
+            let bitmapData = bitmap.bitmapData
+        else {
+            return textInkMetricsByColorLookup(bitmap)
+        }
+
+        var minX = Int.max
+        var maxX = 0
         var clusters = 0
         var isInsideCluster = false
 
         for y in 0..<bitmap.pixelsHigh {
             var rowHasText = false
-            for x in stride(from: 0, to: bitmap.pixelsWide, by: 2) {
-                guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else {
-                    continue
-                }
-                if color.redComponent + color.greenComponent + color.blueComponent > 1.5 {
+            for x in 0..<bitmap.pixelsWide {
+                let pixelOffset = y * bitmap.bytesPerRow + x * bitmap.samplesPerPixel
+                let brightness = Int(bitmapData[pixelOffset])
+                    + Int(bitmapData[pixelOffset + 1])
+                    + Int(bitmapData[pixelOffset + 2])
+                if brightness > 600 {
                     rowHasText = true
-                    break
+                    minX = min(minX, x)
+                    maxX = max(maxX, x)
                 }
             }
-
             if rowHasText, !isInsideCluster {
                 clusters += 1
                 isInsideCluster = true
@@ -515,28 +601,67 @@ extension FlowTabPriorityCoverageTests {
             }
         }
 
-        return clusters
+        return (minX, maxX, clusters)
     }
 
-    private func textInkWidth(from image: NSImage?) -> Int {
-        guard let cgImage = cgImage(from: image) else { return 0 }
-        let bitmap = NSBitmapImageRep(cgImage: cgImage)
+    private func textInkMetricsByColorLookup(_ bitmap: NSBitmapImageRep) -> (
+        minX: Int,
+        maxX: Int,
+        rowClusters: Int
+    ) {
         var minX = Int.max
         var maxX = 0
+        var clusters = 0
+        var isInsideCluster = false
 
         for y in 0..<bitmap.pixelsHigh {
+            var rowHasText = false
             for x in 0..<bitmap.pixelsWide {
                 guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else {
                     continue
                 }
                 if color.redComponent + color.greenComponent + color.blueComponent > 1.5 {
+                    rowHasText = true
                     minX = min(minX, x)
                     maxX = max(maxX, x)
                 }
             }
+            if rowHasText, !isInsideCluster {
+                clusters += 1
+                isInsideCluster = true
+            } else if !rowHasText {
+                isInsideCluster = false
+            }
         }
 
-        return minX == Int.max ? 0 : maxX - minX + 1
+        return (minX, maxX, clusters)
+    }
+
+    private func terminalDisplayColumnCount(_ text: String) -> Int {
+        text.reduce(0) { count, character in
+            if character == "\t" {
+                return count + 4
+            }
+            return count + (character.unicodeScalars.contains(where: isWideTerminalScalar) ? 2 : 1)
+        }
+    }
+
+    private func isWideTerminalScalar(_ scalar: UnicodeScalar) -> Bool {
+        switch scalar.value {
+        case 0x1100...0x115F,
+             0x2329...0x232A,
+             0x2E80...0xA4CF,
+             0xAC00...0xD7A3,
+             0xF900...0xFAFF,
+             0xFE10...0xFE19,
+             0xFE30...0xFE6F,
+             0xFF00...0xFF60,
+             0xFFE0...0xFFE6,
+             0x1F300...0x1FAFF:
+            return true
+        default:
+            return false
+        }
     }
 }
 

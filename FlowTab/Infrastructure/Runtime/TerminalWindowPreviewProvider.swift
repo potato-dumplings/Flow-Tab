@@ -22,6 +22,8 @@ struct TerminalTabSnapshot {
     let windowTitle: String
     let customTitle: String
     let contents: String
+    let columnCount: Int?
+    let rowCount: Int?
     let style: TerminalPreviewStyle
 }
 
@@ -81,7 +83,8 @@ struct TerminalWindowPreviewProvider: SpecialWindowPreviewProviding {
         guard
             let image = TerminalPreviewRenderer.render(
                 snapshot: snapshot,
-                fallbackTitle: request.preferredTitle
+                fallbackTitle: request.preferredTitle,
+                windowFrame: request.windowFrame
             )
         else {
             return .failure(.transientSystemError)
@@ -189,6 +192,12 @@ struct TerminalScriptingAdapter: TerminalScriptingSnapshotProviding {
             let windowTitle = item.numberOfItems >= 8
                 ? string(from: item.atIndex(8)) ?? ""
                 : ""
+            let columnCount = item.numberOfItems >= 9
+                ? optionalPositiveInt(from: item.atIndex(9))
+                : nil
+            let rowCount = item.numberOfItems >= 10
+                ? optionalPositiveInt(from: item.atIndex(10))
+                : nil
             let style = TerminalPreviewStyle(
                 backgroundColor: color(from: item.atIndex(5), fallback: .black),
                 normalTextColor: color(from: item.atIndex(6), fallback: .white),
@@ -202,6 +211,8 @@ struct TerminalScriptingAdapter: TerminalScriptingSnapshotProviding {
                     windowTitle: windowTitle,
                     customTitle: string(from: item.atIndex(1)) ?? "",
                     contents: string(from: item.atIndex(2)) ?? "",
+                    columnCount: columnCount,
+                    rowCount: rowCount,
                     style: style
                 )
             )
@@ -225,6 +236,14 @@ struct TerminalScriptingAdapter: TerminalScriptingSnapshotProviding {
     ) -> Int {
         guard let descriptor else { return fallback }
         return Int(descriptor.int32Value)
+    }
+
+    private static func optionalPositiveInt(
+        from descriptor: NSAppleEventDescriptor?
+    ) -> Int? {
+        guard let descriptor else { return nil }
+        let value = Int(descriptor.int32Value)
+        return value > 0 ? value : nil
     }
 
     private static func cgWindowID(from descriptor: NSAppleEventDescriptor?) -> CGWindowID? {
@@ -286,6 +305,16 @@ struct TerminalScriptingAdapter: TerminalScriptingSnapshotProviding {
                     set tabTitle to ""
                 end try
                 try
+                    set tabColumnCount to «property ccol» of «class ttab» tabIndex of window windowIndex
+                on error
+                    set tabColumnCount to -1
+                end try
+                try
+                    set tabRowCount to «property crow» of «class ttab» tabIndex of window windowIndex
+                on error
+                    set tabRowCount to -1
+                end try
+                try
                     set tabSettings to «property tcst» of «class ttab» tabIndex of window windowIndex
                     set styleFontName to («property font» of tabSettings) as text
                     set styleFontSize to «property ptsz» of tabSettings
@@ -297,7 +326,7 @@ struct TerminalScriptingAdapter: TerminalScriptingSnapshotProviding {
                     set backgroundRGB to {0, 0, 0}
                     set normalRGB to {65535, 65535, 65535}
                 end try
-                set end of tabRows to {tabTitle, tabContents, styleFontName, styleFontSize, backgroundRGB, normalRGB, terminalWindowID, terminalWindowTitle}
+                set end of tabRows to {tabTitle, tabContents, styleFontName, styleFontSize, backgroundRGB, normalRGB, terminalWindowID, terminalWindowTitle, tabColumnCount, tabRowCount}
             end repeat
         end repeat
         return tabRows
@@ -306,25 +335,36 @@ struct TerminalScriptingAdapter: TerminalScriptingSnapshotProviding {
 }
 
 enum TerminalPreviewRenderer {
-    private static let imageSize = NSSize(width: 960, height: 600)
-    private static let contentInset = CGFloat(18)
+    private static let defaultImageSize = NSSize(width: 1440, height: 900)
+    private static let preferredLongEdge = CGFloat(1440)
+    private static let maximumLongEdge = CGFloat(2048)
+    private static let contentInset = CGFloat(8)
+    private static let maxRenderableRows = 160
 
     static func render(
         snapshot: TerminalTabSnapshot,
-        fallbackTitle: String?
+        fallbackTitle: String?,
+        windowFrame: CGRect? = nil
     ) -> NSImage? {
         render(
             contents: snapshot.contents,
+            columnCount: snapshot.columnCount,
+            rowCount: snapshot.rowCount,
             style: snapshot.style,
-            fallbackTitle: fallbackTitle
+            fallbackTitle: fallbackTitle,
+            windowFrame: windowFrame
         )
     }
 
     private static func render(
         contents: String,
+        columnCount: Int?,
+        rowCount: Int?,
         style: TerminalPreviewStyle,
-        fallbackTitle: String?
+        fallbackTitle: String?,
+        windowFrame: CGRect?
     ) -> NSImage? {
+        let imageSize = imageSize(for: windowFrame)
         let image = NSImage(size: imageSize)
         image.lockFocus()
         defer { image.unlockFocus() }
@@ -340,26 +380,95 @@ enum TerminalPreviewRenderer {
             width: imageSize.width - contentInset * 2,
             height: imageSize.height - contentInset * 2
         )
-        let maxLines = max(1, Int(contentRect.height / lineHeight))
-        let maxColumns = terminalColumnCapacity(font: font, contentWidth: contentRect.width)
-        let renderedText = terminalText(
+        let lines = terminalLines(
             contents: contents,
             fallbackTitle: fallbackTitle,
-            maxLines: maxLines,
-            maxColumns: maxColumns
+            columnCount: columnCount,
+            rowCount: rowCount,
+            maxRows: maxRenderableRows
         )
+        let inferredColumns = lines.map(terminalColumnCount).max() ?? 1
+        let sourceColumns = max(1, columnCount ?? inferredColumns)
+        let sourceRows = max(1, min(rowCount ?? lines.count, maxRenderableRows))
+        let sourceSize = NSSize(
+            width: CGFloat(sourceColumns) * terminalCharacterWidth(font: font),
+            height: CGFloat(sourceRows) * lineHeight
+        )
+        let scaleX = contentRect.width / max(1, sourceSize.width)
+        let scaleY = contentRect.height / max(1, sourceSize.height)
+        let fittingScale = min(scaleX, scaleY)
+        let hasTerminalGridSize = columnCount != nil && rowCount != nil
+        let scale = hasTerminalGridSize ? fittingScale : min(1, fittingScale)
+        let scaledLineHeight = max(1, lineHeight * scale)
+        let scaledFont = scaledFont(from: font, scale: scale)
         let attributes: [NSAttributedString.Key: Any] = [
             .foregroundColor: style.normalTextColor,
-            .font: font,
-            .paragraphStyle: terminalParagraphStyle(lineHeight: lineHeight)
+            .font: scaledFont,
+            .paragraphStyle: terminalParagraphStyle(lineHeight: scaledLineHeight)
         ]
-        (renderedText as NSString).draw(
-            with: contentRect,
-            options: [.usesLineFragmentOrigin, .usesFontLeading, .truncatesLastVisibleLine],
+        drawTerminalGrid(
+            lines,
+            in: contentRect,
+            sourceRows: sourceRows,
+            sourceColumns: sourceColumns,
+            scaledCharacterWidth: terminalCharacterWidth(font: font) * scale,
+            scaledLineHeight: scaledLineHeight,
             attributes: attributes
         )
 
         return image
+    }
+
+    private static func drawTerminalGrid(
+        _ lines: [String],
+        in contentRect: NSRect,
+        sourceRows: Int,
+        sourceColumns: Int,
+        scaledCharacterWidth: CGFloat,
+        scaledLineHeight: CGFloat,
+        attributes: [NSAttributedString.Key: Any]
+    ) {
+        let gridHeight = CGFloat(sourceRows) * scaledLineHeight
+        let originY = contentRect.maxY - gridHeight
+        for (lineIndex, line) in lines.prefix(sourceRows).enumerated() {
+            let y = originY + gridHeight - CGFloat(lineIndex + 1) * scaledLineHeight
+            var column = 0
+            for character in line {
+                let columnWidth = terminalColumnWidth(character)
+                defer { column += columnWidth }
+                guard column < sourceColumns, character != "\t", character != " " else {
+                    continue
+                }
+                let rect = NSRect(
+                    x: contentRect.minX + CGFloat(column) * scaledCharacterWidth,
+                    y: y,
+                    width: CGFloat(columnWidth) * scaledCharacterWidth,
+                    height: scaledLineHeight
+                )
+                (String(character) as NSString).draw(
+                    with: rect,
+                    options: [.usesLineFragmentOrigin, .usesFontLeading, .truncatesLastVisibleLine],
+                    attributes: attributes
+                )
+            }
+        }
+    }
+
+    private static func imageSize(for windowFrame: CGRect?) -> NSSize {
+        guard let frame = windowFrame?.standardized,
+              frame.width > 0,
+              frame.height > 0
+        else {
+            return defaultImageSize
+        }
+        let longEdge = max(frame.width, frame.height)
+        guard longEdge > 0 else { return defaultImageSize }
+        let targetLongEdge = min(max(longEdge, preferredLongEdge), maximumLongEdge)
+        let scale = targetLongEdge / longEdge
+        return NSSize(
+            width: max(1, ceil(frame.width * scale)),
+            height: max(1, ceil(frame.height * scale))
+        )
     }
 
     private static func resolvedFont(style: TerminalPreviewStyle) -> NSFont {
@@ -372,58 +481,127 @@ enum TerminalPreviewRenderer {
         return NSFont.monospacedSystemFont(ofSize: displaySize, weight: .regular)
     }
 
-    private static func terminalColumnCapacity(font: NSFont, contentWidth: CGFloat) -> Int {
-        let characterWidth = max(
+    private static func scaledFont(from font: NSFont, scale: CGFloat) -> NSFont {
+        NSFont(
+            descriptor: font.fontDescriptor,
+            size: max(1, font.pointSize * scale)
+        ) ?? NSFont.monospacedSystemFont(
+            ofSize: max(1, font.pointSize * scale),
+            weight: .regular
+        )
+    }
+
+    private static func terminalCharacterWidth(font: NSFont) -> CGFloat {
+        max(
             1,
             ceil(("W" as NSString).size(withAttributes: [.font: font]).width)
         )
-        return max(1, Int(contentWidth / characterWidth))
     }
 
-    private static func terminalText(
+    private static func terminalLines(
         contents: String,
         fallbackTitle: String?,
-        maxLines: Int,
-        maxColumns: Int
-    ) -> String {
+        columnCount: Int?,
+        rowCount: Int?,
+        maxRows: Int
+    ) -> [String] {
         let normalized = contents
             .replacingOccurrences(of: "\r\n", with: "\n")
             .replacingOccurrences(of: "\r", with: "\n")
-        let visualLines = normalized
+        let lines = normalized
             .split(separator: "\n", omittingEmptySubsequences: false)
-            .flatMap { wrappedTerminalLine(String($0), maxColumns: maxColumns) }
-        if let lastContentIndex = visualLines.lastIndex(
+            .map(String.init)
+        if let lastContentIndex = lines.lastIndex(
             where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
         ) {
-            let visibleLines = visualLines[...lastContentIndex].suffix(maxLines)
-            return visibleLines.joined(separator: "\n")
+            let contentLines = Array(lines[...lastContentIndex])
+            let terminalRows = rowCount.map { min(max(1, $0), maxRows) } ?? maxRows
+            let visualLines: [String]
+            if let columnCount, columnCount > 0 {
+                visualLines = softWrapTerminalLines(
+                    contentLines,
+                    columnCount: columnCount
+                )
+            } else {
+                visualLines = contentLines
+            }
+            return Array(visualLines.suffix(max(1, terminalRows)))
         }
         let title = fallbackTitle?.trimmingCharacters(in: .whitespacesAndNewlines)
         if let title, !title.isEmpty {
-            return title
+            return [title]
         }
-        return "Terminal"
+        return ["Terminal"]
     }
 
-    private static func wrappedTerminalLine(_ line: String, maxColumns: Int) -> [String] {
-        guard !line.isEmpty else { return [""] }
-        var wrapped: [String] = []
-        var startIndex = line.startIndex
-        while startIndex < line.endIndex {
-            let endIndex = line.index(
-                startIndex,
-                offsetBy: maxColumns,
-                limitedBy: line.endIndex
-            ) ?? line.endIndex
-            wrapped.append(String(line[startIndex..<endIndex]))
-            startIndex = endIndex
+    private static func softWrapTerminalLines(
+        _ lines: [String],
+        columnCount: Int
+    ) -> [String] {
+        let columns = max(1, columnCount)
+        return lines.flatMap { line -> [String] in
+            guard !line.isEmpty else { return [""] }
+            var rows: [String] = []
+            var currentRow = ""
+            var currentColumns = 0
+
+            for character in line {
+                let characterColumns = terminalColumnWidth(character)
+                if currentColumns > 0, currentColumns + characterColumns > columns {
+                    rows.append(currentRow)
+                    currentRow = ""
+                    currentColumns = 0
+                }
+                currentRow.append(character)
+                currentColumns += characterColumns
+                if currentColumns >= columns {
+                    rows.append(currentRow)
+                    currentRow = ""
+                    currentColumns = 0
+                }
+            }
+
+            if !currentRow.isEmpty || rows.isEmpty {
+                rows.append(currentRow)
+            }
+            return rows
         }
-        return wrapped
+    }
+
+    private static func terminalColumnCount(_ line: String) -> Int {
+        line.reduce(0) { count, character in
+            count + terminalColumnWidth(character)
+        }
+    }
+
+    private static func terminalColumnWidth(_ character: Character) -> Int {
+        if character == "\t" {
+            return 4
+        }
+        return character.unicodeScalars.contains(where: isWideTerminalScalar) ? 2 : 1
+    }
+
+    private static func isWideTerminalScalar(_ scalar: UnicodeScalar) -> Bool {
+        switch scalar.value {
+        case 0x1100...0x115F,
+             0x2329...0x232A,
+             0x2E80...0xA4CF,
+             0xAC00...0xD7A3,
+             0xF900...0xFAFF,
+             0xFE10...0xFE19,
+             0xFE30...0xFE6F,
+             0xFF00...0xFF60,
+             0xFFE0...0xFFE6,
+             0x1F300...0x1FAFF:
+            return true
+        default:
+            return false
+        }
     }
 
     private static func terminalParagraphStyle(lineHeight: CGFloat) -> NSParagraphStyle {
         let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.lineBreakMode = .byCharWrapping
+        paragraphStyle.lineBreakMode = .byClipping
         paragraphStyle.minimumLineHeight = lineHeight
         paragraphStyle.maximumLineHeight = lineHeight
         return paragraphStyle

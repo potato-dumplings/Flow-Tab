@@ -22,6 +22,7 @@ struct WindowPreviewRequest {
     let windowID: String
     let preferredCGWindowID: CGWindowID?
     let preferredTitle: String?
+    let windowFrame: CGRect?
     let inferTitleBarStyle: Bool
     let activationHandleID: String?
 

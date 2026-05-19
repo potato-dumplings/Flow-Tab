@@ -30,6 +30,7 @@ extension LiveSwitcherModel {
         let ownerPID: pid_t
         let preferredWindowID: CGWindowID?
         let preferredTitle: String
+        let windowFrame: CGRect?
         let inferTitleBarStyle: Bool
         let activationHandleID: String?
         let initialCacheKey: String
@@ -42,6 +43,7 @@ extension LiveSwitcherModel {
                 windowID: windowID,
                 preferredCGWindowID: preferredWindowID,
                 preferredTitle: preferredTitle,
+                windowFrame: windowFrame,
                 inferTitleBarStyle: inferTitleBarStyle,
                 activationHandleID: activationHandleID
             )
@@ -318,6 +320,7 @@ extension LiveSwitcherModel {
             ownerPID: ownerPID,
             preferredWindowID: windowContext.cgWindowID,
             preferredTitle: windowContext.title,
+            windowFrame: windowContext.frame,
             inferTitleBarStyle: titleBarStyleInferenceEnabled,
             activationHandleID: windowContext.activationHandleID,
             initialCacheKey: previewCacheKey
