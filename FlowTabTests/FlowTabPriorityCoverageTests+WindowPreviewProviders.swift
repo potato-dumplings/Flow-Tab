@@ -175,6 +175,28 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(lines, ["visible-1", "visible-2"])
     }
 
+    func testTerminalPreviewTextLayoutUsesTerminalCellsForTabsWideAndZeroWidthCharacters() {
+        let runs = TerminalPreviewTextLayout.cellRuns(
+            in: "A\tB\u{200B}界",
+            maxColumns: 12
+        )
+
+        XCTAssertEqual(runs.map(\.text), ["A", "B", "界"])
+        XCTAssertEqual(runs.map(\.column), [0, 8, 9])
+        XCTAssertEqual(runs.map(\.columnWidth), [1, 1, 2])
+    }
+
+    func testTerminalPreviewRendererStripsANSISequencesBeforePreparingRows() {
+        let lines = TerminalPreviewRenderer.terminalLinesForTesting(
+            contents: "\u{001B}[31mred\u{001B}[0m ok",
+            fallbackTitle: nil,
+            columnCount: 80,
+            rowCount: 1,
+            maxRows: 160
+        )
+
+        XCTAssertEqual(lines, ["red ok"])
+    }
 
     func testTerminalPreviewProviderMatchesAXIndexToTerminalSnapshot() async {
         let currentApp = NSRunningApplication.current
@@ -653,30 +675,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     private func terminalDisplayColumnCount(_ text: String) -> Int {
-        text.reduce(0) { count, character in
-            if character == "\t" {
-                return count + 4
-            }
-            return count + (character.unicodeScalars.contains(where: isWideTerminalScalar) ? 2 : 1)
-        }
-    }
-
-    private func isWideTerminalScalar(_ scalar: UnicodeScalar) -> Bool {
-        switch scalar.value {
-        case 0x1100...0x115F,
-             0x2329...0x232A,
-             0x2E80...0xA4CF,
-             0xAC00...0xD7A3,
-             0xF900...0xFAFF,
-             0xFE10...0xFE19,
-             0xFE30...0xFE6F,
-             0xFF00...0xFF60,
-             0xFFE0...0xFFE6,
-             0x1F300...0x1FAFF:
-            return true
-        default:
-            return false
-        }
+        TerminalPreviewTextLayout.columnCount(for: text)
     }
 }
 

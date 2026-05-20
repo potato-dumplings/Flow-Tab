@@ -450,20 +450,14 @@ enum TerminalPreviewRenderer {
 
         for (lineIndex, line) in lines.prefix(sourceRows).enumerated() {
             let y = originY + gridHeight - CGFloat(lineIndex + 1) * scaledLineHeight
-            var column = 0
-            for character in line {
-                let columnWidth = terminalColumnWidth(character)
-                defer { column += columnWidth }
-                guard column < sourceColumns, character != "\t", character != " " else {
-                    continue
-                }
+            for run in TerminalPreviewTextLayout.cellRuns(in: line, maxColumns: sourceColumns) {
                 let rect = NSRect(
-                    x: contentRect.minX + CGFloat(column) * scaledCharacterWidth,
+                    x: contentRect.minX + CGFloat(run.column) * scaledCharacterWidth,
                     y: y,
-                    width: CGFloat(columnWidth) * scaledCharacterWidth,
+                    width: CGFloat(run.columnWidth) * scaledCharacterWidth,
                     height: scaledLineHeight
                 )
-                let key = String(character)
+                let key = run.text
                 let textLine = lineCache[key] ?? {
                     let line = terminalTextLine(
                         key,
@@ -536,19 +530,15 @@ enum TerminalPreviewRenderer {
             limit: terminalRows
         )
         if !contentLines.isEmpty {
-            var visualLines: [String] = []
-            visualLines.reserveCapacity(terminalRows)
+            let visualLines: [String]
             if let columnCount, columnCount > 0 {
-                for line in contentLines {
-                    appendSoftWrappedTerminalLine(
-                        line,
-                        columnCount: columnCount,
-                        maxRows: terminalRows,
-                        to: &visualLines
-                    )
-                }
+                visualLines = TerminalPreviewTextLayout.softWrappedLines(
+                    from: contentLines,
+                    columnCount: columnCount,
+                    maxRows: terminalRows
+                )
             } else {
-                visualLines = contentLines
+                visualLines = TerminalPreviewTextLayout.displayLines(from: contentLines)
             }
             return Array(visualLines.suffix(terminalRows))
         }
@@ -602,85 +592,12 @@ enum TerminalPreviewRenderer {
         return collected.reversed().map(String.init)
     }
 
-    private static func appendSoftWrappedTerminalLine(
-        _ line: String,
-        columnCount: Int,
-        maxRows: Int,
-        to visualLines: inout [String]
-    ) {
-        let columns = max(1, columnCount)
-        guard !line.isEmpty else {
-            appendVisualLine("", maxRows: maxRows, to: &visualLines)
-            return
-        }
-
-        var currentRow = ""
-        var currentColumns = 0
-        for character in line {
-            let characterColumns = terminalColumnWidth(character)
-            if currentColumns > 0, currentColumns + characterColumns > columns {
-                appendVisualLine(currentRow, maxRows: maxRows, to: &visualLines)
-                currentRow = ""
-                currentColumns = 0
-            }
-            currentRow.append(character)
-            currentColumns += characterColumns
-            if currentColumns >= columns {
-                appendVisualLine(currentRow, maxRows: maxRows, to: &visualLines)
-                currentRow = ""
-                currentColumns = 0
-            }
-        }
-
-        if !currentRow.isEmpty {
-            appendVisualLine(currentRow, maxRows: maxRows, to: &visualLines)
-        }
-    }
-
-    private static func appendVisualLine(
-        _ line: String,
-        maxRows: Int,
-        to visualLines: inout [String]
-    ) {
-        visualLines.append(line)
-        if visualLines.count > maxRows {
-            visualLines.removeFirst(visualLines.count - maxRows)
-        }
-    }
-
     private static func rowLimit(rowCount: Int?, maxRows: Int) -> Int {
         rowCount.map { min(max(1, $0), maxRows) } ?? maxRows
     }
 
     private static func terminalColumnCount(_ line: String) -> Int {
-        line.reduce(0) { count, character in
-            count + terminalColumnWidth(character)
-        }
-    }
-
-    private static func terminalColumnWidth(_ character: Character) -> Int {
-        if character == "\t" {
-            return 4
-        }
-        return character.unicodeScalars.contains(where: isWideTerminalScalar) ? 2 : 1
-    }
-
-    private static func isWideTerminalScalar(_ scalar: UnicodeScalar) -> Bool {
-        switch scalar.value {
-        case 0x1100...0x115F,
-             0x2329...0x232A,
-             0x2E80...0xA4CF,
-             0xAC00...0xD7A3,
-             0xF900...0xFAFF,
-             0xFE10...0xFE19,
-             0xFE30...0xFE6F,
-             0xFF00...0xFF60,
-             0xFFE0...0xFFE6,
-             0x1F300...0x1FAFF:
-            return true
-        default:
-            return false
-        }
+        TerminalPreviewTextLayout.columnCount(for: line)
     }
 
     private static func terminalTextLine(

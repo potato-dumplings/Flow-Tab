@@ -54,6 +54,7 @@
 		A1B2C4402F73000100B0D737 /* RuntimeWindowPreviewProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4372F73000100B0D737 /* RuntimeWindowPreviewProvider.swift */; };
 		D2A0001235B9000100B0D737 /* WindowPreviewProviderResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2A0001135B9000100B0D737 /* WindowPreviewProviderResolver.swift */; };
 		D2A0002235B9000100B0D737 /* TerminalWindowPreviewProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2A0002135B9000100B0D737 /* TerminalWindowPreviewProvider.swift */; };
+		D2A0004235B9000100B0D737 /* TerminalPreviewTextLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2A0004135B9000100B0D737 /* TerminalPreviewTextLayout.swift */; };
 		A1B2C4412F73000100B0D737 /* AppIconProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4382F73000100B0D737 /* AppIconProvider.swift */; };
 		A9V110012F91000100B0D737 /* AppInventoryService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9V100012F91000100B0D737 /* AppInventoryService.swift */; };
 		B10011012F76000100B0D737 /* FlowTabTests+CoreConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001012F76000100B0D737 /* FlowTabTests+CoreConfiguration.swift */; };
@@ -237,6 +238,7 @@
 		A1B2C4372F73000100B0D737 /* RuntimeWindowPreviewProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowPreviewProvider.swift; sourceTree = "<group>"; };
 		D2A0001135B9000100B0D737 /* WindowPreviewProviderResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowPreviewProviderResolver.swift; sourceTree = "<group>"; };
 		D2A0002135B9000100B0D737 /* TerminalWindowPreviewProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalWindowPreviewProvider.swift; sourceTree = "<group>"; };
+		D2A0004135B9000100B0D737 /* TerminalPreviewTextLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalPreviewTextLayout.swift; sourceTree = "<group>"; };
 		A1B2C4382F73000100B0D737 /* AppIconProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconProvider.swift; sourceTree = "<group>"; };
 		A9V100012F91000100B0D737 /* AppInventoryService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppInventoryService.swift; sourceTree = "<group>"; };
 		B10001012F76000100B0D737 /* FlowTabTests+CoreConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+CoreConfiguration.swift"; sourceTree = "<group>"; };
@@ -592,6 +594,7 @@
 				A1B2C4372F73000100B0D737 /* RuntimeWindowPreviewProvider.swift */,
 				D2A0001135B9000100B0D737 /* WindowPreviewProviderResolver.swift */,
 				D2A0002135B9000100B0D737 /* TerminalWindowPreviewProvider.swift */,
+				D2A0004135B9000100B0D737 /* TerminalPreviewTextLayout.swift */,
 				A1B2C4382F73000100B0D737 /* AppIconProvider.swift */,
 				A9V100012F91000100B0D737 /* AppInventoryService.swift */,
 				F4D5E6F835AB000100B0D737 /* RuntimeCGSpaceInspector.swift */,
@@ -942,6 +945,7 @@
 				A1B2C4402F73000100B0D737 /* RuntimeWindowPreviewProvider.swift in Sources */,
 				D2A0001235B9000100B0D737 /* WindowPreviewProviderResolver.swift in Sources */,
 				D2A0002235B9000100B0D737 /* TerminalWindowPreviewProvider.swift in Sources */,
+				D2A0004235B9000100B0D737 /* TerminalPreviewTextLayout.swift in Sources */,
 				A1B2C4412F73000100B0D737 /* AppIconProvider.swift in Sources */,
 				A9V110012F91000100B0D737 /* AppInventoryService.swift in Sources */,
 				F4D5E6F735AB000100B0D737 /* RuntimeCGSpaceInspector.swift in Sources */,
