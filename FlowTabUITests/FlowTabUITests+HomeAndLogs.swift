@@ -108,6 +108,41 @@ extension FlowTabUITests {
         XCTAssertFalse(element(in: app, identifier: Identifier.permissionBanner).exists)
     }
 
+    func testHomeInitialAppLayerUsesRuntimeOrderAndZeroCountsWithoutAccessibilityPermission() throws {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-mock-runtime",
+                "-showPermissionReminder",
+                "NO",
+                "--flowtab-ui-ax-trusted",
+                "NO",
+                "--flowtab-ui-screen-trusted",
+                "YES"
+            ]
+        )
+        launchFlowTabUITestApplication(app)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
+        XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5))
+        XCTAssertTrue(element(in: app, identifier: Identifier.homeTabContent).waitForExistence(timeout: 5))
+
+        let mailRow = element(in: app, identifier: Identifier.homeAppMockMail)
+        let browserRow = element(in: app, identifier: Identifier.homeAppMockBrowser)
+        XCTAssertTrue(mailRow.waitForExistence(timeout: 6))
+        XCTAssertTrue(browserRow.waitForExistence(timeout: 6))
+        XCTAssertLessThan(
+            mailRow.frame.minY,
+            browserRow.frame.minY,
+            "Home initial app rows should use the runtime snapshot order before any precise count refresh."
+        )
+
+        assertHomeAppRowValue(mailRow, equals: "0w", timeout: 2)
+        assertHomeAppRowValue(browserRow, equals: "0w", timeout: 2)
+        RunLoop.current.run(until: Date().addingTimeInterval(1.2))
+        XCTAssertEqual(elementStringValue(mailRow), "0w")
+        XCTAssertEqual(elementStringValue(browserRow), "0w")
+    }
+
     func testHomeWindowListUsesSeededWindowRecency() throws {
         let workflow = try configuredHomeWindowRecencyWorkflow()
 
@@ -526,6 +561,22 @@ extension FlowTabUITests {
         }
 
         return CGWindowID(windowNumber)
+    }
+
+    private func assertHomeAppRowValue(
+        _ row: XCUIElement,
+        equals expectedValue: String,
+        timeout: TimeInterval
+    ) {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if row.exists && elementStringValue(row) == expectedValue {
+                return
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+
+        XCTFail("Expected Home app row value '\(expectedValue)', actual: '\(elementStringValue(row))'")
     }
 
     private func homeAppVisibilityRuntimeArguments(resetDefaults: Bool = false) -> [String] {

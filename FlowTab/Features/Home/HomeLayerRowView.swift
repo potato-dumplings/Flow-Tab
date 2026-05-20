@@ -4,6 +4,7 @@ struct HomeLayerRowView: View {
     let title: String
     let subtitle: String
     let trailing: String
+    let isTrailingLoading: Bool
     let badge: String?
     let badgeAccessibilityIdentifier: String?
     let isSelected: Bool
@@ -12,6 +13,7 @@ struct HomeLayerRowView: View {
         title: String,
         subtitle: String,
         trailing: String,
+        isTrailingLoading: Bool = false,
         badge: String? = nil,
         badgeAccessibilityIdentifier: String? = nil,
         isSelected: Bool
@@ -19,6 +21,7 @@ struct HomeLayerRowView: View {
         self.title = title
         self.subtitle = subtitle
         self.trailing = trailing
+        self.isTrailingLoading = isTrailingLoading
         self.badge = badge
         self.badgeAccessibilityIdentifier = badgeAccessibilityIdentifier
         self.isSelected = isSelected
@@ -62,10 +65,7 @@ struct HomeLayerRowView: View {
 
             Spacer(minLength: 8)
 
-            Text(trailing)
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
+            trailingContent
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
@@ -73,5 +73,20 @@ struct HomeLayerRowView: View {
             RoundedRectangle(cornerRadius: 9, style: .continuous)
                 .fill(isSelected ? Color.accentColor.opacity(0.16) : Color.primary.opacity(0.04))
         )
+    }
+
+    @ViewBuilder
+    private var trailingContent: some View {
+        if isTrailingLoading {
+            ProgressView()
+                .controlSize(.small)
+                .frame(width: 22, height: 14, alignment: .center)
+        } else {
+            Text(trailing)
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .frame(minWidth: 22, alignment: .trailing)
+        }
     }
 }

@@ -31,6 +31,7 @@ struct HomeLandingView: View {
     @State private var hiddenAppIDs = AppVisibilityPreferencesStore.loadHiddenAppIDs()
     @State private var windowsByAppID: [String: [WindowCandidate]] = [:]
     @State private var homeSnapshotsByAppID: [String: RuntimeHomeAppSnapshot] = [:]
+    @State private var loadingWindowCountAppIDs: Set<String> = []
     @State private var selectedAppID: String?
     @State private var appSummariesRefreshTask: Task<Void, Never>?
     @State private var selectedAppRefreshTask: Task<Void, Never>?
@@ -39,6 +40,7 @@ struct HomeLandingView: View {
     @State private var windowChangeMonitor = HomeWindowChangeMonitor()
 
     private let appRefreshDebounceDelayNs: UInt64 = 220_000_000
+    private let initialPreciseAppRefreshDelayNs: UInt64 = 900_000_000
     private let selectedAppRefreshDebounceDelayNs: UInt64 = 120_000_000
     private let permissionPollIntervalNs: UInt64 = 1_000_000_000
 
@@ -204,6 +206,7 @@ struct HomeLandingView: View {
                     LazyVStack(spacing: 8) {
                         ForEach(presentedAppSummaries) { app in
                             let isHidden = appVisibilityPresentation.isHidden(appID: app.appID)
+                            let isWindowCountLoading = loadingWindowCountAppIDs.contains(app.appID)
                             let appIDComponent = app.appID.flowTabAccessibilityIdentifierComponent
                             let hiddenBadge = isHidden
                                 ? AppStrings.text(.homeAppNotShownBadge, language: appLanguage)
@@ -215,6 +218,7 @@ struct HomeLandingView: View {
                                     title: app.displayName,
                                     subtitle: app.appID,
                                     trailing: "\(app.windowCount)w",
+                                    isTrailingLoading: isWindowCountLoading,
                                     badge: hiddenBadge,
                                     badgeAccessibilityIdentifier: isHidden
                                         ? "flowtab.home.app.hidden-badge.\(appIDComponent)"
@@ -225,7 +229,11 @@ struct HomeLandingView: View {
                             .buttonStyle(.plain)
                             .accessibilityIdentifier("flowtab.home.app.\(appIDComponent)")
                             .accessibilityLabel(hiddenBadge.map { "\(app.displayName) \($0)" } ?? app.displayName)
-                            .accessibilityValue(isHidden ? "\(app.windowCount)w hidden" : "\(app.windowCount)w")
+                            .accessibilityValue(appAccessibilityValue(
+                                windowCount: app.windowCount,
+                                isHidden: isHidden,
+                                isWindowCountLoading: isWindowCountLoading
+                            ))
                         }
                     }
                 }
@@ -338,7 +346,7 @@ struct HomeLandingView: View {
         startPermissionWatcherIfNeeded()
 
         if appSummaries.isEmpty {
-            scheduleAppSummariesRefresh(reason: "initial_load")
+            scheduleInitialAppSummariesRefresh(reason: "initial_load")
             return
         }
 
@@ -417,6 +425,13 @@ struct HomeLandingView: View {
     }
 
     private func scheduleRefreshIfRunningAppsChanged(reason: String) {
+        guard !appSummaries.isEmpty, loadingWindowCountAppIDs.isEmpty else {
+            RuntimeLog.debug(
+                .snapshot,
+                "homeSkipRunningAppsRefresh reason=\(reason) phase=initializing apps=\(appSummaries.count) loadingCounts=\(loadingWindowCountAppIDs.count)"
+            )
+            return
+        }
         if currentRunningAppSignature() != Self.cachedRunningAppSignature {
             scheduleAppSummariesRefresh(reason: "running_apps_changed_\(reason)")
         }
@@ -443,12 +458,46 @@ struct HomeLandingView: View {
         )
     }
 
+    private func appAccessibilityValue(
+        windowCount: Int,
+        isHidden: Bool,
+        isWindowCountLoading: Bool
+    ) -> String {
+        if isWindowCountLoading {
+            return isHidden ? "loading hidden" : "loading"
+        }
+        return isHidden ? "\(windowCount)w hidden" : "\(windowCount)w"
+    }
+
     private func activateWindow(_ appID: String, windowID: String) {
         HomeWindowActivationController.shared.activateWindow(
             appID: appID,
             windowID: windowID,
             snapshot: homeSnapshotsByAppID[appID]
         )
+    }
+
+    private func scheduleInitialAppSummariesRefresh(reason: String) {
+        appSummariesRefreshTask?.cancel()
+        appSummariesRefreshTask = Task { @MainActor in
+            RuntimeLog.debug(.snapshot, "homeInitialRefresh begin reason=\(reason)")
+            await refreshInitialLightweightAppSummaries()
+            guard accessibilityTrusted else {
+                RuntimeLog.debug(
+                    .snapshot,
+                    "homeInitialRefresh preciseSkipped reason=\(reason) accessibilityTrusted=false"
+                )
+                appSummariesRefreshTask = nil
+                return
+            }
+            RuntimeLog.debug(
+                .snapshot,
+                "homeInitialRefresh preciseScheduled reason=\(reason) delayMs=900"
+            )
+            try? await Task.sleep(nanoseconds: initialPreciseAppRefreshDelayNs)
+            await refreshAppSummaries(reason: reason)
+            appSummariesRefreshTask = nil
+        }
     }
 
     private func scheduleAppSummariesRefresh(reason: String) {
@@ -460,11 +509,38 @@ struct HomeLandingView: View {
         }
     }
 
+    private func refreshInitialLightweightAppSummaries() async {
+        let startMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let summaries = lightweightHomeAppSummaries()
+        guard !Task.isCancelled, appSummaries.isEmpty else { return }
+        guard !summaries.isEmpty else { return }
+
+        appSummaries = summaries
+        loadingWindowCountAppIDs = accessibilityTrusted ? Set(summaries.map(\.appID)) : []
+        syncSelectedApp()
+        persistCache(updateRunningSignature: !accessibilityTrusted)
+
+        if accessibilityTrusted, let selectedAppID = currentSelectedAppID {
+            scheduleSelectedAppRefresh(
+                appID: selectedAppID,
+                force: true,
+                reason: "selected_after_initial_lightweight"
+            )
+        }
+        RuntimeLog.debug(
+            .snapshot,
+            "homeInitialLightweight result=ready apps=\(summaries.count) selected=\(currentSelectedAppID ?? "nil") loadingCounts=\(loadingWindowCountAppIDs.count) accessibilityTrusted=\(accessibilityTrusted) totalMs=\(formatHomeMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))"
+        )
+    }
+
     private func refreshAppSummaries(reason: String) async {
+        let startMs = RuntimePerformanceClock.monotonicMilliseconds()
+        RuntimeLog.debug(.snapshot, "homeRefreshAppSummaries begin reason=\(reason)")
         let summaries = await fetchHomeAppSummariesOnBackground()
         guard !Task.isCancelled else { return }
 
         appSummaries = summaries
+        loadingWindowCountAppIDs.removeAll()
         let validAppIDs = Set(summaries.map(\.appID))
         windowsByAppID = windowsByAppID.filter { validAppIDs.contains($0.key) }
         homeSnapshotsByAppID = homeSnapshotsByAppID.filter { validAppIDs.contains($0.key) }
@@ -481,6 +557,10 @@ struct HomeLandingView: View {
                 reason: "selected_after_\(reason)"
             )
         }
+        RuntimeLog.debug(
+            .snapshot,
+            "homeRefreshAppSummaries result=ready reason=\(reason) apps=\(summaries.count) totalMs=\(formatHomeMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))"
+        )
     }
 
     private func scheduleSelectedAppRefresh(appID: String, force: Bool, reason: String) {
@@ -514,34 +594,43 @@ struct HomeLandingView: View {
     private func refreshSingleAppCache(
         appID: String,
         updateWindows: Bool,
-        reason _: String
+        reason: String
     ) async {
         guard !Task.isCancelled else { return }
+        let startMs = RuntimePerformanceClock.monotonicMilliseconds()
+        RuntimeLog.debug(
+            .snapshot,
+            "homeRefreshSingleApp begin appID=\(appID) updateWindows=\(updateWindows) reason=\(reason)"
+        )
         if updateWindows {
             let snapshot = await fetchHomeAppSnapshotOnBackground(appID: appID)
             guard !Task.isCancelled else { return }
 
             guard let snapshot else {
-                appSummaries.removeAll { $0.appID == appID }
-                windowsByAppID.removeValue(forKey: appID)
-                homeSnapshotsByAppID.removeValue(forKey: appID)
-                syncSelectedApp()
-                setupWindowMonitorIfNeeded()
-                persistCache()
-                if let selectedAppID = currentSelectedAppID, windowsByAppID[selectedAppID] == nil {
-                    scheduleSelectedAppRefresh(
-                        appID: selectedAppID,
-                        force: true,
-                        reason: "selected_after_remove"
-                    )
+                if loadingWindowCountAppIDs.isEmpty {
+                    appSummaries.removeAll { $0.appID == appID }
+                    windowsByAppID.removeValue(forKey: appID)
+                    homeSnapshotsByAppID.removeValue(forKey: appID)
+                    syncSelectedApp()
+                    setupWindowMonitorIfNeeded()
+                    persistCache()
+                    if let selectedAppID = currentSelectedAppID, windowsByAppID[selectedAppID] == nil {
+                        scheduleSelectedAppRefresh(
+                            appID: selectedAppID,
+                            force: true,
+                            reason: "selected_after_remove"
+                        )
+                    }
                 }
                 return
             }
 
-            if let existingIndex = appSummaries.firstIndex(where: { $0.appID == appID }) {
-                appSummaries[existingIndex] = snapshot.summary
-            } else {
-                appSummaries.append(snapshot.summary)
+            if loadingWindowCountAppIDs.isEmpty {
+                if let existingIndex = appSummaries.firstIndex(where: { $0.appID == appID }) {
+                    appSummaries[existingIndex] = snapshot.summary
+                } else {
+                    appSummaries.append(snapshot.summary)
+                }
             }
             windowsByAppID[appID] = snapshot.candidate.windows
             homeSnapshotsByAppID[appID] = snapshot
@@ -571,12 +660,39 @@ struct HomeLandingView: View {
             return lhs.lastActiveAt > rhs.lastActiveAt
         }
         syncSelectedApp()
-        setupWindowMonitorIfNeeded()
+        setupWindowMonitorIfCountsReady()
         persistCache()
+        RuntimeLog.debug(
+            .snapshot,
+            "homeRefreshSingleApp result=ready appID=\(appID) updateWindows=\(updateWindows) reason=\(reason) windows=\(windowsByAppID[appID]?.count ?? -1) totalMs=\(formatHomeMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))"
+        )
     }
 
     private func fetchHomeAppSummariesOnBackground() async -> [RuntimeHomeAppSummary] {
         await homeRuntimeSnapshotService.homeAppSummaries()
+    }
+
+    private func setupWindowMonitorIfCountsReady() {
+        guard loadingWindowCountAppIDs.isEmpty else { return }
+        setupWindowMonitorIfNeeded()
+    }
+
+    private func lightweightHomeAppSummaries() -> [RuntimeHomeAppSummary] {
+        let snapshot = homeRuntimeSnapshotService.lightweightAppSnapshot()
+        return snapshot.apps.map { app in
+            return RuntimeHomeAppSummary(
+                appID: app.id,
+                displayName: app.displayName,
+                groupID: app.groupID,
+                lastActiveAt: app.lastActiveAt,
+                windowCount: 0,
+                pid: snapshot.contextsByID[app.id]?.runningApp.processIdentifier ?? 0
+            )
+        }
+    }
+
+    private func formatHomeMilliseconds(_ value: Double) -> String {
+        String(format: "%.3f", value)
     }
 
     private func fetchHomeAppSummaryOnBackground(appID: String) async -> RuntimeHomeAppSummary? {
@@ -601,9 +717,11 @@ struct HomeLandingView: View {
     private func persistCache(updateRunningSignature: Bool = false) {
         Self.cachedAccessibilityTrusted = accessibilityTrusted
         Self.cachedScreenCaptureTrusted = screenCaptureTrusted
-        Self.cachedAppSummaries = appSummaries
-        Self.cachedWindowsByAppID = windowsByAppID
-        Self.cachedSelectedAppID = selectedAppID
+        if loadingWindowCountAppIDs.isEmpty {
+            Self.cachedAppSummaries = appSummaries
+            Self.cachedWindowsByAppID = windowsByAppID
+            Self.cachedSelectedAppID = selectedAppID
+        }
         if updateRunningSignature {
             Self.cachedRunningAppSignature = currentRunningAppSignature()
         }
@@ -630,10 +748,12 @@ private final class HomeWindowChangeMonitor {
     private final class ObserverContext {
         weak var monitor: HomeWindowChangeMonitor?
         let appID: String
+        let installedAt: TimeInterval
 
         init(monitor: HomeWindowChangeMonitor, appID: String) {
             self.monitor = monitor
             self.appID = appID
+            installedAt = ProcessInfo.processInfo.systemUptime
         }
     }
 
@@ -644,6 +764,7 @@ private final class HomeWindowChangeMonitor {
     private var appIDByPID: [pid_t: String] = [:]
     private var lastEventAtByAppID: [String: TimeInterval] = [:]
     private let eventThrottleInterval: TimeInterval = 0.16
+    private let observerWarmUpInterval: TimeInterval = 0.75
     private let watchedNotifications: [CFString] = [
         kAXWindowCreatedNotification as CFString,
         kAXUIElementDestroyedNotification as CFString,
@@ -727,8 +848,11 @@ private final class HomeWindowChangeMonitor {
         appIDByPID.removeValue(forKey: pid)
     }
 
-    private func emitWindowChanged(for appID: String) {
+    private func emitWindowChanged(for appID: String, installedAt: TimeInterval) {
         let now = ProcessInfo.processInfo.systemUptime
+        guard now - installedAt >= observerWarmUpInterval else {
+            return
+        }
         if let lastTimestamp = lastEventAtByAppID[appID], now - lastTimestamp < eventThrottleInterval {
             return
         }
@@ -740,7 +864,7 @@ private final class HomeWindowChangeMonitor {
         guard let refcon else { return }
         let context = Unmanaged<ObserverContext>.fromOpaque(refcon).takeUnretainedValue()
         Task { @MainActor in
-            context.monitor?.emitWindowChanged(for: context.appID)
+            context.monitor?.emitWindowChanged(for: context.appID, installedAt: context.installedAt)
         }
     }
 }
