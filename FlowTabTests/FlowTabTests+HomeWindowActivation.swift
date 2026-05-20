@@ -190,6 +190,35 @@ extension FlowTabTests {
         XCTAssertFalse(presentation.isHidden(appID: "com.example.browser"))
     }
 
+    func testHomeInitialLoadingPolicyCommitsSelectedAppSummaryOnly() {
+        let loadingAppIDs: Set<String> = [
+            "com.flowtab.mock.mail",
+            "com.flowtab.mock.browser"
+        ]
+
+        XCTAssertTrue(
+            HomeInitialAppSummaryUpdatePolicy.shouldCommitSingleAppSummary(
+                appID: "com.flowtab.mock.mail",
+                selectedAppID: "com.flowtab.mock.mail",
+                loadingWindowCountAppIDs: loadingAppIDs
+            )
+        )
+        XCTAssertFalse(
+            HomeInitialAppSummaryUpdatePolicy.shouldCommitSingleAppSummary(
+                appID: "com.flowtab.mock.browser",
+                selectedAppID: "com.flowtab.mock.mail",
+                loadingWindowCountAppIDs: loadingAppIDs
+            )
+        )
+        XCTAssertTrue(
+            HomeInitialAppSummaryUpdatePolicy.shouldCommitSingleAppSummary(
+                appID: "com.flowtab.mock.browser",
+                selectedAppID: "com.flowtab.mock.mail",
+                loadingWindowCountAppIDs: []
+            )
+        )
+    }
+
     private func makeHomeActivationSnapshot(
         appID: String,
         windows: [WindowCandidate]

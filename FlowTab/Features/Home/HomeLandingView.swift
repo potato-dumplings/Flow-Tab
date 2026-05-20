@@ -607,6 +607,13 @@ struct HomeLandingView: View {
             guard !Task.isCancelled else { return }
 
             guard let snapshot else {
+                if HomeInitialAppSummaryUpdatePolicy.shouldCommitSingleAppSummary(
+                    appID: appID,
+                    selectedAppID: currentSelectedAppID,
+                    loadingWindowCountAppIDs: loadingWindowCountAppIDs
+                ) {
+                    loadingWindowCountAppIDs.remove(appID)
+                }
                 if loadingWindowCountAppIDs.isEmpty {
                     appSummaries.removeAll { $0.appID == appID }
                     windowsByAppID.removeValue(forKey: appID)
@@ -625,12 +632,18 @@ struct HomeLandingView: View {
                 return
             }
 
-            if loadingWindowCountAppIDs.isEmpty {
+            let shouldCommitSummary = HomeInitialAppSummaryUpdatePolicy.shouldCommitSingleAppSummary(
+                appID: appID,
+                selectedAppID: currentSelectedAppID,
+                loadingWindowCountAppIDs: loadingWindowCountAppIDs
+            )
+            if shouldCommitSummary {
                 if let existingIndex = appSummaries.firstIndex(where: { $0.appID == appID }) {
                     appSummaries[existingIndex] = snapshot.summary
                 } else {
                     appSummaries.append(snapshot.summary)
                 }
+                loadingWindowCountAppIDs.remove(appID)
             }
             windowsByAppID[appID] = snapshot.candidate.windows
             homeSnapshotsByAppID[appID] = snapshot
@@ -653,11 +666,13 @@ struct HomeLandingView: View {
             }
         }
 
-        appSummaries.sort { lhs, rhs in
-            if lhs.lastActiveAt == rhs.lastActiveAt {
-                return lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName) == .orderedAscending
+        if loadingWindowCountAppIDs.isEmpty {
+            appSummaries.sort { lhs, rhs in
+                if lhs.lastActiveAt == rhs.lastActiveAt {
+                    return lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName) == .orderedAscending
+                }
+                return lhs.lastActiveAt > rhs.lastActiveAt
             }
-            return lhs.lastActiveAt > rhs.lastActiveAt
         }
         syncSelectedApp()
         setupWindowMonitorIfCountsReady()
@@ -740,6 +755,16 @@ struct HomeLandingView: View {
         permissionWatchTask = nil
         windowChangeMonitor.stop()
         persistCache()
+    }
+}
+
+enum HomeInitialAppSummaryUpdatePolicy {
+    static func shouldCommitSingleAppSummary(
+        appID: String,
+        selectedAppID: String?,
+        loadingWindowCountAppIDs: Set<String>
+    ) -> Bool {
+        loadingWindowCountAppIDs.isEmpty || appID == selectedAppID
     }
 }
 
