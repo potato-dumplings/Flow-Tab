@@ -160,6 +160,21 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertLessThan(textInkWidth(from: image), 80)
     }
 
+    func testTerminalPreviewRendererPreparesOnlyVisibleTailRowsFromLongScrollback() {
+        let hiddenScrollback = (0..<1_000)
+            .map { "hidden-\($0)-" + String(repeating: "W", count: 120) }
+            .joined(separator: "\n")
+        let lines = TerminalPreviewRenderer.terminalLinesForTesting(
+            contents: hiddenScrollback + "\nvisible-1\nvisible-2",
+            fallbackTitle: nil,
+            columnCount: 80,
+            rowCount: 2,
+            maxRows: 160
+        )
+
+        XCTAssertEqual(lines, ["visible-1", "visible-2"])
+    }
+
 
     func testTerminalPreviewProviderMatchesAXIndexToTerminalSnapshot() async {
         let currentApp = NSRunningApplication.current

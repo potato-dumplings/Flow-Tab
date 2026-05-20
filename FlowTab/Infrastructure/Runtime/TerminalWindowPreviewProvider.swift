@@ -1,5 +1,6 @@
 import AppKit
 import ApplicationServices
+import CoreText
 import Foundation
 
 struct TerminalPreviewStyle {
@@ -365,12 +366,24 @@ enum TerminalPreviewRenderer {
         windowFrame: CGRect?
     ) -> NSImage? {
         let imageSize = imageSize(for: windowFrame)
-        let image = NSImage(size: imageSize)
-        image.lockFocus()
-        defer { image.unlockFocus() }
+        let pixelWidth = max(1, Int(ceil(imageSize.width)))
+        let pixelHeight = max(1, Int(ceil(imageSize.height)))
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        guard let context = CGContext(
+            data: nil,
+            width: pixelWidth,
+            height: pixelHeight,
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else {
+            return nil
+        }
 
-        style.backgroundColor.setFill()
-        NSBezierPath(rect: NSRect(origin: .zero, size: imageSize)).fill()
+        context.setFillColor(cgColor(from: style.backgroundColor, fallback: .black))
+        context.fill(CGRect(x: 0, y: 0, width: pixelWidth, height: pixelHeight))
+        context.textMatrix = .identity
 
         let font = resolvedFont(style: style)
         let lineHeight = max(1, ceil(font.ascender - font.descender + font.leading))
@@ -401,35 +414,40 @@ enum TerminalPreviewRenderer {
         let scale = hasTerminalGridSize ? fittingScale : min(1, fittingScale)
         let scaledLineHeight = max(1, lineHeight * scale)
         let scaledFont = scaledFont(from: font, scale: scale)
-        let attributes: [NSAttributedString.Key: Any] = [
-            .foregroundColor: style.normalTextColor,
-            .font: scaledFont,
-            .paragraphStyle: terminalParagraphStyle(lineHeight: scaledLineHeight)
-        ]
+        let textColor = cgColor(from: style.normalTextColor, fallback: .white)
         drawTerminalGrid(
             lines,
             in: contentRect,
+            context: context,
             sourceRows: sourceRows,
             sourceColumns: sourceColumns,
             scaledCharacterWidth: terminalCharacterWidth(font: font) * scale,
             scaledLineHeight: scaledLineHeight,
-            attributes: attributes
+            font: coreTextFont(from: scaledFont),
+            textColor: textColor
         )
 
-        return image
+        guard let image = context.makeImage() else { return nil }
+        return NSImage(cgImage: image, size: imageSize)
     }
 
     private static func drawTerminalGrid(
         _ lines: [String],
         in contentRect: NSRect,
+        context: CGContext,
         sourceRows: Int,
         sourceColumns: Int,
         scaledCharacterWidth: CGFloat,
         scaledLineHeight: CGFloat,
-        attributes: [NSAttributedString.Key: Any]
+        font: CTFont,
+        textColor: CGColor
     ) {
         let gridHeight = CGFloat(sourceRows) * scaledLineHeight
         let originY = contentRect.maxY - gridHeight
+        let fontHeight = CTFontGetAscent(font) + CTFontGetDescent(font) + CTFontGetLeading(font)
+        let baselineOffset = max(0, (scaledLineHeight - fontHeight) / 2) + CTFontGetDescent(font)
+        var lineCache: [String: CTLine] = [:]
+
         for (lineIndex, line) in lines.prefix(sourceRows).enumerated() {
             let y = originY + gridHeight - CGFloat(lineIndex + 1) * scaledLineHeight
             var column = 0
@@ -445,11 +463,18 @@ enum TerminalPreviewRenderer {
                     width: CGFloat(columnWidth) * scaledCharacterWidth,
                     height: scaledLineHeight
                 )
-                (String(character) as NSString).draw(
-                    with: rect,
-                    options: [.usesLineFragmentOrigin, .usesFontLeading, .truncatesLastVisibleLine],
-                    attributes: attributes
-                )
+                let key = String(character)
+                let textLine = lineCache[key] ?? {
+                    let line = terminalTextLine(
+                        key,
+                        font: font,
+                        textColor: textColor
+                    )
+                    lineCache[key] = line
+                    return line
+                }()
+                context.textPosition = CGPoint(x: rect.minX, y: rect.minY + baselineOffset)
+                CTLineDraw(textLine, context)
             }
         }
     }
@@ -505,27 +530,27 @@ enum TerminalPreviewRenderer {
         rowCount: Int?,
         maxRows: Int
     ) -> [String] {
-        let normalized = contents
-            .replacingOccurrences(of: "\r\n", with: "\n")
-            .replacingOccurrences(of: "\r", with: "\n")
-        let lines = normalized
-            .split(separator: "\n", omittingEmptySubsequences: false)
-            .map(String.init)
-        if let lastContentIndex = lines.lastIndex(
-            where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
-        ) {
-            let contentLines = Array(lines[...lastContentIndex])
-            let terminalRows = rowCount.map { min(max(1, $0), maxRows) } ?? maxRows
-            let visualLines: [String]
+        let terminalRows = rowLimit(rowCount: rowCount, maxRows: maxRows)
+        let contentLines = tailLogicalLines(
+            contents: contents,
+            limit: terminalRows
+        )
+        if !contentLines.isEmpty {
+            var visualLines: [String] = []
+            visualLines.reserveCapacity(terminalRows)
             if let columnCount, columnCount > 0 {
-                visualLines = softWrapTerminalLines(
-                    contentLines,
-                    columnCount: columnCount
-                )
+                for line in contentLines {
+                    appendSoftWrappedTerminalLine(
+                        line,
+                        columnCount: columnCount,
+                        maxRows: terminalRows,
+                        to: &visualLines
+                    )
+                }
             } else {
                 visualLines = contentLines
             }
-            return Array(visualLines.suffix(max(1, terminalRows)))
+            return Array(visualLines.suffix(terminalRows))
         }
         let title = fallbackTitle?.trimmingCharacters(in: .whitespacesAndNewlines)
         if let title, !title.isEmpty {
@@ -534,38 +559,97 @@ enum TerminalPreviewRenderer {
         return ["Terminal"]
     }
 
-    private static func softWrapTerminalLines(
-        _ lines: [String],
-        columnCount: Int
+    private static func tailLogicalLines(
+        contents: String,
+        limit: Int
     ) -> [String] {
-        let columns = max(1, columnCount)
-        return lines.flatMap { line -> [String] in
-            guard !line.isEmpty else { return [""] }
-            var rows: [String] = []
-            var currentRow = ""
-            var currentColumns = 0
+        guard !contents.isEmpty else { return [] }
+        let limit = max(1, limit)
+        var collected: [Substring] = []
+        collected.reserveCapacity(limit)
+        var end = contents.endIndex
+        var foundContent = false
 
-            for character in line {
-                let characterColumns = terminalColumnWidth(character)
-                if currentColumns > 0, currentColumns + characterColumns > columns {
-                    rows.append(currentRow)
-                    currentRow = ""
-                    currentColumns = 0
+        while end > contents.startIndex, collected.count < limit {
+            let lineEnd = end
+            var lineStart = end
+            while lineStart > contents.startIndex {
+                let previous = contents.index(before: lineStart)
+                guard contents[previous] != "\n", contents[previous] != "\r" else {
+                    break
                 }
-                currentRow.append(character)
-                currentColumns += characterColumns
-                if currentColumns >= columns {
-                    rows.append(currentRow)
-                    currentRow = ""
-                    currentColumns = 0
-                }
+                lineStart = previous
             }
 
-            if !currentRow.isEmpty || rows.isEmpty {
-                rows.append(currentRow)
+            let line = contents[lineStart..<lineEnd]
+            if foundContent || line.contains(where: { !$0.isWhitespace }) {
+                foundContent = true
+                collected.append(line)
             }
-            return rows
+
+            guard lineStart > contents.startIndex else { break }
+            var delimiterStart = contents.index(before: lineStart)
+            if contents[delimiterStart] == "\n", delimiterStart > contents.startIndex {
+                let previous = contents.index(before: delimiterStart)
+                if contents[previous] == "\r" {
+                    delimiterStart = previous
+                }
+            }
+            end = delimiterStart
         }
+
+        guard foundContent else { return [] }
+        return collected.reversed().map(String.init)
+    }
+
+    private static func appendSoftWrappedTerminalLine(
+        _ line: String,
+        columnCount: Int,
+        maxRows: Int,
+        to visualLines: inout [String]
+    ) {
+        let columns = max(1, columnCount)
+        guard !line.isEmpty else {
+            appendVisualLine("", maxRows: maxRows, to: &visualLines)
+            return
+        }
+
+        var currentRow = ""
+        var currentColumns = 0
+        for character in line {
+            let characterColumns = terminalColumnWidth(character)
+            if currentColumns > 0, currentColumns + characterColumns > columns {
+                appendVisualLine(currentRow, maxRows: maxRows, to: &visualLines)
+                currentRow = ""
+                currentColumns = 0
+            }
+            currentRow.append(character)
+            currentColumns += characterColumns
+            if currentColumns >= columns {
+                appendVisualLine(currentRow, maxRows: maxRows, to: &visualLines)
+                currentRow = ""
+                currentColumns = 0
+            }
+        }
+
+        if !currentRow.isEmpty {
+            appendVisualLine(currentRow, maxRows: maxRows, to: &visualLines)
+        }
+    }
+
+    private static func appendVisualLine(
+        _ line: String,
+        maxRows: Int,
+        to visualLines: inout [String]
+    ) {
+        visualLines.append(line)
+        if visualLines.count > maxRows {
+            visualLines.removeFirst(visualLines.count - maxRows)
+        }
+    }
+
+    private static func rowLimit(rowCount: Int?, maxRows: Int) -> Int {
+        rowCount.map { min(max(1, $0), maxRows) } ?? maxRows
     }
 
     private static func terminalColumnCount(_ line: String) -> Int {
@@ -599,11 +683,43 @@ enum TerminalPreviewRenderer {
         }
     }
 
-    private static func terminalParagraphStyle(lineHeight: CGFloat) -> NSParagraphStyle {
-        let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.lineBreakMode = .byClipping
-        paragraphStyle.minimumLineHeight = lineHeight
-        paragraphStyle.maximumLineHeight = lineHeight
-        return paragraphStyle
+    private static func terminalTextLine(
+        _ text: String,
+        font: CTFont,
+        textColor: CGColor
+    ) -> CTLine {
+        CTLineCreateWithAttributedString(
+            NSAttributedString(
+                string: text,
+                attributes: [
+                    kCTFontAttributeName as NSAttributedString.Key: font,
+                    kCTForegroundColorAttributeName as NSAttributedString.Key: textColor
+                ]
+            )
+        )
+    }
+
+    private static func coreTextFont(from font: NSFont) -> CTFont {
+        CTFontCreateWithName(font.fontName as CFString, font.pointSize, nil)
+    }
+
+    private static func cgColor(from color: NSColor, fallback: NSColor) -> CGColor {
+        (color.usingColorSpace(.deviceRGB) ?? fallback).cgColor
+    }
+
+    static func terminalLinesForTesting(
+        contents: String,
+        fallbackTitle: String?,
+        columnCount: Int?,
+        rowCount: Int?,
+        maxRows: Int
+    ) -> [String] {
+        terminalLines(
+            contents: contents,
+            fallbackTitle: fallbackTitle,
+            columnCount: columnCount,
+            rowCount: rowCount,
+            maxRows: maxRows
+        )
     }
 }
