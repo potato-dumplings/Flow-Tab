@@ -262,6 +262,24 @@ extension FlowTabUITests {
         )
     }
 
+    func testOptionTabSwitcherClickCommitsAppAndClosesPanel() throws {
+        let app = makeApp(additionalArguments: optionTabPointerHoverArguments)
+        launchFlowTabUITestApplication(app)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+
+        let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
+        let mailTile = element(in: app, identifier: Identifier.switcherAppMockMail)
+        XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 5))
+        XCTAssertTrue(mailTile.waitForExistence(timeout: 5))
+
+        mailTile.tap()
+
+        XCTAssertTrue(
+            waitForNonExistence(diagnosticsSummary, timeout: 2),
+            "Clicking an Option+Tab app tile should commit the app and close the panel immediately."
+        )
+    }
+
     func testControlTabSwitcherPointerHoverSelectsWindowAfterMovement() throws {
         let app = makeApp(additionalArguments: controlTabPointerHoverArguments)
         launchFlowTabUITestApplication(app)
@@ -322,6 +340,25 @@ extension FlowTabUITests {
             equals: "mock-current-primary",
             duration: 1,
             message: "A stationary pointer already over the secondary window card must not select it on presentation."
+        )
+    }
+
+    func testControlTabSwitcherClickCommitsWindowAndClosesPanel() throws {
+        let app = makeApp(additionalArguments: controlTabPointerHoverArguments)
+        launchFlowTabUITestApplication(app)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+
+        let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
+        let secondaryWindowID = "flowtab.switcher.window.\("mock-current-secondary".flowTabUITestAccessibilityIdentifierComponent)"
+        let secondaryWindow = element(in: app, identifier: secondaryWindowID)
+        XCTAssertTrue(openInAppSwitcherForPointerHover(diagnosticsSummary))
+        XCTAssertTrue(secondaryWindow.waitForExistence(timeout: 5))
+
+        secondaryWindow.tap()
+
+        XCTAssertTrue(
+            waitForNonExistence(diagnosticsSummary, timeout: 2),
+            "Clicking a Control+Tab window card should commit the window and close the panel immediately."
         )
     }
 
@@ -408,6 +445,28 @@ extension FlowTabUITests {
             equals: "app%3Acom.flowtab.mock.mail",
             duration: 1,
             message: "A stationary pointer already over the browser search result must not select it on presentation."
+        )
+    }
+
+    func testSearchPanelClickCommitsResultAndClosesPanel() throws {
+        let app = makeApp(additionalArguments: searchPointerHoverArguments)
+        launchFlowTabUITestApplication(app)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+
+        let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
+        let browserResultID = "flowtab.switcher.search.app.\("com.flowtab.mock.browser".flowTabUITestAccessibilityIdentifierComponent)"
+        let browserResult = app.descendants(matching: .any)
+            .matching(identifier: browserResultID)
+            .firstMatch
+        XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 5))
+        XCTAssertTrue(browserResult.waitForExistence(timeout: 5))
+        assertSearchResultUsesRowSizedFrame(browserResult)
+
+        browserResult.tap()
+
+        XCTAssertTrue(
+            waitForNonExistence(diagnosticsSummary, timeout: 2),
+            "Clicking a search result row should commit the result and close the panel immediately."
         )
     }
 

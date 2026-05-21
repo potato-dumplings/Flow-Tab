@@ -173,6 +173,38 @@ extension SwitcherPanelController {
         updatePanelSize()
     }
 
+    func commitSwitcherAppByPointerClick(appID: String) {
+        guard isPanelPresented else { return }
+        guard model.selectAppFromPointer(appID: appID) else { return }
+        logInputTrace(
+            "pointerClickCommit target=app appID=\(appID) nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
+        )
+        finishSelection()
+    }
+
+    func commitSwitcherWindowByPointerClick(appID: String, windowID: String) {
+        guard isPanelPresented else { return }
+        guard model.selectWindowFromPointer(appID: appID, windowID: windowID) else { return }
+        logInputTrace(
+            "pointerClickCommit target=window appID=\(appID) windowID=\(windowID) nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
+        )
+        finishSelection()
+    }
+
+    func commitSwitcherSearchResultByPointerClick(resultID: String) {
+        guard isPanelPresented else { return }
+        guard model.isSearchActive else { return }
+        _ = model.selectSearchResult(withID: resultID)
+        guard model.applySelectedSearchResultToSession() else {
+            NSSound.beep()
+            return
+        }
+        logInputTrace(
+            "pointerClickCommit target=searchResult resultID=\(resultID) nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
+        )
+        finishSelection()
+    }
+
     @discardableResult
     func enterSearchModeIfPossible() -> Bool {
         logSearchTrace("enterSearchMode action=attempt \(searchTraceStateSummary())")

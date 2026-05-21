@@ -292,6 +292,15 @@ final class SwitcherPanelController {
                     },
                     selectSearchResult: { [weak self] resultID in
                         self?.selectSwitcherSearchResultByPointer(resultID: resultID)
+                    },
+                    commitApp: { [weak self] appID in
+                        self?.commitSwitcherAppByPointerClick(appID: appID)
+                    },
+                    commitWindow: { [weak self] appID, windowID in
+                        self?.commitSwitcherWindowByPointerClick(appID: appID, windowID: windowID)
+                    },
+                    commitSearchResult: { [weak self] resultID in
+                        self?.commitSwitcherSearchResultByPointerClick(resultID: resultID)
                     }
                 )
             )

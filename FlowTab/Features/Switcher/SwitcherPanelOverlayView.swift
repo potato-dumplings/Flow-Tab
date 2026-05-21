@@ -533,6 +533,19 @@ private struct CommandTabOverlay: View {
                         ) else { return }
                         pointerSelectionActions.selectApp(appID)
                     }
+                    .simultaneousGesture(
+                        SpatialTapGesture(coordinateSpace: .global)
+                            .onEnded { value in
+                                guard let appID = SwitcherPointerAppStripHitTest.appID(
+                                    at: value.location,
+                                    in: proxy.frame(in: .global),
+                                    appIDs: appIDs,
+                                    tileSize: appTileSize,
+                                    spacing: appTileSpacing
+                                ) else { return }
+                                pointerSelectionActions.commitApp(appID)
+                            }
+                    )
             }
         }
         .padding(.horizontal, 2)
@@ -574,7 +587,14 @@ private struct CommandTabOverlay: View {
                                 .accessibilityLabel(Text(preview.title))
                                 .accessibilityValue(Text(switcherWindowAccessibilityValue(preview)))
                                 .accessibilityIdentifier(switcherWindowAccessibilityIdentifier(preview))
-                                .switcherPointerSelection(isEnabled: selectedApp != nil) {
+                                .switcherPointerSelection(
+                                    isEnabled: selectedApp != nil,
+                                    onClick: {
+                                        if let appID = selectedApp?.id {
+                                            pointerSelectionActions.commitWindow(appID, preview.id)
+                                        }
+                                    }
+                                ) {
                                     if let appID = selectedApp?.id {
                                         pointerSelectionActions.selectWindow(appID, preview.id)
                                     }
@@ -650,7 +670,11 @@ private struct CommandTabOverlay: View {
                                         icon: iconForApp(item.app)
                                     )
                                     .id(item.id)
-                                    .switcherPointerSelection {
+                                    .switcherPointerSelection(
+                                        onClick: {
+                                            pointerSelectionActions.commitSearchResult(item.id)
+                                        }
+                                    ) {
                                         pointerSelectionActions.selectSearchResult(item.id)
                                     }
                                     .background(SearchLayoutSizeReader(target: .row))
@@ -679,7 +703,11 @@ private struct CommandTabOverlay: View {
                                 ForEach(searchWindowItems) { item in
                                     SearchWindowRow(item: item)
                                         .id(item.id)
-                                        .switcherPointerSelection {
+                                        .switcherPointerSelection(
+                                            onClick: {
+                                                pointerSelectionActions.commitSearchResult(item.id)
+                                            }
+                                        ) {
                                             pointerSelectionActions.selectSearchResult(item.id)
                                         }
                                         .background(SearchLayoutSizeReader(target: .row))
@@ -750,7 +778,14 @@ private struct CommandTabOverlay: View {
                             .accessibilityLabel(Text(preview.title))
                             .accessibilityValue(Text(switcherWindowAccessibilityValue(preview)))
                             .accessibilityIdentifier(switcherWindowAccessibilityIdentifier(preview))
-                            .switcherPointerSelection(isEnabled: selectedApp != nil) {
+                            .switcherPointerSelection(
+                                isEnabled: selectedApp != nil,
+                                onClick: {
+                                    if let appID = selectedApp?.id {
+                                        pointerSelectionActions.commitWindow(appID, preview.id)
+                                    }
+                                }
+                            ) {
                                 if let appID = selectedApp?.id {
                                     pointerSelectionActions.selectWindow(appID, preview.id)
                                 }

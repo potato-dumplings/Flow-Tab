@@ -282,6 +282,107 @@ extension FlowTabPriorityCoverageTests {
         }
     }
 
+    @MainActor
+    func testSwitcherPanelControllerPointerAppClickCommitsImmediatelyWithoutPointerMovement() {
+        let controller = SwitcherPanelController()
+        controller.modelForTesting.snapshotProviderOverride = {
+            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
+        }
+        var activatedTarget: ActivationTarget?
+        controller.modelForTesting.activationOverride = { target, _ in
+            activatedTarget = target
+        }
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        controller.pointerSelectionGate.reset(currentLocation: .zero)
+
+        controller.commitSwitcherAppByPointerClick(appID: "com.example.browser")
+
+        XCTAssertEqual(
+            activatedTarget,
+            .window(appID: "com.example.browser", windowID: "browser-1", restoreIfMinimized: false)
+        )
+        XCTAssertNil(controller.modelForTesting.session)
+        XCTAssertFalse(controller.modelForTesting.isSearchActive)
+        XCTAssertFalse(controller.isPanelPresented)
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerPointerWindowClickCommitsImmediatelyWithoutPointerMovement() {
+        let controller = SwitcherPanelController()
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let windows = [
+            WindowCandidate(id: "front-1", title: "Primary", isMinimized: false, lastActiveAt: 300),
+            WindowCandidate(id: "front-2", title: "Secondary", isMinimized: false, lastActiveAt: 290)
+        ]
+        let context = makeRuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windows: windows
+        )
+        controller.modelForTesting.frontmostApplicationOverride = { currentApp }
+        controller.modelForTesting.snapshotProviderOverride = {
+            RuntimeSnapshot(
+                apps: [
+                    AppSwitchCandidate(
+                        id: appID,
+                        displayName: currentApp.localizedName ?? "Current App",
+                        groupID: "current",
+                        lastActiveAt: 300,
+                        windows: windows
+                    )
+                ],
+                contextsByID: [appID: context]
+            )
+        }
+        var activatedTarget: ActivationTarget?
+        controller.modelForTesting.activationOverride = { target, _ in
+            activatedTarget = target
+        }
+
+        XCTAssertTrue(controller.beginInAppWindowHotkeySessionForTesting())
+        controller.pointerSelectionGate.reset(currentLocation: .zero)
+
+        controller.commitSwitcherWindowByPointerClick(appID: appID, windowID: "front-2")
+
+        XCTAssertEqual(
+            activatedTarget,
+            .window(appID: appID, windowID: "front-2", restoreIfMinimized: false)
+        )
+        XCTAssertNil(controller.modelForTesting.session)
+        XCTAssertFalse(controller.modelForTesting.isSearchActive)
+        XCTAssertFalse(controller.isPanelPresented)
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerPointerSearchResultClickCommitsImmediatelyWithoutPointerMovement() async {
+        await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
+            let controller = SwitcherPanelController()
+            controller.modelForTesting.snapshotProviderOverride = {
+                RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
+            }
+            var activatedTarget: ActivationTarget?
+            controller.modelForTesting.activationOverride = { target, _ in
+                activatedTarget = target
+            }
+
+            XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+            XCTAssertTrue(controller.enterSearchModeIfPossible())
+            controller.pointerSelectionGate.reset(currentLocation: .zero)
+
+            controller.commitSwitcherSearchResultByPointerClick(resultID: "app:com.example.browser")
+
+            XCTAssertEqual(
+                activatedTarget,
+                .window(appID: "com.example.browser", windowID: "browser-1", restoreIfMinimized: false)
+            )
+            XCTAssertNil(controller.modelForTesting.session)
+            XCTAssertFalse(controller.modelForTesting.isSearchActive)
+            XCTAssertFalse(controller.isPanelPresented)
+        }
+    }
+
     func testCommandTabTakeoverControllerReconcileActivatesAndRestoreReenablesSystemShortcuts() {
         guard let userDefaults = makeIsolatedUserDefaults() else { return }
         defer { clearIsolatedUserDefaults(userDefaults) }

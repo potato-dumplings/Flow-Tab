@@ -5,6 +5,9 @@ struct SwitcherPointerSelectionActions {
     let selectApp: (String) -> Void
     let selectWindow: (String, String) -> Void
     let selectSearchResult: (String) -> Void
+    let commitApp: (String) -> Void
+    let commitWindow: (String, String) -> Void
+    let commitSearchResult: (String) -> Void
 }
 
 struct SwitcherPointerSelectionGate: Equatable {
@@ -42,11 +45,16 @@ struct SwitcherPointerSelectionGate: Equatable {
 
 private struct SwitcherPointerSelectionModifier: ViewModifier {
     let isEnabled: Bool
+    let onClick: (() -> Void)?
     let onActiveHover: () -> Void
 
     func body(content: Content) -> some View {
         content
             .contentShape(Rectangle())
+            .onTapGesture {
+                guard isEnabled else { return }
+                onClick?()
+            }
             .onContinuousHover(coordinateSpace: .global) { phase in
                 guard isEnabled else { return }
                 guard case .active = phase else { return }
@@ -101,11 +109,13 @@ struct SwitcherPointerAppStripHitTest {
 extension View {
     func switcherPointerSelection(
         isEnabled: Bool = true,
+        onClick: (() -> Void)? = nil,
         onActiveHover: @escaping () -> Void
     ) -> some View {
         modifier(
             SwitcherPointerSelectionModifier(
                 isEnabled: isEnabled,
+                onClick: onClick,
                 onActiveHover: onActiveHover
             )
         )
