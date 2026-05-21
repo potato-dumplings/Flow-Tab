@@ -71,6 +71,8 @@ private struct HomeSidebar: View {
     private var themeModeRaw = ThemePreferencesStore.defaultMode.rawValue
     @AppStorage(AppPreferenceKeys.appLanguage)
     private var appLanguageRaw = AppLanguagePreferencesStore.defaultLanguage.rawValue
+    @State private var accessibilityTrusted = AccessibilityPermissionChecker.isTrusted()
+    @State private var screenCaptureTrusted = ScreenCapturePermissionChecker.hasScreenCapturePermission
     private let navIconColumnWidth: CGFloat = 24
     private let navItemSpacing: CGFloat = 15
 
@@ -122,6 +124,11 @@ private struct HomeSidebar: View {
         }
     }
 
+    private func refreshPermissionStatus() {
+        accessibilityTrusted = AccessibilityPermissionChecker.isTrusted()
+        screenCaptureTrusted = ScreenCapturePermissionChecker.hasScreenCapturePermission
+    }
+
     var body: some View {
         ZStack {
             sidebarBackgroundColor
@@ -156,11 +163,26 @@ private struct HomeSidebar: View {
                 .frame(maxWidth: .infinity)
 
                 Spacer(minLength: 0)
+
+                HomePermissionStatusCard(
+                    accessibilityTrusted: accessibilityTrusted,
+                    screenCaptureTrusted: screenCaptureTrusted,
+                    language: appLanguage
+                )
             }
             .padding(.horizontal, 10)
-            .padding(.vertical, 17)
+            .padding(.top, 17)
+            .padding(.bottom, HomePageLayout.bottomInset)
         }
         .frame(width: 200)
+        .onAppear {
+            refreshPermissionStatus()
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: NSApplication.didBecomeActiveNotification
+        )) { _ in
+            refreshPermissionStatus()
+        }
     }
 
     @ViewBuilder

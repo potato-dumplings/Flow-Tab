@@ -1,9 +1,11 @@
+import AppKit
 import SwiftUI
 
 struct HomeLayerRowView: View {
     let title: String
     let subtitle: String
     let trailing: String
+    let icon: NSImage?
     let isTrailingLoading: Bool
     let badge: String?
     let badgeAccessibilityIdentifier: String?
@@ -13,6 +15,7 @@ struct HomeLayerRowView: View {
         title: String,
         subtitle: String,
         trailing: String,
+        icon: NSImage? = nil,
         isTrailingLoading: Bool = false,
         badge: String? = nil,
         badgeAccessibilityIdentifier: String? = nil,
@@ -21,6 +24,7 @@ struct HomeLayerRowView: View {
         self.title = title
         self.subtitle = subtitle
         self.trailing = trailing
+        self.icon = icon
         self.isTrailingLoading = isTrailingLoading
         self.badge = badge
         self.badgeAccessibilityIdentifier = badgeAccessibilityIdentifier
@@ -29,6 +33,15 @@ struct HomeLayerRowView: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 10) {
+            if let icon {
+                Image(nsImage: icon)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 26, height: 26)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .accessibilityHidden(true)
+            }
+
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(title)
@@ -70,7 +83,7 @@ struct HomeLayerRowView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
         .background(
-            RoundedRectangle(cornerRadius: 9, style: .continuous)
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(isSelected ? Color.accentColor.opacity(0.16) : Color.primary.opacity(0.04))
         )
     }

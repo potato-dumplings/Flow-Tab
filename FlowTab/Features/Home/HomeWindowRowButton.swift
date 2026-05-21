@@ -1,9 +1,12 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct HomeWindowRowButton: NSViewRepresentable {
     let title: String
-    let trailing: String
+    let subtitle: String
+    let status: String
+    let icon: NSImage?
     let isSelected: Bool
     let accessibilityIdentifier: String
     let action: () -> Void
@@ -18,7 +21,9 @@ struct HomeWindowRowButton: NSViewRepresentable {
         button.onPress = action
         button.update(
             title: title,
-            trailing: trailing,
+            subtitle: subtitle,
+            status: status,
+            icon: icon,
             isSelected: isSelected,
             accessibilityIdentifier: accessibilityIdentifier
         )
@@ -28,8 +33,11 @@ struct HomeWindowRowButton: NSViewRepresentable {
 final class HomeWindowRowButtonControl: NSButton {
     var onPress: (() -> Void)?
 
+    private let iconView = NSImageView()
     private let titleLabel = NSTextField(labelWithString: "")
-    private let trailingLabel = NSTextField(labelWithString: "")
+    private let subtitleLabel = NSTextField(labelWithString: "")
+    private let statusPillView = NSView()
+    private let statusLabel = NSTextField(labelWithString: "")
     private var isSelectedRow = false
     private var isHovering = false
     private var hoverTrackingArea: NSTrackingArea?
@@ -45,7 +53,7 @@ final class HomeWindowRowButtonControl: NSButton {
     }
 
     override var intrinsicContentSize: NSSize {
-        NSSize(width: NSView.noIntrinsicMetric, height: 34)
+        NSSize(width: NSView.noIntrinsicMetric, height: 44)
     }
 
     override var isHighlighted: Bool {
@@ -65,7 +73,7 @@ final class HomeWindowRowButtonControl: NSButton {
     }
 
     override func accessibilityValue() -> Any? {
-        trailingLabel.stringValue
+        "\(subtitleLabel.stringValue) \(statusLabel.stringValue)"
     }
 
     override func accessibilityChildren() -> [Any]? {
@@ -125,16 +133,20 @@ final class HomeWindowRowButtonControl: NSButton {
 
     func update(
         title: String,
-        trailing: String,
+        subtitle: String,
+        status: String,
+        icon: NSImage?,
         isSelected: Bool,
         accessibilityIdentifier: String
     ) {
         titleLabel.stringValue = title
-        trailingLabel.stringValue = trailing
+        subtitleLabel.stringValue = subtitle
+        statusLabel.stringValue = status
+        iconView.image = icon ?? NSWorkspace.shared.icon(for: .applicationBundle)
         isSelectedRow = isSelected
         setAccessibilityIdentifier(accessibilityIdentifier)
         setAccessibilityLabel(title)
-        setAccessibilityValue(trailing)
+        setAccessibilityValue("\(subtitle) \(status)")
         updateAppearance()
     }
 
@@ -150,30 +162,63 @@ final class HomeWindowRowButtonControl: NSButton {
         target = self
         action = #selector(handlePress(_:))
 
-        configure(label: titleLabel)
-        configure(label: trailingLabel)
-        titleLabel.font = .systemFont(ofSize: 13, weight: .medium)
-        trailingLabel.font = .monospacedSystemFont(ofSize: 11, weight: .medium)
-        trailingLabel.alignment = .right
-        titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        trailingLabel.setContentHuggingPriority(.required, for: .horizontal)
-        trailingLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+        iconView.translatesAutoresizingMaskIntoConstraints = false
+        iconView.imageScaling = .scaleProportionallyUpOrDown
+        iconView.wantsLayer = true
+        iconView.layer?.cornerRadius = 5
+        iconView.layer?.masksToBounds = true
+        iconView.setAccessibilityElement(false)
 
+        configure(label: titleLabel)
+        configure(label: subtitleLabel)
+        configure(label: statusLabel)
+        titleLabel.font = .systemFont(ofSize: 13, weight: .medium)
+        subtitleLabel.font = .systemFont(ofSize: 11, weight: .regular)
+        statusLabel.font = .systemFont(ofSize: 12, weight: .medium)
+        statusLabel.alignment = .center
+        statusPillView.translatesAutoresizingMaskIntoConstraints = false
+        statusPillView.wantsLayer = true
+        statusPillView.setAccessibilityElement(false)
+        titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        subtitleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        statusPillView.setContentHuggingPriority(.required, for: .horizontal)
+        statusPillView.setContentCompressionResistancePriority(.required, for: .horizontal)
+
+        addSubview(iconView)
         addSubview(titleLabel)
-        addSubview(trailingLabel)
+        addSubview(subtitleLabel)
+        addSubview(statusPillView)
+        statusPillView.addSubview(statusLabel)
 
         NSLayoutConstraint.activate([
-            titleLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
-            titleLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
-            trailingLabel.leadingAnchor.constraint(
+            iconView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 10),
+            iconView.centerYAnchor.constraint(equalTo: centerYAnchor),
+            iconView.widthAnchor.constraint(equalToConstant: 24),
+            iconView.heightAnchor.constraint(equalToConstant: 24),
+
+            titleLabel.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 10),
+            titleLabel.topAnchor.constraint(equalTo: topAnchor, constant: 7),
+            titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: statusPillView.leadingAnchor, constant: -8),
+
+            subtitleLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
+            subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 1),
+            subtitleLabel.trailingAnchor.constraint(lessThanOrEqualTo: statusPillView.leadingAnchor, constant: -8),
+
+            statusPillView.leadingAnchor.constraint(
                 greaterThanOrEqualTo: titleLabel.trailingAnchor,
                 constant: 8
             ),
-            trailingLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
-            trailingLabel.centerYAnchor.constraint(equalTo: centerYAnchor)
+            statusPillView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -10),
+            statusPillView.centerYAnchor.constraint(equalTo: centerYAnchor),
+            statusPillView.heightAnchor.constraint(equalToConstant: 24),
+            statusPillView.widthAnchor.constraint(greaterThanOrEqualToConstant: 58),
+
+            statusLabel.leadingAnchor.constraint(equalTo: statusPillView.leadingAnchor, constant: 10),
+            statusLabel.trailingAnchor.constraint(equalTo: statusPillView.trailingAnchor, constant: -10),
+            statusLabel.centerYAnchor.constraint(equalTo: statusPillView.centerYAnchor)
         ])
 
-        layer?.cornerRadius = 9
+        layer?.cornerRadius = 8
         layer?.masksToBounds = true
         updateAppearance()
     }
@@ -202,7 +247,25 @@ final class HomeWindowRowButtonControl: NSButton {
 
         layer.backgroundColor = backgroundColor.cgColor
         titleLabel.textColor = isEnabled ? .labelColor : .secondaryLabelColor
-        trailingLabel.textColor = .secondaryLabelColor
+        subtitleLabel.textColor = .secondaryLabelColor
+        statusLabel.textColor = statusTextColor(isDark: isDark)
+        statusPillView.layer?.backgroundColor = statusBackgroundColor(isDark: isDark).cgColor
+        statusPillView.layer?.cornerRadius = 8
+        statusPillView.layer?.masksToBounds = true
+    }
+
+    private func statusTextColor(isDark: Bool) -> NSColor {
+        if isSelectedRow {
+            return .white
+        }
+        return isDark ? .secondaryLabelColor : .labelColor.withAlphaComponent(0.68)
+    }
+
+    private func statusBackgroundColor(isDark: Bool) -> NSColor {
+        if isSelectedRow {
+            return NSColor.controlAccentColor.withAlphaComponent(isDark ? 0.64 : 0.78)
+        }
+        return NSColor.labelColor.withAlphaComponent(isDark ? 0.12 : 0.07)
     }
 
     @objc private func handlePress(_: NSButton) {

@@ -68,13 +68,16 @@ enum AppStringKey: String {
     case permissionGuideReady
     case actionGoToSettings
     case actionDontRemindAgain
+    case homePageSubtitle
     case homeAppLayerTitle
     case homeAppLayerSubtitle
+    case homeAppCount
     case homeNoSwitchableApps
     case homeTriggerHotkeyFirst
     case homeWindowLayerTitle
     case homeCurrentAppWindows
     case homeAppWindowsOf
+    case homeWindowCount
     case homeWindowDataLoading
     case homeReadingWindowsOf
     case homeNoSwitchableWindows
@@ -82,6 +85,17 @@ enum AppStringKey: String {
     case homeNoWindowData
     case homeWaitCacheUpdate
     case homeAppNotShownBadge
+    case homeStatsTotalApps
+    case homeStatsVisibleApps
+    case homeStatsHiddenApps
+    case homeStatsTotalWindows
+    case homeWindowStatusCurrent
+    case homeWindowStatusMinimized
+    case homeWindowStatusSwitchable
+    case homePermissionAccessibility
+    case homePermissionScreenCapture
+    case homePermissionGranted
+    case homePermissionMissing
     case hotkeyCommandTabTakeoverActive
     case hotkeyCommandTabTakeoverInactive
     case hotkeyMainSummary
@@ -205,13 +219,16 @@ enum AppStrings {
             .permissionGuideReady: "权限已开启。",
             .actionGoToSettings: "前往设置",
             .actionDontRemindAgain: "不再提示",
+            .homePageSubtitle: "概览应用与窗口使用情况",
             .homeAppLayerTitle: "应用层",
             .homeAppLayerSubtitle: "当前可切换应用",
+            .homeAppCount: "{count} 个应用",
             .homeNoSwitchableApps: "无可切换应用",
             .homeTriggerHotkeyFirst: "先触发一次 {hotkey}",
             .homeWindowLayerTitle: "窗口层",
             .homeCurrentAppWindows: "当前应用窗口",
             .homeAppWindowsOf: "{app} 的窗口",
+            .homeWindowCount: "{count} 个窗口",
             .homeWindowDataLoading: "窗口数据加载中",
             .homeReadingWindowsOf: "正在读取 {app} 的窗口",
             .homeNoSwitchableWindows: "当前应用无可切换窗口",
@@ -219,6 +236,17 @@ enum AppStrings {
             .homeNoWindowData: "暂无窗口数据",
             .homeWaitCacheUpdate: "等待缓存更新",
             .homeAppNotShownBadge: "不展示",
+            .homeStatsTotalApps: "应用总数",
+            .homeStatsVisibleApps: "可见应用",
+            .homeStatsHiddenApps: "隐藏应用",
+            .homeStatsTotalWindows: "窗口总数",
+            .homeWindowStatusCurrent: "当前",
+            .homeWindowStatusMinimized: "最小化",
+            .homeWindowStatusSwitchable: "可切换",
+            .homePermissionAccessibility: "辅助权限",
+            .homePermissionScreenCapture: "屏幕录制",
+            .homePermissionGranted: "已授予",
+            .homePermissionMissing: "未授权",
             .hotkeyCommandTabTakeoverActive: "已接管系统 Command + Tab / Command + Shift + Tab，退出 FlowTab 后会自动恢复。",
             .hotkeyCommandTabTakeoverInactive: "检测到 Command + Tab 组合：FlowTab 会自动尝试接管系统 Command + Tab / Command + Shift + Tab。",
             .hotkeyMainSummary: "当前：{main}（{reverseLabel}：{reverse}），{quitLabel}：{quit}",
@@ -337,13 +365,16 @@ enum AppStrings {
             .permissionGuideReady: "Permissions granted.",
             .actionGoToSettings: "Go to Settings",
             .actionDontRemindAgain: "Don't remind again",
+            .homePageSubtitle: "Overview of app and window usage",
             .homeAppLayerTitle: "App Layer",
             .homeAppLayerSubtitle: "Switchable apps",
+            .homeAppCount: "{count} apps",
             .homeNoSwitchableApps: "No switchable apps",
             .homeTriggerHotkeyFirst: "Trigger {hotkey} once first",
             .homeWindowLayerTitle: "Window Layer",
             .homeCurrentAppWindows: "Current app windows",
             .homeAppWindowsOf: "{app} windows",
+            .homeWindowCount: "{count} windows",
             .homeWindowDataLoading: "Loading window data",
             .homeReadingWindowsOf: "Reading {app} windows",
             .homeNoSwitchableWindows: "No switchable windows in current app",
@@ -351,6 +382,17 @@ enum AppStrings {
             .homeNoWindowData: "No window data",
             .homeWaitCacheUpdate: "Waiting for cache update",
             .homeAppNotShownBadge: "Not shown",
+            .homeStatsTotalApps: "Total Apps",
+            .homeStatsVisibleApps: "Visible Apps",
+            .homeStatsHiddenApps: "Hidden Apps",
+            .homeStatsTotalWindows: "Total Windows",
+            .homeWindowStatusCurrent: "Current",
+            .homeWindowStatusMinimized: "Minimized",
+            .homeWindowStatusSwitchable: "Switchable",
+            .homePermissionAccessibility: "Accessibility",
+            .homePermissionScreenCapture: "Screen Recording",
+            .homePermissionGranted: "Granted",
+            .homePermissionMissing: "Missing",
             .hotkeyCommandTabTakeoverActive: "System Command + Tab / Command + Shift + Tab is now taken over and will be restored after FlowTab exits.",
             .hotkeyCommandTabTakeoverInactive: "Command + Tab combination detected: FlowTab will try to take over system Command + Tab / Command + Shift + Tab.",
             .hotkeyMainSummary: "Current: {main} ({reverseLabel}: {reverse}), {quitLabel}: {quit}",

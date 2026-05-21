@@ -219,6 +219,43 @@ extension FlowTabTests {
         )
     }
 
+    func testHomeOverviewStatsCountsVisibilityAndReadyWindows() {
+        let summaries = [
+            makeHomeAppSummary(appID: "com.example.mail", displayName: "Mail", rank: 0, windowCount: 2),
+            makeHomeAppSummary(appID: "com.example.browser", displayName: "Browser", rank: 1, windowCount: 4),
+            makeHomeAppSummary(appID: "com.example.notes", displayName: "Notes", rank: 2, windowCount: 1)
+        ]
+
+        let stats = HomeOverviewStats.make(
+            appSummaries: summaries,
+            hiddenAppIDs: ["com.example.mail"],
+            loadingWindowCountAppIDs: []
+        )
+
+        XCTAssertEqual(stats.totalApps, 3)
+        XCTAssertEqual(stats.visibleApps, 2)
+        XCTAssertEqual(stats.hiddenApps, 1)
+        XCTAssertEqual(stats.totalWindows, .ready(7))
+    }
+
+    func testHomeOverviewStatsKeepsWindowTotalLoadingDuringInitialCountRefresh() {
+        let summaries = [
+            makeHomeAppSummary(appID: "com.example.mail", displayName: "Mail", rank: 0, windowCount: 0),
+            makeHomeAppSummary(appID: "com.example.browser", displayName: "Browser", rank: 1, windowCount: 0)
+        ]
+
+        let stats = HomeOverviewStats.make(
+            appSummaries: summaries,
+            hiddenAppIDs: [],
+            loadingWindowCountAppIDs: ["com.example.mail", "com.example.browser"]
+        )
+
+        XCTAssertEqual(stats.totalApps, 2)
+        XCTAssertEqual(stats.visibleApps, 2)
+        XCTAssertEqual(stats.hiddenApps, 0)
+        XCTAssertEqual(stats.totalWindows, .loading)
+    }
+
     private func makeHomeActivationSnapshot(
         appID: String,
         windows: [WindowCandidate]
@@ -263,14 +300,15 @@ extension FlowTabTests {
     private func makeHomeAppSummary(
         appID: String,
         displayName: String,
-        rank: Int
+        rank: Int,
+        windowCount: Int = 1
     ) -> RuntimeHomeAppSummary {
         RuntimeHomeAppSummary(
             appID: appID,
             displayName: displayName,
             groupID: "fixture",
             lastActiveAt: TimeInterval(300 - rank),
-            windowCount: 1,
+            windowCount: windowCount,
             pid: pid_t(12_000 + rank)
         )
     }

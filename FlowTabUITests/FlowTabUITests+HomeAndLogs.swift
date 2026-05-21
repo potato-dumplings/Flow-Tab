@@ -143,6 +143,35 @@ extension FlowTabUITests {
         XCTAssertEqual(elementStringValue(browserRow), "0w")
     }
 
+    func testHomeOverviewChromeShowsCountsStatsAndSidebarPermissionStatus() throws {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-mock-runtime",
+                "-showPermissionReminder",
+                "NO",
+                "--flowtab-ui-ax-trusted",
+                "YES",
+                "--flowtab-ui-screen-trusted",
+                "YES"
+            ]
+        )
+        launchFlowTabUITestApplication(app)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
+        XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5))
+        XCTAssertTrue(element(in: app, identifier: Identifier.homeTabContent).waitForExistence(timeout: 5))
+
+        XCTAssertTrue(element(in: app, identifier: Identifier.homeHeader).waitForExistence(timeout: 5))
+        XCTAssertTrue(element(in: app, identifier: Identifier.homeAppCount).waitForExistence(timeout: 8))
+        XCTAssertTrue(element(in: app, identifier: Identifier.homeWindowCount).waitForExistence(timeout: 8))
+        XCTAssertTrue(element(in: app, identifier: Identifier.homeStatsTotalApps).waitForExistence(timeout: 8))
+        XCTAssertTrue(element(in: app, identifier: Identifier.homeStatsVisibleApps).waitForExistence(timeout: 8))
+        XCTAssertTrue(element(in: app, identifier: Identifier.homeStatsHiddenApps).waitForExistence(timeout: 8))
+        XCTAssertTrue(element(in: app, identifier: Identifier.homeStatsTotalWindows).waitForExistence(timeout: 8))
+        XCTAssertTrue(element(in: app, identifier: Identifier.sidebarPermissionAccessibility).waitForExistence(timeout: 5))
+        XCTAssertTrue(element(in: app, identifier: Identifier.sidebarPermissionScreenCapture).waitForExistence(timeout: 5))
+    }
+
     func testHomeWindowListUsesSeededWindowRecency() throws {
         let workflow = try configuredHomeWindowRecencyWorkflow()
 

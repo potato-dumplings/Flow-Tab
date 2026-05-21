@@ -86,6 +86,8 @@ struct HomeLandingView: View {
             HomeBackdropView()
 
             VStack(alignment: .leading, spacing: 12) {
+                pageHeader
+
                 if shouldShowPermissionGuide {
                     permissionGuideBanner
                 }
@@ -95,11 +97,20 @@ struct HomeLandingView: View {
                     windowLayerCard
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxHeight: .infinity, alignment: .top)
 
-                Spacer(minLength: 0)
+                HomeOverviewStatsBar(
+                    stats: overviewStats,
+                    language: appLanguage
+                )
+                .frame(
+                    maxWidth: .infinity,
+                    minHeight: HomePageLayout.bottomStatusHeight,
+                    maxHeight: HomePageLayout.bottomStatusHeight
+                )
             }
             .padding(.horizontal, 24)
-            .padding(.bottom, 24)
+            .padding(.bottom, HomePageLayout.bottomInset)
             .padding(.top, HomePageLayout.alignedTopInset)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -139,6 +150,31 @@ struct HomeLandingView: View {
             teardownActiveState()
         }
         .accessibilityIdentifier("flowtab.tab.home.content")
+    }
+
+    private var pageHeader: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            HomeAccessibleText(
+                text: AppStrings.text(.tabHome, language: appLanguage),
+                font: .systemFont(ofSize: 22, weight: .semibold),
+                textColor: .labelColor,
+                accessibilityIdentifier: "flowtab.home.header"
+            )
+            .frame(height: 27)
+
+            Text(AppStrings.text(.homePageSubtitle, language: appLanguage))
+                .font(.system(size: 13, weight: .regular))
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+        }
+    }
+
+    private var overviewStats: HomeOverviewStats {
+        HomeOverviewStats.make(
+            appSummaries: appSummaries,
+            hiddenAppIDs: hiddenAppIDs,
+            loadingWindowCountAppIDs: loadingWindowCountAppIDs
+        )
     }
 
     private var permissionGuideBanner: some View {
@@ -188,7 +224,9 @@ struct HomeLandingView: View {
     private var appLayerCard: some View {
         HomeSectionCard(
             title: AppStrings.text(.homeAppLayerTitle, language: appLanguage),
-            subtitle: AppStrings.text(.homeAppLayerSubtitle, language: appLanguage)
+            subtitle: AppStrings.text(.homeAppLayerSubtitle, language: appLanguage),
+            trailingText: countText(.homeAppCount, count: presentedAppSummaries.count),
+            trailingAccessibilityIdentifier: "flowtab.home.app.count"
         ) {
             if appSummaries.isEmpty {
                 HomeLayerRowView(
@@ -218,6 +256,7 @@ struct HomeLandingView: View {
                                     title: app.displayName,
                                     subtitle: app.appID,
                                     trailing: "\(app.windowCount)w",
+                                    icon: HomeAppIconProvider.icon(for: app),
                                     isTrailingLoading: isWindowCountLoading,
                                     badge: hiddenBadge,
                                     badgeAccessibilityIdentifier: isHidden
@@ -256,7 +295,11 @@ struct HomeLandingView: View {
                     replacements: ["app": $0.displayName],
                     language: appLanguage
                 )
-            } ?? AppStrings.text(.homeCurrentAppWindows, language: appLanguage)
+            } ?? AppStrings.text(.homeCurrentAppWindows, language: appLanguage),
+            trailingText: activeApp.flatMap { windowsByAppID[$0.appID] } == nil
+                ? "--"
+                : countText(.homeWindowCount, count: activeWindows.count),
+            trailingAccessibilityIdentifier: "flowtab.home.window.count"
         ) {
             if let activeApp, windowsByAppID[activeApp.appID] == nil {
                 HomeLayerRowView(
@@ -275,13 +318,15 @@ struct HomeLandingView: View {
                         ForEach(Array(activeWindows.enumerated()), id: \.element.id) { index, window in
                             HomeWindowRowButton(
                                 title: windowTitle(window.title, index: index),
-                                trailing: windowIdentifier(window.id),
+                                subtitle: activeApp.appID,
+                                status: windowStatusText(window: window, index: index),
+                                icon: HomeAppIconProvider.icon(for: activeApp),
                                 isSelected: index == 0,
                                 accessibilityIdentifier: "flowtab.home.window.\(window.id.flowTabAccessibilityIdentifierComponent)"
                             ) {
                                 activateWindow(activeApp.appID, windowID: window.id)
                             }
-                            .frame(height: 34)
+                            .frame(height: 44)
                             .frame(maxWidth: .infinity)
                         }
                     }
@@ -315,15 +360,32 @@ struct HomeLandingView: View {
     }
 
     private func windowTitle(_ title: String, index: Int) -> String {
-        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = title
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
         if trimmed.isEmpty {
             return "Window #\(index + 1)"
         }
         return trimmed
     }
 
-    private func windowIdentifier(_ rawID: String) -> String {
-        rawID.replacingOccurrences(of: "ax:", with: "").replacingOccurrences(of: ":", with: "-")
+    private func countText(_ key: AppStringKey, count: Int) -> String {
+        AppStrings.text(
+            key,
+            replacements: ["count": "\(count)"],
+            language: appLanguage
+        )
+    }
+
+    private func windowStatusText(window: WindowCandidate, index: Int) -> String {
+        if window.isMinimized {
+            return AppStrings.text(.homeWindowStatusMinimized, language: appLanguage)
+        }
+        if index == 0 {
+            return AppStrings.text(.homeWindowStatusCurrent, language: appLanguage)
+        }
+        return AppStrings.text(.homeWindowStatusSwitchable, language: appLanguage)
     }
 
     private func noSwitchableWindowsSubtitle(for app: RuntimeHomeAppSummary) -> String {

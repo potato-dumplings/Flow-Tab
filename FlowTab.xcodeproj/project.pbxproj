@@ -103,6 +103,7 @@
 		C30000012FBD100100B0D737 /* HomeRuntimeSnapshotService.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000112FBD100100B0D737 /* HomeRuntimeSnapshotService.swift */; };
 		C30000022FBD100100B0D737 /* HomeAppVisibilityPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000122FBD100100B0D737 /* HomeAppVisibilityPresentation.swift */; };
 		C30000032FBD100100B0D737 /* HomeLayerRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C30000132FBD100100B0D737 /* HomeLayerRowView.swift */; };
+		D43000012FFD000100B0D737 /* HomeOverviewComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = D43000112FFD000100B0D737 /* HomeOverviewComponents.swift */; };
 		C10000012F75000100B0D737 /* AppFoundation.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000112F75000100B0D737 /* AppFoundation.swift */; };
 		C10000022F75000100B0D737 /* HomeRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000122F75000100B0D737 /* HomeRootView.swift */; };
 		C10000032F75000100B0D737 /* HomeLandingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000132F75000100B0D737 /* HomeLandingView.swift */; };
@@ -287,6 +288,7 @@
 		C30000112FBD100100B0D737 /* HomeRuntimeSnapshotService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeRuntimeSnapshotService.swift; sourceTree = "<group>"; };
 		C30000122FBD100100B0D737 /* HomeAppVisibilityPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeAppVisibilityPresentation.swift; sourceTree = "<group>"; };
 		C30000132FBD100100B0D737 /* HomeLayerRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeLayerRowView.swift; sourceTree = "<group>"; };
+		D43000112FFD000100B0D737 /* HomeOverviewComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeOverviewComponents.swift; sourceTree = "<group>"; };
 		C10000112F75000100B0D737 /* AppFoundation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppFoundation.swift; sourceTree = "<group>"; };
 		C10000122F75000100B0D737 /* HomeRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeRootView.swift; sourceTree = "<group>"; };
 		C10000132F75000100B0D737 /* HomeLandingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeLandingView.swift; sourceTree = "<group>"; };
@@ -635,6 +637,7 @@
 				C10000132F75000100B0D737 /* HomeLandingView.swift */,
 				C30000122FBD100100B0D737 /* HomeAppVisibilityPresentation.swift */,
 				C30000132FBD100100B0D737 /* HomeLayerRowView.swift */,
+				D43000112FFD000100B0D737 /* HomeOverviewComponents.swift */,
 				C30000112FBD100100B0D737 /* HomeRuntimeSnapshotService.swift */,
 				C20000112FBD000100B0D737 /* HomeWindowActivationController.swift */,
 				C20000122FBD000100B0D737 /* HomeWindowRowButton.swift */,
@@ -910,6 +913,7 @@
 				C10000032F75000100B0D737 /* HomeLandingView.swift in Sources */,
 				C30000022FBD100100B0D737 /* HomeAppVisibilityPresentation.swift in Sources */,
 				C30000032FBD100100B0D737 /* HomeLayerRowView.swift in Sources */,
+				D43000012FFD000100B0D737 /* HomeOverviewComponents.swift in Sources */,
 				C30000012FBD100100B0D737 /* HomeRuntimeSnapshotService.swift in Sources */,
 				C20000012FBD000100B0D737 /* HomeWindowActivationController.swift in Sources */,
 				C20000022FBD000100B0D737 /* HomeWindowRowButton.swift in Sources */,

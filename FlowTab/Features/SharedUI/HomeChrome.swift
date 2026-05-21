@@ -1,7 +1,10 @@
+import AppKit
 import SwiftUI
 
 enum HomePageLayout {
     static let alignedTopInset: CGFloat = 18
+    static let bottomInset: CGFloat = 17
+    static let bottomStatusHeight: CGFloat = 64
 }
 
 struct HomeBackdropView: View {
@@ -23,6 +26,8 @@ struct HomeBackdropView: View {
 struct HomeSectionCard<Content: View>: View {
     let title: String
     let subtitle: String
+    let trailingText: String?
+    let trailingAccessibilityIdentifier: String?
     let content: Content
     @Environment(\.colorScheme) private var colorScheme
 
@@ -47,17 +52,40 @@ struct HomeSectionCard<Content: View>: View {
         return Color.black.opacity(0.05)
     }
 
-    init(title: String, subtitle: String, @ViewBuilder content: () -> Content) {
+    init(
+        title: String,
+        subtitle: String,
+        trailingText: String? = nil,
+        trailingAccessibilityIdentifier: String? = nil,
+        @ViewBuilder content: () -> Content
+    ) {
         self.title = title
         self.subtitle = subtitle
+        self.trailingText = trailingText
+        self.trailingAccessibilityIdentifier = trailingAccessibilityIdentifier
         self.content = content()
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(title)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(.primary)
+            HStack(alignment: .center, spacing: 8) {
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.primary)
+
+                Spacer(minLength: 8)
+
+                if let trailingText {
+                    HomeAccessibleText(
+                        text: trailingText,
+                        font: .systemFont(ofSize: 11, weight: .medium),
+                        textColor: .secondaryLabelColor,
+                        accessibilityIdentifier: trailingAccessibilityIdentifier
+                    )
+                    .fixedSize(horizontal: true, vertical: false)
+                    .frame(height: 14, alignment: .trailing)
+                }
+            }
 
             Text(subtitle)
                 .font(.system(size: 11))
@@ -66,7 +94,7 @@ struct HomeSectionCard<Content: View>: View {
             content
         }
         .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(cardBackgroundColor)
