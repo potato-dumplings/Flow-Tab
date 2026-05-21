@@ -202,6 +202,60 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(confidence, .targetOrdinalTieBreak)
     }
 
+    func testChromeFocusBridgeCandidateDecisionUsesTargetOrdinalWhenCGTitlesAreUnavailable() {
+        let frame = CGRect(x: 0, y: 40, width: 1_200, height: 800)
+        let candidates = [
+            RuntimeChromeWindowFocusBridge.Candidate(
+                windowID: 31,
+                name: "First Tab",
+                activeTabTitle: "First Tab",
+                bounds: frame,
+                titleAffinity: 2,
+                geometryDistance: 12
+            ),
+            RuntimeChromeWindowFocusBridge.Candidate(
+                windowID: 44,
+                name: "Second Tab",
+                activeTabTitle: "Second Tab",
+                bounds: frame,
+                titleAffinity: 2,
+                geometryDistance: 12
+            )
+        ]
+        let cgWindows = [
+            RuntimeSnapshotProvider.CGWindowEntry(
+                id: 455,
+                title: nil,
+                bounds: frame,
+                isOnscreen: false,
+                alpha: 1,
+                storeType: 1
+            ),
+            RuntimeSnapshotProvider.CGWindowEntry(
+                id: 456,
+                title: nil,
+                bounds: frame,
+                isOnscreen: false,
+                alpha: 1,
+                storeType: 1
+            )
+        ]
+
+        let decision = RuntimeChromeWindowFocusBridge.candidateDecision(
+            candidates,
+            targetCGWindowID: 456,
+            fallbackTitle: "Google Chrome",
+            fallbackFrame: frame,
+            currentCGWindows: cgWindows
+        )
+
+        guard case let .selected(candidate, confidence) = decision else {
+            return XCTFail("Expected target ordinal to resolve the title-unavailable score tie")
+        }
+        XCTAssertEqual(candidate.windowID, 44)
+        XCTAssertEqual(confidence, .targetOrdinalTieBreak)
+    }
+
     @MainActor
     func testRuntimeActivatorActivationConfirmationPolicyWrapsRetryDelays() {
         let activator = RuntimeActivator()

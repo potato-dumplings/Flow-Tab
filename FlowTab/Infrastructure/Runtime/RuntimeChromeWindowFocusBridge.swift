@@ -486,8 +486,9 @@ struct RuntimeChromeWindowFocusBridge {
         else {
             return nil
         }
-        let targetTitle = normalizedChromeTitle(targetWindow.title ?? fallbackTitle)
-        guard !targetTitle.isEmpty else { return nil }
+        let fallbackTitle = normalizedChromeTitleIfPresent(fallbackTitle)
+        let targetTitle = normalizedChromeTitleIfPresent(targetWindow.title)
+        guard targetTitle != nil || fallbackTitle != nil else { return nil }
 
         let siblings = currentCGWindows
             .filter { window in
@@ -496,11 +497,33 @@ struct RuntimeChromeWindowFocusBridge {
                 }
                 guard let frame = window.bounds?.standardized else { return false }
                 guard frameDistance(frame, targetFrame) <= 4 else { return false }
-                return normalizedChromeTitle(window.title ?? "") == targetTitle
+                return chromeCGTitleMatchesOrdinalBucket(
+                    window.title,
+                    targetTitle: targetTitle,
+                    fallbackTitle: fallbackTitle
+                )
             }
             .sorted { lhs, rhs in lhs.id < rhs.id }
         guard siblings.count > 1 else { return nil }
         return siblings.firstIndex { $0.id == targetCGWindowID }
+    }
+
+    private static func chromeCGTitleMatchesOrdinalBucket(
+        _ title: String?,
+        targetTitle: String?,
+        fallbackTitle: String?
+    ) -> Bool {
+        let title = normalizedChromeTitleIfPresent(title)
+        if let targetTitle {
+            return title == targetTitle
+        }
+        return title == nil || title == fallbackTitle
+    }
+
+    private static func normalizedChromeTitleIfPresent(_ value: String?) -> String? {
+        guard let value else { return nil }
+        let normalizedTitle = normalizedChromeTitle(value)
+        return normalizedTitle.isEmpty ? nil : normalizedTitle
     }
 
     private static func parseInteger(_ value: String) -> Int64? {
