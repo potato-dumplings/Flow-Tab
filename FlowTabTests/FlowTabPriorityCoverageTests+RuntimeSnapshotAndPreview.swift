@@ -1118,6 +1118,52 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(mergedEntries.first?.title, "Chrome Normal Tab")
     }
 
+    func testRuntimeSnapshotProviderWindowListFiltersChromeFindOverlayAXWindow() {
+        let appName = "Google Chrome"
+        let browserFrame = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
+        let findOverlayFrame = CGRect(x: 1_140, y: 110, width: 403, height: 84)
+
+        let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+            axWindows: [
+                .init(
+                    id: "ax:chrome:browser",
+                    index: 0,
+                    title: "Docs - Google Chrome - Profile",
+                    bounds: browserFrame,
+                    bridgedCGWindowID: 151_421
+                ),
+                .init(
+                    id: "ax:chrome:find-overlay",
+                    index: 1,
+                    title: "Find in page",
+                    bounds: findOverlayFrame,
+                    bridgedCGWindowID: 151_422
+                )
+            ],
+            cgWindows: [
+                .init(
+                    id: 151_422,
+                    title: nil,
+                    bounds: findOverlayFrame,
+                    isOnscreen: true,
+                    spaceIDs: [1]
+                ),
+                .init(
+                    id: 151_421,
+                    title: "Docs",
+                    bounds: browserFrame,
+                    isOnscreen: true,
+                    spaceIDs: [1]
+                )
+            ],
+            pid: 67_097,
+            appName: appName
+        )
+
+        XCTAssertEqual(mergedEntries.compactMap(\.cgWindowID), [151_421])
+        XCTAssertEqual(mergedEntries.first?.title, "Docs - Google Chrome - Profile")
+    }
+
     func testRuntimeSnapshotProviderWindowListKeepsStickyCGEntriesBoundToSpaceOneDuringTransientAXRebuild() {
         let provider = RuntimeSnapshotProvider()
         let pid: pid_t = 18_405

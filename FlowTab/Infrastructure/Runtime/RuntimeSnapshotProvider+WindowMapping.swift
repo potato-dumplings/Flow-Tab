@@ -291,9 +291,15 @@ extension RuntimeSnapshotProvider {
             hasFullscreenTopology: !fullscreenContentBounds.isEmpty,
             stage: "presentation"
         )
+        let overlayFilteredPresentationEntries = filterAuxiliaryOverlayEntries(
+            presentationEntries,
+            knownCGWindowsByID: knownCGWindowsByID,
+            appName: appName,
+            stage: "presentation"
+        )
 
         return orderWindowEntriesForPresentation(
-            presentationEntries,
+            overlayFilteredPresentationEntries,
             prioritizesOnscreen: !fullscreenContentBounds.isEmpty,
             cgWindowOrderByID: cgWindowOrderByID,
             knownCGWindowsByID: knownCGWindowsByID,
@@ -385,6 +391,46 @@ extension RuntimeSnapshotProvider {
             RuntimeLog.debug(
                 .axMatch,
                 "\(appName) filtered-fullscreen-sibling-artifacts stage=\(stage) dropped=\(droppedCount)"
+            )
+        }
+        return filteredEntries
+    }
+
+    private func filterAuxiliaryOverlayEntries(
+        _ entries: [WindowListEntry],
+        knownCGWindowsByID: [CGWindowID: CGWindowEntry],
+        appName: String,
+        stage: String
+    ) -> [WindowListEntry] {
+        guard entries.count > 1 else { return entries }
+
+        let primarySurfaces = entries.filter {
+            runtimeWindowEntryLooksLikeStrongUserWindow(
+                $0,
+                knownCGWindowsByID: knownCGWindowsByID,
+                appName: appName
+            )
+        }
+        guard !primarySurfaces.isEmpty else { return entries }
+
+        var droppedCount = 0
+        let filteredEntries = entries.filter { entry in
+            let isOverlay = runtimeWindowEntryLooksLikeContainedAuxiliaryOverlay(
+                entry,
+                primarySurfaces: primarySurfaces,
+                knownCGWindowsByID: knownCGWindowsByID,
+                appName: appName
+            )
+            if isOverlay {
+                droppedCount += 1
+            }
+            return !isOverlay
+        }
+
+        if droppedCount > 0 {
+            RuntimeLog.debug(
+                .axMatch,
+                "\(appName) filtered-auxiliary-overlays stage=\(stage) dropped=\(droppedCount)"
             )
         }
         return filteredEntries
@@ -1022,6 +1068,9 @@ private let runtimeFullscreenContentSiblingMinimumWidth: CGFloat = 900
 private let runtimeFullscreenContentSiblingMinimumHeight: CGFloat = 600
 private let runtimeFullscreenContentSiblingOriginTolerance: CGFloat = 90
 private let runtimeFullscreenContentSiblingTopInsetLimit: CGFloat = 260
+private let runtimeAuxiliaryOverlayMaximumWidth: CGFloat = 720
+private let runtimeAuxiliaryOverlayMaximumHeight: CGFloat = 180
+private let runtimeAuxiliaryOverlayContainmentTolerance: CGFloat = 8
 
 private func runtimeWindowEntryLooksLikeFullscreenHostArtifact(
     _ entry: RuntimeSnapshotProvider.WindowListEntry,
@@ -1169,6 +1218,53 @@ private func runtimeWindowEntryLooksLikeShallowFullscreenSibling(
     }
     return bounds.width >= runtimeFullscreenSiblingArtifactMinimumWidth
         && bounds.height <= runtimeFullscreenSiblingArtifactMaximumHeight
+}
+
+private func runtimeWindowEntryLooksLikeContainedAuxiliaryOverlay(
+    _ entry: RuntimeSnapshotProvider.WindowListEntry,
+    primarySurfaces: [RuntimeSnapshotProvider.WindowListEntry],
+    knownCGWindowsByID: [CGWindowID: RuntimeSnapshotProvider.CGWindowEntry],
+    appName: String
+) -> Bool {
+    guard !runtimeWindowEntryLooksLikeStrongUserWindow(
+        entry,
+        knownCGWindowsByID: knownCGWindowsByID,
+        appName: appName
+    ) else {
+        return false
+    }
+    guard let bounds = runtimeWindowEntryBounds(entry, knownCGWindowsByID: knownCGWindowsByID)?.standardized else {
+        return false
+    }
+    guard bounds.width > 0, bounds.height > 0 else { return false }
+    guard bounds.width <= runtimeAuxiliaryOverlayMaximumWidth else { return false }
+    guard bounds.height <= runtimeAuxiliaryOverlayMaximumHeight else { return false }
+
+    return primarySurfaces.contains { primarySurface in
+        guard primarySurface.cgWindowID != entry.cgWindowID else { return false }
+        guard runtimeWindowEntriesShareAnySpace(entry, primarySurface) else { return false }
+        guard let primaryBounds = runtimeWindowEntryBounds(
+            primarySurface,
+            knownCGWindowsByID: knownCGWindowsByID
+        )?.standardized else {
+            return false
+        }
+        let containmentBounds = primaryBounds.insetBy(
+            dx: -runtimeAuxiliaryOverlayContainmentTolerance,
+            dy: -runtimeAuxiliaryOverlayContainmentTolerance
+        )
+        return containmentBounds.contains(bounds)
+    }
+}
+
+private func runtimeWindowEntriesShareAnySpace(
+    _ lhs: RuntimeSnapshotProvider.WindowListEntry,
+    _ rhs: RuntimeSnapshotProvider.WindowListEntry
+) -> Bool {
+    let lhsSpaces = Set(RuntimeWindowTopologyClassifier.normalizedSpaceIDs(lhs.spaceIDs))
+    let rhsSpaces = Set(RuntimeWindowTopologyClassifier.normalizedSpaceIDs(rhs.spaceIDs))
+    guard !lhsSpaces.isEmpty, !rhsSpaces.isEmpty else { return false }
+    return !lhsSpaces.isDisjoint(with: rhsSpaces)
 }
 
 private func runtimeWindowEntryBounds(
