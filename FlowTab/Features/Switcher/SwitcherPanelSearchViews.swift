@@ -288,6 +288,8 @@ struct SearchAppRow: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(
@@ -305,6 +307,8 @@ struct SearchAppRow: View {
                     lineWidth: item.isSelected ? 1.4 : 1
                 )
         )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(item.app.displayName))
         .accessibilityIdentifier("flowtab.switcher.search.app.\(item.app.id.flowTabAccessibilityIdentifierComponent)")
     }
 }
@@ -352,6 +356,8 @@ struct SearchWindowRow: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
                 .fill(
@@ -369,6 +375,8 @@ struct SearchWindowRow: View {
                     lineWidth: item.isSelected ? 1.4 : 1
                 )
         )
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text("\(item.title), \(item.appName)"))
         .accessibilityIdentifier("flowtab.switcher.search.window.\(item.id.flowTabAccessibilityIdentifierComponent)")
     }
 }

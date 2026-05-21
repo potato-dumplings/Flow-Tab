@@ -149,6 +149,7 @@ extension SwitcherPanelController {
 
         cancelPendingModifierReleaseConfirmation()
         model.handle(keyInput)
+        resetPointerSelectionGate()
         RuntimeLog.debug(.session, "advance key=\(keyInput.debugName) \(self.model.debugSelectionSummary())")
         updatePanelSize()
         scheduleDelayedWindowLayerEntryIfNeeded()

@@ -174,6 +174,114 @@ extension FlowTabPriorityCoverageTests {
         }
     }
 
+    @MainActor
+    func testSwitcherPanelControllerPointerAppSelectionRequiresPointerMovement() {
+        let controller = SwitcherPanelController()
+        controller.modelForTesting.snapshotProviderOverride = {
+            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
+        }
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        let initialSelectedAppID = controller.modelForTesting.selectedApp?.id
+
+        controller.pointerSelectionGate.reset(currentLocation: .zero)
+        controller.selectSwitcherAppByPointer(appID: "com.example.mail", currentLocation: .zero)
+
+        XCTAssertEqual(controller.modelForTesting.selectedApp?.id, initialSelectedAppID)
+
+        controller.selectSwitcherAppByPointer(appID: "com.example.mail", currentLocation: CGPoint(x: 2, y: 0))
+
+        XCTAssertEqual(controller.modelForTesting.selectedApp?.id, "com.example.mail")
+        controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerPointerWindowSelectionUsesWindowOnlySession() {
+        let controller = SwitcherPanelController()
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let windows = [
+            WindowCandidate(id: "front-1", title: "Primary", isMinimized: false, lastActiveAt: 300),
+            WindowCandidate(id: "front-2", title: "Secondary", isMinimized: false, lastActiveAt: 290)
+        ]
+        let context = makeRuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windows: windows
+        )
+        controller.modelForTesting.frontmostApplicationOverride = { currentApp }
+        controller.modelForTesting.snapshotProviderOverride = {
+            RuntimeSnapshot(
+                apps: [
+                    AppSwitchCandidate(
+                        id: appID,
+                        displayName: currentApp.localizedName ?? "Current App",
+                        groupID: "current",
+                        lastActiveAt: 300,
+                        windows: windows
+                    )
+                ],
+                contextsByID: [appID: context]
+            )
+        }
+
+        XCTAssertTrue(controller.beginInAppWindowHotkeySessionForTesting())
+        let initialSelectedWindowID = controller.modelForTesting.session?.selectedWindow?.id
+        controller.pointerSelectionGate.reset(currentLocation: .zero)
+
+        controller.selectSwitcherWindowByPointer(
+            appID: appID,
+            windowID: "front-2",
+            currentLocation: .zero
+        )
+
+        XCTAssertEqual(controller.modelForTesting.session?.selectedWindow?.id, initialSelectedWindowID)
+
+        controller.selectSwitcherWindowByPointer(
+            appID: appID,
+            windowID: "front-2",
+            currentLocation: CGPoint(x: 2, y: 0)
+        )
+
+        XCTAssertEqual(controller.modelForTesting.session?.mode, .windowCycle(appID: appID))
+        XCTAssertEqual(controller.modelForTesting.session?.selectedWindow?.id, "front-2")
+        controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerPointerSearchResultSelectionFocusesResults() async {
+        await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
+            let controller = SwitcherPanelController()
+            controller.modelForTesting.snapshotProviderOverride = {
+                RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
+            }
+
+            XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+            XCTAssertTrue(controller.enterSearchModeIfPossible())
+            XCTAssertTrue(controller.modelForTesting.isSearchInputFocused)
+
+            controller.pointerSelectionGate.reset(currentLocation: .zero)
+            controller.selectSwitcherSearchResultByPointer(
+                resultID: "app:com.example.browser",
+                currentLocation: .zero
+            )
+
+            XCTAssertTrue(controller.modelForTesting.isSearchInputFocused)
+
+            controller.selectSwitcherSearchResultByPointer(
+                resultID: "app:com.example.browser",
+                currentLocation: CGPoint(x: 2, y: 0)
+            )
+
+            XCTAssertFalse(controller.modelForTesting.isSearchInputFocused)
+            XCTAssertEqual(
+                controller.modelForTesting.searchViewState.selectedResult?.kind,
+                .app(appID: "com.example.browser")
+            )
+            controller.cancelSelectionForTesting()
+        }
+    }
+
     func testCommandTabTakeoverControllerReconcileActivatesAndRestoreReenablesSystemShortcuts() {
         guard let userDefaults = makeIsolatedUserDefaults() else { return }
         defer { clearIsolatedUserDefaults(userDefaults) }

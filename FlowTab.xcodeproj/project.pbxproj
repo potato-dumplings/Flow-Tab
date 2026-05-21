@@ -25,6 +25,7 @@
 		A1B2C3F42F73000100B0D737 /* SwitcherPanelSearchBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3E42F73000100B0D737 /* SwitcherPanelSearchBridge.swift */; };
 		A1B2C3F52F73000100B0D737 /* SwitcherPanelSearchViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3E52F73000100B0D737 /* SwitcherPanelSearchViews.swift */; };
 		A1B2C3F62F73000100B0D737 /* SwitcherPanelPreviewViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3E62F73000100B0D737 /* SwitcherPanelPreviewViews.swift */; };
+		D4A000223610000100B0D737 /* SwitcherPointerSelection.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4A000123610000100B0D737 /* SwitcherPointerSelection.swift */; };
 		B28010012FF100100B0D737 /* SwitcherWindowPreviewPaging.swift in Sources */ = {isa = PBXBuildFile; fileRef = B28000012FF100100B0D737 /* SwitcherWindowPreviewPaging.swift */; };
 		A1B2C4112F73000100B0D737 /* SwitcherPanelWindowConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4012F73000100B0D737 /* SwitcherPanelWindowConfiguration.swift */; };
 		A1B2C4122F73000100B0D737 /* SwitcherPanelController+Presentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4022F73000100B0D737 /* SwitcherPanelController+Presentation.swift */; };
@@ -210,6 +211,7 @@
 		A1B2C3E42F73000100B0D737 /* SwitcherPanelSearchBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherPanelSearchBridge.swift; sourceTree = "<group>"; };
 		A1B2C3E52F73000100B0D737 /* SwitcherPanelSearchViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherPanelSearchViews.swift; sourceTree = "<group>"; };
 		A1B2C3E62F73000100B0D737 /* SwitcherPanelPreviewViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherPanelPreviewViews.swift; sourceTree = "<group>"; };
+		D4A000123610000100B0D737 /* SwitcherPointerSelection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherPointerSelection.swift; sourceTree = "<group>"; };
 		B28000012FF100100B0D737 /* SwitcherWindowPreviewPaging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherWindowPreviewPaging.swift; sourceTree = "<group>"; };
 		A1B2C4012F73000100B0D737 /* SwitcherPanelWindowConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherPanelWindowConfiguration.swift; sourceTree = "<group>"; };
 		A1B2C4022F73000100B0D737 /* SwitcherPanelController+Presentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelController+Presentation.swift"; sourceTree = "<group>"; };
@@ -548,6 +550,7 @@
 				B27000012FF000100B0D737 /* LiveSwitcherModel+Snapshots.swift */,
 				A9V100022F91000100B0D737 /* LiveSwitcherModel+AppVisibility.swift */,
 				A1B2C3E32F73000100B0D737 /* SwitcherPanelOverlayView.swift */,
+				D4A000123610000100B0D737 /* SwitcherPointerSelection.swift */,
 				B28000012FF100100B0D737 /* SwitcherWindowPreviewPaging.swift */,
 				A1B2C3E42F73000100B0D737 /* SwitcherPanelSearchBridge.swift */,
 				A1B2C3E52F73000100B0D737 /* SwitcherPanelSearchViews.swift */,
@@ -971,6 +974,7 @@
 				B27010012FF000100B0D737 /* LiveSwitcherModel+Snapshots.swift in Sources */,
 				A9V110022F91000100B0D737 /* LiveSwitcherModel+AppVisibility.swift in Sources */,
 				A1B2C3F32F73000100B0D737 /* SwitcherPanelOverlayView.swift in Sources */,
+				D4A000223610000100B0D737 /* SwitcherPointerSelection.swift in Sources */,
 				B28010012FF100100B0D737 /* SwitcherWindowPreviewPaging.swift in Sources */,
 				A1B2C3F42F73000100B0D737 /* SwitcherPanelSearchBridge.swift in Sources */,
 				A1B2C3F52F73000100B0D737 /* SwitcherPanelSearchViews.swift in Sources */,

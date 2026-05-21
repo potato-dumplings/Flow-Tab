@@ -4,6 +4,7 @@ import FlowTabCore
 
 struct SwitcherPanelRootView: View {
     @ObservedObject var model: LiveSwitcherModel
+    let pointerSelectionActions: SwitcherPointerSelectionActions
     @ObservedObject private var systemTheme = SystemThemeState.shared
     @AppStorage(AppPreferenceKeys.themeMode)
     private var themeModeRaw = ThemePreferencesStore.defaultMode.rawValue
@@ -67,6 +68,7 @@ struct SwitcherPanelRootView: View {
                     onSearchResultScrollRequested: { resultID in
                         model.recordSearchResultScrollRequestForTesting(resultID)
                     },
+                    pointerSelectionActions: pointerSelectionActions,
                     iconForApp: { app in
                         model.icon(for: app)
                     }
@@ -265,6 +267,7 @@ private struct CommandTabOverlay: View {
     let appTileSize: CGFloat
     let appTileSpacing: CGFloat
     let onSearchResultScrollRequested: (String) -> Void
+    let pointerSelectionActions: SwitcherPointerSelectionActions
     let iconForApp: (AppSwitchCandidate) -> NSImage?
     @Environment(\.colorScheme) private var colorScheme
 
@@ -517,6 +520,21 @@ private struct CommandTabOverlay: View {
             value: appIDs
         )
         .frame(maxWidth: .infinity, alignment: .center)
+        .overlay {
+            GeometryReader { proxy in
+                Color.clear
+                    .switcherPointerTracking { location in
+                        guard let appID = SwitcherPointerAppStripHitTest.appID(
+                            at: location,
+                            in: proxy.frame(in: .global),
+                            appIDs: appIDs,
+                            tileSize: appTileSize,
+                            spacing: appTileSpacing
+                        ) else { return }
+                        pointerSelectionActions.selectApp(appID)
+                    }
+            }
+        }
         .padding(.horizontal, 2)
     }
 
@@ -556,6 +574,11 @@ private struct CommandTabOverlay: View {
                                 .accessibilityLabel(Text(preview.title))
                                 .accessibilityValue(Text(switcherWindowAccessibilityValue(preview)))
                                 .accessibilityIdentifier(switcherWindowAccessibilityIdentifier(preview))
+                                .switcherPointerSelection(isEnabled: selectedApp != nil) {
+                                    if let appID = selectedApp?.id {
+                                        pointerSelectionActions.selectWindow(appID, preview.id)
+                                    }
+                                }
                                 windowPreviewImageMarker(for: preview)
                             }
                             .id(preview.id)
@@ -627,6 +650,9 @@ private struct CommandTabOverlay: View {
                                         icon: iconForApp(item.app)
                                     )
                                     .id(item.id)
+                                    .switcherPointerSelection {
+                                        pointerSelectionActions.selectSearchResult(item.id)
+                                    }
                                     .background(SearchLayoutSizeReader(target: .row))
                                 }
                             }
@@ -653,6 +679,9 @@ private struct CommandTabOverlay: View {
                                 ForEach(searchWindowItems) { item in
                                     SearchWindowRow(item: item)
                                         .id(item.id)
+                                        .switcherPointerSelection {
+                                            pointerSelectionActions.selectSearchResult(item.id)
+                                        }
                                         .background(SearchLayoutSizeReader(target: .row))
                                 }
                             }
@@ -721,6 +750,11 @@ private struct CommandTabOverlay: View {
                             .accessibilityLabel(Text(preview.title))
                             .accessibilityValue(Text(switcherWindowAccessibilityValue(preview)))
                             .accessibilityIdentifier(switcherWindowAccessibilityIdentifier(preview))
+                            .switcherPointerSelection(isEnabled: selectedApp != nil) {
+                                if let appID = selectedApp?.id {
+                                    pointerSelectionActions.selectWindow(appID, preview.id)
+                                }
+                            }
                             windowPreviewImageMarker(for: preview)
                         }
                         .id(preview.id)

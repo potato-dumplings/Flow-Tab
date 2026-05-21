@@ -6,6 +6,58 @@ import FlowTabCore
 import Carbon
 
 extension FlowTabTests {
+    func testSwitcherPointerSelectionGateIgnoresInitialHoverUntilPointerMoves() {
+        var gate = SwitcherPointerSelectionGate(movementThreshold: 1)
+
+        gate.reset(currentLocation: CGPoint(x: 10, y: 10))
+
+        XCTAssertFalse(gate.isArmed)
+        XCTAssertFalse(gate.recordPointerMoved(to: CGPoint(x: 10.5, y: 10.5)))
+        XCTAssertFalse(gate.isArmed)
+
+        XCTAssertTrue(gate.recordPointerMoved(to: CGPoint(x: 11, y: 10)))
+        XCTAssertTrue(gate.isArmed)
+    }
+
+    func testSwitcherPointerSelectionGateResetRequiresFreshMovement() {
+        var gate = SwitcherPointerSelectionGate(movementThreshold: 1)
+
+        gate.reset(currentLocation: CGPoint(x: 0, y: 0))
+        XCTAssertTrue(gate.recordPointerMoved(to: CGPoint(x: 2, y: 0)))
+        XCTAssertTrue(gate.isArmed)
+
+        gate.reset(currentLocation: CGPoint(x: 2, y: 0))
+
+        XCTAssertFalse(gate.isArmed)
+        XCTAssertFalse(gate.recordPointerMoved(to: CGPoint(x: 2.5, y: 0)))
+        XCTAssertTrue(gate.recordPointerMoved(to: CGPoint(x: 3.1, y: 0)))
+    }
+
+    func testSwitcherPointerAppStripHitTestMapsGlobalHoverToTile() {
+        let appIDs = ["browser", "mail", "notes"]
+        let frame = CGRect(x: 100, y: 200, width: 300, height: 72)
+
+        XCTAssertEqual(
+            SwitcherPointerAppStripHitTest.appID(
+                at: CGPoint(x: 250, y: 236),
+                in: frame,
+                appIDs: appIDs,
+                tileSize: 48,
+                spacing: 12
+            ),
+            "mail"
+        )
+        XCTAssertNil(
+            SwitcherPointerAppStripHitTest.appID(
+                at: CGPoint(x: 220, y: 236),
+                in: frame,
+                appIDs: appIDs,
+                tileSize: 48,
+                spacing: 12
+            )
+        )
+    }
+
     func testSearchMatchesAppByPartialName() {
         let coordinator = SwitcherSearchCoordinator()
         coordinator.rebuildIndex(with: searchSampleApps())
@@ -113,6 +165,17 @@ extension FlowTabTests {
         XCTAssertTrue(coordinator.moveSelection(by: 1))
         XCTAssertEqual(coordinator.state.selectedResultIndex, 0)
         XCTAssertEqual(coordinator.state.selectedResult?.primaryText, "微信")
+    }
+
+    func testSearchSelectResultByIDMovesFocusToResults() {
+        let coordinator = SwitcherSearchCoordinator()
+        coordinator.rebuildIndex(with: searchSampleApps())
+        XCTAssertTrue(coordinator.activate(defaultScope: .app))
+
+        XCTAssertTrue(coordinator.selectResult(withID: "app:com.flowtab.search"))
+
+        XCTAssertFalse(coordinator.state.isInputFocused)
+        XCTAssertEqual(coordinator.state.selectedResult?.kind, .app(appID: "com.flowtab.search"))
     }
 
     func testSearchReplaceQueryWithoutRebuildUpdatesQueryAndCursor() {

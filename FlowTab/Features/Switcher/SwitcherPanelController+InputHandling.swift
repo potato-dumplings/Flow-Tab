@@ -18,6 +18,11 @@ extension SwitcherPanelController {
             return nil
         }
 
+        localMouseMovedMonitor = NSEvent.addLocalMonitorForEvents(matching: .mouseMoved) { [weak self] event in
+            self?.handlePointerMoved()
+            return event
+        }
+
         globalKeyDownMonitor = NSEvent.addGlobalMonitorForEvents(matching: .keyDown) { [weak self] event in
             Task { @MainActor [weak self] in
                 self?.handleGlobalKeyDown(event)
@@ -35,6 +40,12 @@ extension SwitcherPanelController {
                 self?.handleGlobalMouseDown(event)
             }
         }
+
+        globalMouseMovedMonitor = NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.handlePointerMoved()
+            }
+        }
     }
 
     func removeEventMonitors() {
@@ -50,6 +61,10 @@ extension SwitcherPanelController {
             NSEvent.removeMonitor(localFlagsChangedMonitor)
             self.localFlagsChangedMonitor = nil
         }
+        if let localMouseMovedMonitor {
+            NSEvent.removeMonitor(localMouseMovedMonitor)
+            self.localMouseMovedMonitor = nil
+        }
         if let globalKeyDownMonitor {
             NSEvent.removeMonitor(globalKeyDownMonitor)
             self.globalKeyDownMonitor = nil
@@ -61,6 +76,10 @@ extension SwitcherPanelController {
         if let globalMouseDownMonitor {
             NSEvent.removeMonitor(globalMouseDownMonitor)
             self.globalMouseDownMonitor = nil
+        }
+        if let globalMouseMovedMonitor {
+            NSEvent.removeMonitor(globalMouseMovedMonitor)
+            self.globalMouseMovedMonitor = nil
         }
         if let delayedWindowLayerTimer {
             delayedWindowLayerTimer.invalidate()
@@ -123,6 +142,37 @@ extension SwitcherPanelController {
         }
     }
 
+    func resetPointerSelectionGate() {
+        pointerSelectionGate.reset(currentLocation: NSEvent.mouseLocation)
+    }
+
+    func handlePointerMoved() {
+        guard isPanelPresented else { return }
+        pointerSelectionGate.recordPointerMoved(to: NSEvent.mouseLocation)
+    }
+
+    func selectSwitcherAppByPointer(appID: String, currentLocation: CGPoint? = nil) {
+        pointerSelectionGate.recordPointerMoved(to: currentLocation ?? NSEvent.mouseLocation)
+        guard pointerSelectionGate.isArmed else { return }
+        guard model.selectAppFromPointer(appID: appID) else { return }
+        updatePanelSize()
+        scheduleDelayedWindowLayerEntryIfNeeded()
+    }
+
+    func selectSwitcherWindowByPointer(appID: String, windowID: String, currentLocation: CGPoint? = nil) {
+        pointerSelectionGate.recordPointerMoved(to: currentLocation ?? NSEvent.mouseLocation)
+        guard pointerSelectionGate.isArmed else { return }
+        guard model.selectWindowFromPointer(appID: appID, windowID: windowID) else { return }
+        updatePanelSize()
+    }
+
+    func selectSwitcherSearchResultByPointer(resultID: String, currentLocation: CGPoint? = nil) {
+        pointerSelectionGate.recordPointerMoved(to: currentLocation ?? NSEvent.mouseLocation)
+        guard pointerSelectionGate.isArmed else { return }
+        guard model.selectSearchResult(withID: resultID) else { return }
+        updatePanelSize()
+    }
+
     @discardableResult
     func enterSearchModeIfPossible() -> Bool {
         logSearchTrace("enterSearchMode action=attempt \(searchTraceStateSummary())")
@@ -135,6 +185,7 @@ extension SwitcherPanelController {
             return false
         }
         cancelPendingModifierReleaseConfirmation()
+        resetPointerSelectionGate()
         updatePanelSize()
         RuntimeLog.info(.session, "enter search mode")
         logSearchTrace("enterSearchMode action=entered \(searchTraceStateSummary())")
@@ -147,6 +198,7 @@ extension SwitcherPanelController {
         case 48:
             guard !isComposingMarkedText else { return false }
             if model.toggleSearchScope() {
+                resetPointerSelectionGate()
                 updatePanelSize()
             }
             return true
@@ -185,6 +237,7 @@ extension SwitcherPanelController {
                 return true
             }
             if model.handleSearchEscape() != .ignored {
+                resetPointerSelectionGate()
                 updatePanelSize()
             }
             return true

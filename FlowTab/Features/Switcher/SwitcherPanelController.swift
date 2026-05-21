@@ -141,9 +141,11 @@ final class SwitcherPanelController {
 
     var keyDownMonitor: Any?
     var localFlagsChangedMonitor: Any?
+    var localMouseMovedMonitor: Any?
     var globalKeyDownMonitor: Any?
     var globalFlagsChangedMonitor: Any?
     var globalMouseDownMonitor: Any?
+    var globalMouseMovedMonitor: Any?
     var appDidResignActiveObserver: NSObjectProtocol?
     var activeSpaceDidChangeObserver: NSObjectProtocol?
     var workspaceDidTerminateApplicationObserver: NSObjectProtocol?
@@ -230,6 +232,7 @@ final class SwitcherPanelController {
     var hideNonPanelWindowsOverride: (() -> Void)?
     var activateApplicationIgnoringOtherAppsOverride: (() -> Void)?
     var lastSearchLayoutSizingLogSummary: String?
+    var pointerSelectionGate = SwitcherPointerSelectionGate()
 
     var searchFeatureEnabled: Bool {
         SearchInteractionPreferencesStore.loadIsEnabled()
@@ -277,19 +280,36 @@ final class SwitcherPanelController {
         panel.collectionBehavior = SwitcherPanelWindowConfiguration.presentationCollectionBehavior()
         panel.hidesOnDeactivate = false
         panel.ignoresMouseEvents = false
-        let hostingView = NSHostingView(rootView: SwitcherPanelRootView(model: model))
+        let hostingView = NSHostingView(
+            rootView: SwitcherPanelRootView(
+                model: model,
+                pointerSelectionActions: SwitcherPointerSelectionActions(
+                    selectApp: { [weak self] appID in
+                        self?.selectSwitcherAppByPointer(appID: appID)
+                    },
+                    selectWindow: { [weak self] appID, windowID in
+                        self?.selectSwitcherWindowByPointer(appID: appID, windowID: windowID)
+                    },
+                    selectSearchResult: { [weak self] resultID in
+                        self?.selectSwitcherSearchResultByPointer(resultID: resultID)
+                    }
+                )
+            )
+        )
         hostingView.wantsLayer = true
         hostingView.layer?.backgroundColor = NSColor.clear.cgColor
         let contentView = SwitcherPanelContentView(hostingView: hostingView)
         panel.contentView = contentView
         model.onSearchStateChanged = { [weak self] in
             guard let self else { return }
+            self.resetPointerSelectionGate()
             guard self.isPanelPresented else { return }
             self.updatePanelSize()
         }
         model.onSessionLayoutChanged = { [weak self] in
             guard let self else { return }
             self.syncPanelAccessibilityAnchors()
+            self.resetPointerSelectionGate()
             guard self.isPanelPresented else { return }
             guard self.model.session != nil else {
                 self.endPresentationSession()
@@ -454,7 +474,16 @@ final class SwitcherPanelController {
     }
 
     func syncPanelAccessibilityAnchors() {
-        panel.updateSwitcherAccessibilityApps(model.session?.apps ?? [])
+        let appStripHeaderOffset =
+            searchFeatureEnabled && !model.isPreviewLayerMode && !model.isSearchActive
+            ? appLayerSearchHeaderExtraHeight
+            : 0
+        panel.updateSwitcherAccessibilityApps(
+            model.isSearchActive ? [] : model.session?.apps ?? [],
+            tileSize: model.appGridTileSize,
+            spacing: model.appGridSpacing,
+            appStripHeaderOffset: appStripHeaderOffset
+        )
     }
 
     func scheduleDelayedWindowLayerEntryForTesting() {

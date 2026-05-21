@@ -7,6 +7,9 @@ import FlowTabCore
 final class SwitcherOverlayPanel: NSPanel {
     private var switcherAppAccessibilityElements: [String: NSAccessibilityElement] = [:]
     private var orderedSwitcherAppIDs: [String] = []
+    private var switcherAppTileSize: CGFloat = 1
+    private var switcherAppTileSpacing: CGFloat = 0
+    private var switcherAppStripHeaderOffset: CGFloat = 0
 
     override var canBecomeKey: Bool {
         true
@@ -16,7 +19,12 @@ final class SwitcherOverlayPanel: NSPanel {
         false
     }
 
-    func updateSwitcherAccessibilityApps(_ apps: [AppSwitchCandidate]) {
+    func updateSwitcherAccessibilityApps(
+        _ apps: [AppSwitchCandidate],
+        tileSize: CGFloat,
+        spacing: CGFloat,
+        appStripHeaderOffset: CGFloat
+    ) {
         let visibleAppIDs = Set(apps.map(\.id))
 
         for appID in Array(switcherAppAccessibilityElements.keys) where !visibleAppIDs.contains(appID) {
@@ -24,6 +32,9 @@ final class SwitcherOverlayPanel: NSPanel {
         }
 
         orderedSwitcherAppIDs = apps.map(\.id)
+        switcherAppTileSize = max(1, tileSize)
+        switcherAppTileSpacing = max(0, spacing)
+        switcherAppStripHeaderOffset = max(0, appStripHeaderOffset)
         for app in apps {
             let element = switcherAppAccessibilityElements[app.id] ?? NSAccessibilityElement()
             configureSwitcherAccessibilityElement(
@@ -56,14 +67,31 @@ final class SwitcherOverlayPanel: NSPanel {
 
     private func updateSwitcherAccessibilityFrames() {
         let baseFrame = frame
+        let availableWidth = max(1, baseFrame.width - SwitcherPanelLayoutMetrics.horizontalInset)
+        let tileCount = CGFloat(orderedSwitcherAppIDs.count)
+        let contentWidth =
+            tileCount * switcherAppTileSize
+            + max(0, tileCount - 1) * switcherAppTileSpacing
+        let startX =
+            baseFrame.minX
+            + SwitcherPanelLayoutMetrics.rootPadding
+            + SwitcherPanelLayoutMetrics.bodyHorizontalPadding
+            + max(0, (availableWidth - contentWidth) / 2)
+        let originY =
+            baseFrame.maxY
+            - SwitcherPanelLayoutMetrics.rootPadding
+            - SwitcherPanelLayoutMetrics.bodyVerticalPadding
+            - switcherAppStripHeaderOffset
+            - switcherAppTileSize
+
         for (index, appID) in orderedSwitcherAppIDs.enumerated() {
             guard let element = switcherAppAccessibilityElements[appID] else { continue }
             element.setAccessibilityFrame(
                 NSRect(
-                    x: baseFrame.minX + CGFloat(index + 1),
-                    y: baseFrame.minY + 1,
-                    width: 1,
-                    height: 1
+                    x: startX + CGFloat(index) * (switcherAppTileSize + switcherAppTileSpacing),
+                    y: originY,
+                    width: switcherAppTileSize,
+                    height: switcherAppTileSize
                 )
             )
         }

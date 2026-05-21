@@ -486,7 +486,7 @@ extension SwitcherPanelController {
         clearInitialPresentationVisibilityTracking(invalidate: true)
         removeEventMonitors()
         panel.orderOut(nil)
-        panel.updateSwitcherAccessibilityApps([])
+        panel.updateSwitcherAccessibilityApps([], tileSize: 1, spacing: 0, appStripHeaderOffset: 0)
         panel.level = SwitcherPanelWindowConfiguration.level
         panel.collectionBehavior = SwitcherPanelWindowConfiguration.presentationCollectionBehavior()
         activeHotkeySessionKind = nil
@@ -505,6 +505,7 @@ extension SwitcherPanelController {
     func beginPresentationSession(kind: HotkeySessionKind, trigger: String) {
         presentationSessionGeneration += 1
         activeHotkeySessionKind = kind
+        resetPointerSelectionGate()
         logInputTrace(
             "presentationSession trigger=\(trigger) action=begin kind=\(kind) generation=\(presentationSessionGeneration)"
         )

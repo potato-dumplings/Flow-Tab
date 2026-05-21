@@ -782,6 +782,32 @@ final class LiveSwitcherModel: ObservableObject {
         self.session = session
     }
 
+    @discardableResult
+    func selectAppFromPointer(appID: String) -> Bool {
+        guard !searchViewState.isActive else { return false }
+        guard var session else { return false }
+        let previousAppID = session.selectedApp.id
+        guard session.selectApp(withID: appID) else { return false }
+        if session.selectedApp.id != previousAppID {
+            autoEnterSuppressedAppID = nil
+        }
+        self.session = session
+        return true
+    }
+
+    @discardableResult
+    func selectWindowFromPointer(appID: String, windowID: String) -> Bool {
+        guard !searchViewState.isActive else { return false }
+        guard var session else { return false }
+        let previousAppID = session.selectedApp.id
+        guard session.selectWindow(appID: appID, windowID: windowID) else { return false }
+        if session.selectedApp.id != previousAppID {
+            autoEnterSuppressedAppID = nil
+        }
+        self.session = session
+        return true
+    }
+
     func prepareTerminateSelectedAppAnimation() -> Bool {
         guard let session else { return false }
         terminatingAppID = session.selectedApp.id
