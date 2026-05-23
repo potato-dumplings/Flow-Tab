@@ -2,6 +2,10 @@ import AppKit
 import SwiftUI
 
 struct AppVisibilityManagerView: View {
+    private enum Layout {
+        static let listRowHeight: CGFloat = 55
+    }
+
     let onClose: () -> Void
 
     @StateObject private var model = AppVisibilityManagerModel()
@@ -189,18 +193,19 @@ struct AppVisibilityManagerView: View {
 
     private var appList: some View {
         let visibleApps = model.visibleApps
-        return ScrollView {
-            LazyVStack(spacing: 0) {
-                ForEach(Array(visibleApps.enumerated()), id: \.element.id) { index, app in
-                    appRowButton(
-                        app: app,
-                        isLast: index == visibleApps.count - 1
-                    )
-                }
+        return FlowSnappedListScrollView(
+            rowCount: visibleApps.count,
+            rowHeight: Layout.listRowHeight,
+            accessibilityIdentifier: "flowtab.settings.app-visibility.list"
+        ) {
+            ForEach(Array(visibleApps.enumerated()), id: \.element.id) { index, app in
+                appRowButton(
+                    app: app,
+                    isLast: index == visibleApps.count - 1
+                )
             }
-            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         }
-        .scrollIndicators(.visible)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(groupedSurface)
@@ -230,7 +235,7 @@ struct AppVisibilityManagerView: View {
                 isSelected: app.id == model.selectedAppID
             )
             .padding(.horizontal, 12)
-            .frame(height: 55)
+            .frame(height: Layout.listRowHeight)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
                 rowBackground(isSelected: app.id == model.selectedAppID)

@@ -110,6 +110,7 @@
 		C10000022F75000100B0D737 /* HomeRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000122F75000100B0D737 /* HomeRootView.swift */; };
 		C10000032F75000100B0D737 /* HomeLandingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000132F75000100B0D737 /* HomeLandingView.swift */; };
 		C10000042F75000100B0D737 /* HomeChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000142F75000100B0D737 /* HomeChrome.swift */; };
+		C10000312F75000100B0D737 /* FlowSnappedListScrollView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000302F75000100B0D737 /* FlowSnappedListScrollView.swift */; };
 		C10000052F75000100B0D737 /* HotkeySettingsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000152F75000100B0D737 /* HotkeySettingsCard.swift */; };
 		C10000062F75000100B0D737 /* AppKitMeasurementControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000162F75000100B0D737 /* AppKitMeasurementControls.swift */; };
 		C10000072F75000100B0D737 /* AppKitFormSelectControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000172F75000100B0D737 /* AppKitFormSelectControls.swift */; };
@@ -297,6 +298,7 @@
 		C10000122F75000100B0D737 /* HomeRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeRootView.swift; sourceTree = "<group>"; };
 		C10000132F75000100B0D737 /* HomeLandingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeLandingView.swift; sourceTree = "<group>"; };
 		C10000142F75000100B0D737 /* HomeChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeChrome.swift; sourceTree = "<group>"; };
+		C10000302F75000100B0D737 /* FlowSnappedListScrollView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowSnappedListScrollView.swift; sourceTree = "<group>"; };
 		C10000152F75000100B0D737 /* HotkeySettingsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeySettingsCard.swift; sourceTree = "<group>"; };
 		C10000162F75000100B0D737 /* AppKitMeasurementControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitMeasurementControls.swift; sourceTree = "<group>"; };
 		C10000172F75000100B0D737 /* AppKitFormSelectControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitFormSelectControls.swift; sourceTree = "<group>"; };
@@ -684,6 +686,7 @@
 			isa = PBXGroup;
 			children = (
 				C10000142F75000100B0D737 /* HomeChrome.swift */,
+				C10000302F75000100B0D737 /* FlowSnappedListScrollView.swift */,
 			);
 			path = SharedUI;
 			sourceTree = "<group>";
@@ -916,6 +919,7 @@
 				C10000062F75000100B0D737 /* AppKitMeasurementControls.swift in Sources */,
 				C10000052F75000100B0D737 /* HotkeySettingsCard.swift in Sources */,
 				C10000042F75000100B0D737 /* HomeChrome.swift in Sources */,
+				C10000312F75000100B0D737 /* FlowSnappedListScrollView.swift in Sources */,
 				C10000032F75000100B0D737 /* HomeLandingView.swift in Sources */,
 				C30000022FBD100100B0D737 /* HomeAppVisibilityPresentation.swift in Sources */,
 				C30000032FBD100100B0D737 /* HomeLayerRowView.swift in Sources */,

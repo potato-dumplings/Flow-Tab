@@ -6,6 +6,9 @@ enum HomePageLayout {
     static let alignedTopInset: CGFloat = 18
     static let bottomInset: CGFloat = 17
     static let bottomStatusHeight: CGFloat = 64
+    static let layerListRowSpacing: CGFloat = 8
+    static let appLayerRowHeight: CGFloat = 52
+    static let windowLayerRowHeight: CGFloat = 44
 }
 
 struct HomeBackdropView: View {

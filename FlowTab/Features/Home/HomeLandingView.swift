@@ -240,44 +240,46 @@ struct HomeLandingView: View {
                     isSelected: false
                 )
             } else {
-                ScrollView {
-                    LazyVStack(spacing: 8) {
-                        ForEach(presentedAppSummaries) { app in
-                            let isHidden = appVisibilityPresentation.isHidden(appID: app.appID)
-                            let isWindowCountLoading = loadingWindowCountAppIDs.contains(app.appID)
-                            let appIDComponent = app.appID.flowTabAccessibilityIdentifierComponent
-                            let hiddenBadge = isHidden
-                                ? AppStrings.text(.homeAppNotShownBadge, language: appLanguage)
-                                : nil
-                            Button {
-                                selectApp(app.appID)
-                            } label: {
-                                HomeLayerRowView(
-                                    title: app.displayName,
-                                    subtitle: app.appID,
-                                    trailing: "\(app.windowCount)w",
-                                    icon: HomeAppIconProvider.icon(for: app),
-                                    isTrailingLoading: isWindowCountLoading,
-                                    badge: hiddenBadge,
-                                    badgeAccessibilityIdentifier: isHidden
-                                        ? "flowtab.home.app.hidden-badge.\(appIDComponent)"
-                                        : nil,
-                                    isSelected: app.appID == currentSelectedAppID
-                                )
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityIdentifier("flowtab.home.app.\(appIDComponent)")
-                            .accessibilityLabel(hiddenBadge.map { "\(app.displayName) \($0)" } ?? app.displayName)
-                            .accessibilityValue(appAccessibilityValue(
-                                windowCount: app.windowCount,
-                                isHidden: isHidden,
-                                isWindowCountLoading: isWindowCountLoading
-                            ))
+                FlowSnappedListScrollView(
+                    rowCount: presentedAppSummaries.count,
+                    rowHeight: HomePageLayout.appLayerRowHeight,
+                    rowSpacing: HomePageLayout.layerListRowSpacing,
+                    accessibilityIdentifier: "flowtab.home.app.list"
+                ) {
+                    ForEach(presentedAppSummaries) { app in
+                        let isHidden = appVisibilityPresentation.isHidden(appID: app.appID)
+                        let isWindowCountLoading = loadingWindowCountAppIDs.contains(app.appID)
+                        let appIDComponent = app.appID.flowTabAccessibilityIdentifierComponent
+                        let hiddenBadge = isHidden
+                            ? AppStrings.text(.homeAppNotShownBadge, language: appLanguage)
+                            : nil
+                        Button {
+                            selectApp(app.appID)
+                        } label: {
+                            HomeLayerRowView(
+                                title: app.displayName,
+                                subtitle: app.appID,
+                                trailing: "\(app.windowCount)w",
+                                icon: HomeAppIconProvider.icon(for: app),
+                                isTrailingLoading: isWindowCountLoading,
+                                badge: hiddenBadge,
+                                badgeAccessibilityIdentifier: isHidden
+                                    ? "flowtab.home.app.hidden-badge.\(appIDComponent)"
+                                    : nil,
+                                isSelected: app.appID == currentSelectedAppID
+                            )
                         }
+                        .buttonStyle(.plain)
+                        .frame(height: HomePageLayout.appLayerRowHeight)
+                        .accessibilityIdentifier("flowtab.home.app.\(appIDComponent)")
+                        .accessibilityLabel(hiddenBadge.map { "\(app.displayName) \($0)" } ?? app.displayName)
+                        .accessibilityValue(appAccessibilityValue(
+                            windowCount: app.windowCount,
+                            isHidden: isHidden,
+                            isWindowCountLoading: isWindowCountLoading
+                        ))
                     }
                 }
-                .accessibilityIdentifier("flowtab.home.app.list")
-                .frame(minHeight: 180, maxHeight: 500)
             }
         }
     }
@@ -313,26 +315,27 @@ struct HomeLandingView: View {
                     isSelected: false
                 )
             } else if let activeApp, !activeWindows.isEmpty {
-                ScrollView {
-                    LazyVStack(spacing: 8) {
-                        ForEach(Array(activeWindows.enumerated()), id: \.element.id) { index, window in
-                            HomeWindowRowButton(
-                                title: windowTitle(window.title, index: index),
-                                subtitle: activeApp.appID,
-                                status: windowStatusText(window: window, index: index),
-                                icon: HomeAppIconProvider.icon(for: activeApp),
-                                isSelected: index == 0,
-                                accessibilityIdentifier: "flowtab.home.window.\(window.id.flowTabAccessibilityIdentifierComponent)"
-                            ) {
-                                activateWindow(activeApp.appID, windowID: window.id)
-                            }
-                            .frame(height: 44)
-                            .frame(maxWidth: .infinity)
+                FlowSnappedListScrollView(
+                    rowCount: activeWindows.count,
+                    rowHeight: HomePageLayout.windowLayerRowHeight,
+                    rowSpacing: HomePageLayout.layerListRowSpacing,
+                    accessibilityIdentifier: "flowtab.home.window.list"
+                ) {
+                    ForEach(Array(activeWindows.enumerated()), id: \.element.id) { index, window in
+                        HomeWindowRowButton(
+                            title: windowTitle(window.title, index: index),
+                            subtitle: activeApp.appID,
+                            status: windowStatusText(window: window, index: index),
+                            icon: HomeAppIconProvider.icon(for: activeApp),
+                            isSelected: index == 0,
+                            accessibilityIdentifier: "flowtab.home.window.\(window.id.flowTabAccessibilityIdentifierComponent)"
+                        ) {
+                            activateWindow(activeApp.appID, windowID: window.id)
                         }
+                        .frame(height: HomePageLayout.windowLayerRowHeight)
+                        .frame(maxWidth: .infinity)
                     }
                 }
-                .accessibilityIdentifier("flowtab.home.window.list")
-                .frame(minHeight: 180, maxHeight: 500)
             } else if activeApp != nil {
                 HomeLayerRowView(
                     title: AppStrings.text(.homeNoSwitchableWindows, language: appLanguage),
