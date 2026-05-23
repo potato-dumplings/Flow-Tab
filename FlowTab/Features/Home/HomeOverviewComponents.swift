@@ -328,6 +328,7 @@ struct HomePermissionStatusCard: View {
     let accessibilityTrusted: Bool
     let screenCaptureTrusted: Bool
     let language: AppLanguage
+    let colorScheme: ColorScheme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
@@ -335,12 +336,14 @@ struct HomePermissionStatusCard: View {
                 title: AppStrings.text(.homePermissionAccessibility, language: language),
                 isGranted: accessibilityTrusted,
                 language: language,
+                colorScheme: colorScheme,
                 accessibilityIdentifier: "flowtab.sidebar.permission.accessibility"
             )
             HomePermissionStatusRow(
                 title: AppStrings.text(.homePermissionScreenCapture, language: language),
                 isGranted: screenCaptureTrusted,
                 language: language,
+                colorScheme: colorScheme,
                 accessibilityIdentifier: "flowtab.sidebar.permission.screen-capture"
             )
         }
@@ -364,23 +367,46 @@ struct HomePermissionStatusCard: View {
     }
 }
 
+enum HomePermissionStatusColors {
+    static func titleTextColor(colorScheme: ColorScheme) -> NSColor {
+        (colorScheme == .dark ? NSColor.white : NSColor.black).withAlphaComponent(0.86)
+    }
+
+    static func iconColor(isGranted: Bool) -> Color {
+        Color(nsColor: isGranted ? .systemGreen : .systemOrange)
+    }
+
+    static func statusTextColor(isGranted: Bool) -> NSColor {
+        isGranted ? .secondaryLabelColor : .systemOrange
+    }
+}
+
 private struct HomePermissionStatusRow: View {
     let title: String
     let isGranted: Bool
     let language: AppLanguage
+    let colorScheme: ColorScheme
     let accessibilityIdentifier: String
+
+    private var titleTextColor: NSColor {
+        HomePermissionStatusColors.titleTextColor(colorScheme: colorScheme)
+    }
+
+    private var statusTextColor: Color {
+        Color(nsColor: HomePermissionStatusColors.statusTextColor(isGranted: isGranted))
+    }
 
     var body: some View {
         HStack(spacing: 9) {
             Image(systemName: isGranted ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
                 .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(isGranted ? Color.green : Color.orange)
+                .foregroundStyle(HomePermissionStatusColors.iconColor(isGranted: isGranted))
                 .frame(width: 14)
 
             HomeAccessibleText(
                 text: title,
                 font: .systemFont(ofSize: 12, weight: .medium),
-                textColor: .labelColor.withAlphaComponent(0.86),
+                textColor: titleTextColor,
                 accessibilityIdentifier: accessibilityIdentifier
             )
             .frame(height: 15)
@@ -389,7 +415,7 @@ private struct HomePermissionStatusRow: View {
 
             Text(AppStrings.text(isGranted ? .homePermissionGranted : .homePermissionMissing, language: language))
                 .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(statusTextColor)
                 .lineLimit(1)
         }
     }

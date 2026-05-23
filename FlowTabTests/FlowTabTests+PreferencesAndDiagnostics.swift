@@ -99,6 +99,16 @@ extension FlowTabTests {
         XCTAssertGreaterThan(settingsContainer.pageView.frame.width, 1_100)
     }
 
+    @MainActor
+    func testHomePermissionStatusColorsFollowResolvedThemeAndSettingsStatusTone() throws {
+        let lightLabel = try hostedHomePermissionStatusTitleLabel(colorScheme: .light)
+        let darkLabel = try hostedHomePermissionStatusTitleLabel(colorScheme: .dark)
+
+        assertColor(lightLabel.textColor, matches: NSColor.black.withAlphaComponent(0.86))
+        assertColor(darkLabel.textColor, matches: NSColor.white.withAlphaComponent(0.86))
+        assertColor(HomePermissionStatusColors.statusTextColor(isGranted: false), matches: .systemOrange)
+    }
+
     func testPermissionSettingsCardStateUsesDeniedCopyWhenPermissionsMissing() {
         let state = PermissionSettingsCardState(
             showPermissionReminder: true,
@@ -883,7 +893,7 @@ extension FlowTabTests {
         identifier: String,
         as type: T.Type = T.self
     ) -> T? {
-        if view.identifier?.rawValue == identifier {
+        if view.identifier?.rawValue == identifier || view.accessibilityIdentifier() == identifier {
             return view as? T
         }
         for subview in view.subviews {
@@ -907,6 +917,46 @@ extension FlowTabTests {
             }
         }
         return nil
+    }
+
+    @MainActor
+    private func hostedHomePermissionStatusTitleLabel(colorScheme: ColorScheme) throws -> NSTextField {
+        let hostedView = NSHostingView(
+            rootView: HomePermissionStatusCard(
+                accessibilityTrusted: false,
+                screenCaptureTrusted: false,
+                language: .simplifiedChinese,
+                colorScheme: colorScheme
+            )
+            .frame(width: 180, height: HomePageLayout.bottomStatusHeight)
+        )
+        hostedView.frame = NSRect(x: 0, y: 0, width: 180, height: HomePageLayout.bottomStatusHeight)
+        hostedView.layoutSubtreeIfNeeded()
+
+        let label: NSTextField? = descendant(
+            in: hostedView,
+            identifier: "flowtab.sidebar.permission.accessibility"
+        )
+        return try XCTUnwrap(label)
+    }
+
+    private func assertColor(
+        _ actual: NSColor?,
+        matches expected: NSColor,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        guard let actualColor = actual?.usingColorSpace(.sRGB),
+            let expectedColor = expected.usingColorSpace(.sRGB)
+        else {
+            XCTFail("Expected comparable sRGB colors", file: file, line: line)
+            return
+        }
+
+        XCTAssertEqual(actualColor.redComponent, expectedColor.redComponent, accuracy: 0.001, file: file, line: line)
+        XCTAssertEqual(actualColor.greenComponent, expectedColor.greenComponent, accuracy: 0.001, file: file, line: line)
+        XCTAssertEqual(actualColor.blueComponent, expectedColor.blueComponent, accuracy: 0.001, file: file, line: line)
+        XCTAssertEqual(actualColor.alphaComponent, expectedColor.alphaComponent, accuracy: 0.001, file: file, line: line)
     }
 
     private func waitForRunLoopCondition(

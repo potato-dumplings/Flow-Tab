@@ -167,7 +167,8 @@ private struct HomeSidebar: View {
                 HomePermissionStatusCard(
                     accessibilityTrusted: accessibilityTrusted,
                     screenCaptureTrusted: screenCaptureTrusted,
-                    language: appLanguage
+                    language: appLanguage,
+                    colorScheme: colorScheme
                 )
             }
             .padding(.horizontal, 10)
