@@ -45,6 +45,10 @@ final class AppKitSettingsPageContainerView: NSView {
     private let verticalContentInset = HomePageLayout.alignedTopInset
     private var wasActive = false
     private var pendingInitialFocusClear = false
+    private var pageLeadingConstraint: NSLayoutConstraint?
+    private var pageTopConstraint: NSLayoutConstraint?
+    private var pageWidthConstraint: NSLayoutConstraint?
+    private var pageHeightConstraint: NSLayoutConstraint?
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -65,13 +69,35 @@ final class AppKitSettingsPageContainerView: NSView {
         needsLayout = true
     }
 
+    override func setFrameSize(_ newSize: NSSize) {
+        let previousSize = frame.size
+        super.setFrameSize(newSize)
+        if previousSize != newSize {
+            needsLayout = true
+        }
+    }
+
+    override func setBoundsSize(_ newSize: NSSize) {
+        let previousSize = bounds.size
+        super.setBoundsSize(newSize)
+        if previousSize != newSize {
+            needsLayout = true
+        }
+    }
+
     override func layout() {
         super.layout()
 
-        let viewportWidth = scrollView.contentView.bounds.width
+        let containerSize = bounds.size
+        scrollView.frame = NSRect(origin: .zero, size: containerSize)
+
+        let viewportWidth = containerSize.width
         guard viewportWidth > 0 else { return }
 
         let pageWidth = max(viewportWidth - horizontalContentInset * 2, 320)
+        pageLeadingConstraint?.constant = horizontalContentInset
+        pageWidthConstraint?.constant = pageWidth
+        pageHeightConstraint?.isActive = false
         pageView.prepareLayout(forWidth: pageWidth)
         let fittedSize = pageView.preferredFittingSize(forWidth: pageWidth)
         let topInset = verticalContentInset + safeAreaInsets.top
@@ -83,12 +109,10 @@ final class AppKitSettingsPageContainerView: NSView {
             width: viewportWidth,
             height: documentHeight
         )
-        pageView.frame = NSRect(
-            x: horizontalContentInset,
-            y: topInset,
-            width: pageWidth,
-            height: fittedSize.height
-        )
+        pageTopConstraint?.constant = topInset
+        pageHeightConstraint?.constant = fittedSize.height
+        pageHeightConstraint?.isActive = true
+        documentView.layoutSubtreeIfNeeded()
     }
 
     private func buildViewHierarchy() {
@@ -106,11 +130,24 @@ final class AppKitSettingsPageContainerView: NSView {
         scrollView.documentView = documentView
 
         addSubview(scrollView)
+        let pageLeadingConstraint = pageView.leadingAnchor.constraint(
+            equalTo: documentView.leadingAnchor
+        )
+        let pageTopConstraint = pageView.topAnchor.constraint(equalTo: documentView.topAnchor)
+        let pageWidthConstraint = pageView.widthAnchor.constraint(equalToConstant: 320)
+        let pageHeightConstraint = pageView.heightAnchor.constraint(equalToConstant: 1)
+        self.pageLeadingConstraint = pageLeadingConstraint
+        self.pageTopConstraint = pageTopConstraint
+        self.pageWidthConstraint = pageWidthConstraint
+        self.pageHeightConstraint = pageHeightConstraint
         NSLayoutConstraint.activate([
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
             scrollView.topAnchor.constraint(equalTo: topAnchor),
             scrollView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: bottomAnchor)
+            scrollView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            pageLeadingConstraint,
+            pageTopConstraint,
+            pageWidthConstraint
         ])
     }
 

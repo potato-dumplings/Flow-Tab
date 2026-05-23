@@ -78,6 +78,27 @@ extension FlowTabTests {
         )
     }
 
+    @MainActor
+    func testSettingsPageContentExpandsToWideSwiftUIProposal() throws {
+        let hostedView = NSHostingView(
+            rootView: AppSettingsView(isActive: true)
+                .frame(width: 1_200, height: 760, alignment: .topLeading)
+        )
+        hostedView.frame = NSRect(x: 0, y: 0, width: 1_200, height: 760)
+        hostedView.layoutSubtreeIfNeeded()
+
+        let container: AppKitSettingsPageContainerView? = descendant(
+            in: hostedView,
+            as: AppKitSettingsPageContainerView.self
+        )
+        let settingsContainer = try XCTUnwrap(container)
+        settingsContainer.layout()
+        settingsContainer.layoutSubtreeIfNeeded()
+
+        XCTAssertEqual(settingsContainer.frame.width, 1_200, accuracy: 1)
+        XCTAssertGreaterThan(settingsContainer.pageView.frame.width, 1_100)
+    }
+
     func testPermissionSettingsCardStateUsesDeniedCopyWhenPermissionsMissing() {
         let state = PermissionSettingsCardState(
             showPermissionReminder: true,
@@ -835,6 +856,21 @@ extension FlowTabTests {
         }
         for subview in view.subviews {
             if let match: T = descendant(in: subview, identifier: identifier, as: type) {
+                return match
+            }
+        }
+        return nil
+    }
+
+    private func descendant<T: NSView>(
+        in view: NSView,
+        as type: T.Type = T.self
+    ) -> T? {
+        if let match = view as? T {
+            return match
+        }
+        for subview in view.subviews {
+            if let match: T = descendant(in: subview, as: type) {
                 return match
             }
         }
