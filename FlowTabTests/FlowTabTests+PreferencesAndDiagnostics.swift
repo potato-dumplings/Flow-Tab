@@ -127,6 +127,38 @@ extension FlowTabTests {
         XCTAssertEqual(state.screenCaptureButtonTitle, AppStrings.text(.permissionScreenClose))
     }
 
+    @MainActor
+    func testPermissionSettingsRowsStayCompactWhenVerticalStackGetsExtraHeight() throws {
+        let accessibilityRow = PermissionStatusControlRowView(
+            control: FlowGradientActionButton(),
+            controlWidth: 166
+        )
+        let screenCaptureRow = PermissionStatusControlRowView(
+            control: FlowGradientActionButton(),
+            controlWidth: 166
+        )
+        accessibilityRow.update(
+            text: AppStrings.text(.permissionAccessibilityDenied),
+            detail: AppStrings.text(.permissionAccessibilityDetail),
+            statusColor: .systemOrange
+        )
+        screenCaptureRow.update(
+            text: AppStrings.text(.permissionScreenDenied),
+            detail: AppStrings.text(.permissionScreenDetail),
+            statusColor: .systemOrange
+        )
+
+        let stackView = NSStackView(views: [accessibilityRow, screenCaptureRow])
+        stackView.orientation = .vertical
+        stackView.alignment = .leading
+        stackView.spacing = 10
+        stackView.frame = NSRect(x: 0, y: 0, width: 620, height: 260)
+        stackView.layoutSubtreeIfNeeded()
+
+        XCTAssertLessThanOrEqual(accessibilityRow.frame.height, 40)
+        XCTAssertLessThanOrEqual(screenCaptureRow.frame.height, 40)
+    }
+
     func testPermissionPollingPolicyBuildsTimeoutDescriptionFromCurrentLimits() {
         let policy = PermissionPollingPolicy.default
 

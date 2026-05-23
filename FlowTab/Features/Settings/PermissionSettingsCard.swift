@@ -138,7 +138,7 @@ struct PermissionSettingsCardState: Equatable {
 
 }
 
-private final class PermissionStatusControlRowView<Control: NSView>: NSView {
+final class PermissionStatusControlRowView<Control: NSView>: NSView {
     let titleLabel = AppKitSettingsCardBaseView.makeStatusLabel()
     let detailLabel = AppKitSettingsCardBaseView.makeBodyLabel()
     let control: Control
@@ -155,6 +155,11 @@ private final class PermissionStatusControlRowView<Control: NSView>: NSView {
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    override var intrinsicContentSize: NSSize {
+        layoutSubtreeIfNeeded()
+        return NSSize(width: NSView.noIntrinsicMetric, height: stackView.fittingSize.height)
     }
 
     private func buildViewHierarchy() {
@@ -196,7 +201,7 @@ private final class PermissionStatusControlRowView<Control: NSView>: NSView {
             stackView.leadingAnchor.constraint(equalTo: leadingAnchor),
             stackView.topAnchor.constraint(equalTo: topAnchor),
             stackView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            stackView.bottomAnchor.constraint(lessThanOrEqualTo: bottomAnchor)
+            stackView.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
     }
 
