@@ -91,6 +91,78 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testAppDelegateLaunchNormalizesStoredInAppHotkeyConflictBeforeRegistration() {
+        guard let userDefaults = makeIsolatedUserDefaults() else { return }
+
+        let previousHooks = AppDelegate.testHooks
+        let previousSharedDelegate = AppDelegate.shared
+        let previousActivationOverride = AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride
+        let previousAXTrusted = AccessibilityPermissionChecker.isTrustedOverrideForTesting
+        let previousAXRequest = AccessibilityPermissionChecker.requestPermissionOverrideForTesting
+        let hotkeyFactory = SpyHotkeyMonitorFactory()
+        var delegate: AppDelegate?
+        defer {
+            delegate?.applicationWillTerminate(
+                Notification(name: NSApplication.willTerminateNotification)
+            )
+            AppDelegate.testHooks = previousHooks
+            AppDelegate.shared = previousSharedDelegate
+            AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride = previousActivationOverride
+            AccessibilityPermissionChecker.isTrustedOverrideForTesting = previousAXTrusted
+            AccessibilityPermissionChecker.requestPermissionOverrideForTesting = previousAXRequest
+            clearIsolatedUserDefaults(userDefaults)
+        }
+
+        userDefaults.set(
+            SwitcherPrimaryModifier.control.rawValue,
+            forKey: AppPreferenceKeys.hotkeyPrimaryModifier
+        )
+        userDefaults.set(SwitcherHotkeyKey.tab.rawValue, forKey: AppPreferenceKeys.hotkeyMainKey)
+        userDefaults.set(SwitcherHotkeyKey.q.rawValue, forKey: AppPreferenceKeys.hotkeyQuitKey)
+        userDefaults.set(
+            SwitcherPrimaryModifier.control.rawValue,
+            forKey: AppPreferenceKeys.inAppWindowHotkeyPrimaryModifier
+        )
+        userDefaults.set(SwitcherHotkeyKey.tab.rawValue, forKey: AppPreferenceKeys.inAppWindowHotkeyMainKey)
+
+        AccessibilityPermissionChecker.isTrustedOverrideForTesting = { true }
+        AccessibilityPermissionChecker.requestPermissionOverrideForTesting = { true }
+        AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride = {}
+        AppDelegate.testHooks = AppDelegate.TestHooks(
+            userDefaults: userDefaults,
+            makePanelController: nil,
+            makeHotkeyMonitor: { configuration, signature, forwardHotkeyID, backwardHotkeyID in
+                hotkeyFactory.make(
+                    configuration: configuration,
+                    signature: signature,
+                    forwardHotkeyID: forwardHotkeyID,
+                    backwardHotkeyID: backwardHotkeyID
+                )
+            },
+            commandTabTakeoverController: SpyCommandTabTakeoverController(),
+            stressRunner: SpyStressRunner()
+        )
+
+        let appDelegate = AppDelegate()
+        delegate = appDelegate
+        appDelegate.applicationDidFinishLaunching(
+            Notification(name: NSApplication.didFinishLaunchingNotification)
+        )
+
+        XCTAssertEqual(hotkeyFactory.records.count, 2)
+        guard hotkeyFactory.records.count == 2 else { return }
+        XCTAssertEqual(hotkeyFactory.records.map(\.signature), [0x46544142, 0x4654574E])
+        XCTAssertEqual(hotkeyFactory.records[0].configuration.primaryModifier, .control)
+        XCTAssertEqual(hotkeyFactory.records[0].configuration.mainKey, .tab)
+        XCTAssertEqual(hotkeyFactory.records[1].configuration.primaryModifier, .option)
+        XCTAssertEqual(hotkeyFactory.records[1].configuration.mainKey, .tab)
+        XCTAssertEqual(
+            userDefaults.string(forKey: AppPreferenceKeys.inAppWindowHotkeyPrimaryModifier),
+            SwitcherPrimaryModifier.option.rawValue
+        )
+    }
+
+    @MainActor
     func testAppDelegateLaunchCanSuppressHomeWindowForUITestTriggerListener() {
         guard let userDefaults = makeIsolatedUserDefaults() else { return }
 

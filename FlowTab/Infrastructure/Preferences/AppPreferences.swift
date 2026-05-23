@@ -82,10 +82,55 @@ struct HotkeyRegistrationRequest: Sendable {
     }
 
     static func load(userDefaults: UserDefaults = .standard) -> HotkeyRegistrationRequest {
-        HotkeyRegistrationRequest(
-            mainConfiguration: SwitcherHotkeyPreferencesStore.load(userDefaults: userDefaults),
-            inAppWindowConfiguration: InAppWindowHotkeyPreferencesStore.load(userDefaults: userDefaults)
+        let mainPrimaryModifierRaw = userDefaults.string(forKey: AppPreferenceKeys.hotkeyPrimaryModifier)
+            ?? SwitcherHotkeyPreferencesStore.defaultPrimaryModifier.rawValue
+        let mainKeyRaw = userDefaults.string(forKey: AppPreferenceKeys.hotkeyMainKey)
+            ?? SwitcherHotkeyPreferencesStore.defaultMainKey.rawValue
+        let quitKeyRaw = userDefaults.string(forKey: AppPreferenceKeys.hotkeyQuitKey)
+            ?? SwitcherHotkeyPreferencesStore.defaultQuitKey.rawValue
+        let inAppPrimaryModifierRaw = userDefaults.string(forKey: AppPreferenceKeys.inAppWindowHotkeyPrimaryModifier)
+            ?? InAppWindowHotkeyPreferencesStore.defaultPrimaryModifier.rawValue
+        let inAppMainKeyRaw = userDefaults.string(forKey: AppPreferenceKeys.inAppWindowHotkeyMainKey)
+            ?? InAppWindowHotkeyPreferencesStore.defaultMainKey.rawValue
+
+        let request = HotkeyRegistrationRequest.normalized(
+            mainPrimaryModifierRaw: mainPrimaryModifierRaw,
+            mainKeyRaw: mainKeyRaw,
+            quitKeyRaw: quitKeyRaw,
+            inAppPrimaryModifierRaw: inAppPrimaryModifierRaw,
+            inAppMainKeyRaw: inAppMainKeyRaw
         )
+        persistNormalizedValue(
+            request.mainConfiguration.primaryModifier.rawValue,
+            rawValue: mainPrimaryModifierRaw,
+            forKey: AppPreferenceKeys.hotkeyPrimaryModifier,
+            userDefaults: userDefaults
+        )
+        persistNormalizedValue(
+            request.mainConfiguration.mainKey.rawValue,
+            rawValue: mainKeyRaw,
+            forKey: AppPreferenceKeys.hotkeyMainKey,
+            userDefaults: userDefaults
+        )
+        persistNormalizedValue(
+            request.mainConfiguration.quitKey.rawValue,
+            rawValue: quitKeyRaw,
+            forKey: AppPreferenceKeys.hotkeyQuitKey,
+            userDefaults: userDefaults
+        )
+        persistNormalizedValue(
+            request.inAppWindowConfiguration.primaryModifier.rawValue,
+            rawValue: inAppPrimaryModifierRaw,
+            forKey: AppPreferenceKeys.inAppWindowHotkeyPrimaryModifier,
+            userDefaults: userDefaults
+        )
+        persistNormalizedValue(
+            request.inAppWindowConfiguration.mainKey.rawValue,
+            rawValue: inAppMainKeyRaw,
+            forKey: AppPreferenceKeys.inAppWindowHotkeyMainKey,
+            userDefaults: userDefaults
+        )
+        return request
     }
 
     static func normalized(
@@ -115,6 +160,17 @@ struct HotkeyRegistrationRequest: Sendable {
             mainConfiguration: mainConfiguration,
             inAppWindowConfiguration: inAppWindowConfiguration
         )
+    }
+
+    private static func persistNormalizedValue(
+        _ value: String,
+        rawValue: String,
+        forKey key: String,
+        userDefaults: UserDefaults
+    ) {
+        if rawValue != value {
+            userDefaults.set(value, forKey: key)
+        }
     }
 
     init?(notificationUserInfo: [AnyHashable: Any]) {

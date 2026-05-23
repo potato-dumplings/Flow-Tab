@@ -156,6 +156,38 @@ extension FlowTabTests {
         )
     }
 
+    func testHotkeyRegistrationRequestLoadNormalizesStoredInAppConflict() {
+        guard let userDefaults = makeIsolatedUserDefaults() else { return }
+        defer { clearIsolatedUserDefaults(userDefaults) }
+
+        userDefaults.set(
+            SwitcherPrimaryModifier.control.rawValue,
+            forKey: AppPreferenceKeys.hotkeyPrimaryModifier
+        )
+        userDefaults.set(SwitcherHotkeyKey.tab.rawValue, forKey: AppPreferenceKeys.hotkeyMainKey)
+        userDefaults.set(SwitcherHotkeyKey.q.rawValue, forKey: AppPreferenceKeys.hotkeyQuitKey)
+        userDefaults.set(
+            SwitcherPrimaryModifier.control.rawValue,
+            forKey: AppPreferenceKeys.inAppWindowHotkeyPrimaryModifier
+        )
+        userDefaults.set(SwitcherHotkeyKey.tab.rawValue, forKey: AppPreferenceKeys.inAppWindowHotkeyMainKey)
+
+        let request = HotkeyRegistrationRequest.load(userDefaults: userDefaults)
+
+        XCTAssertEqual(request.mainConfiguration.primaryModifier, .control)
+        XCTAssertEqual(request.mainConfiguration.mainKey, .tab)
+        XCTAssertEqual(request.inAppWindowConfiguration.primaryModifier, .option)
+        XCTAssertEqual(request.inAppWindowConfiguration.mainKey, .tab)
+        XCTAssertEqual(
+            userDefaults.string(forKey: AppPreferenceKeys.inAppWindowHotkeyPrimaryModifier),
+            SwitcherPrimaryModifier.option.rawValue
+        )
+        XCTAssertEqual(
+            userDefaults.string(forKey: AppPreferenceKeys.inAppWindowHotkeyMainKey),
+            SwitcherHotkeyKey.tab.rawValue
+        )
+    }
+
     func testHotkeyRegistrationRequestCoversSupportedSettingsMatrixAxes() {
         for modifier in SwitcherPrimaryModifier.allCases {
             for mainKey in SwitcherHotkeyKey.allCases {
