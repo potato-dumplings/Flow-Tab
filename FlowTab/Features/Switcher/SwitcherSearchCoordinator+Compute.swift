@@ -345,7 +345,12 @@ extension SwitcherSearchCoordinator {
         totalCount: Int,
         limit: Int? = nil
     ) -> [Int] {
-        let coarse = coarseFilter(query: query, invertedIndex: invertedIndex, limit: limit)
+        let coarse: [Int]
+        if let limit, limit > 0 {
+            coarse = limitedCoarseCandidates(query: query, invertedIndex: invertedIndex, limit: limit)
+        } else {
+            coarse = coarseFilter(query: query, invertedIndex: invertedIndex)
+        }
         if coarse.isEmpty {
             if let limit, limit > 0 {
                 return Array((0..<totalCount).prefix(limit))
@@ -436,10 +441,60 @@ extension SwitcherSearchCoordinator {
         )
     }
 
-    static func coarseFilter(
+    static func limitedCoarseCandidates(
         query: SearchKey,
         invertedIndex: ScopeInvertedIndex,
-        limit: Int? = nil
+        limit: Int
+    ) -> [Int] {
+        guard limit > 0 else { return [] }
+        var selected: [Int] = []
+        selected.reserveCapacity(limit)
+        var seen: Set<Int> = []
+
+        func appendPosting(_ posting: [Int]) {
+            for index in posting where seen.insert(index).inserted {
+                selected.append(index)
+                if selected.count >= limit {
+                    return
+                }
+            }
+        }
+
+        let dedupTerms = orderedUniqueSearchTerms(
+            query.terms + [query.compact, query.normalized].filter { !$0.isEmpty }
+        )
+        for term in dedupTerms where !term.isEmpty {
+            guard let posting = invertedIndex.termPostings[term] else { continue }
+            appendPosting(posting)
+            if selected.count >= limit {
+                return selected
+            }
+        }
+
+        for gram in bigrams(of: query.compact) {
+            guard let posting = invertedIndex.bigramPostings[gram] else { continue }
+            appendPosting(posting)
+            if selected.count >= limit {
+                return selected
+            }
+        }
+
+        return selected
+    }
+
+    static func orderedUniqueSearchTerms(_ values: [String]) -> [String] {
+        var seen: Set<String> = []
+        var result: [String] = []
+        result.reserveCapacity(values.count)
+        for value in values where !value.isEmpty && seen.insert(value).inserted {
+            result.append(value)
+        }
+        return result
+    }
+
+    static func coarseFilter(
+        query: SearchKey,
+        invertedIndex: ScopeInvertedIndex
     ) -> [Int] {
         var weights: [Int: Int] = [:]
         var gramHits: [Int: Int] = [:]
@@ -474,40 +529,10 @@ extension SwitcherSearchCoordinator {
             return nil
         }
 
-        if let limit, limit > 0, selected.count > limit {
-            var topCandidates: [(Int, Int)] = []
-            topCandidates.reserveCapacity(limit)
-            for candidate in selected {
-                insertCoarseCandidate(candidate, into: &topCandidates, limit: limit)
-            }
-            return topCandidates.map(\.0)
-        }
-
         let sorted = selected.sorted { lhs, rhs in
             isBetterCoarseCandidate(lhs, than: rhs)
         }
         return sorted.map(\.0)
-    }
-
-    static func insertCoarseCandidate(
-        _ candidate: (Int, Int),
-        into topCandidates: inout [(Int, Int)],
-        limit: Int
-    ) {
-        var lower = 0
-        var upper = topCandidates.count
-        while lower < upper {
-            let middle = (lower + upper) / 2
-            if isBetterCoarseCandidate(topCandidates[middle], than: candidate) {
-                lower = middle + 1
-            } else {
-                upper = middle
-            }
-        }
-        topCandidates.insert(candidate, at: lower)
-        if topCandidates.count > limit {
-            topCandidates.removeLast()
-        }
     }
 
     static func isBetterCoarseCandidate(_ lhs: (Int, Int), than rhs: (Int, Int)) -> Bool {
