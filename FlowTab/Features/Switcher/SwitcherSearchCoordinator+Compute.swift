@@ -28,7 +28,8 @@ extension SwitcherSearchCoordinator {
                 appCache = touchedCache(
                     cache,
                     query: query.normalized,
-                    latestMatchedIndexes: cachedEntry.matchedIndexes
+                    latestMatchedIndexes: cachedEntry.matchedIndexes,
+                    latestMatchedIndexesAreComplete: cachedEntry.matchedIndexesAreComplete
                 )
                 if cachedEntry.topResults.isEmpty {
                     RuntimeLog.warning(
@@ -38,36 +39,46 @@ extension SwitcherSearchCoordinator {
                 }
                 rebuilt = cachedEntry.topResults
             } else {
-                let candidateIndexes = candidateIndexes(
+                let candidatePlan = candidateIndexPlan(
                     query: query,
                     cache: appCache,
                     invertedIndex: input.appInvertedIndex,
                     totalCount: input.appEntries.count
                 )
-                let boundedCandidateIndexes = boundedCandidateIndexes(
-                    candidateIndexes,
-                    scope: .app,
-                    query: query
-                )
-                var ranked = rankAppMatches(
+                let candidateIndexes = candidatePlan.indexes
+                let boundedCandidateIndexes = boundedCandidateIndexes(candidateIndexes, scope: .app, query: query)
+                let ranksCompleteCandidateSet = candidateIndexes.count == boundedCandidateIndexes.count
+                let rankedMatches = rankAppMatches(
                     query: query,
                     entries: input.appEntries,
-                    candidateIndexes: boundedCandidateIndexes,
+                    candidateIndexes: ranksCompleteCandidateSet ? candidateIndexes : boundedCandidateIndexes,
                     topResultLimit: Self.appTopResultLimit
                 )
-                if ranked.topRanked.isEmpty, boundedCandidateIndexes.count < input.appEntries.count {
-                    ranked = rankAppMatches(
+                var ranked = (
+                    matchedIndexes: rankedMatches.matchedIndexes,
+                    topRanked: rankedMatches.topRanked,
+                    matchedIndexesAreComplete: candidatePlan.canCacheCompleteMatches
+                        && ranksCompleteCandidateSet
+                        && rankedMatches.matchedIndexes.count <= completeMatchCacheMatchedLimit
+                )
+                if ranked.topRanked.isEmpty, candidateIndexes.count < input.appEntries.count {
+                    let fullScanRanked = rankAppMatches(
                         query: query,
                         entries: input.appEntries,
                         candidateIndexes: Array(input.appEntries.indices),
                         topResultLimit: Self.appTopResultLimit
                     )
-                    if !ranked.topRanked.isEmpty {
+                    if !fullScanRanked.topRanked.isEmpty {
                         RuntimeLog.info(
                             .search,
-                            "scope=app query=\"\(query.normalized)\" recallFallback=fullScan initialCandidates=\(boundedCandidateIndexes.count) totalEntries=\(input.appEntries.count) recoveredResults=\(ranked.topRanked.count)"
+                            "scope=app query=\"\(query.normalized)\" recallFallback=fullScan initialCandidates=\(candidateIndexes.count) totalEntries=\(input.appEntries.count) recoveredResults=\(fullScanRanked.topRanked.count)"
                         )
                     }
+                    ranked = (
+                        matchedIndexes: fullScanRanked.matchedIndexes,
+                        topRanked: fullScanRanked.topRanked,
+                        matchedIndexesAreComplete: fullScanRanked.matchedIndexes.count <= completeMatchCacheMatchedLimit
+                    )
                 }
                 let matchedIndexes = ranked.matchedIndexes
                 let topResults = ranked.topRanked.map { ranked in
@@ -79,7 +90,10 @@ extension SwitcherSearchCoordinator {
                         secondaryText: nil
                     )
                 }
-                let cachePolicy = cachePolicy(for: query.normalized)
+                let cachePolicy = cachePolicy(
+                    for: query.normalized,
+                    matchedIndexesAreComplete: ranked.matchedIndexesAreComplete
+                )
                 appCache = updatedCache(
                     appCache,
                     query: query.normalized,
@@ -87,6 +101,7 @@ extension SwitcherSearchCoordinator {
                         matchedIndexes,
                         limit: cachePolicy.matchedIndexesLimit
                     ),
+                    matchedIndexesAreComplete: ranked.matchedIndexesAreComplete,
                     topResults: topResults,
                     limit: cachePolicy.entryLimit,
                     persistEntry: cachePolicy.persistEntry
@@ -126,7 +141,8 @@ extension SwitcherSearchCoordinator {
                 windowCache = touchedCache(
                     cache,
                     query: query.normalized,
-                    latestMatchedIndexes: cachedEntry.matchedIndexes
+                    latestMatchedIndexes: cachedEntry.matchedIndexes,
+                    latestMatchedIndexesAreComplete: cachedEntry.matchedIndexesAreComplete
                 )
                 if cachedEntry.topResults.isEmpty {
                     RuntimeLog.warning(
@@ -136,36 +152,46 @@ extension SwitcherSearchCoordinator {
                 }
                 rebuilt = cachedEntry.topResults
             } else {
-                let candidateIndexes = candidateIndexes(
+                let candidatePlan = candidateIndexPlan(
                     query: query,
                     cache: windowCache,
                     invertedIndex: input.windowInvertedIndex,
                     totalCount: input.windowEntries.count
                 )
-                let boundedCandidateIndexes = boundedCandidateIndexes(
-                    candidateIndexes,
-                    scope: .window,
-                    query: query
-                )
-                var ranked = rankWindowMatches(
+                let candidateIndexes = candidatePlan.indexes
+                let boundedCandidateIndexes = boundedCandidateIndexes(candidateIndexes, scope: .window, query: query)
+                let ranksCompleteCandidateSet = candidateIndexes.count == boundedCandidateIndexes.count
+                let rankedMatches = rankWindowMatches(
                     query: query,
                     entries: input.windowEntries,
-                    candidateIndexes: boundedCandidateIndexes,
+                    candidateIndexes: ranksCompleteCandidateSet ? candidateIndexes : boundedCandidateIndexes,
                     topResultLimit: Self.windowTopResultLimit
                 )
-                if ranked.topRanked.isEmpty, boundedCandidateIndexes.count < input.windowEntries.count {
-                    ranked = rankWindowMatches(
+                var ranked = (
+                    matchedIndexes: rankedMatches.matchedIndexes,
+                    topRanked: rankedMatches.topRanked,
+                    matchedIndexesAreComplete: candidatePlan.canCacheCompleteMatches
+                        && ranksCompleteCandidateSet
+                        && rankedMatches.matchedIndexes.count <= completeMatchCacheMatchedLimit
+                )
+                if ranked.topRanked.isEmpty, candidateIndexes.count < input.windowEntries.count {
+                    let fullScanRanked = rankWindowMatches(
                         query: query,
                         entries: input.windowEntries,
                         candidateIndexes: Array(input.windowEntries.indices),
                         topResultLimit: Self.windowTopResultLimit
                     )
-                    if !ranked.topRanked.isEmpty {
+                    if !fullScanRanked.topRanked.isEmpty {
                         RuntimeLog.info(
                             .search,
-                            "scope=window query=\"\(query.normalized)\" recallFallback=fullScan initialCandidates=\(boundedCandidateIndexes.count) totalEntries=\(input.windowEntries.count) recoveredResults=\(ranked.topRanked.count)"
+                            "scope=window query=\"\(query.normalized)\" recallFallback=fullScan initialCandidates=\(candidateIndexes.count) totalEntries=\(input.windowEntries.count) recoveredResults=\(fullScanRanked.topRanked.count)"
                         )
                     }
+                    ranked = (
+                        matchedIndexes: fullScanRanked.matchedIndexes,
+                        topRanked: fullScanRanked.topRanked,
+                        matchedIndexesAreComplete: fullScanRanked.matchedIndexes.count <= completeMatchCacheMatchedLimit
+                    )
                 }
                 let matchedIndexes = ranked.matchedIndexes
                 let topResults = ranked.topRanked.map { ranked in
@@ -178,7 +204,10 @@ extension SwitcherSearchCoordinator {
                         secondaryText: window.appDisplayName
                     )
                 }
-                let cachePolicy = cachePolicy(for: query.normalized)
+                let cachePolicy = cachePolicy(
+                    for: query.normalized,
+                    matchedIndexesAreComplete: ranked.matchedIndexesAreComplete
+                )
                 windowCache = updatedCache(
                     windowCache,
                     query: query.normalized,
@@ -186,6 +215,7 @@ extension SwitcherSearchCoordinator {
                         matchedIndexes,
                         limit: cachePolicy.matchedIndexesLimit
                     ),
+                    matchedIndexesAreComplete: ranked.matchedIndexesAreComplete,
                     topResults: topResults,
                     limit: cachePolicy.entryLimit,
                     persistEntry: cachePolicy.persistEntry
@@ -222,37 +252,108 @@ extension SwitcherSearchCoordinator {
         )
     }
 
-    static func candidateIndexes(
+    static func candidateIndexPlan(
         query: SearchKey,
         cache: ScopeMatchCache?,
         invertedIndex: ScopeInvertedIndex,
         totalCount: Int
-    ) -> [Int] {
+    ) -> CandidateIndexPlan {
         if let cache {
+            if
+                !cache.latestQuery.isEmpty,
+                query.normalized == cache.latestQuery
+            {
+                return CandidateIndexPlan(
+                    indexes: cache.latestMatchedIndexes,
+                    canCacheCompleteMatches: cache.latestMatchedIndexesAreComplete
+                )
+            }
             if
                 !cache.latestQuery.isEmpty,
                 query.normalized.hasPrefix(cache.latestQuery)
             {
-                return cache.latestMatchedIndexes
+                return supplementedPrefixCandidatePlan(
+                    cachedIndexes: cache.latestMatchedIndexes,
+                    query: query,
+                    invertedIndex: invertedIndex,
+                    totalCount: totalCount
+                )
             }
-            if let exactEntry = cache.entries[query.normalized] {
-                return exactEntry.matchedIndexes
+            if
+                let exactEntry = cache.entries[query.normalized],
+                exactEntry.matchedIndexesAreComplete
+            {
+                return CandidateIndexPlan(
+                    indexes: exactEntry.matchedIndexes,
+                    canCacheCompleteMatches: exactEntry.matchedIndexesAreComplete
+                )
             }
 
             var prefix = query.normalized
             while !prefix.isEmpty {
                 prefix.removeLast()
                 if let entry = cache.entries[prefix] {
-                    return entry.matchedIndexes
+                    return supplementedPrefixCandidatePlan(
+                        cachedIndexes: entry.matchedIndexes,
+                        query: query,
+                        invertedIndex: invertedIndex,
+                        totalCount: totalCount
+                    )
                 }
             }
         }
 
-        let coarse = coarseFilter(query: query, invertedIndex: invertedIndex)
+        return CandidateIndexPlan(
+            indexes: indexedCandidates(query: query, invertedIndex: invertedIndex, totalCount: totalCount),
+            canCacheCompleteMatches: true
+        )
+    }
+
+    static func supplementedPrefixCandidatePlan(
+        cachedIndexes: [Int],
+        query: SearchKey,
+        invertedIndex: ScopeInvertedIndex,
+        totalCount: Int
+    ) -> CandidateIndexPlan {
+        let supplementalIndexes = indexedCandidates(
+            query: query,
+            invertedIndex: invertedIndex,
+            totalCount: totalCount,
+            limit: prefixSupplementCandidateLimit
+        )
+        return CandidateIndexPlan(
+            indexes: mergedCandidateIndexes(primary: supplementalIndexes, supplemental: cachedIndexes),
+            canCacheCompleteMatches: false
+        )
+    }
+
+    static func indexedCandidates(
+        query: SearchKey,
+        invertedIndex: ScopeInvertedIndex,
+        totalCount: Int,
+        limit: Int? = nil
+    ) -> [Int] {
+        let coarse = coarseFilter(query: query, invertedIndex: invertedIndex, limit: limit)
         if coarse.isEmpty {
+            if let limit, limit > 0 {
+                return Array((0..<totalCount).prefix(limit))
+            }
             return Array(0..<totalCount)
         }
         return coarse
+    }
+
+    static func mergedCandidateIndexes(primary: [Int], supplemental: [Int]) -> [Int] {
+        guard !primary.isEmpty else { return supplemental }
+        guard !supplemental.isEmpty else { return primary }
+
+        var seen = Set(primary)
+        var merged = primary
+        merged.reserveCapacity(primary.count + supplemental.count)
+        for index in supplemental where seen.insert(index).inserted {
+            merged.append(index)
+        }
+        return merged
     }
 
     static func boundedCandidateIndexes(
@@ -278,26 +379,31 @@ extension SwitcherSearchCoordinator {
     }
 
     static func cachePolicy(
-        for normalizedQuery: String
+        for normalizedQuery: String,
+        matchedIndexesAreComplete: Bool
     ) -> (entryLimit: Int, matchedIndexesLimit: Int, persistEntry: Bool) {
         let compactLength = compactToken(normalizedQuery).count
+        let budgetedMatchedIndexesLimit = compactLength <= shortQueryThreshold
+            ? shortQueryMatchedIndexesLimit
+            : longQueryMatchedIndexesLimit
+        let matchedIndexesLimit = matchedIndexesAreComplete ? 0 : budgetedMatchedIndexesLimit
         if compactLength <= 1 {
             return (
                 entryLimit: 0,
-                matchedIndexesLimit: shortQueryMatchedIndexesLimit,
+                matchedIndexesLimit: matchedIndexesLimit,
                 persistEntry: false
             )
         }
         if compactLength <= shortQueryThreshold {
             return (
                 entryLimit: shortQueryCacheEntryLimit,
-                matchedIndexesLimit: shortQueryMatchedIndexesLimit,
+                matchedIndexesLimit: matchedIndexesLimit,
                 persistEntry: true
             )
         }
         return (
             entryLimit: scopeMatchCacheEntryLimit,
-            matchedIndexesLimit: longQueryMatchedIndexesLimit,
+            matchedIndexesLimit: matchedIndexesLimit,
             persistEntry: true
         )
     }
@@ -318,7 +424,11 @@ extension SwitcherSearchCoordinator {
         )
     }
 
-    static func coarseFilter(query: SearchKey, invertedIndex: ScopeInvertedIndex) -> [Int] {
+    static func coarseFilter(
+        query: SearchKey,
+        invertedIndex: ScopeInvertedIndex,
+        limit: Int? = nil
+    ) -> [Int] {
         var weights: [Int: Int] = [:]
         var gramHits: [Int: Int] = [:]
 
@@ -352,13 +462,47 @@ extension SwitcherSearchCoordinator {
             return nil
         }
 
-        let sorted = selected.sorted { lhs, rhs in
-            if lhs.1 != rhs.1 {
-                return lhs.1 > rhs.1
+        if let limit, limit > 0, selected.count > limit {
+            var topCandidates: [(Int, Int)] = []
+            topCandidates.reserveCapacity(limit)
+            for candidate in selected {
+                insertCoarseCandidate(candidate, into: &topCandidates, limit: limit)
             }
-            return lhs.0 < rhs.0
+            return topCandidates.map(\.0)
+        }
+
+        let sorted = selected.sorted { lhs, rhs in
+            isBetterCoarseCandidate(lhs, than: rhs)
         }
         return sorted.map(\.0)
+    }
+
+    static func insertCoarseCandidate(
+        _ candidate: (Int, Int),
+        into topCandidates: inout [(Int, Int)],
+        limit: Int
+    ) {
+        var lower = 0
+        var upper = topCandidates.count
+        while lower < upper {
+            let middle = (lower + upper) / 2
+            if isBetterCoarseCandidate(topCandidates[middle], than: candidate) {
+                lower = middle + 1
+            } else {
+                upper = middle
+            }
+        }
+        topCandidates.insert(candidate, at: lower)
+        if topCandidates.count > limit {
+            topCandidates.removeLast()
+        }
+    }
+
+    static func isBetterCoarseCandidate(_ lhs: (Int, Int), than rhs: (Int, Int)) -> Bool {
+        if lhs.1 != rhs.1 {
+            return lhs.1 > rhs.1
+        }
+        return lhs.0 < rhs.0
     }
 
     static func buildScopeInvertedIndex(from indexes: [SearchIndex]) -> ScopeInvertedIndex {
@@ -380,7 +524,8 @@ extension SwitcherSearchCoordinator {
     static func touchedCache(
         _ cache: ScopeMatchCache,
         query: String,
-        latestMatchedIndexes: [Int]
+        latestMatchedIndexes: [Int],
+        latestMatchedIndexesAreComplete: Bool
     ) -> ScopeMatchCache {
         var lruOrder = cache.lruOrder
         lruOrder.removeAll { $0 == query }
@@ -388,6 +533,7 @@ extension SwitcherSearchCoordinator {
         return ScopeMatchCache(
             latestQuery: query,
             latestMatchedIndexes: latestMatchedIndexes,
+            latestMatchedIndexesAreComplete: latestMatchedIndexesAreComplete,
             entries: cache.entries,
             lruOrder: lruOrder
         )
@@ -397,6 +543,7 @@ extension SwitcherSearchCoordinator {
         _ existing: ScopeMatchCache?,
         query: String,
         matchedIndexes: [Int],
+        matchedIndexesAreComplete: Bool,
         topResults: [SwitcherSearchResult],
         limit: Int,
         persistEntry: Bool
@@ -407,6 +554,7 @@ extension SwitcherSearchCoordinator {
         if persistEntry {
             entries[query] = QueryCacheEntry(
                 matchedIndexes: matchedIndexes,
+                matchedIndexesAreComplete: matchedIndexesAreComplete,
                 topResults: topResults
             )
             lruOrder.removeAll { $0 == query }
@@ -429,6 +577,7 @@ extension SwitcherSearchCoordinator {
         return ScopeMatchCache(
             latestQuery: query,
             latestMatchedIndexes: matchedIndexes,
+            latestMatchedIndexesAreComplete: matchedIndexesAreComplete,
             entries: entries,
             lruOrder: lruOrder
         )

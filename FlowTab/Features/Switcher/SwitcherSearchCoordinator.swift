@@ -81,12 +81,14 @@ final class SwitcherSearchCoordinator {
 
     struct QueryCacheEntry: Sendable {
         let matchedIndexes: [Int]
+        let matchedIndexesAreComplete: Bool
         let topResults: [SwitcherSearchResult]
     }
 
     struct ScopeMatchCache: Sendable {
         let latestQuery: String
         let latestMatchedIndexes: [Int]
+        let latestMatchedIndexesAreComplete: Bool
         let entries: [String: QueryCacheEntry]
         let lruOrder: [String]
     }
@@ -94,6 +96,11 @@ final class SwitcherSearchCoordinator {
     struct ScopeInvertedIndex: Sendable {
         let termPostings: [String: [Int]]
         let bigramPostings: [String: [Int]]
+    }
+
+    struct CandidateIndexPlan: Sendable {
+        let indexes: [Int]
+        let canCacheCompleteMatches: Bool
     }
 
     struct ComputationInput: Sendable {
@@ -133,6 +140,8 @@ final class SwitcherSearchCoordinator {
     static let shortQueryCacheEntryLimit: Int = 12
     static let appTopResultLimit: Int = 300
     static let windowTopResultLimit: Int = 400
+    static let completeMatchCacheMatchedLimit: Int = 250
+    static let prefixSupplementCandidateLimit: Int = 256
     static let appCandidateLimitShortQuery: Int = 1_000
     static let appCandidateLimitLongQuery: Int = 1_600
     static let windowCandidateLimitShortQuery: Int = 1_200
