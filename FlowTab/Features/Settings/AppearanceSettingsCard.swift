@@ -2,7 +2,9 @@ import SwiftUI
 import AppKit
 import FlowTabCore
 
-struct AppKitAppearanceSettingsCardContent: NSViewRepresentable {
+struct AppKitAppearanceSettingsCardContent: AppKitSettingsCardRepresentable {
+    typealias NSViewType = AppearanceSettingsCardAppKitView
+
     @Binding var showShortcutHint: Bool
     @Binding var showInCommandTab: Bool
     @Binding var themeModeRaw: String
@@ -64,43 +66,33 @@ struct AppKitAppearanceSettingsCardContent: NSViewRepresentable {
         )
     }
 
-    func makeNSView(context: Context) -> AppearanceSettingsCardAppKitView {
-        let view = AppearanceSettingsCardAppKitView()
-        connect(view, coordinator: context.coordinator)
-        return view
+    func makeCardView(context _: Context) -> AppearanceSettingsCardAppKitView {
+        AppearanceSettingsCardAppKitView()
     }
 
-    func sizeThatFits(
-        _ proposal: ProposedViewSize,
-        nsView: AppearanceSettingsCardAppKitView,
-        context: Context
-    ) -> CGSize? {
-        nsView.preferredFittingSize(forWidth: proposal.width)
-    }
-
-    func updateNSView(_ nsView: AppearanceSettingsCardAppKitView, context: Context) {
-        context.coordinator.update(
+    func updateCoordinator(_ coordinator: Coordinator) {
+        coordinator.update(
             showShortcutHint: $showShortcutHint,
             showInCommandTab: $showInCommandTab,
             themeModeRaw: $themeModeRaw,
             appLanguageRaw: $appLanguageRaw
         )
-        connect(nsView, coordinator: context.coordinator)
-        nsView.update(
-            with: AppearanceSettingsCardState(
-                showShortcutHint: showShortcutHint,
-                showInCommandTab: showInCommandTab,
-                themeModeRaw: themeModeRaw,
-                appLanguageRaw: appLanguageRaw
-            )
-        )
     }
 
-    private func connect(_ view: AppearanceSettingsCardAppKitView, coordinator: Coordinator) {
+    func connect(_ view: AppearanceSettingsCardAppKitView, coordinator: Coordinator) {
         view.onShowShortcutHintChanged = { coordinator.setShowShortcutHint($0) }
         view.onShowInCommandTabChanged = { coordinator.setShowInCommandTab($0) }
         view.onThemeModeChanged = { coordinator.setThemeMode(rawValue: $0) }
         view.onAppLanguageChanged = { coordinator.setAppLanguage(rawValue: $0) }
+    }
+
+    func makeState() -> AppearanceSettingsCardState {
+        AppearanceSettingsCardState(
+            showShortcutHint: showShortcutHint,
+            showInCommandTab: showInCommandTab,
+            themeModeRaw: themeModeRaw,
+            appLanguageRaw: appLanguageRaw
+        )
     }
 }
 
@@ -119,7 +111,7 @@ struct AppearanceSettingsCardState: Equatable {
     }
 }
 
-final class AppearanceSettingsCardAppKitView: AppKitSettingsCardBaseView {
+final class AppearanceSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKitSettingsCardStateView {
     var onShowShortcutHintChanged: ((Bool) -> Void)?
     var onShowInCommandTabChanged: ((Bool) -> Void)?
     var onThemeModeChanged: ((String) -> Void)?

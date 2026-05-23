@@ -1,7 +1,9 @@
 import SwiftUI
 import AppKit
 
-struct AppKitWindowBehaviorSettingsCardContent: NSViewRepresentable {
+struct AppKitWindowBehaviorSettingsCardContent: AppKitSettingsCardRepresentable {
+    typealias NSViewType = WindowBehaviorSettingsCardAppKitView
+
     let windowLayerAutoEnterDelayText: String
     @Binding var autoRestoreMinimizedWindowOnSwitch: Bool
     @Binding var hideMinimizedAppsFromAppLayer: Bool
@@ -75,39 +77,21 @@ struct AppKitWindowBehaviorSettingsCardContent: NSViewRepresentable {
         )
     }
 
-    func makeNSView(context: Context) -> WindowBehaviorSettingsCardAppKitView {
-        let view = WindowBehaviorSettingsCardAppKitView()
-        connect(view, coordinator: context.coordinator)
-        return view
+    func makeCardView(context _: Context) -> WindowBehaviorSettingsCardAppKitView {
+        WindowBehaviorSettingsCardAppKitView()
     }
 
-    func sizeThatFits(
-        _ proposal: ProposedViewSize,
-        nsView: WindowBehaviorSettingsCardAppKitView,
-        context: Context
-    ) -> CGSize? {
-        nsView.preferredFittingSize(forWidth: proposal.width)
-    }
-
-    func updateNSView(_ nsView: WindowBehaviorSettingsCardAppKitView, context: Context) {
-        context.coordinator.update(
+    func updateCoordinator(_ coordinator: Coordinator) {
+        coordinator.update(
             autoRestoreMinimizedWindowOnSwitch: $autoRestoreMinimizedWindowOnSwitch,
             hideMinimizedAppsFromAppLayer: $hideMinimizedAppsFromAppLayer,
             onWindowLayerAutoEnterDelayTextChanged: onWindowLayerAutoEnterDelayTextChanged,
             onWindowLayerAutoEnterDelayTextCommitted: onWindowLayerAutoEnterDelayTextCommitted,
             onWindowLayerAutoEnterDelayEditingChanged: onWindowLayerAutoEnterDelayEditingChanged
         )
-        connect(nsView, coordinator: context.coordinator)
-        nsView.update(
-            with: WindowBehaviorSettingsCardState(
-                windowLayerAutoEnterDelayText: windowLayerAutoEnterDelayText,
-                autoRestoreMinimizedWindowOnSwitch: autoRestoreMinimizedWindowOnSwitch,
-                hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
-            )
-        )
     }
 
-    private func connect(_ view: WindowBehaviorSettingsCardAppKitView, coordinator: Coordinator) {
+    func connect(_ view: WindowBehaviorSettingsCardAppKitView, coordinator: Coordinator) {
         view.onWindowLayerAutoEnterDelayTextChanged = { coordinator.changeDelayText($0) }
         view.onWindowLayerAutoEnterDelayTextCommitted = { coordinator.commitDelayText() }
         view.onWindowLayerAutoEnterDelayEditingChanged = { coordinator.setDelayEditing($0) }
@@ -118,6 +102,14 @@ struct AppKitWindowBehaviorSettingsCardContent: NSViewRepresentable {
             coordinator.setHideMinimizedAppsFromAppLayer($0)
         }
     }
+
+    func makeState() -> WindowBehaviorSettingsCardState {
+        WindowBehaviorSettingsCardState(
+            windowLayerAutoEnterDelayText: windowLayerAutoEnterDelayText,
+            autoRestoreMinimizedWindowOnSwitch: autoRestoreMinimizedWindowOnSwitch,
+            hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
+        )
+    }
 }
 
 struct WindowBehaviorSettingsCardState: Equatable {
@@ -126,7 +118,8 @@ struct WindowBehaviorSettingsCardState: Equatable {
     let hideMinimizedAppsFromAppLayer: Bool
 }
 
-final class WindowBehaviorSettingsCardAppKitView: AppKitSettingsCardBaseView, NSTextFieldDelegate {
+final class WindowBehaviorSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKitSettingsCardStateView,
+    NSTextFieldDelegate {
     var onWindowLayerAutoEnterDelayTextChanged: ((String) -> Void)?
     var onWindowLayerAutoEnterDelayTextCommitted: (() -> Void)?
     var onWindowLayerAutoEnterDelayEditingChanged: ((Bool) -> Void)?
@@ -271,4 +264,3 @@ final class WindowBehaviorSettingsCardAppKitView: AppKitSettingsCardBaseView, NS
         onHideMinimizedAppsFromAppLayerChanged?(sender.state == .on)
     }
 }
-

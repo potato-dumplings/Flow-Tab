@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 
 enum HomePageLayout {
+    static let horizontalInset: CGFloat = 24
     static let alignedTopInset: CGFloat = 18
     static let bottomInset: CGFloat = 17
     static let bottomStatusHeight: CGFloat = 64

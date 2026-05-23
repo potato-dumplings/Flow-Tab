@@ -1,4 +1,41 @@
 import AppKit
+import SwiftUI
+
+protocol AppKitSettingsCardStateView: AnyObject {
+    associatedtype CardState
+
+    func update(with state: CardState)
+}
+
+protocol AppKitSettingsCardRepresentable: NSViewRepresentable
+where NSViewType: NSView & AppKitSettingsCardStateView {
+    func makeCardView(context: Context) -> NSViewType
+    func updateCoordinator(_ coordinator: Coordinator)
+    func connect(_ view: NSViewType, coordinator: Coordinator)
+    func makeState() -> NSViewType.CardState
+}
+
+extension AppKitSettingsCardRepresentable {
+    func makeNSView(context: Context) -> NSViewType {
+        let view = makeCardView(context: context)
+        connect(view, coordinator: context.coordinator)
+        return view
+    }
+
+    func sizeThatFits(
+        _ proposal: ProposedViewSize,
+        nsView: NSViewType,
+        context _: Context
+    ) -> CGSize? {
+        nsView.preferredFittingSize(forWidth: proposal.width)
+    }
+
+    func updateNSView(_ nsView: NSViewType, context: Context) {
+        updateCoordinator(context.coordinator)
+        connect(nsView, coordinator: context.coordinator)
+        nsView.update(with: makeState())
+    }
+}
 
 class AppKitSettingsCardBaseView: NSView {
     let stackView = NSStackView()

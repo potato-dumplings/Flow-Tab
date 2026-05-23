@@ -765,7 +765,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testAppDelegateSkipsInAppHotkeyMonitorWhenShortcutConflictsWithMainHotkey() {
+    func testAppDelegateNormalizesInAppHotkeyConflictToControlTabBeforeRegistration() {
         guard let userDefaults = makeIsolatedUserDefaults() else { return }
 
         let previousHooks = AppDelegate.testHooks
@@ -813,9 +813,18 @@ extension FlowTabPriorityCoverageTests {
         )
 
         XCTAssertTrue(delegate.hasMainHotkeyMonitorForTesting)
-        XCTAssertFalse(delegate.hasInAppHotkeyMonitorForTesting)
-        XCTAssertEqual(hotkeyFactory.records.count, 1)
+        XCTAssertTrue(delegate.hasInAppHotkeyMonitorForTesting)
+        XCTAssertEqual(hotkeyFactory.records.count, 2)
         XCTAssertEqual(hotkeyFactory.records.first?.signature, 0x46544142)
+        XCTAssertEqual(hotkeyFactory.records.first?.configuration.primaryModifier, .option)
+        XCTAssertEqual(hotkeyFactory.records.first?.configuration.mainKey, .tab)
+        XCTAssertEqual(hotkeyFactory.records.last?.signature, 0x4654574E)
+        XCTAssertEqual(hotkeyFactory.records.last?.configuration.primaryModifier, .control)
+        XCTAssertEqual(hotkeyFactory.records.last?.configuration.mainKey, .tab)
+        XCTAssertEqual(
+            userDefaults.string(forKey: AppPreferenceKeys.inAppWindowHotkeyPrimaryModifier),
+            SwitcherPrimaryModifier.control.rawValue
+        )
     }
 
     @MainActor

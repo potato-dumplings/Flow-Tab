@@ -109,7 +109,7 @@ struct HomeLandingView: View {
                     maxHeight: HomePageLayout.bottomStatusHeight
                 )
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, HomePageLayout.horizontalInset)
             .padding(.bottom, HomePageLayout.bottomInset)
             .padding(.top, HomePageLayout.alignedTopInset)
         }

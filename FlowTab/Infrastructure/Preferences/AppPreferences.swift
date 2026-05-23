@@ -76,9 +76,19 @@ struct HotkeyRegistrationRequest: Sendable {
         mainConfiguration: SwitcherHotkeyConfiguration,
         inAppWindowConfiguration: SwitcherHotkeyConfiguration
     ) {
+        let resolvedInAppWindowConfiguration =
+            InAppWindowHotkeyPreferencesStore.resolveAvoidingMainHotkeyConflict(
+                primaryModifierRaw: inAppWindowConfiguration.primaryModifier.rawValue,
+                mainKeyRaw: inAppWindowConfiguration.mainKey.rawValue,
+                mainHotkeyConfiguration: mainConfiguration
+            )
         self.requestID = requestID
         self.mainConfiguration = mainConfiguration
-        self.inAppWindowConfiguration = inAppWindowConfiguration
+        self.inAppWindowConfiguration = SwitcherHotkeyConfiguration(
+            primaryModifier: resolvedInAppWindowConfiguration.primaryModifier,
+            mainKey: resolvedInAppWindowConfiguration.mainKey,
+            quitKey: inAppWindowConfiguration.quitKey
+        )
     }
 
     static func load(userDefaults: UserDefaults = .standard) -> HotkeyRegistrationRequest {

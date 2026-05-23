@@ -1,7 +1,9 @@
 import SwiftUI
 import AppKit
 
-struct AppKitPermissionSettingsCardContent: NSViewRepresentable {
+struct AppKitPermissionSettingsCardContent: AppKitSettingsCardRepresentable {
+    typealias NSViewType = PermissionSettingsCardAppKitView
+
     @Binding var showPermissionReminder: Bool
     @Binding var allowLaunchAtLogin: Bool
     let accessibilityTrusted: Bool
@@ -73,44 +75,34 @@ struct AppKitPermissionSettingsCardContent: NSViewRepresentable {
         )
     }
 
-    func makeNSView(context: Context) -> PermissionSettingsCardAppKitView {
-        let view = PermissionSettingsCardAppKitView()
-        connect(view, coordinator: context.coordinator)
-        return view
+    func makeCardView(context _: Context) -> PermissionSettingsCardAppKitView {
+        PermissionSettingsCardAppKitView()
     }
 
-    func sizeThatFits(
-        _ proposal: ProposedViewSize,
-        nsView: PermissionSettingsCardAppKitView,
-        context: Context
-    ) -> CGSize? {
-        nsView.preferredFittingSize(forWidth: proposal.width)
-    }
-
-    func updateNSView(_ nsView: PermissionSettingsCardAppKitView, context: Context) {
-        context.coordinator.update(
+    func updateCoordinator(_ coordinator: Coordinator) {
+        coordinator.update(
             showPermissionReminder: $showPermissionReminder,
             allowLaunchAtLogin: $allowLaunchAtLogin,
             onLaunchAtLoginChanged: onLaunchAtLoginChanged,
             onAccessibilityAction: onAccessibilityAction,
             onScreenCaptureAction: onScreenCaptureAction
         )
-        connect(nsView, coordinator: context.coordinator)
-        nsView.update(
-            with: PermissionSettingsCardState(
-                showPermissionReminder: showPermissionReminder,
-                allowLaunchAtLogin: allowLaunchAtLogin,
-                accessibilityTrusted: accessibilityTrusted,
-                screenCaptureTrusted: screenCaptureTrusted
-            )
-        )
     }
 
-    private func connect(_ view: PermissionSettingsCardAppKitView, coordinator: Coordinator) {
+    func connect(_ view: PermissionSettingsCardAppKitView, coordinator: Coordinator) {
         view.onShowPermissionReminderChanged = { coordinator.setShowPermissionReminder($0) }
         view.onAllowLaunchAtLoginChanged = { coordinator.setAllowLaunchAtLogin($0) }
         view.onAccessibilityAction = { coordinator.triggerAccessibilityAction() }
         view.onScreenCaptureAction = { coordinator.triggerScreenCaptureAction() }
+    }
+
+    func makeState() -> PermissionSettingsCardState {
+        PermissionSettingsCardState(
+            showPermissionReminder: showPermissionReminder,
+            allowLaunchAtLogin: allowLaunchAtLogin,
+            accessibilityTrusted: accessibilityTrusted,
+            screenCaptureTrusted: screenCaptureTrusted
+        )
     }
 }
 
@@ -215,7 +207,7 @@ private final class PermissionStatusControlRowView<Control: NSView>: NSView {
     }
 }
 
-final class PermissionSettingsCardAppKitView: AppKitSettingsCardBaseView {
+final class PermissionSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKitSettingsCardStateView {
     var onShowPermissionReminderChanged: ((Bool) -> Void)?
     var onAllowLaunchAtLoginChanged: ((Bool) -> Void)?
     var onAccessibilityAction: (() -> Void)?

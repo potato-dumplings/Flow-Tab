@@ -41,7 +41,7 @@ final class AppKitSettingsPageContainerView: NSView {
 
     private let scrollView = NSScrollView()
     private let documentView = AppKitFlippedDocumentView()
-    private let horizontalContentInset: CGFloat = 24
+    private let horizontalContentInset = HomePageLayout.horizontalInset
     private let verticalContentInset = HomePageLayout.alignedTopInset
     private var wasActive = false
     private var pendingInitialFocusClear = false

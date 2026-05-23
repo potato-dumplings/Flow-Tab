@@ -42,7 +42,7 @@ struct AppLogsView: View {
                         hotkeyShortcutText: hotkeyConfiguration.mainShortcutText
                     )
                 }
-                .padding(.horizontal, 24)
+                .padding(.horizontal, HomePageLayout.horizontalInset)
                 .padding(.bottom, 24)
                 .padding(.top, HomePageLayout.alignedTopInset)
             }
@@ -51,4 +51,3 @@ struct AppLogsView: View {
         .accessibilityIdentifier("flowtab.tab.logs.content")
     }
 }
-

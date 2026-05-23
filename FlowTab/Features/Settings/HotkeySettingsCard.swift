@@ -2,7 +2,9 @@ import SwiftUI
 import AppKit
 import FlowTabCore
 
-struct AppKitHotkeySettingsCardContent: NSViewRepresentable {
+struct AppKitHotkeySettingsCardContent: AppKitSettingsCardRepresentable {
+    typealias NSViewType = HotkeySettingsCardAppKitView
+
     @Binding var hotkeyPrimaryModifierRaw: String
     @Binding var hotkeyMainKeyRaw: String
     @Binding var hotkeyQuitKeyRaw: String
@@ -77,48 +79,38 @@ struct AppKitHotkeySettingsCardContent: NSViewRepresentable {
         )
     }
 
-    func makeNSView(context: Context) -> HotkeySettingsCardAppKitView {
-        let view = HotkeySettingsCardAppKitView()
-        connect(view, coordinator: context.coordinator)
-        return view
+    func makeCardView(context _: Context) -> HotkeySettingsCardAppKitView {
+        HotkeySettingsCardAppKitView()
     }
 
-    func sizeThatFits(
-        _ proposal: ProposedViewSize,
-        nsView: HotkeySettingsCardAppKitView,
-        context: Context
-    ) -> CGSize? {
-        nsView.preferredFittingSize(forWidth: proposal.width)
-    }
-
-    func updateNSView(_ nsView: HotkeySettingsCardAppKitView, context: Context) {
-        context.coordinator.update(
+    func updateCoordinator(_ coordinator: Coordinator) {
+        coordinator.update(
             hotkeyPrimaryModifierRaw: $hotkeyPrimaryModifierRaw,
             hotkeyMainKeyRaw: $hotkeyMainKeyRaw,
             hotkeyQuitKeyRaw: $hotkeyQuitKeyRaw,
             inAppWindowHotkeyPrimaryModifierRaw: $inAppWindowHotkeyPrimaryModifierRaw,
             inAppWindowHotkeyMainKeyRaw: $inAppWindowHotkeyMainKeyRaw
         )
-        connect(nsView, coordinator: context.coordinator)
-        nsView.update(
-            with: HotkeySettingsCardState(
-                hotkeyPrimaryModifierRaw: hotkeyPrimaryModifierRaw,
-                hotkeyMainKeyRaw: hotkeyMainKeyRaw,
-                hotkeyQuitKeyRaw: hotkeyQuitKeyRaw,
-                inAppWindowHotkeyPrimaryModifierRaw: inAppWindowHotkeyPrimaryModifierRaw,
-                inAppWindowHotkeyMainKeyRaw: inAppWindowHotkeyMainKeyRaw,
-                commandTabTakeoverActive: commandTabTakeoverActive,
-                accessibilityTrusted: accessibilityTrusted
-            )
-        )
     }
 
-    private func connect(_ view: HotkeySettingsCardAppKitView, coordinator: Coordinator) {
+    func connect(_ view: HotkeySettingsCardAppKitView, coordinator: Coordinator) {
         view.onHotkeyPrimaryModifierChanged = { coordinator.setHotkeyPrimaryModifier($0) }
         view.onHotkeyMainKeyChanged = { coordinator.setHotkeyMainKey($0) }
         view.onHotkeyQuitKeyChanged = { coordinator.setHotkeyQuitKey($0) }
         view.onInAppWindowPrimaryModifierChanged = { coordinator.setInAppWindowPrimaryModifier($0) }
         view.onInAppWindowMainKeyChanged = { coordinator.setInAppWindowMainKey($0) }
+    }
+
+    func makeState() -> HotkeySettingsCardState {
+        HotkeySettingsCardState(
+            hotkeyPrimaryModifierRaw: hotkeyPrimaryModifierRaw,
+            hotkeyMainKeyRaw: hotkeyMainKeyRaw,
+            hotkeyQuitKeyRaw: hotkeyQuitKeyRaw,
+            inAppWindowHotkeyPrimaryModifierRaw: inAppWindowHotkeyPrimaryModifierRaw,
+            inAppWindowHotkeyMainKeyRaw: inAppWindowHotkeyMainKeyRaw,
+            commandTabTakeoverActive: commandTabTakeoverActive,
+            accessibilityTrusted: accessibilityTrusted
+        )
     }
 }
 
@@ -192,7 +184,7 @@ struct HotkeySettingsCardState: Equatable {
     }
 }
 
-final class HotkeySettingsCardAppKitView: NSView {
+final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
     private final class DelayedTakeoverStatusToken {
         var generation: UInt64 = 0
     }

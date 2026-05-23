@@ -2,7 +2,9 @@ import SwiftUI
 import AppKit
 import FlowTabCore
 
-struct AppKitSearchSettingsCardContent: NSViewRepresentable {
+struct AppKitSearchSettingsCardContent: AppKitSettingsCardRepresentable {
+    typealias NSViewType = SearchSettingsCardAppKitView
+
     @Binding var searchEnabled: Bool
     @Binding var searchDefaultScopeRaw: String
 
@@ -33,34 +35,24 @@ struct AppKitSearchSettingsCardContent: NSViewRepresentable {
         Coordinator(searchEnabled: $searchEnabled, searchDefaultScopeRaw: $searchDefaultScopeRaw)
     }
 
-    func makeNSView(context: Context) -> SearchSettingsCardAppKitView {
-        let view = SearchSettingsCardAppKitView()
-        connect(view, coordinator: context.coordinator)
-        return view
+    func makeCardView(context _: Context) -> SearchSettingsCardAppKitView {
+        SearchSettingsCardAppKitView()
     }
 
-    func sizeThatFits(
-        _ proposal: ProposedViewSize,
-        nsView: SearchSettingsCardAppKitView,
-        context: Context
-    ) -> CGSize? {
-        nsView.preferredFittingSize(forWidth: proposal.width)
+    func updateCoordinator(_ coordinator: Coordinator) {
+        coordinator.update(searchEnabled: $searchEnabled, searchDefaultScopeRaw: $searchDefaultScopeRaw)
     }
 
-    func updateNSView(_ nsView: SearchSettingsCardAppKitView, context: Context) {
-        context.coordinator.update(searchEnabled: $searchEnabled, searchDefaultScopeRaw: $searchDefaultScopeRaw)
-        connect(nsView, coordinator: context.coordinator)
-        nsView.update(
-            with: SearchSettingsCardState(
-                searchEnabled: searchEnabled,
-                searchDefaultScopeRaw: searchDefaultScopeRaw
-            )
-        )
-    }
-
-    private func connect(_ view: SearchSettingsCardAppKitView, coordinator: Coordinator) {
+    func connect(_ view: SearchSettingsCardAppKitView, coordinator: Coordinator) {
         view.onSearchEnabledChanged = { coordinator.setSearchEnabled($0) }
         view.onSearchDefaultScopeChanged = { coordinator.setSearchDefaultScope(rawValue: $0) }
+    }
+
+    func makeState() -> SearchSettingsCardState {
+        SearchSettingsCardState(
+            searchEnabled: searchEnabled,
+            searchDefaultScopeRaw: searchDefaultScopeRaw
+        )
     }
 }
 
@@ -79,7 +71,7 @@ struct SearchSettingsCardState: Equatable {
     }
 }
 
-final class SearchSettingsCardAppKitView: AppKitSettingsCardBaseView {
+final class SearchSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKitSettingsCardStateView {
     var onSearchEnabledChanged: ((Bool) -> Void)?
     var onSearchDefaultScopeChanged: ((String) -> Void)?
 
@@ -165,4 +157,3 @@ final class SearchSettingsCardAppKitView: AppKitSettingsCardBaseView {
         onSearchDefaultScopeChanged?(rawValue)
     }
 }
-
