@@ -188,10 +188,16 @@ public enum SearchTextMatcher {
         var best: Int?
         consider(&best, matchPositionScore(query.normalized, in: index.normalized, prefixBase: 0, containsBase: 20))
         consider(&best, matchPositionScore(query.compact, in: index.compact, prefixBase: 4, containsBase: 30))
-        consider(&best, matchPositionScore(query.normalized, in: index.latinNormalized, prefixBase: 8, containsBase: 34))
-        consider(&best, matchPositionScore(query.compact, in: index.latinCompact, prefixBase: 12, containsBase: 38))
+        if index.latinNormalized != index.normalized {
+            consider(&best, matchPositionScore(query.normalized, in: index.latinNormalized, prefixBase: 8, containsBase: 34))
+        }
+        if index.latinCompact != index.compact {
+            consider(&best, matchPositionScore(query.compact, in: index.latinCompact, prefixBase: 12, containsBase: 38))
+        }
         consider(&best, matchTokenPrefixScore(query.terms, in: index.terms, base: 14))
-        consider(&best, matchTokenPrefixScore(query.terms, in: index.latinTerms, base: 18))
+        if index.latinTerms != index.terms {
+            consider(&best, matchTokenPrefixScore(query.terms, in: index.latinTerms, base: 18))
+        }
         consider(&best, matchInitialsPrefixOrContainsScore(query.compact, in: index.initials, base: 10))
         consider(&best, matchInitialsPrefixOrContainsScore(query.compact, in: index.uppercaseAbbreviation, base: 10))
         consider(&best, matchIdentifierScore(query.compact, in: index.identifierTerms, base: 16))
@@ -362,6 +368,7 @@ public enum SearchTextMatcher {
         in identifierTerms: [String],
         base: Int
     ) -> Int? {
+        guard query.count >= orderedSubsequenceMinimumQueryLength else { return nil }
         guard !identifierTerms.isEmpty else { return nil }
 
         var best: Int?
