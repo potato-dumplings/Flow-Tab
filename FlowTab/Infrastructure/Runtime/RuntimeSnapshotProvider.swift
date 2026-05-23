@@ -140,6 +140,26 @@ final class RuntimeSnapshotProvider {
         let hasVisibleWindow: Bool
     }
 
+    struct AXAppWindowCollection {
+        let app: NSRunningApplication
+        let appName: String
+        let cgWindows: [CGWindowEntry]
+        let allCGWindows: [CGWindowEntry]
+        let publicWindowsFetchResult: AXWindowInspector.WindowsFetchResult
+        let publicSwitchableWindowCount: Int
+        let shouldIncludeRemoteAXWindows: Bool
+        let windowsFetchResult: AXWindowInspector.WindowsFetchResult
+        let windows: [AXUIElement]
+        let axEntries: [AXWindowEntry]
+        let cgPrepMs: Double
+        let publicFetchMs: Double
+        let publicSwitchableMs: Double
+        let remoteDecisionMs: Double
+        let finalFetchMs: Double
+        let axInspectMs: Double
+        let totalMs: Double
+    }
+
     struct SnapshotAssemblyApp {
         let pid: pid_t
         let bundleIdentifier: String?
@@ -173,6 +193,8 @@ final class RuntimeSnapshotProvider {
         let pid: pid_t
         let candidate: AppSwitchCandidate
     }
+
+    private static let maxConcurrentAXAppCollections = 4
 
     var windowMappingStateByPID: [pid_t: RuntimeWindowMappingState] = [:]
 
@@ -519,39 +541,24 @@ final class RuntimeSnapshotProvider {
             return [:]
         }
 
+        let collections = collectAXAppWindowCollections(
+            for: runningApps,
+            cgWindowsByPID: cgWindowsByPID,
+            allCGWindowsByPID: allCGWindowsByPID
+        )
         var windowsByPID: [pid_t: [WindowListEntry]] = [:]
         var totalRawWindows = 0
         var totalSwitchableWindows = 0
         var totalResolvedWindows = 0
-        for app in runningApps {
-            let appStartMs = RuntimePerformanceClock.monotonicMilliseconds()
-            let appName = app.localizedName ?? app.bundleIdentifier ?? "pid:\(app.processIdentifier)"
-            let cgWindows = cgWindowsByPID[app.processIdentifier] ?? []
-            let allCGWindows = markCurrentOnscreenCGWindows(
-                allCGWindowsByPID[app.processIdentifier] ?? cgWindows,
-                onscreenCGWindows: cgWindows
-            )
-            let cgReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-            let publicWindowsFetchResult = AXWindowInspector.windowsFetchResult(
-                for: app,
-                includeRemoteWindows: false
-            )
-            let publicFetchReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-            let publicSwitchableWindowCount = publicWindowsFetchResult.windows.filter {
-                AXWindowInspector.isSwitchable($0)
-            }.count
-            let publicSwitchableReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-            let shouldIncludeRemoteAXWindows = shouldIncludeRemoteAXWindows(
-                allCGWindows: allCGWindows,
-                publicSwitchableWindowCount: publicSwitchableWindowCount,
-                publicFetchSucceeded: publicWindowsFetchResult.error == .success
-            )
-            let remoteDecisionReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-            let windowsFetchResult = shouldIncludeRemoteAXWindows
-                ? AXWindowInspector.windowsFetchResult(for: app, includeRemoteWindows: true)
-                : publicWindowsFetchResult
-            let windows = windowsFetchResult.windows
-            let finalFetchReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+
+        for collection in collections {
+            let app = collection.app
+            let appName = collection.appName
+            let windows = collection.windows
+            let publicWindowsFetchResult = collection.publicWindowsFetchResult
+            let windowsFetchResult = collection.windowsFetchResult
+            let axEntries = collection.axEntries
+            let registryStartMs = RuntimePerformanceClock.monotonicMilliseconds()
             AXLiveWindowRegistry.shared.refreshSnapshot(
                 forPID: app.processIdentifier,
                 windows: windows
@@ -562,43 +569,21 @@ final class RuntimeSnapshotProvider {
                 "\(appName) rawWindows=\(windows.count) \(windowsFetchResult.logDetails)"
             )
 
-            let axEntries = windows.enumerated().compactMap { index, window -> AXWindowEntry? in
-                guard AXWindowInspector.isSwitchable(window) else {
-                    let role = AXWindowInspector.role(for: window) ?? "unknown"
-                    RuntimeLog.debug(.ax, "\(appName) skip[\(index)] role=\(role)")
-                    return nil
-                }
-                let windowID = AXWindowInspector.makeWindowID(
-                    pid: app.processIdentifier,
-                    index: index
-                )
-                let titleFromAX = AXWindowInspector.title(for: window)
-                return AXWindowEntry(
-                    index: index,
-                    id: windowID,
-                    title: titleFromAX ?? "",
-                    sourceTitle: titleFromAX,
-                    isMinimized: AXWindowInspector.isMinimized(window),
-                    window: window,
-                    frame: AXWindowInspector.frame(for: window)
-                )
-            }
-            let axInspectReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
             logChromeLikeTopologySnapshot(
                 appName: appName,
                 pid: app.processIdentifier,
                 publicWindowsFetchResult: publicWindowsFetchResult,
                 finalWindowsFetchResult: windowsFetchResult,
-                includeRemoteAXWindows: shouldIncludeRemoteAXWindows,
-                publicSwitchableWindowCount: publicSwitchableWindowCount,
+                includeRemoteAXWindows: collection.shouldIncludeRemoteAXWindows,
+                publicSwitchableWindowCount: collection.publicSwitchableWindowCount,
                 axWindows: axEntries,
-                cgWindows: allCGWindows
+                cgWindows: collection.allCGWindows
             )
             let topologyLogReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
 
             let resolvedEntries = resolvedWindowEntries(
                 axWindows: axEntries,
-                cgWindows: allCGWindows,
+                cgWindows: collection.allCGWindows,
                 pid: app.processIdentifier,
                 appName: appName,
                 remoteScanCompleteness: windowsFetchResult.remoteScanCompleteness
@@ -613,26 +598,26 @@ final class RuntimeSnapshotProvider {
                     ("appID", logAppIdentifier(app)),
                     ("pid", "\(app.processIdentifier)"),
                     ("name", logAppName(appName)),
-                    ("cgOnscreen", "\(cgWindows.count)"),
-                    ("cgAll", "\(allCGWindows.count)"),
+                    ("cgOnscreen", "\(collection.cgWindows.count)"),
+                    ("cgAll", "\(collection.allCGWindows.count)"),
                     ("rawAX", "\(windows.count)"),
                     ("publicRawAX", "\(publicWindowsFetchResult.windows.count)"),
-                    ("publicSwitchableAX", "\(publicSwitchableWindowCount)"),
+                    ("publicSwitchableAX", "\(collection.publicSwitchableWindowCount)"),
                     ("switchableAX", "\(axEntries.count)"),
                     ("resolved", "\(resolvedEntries.count)"),
-                    ("includeRemote", shouldIncludeRemoteAXWindows ? "1" : "0"),
+                    ("includeRemote", collection.shouldIncludeRemoteAXWindows ? "1" : "0"),
                     ("publicError", "\(publicWindowsFetchResult.error.rawValue)"),
                     ("finalError", "\(windowsFetchResult.error.rawValue)"),
-                    ("cgPrepMs", formatSnapshotMilliseconds(cgReadyMs - appStartMs)),
-                    ("publicFetchMs", formatSnapshotMilliseconds(publicFetchReadyMs - cgReadyMs)),
-                    ("publicSwitchableMs", formatSnapshotMilliseconds(publicSwitchableReadyMs - publicFetchReadyMs)),
-                    ("remoteDecisionMs", formatSnapshotMilliseconds(remoteDecisionReadyMs - publicSwitchableReadyMs)),
-                    ("finalFetchMs", formatSnapshotMilliseconds(finalFetchReadyMs - remoteDecisionReadyMs)),
-                    ("registryMs", formatSnapshotMilliseconds(registryReadyMs - finalFetchReadyMs)),
-                    ("axInspectMs", formatSnapshotMilliseconds(axInspectReadyMs - registryReadyMs)),
-                    ("topologyLogMs", formatSnapshotMilliseconds(topologyLogReadyMs - axInspectReadyMs)),
+                    ("cgPrepMs", formatSnapshotMilliseconds(collection.cgPrepMs)),
+                    ("publicFetchMs", formatSnapshotMilliseconds(collection.publicFetchMs)),
+                    ("publicSwitchableMs", formatSnapshotMilliseconds(collection.publicSwitchableMs)),
+                    ("remoteDecisionMs", formatSnapshotMilliseconds(collection.remoteDecisionMs)),
+                    ("finalFetchMs", formatSnapshotMilliseconds(collection.finalFetchMs)),
+                    ("registryMs", formatSnapshotMilliseconds(registryReadyMs - registryStartMs)),
+                    ("axInspectMs", formatSnapshotMilliseconds(collection.axInspectMs)),
+                    ("topologyLogMs", formatSnapshotMilliseconds(topologyLogReadyMs - registryReadyMs)),
                     ("resolveMs", formatSnapshotMilliseconds(resolveReadyMs - topologyLogReadyMs)),
-                    ("totalMs", formatSnapshotMilliseconds(resolveReadyMs - appStartMs))
+                    ("totalMs", formatSnapshotMilliseconds(collection.totalMs + resolveReadyMs - registryStartMs))
                 ]
             )
             guard !resolvedEntries.isEmpty else { continue }
@@ -654,10 +639,137 @@ final class RuntimeSnapshotProvider {
                 ("rawAX", "\(totalRawWindows)"),
                 ("switchableAX", "\(totalSwitchableWindows)"),
                 ("resolved", "\(totalResolvedWindows)"),
+                ("concurrency", "\(Self.maxConcurrentAXAppCollections)"),
                 ("totalMs", formatSnapshotMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))
             ]
         )
         return windowsByPID
+    }
+
+    private func collectAXAppWindowCollections(
+        for runningApps: [NSRunningApplication],
+        cgWindowsByPID: [pid_t: [CGWindowEntry]],
+        allCGWindowsByPID: [pid_t: [CGWindowEntry]]
+    ) -> [AXAppWindowCollection] {
+        Self.collectBoundedAXAppResults(count: runningApps.count) { [self] index in
+            collectAXAppWindowCollection(
+                index: index,
+                app: runningApps[index],
+                cgWindowsByPID: cgWindowsByPID,
+                allCGWindowsByPID: allCGWindowsByPID
+            )
+        }
+    }
+
+    private func collectAXAppWindowCollection(
+        index: Int,
+        app: NSRunningApplication,
+        cgWindowsByPID: [pid_t: [CGWindowEntry]],
+        allCGWindowsByPID: [pid_t: [CGWindowEntry]]
+    ) -> AXAppWindowCollection {
+        let appStartMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let appName = app.localizedName ?? app.bundleIdentifier ?? "pid:\(app.processIdentifier)"
+        let cgWindows = cgWindowsByPID[app.processIdentifier] ?? []
+        let allCGWindows = markCurrentOnscreenCGWindows(
+            allCGWindowsByPID[app.processIdentifier] ?? cgWindows,
+            onscreenCGWindows: cgWindows
+        )
+        let cgReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let publicWindowsFetchResult = AXWindowInspector.windowsFetchResult(
+            for: app,
+            includeRemoteWindows: false
+        )
+        let publicFetchReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let publicSwitchableWindowCount = publicWindowsFetchResult.windows.filter {
+            AXWindowInspector.isSwitchable($0)
+        }.count
+        let publicSwitchableReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let shouldIncludeRemoteAXWindows = shouldIncludeRemoteAXWindows(
+            allCGWindows: allCGWindows,
+            publicSwitchableWindowCount: publicSwitchableWindowCount,
+            publicFetchSucceeded: publicWindowsFetchResult.error == .success
+        )
+        let remoteDecisionReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let windowsFetchResult = shouldIncludeRemoteAXWindows
+            ? AXWindowInspector.windowsFetchResult(for: app, includeRemoteWindows: true)
+            : publicWindowsFetchResult
+        let windows = windowsFetchResult.windows
+        let finalFetchReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let axEntries = windows.enumerated().compactMap { windowIndex, window -> AXWindowEntry? in
+            guard AXWindowInspector.isSwitchable(window) else {
+                let role = AXWindowInspector.role(for: window) ?? "unknown"
+                RuntimeLog.debug(.ax, "\(appName) skip[\(windowIndex)] role=\(role)")
+                return nil
+            }
+            let windowID = AXWindowInspector.makeWindowID(
+                pid: app.processIdentifier,
+                index: windowIndex
+            )
+            let titleFromAX = AXWindowInspector.title(for: window)
+            return AXWindowEntry(
+                index: windowIndex,
+                id: windowID,
+                title: titleFromAX ?? "",
+                sourceTitle: titleFromAX,
+                isMinimized: AXWindowInspector.isMinimized(window),
+                window: window,
+                frame: AXWindowInspector.frame(for: window)
+            )
+        }
+        let axInspectReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+
+        return AXAppWindowCollection(
+            app: app,
+            appName: appName,
+            cgWindows: cgWindows,
+            allCGWindows: allCGWindows,
+            publicWindowsFetchResult: publicWindowsFetchResult,
+            publicSwitchableWindowCount: publicSwitchableWindowCount,
+            shouldIncludeRemoteAXWindows: shouldIncludeRemoteAXWindows,
+            windowsFetchResult: windowsFetchResult,
+            windows: windows,
+            axEntries: axEntries,
+            cgPrepMs: cgReadyMs - appStartMs,
+            publicFetchMs: publicFetchReadyMs - cgReadyMs,
+            publicSwitchableMs: publicSwitchableReadyMs - publicFetchReadyMs,
+            remoteDecisionMs: remoteDecisionReadyMs - publicSwitchableReadyMs,
+            finalFetchMs: finalFetchReadyMs - remoteDecisionReadyMs,
+            axInspectMs: axInspectReadyMs - finalFetchReadyMs,
+            totalMs: axInspectReadyMs - appStartMs
+        )
+    }
+
+    private static func collectBoundedAXAppResults<Result>(
+        count: Int,
+        collect: @escaping (Int) -> Result
+    ) -> [Result] {
+        guard count > 1 else {
+            return (0..<count).map { collect($0) }
+        }
+
+        let group = DispatchGroup()
+        let resultLock = NSLock()
+        let concurrencyLimit = min(maxConcurrentAXAppCollections, count)
+        let concurrencyGate = DispatchSemaphore(value: concurrencyLimit)
+        var results = Array<Result?>(repeating: nil, count: count)
+
+        for index in 0..<count {
+            concurrencyGate.wait()
+            group.enter()
+            DispatchQueue.global(qos: .userInitiated).async {
+                defer {
+                    concurrencyGate.signal()
+                    group.leave()
+                }
+                let result = collect(index)
+                resultLock.lock()
+                results[index] = result
+                resultLock.unlock()
+            }
+        }
+
+        group.wait()
+        return results.compactMap { $0 }
     }
 
     private func shouldIncludeRemoteAXWindows(
@@ -1179,6 +1291,45 @@ final class RuntimeSnapshotProvider {
             appName: appName,
             fallbackIndex: fallbackIndex,
             refreshedAXTitle: refreshedAXTitle
+        )
+    }
+
+    struct BoundedAXAppCollectionPressureResultForTesting {
+        let orderedResults: [Int]
+        let elapsedMs: Double
+        let configuredConcurrency: Int
+        let maxInFlight: Int
+    }
+
+    static func boundedAXAppCollectionPressureForTesting(
+        taskCount: Int,
+        delayNanoseconds: UInt64
+    ) -> BoundedAXAppCollectionPressureResultForTesting {
+        let inFlightLock = NSLock()
+        var inFlight = 0
+        var maxInFlight = 0
+        let startNs = DispatchTime.now().uptimeNanoseconds
+
+        let orderedResults: [Int] = collectBoundedAXAppResults(count: taskCount) { index in
+            inFlightLock.lock()
+            inFlight += 1
+            maxInFlight = max(maxInFlight, inFlight)
+            inFlightLock.unlock()
+
+            Thread.sleep(forTimeInterval: Double(delayNanoseconds) / 1_000_000_000.0)
+
+            inFlightLock.lock()
+            inFlight -= 1
+            inFlightLock.unlock()
+            return index
+        }
+        let elapsedMs = Double(DispatchTime.now().uptimeNanoseconds - startNs) / 1_000_000.0
+
+        return BoundedAXAppCollectionPressureResultForTesting(
+            orderedResults: orderedResults,
+            elapsedMs: elapsedMs,
+            configuredConcurrency: min(maxConcurrentAXAppCollections, taskCount),
+            maxInFlight: maxInFlight
         )
     }
 
