@@ -91,7 +91,7 @@ final class HomeTabState: ObservableObject {
 
 enum AppWindowLayout {
     static let width: CGFloat = 1120
-    static let height: CGFloat = 780
+    static let height: CGFloat = 850
 }
 
 enum AppWindowCoordinator {

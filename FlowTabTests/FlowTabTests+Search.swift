@@ -713,7 +713,7 @@ extension FlowTabTests {
     @MainActor
     func testLiveSwitcherModelBackgroundRefreshDiagnosticTracksGenerationReasonAndApplyGeneration() {
         let currentApp = NSRunningApplication.current
-        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let appID = "com.flowtab.tests.background-refresh-diagnostic"
         let fastApp = AppSwitchCandidate(
             id: appID,
             displayName: currentApp.localizedName ?? "Current App",

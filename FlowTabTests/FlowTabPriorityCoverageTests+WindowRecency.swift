@@ -498,6 +498,9 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testLiveSwitcherModelGlobalSnapshotRecencyUsesOnlySelectedAppsOwnWindowEvidence() {
+        let restoreCurrentAppVisibility = enableCurrentAppInSwitcherForTesting()
+        defer { restoreCurrentAppVisibility() }
+
         let model = LiveSwitcherModel(windowRecencyTracker: RuntimeWindowRecencyTracker())
         let currentApp = NSRunningApplication.current
         let currentAppID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
@@ -798,6 +801,9 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testLiveSwitcherModelRecordsFrontmostRuntimeWindowWhenAXFocusedWindowUnavailable() {
+        let restoreCurrentAppVisibility = enableCurrentAppInSwitcherForTesting()
+        defer { restoreCurrentAppVisibility() }
+
         let model = LiveSwitcherModel(windowRecencyTracker: RuntimeWindowRecencyTracker())
         let currentApp = NSRunningApplication.current
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"

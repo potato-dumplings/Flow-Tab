@@ -214,6 +214,35 @@ extension FlowTabPriorityCoverageTests {
             userDefaults.removeObject(forKey: key)
         }
     }
+    func enableCurrentAppInSwitcherForTesting() -> () -> Void {
+        let defaults = UserDefaults.standard
+        let previousShowInCommandTab = defaults.object(forKey: AppPreferenceKeys.showInCommandTab)
+        let previousHiddenAppIDs = defaults.object(forKey: AppPreferenceKeys.hiddenAppIDs)
+        let currentAppID = AppVisibilityPreferencesStore.currentAppID()
+
+        defaults.set(true, forKey: AppPreferenceKeys.showInCommandTab)
+        var hiddenAppIDs = Set(defaults.stringArray(forKey: AppPreferenceKeys.hiddenAppIDs) ?? [])
+        if let normalizedCurrentAppID = AppVisibilityFilter.normalizedAppID(currentAppID) {
+            hiddenAppIDs.remove(normalizedCurrentAppID)
+        }
+        defaults.set(
+            AppVisibilityFilter.normalizedHiddenAppIDs(Array(hiddenAppIDs)),
+            forKey: AppPreferenceKeys.hiddenAppIDs
+        )
+
+        return {
+            self.restoreUserDefaultsValue(
+                previousShowInCommandTab,
+                forKey: AppPreferenceKeys.showInCommandTab,
+                userDefaults: defaults
+            )
+            self.restoreUserDefaultsValue(
+                previousHiddenAppIDs,
+                forKey: AppPreferenceKeys.hiddenAppIDs,
+                userDefaults: defaults
+            )
+        }
+    }
     func withTemporarySearchPreferences(
         enabled: Bool,
         defaultScope: SwitcherSearchScope,

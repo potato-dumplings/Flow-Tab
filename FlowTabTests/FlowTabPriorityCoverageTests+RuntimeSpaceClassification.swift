@@ -369,6 +369,9 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testLiveSwitcherModelGlobalAndFocusedSessionsUseSameSpaceTopologyRuntimeTruth() {
+        let restoreCurrentAppVisibility = enableCurrentAppInSwitcherForTesting()
+        defer { restoreCurrentAppVisibility() }
+
         let currentApp = NSRunningApplication.current
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)

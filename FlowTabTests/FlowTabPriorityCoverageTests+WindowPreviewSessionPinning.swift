@@ -127,7 +127,7 @@ extension FlowTabPriorityCoverageTests {
         let model = LiveSwitcherModel()
         model.backgroundFullSnapshotRefreshEnabled = false
         let currentApp = NSRunningApplication.current
-        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let appID = "com.flowtab.tests.preview-session-pinning"
         let windows = (0..<12).map { index in
             WindowCandidate(
                 id: String(format: "pinned-preview-window-%02d", index),
@@ -202,7 +202,7 @@ extension FlowTabPriorityCoverageTests {
         let model = LiveSwitcherModel()
         model.backgroundFullSnapshotRefreshEnabled = false
         let currentApp = NSRunningApplication.current
-        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let appID = "com.flowtab.tests.preview-deferred-recapture"
         let windows = (0..<12).map { index in
             WindowCandidate(
                 id: String(format: "deferred-preview-window-%02d", index),
@@ -265,7 +265,7 @@ extension FlowTabPriorityCoverageTests {
         let model = LiveSwitcherModel()
         model.backgroundFullSnapshotRefreshEnabled = false
         let currentApp = NSRunningApplication.current
-        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let appID = "com.flowtab.tests.preview-visible-batch"
         let windows = (0..<6).map { index in
             WindowCandidate(
                 id: String(format: "batched-preview-window-%02d", index),
@@ -352,7 +352,7 @@ extension FlowTabPriorityCoverageTests {
         let model = LiveSwitcherModel()
         model.backgroundFullSnapshotRefreshEnabled = false
         let currentApp = NSRunningApplication.current
-        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let appID = "com.flowtab.tests.preview-visible-batch-failure"
         let windows = (0..<4).map { index in
             WindowCandidate(
                 id: String(format: "failed-batched-preview-window-%02d", index),
@@ -421,7 +421,7 @@ extension FlowTabPriorityCoverageTests {
         let model = LiveSwitcherModel()
         model.backgroundFullSnapshotRefreshEnabled = false
         let currentApp = NSRunningApplication.current
-        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let appID = "com.flowtab.tests.preview-provider-failure"
         let windows = (0..<3).map { index in
             WindowCandidate(
                 id: String(format: "provider-failed-preview-window-%02d", index),
