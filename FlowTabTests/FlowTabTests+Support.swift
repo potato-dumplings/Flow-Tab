@@ -6,6 +6,31 @@ import FlowTabCore
 import Carbon
 
 extension FlowTabTests {
+    struct SearchPressureWorkload {
+        let name: String
+        let warmupQuery: String?
+        let queries: [String]
+        let expectedHits: [String]
+        let expectedMisses: [String]
+        let expectedFinalResultCount: Int?
+
+        init(
+            name: String,
+            warmupQuery: String? = nil,
+            queries: [String],
+            expectedHits: [String] = [],
+            expectedMisses: [String] = [],
+            expectedFinalResultCount: Int? = nil
+        ) {
+            self.name = name
+            self.warmupQuery = warmupQuery
+            self.queries = queries
+            self.expectedHits = expectedHits
+            self.expectedMisses = expectedMisses
+            self.expectedFinalResultCount = expectedFinalResultCount
+        }
+    }
+
     @MainActor
     func waitUntil(
         _ description: String,
@@ -250,6 +275,62 @@ extension FlowTabTests {
             "search", "search coor", "search coordinator", ""
         ]
     }
+    func searchPressureWorkloadMatrix(windowCount: Int) -> [SearchPressureWorkload] {
+        [
+            SearchPressureWorkload(
+                name: "short-prefix-cache",
+                queries: [
+                    "t", "te", "ten", "tenc", "tencent",
+                    "te", "t", "wx", ""
+                ],
+                expectedHits: ["tencent", "wx"]
+            ),
+            SearchPressureWorkload(
+                name: "high-hit",
+                queries: [
+                    "w", "com", "search", "review", "road", "notes", ""
+                ],
+                expectedHits: ["review", "notes"]
+            ),
+            SearchPressureWorkload(
+                name: "segmented-long",
+                queries: [
+                    "f", "fl", "flow", "flow ",
+                    "flow s", "flow se", "flow search",
+                    "flow sea", "flow search coordinator", ""
+                ],
+                expectedHits: ["flow search", "flow search coordinator"]
+            ),
+            SearchPressureWorkload(
+                name: "chinese",
+                queries: [
+                    "文", "文件", "文件助", "文件助手",
+                    "文件 助手", "文件助", "文件", ""
+                ],
+                expectedHits: ["文件助手"]
+            ),
+            SearchPressureWorkload(
+                name: "no-result-prefix-only",
+                queries: [
+                    "qxz", "qxzno", "qxznohit", "qxz-nohit-777"
+                ],
+                expectedMisses: ["qxz-nohit-777"]
+            ),
+            SearchPressureWorkload(
+                name: "no-result",
+                queries: [
+                    "qxz", "qxzno", "qxznohit", "qxz-nohit-777", ""
+                ],
+                expectedMisses: ["qxz-nohit-777"]
+            ),
+            SearchPressureWorkload(
+                name: "clear-query",
+                warmupQuery: "review",
+                queries: [""],
+                expectedFinalResultCount: windowCount
+            )
+        ]
+    }
     func searchCacheMissSampleApps() -> [AppSwitchCandidate] {
         var apps: [AppSwitchCandidate] = []
         apps.reserveCapacity(1_105)
@@ -291,7 +372,7 @@ extension FlowTabTests {
         on coordinator: SwitcherSearchCoordinator,
         rounds: Int
     ) {
-        var currentQuery = ""
+        var currentQuery = coordinator.state.query
         for _ in 0..<rounds {
             for query in queries {
                 let prefixLength = commonPrefixLength(currentQuery, query)
@@ -325,6 +406,15 @@ extension FlowTabTests {
         _ = coordinator.appendQueryText(query)
         drainPendingSearchRebuild(on: coordinator)
         return coordinator.state.results.prefix(10).map(\.id)
+    }
+    func searchResultIDs(
+        query: String,
+        on coordinator: SwitcherSearchCoordinator,
+        limit: Int = 10
+    ) -> [String] {
+        _ = coordinator.replaceQueryWithoutRebuild(query, cursorPosition: query.count)
+        coordinator.rebuildResults(resetSelection: true)
+        return coordinator.state.results.prefix(limit).map(\.id)
     }
     func commonPrefixLength(_ lhs: String, _ rhs: String) -> Int {
         var count = 0

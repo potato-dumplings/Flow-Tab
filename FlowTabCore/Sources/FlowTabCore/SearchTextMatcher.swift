@@ -138,6 +138,7 @@ public enum SearchTextMatcher {
         var coarseBigrams = Set<String>()
         coarseBigrams.formUnion(bigrams(of: compact))
         coarseBigrams.formUnion(bigrams(of: latinCompact))
+        coarseBigrams.formUnion(bigrams(of: initials))
         coarseBigrams.formUnion(bigrams(of: compactUppercaseAbbreviation))
         for term in identifierTerms {
             coarseBigrams.formUnion(bigrams(of: term))

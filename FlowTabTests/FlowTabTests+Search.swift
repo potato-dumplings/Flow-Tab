@@ -326,6 +326,41 @@ extension FlowTabTests {
         XCTAssertEqual(coordinator.state.results.map(\.secondaryText), ["微信", "微信"])
     }
 
+    func testSearchCanMatchChinesePinyinInitialPrefixBeyondExactInitials() {
+        let coordinator = SwitcherSearchCoordinator()
+        coordinator.rebuildIndex(with: searchSampleApps())
+        XCTAssertTrue(coordinator.activate(defaultScope: .app))
+
+        XCTAssertTrue(coordinator.appendQueryText("wjc"))
+        drainPendingSearchRebuild(on: coordinator)
+        XCTAssertEqual(coordinator.state.results.map(\.primaryText), ["文件传输助手"])
+    }
+
+    func testSearchIndexedCandidatesTreatSingleTermEmptyCoarseFilterAsCompleteMiss() {
+        let apps = searchSampleApps()
+        let entries = apps.map { app in
+            SwitcherSearchCoordinator.AppEntry(
+                appID: app.id,
+                appDisplayName: app.displayName,
+                searchIndex: SwitcherSearchCoordinator.buildSearchIndex(
+                    for: app.displayName,
+                    identifier: app.id
+                )
+            )
+        }
+        let invertedIndex = SwitcherSearchCoordinator.buildScopeInvertedIndex(
+            from: entries.map(\.searchIndex)
+        )
+
+        let candidates = SwitcherSearchCoordinator.indexedCandidates(
+            query: SwitcherSearchCoordinator.buildSearchKey(from: "qxz"),
+            invertedIndex: invertedIndex,
+            totalCount: entries.count
+        )
+
+        XCTAssertTrue(candidates.isEmpty)
+    }
+
     func testWindowSearchMatchesCamelCaseTitleBySegmentedWords() {
         let coordinator = SwitcherSearchCoordinator()
         coordinator.rebuildIndex(with: searchSampleApps())
@@ -574,6 +609,66 @@ extension FlowTabTests {
 
         XCTAssertFalse(runBaselineProbe(query: "flow search", apps: apps, scope: .window).isEmpty)
         XCTAssertFalse(runBaselineProbe(query: "文件助手", apps: apps, scope: .window).isEmpty)
+    }
+
+    func testSearchPressureWindowScopeQueryWorkloadMatrix() {
+        let apps = makeBenchmarkApps(appCount: 400, windowsPerApp: 25)
+        let windowCount = apps.reduce(0) { $0 + $1.windows.count }
+        let workloads = searchPressureWorkloadMatrix(windowCount: windowCount)
+        let rounds = 3
+
+        let coordinator = SwitcherSearchCoordinator()
+        coordinator.rebuildIndex(with: apps)
+        _ = coordinator.activate(defaultScope: .window)
+
+        for workload in workloads {
+            if let warmupQuery = workload.warmupQuery {
+                _ = coordinator.replaceQueryWithoutRebuild(warmupQuery, cursorPosition: warmupQuery.count)
+                coordinator.rebuildResults(resetSelection: true)
+            }
+
+            let queryNanos = measureNanos {
+                runBaselineQueries(workload.queries, on: coordinator, rounds: rounds)
+            }
+            let queryMs = nanosToMilliseconds(queryNanos)
+            let queryCount = workload.queries.count * rounds
+            let qps = Double(queryCount) / max(0.001, queryMs / 1000.0)
+
+            print(
+                String(
+                    format: "[SearchPressureWorkloadMatrix] workload=%@ dataset=%d apps / %d windows, rounds=%d, query=%.2fms, queries=%d, throughput=%.2f qps",
+                    workload.name,
+                    apps.count,
+                    windowCount,
+                    rounds,
+                    queryMs,
+                    queryCount,
+                    qps
+                )
+            )
+
+            for query in workload.expectedHits {
+                XCTAssertFalse(
+                    searchResultIDs(query: query, on: coordinator).isEmpty,
+                    "Expected workload \(workload.name) query \(query) to return at least one result"
+                )
+            }
+            for query in workload.expectedMisses {
+                XCTAssertTrue(
+                    searchResultIDs(query: query, on: coordinator).isEmpty,
+                    "Expected workload \(workload.name) query \(query) to return no results"
+                )
+            }
+            if let expectedFinalResultCount = workload.expectedFinalResultCount {
+                XCTAssertEqual(
+                    coordinator.state.results.count,
+                    expectedFinalResultCount,
+                    "Expected workload \(workload.name) final result count to match the full window dataset"
+                )
+            }
+            _ = coordinator.replaceQueryWithoutRebuild("", cursorPosition: 0)
+            coordinator.rebuildResults(resetSelection: true)
+        }
     }
 
     @MainActor

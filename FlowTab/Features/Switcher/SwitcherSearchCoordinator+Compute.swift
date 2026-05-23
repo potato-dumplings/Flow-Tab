@@ -32,7 +32,7 @@ extension SwitcherSearchCoordinator {
                     latestMatchedIndexesAreComplete: cachedEntry.matchedIndexesAreComplete
                 )
                 if cachedEntry.topResults.isEmpty {
-                    RuntimeLog.warning(
+                    RuntimeLog.debug(
                         .search,
                         "scope=app query=\"\(query.normalized)\" source=cache matched=\(cachedEntry.matchedIndexes.count) topResults=0"
                     )
@@ -61,7 +61,11 @@ extension SwitcherSearchCoordinator {
                         && ranksCompleteCandidateSet
                         && rankedMatches.matchedIndexes.count <= completeMatchCacheMatchedLimit
                 )
-                if ranked.topRanked.isEmpty, candidateIndexes.count < input.appEntries.count {
+                if shouldRunFullScanFallback(
+                    topRankedIsEmpty: ranked.topRanked.isEmpty,
+                    candidatePlan: candidatePlan,
+                    totalCount: input.appEntries.count
+                ) {
                     let fullScanRanked = rankAppMatches(
                         query: query,
                         entries: input.appEntries,
@@ -106,18 +110,14 @@ extension SwitcherSearchCoordinator {
                     limit: cachePolicy.entryLimit,
                     persistEntry: cachePolicy.persistEntry
                 )
-                if topResults.isEmpty {
+                if topResults.isEmpty, RuntimeLog.isDebugEnabled(for: .search) {
                     logEmptySearchDiagnostics(
                         scope: .app,
                         query: query,
-                        coarseCandidateCount: coarseFilter(query: query, invertedIndex: input.appInvertedIndex).count,
                         candidateCount: candidateIndexes.count,
                         boundedCandidateCount: boundedCandidateIndexes.count,
                         matchedCount: matchedIndexes.count,
-                        topResultCount: topResults.count,
-                        rawIdentifierContainsCount: input.appEntries.filter {
-                            $0.appID.localizedCaseInsensitiveContains(query.compact)
-                        }.count
+                        topResultCount: topResults.count
                     )
                 }
                 rebuilt = topResults
@@ -145,7 +145,7 @@ extension SwitcherSearchCoordinator {
                     latestMatchedIndexesAreComplete: cachedEntry.matchedIndexesAreComplete
                 )
                 if cachedEntry.topResults.isEmpty {
-                    RuntimeLog.warning(
+                    RuntimeLog.debug(
                         .search,
                         "scope=window query=\"\(query.normalized)\" source=cache matched=\(cachedEntry.matchedIndexes.count) topResults=0"
                     )
@@ -174,7 +174,11 @@ extension SwitcherSearchCoordinator {
                         && ranksCompleteCandidateSet
                         && rankedMatches.matchedIndexes.count <= completeMatchCacheMatchedLimit
                 )
-                if ranked.topRanked.isEmpty, candidateIndexes.count < input.windowEntries.count {
+                if shouldRunFullScanFallback(
+                    topRankedIsEmpty: ranked.topRanked.isEmpty,
+                    candidatePlan: candidatePlan,
+                    totalCount: input.windowEntries.count
+                ) {
                     let fullScanRanked = rankWindowMatches(
                         query: query,
                         entries: input.windowEntries,
@@ -220,18 +224,14 @@ extension SwitcherSearchCoordinator {
                     limit: cachePolicy.entryLimit,
                     persistEntry: cachePolicy.persistEntry
                 )
-                if topResults.isEmpty {
+                if topResults.isEmpty, RuntimeLog.isDebugEnabled(for: .search) {
                     logEmptySearchDiagnostics(
                         scope: .window,
                         query: query,
-                        coarseCandidateCount: coarseFilter(query: query, invertedIndex: input.windowInvertedIndex).count,
                         candidateCount: candidateIndexes.count,
                         boundedCandidateCount: boundedCandidateIndexes.count,
                         matchedCount: matchedIndexes.count,
-                        topResultCount: topResults.count,
-                        rawIdentifierContainsCount: input.windowEntries.filter {
-                            $0.appID.localizedCaseInsensitiveContains(query.compact)
-                        }.count
+                        topResultCount: topResults.count
                     )
                 }
                 rebuilt = topResults
@@ -321,6 +321,16 @@ extension SwitcherSearchCoordinator {
         )
     }
 
+    static func shouldRunFullScanFallback(
+        topRankedIsEmpty: Bool,
+        candidatePlan: CandidateIndexPlan,
+        totalCount: Int
+    ) -> Bool {
+        topRankedIsEmpty
+            && candidatePlan.indexes.count < totalCount
+            && (!candidatePlan.canCacheCompleteMatches || !candidatePlan.indexes.isEmpty)
+    }
+
     static func supplementedPrefixCandidatePlan(
         cachedIndexes: [Int],
         query: SearchKey,
@@ -352,12 +362,19 @@ extension SwitcherSearchCoordinator {
             coarse = coarseFilter(query: query, invertedIndex: invertedIndex)
         }
         if coarse.isEmpty {
+            if emptyCoarseFilterProvesCompleteMiss(query) {
+                return []
+            }
             if let limit, limit > 0 {
                 return Array((0..<totalCount).prefix(limit))
             }
             return Array(0..<totalCount)
         }
         return coarse
+    }
+
+    static func emptyCoarseFilterProvesCompleteMiss(_ query: SearchKey) -> Bool {
+        query.terms.count == 1 && query.compact.count >= 2
     }
 
     static func mergedCandidateIndexes(primary: [Int], supplemental: [Int]) -> [Int] {
@@ -428,16 +445,14 @@ extension SwitcherSearchCoordinator {
     static func logEmptySearchDiagnostics(
         scope: SwitcherSearchScope,
         query: SearchKey,
-        coarseCandidateCount: Int,
         candidateCount: Int,
         boundedCandidateCount: Int,
         matchedCount: Int,
-        topResultCount: Int,
-        rawIdentifierContainsCount: Int
+        topResultCount: Int
     ) {
-        RuntimeLog.warning(
+        RuntimeLog.debug(
             .search,
-            "scope=\(scope.rawValue) query=\"\(query.normalized)\" compact=\"\(query.compact)\" terms=\(query.terms) coarseCandidates=\(coarseCandidateCount) candidateIndexes=\(candidateCount) boundedCandidates=\(boundedCandidateCount) matched=\(matchedCount) topResults=\(topResultCount) rawIdentifierContains=\(rawIdentifierContainsCount)"
+            "scope=\(scope.rawValue) query=\"\(query.normalized)\" compact=\"\(query.compact)\" terms=\(query.terms) candidateIndexes=\(candidateCount) boundedCandidates=\(boundedCandidateCount) matched=\(matchedCount) topResults=\(topResultCount)"
         )
     }
 
