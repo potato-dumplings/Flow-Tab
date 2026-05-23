@@ -272,6 +272,12 @@ extension SwitcherSearchCoordinator {
                 !cache.latestQuery.isEmpty,
                 query.normalized.hasPrefix(cache.latestQuery)
             {
+                if cache.latestMatchedIndexesAreComplete {
+                    return CandidateIndexPlan(
+                        indexes: cache.latestMatchedIndexes,
+                        canCacheCompleteMatches: true
+                    )
+                }
                 return supplementedPrefixCandidatePlan(
                     cachedIndexes: cache.latestMatchedIndexes,
                     query: query,
@@ -293,6 +299,12 @@ extension SwitcherSearchCoordinator {
             while !prefix.isEmpty {
                 prefix.removeLast()
                 if let entry = cache.entries[prefix] {
+                    if entry.matchedIndexesAreComplete {
+                        return CandidateIndexPlan(
+                            indexes: entry.matchedIndexes,
+                            canCacheCompleteMatches: true
+                        )
+                    }
                     return supplementedPrefixCandidatePlan(
                         cachedIndexes: entry.matchedIndexes,
                         query: query,

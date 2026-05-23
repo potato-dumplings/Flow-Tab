@@ -140,8 +140,8 @@ final class SwitcherSearchCoordinator {
     static let shortQueryCacheEntryLimit: Int = 12
     static let appTopResultLimit: Int = 300
     static let windowTopResultLimit: Int = 400
-    static let completeMatchCacheMatchedLimit: Int = 250
-    static let prefixSupplementCandidateLimit: Int = 256
+    static let completeMatchCacheMatchedLimit: Int = shortQueryMatchedIndexesLimit
+    static let prefixSupplementCandidateLimit: Int = 64
     static let appCandidateLimitShortQuery: Int = 1_000
     static let appCandidateLimitLongQuery: Int = 1_600
     static let windowCandidateLimitShortQuery: Int = 1_200

@@ -7,12 +7,20 @@ extension SwitcherSearchCoordinator {
         SearchTextMatcher.isBetter(lhs, than: rhs)
     }
 
-    static func insertTopRankedResult(
-        _ result: RankedResult,
-        into topRanked: inout [RankedResult],
+    static func topRankedResults(
+        _ rankedResults: [RankedResult],
         limit: Int
-    ) {
-        SearchTextMatcher.insertTopRankedResult(result, into: &topRanked, limit: limit)
+    ) -> [RankedResult] {
+        guard limit > 0 else { return [] }
+        guard rankedResults.count > 1 else { return rankedResults }
+        var rankedResults = rankedResults
+        rankedResults.sort { lhs, rhs in
+            isBetter(lhs, than: rhs)
+        }
+        if rankedResults.count > limit {
+            rankedResults.removeSubrange(limit...)
+        }
+        return rankedResults
     }
 
     static func resolvedSelectedResultIndex(
@@ -39,8 +47,8 @@ extension SwitcherSearchCoordinator {
     ) -> (matchedIndexes: [Int], topRanked: [RankedResult]) {
         var matchedIndexes: [Int] = []
         matchedIndexes.reserveCapacity(candidateIndexes.count)
-        var topRanked: [RankedResult] = []
-        topRanked.reserveCapacity(min(topResultLimit, candidateIndexes.count))
+        var rankedResults: [RankedResult] = []
+        rankedResults.reserveCapacity(candidateIndexes.count)
 
         for index in candidateIndexes {
             let app = entries[index]
@@ -48,10 +56,9 @@ extension SwitcherSearchCoordinator {
                 continue
             }
             matchedIndexes.append(index)
-            let ranked = RankedResult(score: score, order: index)
-            insertTopRankedResult(ranked, into: &topRanked, limit: topResultLimit)
+            rankedResults.append(RankedResult(score: score, order: index))
         }
-        return (matchedIndexes, topRanked)
+        return (matchedIndexes, topRankedResults(rankedResults, limit: topResultLimit))
     }
 
     static func rankWindowMatches(
@@ -62,8 +69,8 @@ extension SwitcherSearchCoordinator {
     ) -> (matchedIndexes: [Int], topRanked: [RankedResult]) {
         var matchedIndexes: [Int] = []
         matchedIndexes.reserveCapacity(candidateIndexes.count)
-        var topRanked: [RankedResult] = []
-        topRanked.reserveCapacity(min(topResultLimit, candidateIndexes.count))
+        var rankedResults: [RankedResult] = []
+        rankedResults.reserveCapacity(candidateIndexes.count)
         var appScoreCache: [String: Int] = [:]
         var appScoreMisses: Set<String> = []
 
@@ -87,10 +94,9 @@ extension SwitcherSearchCoordinator {
                 continue
             }
             matchedIndexes.append(index)
-            let ranked = RankedResult(score: score, order: index)
-            insertTopRankedResult(ranked, into: &topRanked, limit: topResultLimit)
+            rankedResults.append(RankedResult(score: score, order: index))
         }
-        return (matchedIndexes, topRanked)
+        return (matchedIndexes, topRankedResults(rankedResults, limit: topResultLimit))
     }
 
     static func matchScore(query: SearchKey, in index: SearchIndex) -> Int? {
