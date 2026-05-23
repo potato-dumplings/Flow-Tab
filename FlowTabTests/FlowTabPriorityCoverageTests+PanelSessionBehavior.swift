@@ -1053,7 +1053,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testSwitcherPanelControllerRecentersPresentedPanelWhenPreviewLayerExpandsWidth() {
+    func testSwitcherPanelControllerPreviewLayerExpandsBelowCenteredAppLayer() {
         let controller = SwitcherPanelController()
         let app = manyWindowLayoutApp(windowCount: 100)
         let visibleFrame = CGRect(x: 0, y: 0, width: 1440, height: 900)
@@ -1064,7 +1064,12 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
 
         controller.updatePanelSizeForTesting(visibleFrame: visibleFrame)
+        controller.centerPanelOnActiveScreen()
         let appLayerFrame = controller.panel.frame
+        guard let screenCenterY = (controller.panel.screen ?? NSScreen.main)?.frame.midY else {
+            XCTFail("Expected a screen for switcher panel placement")
+            return
+        }
 
         XCTAssertTrue(controller.modelForTesting.autoEnterWindowLayerIfPossible())
 
@@ -1073,6 +1078,8 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertGreaterThan(previewLayerFrame.width, appLayerFrame.width)
         XCTAssertEqual(previewLayerFrame.midX, appLayerFrame.midX, accuracy: 0.5)
+        XCTAssertEqual(appLayerFrame.midY, screenCenterY, accuracy: 0.5)
+        XCTAssertEqual(previewLayerFrame.maxY, appLayerFrame.maxY, accuracy: 0.5)
     }
 
 }

@@ -641,6 +641,69 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testSwitcherPanelControllerSearchEntryExpandsBelowCenteredAppLayer() async {
+        await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
+            let controller = SwitcherPanelController()
+            let visibleFrame = CGRect(x: 0, y: 0, width: 1440, height: 900)
+            controller.modelForTesting.snapshotProviderOverride = {
+                RuntimeSnapshot(apps: self.layoutScenarioApps(count: 10), contextsByID: [:])
+            }
+
+            XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+            controller.updatePanelSizeForTesting(visibleFrame: visibleFrame)
+            controller.centerPanelOnActiveScreen()
+            let appLayerFrame = controller.panel.frame
+            guard let screenCenterY = (controller.panel.screen ?? NSScreen.main)?.frame.midY else {
+                XCTFail("Expected a screen for switcher panel placement")
+                return
+            }
+
+            XCTAssertTrue(controller.enterSearchModeIfPossible())
+            let searchFrame = controller.panel.frame
+
+            XCTAssertEqual(searchFrame.width, appLayerFrame.width, accuracy: 0.001)
+            XCTAssertGreaterThan(searchFrame.height, appLayerFrame.height)
+            XCTAssertEqual(appLayerFrame.midY, screenCenterY, accuracy: 0.5)
+            XCTAssertEqual(searchFrame.maxY, appLayerFrame.maxY, accuracy: 0.5)
+            XCTAssertLessThan(searchFrame.minY, appLayerFrame.minY)
+            controller.cancelSelectionForTesting()
+        }
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerSearchHeightChangeKeepsPresentedPanelAnchoredAtTop() async {
+        await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
+            let controller = SwitcherPanelController()
+            controller.modelForTesting.snapshotProviderOverride = {
+                RuntimeSnapshot(apps: self.layoutScenarioApps(count: 10), contextsByID: [:])
+            }
+
+            XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+            XCTAssertTrue(controller.enterSearchModeIfPossible())
+            controller.modelForTesting.updateSearchLayoutMeasurements(
+                SwitcherSearchLayoutMeasurements(
+                    presentationHeaderHeight: 54,
+                    resultRowHeight: 48
+                )
+            )
+            let initialSearchFrame = controller.panel.frame
+
+            controller.modelForTesting.updateSearchLayoutMeasurements(
+                SwitcherSearchLayoutMeasurements(
+                    presentationHeaderHeight: 64,
+                    resultRowHeight: 56
+                )
+            )
+            let expandedSearchFrame = controller.panel.frame
+
+            XCTAssertEqual(expandedSearchFrame.width, initialSearchFrame.width, accuracy: 0.001)
+            XCTAssertGreaterThan(expandedSearchFrame.height, initialSearchFrame.height)
+            XCTAssertEqual(expandedSearchFrame.maxY, initialSearchFrame.maxY, accuracy: 0.5)
+            controller.cancelSelectionForTesting()
+        }
+    }
+
+    @MainActor
     func testSwitcherPanelControllerSearchEnterAppliesSelectionAndEscapeExitsSearch() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
             let controller = SwitcherPanelController()

@@ -652,15 +652,21 @@ extension SwitcherPanelController {
         setPanelContentSize(targetSize, recenterScreen: recenterScreen)
     }
 
-    private func setPanelContentSize(_ targetSize: NSSize, recenterScreen: NSScreen?) {
+    private func setPanelContentSize(_ targetSize: NSSize, recenterScreen _: NSScreen?) {
+        let oldFrame = panel.frame
         let currentSize = panel.contentRect(forFrameRect: panel.frame).size
         guard currentSize != targetSize else { return }
 
-        let widthDidChange = currentSize.width != targetSize.width
         panel.setContentSize(targetSize)
 
-        guard widthDidChange, isPanelPresented else { return }
-        centerPanelOnActiveScreen(preferredScreen: recenterScreen)
+        guard isPanelPresented else { return }
+        let newFrame = panel.frame
+        panel.setFrameOrigin(
+            NSPoint(
+                x: oldFrame.midX - newFrame.width / 2,
+                y: oldFrame.maxY - newFrame.height
+            )
+        )
     }
 
     func resolvedStandardPreviewSectionHeight(panelWidth: CGFloat, itemCount: Int) -> CGFloat {
