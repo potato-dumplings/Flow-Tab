@@ -90,7 +90,20 @@ class AppKitSettingsCardBaseView: NSView {
         width: CGFloat
     ) {
         selectControl.configure(options: options)
-        selectControl.widthAnchor.constraint(equalToConstant: width).isActive = true
+        applyPreferredControlWidth(selectControl, width: width)
+    }
+
+    static func applyPreferredControlWidth(
+        _ control: NSView,
+        width: CGFloat,
+        minimumWidth: CGFloat = 68
+    ) {
+        let maximumWidth = control.widthAnchor.constraint(lessThanOrEqualToConstant: width)
+        let preferredWidth = control.widthAnchor.constraint(equalToConstant: width)
+        let minimumWidth = control.widthAnchor.constraint(greaterThanOrEqualToConstant: minimumWidth)
+        preferredWidth.priority = .defaultHigh
+        minimumWidth.priority = .defaultHigh
+        NSLayoutConstraint.activate([maximumWidth, preferredWidth, minimumWidth])
     }
 
     static func selectItem(in selectControl: FlowFormSelectControl, rawValue: String) {

@@ -181,7 +181,7 @@ final class AppearanceSettingsCardAppKitView: AppKitSettingsCardBaseView {
         themeModeControl.onSelectionChanged = { [weak self] rawValue in
             self?.handleThemeModeChanged(rawValue)
         }
-        themeModeControl.widthAnchor.constraint(equalToConstant: 300).isActive = true
+        AppKitSettingsCardBaseView.applyPreferredControlWidth(themeModeControl, width: 300)
         appLanguageSelect.onSelectionChanged = { [weak self] rawValue in
             self?.handleAppLanguageChanged(rawValue)
         }

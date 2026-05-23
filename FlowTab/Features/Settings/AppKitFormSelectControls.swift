@@ -202,6 +202,7 @@ private final class FlowFormSelectMenuView: NSView {
         addSubview(stackView)
 
         widthConstraint = widthAnchor.constraint(equalToConstant: 120)
+        widthConstraint?.priority = .defaultHigh
         widthConstraint?.isActive = true
 
         NSLayoutConstraint.activate([

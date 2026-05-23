@@ -72,6 +72,7 @@ final class AppKitSettingsPageContainerView: NSView {
         guard viewportWidth > 0 else { return }
 
         let pageWidth = max(viewportWidth - horizontalContentInset * 2, 320)
+        pageView.prepareLayout(forWidth: pageWidth)
         let fittedSize = pageView.preferredFittingSize(forWidth: pageWidth)
         let topInset = verticalContentInset + safeAreaInsets.top
         let documentHeight = fittedSize.height + topInset + verticalContentInset
@@ -100,7 +101,6 @@ final class AppKitSettingsPageContainerView: NSView {
         scrollView.hasHorizontalScroller = false
         scrollView.autohidesScrollers = true
 
-        pageView.translatesAutoresizingMaskIntoConstraints = true
         documentView.translatesAutoresizingMaskIntoConstraints = true
         documentView.addSubview(pageView)
         scrollView.documentView = documentView
@@ -320,6 +320,8 @@ final class AppKitSettingsPageView: NSView {
     private let searchContent = SearchSettingsCardAppKitView()
     private let appVisibilityContent = AppVisibilitySettingsCardAppKitView()
     private let hotkeyContent = HotkeySettingsCardAppKitView()
+    private var columnWidthConstraints: [NSLayoutConstraint] = []
+    private var isUsingSingleColumnLayout = false
 
     private lazy var appearanceCard = AppKitSectionCardView(
         title: AppStrings.text(.settingsCardAppearanceTitle),
@@ -369,6 +371,22 @@ final class AppKitSettingsPageView: NSView {
     override var intrinsicContentSize: NSSize {
         layoutSubtreeIfNeeded()
         return NSSize(width: NSView.noIntrinsicMetric, height: contentStack.fittingSize.height)
+    }
+
+    static func usesSingleColumnLayout(forWidth width: CGFloat) -> Bool {
+        width < 680
+    }
+
+    func prepareLayout(forWidth width: CGFloat) {
+        let useSingleColumn = Self.usesSingleColumnLayout(forWidth: width)
+        guard useSingleColumn != isUsingSingleColumnLayout else { return }
+        isUsingSingleColumnLayout = useSingleColumn
+
+        columnsStack.orientation = useSingleColumn ? .vertical : .horizontal
+        columnsStack.alignment = useSingleColumn ? .leading : .top
+        columnsStack.distribution = useSingleColumn ? .fill : .fillEqually
+        columnWidthConstraints.forEach { $0.isActive = useSingleColumn }
+        invalidateIntrinsicContentSize()
     }
 
     func update(with state: AppKitSettingsPageState) {
@@ -482,6 +500,10 @@ final class AppKitSettingsPageView: NSView {
         rightColumn.translatesAutoresizingMaskIntoConstraints = false
         rightColumn.setContentHuggingPriority(.required, for: .vertical)
         rightColumn.setContentCompressionResistancePriority(.required, for: .vertical)
+        columnWidthConstraints = [
+            leftColumn.widthAnchor.constraint(equalTo: columnsStack.widthAnchor),
+            rightColumn.widthAnchor.constraint(equalTo: columnsStack.widthAnchor)
+        ]
 
         contentStack.addArrangedSubview(headerStack)
         contentStack.addArrangedSubview(columnsStack)
@@ -501,7 +523,7 @@ final class AppKitSettingsPageView: NSView {
             contentStack.leadingAnchor.constraint(equalTo: leadingAnchor),
             contentStack.topAnchor.constraint(equalTo: topAnchor),
             contentStack.trailingAnchor.constraint(equalTo: trailingAnchor),
-            contentStack.bottomAnchor.constraint(equalTo: bottomAnchor)
+            contentStack.bottomAnchor.constraint(lessThanOrEqualTo: bottomAnchor)
         ])
     }
 

@@ -55,6 +55,29 @@ extension FlowTabTests {
         XCTAssertEqual(AppStrings.text(.tabSettings, language: .english), "Settings")
     }
 
+    func testSettingsPageNarrowLayoutUsesSingleColumnAndFlexibleControlWidths() {
+        XCTAssertTrue(AppKitSettingsPageView.usesSingleColumnLayout(forWidth: 320))
+        XCTAssertFalse(AppKitSettingsPageView.usesSingleColumnLayout(forWidth: 760))
+
+        let view = AppKitSettingsPageView()
+        view.update(with: makeSettingsPageState())
+        view.prepareLayout(forWidth: 320)
+
+        XCTAssertNotNil(
+            descendant(
+                in: view,
+                identifier: "flowtab.settings.appearance.theme-mode",
+                as: FlowCapsuleSegmentedControl.self
+            )
+        )
+        XCTAssertTrue(
+            requiredFixedSettingsControlWidthConstraints(in: view).isEmpty,
+            requiredFixedSettingsControlWidthConstraints(in: view)
+                .map { $0.description }
+                .joined(separator: "\n")
+        )
+    }
+
     func testPermissionSettingsCardStateUsesDeniedCopyWhenPermissionsMissing() {
         let state = PermissionSettingsCardState(
             showPermissionReminder: true,
@@ -753,6 +776,53 @@ extension FlowTabTests {
             commandTabTakeoverActive: commandTabTakeoverActive,
             accessibilityTrusted: true
         )
+    }
+
+    private func makeSettingsPageState() -> AppKitSettingsPageState {
+        AppKitSettingsPageState(
+            showShortcutHint: true,
+            showInCommandTab: true,
+            themeModeRaw: ThemeMode.followSystem.rawValue,
+            appLanguageRaw: AppLanguage.simplifiedChinese.rawValue,
+            windowLayerAutoEnterDelayText: "0.3",
+            autoRestoreMinimizedWindowOnSwitch: true,
+            hideMinimizedAppsFromAppLayer: false,
+            showPermissionReminder: true,
+            allowLaunchAtLogin: false,
+            searchEnabled: true,
+            searchDefaultScopeRaw: SwitcherSearchScope.app.rawValue,
+            hiddenAppCount: 2,
+            hotkeyPrimaryModifierRaw: SwitcherPrimaryModifier.option.rawValue,
+            hotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
+            hotkeyQuitKeyRaw: SwitcherHotkeyKey.q.rawValue,
+            inAppWindowHotkeyPrimaryModifierRaw: SwitcherPrimaryModifier.control.rawValue,
+            inAppWindowHotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
+            commandTabTakeoverActive: false,
+            accessibilityTrusted: false,
+            screenCaptureTrusted: false
+        )
+    }
+
+    private func requiredFixedSettingsControlWidthConstraints(in view: NSView) -> [NSLayoutConstraint] {
+        descendantViews(in: view)
+            .flatMap(\.constraints)
+            .filter { constraint in
+                guard constraint.firstAttribute == .width,
+                    constraint.relation == .equal,
+                    constraint.secondItem == nil,
+                    constraint.priority == .required
+                else {
+                    return false
+                }
+
+                return constraint.firstItem is FlowCapsuleSegmentedControl
+                    || constraint.firstItem is FlowFormSelectControl
+                    || constraint.firstItem is FlowGradientActionButton
+            }
+    }
+
+    private func descendantViews(in view: NSView) -> [NSView] {
+        [view] + view.subviews.flatMap { descendantViews(in: $0) }
     }
 
     private func descendant<T: NSView>(

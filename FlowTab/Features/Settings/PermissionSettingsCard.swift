@@ -197,7 +197,7 @@ private final class PermissionStatusControlRowView<Control: NSView>: NSView {
         stackView.addArrangedSubview(spacer)
         stackView.addArrangedSubview(control)
         if let controlWidth {
-            control.widthAnchor.constraint(equalToConstant: controlWidth).isActive = true
+            AppKitSettingsCardBaseView.applyPreferredControlWidth(control, width: controlWidth)
         }
 
         NSLayoutConstraint.activate([
