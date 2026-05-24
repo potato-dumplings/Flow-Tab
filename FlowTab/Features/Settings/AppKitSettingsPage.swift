@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import FlowTabCore
 
 struct AppKitSettingsPageState: Equatable {
     let showShortcutHint: Bool
@@ -61,6 +62,7 @@ final class AppKitSettingsPageContainerView: NSView {
     }
 
     func update(with state: AppKitSettingsPageState, isActive: Bool) {
+        appearance = Self.appKitAppearance(for: state.themeModeRaw)
         pageView.update(with: state)
         if isActive && !wasActive {
             clearInitialFirstResponderIfNeeded()
@@ -175,6 +177,17 @@ final class AppKitSettingsPageContainerView: NSView {
             editedView.isDescendant(of: pageView)
         {
             window.makeFirstResponder(nil)
+        }
+    }
+
+    private static func appKitAppearance(for themeModeRaw: String) -> NSAppearance? {
+        switch ThemePreferencesStore.resolve(rawValue: themeModeRaw) {
+        case .light:
+            return NSAppearance(named: .aqua)
+        case .dark:
+            return NSAppearance(named: .darkAqua)
+        case .followSystem:
+            return nil
         }
     }
 }

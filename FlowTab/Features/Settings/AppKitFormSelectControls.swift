@@ -1,5 +1,22 @@
 import AppKit
 
+private enum FlowFormSelectStyle {
+    static func primaryTextColor(isDark: Bool, isEnabled: Bool) -> NSColor {
+        guard isEnabled else {
+            return secondaryTextColor(isDark: isDark, isEnabled: false)
+        }
+        return (isDark ? NSColor.white : NSColor.black)
+            .withAlphaComponent(isDark ? 0.92 : 0.78)
+    }
+
+    static func secondaryTextColor(isDark: Bool, isEnabled: Bool) -> NSColor {
+        if isDark {
+            return NSColor.white.withAlphaComponent(isEnabled ? 0.68 : 0.42)
+        }
+        return NSColor.black.withAlphaComponent(isEnabled ? 0.56 : 0.36)
+    }
+}
+
 private final class FlowFormSelectOptionButton: NSButton {
     var optionID = ""
     var isOptionSelected = false {
@@ -102,14 +119,14 @@ private final class FlowFormSelectOptionButton: NSButton {
 
         let titleColor: NSColor
         if !isEnabled {
-            titleColor = NSColor.secondaryLabelColor.withAlphaComponent(0.65)
+            titleColor = FlowFormSelectStyle.secondaryTextColor(isDark: isDark, isEnabled: false)
         } else if isOptionSelected {
             titleColor = .controlAccentColor
         } else {
-            titleColor = NSColor.labelColor.withAlphaComponent(isDark ? 0.92 : 0.78)
+            titleColor = FlowFormSelectStyle.primaryTextColor(isDark: isDark, isEnabled: true)
         }
 
-        attributedTitle = NSAttributedString(
+        let styledTitle = NSAttributedString(
             string: optionTitle,
             attributes: [
                 .paragraphStyle: {
@@ -121,6 +138,8 @@ private final class FlowFormSelectOptionButton: NSButton {
                 .foregroundColor: titleColor
             ]
         )
+        attributedTitle = styledTitle
+        attributedAlternateTitle = styledTitle
     }
 }
 
@@ -472,12 +491,11 @@ final class FlowFormSelectControl: NSView, NSPopoverDelegate {
         layer.borderColor = borderColor.cgColor
         layer.backgroundColor = backgroundColor.cgColor
 
-        titleLabel.textColor = isEnabled
-            ? NSColor.labelColor.withAlphaComponent(isDark ? 0.92 : 0.78)
-            : NSColor.secondaryLabelColor.withAlphaComponent(0.65)
-        chevronImageView.contentTintColor = isEnabled
-            ? NSColor.secondaryLabelColor.withAlphaComponent(isDark ? 0.92 : 0.75)
-            : NSColor.secondaryLabelColor.withAlphaComponent(0.55)
+        titleLabel.textColor = FlowFormSelectStyle.primaryTextColor(isDark: isDark, isEnabled: isEnabled)
+        chevronImageView.contentTintColor = FlowFormSelectStyle.secondaryTextColor(
+            isDark: isDark,
+            isEnabled: isEnabled
+        )
         chevronImageView.image = NSImage(
             systemSymbolName: isExpanded ? "chevron.up" : "chevron.down",
             accessibilityDescription: nil
