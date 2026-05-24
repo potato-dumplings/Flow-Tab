@@ -53,6 +53,20 @@ extension FlowTabTests {
             "关闭后，当前应用将仅作为菜单栏辅助应用运行。"
         )
         XCTAssertEqual(AppStrings.text(.tabSettings, language: .english), "Settings")
+        XCTAssertEqual(
+            AppStrings.text(.settingsPageSubtitle, language: .english),
+            "Display, hotkeys, and permissions"
+        )
+        XCTAssertEqual(
+            AppStrings.text(.settingsPageSubtitle, language: .simplifiedChinese),
+            "基础显示设置、快捷键与权限"
+        )
+        XCTAssertEqual(AppStrings.text(.settingsCardAppearanceTitle, language: .english), "Appearance")
+        XCTAssertEqual(AppStrings.text(.appearanceThemeMode, language: .english), "Theme mode")
+        XCTAssertEqual(
+            AppStrings.text(.permissionAccessibilityRequest, language: .english),
+            "Request Accessibility permission"
+        )
     }
 
     func testSettingsPageNarrowLayoutUsesSingleColumnAndFlexibleControlWidths() {
@@ -76,6 +90,47 @@ extension FlowTabTests {
                 .map { $0.description }
                 .joined(separator: "\n")
         )
+    }
+
+    @MainActor
+    func testSettingsAppKitPageRefreshesLocalizedTextWhenLanguageChanges() throws {
+        let previousLanguageRaw = UserDefaults.standard.string(forKey: AppPreferenceKeys.appLanguage)
+        UserDefaults.standard.set(AppLanguage.simplifiedChinese.rawValue, forKey: AppPreferenceKeys.appLanguage)
+        defer {
+            if let previousLanguageRaw {
+                UserDefaults.standard.set(previousLanguageRaw, forKey: AppPreferenceKeys.appLanguage)
+            } else {
+                UserDefaults.standard.removeObject(forKey: AppPreferenceKeys.appLanguage)
+            }
+        }
+
+        let view = AppKitSettingsPageView()
+        view.update(with: makeSettingsPageState(language: .simplifiedChinese))
+        view.update(with: makeSettingsPageState(language: .english))
+        view.frame = NSRect(x: 0, y: 0, width: 1_200, height: 760)
+        view.prepareLayout(forWidth: 1_200)
+        view.layoutSubtreeIfNeeded()
+
+        let localizedText = localizedTextValues(in: view)
+        XCTAssertTrue(localizedText.contains("Display, hotkeys, and permissions"), localizedText.sorted().joined(separator: "\n"))
+        XCTAssertTrue(localizedText.contains("Appearance"), localizedText.sorted().joined(separator: "\n"))
+        XCTAssertTrue(localizedText.contains("Theme mode"), localizedText.sorted().joined(separator: "\n"))
+        XCTAssertTrue(localizedText.contains("Request Accessibility permission"), localizedText.sorted().joined(separator: "\n"))
+        XCTAssertFalse(localizedText.contains("基础显示设置、快捷键与权限"), localizedText.sorted().joined(separator: "\n"))
+        XCTAssertFalse(localizedText.contains("外观"), localizedText.sorted().joined(separator: "\n"))
+        XCTAssertFalse(localizedText.contains("主题模式"), localizedText.sorted().joined(separator: "\n"))
+        XCTAssertFalse(localizedText.contains("请求辅助功能权限"), localizedText.sorted().joined(separator: "\n"))
+
+        let subtitle: NSTextField = try XCTUnwrap(
+            descendant(
+                in: view,
+                identifier: "flowtab.settings.page.subtitle"
+            )
+        )
+        XCTAssertFalse(subtitle.isHidden)
+        XCTAssertEqual(subtitle.stringValue, "Display, hotkeys, and permissions")
+        XCTAssertGreaterThan(subtitle.frame.width, 80)
+        XCTAssertGreaterThan(subtitle.frame.height, 8)
     }
 
     @MainActor
@@ -114,13 +169,26 @@ extension FlowTabTests {
             showPermissionReminder: true,
             allowLaunchAtLogin: false,
             accessibilityTrusted: false,
-            screenCaptureTrusted: false
+            screenCaptureTrusted: false,
+            appLanguageRaw: AppLanguage.simplifiedChinese.rawValue
         )
 
-        XCTAssertEqual(state.accessibilityStatusText, AppStrings.text(.permissionAccessibilityDenied))
-        XCTAssertEqual(state.accessibilityButtonTitle, AppStrings.text(.permissionAccessibilityRequest))
-        XCTAssertEqual(state.screenCaptureStatusText, AppStrings.text(.permissionScreenDenied))
-        XCTAssertEqual(state.screenCaptureButtonTitle, AppStrings.text(.permissionScreenRequest))
+        XCTAssertEqual(
+            state.accessibilityStatusText,
+            AppStrings.text(.permissionAccessibilityDenied, language: .simplifiedChinese)
+        )
+        XCTAssertEqual(
+            state.accessibilityButtonTitle,
+            AppStrings.text(.permissionAccessibilityRequest, language: .simplifiedChinese)
+        )
+        XCTAssertEqual(
+            state.screenCaptureStatusText,
+            AppStrings.text(.permissionScreenDenied, language: .simplifiedChinese)
+        )
+        XCTAssertEqual(
+            state.screenCaptureButtonTitle,
+            AppStrings.text(.permissionScreenRequest, language: .simplifiedChinese)
+        )
     }
 
     func testPermissionSettingsCardStateUsesGrantedCopyWhenPermissionsPresent() {
@@ -128,13 +196,26 @@ extension FlowTabTests {
             showPermissionReminder: false,
             allowLaunchAtLogin: true,
             accessibilityTrusted: true,
-            screenCaptureTrusted: true
+            screenCaptureTrusted: true,
+            appLanguageRaw: AppLanguage.simplifiedChinese.rawValue
         )
 
-        XCTAssertEqual(state.accessibilityStatusText, AppStrings.text(.permissionAccessibilityGranted))
-        XCTAssertEqual(state.accessibilityButtonTitle, AppStrings.text(.permissionAccessibilityClose))
-        XCTAssertEqual(state.screenCaptureStatusText, AppStrings.text(.permissionScreenGranted))
-        XCTAssertEqual(state.screenCaptureButtonTitle, AppStrings.text(.permissionScreenClose))
+        XCTAssertEqual(
+            state.accessibilityStatusText,
+            AppStrings.text(.permissionAccessibilityGranted, language: .simplifiedChinese)
+        )
+        XCTAssertEqual(
+            state.accessibilityButtonTitle,
+            AppStrings.text(.permissionAccessibilityClose, language: .simplifiedChinese)
+        )
+        XCTAssertEqual(
+            state.screenCaptureStatusText,
+            AppStrings.text(.permissionScreenGranted, language: .simplifiedChinese)
+        )
+        XCTAssertEqual(
+            state.screenCaptureButtonTitle,
+            AppStrings.text(.permissionScreenClose, language: .simplifiedChinese)
+        )
     }
 
     @MainActor
@@ -837,16 +918,19 @@ extension FlowTabTests {
             inAppWindowHotkeyPrimaryModifierRaw: SwitcherPrimaryModifier.option.rawValue,
             inAppWindowHotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
             commandTabTakeoverActive: commandTabTakeoverActive,
-            accessibilityTrusted: true
+            accessibilityTrusted: true,
+            appLanguageRaw: AppLanguage.simplifiedChinese.rawValue
         )
     }
 
-    private func makeSettingsPageState() -> AppKitSettingsPageState {
+    private func makeSettingsPageState(
+        language: AppLanguage = .simplifiedChinese
+    ) -> AppKitSettingsPageState {
         AppKitSettingsPageState(
             showShortcutHint: true,
             showInCommandTab: true,
             themeModeRaw: ThemeMode.followSystem.rawValue,
-            appLanguageRaw: AppLanguage.simplifiedChinese.rawValue,
+            appLanguageRaw: language.rawValue,
             windowLayerAutoEnterDelayText: "0.3",
             autoRestoreMinimizedWindowOnSwitch: true,
             hideMinimizedAppsFromAppLayer: false,
@@ -886,6 +970,20 @@ extension FlowTabTests {
 
     private func descendantViews(in view: NSView) -> [NSView] {
         [view] + view.subviews.flatMap { descendantViews(in: $0) }
+    }
+
+    private func localizedTextValues(in view: NSView) -> Set<String> {
+        Set(
+            descendantViews(in: view).compactMap { view in
+                if let textField = view as? NSTextField {
+                    return textField.stringValue.isEmpty ? nil : textField.stringValue
+                }
+                if let button = view as? NSButton {
+                    return button.title.isEmpty ? nil : button.title
+                }
+                return nil
+            }
+        )
     }
 
     private func descendant<T: NSView>(

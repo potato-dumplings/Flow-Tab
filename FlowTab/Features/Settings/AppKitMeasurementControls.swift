@@ -27,7 +27,7 @@ extension NSView {
 final class FlowCapsuleSegmentedControl: NSView {
     var onSelectionChanged: ((String) -> Void)?
 
-    private let options: [(id: String, title: String)]
+    private var options: [(id: String, title: String)]
     private let stackView = NSStackView()
     private var buttonsByID: [String: NSButton] = [:]
     private var selectedID: String?
@@ -60,6 +60,23 @@ final class FlowCapsuleSegmentedControl: NSView {
         updateAppearance()
     }
 
+    func configure(options: [(id: String, title: String)]) {
+        self.options = options
+        let optionIDs = Set(options.map { $0.id })
+        for view in stackView.arrangedSubviews {
+            stackView.removeArrangedSubview(view)
+            view.removeFromSuperview()
+        }
+        buttonsByID.removeAll()
+        if let selectedID, !optionIDs.contains(selectedID) {
+            self.selectedID = options.first?.id
+        }
+        buildOptionButtons()
+        setAccessibilityValue(selectedID ?? "")
+        updateAppearance()
+        invalidateIntrinsicContentSize()
+    }
+
     private func buildViewHierarchy() {
         wantsLayer = true
         translatesAutoresizingMaskIntoConstraints = false
@@ -84,6 +101,11 @@ final class FlowCapsuleSegmentedControl: NSView {
             stackView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -2)
         ])
 
+        buildOptionButtons()
+        updateAppearance()
+    }
+
+    private func buildOptionButtons() {
         for option in options {
             let button = NSButton(title: option.title, target: self, action: #selector(handleButtonPressed(_:)))
             button.setFlowTabTestingIdentifier(option.id)
@@ -98,8 +120,6 @@ final class FlowCapsuleSegmentedControl: NSView {
             stackView.addArrangedSubview(button)
             buttonsByID[option.id] = button
         }
-
-        updateAppearance()
     }
 
     @objc private func handleButtonPressed(_ sender: NSButton) {
@@ -360,4 +380,3 @@ final class FlowSoftTextField: NSView {
         layer.backgroundColor = backgroundColor.cgColor
     }
 }
-

@@ -2,16 +2,22 @@ import AppKit
 
 struct AppVisibilitySettingsCardState: Equatable {
     let hiddenAppCount: Int
+    let appLanguageRaw: String
+
+    var language: AppLanguage {
+        AppLanguagePreferencesStore.resolve(rawValue: appLanguageRaw)
+    }
 
     var statusText: String {
         AppStrings.text(
             .appVisibilityManagerSubtitle,
-            replacements: ["count": "\(hiddenAppCount)"]
+            replacements: ["count": "\(hiddenAppCount)"],
+            language: language
         )
     }
 
     var summaryText: String {
-        AppStrings.text(.appVisibilitySummary)
+        AppStrings.text(.appVisibilitySummary, language: language)
     }
 }
 
@@ -37,6 +43,7 @@ final class AppVisibilitySettingsCardAppKitView: AppKitSettingsCardBaseView {
         guard currentState != state else { return }
         currentState = state
         summaryLabel.stringValue = state.summaryText
+        manageButton.updateTitle(AppStrings.text(.appVisibilityManage, language: state.language))
         invalidateIntrinsicContentSize()
     }
 
@@ -81,7 +88,7 @@ final class AppVisibilitySettingsCardAppKitView: AppKitSettingsCardBaseView {
 private final class AppVisibilityManageButton: NSButton {
     private var isHovering = false
     private var hoverTrackingArea: NSTrackingArea?
-    private let buttonTitle: String
+    private var buttonTitle: String
 
     init(title: String) {
         buttonTitle = title
@@ -102,6 +109,12 @@ private final class AppVisibilityManageButton: NSButton {
     override func viewDidChangeEffectiveAppearance() {
         super.viewDidChangeEffectiveAppearance()
         updateAppearance()
+    }
+
+    func updateTitle(_ title: String) {
+        buttonTitle = title
+        updateAppearance()
+        invalidateIntrinsicContentSize()
     }
 
     override func updateTrackingAreas() {

@@ -358,7 +358,7 @@ final class AppKitSettingsPageView: NSView {
     private let contentStack = NSStackView()
     private let headerStack = NSStackView()
     private let titleLabel = NSTextField(labelWithString: AppStrings.text(.settingsPageTitle))
-    private let subtitleLabel = NSTextField(labelWithString: AppStrings.text(.settingsPageSubtitle))
+    private let subtitleLabel = NSTextField(wrappingLabelWithString: AppStrings.text(.settingsPageSubtitle))
     private let columnsStack = NSStackView()
     private let leftColumn = NSStackView()
     private let rightColumn = NSStackView()
@@ -419,7 +419,6 @@ final class AppKitSettingsPageView: NSView {
     }
 
     override var intrinsicContentSize: NSSize {
-        layoutSubtreeIfNeeded()
         return NSSize(width: NSView.noIntrinsicMetric, height: contentStack.fittingSize.height)
     }
 
@@ -443,6 +442,14 @@ final class AppKitSettingsPageView: NSView {
         guard currentState != state else { return }
         currentState = state
 
+        let language = AppLanguagePreferencesStore.resolve(rawValue: state.appLanguageRaw)
+        titleLabel.stringValue = AppStrings.text(.settingsPageTitle, language: language)
+        subtitleLabel.stringValue = AppStrings.text(.settingsPageSubtitle, language: language)
+        subtitleLabel.isHidden = subtitleLabel.stringValue.isEmpty
+        subtitleLabel.invalidateIntrinsicContentSize()
+        headerStack.invalidateIntrinsicContentSize()
+        updateCardChrome(language: language)
+
         appearanceContent.update(
             with: AppearanceSettingsCardState(
                 showShortcutHint: state.showShortcutHint,
@@ -455,20 +462,26 @@ final class AppKitSettingsPageView: NSView {
             with: WindowBehaviorSettingsCardState(
                 windowLayerAutoEnterDelayText: state.windowLayerAutoEnterDelayText,
                 autoRestoreMinimizedWindowOnSwitch: state.autoRestoreMinimizedWindowOnSwitch,
-                hideMinimizedAppsFromAppLayer: state.hideMinimizedAppsFromAppLayer
+                hideMinimizedAppsFromAppLayer: state.hideMinimizedAppsFromAppLayer,
+                appLanguageRaw: state.appLanguageRaw
             )
         )
         searchContent.update(
             with: SearchSettingsCardState(
                 searchEnabled: state.searchEnabled,
-                searchDefaultScopeRaw: state.searchDefaultScopeRaw
+                searchDefaultScopeRaw: state.searchDefaultScopeRaw,
+                appLanguageRaw: state.appLanguageRaw
             )
         )
+        let appVisibilityState = AppVisibilitySettingsCardState(
+            hiddenAppCount: state.hiddenAppCount,
+            appLanguageRaw: state.appLanguageRaw
+        )
         appVisibilityContent.update(
-            with: AppVisibilitySettingsCardState(hiddenAppCount: state.hiddenAppCount)
+            with: appVisibilityState
         )
         appVisibilityCard.updateTitleAccessory(
-            AppVisibilitySettingsCardState(hiddenAppCount: state.hiddenAppCount).statusText
+            appVisibilityState.statusText
         )
         hotkeyContent.update(
             with: HotkeySettingsCardState(
@@ -478,7 +491,8 @@ final class AppKitSettingsPageView: NSView {
                 inAppWindowHotkeyPrimaryModifierRaw: state.inAppWindowHotkeyPrimaryModifierRaw,
                 inAppWindowHotkeyMainKeyRaw: state.inAppWindowHotkeyMainKeyRaw,
                 commandTabTakeoverActive: state.commandTabTakeoverActive,
-                accessibilityTrusted: state.accessibilityTrusted
+                accessibilityTrusted: state.accessibilityTrusted,
+                appLanguageRaw: state.appLanguageRaw
             )
         )
         permissionContent.update(
@@ -486,7 +500,8 @@ final class AppKitSettingsPageView: NSView {
                 showPermissionReminder: state.showPermissionReminder,
                 allowLaunchAtLogin: state.allowLaunchAtLogin,
                 accessibilityTrusted: state.accessibilityTrusted,
-                screenCaptureTrusted: state.screenCaptureTrusted
+                screenCaptureTrusted: state.screenCaptureTrusted,
+                appLanguageRaw: state.appLanguageRaw
             )
         )
         appearanceCard.invalidateIntrinsicContentSize()
@@ -496,6 +511,33 @@ final class AppKitSettingsPageView: NSView {
         appVisibilityCard.invalidateIntrinsicContentSize()
         hotkeyCard.invalidateIntrinsicContentSize()
         invalidateIntrinsicContentSize()
+    }
+
+    private func updateCardChrome(language: AppLanguage) {
+        appearanceCard.updateChrome(
+            title: AppStrings.text(.settingsCardAppearanceTitle, language: language),
+            subtitle: AppStrings.text(.settingsCardAppearanceSubtitle, language: language)
+        )
+        windowBehaviorCard.updateChrome(
+            title: AppStrings.text(.settingsCardWindowBehaviorTitle, language: language),
+            subtitle: AppStrings.text(.settingsCardWindowBehaviorSubtitle, language: language)
+        )
+        permissionCard.updateChrome(
+            title: AppStrings.text(.settingsCardPermissionTitle, language: language),
+            subtitle: AppStrings.text(.settingsCardPermissionSubtitle, language: language)
+        )
+        searchCard.updateChrome(
+            title: AppStrings.text(.settingsCardSearchTitle, language: language),
+            subtitle: AppStrings.text(.settingsCardSearchSubtitle, language: language)
+        )
+        appVisibilityCard.updateChrome(
+            title: AppStrings.text(.settingsCardAppVisibilityTitle, language: language),
+            subtitle: nil
+        )
+        hotkeyCard.updateChrome(
+            title: AppStrings.text(.settingsCardHotkeyTitle, language: language),
+            subtitle: AppStrings.text(.settingsCardHotkeySubtitle, language: language)
+        )
     }
 
     private func buildViewHierarchy() {
@@ -511,6 +553,12 @@ final class AppKitSettingsPageView: NSView {
         titleLabel.font = .systemFont(ofSize: 22, weight: .semibold)
         subtitleLabel.font = .systemFont(ofSize: 12)
         subtitleLabel.textColor = .secondaryLabelColor
+        subtitleLabel.lineBreakMode = .byWordWrapping
+        subtitleLabel.maximumNumberOfLines = 2
+        subtitleLabel.setContentHuggingPriority(.required, for: .vertical)
+        subtitleLabel.setContentCompressionResistancePriority(.required, for: .vertical)
+        subtitleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        subtitleLabel.setFlowTabTestingIdentifier("flowtab.settings.page.subtitle")
 
         headerStack.orientation = .vertical
         headerStack.alignment = .leading

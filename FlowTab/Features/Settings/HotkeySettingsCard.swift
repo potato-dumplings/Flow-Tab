@@ -109,7 +109,8 @@ struct AppKitHotkeySettingsCardContent: AppKitSettingsCardRepresentable {
             inAppWindowHotkeyPrimaryModifierRaw: inAppWindowHotkeyPrimaryModifierRaw,
             inAppWindowHotkeyMainKeyRaw: inAppWindowHotkeyMainKeyRaw,
             commandTabTakeoverActive: commandTabTakeoverActive,
-            accessibilityTrusted: accessibilityTrusted
+            accessibilityTrusted: accessibilityTrusted,
+            appLanguageRaw: AppLanguagePreferencesStore.load().rawValue
         )
     }
 }
@@ -122,6 +123,11 @@ struct HotkeySettingsCardState: Equatable {
     let inAppWindowHotkeyMainKeyRaw: String
     let commandTabTakeoverActive: Bool
     let accessibilityTrusted: Bool
+    let appLanguageRaw: String
+
+    var language: AppLanguage {
+        AppLanguagePreferencesStore.resolve(rawValue: appLanguageRaw)
+    }
 
     var hotkeyConfiguration: SwitcherHotkeyConfiguration {
         SwitcherHotkeyPreferencesStore.resolve(
@@ -154,8 +160,8 @@ struct HotkeySettingsCardState: Equatable {
 
     var commandTabTakeoverStatusText: String {
         commandTabTakeoverActive
-            ? AppStrings.text(.hotkeyCommandTabTakeoverActive)
-            : AppStrings.text(.hotkeyCommandTabTakeoverInactive)
+            ? AppStrings.text(.hotkeyCommandTabTakeoverActive, language: language)
+            : AppStrings.text(.hotkeyCommandTabTakeoverInactive, language: language)
     }
 
     var mainSummaryText: String {
@@ -163,11 +169,12 @@ struct HotkeySettingsCardState: Equatable {
             .hotkeyMainSummary,
             replacements: [
                 "main": hotkeyConfiguration.mainShortcutText,
-                "reverseLabel": AppStrings.text(.hotkeySummaryReverseLabel),
+                "reverseLabel": AppStrings.text(.hotkeySummaryReverseLabel, language: language),
                 "reverse": hotkeyConfiguration.backwardShortcutText,
-                "quitLabel": AppStrings.text(.hotkeySummaryQuitLabel),
+                "quitLabel": AppStrings.text(.hotkeySummaryQuitLabel, language: language),
                 "quit": hotkeyConfiguration.quitShortcutText
-            ]
+            ],
+            language: language
         )
     }
 
@@ -175,11 +182,12 @@ struct HotkeySettingsCardState: Equatable {
         AppStrings.text(
             .hotkeyInAppSummary,
             replacements: [
-                "inAppLabel": AppStrings.text(.hotkeySummaryInAppLabel),
+                "inAppLabel": AppStrings.text(.hotkeySummaryInAppLabel, language: language),
                 "main": inAppWindowHotkeyConfiguration.mainShortcutText,
-                "reverseLabel": AppStrings.text(.hotkeySummaryReverseLabel),
+                "reverseLabel": AppStrings.text(.hotkeySummaryReverseLabel, language: language),
                 "reverse": inAppWindowHotkeyConfiguration.backwardShortcutText
-            ]
+            ],
+            language: language
         )
     }
 }
@@ -207,6 +215,26 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
     private let inAppRowsContainer = NSStackView()
     private let inAppSummaryLabel = HotkeySettingsCardAppKitView.makeSecondaryLabel()
     private let inAppTakeoverStatusLabel = HotkeySettingsCardAppKitView.makeStatusLabel()
+    private lazy var mainPrimaryModifierRow = AppKitSettingsCardBaseView.makeControlRow(
+        title: "",
+        control: mainPrimaryModifierSelect
+    )
+    private lazy var mainKeyRow = AppKitSettingsCardBaseView.makeControlRow(
+        title: "",
+        control: mainKeySelect
+    )
+    private lazy var quitKeyRow = AppKitSettingsCardBaseView.makeControlRow(
+        title: "",
+        control: quitKeySelect
+    )
+    private lazy var inAppPrimaryModifierRow = AppKitSettingsCardBaseView.makeControlRow(
+        title: "",
+        control: inAppPrimaryModifierSelect
+    )
+    private lazy var inAppMainKeyRow = AppKitSettingsCardBaseView.makeControlRow(
+        title: "",
+        control: inAppMainKeySelect
+    )
     private static let defaultTakeoverInactiveDisplayDelay: TimeInterval = 0.25
     private let takeoverInactiveDisplayDelay: TimeInterval
     private var isApplyingState = false
@@ -270,6 +298,7 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
         inAppMainKeySelect.isEnabled = state.accessibilityTrusted
         inAppSummaryLabel.stringValue = state.inAppSummaryText
         updateInAppTakeoverStatus(with: state)
+        updateLocalizedRows(language: state.language)
 
         invalidateIntrinsicContentSize()
     }
@@ -340,13 +369,10 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
         mainTakeoverStatusLabel.setFlowTabTestingIdentifier("flowtab.settings.hotkey.main-takeover-status")
         inAppTakeoverStatusLabel.setFlowTabTestingIdentifier("flowtab.settings.hotkey.in-app-takeover-status")
 
-        let mainPrimaryRow = makeControlRow(title: AppStrings.text(.hotkeyRowMainModifier), control: mainPrimaryModifierSelect)
-        let mainKeyRow = makeControlRow(title: AppStrings.text(.hotkeyRowMainKey), control: mainKeySelect)
-        let quitKeyRow = makeControlRow(title: AppStrings.text(.hotkeyRowQuitKey), control: quitKeySelect)
-        stackView.addArrangedSubview(mainPrimaryRow)
+        stackView.addArrangedSubview(mainPrimaryModifierRow)
         stackView.addArrangedSubview(mainKeyRow)
         stackView.addArrangedSubview(quitKeyRow)
-        mainPrimaryRow.widthAnchor.constraint(equalTo: stackView.widthAnchor).isActive = true
+        mainPrimaryModifierRow.widthAnchor.constraint(equalTo: stackView.widthAnchor).isActive = true
         mainKeyRow.widthAnchor.constraint(equalTo: stackView.widthAnchor).isActive = true
         quitKeyRow.widthAnchor.constraint(equalTo: stackView.widthAnchor).isActive = true
         stackView.addArrangedSubview(mainSummaryLabel)
@@ -364,36 +390,14 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
         inAppRowsContainer.translatesAutoresizingMaskIntoConstraints = false
         inAppRowsContainer.setContentHuggingPriority(.required, for: .vertical)
         inAppRowsContainer.setContentCompressionResistancePriority(.required, for: .vertical)
-        let inAppPrimaryRow = makeControlRow(title: AppStrings.text(.hotkeyRowInAppModifier), control: inAppPrimaryModifierSelect)
-        let inAppMainKeyRow = makeControlRow(title: AppStrings.text(.hotkeyRowInAppKey), control: inAppMainKeySelect)
-        inAppRowsContainer.addArrangedSubview(inAppPrimaryRow)
+        inAppRowsContainer.addArrangedSubview(inAppPrimaryModifierRow)
         inAppRowsContainer.addArrangedSubview(inAppMainKeyRow)
-        inAppPrimaryRow.widthAnchor.constraint(equalTo: inAppRowsContainer.widthAnchor).isActive = true
+        inAppPrimaryModifierRow.widthAnchor.constraint(equalTo: inAppRowsContainer.widthAnchor).isActive = true
         inAppMainKeyRow.widthAnchor.constraint(equalTo: inAppRowsContainer.widthAnchor).isActive = true
 
         stackView.addArrangedSubview(inAppRowsContainer)
         stackView.addArrangedSubview(inAppSummaryLabel)
         stackView.addArrangedSubview(inAppTakeoverStatusLabel)
-    }
-
-    private func makeControlRow(title: String, control: NSView) -> NSStackView {
-        let titleLabel = NSTextField(labelWithString: title)
-        titleLabel.font = .systemFont(ofSize: 13)
-        titleLabel.lineBreakMode = .byTruncatingTail
-        titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-
-        let spacer = NSView()
-        spacer.translatesAutoresizingMaskIntoConstraints = false
-        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        spacer.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-
-        let row = NSStackView(views: [titleLabel, spacer, control])
-        row.orientation = .horizontal
-        row.alignment = .centerY
-        row.spacing = 10
-        row.translatesAutoresizingMaskIntoConstraints = false
-        row.detachesHiddenViews = true
-        return row
     }
 
     private func configure(
@@ -439,6 +443,7 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
             label: mainTakeoverStatusLabel,
             usesCommandTab: state.mainUsesCommandTab,
             takeoverActive: state.commandTabTakeoverActive,
+            language: state.language,
             workItem: &mainInactiveStatusWorkItem,
             token: mainInactiveStatusToken
         )
@@ -449,6 +454,7 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
             label: inAppTakeoverStatusLabel,
             usesCommandTab: state.inAppUsesCommandTab,
             takeoverActive: state.commandTabTakeoverActive,
+            language: state.language,
             workItem: &inAppInactiveStatusWorkItem,
             token: inAppInactiveStatusToken
         )
@@ -458,6 +464,7 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
         label: NSTextField,
         usesCommandTab: Bool,
         takeoverActive: Bool,
+        language: AppLanguage,
         workItem: inout DispatchWorkItem?,
         token: DelayedTakeoverStatusToken
     ) {
@@ -471,7 +478,7 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
         }
 
         if takeoverActive {
-            label.stringValue = AppStrings.text(.hotkeyCommandTabTakeoverActive)
+            label.stringValue = AppStrings.text(.hotkeyCommandTabTakeoverActive, language: language)
             label.textColor = .systemGreen
             label.isHidden = false
             return
@@ -490,12 +497,23 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
                 : latestState.inAppUsesCommandTab
 
             guard latestUsesCommandTab, !latestState.commandTabTakeoverActive else { return }
-            label.stringValue = AppStrings.text(.hotkeyCommandTabTakeoverInactive)
+            label.stringValue = AppStrings.text(
+                .hotkeyCommandTabTakeoverInactive,
+                language: latestState.language
+            )
             label.textColor = .systemRed
             label.isHidden = false
         }
         workItem = pendingWorkItem
         DispatchQueue.main.asyncAfter(deadline: .now() + takeoverInactiveDisplayDelay, execute: pendingWorkItem)
+    }
+
+    private func updateLocalizedRows(language: AppLanguage) {
+        mainPrimaryModifierRow.updateTitle(AppStrings.text(.hotkeyRowMainModifier, language: language))
+        mainKeyRow.updateTitle(AppStrings.text(.hotkeyRowMainKey, language: language))
+        quitKeyRow.updateTitle(AppStrings.text(.hotkeyRowQuitKey, language: language))
+        inAppPrimaryModifierRow.updateTitle(AppStrings.text(.hotkeyRowInAppModifier, language: language))
+        inAppMainKeyRow.updateTitle(AppStrings.text(.hotkeyRowInAppKey, language: language))
     }
 
     private static func makeSecondaryLabel() -> NSTextField {

@@ -120,19 +120,57 @@ final class AppearanceSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKit
     private let showShortcutHintSwitch = NSSwitch()
     private let showInCommandTabSwitch = NSSwitch()
     private let themeModeControl = FlowCapsuleSegmentedControl(
-        options: AppearanceSettingsCardAppKitView.themeOptions()
+        options: AppearanceSettingsCardAppKitView.themeOptions(
+            language: AppLanguagePreferencesStore.load()
+        )
     )
     private let appLanguageSelect = FlowFormSelectControl(frame: .zero)
     private let descriptionLabel = AppKitSettingsCardBaseView.makeBodyLabel()
+    private lazy var showShortcutHintRow = AppKitSettingsCardBaseView.makeControlRow(
+        title: "",
+        control: showShortcutHintSwitch
+    )
+    private lazy var showInCommandTabRow = AppKitSettingsCardBaseView.makeControlRow(
+        title: "",
+        control: showInCommandTabSwitch
+    )
+    private lazy var languageRow = AppKitSettingsCardBaseView.makeControlRow(
+        title: "",
+        control: appLanguageSelect
+    )
+    private lazy var themeModeRow = AppKitSettingsCardBaseView.makeControlRow(
+        title: "",
+        control: themeModeControl
+    )
     private var isApplyingState = false
     private var currentState: AppearanceSettingsCardState?
 
-    private static func themeOptions() -> [(id: String, title: String)] {
-        ThemeMode.allCases.map { (id: $0.rawValue, title: $0.displayName) }
+    private static func themeOptions(language: AppLanguage) -> [(id: String, title: String)] {
+        ThemeMode.allCases.map { mode in
+            let key: AppStringKey
+            switch mode {
+            case .followSystem:
+                key = .themeFollowSystem
+            case .light:
+                key = .themeLight
+            case .dark:
+                key = .themeDark
+            }
+            return (id: mode.rawValue, title: AppStrings.text(key, language: language))
+        }
     }
 
-    private static func languageOptions() -> [(id: String, title: String)] {
-        AppLanguage.allCases.map { (id: $0.rawValue, title: $0.displayName) }
+    private static func languageOptions(language: AppLanguage) -> [(id: String, title: String)] {
+        AppLanguage.allCases.map { languageOption in
+            let key: AppStringKey
+            switch languageOption {
+            case .simplifiedChinese:
+                key = .languageSimplifiedChinese
+            case .english:
+                key = .languageEnglish
+            }
+            return (id: languageOption.rawValue, title: AppStrings.text(key, language: language))
+        }
     }
 
     override init(frame frameRect: NSRect) {
@@ -148,15 +186,22 @@ final class AppearanceSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKit
     func update(with state: AppearanceSettingsCardState) {
         guard currentState != state else { return }
         currentState = state
+        let language = state.resolvedAppLanguage
 
         isApplyingState = true
         showShortcutHintSwitch.state = state.showShortcutHint ? .on : .off
         showInCommandTabSwitch.state = state.showInCommandTab ? .on : .off
+        themeModeControl.configure(options: Self.themeOptions(language: language))
+        appLanguageSelect.configure(options: Self.languageOptions(language: language))
         themeModeControl.updateSelection(id: state.resolvedThemeMode.rawValue)
         AppKitSettingsCardBaseView.selectItem(in: appLanguageSelect, rawValue: state.resolvedAppLanguage.rawValue)
         isApplyingState = false
 
-        descriptionLabel.stringValue = AppStrings.text(.appearanceDescription)
+        showShortcutHintRow.updateTitle(AppStrings.text(.appearanceShowShortcutHint, language: language))
+        showInCommandTabRow.updateTitle(AppStrings.text(.appearanceShowAppWindow, language: language))
+        languageRow.updateTitle(AppStrings.text(.appearanceLanguage, language: language))
+        themeModeRow.updateTitle(AppStrings.text(.appearanceThemeMode, language: language))
+        descriptionLabel.stringValue = AppStrings.text(.appearanceDescription, language: language)
         invalidateIntrinsicContentSize()
     }
 
@@ -179,35 +224,15 @@ final class AppearanceSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKit
         }
         AppKitSettingsCardBaseView.configure(
             selectControl: appLanguageSelect,
-            options: Self.languageOptions(),
+            options: Self.languageOptions(language: AppLanguagePreferencesStore.load()),
             width: 96
         )
 
-        addFullWidthArrangedSubview(
-            AppKitSettingsCardBaseView.makeControlRow(
-                title: AppStrings.text(.appearanceShowShortcutHint),
-                control: showShortcutHintSwitch
-            )
-        )
-        addFullWidthArrangedSubview(
-            AppKitSettingsCardBaseView.makeControlRow(
-                title: AppStrings.text(.appearanceShowAppWindow),
-                control: showInCommandTabSwitch
-            )
-        )
+        addFullWidthArrangedSubview(showShortcutHintRow)
+        addFullWidthArrangedSubview(showInCommandTabRow)
         addFullWidthArrangedSubview(descriptionLabel)
-        addFullWidthArrangedSubview(
-            AppKitSettingsCardBaseView.makeControlRow(
-                title: AppStrings.text(.appearanceLanguage),
-                control: appLanguageSelect
-            )
-        )
-        addFullWidthArrangedSubview(
-            AppKitSettingsCardBaseView.makeControlRow(
-                title: AppStrings.text(.appearanceThemeMode),
-                control: themeModeControl
-            )
-        )
+        addFullWidthArrangedSubview(languageRow)
+        addFullWidthArrangedSubview(themeModeRow)
     }
 
     @objc private func handleShowShortcutHintChanged(_ sender: NSSwitch) {

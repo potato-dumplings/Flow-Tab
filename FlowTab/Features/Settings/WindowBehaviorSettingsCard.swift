@@ -107,7 +107,8 @@ struct AppKitWindowBehaviorSettingsCardContent: AppKitSettingsCardRepresentable 
         WindowBehaviorSettingsCardState(
             windowLayerAutoEnterDelayText: windowLayerAutoEnterDelayText,
             autoRestoreMinimizedWindowOnSwitch: autoRestoreMinimizedWindowOnSwitch,
-            hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
+            hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer,
+            appLanguageRaw: AppLanguagePreferencesStore.load().rawValue
         )
     }
 }
@@ -116,6 +117,11 @@ struct WindowBehaviorSettingsCardState: Equatable {
     let windowLayerAutoEnterDelayText: String
     let autoRestoreMinimizedWindowOnSwitch: Bool
     let hideMinimizedAppsFromAppLayer: Bool
+    let appLanguageRaw: String
+
+    var language: AppLanguage {
+        AppLanguagePreferencesStore.resolve(rawValue: appLanguageRaw)
+    }
 }
 
 final class WindowBehaviorSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKitSettingsCardStateView,
@@ -130,6 +136,29 @@ final class WindowBehaviorSettingsCardAppKitView: AppKitSettingsCardBaseView, Ap
     private let autoRestoreMinimizedWindowSwitch = NSSwitch()
     private let hideMinimizedAppsSwitch = NSSwitch()
     private let noteLabel = AppKitSettingsCardBaseView.makeBodyLabel()
+    private let delayUnitLabel = NSTextField(labelWithString: "")
+    private lazy var delayRow = AppKitSettingsCardBaseView.makeControlRow(
+        title: "",
+        control: delayControl
+    )
+    private lazy var autoRestoreMinimizedWindowRow = AppKitSettingsCardBaseView.makeControlRow(
+        title: "",
+        control: autoRestoreMinimizedWindowSwitch
+    )
+    private lazy var hideMinimizedAppsRow = AppKitSettingsCardBaseView.makeControlRow(
+        title: "",
+        control: hideMinimizedAppsSwitch
+    )
+    private lazy var delayControl: NSStackView = {
+        let stack = NSStackView(views: [delayInputField, delayUnitLabel])
+        stack.orientation = .horizontal
+        stack.alignment = .centerY
+        stack.spacing = 8
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        stack.setContentHuggingPriority(.required, for: .vertical)
+        stack.setContentCompressionResistancePriority(.required, for: .vertical)
+        return stack
+    }()
     private var isApplyingState = false
     private var currentState: WindowBehaviorSettingsCardState?
 
@@ -174,7 +203,16 @@ final class WindowBehaviorSettingsCardAppKitView: AppKitSettingsCardBaseView, Ap
         hideMinimizedAppsSwitch.state = state.hideMinimizedAppsFromAppLayer ? .on : .off
         isApplyingState = false
 
-        noteLabel.stringValue = AppStrings.text(.windowBehaviorNote)
+        let language = state.language
+        delayUnitLabel.stringValue = AppStrings.text(.windowBehaviorSecondUnit, language: language)
+        delayRow.updateTitle(AppStrings.text(.windowBehaviorAutoEnterDelay, language: language))
+        autoRestoreMinimizedWindowRow.updateTitle(
+            AppStrings.text(.windowBehaviorAutoRestoreMinimized, language: language)
+        )
+        hideMinimizedAppsRow.updateTitle(
+            AppStrings.text(.windowBehaviorHideMinimizedApps, language: language)
+        )
+        noteLabel.stringValue = AppStrings.text(.windowBehaviorNote, language: language)
         invalidateIntrinsicContentSize()
     }
 
@@ -190,41 +228,17 @@ final class WindowBehaviorSettingsCardAppKitView: AppKitSettingsCardBaseView, Ap
         delayTextField.setFlowTabTestingIdentifier("flowtab.settings.window.auto-enter-delay.input")
         delayTextField.delegate = self
 
-        let delayUnitLabel = NSTextField(labelWithString: AppStrings.text(.windowBehaviorSecondUnit))
         delayUnitLabel.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
         delayUnitLabel.textColor = .secondaryLabelColor
-
-        let delayControl = NSStackView(views: [delayInputField, delayUnitLabel])
-        delayControl.orientation = .horizontal
-        delayControl.alignment = .centerY
-        delayControl.spacing = 8
-        delayControl.translatesAutoresizingMaskIntoConstraints = false
-        delayControl.setContentHuggingPriority(.required, for: .vertical)
-        delayControl.setContentCompressionResistancePriority(.required, for: .vertical)
 
         autoRestoreMinimizedWindowSwitch.target = self
         autoRestoreMinimizedWindowSwitch.action = #selector(handleAutoRestoreMinimizedWindowSwitchChanged)
         hideMinimizedAppsSwitch.target = self
         hideMinimizedAppsSwitch.action = #selector(handleHideMinimizedAppsSwitchChanged)
 
-        addFullWidthArrangedSubview(
-            AppKitSettingsCardBaseView.makeControlRow(
-                title: AppStrings.text(.windowBehaviorAutoEnterDelay),
-                control: delayControl
-            )
-        )
-        addFullWidthArrangedSubview(
-            AppKitSettingsCardBaseView.makeControlRow(
-                title: AppStrings.text(.windowBehaviorAutoRestoreMinimized),
-                control: autoRestoreMinimizedWindowSwitch
-            )
-        )
-        addFullWidthArrangedSubview(
-            AppKitSettingsCardBaseView.makeControlRow(
-                title: AppStrings.text(.windowBehaviorHideMinimizedApps),
-                control: hideMinimizedAppsSwitch
-            )
-        )
+        addFullWidthArrangedSubview(delayRow)
+        addFullWidthArrangedSubview(autoRestoreMinimizedWindowRow)
+        addFullWidthArrangedSubview(hideMinimizedAppsRow)
         addFullWidthArrangedSubview(noteLabel)
     }
 

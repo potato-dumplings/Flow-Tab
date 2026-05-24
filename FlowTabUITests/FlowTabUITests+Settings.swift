@@ -112,7 +112,9 @@ extension FlowTabUITests {
 
         selectOption(in: app, controlIdentifier: Identifier.settingsAppearanceAppLanguage, optionIdentifier: "en")
         assertValue(of: element(in: app, identifier: Identifier.settingsAppearanceAppLanguage), equals: "en")
-        XCTAssertTrue(app.staticTexts["Display, hotkeys, and permissions"].waitForExistence(timeout: 5))
+        let pageSubtitle = app.staticTexts["Display, hotkeys, and permissions"]
+        XCTAssertTrue(pageSubtitle.waitForExistence(timeout: 5))
+        assertSettingsPageSubtitleIsVisible(pageSubtitle, below: app.staticTexts["Settings"])
         XCTAssertTrue(app.staticTexts["Appearance"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Theme mode"].waitForExistence(timeout: 5))
         XCTAssertTrue(
@@ -773,6 +775,19 @@ extension FlowTabUITests {
             }
         }
         return samples > 0 ? total / CGFloat(samples) : nil
+    }
+
+    private func assertSettingsPageSubtitleIsVisible(
+        _ subtitle: XCUIElement,
+        below title: XCUIElement,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertTrue(title.exists, file: file, line: line)
+        XCTAssertFalse(subtitle.frame.isEmpty, file: file, line: line)
+        XCTAssertGreaterThan(subtitle.frame.width, 80, file: file, line: line)
+        XCTAssertGreaterThan(subtitle.frame.height, 8, file: file, line: line)
+        XCTAssertGreaterThan(subtitle.frame.minY, title.frame.maxY, file: file, line: line)
     }
 
 }

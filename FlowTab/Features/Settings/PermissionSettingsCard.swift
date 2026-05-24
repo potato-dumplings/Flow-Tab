@@ -101,7 +101,8 @@ struct AppKitPermissionSettingsCardContent: AppKitSettingsCardRepresentable {
             showPermissionReminder: showPermissionReminder,
             allowLaunchAtLogin: allowLaunchAtLogin,
             accessibilityTrusted: accessibilityTrusted,
-            screenCaptureTrusted: screenCaptureTrusted
+            screenCaptureTrusted: screenCaptureTrusted,
+            appLanguageRaw: AppLanguagePreferencesStore.load().rawValue
         )
     }
 }
@@ -111,29 +112,34 @@ struct PermissionSettingsCardState: Equatable {
     let allowLaunchAtLogin: Bool
     let accessibilityTrusted: Bool
     let screenCaptureTrusted: Bool
+    let appLanguageRaw: String
+
+    var language: AppLanguage {
+        AppLanguagePreferencesStore.resolve(rawValue: appLanguageRaw)
+    }
 
     var accessibilityStatusText: String {
         accessibilityTrusted
-            ? AppStrings.text(.permissionAccessibilityGranted)
-            : AppStrings.text(.permissionAccessibilityDenied)
+            ? AppStrings.text(.permissionAccessibilityGranted, language: language)
+            : AppStrings.text(.permissionAccessibilityDenied, language: language)
     }
 
     var accessibilityButtonTitle: String {
         accessibilityTrusted
-            ? AppStrings.text(.permissionAccessibilityClose)
-            : AppStrings.text(.permissionAccessibilityRequest)
+            ? AppStrings.text(.permissionAccessibilityClose, language: language)
+            : AppStrings.text(.permissionAccessibilityRequest, language: language)
     }
 
     var screenCaptureStatusText: String {
         screenCaptureTrusted
-            ? AppStrings.text(.permissionScreenGranted)
-            : AppStrings.text(.permissionScreenDenied)
+            ? AppStrings.text(.permissionScreenGranted, language: language)
+            : AppStrings.text(.permissionScreenDenied, language: language)
     }
 
     var screenCaptureButtonTitle: String {
         screenCaptureTrusted
-            ? AppStrings.text(.permissionScreenClose)
-            : AppStrings.text(.permissionScreenRequest)
+            ? AppStrings.text(.permissionScreenClose, language: language)
+            : AppStrings.text(.permissionScreenRequest, language: language)
     }
 
 }
@@ -222,6 +228,14 @@ final class PermissionSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKit
     private let allowLaunchAtLoginSwitch = NSSwitch()
     private let accessibilityRow: PermissionStatusControlRowView<FlowGradientActionButton>
     private let screenCaptureRow: PermissionStatusControlRowView<FlowGradientActionButton>
+    private lazy var allowLaunchAtLoginRow = AppKitSettingsCardBaseView.makeControlRow(
+        title: "",
+        control: allowLaunchAtLoginSwitch
+    )
+    private lazy var permissionReminderRow = AppKitSettingsCardBaseView.makeControlRow(
+        title: "",
+        control: showPermissionReminderSwitch
+    )
     private var isApplyingState = false
     private var currentState: PermissionSettingsCardState?
 
@@ -268,9 +282,16 @@ final class PermissionSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKit
         allowLaunchAtLoginSwitch.state = state.allowLaunchAtLogin ? .on : .off
         isApplyingState = false
 
+        let language = state.language
+        allowLaunchAtLoginRow.updateTitle(
+            AppStrings.text(.permissionLaunchAtLoginToggle, language: language)
+        )
+        permissionReminderRow.updateTitle(
+            AppStrings.text(.permissionHomeReminderToggle, language: language)
+        )
         accessibilityRow.update(
             text: state.accessibilityStatusText,
-            detail: AppStrings.text(.permissionAccessibilityDetail),
+            detail: AppStrings.text(.permissionAccessibilityDetail, language: language),
             statusColor: state.accessibilityTrusted ? .systemGreen : .systemOrange
         )
         accessibilityRow.control.update(
@@ -279,7 +300,7 @@ final class PermissionSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKit
         )
         screenCaptureRow.update(
             text: state.screenCaptureStatusText,
-            detail: AppStrings.text(.permissionScreenDetail),
+            detail: AppStrings.text(.permissionScreenDetail, language: language),
             statusColor: state.screenCaptureTrusted ? .systemGreen : .systemOrange
         )
         screenCaptureRow.control.update(
@@ -307,18 +328,8 @@ final class PermissionSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKit
             "flowtab.settings.permission.screen-capture-action"
         )
 
-        addFullWidthArrangedSubview(
-            AppKitSettingsCardBaseView.makeControlRow(
-                title: AppStrings.text(.permissionLaunchAtLoginToggle),
-                control: allowLaunchAtLoginSwitch
-            )
-        )
-        addFullWidthArrangedSubview(
-            AppKitSettingsCardBaseView.makeControlRow(
-                title: AppStrings.text(.permissionHomeReminderToggle),
-                control: showPermissionReminderSwitch
-            )
-        )
+        addFullWidthArrangedSubview(allowLaunchAtLoginRow)
+        addFullWidthArrangedSubview(permissionReminderRow)
         addFullWidthArrangedSubview(accessibilityRow)
         addFullWidthArrangedSubview(screenCaptureRow)
     }

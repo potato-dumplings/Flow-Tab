@@ -84,24 +84,8 @@ class AppKitSettingsCardBaseView: NSView {
         ])
     }
 
-    static func makeControlRow(title: String, control: NSView) -> NSStackView {
-        let titleLabel = NSTextField(labelWithString: title)
-        titleLabel.font = .systemFont(ofSize: 13)
-        titleLabel.lineBreakMode = .byTruncatingTail
-        titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-
-        let spacer = NSView()
-        spacer.translatesAutoresizingMaskIntoConstraints = false
-        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        spacer.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-
-        let row = NSStackView(views: [titleLabel, spacer, control])
-        row.orientation = .horizontal
-        row.alignment = .centerY
-        row.spacing = 10
-        row.detachesHiddenViews = true
-        row.translatesAutoresizingMaskIntoConstraints = false
-        return row
+    static func makeControlRow(title: String, control: NSView) -> AppKitSettingsControlRow {
+        AppKitSettingsControlRow(title: title, control: control)
     }
 
     static func makeBodyLabel(fontSize: CGFloat = 11) -> NSTextField {
@@ -149,6 +133,46 @@ class AppKitSettingsCardBaseView: NSView {
 
 }
 
+final class AppKitSettingsControlRow: NSStackView {
+    private let titleLabel = NSTextField(labelWithString: "")
+    private let spacer = NSView()
+
+    init(title: String, control: NSView) {
+        super.init(frame: .zero)
+        buildViewHierarchy(control: control)
+        updateTitle(title)
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        buildViewHierarchy(control: NSView())
+    }
+
+    func updateTitle(_ title: String) {
+        titleLabel.stringValue = title
+        invalidateIntrinsicContentSize()
+    }
+
+    private func buildViewHierarchy(control: NSView) {
+        titleLabel.font = .systemFont(ofSize: 13)
+        titleLabel.lineBreakMode = .byTruncatingTail
+        titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        spacer.translatesAutoresizingMaskIntoConstraints = false
+        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        spacer.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+
+        orientation = .horizontal
+        alignment = .centerY
+        spacing = 10
+        detachesHiddenViews = true
+        translatesAutoresizingMaskIntoConstraints = false
+        addArrangedSubview(titleLabel)
+        addArrangedSubview(spacer)
+        addArrangedSubview(control)
+    }
+}
+
 extension NSAppearance {
     var isFlowTabDarkInterface: Bool {
         bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
@@ -181,6 +205,13 @@ final class AppKitSectionCardView: NSView {
     func updateTitleAccessory(_ text: String?) {
         titleAccessoryLabel.stringValue = text ?? ""
         titleAccessoryLabel.isHidden = text?.isEmpty ?? true
+        invalidateIntrinsicContentSize()
+    }
+
+    func updateChrome(title: String, subtitle: String?) {
+        titleLabel.stringValue = title
+        subtitleLabel.stringValue = subtitle ?? ""
+        subtitleLabel.isHidden = subtitle?.isEmpty ?? true
         invalidateIntrinsicContentSize()
     }
 

@@ -51,7 +51,8 @@ struct AppKitSearchSettingsCardContent: AppKitSettingsCardRepresentable {
     func makeState() -> SearchSettingsCardState {
         SearchSettingsCardState(
             searchEnabled: searchEnabled,
-            searchDefaultScopeRaw: searchDefaultScopeRaw
+            searchDefaultScopeRaw: searchDefaultScopeRaw,
+            appLanguageRaw: AppLanguagePreferencesStore.load().rawValue
         )
     }
 }
@@ -59,6 +60,11 @@ struct AppKitSearchSettingsCardContent: AppKitSettingsCardRepresentable {
 struct SearchSettingsCardState: Equatable {
     let searchEnabled: Bool
     let searchDefaultScopeRaw: String
+    let appLanguageRaw: String
+
+    var language: AppLanguage {
+        AppLanguagePreferencesStore.resolve(rawValue: appLanguageRaw)
+    }
 
     var resolvedScope: SwitcherSearchScope {
         SwitcherSearchScope(rawValue: searchDefaultScopeRaw) ?? SearchInteractionPreferencesStore.defaultScope
@@ -66,8 +72,8 @@ struct SearchSettingsCardState: Equatable {
 
     var summaryText: String {
         searchEnabled
-            ? AppStrings.text(.searchSummaryEnabled)
-            : AppStrings.text(.searchSummaryDisabled)
+            ? AppStrings.text(.searchSummaryEnabled, language: language)
+            : AppStrings.text(.searchSummaryDisabled, language: language)
     }
 }
 
@@ -78,9 +84,28 @@ final class SearchSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKitSett
     private let searchEnabledSwitch = NSSwitch()
     private let searchDefaultScopeSelect = FlowFormSelectControl(frame: .zero)
     private let scopeRowContainer = NSStackView()
+    private lazy var searchEnabledRow = AppKitSettingsCardBaseView.makeControlRow(
+        title: "",
+        control: searchEnabledSwitch
+    )
+    private lazy var scopeRow = AppKitSettingsCardBaseView.makeControlRow(
+        title: "",
+        control: searchDefaultScopeSelect
+    )
     private let summaryLabel = AppKitSettingsCardBaseView.makeBodyLabel()
     private var isApplyingState = false
     private var currentState: SearchSettingsCardState?
+
+    private static func scopeOptions(language: AppLanguage) -> [(id: String, title: String)] {
+        SwitcherSearchScope.allCases.map { scope in
+            switch scope {
+            case .app:
+                return (id: scope.rawValue, title: AppStrings.text(.searchScopeApp, language: language))
+            case .window:
+                return (id: scope.rawValue, title: AppStrings.text(.searchScopeWindow, language: language))
+            }
+        }
+    }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -98,9 +123,12 @@ final class SearchSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKitSett
 
         isApplyingState = true
         searchEnabledSwitch.state = state.searchEnabled ? .on : .off
+        searchDefaultScopeSelect.configure(options: Self.scopeOptions(language: state.language))
         AppKitSettingsCardBaseView.selectItem(in: searchDefaultScopeSelect, rawValue: state.resolvedScope.rawValue)
         isApplyingState = false
 
+        searchEnabledRow.updateTitle(AppStrings.text(.searchEnable, language: state.language))
+        scopeRow.updateTitle(AppStrings.text(.searchDefaultScope, language: state.language))
         searchDefaultScopeSelect.isEnabled = state.searchEnabled
         scopeRowContainer.alphaValue = state.searchEnabled ? 1 : 0.5
         summaryLabel.stringValue = state.summaryText
@@ -117,14 +145,10 @@ final class SearchSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKitSett
         }
         AppKitSettingsCardBaseView.configure(
             selectControl: searchDefaultScopeSelect,
-            options: SwitcherSearchScope.allCases.map { (id: $0.rawValue, title: $0.label) },
+            options: Self.scopeOptions(language: AppLanguagePreferencesStore.load()),
             width: 68
         )
 
-        let searchEnabledRow = AppKitSettingsCardBaseView.makeControlRow(
-            title: AppStrings.text(.searchEnable),
-            control: searchEnabledSwitch
-        )
         scopeRowContainer.orientation = .vertical
         scopeRowContainer.alignment = .leading
         scopeRowContainer.spacing = 0
@@ -132,12 +156,7 @@ final class SearchSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKitSett
         scopeRowContainer.translatesAutoresizingMaskIntoConstraints = false
         scopeRowContainer.setContentHuggingPriority(.required, for: .vertical)
         scopeRowContainer.setContentCompressionResistancePriority(.required, for: .vertical)
-        scopeRowContainer.addArrangedSubview(
-            AppKitSettingsCardBaseView.makeControlRow(
-                title: AppStrings.text(.searchDefaultScope),
-                control: searchDefaultScopeSelect
-            )
-        )
+        scopeRowContainer.addArrangedSubview(scopeRow)
         if let scopeRow = scopeRowContainer.arrangedSubviews.first {
             scopeRow.widthAnchor.constraint(equalTo: scopeRowContainer.widthAnchor).isActive = true
         }
