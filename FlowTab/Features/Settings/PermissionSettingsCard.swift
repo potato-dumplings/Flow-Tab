@@ -126,8 +126,14 @@ struct PermissionSettingsCardState: Equatable {
 
     var accessibilityButtonTitle: String {
         accessibilityTrusted
-            ? AppStrings.text(.permissionAccessibilityClose, language: language)
+            ? AppStrings.text(.permissionAccessibilityManage, language: language)
             : AppStrings.text(.permissionAccessibilityRequest, language: language)
+    }
+
+    var accessibilityPermissionActionLabel: String {
+        accessibilityTrusted
+            ? AppStrings.text(.permissionAccessibilityManageActionLabel, language: language)
+            : AppStrings.text(.permissionAccessibilityRequestActionLabel, language: language)
     }
 
     var screenCaptureStatusText: String {
@@ -138,8 +144,14 @@ struct PermissionSettingsCardState: Equatable {
 
     var screenCaptureButtonTitle: String {
         screenCaptureTrusted
-            ? AppStrings.text(.permissionScreenClose, language: language)
+            ? AppStrings.text(.permissionScreenManage, language: language)
             : AppStrings.text(.permissionScreenRequest, language: language)
+    }
+
+    var screenCapturePermissionActionLabel: String {
+        screenCaptureTrusted
+            ? AppStrings.text(.permissionScreenManageActionLabel, language: language)
+            : AppStrings.text(.permissionScreenRequestActionLabel, language: language)
     }
 
 }
@@ -148,7 +160,6 @@ final class PermissionStatusControlRowView<Control: NSView>: NSView {
     let titleLabel = AppKitSettingsCardBaseView.makeStatusLabel()
     let detailLabel = AppKitSettingsCardBaseView.makeBodyLabel()
     let control: Control
-    private let stackView = NSStackView()
     private let textStack = NSStackView()
     private let controlWidth: CGFloat?
 
@@ -164,14 +175,24 @@ final class PermissionStatusControlRowView<Control: NSView>: NSView {
     }
 
     override var intrinsicContentSize: NSSize {
+        updatePreferredLabelWidths()
         layoutSubtreeIfNeeded()
-        return NSSize(width: NSView.noIntrinsicMetric, height: stackView.fittingSize.height)
+        return NSSize(
+            width: NSView.noIntrinsicMetric,
+            height: ceil(max(textStack.fittingSize.height, control.fittingSize.height))
+        )
+    }
+
+    override func layout() {
+        updatePreferredLabelWidths()
+        super.layout()
     }
 
     private func buildViewHierarchy() {
         translatesAutoresizingMaskIntoConstraints = false
         setContentHuggingPriority(.required, for: .vertical)
         setContentCompressionResistancePriority(.required, for: .vertical)
+        configureTextLabelPriorities()
 
         textStack.orientation = .vertical
         textStack.alignment = .leading
@@ -180,41 +201,59 @@ final class PermissionStatusControlRowView<Control: NSView>: NSView {
         textStack.translatesAutoresizingMaskIntoConstraints = false
         textStack.setContentHuggingPriority(.required, for: .vertical)
         textStack.setContentCompressionResistancePriority(.required, for: .vertical)
+        textStack.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         textStack.addArrangedSubview(titleLabel)
         textStack.addArrangedSubview(detailLabel)
 
-        let spacer = NSView()
-        spacer.translatesAutoresizingMaskIntoConstraints = false
-        spacer.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        spacer.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-
-        stackView.orientation = .horizontal
-        stackView.alignment = .centerY
-        stackView.spacing = 10
-        stackView.detachesHiddenViews = true
-        stackView.translatesAutoresizingMaskIntoConstraints = false
-        stackView.setContentHuggingPriority(.required, for: .vertical)
-        stackView.setContentCompressionResistancePriority(.required, for: .vertical)
-        addSubview(stackView)
-        stackView.addArrangedSubview(textStack)
-        stackView.addArrangedSubview(spacer)
-        stackView.addArrangedSubview(control)
+        control.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(textStack)
+        addSubview(control)
         if let controlWidth {
             AppKitSettingsCardBaseView.applyPreferredControlWidth(control, width: controlWidth)
         }
 
         NSLayoutConstraint.activate([
-            stackView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            stackView.topAnchor.constraint(equalTo: topAnchor),
-            stackView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            stackView.bottomAnchor.constraint(equalTo: bottomAnchor)
+            textStack.leadingAnchor.constraint(equalTo: leadingAnchor),
+            textStack.topAnchor.constraint(equalTo: topAnchor),
+            textStack.bottomAnchor.constraint(equalTo: bottomAnchor),
+            textStack.trailingAnchor.constraint(lessThanOrEqualTo: control.leadingAnchor, constant: -10),
+
+            control.trailingAnchor.constraint(equalTo: trailingAnchor),
+            control.centerYAnchor.constraint(equalTo: textStack.centerYAnchor),
+            control.topAnchor.constraint(greaterThanOrEqualTo: topAnchor),
+            control.bottomAnchor.constraint(lessThanOrEqualTo: bottomAnchor)
         ])
     }
 
     func update(text: String, detail: String, statusColor: NSColor) {
         titleLabel.stringValue = text
         titleLabel.textColor = statusColor
+        titleLabel.isHidden = text.isEmpty
         detailLabel.stringValue = detail
+        detailLabel.isHidden = detail.isEmpty
+        titleLabel.invalidateIntrinsicContentSize()
+        detailLabel.invalidateIntrinsicContentSize()
+        textStack.invalidateIntrinsicContentSize()
+        invalidateIntrinsicContentSize()
+        needsLayout = true
+        superview?.invalidateIntrinsicContentSize()
+        superview?.needsLayout = true
+    }
+
+    private func configureTextLabelPriorities() {
+        [titleLabel, detailLabel].forEach { label in
+            label.setContentHuggingPriority(.required, for: .vertical)
+            label.setContentCompressionResistancePriority(.required, for: .vertical)
+            label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        }
+    }
+
+    private func updatePreferredLabelWidths() {
+        guard bounds.width > 0 else { return }
+        let controlWidth = max(control.fittingSize.width, control.intrinsicContentSize.width)
+        let textWidth = max(0, bounds.width - controlWidth - 10)
+        titleLabel.preferredMaxLayoutWidth = textWidth
+        detailLabel.preferredMaxLayoutWidth = textWidth
     }
 }
 
@@ -242,11 +281,11 @@ final class PermissionSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKit
     override init(frame frameRect: NSRect) {
         accessibilityRow = PermissionStatusControlRowView(
             control: FlowGradientActionButton(),
-            controlWidth: 166
+            controlWidth: 96
         )
         screenCaptureRow = PermissionStatusControlRowView(
             control: FlowGradientActionButton(),
-            controlWidth: 166
+            controlWidth: 96
         )
         super.init(frame: frameRect)
         accessibilityRow.control.target = self
@@ -259,11 +298,11 @@ final class PermissionSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKit
     required init?(coder: NSCoder) {
         accessibilityRow = PermissionStatusControlRowView(
             control: FlowGradientActionButton(),
-            controlWidth: 166
+            controlWidth: 96
         )
         screenCaptureRow = PermissionStatusControlRowView(
             control: FlowGradientActionButton(),
-            controlWidth: 166
+            controlWidth: 96
         )
         super.init(coder: coder)
         accessibilityRow.control.target = self
@@ -298,6 +337,8 @@ final class PermissionSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKit
             title: state.accessibilityButtonTitle,
             tone: state.accessibilityTrusted ? .blueDominant : .grayDominant
         )
+        accessibilityRow.control.toolTip = state.accessibilityPermissionActionLabel
+        accessibilityRow.control.setAccessibilityLabel(state.accessibilityPermissionActionLabel)
         screenCaptureRow.update(
             text: state.screenCaptureStatusText,
             detail: AppStrings.text(.permissionScreenDetail, language: language),
@@ -307,6 +348,8 @@ final class PermissionSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKit
             title: state.screenCaptureButtonTitle,
             tone: state.screenCaptureTrusted ? .blueDominant : .grayDominant
         )
+        screenCaptureRow.control.toolTip = state.screenCapturePermissionActionLabel
+        screenCaptureRow.control.setAccessibilityLabel(state.screenCapturePermissionActionLabel)
         invalidateIntrinsicContentSize()
     }
 

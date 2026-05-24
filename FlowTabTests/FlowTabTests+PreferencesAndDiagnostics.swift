@@ -63,9 +63,23 @@ extension FlowTabTests {
         )
         XCTAssertEqual(AppStrings.text(.settingsCardAppearanceTitle, language: .english), "Appearance")
         XCTAssertEqual(AppStrings.text(.appearanceThemeMode, language: .english), "Theme mode")
+        XCTAssertEqual(AppStrings.text(.themeFollowSystem, language: .english), "System")
+        XCTAssertEqual(AppStrings.text(.permissionAccessibilityManage, language: .english), "Manage")
         XCTAssertEqual(
             AppStrings.text(.permissionAccessibilityRequest, language: .english),
-            "Request Accessibility permission"
+            "Request"
+        )
+        XCTAssertEqual(
+            AppStrings.text(.permissionAccessibilityManageActionLabel, language: .english),
+            "Manage Accessibility permission"
+        )
+        XCTAssertEqual(
+            AppStrings.text(.permissionAccessibilityManage, language: .simplifiedChinese),
+            "管理辅助功能权限"
+        )
+        XCTAssertEqual(
+            AppStrings.text(.permissionScreenManage, language: .simplifiedChinese),
+            "管理屏幕录制权限"
         )
     }
 
@@ -115,10 +129,12 @@ extension FlowTabTests {
         XCTAssertTrue(localizedText.contains("Display, hotkeys, and permissions"), localizedText.sorted().joined(separator: "\n"))
         XCTAssertTrue(localizedText.contains("Appearance"), localizedText.sorted().joined(separator: "\n"))
         XCTAssertTrue(localizedText.contains("Theme mode"), localizedText.sorted().joined(separator: "\n"))
-        XCTAssertTrue(localizedText.contains("Request Accessibility permission"), localizedText.sorted().joined(separator: "\n"))
+        XCTAssertTrue(localizedText.contains("System"), localizedText.sorted().joined(separator: "\n"))
+        XCTAssertTrue(localizedText.contains("Request"), localizedText.sorted().joined(separator: "\n"))
         XCTAssertFalse(localizedText.contains("基础显示设置、快捷键与权限"), localizedText.sorted().joined(separator: "\n"))
         XCTAssertFalse(localizedText.contains("外观"), localizedText.sorted().joined(separator: "\n"))
         XCTAssertFalse(localizedText.contains("主题模式"), localizedText.sorted().joined(separator: "\n"))
+        XCTAssertFalse(localizedText.contains("Follow System"), localizedText.sorted().joined(separator: "\n"))
         XCTAssertFalse(localizedText.contains("请求辅助功能权限"), localizedText.sorted().joined(separator: "\n"))
 
         let subtitle: NSTextField = try XCTUnwrap(
@@ -206,7 +222,11 @@ extension FlowTabTests {
         )
         XCTAssertEqual(
             state.accessibilityButtonTitle,
-            AppStrings.text(.permissionAccessibilityClose, language: .simplifiedChinese)
+            AppStrings.text(.permissionAccessibilityManage, language: .simplifiedChinese)
+        )
+        XCTAssertEqual(
+            state.accessibilityPermissionActionLabel,
+            AppStrings.text(.permissionAccessibilityManageActionLabel, language: .simplifiedChinese)
         )
         XCTAssertEqual(
             state.screenCaptureStatusText,
@@ -214,7 +234,11 @@ extension FlowTabTests {
         )
         XCTAssertEqual(
             state.screenCaptureButtonTitle,
-            AppStrings.text(.permissionScreenClose, language: .simplifiedChinese)
+            AppStrings.text(.permissionScreenManage, language: .simplifiedChinese)
+        )
+        XCTAssertEqual(
+            state.screenCapturePermissionActionLabel,
+            AppStrings.text(.permissionScreenManageActionLabel, language: .simplifiedChinese)
         )
     }
 
@@ -222,11 +246,11 @@ extension FlowTabTests {
     func testPermissionSettingsRowsStayCompactWhenVerticalStackGetsExtraHeight() throws {
         let accessibilityRow = PermissionStatusControlRowView(
             control: FlowGradientActionButton(),
-            controlWidth: 166
+            controlWidth: 96
         )
         let screenCaptureRow = PermissionStatusControlRowView(
             control: FlowGradientActionButton(),
-            controlWidth: 166
+            controlWidth: 96
         )
         accessibilityRow.update(
             text: AppStrings.text(.permissionAccessibilityDenied),
@@ -246,8 +270,8 @@ extension FlowTabTests {
         stackView.frame = NSRect(x: 0, y: 0, width: 620, height: 260)
         stackView.layoutSubtreeIfNeeded()
 
-        XCTAssertLessThanOrEqual(accessibilityRow.frame.height, 40)
-        XCTAssertLessThanOrEqual(screenCaptureRow.frame.height, 40)
+        XCTAssertLessThanOrEqual(accessibilityRow.frame.height, accessibilityRow.intrinsicContentSize.height + 1)
+        XCTAssertLessThanOrEqual(screenCaptureRow.frame.height, screenCaptureRow.intrinsicContentSize.height + 1)
     }
 
     func testPermissionPollingPolicyBuildsTimeoutDescriptionFromCurrentLimits() {
@@ -411,6 +435,40 @@ extension FlowTabTests {
         XCTAssertEqual(
             userDefaults.string(forKey: AppPreferenceKeys.searchDefaultScope),
             SearchInteractionPreferencesStore.defaultScope.rawValue
+        )
+    }
+
+    func testSearchInteractionEffectiveDefaultScopeRequiresAccessibilityForWindowScope() {
+        XCTAssertEqual(
+            SearchInteractionPreferencesStore.effectiveDefaultScope(
+                rawValue: SwitcherSearchScope.window.rawValue,
+                accessibilityTrusted: false
+            ),
+            .app
+        )
+        XCTAssertEqual(
+            SearchInteractionPreferencesStore.effectiveDefaultScope(
+                rawValue: SwitcherSearchScope.window.rawValue,
+                accessibilityTrusted: true
+            ),
+            .window
+        )
+    }
+
+    func testSearchSettingsCardStateFallsBackToAppScopeWithoutAccessibilityPermission() {
+        let state = SearchSettingsCardState(
+            searchEnabled: true,
+            searchDefaultScopeRaw: SwitcherSearchScope.window.rawValue,
+            appLanguageRaw: AppLanguage.simplifiedChinese.rawValue,
+            accessibilityTrusted: false
+        )
+
+        XCTAssertEqual(state.availableScopes, [.app])
+        XCTAssertEqual(state.resolvedScope, .app)
+        XCTAssertFalse(state.isScopeSelectEnabled)
+        XCTAssertEqual(
+            state.summaryText,
+            AppStrings.text(.searchSummaryAccessibilityRequired, language: .simplifiedChinese)
         )
     }
 

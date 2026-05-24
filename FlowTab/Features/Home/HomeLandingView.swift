@@ -178,32 +178,16 @@ struct HomeLandingView: View {
     }
 
     private var permissionGuideBanner: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "info.circle.fill")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(.orange)
-
-            Text(permissionGuideMessage)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(.primary)
-                .multilineTextAlignment(.leading)
-
-            Spacer(minLength: 0)
-
-            FlowActionButton(
-                title: AppStrings.text(.actionGoToSettings, language: appLanguage),
-                tone: .blueDominant,
-                accessibilityIdentifier: "flowtab.home.permission.open-settings"
-            ) {
-                openSettings()
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 10) {
+                permissionGuideMessageRow
+                Spacer(minLength: 0)
+                permissionGuideActionRow
             }
 
-            FlowActionButton(
-                title: AppStrings.text(.actionDontRemindAgain, language: appLanguage),
-                tone: .grayDominant,
-                accessibilityIdentifier: "flowtab.home.permission.dismiss"
-            ) {
-                showPermissionReminder = false
+            VStack(alignment: .leading, spacing: 9) {
+                permissionGuideMessageRow
+                permissionGuideActionRow
             }
         }
         .padding(.horizontal, 12)
@@ -221,11 +205,45 @@ struct HomeLandingView: View {
         .accessibilityIdentifier("flowtab.home.permission.banner")
     }
 
+    private var permissionGuideMessageRow: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Image(systemName: "info.circle.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.orange)
+
+            Text(permissionGuideMessage)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(.primary)
+                .multilineTextAlignment(.leading)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var permissionGuideActionRow: some View {
+        HStack(spacing: 8) {
+            FlowActionButton(
+                title: AppStrings.text(.actionGoToSettings, language: appLanguage),
+                tone: .blueDominant,
+                accessibilityIdentifier: "flowtab.home.permission.open-settings"
+            ) {
+                openSettings()
+            }
+
+            FlowActionButton(
+                title: AppStrings.text(.actionDontRemindAgain, language: appLanguage),
+                tone: .grayDominant,
+                accessibilityIdentifier: "flowtab.home.permission.dismiss"
+            ) {
+                showPermissionReminder = false
+            }
+        }
+    }
+
     private var appLayerCard: some View {
         HomeSectionCard(
             title: AppStrings.text(.homeAppLayerTitle, language: appLanguage),
             subtitle: AppStrings.text(.homeAppLayerSubtitle, language: appLanguage),
-            trailingText: countText(.homeAppCount, count: presentedAppSummaries.count),
+            trailingText: AppStrings.appCount(presentedAppSummaries.count, language: appLanguage),
             trailingAccessibilityIdentifier: "flowtab.home.app.count"
         ) {
             if appSummaries.isEmpty {
@@ -300,7 +318,7 @@ struct HomeLandingView: View {
             } ?? AppStrings.text(.homeCurrentAppWindows, language: appLanguage),
             trailingText: activeApp.flatMap { windowsByAppID[$0.appID] } == nil
                 ? "--"
-                : countText(.homeWindowCount, count: activeWindows.count),
+                : AppStrings.windowCount(activeWindows.count, language: appLanguage),
             trailingAccessibilityIdentifier: "flowtab.home.window.count"
         ) {
             if let activeApp, windowsByAppID[activeApp.appID] == nil {
@@ -371,14 +389,6 @@ struct HomeLandingView: View {
             return "Window #\(index + 1)"
         }
         return trimmed
-    }
-
-    private func countText(_ key: AppStringKey, count: Int) -> String {
-        AppStrings.text(
-            key,
-            replacements: ["count": "\(count)"],
-            language: appLanguage
-        )
     }
 
     private func windowStatusText(window: WindowCandidate, index: Int) -> String {

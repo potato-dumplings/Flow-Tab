@@ -119,12 +119,13 @@ class AppKitSettingsCardBaseView: NSView {
         width: CGFloat,
         minimumWidth: CGFloat = 68
     ) {
-        let maximumWidth = control.widthAnchor.constraint(lessThanOrEqualToConstant: width)
-        let preferredWidth = control.widthAnchor.constraint(equalToConstant: width)
-        let minimumWidth = control.widthAnchor.constraint(greaterThanOrEqualToConstant: minimumWidth)
-        preferredWidth.priority = .defaultHigh
-        minimumWidth.priority = .defaultHigh
-        NSLayoutConstraint.activate([maximumWidth, preferredWidth, minimumWidth])
+        control.setContentHuggingPriority(.required, for: .horizontal)
+        control.setContentCompressionResistancePriority(.required, for: .horizontal)
+        let minimumConstraint = control.widthAnchor.constraint(
+            greaterThanOrEqualToConstant: max(width, minimumWidth)
+        )
+        minimumConstraint.priority = .defaultHigh
+        NSLayoutConstraint.activate([minimumConstraint])
     }
 
     static func selectItem(in selectControl: FlowFormSelectControl, rawValue: String) {
@@ -156,6 +157,7 @@ final class AppKitSettingsControlRow: NSStackView {
     private func buildViewHierarchy(control: NSView) {
         titleLabel.font = .systemFont(ofSize: 13)
         titleLabel.lineBreakMode = .byTruncatingTail
+        titleLabel.maximumNumberOfLines = 1
         titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         spacer.translatesAutoresizingMaskIntoConstraints = false

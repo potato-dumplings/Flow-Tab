@@ -74,6 +74,23 @@ extension FlowTabUITests {
         }
     }
 
+    func testSearchHeaderHighlightedAppChipStaysContentSizedForShortTitle() throws {
+        let app = makeApp(additionalArguments: searchPointerHoverArguments)
+        launchFlowTabUITestApplication(app)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+
+        let searchHeader = element(in: app, identifier: Identifier.switcherSearchHeader)
+        let highlightedChip = element(in: app, identifier: Identifier.switcherSearchHighlight)
+        XCTAssertTrue(searchHeader.waitForExistence(timeout: 5))
+        XCTAssertTrue(highlightedChip.waitForExistence(timeout: 5))
+        XCTAssertGreaterThan(highlightedChip.frame.width, 40)
+        XCTAssertLessThan(
+            highlightedChip.frame.width,
+            150,
+            "Short highlighted app names should stay content-sized instead of expanding to the long-title width cap."
+        )
+    }
+
     func testSearchPanelChineseQueryShowsChineseMockResult() throws {
         let app = makeApp(
             additionalArguments: [

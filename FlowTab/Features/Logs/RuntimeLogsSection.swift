@@ -153,7 +153,10 @@ struct RuntimeLogsSection: View {
             subtitle: AppStrings.text(.logsSectionSubtitle)
         ) {
             VStack(alignment: .leading, spacing: 10) {
-                Toggle(AppStrings.text(.logsEnableVerbose), isOn: $enableVerboseDiagnostics)
+                Toggle(isOn: $enableVerboseDiagnostics) {
+                    Text(AppStrings.text(.logsEnableVerbose))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
                     .toggleStyle(.switch)
                     .font(.system(size: 12))
 

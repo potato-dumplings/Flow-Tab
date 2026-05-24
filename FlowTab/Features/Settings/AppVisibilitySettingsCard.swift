@@ -9,11 +9,7 @@ struct AppVisibilitySettingsCardState: Equatable {
     }
 
     var statusText: String {
-        AppStrings.text(
-            .appVisibilityManagerSubtitle,
-            replacements: ["count": "\(hiddenAppCount)"],
-            language: language
-        )
+        AppStrings.hiddenAppCount(hiddenAppCount, language: language)
     }
 
     var summaryText: String {
@@ -57,7 +53,7 @@ final class AppVisibilitySettingsCardAppKitView: AppKitSettingsCardBaseView {
             manageButton.topAnchor.constraint(equalTo: manageButtonContainer.topAnchor, constant: -14),
             manageButton.leadingAnchor.constraint(equalTo: manageButtonContainer.leadingAnchor),
             manageButton.trailingAnchor.constraint(equalTo: manageButtonContainer.trailingAnchor),
-            manageButtonContainer.widthAnchor.constraint(equalToConstant: 68),
+            manageButtonContainer.widthAnchor.constraint(greaterThanOrEqualToConstant: 68),
             manageButtonContainer.heightAnchor.constraint(equalToConstant: 18)
         ])
 
@@ -103,7 +99,7 @@ private final class AppVisibilityManageButton: NSButton {
     }
 
     override var intrinsicContentSize: NSSize {
-        NSSize(width: 68, height: 32)
+        NSSize(width: max(68, ceil(attributedTitle.size().width) + 28), height: 32)
     }
 
     override func viewDidChangeEffectiveAppearance() {
@@ -157,6 +153,8 @@ private final class AppVisibilityManageButton: NSButton {
         imagePosition = .noImage
         setButtonType(.momentaryChange)
         translatesAutoresizingMaskIntoConstraints = false
+        setContentHuggingPriority(.required, for: .horizontal)
+        setContentCompressionResistancePriority(.required, for: .horizontal)
         widthAnchor.constraint(equalToConstant: 68).isActive = true
         heightAnchor.constraint(equalToConstant: 32).isActive = true
         updateAppearance()

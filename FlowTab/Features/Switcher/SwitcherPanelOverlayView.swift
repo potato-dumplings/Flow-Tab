@@ -651,6 +651,7 @@ private struct CommandTabOverlay: View {
                 onSearchInputChanged: onSearchInputChanged,
                 onSearchMarkedTextChanged: onSearchMarkedTextChanged
             )
+            .accessibilityElement(children: .contain)
             .accessibilityIdentifier("flowtab.switcher.search")
             .background(SearchLayoutSizeReader(target: .header))
 

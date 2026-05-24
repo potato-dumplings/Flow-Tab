@@ -153,6 +153,17 @@ struct SearchPresentationHeader: View {
     @Environment(\.colorScheme) private var colorScheme
 
     private let inputLineHeight: CGFloat = 24
+    private let highlightedTitleMaxWidth: CGFloat = 140
+    private let highlightedChipHorizontalPadding: CGFloat = 6
+    private let highlightedChipVerticalPadding: CGFloat = 5
+    private let highlightedChipTextSpacing: CGFloat = 4
+    private let highlightedTitleFontSize: CGFloat = 14
+
+    private func highlightedTitleWidth(for title: String) -> CGFloat {
+        let font = NSFont.systemFont(ofSize: highlightedTitleFontSize, weight: .regular)
+        let measured = (title as NSString).size(withAttributes: [.font: font]).width
+        return min(max(1, ceil(measured)), highlightedTitleMaxWidth)
+    }
 
     var body: some View {
         HStack(spacing: 12) {
@@ -176,25 +187,33 @@ struct SearchPresentationHeader: View {
                 .opacity(query.isEmpty && !isInputFocused ? 0.01 : 1)
                 .allowsHitTesting(false)
             }
+            .layoutPriority(1)
             .frame(maxWidth: .infinity, minHeight: inputLineHeight, maxHeight: inputLineHeight, alignment: .leading)
             .clipped()
 
             if let highlightedItem {
-                HStack(spacing: 8) {
+                HStack(spacing: highlightedChipTextSpacing) {
                     Text("—")
                         .font(.system(size: 16, weight: .regular))
                         .foregroundStyle(.secondary)
                     Text(highlightedItem.title)
                         .lineLimit(1)
-                        .font(.system(size: 14, weight: .regular))
+                        .truncationMode(.tail)
+                        .font(.system(size: highlightedTitleFontSize, weight: .regular))
                         .foregroundStyle(.primary)
+                        .frame(width: highlightedTitleWidth(for: highlightedItem.title), alignment: .leading)
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
+                .padding(.horizontal, highlightedChipHorizontalPadding)
+                .padding(.vertical, highlightedChipVerticalPadding)
+                .fixedSize(horizontal: true, vertical: false)
                 .background(
                     RoundedRectangle(cornerRadius: 9, style: .continuous)
                         .fill(Color.accentColor.opacity(colorScheme == .dark ? 0.30 : 0.20))
                 )
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(Text(highlightedItem.title))
+                .accessibilityIdentifier("flowtab.switcher.search.highlight")
+                .layoutPriority(0)
             }
 
             Group {
@@ -215,6 +234,7 @@ struct SearchPresentationHeader: View {
             .frame(width: 26, height: 26)
             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             .shadow(color: .black.opacity(colorScheme == .dark ? 0.22 : 0.10), radius: 3, y: 1)
+            .accessibilityHidden(true)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 7)

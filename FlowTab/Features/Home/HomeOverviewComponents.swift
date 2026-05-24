@@ -352,7 +352,6 @@ struct HomePermissionStatusCard: View {
         .frame(
             maxWidth: .infinity,
             minHeight: HomePageLayout.bottomStatusHeight,
-            maxHeight: HomePageLayout.bottomStatusHeight,
             alignment: .leading
         )
         .background(
@@ -397,26 +396,46 @@ private struct HomePermissionStatusRow: View {
     }
 
     var body: some View {
-        HStack(spacing: 9) {
-            Image(systemName: isGranted ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(HomePermissionStatusColors.iconColor(isGranted: isGranted))
-                .frame(width: 14)
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 9) {
+                statusIcon
+                titleText
+                Spacer(minLength: 4)
+                statusText
+            }
 
-            HomeAccessibleText(
-                text: title,
-                font: .systemFont(ofSize: 12, weight: .medium),
-                textColor: titleTextColor,
-                accessibilityIdentifier: accessibilityIdentifier
-            )
-            .frame(height: 15)
-
-            Spacer(minLength: 4)
-
-            Text(AppStrings.text(isGranted ? .homePermissionGranted : .homePermissionMissing, language: language))
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(statusTextColor)
-                .lineLimit(1)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 9) {
+                    statusIcon
+                    titleText
+                }
+                statusText
+                    .padding(.leading, 23)
+            }
         }
+    }
+
+    private var statusIcon: some View {
+        Image(systemName: isGranted ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
+            .font(.system(size: 12, weight: .semibold))
+            .foregroundStyle(HomePermissionStatusColors.iconColor(isGranted: isGranted))
+            .frame(width: 14)
+    }
+
+    private var titleText: some View {
+        HomeAccessibleText(
+            text: title,
+            font: .systemFont(ofSize: 12, weight: .medium),
+            textColor: titleTextColor,
+            accessibilityIdentifier: accessibilityIdentifier
+        )
+        .frame(height: 15)
+    }
+
+    private var statusText: some View {
+        Text(AppStrings.text(isGranted ? .homePermissionGranted : .homePermissionMissing, language: language))
+            .font(.system(size: 11, weight: .medium))
+            .foregroundStyle(statusTextColor)
+            .lineLimit(1)
     }
 }

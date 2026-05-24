@@ -470,7 +470,8 @@ final class AppKitSettingsPageView: NSView {
             with: SearchSettingsCardState(
                 searchEnabled: state.searchEnabled,
                 searchDefaultScopeRaw: state.searchDefaultScopeRaw,
-                appLanguageRaw: state.appLanguageRaw
+                appLanguageRaw: state.appLanguageRaw,
+                accessibilityTrusted: state.accessibilityTrusted
             )
         )
         let appVisibilityState = AppVisibilitySettingsCardState(

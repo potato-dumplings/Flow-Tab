@@ -450,6 +450,20 @@ enum SearchInteractionPreferencesStore {
         }
         return resolved
     }
+
+    static func availableScopes(accessibilityTrusted: Bool) -> [SwitcherSearchScope] {
+        accessibilityTrusted ? SwitcherSearchScope.allCases : [.app]
+    }
+
+    static func effectiveDefaultScope(
+        rawValue: String,
+        accessibilityTrusted: Bool
+    ) -> SwitcherSearchScope {
+        let resolved = SwitcherSearchScope(rawValue: rawValue) ?? defaultScope
+        return availableScopes(accessibilityTrusted: accessibilityTrusted).contains(resolved)
+            ? resolved
+            : .app
+    }
 }
 
 enum InAppWindowHotkeyPreferencesStore {

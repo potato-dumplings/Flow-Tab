@@ -7,6 +7,7 @@ struct AppKitSearchSettingsCardContent: AppKitSettingsCardRepresentable {
 
     @Binding var searchEnabled: Bool
     @Binding var searchDefaultScopeRaw: String
+    let accessibilityTrusted: Bool
 
     final class Coordinator {
         var searchEnabled: Binding<Bool>
@@ -52,7 +53,8 @@ struct AppKitSearchSettingsCardContent: AppKitSettingsCardRepresentable {
         SearchSettingsCardState(
             searchEnabled: searchEnabled,
             searchDefaultScopeRaw: searchDefaultScopeRaw,
-            appLanguageRaw: AppLanguagePreferencesStore.load().rawValue
+            appLanguageRaw: AppLanguagePreferencesStore.load().rawValue,
+            accessibilityTrusted: accessibilityTrusted
         )
     }
 }
@@ -61,19 +63,35 @@ struct SearchSettingsCardState: Equatable {
     let searchEnabled: Bool
     let searchDefaultScopeRaw: String
     let appLanguageRaw: String
+    let accessibilityTrusted: Bool
 
     var language: AppLanguage {
         AppLanguagePreferencesStore.resolve(rawValue: appLanguageRaw)
     }
 
+    var availableScopes: [SwitcherSearchScope] {
+        SearchInteractionPreferencesStore.availableScopes(accessibilityTrusted: accessibilityTrusted)
+    }
+
     var resolvedScope: SwitcherSearchScope {
-        SwitcherSearchScope(rawValue: searchDefaultScopeRaw) ?? SearchInteractionPreferencesStore.defaultScope
+        SearchInteractionPreferencesStore.effectiveDefaultScope(
+            rawValue: searchDefaultScopeRaw,
+            accessibilityTrusted: accessibilityTrusted
+        )
+    }
+
+    var isScopeSelectEnabled: Bool {
+        searchEnabled && availableScopes.count > 1
     }
 
     var summaryText: String {
-        searchEnabled
-            ? AppStrings.text(.searchSummaryEnabled, language: language)
-            : AppStrings.text(.searchSummaryDisabled, language: language)
+        guard searchEnabled else {
+            return AppStrings.text(.searchSummaryDisabled, language: language)
+        }
+        guard accessibilityTrusted else {
+            return AppStrings.text(.searchSummaryAccessibilityRequired, language: language)
+        }
+        return AppStrings.text(.searchSummaryEnabled, language: language)
     }
 }
 
@@ -96,8 +114,11 @@ final class SearchSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKitSett
     private var isApplyingState = false
     private var currentState: SearchSettingsCardState?
 
-    private static func scopeOptions(language: AppLanguage) -> [(id: String, title: String)] {
-        SwitcherSearchScope.allCases.map { scope in
+    private static func scopeOptions(
+        scopes: [SwitcherSearchScope],
+        language: AppLanguage
+    ) -> [(id: String, title: String)] {
+        scopes.map { scope in
             switch scope {
             case .app:
                 return (id: scope.rawValue, title: AppStrings.text(.searchScopeApp, language: language))
@@ -123,14 +144,16 @@ final class SearchSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKitSett
 
         isApplyingState = true
         searchEnabledSwitch.state = state.searchEnabled ? .on : .off
-        searchDefaultScopeSelect.configure(options: Self.scopeOptions(language: state.language))
+        searchDefaultScopeSelect.configure(
+            options: Self.scopeOptions(scopes: state.availableScopes, language: state.language)
+        )
         AppKitSettingsCardBaseView.selectItem(in: searchDefaultScopeSelect, rawValue: state.resolvedScope.rawValue)
         isApplyingState = false
 
         searchEnabledRow.updateTitle(AppStrings.text(.searchEnable, language: state.language))
         scopeRow.updateTitle(AppStrings.text(.searchDefaultScope, language: state.language))
-        searchDefaultScopeSelect.isEnabled = state.searchEnabled
-        scopeRowContainer.alphaValue = state.searchEnabled ? 1 : 0.5
+        searchDefaultScopeSelect.isEnabled = state.isScopeSelectEnabled
+        scopeRowContainer.alphaValue = state.isScopeSelectEnabled ? 1 : 0.5
         summaryLabel.stringValue = state.summaryText
         invalidateIntrinsicContentSize()
     }
@@ -145,7 +168,10 @@ final class SearchSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKitSett
         }
         AppKitSettingsCardBaseView.configure(
             selectControl: searchDefaultScopeSelect,
-            options: Self.scopeOptions(language: AppLanguagePreferencesStore.load()),
+            options: Self.scopeOptions(
+                scopes: SwitcherSearchScope.allCases,
+                language: AppLanguagePreferencesStore.load()
+            ),
             width: 68
         )
 

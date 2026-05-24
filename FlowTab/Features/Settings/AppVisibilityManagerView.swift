@@ -107,10 +107,7 @@ struct AppVisibilityManagerView: View {
                     .font(.system(size: 23, weight: .semibold))
                     .lineLimit(1)
                 Text(
-                    AppStrings.text(
-                        .appVisibilityManagerSubtitle,
-                        replacements: ["count": "\(model.hiddenCount)"]
-                    )
+                    AppStrings.hiddenAppCount(model.hiddenCount)
                 )
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)

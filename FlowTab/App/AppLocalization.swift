@@ -136,6 +136,7 @@ enum AppStringKey: String {
     case windowBehaviorHideMinimizedApps
     case searchSummaryEnabled
     case searchSummaryDisabled
+    case searchSummaryAccessibilityRequired
     case searchEnable
     case searchDefaultScope
     case searchScopeApp
@@ -162,12 +163,16 @@ enum AppStringKey: String {
     case appVisibilityHiddenBadge
     case permissionAccessibilityGranted
     case permissionAccessibilityDenied
-    case permissionAccessibilityClose
+    case permissionAccessibilityManage
     case permissionAccessibilityRequest
+    case permissionAccessibilityManageActionLabel
+    case permissionAccessibilityRequestActionLabel
     case permissionScreenGranted
     case permissionScreenDenied
-    case permissionScreenClose
+    case permissionScreenManage
     case permissionScreenRequest
+    case permissionScreenManageActionLabel
+    case permissionScreenRequestActionLabel
     case permissionAccessibilityDetail
     case permissionScreenDetail
     case permissionHomeReminderToggle
@@ -287,6 +292,7 @@ enum AppStrings {
             .windowBehaviorHideMinimizedApps: "应用层隐藏仅最小化应用",
             .searchSummaryEnabled: "面板默认从应用层开始；按 Enter 或 ↑ 进入搜索。",
             .searchSummaryDisabled: "已关闭搜索：面板仅显示应用层与窗口层。",
+            .searchSummaryAccessibilityRequired: "窗口搜索需要辅助功能权限；授权后可选择窗口范围。",
             .searchEnable: "启用搜索功能",
             .searchDefaultScope: "默认搜索范围",
             .searchScopeApp: "应用",
@@ -313,12 +319,16 @@ enum AppStrings {
             .appVisibilityHiddenBadge: "已隐藏",
             .permissionAccessibilityGranted: "辅助功能权限：已授权",
             .permissionAccessibilityDenied: "辅助功能权限：未授权",
-            .permissionAccessibilityClose: "关闭辅助功能权限",
+            .permissionAccessibilityManage: "管理辅助功能权限",
             .permissionAccessibilityRequest: "请求辅助功能权限",
+            .permissionAccessibilityManageActionLabel: "管理辅助功能权限",
+            .permissionAccessibilityRequestActionLabel: "请求辅助功能权限",
             .permissionScreenGranted: "屏幕录制权限：已授权",
             .permissionScreenDenied: "屏幕录制权限：未授权",
-            .permissionScreenClose: "关闭屏幕录制权限",
+            .permissionScreenManage: "管理屏幕录制权限",
             .permissionScreenRequest: "请求屏幕录制权限",
+            .permissionScreenManageActionLabel: "管理屏幕录制权限",
+            .permissionScreenRequestActionLabel: "请求屏幕录制权限",
             .permissionAccessibilityDetail: "用于应用切换、应用内窗口切换和最小化窗口处理。",
             .permissionScreenDetail: "用于显示窗口真实预览画面；未授权时仅显示兜底信息。",
             .permissionHomeReminderToggle: "无权限时是否在首页提示获取权限",
@@ -345,7 +355,7 @@ enum AppStrings {
             .panelNoResult: "没有匹配结果"
         ],
         .english: [
-            .themeFollowSystem: "Follow System",
+            .themeFollowSystem: "System",
             .themeLight: "Light",
             .themeDark: "Dark",
             .menuSettings: "Settings",
@@ -433,6 +443,7 @@ enum AppStrings {
             .windowBehaviorHideMinimizedApps: "Hide minimized-only apps in app layer",
             .searchSummaryEnabled: "Panel starts from app layer by default; press Enter or ↑ to start search.",
             .searchSummaryDisabled: "Search is disabled: panel only shows app and window layers.",
+            .searchSummaryAccessibilityRequired: "Window search requires Accessibility permission. Enable it to choose Window.",
             .searchEnable: "Enable search",
             .searchDefaultScope: "Default search scope",
             .searchScopeApp: "App",
@@ -459,12 +470,16 @@ enum AppStrings {
             .appVisibilityHiddenBadge: "Hidden",
             .permissionAccessibilityGranted: "Accessibility: Granted",
             .permissionAccessibilityDenied: "Accessibility: Not granted",
-            .permissionAccessibilityClose: "Disable Accessibility permission",
-            .permissionAccessibilityRequest: "Request Accessibility permission",
+            .permissionAccessibilityManage: "Manage",
+            .permissionAccessibilityRequest: "Request",
+            .permissionAccessibilityManageActionLabel: "Manage Accessibility permission",
+            .permissionAccessibilityRequestActionLabel: "Request Accessibility permission",
             .permissionScreenGranted: "Screen Recording: Granted",
             .permissionScreenDenied: "Screen Recording: Not granted",
-            .permissionScreenClose: "Disable Screen Recording permission",
-            .permissionScreenRequest: "Request Screen Recording permission",
+            .permissionScreenManage: "Manage",
+            .permissionScreenRequest: "Request",
+            .permissionScreenManageActionLabel: "Manage Screen Recording permission",
+            .permissionScreenRequestActionLabel: "Request Screen Recording permission",
             .permissionAccessibilityDetail: "Used for app switching, in-app window switching, and minimized-window handling.",
             .permissionScreenDetail: "Used for real window previews; fallback info is shown when not granted.",
             .permissionHomeReminderToggle: "Show Home reminder when permissions are missing",
@@ -504,5 +519,36 @@ enum AppStrings {
             resolved = resolved.replacingOccurrences(of: "{\(token)}", with: value)
         }
         return resolved
+    }
+
+    static func appCount(_ count: Int, language: AppLanguage = AppLanguagePreferencesStore.load()) -> String {
+        switch language {
+        case .simplifiedChinese:
+            return text(.homeAppCount, replacements: ["count": "\(count)"], language: language)
+        case .english:
+            return "\(count) \(englishNoun(singular: "app", plural: "apps", count: count))"
+        }
+    }
+
+    static func windowCount(_ count: Int, language: AppLanguage = AppLanguagePreferencesStore.load()) -> String {
+        switch language {
+        case .simplifiedChinese:
+            return text(.homeWindowCount, replacements: ["count": "\(count)"], language: language)
+        case .english:
+            return "\(count) \(englishNoun(singular: "window", plural: "windows", count: count))"
+        }
+    }
+
+    static func hiddenAppCount(_ count: Int, language: AppLanguage = AppLanguagePreferencesStore.load()) -> String {
+        switch language {
+        case .simplifiedChinese:
+            return text(.appVisibilityManagerSubtitle, replacements: ["count": "\(count)"], language: language)
+        case .english:
+            return "\(count) \(englishNoun(singular: "app", plural: "apps", count: count)) hidden"
+        }
+    }
+
+    private static func englishNoun(singular: String, plural: String, count: Int) -> String {
+        count == 1 ? singular : plural
     }
 }

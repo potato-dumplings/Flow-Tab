@@ -95,6 +95,8 @@ final class FlowTabUITests: XCTestCase {
         static let switcherAppTopLevelZeroWindow =
             "flowtab.switcher.app.\("com.flowtab.mock.top-level-zero-window".flowTabUITestAccessibilityIdentifierComponent)"
         static let switcherNextWindowPage = "flowtab.switcher.window-page.next"
+        static let switcherSearchHeader = "flowtab.switcher.search"
+        static let switcherSearchHighlight = "flowtab.switcher.search.highlight"
         static let switcherSearchInput = "flowtab.switcher.search.input"
         static let switcherSearchAppMockMail = "flowtab.switcher.search.app.\("com.flowtab.mock.mail".flowTabUITestAccessibilityIdentifierComponent)"
         static let switcherSearchWindowMockMailInbox =

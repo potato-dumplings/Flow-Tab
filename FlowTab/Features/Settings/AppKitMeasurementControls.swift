@@ -45,7 +45,14 @@ final class FlowCapsuleSegmentedControl: NSView {
     }
 
     override var intrinsicContentSize: NSSize {
-        NSSize(width: 300, height: 32)
+        let font = NSFont.systemFont(ofSize: 12, weight: .medium)
+        let widestTitle = options
+            .map { ($0.title as NSString).size(withAttributes: [.font: font]).width }
+            .max() ?? 0
+        let segmentWidth = ceil(widestTitle) + 28
+        let spacing = CGFloat(max(options.count - 1, 0)) * stackView.spacing
+        let preferredWidth = segmentWidth * CGFloat(max(options.count, 1)) + spacing + 4
+        return NSSize(width: max(240, preferredWidth), height: 32)
     }
 
     override func viewDidChangeEffectiveAppearance() {
@@ -80,7 +87,9 @@ final class FlowCapsuleSegmentedControl: NSView {
     private func buildViewHierarchy() {
         wantsLayer = true
         translatesAutoresizingMaskIntoConstraints = false
+        setContentHuggingPriority(.required, for: .horizontal)
         setContentHuggingPriority(.required, for: .vertical)
+        setContentCompressionResistancePriority(.required, for: .horizontal)
         setContentCompressionResistancePriority(.required, for: .vertical)
         setAccessibilityElement(true)
         setAccessibilityRole(.radioGroup)
@@ -170,6 +179,11 @@ final class FlowGradientActionButton: NSButton {
         buildViewHierarchy()
     }
 
+    override var intrinsicContentSize: NSSize {
+        let titleWidth = attributedTitle.size().width
+        return NSSize(width: max(96, ceil(titleWidth) + 32), height: 30)
+    }
+
     override func layout() {
         super.layout()
         updateAppearance()
@@ -189,6 +203,7 @@ final class FlowGradientActionButton: NSButton {
             image = nil
         }
         updateAppearance()
+        invalidateIntrinsicContentSize()
     }
 
     private func buildViewHierarchy() {
@@ -199,7 +214,9 @@ final class FlowGradientActionButton: NSButton {
         imagePosition = .imageLeading
         imageScaling = .scaleProportionallyDown
         translatesAutoresizingMaskIntoConstraints = false
+        setContentHuggingPriority(.required, for: .horizontal)
         setContentHuggingPriority(.required, for: .vertical)
+        setContentCompressionResistancePriority(.required, for: .horizontal)
         setContentCompressionResistancePriority(.required, for: .vertical)
         heightAnchor.constraint(greaterThanOrEqualToConstant: 30).isActive = true
 

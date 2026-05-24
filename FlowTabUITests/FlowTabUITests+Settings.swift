@@ -243,6 +243,24 @@ extension FlowTabUITests {
         )
     }
 
+    func testSettingsSimplifiedChinesePermissionStatusesAreVisible() throws {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-ax-trusted",
+                "NO",
+                "--flowtab-ui-screen-trusted",
+                "NO"
+            ]
+        )
+        launchFlowTabUITestApplication(app)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+        openSettingsTab(in: app)
+
+        XCTAssertTrue(app.staticTexts["辅助功能权限：未授权"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["屏幕录制权限：未授权"].waitForExistence(timeout: 5))
+    }
+
     func testSettingsHotkeySelectionsPersistAcrossRelaunch() throws {
         let firstLaunchApp = makeApp(
             additionalArguments: [

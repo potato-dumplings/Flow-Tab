@@ -120,6 +120,32 @@ extension FlowTabUITests {
         assertValue(of: element(in: firstLaunchApp, identifier: Identifier.settingsSearchDefaultScope), equals: "window")
     }
 
+    func testSettingsSearchWindowScopeUnavailableWithoutAccessibilityPermission() throws {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-ax-trusted",
+                "NO",
+                "--flowtab-ui-screen-trusted",
+                "YES"
+            ]
+        )
+        launchFlowTabUITestApplication(app)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+        openSettingsTab(in: app)
+
+        let scopeControl = element(in: app, identifier: Identifier.settingsSearchDefaultScope)
+        XCTAssertTrue(scopeControl.waitForExistence(timeout: 5))
+        assertValue(of: scopeControl, equals: "app")
+        tapElement(scopeControl)
+
+        let windowOption = app.descendants(matching: .any)
+            .matching(identifier: "\(Identifier.settingsSearchDefaultScope).option.window")
+            .firstMatch
+        XCTAssertFalse(windowOption.waitForExistence(timeout: 1))
+        assertValue(of: scopeControl, equals: "app")
+    }
+
     func testSettingsAppVisibilityHidesMockAppFromSwitcherAndSearch() throws {
         let settingsApp = makeApp(
             additionalArguments: appVisibilityRuntimeArguments(resetDefaults: true)

@@ -324,7 +324,7 @@ final class FlowFormSelectControl: NSView, NSPopoverDelegate {
     }
 
     override var intrinsicContentSize: NSSize {
-        NSSize(width: 120, height: 32)
+        NSSize(width: preferredControlWidth, height: 32)
     }
 
     override func layout() {
@@ -387,6 +387,7 @@ final class FlowFormSelectControl: NSView, NSPopoverDelegate {
             selectedID: selectedID,
             preferredWidth: max(bounds.width, intrinsicContentSize.width)
         )
+        invalidateIntrinsicContentSize()
     }
 
     func updateSelection(id: String) {
@@ -403,12 +404,23 @@ final class FlowFormSelectControl: NSView, NSPopoverDelegate {
             preferredWidth: max(bounds.width, intrinsicContentSize.width)
         )
         updateAppearance()
+        invalidateIntrinsicContentSize()
+    }
+
+    private var preferredControlWidth: CGFloat {
+        let font = NSFont.systemFont(ofSize: 13)
+        let widestTitle = options
+            .map { ($0.title as NSString).size(withAttributes: [.font: font]).width }
+            .max() ?? 0
+        return max(84, ceil(widestTitle) + 44)
     }
 
     private func buildViewHierarchy() {
         wantsLayer = true
         translatesAutoresizingMaskIntoConstraints = false
+        setContentHuggingPriority(.required, for: .horizontal)
         setContentHuggingPriority(.required, for: .vertical)
+        setContentCompressionResistancePriority(.required, for: .horizontal)
         setContentCompressionResistancePriority(.required, for: .vertical)
         heightAnchor.constraint(equalToConstant: 32).isActive = true
         popover.delegate = self
