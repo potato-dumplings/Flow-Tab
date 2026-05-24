@@ -20,6 +20,61 @@ extension FlowTabTests {
         )
     }
 
+    @MainActor
+    func testSettingsManageButtonUsesApplicationThemeAfterLanguageChange() throws {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 1_200, height: 820),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        window.appearance = NSAppearance(named: .aqua)
+        defer {
+            window.orderOut(nil)
+            window.contentView = nil
+        }
+
+        let container = AppKitSettingsPageContainerView()
+        container.frame = window.contentView?.bounds ?? NSRect(x: 0, y: 0, width: 1_200, height: 820)
+        window.contentView = container
+        container.update(
+            with: makeSettingsPageState(
+                themeModeRaw: ThemeMode.dark.rawValue,
+                language: .english
+            ),
+            isActive: true
+        )
+        container.layoutSubtreeIfNeeded()
+        container.update(
+            with: makeSettingsPageState(
+                themeModeRaw: ThemeMode.dark.rawValue,
+                language: .simplifiedChinese
+            ),
+            isActive: true
+        )
+        container.layoutSubtreeIfNeeded()
+
+        let manageButton: NSButton = try XCTUnwrap(
+            descendant(in: container, identifier: "flowtab.settings.app-visibility.manage")
+        )
+        XCTAssertEqual(
+            container.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]),
+            .darkAqua
+        )
+        XCTAssertEqual(manageButton.attributedTitle.string, "管理")
+        assertButtonTitleColor(
+            manageButton.attributedTitle,
+            expectedInk: .light,
+            appearance: manageButton.effectiveAppearance
+        )
+        XCTAssertEqual(manageButton.attributedAlternateTitle.string, manageButton.attributedTitle.string)
+        assertButtonTitleColor(
+            manageButton.attributedAlternateTitle,
+            expectedInk: .light,
+            appearance: manageButton.effectiveAppearance
+        )
+    }
+
     private enum ExpectedSettingsSelectInk {
         case dark
         case light
@@ -182,12 +237,15 @@ extension FlowTabTests {
         }
     }
 
-    private func makeSettingsPageState(themeModeRaw: String) -> AppKitSettingsPageState {
+    private func makeSettingsPageState(
+        themeModeRaw: String,
+        language: AppLanguage = .simplifiedChinese
+    ) -> AppKitSettingsPageState {
         AppKitSettingsPageState(
             showShortcutHint: true,
             showInCommandTab: true,
             themeModeRaw: themeModeRaw,
-            appLanguageRaw: AppLanguage.simplifiedChinese.rawValue,
+            appLanguageRaw: language.rawValue,
             windowLayerAutoEnterDelayText: "0.3",
             autoRestoreMinimizedWindowOnSwitch: true,
             hideMinimizedAppsFromAppLayer: false,

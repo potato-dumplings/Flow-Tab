@@ -179,6 +179,18 @@ extension NSAppearance {
     var isFlowTabDarkInterface: Bool {
         bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
     }
+
+    func flowTabResolvedColor(_ colorProvider: () -> NSColor) -> NSColor {
+        var resolvedColor: NSColor?
+        performAsCurrentDrawingAppearance {
+            resolvedColor = colorProvider()
+        }
+        return resolvedColor ?? colorProvider()
+    }
+
+    func flowTabResolvedCGColor(_ colorProvider: () -> NSColor) -> CGColor {
+        flowTabResolvedColor(colorProvider).cgColor
+    }
 }
 
 final class AppKitSectionCardView: NSView {

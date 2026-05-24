@@ -161,9 +161,32 @@ private final class AppVisibilityManageButton: NSButton {
     }
 
     private func updateAppearance() {
-        guard let layer else { return }
-        let isDark = effectiveAppearance.isFlowTabDarkInterface
+        wantsLayer = true
+        let appearance = effectiveAppearance
+        let isDark = appearance.isFlowTabDarkInterface
         let baseAlpha: CGFloat = isHovering ? 1 : 0.96
+        let titleColor = appearance.flowTabResolvedColor {
+            NSColor.labelColor.withAlphaComponent(isDark ? 0.78 : 0.72)
+        }
+
+        let styledTitle = NSAttributedString(
+            string: buttonTitle,
+            attributes: [
+                .paragraphStyle: {
+                    let style = NSMutableParagraphStyle()
+                    style.alignment = .center
+                    return style
+                }(),
+                .font: NSFont.systemFont(ofSize: 13, weight: .medium),
+                .foregroundColor: titleColor
+            ]
+        )
+        title = buttonTitle
+        attributedTitle = styledTitle
+        attributedAlternateTitle = styledTitle
+        contentTintColor = titleColor
+
+        guard let layer else { return }
 
         if isDark {
             layer.backgroundColor = NSColor.white.withAlphaComponent(isHovering ? 0.18 : 0.12).cgColor
@@ -180,17 +203,5 @@ private final class AppVisibilityManageButton: NSButton {
 
         layer.cornerRadius = 8
         layer.borderWidth = 1
-        attributedTitle = NSAttributedString(
-            string: buttonTitle,
-            attributes: [
-                .paragraphStyle: {
-                    let style = NSMutableParagraphStyle()
-                    style.alignment = .center
-                    return style
-                }(),
-                .font: NSFont.systemFont(ofSize: 13, weight: .medium),
-                .foregroundColor: NSColor.labelColor.withAlphaComponent(isDark ? 0.78 : 0.72)
-            ]
-        )
     }
 }

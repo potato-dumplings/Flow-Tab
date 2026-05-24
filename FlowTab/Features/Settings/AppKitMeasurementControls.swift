@@ -229,10 +229,11 @@ final class FlowGradientActionButton: NSButton {
 
     private func updateAppearance() {
         wantsLayer = true
+        let appearance = effectiveAppearance
         let cornerRadius = bounds.height / 2
         gradientLayer.frame = bounds
         gradientLayer.cornerRadius = cornerRadius
-        gradientLayer.colors = gradientColors(for: tone)
+        gradientLayer.colors = gradientColors(for: tone, appearance: appearance)
 
         borderLayer.frame = bounds
         borderLayer.path = CGPath(
@@ -243,17 +244,19 @@ final class FlowGradientActionButton: NSButton {
         )
         borderLayer.fillColor = NSColor.clear.cgColor
         borderLayer.lineWidth = 1
-        borderLayer.strokeColor = borderColor(for: tone)
+        borderLayer.strokeColor = borderColor(for: tone, appearance: appearance)
 
         layer?.cornerRadius = cornerRadius
-        layer?.shadowColor = shadowColor(for: tone)
+        layer?.shadowColor = shadowColor(for: tone, appearance: appearance)
         layer?.shadowOpacity = 1
         layer?.shadowRadius = 6
         layer?.shadowOffset = CGSize(width: 0, height: 2)
 
-        let titleColor = tone == .blueDominant
-            ? NSColor.white
-            : NSColor.labelColor.withAlphaComponent(0.78)
+        let titleColor = appearance.flowTabResolvedColor {
+            tone == .blueDominant
+                ? NSColor.white
+                : NSColor.labelColor.withAlphaComponent(0.78)
+        }
         attributedTitle = NSAttributedString(
             string: title,
             attributes: [
@@ -264,38 +267,38 @@ final class FlowGradientActionButton: NSButton {
         contentTintColor = titleColor
     }
 
-    private func gradientColors(for tone: FlowActionButtonTone) -> [CGColor] {
+    private func gradientColors(for tone: FlowActionButtonTone, appearance: NSAppearance) -> [CGColor] {
         switch tone {
         case .grayDominant:
             return [
-                NSColor.labelColor.withAlphaComponent(0.12).cgColor,
-                NSColor.labelColor.withAlphaComponent(0.09).cgColor,
-                NSColor.controlAccentColor.withAlphaComponent(0.26).cgColor
+                appearance.flowTabResolvedCGColor { NSColor.labelColor.withAlphaComponent(0.12) },
+                appearance.flowTabResolvedCGColor { NSColor.labelColor.withAlphaComponent(0.09) },
+                appearance.flowTabResolvedCGColor { NSColor.controlAccentColor.withAlphaComponent(0.26) }
             ]
         case .blueDominant:
             return [
-                NSColor.controlAccentColor.withAlphaComponent(0.94).cgColor,
-                NSColor.controlAccentColor.withAlphaComponent(0.76).cgColor,
-                NSColor.labelColor.withAlphaComponent(0.18).cgColor
+                appearance.flowTabResolvedCGColor { NSColor.controlAccentColor.withAlphaComponent(0.94) },
+                appearance.flowTabResolvedCGColor { NSColor.controlAccentColor.withAlphaComponent(0.76) },
+                appearance.flowTabResolvedCGColor { NSColor.labelColor.withAlphaComponent(0.18) }
             ]
         }
     }
 
-    private func borderColor(for tone: FlowActionButtonTone) -> CGColor {
+    private func borderColor(for tone: FlowActionButtonTone, appearance: NSAppearance) -> CGColor {
         switch tone {
         case .grayDominant:
-            return NSColor.labelColor.withAlphaComponent(0.24).cgColor
+            return appearance.flowTabResolvedCGColor { NSColor.labelColor.withAlphaComponent(0.24) }
         case .blueDominant:
-            return NSColor.controlAccentColor.withAlphaComponent(0.55).cgColor
+            return appearance.flowTabResolvedCGColor { NSColor.controlAccentColor.withAlphaComponent(0.55) }
         }
     }
 
-    private func shadowColor(for tone: FlowActionButtonTone) -> CGColor {
+    private func shadowColor(for tone: FlowActionButtonTone, appearance: NSAppearance) -> CGColor {
         switch tone {
         case .grayDominant:
-            return NSColor.labelColor.withAlphaComponent(0.08).cgColor
+            return appearance.flowTabResolvedCGColor { NSColor.labelColor.withAlphaComponent(0.08) }
         case .blueDominant:
-            return NSColor.controlAccentColor.withAlphaComponent(0.20).cgColor
+            return appearance.flowTabResolvedCGColor { NSColor.controlAccentColor.withAlphaComponent(0.20) }
         }
     }
 }

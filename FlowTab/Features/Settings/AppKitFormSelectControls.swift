@@ -355,12 +355,7 @@ final class FlowFormSelectControl: NSView, NSPopoverDelegate {
         menuViewController.onSelectionChanged = { [weak self] id in
             self?.handleSelectionChanged(id)
         }
-        menuViewController.optionIdentifierPrefix = identifier?.rawValue
-        menuViewController.update(
-            options: options,
-            selectedID: selectedID,
-            preferredWidth: max(bounds.width, 68)
-        )
+        refreshMenuOptions(preferredWidth: max(bounds.width, 68))
         popover.behavior = .transient
         popover.animates = true
         popover.appearance = effectiveAppearance
@@ -382,11 +377,7 @@ final class FlowFormSelectControl: NSView, NSPopoverDelegate {
             selectedID = options.first?.id
         }
         updateDisplayTitle()
-        menuViewController.update(
-            options: options,
-            selectedID: selectedID,
-            preferredWidth: max(bounds.width, intrinsicContentSize.width)
-        )
+        refreshMenuOptions(preferredWidth: max(bounds.width, intrinsicContentSize.width))
         invalidateIntrinsicContentSize()
     }
 
@@ -398,11 +389,7 @@ final class FlowFormSelectControl: NSView, NSPopoverDelegate {
         }
         selectedID = id
         updateDisplayTitle()
-        menuViewController.update(
-            options: options,
-            selectedID: selectedID,
-            preferredWidth: max(bounds.width, intrinsicContentSize.width)
-        )
+        refreshMenuOptions(preferredWidth: max(bounds.width, intrinsicContentSize.width))
         updateAppearance()
         invalidateIntrinsicContentSize()
     }
@@ -471,6 +458,15 @@ final class FlowFormSelectControl: NSView, NSPopoverDelegate {
     private func updateDisplayTitle() {
         titleLabel.stringValue = options.first(where: { $0.id == selectedID })?.title ?? ""
         setAccessibilityValue(selectedID ?? "")
+    }
+
+    private func refreshMenuOptions(preferredWidth: CGFloat) {
+        menuViewController.optionIdentifierPrefix = identifier?.rawValue
+        menuViewController.update(
+            options: options,
+            selectedID: selectedID,
+            preferredWidth: preferredWidth
+        )
     }
 
     private func updateAppearance() {
