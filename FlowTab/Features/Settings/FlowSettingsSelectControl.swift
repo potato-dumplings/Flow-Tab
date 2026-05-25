@@ -77,7 +77,7 @@ final class FlowSettingsSelectControl: NSView, FlowSettingsAppearanceRefreshable
     }
 
     private var preferredControlWidth: CGFloat {
-        let font = style.states.value(for: .normal).text?.font ?? .systemFont(ofSize: 13)
+        let font = style.states.value(for: .normal).text?.font ?? FlowTypography.appKit(.controlText)
         return style.metrics.preferredWidth(for: options.map(\.title), font: font)
     }
 

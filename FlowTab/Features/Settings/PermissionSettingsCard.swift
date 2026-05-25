@@ -287,7 +287,7 @@ final class PermissionStatusControlRowView<Control: NSView>: NSView {
     }
 
     private func preferredHeight(for label: NSTextField) -> CGFloat {
-        let font = label.font ?? .systemFont(ofSize: NSFont.systemFontSize)
+        let font = label.font ?? FlowTypography.appKit(.body)
         let width = label.preferredMaxLayoutWidth > 0
             ? label.preferredMaxLayoutWidth
             : max(bounds.width, superview?.bounds.width ?? 0)

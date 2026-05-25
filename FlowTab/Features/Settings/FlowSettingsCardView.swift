@@ -132,10 +132,10 @@ final class FlowSettingsCardView: NSView, FlowSettingsAppearanceRefreshable {
         setContentHuggingPriority(.required, for: .vertical)
         setContentCompressionResistancePriority(.required, for: .vertical)
 
-        titleLabel.font = .systemFont(ofSize: 15, weight: .semibold)
-        subtitleLabel.font = .systemFont(ofSize: 11)
+        titleLabel.font = FlowTypography.appKit(.cardTitle)
+        subtitleLabel.font = FlowTypography.appKit(.cardSubtitle)
         subtitleLabel.textColor = .secondaryLabelColor
-        titleAccessoryLabel.font = .systemFont(ofSize: 13)
+        titleAccessoryLabel.font = FlowTypography.appKit(.controlText)
         titleAccessoryLabel.textColor = .secondaryLabelColor
 
         titleRow.orientation = .horizontal

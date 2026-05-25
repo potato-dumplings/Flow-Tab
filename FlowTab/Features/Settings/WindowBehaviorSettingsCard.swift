@@ -228,7 +228,7 @@ final class WindowBehaviorSettingsCardAppKitView: AppKitSettingsCardBaseView, Ap
         delayTextField.setFlowTabTestingIdentifier("flowtab.settings.window.auto-enter-delay.input")
         delayTextField.delegate = self
 
-        delayUnitLabel.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        delayUnitLabel.font = FlowTypography.appKit(.bodyMonospaced)
         delayUnitLabel.textColor = .secondaryLabelColor
 
         autoRestoreMinimizedWindowSwitch.target = self

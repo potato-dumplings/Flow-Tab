@@ -100,18 +100,18 @@ class AppKitSettingsCardBaseView: NSView {
         AppKitSettingsControlRow(title: title, control: control)
     }
 
-    static func makeBodyLabel(fontSize: CGFloat = 11) -> NSTextField {
+    static func makeBodyLabel(_ token: FlowTypography.Token = .cardSubtitle) -> NSTextField {
         let label = NSTextField(wrappingLabelWithString: "")
-        label.font = .systemFont(ofSize: fontSize)
+        label.font = FlowTypography.appKit(token)
         label.textColor = .secondaryLabelColor
         label.lineBreakMode = .byWordWrapping
         label.maximumNumberOfLines = 0
         return label
     }
 
-    static func makeStatusLabel(fontSize: CGFloat = 12) -> NSTextField {
+    static func makeStatusLabel(_ token: FlowTypography.Token = .body) -> NSTextField {
         let label = NSTextField(wrappingLabelWithString: "")
-        label.font = .systemFont(ofSize: fontSize)
+        label.font = FlowTypography.appKit(token)
         label.lineBreakMode = .byWordWrapping
         label.maximumNumberOfLines = 0
         return label
@@ -185,7 +185,7 @@ final class AppKitSettingsControlRow: NSStackView {
     }
 
     private func buildViewHierarchy(control: NSView) {
-        titleLabel.font = .systemFont(ofSize: 13)
+        titleLabel.font = FlowTypography.appKit(.formLabel)
         titleLabel.lineBreakMode = .byTruncatingTail
         titleLabel.maximumNumberOfLines = 1
         titleLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)

@@ -140,6 +140,7 @@
 		C100000E2F75000100B0D737 /* AppLogsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100001E2F75000100B0D737 /* AppLogsView.swift */; };
 		C100000F2F75000100B0D737 /* AppSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100001F2F75000100B0D737 /* AppSettingsView.swift */; };
 		C10000102F75000100B0D737 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000202F75000100B0D737 /* AppDelegate.swift */; };
+		C10000272F75000100B0D737 /* FlowTypography.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000282F75000100B0D737 /* FlowTypography.swift */; };
 		C10000242F75000100B0D737 /* AppPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000212F75000100B0D737 /* AppPreferences.swift */; };
 		C10000252F75000100B0D737 /* SystemThemeState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000222F75000100B0D737 /* SystemThemeState.swift */; };
 		C10000262F75000100B0D737 /* String+FlowTabAccessibilitySlug.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000232F75000100B0D737 /* String+FlowTabAccessibilitySlug.swift */; };
@@ -346,6 +347,7 @@
 		C10000212F75000100B0D737 /* AppPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPreferences.swift; sourceTree = "<group>"; };
 		C10000222F75000100B0D737 /* SystemThemeState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemThemeState.swift; sourceTree = "<group>"; };
 		C10000232F75000100B0D737 /* String+FlowTabAccessibilitySlug.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "String+FlowTabAccessibilitySlug.swift"; sourceTree = "<group>"; };
+		C10000282F75000100B0D737 /* FlowTypography.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTypography.swift; sourceTree = "<group>"; };
 		C10000402F75000100B0D737 /* FlowPresentationState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowPresentationState.swift; sourceTree = "<group>"; };
 		D1A1B1C12A00000100B0D737 /* FlowTabUITestBootstrapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTabUITestBootstrapper.swift; sourceTree = "<group>"; };
 		D1A1B1C22A00000100B0D737 /* NSView+FlowTabTesting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "NSView+FlowTabTesting.swift"; sourceTree = "<group>"; };
@@ -738,6 +740,7 @@
 		F100000C2F74000100B0D737 /* Appearance */ = {
 			isa = PBXGroup;
 			children = (
+				C10000282F75000100B0D737 /* FlowTypography.swift */,
 				C10000402F75000100B0D737 /* FlowPresentationState.swift */,
 				C10000222F75000100B0D737 /* SystemThemeState.swift */,
 			);
@@ -985,6 +988,7 @@
 				C20000022FBD000100B0D737 /* HomeWindowRowButton.swift in Sources */,
 				C10000022F75000100B0D737 /* HomeRootView.swift in Sources */,
 				C10000012F75000100B0D737 /* AppFoundation.swift in Sources */,
+				C10000272F75000100B0D737 /* FlowTypography.swift in Sources */,
 				C10000412F75000100B0D737 /* FlowPresentationState.swift in Sources */,
 				C10000252F75000100B0D737 /* SystemThemeState.swift in Sources */,
 				C10000242F75000100B0D737 /* AppPreferences.swift in Sources */,

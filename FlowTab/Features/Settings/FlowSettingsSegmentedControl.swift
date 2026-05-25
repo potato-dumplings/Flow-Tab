@@ -26,7 +26,7 @@ final class FlowSettingsSegmentedControl: NSView, FlowSettingsAppearanceRefresha
         NSSize(
             width: metrics.preferredWidth(
                 for: options.map(\.title),
-                font: .systemFont(ofSize: 12, weight: .medium),
+                font: FlowTypography.appKit(.bodyEmphasized),
                 segmentCount: options.count
             ),
             height: metrics.height
@@ -201,7 +201,7 @@ private final class SegmentButton: NSButton, FlowSettingsAppearanceRefreshable {
         attributedTitle = FlowSettingsStyleResolver.attributedString(
             title,
             token: FlowSettingsTextToken(
-                font: .systemFont(ofSize: 12, weight: .medium),
+                font: FlowTypography.appKit(.bodyEmphasized),
                 color: titleColor,
                 alignment: .center,
                 lineBreakMode: .byClipping

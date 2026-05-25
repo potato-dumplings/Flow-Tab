@@ -103,7 +103,7 @@ struct FlowSettingsActionButtonStyle {
             iconSpacing: 0
         )
         let text = FlowSettingsTextToken(
-            font: .systemFont(ofSize: 12, weight: .semibold),
+            font: FlowTypography.appKit(.bodyStrong),
             color: textColor,
             alignment: .center,
             lineBreakMode: .byClipping
@@ -140,7 +140,7 @@ struct FlowSettingsActionButtonStyle {
     private static func compactActionStyle() -> FlowSettingsActionButtonStyle {
         let metrics = FlowSettingsControlMetrics(height: 32, minimumWidth: 68, horizontalPadding: 14, iconSpacing: 0)
         let text = FlowSettingsTextToken(
-            font: .systemFont(ofSize: 13, weight: .medium),
+            font: FlowTypography.appKit(.controlTextEmphasized),
             color: .semantic(.label, alpha: 0.76),
             alignment: .center,
             lineBreakMode: .byClipping
@@ -208,7 +208,7 @@ struct FlowSettingsSelectStyle {
             iconSpacing: 20
         )
         let text = FlowSettingsTextToken(
-            font: .systemFont(ofSize: 13),
+            font: FlowTypography.appKit(.controlText),
             color: .rgb(
                 light: FlowSettingsRGBColor(red: 0, green: 0, blue: 0, alpha: 0.78),
                 dark: FlowSettingsRGBColor(red: 1, green: 1, blue: 1, alpha: 0.92)

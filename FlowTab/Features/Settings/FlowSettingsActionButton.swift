@@ -12,7 +12,7 @@ final class FlowSettingsActionButton: NSButton, FlowSettingsAppearanceRefreshabl
     override var intrinsicContentSize: NSSize {
         let width = style.metrics.preferredWidth(
             for: [buttonTitle],
-            font: style.states.value(for: .normal).text?.font ?? .systemFont(ofSize: 12)
+            font: style.states.value(for: .normal).text?.font ?? FlowTypography.appKit(.bodyStrong)
         )
         return NSSize(width: width, height: style.metrics.height)
     }

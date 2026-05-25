@@ -104,7 +104,7 @@ struct FlowDropdownPresentation {
         return FlowDropdownPresentation(
             targetAppearance: targetAppearance,
             metrics: metrics,
-            font: .systemFont(ofSize: 13),
+            font: FlowTypography.appKit(.controlText),
             cornerRadius: 10,
             controlStyles: [
                 .normal: normal,

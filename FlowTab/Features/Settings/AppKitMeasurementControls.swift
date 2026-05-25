@@ -73,7 +73,7 @@ final class FlowSoftTextField: NSView {
         textField.drawsBackground = false
         textField.focusRingType = .none
         textField.placeholderString = "0.75"
-        textField.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        textField.font = FlowTypography.appKit(.bodyMonospaced)
         textField.alignment = .center
         textField.setContentHuggingPriority(.required, for: .vertical)
         textField.setContentCompressionResistancePriority(.required, for: .vertical)

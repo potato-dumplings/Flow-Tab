@@ -20,7 +20,7 @@ struct AppVisibilitySettingsCardState: Equatable {
 final class AppVisibilitySettingsCardAppKitView: AppKitSettingsCardBaseView {
     var onManageAppVisibility: (() -> Void)?
 
-    private let summaryLabel = AppKitSettingsCardBaseView.makeBodyLabel(fontSize: 12)
+    private let summaryLabel = AppKitSettingsCardBaseView.makeBodyLabel(.body)
     private let manageButton = FlowSettingsActionButton()
     private var currentState: AppVisibilitySettingsCardState?
 

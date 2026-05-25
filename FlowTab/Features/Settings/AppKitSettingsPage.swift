@@ -638,8 +638,8 @@ final class AppKitSettingsPageView: NSView {
         dismissEditingClickRecognizer.delaysPrimaryMouseButtonEvents = false
         addGestureRecognizer(dismissEditingClickRecognizer)
 
-        titleLabel.font = .systemFont(ofSize: 22, weight: .semibold)
-        subtitleLabel.font = .systemFont(ofSize: 12)
+        titleLabel.font = FlowTypography.appKit(.pageTitle)
+        subtitleLabel.font = FlowTypography.appKit(.pageSubtitle)
         subtitleLabel.textColor = .secondaryLabelColor
         subtitleLabel.lineBreakMode = .byWordWrapping
         subtitleLabel.maximumNumberOfLines = 2

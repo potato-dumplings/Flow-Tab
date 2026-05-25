@@ -530,7 +530,7 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
 
     private static func makeSecondaryLabel() -> NSTextField {
         let label = NSTextField(wrappingLabelWithString: "")
-        label.font = .systemFont(ofSize: 12)
+        label.font = FlowTypography.appKit(.body)
         label.textColor = .secondaryLabelColor
         label.lineBreakMode = .byWordWrapping
         label.maximumNumberOfLines = 0
@@ -539,7 +539,7 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
 
     private static func makeStatusLabel() -> NSTextField {
         let label = NSTextField(wrappingLabelWithString: "")
-        label.font = .systemFont(ofSize: 12)
+        label.font = FlowTypography.appKit(.body)
         label.lineBreakMode = .byWordWrapping
         label.maximumNumberOfLines = 0
         label.isHidden = true
