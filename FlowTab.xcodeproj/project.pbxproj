@@ -116,8 +116,13 @@
 		C10000312F75000100B0D737 /* FlowSnappedListScrollView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000302F75000100B0D737 /* FlowSnappedListScrollView.swift */; };
 		C10000052F75000100B0D737 /* HotkeySettingsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000152F75000100B0D737 /* HotkeySettingsCard.swift */; };
 		C10000062F75000100B0D737 /* AppKitMeasurementControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000162F75000100B0D737 /* AppKitMeasurementControls.swift */; };
-		C10000072F75000100B0D737 /* AppKitFormSelectControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000172F75000100B0D737 /* AppKitFormSelectControls.swift */; };
 		C10000082F75000100B0D737 /* AppKitSettingsCardChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000182F75000100B0D737 /* AppKitSettingsCardChrome.swift */; };
+		E50000013601000100B0D737 /* FlowSettingsStylePrimitives.swift in Sources */ = {isa = PBXBuildFile; fileRef = E50000113601000100B0D737 /* FlowSettingsStylePrimitives.swift */; };
+		E50000023601000100B0D737 /* FlowSettingsComponentStyles.swift in Sources */ = {isa = PBXBuildFile; fileRef = E50000123601000100B0D737 /* FlowSettingsComponentStyles.swift */; };
+		E50000033601000100B0D737 /* FlowSettingsActionButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = E50000133601000100B0D737 /* FlowSettingsActionButton.swift */; };
+		E50000043601000100B0D737 /* FlowSettingsSelectControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = E50000143601000100B0D737 /* FlowSettingsSelectControl.swift */; };
+		E50000053601000100B0D737 /* FlowSettingsSegmentedControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = E50000153601000100B0D737 /* FlowSettingsSegmentedControl.swift */; };
+		E50000063601000100B0D737 /* FlowSettingsCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E50000163601000100B0D737 /* FlowSettingsCardView.swift */; };
 		C10000092F75000100B0D737 /* AppKitSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000192F75000100B0D737 /* AppKitSettingsPage.swift */; };
 		C100000A2F75000100B0D737 /* AppearanceSettingsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100001A2F75000100B0D737 /* AppearanceSettingsCard.swift */; };
 		C100000B2F75000100B0D737 /* WindowBehaviorSettingsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100001B2F75000100B0D737 /* WindowBehaviorSettingsCard.swift */; };
@@ -307,8 +312,13 @@
 		C10000302F75000100B0D737 /* FlowSnappedListScrollView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowSnappedListScrollView.swift; sourceTree = "<group>"; };
 		C10000152F75000100B0D737 /* HotkeySettingsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeySettingsCard.swift; sourceTree = "<group>"; };
 		C10000162F75000100B0D737 /* AppKitMeasurementControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitMeasurementControls.swift; sourceTree = "<group>"; };
-		C10000172F75000100B0D737 /* AppKitFormSelectControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitFormSelectControls.swift; sourceTree = "<group>"; };
 		C10000182F75000100B0D737 /* AppKitSettingsCardChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitSettingsCardChrome.swift; sourceTree = "<group>"; };
+		E50000113601000100B0D737 /* FlowSettingsStylePrimitives.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowSettingsStylePrimitives.swift; sourceTree = "<group>"; };
+		E50000123601000100B0D737 /* FlowSettingsComponentStyles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowSettingsComponentStyles.swift; sourceTree = "<group>"; };
+		E50000133601000100B0D737 /* FlowSettingsActionButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowSettingsActionButton.swift; sourceTree = "<group>"; };
+		E50000143601000100B0D737 /* FlowSettingsSelectControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowSettingsSelectControl.swift; sourceTree = "<group>"; };
+		E50000153601000100B0D737 /* FlowSettingsSegmentedControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowSettingsSegmentedControl.swift; sourceTree = "<group>"; };
+		E50000163601000100B0D737 /* FlowSettingsCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowSettingsCardView.swift; sourceTree = "<group>"; };
 		C10000192F75000100B0D737 /* AppKitSettingsPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitSettingsPage.swift; sourceTree = "<group>"; };
 		C100001A2F75000100B0D737 /* AppearanceSettingsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceSettingsCard.swift; sourceTree = "<group>"; };
 		C100001B2F75000100B0D737 /* WindowBehaviorSettingsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowBehaviorSettingsCard.swift; sourceTree = "<group>"; };
@@ -684,8 +694,13 @@
 				A9V100052F91000100B0D737 /* AppVisibilitySettingsCard.swift */,
 				C100001D2F75000100B0D737 /* PermissionSettingsCard.swift */,
 				C10000152F75000100B0D737 /* HotkeySettingsCard.swift */,
+				E50000113601000100B0D737 /* FlowSettingsStylePrimitives.swift */,
+				E50000123601000100B0D737 /* FlowSettingsComponentStyles.swift */,
+				E50000133601000100B0D737 /* FlowSettingsActionButton.swift */,
+				E50000143601000100B0D737 /* FlowSettingsSelectControl.swift */,
+				E50000153601000100B0D737 /* FlowSettingsSegmentedControl.swift */,
+				E50000163601000100B0D737 /* FlowSettingsCardView.swift */,
 				C10000182F75000100B0D737 /* AppKitSettingsCardChrome.swift */,
-				C10000172F75000100B0D737 /* AppKitFormSelectControls.swift */,
 				C10000162F75000100B0D737 /* AppKitMeasurementControls.swift */,
 			);
 			path = Settings;
@@ -924,7 +939,12 @@
 				C100000A2F75000100B0D737 /* AppearanceSettingsCard.swift in Sources */,
 				C10000092F75000100B0D737 /* AppKitSettingsPage.swift in Sources */,
 				C10000082F75000100B0D737 /* AppKitSettingsCardChrome.swift in Sources */,
-				C10000072F75000100B0D737 /* AppKitFormSelectControls.swift in Sources */,
+				E50000013601000100B0D737 /* FlowSettingsStylePrimitives.swift in Sources */,
+				E50000023601000100B0D737 /* FlowSettingsComponentStyles.swift in Sources */,
+				E50000033601000100B0D737 /* FlowSettingsActionButton.swift in Sources */,
+				E50000043601000100B0D737 /* FlowSettingsSelectControl.swift in Sources */,
+				E50000053601000100B0D737 /* FlowSettingsSegmentedControl.swift in Sources */,
+				E50000063601000100B0D737 /* FlowSettingsCardView.swift in Sources */,
 				C10000062F75000100B0D737 /* AppKitMeasurementControls.swift in Sources */,
 				C10000052F75000100B0D737 /* HotkeySettingsCard.swift in Sources */,
 				C10000042F75000100B0D737 /* HomeChrome.swift in Sources */,

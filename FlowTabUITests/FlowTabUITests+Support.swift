@@ -434,10 +434,90 @@ extension FlowTabUITests {
         }
 
         let optionsQuery = app.descendants(matching: .any).matching(identifier: optionIdentifier)
-        XCTAssertTrue(
-            tapFirstHittable(in: optionsQuery, timeout: 6),
-            "Missing or non-hittable option: \(optionIdentifier)"
+        if tapFirstHittable(in: optionsQuery, timeout: 3) {
+            return
+        }
+        if tapFirstHittable(in: app.menuItems.matching(identifier: optionIdentifier), timeout: 1) {
+            return
+        }
+
+        let titleCandidates = selectOptionTitleCandidates(
+            controlIdentifier: controlIdentifier,
+            optionIdentifier: optionIdentifier
         )
+        for title in titleCandidates {
+            let titleQuery = app.descendants(matching: .any).matching(
+                NSPredicate(format: "label == %@", title)
+            )
+            if tapFirstHittable(in: titleQuery, timeout: 1) {
+                return
+            }
+            let menuItemQuery = app.menuItems.matching(NSPredicate(format: "label == %@", title))
+            if tapFirstHittable(in: menuItemQuery, timeout: 1) {
+                return
+            }
+        }
+
+        XCTFail("Missing or non-hittable option: \(optionIdentifier)")
+    }
+
+    func selectOptionTitleCandidates(controlIdentifier: String, optionIdentifier: String) -> [String] {
+        if controlIdentifier == Identifier.settingsAppearanceAppLanguage {
+            switch optionIdentifier {
+            case "zh-Hans":
+                return ["简体中文", "Simplified Chinese"]
+            case "en":
+                return ["English"]
+            default:
+                return []
+            }
+        }
+
+        if controlIdentifier == Identifier.settingsSearchDefaultScope {
+            switch optionIdentifier {
+            case "app":
+                return ["应用", "App"]
+            case "window":
+                return ["窗口", "Window"]
+            default:
+                return []
+            }
+        }
+
+        if [
+            Identifier.settingsHotkeyMainModifier,
+            Identifier.settingsHotkeyInAppModifier
+        ].contains(controlIdentifier) {
+            switch optionIdentifier {
+            case "option":
+                return ["Option"]
+            case "control":
+                return ["Control"]
+            case "command":
+                return ["Command"]
+            default:
+                return []
+            }
+        }
+
+        if [
+            Identifier.settingsHotkeyMainKey,
+            Identifier.settingsHotkeyQuitKey,
+            Identifier.settingsHotkeyInAppKey
+        ].contains(controlIdentifier) {
+            switch optionIdentifier {
+            case "tab":
+                return ["Tab"]
+            case "space":
+                return ["Space"]
+            case "grave":
+                return ["`"]
+            default:
+                return [optionIdentifier.uppercased()]
+            }
+        }
+
+        return []
     }
     func elementStringValue(_ element: XCUIElement) -> String {
         if let value = element.value as? String {

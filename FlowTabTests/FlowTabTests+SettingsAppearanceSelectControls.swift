@@ -5,6 +5,121 @@ import FlowTabCore
 
 extension FlowTabTests {
     @MainActor
+    func testSettingsColorResolverUsesTargetAppearanceInsteadOfHostAppearance() throws {
+        let hostAppearance = try XCTUnwrap(NSAppearance(named: .darkAqua))
+        let targetAppearance = FlowSettingsStyleResolver.targetAppearance(
+            for: ThemeMode.light.rawValue,
+            fallback: hostAppearance
+        )
+        let resolvedColor = FlowSettingsStyleResolver.color(
+            .rgb(
+                light: FlowSettingsRGBColor(red: 0.1, green: 0.2, blue: 0.3, alpha: 1),
+                dark: FlowSettingsRGBColor(red: 0.8, green: 0.7, blue: 0.6, alpha: 1)
+            ),
+            appearance: targetAppearance
+        ).usingColorSpace(.sRGB)
+
+        XCTAssertEqual(targetAppearance.bestMatch(from: [.darkAqua, .aqua]), .aqua)
+        XCTAssertEqual(resolvedColor?.redComponent ?? 0, 0.1, accuracy: 0.001)
+        XCTAssertEqual(resolvedColor?.greenComponent ?? 0, 0.2, accuracy: 0.001)
+        XCTAssertEqual(resolvedColor?.blueComponent ?? 0, 0.3, accuracy: 0.001)
+    }
+
+    func testSettingsStateStylesFallbackToNormalState() {
+        let normal = FlowSettingsResolvedStyle(
+            text: FlowSettingsTextToken(
+                font: .systemFont(ofSize: 11),
+                color: .semantic(.label, alpha: 1),
+                alignment: .center,
+                lineBreakMode: .byClipping
+            ),
+            surface: nil,
+            gradient: nil
+        )
+        let styles = FlowSettingsStateStyle(
+            values: [.normal: normal],
+            fallback: FlowSettingsActionButtonState.normal
+        )
+
+        XCTAssertEqual(styles.value(for: .pressed).text?.font.pointSize, 11)
+        XCTAssertEqual(
+            FlowSettingsActionButtonStyle.preset(.primaryAction).states.value(for: .disabled).text?.font.pointSize,
+            FlowSettingsActionButtonStyle.preset(.primaryAction).states.value(for: .normal).text?.font.pointSize
+        )
+        XCTAssertNotNil(FlowSettingsSelectStyle.preset(.formSelect).states.value(for: .expanded).surface)
+    }
+
+    @MainActor
+    func testSettingsComponentMetricsUseContentAndMinimumWidths() {
+        let actionButton = FlowSettingsActionButton()
+        actionButton.update(
+            title: "Request Accessibility permission",
+            accessibilityLabel: nil,
+            style: .preset(.secondaryAction)
+        )
+        let compactActionButton = FlowSettingsActionButton()
+        compactActionButton.update(
+            title: "管理",
+            accessibilityLabel: nil,
+            style: .preset(.compactSecondaryAction)
+        )
+        let selectControl = FlowSettingsSelectControl(frame: .zero)
+        selectControl.configure(
+            options: [
+                (id: "zh-Hans", title: "简体中文"),
+                (id: "en", title: "English")
+            ]
+        )
+
+        XCTAssertGreaterThan(actionButton.intrinsicContentSize.width, 160)
+        XCTAssertGreaterThanOrEqual(compactActionButton.intrinsicContentSize.width, 68)
+        XCTAssertGreaterThanOrEqual(selectControl.intrinsicContentSize.width, 84)
+    }
+
+    @MainActor
+    func testSettingsActionButtonRefreshesTextStatesAndAccessibility() throws {
+        let appearance = try XCTUnwrap(NSAppearance(named: .darkAqua))
+        let button = FlowSettingsActionButton()
+        button.applySettingsAppearance(appearance)
+        button.update(
+            title: "Manage",
+            accessibilityLabel: "Manage Accessibility permission",
+            tooltip: "Manage Accessibility permission",
+            style: .preset(.primaryAction)
+        )
+
+        XCTAssertEqual(button.title, "Manage")
+        XCTAssertEqual(button.accessibilityLabel(), "Manage Accessibility permission")
+        XCTAssertEqual(button.toolTip, "Manage Accessibility permission")
+        XCTAssertEqual(button.attributedAlternateTitle.string, "Manage")
+        assertButtonTitleColor(button.attributedTitle, expectedInk: .light, appearance: appearance)
+
+        button.isEnabled = false
+        XCTAssertFalse(button.attributedTitle.string.contains("\n"))
+        XCTAssertEqual(button.attributedAlternateTitle.string, button.attributedTitle.string)
+    }
+
+    @MainActor
+    func testSettingsActionButtonUsesSingleMainLayerBorder() throws {
+        let appearance = try XCTUnwrap(NSAppearance(named: .aqua))
+        let button = FlowSettingsActionButton()
+        button.applySettingsAppearance(appearance)
+        button.update(
+            title: AppStrings.text(.appVisibilityManage, language: .simplifiedChinese),
+            accessibilityLabel: nil,
+            style: .preset(.compactSecondaryAction)
+        )
+        button.frame = NSRect(origin: .zero, size: button.intrinsicContentSize)
+        button.layoutSubtreeIfNeeded()
+
+        let extraBorderLayers = button.layer?.sublayers?.compactMap { $0 as? CAShapeLayer }
+            .filter { $0.lineWidth > 0 && $0.strokeColor != nil } ?? []
+
+        XCTAssertEqual(button.layer?.borderWidth, 1)
+        XCTAssertTrue(extraBorderLayers.isEmpty, "Action buttons should not draw a second custom border layer.")
+    }
+
+    @MainActor
     func testSettingsSelectControlsUseApplicationThemeWhenSystemAppearanceDiffers() throws {
         try assertSettingsSelectControls(
             hostAppearanceName: .darkAqua,
@@ -17,6 +132,43 @@ extension FlowTabTests {
             themeMode: .dark,
             expectedAppearanceName: .darkAqua,
             expectedInk: .light
+        )
+    }
+
+    @MainActor
+    func testSettingsFollowSystemDoesNotReusePreviousExplicitAppearance() throws {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 1_200, height: 820),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        window.appearance = NSAppearance(named: .aqua)
+        defer {
+            window.orderOut(nil)
+            window.contentView = nil
+        }
+
+        let container = AppKitSettingsPageContainerView()
+        container.frame = window.contentView?.bounds ?? NSRect(x: 0, y: 0, width: 1_200, height: 820)
+        window.contentView = container
+
+        container.update(
+            with: makeSettingsPageState(themeModeRaw: ThemeMode.dark.rawValue),
+            isActive: true
+        )
+        container.layoutSubtreeIfNeeded()
+        XCTAssertEqual(container.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]), .darkAqua)
+
+        container.update(
+            with: makeSettingsPageState(themeModeRaw: ThemeMode.followSystem.rawValue),
+            isActive: true
+        )
+        container.layoutSubtreeIfNeeded()
+
+        XCTAssertEqual(
+            container.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua]),
+            .aqua
         )
     }
 
@@ -124,7 +276,7 @@ extension FlowTabTests {
         ]
 
         for identifier in selectIdentifiers {
-            let selectControl: FlowFormSelectControl = try XCTUnwrap(
+            let selectControl: FlowSettingsSelectControl = try XCTUnwrap(
                 descendant(in: container, identifier: identifier),
                 "Missing select control \(identifier)",
                 file: file,
@@ -138,102 +290,14 @@ extension FlowTabTests {
                 line: line
             )
 
-            let titleLabel: NSTextField = try XCTUnwrap(
-                descendant(in: selectControl, as: NSTextField.self),
-                "Missing title label for \(identifier)",
+            let popUpButton: NSPopUpButton = try XCTUnwrap(
+                descendant(in: selectControl, as: NSPopUpButton.self),
+                "Missing popup button for \(identifier)",
                 file: file,
                 line: line
             )
-            assertColor(titleLabel.textColor, resolvesTo: expectedInk, in: selectControl.effectiveAppearance)
-
-            let chevronImageView: NSImageView = try XCTUnwrap(
-                descendant(in: selectControl, as: NSImageView.self),
-                "Missing chevron for \(identifier)",
-                file: file,
-                line: line
-            )
-            assertColor(chevronImageView.contentTintColor, resolvesTo: expectedInk, in: selectControl.effectiveAppearance)
-
-            try assertSelectMenuButtonsResolveToExpectedInk(
-                selectControl,
-                expectedInk: expectedInk,
-                file: file,
-                line: line
-            )
-        }
-    }
-
-    @MainActor
-    private func assertSelectMenuButtonsResolveToExpectedInk(
-        _ selectControl: FlowFormSelectControl,
-        expectedInk: ExpectedSettingsSelectInk,
-        file: StaticString = #filePath,
-        line: UInt = #line
-    ) throws {
-        let window = try XCTUnwrap(selectControl.window, file: file, line: line)
-        let event = try XCTUnwrap(
-            NSEvent.mouseEvent(
-                with: .leftMouseDown,
-                location: NSPoint(x: selectControl.bounds.midX, y: selectControl.bounds.midY),
-                modifierFlags: [],
-                timestamp: 0,
-                windowNumber: window.windowNumber,
-                context: nil,
-                eventNumber: 0,
-                clickCount: 1,
-                pressure: 1
-            ),
-            file: file,
-            line: line
-        )
-        selectControl.mouseDown(with: event)
-        defer {
-            selectControl.mouseDown(with: event)
-        }
-
-        let menuView = try XCTUnwrap(
-            selectMenuView(for: selectControl),
-            file: file,
-            line: line
-        )
-        menuView.appearance = selectControl.effectiveAppearance
-        menuView.layoutSubtreeIfNeeded()
-
-        let optionPrefix = "\(selectControl.identifier?.rawValue ?? "").option."
-        let optionButtons = NSApp.windows
-            .compactMap(\.contentView)
-            .flatMap { descendantViews(in: $0) } + descendantViews(in: menuView)
-        let menuButtons = optionButtons
-            .compactMap { $0 as? NSButton }
-            .filter { $0.identifier?.rawValue.hasPrefix(optionPrefix) == true }
-
-        XCTAssertFalse(menuButtons.isEmpty, "Missing menu option buttons", file: file, line: line)
-        let selectedOptionID = selectedOptionID(for: selectControl.identifier?.rawValue)
-        for button in menuButtons {
-            XCTAssertFalse(button.attributedTitle.string.isEmpty, "Expected non-empty attributed title", file: file, line: line)
-            XCTAssertFalse(
-                button.attributedAlternateTitle.string.isEmpty,
-                "Expected non-empty attributed alternate title",
-                file: file,
-                line: line
-            )
-            guard button.identifier?.rawValue != selectedOptionID.map({ "\(optionPrefix)\($0)" }) else {
-                continue
-            }
-            assertButtonTitleColor(
-                button.attributedTitle,
-                expectedInk: expectedInk,
-                appearance: button.effectiveAppearance,
-                file: file,
-                line: line
-            )
-            assertButtonTitleColor(
-                button.attributedAlternateTitle,
-                expectedInk: expectedInk,
-                appearance: button.effectiveAppearance,
-                file: file,
-                line: line
-            )
+            assertColor(popUpButton.contentTintColor, resolvesTo: expectedInk, in: selectControl.effectiveAppearance)
+            XCTAssertFalse(popUpButton.itemArray.isEmpty, "Expected system NSMenu options", file: file, line: line)
         }
     }
 
@@ -263,36 +327,6 @@ extension FlowTabTests {
             accessibilityTrusted: false,
             screenCaptureTrusted: false
         )
-    }
-
-    private func selectMenuView(for selectControl: FlowFormSelectControl) -> NSView? {
-        mirroredChild(named: "menuViewController", in: selectControl)
-            .flatMap { $0 as? NSViewController }?
-            .view
-    }
-
-    private func mirroredChild(named name: String, in value: Any) -> Any? {
-        var mirror: Mirror? = Mirror(reflecting: value)
-        while let currentMirror = mirror {
-            if let child = currentMirror.children.first(where: { $0.label == name }) {
-                return child.value
-            }
-            mirror = currentMirror.superclassMirror
-        }
-        return nil
-    }
-
-    private func selectedOptionID(for selectControlIdentifier: String?) -> String? {
-        switch selectControlIdentifier {
-        case "flowtab.settings.appearance.app-language":
-            return AppLanguage.simplifiedChinese.rawValue
-        case "flowtab.settings.search.default-scope":
-            return SwitcherSearchScope.app.rawValue
-        case "flowtab.settings.hotkey.main-modifier":
-            return SwitcherPrimaryModifier.option.rawValue
-        default:
-            return nil
-        }
     }
 
     private func assertButtonTitleColor(

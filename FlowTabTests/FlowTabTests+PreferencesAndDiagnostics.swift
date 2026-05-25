@@ -95,7 +95,7 @@ extension FlowTabTests {
             descendant(
                 in: view,
                 identifier: "flowtab.settings.appearance.theme-mode",
-                as: FlowCapsuleSegmentedControl.self
+                as: FlowSettingsSegmentedControl.self
             )
         )
         XCTAssertTrue(
@@ -123,6 +123,7 @@ extension FlowTabTests {
         view.update(with: makeSettingsPageState(language: .english))
         view.frame = NSRect(x: 0, y: 0, width: 1_200, height: 760)
         view.prepareLayout(forWidth: 1_200)
+        view.layout()
         view.layoutSubtreeIfNeeded()
 
         let localizedText = localizedTextValues(in: view)
@@ -146,7 +147,7 @@ extension FlowTabTests {
         XCTAssertFalse(subtitle.isHidden)
         XCTAssertEqual(subtitle.stringValue, "Display, hotkeys, and permissions")
         XCTAssertGreaterThan(subtitle.frame.width, 80)
-        XCTAssertGreaterThan(subtitle.frame.height, 8)
+        XCTAssertGreaterThan(subtitle.intrinsicContentSize.height, 8)
     }
 
     @MainActor
@@ -168,6 +169,128 @@ extension FlowTabTests {
 
         XCTAssertEqual(settingsContainer.frame.width, 1_200, accuracy: 1)
         XCTAssertGreaterThan(settingsContainer.pageView.frame.width, 1_100)
+    }
+
+    @MainActor
+    func testSettingsLanguageChangeRebuildsSettingsBridgeWithLocalizedText() throws {
+        let previousLanguageRaw = UserDefaults.standard.string(forKey: AppPreferenceKeys.appLanguage)
+        UserDefaults.standard.set(AppLanguage.english.rawValue, forKey: AppPreferenceKeys.appLanguage)
+        defer {
+            if let previousLanguageRaw {
+                UserDefaults.standard.set(previousLanguageRaw, forKey: AppPreferenceKeys.appLanguage)
+            } else {
+                UserDefaults.standard.removeObject(forKey: AppPreferenceKeys.appLanguage)
+            }
+        }
+
+        let hostedView = NSHostingView(
+            rootView: AppSettingsView(isActive: true)
+                .frame(width: 1_440, height: 900, alignment: .topLeading)
+        )
+        hostedView.frame = NSRect(x: 0, y: 0, width: 1_440, height: 900)
+        hostedView.layoutSubtreeIfNeeded()
+
+        _ = try XCTUnwrap(
+            descendant(in: hostedView, as: AppKitSettingsPageContainerView.self)
+        )
+
+        UserDefaults.standard.set(
+            AppLanguage.simplifiedChinese.rawValue,
+            forKey: AppPreferenceKeys.appLanguage
+        )
+
+        XCTAssertTrue(
+            waitForRunLoopCondition(timeout: 1.0) {
+                hostedView.layoutSubtreeIfNeeded()
+                let containers = descendantViews(in: hostedView)
+                    .compactMap { $0 as? AppKitSettingsPageContainerView }
+                guard containers.count == 1, let container = containers.first else { return false }
+                return localizedTextValues(in: container.pageView).contains("基础显示设置、快捷键与权限")
+            },
+            "Language changes should rebuild or refresh Settings with localized text."
+        )
+    }
+
+    @MainActor
+    func testSettingsRootLanguageChangeRebuildsSettingsBridgeWithLocalizedText() throws {
+        let previousSelectedTab = HomeTabState.shared.selectedTab
+        let previousLanguageRaw = UserDefaults.standard.string(forKey: AppPreferenceKeys.appLanguage)
+        let previousThemeRaw = UserDefaults.standard.string(forKey: AppPreferenceKeys.themeMode)
+        HomeTabState.shared.selectedTab = .settings
+        UserDefaults.standard.set(AppLanguage.english.rawValue, forKey: AppPreferenceKeys.appLanguage)
+        UserDefaults.standard.set(ThemeMode.light.rawValue, forKey: AppPreferenceKeys.themeMode)
+        defer {
+            HomeTabState.shared.selectedTab = previousSelectedTab
+            restoreUserDefaultsValue(previousLanguageRaw, forKey: AppPreferenceKeys.appLanguage)
+            restoreUserDefaultsValue(previousThemeRaw, forKey: AppPreferenceKeys.themeMode)
+        }
+
+        let hostedView = NSHostingView(
+            rootView: HomeRootView()
+                .frame(width: 1_440, height: 900, alignment: .topLeading)
+        )
+        hostedView.frame = NSRect(x: 0, y: 0, width: 1_440, height: 900)
+        hostedView.layoutSubtreeIfNeeded()
+
+        _ = try XCTUnwrap(
+            descendant(in: hostedView, as: AppKitSettingsPageContainerView.self)
+        )
+
+        UserDefaults.standard.set(
+            AppLanguage.simplifiedChinese.rawValue,
+            forKey: AppPreferenceKeys.appLanguage
+        )
+
+        XCTAssertTrue(
+            waitForRunLoopCondition(timeout: 1.0) {
+                hostedView.layoutSubtreeIfNeeded()
+                let containers = descendantViews(in: hostedView)
+                    .compactMap { $0 as? AppKitSettingsPageContainerView }
+                guard containers.count == 1, let container = containers.first else { return false }
+                return localizedTextValues(in: container.pageView).contains("基础显示设置、快捷键与权限")
+            },
+            "Root language changes should rebuild or refresh Settings with localized text."
+        )
+    }
+
+    @MainActor
+    func testSettingsRootThemeChangeRebuildsSettingsBridgeWithTargetAppearance() throws {
+        let previousSelectedTab = HomeTabState.shared.selectedTab
+        let previousLanguageRaw = UserDefaults.standard.string(forKey: AppPreferenceKeys.appLanguage)
+        let previousThemeRaw = UserDefaults.standard.string(forKey: AppPreferenceKeys.themeMode)
+        HomeTabState.shared.selectedTab = .settings
+        UserDefaults.standard.set(AppLanguage.simplifiedChinese.rawValue, forKey: AppPreferenceKeys.appLanguage)
+        UserDefaults.standard.set(ThemeMode.light.rawValue, forKey: AppPreferenceKeys.themeMode)
+        defer {
+            HomeTabState.shared.selectedTab = previousSelectedTab
+            restoreUserDefaultsValue(previousLanguageRaw, forKey: AppPreferenceKeys.appLanguage)
+            restoreUserDefaultsValue(previousThemeRaw, forKey: AppPreferenceKeys.themeMode)
+        }
+
+        let hostedView = NSHostingView(
+            rootView: HomeRootView()
+                .frame(width: 1_440, height: 900, alignment: .topLeading)
+        )
+        hostedView.frame = NSRect(x: 0, y: 0, width: 1_440, height: 900)
+        hostedView.layoutSubtreeIfNeeded()
+
+        _ = try XCTUnwrap(
+            descendant(in: hostedView, as: AppKitSettingsPageContainerView.self)
+        )
+
+        UserDefaults.standard.set(ThemeMode.dark.rawValue, forKey: AppPreferenceKeys.themeMode)
+
+        XCTAssertTrue(
+            waitForRunLoopCondition(timeout: 1.0) {
+                hostedView.layoutSubtreeIfNeeded()
+                let containers = descendantViews(in: hostedView)
+                    .compactMap { $0 as? AppKitSettingsPageContainerView }
+                guard containers.count == 1, let container = containers.first else { return false }
+                return container.appearance?.isFlowTabDarkInterface == true
+                    && settingsCardBackgroundIsDark(in: container.pageView)
+            },
+            "Root theme changes should rebuild or refresh Settings with the target app appearance."
+        )
     }
 
     @MainActor
@@ -245,11 +368,11 @@ extension FlowTabTests {
     @MainActor
     func testPermissionSettingsRowsStayCompactWhenVerticalStackGetsExtraHeight() throws {
         let accessibilityRow = PermissionStatusControlRowView(
-            control: FlowGradientActionButton(),
+            control: FlowSettingsActionButton(),
             controlWidth: 96
         )
         let screenCaptureRow = PermissionStatusControlRowView(
-            control: FlowGradientActionButton(),
+            control: FlowSettingsActionButton(),
             controlWidth: 96
         )
         accessibilityRow.update(
@@ -272,6 +395,34 @@ extension FlowTabTests {
 
         XCTAssertLessThanOrEqual(accessibilityRow.frame.height, accessibilityRow.intrinsicContentSize.height + 1)
         XCTAssertLessThanOrEqual(screenCaptureRow.frame.height, screenCaptureRow.intrinsicContentSize.height + 1)
+    }
+
+    @MainActor
+    func testPermissionSettingsScreenCaptureDetailUsesPostLayoutTextWidth() throws {
+        let button = FlowSettingsActionButton()
+        button.update(
+            title: AppStrings.text(.permissionScreenRequest, language: .simplifiedChinese),
+            accessibilityLabel: nil,
+            style: .preset(.secondaryAction)
+        )
+        let row = PermissionStatusControlRowView(control: button, controlWidth: 96)
+        row.update(
+            text: AppStrings.text(.permissionScreenDenied, language: .simplifiedChinese),
+            detail: AppStrings.text(.permissionScreenDetail, language: .simplifiedChinese),
+            statusColor: .systemOrange
+        )
+        row.frame = NSRect(x: 0, y: 0, width: 632, height: 80)
+        row.layoutSubtreeIfNeeded()
+
+        let detailLabel = try XCTUnwrap(
+            descendantViews(in: row).compactMap { $0 as? NSTextField }
+                .first { $0.stringValue == AppStrings.text(.permissionScreenDetail, language: .simplifiedChinese) }
+        )
+        let controlWidth = max(button.fittingSize.width, button.intrinsicContentSize.width)
+        let expectedTextWidth = floor(row.bounds.width - controlWidth - 10)
+
+        XCTAssertGreaterThan(expectedTextWidth, 0)
+        XCTAssertEqual(detailLabel.preferredMaxLayoutWidth, expectedTextWidth, accuracy: 2.5)
     }
 
     func testPermissionPollingPolicyBuildsTimeoutDescriptionFromCurrentLimits() {
@@ -1020,9 +1171,9 @@ extension FlowTabTests {
                     return false
                 }
 
-                return constraint.firstItem is FlowCapsuleSegmentedControl
-                    || constraint.firstItem is FlowFormSelectControl
-                    || constraint.firstItem is FlowGradientActionButton
+                return constraint.firstItem is FlowSettingsSegmentedControl
+                    || constraint.firstItem is FlowSettingsSelectControl
+                    || constraint.firstItem is FlowSettingsActionButton
             }
     }
 
@@ -1127,6 +1278,24 @@ extension FlowTabTests {
             RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.005))
         }
         return predicate()
+    }
+
+    private func restoreUserDefaultsValue(_ value: String?, forKey key: String) {
+        if let value {
+            UserDefaults.standard.set(value, forKey: key)
+        } else {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+    }
+
+    private func settingsCardBackgroundIsDark(in view: NSView) -> Bool {
+        guard let card = descendantViews(in: view).compactMap({ $0 as? FlowSettingsCardView }).first,
+            let cgColor = card.layer?.backgroundColor,
+            let color = NSColor(cgColor: cgColor)?.usingColorSpace(.sRGB)
+        else {
+            return false
+        }
+        return color.redComponent < 0.3 && color.greenComponent < 0.3 && color.blueComponent < 0.3
     }
 
 }

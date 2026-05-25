@@ -53,6 +53,7 @@ struct HomeRootView: View {
                 }
                 tabContainer(isSelected: tabState.selectedTab == .settings) {
                     AppSettingsView(isActive: tabState.selectedTab == .settings)
+                        .id("settings-\(themeModeRaw)-\(appLanguageRaw)")
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -60,7 +61,6 @@ struct HomeRootView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .preferredColorScheme(resolvedColorScheme)
         .animation(.none, value: resolvedColorScheme)
-        .id(appLanguageRaw)
     }
 }
 

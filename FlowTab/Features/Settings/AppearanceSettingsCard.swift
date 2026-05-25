@@ -119,12 +119,12 @@ final class AppearanceSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKit
 
     private let showShortcutHintSwitch = NSSwitch()
     private let showInCommandTabSwitch = NSSwitch()
-    private let themeModeControl = FlowCapsuleSegmentedControl(
+    private let themeModeControl = FlowSettingsSegmentedControl(
         options: AppearanceSettingsCardAppKitView.themeOptions(
             language: AppLanguagePreferencesStore.load()
         )
     )
-    private let appLanguageSelect = FlowFormSelectControl(frame: .zero)
+    private let appLanguageSelect = FlowSettingsSelectControl(frame: .zero)
     private let descriptionLabel = AppKitSettingsCardBaseView.makeBodyLabel()
     private lazy var showShortcutHintRow = AppKitSettingsCardBaseView.makeControlRow(
         title: "",

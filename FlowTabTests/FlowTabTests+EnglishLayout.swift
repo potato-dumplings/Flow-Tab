@@ -23,6 +23,7 @@ extension FlowTabTests {
         view.frame = NSRect(x: 0, y: 0, width: 760, height: 760)
         view.update(with: makeEnglishSettingsPageState(hiddenAppCount: 1))
         view.prepareLayout(forWidth: 760)
+        view.layout()
         view.layoutSubtreeIfNeeded()
 
         let localizedText = localizedTextValues(in: view)
@@ -32,34 +33,34 @@ extension FlowTabTests {
         XCTAssertFalse(localizedText.contains("Follow System"), localizedText.sorted().joined(separator: "\n"))
         let fixedControlWidthConstraints = requiredFixedSettingsControlWidthConstraints(in: view)
             .filter { constraint in
-                constraint.firstItem is FlowFormSelectControl
-                    || constraint.firstItem is FlowGradientActionButton
+                constraint.firstItem is FlowSettingsSelectControl
+                    || constraint.firstItem is FlowSettingsActionButton
             }
         XCTAssertTrue(
             fixedControlWidthConstraints.isEmpty,
             fixedControlWidthConstraints.map(\.description).joined(separator: "\n")
         )
 
-        let languageSelect: FlowFormSelectControl = try XCTUnwrap(
+        let languageSelect: FlowSettingsSelectControl = try XCTUnwrap(
             descendant(in: view, identifier: "flowtab.settings.appearance.app-language")
         )
         XCTAssertGreaterThanOrEqual(languageSelect.intrinsicContentSize.width, 140)
 
-        let scopeSelect: FlowFormSelectControl = try XCTUnwrap(
+        let scopeSelect: FlowSettingsSelectControl = try XCTUnwrap(
             descendant(in: view, identifier: "flowtab.settings.search.default-scope")
         )
         XCTAssertGreaterThanOrEqual(scopeSelect.intrinsicContentSize.width, 84)
 
-        let themeModeControl: FlowCapsuleSegmentedControl = try XCTUnwrap(
+        let themeModeControl: FlowSettingsSegmentedControl = try XCTUnwrap(
             descendant(in: view, identifier: "flowtab.settings.appearance.theme-mode")
         )
         XCTAssertLessThanOrEqual(themeModeControl.frame.width, themeModeControl.intrinsicContentSize.width + 1)
         XCTAssertLessThanOrEqual(themeModeControl.intrinsicContentSize.width, 260)
 
-        let accessibilityButton: FlowGradientActionButton = try XCTUnwrap(
+        let accessibilityButton: FlowSettingsActionButton = try XCTUnwrap(
             descendant(in: view, identifier: "flowtab.settings.permission.accessibility-action")
         )
-        let screenCaptureButton: FlowGradientActionButton = try XCTUnwrap(
+        let screenCaptureButton: FlowSettingsActionButton = try XCTUnwrap(
             descendant(in: view, identifier: "flowtab.settings.permission.screen-capture-action")
         )
         XCTAssertEqual(accessibilityButton.title, "Request")
@@ -75,7 +76,7 @@ extension FlowTabTests {
 
         XCTAssertLessThanOrEqual(
             try sectionCard(in: view, containingText: "Appearance").frame.height,
-            250
+            280
         )
         XCTAssertLessThanOrEqual(
             try sectionCard(in: view, containingText: "Window Behavior").frame.height,
@@ -108,10 +109,10 @@ extension FlowTabTests {
         XCTAssertFalse(localizedText.contains("Disable Accessibility permission"), localizedText.sorted().joined(separator: "\n"))
         XCTAssertFalse(localizedText.contains("Disable Screen Recording permission"), localizedText.sorted().joined(separator: "\n"))
 
-        let accessibilityButton: FlowGradientActionButton = try XCTUnwrap(
+        let accessibilityButton: FlowSettingsActionButton = try XCTUnwrap(
             descendant(in: view, identifier: "flowtab.settings.permission.accessibility-action")
         )
-        let screenCaptureButton: FlowGradientActionButton = try XCTUnwrap(
+        let screenCaptureButton: FlowSettingsActionButton = try XCTUnwrap(
             descendant(in: view, identifier: "flowtab.settings.permission.screen-capture-action")
         )
         XCTAssertEqual(accessibilityButton.title, "Manage")
@@ -146,6 +147,267 @@ extension FlowTabTests {
     }
 
     @MainActor
+    func testSettingsLanguageSwitchRelayoutsChineseCardsWithoutOverlap() throws {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 1_440, height: 900),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        defer {
+            window.orderOut(nil)
+            window.contentView = nil
+        }
+
+        let container = AppKitSettingsPageContainerView()
+        container.frame = window.contentView?.bounds ?? NSRect(x: 0, y: 0, width: 1_440, height: 900)
+        window.contentView = container
+
+        container.update(
+            with: makeSettingsPageState(language: .english, hiddenAppCount: 1),
+            isActive: true
+        )
+        settleSettingsContainerLayout(container)
+        container.update(
+            with: makeSettingsPageState(language: .simplifiedChinese, hiddenAppCount: 1),
+            isActive: true
+        )
+        settleSettingsContainerLayout(container)
+
+        let cards = settingsCards(in: container.pageView)
+        XCTAssertEqual(cards.count, 6)
+        assertCardsDoNotOverlap(cards, in: container.pageView)
+        assertArrangedSubviewsDoNotOverlap(in: container.pageView)
+        try assertSettingsCardsStayNearHeader(in: container.pageView)
+
+        let permissionCard = try sectionCard(in: container.pageView, containingText: "权限")
+        try assertTextFieldIsVisiblyLaidOut("辅助功能权限：未授权", in: permissionCard)
+        try assertTextFieldIsVisiblyLaidOut("屏幕录制权限：未授权", in: permissionCard)
+        try assertControlIsVisiblyLaidOut(
+            identifier: "flowtab.settings.permission.accessibility-action",
+            in: permissionCard
+        )
+        try assertControlIsVisiblyLaidOut(
+            identifier: "flowtab.settings.permission.screen-capture-action",
+            in: permissionCard
+        )
+
+        let hotkeyCard = try sectionCard(in: container.pageView, containingText: "快捷键")
+        try assertTextFieldIsVisiblyLaidOut("主修饰键", in: hotkeyCard)
+        try assertControlIsVisiblyLaidOut(
+            identifier: "flowtab.settings.hotkey.main-modifier",
+            in: hotkeyCard
+        )
+        try assertControlIsVisiblyLaidOut(
+            identifier: "flowtab.settings.hotkey.in-app-key",
+            in: hotkeyCard
+        )
+    }
+
+    @MainActor
+    func testSettingsThemeSwitchKeepsCardFramesStable() throws {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 1_440, height: 900),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        defer {
+            window.orderOut(nil)
+            window.contentView = nil
+        }
+
+        let container = AppKitSettingsPageContainerView()
+        container.frame = window.contentView?.bounds ?? NSRect(x: 0, y: 0, width: 1_440, height: 900)
+        window.contentView = container
+
+        container.update(
+            with: makeSettingsPageState(
+                themeMode: .light,
+                language: .simplifiedChinese,
+                hiddenAppCount: 1
+            ),
+            isActive: true
+        )
+        settleSettingsContainerLayout(container)
+        let lightFrames = settingsCardFramesByTitle(in: container.pageView, relativeTo: container)
+
+        container.update(
+            with: makeSettingsPageState(
+                themeMode: .dark,
+                language: .simplifiedChinese,
+                hiddenAppCount: 1
+            ),
+            isActive: true
+        )
+        settleSettingsContainerLayout(container)
+
+        let darkFrames = settingsCardFramesByTitle(in: container.pageView, relativeTo: container)
+        XCTAssertEqual(darkFrames.keys.sorted(), lightFrames.keys.sorted())
+        XCTAssertEqual(darkFrames.count, 6)
+        for (title, lightFrame) in lightFrames {
+            let darkFrame = try XCTUnwrap(darkFrames[title], "Missing card frame for \(title)")
+            assertFrameEqual(darkFrame, lightFrame, accuracy: 1, message: "Theme switch moved card \(title)")
+        }
+        assertCardsDoNotOverlap(settingsCards(in: container.pageView), in: container.pageView)
+        assertArrangedSubviewsDoNotOverlap(in: container.pageView)
+        try assertSettingsCardsStayNearHeader(in: container.pageView)
+    }
+
+    @MainActor
+    func testSettingsCardsKeepPreferredHeightsInTwoColumnLayout() throws {
+        let view = AppKitSettingsPageView()
+        view.frame = NSRect(x: 0, y: 0, width: 1_440, height: 900)
+        view.update(with: makeSettingsPageState(
+            themeMode: .followSystem,
+            language: .simplifiedChinese,
+            hiddenAppCount: 1
+        ))
+        view.prepareLayout(forWidth: 1_240)
+        view.layout()
+        view.layoutSubtreeIfNeeded()
+
+        let cards = settingsCards(in: view)
+        XCTAssertEqual(cards.count, 6)
+        for card in cards {
+            XCTAssertLessThanOrEqual(
+                card.frame.height,
+                card.preferredLayoutHeight() + 1,
+                "Settings card should not absorb extra column height: \(localizedTextValues(in: card).sorted())"
+            )
+            assertCardBottomContentInsetIsCompact(card)
+        }
+    }
+
+    @MainActor
+    func testSettingsContainerKeepsCardsAnchoredWithSingleLayoutPassAcrossThemeSwitch() throws {
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 1_440, height: 900),
+            styleMask: [.borderless],
+            backing: .buffered,
+            defer: false
+        )
+        defer {
+            window.orderOut(nil)
+            window.contentView = nil
+        }
+
+        let container = AppKitSettingsPageContainerView()
+        container.frame = window.contentView?.bounds ?? NSRect(x: 0, y: 0, width: 1_440, height: 900)
+        window.contentView = container
+
+        container.update(
+            with: makeSettingsPageState(
+                themeMode: .light,
+                language: .simplifiedChinese,
+                hiddenAppCount: 1
+            ),
+            isActive: true
+        )
+        container.layout()
+        container.layoutSubtreeIfNeeded()
+
+        let lightFrames = settingsCardFramesByTitle(in: container.pageView, relativeTo: container)
+        try assertSettingsCardsStayNearHeader(in: container.pageView)
+
+        container.update(
+            with: makeSettingsPageState(
+                themeMode: .dark,
+                language: .simplifiedChinese,
+                hiddenAppCount: 1
+            ),
+            isActive: true
+        )
+        container.layout()
+        container.layoutSubtreeIfNeeded()
+
+        let darkFrames = settingsCardFramesByTitle(in: container.pageView, relativeTo: container)
+        try assertSettingsCardsStayNearHeader(in: container.pageView)
+        XCTAssertEqual(darkFrames.keys.sorted(), lightFrames.keys.sorted())
+        for (title, lightFrame) in lightFrames {
+            let darkFrame = try XCTUnwrap(darkFrames[title], "Missing card frame for \(title)")
+            assertFrameEqual(darkFrame, lightFrame, accuracy: 1, message: "Theme switch moved card \(title)")
+        }
+    }
+
+    @MainActor
+    func testSettingsRootThemeSwitchMatchesColdDarkLayoutInSwiftUIHost() throws {
+        let previousSelectedTab = HomeTabState.shared.selectedTab
+        let previousLanguageRaw = UserDefaults.standard.string(forKey: AppPreferenceKeys.appLanguage)
+        let previousThemeRaw = UserDefaults.standard.string(forKey: AppPreferenceKeys.themeMode)
+        HomeTabState.shared.selectedTab = .settings
+        UserDefaults.standard.set(AppLanguage.english.rawValue, forKey: AppPreferenceKeys.appLanguage)
+        UserDefaults.standard.set(ThemeMode.light.rawValue, forKey: AppPreferenceKeys.themeMode)
+        defer {
+            HomeTabState.shared.selectedTab = previousSelectedTab
+            restoreStandardUserDefaultsValue(previousLanguageRaw, forKey: AppPreferenceKeys.appLanguage)
+            restoreStandardUserDefaultsValue(previousThemeRaw, forKey: AppPreferenceKeys.themeMode)
+        }
+
+        let hostedView = NSHostingView(
+            rootView: HomeRootView()
+                .frame(width: 1_440, height: 900, alignment: .topLeading)
+        )
+        hostedView.frame = NSRect(x: 0, y: 0, width: 1_440, height: 900)
+        hostedView.layoutSubtreeIfNeeded()
+
+        let initialContainer: AppKitSettingsPageContainerView = try XCTUnwrap(
+            descendantViews(in: hostedView).compactMap { $0 as? AppKitSettingsPageContainerView }.first
+        )
+        settleSettingsContainerLayout(initialContainer)
+
+        UserDefaults.standard.set(ThemeMode.dark.rawValue, forKey: AppPreferenceKeys.themeMode)
+
+        XCTAssertTrue(
+            waitForRunLoopCondition(timeout: 1.0) {
+                hostedView.layoutSubtreeIfNeeded()
+                let containers = descendantViews(in: hostedView)
+                    .compactMap { $0 as? AppKitSettingsPageContainerView }
+                guard containers.count == 1, let container = containers.first else { return false }
+                return container.appearance?.isFlowTabDarkInterface == true
+                    && settingsCardBackgroundIsDark(in: container.pageView)
+            },
+            "Root theme changes should rebuild or refresh Settings with the target app appearance."
+        )
+        let switchedContainer: AppKitSettingsPageContainerView = try XCTUnwrap(
+            descendantViews(in: hostedView).compactMap { $0 as? AppKitSettingsPageContainerView }.first
+        )
+        settleSettingsContainerLayout(switchedContainer)
+
+        let switchedFrames = settingsCardFramesByTitle(in: switchedContainer.pageView, relativeTo: hostedView)
+
+        let coldDarkHostedView = NSHostingView(
+            rootView: HomeRootView()
+                .frame(width: 1_440, height: 900, alignment: .topLeading)
+        )
+        coldDarkHostedView.frame = NSRect(x: 0, y: 0, width: 1_440, height: 900)
+        coldDarkHostedView.layoutSubtreeIfNeeded()
+        XCTAssertTrue(
+            waitForRunLoopCondition(timeout: 1.0) {
+                coldDarkHostedView.layoutSubtreeIfNeeded()
+                let containers = descendantViews(in: coldDarkHostedView)
+                    .compactMap { $0 as? AppKitSettingsPageContainerView }
+                guard containers.count == 1, let container = containers.first else { return false }
+                return container.appearance?.isFlowTabDarkInterface == true
+                    && settingsCardBackgroundIsDark(in: container.pageView)
+            },
+            "Cold dark Settings should settle with the target app appearance."
+        )
+        let coldDarkContainer: AppKitSettingsPageContainerView = try XCTUnwrap(
+            descendantViews(in: coldDarkHostedView).compactMap { $0 as? AppKitSettingsPageContainerView }.first
+        )
+        settleSettingsContainerLayout(coldDarkContainer)
+        let coldDarkFrames = settingsCardFramesByTitle(in: coldDarkContainer.pageView, relativeTo: coldDarkHostedView)
+
+        XCTAssertEqual(switchedFrames.keys.sorted(), coldDarkFrames.keys.sorted())
+        for (title, switchedFrame) in switchedFrames {
+            let coldFrame = try XCTUnwrap(coldDarkFrames[title], "Missing cold dark card frame for \(title)")
+            assertFrameEqual(switchedFrame, coldFrame, accuracy: 1, message: "Hot theme switch differs from cold dark layout for \(title)")
+        }
+        try assertSettingsCardsStayNearHeader(in: switchedContainer.pageView)
+    }
+
+    @MainActor
     func testSidebarPermissionStatusExpandsForEnglishAtSidebarWidth() {
         let hostedView = NSHostingView(
             rootView: HomePermissionStatusCard(
@@ -177,6 +439,7 @@ extension FlowTabTests {
     }
 
     private func makeSettingsPageState(
+        themeMode: ThemeMode = .followSystem,
         language: AppLanguage,
         hiddenAppCount: Int,
         accessibilityTrusted: Bool = false,
@@ -185,7 +448,7 @@ extension FlowTabTests {
         AppKitSettingsPageState(
             showShortcutHint: true,
             showInCommandTab: true,
-            themeModeRaw: ThemeMode.followSystem.rawValue,
+            themeModeRaw: themeMode.rawValue,
             appLanguageRaw: language.rawValue,
             windowLayerAutoEnterDelayText: "0.75",
             autoRestoreMinimizedWindowOnSwitch: false,
@@ -219,9 +482,9 @@ extension FlowTabTests {
                     return false
                 }
 
-                return constraint.firstItem is FlowCapsuleSegmentedControl
-                    || constraint.firstItem is FlowFormSelectControl
-                    || constraint.firstItem is FlowGradientActionButton
+                return constraint.firstItem is FlowSettingsSegmentedControl
+                    || constraint.firstItem is FlowSettingsSelectControl
+                    || constraint.firstItem is FlowSettingsActionButton
             }
     }
 
@@ -239,10 +502,10 @@ extension FlowTabTests {
         )
     }
 
-    private func sectionCard(in view: NSView, containingText text: String) throws -> AppKitSectionCardView {
+    private func sectionCard(in view: NSView, containingText text: String) throws -> FlowSettingsCardView {
         try XCTUnwrap(
             descendantViews(in: view).compactMap { card in
-                guard let sectionCard = card as? AppKitSectionCardView,
+                guard let sectionCard = card as? FlowSettingsCardView,
                     localizedTextValues(in: sectionCard).contains(text)
                 else {
                     return nil
@@ -252,6 +515,177 @@ extension FlowTabTests {
             .first,
             "Missing Settings card containing text: \(text)"
         )
+    }
+
+    private func settingsCards(in view: NSView) -> [FlowSettingsCardView] {
+        descendantViews(in: view).compactMap { $0 as? FlowSettingsCardView }
+    }
+
+    private func settleSettingsContainerLayout(_ container: AppKitSettingsPageContainerView) {
+        for _ in 0..<4 {
+            container.layout()
+            container.layoutSubtreeIfNeeded()
+        }
+    }
+
+    private func settingsCardFramesByTitle(in view: NSView, relativeTo ancestor: NSView) -> [String: NSRect] {
+        var frames: [String: NSRect] = [:]
+        for title in [
+            "外观",
+            "窗口行为",
+            "权限",
+            "搜索",
+            "应用可见性",
+            "快捷键",
+            "Appearance",
+            "Window Behavior",
+            "Permissions",
+            "Search",
+            "App Visibility",
+            "Hotkeys"
+        ] {
+            guard let card = findSectionCard(in: view, containingText: title) else { continue }
+            frames[title] = visualFrame(of: card, relativeTo: ancestor)
+        }
+        return frames
+    }
+
+    private func findSectionCard(in view: NSView, containingText text: String) -> FlowSettingsCardView? {
+        descendantViews(in: view).compactMap { card in
+            guard let sectionCard = card as? FlowSettingsCardView,
+                localizedTextValues(in: sectionCard).contains(text)
+            else {
+                return nil
+            }
+            return sectionCard
+        }
+        .first
+    }
+
+    private func visualFrame(of view: NSView, relativeTo ancestor: NSView) -> NSRect {
+        let rawFrame = view.convert(view.bounds, to: ancestor)
+        return NSRect(
+            x: rawFrame.minX,
+            y: ancestor.bounds.height - rawFrame.maxY,
+            width: rawFrame.width,
+            height: rawFrame.height
+        )
+    }
+
+    private func assertFrameEqual(
+        _ actual: NSRect,
+        _ expected: NSRect,
+        accuracy: CGFloat,
+        message: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertEqual(actual.origin.x, expected.origin.x, accuracy: accuracy, "\(message) x", file: file, line: line)
+        XCTAssertEqual(actual.origin.y, expected.origin.y, accuracy: accuracy, "\(message) y", file: file, line: line)
+        XCTAssertEqual(actual.size.width, expected.size.width, accuracy: accuracy, "\(message) width", file: file, line: line)
+        XCTAssertEqual(actual.size.height, expected.size.height, accuracy: accuracy, "\(message) height", file: file, line: line)
+    }
+
+    private func assertSettingsCardsStayNearHeader(
+        in view: NSView,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let subtitle: NSTextField = try XCTUnwrap(
+            descendant(
+                in: view,
+                identifier: "flowtab.settings.page.subtitle"
+            ),
+            file: file,
+            line: line
+        )
+        let subtitleFrame = visualFrame(of: subtitle, relativeTo: view)
+        let cardFrames = settingsCards(in: view).map { visualFrame(of: $0, relativeTo: view) }
+        let firstCardTop = cardFrames.map(\.minY).min() ?? .infinity
+        let gapBelowSubtitle = firstCardTop - subtitleFrame.maxY
+        XCTAssertGreaterThanOrEqual(
+            gapBelowSubtitle,
+            -1,
+            "Settings cards moved above the page subtitle. subtitle=\(subtitleFrame) cards=\(cardFrames)",
+            file: file,
+            line: line
+        )
+        XCTAssertLessThan(
+            gapBelowSubtitle,
+            60,
+            "Settings cards drifted away from the page header. subtitle=\(subtitleFrame) cards=\(cardFrames)",
+            file: file,
+            line: line
+        )
+    }
+
+    private func assertCardsDoNotOverlap(
+        _ cards: [FlowSettingsCardView],
+        in ancestor: NSView,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let frames = cards.map { card in
+            card.convert(card.bounds, to: ancestor)
+        }
+        for index in frames.indices {
+            for otherIndex in frames.indices where otherIndex > index {
+                let intersection = frames[index].intersection(frames[otherIndex])
+                XCTAssertTrue(
+                    intersection.isNull || intersection.width <= 1 || intersection.height <= 1,
+                    "Settings cards overlap: \(frames[index]) and \(frames[otherIndex])",
+                    file: file,
+                    line: line
+                )
+            }
+        }
+    }
+
+    private func assertCardBottomContentInsetIsCompact(
+        _ card: FlowSettingsCardView,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let contentFrames = descendantViews(in: card)
+            .filter { view in
+                guard !view.isHidden, view.alphaValue > 0 else { return false }
+                return view is NSTextField || view is NSControl || view is NSImageView
+            }
+            .map { view in
+                view.convert(view.bounds, to: card)
+            }
+            .filter { !$0.isEmpty }
+        guard let bottomContentY = contentFrames.map(\.minY).min() else { return }
+        XCTAssertLessThanOrEqual(
+            bottomContentY,
+            24,
+            "Settings card has excessive bottom content inset: \(localizedTextValues(in: card).sorted()) frames=\(contentFrames)",
+            file: file,
+            line: line
+        )
+    }
+
+    private func assertArrangedSubviewsDoNotOverlap(
+        in view: NSView,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        for stackView in descendantViews(in: view).compactMap({ $0 as? NSStackView }) {
+            let visibleSubviews = stackView.arrangedSubviews.filter { !$0.isHidden && !$0.frame.isEmpty }
+            for index in visibleSubviews.indices {
+                for otherIndex in visibleSubviews.indices where otherIndex > index {
+                    let firstFrame = visibleSubviews[index].convert(visibleSubviews[index].bounds, to: stackView)
+                    let secondFrame = visibleSubviews[otherIndex].convert(visibleSubviews[otherIndex].bounds, to: stackView)
+                    let intersection = firstFrame.intersection(secondFrame)
+                    XCTAssertTrue(
+                        intersection.isNull || intersection.width <= 1 || intersection.height <= 1,
+                        "Arranged subviews overlap in \(type(of: stackView)): \(firstFrame) and \(secondFrame)",
+                        file: file,
+                        line: line
+                    )
+                }
+            }
+        }
     }
 
     private func assertTextFieldIsVisiblyLaidOut(
@@ -279,6 +713,57 @@ extension FlowTabTests {
             file: file,
             line: line
         )
+    }
+
+    private func assertControlIsVisiblyLaidOut(
+        identifier: String,
+        in ancestor: NSView,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) throws {
+        let control: NSView = try XCTUnwrap(
+            descendant(in: ancestor, identifier: identifier),
+            "Missing control: \(identifier)",
+            file: file,
+            line: line
+        )
+        ancestor.layoutSubtreeIfNeeded()
+        let visibleFrame = control.convert(control.bounds, to: ancestor)
+
+        XCTAssertFalse(control.isHidden, file: file, line: line)
+        XCTAssertGreaterThan(control.frame.width, 20, file: file, line: line)
+        XCTAssertGreaterThan(control.frame.height, 12, file: file, line: line)
+        XCTAssertTrue(
+            ancestor.bounds.insetBy(dx: -1, dy: -1).contains(visibleFrame),
+            "Control is laid out outside the card: \(identifier) \(visibleFrame)",
+            file: file,
+            line: line
+        )
+    }
+
+    private func waitForRunLoopCondition(timeout: TimeInterval, condition: () -> Bool) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if condition() { return true }
+            RunLoop.main.run(mode: .default, before: Date().addingTimeInterval(0.01))
+        }
+        return condition()
+    }
+
+    private func restoreStandardUserDefaultsValue(_ value: String?, forKey key: String) {
+        if let value {
+            UserDefaults.standard.set(value, forKey: key)
+        } else {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+    }
+
+    private func settingsCardBackgroundIsDark(in view: NSView) -> Bool {
+        settingsCards(in: view).contains { card in
+            guard let backgroundColor = card.layer?.backgroundColor else { return false }
+            let color = NSColor(cgColor: backgroundColor)?.usingColorSpace(.sRGB)
+            return (color?.brightnessComponent ?? 1) < 0.3
+        }
     }
 
     private func descendantViews(in view: NSView) -> [NSView] {

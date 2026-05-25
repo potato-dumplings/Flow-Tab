@@ -55,7 +55,6 @@ struct AppVisibilityManagerView: View {
         }
         .background(contentBackground)
         .preferredColorScheme(colorScheme)
-        .id(appLanguageRaw)
         .onAppear {
             model.reload()
         }

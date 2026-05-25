@@ -55,6 +55,5 @@ struct ContentView: View {
         .frame(minWidth: 420, minHeight: 240)
         .preferredColorScheme(resolvedColorScheme)
         .animation(.none, value: resolvedColorScheme)
-        .id(appLanguageRaw)
     }
 }

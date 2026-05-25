@@ -21,7 +21,6 @@ struct FlowTabApp: App {
         WindowGroup("FlowTab") {
             HomeRootView()
                 .frame(minWidth: AppWindowLayout.width, minHeight: AppWindowLayout.height)
-                .id(appLanguageRaw)
         }
         .defaultSize(width: AppWindowLayout.width, height: AppWindowLayout.height)
         .windowStyle(.hiddenTitleBar)
@@ -29,7 +28,6 @@ struct FlowTabApp: App {
         Settings {
             HomeRootView()
                 .frame(minWidth: AppWindowLayout.width, minHeight: AppWindowLayout.height)
-                .id(appLanguageRaw)
         }
         .windowStyle(.hiddenTitleBar)
 

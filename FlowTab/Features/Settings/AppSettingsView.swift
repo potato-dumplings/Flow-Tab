@@ -192,6 +192,10 @@ struct AppSettingsView: View {
         )
     }
 
+    private var settingsPageBridgeIdentity: String {
+        "\(themeModeRaw)|\(appLanguageRaw)"
+    }
+
     var body: some View {
         ZStack {
             HomeBackdropView()
@@ -248,7 +252,7 @@ struct AppSettingsView: View {
                     }
                 }
             )
-            .id(appLanguageRaw)
+            .id(settingsPageBridgeIdentity)
             .opacity(showsAppVisibilityManager ? 0 : 1)
             .allowsHitTesting(!showsAppVisibilityManager)
             .accessibilityHidden(showsAppVisibilityManager)

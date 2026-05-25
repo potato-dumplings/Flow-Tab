@@ -50,6 +50,8 @@ final class AppKitSettingsPageContainerView: NSView {
     private var pageTopConstraint: NSLayoutConstraint?
     private var pageWidthConstraint: NSLayoutConstraint?
     private var pageHeightConstraint: NSLayoutConstraint?
+    private let maximumLayoutSettlingPasses = 3
+    private var hasDeferredLayoutRefresh = false
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -62,13 +64,21 @@ final class AppKitSettingsPageContainerView: NSView {
     }
 
     func update(with state: AppKitSettingsPageState, isActive: Bool) {
-        appearance = Self.appKitAppearance(for: state.themeModeRaw)
+        let targetAppearance = FlowSettingsStyleResolver.targetAppearance(
+            for: state.themeModeRaw,
+            fallback: inheritedAppearanceFallback
+        )
+        appearance = targetAppearance
+        scrollView.appearance = targetAppearance
+        documentView.appearance = targetAppearance
+        pageView.appearance = targetAppearance
+        pageView.applySettingsAppearance(targetAppearance)
         pageView.update(with: state)
         if isActive && !wasActive {
             clearInitialFirstResponderIfNeeded()
         }
         wasActive = isActive
-        needsLayout = true
+        refreshLayoutAfterSettingsUpdate()
     }
 
     override func setFrameSize(_ newSize: NSSize) {
@@ -99,22 +109,30 @@ final class AppKitSettingsPageContainerView: NSView {
         let pageWidth = max(viewportWidth - horizontalContentInset * 2, 320)
         pageLeadingConstraint?.constant = horizontalContentInset
         pageWidthConstraint?.constant = pageWidth
-        pageHeightConstraint?.isActive = false
-        pageView.prepareLayout(forWidth: pageWidth)
-        let fittedSize = pageView.preferredFittingSize(forWidth: pageWidth)
         let topInset = verticalContentInset + safeAreaInsets.top
-        let documentHeight = fittedSize.height + topInset + verticalContentInset
+        var previousHeight: CGFloat?
+        for _ in 0..<maximumLayoutSettlingPasses {
+            pageHeightConstraint?.isActive = false
+            pageView.prepareLayout(forWidth: pageWidth)
+            let fittedSize = pageView.preferredFittingSize(forWidth: pageWidth)
+            let documentHeight = fittedSize.height + topInset + verticalContentInset
 
-        documentView.frame = NSRect(
-            x: 0,
-            y: 0,
-            width: viewportWidth,
-            height: documentHeight
-        )
-        pageTopConstraint?.constant = topInset
-        pageHeightConstraint?.constant = fittedSize.height
-        pageHeightConstraint?.isActive = true
-        documentView.layoutSubtreeIfNeeded()
+            documentView.frame = NSRect(
+                x: 0,
+                y: 0,
+                width: viewportWidth,
+                height: documentHeight
+            )
+            pageTopConstraint?.constant = topInset
+            pageHeightConstraint?.constant = fittedSize.height
+            pageHeightConstraint?.isActive = true
+            documentView.layoutSubtreeIfNeeded()
+
+            if let previousHeight, abs(previousHeight - fittedSize.height) <= 0.5 {
+                break
+            }
+            previousHeight = fittedSize.height
+        }
     }
 
     private func buildViewHierarchy() {
@@ -180,16 +198,36 @@ final class AppKitSettingsPageContainerView: NSView {
         }
     }
 
-    private static func appKitAppearance(for themeModeRaw: String) -> NSAppearance? {
-        switch ThemePreferencesStore.resolve(rawValue: themeModeRaw) {
-        case .light:
-            return NSAppearance(named: .aqua)
-        case .dark:
-            return NSAppearance(named: .darkAqua)
-        case .followSystem:
-            return nil
+    private func refreshLayoutAfterSettingsUpdate() {
+        pageView.invalidateIntrinsicContentSize()
+        pageView.needsLayout = true
+        documentView.needsLayout = true
+        needsLayout = true
+        layoutSubtreeIfNeeded()
+        scheduleDeferredLayoutRefresh()
+    }
+
+    private func scheduleDeferredLayoutRefresh() {
+        guard !hasDeferredLayoutRefresh else { return }
+        hasDeferredLayoutRefresh = true
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.hasDeferredLayoutRefresh = false
+            self.pageView.invalidateIntrinsicContentSize()
+            self.pageView.needsLayout = true
+            self.documentView.needsLayout = true
+            self.needsLayout = true
+            self.layoutSubtreeIfNeeded()
         }
     }
+
+    private var inheritedAppearanceFallback: NSAppearance {
+        window?.effectiveAppearance
+            ?? superview?.effectiveAppearance
+            ?? NSApp.effectiveAppearance
+    }
+
 }
 
 struct AppKitSettingsPageContent: NSViewRepresentable {
@@ -373,38 +411,39 @@ final class AppKitSettingsPageView: NSView {
     private var columnWidthConstraints: [NSLayoutConstraint] = []
     private var isUsingSingleColumnLayout = false
 
-    private lazy var appearanceCard = AppKitSectionCardView(
+    private lazy var appearanceCard = FlowSettingsCardView(
         title: AppStrings.text(.settingsCardAppearanceTitle),
         subtitle: AppStrings.text(.settingsCardAppearanceSubtitle),
         contentView: appearanceContent
     )
-    private lazy var windowBehaviorCard = AppKitSectionCardView(
+    private lazy var windowBehaviorCard = FlowSettingsCardView(
         title: AppStrings.text(.settingsCardWindowBehaviorTitle),
         subtitle: AppStrings.text(.settingsCardWindowBehaviorSubtitle),
         contentView: windowBehaviorContent
     )
-    private lazy var permissionCard = AppKitSectionCardView(
+    private lazy var permissionCard = FlowSettingsCardView(
         title: AppStrings.text(.settingsCardPermissionTitle),
         subtitle: AppStrings.text(.settingsCardPermissionSubtitle),
         contentView: permissionContent
     )
-    private lazy var searchCard = AppKitSectionCardView(
+    private lazy var searchCard = FlowSettingsCardView(
         title: AppStrings.text(.settingsCardSearchTitle),
         subtitle: AppStrings.text(.settingsCardSearchSubtitle),
         contentView: searchContent
     )
-    private lazy var appVisibilityCard = AppKitSectionCardView(
+    private lazy var appVisibilityCard = FlowSettingsCardView(
         title: AppStrings.text(.settingsCardAppVisibilityTitle),
         subtitle: nil,
         contentView: appVisibilityContent
     )
-    private lazy var hotkeyCard = AppKitSectionCardView(
+    private lazy var hotkeyCard = FlowSettingsCardView(
         title: AppStrings.text(.settingsCardHotkeyTitle),
         subtitle: AppStrings.text(.settingsCardHotkeySubtitle),
         contentView: hotkeyContent
     )
 
     private var currentState: AppKitSettingsPageState?
+    private var targetSettingsAppearance = FlowSettingsStyleResolver.defaultAppearance
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -422,6 +461,14 @@ final class AppKitSettingsPageView: NSView {
         return NSSize(width: NSView.noIntrinsicMetric, height: contentStack.fittingSize.height)
     }
 
+    override func layout() {
+        let needsSecondLayoutPass = updateHeaderWrappingLabelWidths(forWidth: bounds.width)
+        super.layout()
+        if needsSecondLayoutPass {
+            super.layout()
+        }
+    }
+
     static func usesSingleColumnLayout(forWidth width: CGFloat) -> Bool {
         width < 680
     }
@@ -436,6 +483,27 @@ final class AppKitSettingsPageView: NSView {
         columnsStack.distribution = useSingleColumn ? .fill : .fillEqually
         columnWidthConstraints.forEach { $0.isActive = useSingleColumn }
         invalidateIntrinsicContentSize()
+    }
+
+    func preferredFittingSize(forWidth width: CGFloat) -> CGSize {
+        prepareLayout(forWidth: width)
+        updateHeaderWrappingLabelWidths(forWidth: width)
+        layoutSubtreeIfNeeded()
+
+        let headerHeight = preferredHeight(for: headerStack)
+        let leftColumnHeight = preferredColumnHeight(leftColumn)
+        let rightColumnHeight = preferredColumnHeight(rightColumn)
+        let columnsHeight: CGFloat
+        if isUsingSingleColumnLayout {
+            columnsHeight = leftColumnHeight + columnsStack.spacing + rightColumnHeight
+        } else {
+            columnsHeight = max(leftColumnHeight, rightColumnHeight)
+        }
+
+        return CGSize(
+            width: width,
+            height: ceil(headerHeight + contentStack.spacing + columnsHeight)
+        )
     }
 
     func update(with state: AppKitSettingsPageState) {
@@ -512,6 +580,22 @@ final class AppKitSettingsPageView: NSView {
         appVisibilityCard.invalidateIntrinsicContentSize()
         hotkeyCard.invalidateIntrinsicContentSize()
         invalidateIntrinsicContentSize()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        applySettingsAppearance(targetSettingsAppearance)
+    }
+
+    func applySettingsAppearance(_ appearance: NSAppearance) {
+        targetSettingsAppearance = appearance
+        self.appearance = appearance
+        for subview in descendantViews(in: self) {
+            subview.appearance = appearance
+        }
+        for view in descendantRefreshableViews(in: self) where view !== self {
+            view.applySettingsAppearance(appearance)
+        }
     }
 
     private func updateCardChrome(language: AppLanguage) {
@@ -713,5 +797,46 @@ final class AppKitSettingsPageView: NSView {
         column.addArrangedSubview(card)
         card.translatesAutoresizingMaskIntoConstraints = false
         card.widthAnchor.constraint(equalTo: column.widthAnchor).isActive = true
+    }
+
+    @discardableResult
+    private func updateHeaderWrappingLabelWidths(forWidth width: CGFloat) -> Bool {
+        guard width > 0 else { return false }
+        let preferredWidth = floor(width)
+        guard abs(subtitleLabel.preferredMaxLayoutWidth - preferredWidth) > 0.5 else { return false }
+        subtitleLabel.preferredMaxLayoutWidth = preferredWidth
+        subtitleLabel.invalidateIntrinsicContentSize()
+        headerStack.invalidateIntrinsicContentSize()
+        return true
+    }
+
+    private func preferredColumnHeight(_ stackView: NSStackView) -> CGFloat {
+        let visibleSubviews = stackView.arrangedSubviews.filter { !$0.isHidden }
+        guard !visibleSubviews.isEmpty else { return 0 }
+        let contentHeight = visibleSubviews
+            .map { preferredHeight(for: $0) }
+            .reduce(0, +)
+        return ceil(contentHeight + stackView.spacing * CGFloat(visibleSubviews.count - 1))
+    }
+
+    private func preferredHeight(for view: NSView) -> CGFloat {
+        FlowSettingsLayoutMetrics.preferredHeight(for: view)
+    }
+
+    private func descendantRefreshableViews(in view: NSView) -> [NSView & FlowSettingsAppearanceRefreshable] {
+        view.subviews.flatMap { subview -> [NSView & FlowSettingsAppearanceRefreshable] in
+            var matches: [NSView & FlowSettingsAppearanceRefreshable] = []
+            if let refreshable = subview as? NSView & FlowSettingsAppearanceRefreshable {
+                matches.append(refreshable)
+            }
+            matches.append(contentsOf: descendantRefreshableViews(in: subview))
+            return matches
+        }
+    }
+
+    private func descendantViews(in view: NSView) -> [NSView] {
+        view.subviews.flatMap { subview in
+            [subview] + descendantViews(in: subview)
+        }
     }
 }

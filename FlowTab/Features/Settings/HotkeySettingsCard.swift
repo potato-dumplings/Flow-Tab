@@ -204,11 +204,11 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
     var onInAppWindowMainKeyChanged: ((String) -> Void)?
 
     private let stackView = NSStackView()
-    private let mainPrimaryModifierSelect = FlowFormSelectControl(frame: .zero)
-    private let mainKeySelect = FlowFormSelectControl(frame: .zero)
-    private let quitKeySelect = FlowFormSelectControl(frame: .zero)
-    private let inAppPrimaryModifierSelect = FlowFormSelectControl(frame: .zero)
-    private let inAppMainKeySelect = FlowFormSelectControl(frame: .zero)
+    private let mainPrimaryModifierSelect = FlowSettingsSelectControl(frame: .zero)
+    private let mainKeySelect = FlowSettingsSelectControl(frame: .zero)
+    private let quitKeySelect = FlowSettingsSelectControl(frame: .zero)
+    private let inAppPrimaryModifierSelect = FlowSettingsSelectControl(frame: .zero)
+    private let inAppMainKeySelect = FlowSettingsSelectControl(frame: .zero)
     private let mainSummaryLabel = HotkeySettingsCardAppKitView.makeSecondaryLabel()
     private let mainTakeoverStatusLabel = HotkeySettingsCardAppKitView.makeStatusLabel()
     private let divider = NSBox()
@@ -268,8 +268,20 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
     }
 
     override var intrinsicContentSize: NSSize {
-        layoutSubtreeIfNeeded()
-        return NSSize(width: NSView.noIntrinsicMetric, height: stackView.fittingSize.height)
+        NSSize(width: NSView.noIntrinsicMetric, height: preferredLayoutHeight())
+    }
+
+    override func layout() {
+        let needsSecondLayoutPass = updateWrappingLabelWidths()
+        super.layout()
+        if needsSecondLayoutPass {
+            super.layout()
+        }
+    }
+
+    func preferredLayoutHeight() -> CGFloat {
+        updateWrappingLabelWidths()
+        return FlowSettingsLayoutMetrics.preferredStackHeight(stackView)
     }
 
     func update(with state: HotkeySettingsCardState) {
@@ -401,7 +413,7 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
     }
 
     private func configure(
-        selectControl: FlowFormSelectControl,
+        selectControl: FlowSettingsSelectControl,
         options: [(id: String, title: String)],
         onSelectionChanged: @escaping (String) -> Void
     ) {
@@ -409,7 +421,7 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
         AppKitSettingsCardBaseView.configure(selectControl: selectControl, options: options, width: 160)
     }
 
-    private func selectItem(in selectControl: FlowFormSelectControl, rawValue: String) {
+    private func selectItem(in selectControl: FlowSettingsSelectControl, rawValue: String) {
         AppKitSettingsCardBaseView.selectItem(in: selectControl, rawValue: rawValue)
     }
 
@@ -532,5 +544,21 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
         label.maximumNumberOfLines = 0
         label.isHidden = true
         return label
+    }
+
+    @discardableResult
+    private func updateWrappingLabelWidths() -> Bool {
+        let availableWidth = stackView.bounds.width > 0 ? stackView.bounds.width : bounds.width
+        guard availableWidth > 0 else { return false }
+
+        var didUpdate = false
+        for label in [mainSummaryLabel, mainTakeoverStatusLabel, inAppSummaryLabel, inAppTakeoverStatusLabel] {
+            let preferredWidth = floor(availableWidth)
+            guard abs(label.preferredMaxLayoutWidth - preferredWidth) > 0.5 else { continue }
+            label.preferredMaxLayoutWidth = preferredWidth
+            label.invalidateIntrinsicContentSize()
+            didUpdate = true
+        }
+        return didUpdate
     }
 }

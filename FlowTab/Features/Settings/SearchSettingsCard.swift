@@ -100,7 +100,7 @@ final class SearchSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKitSett
     var onSearchDefaultScopeChanged: ((String) -> Void)?
 
     private let searchEnabledSwitch = NSSwitch()
-    private let searchDefaultScopeSelect = FlowFormSelectControl(frame: .zero)
+    private let searchDefaultScopeSelect = FlowSettingsSelectControl(frame: .zero)
     private let scopeRowContainer = NSStackView()
     private lazy var searchEnabledRow = AppKitSettingsCardBaseView.makeControlRow(
         title: "",

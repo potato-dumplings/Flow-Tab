@@ -175,17 +175,23 @@ final class PermissionStatusControlRowView<Control: NSView>: NSView {
     }
 
     override var intrinsicContentSize: NSSize {
-        updatePreferredLabelWidths()
-        layoutSubtreeIfNeeded()
         return NSSize(
             width: NSView.noIntrinsicMetric,
-            height: ceil(max(textStack.fittingSize.height, control.fittingSize.height))
+            height: preferredLayoutHeight()
         )
     }
 
     override func layout() {
-        updatePreferredLabelWidths()
+        let needsSecondLayoutPass = updatePreferredLabelWidths()
         super.layout()
+        if updatePreferredLabelWidths() || needsSecondLayoutPass {
+            super.layout()
+        }
+    }
+
+    func preferredLayoutHeight() -> CGFloat {
+        updatePreferredLabelWidths()
+        return ceil(max(preferredTextHeight(), control.fittingSize.height))
     }
 
     private func buildViewHierarchy() {
@@ -248,12 +254,52 @@ final class PermissionStatusControlRowView<Control: NSView>: NSView {
         }
     }
 
-    private func updatePreferredLabelWidths() {
-        guard bounds.width > 0 else { return }
+    @discardableResult
+    private func updatePreferredLabelWidths() -> Bool {
+        let rowWidth = bounds.width > 0 ? bounds.width : superview?.bounds.width ?? 0
+        guard rowWidth > 0 else { return false }
         let controlWidth = max(control.fittingSize.width, control.intrinsicContentSize.width)
-        let textWidth = max(0, bounds.width - controlWidth - 10)
-        titleLabel.preferredMaxLayoutWidth = textWidth
-        detailLabel.preferredMaxLayoutWidth = textWidth
+        let textWidth = max(0, rowWidth - controlWidth - 10)
+        let preferredWidth = floor(textWidth)
+        guard abs(detailLabel.preferredMaxLayoutWidth - preferredWidth) > 0.5
+            || abs(titleLabel.preferredMaxLayoutWidth - preferredWidth) > 0.5
+        else {
+            return false
+        }
+        titleLabel.preferredMaxLayoutWidth = preferredWidth
+        detailLabel.preferredMaxLayoutWidth = preferredWidth
+        titleLabel.invalidateIntrinsicContentSize()
+        detailLabel.invalidateIntrinsicContentSize()
+        textStack.invalidateIntrinsicContentSize()
+        invalidateIntrinsicContentSize()
+        superview?.invalidateIntrinsicContentSize()
+        superview?.superview?.invalidateIntrinsicContentSize()
+        return true
+    }
+
+    private func preferredTextHeight() -> CGFloat {
+        let labels = [titleLabel, detailLabel].filter { !$0.isHidden && !$0.stringValue.isEmpty }
+        guard !labels.isEmpty else { return 0 }
+        let textHeight = labels
+            .map { preferredHeight(for: $0) }
+            .reduce(0, +)
+        return textHeight + textStack.spacing * CGFloat(max(labels.count - 1, 0))
+    }
+
+    private func preferredHeight(for label: NSTextField) -> CGFloat {
+        let font = label.font ?? .systemFont(ofSize: NSFont.systemFontSize)
+        let width = label.preferredMaxLayoutWidth > 0
+            ? label.preferredMaxLayoutWidth
+            : max(bounds.width, superview?.bounds.width ?? 0)
+        guard width > 0 else {
+            return ceil(font.ascender - font.descender + font.leading)
+        }
+        let rect = (label.stringValue as NSString).boundingRect(
+            with: CGSize(width: width, height: .greatestFiniteMagnitude),
+            options: [.usesLineFragmentOrigin, .usesFontLeading],
+            attributes: [.font: font]
+        )
+        return ceil(rect.height)
     }
 }
 
@@ -265,8 +311,8 @@ final class PermissionSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKit
 
     private let showPermissionReminderSwitch = NSSwitch()
     private let allowLaunchAtLoginSwitch = NSSwitch()
-    private let accessibilityRow: PermissionStatusControlRowView<FlowGradientActionButton>
-    private let screenCaptureRow: PermissionStatusControlRowView<FlowGradientActionButton>
+    private let accessibilityRow: PermissionStatusControlRowView<FlowSettingsActionButton>
+    private let screenCaptureRow: PermissionStatusControlRowView<FlowSettingsActionButton>
     private lazy var allowLaunchAtLoginRow = AppKitSettingsCardBaseView.makeControlRow(
         title: "",
         control: allowLaunchAtLoginSwitch
@@ -280,11 +326,11 @@ final class PermissionSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKit
 
     override init(frame frameRect: NSRect) {
         accessibilityRow = PermissionStatusControlRowView(
-            control: FlowGradientActionButton(),
+            control: FlowSettingsActionButton(),
             controlWidth: 96
         )
         screenCaptureRow = PermissionStatusControlRowView(
-            control: FlowGradientActionButton(),
+            control: FlowSettingsActionButton(),
             controlWidth: 96
         )
         super.init(frame: frameRect)
@@ -297,11 +343,11 @@ final class PermissionSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKit
 
     required init?(coder: NSCoder) {
         accessibilityRow = PermissionStatusControlRowView(
-            control: FlowGradientActionButton(),
+            control: FlowSettingsActionButton(),
             controlWidth: 96
         )
         screenCaptureRow = PermissionStatusControlRowView(
-            control: FlowGradientActionButton(),
+            control: FlowSettingsActionButton(),
             controlWidth: 96
         )
         super.init(coder: coder)
@@ -328,28 +374,28 @@ final class PermissionSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKit
         permissionReminderRow.updateTitle(
             AppStrings.text(.permissionHomeReminderToggle, language: language)
         )
+        accessibilityRow.control.update(
+            title: state.accessibilityButtonTitle,
+            accessibilityLabel: state.accessibilityPermissionActionLabel,
+            tooltip: state.accessibilityPermissionActionLabel,
+            style: .preset(state.accessibilityTrusted ? .primaryAction : .secondaryAction)
+        )
         accessibilityRow.update(
             text: state.accessibilityStatusText,
             detail: AppStrings.text(.permissionAccessibilityDetail, language: language),
             statusColor: state.accessibilityTrusted ? .systemGreen : .systemOrange
         )
-        accessibilityRow.control.update(
-            title: state.accessibilityButtonTitle,
-            tone: state.accessibilityTrusted ? .blueDominant : .grayDominant
+        screenCaptureRow.control.update(
+            title: state.screenCaptureButtonTitle,
+            accessibilityLabel: state.screenCapturePermissionActionLabel,
+            tooltip: state.screenCapturePermissionActionLabel,
+            style: .preset(state.screenCaptureTrusted ? .primaryAction : .secondaryAction)
         )
-        accessibilityRow.control.toolTip = state.accessibilityPermissionActionLabel
-        accessibilityRow.control.setAccessibilityLabel(state.accessibilityPermissionActionLabel)
         screenCaptureRow.update(
             text: state.screenCaptureStatusText,
             detail: AppStrings.text(.permissionScreenDetail, language: language),
             statusColor: state.screenCaptureTrusted ? .systemGreen : .systemOrange
         )
-        screenCaptureRow.control.update(
-            title: state.screenCaptureButtonTitle,
-            tone: state.screenCaptureTrusted ? .blueDominant : .grayDominant
-        )
-        screenCaptureRow.control.toolTip = state.screenCapturePermissionActionLabel
-        screenCaptureRow.control.setAccessibilityLabel(state.screenCapturePermissionActionLabel)
         invalidateIntrinsicContentSize()
     }
 
