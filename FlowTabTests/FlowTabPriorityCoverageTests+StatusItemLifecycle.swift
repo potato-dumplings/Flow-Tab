@@ -44,15 +44,28 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testStatusItemMenuContainsOnlyQuitAndQuitRequestsTermination() {
+        let previousContext = FlowPresentationState.shared.context
+        defer {
+            FlowPresentationState.shared.setThemeMode(rawValue: previousContext.themeMode.rawValue)
+            FlowPresentationState.shared.setAppLanguage(rawValue: previousContext.appLanguage.rawValue)
+        }
+        FlowPresentationState.shared.setAppLanguage(rawValue: AppLanguage.simplifiedChinese.rawValue)
+
         let delegate = AppDelegate()
         let menu = delegate.makeStatusItemMenu()
 
-        XCTAssertEqual(menu.items.map(\.title), [AppStrings.text(.menuQuit)])
+        XCTAssertEqual(menu.items.map(\.title), [AppStrings.text(.menuQuit, language: .simplifiedChinese)])
         XCTAssertEqual(
             menu.items.first?.identifier?.rawValue,
             AppDelegate.statusItemQuitMenuItemIdentifier
         )
         XCTAssertNotNil(menu.items.first?.action)
+
+        FlowPresentationState.shared.setAppLanguage(rawValue: AppLanguage.english.rawValue)
+        XCTAssertEqual(
+            delegate.makeStatusItemMenu().items.map(\.title),
+            [AppStrings.text(.menuQuit, language: .english)]
+        )
 
         let application = TestTerminationApplication()
         delegate.handleStatusItemQuitAction(application: application)

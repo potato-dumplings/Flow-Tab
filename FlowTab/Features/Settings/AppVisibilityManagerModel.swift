@@ -10,14 +10,14 @@ final class AppVisibilityManagerModel: ObservableObject {
 
         var id: String { rawValue }
 
-        var title: String {
+        func title(language: AppLanguage) -> String {
             switch self {
             case .all:
-                return AppStrings.text(.appVisibilityFilterAll)
+                return AppStrings.text(.appVisibilityFilterAll, language: language)
             case .hidden:
-                return AppStrings.text(.appVisibilityFilterHidden)
+                return AppStrings.text(.appVisibilityFilterHidden, language: language)
             case .running:
-                return AppStrings.text(.appVisibilityFilterRunning)
+                return AppStrings.text(.appVisibilityFilterRunning, language: language)
             }
         }
     }

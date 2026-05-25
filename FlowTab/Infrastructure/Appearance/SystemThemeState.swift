@@ -1,6 +1,5 @@
 import AppKit
 import SwiftUI
-import FlowTabCore
 
 @MainActor
 final class SystemThemeState: ObservableObject {
@@ -10,6 +9,7 @@ final class SystemThemeState: ObservableObject {
 
     private var appearanceObserver: NSObjectProtocol?
     private var appActivationObserver: NSObjectProtocol?
+    private var colorSchemeObservers: [UUID: @MainActor (ColorScheme) -> Void] = [:]
 
     private init() {
         refreshColorScheme()
@@ -49,19 +49,25 @@ final class SystemThemeState: ObservableObject {
         let nextColorScheme: ColorScheme = isDark ? .dark : .light
         if colorScheme != nextColorScheme {
             colorScheme = nextColorScheme
+            notifyColorSchemeObservers(nextColorScheme)
         }
     }
-}
 
-extension ThemeMode {
-    func resolvedColorScheme(systemColorScheme: ColorScheme) -> ColorScheme {
-        switch self {
-        case .followSystem:
-            return systemColorScheme
-        case .light:
-            return .light
-        case .dark:
-            return .dark
+    func observeColorSchemeChanges(
+        _ handler: @escaping @MainActor (ColorScheme) -> Void
+    ) -> FlowPresentationThemeObservation {
+        let id = UUID()
+        colorSchemeObservers[id] = handler
+        return FlowPresentationThemeObservation { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.colorSchemeObservers[id] = nil
+            }
+        }
+    }
+
+    private func notifyColorSchemeObservers(_ colorScheme: ColorScheme) {
+        for observer in colorSchemeObservers.values {
+            observer(colorScheme)
         }
     }
 }

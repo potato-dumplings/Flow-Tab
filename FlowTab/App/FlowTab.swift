@@ -5,12 +5,7 @@ struct FlowTabApp: App {
     static var mruTracker: any MRUTracking = SystemAppMRUTracker.shared
 
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
-    @AppStorage(AppPreferenceKeys.appLanguage)
-    private var appLanguageRaw = AppLanguagePreferencesStore.defaultLanguage.rawValue
-
-    private var appLanguage: AppLanguage {
-        AppLanguagePreferencesStore.resolve(rawValue: appLanguageRaw)
-    }
+    @ObservedObject private var presentation = FlowPresentationState.shared
 
     init() {
         FlowTabUITestBootstrapper.prepareIfNeeded()
@@ -33,7 +28,7 @@ struct FlowTabApp: App {
 
         .commands {
             CommandGroup(replacing: .appSettings) {
-                Button(AppStrings.text(.menuSettings, language: appLanguage)) {
+                Button(AppStrings.text(.menuSettings, language: presentation.context.appLanguage)) {
                     AppWindowCoordinator.openSettings()
                 }
                 .keyboardShortcut(",", modifiers: [.command])

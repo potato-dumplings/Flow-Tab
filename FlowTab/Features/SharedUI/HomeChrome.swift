@@ -1,25 +1,21 @@
 import AppKit
 import SwiftUI
 
-enum HomePageLayout {
+enum FlowPageLayout {
     static let horizontalInset: CGFloat = 24
     static let alignedTopInset: CGFloat = 18
     static let bottomInset: CGFloat = 17
+}
+
+enum HomePageLayout {
     static let bottomStatusHeight: CGFloat = 64
     static let layerListRowSpacing: CGFloat = 8
     static let appLayerRowHeight: CGFloat = 52
     static let windowLayerRowHeight: CGFloat = 44
 }
 
-struct HomeBackdropView: View {
-    @ObservedObject private var systemTheme = SystemThemeState.shared
-    @AppStorage(AppPreferenceKeys.themeMode)
-    private var themeModeRaw = ThemePreferencesStore.defaultMode.rawValue
-
-    private var colorScheme: ColorScheme {
-        ThemePreferencesStore.resolve(rawValue: themeModeRaw)
-            .resolvedColorScheme(systemColorScheme: systemTheme.colorScheme)
-    }
+struct FlowPageBackdropView: View {
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         (colorScheme == .dark ? Color.black : Color.white)
@@ -27,7 +23,7 @@ struct HomeBackdropView: View {
     }
 }
 
-struct HomeSectionCard<Content: View>: View {
+struct FlowPageSectionCard<Content: View>: View {
     let title: String
     let subtitle: String
     let trailingText: String?
@@ -111,24 +107,29 @@ struct HomeSectionCard<Content: View>: View {
     }
 }
 
-enum FlowActionButtonTone: Equatable {
-    case grayDominant
-    case blueDominant
+enum FlowPageActionButtonTone: Equatable {
+    case homeSecondaryGradient
+    case homePrimaryGradient
+    case solidAccent
 }
 
-struct FlowActionButton: View {
+struct FlowPageActionButton: View {
     let title: String
     let systemImage: String?
-    let tone: FlowActionButtonTone
+    let tone: FlowPageActionButtonTone
     let width: CGFloat?
+    let height: CGFloat
+    let horizontalPadding: CGFloat
     let accessibilityIdentifier: String?
     let action: () -> Void
 
     init(
         title: String,
         systemImage: String? = nil,
-        tone: FlowActionButtonTone = .grayDominant,
+        tone: FlowPageActionButtonTone = .homeSecondaryGradient,
         width: CGFloat? = nil,
+        height: CGFloat = 30,
+        horizontalPadding: CGFloat = 12,
         accessibilityIdentifier: String? = nil,
         action: @escaping () -> Void
     ) {
@@ -136,66 +137,10 @@ struct FlowActionButton: View {
         self.systemImage = systemImage
         self.tone = tone
         self.width = width
+        self.height = height
+        self.horizontalPadding = horizontalPadding
         self.accessibilityIdentifier = accessibilityIdentifier
         self.action = action
-    }
-
-    private var foregroundColor: Color {
-        tone == .blueDominant ? .white : .primary.opacity(0.78)
-    }
-
-    private var backgroundFill: LinearGradient {
-        switch tone {
-        case .grayDominant:
-            return LinearGradient(
-                stops: [
-                    .init(color: Color.primary.opacity(0.12), location: 0.0),
-                    .init(color: Color.primary.opacity(0.09), location: 0.75),
-                    .init(color: Color.accentColor.opacity(0.26), location: 1.0)
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-        case .blueDominant:
-            return LinearGradient(
-                stops: [
-                    .init(color: Color.accentColor.opacity(0.94), location: 0.0),
-                    .init(color: Color.accentColor.opacity(0.76), location: 0.75),
-                    .init(color: Color.primary.opacity(0.18), location: 1.0)
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-        }
-    }
-
-    private var borderFill: LinearGradient {
-        switch tone {
-        case .grayDominant:
-            return LinearGradient(
-                stops: [
-                    .init(color: Color.primary.opacity(0.24), location: 0.0),
-                    .init(color: Color.primary.opacity(0.19), location: 0.75),
-                    .init(color: Color.accentColor.opacity(0.36), location: 1.0)
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-        case .blueDominant:
-            return LinearGradient(
-                stops: [
-                    .init(color: Color.accentColor.opacity(0.55), location: 0.0),
-                    .init(color: Color.accentColor.opacity(0.44), location: 0.75),
-                    .init(color: Color.primary.opacity(0.28), location: 1.0)
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-        }
-    }
-
-    private var shadowColor: Color {
-        tone == .blueDominant ? Color.accentColor.opacity(0.20) : Color.primary.opacity(0.08)
     }
 
     var body: some View {
@@ -207,29 +152,155 @@ struct FlowActionButton: View {
                     Text(title)
                 }
             }
-            .font(.system(size: 12, weight: .semibold))
-            .lineLimit(1)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .frame(minHeight: 30)
-            .frame(width: width)
-            .foregroundStyle(foregroundColor)
-            .background(
-                Capsule()
-                    .fill(backgroundFill)
-            )
-            .overlay(
-                Capsule()
-                    .stroke(borderFill, lineWidth: 1)
-            )
-            .shadow(color: shadowColor, radius: 6, y: 2)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(
+            FlowPageActionButtonStyle(
+                tone: tone,
+                width: width,
+                height: height,
+                horizontalPadding: horizontalPadding
+            )
+        )
 
         if let accessibilityIdentifier {
             button.accessibilityIdentifier(accessibilityIdentifier)
         } else {
             button
+        }
+    }
+}
+
+private struct FlowPageActionButtonStyle: ButtonStyle {
+    private static let solidAccentColor = Color(
+        .sRGB,
+        red: 58 / 255,
+        green: 128 / 255,
+        blue: 247 / 255,
+        opacity: 1
+    )
+
+    let tone: FlowPageActionButtonTone
+    let width: CGFloat?
+    let height: CGFloat
+    let horizontalPadding: CGFloat
+
+    @Environment(\.isEnabled) private var isEnabled
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 12, weight: .semibold))
+            .lineLimit(1)
+            .padding(.horizontal, horizontalPadding)
+            .frame(height: height)
+            .frame(width: width)
+            .foregroundStyle(foregroundColor)
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(backgroundFill(isPressed: configuration.isPressed))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(borderFill, lineWidth: borderLineWidth)
+            )
+            .shadow(color: shadowColor, radius: 6, y: 2)
+            .opacity(isEnabled ? 1 : 0.55)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
+
+    private var cornerRadius: CGFloat {
+        tone == .solidAccent ? 7 : height / 2
+    }
+
+    private var foregroundColor: Color {
+        switch tone {
+        case .homePrimaryGradient, .solidAccent:
+            return .white
+        case .homeSecondaryGradient:
+            return .primary.opacity(0.78)
+        }
+    }
+
+    private var borderFill: LinearGradient {
+        switch tone {
+        case .homeSecondaryGradient:
+            return LinearGradient(
+                stops: [
+                    .init(color: Color.primary.opacity(0.24), location: 0.0),
+                    .init(color: Color.primary.opacity(0.19), location: 0.75),
+                    .init(color: Color.accentColor.opacity(0.36), location: 1.0)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        case .homePrimaryGradient:
+            return LinearGradient(
+                stops: [
+                    .init(color: Color.accentColor.opacity(0.55), location: 0.0),
+                    .init(color: Color.accentColor.opacity(0.44), location: 0.75),
+                    .init(color: Color.primary.opacity(0.28), location: 1.0)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        case .solidAccent:
+            return LinearGradient(
+                stops: [
+                    .init(color: Color.accentColor.opacity(0.94), location: 0.0),
+                    .init(color: Color.accentColor.opacity(0.94), location: 1.0)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        }
+    }
+
+    private var borderLineWidth: CGFloat {
+        tone == .solidAccent ? 0 : 1
+    }
+
+    private var shadowColor: Color {
+        switch tone {
+        case .homePrimaryGradient:
+            return Color.accentColor.opacity(0.20)
+        case .homeSecondaryGradient:
+            return Color.primary.opacity(0.08)
+        case .solidAccent:
+            return Color.clear
+        }
+    }
+
+    private func backgroundFill(isPressed: Bool) -> LinearGradient {
+        let pressedScale = isPressed ? 0.85 : 1
+        switch tone {
+        case .homeSecondaryGradient:
+            return LinearGradient(
+                stops: [
+                    .init(color: Color.primary.opacity(0.12 * pressedScale), location: 0.0),
+                    .init(color: Color.primary.opacity(0.09 * pressedScale), location: 0.75),
+                    .init(color: Color.accentColor.opacity(0.26 * pressedScale), location: 1.0)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        case .homePrimaryGradient:
+            return LinearGradient(
+                stops: [
+                    .init(color: Color.accentColor.opacity(0.94 * pressedScale), location: 0.0),
+                    .init(color: Color.accentColor.opacity(0.76 * pressedScale), location: 0.75),
+                    .init(color: Color.primary.opacity(0.18 * pressedScale), location: 1.0)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        case .solidAccent:
+            return LinearGradient(
+                stops: [
+                    .init(color: Self.solidAccentColor.opacity(pressedScale), location: 0.0),
+                    .init(color: Self.solidAccentColor.opacity(pressedScale), location: 1.0)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
         }
     }
 }

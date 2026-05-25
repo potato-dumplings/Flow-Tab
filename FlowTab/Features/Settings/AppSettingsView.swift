@@ -78,15 +78,13 @@ struct PermissionPollingDiagnostic: Equatable {
 struct AppSettingsView: View {
     let isActive: Bool
 
+    @ObservedObject private var presentation = FlowPresentationState.shared
     @AppStorage(AppPreferenceKeys.showShortcutHint) private var showShortcutHint = true
     @AppStorage(AppPreferenceKeys.showInCommandTab)
     private var showInCommandTab = AppVisibilityPreferencesStore.defaultShowInCommandTab
     @AppStorage(AppPreferenceKeys.showPermissionReminder) private var showPermissionReminder = true
     @AppStorage(AppPreferenceKeys.allowLaunchAtLogin)
     private var allowLaunchAtLogin = LaunchAtLoginPreferencesStore.defaultAllowLaunchAtLogin
-    @AppStorage(AppPreferenceKeys.themeMode) private var themeModeRaw = ThemePreferencesStore.defaultMode.rawValue
-    @AppStorage(AppPreferenceKeys.appLanguage)
-    private var appLanguageRaw = AppLanguagePreferencesStore.defaultLanguage.rawValue
     @AppStorage(AppPreferenceKeys.autoRestoreMinimizedWindowOnSwitch)
     private var autoRestoreMinimizedWindowOnSwitch =
         SwitcherBehaviorPreferencesStore.defaultAutoRestoreMinimizedWindowOnSwitch
@@ -196,16 +194,39 @@ struct AppSettingsView: View {
         "\(themeModeRaw)|\(appLanguageRaw)"
     }
 
+    private var themeModeRaw: String {
+        presentation.context.themeMode.rawValue
+    }
+
+    private var appLanguageRaw: String {
+        presentation.context.appLanguage.rawValue
+    }
+
+    private var themeModeBinding: Binding<String> {
+        Binding(
+            get: { themeModeRaw },
+            set: { FlowPresentationState.shared.setThemeMode(rawValue: $0) }
+        )
+    }
+
+    private var appLanguageBinding: Binding<String> {
+        Binding(
+            get: { appLanguageRaw },
+            set: { FlowPresentationState.shared.setAppLanguage(rawValue: $0) }
+        )
+    }
+
     var body: some View {
         ZStack {
-            HomeBackdropView()
+            FlowPageBackdropView()
 
             AppKitSettingsPageContent(
                 isActive: isActive && !showsAppVisibilityManager,
                 showShortcutHint: $showShortcutHint,
                 showInCommandTab: showInCommandTabPreference,
-                themeModeRaw: $themeModeRaw,
-                appLanguageRaw: $appLanguageRaw,
+                themeModeRaw: themeModeBinding,
+                appLanguageRaw: appLanguageBinding,
+                presentationContext: presentation.context,
                 windowLayerAutoEnterDelayText: windowLayerAutoEnterDelayText,
                 autoRestoreMinimizedWindowOnSwitch: $autoRestoreMinimizedWindowOnSwitch,
                 hideMinimizedAppsFromAppLayer: $hideMinimizedAppsFromAppLayer,
@@ -276,13 +297,6 @@ struct AppSettingsView: View {
         .onChange(of: isActive) { active in
             handleVisibilityChanged(active)
         }
-        .onChange(of: themeModeRaw) { _ in
-            enforceThemeModeConsistency()
-        }
-        .onChange(of: appLanguageRaw) { _ in
-            enforceLanguageConsistency()
-            notifyLanguagePreferenceChanged()
-        }
         .onChange(of: showInCommandTab) { _ in
             notifyAppVisibilityPreferenceChanged()
         }
@@ -342,8 +356,6 @@ struct AppSettingsView: View {
             return
         }
         if !didInitialize {
-            enforceThemeModeConsistency()
-            enforceLanguageConsistency()
             enforceHotkeyConsistency()
             enforceInAppWindowHotkeyConsistency()
             enforceWindowLayerPreferencesConsistency()
@@ -408,10 +420,12 @@ struct AppSettingsView: View {
     private func presentScreenCapturePermissionReminder() {
         let alert = NSAlert()
         alert.alertStyle = .informational
-        alert.messageText = AppStrings.text(.alertScreenDeniedTitle)
-        alert.informativeText = AppStrings.text(.alertScreenDeniedMessage)
-        alert.addButton(withTitle: AppStrings.text(.alertOpenSystemSettings))
-        alert.addButton(withTitle: AppStrings.text(.alertLater))
+        alert.messageText = AppStrings.text(.alertScreenDeniedTitle, language: presentation.context.appLanguage)
+        alert.informativeText = AppStrings.text(.alertScreenDeniedMessage, language: presentation.context.appLanguage)
+        alert.addButton(
+            withTitle: AppStrings.text(.alertOpenSystemSettings, language: presentation.context.appLanguage)
+        )
+        alert.addButton(withTitle: AppStrings.text(.alertLater, language: presentation.context.appLanguage))
         if alert.runModal() == .alertFirstButtonReturn {
             openScreenCapturePrivacySettings()
         }
@@ -589,20 +603,6 @@ struct AppSettingsView: View {
         }
     }
 
-    private func enforceThemeModeConsistency() {
-        let resolved = ThemePreferencesStore.resolve(rawValue: themeModeRaw)
-        if themeModeRaw != resolved.rawValue {
-            themeModeRaw = resolved.rawValue
-        }
-    }
-
-    private func enforceLanguageConsistency() {
-        let resolved = AppLanguagePreferencesStore.resolve(rawValue: appLanguageRaw)
-        if appLanguageRaw != resolved.rawValue {
-            appLanguageRaw = resolved.rawValue
-        }
-    }
-
     private func enforceSearchPreferencesConsistency() {
         let resolved = SearchInteractionPreferencesStore.loadDefaultScope()
         if searchDefaultScopeRaw != resolved.rawValue {
@@ -735,11 +735,6 @@ struct AppSettingsView: View {
 
     private func refreshHiddenAppCount() {
         hiddenAppCount = AppVisibilityPreferencesStore.loadHiddenAppIDs().count
-    }
-
-    private func notifyLanguagePreferenceChanged() {
-        RuntimeLog.info(.app, "language=\(appLanguageRaw)")
-        NotificationCenter.default.post(name: .flowTabLanguagePreferenceChanged, object: nil)
     }
 
     private func startPermissionPolling(target: PermissionPollingTarget) {

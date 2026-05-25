@@ -3,6 +3,7 @@ import FlowTabCore
 
 struct AppLogsView: View {
     let isActive: Bool
+    let appLanguage: AppLanguage
 
     @AppStorage(AppPreferenceKeys.enableVerboseDiagnostics) private var enableVerboseDiagnostics = false
     @AppStorage(AppPreferenceKeys.runtimeLogLevel)
@@ -24,14 +25,14 @@ struct AppLogsView: View {
 
     var body: some View {
         ZStack {
-            HomeBackdropView()
+            FlowPageBackdropView()
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(AppStrings.text(.logsPageTitle))
+                        Text(AppStrings.text(.logsPageTitle, language: appLanguage))
                             .font(.system(size: 22, weight: .semibold))
-                        Text(AppStrings.text(.logsPageSubtitle))
+                        Text(AppStrings.text(.logsPageSubtitle, language: appLanguage))
                             .font(.system(size: 12))
                             .foregroundStyle(.secondary)
                     }
@@ -39,12 +40,13 @@ struct AppLogsView: View {
                     RuntimeLogsSection(
                         enableVerboseDiagnostics: $enableVerboseDiagnostics,
                         runtimeLogLevelRaw: $runtimeLogLevelRaw,
-                        hotkeyShortcutText: hotkeyConfiguration.mainShortcutText
+                        hotkeyShortcutText: hotkeyConfiguration.mainShortcutText,
+                        appLanguage: appLanguage
                     )
                 }
-                .padding(.horizontal, HomePageLayout.horizontalInset)
+                .padding(.horizontal, FlowPageLayout.horizontalInset)
                 .padding(.bottom, 24)
-                .padding(.top, HomePageLayout.alignedTopInset)
+                .padding(.top, FlowPageLayout.alignedTopInset)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)

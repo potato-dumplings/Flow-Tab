@@ -6,12 +6,12 @@ enum SwitcherSearchScope: String, CaseIterable, Equatable, Sendable {
     case app
     case window
 
-    var label: String {
+    func label(language: AppLanguage) -> String {
         switch self {
         case .app:
-            return AppStrings.text(.searchScopeApp)
+            return AppStrings.text(.searchScopeApp, language: language)
         case .window:
-            return AppStrings.text(.searchScopeWindow)
+            return AppStrings.text(.searchScopeWindow, language: language)
         }
     }
 }

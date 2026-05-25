@@ -76,15 +76,8 @@ enum FlowSettingsStyleResolver {
         NSAppearance.current ?? NSAppearance(named: .aqua) ?? NSApp.effectiveAppearance
     }
 
-    static func targetAppearance(for themeModeRaw: String, fallback: NSAppearance) -> NSAppearance {
-        switch ThemePreferencesStore.resolve(rawValue: themeModeRaw) {
-        case .light:
-            return NSAppearance(named: .aqua) ?? fallback
-        case .dark:
-            return NSAppearance(named: .darkAqua) ?? fallback
-        case .followSystem:
-            return fallback
-        }
+    static func targetAppearance(named appearanceName: NSAppearance.Name, fallback: NSAppearance) -> NSAppearance {
+        NSAppearance(named: appearanceName) ?? fallback
     }
 
     static func color(_ token: FlowSettingsColorToken, appearance: NSAppearance) -> NSColor {

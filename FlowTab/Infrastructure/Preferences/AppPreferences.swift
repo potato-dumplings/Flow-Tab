@@ -47,6 +47,40 @@ enum AppPreferenceKeys {
     ]
 }
 
+enum AppLanguage: String, CaseIterable, Equatable, Sendable, Identifiable {
+    case simplifiedChinese = "zh-Hans"
+    case english = "en"
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .simplifiedChinese:
+            return "简体中文"
+        case .english:
+            return "English"
+        }
+    }
+}
+
+enum AppLanguagePreferencesStore {
+    static let defaultLanguage: AppLanguage = .simplifiedChinese
+
+    static func resolve(rawValue: String) -> AppLanguage {
+        AppLanguage(rawValue: rawValue) ?? defaultLanguage
+    }
+
+    static func load(userDefaults: UserDefaults = .standard) -> AppLanguage {
+        let rawValue = userDefaults.string(forKey: AppPreferenceKeys.appLanguage)
+            ?? defaultLanguage.rawValue
+        let resolved = resolve(rawValue: rawValue)
+        if rawValue != resolved.rawValue {
+            userDefaults.set(resolved.rawValue, forKey: AppPreferenceKeys.appLanguage)
+        }
+        return resolved
+    }
+}
+
 extension Notification.Name {
     static let flowTabReRegisterHotkeys = Notification.Name("FlowTab.ReRegisterHotkeys")
     static let flowTabAppVisibilityPreferenceChanged = Notification.Name(

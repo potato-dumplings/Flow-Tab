@@ -5,23 +5,11 @@ import FlowTabCore
 struct SwitcherPanelRootView: View {
     @ObservedObject var model: LiveSwitcherModel
     let pointerSelectionActions: SwitcherPointerSelectionActions
-    @ObservedObject private var systemTheme = SystemThemeState.shared
-    @AppStorage(AppPreferenceKeys.themeMode)
-    private var themeModeRaw = ThemePreferencesStore.defaultMode.rawValue
+    @ObservedObject private var presentation = FlowPresentationState.shared
     @AppStorage(AppPreferenceKeys.searchEnabled)
     private var searchEnabled = SearchInteractionPreferencesStore.defaultIsEnabled
     @AppStorage(AppPreferenceKeys.searchDefaultScope)
     private var searchDefaultScopeRaw = SearchInteractionPreferencesStore.defaultScope.rawValue
-    @AppStorage(AppPreferenceKeys.appLanguage)
-    private var appLanguageRaw = AppLanguagePreferencesStore.defaultLanguage.rawValue
-
-    private var themeMode: ThemeMode {
-        ThemePreferencesStore.resolve(rawValue: themeModeRaw)
-    }
-
-    private var resolvedColorScheme: ColorScheme {
-        themeMode.resolvedColorScheme(systemColorScheme: systemTheme.colorScheme)
-    }
 
     private var searchDefaultScope: SwitcherSearchScope {
         SwitcherSearchScope(rawValue: searchDefaultScopeRaw) ?? SearchInteractionPreferencesStore.defaultScope
@@ -61,6 +49,7 @@ struct SwitcherPanelRootView: View {
                     },
                     searchFeatureEnabled: searchEnabled,
                     searchDefaultScope: searchDefaultScope,
+                    appLanguage: presentation.context.appLanguage,
                     selectedApp: model.selectedApp,
                     terminatingAppID: model.terminatingAppID,
                     appTileSize: model.appGridTileSize,
@@ -101,14 +90,14 @@ struct SwitcherPanelRootView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.clear)
-        .preferredColorScheme(resolvedColorScheme)
-        .animation(.none, value: resolvedColorScheme)
+        .preferredColorScheme(presentation.context.resolvedColorScheme)
+        .animation(.none, value: presentation.context.resolvedColorScheme)
         .overlay(alignment: .topLeading) {
             if FlowTabTestLaunchOptions.showsSwitcherDiagnostics, model.session != nil {
                 switcherDiagnosticsSummary
             }
         }
-        .id(appLanguageRaw)
+        .id(presentation.context.appLanguage.rawValue)
     }
 
     private var switcherDiagnosticsSummary: some View {
@@ -262,6 +251,7 @@ private struct CommandTabOverlay: View {
     let onSearchLayoutMeasured: (SwitcherSearchLayoutMeasurements) -> Void
     let searchFeatureEnabled: Bool
     let searchDefaultScope: SwitcherSearchScope
+    let appLanguage: AppLanguage
     let selectedApp: AppSwitchCandidate?
     let terminatingAppID: String?
     let appTileSize: CGFloat
@@ -489,7 +479,8 @@ private struct CommandTabOverlay: View {
                 query: "",
                 scope: searchDefaultScope,
                 isInputFocused: false,
-                hintText: AppStrings.text(.panelHintEnterToSearch)
+                hintText: AppStrings.text(.panelHintEnterToSearch, language: appLanguage),
+                language: appLanguage
             )
         }
     }
@@ -648,6 +639,7 @@ private struct CommandTabOverlay: View {
                 isInputFocused: searchState.isInputFocused,
                 highlightedItem: searchHeaderHighlightItem,
                 isSearchActive: searchState.isActive,
+                language: appLanguage,
                 onSearchInputChanged: onSearchInputChanged,
                 onSearchMarkedTextChanged: onSearchMarkedTextChanged
             )
@@ -657,7 +649,7 @@ private struct CommandTabOverlay: View {
 
             if searchState.scope == .app {
                 if searchAppItems.isEmpty {
-                    SearchEmptyState(scope: .app)
+                    SearchEmptyState(scope: .app, language: appLanguage)
                         .frame(height: searchResultViewportHeight)
                 } else {
                     ScrollViewReader { scrollProxy in
@@ -693,7 +685,7 @@ private struct CommandTabOverlay: View {
                 }
             } else {
                 if searchWindowItems.isEmpty {
-                    SearchEmptyState(scope: .window)
+                    SearchEmptyState(scope: .window, language: appLanguage)
                         .frame(height: searchResultViewportHeight)
                 } else {
                     ScrollViewReader { scrollProxy in

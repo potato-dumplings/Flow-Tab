@@ -13,6 +13,7 @@ struct HomeLandingView: View {
     private static var cachedRunningAppSignature: Set<String> = []
 
     let isActive: Bool
+    let appLanguage: AppLanguage
     let openSettings: () -> Void
 
     @AppStorage(AppPreferenceKeys.showPermissionReminder)
@@ -23,8 +24,6 @@ struct HomeLandingView: View {
     private var hotkeyMainKeyRaw = SwitcherHotkeyPreferencesStore.defaultMainKey.rawValue
     @AppStorage(AppPreferenceKeys.hotkeyQuitKey)
     private var hotkeyQuitKeyRaw = SwitcherHotkeyPreferencesStore.defaultQuitKey.rawValue
-    @AppStorage(AppPreferenceKeys.appLanguage)
-    private var appLanguageRaw = AppLanguagePreferencesStore.defaultLanguage.rawValue
     @State private var accessibilityTrusted = AccessibilityPermissionChecker.isTrusted()
     @State private var screenCaptureTrusted = ScreenCapturePermissionChecker.hasScreenCapturePermission
     @State private var appSummaries: [RuntimeHomeAppSummary] = []
@@ -56,10 +55,6 @@ struct HomeLandingView: View {
         showPermissionReminder && (!accessibilityTrusted || !screenCaptureTrusted)
     }
 
-    private var appLanguage: AppLanguage {
-        AppLanguagePreferencesStore.resolve(rawValue: appLanguageRaw)
-    }
-
     private var appVisibilityPresentation: HomeAppVisibilityPresentation {
         HomeAppVisibilityPresentation(hiddenAppIDs: hiddenAppIDs)
     }
@@ -83,7 +78,7 @@ struct HomeLandingView: View {
 
     var body: some View {
         ZStack {
-            HomeBackdropView()
+            FlowPageBackdropView()
 
             VStack(alignment: .leading, spacing: 12) {
                 pageHeader
@@ -109,9 +104,9 @@ struct HomeLandingView: View {
                     maxHeight: HomePageLayout.bottomStatusHeight
                 )
             }
-            .padding(.horizontal, HomePageLayout.horizontalInset)
-            .padding(.bottom, HomePageLayout.bottomInset)
-            .padding(.top, HomePageLayout.alignedTopInset)
+            .padding(.horizontal, FlowPageLayout.horizontalInset)
+            .padding(.bottom, FlowPageLayout.bottomInset)
+            .padding(.top, FlowPageLayout.alignedTopInset)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .onAppear {
@@ -221,17 +216,17 @@ struct HomeLandingView: View {
 
     private var permissionGuideActionRow: some View {
         HStack(spacing: 8) {
-            FlowActionButton(
+            FlowPageActionButton(
                 title: AppStrings.text(.actionGoToSettings, language: appLanguage),
-                tone: .blueDominant,
+                tone: .homePrimaryGradient,
                 accessibilityIdentifier: "flowtab.home.permission.open-settings"
             ) {
                 openSettings()
             }
 
-            FlowActionButton(
+            FlowPageActionButton(
                 title: AppStrings.text(.actionDontRemindAgain, language: appLanguage),
-                tone: .grayDominant,
+                tone: .homeSecondaryGradient,
                 accessibilityIdentifier: "flowtab.home.permission.dismiss"
             ) {
                 showPermissionReminder = false
@@ -240,7 +235,7 @@ struct HomeLandingView: View {
     }
 
     private var appLayerCard: some View {
-        HomeSectionCard(
+        FlowPageSectionCard(
             title: AppStrings.text(.homeAppLayerTitle, language: appLanguage),
             subtitle: AppStrings.text(.homeAppLayerSubtitle, language: appLanguage),
             trailingText: AppStrings.appCount(presentedAppSummaries.count, language: appLanguage),
@@ -307,7 +302,7 @@ struct HomeLandingView: View {
             ?? presentedAppSummaries.first
         let activeWindows = activeApp.flatMap { windowsByAppID[$0.appID] } ?? []
 
-        return HomeSectionCard(
+        return FlowPageSectionCard(
             title: AppStrings.text(.homeWindowLayerTitle, language: appLanguage),
             subtitle: activeApp.map {
                 AppStrings.text(

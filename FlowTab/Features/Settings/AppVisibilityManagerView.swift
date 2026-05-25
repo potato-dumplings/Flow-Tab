@@ -9,15 +9,14 @@ struct AppVisibilityManagerView: View {
     let onClose: () -> Void
 
     @StateObject private var model = AppVisibilityManagerModel()
-    @ObservedObject private var systemTheme = SystemThemeState.shared
-    @AppStorage(AppPreferenceKeys.themeMode)
-    private var themeModeRaw = ThemePreferencesStore.defaultMode.rawValue
-    @AppStorage(AppPreferenceKeys.appLanguage)
-    private var appLanguageRaw = AppLanguagePreferencesStore.defaultLanguage.rawValue
+    @ObservedObject private var presentation = FlowPresentationState.shared
 
     private var colorScheme: ColorScheme {
-        ThemePreferencesStore.resolve(rawValue: themeModeRaw)
-            .resolvedColorScheme(systemColorScheme: systemTheme.colorScheme)
+        presentation.context.resolvedColorScheme
+    }
+
+    private var appLanguage: AppLanguage {
+        presentation.context.appLanguage
     }
 
     private var isDark: Bool {
@@ -90,7 +89,7 @@ struct AppVisibilityManagerView: View {
                 HStack(spacing: 5) {
                     Image(systemName: "chevron.left")
                         .font(.system(size: 12, weight: .semibold))
-                    Text(AppStrings.text(.appVisibilityBack))
+                    Text(AppStrings.text(.appVisibilityBack, language: appLanguage))
                         .font(.system(size: 12, weight: .regular))
                 }
                 .padding(.vertical, 6)
@@ -102,11 +101,11 @@ struct AppVisibilityManagerView: View {
             .accessibilityIdentifier("flowtab.settings.app-visibility.back")
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(AppStrings.text(.appVisibilityManagerTitle))
+                Text(AppStrings.text(.appVisibilityManagerTitle, language: appLanguage))
                     .font(.system(size: 23, weight: .semibold))
                     .lineLimit(1)
                 Text(
-                    AppStrings.hiddenAppCount(model.hiddenCount)
+                    AppStrings.hiddenAppCount(model.hiddenCount, language: appLanguage)
                 )
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
@@ -144,7 +143,7 @@ struct AppVisibilityManagerView: View {
         return Button {
             model.filter = filter
         } label: {
-            Text(filter.title)
+            Text(filter.title(language: appLanguage))
                 .font(.system(size: 12, weight: isSelected ? .medium : .regular))
                 .lineLimit(1)
                 .padding(.vertical, 2)
@@ -170,7 +169,7 @@ struct AppVisibilityManagerView: View {
                 .foregroundStyle(.secondary)
             AppVisibilitySearchField(
                 text: $model.query,
-                placeholder: AppStrings.text(.appVisibilitySearchPlaceholder),
+                placeholder: AppStrings.text(.appVisibilitySearchPlaceholder, language: appLanguage),
                 accessibilityIdentifier: "flowtab.settings.app-visibility.search"
             )
             .frame(height: 17)
@@ -214,7 +213,7 @@ struct AppVisibilityManagerView: View {
             if model.isLoading {
                 ProgressView()
             } else if visibleApps.isEmpty {
-                Text(AppStrings.text(.appVisibilityNoApps))
+                Text(AppStrings.text(.appVisibilityNoApps, language: appLanguage))
                     .font(.system(size: 12))
                     .foregroundStyle(.secondary)
             }
@@ -228,7 +227,8 @@ struct AppVisibilityManagerView: View {
             AppVisibilityListRow(
                 app: app,
                 isHidden: model.isHidden(app),
-                isSelected: app.id == model.selectedAppID
+                isSelected: app.id == model.selectedAppID,
+                language: appLanguage
             )
             .padding(.horizontal, 12)
             .frame(height: Layout.listRowHeight)
@@ -299,7 +299,7 @@ struct AppVisibilityManagerView: View {
             Divider()
 
             HStack(spacing: 14) {
-                Text(AppStrings.text(.appVisibilityShowInSwitcher))
+                Text(AppStrings.text(.appVisibilityShowInSwitcher, language: appLanguage))
                     .font(.system(size: 14, weight: .medium))
                 Toggle(
                     "",
@@ -314,15 +314,21 @@ struct AppVisibilityManagerView: View {
             }
 
             VStack(alignment: .leading, spacing: 0) {
-                detailRow(title: AppStrings.text(.appVisibilityBundleID), value: app.bundleIdentifier ?? "-")
-                Divider().overlay(rowSeparatorColor)
-                detailRow(title: AppStrings.text(.appVisibilityPath), value: app.path ?? "-")
+                detailRow(
+                    title: AppStrings.text(.appVisibilityBundleID, language: appLanguage),
+                    value: app.bundleIdentifier ?? "-"
+                )
                 Divider().overlay(rowSeparatorColor)
                 detailRow(
-                    title: AppStrings.text(.appVisibilityStatus),
+                    title: AppStrings.text(.appVisibilityPath, language: appLanguage),
+                    value: app.path ?? "-"
+                )
+                Divider().overlay(rowSeparatorColor)
+                detailRow(
+                    title: AppStrings.text(.appVisibilityStatus, language: appLanguage),
                     value: isHidden
-                        ? AppStrings.text(.appVisibilityStatusHidden)
-                        : AppStrings.text(.appVisibilityStatusVisible)
+                        ? AppStrings.text(.appVisibilityStatusHidden, language: appLanguage)
+                        : AppStrings.text(.appVisibilityStatusVisible, language: appLanguage)
                 )
             }
             .padding(.horizontal, 14)
@@ -336,7 +342,7 @@ struct AppVisibilityManagerView: View {
                     .stroke(borderColor, lineWidth: 1)
             )
 
-            Text(AppStrings.text(.appVisibilityEffectNote))
+            Text(AppStrings.text(.appVisibilityEffectNote, language: appLanguage))
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .lineSpacing(2)
@@ -364,9 +370,9 @@ struct AppVisibilityManagerView: View {
 
     private var emptyDetail: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(AppStrings.text(.appVisibilityNoSelectionTitle))
+            Text(AppStrings.text(.appVisibilityNoSelectionTitle, language: appLanguage))
                 .font(.system(size: 20, weight: .semibold))
-            Text(AppStrings.text(.appVisibilityNoSelectionSubtitle))
+            Text(AppStrings.text(.appVisibilityNoSelectionSubtitle, language: appLanguage))
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
         }
@@ -388,6 +394,7 @@ private struct AppVisibilityListRow: View {
     let app: InstalledAppRecord
     let isHidden: Bool
     let isSelected: Bool
+    let language: AppLanguage
 
     var body: some View {
         HStack(spacing: 9) {
@@ -399,7 +406,7 @@ private struct AppVisibilityListRow: View {
                         .font(.system(size: 12.5, weight: .medium))
                         .lineLimit(1)
                     if isHidden {
-                        Text(AppStrings.text(.appVisibilityHiddenBadge))
+                        Text(AppStrings.text(.appVisibilityHiddenBadge, language: language))
                             .font(.system(size: 9.5, weight: .medium))
                             .padding(.horizontal, 5)
                             .padding(.vertical, 1)

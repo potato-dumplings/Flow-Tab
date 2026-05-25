@@ -23,6 +23,7 @@ struct AppKitSettingsPageState: Equatable {
     let commandTabTakeoverActive: Bool
     let accessibilityTrusted: Bool
     let screenCaptureTrusted: Bool
+    let targetNSAppearanceName: NSAppearance.Name
 }
 
 struct AppKitSettingsHotkeyRawValues: Equatable {
@@ -42,8 +43,8 @@ final class AppKitSettingsPageContainerView: NSView {
 
     private let scrollView = NSScrollView()
     private let documentView = AppKitFlippedDocumentView()
-    private let horizontalContentInset = HomePageLayout.horizontalInset
-    private let verticalContentInset = HomePageLayout.alignedTopInset
+    private let horizontalContentInset = FlowPageLayout.horizontalInset
+    private let verticalContentInset = FlowPageLayout.alignedTopInset
     private var wasActive = false
     private var pendingInitialFocusClear = false
     private var pageLeadingConstraint: NSLayoutConstraint?
@@ -65,7 +66,7 @@ final class AppKitSettingsPageContainerView: NSView {
 
     func update(with state: AppKitSettingsPageState, isActive: Bool) {
         let targetAppearance = FlowSettingsStyleResolver.targetAppearance(
-            for: state.themeModeRaw,
+            named: state.targetNSAppearanceName,
             fallback: inheritedAppearanceFallback
         )
         appearance = targetAppearance
@@ -236,6 +237,7 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
     @Binding var showInCommandTab: Bool
     @Binding var themeModeRaw: String
     @Binding var appLanguageRaw: String
+    let presentationContext: FlowPresentationContext
     let windowLayerAutoEnterDelayText: String
     @Binding var autoRestoreMinimizedWindowOnSwitch: Bool
     @Binding var hideMinimizedAppsFromAppLayer: Bool
@@ -363,7 +365,8 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
                 inAppWindowHotkeyMainKeyRaw: inAppWindowHotkeyMainKeyRaw.wrappedValue,
                 commandTabTakeoverActive: commandTabTakeoverActive,
                 accessibilityTrusted: accessibilityTrusted,
-                screenCaptureTrusted: screenCaptureTrusted
+                screenCaptureTrusted: screenCaptureTrusted,
+                targetNSAppearanceName: presentationContext.targetNSAppearanceName
             ),
             isActive: isActive
         )

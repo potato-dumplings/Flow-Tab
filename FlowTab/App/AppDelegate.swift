@@ -372,7 +372,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func makeStatusItemMenu() -> NSMenu {
         let menu = NSMenu()
         let quitItem = NSMenuItem(
-            title: AppStrings.text(.menuQuit),
+            title: AppStrings.text(
+                .menuQuit,
+                language: FlowPresentationState.shared.context.appLanguage
+            ),
             action: #selector(quitFromStatusItem),
             keyEquivalent: ""
         )

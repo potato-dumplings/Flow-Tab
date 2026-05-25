@@ -73,23 +73,26 @@ struct SearchInputHeader: View {
     let scope: SwitcherSearchScope
     let isInputFocused: Bool
     let hintText: String
+    let language: AppLanguage
     @Environment(\.colorScheme) private var colorScheme
 
     init(
         query: String,
         scope: SwitcherSearchScope,
         isInputFocused: Bool,
-        hintText: String
+        hintText: String,
+        language: AppLanguage
     ) {
         self.query = query
         self.scope = scope
         self.isInputFocused = isInputFocused
         self.hintText = hintText
+        self.language = language
     }
 
     private var queryText: String {
         if query.isEmpty && !isInputFocused {
-            return AppStrings.text(.panelInputPlaceholder)
+            return AppStrings.text(.panelInputPlaceholder, language: language)
         }
         return query
     }
@@ -108,7 +111,7 @@ struct SearchInputHeader: View {
 
                 Spacer(minLength: 8)
 
-                Text(scope.label)
+                Text(scope.label(language: language))
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 8)
@@ -148,6 +151,7 @@ struct SearchPresentationHeader: View {
     let isInputFocused: Bool
     let highlightedItem: SearchHeaderHighlightItem?
     let isSearchActive: Bool
+    let language: AppLanguage
     let onSearchInputChanged: (String, Int) -> Void
     let onSearchMarkedTextChanged: (Bool) -> Void
     @Environment(\.colorScheme) private var colorScheme
@@ -169,7 +173,7 @@ struct SearchPresentationHeader: View {
         HStack(spacing: 12) {
             ZStack(alignment: .leading) {
                 if query.isEmpty && !isInputFocused {
-                    Text(AppStrings.text(.panelSearchLabel))
+                    Text(AppStrings.text(.panelSearchLabel, language: language))
                         .lineLimit(1)
                         .truncationMode(.tail)
                         .font(.system(size: 20, weight: .regular))
@@ -256,13 +260,14 @@ struct SearchPresentationHeader: View {
 
 struct SearchEmptyState: View {
     let scope: SwitcherSearchScope
+    let language: AppLanguage
 
     var body: some View {
         VStack(spacing: 8) {
             Image(systemName: scope == .app ? "app.badge" : "macwindow.on.rectangle")
                 .font(.system(size: 24, weight: .medium))
                 .foregroundStyle(.secondary)
-            Text(AppStrings.text(.panelNoResult))
+            Text(AppStrings.text(.panelNoResult, language: language))
                 .font(.system(size: 13, weight: .medium))
                 .foregroundStyle(.secondary)
         }

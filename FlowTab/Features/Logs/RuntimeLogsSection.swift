@@ -91,6 +91,7 @@ struct RuntimeLogsSection: View {
     @Binding var enableVerboseDiagnostics: Bool
     @Binding var runtimeLogLevelRaw: String
     let hotkeyShortcutText: String
+    let appLanguage: AppLanguage
 
     @StateObject private var logsViewModel = RuntimeLogLinesViewModel()
 
@@ -126,44 +127,23 @@ struct RuntimeLogsSection: View {
         return "flowtab.logs.line.row.\(index)"
     }
 
-    private var logsActionButtonTint: Color {
-        Color(.sRGB, red: 58 / 255, green: 128 / 255, blue: 247 / 255, opacity: 1)
-    }
-
-    private struct LogsActionButtonStyle: ButtonStyle {
-        let tint: Color
-
-        func makeBody(configuration: Configuration) -> some View {
-            configuration.label
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 10)
-                .frame(height: 28)
-                .background(
-                    RoundedRectangle(cornerRadius: 7, style: .continuous)
-                        .fill(tint.opacity(configuration.isPressed ? 0.85 : 1))
-                )
-                .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
-        }
-    }
-
     var body: some View {
-        HomeSectionCard(
-            title: AppStrings.text(.logsSectionTitle),
-            subtitle: AppStrings.text(.logsSectionSubtitle)
+        FlowPageSectionCard(
+            title: AppStrings.text(.logsSectionTitle, language: appLanguage),
+            subtitle: AppStrings.text(.logsSectionSubtitle, language: appLanguage)
         ) {
             VStack(alignment: .leading, spacing: 10) {
                 Toggle(isOn: $enableVerboseDiagnostics) {
-                    Text(AppStrings.text(.logsEnableVerbose))
+                    Text(AppStrings.text(.logsEnableVerbose, language: appLanguage))
                         .fixedSize(horizontal: false, vertical: true)
                 }
                     .toggleStyle(.switch)
                     .font(.system(size: 12))
 
                 HStack(spacing: 10) {
-                    Text(AppStrings.text(.logsLevel))
+                    Text(AppStrings.text(.logsLevel, language: appLanguage))
                         .font(.system(size: 12))
-                    Picker(AppStrings.text(.logsLevel), selection: $runtimeLogLevelRaw) {
+                    Picker(AppStrings.text(.logsLevel, language: appLanguage), selection: $runtimeLogLevelRaw) {
                         ForEach(RuntimeLogLevel.allCases) { level in
                             Text(level.displayName).tag(level.rawValue)
                         }
@@ -176,7 +156,8 @@ struct RuntimeLogsSection: View {
                 Text(
                     AppStrings.text(
                         .logsDirectory,
-                        replacements: ["path": RuntimeDiagnostics.logsDirectoryPath]
+                        replacements: ["path": RuntimeDiagnostics.logsDirectoryPath],
+                        language: appLanguage
                     )
                 )
                     .font(.system(size: 11, design: .monospaced))
@@ -185,17 +166,25 @@ struct RuntimeLogsSection: View {
                     .lineLimit(2)
 
                 HStack(spacing: 8) {
-                    Button(AppStrings.text(.logsOpenDirectory)) {
+                    FlowPageActionButton(
+                        title: AppStrings.text(.logsOpenDirectory, language: appLanguage),
+                        tone: .solidAccent,
+                        height: 28,
+                        horizontalPadding: 10,
+                        accessibilityIdentifier: "flowtab.logs.open-directory"
+                    ) {
                         openLogsDirectory()
                     }
-                    .buttonStyle(LogsActionButtonStyle(tint: logsActionButtonTint))
-                    .accessibilityIdentifier("flowtab.logs.open-directory")
 
-                    Button(AppStrings.text(.logsClear)) {
+                    FlowPageActionButton(
+                        title: AppStrings.text(.logsClear, language: appLanguage),
+                        tone: .solidAccent,
+                        height: 28,
+                        horizontalPadding: 10,
+                        accessibilityIdentifier: "flowtab.logs.clear"
+                    ) {
                         logsViewModel.clearDisplayedOutput(minimumLevel: selectedLogLevel)
                     }
-                    .buttonStyle(LogsActionButtonStyle(tint: logsActionButtonTint))
-                    .accessibilityIdentifier("flowtab.logs.clear")
                 }
 
                 ScrollView {
@@ -204,7 +193,8 @@ struct RuntimeLogsSection: View {
                             Text(
                                 AppStrings.text(
                                     .logsEmptyHint,
-                                    replacements: ["hotkey": hotkeyShortcutText]
+                                    replacements: ["hotkey": hotkeyShortcutText],
+                                    language: appLanguage
                                 )
                             )
                                 .font(.system(size: 12))

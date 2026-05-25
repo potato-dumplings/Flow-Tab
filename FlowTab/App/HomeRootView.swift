@@ -4,22 +4,12 @@ import FlowTabCore
 
 struct HomeRootView: View {
     @ObservedObject private var tabState = HomeTabState.shared
-    @ObservedObject private var systemTheme = SystemThemeState.shared
-    @AppStorage(AppPreferenceKeys.themeMode)
-    private var themeModeRaw = ThemePreferencesStore.defaultMode.rawValue
-    @AppStorage(AppPreferenceKeys.appLanguage)
-    private var appLanguageRaw = AppLanguagePreferencesStore.defaultLanguage.rawValue
-
-    private var themeMode: ThemeMode {
-        ThemePreferencesStore.resolve(rawValue: themeModeRaw)
-    }
+    @ObservedObject private var presentation = FlowPresentationState.shared
 
     private var dividerColor: Color {
-        resolvedColorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.12)
-    }
-
-    private var resolvedColorScheme: ColorScheme {
-        themeMode.resolvedColorScheme(systemColorScheme: systemTheme.colorScheme)
+        presentation.context.resolvedColorScheme == .dark
+            ? Color.white.opacity(0.12)
+            : Color.black.opacity(0.12)
     }
 
     @ViewBuilder
@@ -37,48 +27,54 @@ struct HomeRootView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            HomeSidebar(selectedTab: $tabState.selectedTab)
+            HomeSidebar(
+                selectedTab: $tabState.selectedTab,
+                presentationContext: presentation.context
+            )
 
             Divider()
                 .overlay(dividerColor)
 
             ZStack {
                 tabContainer(isSelected: tabState.selectedTab == .home) {
-                    HomeLandingView(isActive: tabState.selectedTab == .home) {
+                    HomeLandingView(
+                        isActive: tabState.selectedTab == .home,
+                        appLanguage: presentation.context.appLanguage
+                    ) {
                         tabState.selectedTab = .settings
                     }
                 }
                 tabContainer(isSelected: tabState.selectedTab == .logs) {
-                    AppLogsView(isActive: tabState.selectedTab == .logs)
+                    AppLogsView(
+                        isActive: tabState.selectedTab == .logs,
+                        appLanguage: presentation.context.appLanguage
+                    )
                 }
                 tabContainer(isSelected: tabState.selectedTab == .settings) {
                     AppSettingsView(isActive: tabState.selectedTab == .settings)
-                        .id("settings-\(themeModeRaw)-\(appLanguageRaw)")
+                        .id(
+                            "settings-\(presentation.context.themeMode.rawValue)-\(presentation.context.appLanguage.rawValue)"
+                        )
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .preferredColorScheme(resolvedColorScheme)
-        .animation(.none, value: resolvedColorScheme)
+        .preferredColorScheme(presentation.context.resolvedColorScheme)
+        .animation(.none, value: presentation.context.resolvedColorScheme)
     }
 }
 
 private struct HomeSidebar: View {
     @Binding var selectedTab: HomeTab
-    @ObservedObject private var systemTheme = SystemThemeState.shared
-    @AppStorage(AppPreferenceKeys.themeMode)
-    private var themeModeRaw = ThemePreferencesStore.defaultMode.rawValue
-    @AppStorage(AppPreferenceKeys.appLanguage)
-    private var appLanguageRaw = AppLanguagePreferencesStore.defaultLanguage.rawValue
+    let presentationContext: FlowPresentationContext
     @State private var accessibilityTrusted = AccessibilityPermissionChecker.isTrusted()
     @State private var screenCaptureTrusted = ScreenCapturePermissionChecker.hasScreenCapturePermission
     private let navIconColumnWidth: CGFloat = 24
     private let navItemSpacing: CGFloat = 15
 
     private var colorScheme: ColorScheme {
-        ThemePreferencesStore.resolve(rawValue: themeModeRaw)
-            .resolvedColorScheme(systemColorScheme: systemTheme.colorScheme)
+        presentationContext.resolvedColorScheme
     }
 
     private var sidebarBackgroundColor: Color {
@@ -102,7 +98,7 @@ private struct HomeSidebar: View {
     }
 
     private var appLanguage: AppLanguage {
-        AppLanguagePreferencesStore.resolve(rawValue: appLanguageRaw)
+        presentationContext.appLanguage
     }
 
     private var items: [(tab: HomeTab, title: String, icon: String)] {
@@ -173,7 +169,7 @@ private struct HomeSidebar: View {
             }
             .padding(.horizontal, 10)
             .padding(.top, 17)
-            .padding(.bottom, HomePageLayout.bottomInset)
+            .padding(.bottom, FlowPageLayout.bottomInset)
         }
         .frame(width: 200)
         .onAppear {

@@ -258,11 +258,14 @@ extension FlowTabTests {
         let previousSelectedTab = HomeTabState.shared.selectedTab
         let previousLanguageRaw = UserDefaults.standard.string(forKey: AppPreferenceKeys.appLanguage)
         let previousThemeRaw = UserDefaults.standard.string(forKey: AppPreferenceKeys.themeMode)
+        let previousPresentationContext = FlowPresentationState.shared.context
         HomeTabState.shared.selectedTab = .settings
-        UserDefaults.standard.set(AppLanguage.simplifiedChinese.rawValue, forKey: AppPreferenceKeys.appLanguage)
-        UserDefaults.standard.set(ThemeMode.light.rawValue, forKey: AppPreferenceKeys.themeMode)
+        FlowPresentationState.shared.setAppLanguage(rawValue: AppLanguage.simplifiedChinese.rawValue)
+        FlowPresentationState.shared.setThemeMode(rawValue: ThemeMode.light.rawValue)
         defer {
             HomeTabState.shared.selectedTab = previousSelectedTab
+            FlowPresentationState.shared.setAppLanguage(rawValue: previousPresentationContext.appLanguage.rawValue)
+            FlowPresentationState.shared.setThemeMode(rawValue: previousPresentationContext.themeMode.rawValue)
             restoreUserDefaultsValue(previousLanguageRaw, forKey: AppPreferenceKeys.appLanguage)
             restoreUserDefaultsValue(previousThemeRaw, forKey: AppPreferenceKeys.themeMode)
         }
@@ -278,7 +281,7 @@ extension FlowTabTests {
             descendant(in: hostedView, as: AppKitSettingsPageContainerView.self)
         )
 
-        UserDefaults.standard.set(ThemeMode.dark.rawValue, forKey: AppPreferenceKeys.themeMode)
+        FlowPresentationState.shared.setThemeMode(rawValue: ThemeMode.dark.rawValue)
 
         XCTAssertTrue(
             waitForRunLoopCondition(timeout: 1.0) {
@@ -541,6 +544,281 @@ extension FlowTabTests {
     func testThemePreferencesResolveFallsBackToFollowSystem() {
         XCTAssertEqual(ThemePreferencesStore.resolve(rawValue: ThemeMode.light.rawValue), .light)
         XCTAssertEqual(ThemePreferencesStore.resolve(rawValue: "invalid"), .followSystem)
+    }
+
+    func testFlowPresentationResolverNormalizesRawValuesAndResolvesAppearance() {
+        let invalidResolution = FlowPresentationResolver.resolve(
+            themeRaw: "unknown-theme",
+            languageRaw: "unknown-language",
+            systemColorScheme: .dark
+        )
+        XCTAssertEqual(invalidResolution.context.themeMode, .followSystem)
+        XCTAssertEqual(invalidResolution.context.appLanguage, .simplifiedChinese)
+        XCTAssertEqual(invalidResolution.context.resolvedColorScheme, .dark)
+        XCTAssertEqual(invalidResolution.context.targetNSAppearanceName, .darkAqua)
+        XCTAssertEqual(invalidResolution.normalizedThemeRaw, ThemeMode.followSystem.rawValue)
+        XCTAssertEqual(invalidResolution.normalizedLanguageRaw, AppLanguage.simplifiedChinese.rawValue)
+
+        let explicitLight = FlowPresentationResolver.resolve(
+            themeRaw: ThemeMode.light.rawValue,
+            languageRaw: AppLanguage.english.rawValue,
+            systemColorScheme: .dark
+        )
+        XCTAssertEqual(explicitLight.context.resolvedColorScheme, .light)
+        XCTAssertEqual(explicitLight.context.targetNSAppearanceName, .aqua)
+
+        let explicitDark = FlowPresentationResolver.resolve(
+            themeRaw: ThemeMode.dark.rawValue,
+            languageRaw: AppLanguage.english.rawValue,
+            systemColorScheme: .light
+        )
+        XCTAssertEqual(explicitDark.context.resolvedColorScheme, .dark)
+        XCTAssertEqual(explicitDark.context.targetNSAppearanceName, .darkAqua)
+    }
+
+    @MainActor
+    func testFlowPresentationStateInitializesWithNormalizedWritebackWithoutLanguageNotification() {
+        guard let userDefaults = makeIsolatedUserDefaults() else { return }
+        defer { clearIsolatedUserDefaults(userDefaults) }
+        userDefaults.set("unknown-theme", forKey: AppPreferenceKeys.themeMode)
+        userDefaults.set("unknown-language", forKey: AppPreferenceKeys.appLanguage)
+        let notificationCenter = NotificationCenter()
+        let systemThemeProvider = FakeFlowPresentationSystemThemeProvider(colorScheme: .dark)
+        var languageNotificationCount = 0
+        let observer = notificationCenter.addObserver(
+            forName: .flowTabLanguagePreferenceChanged,
+            object: nil,
+            queue: nil
+        ) { _ in
+            languageNotificationCount += 1
+        }
+        defer { notificationCenter.removeObserver(observer) }
+
+        let state = FlowPresentationState(
+            userDefaults: userDefaults,
+            notificationCenter: notificationCenter,
+            systemThemeProvider: systemThemeProvider
+        )
+
+        XCTAssertEqual(state.context.themeMode, .followSystem)
+        XCTAssertEqual(state.context.appLanguage, .simplifiedChinese)
+        XCTAssertEqual(state.context.resolvedColorScheme, .dark)
+        XCTAssertEqual(userDefaults.string(forKey: AppPreferenceKeys.themeMode), ThemeMode.followSystem.rawValue)
+        XCTAssertEqual(
+            userDefaults.string(forKey: AppPreferenceKeys.appLanguage),
+            AppLanguage.simplifiedChinese.rawValue
+        )
+        XCTAssertEqual(languageNotificationCount, 0)
+    }
+
+    @MainActor
+    func testFlowPresentationStateKeepsInjectedStoresAndCentersIsolated() {
+        guard let firstDefaults = makeIsolatedUserDefaults(),
+              let secondDefaults = makeIsolatedUserDefaults()
+        else { return }
+        defer {
+            clearIsolatedUserDefaults(firstDefaults)
+            clearIsolatedUserDefaults(secondDefaults)
+        }
+        firstDefaults.set(ThemeMode.dark.rawValue, forKey: AppPreferenceKeys.themeMode)
+        firstDefaults.set(AppLanguage.english.rawValue, forKey: AppPreferenceKeys.appLanguage)
+        secondDefaults.set(ThemeMode.light.rawValue, forKey: AppPreferenceKeys.themeMode)
+        secondDefaults.set(AppLanguage.simplifiedChinese.rawValue, forKey: AppPreferenceKeys.appLanguage)
+        let firstCenter = NotificationCenter()
+        let secondCenter = NotificationCenter()
+        let firstProvider = FakeFlowPresentationSystemThemeProvider(colorScheme: .light)
+        let secondProvider = FakeFlowPresentationSystemThemeProvider(colorScheme: .dark)
+        var firstNotifications = 0
+        var secondNotifications = 0
+        let firstObserver = firstCenter.addObserver(
+            forName: .flowTabLanguagePreferenceChanged,
+            object: nil,
+            queue: nil
+        ) { _ in
+            firstNotifications += 1
+        }
+        let secondObserver = secondCenter.addObserver(
+            forName: .flowTabLanguagePreferenceChanged,
+            object: nil,
+            queue: nil
+        ) { _ in
+            secondNotifications += 1
+        }
+        defer {
+            firstCenter.removeObserver(firstObserver)
+            secondCenter.removeObserver(secondObserver)
+        }
+        let firstState = FlowPresentationState(
+            userDefaults: firstDefaults,
+            notificationCenter: firstCenter,
+            systemThemeProvider: firstProvider
+        )
+        let secondState = FlowPresentationState(
+            userDefaults: secondDefaults,
+            notificationCenter: secondCenter,
+            systemThemeProvider: secondProvider
+        )
+
+        firstState.setAppLanguage(rawValue: AppLanguage.simplifiedChinese.rawValue)
+
+        XCTAssertEqual(firstState.context.appLanguage, .simplifiedChinese)
+        XCTAssertEqual(secondState.context.appLanguage, .simplifiedChinese)
+        XCTAssertEqual(firstNotifications, 1)
+        XCTAssertEqual(secondNotifications, 0)
+        XCTAssertEqual(firstDefaults.string(forKey: AppPreferenceKeys.appLanguage), AppLanguage.simplifiedChinese.rawValue)
+        XCTAssertEqual(secondDefaults.string(forKey: AppPreferenceKeys.appLanguage), AppLanguage.simplifiedChinese.rawValue)
+    }
+
+    @MainActor
+    func testFlowPresentationStateFollowSystemRespondsToSystemThemeWithoutWritingRawThemeOrLanguageNotification() {
+        guard let userDefaults = makeIsolatedUserDefaults() else { return }
+        defer { clearIsolatedUserDefaults(userDefaults) }
+        userDefaults.set(ThemeMode.followSystem.rawValue, forKey: AppPreferenceKeys.themeMode)
+        userDefaults.set(AppLanguage.simplifiedChinese.rawValue, forKey: AppPreferenceKeys.appLanguage)
+        let notificationCenter = NotificationCenter()
+        let systemThemeProvider = FakeFlowPresentationSystemThemeProvider(colorScheme: .light)
+        var languageNotificationCount = 0
+        let observer = notificationCenter.addObserver(
+            forName: .flowTabLanguagePreferenceChanged,
+            object: nil,
+            queue: nil
+        ) { _ in
+            languageNotificationCount += 1
+        }
+        defer { notificationCenter.removeObserver(observer) }
+        let state = FlowPresentationState(
+            userDefaults: userDefaults,
+            notificationCenter: notificationCenter,
+            systemThemeProvider: systemThemeProvider
+        )
+
+        systemThemeProvider.pushColorScheme(.dark)
+
+        XCTAssertEqual(state.context.systemColorScheme, .dark)
+        XCTAssertEqual(state.context.resolvedColorScheme, .dark)
+        XCTAssertEqual(state.context.targetNSAppearanceName, .darkAqua)
+        XCTAssertEqual(userDefaults.string(forKey: AppPreferenceKeys.themeMode), ThemeMode.followSystem.rawValue)
+        XCTAssertEqual(languageNotificationCount, 0)
+    }
+
+    @MainActor
+    func testFlowPresentationThemeObservationCancelIsIdempotent() async {
+        let systemThemeProvider = FakeFlowPresentationSystemThemeProvider(colorScheme: .light)
+        var colorSchemeChanges: [ColorScheme] = []
+        let observation = systemThemeProvider.observeColorSchemeChanges { colorScheme in
+            colorSchemeChanges.append(colorScheme)
+        }
+
+        systemThemeProvider.pushColorScheme(.dark)
+        observation.cancel()
+        observation.cancel()
+        await Task.yield()
+        systemThemeProvider.pushColorScheme(.light)
+
+        XCTAssertEqual(colorSchemeChanges, [.dark])
+        XCTAssertEqual(systemThemeProvider.observerCount, 0)
+    }
+
+    @MainActor
+    func testFlowPresentationStateSetAppLanguagePostsOnlyForEffectiveLanguageChanges() {
+        guard let userDefaults = makeIsolatedUserDefaults() else { return }
+        defer { clearIsolatedUserDefaults(userDefaults) }
+        userDefaults.set(ThemeMode.followSystem.rawValue, forKey: AppPreferenceKeys.themeMode)
+        userDefaults.set(AppLanguage.simplifiedChinese.rawValue, forKey: AppPreferenceKeys.appLanguage)
+        let notificationCenter = NotificationCenter()
+        let systemThemeProvider = FakeFlowPresentationSystemThemeProvider(colorScheme: .light)
+        var languageNotificationCount = 0
+        let observer = notificationCenter.addObserver(
+            forName: .flowTabLanguagePreferenceChanged,
+            object: nil,
+            queue: nil
+        ) { _ in
+            languageNotificationCount += 1
+        }
+        defer { notificationCenter.removeObserver(observer) }
+        let state = FlowPresentationState(
+            userDefaults: userDefaults,
+            notificationCenter: notificationCenter,
+            systemThemeProvider: systemThemeProvider
+        )
+
+        state.setAppLanguage(rawValue: "unknown-language")
+        state.setAppLanguage(rawValue: AppLanguage.english.rawValue)
+        state.setAppLanguage(rawValue: AppLanguage.english.rawValue)
+
+        XCTAssertEqual(state.context.appLanguage, .english)
+        XCTAssertEqual(languageNotificationCount, 1)
+        XCTAssertEqual(userDefaults.string(forKey: AppPreferenceKeys.appLanguage), AppLanguage.english.rawValue)
+    }
+
+    @MainActor
+    func testUITestBootstrapResetRefreshesSharedPresentationState() {
+        let previousContext = FlowPresentationState.shared.context
+        let standardDefaults = UserDefaults.standard
+        let previousValues = AppPreferenceKeys.allKeys.reduce(into: [String: Any]()) { values, key in
+            values[key] = standardDefaults.object(forKey: key)
+        }
+        let takeoverMarkerValue = standardDefaults.object(
+            forKey: CommandTabTakeoverController.takeoverMarkerKey
+        )
+        defer {
+            for key in AppPreferenceKeys.allKeys {
+                if let value = previousValues[key] {
+                    standardDefaults.set(value, forKey: key)
+                } else {
+                    standardDefaults.removeObject(forKey: key)
+                }
+            }
+            restoreUserDefaultsValue(
+                takeoverMarkerValue,
+                forKey: CommandTabTakeoverController.takeoverMarkerKey,
+                userDefaults: standardDefaults
+            )
+            FlowPresentationState.shared.setThemeMode(rawValue: previousContext.themeMode.rawValue)
+            FlowPresentationState.shared.setAppLanguage(rawValue: previousContext.appLanguage.rawValue)
+        }
+
+        standardDefaults.set(ThemeMode.dark.rawValue, forKey: AppPreferenceKeys.themeMode)
+        standardDefaults.set(AppLanguage.english.rawValue, forKey: AppPreferenceKeys.appLanguage)
+        FlowPresentationState.shared.refreshFromStoredPreferences()
+        XCTAssertEqual(FlowPresentationState.shared.context.themeMode, .dark)
+        XCTAssertEqual(FlowPresentationState.shared.context.appLanguage, .english)
+
+        withLaunchArgumentsForTesting(["--flowtab-ui-reset-defaults"]) {
+            FlowTabUITestBootstrapper.prepareIfNeeded(userDefaults: standardDefaults)
+        }
+
+        XCTAssertEqual(FlowPresentationState.shared.context.themeMode, .followSystem)
+        XCTAssertEqual(FlowPresentationState.shared.context.appLanguage, .simplifiedChinese)
+        XCTAssertEqual(
+            standardDefaults.string(forKey: AppPreferenceKeys.themeMode),
+            ThemeMode.followSystem.rawValue
+        )
+        XCTAssertEqual(
+            standardDefaults.string(forKey: AppPreferenceKeys.appLanguage),
+            AppLanguage.simplifiedChinese.rawValue
+        )
+    }
+
+    func testFlowPresentationContextEqualityIgnoresNSAppearanceIdentity() {
+        let firstContext = FlowPresentationContext(
+            themeMode: .dark,
+            appLanguage: .english,
+            systemColorScheme: .light,
+            resolvedColorScheme: .dark,
+            targetNSAppearanceName: .darkAqua
+        )
+        let secondContext = FlowPresentationContext(
+            themeMode: .dark,
+            appLanguage: .english,
+            systemColorScheme: .light,
+            resolvedColorScheme: .dark,
+            targetNSAppearanceName: .darkAqua
+        )
+
+        XCTAssertEqual(firstContext, secondContext)
+        XCTAssertEqual(firstContext.targetNSAppearance.name, .darkAqua)
+        XCTAssertEqual(secondContext.targetNSAppearance.name, .darkAqua)
     }
 
     func testWindowLayerNormalizedAutoEnterDelayClampsAndRounds() {
@@ -1155,7 +1433,8 @@ extension FlowTabTests {
             inAppWindowHotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
             commandTabTakeoverActive: false,
             accessibilityTrusted: false,
-            screenCaptureTrusted: false
+            screenCaptureTrusted: false,
+            targetNSAppearanceName: .aqua
         )
     }
 
@@ -1298,4 +1577,37 @@ extension FlowTabTests {
         return color.redComponent < 0.3 && color.greenComponent < 0.3 && color.blueComponent < 0.3
     }
 
+}
+
+@MainActor
+private final class FakeFlowPresentationSystemThemeProvider: FlowPresentationSystemThemeProviding {
+    private(set) var currentColorScheme: ColorScheme
+    private var observers: [UUID: @MainActor (ColorScheme) -> Void] = [:]
+
+    init(colorScheme: ColorScheme) {
+        currentColorScheme = colorScheme
+    }
+
+    var observerCount: Int {
+        observers.count
+    }
+
+    func observeColorSchemeChanges(
+        _ handler: @escaping @MainActor (ColorScheme) -> Void
+    ) -> FlowPresentationThemeObservation {
+        let id = UUID()
+        observers[id] = handler
+        return FlowPresentationThemeObservation { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.observers[id] = nil
+            }
+        }
+    }
+
+    func pushColorScheme(_ colorScheme: ColorScheme) {
+        currentColorScheme = colorScheme
+        for observer in observers.values {
+            observer(colorScheme)
+        }
+    }
 }

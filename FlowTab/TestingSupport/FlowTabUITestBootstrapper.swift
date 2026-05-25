@@ -51,6 +51,7 @@ enum FlowTabUITestBootstrapper {
             userDefaults.removeObject(forKey: CommandTabTakeoverController.takeoverMarkerKey)
             HomeTabState.shared.selectedTab = .home
             RuntimeDiagnostics.shared.clear()
+            FlowPresentationState.shared.refreshFromStoredPreferences()
         }
 
         if FlowTabTestLaunchOptions.enablesMockHotkeyEffects {

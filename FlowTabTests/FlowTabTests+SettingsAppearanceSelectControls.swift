@@ -8,7 +8,7 @@ extension FlowTabTests {
     func testSettingsColorResolverUsesTargetAppearanceInsteadOfHostAppearance() throws {
         let hostAppearance = try XCTUnwrap(NSAppearance(named: .darkAqua))
         let targetAppearance = FlowSettingsStyleResolver.targetAppearance(
-            for: ThemeMode.light.rawValue,
+            named: .aqua,
             fallback: hostAppearance
         )
         let resolvedColor = FlowSettingsStyleResolver.color(
@@ -325,7 +325,10 @@ extension FlowTabTests {
             inAppWindowHotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
             commandTabTakeoverActive: false,
             accessibilityTrusted: false,
-            screenCaptureTrusted: false
+            screenCaptureTrusted: false,
+            targetNSAppearanceName: ThemePreferencesStore.resolve(rawValue: themeModeRaw) == .dark
+                ? .darkAqua
+                : .aqua
         )
     }
 

@@ -335,11 +335,14 @@ extension FlowTabTests {
         let previousSelectedTab = HomeTabState.shared.selectedTab
         let previousLanguageRaw = UserDefaults.standard.string(forKey: AppPreferenceKeys.appLanguage)
         let previousThemeRaw = UserDefaults.standard.string(forKey: AppPreferenceKeys.themeMode)
+        let previousPresentationContext = FlowPresentationState.shared.context
         HomeTabState.shared.selectedTab = .settings
-        UserDefaults.standard.set(AppLanguage.english.rawValue, forKey: AppPreferenceKeys.appLanguage)
-        UserDefaults.standard.set(ThemeMode.light.rawValue, forKey: AppPreferenceKeys.themeMode)
+        FlowPresentationState.shared.setAppLanguage(rawValue: AppLanguage.english.rawValue)
+        FlowPresentationState.shared.setThemeMode(rawValue: ThemeMode.light.rawValue)
         defer {
             HomeTabState.shared.selectedTab = previousSelectedTab
+            FlowPresentationState.shared.setAppLanguage(rawValue: previousPresentationContext.appLanguage.rawValue)
+            FlowPresentationState.shared.setThemeMode(rawValue: previousPresentationContext.themeMode.rawValue)
             restoreStandardUserDefaultsValue(previousLanguageRaw, forKey: AppPreferenceKeys.appLanguage)
             restoreStandardUserDefaultsValue(previousThemeRaw, forKey: AppPreferenceKeys.themeMode)
         }
@@ -356,7 +359,7 @@ extension FlowTabTests {
         )
         settleSettingsContainerLayout(initialContainer)
 
-        UserDefaults.standard.set(ThemeMode.dark.rawValue, forKey: AppPreferenceKeys.themeMode)
+        FlowPresentationState.shared.setThemeMode(rawValue: ThemeMode.dark.rawValue)
 
         XCTAssertTrue(
             waitForRunLoopCondition(timeout: 1.0) {
@@ -465,7 +468,8 @@ extension FlowTabTests {
             inAppWindowHotkeyMainKeyRaw: SwitcherHotkeyKey.tab.rawValue,
             commandTabTakeoverActive: false,
             accessibilityTrusted: accessibilityTrusted,
-            screenCaptureTrusted: screenCaptureTrusted
+            screenCaptureTrusted: screenCaptureTrusted,
+            targetNSAppearanceName: themeMode == .dark ? .darkAqua : .aqua
         )
     }
 
