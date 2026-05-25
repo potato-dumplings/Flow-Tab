@@ -119,6 +119,7 @@
 		FD00010336A0000100B0D737 /* FlowDropdownMenuView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD00000336A0000100B0D737 /* FlowDropdownMenuView.swift */; };
 		FD00010436A0000100B0D737 /* FlowDropdownRepresentable.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD00000436A0000100B0D737 /* FlowDropdownRepresentable.swift */; };
 		FD00010536A0000100B0D737 /* FlowDropdownMenuWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD00000536A0000100B0D737 /* FlowDropdownMenuWindowController.swift */; };
+		FD00010636A0000100B0D737 /* FlowDropdownOptionRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD00000636A0000100B0D737 /* FlowDropdownOptionRowView.swift */; };
 		C10000052F75000100B0D737 /* HotkeySettingsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000152F75000100B0D737 /* HotkeySettingsCard.swift */; };
 		C10000062F75000100B0D737 /* AppKitMeasurementControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000162F75000100B0D737 /* AppKitMeasurementControls.swift */; };
 		C10000082F75000100B0D737 /* AppKitSettingsCardChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000182F75000100B0D737 /* AppKitSettingsCardChrome.swift */; };
@@ -321,6 +322,7 @@
 		FD00000336A0000100B0D737 /* FlowDropdownMenuView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowDropdownMenuView.swift; sourceTree = "<group>"; };
 		FD00000436A0000100B0D737 /* FlowDropdownRepresentable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowDropdownRepresentable.swift; sourceTree = "<group>"; };
 		FD00000536A0000100B0D737 /* FlowDropdownMenuWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowDropdownMenuWindowController.swift; sourceTree = "<group>"; };
+		FD00000636A0000100B0D737 /* FlowDropdownOptionRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowDropdownOptionRowView.swift; sourceTree = "<group>"; };
 		C10000152F75000100B0D737 /* HotkeySettingsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeySettingsCard.swift; sourceTree = "<group>"; };
 		C10000162F75000100B0D737 /* AppKitMeasurementControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitMeasurementControls.swift; sourceTree = "<group>"; };
 		C10000182F75000100B0D737 /* AppKitSettingsCardChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitSettingsCardChrome.swift; sourceTree = "<group>"; };
@@ -726,6 +728,7 @@
 				FD00000136A0000100B0D737 /* FlowDropdownTypes.swift */,
 				FD00000236A0000100B0D737 /* FlowDropdownControl.swift */,
 				FD00000336A0000100B0D737 /* FlowDropdownMenuView.swift */,
+				FD00000636A0000100B0D737 /* FlowDropdownOptionRowView.swift */,
 				FD00000536A0000100B0D737 /* FlowDropdownMenuWindowController.swift */,
 				FD00000436A0000100B0D737 /* FlowDropdownRepresentable.swift */,
 			);
@@ -970,6 +973,7 @@
 				FD00010136A0000100B0D737 /* FlowDropdownTypes.swift in Sources */,
 				FD00010236A0000100B0D737 /* FlowDropdownControl.swift in Sources */,
 				FD00010336A0000100B0D737 /* FlowDropdownMenuView.swift in Sources */,
+				FD00010636A0000100B0D737 /* FlowDropdownOptionRowView.swift in Sources */,
 				FD00010536A0000100B0D737 /* FlowDropdownMenuWindowController.swift in Sources */,
 				FD00010436A0000100B0D737 /* FlowDropdownRepresentable.swift in Sources */,
 				C10000032F75000100B0D737 /* HomeLandingView.swift in Sources */,

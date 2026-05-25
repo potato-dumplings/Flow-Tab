@@ -177,6 +177,37 @@ extension FlowTabTests {
     }
 
     @MainActor
+    func testFlowDropdownKeepsOnlyOneHoveredRowFilled() throws {
+        let appearance = try XCTUnwrap(NSAppearance(named: .darkAqua))
+        let presentation = FlowDropdownPresentation.form(targetAppearance: appearance)
+        let menuView = FlowDropdownMenuView(
+            options: [
+                FlowDropdownOption(id: "e", title: "E"),
+                FlowDropdownOption(id: "f", title: "F"),
+                FlowDropdownOption(id: "g", title: "G")
+            ],
+            selectedID: nil,
+            controlIdentifier: "flowtab.test.dropdown",
+            presentation: presentation
+        )
+        menuView.frame = NSRect(x: 0, y: 0, width: 180, height: 120)
+        menuView.layoutSubtreeIfNeeded()
+
+        let rows = menuView.rowsForTesting
+        let firstRow = try XCTUnwrap(rows.first)
+        let secondRow = try XCTUnwrap(rows.dropFirst().first)
+        let event = try XCTUnwrap(dropdownMouseEvent())
+
+        firstRow.mouseEntered(with: event)
+        XCTAssertNotNil(firstRow.backgroundColorForTesting)
+        XCTAssertNil(secondRow.backgroundColorForTesting)
+
+        secondRow.mouseEntered(with: event)
+        XCTAssertNil(firstRow.backgroundColorForTesting)
+        XCTAssertNotNil(secondRow.backgroundColorForTesting)
+    }
+
+    @MainActor
     func testFlowDropdownUsesResolvedPresentationAndSelectionCallbackOnce() throws {
         let lightAppearance = try XCTUnwrap(NSAppearance(named: .aqua))
         let darkAppearance = try XCTUnwrap(NSAppearance(named: .darkAqua))
@@ -533,6 +564,20 @@ extension FlowTabTests {
         XCTAssertEqual(actual.greenComponent, expected.greenComponent, accuracy: 0.01, file: file, line: line)
         XCTAssertEqual(actual.blueComponent, expected.blueComponent, accuracy: 0.01, file: file, line: line)
         XCTAssertEqual(actual.alphaComponent, expected.alphaComponent, accuracy: 0.01, file: file, line: line)
+    }
+
+    private func dropdownMouseEvent() -> NSEvent? {
+        NSEvent.mouseEvent(
+            with: .mouseMoved,
+            location: .zero,
+            modifierFlags: [],
+            timestamp: 0,
+            windowNumber: 0,
+            context: nil,
+            eventNumber: 0,
+            clickCount: 0,
+            pressure: 0
+        )
     }
 
     private func assertColor(

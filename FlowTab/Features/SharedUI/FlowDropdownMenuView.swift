@@ -8,6 +8,8 @@ final class FlowDropdownMenuView: NSView {
     private var presentation: FlowDropdownPresentation
     private var rows: [FlowDropdownOptionRowView] = []
     private var usesScrollView = false
+    private var hoveredOptionID: String?
+    private var scrollObserver: NSObjectProtocol?
 
     init(
         frame frameRect: NSRect = .zero,
@@ -75,6 +77,7 @@ final class FlowDropdownMenuView: NSView {
             scrollView.setAccessibilityIdentifier(nil)
         }
         rows.forEach { $0.removeFromSuperview() }
+        setHoveredOption(nil)
         rows = options.map { option in
             let row = FlowDropdownOptionRowView(
                 option: option,
@@ -87,6 +90,9 @@ final class FlowDropdownMenuView: NSView {
             )
             row.onSelect = { [weak self] id in
                 self?.onSelect?(id)
+            }
+            row.onHoverChanged = { [weak self] id, isHovering in
+                self?.handleRowHoverChanged(optionID: id, isHovering: isHovering)
             }
             contentView.addSubview(row)
             return row
@@ -109,7 +115,21 @@ final class FlowDropdownMenuView: NSView {
         scrollView.contentInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
         scrollView.scrollerInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
         scrollView.contentView.drawsBackground = false
+        scrollView.contentView.postsBoundsChangedNotifications = true
         scrollView.verticalScrollElasticity = .none
+        scrollObserver = NotificationCenter.default.addObserver(
+            forName: NSView.boundsDidChangeNotification,
+            object: scrollView.contentView,
+            queue: .main
+        ) { [weak self] _ in
+            self?.setHoveredOption(nil)
+        }
+    }
+
+    deinit {
+        if let scrollObserver {
+            NotificationCenter.default.removeObserver(scrollObserver)
+        }
     }
 
     override var isOpaque: Bool { false }
@@ -204,168 +224,28 @@ final class FlowDropdownMenuView: NSView {
     }
 
     private func scrollToTop() {
+        setHoveredOption(nil)
         scrollView.contentView.scroll(to: NSPoint(x: 0, y: 0))
         scrollView.reflectScrolledClipView(scrollView.contentView)
     }
-}
 
-private final class FlowDropdownMenuContentView: NSView {
-    override var isFlipped: Bool { true }
-    override var isOpaque: Bool { false }
-}
-
-final class FlowDropdownOptionRowView: NSView {
-    var onSelect: ((String) -> Void)?
-
-    private let option: FlowDropdownOption
-    private var presentation: FlowDropdownPresentation
-    private var isSelected: Bool
-    private var isHovering = false
-    private var hoverTrackingArea: NSTrackingArea?
-
-    init(
-        option: FlowDropdownOption,
-        isSelected: Bool,
-        presentation: FlowDropdownPresentation,
-        accessibilityIdentifier: String
-    ) {
-        self.option = option
-        self.isSelected = isSelected
-        self.presentation = presentation
-        super.init(frame: .zero)
-        buildViewHierarchy(accessibilityIdentifier: accessibilityIdentifier)
-        refreshStyle()
-    }
-
-    required init?(coder: NSCoder) {
-        option = FlowDropdownOption(id: "", title: "")
-        isSelected = false
-        presentation = .form(targetAppearance: NSAppearance(named: .aqua) ?? NSApp.effectiveAppearance)
-        super.init(coder: coder)
-        buildViewHierarchy(accessibilityIdentifier: "")
-    }
-
-    var titleForTesting: String { option.title }
-    var textColorForTesting: NSColor? { resolvedColor(presentation.menuStyle.textColor) }
-    var backgroundColorForTesting: NSColor? {
-        rowFillColor()
-    }
-    var titleFrameForTesting: NSRect { titleRect() }
-    var titleAlignmentForTesting: NSTextAlignment { .center }
-
-    override var isFlipped: Bool { true }
-    override var isOpaque: Bool { false }
-
-    override func draw(_ dirtyRect: NSRect) {
-        super.draw(dirtyRect)
-        if let rowColor = rowFillColor() {
-            let rowRect = bounds.insetBy(dx: 6, dy: 3)
-            rowColor.setFill()
-            NSBezierPath(roundedRect: rowRect, xRadius: 7, yRadius: 7).fill()
-        }
-        drawTitle()
-    }
-
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let hoverTrackingArea {
-            removeTrackingArea(hoverTrackingArea)
-        }
-        let trackingArea = NSTrackingArea(
-            rect: bounds,
-            options: [.activeAlways, .mouseEnteredAndExited, .inVisibleRect],
-            owner: self,
-            userInfo: nil
-        )
-        addTrackingArea(trackingArea)
-        hoverTrackingArea = trackingArea
-    }
-
-    override func resetCursorRects() {
-        super.resetCursorRects()
-        addCursorRect(bounds, cursor: .pointingHand)
-    }
-
-    override func mouseEntered(with event: NSEvent) {
-        super.mouseEntered(with: event)
-        isHovering = true
-        refreshStyle()
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        super.mouseExited(with: event)
-        isHovering = false
-        refreshStyle()
-    }
-
-    override func mouseDown(with event: NSEvent) {
-        onSelect?(option.id)
-    }
-
-    override func accessibilityPerformPress() -> Bool {
-        onSelect?(option.id)
-        return true
-    }
-
-    private func buildViewHierarchy(accessibilityIdentifier: String) {
-        wantsLayer = false
-        setAccessibilityElement(true)
-        setAccessibilityRole(.button)
-        setAccessibilityIdentifier(accessibilityIdentifier)
-        setAccessibilityLabel(option.title)
-        setAccessibilityValue(option.id)
-    }
-
-    private func refreshStyle() {
-        appearance = presentation.targetAppearance
-        needsDisplay = true
-    }
-
-    private func rowFillColor() -> NSColor? {
-        if isSelected {
-            return resolvedColor(presentation.menuStyle.selectedRowColor)
-        }
+    private func handleRowHoverChanged(optionID: String, isHovering: Bool) {
         if isHovering {
-            return resolvedColor(presentation.menuStyle.hoveredRowColor)
+            setHoveredOption(optionID)
+        } else if hoveredOptionID == optionID {
+            setHoveredOption(nil)
         }
-        return nil
     }
 
-    private func centeredTextHeight() -> CGFloat {
-        ceil(presentation.font.ascender - presentation.font.descender + presentation.font.leading)
-    }
-
-    private func centeredTextY() -> CGFloat {
-        floor((bounds.height - centeredTextHeight()) / 2)
-    }
-
-    private func titleRect() -> NSRect {
-        let textInset: CGFloat = 12
-        return NSRect(
-            x: textInset,
-            y: centeredTextY(),
-            width: max(0, bounds.width - textInset * 2),
-            height: centeredTextHeight()
-        )
-    }
-
-    private func drawTitle() {
-        let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.alignment = .center
-        paragraphStyle.lineBreakMode = .byTruncatingTail
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: presentation.font,
-            .foregroundColor: resolvedColor(presentation.menuStyle.textColor),
-            .paragraphStyle: paragraphStyle
-        ]
-        (option.title as NSString).draw(in: titleRect(), withAttributes: attributes)
-    }
-
-    private func resolvedColor(_ color: NSColor) -> NSColor {
-        var resolvedColor: NSColor?
-        presentation.targetAppearance.performAsCurrentDrawingAppearance {
-            resolvedColor = color.usingColorSpace(.sRGB)
+    private func setHoveredOption(_ optionID: String?) {
+        hoveredOptionID = optionID
+        for row in rows {
+            row.setHovering(row.optionID == optionID)
         }
-        return resolvedColor ?? color
     }
+}
+
+final class FlowDropdownMenuContentView: NSView {
+    override var isFlipped: Bool { true }
+    override var isOpaque: Bool { false }
 }
