@@ -47,7 +47,8 @@ struct HomeRootView: View {
                 tabContainer(isSelected: tabState.selectedTab == .logs) {
                     AppLogsView(
                         isActive: tabState.selectedTab == .logs,
-                        appLanguage: presentation.context.appLanguage
+                        appLanguage: presentation.context.appLanguage,
+                        targetAppearance: presentation.context.targetNSAppearance
                     )
                 }
                 tabContainer(isSelected: tabState.selectedTab == .settings) {

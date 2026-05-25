@@ -203,7 +203,7 @@ struct FlowSettingsSelectStyle {
     static func preset(_ role: FlowSettingsSelectRole) -> FlowSettingsSelectStyle {
         let metrics = FlowSettingsControlMetrics(
             height: 32,
-            minimumWidth: 84,
+            minimumWidth: 132,
             horizontalPadding: 12,
             iconSpacing: 20
         )

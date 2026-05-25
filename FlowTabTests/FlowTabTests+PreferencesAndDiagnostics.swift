@@ -541,6 +541,46 @@ extension FlowTabTests {
         )
     }
 
+    @MainActor
+    func testRuntimeLogsDropdownUpdatesRuntimeLogLevelBinding() throws {
+        let appearance = try XCTUnwrap(NSAppearance(named: .aqua))
+        var enableVerboseDiagnostics = false
+        var runtimeLogLevelRaw = RuntimeLogLevel.info.rawValue
+        let hostedView = NSHostingView(
+            rootView: RuntimeLogsSection(
+                enableVerboseDiagnostics: Binding(
+                    get: { enableVerboseDiagnostics },
+                    set: { enableVerboseDiagnostics = $0 }
+                ),
+                runtimeLogLevelRaw: Binding(
+                    get: { runtimeLogLevelRaw },
+                    set: { runtimeLogLevelRaw = $0 }
+                ),
+                hotkeyShortcutText: "Option + Tab",
+                appLanguage: .english,
+                targetAppearance: appearance
+            )
+        )
+        hostedView.frame = NSRect(x: 0, y: 0, width: 620, height: 620)
+        hostedView.layoutSubtreeIfNeeded()
+
+        var locatedDropdown: FlowDropdownControl?
+        XCTAssertTrue(
+            waitForRunLoopCondition(timeout: 1.0) {
+                hostedView.layoutSubtreeIfNeeded()
+                locatedDropdown = descendant(in: hostedView, identifier: "flowtab.logs.level")
+                return locatedDropdown != nil
+            }
+        )
+        let dropdown = try XCTUnwrap(locatedDropdown)
+        XCTAssertNil(descendant(in: hostedView, as: NSPopUpButton.self))
+
+        dropdown.selectOptionForTesting(RuntimeLogLevel.warning.rawValue)
+
+        XCTAssertEqual(runtimeLogLevelRaw, RuntimeLogLevel.warning.rawValue)
+        XCTAssertEqual(dropdown.selectedIdentifierForTesting, RuntimeLogLevel.warning.rawValue)
+    }
+
     func testThemePreferencesResolveFallsBackToFollowSystem() {
         XCTAssertEqual(ThemePreferencesStore.resolve(rawValue: ThemeMode.light.rawValue), .light)
         XCTAssertEqual(ThemePreferencesStore.resolve(rawValue: "invalid"), .followSystem)

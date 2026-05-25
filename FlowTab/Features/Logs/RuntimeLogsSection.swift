@@ -92,6 +92,7 @@ struct RuntimeLogsSection: View {
     @Binding var runtimeLogLevelRaw: String
     let hotkeyShortcutText: String
     let appLanguage: AppLanguage
+    let targetAppearance: NSAppearance
 
     @StateObject private var logsViewModel = RuntimeLogLinesViewModel()
 
@@ -127,6 +128,12 @@ struct RuntimeLogsSection: View {
         return "flowtab.logs.line.row.\(index)"
     }
 
+    private var logLevelOptions: [FlowDropdownOption] {
+        RuntimeLogLevel.allCases.map {
+            FlowDropdownOption(id: $0.rawValue, title: $0.displayName)
+        }
+    }
+
     var body: some View {
         FlowPageSectionCard(
             title: AppStrings.text(.logsSectionTitle, language: appLanguage),
@@ -143,13 +150,12 @@ struct RuntimeLogsSection: View {
                 HStack(spacing: 10) {
                     Text(AppStrings.text(.logsLevel, language: appLanguage))
                         .font(.system(size: 12))
-                    Picker(AppStrings.text(.logsLevel, language: appLanguage), selection: $runtimeLogLevelRaw) {
-                        ForEach(RuntimeLogLevel.allCases) { level in
-                            Text(level.displayName).tag(level.rawValue)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
+                    FlowDropdownRepresentable(
+                        selectedID: $runtimeLogLevelRaw,
+                        options: logLevelOptions,
+                        presentation: .form(targetAppearance: targetAppearance),
+                        accessibilityIdentifier: "flowtab.logs.level"
+                    )
                     .frame(width: 120)
                 }
 

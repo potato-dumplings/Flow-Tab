@@ -1,9 +1,11 @@
 import SwiftUI
+import AppKit
 import FlowTabCore
 
 struct AppLogsView: View {
     let isActive: Bool
     let appLanguage: AppLanguage
+    let targetAppearance: NSAppearance
 
     @AppStorage(AppPreferenceKeys.enableVerboseDiagnostics) private var enableVerboseDiagnostics = false
     @AppStorage(AppPreferenceKeys.runtimeLogLevel)
@@ -41,7 +43,8 @@ struct AppLogsView: View {
                         enableVerboseDiagnostics: $enableVerboseDiagnostics,
                         runtimeLogLevelRaw: $runtimeLogLevelRaw,
                         hotkeyShortcutText: hotkeyConfiguration.mainShortcutText,
-                        appLanguage: appLanguage
+                        appLanguage: appLanguage,
+                        targetAppearance: targetAppearance
                     )
                 }
                 .padding(.horizontal, FlowPageLayout.horizontalInset)

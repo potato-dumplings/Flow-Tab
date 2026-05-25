@@ -427,9 +427,20 @@ extension FlowTabUITests {
         XCTAssertTrue(control.waitForExistence(timeout: 6), "Missing control: \(controlIdentifier)")
         tapElement(control)
 
+        if control.elementType == .radioGroup {
+            let segmentedOptionQuery = control.descendants(matching: .any).matching(identifier: optionIdentifier)
+            if tapFirstHittable(in: segmentedOptionQuery, timeout: 1) {
+                return
+            }
+        }
+
         let scopedOptionIdentifier = "\(controlIdentifier).option.\(optionIdentifier)"
         let scopedOptionsQuery = app.descendants(matching: .any).matching(identifier: scopedOptionIdentifier)
         if tapFirstHittable(in: scopedOptionsQuery, timeout: 2) {
+            return
+        }
+        let scopedScrollContainer = app.scrollViews["\(controlIdentifier).options"]
+        if tapFirstHittableAfterScrolling(in: scopedOptionsQuery, scrollContainer: scopedScrollContainer, timeout: 4) {
             return
         }
 
@@ -1101,6 +1112,52 @@ extension FlowTabUITests {
             RunLoop.current.run(until: Date().addingTimeInterval(0.1))
         } while Date() < deadline
         return false
+    }
+    func tapFirstHittableAfterScrolling(
+        in query: XCUIElementQuery,
+        scrollContainer: XCUIElement,
+        timeout: TimeInterval
+    ) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            let count = query.count
+            var sawExistingElement = false
+            for index in 0..<count {
+                let element = query.element(boundBy: index)
+                if element.exists && element.isHittable {
+                    element.tap()
+                    return true
+                }
+                if element.exists, scrollContainer.exists {
+                    sawExistingElement = true
+                    let deltaY = dropdownOptionScrollDeltaY(for: element, in: scrollContainer)
+                    scrollContainer.scroll(byDeltaX: 0, deltaY: deltaY)
+                    break
+                }
+            }
+            if !sawExistingElement, scrollContainer.exists {
+                scrollContainer.scroll(byDeltaX: 0, deltaY: -420)
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+        return false
+    }
+    private func dropdownOptionScrollDeltaY(
+        for element: XCUIElement,
+        in container: XCUIElement
+    ) -> CGFloat {
+        let elementFrame = element.frame
+        let containerFrame = container.frame
+        guard isUsableFrame(elementFrame), isUsableFrame(containerFrame) else {
+            return -420
+        }
+        if elementFrame.maxY > containerFrame.maxY {
+            return -min(max(elementFrame.maxY - containerFrame.maxY, 180), 520)
+        }
+        if elementFrame.minY < containerFrame.minY {
+            return min(max(containerFrame.minY - elementFrame.minY, 180), 520)
+        }
+        return elementFrame.midY >= containerFrame.midY ? -240 : 240
     }
     func hasHittableElement(in query: XCUIElementQuery, timeout: TimeInterval) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)

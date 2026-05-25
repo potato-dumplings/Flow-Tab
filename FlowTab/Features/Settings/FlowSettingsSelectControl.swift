@@ -5,23 +5,17 @@ final class FlowSettingsSelectControl: NSView, FlowSettingsAppearanceRefreshable
 
     var isEnabled = true {
         didSet {
-            popUpButton.isEnabled = isEnabled
-            if !isEnabled {
-                isHovering = false
-            }
+            dropdownControl.isEnabled = isEnabled
             refreshStyle()
         }
     }
 
-    private let popUpButton = NSPopUpButton(frame: .zero, pullsDown: false)
-    private var hoverTrackingArea: NSTrackingArea?
+    private let dropdownControl = FlowDropdownControl(frame: .zero)
     private var options: [(id: String, title: String)] = []
     private var selectedID: String?
-    private var isHovering = false
-    private var isExpanded = false
-    private var hasFocus = false
     private var targetAppearance = FlowSettingsStyleResolver.defaultAppearance
     private var style = FlowSettingsSelectStyle.preset(.formSelect)
+    private var heightConstraint: NSLayoutConstraint?
 
     override var intrinsicContentSize: NSSize {
         NSSize(width: preferredControlWidth, height: style.metrics.height)
@@ -37,80 +31,12 @@ final class FlowSettingsSelectControl: NSView, FlowSettingsAppearanceRefreshable
         buildViewHierarchy()
     }
 
-    override func layout() {
-        super.layout()
-        layer?.frame = bounds
-    }
-
-    override func viewDidChangeEffectiveAppearance() {
-        super.viewDidChangeEffectiveAppearance()
-        refreshStyle()
-    }
-
-    override func viewWillMove(toWindow newWindow: NSWindow?) {
-        if newWindow == nil {
-            isExpanded = false
-        }
-        super.viewWillMove(toWindow: newWindow)
-    }
-
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let hoverTrackingArea {
-            removeTrackingArea(hoverTrackingArea)
-        }
-        let trackingArea = NSTrackingArea(
-            rect: bounds,
-            options: [.activeInKeyWindow, .mouseEnteredAndExited, .inVisibleRect],
-            owner: self,
-            userInfo: nil
-        )
-        addTrackingArea(trackingArea)
-        hoverTrackingArea = trackingArea
-    }
-
-    override func resetCursorRects() {
-        super.resetCursorRects()
-        if isEnabled {
-            addCursorRect(bounds, cursor: .pointingHand)
-        }
-    }
-
-    override func mouseEntered(with event: NSEvent) {
-        super.mouseEntered(with: event)
-        guard isEnabled else { return }
-        isHovering = true
-        refreshStyle()
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        super.mouseExited(with: event)
-        isHovering = false
-        refreshStyle()
-    }
-
-    override func becomeFirstResponder() -> Bool {
-        let became = super.becomeFirstResponder()
-        hasFocus = became
-        refreshStyle()
-        return became
-    }
-
-    override func resignFirstResponder() -> Bool {
-        let resigned = super.resignFirstResponder()
-        hasFocus = false
-        refreshStyle()
-        return resigned
-    }
-
     func configure(options: [(id: String, title: String)], style: FlowSettingsSelectStyle = .preset(.formSelect)) {
         self.options = options
         self.style = style
         if options.contains(where: { $0.id == selectedID }) == false {
             selectedID = options.first?.id
         }
-        rebuildMenu()
-        updateDisplaySelection()
         refreshStyle()
         invalidateIntrinsicContentSize()
     }
@@ -118,33 +44,36 @@ final class FlowSettingsSelectControl: NSView, FlowSettingsAppearanceRefreshable
     func updateSelection(id: String) {
         guard options.contains(where: { $0.id == id }) else { return }
         selectedID = id
-        updateDisplaySelection()
-        refreshStyle()
+        dropdownControl.updateSelection(id: id)
+        setAccessibilityValue(id)
         invalidateIntrinsicContentSize()
     }
 
     func applySettingsAppearance(_ appearance: NSAppearance) {
         targetAppearance = appearance
-        popUpButton.appearance = appearance
-        popUpButton.menu?.appearance = appearance
+        self.appearance = appearance
+        dropdownControl.appearance = appearance
         refreshStyle()
     }
 
     func refreshStyle() {
-        wantsLayer = true
-        guard let layer else { return }
-        let resolvedStyle = style.states.value(for: resolvedState())
-        if let surface = resolvedStyle.surface {
-            FlowSettingsStyleResolver.apply(surface: surface, to: layer, appearance: targetAppearance)
-        }
-        let textToken = resolvedStyle.text ?? style.states.value(for: .normal).text
-        if let textToken {
-            popUpButton.contentTintColor = FlowSettingsStyleResolver.color(textToken.color, appearance: targetAppearance)
-            popUpButton.font = textToken.font
-        }
-        popUpButton.isEnabled = isEnabled
+        heightConstraint?.constant = style.metrics.height
+        synchronizeTestingIdentifier()
+        dropdownControl.isEnabled = isEnabled
+        dropdownControl.configure(
+            options: options.map { FlowDropdownOption(id: $0.id, title: $0.title) },
+            selectedID: selectedID,
+            presentation: dropdownPresentation()
+        )
+        setAccessibilityElement(true)
+        setAccessibilityRole(.popUpButton)
         setAccessibilityValue(selectedID ?? "")
-        setNeedsDisplay(bounds)
+        needsLayout = true
+    }
+
+    override func accessibilityPerformPress() -> Bool {
+        guard isEnabled else { return false }
+        return dropdownControl.accessibilityPerformPress()
     }
 
     private var preferredControlWidth: CGFloat {
@@ -153,99 +82,106 @@ final class FlowSettingsSelectControl: NSView, FlowSettingsAppearanceRefreshable
     }
 
     private func buildViewHierarchy() {
-        wantsLayer = true
         translatesAutoresizingMaskIntoConstraints = false
         setContentHuggingPriority(.required, for: .horizontal)
         setContentHuggingPriority(.required, for: .vertical)
         setContentCompressionResistancePriority(.required, for: .horizontal)
         setContentCompressionResistancePriority(.required, for: .vertical)
-        heightAnchor.constraint(equalToConstant: style.metrics.height).isActive = true
 
-        setAccessibilityElement(true)
-        setAccessibilityRole(.popUpButton)
-        setAccessibilityValue(selectedID ?? "")
+        dropdownControl.translatesAutoresizingMaskIntoConstraints = false
+        dropdownControl.onSelectionChanged = { [weak self] id in
+            self?.commitSelection(id)
+        }
+        addSubview(dropdownControl)
 
-        popUpButton.isBordered = false
-        popUpButton.bezelStyle = .regularSquare
-        popUpButton.target = self
-        popUpButton.action = #selector(handleSelectionChanged(_:))
-        popUpButton.translatesAutoresizingMaskIntoConstraints = false
-        popUpButton.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        popUpButton.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        addSubview(popUpButton)
-
+        let heightConstraint = heightAnchor.constraint(equalToConstant: style.metrics.height)
+        self.heightConstraint = heightConstraint
         NSLayoutConstraint.activate([
-            popUpButton.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
-            popUpButton.topAnchor.constraint(equalTo: topAnchor),
-            popUpButton.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
-            popUpButton.bottomAnchor.constraint(equalTo: bottomAnchor)
+            heightConstraint,
+            dropdownControl.leadingAnchor.constraint(equalTo: leadingAnchor),
+            dropdownControl.topAnchor.constraint(equalTo: topAnchor),
+            dropdownControl.trailingAnchor.constraint(equalTo: trailingAnchor),
+            dropdownControl.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
         refreshStyle()
     }
 
-    private func rebuildMenu() {
-        let menu = NSMenu()
-        menu.autoenablesItems = false
-        menu.appearance = targetAppearance
-        for option in options {
-            let item = NSMenuItem(title: option.title, action: #selector(handleMenuItem(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = option.id
-            item.identifier = NSUserInterfaceItemIdentifier(option.id)
-            item.setAccessibilityIdentifier(option.id)
-            item.state = option.id == selectedID ? .on : .off
-            menu.addItem(item)
-        }
-        popUpButton.menu = menu
-        updateDisplaySelection()
-    }
-
-    private func updateDisplaySelection() {
-        let selectedIndex = options.firstIndex { $0.id == selectedID } ?? 0
-        if popUpButton.numberOfItems > selectedIndex {
-            popUpButton.selectItem(at: selectedIndex)
-        }
-        popUpButton.setAccessibilityIdentifier(identifier?.rawValue)
-        popUpButton.setAccessibilityValue(selectedID ?? "")
-        setAccessibilityValue(selectedID ?? "")
-        for item in popUpButton.itemArray {
-            item.state = item.representedObject as? String == selectedID ? .on : .off
-        }
-    }
-
-    @objc private func handleSelectionChanged(_ sender: NSPopUpButton) {
-        guard let id = sender.selectedItem?.representedObject as? String else { return }
-        commitSelection(id)
-    }
-
-    @objc private func handleMenuItem(_ sender: NSMenuItem) {
-        guard let id = sender.representedObject as? String else { return }
-        commitSelection(id)
-    }
-
     private func commitSelection(_ id: String) {
-        let hasChanged = selectedID != id
+        guard options.contains(where: { $0.id == id }) else { return }
+        let didChange = selectedID != id
         selectedID = id
-        isExpanded = false
-        updateDisplaySelection()
-        refreshStyle()
-        if hasChanged {
+        setAccessibilityValue(id)
+        if didChange {
             onSelectionChanged?(id)
         }
     }
 
-    private func optionTestingIdentifier(for optionID: String) -> String {
-        guard let rawIdentifier = identifier?.rawValue, !rawIdentifier.isEmpty else {
-            return optionID
+    private func synchronizeTestingIdentifier() {
+        let rawIdentifier = identifier?.rawValue ?? accessibilityIdentifier()
+        if !rawIdentifier.isEmpty {
+            dropdownControl.identifier = NSUserInterfaceItemIdentifier(rawIdentifier)
+            dropdownControl.setAccessibilityIdentifier(rawIdentifier)
         }
-        return "\(rawIdentifier).option.\(optionID)"
     }
 
-    private func resolvedState() -> FlowSettingsSelectState {
-        guard isEnabled else { return .disabled }
-        if isExpanded { return .expanded }
-        if hasFocus { return .focused }
-        if isHovering { return .hovered }
-        return .normal
+    private func dropdownPresentation() -> FlowDropdownPresentation {
+        let base = FlowDropdownPresentation.form(targetAppearance: targetAppearance)
+        let metrics = FlowDropdownMetrics(
+            height: style.metrics.height,
+            minimumWidth: style.metrics.minimumWidth,
+            horizontalPadding: style.metrics.horizontalPadding,
+            iconSpacing: max(style.metrics.iconSpacing, 24),
+            menuRowHeight: 42,
+            menuVerticalPadding: 8,
+            menuHorizontalInset: 8,
+            menuArrowHeight: 10,
+            maximumVisibleRows: 8
+        )
+        let normalText = style.states.value(for: .normal).text
+        return FlowDropdownPresentation(
+            targetAppearance: targetAppearance,
+            metrics: metrics,
+            font: normalText?.font ?? base.font,
+            cornerRadius: style.states.value(for: .normal).surface?.cornerRadius ?? base.cornerRadius,
+            controlStyles: [
+                .normal: controlStyle(for: .normal, fallback: base.style(for: .normal)),
+                .hovered: controlStyle(for: .hovered, fallback: base.style(for: .hovered)),
+                .focused: controlStyle(for: .focused, fallback: base.style(for: .focused)),
+                .expanded: controlStyle(for: .expanded, fallback: base.style(for: .expanded)),
+                .disabled: controlStyle(for: .disabled, fallback: base.style(for: .disabled))
+            ],
+            menuStyle: base.menuStyle
+        )
+    }
+
+    private func controlStyle(
+        for state: FlowSettingsSelectState,
+        fallback: FlowDropdownControlStyle
+    ) -> FlowDropdownControlStyle {
+        let resolved = style.states.value(for: state)
+        guard let surface = resolved.surface else { return fallback }
+        let text = resolved.text ?? style.states.value(for: .normal).text
+        return FlowDropdownControlStyle(
+            backgroundColor: resolvedBackgroundColor(for: surface) ?? fallback.backgroundColor,
+            borderColor: FlowSettingsStyleResolver.color(surface.borderColor, appearance: targetAppearance),
+            borderWidth: surface.borderWidth,
+            textColor: text.map { FlowSettingsStyleResolver.color($0.color, appearance: targetAppearance) }
+                ?? fallback.textColor,
+            chevronColor: fallback.chevronColor,
+            shadowColor: surface.shadow.map { FlowSettingsStyleResolver.color($0.color, appearance: targetAppearance) }
+                ?? fallback.shadowColor,
+            shadowOpacity: surface.shadow?.opacity ?? fallback.shadowOpacity,
+            shadowRadius: surface.shadow?.radius ?? fallback.shadowRadius,
+            shadowOffset: surface.shadow?.offset ?? fallback.shadowOffset
+        )
+    }
+
+    private func resolvedBackgroundColor(for surface: FlowSettingsSurfaceToken) -> NSColor? {
+        switch surface.fill {
+        case let .color(colorToken):
+            return FlowSettingsStyleResolver.color(colorToken, appearance: targetAppearance)
+        case let .gradient(tokens):
+            return tokens.first.map { FlowSettingsStyleResolver.color($0, appearance: targetAppearance) }
+        }
     }
 }

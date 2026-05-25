@@ -77,6 +77,173 @@ extension FlowTabTests {
     }
 
     @MainActor
+    func testFlowDropdownKeepsSelectionByStableIDWhenTitlesRefresh() throws {
+        let appearance = try XCTUnwrap(NSAppearance(named: .aqua))
+        let presentation = FlowDropdownPresentation.form(targetAppearance: appearance)
+        let control = FlowDropdownControl(frame: NSRect(x: 0, y: 0, width: 180, height: 32))
+        control.configure(
+            options: [
+                FlowDropdownOption(id: "zh-Hans", title: "Simplified Chinese"),
+                FlowDropdownOption(id: "en", title: "English")
+            ],
+            selectedID: "zh-Hans",
+            presentation: presentation
+        )
+
+        control.configure(
+            options: [
+                FlowDropdownOption(id: "zh-Hans", title: "简体中文"),
+                FlowDropdownOption(id: "en", title: "English")
+            ],
+            selectedID: control.selectedIdentifierForTesting,
+            presentation: presentation
+        )
+
+        XCTAssertEqual(control.selectedIdentifierForTesting, "zh-Hans")
+        XCTAssertEqual(control.selectedTitleForTesting, "简体中文")
+        XCTAssertGreaterThanOrEqual(control.intrinsicContentSize.width, 132)
+
+        let menuView = FlowDropdownMenuView(
+            options: [
+                FlowDropdownOption(id: "zh-Hans", title: "Simplified Chinese"),
+                FlowDropdownOption(id: "en", title: "English")
+            ],
+            selectedID: "zh-Hans",
+            controlIdentifier: "flowtab.test.dropdown",
+            presentation: presentation
+        )
+        menuView.configure(
+            options: [
+                FlowDropdownOption(id: "zh-Hans", title: "简体中文"),
+                FlowDropdownOption(id: "en", title: "English")
+            ],
+            selectedID: "zh-Hans",
+            controlIdentifier: "flowtab.test.dropdown",
+            presentation: presentation
+        )
+
+        XCTAssertEqual(menuView.rowsForTesting.first?.titleForTesting, "简体中文")
+        XCTAssertEqual(
+            menuView.rowsForTesting.first?.accessibilityIdentifier(),
+            "flowtab.test.dropdown.option.zh-Hans"
+        )
+    }
+
+    @MainActor
+    func testFlowDropdownCentersTextAndKeepsNormalRowsUnfilled() throws {
+        let appearance = try XCTUnwrap(NSAppearance(named: .darkAqua))
+        let presentation = FlowDropdownPresentation.form(targetAppearance: appearance)
+        let options = [
+            FlowDropdownOption(id: "option", title: "Option"),
+            FlowDropdownOption(id: "control", title: "Control"),
+            FlowDropdownOption(id: "command", title: "Command")
+        ]
+        let control = FlowDropdownControl(frame: NSRect(x: 0, y: 0, width: 180, height: 32))
+        control.configure(options: options, selectedID: "option", presentation: presentation)
+        control.layoutSubtreeIfNeeded()
+
+        XCTAssertEqual(control.titleFrameForTesting.midY, control.bounds.midY, accuracy: 1)
+
+        let menuView = FlowDropdownMenuView(
+            options: options,
+            selectedID: "option",
+            controlIdentifier: "flowtab.test.dropdown",
+            presentation: presentation
+        )
+        menuView.frame = NSRect(x: 0, y: 0, width: 180, height: 120)
+        menuView.layoutSubtreeIfNeeded()
+
+        let rows = menuView.rowsForTesting
+        XCTAssertEqual(rows.map(\.titleForTesting), ["Option", "Control", "Command"])
+        let selectedRow = try XCTUnwrap(rows.first)
+        let normalRow = try XCTUnwrap(rows.dropFirst().first)
+        let commandRow = try XCTUnwrap(rows.last)
+        XCTAssertEqual(selectedRow.titleFrameForTesting.midY, selectedRow.bounds.midY, accuracy: 1)
+        XCTAssertEqual(control.titleAlignmentForTesting, .center)
+        XCTAssertEqual(
+            control.titleFrameForTesting.maxX,
+            control.chevronFrameForTesting.minX - 6,
+            accuracy: 1
+        )
+        XCTAssertLessThan(control.titleFrameForTesting.midX, control.bounds.midX)
+        XCTAssertEqual(selectedRow.titleAlignmentForTesting, .center)
+        XCTAssertEqual(selectedRow.titleFrameForTesting.midX, selectedRow.bounds.midX, accuracy: 1)
+        XCTAssertEqual(normalRow.titleFrameForTesting.midX, selectedRow.titleFrameForTesting.midX)
+        XCTAssertEqual(commandRow.titleFrameForTesting.midX, selectedRow.titleFrameForTesting.midX)
+        assertDropdownColor(try XCTUnwrap(normalRow.textColorForTesting), matches: presentation.menuStyle.textColor)
+        XCTAssertNotNil(selectedRow.backgroundColorForTesting)
+        XCTAssertNil(normalRow.backgroundColorForTesting)
+        XCTAssertNil(commandRow.backgroundColorForTesting)
+    }
+
+    @MainActor
+    func testFlowDropdownUsesResolvedPresentationAndSelectionCallbackOnce() throws {
+        let lightAppearance = try XCTUnwrap(NSAppearance(named: .aqua))
+        let darkAppearance = try XCTUnwrap(NSAppearance(named: .darkAqua))
+        let options = [
+            FlowDropdownOption(id: "one", title: "One"),
+            FlowDropdownOption(id: "two", title: "Two")
+        ]
+        let control = FlowDropdownControl(frame: NSRect(x: 0, y: 0, width: 180, height: 32))
+        control.configure(
+            options: options,
+            selectedID: "one",
+            presentation: .form(targetAppearance: lightAppearance)
+        )
+        control.layoutSubtreeIfNeeded()
+        let lightColor = try XCTUnwrap(control.textColorForTesting)
+
+        control.configure(
+            options: options,
+            selectedID: control.selectedIdentifierForTesting,
+            presentation: .form(targetAppearance: darkAppearance)
+        )
+        control.layoutSubtreeIfNeeded()
+        let darkColor = try XCTUnwrap(control.textColorForTesting)
+        XCTAssertNotEqual(
+            lightColor.usingColorSpace(.sRGB)?.brightnessComponent,
+            darkColor.usingColorSpace(.sRGB)?.brightnessComponent
+        )
+
+        var selectedIDs: [String] = []
+        control.onSelectionChanged = { selectedIDs.append($0) }
+        control.selectOptionForTesting("two")
+        control.selectOptionForTesting("two")
+
+        XCTAssertEqual(control.selectedIdentifierForTesting, "two")
+        XCTAssertEqual(selectedIDs, ["two"])
+
+        control.isEnabled = false
+        XCTAssertFalse(control.accessibilityPerformPress())
+    }
+
+    func testFlowDropdownSharedControlDoesNotReadPresentationOrLocalizationState() throws {
+        let repoRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let sourcePaths = [
+            "FlowTab/Features/SharedUI/FlowDropdownTypes.swift",
+            "FlowTab/Features/SharedUI/FlowDropdownControl.swift",
+            "FlowTab/Features/SharedUI/FlowDropdownMenuView.swift",
+            "FlowTab/Features/SharedUI/FlowDropdownMenuWindowController.swift",
+            "FlowTab/Features/SharedUI/FlowDropdownRepresentable.swift"
+        ]
+        let forbiddenSymbols = [
+            "FlowPresentationState",
+            "AppStrings",
+            "UserDefaults",
+            "AppPreferenceKeys"
+        ]
+
+        for sourcePath in sourcePaths {
+            let source = try String(contentsOf: repoRoot.appendingPathComponent(sourcePath))
+            for symbol in forbiddenSymbols {
+                XCTAssertFalse(source.contains(symbol), "\(sourcePath) should not reference \(symbol)")
+            }
+        }
+    }
+
+    @MainActor
     func testSettingsActionButtonRefreshesTextStatesAndAccessibility() throws {
         let appearance = try XCTUnwrap(NSAppearance(named: .darkAqua))
         let button = FlowSettingsActionButton()
@@ -290,14 +457,19 @@ extension FlowTabTests {
                 line: line
             )
 
-            let popUpButton: NSPopUpButton = try XCTUnwrap(
+            XCTAssertNil(
                 descendant(in: selectControl, as: NSPopUpButton.self),
-                "Missing popup button for \(identifier)",
+                "Settings selects should not expose system popup buttons",
                 file: file,
                 line: line
             )
-            assertColor(popUpButton.contentTintColor, resolvesTo: expectedInk, in: selectControl.effectiveAppearance)
-            XCTAssertFalse(popUpButton.itemArray.isEmpty, "Expected system NSMenu options", file: file, line: line)
+            let dropdownControl: FlowDropdownControl = try XCTUnwrap(
+                descendant(in: selectControl, as: FlowDropdownControl.self),
+                file: file,
+                line: line
+            )
+            assertColor(dropdownControl.textColorForTesting, resolvesTo: expectedInk, in: selectControl.effectiveAppearance)
+            XCTAssertFalse(dropdownControl.selectedTitleForTesting.isEmpty, file: file, line: line)
         }
     }
 
@@ -342,6 +514,25 @@ extension FlowTabTests {
         XCTAssertFalse(title.string.isEmpty, "Expected non-empty attributed title", file: file, line: line)
         let color = title.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
         assertColor(color, resolvesTo: expectedInk, in: appearance, file: file, line: line)
+    }
+
+    private func assertDropdownColor(
+        _ color: NSColor,
+        matches expectedColor: NSColor,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        guard
+            let actual = color.usingColorSpace(.sRGB),
+            let expected = expectedColor.usingColorSpace(.sRGB)
+        else {
+            XCTFail("Expected comparable sRGB colors", file: file, line: line)
+            return
+        }
+        XCTAssertEqual(actual.redComponent, expected.redComponent, accuracy: 0.01, file: file, line: line)
+        XCTAssertEqual(actual.greenComponent, expected.greenComponent, accuracy: 0.01, file: file, line: line)
+        XCTAssertEqual(actual.blueComponent, expected.blueComponent, accuracy: 0.01, file: file, line: line)
+        XCTAssertEqual(actual.alphaComponent, expected.alphaComponent, accuracy: 0.01, file: file, line: line)
     }
 
     private func assertColor(

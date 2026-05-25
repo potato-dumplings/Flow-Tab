@@ -456,6 +456,33 @@ extension FlowTabUITests {
         }
         XCTAssertFalse(app.descendants(matching: .any).matching(identifier: Identifier.logsEmptyHint).firstMatch.exists)
 
+        selectOption(in: app, controlIdentifier: Identifier.logsLevel, optionIdentifier: "WARN")
+        assertValue(of: element(in: app, identifier: Identifier.logsLevel), equals: "WARN")
+        XCTAssertTrue(
+            waitForNonExistence(
+                app.descendants(matching: .any).matching(identifier: Identifier.logsSeededDebugLine).firstMatch,
+                timeout: 3
+            )
+        )
+        XCTAssertTrue(
+            waitForNonExistence(
+                app.descendants(matching: .any).matching(identifier: Identifier.logsSeededInfoLine).firstMatch,
+                timeout: 3
+            )
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)
+                .matching(identifier: Identifier.logsSeededWarnLine)
+                .firstMatch
+                .waitForExistence(timeout: 5)
+        )
+        XCTAssertTrue(
+            app.descendants(matching: .any)
+                .matching(identifier: Identifier.logsSeededErrorLine)
+                .firstMatch
+                .waitForExistence(timeout: 5)
+        )
+
         XCTAssertTrue(
             tapFirstHittable(in: app.buttons.matching(identifier: Identifier.logsClearButton), timeout: 5)
         )

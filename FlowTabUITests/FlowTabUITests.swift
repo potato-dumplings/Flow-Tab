@@ -46,6 +46,7 @@ final class FlowTabUITests: XCTestCase {
         static let permissionReminderSwitch = "flowtab.settings.permission.reminder"
         static let logsClearButton = "flowtab.logs.clear"
         static let logsOpenDirectoryButton = "flowtab.logs.open-directory"
+        static let logsLevel = "flowtab.logs.level"
         static let logsLines = "flowtab.logs.lines"
         static let logsEmptyHint = "flowtab.logs.empty-hint"
         static let logsSeededDebugLine = "flowtab.logs.line.seeded.debug"
