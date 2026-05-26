@@ -287,24 +287,27 @@ final class FlowDropdownControl: NSView {
 
     private func showMenu() {
         guard isEnabled, !options.isEmpty, menuWindowController == nil else { return }
-        let contentSize = menuSize()
+        guard let layout = makeMenuLayoutForCurrentGeometry() else { return }
         let menuView = FlowDropdownMenuView(
-            frame: NSRect(origin: .zero, size: contentSize),
+            frame: NSRect(origin: .zero, size: layout.contentSize),
             options: options,
             selectedID: selectedID,
             controlIdentifier: identifier?.rawValue,
-            presentation: presentation
+            presentation: presentation,
+            direction: layout.direction,
+            visibleRowCount: layout.visibleRowCount,
+            arrowAnchor: layout.arrowAnchor
         )
         menuView.onSelect = { [weak self] id in
             self?.commitSelection(id)
         }
-        menuView.frame = NSRect(origin: .zero, size: contentSize)
+        menuView.frame = NSRect(origin: .zero, size: layout.contentSize)
         menuView.layoutSubtreeIfNeeded()
         self.menuView = menuView
         let menuWindowController = FlowDropdownMenuWindowController(
             control: self,
             menuView: menuView,
-            contentSize: contentSize
+            layout: layout
         )
         menuWindowController.onClose = { [weak self] in
             self?.menuDidClose()
@@ -320,26 +323,44 @@ final class FlowDropdownControl: NSView {
     }
 
     private func updateMenuIfNeeded() {
-        let contentSize = menuSize()
-        menuWindowController?.update(contentSize: contentSize)
-        menuView?.frame = NSRect(origin: .zero, size: contentSize)
-        menuView?.configure(
+        guard let menuWindowController, let menuView else { return }
+        guard let layout = makeMenuLayoutForCurrentGeometry() else {
+            closeMenu()
+            return
+        }
+        menuWindowController.update(layout: layout)
+        menuView.configure(
             options: options,
             selectedID: selectedID,
             controlIdentifier: identifier?.rawValue,
-            presentation: presentation
+            presentation: presentation,
+            direction: layout.direction,
+            visibleRowCount: layout.visibleRowCount,
+            arrowAnchor: layout.arrowAnchor
         )
     }
 
-    private func menuSize() -> NSSize {
-        let metrics = presentation.metrics
-        let visibleRowCount = min(max(options.count, 1), metrics.maximumVisibleRows)
-        return NSSize(
-            width: max(bounds.width, intrinsicContentSize.width),
-            height: metrics.menuArrowHeight
-                + metrics.menuVerticalPadding * 2
-                + CGFloat(visibleRowCount) * metrics.menuRowHeight
+    func makeMenuLayoutForCurrentGeometry() -> FlowDropdownMenuLayout? {
+        guard let parentWindow = window else { return nil }
+        let controlScreenFrame = parentWindow.convertToScreen(convert(bounds, to: nil))
+        let contentScreenFrame = contentScreenFrame(in: parentWindow)
+        let screenVisibleFrame = parentWindow.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? contentScreenFrame
+        return FlowDropdownMenuLayoutResolver.resolve(
+            optionCount: options.count,
+            metrics: presentation.metrics,
+            menuBodyWidth: max(bounds.width, intrinsicContentSize.width),
+            controlFrame: controlScreenFrame,
+            contentFrame: contentScreenFrame,
+            screenVisibleFrame: screenVisibleFrame,
+            preference: presentation.placementPreference
         )
+    }
+
+    private func contentScreenFrame(in parentWindow: NSWindow) -> NSRect {
+        guard let contentView = parentWindow.contentView else {
+            return parentWindow.frame
+        }
+        return parentWindow.convertToScreen(contentView.convert(contentView.bounds, to: nil))
     }
 
     private func commitSelection(_ id: String) {

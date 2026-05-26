@@ -15,6 +15,7 @@ final class FlowSettingsSelectControl: NSView, FlowSettingsAppearanceRefreshable
     private var selectedID: String?
     private var targetAppearance = FlowSettingsStyleResolver.defaultAppearance
     private var style = FlowSettingsSelectStyle.preset(.formSelect)
+    private var placementPreference: FlowDropdownPlacementPreference = .defaultBelow
     private var heightConstraint: NSLayoutConstraint?
 
     override var intrinsicContentSize: NSSize {
@@ -31,9 +32,14 @@ final class FlowSettingsSelectControl: NSView, FlowSettingsAppearanceRefreshable
         buildViewHierarchy()
     }
 
-    func configure(options: [(id: String, title: String)], style: FlowSettingsSelectStyle = .preset(.formSelect)) {
+    func configure(
+        options: [(id: String, title: String)],
+        style: FlowSettingsSelectStyle = .preset(.formSelect),
+        placementPreference: FlowDropdownPlacementPreference = .defaultBelow
+    ) {
         self.options = options
         self.style = style
+        self.placementPreference = placementPreference
         if options.contains(where: { $0.id == selectedID }) == false {
             selectedID = options.first?.id
         }
@@ -55,6 +61,8 @@ final class FlowSettingsSelectControl: NSView, FlowSettingsAppearanceRefreshable
         dropdownControl.appearance = appearance
         refreshStyle()
     }
+
+    var placementPreferenceForTesting: FlowDropdownPlacementPreference { placementPreference }
 
     func refreshStyle() {
         heightConstraint?.constant = style.metrics.height
@@ -143,6 +151,7 @@ final class FlowSettingsSelectControl: NSView, FlowSettingsAppearanceRefreshable
             metrics: metrics,
             font: normalText?.font ?? base.font,
             cornerRadius: style.states.value(for: .normal).surface?.cornerRadius ?? base.cornerRadius,
+            placementPreference: placementPreference,
             controlStyles: [
                 .normal: controlStyle(for: .normal, fallback: base.style(for: .normal)),
                 .hovered: controlStyle(for: .hovered, fallback: base.style(for: .hovered)),

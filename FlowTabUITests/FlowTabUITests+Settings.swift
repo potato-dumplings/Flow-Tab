@@ -341,6 +341,32 @@ extension FlowTabUITests {
         }
     }
 
+    func testSettingsHotkeyKeyDropdownOpensAsRightSideMenuWhenSpaceAllows() throws {
+        let app = makeApp(additionalArguments: hotkeyEffectArguments(resetDefaults: true))
+        launchFlowTabUITestApplication(app)
+        openSettingsTab(in: app)
+
+        let control = element(in: app, identifier: Identifier.settingsHotkeyMainKey)
+        XCTAssertTrue(control.waitForExistence(timeout: 6))
+        let controlFrame = control.frame
+        let visibleMaxX = NSScreen.main?.visibleFrame.maxX ?? controlFrame.maxX
+        guard visibleMaxX - controlFrame.maxX >= 190 else {
+            throw XCTSkip("Current screen does not leave enough right-side room for the side-menu UI assertion.")
+        }
+
+        tapElement(control)
+        let scopedOption = app.descendants(matching: .any)
+            .matching(identifier: "\(Identifier.settingsHotkeyMainKey).option.space")
+            .firstMatch
+        let rawOption = app.descendants(matching: .any).matching(identifier: "space").firstMatch
+        let option = scopedOption.waitForExistence(timeout: 2) ? scopedOption : rawOption
+        XCTAssertTrue(option.waitForExistence(timeout: 3))
+        XCTAssertGreaterThanOrEqual(option.frame.minX, controlFrame.maxX - 1)
+
+        tapElement(option)
+        assertValue(of: control, equals: "space")
+    }
+
     func testSettingsMainHotkeyRepresentativeMatrixTriggersSwitcher() throws {
         let cases: [(modifier: String, key: String, shortcutText: String)] = [
             ("option", "space", "Option + Space"),

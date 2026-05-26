@@ -13,6 +13,20 @@ enum FlowDropdownControlState: Hashable {
     case disabled
 }
 
+enum FlowDropdownMenuDirection: Equatable {
+    case below
+    case above
+    case right
+    case left
+}
+
+enum FlowDropdownPlacementPreference: Equatable {
+    case defaultBelow
+    case preferAbove
+    case preferRight
+    case preferLeft
+}
+
 struct FlowDropdownMetrics: Equatable {
     let height: CGFloat
     let minimumWidth: CGFloat
@@ -58,6 +72,7 @@ struct FlowDropdownPresentation {
     let metrics: FlowDropdownMetrics
     let font: NSFont
     let cornerRadius: CGFloat
+    let placementPreference: FlowDropdownPlacementPreference
     let controlStyles: [FlowDropdownControlState: FlowDropdownControlStyle]
     let menuStyle: FlowDropdownMenuStyle
 
@@ -106,6 +121,7 @@ struct FlowDropdownPresentation {
             metrics: metrics,
             font: FlowTypography.appKit(.controlText),
             cornerRadius: 10,
+            placementPreference: .defaultBelow,
             controlStyles: [
                 .normal: normal,
                 .hovered: hovered,
@@ -145,6 +161,263 @@ struct FlowDropdownPresentation {
             color = provider()
         }
         return color ?? provider()
+    }
+}
+
+struct FlowDropdownMenuLayout: Equatable {
+    let direction: FlowDropdownMenuDirection
+    let frame: NSRect
+    let contentSize: NSSize
+    let visibleRowCount: Int
+    let arrowAnchor: CGFloat
+}
+
+enum FlowDropdownMenuLayoutResolver {
+    static func resolve(
+        optionCount: Int,
+        metrics: FlowDropdownMetrics,
+        menuBodyWidth: CGFloat,
+        controlFrame: NSRect,
+        contentFrame: NSRect,
+        screenVisibleFrame: NSRect,
+        preference: FlowDropdownPlacementPreference
+    ) -> FlowDropdownMenuLayout {
+        let availableBelow = max(0, controlFrame.minY - contentFrame.minY)
+        let availableAbove = max(0, contentFrame.maxY - controlFrame.maxY)
+
+        switch preference {
+        case .defaultBelow:
+            return verticalLayout(
+                direction: .below,
+                optionCount: optionCount,
+                metrics: metrics,
+                menuBodyWidth: menuBodyWidth,
+                controlFrame: controlFrame,
+                availableHeight: availableBelow
+            )
+        case .preferAbove:
+            if verticalRowCapacity(availableHeight: availableAbove, metrics: metrics) >= minimumUsableRows(
+                optionCount: optionCount
+            ) {
+                return verticalLayout(
+                    direction: .above,
+                    optionCount: optionCount,
+                    metrics: metrics,
+                    menuBodyWidth: menuBodyWidth,
+                    controlFrame: controlFrame,
+                    availableHeight: availableAbove
+                )
+            }
+            return fallbackVerticalLayout(
+                optionCount: optionCount,
+                metrics: metrics,
+                menuBodyWidth: menuBodyWidth,
+                controlFrame: controlFrame,
+                availableBelow: availableBelow,
+                availableAbove: availableAbove
+            )
+        case .preferRight:
+            let sideWidth = sideMenuWidth(menuBodyWidth: menuBodyWidth, metrics: metrics)
+            if screenVisibleFrame.maxX - controlFrame.maxX >= sideWidth {
+                return sideLayout(
+                    direction: .right,
+                    optionCount: optionCount,
+                    metrics: metrics,
+                    menuBodyWidth: menuBodyWidth,
+                    controlFrame: controlFrame,
+                    contentFrame: contentFrame
+                )
+            }
+            return fallbackVerticalLayout(
+                optionCount: optionCount,
+                metrics: metrics,
+                menuBodyWidth: menuBodyWidth,
+                controlFrame: controlFrame,
+                availableBelow: availableBelow,
+                availableAbove: availableAbove
+            )
+        case .preferLeft:
+            let sideWidth = sideMenuWidth(menuBodyWidth: menuBodyWidth, metrics: metrics)
+            if controlFrame.minX - screenVisibleFrame.minX >= sideWidth {
+                return sideLayout(
+                    direction: .left,
+                    optionCount: optionCount,
+                    metrics: metrics,
+                    menuBodyWidth: menuBodyWidth,
+                    controlFrame: controlFrame,
+                    contentFrame: contentFrame
+                )
+            }
+            return fallbackVerticalLayout(
+                optionCount: optionCount,
+                metrics: metrics,
+                menuBodyWidth: menuBodyWidth,
+                controlFrame: controlFrame,
+                availableBelow: availableBelow,
+                availableAbove: availableAbove
+            )
+        }
+    }
+
+    private static func fallbackVerticalLayout(
+        optionCount: Int,
+        metrics: FlowDropdownMetrics,
+        menuBodyWidth: CGFloat,
+        controlFrame: NSRect,
+        availableBelow: CGFloat,
+        availableAbove: CGFloat
+    ) -> FlowDropdownMenuLayout {
+        let direction = fallbackVerticalDirection(
+            optionCount: optionCount,
+            metrics: metrics,
+            availableBelow: availableBelow,
+            availableAbove: availableAbove
+        )
+        return verticalLayout(
+            direction: direction,
+            optionCount: optionCount,
+            metrics: metrics,
+            menuBodyWidth: menuBodyWidth,
+            controlFrame: controlFrame,
+            availableHeight: direction == .below ? availableBelow : availableAbove
+        )
+    }
+
+    private static func fallbackVerticalDirection(
+        optionCount: Int,
+        metrics: FlowDropdownMetrics,
+        availableBelow: CGFloat,
+        availableAbove: CGFloat
+    ) -> FlowDropdownMenuDirection {
+        let preferredRows = preferredRows(optionCount: optionCount, metrics: metrics)
+        let minimumRows = minimumUsableRows(optionCount: optionCount)
+        let belowRows = verticalRowCapacity(availableHeight: availableBelow, metrics: metrics)
+        let aboveRows = verticalRowCapacity(availableHeight: availableAbove, metrics: metrics)
+
+        if belowRows >= preferredRows {
+            return .below
+        }
+        if aboveRows >= preferredRows {
+            return .above
+        }
+        if belowRows >= minimumRows {
+            return .below
+        }
+        if aboveRows >= minimumRows {
+            return .above
+        }
+        return aboveRows > belowRows ? .above : .below
+    }
+
+    private static func verticalLayout(
+        direction: FlowDropdownMenuDirection,
+        optionCount: Int,
+        metrics: FlowDropdownMetrics,
+        menuBodyWidth: CGFloat,
+        controlFrame: NSRect,
+        availableHeight: CGFloat
+    ) -> FlowDropdownMenuLayout {
+        let visibleRows = min(
+            max(0, optionCount),
+            verticalRowCapacity(availableHeight: availableHeight, metrics: metrics)
+        )
+        let contentHeight = min(
+            max(0, availableHeight),
+            metrics.menuArrowHeight + bodyHeight(rowCount: visibleRows, metrics: metrics)
+        )
+        let contentSize = NSSize(width: max(0, menuBodyWidth), height: contentHeight)
+        let originY: CGFloat = direction == .below
+            ? floor(controlFrame.minY - contentSize.height)
+            : floor(controlFrame.maxY)
+        let frame = NSRect(
+            x: floor(controlFrame.midX - contentSize.width / 2),
+            y: originY,
+            width: contentSize.width,
+            height: contentSize.height
+        )
+        return FlowDropdownMenuLayout(
+            direction: direction,
+            frame: frame,
+            contentSize: contentSize,
+            visibleRowCount: visibleRows,
+            arrowAnchor: controlFrame.midX - frame.minX
+        )
+    }
+
+    private static func sideLayout(
+        direction: FlowDropdownMenuDirection,
+        optionCount: Int,
+        metrics: FlowDropdownMetrics,
+        menuBodyWidth: CGFloat,
+        controlFrame: NSRect,
+        contentFrame: NSRect
+    ) -> FlowDropdownMenuLayout {
+        let visibleRows = min(
+            max(0, optionCount),
+            sideRowCapacity(contentHeight: contentFrame.height, metrics: metrics)
+        )
+        let contentHeight = min(
+            max(0, contentFrame.height),
+            bodyHeight(rowCount: visibleRows, metrics: metrics)
+        )
+        let contentSize = NSSize(
+            width: sideMenuWidth(menuBodyWidth: menuBodyWidth, metrics: metrics),
+            height: contentHeight
+        )
+        let originY = contentFrame.midY - contentSize.height / 2
+        let frame = NSRect(
+            x: direction == .right ? floor(controlFrame.maxX) : floor(controlFrame.minX - contentSize.width),
+            y: floor(originY),
+            width: contentSize.width,
+            height: contentSize.height
+        )
+        return FlowDropdownMenuLayout(
+            direction: direction,
+            frame: frame,
+            contentSize: contentSize,
+            visibleRowCount: visibleRows,
+            arrowAnchor: controlFrame.midY - frame.minY
+        )
+    }
+
+    private static func preferredRows(optionCount: Int, metrics: FlowDropdownMetrics) -> Int {
+        min(max(0, optionCount), max(0, metrics.maximumVisibleRows))
+    }
+
+    private static func minimumUsableRows(optionCount: Int) -> Int {
+        min(max(0, optionCount), 2)
+    }
+
+    private static func preferredVerticalHeight(optionCount: Int, metrics: FlowDropdownMetrics) -> CGFloat {
+        metrics.menuArrowHeight + bodyHeight(
+            rowCount: preferredRows(optionCount: optionCount, metrics: metrics),
+            metrics: metrics
+        )
+    }
+
+    private static func bodyHeight(rowCount: Int, metrics: FlowDropdownMetrics) -> CGFloat {
+        metrics.menuVerticalPadding * 2 + CGFloat(max(0, rowCount)) * metrics.menuRowHeight
+    }
+
+    private static func verticalRowCapacity(availableHeight: CGFloat, metrics: FlowDropdownMetrics) -> Int {
+        min(
+            max(0, metrics.maximumVisibleRows),
+            rowCapacity(contentHeight: max(0, availableHeight - metrics.menuArrowHeight), metrics: metrics)
+        )
+    }
+
+    private static func sideRowCapacity(contentHeight: CGFloat, metrics: FlowDropdownMetrics) -> Int {
+        rowCapacity(contentHeight: contentHeight, metrics: metrics)
+    }
+
+    private static func rowCapacity(contentHeight: CGFloat, metrics: FlowDropdownMetrics) -> Int {
+        guard metrics.menuRowHeight > 0 else { return 0 }
+        let rowSpace = max(0, contentHeight - metrics.menuVerticalPadding * 2)
+        return max(0, Int(floor((rowSpace + 0.5) / metrics.menuRowHeight)))
+    }
+
+    private static func sideMenuWidth(menuBodyWidth: CGFloat, metrics: FlowDropdownMetrics) -> CGFloat {
+        max(0, menuBodyWidth) + max(0, metrics.menuArrowHeight)
     }
 }
 

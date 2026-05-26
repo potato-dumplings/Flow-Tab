@@ -346,6 +346,7 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
         configure(
             selectControl: mainKeySelect,
             options: SwitcherHotkeyKey.allCases.map { (id: $0.rawValue, title: $0.displayName) },
+            placementPreference: .preferRight,
             onSelectionChanged: { [weak self] rawValue in
                 self?.handleMainKeyChanged(rawValue)
             }
@@ -353,6 +354,7 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
         configure(
             selectControl: quitKeySelect,
             options: SwitcherHotkeyKey.allCases.map { (id: $0.rawValue, title: $0.displayName) },
+            placementPreference: .preferRight,
             onSelectionChanged: { [weak self] rawValue in
                 self?.handleQuitKeyChanged(rawValue)
             }
@@ -367,6 +369,7 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
         configure(
             selectControl: inAppMainKeySelect,
             options: SwitcherHotkeyKey.allCases.map { (id: $0.rawValue, title: $0.displayName) },
+            placementPreference: .preferRight,
             onSelectionChanged: { [weak self] rawValue in
                 self?.handleInAppMainKeyChanged(rawValue)
             }
@@ -415,10 +418,16 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
     private func configure(
         selectControl: FlowSettingsSelectControl,
         options: [(id: String, title: String)],
+        placementPreference: FlowDropdownPlacementPreference = .defaultBelow,
         onSelectionChanged: @escaping (String) -> Void
     ) {
         selectControl.onSelectionChanged = onSelectionChanged
-        AppKitSettingsCardBaseView.configure(selectControl: selectControl, options: options, width: 160)
+        AppKitSettingsCardBaseView.configure(
+            selectControl: selectControl,
+            options: options,
+            width: 160,
+            placementPreference: placementPreference
+        )
     }
 
     private func selectItem(in selectControl: FlowSettingsSelectControl, rawValue: String) {

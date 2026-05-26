@@ -8,19 +8,19 @@ final class FlowDropdownMenuWindowController {
     private weak var control: FlowDropdownControl?
     private var localEventMonitor: Any?
     private var notificationObservers: [NSObjectProtocol] = []
-    private var contentSize: NSSize
+    private var layout: FlowDropdownMenuLayout
     private var isClosed = false
 
     init(
         control: FlowDropdownControl,
         menuView: FlowDropdownMenuView,
-        contentSize: NSSize
+        layout: FlowDropdownMenuLayout
     ) {
         self.control = control
         self.menuView = menuView
-        self.contentSize = contentSize
+        self.layout = layout
         panel = NSPanel(
-            contentRect: NSRect(origin: .zero, size: contentSize),
+            contentRect: NSRect(origin: .zero, size: layout.contentSize),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -30,19 +30,17 @@ final class FlowDropdownMenuWindowController {
 
     func show() {
         guard let control, let parentWindow = control.window else { return }
-        positionPanel(relativeTo: control)
+        positionPanel()
         parentWindow.addChildWindow(panel, ordered: .above)
         panel.orderFrontRegardless()
         startObserving()
     }
 
-    func update(contentSize: NSSize) {
-        self.contentSize = contentSize
-        menuView.frame = NSRect(origin: .zero, size: contentSize)
-        panel.setContentSize(contentSize)
-        if let control {
-            positionPanel(relativeTo: control)
-        }
+    func update(layout: FlowDropdownMenuLayout) {
+        self.layout = layout
+        menuView.frame = NSRect(origin: .zero, size: layout.contentSize)
+        panel.setContentSize(layout.contentSize)
+        positionPanel()
     }
 
     func close() {
@@ -62,18 +60,12 @@ final class FlowDropdownMenuWindowController {
         panel.hidesOnDeactivate = true
         panel.collectionBehavior = [.transient, .ignoresCycle, .moveToActiveSpace]
         panel.contentView = menuView
-        menuView.frame = NSRect(origin: .zero, size: contentSize)
+        menuView.frame = NSRect(origin: .zero, size: layout.contentSize)
         menuView.autoresizingMask = [.width, .height]
     }
 
-    private func positionPanel(relativeTo control: FlowDropdownControl) {
-        guard let parentWindow = control.window else { return }
-        let controlScreenFrame = parentWindow.convertToScreen(control.convert(control.bounds, to: nil))
-        let origin = NSPoint(
-            x: floor(controlScreenFrame.midX - contentSize.width / 2),
-            y: floor(controlScreenFrame.minY - contentSize.height)
-        )
-        panel.setFrame(NSRect(origin: origin, size: contentSize), display: true)
+    private func positionPanel() {
+        panel.setFrame(layout.frame, display: true)
     }
 
     private func startObserving() {
@@ -144,6 +136,10 @@ final class FlowDropdownMenuWindowController {
 
     private func repositionIfOpen() {
         guard !isClosed, let control else { return }
-        positionPanel(relativeTo: control)
+        guard let layout = control.makeMenuLayoutForCurrentGeometry() else {
+            close()
+            return
+        }
+        update(layout: layout)
     }
 }
