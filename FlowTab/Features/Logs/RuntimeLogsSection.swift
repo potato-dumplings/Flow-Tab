@@ -153,14 +153,14 @@ struct RuntimeLogsSection: View {
             VStack(alignment: .leading, spacing: 10) {
                 Toggle(isOn: $enableVerboseDiagnostics) {
                     Text(AppStrings.text(.logsEnableVerbose, language: appLanguage))
+                        .font(FlowTypography.swiftUI(.formLabel))
                         .fixedSize(horizontal: false, vertical: true)
                 }
                     .toggleStyle(.switch)
-                    .font(.system(size: 12))
 
                 HStack(spacing: 10) {
                     Text(AppStrings.text(.logsLevel, language: appLanguage))
-                        .font(.system(size: 12))
+                        .font(FlowTypography.swiftUI(.formLabel))
                     FlowDropdownRepresentable(
                         selectedID: $runtimeLogLevelRaw,
                         options: logLevelOptions,
