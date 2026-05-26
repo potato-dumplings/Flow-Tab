@@ -54,7 +54,7 @@ struct HomeRootView: View {
                 tabContainer(isSelected: tabState.selectedTab == .settings) {
                     AppSettingsView(isActive: tabState.selectedTab == .settings)
                         .id(
-                            "settings-\(presentation.context.themeMode.rawValue)-\(presentation.context.appLanguage.rawValue)"
+                            "settings-\(presentation.context.appearanceRebuildIdentity)"
                         )
                 }
             }

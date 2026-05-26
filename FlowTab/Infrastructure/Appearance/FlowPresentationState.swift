@@ -70,6 +70,14 @@ struct FlowPresentationContext: Equatable {
     let resolvedColorScheme: ColorScheme
     let targetNSAppearanceName: NSAppearance.Name
 
+    var appearanceRebuildIdentity: String {
+        [
+            themeMode.rawValue,
+            appLanguage.rawValue,
+            targetNSAppearanceName.rawValue
+        ].joined(separator: "|")
+    }
+
     var targetNSAppearance: NSAppearance {
         NSAppearance(named: targetNSAppearanceName) ?? NSApp.effectiveAppearance
     }

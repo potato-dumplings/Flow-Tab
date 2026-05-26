@@ -411,6 +411,74 @@ extension FlowTabTests {
     }
 
     @MainActor
+    func testSettingsRootFollowSystemThemeChangeRebuildsSettingsBridgeLikeExplicitSwitch() throws {
+        let systemAppearanceKey = "AppleInterfaceStyle"
+        let previousSelectedTab = HomeTabState.shared.selectedTab
+        let previousLanguageRaw = UserDefaults.standard.string(forKey: AppPreferenceKeys.appLanguage)
+        let previousThemeRaw = UserDefaults.standard.string(forKey: AppPreferenceKeys.themeMode)
+        let previousSystemAppearanceRaw = UserDefaults.standard.string(forKey: systemAppearanceKey)
+        let previousPresentationContext = FlowPresentationState.shared.context
+        HomeTabState.shared.selectedTab = .settings
+        UserDefaults.standard.set("Light", forKey: systemAppearanceKey)
+        postSystemAppearanceChangedNotification()
+        FlowPresentationState.shared.setAppLanguage(rawValue: AppLanguage.english.rawValue)
+        FlowPresentationState.shared.setThemeMode(rawValue: ThemeMode.followSystem.rawValue)
+        XCTAssertTrue(
+            waitForRunLoopCondition(timeout: 1.0) {
+                FlowPresentationState.shared.context.resolvedColorScheme == .light
+            },
+            "Test setup should settle in follow-system light mode before switching the system appearance."
+        )
+        defer {
+            HomeTabState.shared.selectedTab = previousSelectedTab
+            restoreStandardUserDefaultsValue(previousSystemAppearanceRaw, forKey: systemAppearanceKey)
+            postSystemAppearanceChangedNotification()
+            FlowPresentationState.shared.setAppLanguage(rawValue: previousPresentationContext.appLanguage.rawValue)
+            FlowPresentationState.shared.setThemeMode(rawValue: previousPresentationContext.themeMode.rawValue)
+            restoreStandardUserDefaultsValue(previousLanguageRaw, forKey: AppPreferenceKeys.appLanguage)
+            restoreStandardUserDefaultsValue(previousThemeRaw, forKey: AppPreferenceKeys.themeMode)
+        }
+
+        let hostedView = NSHostingView(
+            rootView: HomeRootView()
+                .frame(width: 1_440, height: 900, alignment: .topLeading)
+        )
+        hostedView.frame = NSRect(x: 0, y: 0, width: 1_440, height: 900)
+        hostedView.layoutSubtreeIfNeeded()
+
+        let initialContainer: AppKitSettingsPageContainerView = try XCTUnwrap(
+            descendantViews(in: hostedView).compactMap { $0 as? AppKitSettingsPageContainerView }.first
+        )
+        settleSettingsContainerLayout(initialContainer)
+        let initialContainerID = ObjectIdentifier(initialContainer)
+
+        UserDefaults.standard.set("Dark", forKey: systemAppearanceKey)
+        postSystemAppearanceChangedNotification()
+
+        XCTAssertTrue(
+            waitForRunLoopCondition(timeout: 1.0) {
+                hostedView.layoutSubtreeIfNeeded()
+                let containers = descendantViews(in: hostedView)
+                    .compactMap { $0 as? AppKitSettingsPageContainerView }
+                guard containers.count == 1, let container = containers.first else { return false }
+                return FlowPresentationState.shared.context.themeMode == .followSystem
+                    && FlowPresentationState.shared.context.resolvedColorScheme == .dark
+                    && ObjectIdentifier(container) != initialContainerID
+                    && container.appearance?.isFlowTabDarkInterface == true
+                    && settingsCardBackgroundIsDark(in: container.pageView)
+            },
+            "Follow-system theme changes should rebuild Settings through the same bridge path as explicit theme switches."
+        )
+        let rebuiltContainer: AppKitSettingsPageContainerView = try XCTUnwrap(
+            descendantViews(in: hostedView).compactMap { $0 as? AppKitSettingsPageContainerView }.first
+        )
+        settleSettingsContainerLayout(rebuiltContainer)
+        try assertSettingsCardsStayNearHeader(in: rebuiltContainer.pageView)
+        assertCardsDoNotOverlap(settingsCards(in: rebuiltContainer.pageView), in: rebuiltContainer.pageView)
+        assertArrangedSubviewsDoNotOverlap(in: rebuiltContainer.pageView)
+    }
+
+    @MainActor
     func testSidebarPermissionStatusExpandsForEnglishAtSidebarWidth() {
         let hostedView = NSHostingView(
             rootView: HomePermissionStatusCard(
@@ -760,6 +828,15 @@ extension FlowTabTests {
         } else {
             UserDefaults.standard.removeObject(forKey: key)
         }
+    }
+
+    private func postSystemAppearanceChangedNotification() {
+        DistributedNotificationCenter.default().postNotificationName(
+            Notification.Name("AppleInterfaceThemeChangedNotification"),
+            object: nil,
+            userInfo: nil,
+            deliverImmediately: true
+        )
     }
 
     private func settingsCardBackgroundIsDark(in view: NSView) -> Bool {

@@ -191,7 +191,7 @@ struct AppSettingsView: View {
     }
 
     private var settingsPageBridgeIdentity: String {
-        "\(themeModeRaw)|\(appLanguageRaw)"
+        presentation.context.appearanceRebuildIdentity
     }
 
     private var themeModeRaw: String {
