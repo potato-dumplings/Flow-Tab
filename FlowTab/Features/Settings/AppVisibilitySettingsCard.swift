@@ -21,7 +21,7 @@ final class AppVisibilitySettingsCardAppKitView: AppKitSettingsCardBaseView {
     var onManageAppVisibility: (() -> Void)?
 
     private let summaryLabel = AppKitSettingsCardBaseView.makeBodyLabel(.body)
-    private let manageButton = FlowSettingsActionButton()
+    private let manageButton = FlowCompactActionButtonControl()
     private var currentState: AppVisibilitySettingsCardState?
 
     override init(frame frameRect: NSRect) {
@@ -44,15 +44,16 @@ final class AppVisibilitySettingsCardAppKitView: AppKitSettingsCardBaseView {
         super.layout()
     }
 
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        refreshManageButtonAppearance()
+    }
+
     func update(with state: AppVisibilitySettingsCardState) {
         guard currentState != state else { return }
         currentState = state
         summaryLabel.stringValue = state.summaryText
-        manageButton.update(
-            title: AppStrings.text(.appVisibilityManage, language: state.language),
-            accessibilityLabel: AppStrings.text(.appVisibilityManage, language: state.language),
-            style: .preset(.compactSecondaryAction)
-        )
+        refreshManageButtonAppearance()
         invalidateIntrinsicContentSize()
     }
 
@@ -60,10 +61,10 @@ final class AppVisibilitySettingsCardAppKitView: AppKitSettingsCardBaseView {
         manageButton.target = self
         manageButton.action = #selector(handleManagePressed)
         manageButton.setFlowTabTestingIdentifier("flowtab.settings.app-visibility.manage")
-        manageButton.update(
+        manageButton.configure(
             title: AppStrings.text(.appVisibilityManage),
             accessibilityLabel: AppStrings.text(.appVisibilityManage),
-            style: .preset(.compactSecondaryAction)
+            presentation: .compact(targetAppearance: effectiveAppearance)
         )
 
         let spacer = NSView()
@@ -93,6 +94,16 @@ final class AppVisibilitySettingsCardAppKitView: AppKitSettingsCardBaseView {
         summaryLabel.preferredMaxLayoutWidth = preferredWidth
         summaryLabel.invalidateIntrinsicContentSize()
         invalidateIntrinsicContentSize()
+    }
+
+    private func refreshManageButtonAppearance() {
+        let title = currentState.map { AppStrings.text(.appVisibilityManage, language: $0.language) }
+            ?? AppStrings.text(.appVisibilityManage)
+        manageButton.configure(
+            title: title,
+            accessibilityLabel: title,
+            presentation: .compact(targetAppearance: effectiveAppearance)
+        )
     }
 
     @objc private func handleManagePressed() {

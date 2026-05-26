@@ -134,6 +134,17 @@ struct RuntimeLogsSection: View {
         }
     }
 
+    private var logActionButtonPresentation: FlowCompactActionButtonPresentation {
+        let blue = NSColor(srgbRed: 58 / 255, green: 128 / 255, blue: 247 / 255, alpha: 1)
+        return .compact(
+            targetAppearance: targetAppearance,
+            textColor: .white,
+            backgroundColor: blue,
+            hoverBackgroundColor: blue.withAlphaComponent(0.88),
+            borderColor: blue
+        )
+    }
+
     var body: some View {
         FlowPageSectionCard(
             title: AppStrings.text(.logsSectionTitle, language: appLanguage),
@@ -172,21 +183,19 @@ struct RuntimeLogsSection: View {
                     .lineLimit(2)
 
                 HStack(spacing: 8) {
-                    FlowPageActionButton(
+                    FlowCompactActionButton(
                         title: AppStrings.text(.logsOpenDirectory, language: appLanguage),
-                        tone: .solidAccent,
-                        height: 28,
-                        horizontalPadding: 10,
+                        targetAppearance: targetAppearance,
+                        presentation: logActionButtonPresentation,
                         accessibilityIdentifier: "flowtab.logs.open-directory"
                     ) {
                         openLogsDirectory()
                     }
 
-                    FlowPageActionButton(
+                    FlowCompactActionButton(
                         title: AppStrings.text(.logsClear, language: appLanguage),
-                        tone: .solidAccent,
-                        height: 28,
-                        horizontalPadding: 10,
+                        targetAppearance: targetAppearance,
+                        presentation: logActionButtonPresentation,
                         accessibilityIdentifier: "flowtab.logs.clear"
                     ) {
                         logsViewModel.clearDisplayedOutput(minimumLevel: selectedLogLevel)

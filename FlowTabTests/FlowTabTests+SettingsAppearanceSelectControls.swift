@@ -57,11 +57,11 @@ extension FlowTabTests {
             accessibilityLabel: nil,
             style: .preset(.secondaryAction)
         )
-        let compactActionButton = FlowSettingsActionButton()
-        compactActionButton.update(
+        let compactActionButton = FlowCompactActionButtonControl()
+        compactActionButton.configure(
             title: "管理",
             accessibilityLabel: nil,
-            style: .preset(.compactSecondaryAction)
+            presentation: .compact(targetAppearance: NSAppearance(named: .aqua) ?? NSApp.effectiveAppearance)
         )
         let selectControl = FlowSettingsSelectControl(frame: .zero)
         selectControl.configure(
@@ -74,6 +74,24 @@ extension FlowTabTests {
         XCTAssertGreaterThan(actionButton.intrinsicContentSize.width, 160)
         XCTAssertGreaterThanOrEqual(compactActionButton.intrinsicContentSize.width, 68)
         XCTAssertGreaterThanOrEqual(selectControl.intrinsicContentSize.width, 84)
+    }
+
+    @MainActor
+    func testCompactActionButtonPresentationRespectsTheme() throws {
+        let lightAppearance = try XCTUnwrap(NSAppearance(named: .aqua))
+        let darkAppearance = try XCTUnwrap(NSAppearance(named: .darkAqua))
+        let lightPresentation = FlowCompactActionButtonPresentation.compact(targetAppearance: lightAppearance)
+        let darkPresentation = FlowCompactActionButtonPresentation.compact(targetAppearance: darkAppearance)
+
+        let lightStyle = lightPresentation.style(for: .normal)
+        let darkStyle = darkPresentation.style(for: .normal)
+
+        assertColor(lightStyle.textColor, resolvesTo: .dark, in: lightAppearance)
+        assertColor(darkStyle.textColor, resolvesTo: .light, in: darkAppearance)
+        assertDropdownColor(lightStyle.backgroundColor, matches: NSColor.white.withAlphaComponent(0.96))
+        assertDropdownColor(darkStyle.backgroundColor, matches: NSColor.white.withAlphaComponent(0.12))
+        assertDropdownColor(lightStyle.borderColor, matches: NSColor.black.withAlphaComponent(0.12))
+        assertDropdownColor(darkStyle.borderColor, matches: NSColor.white.withAlphaComponent(0.18))
     }
 
     @MainActor
@@ -257,7 +275,8 @@ extension FlowTabTests {
             "FlowTab/Features/SharedUI/FlowDropdownControl.swift",
             "FlowTab/Features/SharedUI/FlowDropdownMenuView.swift",
             "FlowTab/Features/SharedUI/FlowDropdownMenuWindowController.swift",
-            "FlowTab/Features/SharedUI/FlowDropdownRepresentable.swift"
+            "FlowTab/Features/SharedUI/FlowDropdownRepresentable.swift",
+            "FlowTab/Features/SharedUI/FlowCompactActionButton.swift"
         ]
         let forbiddenSymbols = [
             "FlowPresentationState",
@@ -298,14 +317,13 @@ extension FlowTabTests {
     }
 
     @MainActor
-    func testSettingsActionButtonUsesSingleMainLayerBorder() throws {
+    func testCompactActionButtonUsesSingleMainLayerBorder() throws {
         let appearance = try XCTUnwrap(NSAppearance(named: .aqua))
-        let button = FlowSettingsActionButton()
-        button.applySettingsAppearance(appearance)
-        button.update(
+        let button = FlowCompactActionButtonControl()
+        button.configure(
             title: AppStrings.text(.appVisibilityManage, language: .simplifiedChinese),
             accessibilityLabel: nil,
-            style: .preset(.compactSecondaryAction)
+            presentation: .compact(targetAppearance: appearance)
         )
         button.frame = NSRect(origin: .zero, size: button.intrinsicContentSize)
         button.layoutSubtreeIfNeeded()
@@ -371,7 +389,7 @@ extension FlowTabTests {
     }
 
     @MainActor
-    func testSettingsManageButtonUsesApplicationThemeAfterLanguageChange() throws {
+    func testSettingsAppVisibilityManageUsesSharedCompactActionButton() throws {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1_200, height: 820),
             styleMask: [.borderless],
@@ -404,7 +422,7 @@ extension FlowTabTests {
         )
         container.layoutSubtreeIfNeeded()
 
-        let manageButton: NSButton = try XCTUnwrap(
+        let manageButton: FlowCompactActionButtonControl = try XCTUnwrap(
             descendant(in: container, identifier: "flowtab.settings.app-visibility.manage")
         )
         XCTAssertEqual(

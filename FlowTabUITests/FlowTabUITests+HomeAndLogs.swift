@@ -539,7 +539,7 @@ extension FlowTabUITests {
         }
     }
 
-    func testLogsOpenDirectoryButtonIsVisible() throws {
+    func testLogsTabShowsActionButtons() throws {
         let app = makeApp(
             additionalArguments: [
                 "--flowtab-ui-reset-defaults",
@@ -554,6 +554,11 @@ extension FlowTabUITests {
 
         let openDirectoryButton = app.buttons[Identifier.logsOpenDirectoryButton]
         XCTAssertTrue(openDirectoryButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(openDirectoryButton.isHittable)
+
+        let clearLogsButton = app.buttons[Identifier.logsClearButton]
+        XCTAssertTrue(clearLogsButton.waitForExistence(timeout: 5))
+        XCTAssertTrue(clearLogsButton.isHittable)
     }
 
     private func configuredHomeWindowRecencyWorkflow() throws -> SpaceFixtureResolvedWorkflow {

@@ -30,7 +30,6 @@ enum FlowSettingsSegmentState: Hashable {
 enum FlowSettingsActionButtonRole {
     case primaryAction
     case secondaryAction
-    case compactSecondaryAction
 }
 
 enum FlowSettingsSelectRole {
@@ -84,8 +83,6 @@ struct FlowSettingsActionButtonStyle {
                 border: .semantic(.label, alpha: 0.24),
                 shadow: .semantic(.label, alpha: 0.08)
             )
-        case .compactSecondaryAction:
-            return compactActionStyle()
         }
     }
 
@@ -131,53 +128,6 @@ struct FlowSettingsActionButtonStyle {
                     .focusedHovered: FlowSettingsResolvedStyle(text: text, surface: normalSurface, gradient: fill),
                     .pressed: FlowSettingsResolvedStyle(text: text, surface: normalSurface, gradient: fill.map(pressedToken)),
                     .disabled: FlowSettingsResolvedStyle(text: disabledText, surface: normalSurface, gradient: fill)
-                ],
-                fallback: .normal
-            )
-        )
-    }
-
-    private static func compactActionStyle() -> FlowSettingsActionButtonStyle {
-        let metrics = FlowSettingsControlMetrics(height: 32, minimumWidth: 68, horizontalPadding: 14, iconSpacing: 0)
-        let text = FlowSettingsTextToken(
-            font: FlowTypography.appKit(.controlTextEmphasized),
-            color: .semantic(.label, alpha: 0.76),
-            alignment: .center,
-            lineBreakMode: .byClipping
-        )
-        let normal = FlowSettingsSurfaceToken(
-            fill: .color(.rgb(
-                light: FlowSettingsRGBColor(red: 1, green: 1, blue: 1, alpha: 0.96),
-                dark: FlowSettingsRGBColor(red: 1, green: 1, blue: 1, alpha: 0.12)
-            )),
-            borderColor: .rgb(
-                light: FlowSettingsRGBColor(red: 0, green: 0, blue: 0, alpha: 0.12),
-                dark: FlowSettingsRGBColor(red: 1, green: 1, blue: 1, alpha: 0.18)
-            ),
-            borderWidth: 1,
-            cornerRadius: 8,
-            shadow: FlowSettingsShadowToken(color: .absoluteBlack(alpha: 0.05), opacity: 1, radius: 3, offset: CGSize(width: 0, height: 1))
-        )
-        let hovered = FlowSettingsSurfaceToken(
-            fill: .color(.rgb(
-                light: FlowSettingsRGBColor(red: 1, green: 1, blue: 1, alpha: 1),
-                dark: FlowSettingsRGBColor(red: 1, green: 1, blue: 1, alpha: 0.18)
-            )),
-            borderColor: normal.borderColor,
-            borderWidth: normal.borderWidth,
-            cornerRadius: normal.cornerRadius,
-            shadow: normal.shadow
-        )
-        return FlowSettingsActionButtonStyle(
-            metrics: metrics,
-            states: FlowSettingsStateStyle(
-                values: [
-                    .normal: FlowSettingsResolvedStyle(text: text, surface: normal, gradient: nil),
-                    .hovered: FlowSettingsResolvedStyle(text: text, surface: hovered, gradient: nil),
-                    .focused: FlowSettingsResolvedStyle(text: text, surface: hovered, gradient: nil),
-                    .focusedHovered: FlowSettingsResolvedStyle(text: text, surface: hovered, gradient: nil),
-                    .pressed: FlowSettingsResolvedStyle(text: text, surface: hovered, gradient: nil),
-                    .disabled: FlowSettingsResolvedStyle(text: text, surface: normal, gradient: nil)
                 ],
                 fallback: .normal
             )
