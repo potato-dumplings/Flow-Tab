@@ -28,6 +28,10 @@ enum FlowDropdownPlacementPreference: Equatable {
 }
 
 struct FlowDropdownMetrics: Equatable {
+    static let defaultMinimumWidth: CGFloat = 68
+    static let controlChevronSide: CGFloat = 16
+    static let controlTitleChevronSpacing: CGFloat = 6
+
     let height: CGFloat
     let minimumWidth: CGFloat
     let horizontalPadding: CGFloat
@@ -40,9 +44,23 @@ struct FlowDropdownMetrics: Equatable {
 
     func preferredWidth(for titles: [String], font: NSFont) -> CGFloat {
         let widestTitle = titles
-            .map { ($0 as NSString).size(withAttributes: [.font: font]).width }
+            .map { Self.controlTitleWidth(for: $0, font: font) }
             .max() ?? 0
-        return max(minimumWidth, ceil(widestTitle) + horizontalPadding * 2 + iconSpacing)
+        let accessoryWidth = max(iconSpacing, Self.controlChevronSide + Self.controlTitleChevronSpacing)
+        return max(
+            minimumWidth,
+            ceil(widestTitle) + horizontalPadding * 2 + accessoryWidth
+        )
+    }
+
+    private static func controlTitleWidth(for title: String, font: NSFont) -> CGFloat {
+        let cell = NSTextFieldCell(textCell: title)
+        cell.font = font
+        cell.lineBreakMode = .byTruncatingTail
+        cell.usesSingleLineMode = true
+        cell.wraps = false
+        cell.alignment = .center
+        return cell.cellSize.width
     }
 }
 
@@ -84,7 +102,7 @@ struct FlowDropdownPresentation {
         let isDark = targetAppearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
         let metrics = FlowDropdownMetrics(
             height: 32,
-            minimumWidth: 132,
+            minimumWidth: FlowDropdownMetrics.defaultMinimumWidth,
             horizontalPadding: 12,
             iconSpacing: 24,
             menuRowHeight: 34,

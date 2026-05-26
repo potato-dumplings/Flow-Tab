@@ -66,14 +66,44 @@ extension FlowTabTests {
         let selectControl = FlowSettingsSelectControl(frame: .zero)
         selectControl.configure(
             options: [
-                (id: "zh-Hans", title: "简体中文"),
-                (id: "en", title: "English")
+                (id: "a", title: "A"),
+                (id: "b", title: "B")
             ]
         )
 
         XCTAssertGreaterThan(actionButton.intrinsicContentSize.width, 160)
         XCTAssertGreaterThanOrEqual(compactActionButton.intrinsicContentSize.width, 68)
-        XCTAssertGreaterThanOrEqual(selectControl.intrinsicContentSize.width, 84)
+        XCTAssertEqual(
+            selectControl.intrinsicContentSize.width,
+            FlowDropdownMetrics.defaultMinimumWidth,
+            accuracy: 0.001
+        )
+    }
+
+    @MainActor
+    func testSettingsSelectIntrinsicWidthLeavesRoomForTitleAndChevron() throws {
+        let selectControl = FlowSettingsSelectControl(frame: .zero)
+        selectControl.configure(
+            options: [
+                (id: "zh-Hans", title: "简体中文"),
+                (id: "en", title: "English")
+            ]
+        )
+        selectControl.updateSelection(id: "zh-Hans")
+        selectControl.frame = NSRect(origin: .zero, size: selectControl.intrinsicContentSize)
+        selectControl.layoutSubtreeIfNeeded()
+
+        let dropdownControl: FlowDropdownControl = try XCTUnwrap(
+            descendant(in: selectControl, as: FlowDropdownControl.self)
+        )
+        let titleLabel = NSTextField(labelWithString: "简体中文")
+        titleLabel.font = FlowTypography.appKit(.controlText)
+        titleLabel.maximumNumberOfLines = 1
+        titleLabel.lineBreakMode = .byTruncatingTail
+        titleLabel.alignment = .center
+        let titleWidth = try XCTUnwrap(titleLabel.cell).cellSize.width
+
+        XCTAssertGreaterThanOrEqual(dropdownControl.titleFrameForTesting.width, ceil(titleWidth))
     }
 
     @MainActor
@@ -119,7 +149,9 @@ extension FlowTabTests {
 
         XCTAssertEqual(control.selectedIdentifierForTesting, "zh-Hans")
         XCTAssertEqual(control.selectedTitleForTesting, "简体中文")
-        XCTAssertGreaterThanOrEqual(control.intrinsicContentSize.width, 132)
+        XCTAssertEqual(presentation.metrics.minimumWidth, FlowDropdownMetrics.defaultMinimumWidth)
+        XCTAssertGreaterThanOrEqual(control.intrinsicContentSize.width, FlowDropdownMetrics.defaultMinimumWidth)
+        XCTAssertLessThan(control.intrinsicContentSize.width, 132)
 
         let menuView = FlowDropdownMenuView(
             options: [

@@ -171,8 +171,7 @@ final class SearchSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKitSett
             options: Self.scopeOptions(
                 scopes: SwitcherSearchScope.allCases,
                 language: AppLanguagePreferencesStore.load()
-            ),
-            width: 68
+            )
         )
 
         scopeRowContainer.orientation = .vertical

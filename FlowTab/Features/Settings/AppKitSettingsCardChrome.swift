@@ -120,11 +120,9 @@ class AppKitSettingsCardBaseView: NSView {
     static func configure(
         selectControl: FlowSettingsSelectControl,
         options: [(id: String, title: String)],
-        width: CGFloat,
         placementPreference: FlowDropdownPlacementPreference = .defaultBelow
     ) {
         selectControl.configure(options: options, placementPreference: placementPreference)
-        applyPreferredControlWidth(selectControl, width: width)
     }
 
     static func applyPreferredControlWidth(

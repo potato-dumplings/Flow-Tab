@@ -40,6 +40,11 @@ extension FlowTabTests {
             fixedControlWidthConstraints.isEmpty,
             fixedControlWidthConstraints.map(\.description).joined(separator: "\n")
         )
+        let explicitSelectWidthConstraints = explicitSettingsSelectWidthConstraints(in: view)
+        XCTAssertTrue(
+            explicitSelectWidthConstraints.isEmpty,
+            explicitSelectWidthConstraints.map(\.description).joined(separator: "\n")
+        )
 
         let languageSelect: FlowSettingsSelectControl = try XCTUnwrap(
             descendant(in: view, identifier: "flowtab.settings.appearance.app-language")
@@ -49,7 +54,7 @@ extension FlowTabTests {
         let scopeSelect: FlowSettingsSelectControl = try XCTUnwrap(
             descendant(in: view, identifier: "flowtab.settings.search.default-scope")
         )
-        XCTAssertGreaterThanOrEqual(scopeSelect.intrinsicContentSize.width, 84)
+        XCTAssertGreaterThanOrEqual(scopeSelect.intrinsicContentSize.width, FlowDropdownMetrics.defaultMinimumWidth)
 
         let themeModeControl: FlowSettingsSegmentedControl = try XCTUnwrap(
             descendant(in: view, identifier: "flowtab.settings.appearance.theme-mode")
@@ -557,6 +562,21 @@ extension FlowTabTests {
                 return constraint.firstItem is FlowSettingsSegmentedControl
                     || constraint.firstItem is FlowSettingsSelectControl
                     || constraint.firstItem is FlowSettingsActionButton
+            }
+    }
+
+    private func explicitSettingsSelectWidthConstraints(in view: NSView) -> [NSLayoutConstraint] {
+        descendantViews(in: view)
+            .flatMap(\.constraints)
+            .filter { constraint in
+                guard constraint.firstAttribute == .width,
+                    constraint.secondItem == nil,
+                    !String(describing: type(of: constraint)).contains("NSContentSizeLayoutConstraint")
+                else {
+                    return false
+                }
+
+                return constraint.firstItem is FlowSettingsSelectControl
             }
     }
 

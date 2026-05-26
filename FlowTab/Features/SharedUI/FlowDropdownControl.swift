@@ -83,7 +83,7 @@ final class FlowDropdownControl: NSView {
     override func layout() {
         super.layout()
         layer?.frame = bounds
-        let iconSide: CGFloat = 16
+        let iconSide = FlowDropdownMetrics.controlChevronSide
         chevronImageView.frame = NSRect(
             x: bounds.maxX - presentation.metrics.horizontalPadding - iconSide,
             y: floor((bounds.height - iconSide) / 2),
@@ -93,7 +93,12 @@ final class FlowDropdownControl: NSView {
         titleLabel.frame = NSRect(
             x: presentation.metrics.horizontalPadding,
             y: centeredTextY(),
-            width: max(0, chevronImageView.frame.minX - presentation.metrics.horizontalPadding - 6),
+            width: max(
+                0,
+                chevronImageView.frame.minX
+                    - presentation.metrics.horizontalPadding
+                    - FlowDropdownMetrics.controlTitleChevronSpacing
+            ),
             height: centeredTextHeight()
         )
         updateShadowPath()

@@ -367,6 +367,17 @@ extension FlowTabUITests {
         assertValue(of: control, equals: "space")
     }
 
+    func testSettingsLanguageDropdownUsesLiveIntrinsicWidth() throws {
+        let app = makeApp(additionalArguments: hotkeyEffectArguments(resetDefaults: true))
+        launchFlowTabUITestApplication(app)
+        openSettingsTab(in: app)
+
+        let language = element(in: app, identifier: Identifier.settingsAppearanceAppLanguage)
+        XCTAssertTrue(language.waitForExistence(timeout: 6))
+        XCTAssertGreaterThanOrEqual(language.frame.width, 100)
+        XCTAssertLessThan(language.frame.width, 120)
+    }
+
     func testSettingsMainHotkeyRepresentativeMatrixTriggersSwitcher() throws {
         let cases: [(modifier: String, key: String, shortcutText: String)] = [
             ("option", "space", "Option + Space"),

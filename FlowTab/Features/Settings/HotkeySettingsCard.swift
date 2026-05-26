@@ -425,7 +425,6 @@ final class HotkeySettingsCardAppKitView: NSView, AppKitSettingsCardStateView {
         AppKitSettingsCardBaseView.configure(
             selectControl: selectControl,
             options: options,
-            width: 160,
             placementPreference: placementPreference
         )
     }

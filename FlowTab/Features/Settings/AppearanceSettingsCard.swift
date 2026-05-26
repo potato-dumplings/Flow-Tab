@@ -224,8 +224,7 @@ final class AppearanceSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKit
         }
         AppKitSettingsCardBaseView.configure(
             selectControl: appLanguageSelect,
-            options: Self.languageOptions(language: AppLanguagePreferencesStore.load()),
-            width: 96
+            options: Self.languageOptions(language: AppLanguagePreferencesStore.load())
         )
 
         addFullWidthArrangedSubview(showShortcutHintRow)
