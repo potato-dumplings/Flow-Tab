@@ -579,9 +579,9 @@ extension FlowTabTests {
             commandTabTakeoverActive: false,
             accessibilityTrusted: false,
             screenCaptureTrusted: false,
-            targetNSAppearanceName: ThemePreferencesStore.resolve(rawValue: themeModeRaw) == .dark
-                ? .darkAqua
-                : .aqua
+            targetNSAppearanceName: ThemePreferencesStore.resolve(rawValue: themeModeRaw)
+                .resolvedColorScheme(systemColorScheme: .light)
+                .flowTabNSAppearanceName
         )
     }
 

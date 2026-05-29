@@ -7,12 +7,15 @@ final class SystemThemeState: ObservableObject {
 
     @Published private(set) var colorScheme: ColorScheme = .light
 
+    private var effectiveAppearanceObservation: NSKeyValueObservation?
     private var appearanceObserver: NSObjectProtocol?
     private var appActivationObserver: NSObjectProtocol?
     private var colorSchemeObservers: [UUID: @MainActor (ColorScheme) -> Void] = [:]
 
     private init() {
         refreshColorScheme()
+
+        installEffectiveAppearanceObservationIfPossible()
 
         appearanceObserver = DistributedNotificationCenter.default().addObserver(
             forName: Notification.Name("AppleInterfaceThemeChangedNotification"),
@@ -35,6 +38,20 @@ final class SystemThemeState: ObservableObject {
         }
     }
 
+    private func installEffectiveAppearanceObservationIfPossible() {
+        guard effectiveAppearanceObservation == nil else { return }
+        if let app = NSApp {
+            effectiveAppearanceObservation = app.observe(
+                \.effectiveAppearance,
+                options: [.new]
+            ) { [weak self] _, _ in
+                Task { @MainActor [weak self] in
+                    self?.refreshColorScheme()
+                }
+            }
+        }
+    }
+
     deinit {
         if let appearanceObserver {
             DistributedNotificationCenter.default.removeObserver(appearanceObserver)
@@ -44,13 +61,24 @@ final class SystemThemeState: ObservableObject {
         }
     }
 
-    private func refreshColorScheme() {
-        let isDark = UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark"
-        let nextColorScheme: ColorScheme = isDark ? .dark : .light
+    func refreshColorScheme() {
+        installEffectiveAppearanceObservationIfPossible()
+        let nextColorScheme = Self.colorScheme(for: Self.currentEffectiveAppearance())
         if colorScheme != nextColorScheme {
             colorScheme = nextColorScheme
             notifyColorSchemeObservers(nextColorScheme)
         }
+    }
+
+    private static func currentEffectiveAppearance() -> NSAppearance {
+        NSApp?.effectiveAppearance
+            ?? NSAppearance(named: .aqua)!
+    }
+
+    static func colorScheme(for appearance: NSAppearance) -> ColorScheme {
+        appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+            ? .dark
+            : .light
     }
 
     func observeColorSchemeChanges(

@@ -15,6 +15,12 @@ extension ThemeMode {
     }
 }
 
+extension ColorScheme {
+    var flowTabNSAppearanceName: NSAppearance.Name {
+        self == .dark ? .darkAqua : .aqua
+    }
+}
+
 final class FlowPresentationThemeObservation {
     private var cancellation: (() -> Void)?
 
@@ -53,7 +59,8 @@ final class FlowPresentationSystemThemeProvider: FlowPresentationSystemThemeProv
     }
 
     var currentColorScheme: ColorScheme {
-        systemThemeState.colorScheme
+        systemThemeState.refreshColorScheme()
+        return systemThemeState.colorScheme
     }
 
     func observeColorSchemeChanges(
@@ -79,7 +86,7 @@ struct FlowPresentationContext: Equatable {
     }
 
     var targetNSAppearance: NSAppearance {
-        NSAppearance(named: targetNSAppearanceName) ?? NSApp.effectiveAppearance
+        return NSAppearance(named: targetNSAppearanceName) ?? NSApp.effectiveAppearance
     }
 }
 
@@ -104,7 +111,7 @@ enum FlowPresentationResolver {
                 appLanguage: appLanguage,
                 systemColorScheme: systemColorScheme,
                 resolvedColorScheme: resolvedColorScheme,
-                targetNSAppearanceName: resolvedColorScheme == .dark ? .darkAqua : .aqua
+                targetNSAppearanceName: resolvedColorScheme.flowTabNSAppearanceName
             ),
             normalizedThemeRaw: themeMode.rawValue,
             normalizedLanguageRaw: appLanguage.rawValue

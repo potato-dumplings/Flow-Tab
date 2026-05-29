@@ -417,14 +417,15 @@ extension FlowTabTests {
 
     @MainActor
     func testSettingsRootFollowSystemThemeChangeRebuildsSettingsBridgeLikeExplicitSwitch() throws {
-        let systemAppearanceKey = "AppleInterfaceStyle"
+        let aquaAppearance = try XCTUnwrap(NSAppearance(named: .aqua))
+        let darkAppearance = try XCTUnwrap(NSAppearance(named: .darkAqua))
         let previousSelectedTab = HomeTabState.shared.selectedTab
         let previousLanguageRaw = UserDefaults.standard.string(forKey: AppPreferenceKeys.appLanguage)
         let previousThemeRaw = UserDefaults.standard.string(forKey: AppPreferenceKeys.themeMode)
-        let previousSystemAppearanceRaw = UserDefaults.standard.string(forKey: systemAppearanceKey)
+        let previousAppearance = NSApp.appearance
         let previousPresentationContext = FlowPresentationState.shared.context
         HomeTabState.shared.selectedTab = .settings
-        UserDefaults.standard.set("Light", forKey: systemAppearanceKey)
+        NSApp.appearance = aquaAppearance
         postSystemAppearanceChangedNotification()
         FlowPresentationState.shared.setAppLanguage(rawValue: AppLanguage.english.rawValue)
         FlowPresentationState.shared.setThemeMode(rawValue: ThemeMode.followSystem.rawValue)
@@ -436,7 +437,7 @@ extension FlowTabTests {
         )
         defer {
             HomeTabState.shared.selectedTab = previousSelectedTab
-            restoreStandardUserDefaultsValue(previousSystemAppearanceRaw, forKey: systemAppearanceKey)
+            NSApp.appearance = previousAppearance
             postSystemAppearanceChangedNotification()
             FlowPresentationState.shared.setAppLanguage(rawValue: previousPresentationContext.appLanguage.rawValue)
             FlowPresentationState.shared.setThemeMode(rawValue: previousPresentationContext.themeMode.rawValue)
@@ -457,22 +458,32 @@ extension FlowTabTests {
         settleSettingsContainerLayout(initialContainer)
         let initialContainerID = ObjectIdentifier(initialContainer)
 
-        UserDefaults.standard.set("Dark", forKey: systemAppearanceKey)
+        NSApp.appearance = darkAppearance
         postSystemAppearanceChangedNotification()
 
+        var followSystemBridgeDiagnostics = ""
         XCTAssertTrue(
             waitForRunLoopCondition(timeout: 1.0) {
                 hostedView.layoutSubtreeIfNeeded()
                 let containers = descendantViews(in: hostedView)
                     .compactMap { $0 as? AppKitSettingsPageContainerView }
                 guard containers.count == 1, let container = containers.first else { return false }
-                return FlowPresentationState.shared.context.themeMode == .followSystem
-                    && FlowPresentationState.shared.context.resolvedColorScheme == .dark
-                    && ObjectIdentifier(container) != initialContainerID
-                    && container.appearance?.isFlowTabDarkInterface == true
-                    && settingsCardBackgroundIsDark(in: container.pageView)
+                let context = FlowPresentationState.shared.context
+                let rebuiltContainer = ObjectIdentifier(container) != initialContainerID
+                let containerIsDark = container.appearance?.isFlowTabDarkInterface == true
+                let cardIsDark = settingsCardBackgroundIsDark(in: container.pageView)
+                followSystemBridgeDiagnostics = """
+                theme=\(context.themeMode.rawValue) system=\(context.systemColorScheme) resolved=\(context.resolvedColorScheme) \
+                target=\(context.targetNSAppearanceName.rawValue) \
+                rebuilt=\(rebuiltContainer) containerDark=\(containerIsDark) cardDark=\(cardIsDark)
+                """
+                return context.themeMode == .followSystem
+                    && context.resolvedColorScheme == .dark
+                    && rebuiltContainer
+                    && containerIsDark
+                    && cardIsDark
             },
-            "Follow-system theme changes should rebuild Settings through the same bridge path as explicit theme switches."
+            "Follow-system theme changes should rebuild Settings through the same bridge path as explicit theme switches. \(followSystemBridgeDiagnostics)"
         )
         let rebuiltContainer: AppKitSettingsPageContainerView = try XCTUnwrap(
             descendantViews(in: hostedView).compactMap { $0 as? AppKitSettingsPageContainerView }.first
@@ -542,7 +553,9 @@ extension FlowTabTests {
             commandTabTakeoverActive: false,
             accessibilityTrusted: accessibilityTrusted,
             screenCaptureTrusted: screenCaptureTrusted,
-            targetNSAppearanceName: themeMode == .dark ? .darkAqua : .aqua
+            targetNSAppearanceName: themeMode
+                .resolvedColorScheme(systemColorScheme: .light)
+                .flowTabNSAppearanceName
         )
     }
 
@@ -850,7 +863,9 @@ extension FlowTabTests {
         }
     }
 
+    @MainActor
     private func postSystemAppearanceChangedNotification() {
+        SystemThemeState.shared.refreshColorScheme()
         DistributedNotificationCenter.default().postNotificationName(
             Notification.Name("AppleInterfaceThemeChangedNotification"),
             object: nil,
