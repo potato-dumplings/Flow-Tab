@@ -48,7 +48,9 @@ extension FlowTabUITests {
                 "--flowtab-ui-ax-trusted",
                 "YES",
                 "--flowtab-ui-screen-trusted",
-                "YES"
+                "YES",
+                "--flowtab-ui-runtime-log-level",
+                "INFO"
             ]
         )
         launchFlowTabUITestApplication(app)
@@ -60,9 +62,31 @@ extension FlowTabUITests {
         XCTAssertNotEqual(app.state, .notRunning)
         XCTAssertFalse(element(in: app, identifier: Identifier.logsTabContent).waitForExistence(timeout: 2))
 
+        let flowTabBundleIdentifier = FlowTabUITestAppIdentity.configured().bundleIdentifier
+        let finder = XCUIApplication(bundleIdentifier: "com.apple.finder")
+        finder.activate()
+        XCTAssertTrue(
+            waitForFrontmostBundleIdentifier("com.apple.finder", timeout: 5),
+            "Status item reopen should be exercised from another normal Space app."
+        )
+        XCTAssertNotEqual(NSWorkspace.shared.frontmostApplication?.bundleIdentifier, flowTabBundleIdentifier)
+
+        let logSnapshot = makeRuntimeLogFileSnapshot()
         flowTabStatusItem(in: app).tap()
 
         XCTAssertTrue(element(in: app, identifier: Identifier.logsTabContent).waitForExistence(timeout: 8))
+        waitForRuntimeLogFiles(
+            containing: [
+                "activationPolicy=regular source=status_item_temporary_activation",
+                "activationPolicy=accessory source=status_item_window_stable"
+            ],
+            since: logSnapshot,
+            timeout: 8
+        )
+        XCTAssertTrue(
+            waitForFrontmostBundleIdentifier(flowTabBundleIdentifier, timeout: 5),
+            "FlowTab should stay foreground after restoring its hidden accessory policy."
+        )
     }
 
     func testStatusItemSecondaryClickMenuQuitsApp() throws {

@@ -9,6 +9,8 @@ final class TestAppWindow: AppWindowOpeningWindow {
     let isPanelWindow: Bool
     var isMiniaturized: Bool
     var isVisible: Bool
+    let canBecomeKeyWindow: Bool
+    let isAppContentWindow: Bool
     let flowTabWindowLevel: NSWindow.Level
     let flowTabWindowIdentifier: String?
 
@@ -20,12 +22,16 @@ final class TestAppWindow: AppWindowOpeningWindow {
         isPanelWindow: Bool,
         isMiniaturized: Bool,
         isVisible: Bool = true,
+        canBecomeKeyWindow: Bool = true,
+        isAppContentWindow: Bool = true,
         flowTabWindowLevel: NSWindow.Level = .normal,
         flowTabWindowIdentifier: String? = nil
     ) {
         self.isPanelWindow = isPanelWindow
         self.isMiniaturized = isMiniaturized
         self.isVisible = isVisible
+        self.canBecomeKeyWindow = canBecomeKeyWindow
+        self.isAppContentWindow = isAppContentWindow
         self.flowTabWindowLevel = flowTabWindowLevel
         self.flowTabWindowIdentifier = flowTabWindowIdentifier
     }

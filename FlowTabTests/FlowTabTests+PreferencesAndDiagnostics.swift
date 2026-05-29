@@ -1229,6 +1229,12 @@ extension FlowTabTests {
             isMiniaturized: false,
             flowTabWindowLevel: .statusBar
         )
+        let appMenuWindow = TestAppWindow(
+            isPanelWindow: false,
+            isMiniaturized: false,
+            canBecomeKeyWindow: true,
+            isAppContentWindow: false
+        )
         let closedMainWindow = TestAppWindow(
             isPanelWindow: false,
             isMiniaturized: false,
@@ -1236,7 +1242,7 @@ extension FlowTabTests {
         )
         let application = TestAppWindowApplication(
             isHidden: false,
-            appWindows: [statusBarWindow, closedMainWindow]
+            appWindows: [statusBarWindow, appMenuWindow, closedMainWindow]
         )
 
         let delegate = AppDelegate()
@@ -1248,6 +1254,8 @@ extension FlowTabTests {
 
         XCTAssertEqual(statusBarWindow.makeKeyAndOrderFrontCallCount, 0)
         XCTAssertEqual(statusBarWindow.orderFrontRegardlessCallCount, 0)
+        XCTAssertEqual(appMenuWindow.makeKeyAndOrderFrontCallCount, 0)
+        XCTAssertEqual(appMenuWindow.orderFrontRegardlessCallCount, 0)
         XCTAssertEqual(closedMainWindow.makeKeyAndOrderFrontCallCount, 0)
         XCTAssertEqual(closedMainWindow.orderFrontRegardlessCallCount, 0)
     }

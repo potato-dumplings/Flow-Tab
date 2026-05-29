@@ -362,7 +362,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func handleStatusItemOpenAction(application: any AppWindowOpeningApplication) {
-        AppWindowCoordinator.activateMainWindowOrOpenHomeScene(application: application)
+        let activationPolicyApplication = statusItemActivationPolicyApplication(for: application)
+        let shouldTemporarilyUseRegularActivation =
+            activationPolicyApplication != nil
+            && !AppVisibilityPreferencesStore.loadShowInCommandTab(userDefaults: resolvedUserDefaults)
+        AppWindowCoordinator.activateMainWindowOrOpenHomeScene(
+            application: application,
+            activationPolicyApplication: activationPolicyApplication,
+            temporarilyUseRegularActivation: shouldTemporarilyUseRegularActivation
+        )
+    }
+
+    private func statusItemActivationPolicyApplication(
+        for application: any AppWindowOpeningApplication
+    ) -> (any AppActivationPolicyApplying)? {
+        if let activationPolicyApplication = application as? any AppActivationPolicyApplying {
+            return activationPolicyApplication
+        }
+        if Self.testHooks.activationPolicyApplication != nil {
+            return resolvedActivationPolicyApplication
+        }
+        return nil
     }
 
     func handleStatusItemQuitAction(application: any AppTerminationRequesting) {
