@@ -13,6 +13,7 @@ Use this workflow for regressions, flaky behavior, broken edge cases, and user-r
 - Stop and report the blocker if no reproducible signal exists yet or a required environment, permission, fixture, or test layer is unavailable.
 - Use tests and logs to narrow the root cause instead of guessing.
 - Keep each regression layer focused on different evidence instead of cloning the same assertion everywhere.
+- For every new regression test, name the oracle that defines the expected result. The oracle must come from the product contract, official API result, stable fixture state, explicit input, or independent specification; legacy fields, stale caches, and known faulty implementation paths may be contamination only.
 - Read `test-coverage-matrix-workflow.md` and update `docs/TEST_COVERAGE_MATRIX.md` when the bugfix changes a product scenario's coverage status or leaves a known gap.
 - Run pressure validation when the bug or the fix touches sustained-load, repeated-interaction, or scale-sensitive behavior.
 - Keep regression coverage after the fix.
@@ -25,7 +26,7 @@ Use this workflow for regressions, flaky behavior, broken edge cases, and user-r
 4. Read `risk-calibration.md` and decide which layers are required, not relevant, or blocked.
 5. Read `test-layer-boundaries.md`, identify the failing seed scenario, and fan out adjacent variants that are likely to share the same rule, wiring, topology, permission, lifecycle, or pressure risk.
 6. Decide which layer should hold the failing reproduction, which layer should hold app-orchestration coverage, and whether a visible UI regression is required.
-7. Present a concise regression scenario plan before editing test files. Include the required seed reproduction, higher-layer regression if needed, adjacent variants not included by default, variants intentionally not adding, and the owning layer for each included scenario.
+7. Present a concise regression scenario plan before editing test files. Include the required seed reproduction, the oracle that defines the expected result, the process/result being asserted, any contamination used only to recreate the failure environment, higher-layer regression if needed, adjacent variants not included by default, variants intentionally not adding, and the owning layer for each included scenario.
 8. Wait for confirmation before adding new test scenarios. If confirmation is missing or narrows coverage below a required layer, stop with a blocker or incomplete-layer report rather than changing production logic by guesswork.
 9. Read `test-coverage-matrix-workflow.md` when the defect maps to a product scenario in the matrix or reveals a missing scenario.
 10. Read `validation-command-cookbook.md` and choose the concrete pre-change commands to run or attempt.
@@ -71,6 +72,7 @@ Use this workflow for regressions, flaky behavior, broken edge cases, and user-r
 
 - Prefer the lowest-layer failing reproduction you can express.
 - When existing suites cannot reproduce, derive the new failing test from the observed runtime scenario and the stable signal that supports the hypothesis.
+- Derive expected results from the oracle, not from the old broken implementation path or the proposed fix. Stale data, legacy fields, bad cache entries, and incorrect configuration may be included only as contamination/background.
 - Before adding the seed reproduction or nearby variants, present the regression scenario plan and wait for confirmation. Prefer unit or behavior breadth over many slow UI duplicates.
 - Run every relevant existing test layer before production edits. If a layer is not relevant, say why. If it is relevant but blocked, stop and report the blocker.
 - Keep or add a higher-layer regression when the bug was user-visible or crossed module boundaries.
@@ -94,6 +96,7 @@ Use this workflow for regressions, flaky behavior, broken edge cases, and user-r
 
 - Reject blind patches that are not backed by a reproducible failing signal.
 - Reject bugfixes that edit production code before running or explicitly attempting the relevant pre-change tests.
+- Reject regression tests whose expected result is derived from the known faulty path, the proposed fix, or contamination values instead of an independent oracle.
 - Reject bugfixes where existing tests could not reproduce, stable evidence was available for diagnosis, but no scenario-based failing test was added from that evidence when feasible.
 - Reject completions that omit blocked test layers or missing-environment reasons from the final report.
 - Reject fixes that add test-only or debug-only logic into the production code path.

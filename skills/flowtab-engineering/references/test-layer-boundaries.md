@@ -11,6 +11,7 @@ These labels describe coverage layers, not a one-to-one naming scheme for Xcode 
 - [Behavior Tests](#behavior-tests)
 - [UI Tests](#ui-tests)
 - [Cross-Layer Rules](#cross-layer-rules)
+- [Test Oracle Integrity](#test-oracle-integrity)
 - [Scenario Fan-Out](#scenario-fan-out)
 - [Quick Selection Rules](#quick-selection-rules)
 - [Standard Product Scenarios](#standard-product-scenarios)
@@ -128,6 +129,23 @@ Current repo examples:
 - If a feature seems impossible to cover at unit level, first look for the deterministic rule or data transformation that should be extracted. Do not skip the layer just because the current design hides the seam.
 - `FlowTab/TestingSupport` only provides scaffolding. Tests that use it are still unit, behavior, or UI depending on the evidence they produce.
 - `FlowTabSpaceFixture` extends UI evidence for real window topology. It does not replace the normal unit and behavior chain.
+
+## Test Oracle Integrity
+
+Before adding or recommending a test, identify the oracle first: the product contract, business rule, official API result, stable fixture state, explicit input, or independent specification that defines the expected result.
+
+Assertions must compare the process and result against that oracle. Do not derive expected values from the bug's old implementation path, the proposed fix, a legacy storage field, a stale cache, or a value inserted only to trigger the failure.
+
+Regression tests may include stale data, legacy fields, cached entries, incorrect configuration, or other contamination when they model a real failure environment. Label those values as contamination or background; they must not define the expected result.
+
+Bad:
+
+- Because the old price calculator read `legacyDiscountPercent`, set it to `50` and assert the final price is not the 50% discounted price.
+
+Better:
+
+- Given an order total of `200` and the rule "subtract 20 when total is at least 100", assert the payable amount is `180`.
+- If `legacyDiscountPercent = 50` is included, treat it only as contamination. The expected value still comes from the order total and coupon rule.
 
 ## Scenario Fan-Out
 

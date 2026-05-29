@@ -52,13 +52,16 @@ This skill is not only a generic answer-style guide. It is the FlowTab delivery 
 9. Report scenario fan-out before test conclusions.
    For implementation guidance, coverage audits, and remediation plans, state the seed scenario, the representative variants considered, which layer owns each variant, and any important variant left as a known gap or blocker.
 
-10. Ask for confirmation before expanding test scenarios.
+10. Report test oracles when proposing regression coverage.
+   State the fact, product contract, official API result, stable fixture state, explicit input, or independent specification that defines each expected result. If stale data, legacy fields, cached entries, or incorrect configuration are used to recreate the bug, label them as contamination/background and do not derive the expected value from them.
+
+11. Ask for confirmation before expanding test scenarios.
    Before adding new scenario tests, present a concise plan grouped into required, optional, and intentionally not adding. Explain why the required set is the smallest representative coverage. If the user does not confirm, stop before editing test files or report the affected validation layer as incomplete or blocked.
 
-11. Surface pressure and performance status when relevant.
+12. Surface pressure and performance status when relevant.
    If the change affects hot paths, repeated interaction cost, scale-sensitive work, or long-lived resources, include the baseline, the pressure attempt or result, or a concrete not-applicable reason.
 
-12. Scale the handoff to the risk.
+13. Scale the handoff to the risk.
    Use the full FlowTab handoff for feature delivery, bugfixes, architecture changes, hot-path changes, or blocked validation. Use the compact handoff for docs-only, skill-only, mechanical, or no-runtime-behavior changes.
 
 ## FlowTab Handoff Minimums
@@ -66,6 +69,7 @@ This skill is not only a generic answer-style guide. It is the FlowTab delivery 
 - All implementation summaries or handoffs must state what changed, why it changed, where it changed, and the assumptions or constraints that shaped the choice.
 - When rollback, fallback, or failure handling materially affects delivery risk, handoffs must state it explicitly instead of leaving it implicit.
 - Bugfix handoffs must also state the pre-change failing signal.
+- Bugfix handoffs must state the regression test oracle and distinguish any contamination/background values from the expected-result source.
 - Bugfix handoffs must list the pre-change test runs or test attempts by layer and their outcomes.
 - Bugfix handoffs must state which logs or observations supported the root-cause theory.
 - Bugfix handoffs must list the post-change tests run by layer and their outcomes.
