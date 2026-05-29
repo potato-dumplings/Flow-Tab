@@ -35,7 +35,6 @@ final class FlowSettingsSegmentedControl: NSView, FlowSettingsAppearanceRefresha
 
     override func layout() {
         super.layout()
-        layer?.frame = bounds
     }
 
     override func viewDidChangeEffectiveAppearance() {

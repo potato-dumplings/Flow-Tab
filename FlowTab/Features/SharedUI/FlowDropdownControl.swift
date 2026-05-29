@@ -82,7 +82,6 @@ final class FlowDropdownControl: NSView {
 
     override func layout() {
         super.layout()
-        layer?.frame = bounds
         let iconSide = FlowDropdownMetrics.controlChevronSide
         chevronImageView.frame = NSRect(
             x: bounds.maxX - presentation.metrics.horizontalPadding - iconSide,

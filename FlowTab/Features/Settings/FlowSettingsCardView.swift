@@ -69,7 +69,6 @@ final class FlowSettingsCardView: NSView, FlowSettingsAppearanceRefreshable {
 
     override func layout() {
         super.layout()
-        layer?.frame = bounds
         layer?.shadowPath = CGPath(
             roundedRect: bounds,
             cornerWidth: layer?.cornerRadius ?? 0,
