@@ -638,7 +638,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(mergedEntries.first?.lastConfirmationSource, .publicExactMatch)
     }
 
-    func testRuntimeSnapshotProviderWindowListDeduplicatesUnmatchedAXEntriesSharingSameSpaceBinding() {
+    func testRuntimeSnapshotProviderWindowListKeepsDistinctCGOnlyEntriesSharingSameSpaceBinding() {
         let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
             axWindows: [],
             cgWindows: [
@@ -661,8 +661,39 @@ extension FlowTabPriorityCoverageTests {
             appName: "Google Chrome"
         )
 
+        XCTAssertEqual(mergedEntries.map(\.windowID), ["cg:18405:288544", "cg:18405:258323"])
+        XCTAssertEqual(mergedEntries.map(\.cgWindowID), [288_544, 258_323])
+    }
+
+    func testRuntimeSnapshotProviderWindowListSuppressesCGOnlyEntryCoveredByStickySpaceBinding() {
+        let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+            axWindows: [],
+            cgWindows: [
+                .init(
+                    id: 288_544,
+                    title: "Sticky Window",
+                    bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
+                    isOnscreen: false,
+                    spaceIDs: [11_679]
+                ),
+                .init(
+                    id: 258_323,
+                    title: "Weak Candidate",
+                    bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
+                    isOnscreen: false,
+                    spaceIDs: [11_679]
+                )
+            ],
+            previousMatches: ["ax:18405:sticky": 288_544],
+            previousAXWindowIDs: ["ax:18405:sticky"],
+            previousCGWindowIDs: [288_544],
+            pid: 18405,
+            appName: "Google Chrome"
+        )
+
         XCTAssertEqual(mergedEntries.map(\.windowID), ["cg:18405:288544"])
         XCTAssertEqual(mergedEntries.first?.cgWindowID, 288_544)
+        XCTAssertEqual(mergedEntries.first?.lastConfirmationSource, .stickyBinding)
     }
 
     func testRuntimeSnapshotProviderWindowListKeepsUnmatchedAXEntriesWhenSpaceBindingDiffers() {

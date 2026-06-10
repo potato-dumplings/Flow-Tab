@@ -267,7 +267,7 @@ extension RuntimeSnapshotProvider {
             hasFullscreenTopology: !fullscreenContentBounds.isEmpty,
             stage: "pre-dedupe"
         )
-        let deduplicatedUnmatchedAXEntries = deduplicateUnmatchedAXEntriesBySpace(
+        let deduplicatedUnmatchedAXEntries = suppressUnmatchedAXEntriesCoveredByStickySpace(
             prefilteredUnmatchedAXEntries,
             knownCGWindowsByID: knownCGWindowsByID,
             appName: appName
@@ -856,15 +856,26 @@ extension RuntimeSnapshotProvider {
         }
     }
 
-    private func deduplicateUnmatchedAXEntriesBySpace(
+    private func suppressUnmatchedAXEntriesCoveredByStickySpace(
         _ entries: [WindowListEntry],
         knownCGWindowsByID: [CGWindowID: CGWindowEntry],
         appName: String
     ) -> [WindowListEntry] {
+        let stickySpaceKeys = Set(entries.compactMap { entry -> String? in
+            guard
+                entry.hasStickyBinding,
+                let cgWindowID = entry.cgWindowID
+            else {
+                return nil
+            }
+            let rawSpaceIDs = knownCGWindowsByID[cgWindowID]?.spaceIDs ?? []
+            let normalizedSpaceIDs = RuntimeWindowTopologyClassifier.normalizedSpaceIDs(rawSpaceIDs)
+            guard !normalizedSpaceIDs.isEmpty else { return nil }
+            return normalizedSpaceIDs.map(String.init).joined(separator: ",")
+        })
+
         var deduplicatedEntries: [WindowListEntry] = []
         deduplicatedEntries.reserveCapacity(entries.count)
-
-        var seenSpaceKeys: Set<String> = []
         var droppedCount = 0
 
         for entry in entries {
@@ -880,21 +891,20 @@ extension RuntimeSnapshotProvider {
             }
             let spaceKey = normalizedSpaceIDs.map(String.init).joined(separator: ",")
             if entry.hasStickyBinding {
-                seenSpaceKeys.insert(spaceKey)
                 deduplicatedEntries.append(entry)
                 continue
             }
-            if seenSpaceKeys.insert(spaceKey).inserted {
-                deduplicatedEntries.append(entry)
-            } else {
+            if stickySpaceKeys.contains(spaceKey) {
                 droppedCount += 1
+                continue
             }
+            deduplicatedEntries.append(entry)
         }
 
         if droppedCount > 0 {
             RuntimeLog.debug(
                 .axMatch,
-                "\(appName) dedupe-unmatched-ax-by-space dropped=\(droppedCount)"
+                "\(appName) suppress-unmatched-ax-covered-by-sticky-space dropped=\(droppedCount)"
             )
         }
 
