@@ -730,14 +730,18 @@ extension RuntimeSnapshotProvider {
             windowRecordsByCGWindowID[cgWindowID] = record
         }
 
-        let retainedCGWindowIDs = Set(windowRecordsByCGWindowID.keys.filter { cgWindowID in
-            guard let record = windowRecordsByCGWindowID[cgWindowID] else { return false }
-            return validCGWindowIDs.contains(cgWindowID)
-                || record.hasStickyBinding
-                || record.spaceRecovery != nil
-        })
-        windowRecordsByCGWindowID = windowRecordsByCGWindowID.filter {
-            retainedCGWindowIDs.contains($0.key)
+        for cgWindowID in windowRecordsByCGWindowID.keys.sorted() {
+            guard var record = windowRecordsByCGWindowID[cgWindowID] else { continue }
+            let lifecycleDecision = record.reconcileLifecycle(
+                validCGWindowIDs: validCGWindowIDs,
+                observedAt: observedAt
+            )
+            switch lifecycleDecision {
+            case .keep:
+                windowRecordsByCGWindowID[cgWindowID] = record
+            case .delete:
+                windowRecordsByCGWindowID.removeValue(forKey: cgWindowID)
+            }
         }
         let currentAXToCG = exactMatchesByAXWindowID
         let lastAXWindowIDs: Set<String>

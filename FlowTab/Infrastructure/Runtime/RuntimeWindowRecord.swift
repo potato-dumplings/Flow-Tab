@@ -72,6 +72,19 @@ struct RuntimeWindowMappingState {
     }
 }
 
+enum RuntimeWindowRecordLifecycleDecision: Equatable {
+    case keep
+    case delete
+}
+
+struct RuntimeWindowRecordLifecyclePolicy: Equatable {
+    let evidenceGraceInterval: TimeInterval
+
+    static let runtimeDefault = RuntimeWindowRecordLifecyclePolicy(
+        evidenceGraceInterval: 1.0
+    )
+}
+
 struct RuntimeWindowRecord {
     let cgWindowID: CGWindowID
     let stableWindowID: String
@@ -187,6 +200,36 @@ struct RuntimeWindowRecord {
         }
         lastSeenAt = observedAt
         suspectDeletedAt = nil
+    }
+
+    mutating func reconcileLifecycle(
+        validCGWindowIDs: Set<CGWindowID>,
+        observedAt: TimeInterval,
+        policy: RuntimeWindowRecordLifecyclePolicy = .runtimeDefault
+    ) -> RuntimeWindowRecordLifecycleDecision {
+        if validCGWindowIDs.contains(cgWindowID) || currentAXAttachment != nil {
+            suspectDeletedAt = nil
+            if var recovery = spaceRecovery {
+                recovery.invalidatedAt = nil
+                spaceRecovery = recovery
+            }
+            return .keep
+        }
+
+        guard hasStickyBinding || spaceRecovery?.hasConfirmedActivationRoute == true else {
+            return .delete
+        }
+
+        let firstSuspectAt = suspectDeletedAt ?? observedAt
+        suspectDeletedAt = firstSuspectAt
+        if var recovery = spaceRecovery, recovery.invalidatedAt == nil {
+            recovery.invalidatedAt = observedAt
+            spaceRecovery = recovery
+        }
+        guard observedAt - firstSuspectAt < policy.evidenceGraceInterval else {
+            return .delete
+        }
+        return .keep
     }
 
     mutating func clearCurrentAXAttachment() {
