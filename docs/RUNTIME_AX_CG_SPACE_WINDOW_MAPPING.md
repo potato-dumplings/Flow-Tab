@@ -550,7 +550,7 @@ sticky/CG-only 状态。
 
 ### 部分实现但仍与目标有偏差
 
-- [ ] `RuntimeReconciliationCoordinator` 已落地，集中表达 dirty app、Space topology diff 产生的 `affectedCGWindowIDs`、`pending/inFlight/waitingRetry` 状态，以及 AX 空快照短间隔 retry policy。当前已由 deterministic `FlowTabTests` 证明 dirty coalescing、Space affected-window request 与 retry 调度规则；但 `RuntimeSnapshotProvider`、Home、Switcher 和 active-space notification 尚未统一消费该 coordinator。
+- [ ] `RuntimeReconciliationCoordinator` 已落地，集中表达 dirty app、Space topology diff 产生的 `affectedCGWindowIDs`、`pending/inFlight/waitingRetry` 状态，以及 AX 空快照短间隔 retry policy。`RuntimeSnapshotProvider` 采集到 `RuntimeSpaceTopologySnapshot` 后已交给 coordinator 记录 diff，不再在 provider 内新增 Space diff/affected-window 调度状态；当前已由 deterministic `FlowTabTests` 证明 dirty coalescing、Space affected-window request、retry 调度规则与 provider consumption。但 Home、Switcher 和 active-space notification 尚未统一消费该 coordinator。
 - [ ] `RuntimeWindowRecord` 与 `windowRecordsByCGWindowID` 已承担 `CGWindowID` 主表；`RuntimeWindowRecordDerivedIndexes` 已将当前 `AX -> CG`、反向 `CG -> AX`、`validCGWindowIDs` 与 `lastAXWindowIDs` 收束为主表处理结果的派生 projection，避免在 `RuntimeSnapshotProvider` 中继续双写反向索引。当前仍未完成的是把 record mutation、dirty/retry、space diff 和删除 grace 统一迁出到 reconciliation coordinator。
 - [ ] `RuntimeSpaceTopologySnapshot`、`RuntimeSpaceTopologyDiff` 与 `RuntimeSpaceTopologyProviding` 已落地，生产采集路径也改为先通过 `RuntimeSystemSpaceTopologyProvider` 取得 topology snapshot，再把 `spaceIDsByCGWindowID` 投影给 `CGWindowEntry`。当前已由 deterministic `FlowTabTests` 证明 snapshot 规范化、diff 与 `affectedCGWindowIDs` 规则；但 active-space notification 尚未消费 diff，真实多显示器 / fullscreen Space 拓扑仍缺 UI/E2E 证明。
 - [ ] `window-layer` 当前会输出 sticky 与 `space-backed`/CG-only 条目，但尚未保证每个条目都具备真实提交恢复路径，因此“只展示可提交条目”仍未完全达成。

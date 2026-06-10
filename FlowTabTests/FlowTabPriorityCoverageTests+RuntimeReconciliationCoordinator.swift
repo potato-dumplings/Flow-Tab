@@ -73,4 +73,35 @@ extension FlowTabPriorityCoverageTests {
         coordinator.completeRequest(id: retry.id)
         XCTAssertTrue(coordinator.readyRequests(now: 12).isEmpty)
     }
+
+    func testRuntimeSnapshotProviderRecordsSpaceTopologyThroughCoordinator() {
+        let coordinator = RuntimeReconciliationCoordinator()
+        let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
+        let previous = RuntimeSpaceTopologySnapshot(
+            spacesByID: [
+                10: RuntimeSpaceTopologySpace(id: 10, displayID: 1, isCurrent: true)
+            ],
+            windowIDsBySpaceID: [
+                10: Set<CGWindowID>([240_001])
+            ]
+        )
+        let current = RuntimeSpaceTopologySnapshot(
+            spacesByID: [
+                10: RuntimeSpaceTopologySpace(id: 10, displayID: 1, isCurrent: true),
+                11: RuntimeSpaceTopologySpace(id: 11, displayID: 1, isCurrent: false)
+            ],
+            windowIDsBySpaceID: [
+                10: Set<CGWindowID>([240_002]),
+                11: Set<CGWindowID>([240_003])
+            ]
+        )
+
+        _ = provider.recordSpaceTopologySnapshot(previous, now: 1)
+        let diff = provider.recordSpaceTopologySnapshot(current, now: 2)
+        let request = coordinator.readyRequests(now: 2).first
+
+        XCTAssertEqual(diff.affectedCGWindowIDs, Set<CGWindowID>([240_001, 240_002, 240_003]))
+        XCTAssertEqual(request?.target, .spaceTopology)
+        XCTAssertEqual(request?.affectedCGWindowIDs, Set<CGWindowID>([240_001, 240_002, 240_003]))
+    }
 }

@@ -196,11 +196,16 @@ final class RuntimeSnapshotProvider {
 
     private static let maxConcurrentAXAppCollections = 4
     private let spaceTopologyProvider: RuntimeSpaceTopologyProviding
+    let reconciliationCoordinator: RuntimeReconciliationCoordinator
 
     var windowMappingStateByPID: [pid_t: RuntimeWindowMappingState] = [:]
 
-    init(spaceTopologyProvider: RuntimeSpaceTopologyProviding = RuntimeSystemSpaceTopologyProvider()) {
+    init(
+        spaceTopologyProvider: RuntimeSpaceTopologyProviding = RuntimeSystemSpaceTopologyProvider(),
+        reconciliationCoordinator: RuntimeReconciliationCoordinator = RuntimeReconciliationCoordinator()
+    ) {
         self.spaceTopologyProvider = spaceTopologyProvider
+        self.reconciliationCoordinator = reconciliationCoordinator
     }
 
     func snapshot() -> RuntimeSnapshot {
@@ -993,6 +998,7 @@ final class RuntimeSnapshotProvider {
         }
         let parseReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let spaceTopologySnapshot = spaceTopologyProvider.snapshot(for: windowIDs)
+        let spaceTopologyDiff = recordSpaceTopologySnapshot(spaceTopologySnapshot)
         let spaceIDsByWindowID = Dictionary(
             uniqueKeysWithValues: spaceTopologySnapshot.spaceIDsByCGWindowID.map { windowID, spaceIDs in
                 (windowID, Array(spaceIDs).sorted())
@@ -1009,6 +1015,7 @@ final class RuntimeSnapshotProvider {
                 ("accepted", "\(windowIDs.count)"),
                 ("pids", "\(windowsByPID.count)"),
                 ("spaceIDs", "\(spaceIDsByWindowID.count)"),
+                ("affected", "\(spaceTopologyDiff.affectedCGWindowIDs.count)"),
                 ("copyMs", formatSnapshotMilliseconds(copyReadyMs - startMs)),
                 ("parseMs", formatSnapshotMilliseconds(parseReadyMs - copyReadyMs)),
                 ("spaceMs", formatSnapshotMilliseconds(spaceReadyMs - parseReadyMs)),
