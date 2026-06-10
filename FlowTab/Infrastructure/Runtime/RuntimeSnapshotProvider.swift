@@ -195,8 +195,13 @@ final class RuntimeSnapshotProvider {
     }
 
     private static let maxConcurrentAXAppCollections = 4
+    private let spaceTopologyProvider: RuntimeSpaceTopologyProviding
 
     var windowMappingStateByPID: [pid_t: RuntimeWindowMappingState] = [:]
+
+    init(spaceTopologyProvider: RuntimeSpaceTopologyProviding = RuntimeSystemSpaceTopologyProvider()) {
+        self.spaceTopologyProvider = spaceTopologyProvider
+    }
 
     func snapshot() -> RuntimeSnapshot {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
@@ -987,7 +992,12 @@ final class RuntimeSnapshotProvider {
             )
         }
         let parseReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let spaceIDsByWindowID = RuntimeCGSpaceInspector.spaceIDsByWindowID(windowIDs)
+        let spaceTopologySnapshot = spaceTopologyProvider.snapshot(for: windowIDs)
+        let spaceIDsByWindowID = Dictionary(
+            uniqueKeysWithValues: spaceTopologySnapshot.spaceIDsByCGWindowID.map { windowID, spaceIDs in
+                (windowID, Array(spaceIDs).sorted())
+            }
+        )
         let spaceReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let scope = options.contains(.optionOnScreenOnly) ? "onscreen" : "all"
         logSnapshotTiming(

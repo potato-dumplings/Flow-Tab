@@ -286,7 +286,7 @@ AX 通知应被视为“某个应用发生了变化”的脏信号，而不是�
 
 该策略的目标是避免把 AX 树重建期间的短暂空返回误判为“窗口已消失”。
 
-### AX 树重建高概率判定（已实现）
+### AX 树重建高概率判定
 
 针对“历史上可切换、但当前快照 AX 列表瞬时拉空”的场景，运行时增加了按快照计数的高概率判定：
 
@@ -537,14 +537,13 @@ sticky/CG-only 状态。
 - sticky 复用时，若 `CFEqual` 命中历史 `AXUIElement`，必须允许在标题或 frame 变化时继续复用，并在该次 reconciliation 刷新标题与几何信息。
 - 存在覆盖“sticky 绑定保持不变、AX 标题更新后应刷新输出标题”的回归测试：`FlowTabPriorityCoverageTests.testRuntimeSnapshotProviderWindowListKeepsStickyMatchesWhenAXTitlesChange`。
 
-## 当前未实现清单（2026-04-14 代码核对）
+## 当前未实现清单（2026-06-10 代码核对）
 
 以下条目基于当前实现与本文档目标的对照结果整理，用于跟踪仍未完成或仅部分完成的能力。
 
 ### 明确未实现
 
 - [ ] 将 `windowRecordsByCGID` 落成唯一主表，并补齐 `WindowRecord`、`SpaceRecoveryState` 等运行态字段，替换当前 `bindingsByCGWindowID + lastKnownCGWindowsByID` 的简化状态模型。
-- [ ] 将 `SpaceSnapshot` 落成可 diff 的运行态快照，覆盖 Space 拓扑、`spaceID -> windows` 与 `cgWindowID -> [spaceID]` 关系，而不是只做一次性 `spaceIDsByWindowID` 查询。
 - [ ] 实现 `space topology changed -> affectedCGWindowIDs -> needsReconciliation` 的维护链路，而不是仅靠下次全量快照被动刷新。
 - [ ] 实现 `space evidence timeout`、`suspectDeletedAt` 与 grace window 延迟删除流程，避免当前不在 AX 列表里的窗口因证据瞬时缺席而直接失去恢复资格。
 - [ ] 在提交流程中补齐 `Space` 恢复与私有 `CGWindowID` 激活链路：先切到目标 Space，再恢复 AX；必要时按 `CGWindowID` 做私有激活，成功后回读 `AXFocusedWindow` 并重新学习 exact binding。
@@ -552,6 +551,7 @@ sticky/CG-only 状态。
 
 ### 部分实现但仍与目标有偏差
 
+- [ ] `RuntimeSpaceTopologySnapshot`、`RuntimeSpaceTopologyDiff` 与 `RuntimeSpaceTopologyProviding` 已落地，生产采集路径也改为先通过 `RuntimeSystemSpaceTopologyProvider` 取得 topology snapshot，再把 `spaceIDsByCGWindowID` 投影给 `CGWindowEntry`。当前已由 deterministic `FlowTabTests` 证明 snapshot 规范化、diff 与 `affectedCGWindowIDs` 规则；但 active-space notification 尚未消费 diff，真实多显示器 / fullscreen Space 拓扑仍缺 UI/E2E 证明。
 - [ ] `window-layer` 当前会输出 sticky 与 `space-backed`/CG-only 条目，但尚未保证每个条目都具备真实提交恢复路径，因此“只展示可提交条目”仍未完全达成。
 - [ ] unresolved/CG-only 条目当前会按 `spaceIDs` 去重；这会吞掉不同 `CGWindowID` 的独立窗口记录，与“`CGWindowID` 是长期主锚点”的模型不一致。
 - [ ] sticky 与 `space-backed` 条目当前仍明显依赖当前 `validCG` 可见性；当 CG 临时缺席时，缺少文档要求的独立 grace 保留与恢复策略。
