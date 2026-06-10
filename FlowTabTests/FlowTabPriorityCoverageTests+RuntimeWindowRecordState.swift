@@ -124,4 +124,84 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(resolution.windowRecordsByCGWindowID.isEmpty)
         XCTAssertNil(provider.windowMappingStateByPID[pid])
     }
+
+    func testRuntimeSnapshotProviderWindowLayerExposesInGraceStickyRecordWithoutCurrentCGEvidence() {
+        let provider = RuntimeSnapshotProvider()
+        let pid: pid_t = 18_405
+        let now = Date.timeIntervalSinceReferenceDate
+        var record = RuntimeWindowRecord(
+            cgWindowID: 250_001,
+            stableWindowID: "cg:18405:250001",
+            firstSeenAt: now - 1
+        )
+        record.lastKnownCGTitle = "Recovered Sticky"
+        record.lastKnownDisplayTitle = "Recovered Sticky"
+        record.lastKnownCGFrame = CGRect(x: 0, y: 124, width: 1_728, height: 993)
+        record.lastConfirmationSource = .stickyBinding
+        record.lastExactAXWindowID = "ax:18405:sticky"
+        record.spaceRecovery = RuntimeSpaceRecoveryState(
+            cgWindowID: 250_001,
+            spaceIDs: [11_682],
+            hasConfirmedActivationRoute: true,
+            lastValidatedAt: now - 1,
+            invalidatedAt: now
+        )
+        record.suspectDeletedAt = now
+        provider.windowMappingStateByPID[pid] = RuntimeWindowMappingState(
+            windowRecordsByCGWindowID: [250_001: record]
+        )
+
+        let entries = provider.resolvedStableWindowEntries(
+            axWindows: [],
+            cgWindows: [],
+            pid: pid,
+            appName: "Google Chrome"
+        )
+
+        XCTAssertEqual(entries.map(\.windowID), ["cg:18405:250001"])
+        XCTAssertEqual(entries.first?.title, "Recovered Sticky")
+        XCTAssertEqual(entries.first?.cgWindowID, 250_001)
+        XCTAssertEqual(entries.first?.spaceIDs, [11_682])
+        XCTAssertTrue(entries.first?.hasStickyBinding == true)
+        XCTAssertNil(entries.first?.activationHandleID)
+    }
+
+    func testRuntimeSnapshotProviderWindowLayerExposesInGraceSpaceBackedRecordWithoutStickyBinding() {
+        let provider = RuntimeSnapshotProvider()
+        let pid: pid_t = 18_405
+        let now = Date.timeIntervalSinceReferenceDate
+        var record = RuntimeWindowRecord(
+            cgWindowID: 250_002,
+            stableWindowID: "cg:18405:250002",
+            firstSeenAt: now - 1
+        )
+        record.lastKnownCGTitle = "Recovered Space"
+        record.lastKnownDisplayTitle = "Recovered Space"
+        record.lastKnownCGFrame = CGRect(x: 30, y: 124, width: 1_200, height: 820)
+        record.spaceRecovery = RuntimeSpaceRecoveryState(
+            cgWindowID: 250_002,
+            spaceIDs: [11_683],
+            hasConfirmedActivationRoute: true,
+            lastValidatedAt: now - 1,
+            invalidatedAt: now
+        )
+        record.suspectDeletedAt = now
+        provider.windowMappingStateByPID[pid] = RuntimeWindowMappingState(
+            windowRecordsByCGWindowID: [250_002: record]
+        )
+
+        let entries = provider.resolvedStableWindowEntries(
+            axWindows: [],
+            cgWindows: [],
+            pid: pid,
+            appName: "Google Chrome"
+        )
+
+        XCTAssertEqual(entries.map(\.windowID), ["cg:18405:250002"])
+        XCTAssertEqual(entries.first?.title, "Recovered Space")
+        XCTAssertEqual(entries.first?.cgWindowID, 250_002)
+        XCTAssertEqual(entries.first?.spaceIDs, [11_683])
+        XCTAssertTrue(entries.first?.hasStickyBinding == false)
+        XCTAssertNil(entries.first?.activationHandleID)
+    }
 }

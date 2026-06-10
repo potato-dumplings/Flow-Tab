@@ -15,6 +15,17 @@ struct RuntimeWindowMappingResolution {
             validCGWindows: validCGWindows
         )
     }
+
+    var windowLayerCGWindows: [RuntimeSnapshotProvider.CGWindowEntry] {
+        let knownCGWindowsByID = knownCGWindowsByID
+        let validCGWindowIDs = Set(validCGWindows.map(\.id))
+        let synthesizedWindows: [RuntimeSnapshotProvider.CGWindowEntry] =
+            windowRecordsByCGWindowID.keys.sorted().compactMap { cgWindowID in
+                guard !validCGWindowIDs.contains(cgWindowID) else { return nil }
+                return knownCGWindowsByID[cgWindowID]
+            }
+        return validCGWindows + synthesizedWindows
+    }
 }
 
 private func runtimeWindowEntryUsesDesktopSpace(
@@ -57,13 +68,14 @@ extension RuntimeSnapshotProvider {
             appName: appName,
             remoteScanCompleteness: remoteScanCompleteness
         )
+        let windowLayerCGWindows = mappingResolution.windowLayerCGWindows
         let cgWindowOrderByID = Dictionary(
-            uniqueKeysWithValues: mappingResolution.validCGWindows.enumerated().map { offset, window in
+            uniqueKeysWithValues: windowLayerCGWindows.enumerated().map { offset, window in
                 (window.id, offset)
             }
         )
         let knownCGWindowsByID = mappingResolution.knownCGWindowsByID
-        let fullscreenContentBounds = mappingResolution.validCGWindows.compactMap { cgWindow -> CGRect? in
+        let fullscreenContentBounds = windowLayerCGWindows.compactMap { cgWindow -> CGRect? in
             guard RuntimeWindowTopologyClassifier.isLikelyOffDesktopFullscreenContent(
                 bounds: cgWindow.bounds,
                 spaceIDs: cgWindow.spaceIDs
@@ -129,7 +141,7 @@ extension RuntimeSnapshotProvider {
         }
 
         let exactCGWindowIDs = Set(exactEntries.compactMap(\.cgWindowID))
-        let stickyCGEntries = mappingResolution.validCGWindows.compactMap { cgWindow -> WindowListEntry? in
+        let stickyCGEntries = windowLayerCGWindows.compactMap { cgWindow -> WindowListEntry? in
             guard !exactCGWindowIDs.contains(cgWindow.id) else { return nil }
             guard
                 let record = mappingResolution.windowRecordsByCGWindowID[cgWindow.id],
@@ -181,7 +193,7 @@ extension RuntimeSnapshotProvider {
 
         let stickyCGWindowIDs = Set(stickyCGEntries.compactMap(\.cgWindowID))
         var hiddenProvisionalCGOnlyCount = 0
-        let unmatchedCGEntries = mappingResolution.validCGWindows.compactMap { cgWindow -> WindowListEntry? in
+        let unmatchedCGEntries = windowLayerCGWindows.compactMap { cgWindow -> WindowListEntry? in
             guard !exactCGWindowIDs.contains(cgWindow.id) else { return nil }
             guard !stickyCGWindowIDs.contains(cgWindow.id) else { return nil }
             let record = mappingResolution.windowRecordsByCGWindowID[cgWindow.id]
