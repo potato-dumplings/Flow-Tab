@@ -104,4 +104,25 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(request?.target, .spaceTopology)
         XCTAssertEqual(request?.affectedCGWindowIDs, Set<CGWindowID>([240_001, 240_002, 240_003]))
     }
+
+    func testRuntimeSnapshotServiceSignalsAppWindowChangesToCoordinator() throws {
+        let coordinator = RuntimeReconciliationCoordinator()
+        let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
+        let service = RuntimeSnapshotService(
+            label: "FlowTabTests.RuntimeSnapshotService.AppWindowSignal",
+            snapshotProvider: provider
+        )
+
+        service.signalAppWindowsChanged(appID: "com.example.editor", pid: 18_405)
+        _ = service.lightweightAppSnapshot()
+
+        let request = try XCTUnwrap(
+            coordinator.readyRequests(now: Date.timeIntervalSinceReferenceDate).first {
+                $0.target == .app(18_405)
+            }
+        )
+        XCTAssertEqual(request.appID, "com.example.editor")
+        XCTAssertEqual(request.reasons, Set([.axNotification]))
+        XCTAssertEqual(request.state, .pending)
+    }
 }

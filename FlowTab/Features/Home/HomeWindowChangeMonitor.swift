@@ -1,0 +1,136 @@
+import AppKit
+import ApplicationServices
+import Foundation
+import FlowTabCore
+
+@MainActor
+final class HomeWindowChangeMonitor {
+    private final class ObserverContext {
+        weak var monitor: HomeWindowChangeMonitor?
+        let appID: String
+        let pid: pid_t
+        let installedAt: TimeInterval
+
+        init(monitor: HomeWindowChangeMonitor, appID: String, pid: pid_t) {
+            self.monitor = monitor
+            self.appID = appID
+            self.pid = pid
+            installedAt = ProcessInfo.processInfo.systemUptime
+        }
+    }
+
+    var onAppWindowChanged: ((String, pid_t) -> Void)?
+
+    private var observersByPID: [pid_t: AXObserver] = [:]
+    private var observerContextByPID: [pid_t: ObserverContext] = [:]
+    private var appIDByPID: [pid_t: String] = [:]
+    private var lastEventAtByAppID: [String: TimeInterval] = [:]
+    private let eventThrottleInterval: TimeInterval = 0.16
+    private let observerWarmUpInterval: TimeInterval = 0.75
+    private let watchedNotifications: [CFString] = [
+        kAXWindowCreatedNotification as CFString,
+        kAXUIElementDestroyedNotification as CFString,
+        kAXFocusedWindowChangedNotification as CFString,
+        kAXMainWindowChangedNotification as CFString,
+        kAXWindowMiniaturizedNotification as CFString,
+        kAXWindowDeminiaturizedNotification as CFString
+    ]
+
+    func rebind(_ appSummaries: [RuntimeHomeAppSummary]) {
+        guard AccessibilityPermissionChecker.isTrusted() else {
+            stop()
+            return
+        }
+
+        let expectedByPID = Dictionary(uniqueKeysWithValues: appSummaries.map { ($0.pid, $0.appID) })
+
+        for pid in Array(observersByPID.keys) {
+            guard let expectedAppID = expectedByPID[pid], expectedAppID == appIDByPID[pid] else {
+                removeObserver(pid: pid)
+                continue
+            }
+        }
+
+        for (pid, appID) in expectedByPID where observersByPID[pid] == nil {
+            installObserver(pid: pid, appID: appID)
+        }
+    }
+
+    func stop() {
+        for pid in Array(observersByPID.keys) {
+            removeObserver(pid: pid)
+        }
+        lastEventAtByAppID.removeAll()
+    }
+
+    private func installObserver(pid: pid_t, appID: String) {
+        var observerRef: AXObserver?
+        let result = AXObserverCreate(pid, Self.callback, &observerRef)
+        guard result == .success, let observerRef else { return }
+
+        let appElement = AXUIElementCreateApplication(pid)
+        let context = ObserverContext(monitor: self, appID: appID, pid: pid)
+        let contextPointer = UnsafeMutableRawPointer(Unmanaged.passUnretained(context).toOpaque())
+        for notification in watchedNotifications {
+            let addResult = AXObserverAddNotification(
+                observerRef,
+                appElement,
+                notification,
+                contextPointer
+            )
+            if addResult == .notificationUnsupported {
+                continue
+            }
+            guard addResult == .success || addResult == .notificationAlreadyRegistered else { continue }
+        }
+
+        CFRunLoopAddSource(
+            CFRunLoopGetMain(),
+            AXObserverGetRunLoopSource(observerRef),
+            .defaultMode
+        )
+        observersByPID[pid] = observerRef
+        observerContextByPID[pid] = context
+        appIDByPID[pid] = appID
+    }
+
+    private func removeObserver(pid: pid_t) {
+        guard let observer = observersByPID.removeValue(forKey: pid) else { return }
+
+        let appElement = AXUIElementCreateApplication(pid)
+        for notification in watchedNotifications {
+            AXObserverRemoveNotification(observer, appElement, notification)
+        }
+        CFRunLoopRemoveSource(
+            CFRunLoopGetMain(),
+            AXObserverGetRunLoopSource(observer),
+            .defaultMode
+        )
+        observerContextByPID.removeValue(forKey: pid)
+        appIDByPID.removeValue(forKey: pid)
+    }
+
+    private func emitWindowChanged(for appID: String, pid: pid_t, installedAt: TimeInterval) {
+        let now = ProcessInfo.processInfo.systemUptime
+        guard now - installedAt >= observerWarmUpInterval else {
+            return
+        }
+        if let lastTimestamp = lastEventAtByAppID[appID], now - lastTimestamp < eventThrottleInterval {
+            return
+        }
+        lastEventAtByAppID[appID] = now
+        onAppWindowChanged?(appID, pid)
+    }
+
+    private static let callback: AXObserverCallback = { _, _, _, refcon in
+        guard let refcon else { return }
+        let context = Unmanaged<ObserverContext>.fromOpaque(refcon).takeUnretainedValue()
+        Task { @MainActor in
+            context.monitor?.emitWindowChanged(
+                for: context.appID,
+                pid: context.pid,
+                installedAt: context.installedAt
+            )
+        }
+    }
+}

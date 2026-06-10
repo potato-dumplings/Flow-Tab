@@ -1,6 +1,5 @@
 import SwiftUI
 import AppKit
-import ApplicationServices
 import FlowTabCore
 
 @MainActor
@@ -15,6 +14,19 @@ struct HomeLandingView: View {
     let isActive: Bool
     let appLanguage: AppLanguage
     let openSettings: () -> Void
+    private let runtimeSnapshotService: any RuntimeSnapshotServing
+
+    init(
+        isActive: Bool,
+        appLanguage: AppLanguage,
+        runtimeSnapshotService: any RuntimeSnapshotServing = homeRuntimeSnapshotService,
+        openSettings: @escaping () -> Void
+    ) {
+        self.isActive = isActive
+        self.appLanguage = appLanguage
+        self.runtimeSnapshotService = runtimeSnapshotService
+        self.openSettings = openSettings
+    }
 
     @AppStorage(AppPreferenceKeys.showPermissionReminder)
     private var showPermissionReminder = true
@@ -436,7 +448,8 @@ struct HomeLandingView: View {
             return
         }
 
-        windowChangeMonitor.onAppWindowChanged = { appID in
+        windowChangeMonitor.onAppWindowChanged = { appID, pid in
+            runtimeSnapshotService.signalAppWindowsChanged(appID: appID, pid: pid)
             scheduleSingleAppRefresh(appID: appID, reason: "ax_window_changed")
         }
         windowChangeMonitor.rebind(appSummaries)
@@ -835,131 +848,5 @@ enum HomeInitialAppSummaryUpdatePolicy {
         loadingWindowCountAppIDs: Set<String>
     ) -> Bool {
         loadingWindowCountAppIDs.isEmpty || appID == selectedAppID
-    }
-}
-
-@MainActor
-private final class HomeWindowChangeMonitor {
-    private final class ObserverContext {
-        weak var monitor: HomeWindowChangeMonitor?
-        let appID: String
-        let installedAt: TimeInterval
-
-        init(monitor: HomeWindowChangeMonitor, appID: String) {
-            self.monitor = monitor
-            self.appID = appID
-            installedAt = ProcessInfo.processInfo.systemUptime
-        }
-    }
-
-    var onAppWindowChanged: ((String) -> Void)?
-
-    private var observersByPID: [pid_t: AXObserver] = [:]
-    private var observerContextByPID: [pid_t: ObserverContext] = [:]
-    private var appIDByPID: [pid_t: String] = [:]
-    private var lastEventAtByAppID: [String: TimeInterval] = [:]
-    private let eventThrottleInterval: TimeInterval = 0.16
-    private let observerWarmUpInterval: TimeInterval = 0.75
-    private let watchedNotifications: [CFString] = [
-        kAXWindowCreatedNotification as CFString,
-        kAXUIElementDestroyedNotification as CFString,
-        kAXFocusedWindowChangedNotification as CFString,
-        kAXMainWindowChangedNotification as CFString,
-        kAXWindowMiniaturizedNotification as CFString,
-        kAXWindowDeminiaturizedNotification as CFString
-    ]
-
-    func rebind(_ appSummaries: [RuntimeHomeAppSummary]) {
-        guard AccessibilityPermissionChecker.isTrusted() else {
-            stop()
-            return
-        }
-
-        let expectedByPID = Dictionary(uniqueKeysWithValues: appSummaries.map { ($0.pid, $0.appID) })
-
-        for pid in Array(observersByPID.keys) {
-            guard let expectedAppID = expectedByPID[pid], expectedAppID == appIDByPID[pid] else {
-                removeObserver(pid: pid)
-                continue
-            }
-        }
-
-        for (pid, appID) in expectedByPID where observersByPID[pid] == nil {
-            installObserver(pid: pid, appID: appID)
-        }
-    }
-
-    func stop() {
-        for pid in Array(observersByPID.keys) {
-            removeObserver(pid: pid)
-        }
-        lastEventAtByAppID.removeAll()
-    }
-
-    private func installObserver(pid: pid_t, appID: String) {
-        var observerRef: AXObserver?
-        let result = AXObserverCreate(pid, Self.callback, &observerRef)
-        guard result == .success, let observerRef else { return }
-
-        let appElement = AXUIElementCreateApplication(pid)
-        let context = ObserverContext(monitor: self, appID: appID)
-        let contextPointer = UnsafeMutableRawPointer(Unmanaged.passUnretained(context).toOpaque())
-        for notification in watchedNotifications {
-            let addResult = AXObserverAddNotification(
-                observerRef,
-                appElement,
-                notification,
-                contextPointer
-            )
-            if addResult == .notificationUnsupported {
-                continue
-            }
-            guard addResult == .success || addResult == .notificationAlreadyRegistered else { continue }
-        }
-
-        CFRunLoopAddSource(
-            CFRunLoopGetMain(),
-            AXObserverGetRunLoopSource(observerRef),
-            .defaultMode
-        )
-        observersByPID[pid] = observerRef
-        observerContextByPID[pid] = context
-        appIDByPID[pid] = appID
-    }
-
-    private func removeObserver(pid: pid_t) {
-        guard let observer = observersByPID.removeValue(forKey: pid) else { return }
-
-        let appElement = AXUIElementCreateApplication(pid)
-        for notification in watchedNotifications {
-            AXObserverRemoveNotification(observer, appElement, notification)
-        }
-        CFRunLoopRemoveSource(
-            CFRunLoopGetMain(),
-            AXObserverGetRunLoopSource(observer),
-            .defaultMode
-        )
-        observerContextByPID.removeValue(forKey: pid)
-        appIDByPID.removeValue(forKey: pid)
-    }
-
-    private func emitWindowChanged(for appID: String, installedAt: TimeInterval) {
-        let now = ProcessInfo.processInfo.systemUptime
-        guard now - installedAt >= observerWarmUpInterval else {
-            return
-        }
-        if let lastTimestamp = lastEventAtByAppID[appID], now - lastTimestamp < eventThrottleInterval {
-            return
-        }
-        lastEventAtByAppID[appID] = now
-        onAppWindowChanged?(appID)
-    }
-
-    private static let callback: AXObserverCallback = { _, _, _, refcon in
-        guard let refcon else { return }
-        let context = Unmanaged<ObserverContext>.fromOpaque(refcon).takeUnretainedValue()
-        Task { @MainActor in
-            context.monitor?.emitWindowChanged(for: context.appID, installedAt: context.installedAt)
-        }
     }
 }

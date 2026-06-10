@@ -14,6 +14,7 @@ protocol RuntimeSnapshotServing: Sendable {
     func focusedAppSnapshot(processIdentifier pid: pid_t) -> RuntimeHomeAppSnapshot?
     func currentCGWindowsByPID() -> [pid_t: [RuntimeSnapshotProvider.CGWindowEntry]]
     func signalSpaceTopologyChanged()
+    func signalAppWindowsChanged(appID: String, pid: pid_t)
     func isLikelyTransientAXRebuild(for pid: pid_t) -> Bool
 }
 
@@ -94,6 +95,17 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
     func signalSpaceTopologyChanged() {
         snapshotQueue.async { [snapshotProvider] in
             _ = snapshotProvider.collectCGWindowsByPID(options: [.excludeDesktopElements])
+        }
+    }
+
+    func signalAppWindowsChanged(appID: String, pid: pid_t) {
+        snapshotQueue.async { [snapshotProvider] in
+            snapshotProvider.reconciliationCoordinator.markAppDirty(
+                appID: appID,
+                pid: pid,
+                reason: .axNotification,
+                now: Date.timeIntervalSinceReferenceDate
+            )
         }
     }
 
