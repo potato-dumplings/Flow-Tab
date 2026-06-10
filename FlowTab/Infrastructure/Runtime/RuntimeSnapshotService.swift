@@ -19,18 +19,31 @@ protocol RuntimeSnapshotServing: Sendable {
 }
 
 final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable {
+    enum ReconciliationExecutionOutcome {
+        case completed
+        case transientEmptyAXSnapshot
+    }
+
+    typealias ReconciliationExecutor = (
+        RuntimeReconciliationRequest,
+        RuntimeSnapshotProvider
+    ) -> ReconciliationExecutionOutcome
+
     private let snapshotQueue: DispatchQueue
     private let snapshotProvider: RuntimeSnapshotProvider
     private let windowRecencyTracker: RuntimeWindowRecencyTracker
+    private let reconciliationExecutor: ReconciliationExecutor
 
     init(
         label: String = "FlowTab.RuntimeSnapshotService",
         snapshotProvider: RuntimeSnapshotProvider = RuntimeSnapshotProvider(),
-        windowRecencyTracker: RuntimeWindowRecencyTracker = .shared
+        windowRecencyTracker: RuntimeWindowRecencyTracker = .shared,
+        reconciliationExecutor: @escaping ReconciliationExecutor = RuntimeSnapshotService.defaultReconciliationExecutor
     ) {
         snapshotQueue = DispatchQueue(label: label, qos: .utility)
         self.snapshotProvider = snapshotProvider
         self.windowRecencyTracker = windowRecencyTracker
+        self.reconciliationExecutor = reconciliationExecutor
     }
 
     func snapshot() -> RuntimeSnapshot {
@@ -93,25 +106,80 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
     }
 
     func signalSpaceTopologyChanged() {
-        snapshotQueue.async { [snapshotProvider] in
+        snapshotQueue.async { [self] in
             _ = snapshotProvider.collectCGWindowsByPID(options: [.excludeDesktopElements])
+            drainReadyReconciliationRequestsLocked(now: Date.timeIntervalSinceReferenceDate)
         }
     }
 
     func signalAppWindowsChanged(appID: String, pid: pid_t) {
-        snapshotQueue.async { [snapshotProvider] in
+        snapshotQueue.async { [self] in
+            let now = Date.timeIntervalSinceReferenceDate
             snapshotProvider.reconciliationCoordinator.markAppDirty(
                 appID: appID,
                 pid: pid,
                 reason: .axNotification,
-                now: Date.timeIntervalSinceReferenceDate
+                now: now
             )
+            drainReadyReconciliationRequestsLocked(now: now)
         }
     }
 
     func isLikelyTransientAXRebuild(for pid: pid_t) -> Bool {
         snapshotQueue.sync {
             snapshotProvider.isLikelyTransientAXRebuild(for: pid)
+        }
+    }
+
+    @discardableResult
+    func drainReadyReconciliationRequestsSynchronouslyForTesting(
+        now: TimeInterval = Date.timeIntervalSinceReferenceDate
+    ) -> [RuntimeReconciliationRequest] {
+        snapshotQueue.sync {
+            drainReadyReconciliationRequestsLocked(now: now)
+        }
+    }
+
+    @discardableResult
+    private func drainReadyReconciliationRequestsLocked(now: TimeInterval) -> [RuntimeReconciliationRequest] {
+        let coordinator = snapshotProvider.reconciliationCoordinator
+        let requests = coordinator.readyRequests(now: now)
+        var startedRequests: [RuntimeReconciliationRequest] = []
+        startedRequests.reserveCapacity(requests.count)
+
+        for request in requests {
+            guard let startedRequest = coordinator.startRequest(id: request.id) else { continue }
+            startedRequests.append(startedRequest)
+            switch reconciliationExecutor(startedRequest, snapshotProvider) {
+            case .completed:
+                coordinator.completeRequest(id: startedRequest.id)
+            case .transientEmptyAXSnapshot:
+                _ = coordinator.scheduleRetryAfterTransientEmptyAXSnapshot(
+                    id: startedRequest.id,
+                    now: now
+                )
+            }
+        }
+        return startedRequests
+    }
+
+    private static func defaultReconciliationExecutor(
+        request: RuntimeReconciliationRequest,
+        snapshotProvider: RuntimeSnapshotProvider
+    ) -> ReconciliationExecutionOutcome {
+        switch request.target {
+        case let .app(pid):
+            let snapshot = snapshotProvider.focusedAppSnapshot(processIdentifier: pid)
+            if
+                snapshot?.candidate.windows.isEmpty == true,
+                snapshotProvider.isLikelyTransientAXRebuild(for: pid)
+            {
+                return .transientEmptyAXSnapshot
+            }
+            return .completed
+        case .spaceTopology:
+            _ = snapshotProvider.collectCGWindowsByPID(options: [.excludeDesktopElements])
+            return .completed
         }
     }
 }

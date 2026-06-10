@@ -105,24 +105,60 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(request?.affectedCGWindowIDs, Set<CGWindowID>([240_001, 240_002, 240_003]))
     }
 
-    func testRuntimeSnapshotServiceSignalsAppWindowChangesToCoordinator() throws {
+    func testRuntimeSnapshotServiceDrainsAppWindowChangesThroughCoordinator() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
+        let lock = NSLock()
+        var executedRequests: [RuntimeReconciliationRequest] = []
         let service = RuntimeSnapshotService(
             label: "FlowTabTests.RuntimeSnapshotService.AppWindowSignal",
-            snapshotProvider: provider
+            snapshotProvider: provider,
+            reconciliationExecutor: { request, _ in
+                lock.lock()
+                executedRequests.append(request)
+                lock.unlock()
+                return .completed
+            }
         )
 
         service.signalAppWindowsChanged(appID: "com.example.editor", pid: 18_405)
         _ = service.lightweightAppSnapshot()
 
-        let request = try XCTUnwrap(
-            coordinator.readyRequests(now: Date.timeIntervalSinceReferenceDate).first {
-                $0.target == .app(18_405)
-            }
-        )
+        let request = try XCTUnwrap(executedRequests.first)
         XCTAssertEqual(request.appID, "com.example.editor")
         XCTAssertEqual(request.reasons, Set([.axNotification]))
-        XCTAssertEqual(request.state, .pending)
+        XCTAssertEqual(request.state, .inFlight)
+        XCTAssertTrue(coordinator.readyRequests(now: Date.timeIntervalSinceReferenceDate).isEmpty)
+    }
+
+    func testRuntimeSnapshotServiceSchedulesRetryWhenDrainSeesTransientEmptyAXSnapshot() throws {
+        let coordinator = RuntimeReconciliationCoordinator(
+            retryPolicy: RuntimeReconciliationRetryPolicy(delays: [0.1])
+        )
+        let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
+        let service = RuntimeSnapshotService(
+            label: "FlowTabTests.RuntimeSnapshotService.TransientAXRetry",
+            snapshotProvider: provider,
+            reconciliationExecutor: { _, _ in
+                .transientEmptyAXSnapshot
+            }
+        )
+
+        let dirty = coordinator.markAppDirty(
+            appID: "com.example.editor",
+            pid: 18_405,
+            reason: .axNotification,
+            now: 10
+        )
+        let drained = service.drainReadyReconciliationRequestsSynchronouslyForTesting(now: 10)
+
+        XCTAssertEqual(drained.map(\.id), [dirty.id])
+        XCTAssertTrue(coordinator.readyRequests(now: 10.09).isEmpty)
+
+        let retry = try XCTUnwrap(coordinator.readyRequests(now: 10.1).first)
+        XCTAssertEqual(retry.id, dirty.id)
+        XCTAssertEqual(retry.target, .app(18_405))
+        XCTAssertEqual(retry.state, .waitingRetry)
+        XCTAssertEqual(retry.attempt, 1)
     }
 }
