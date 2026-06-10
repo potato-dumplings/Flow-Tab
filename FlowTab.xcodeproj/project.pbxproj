@@ -167,6 +167,7 @@
 		F6E7A8BC35AC000100B0D737 /* RuntimeWindowSpaceClassification.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7A8BB35AC000100B0D737 /* RuntimeWindowSpaceClassification.swift */; };
 		F6E7A8C035AC000100B0D737 /* RuntimeWindowRecencyTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7A8BF35AC000100B0D737 /* RuntimeWindowRecencyTracker.swift */; };
 		F6E7A8C235AC000100B0D737 /* RuntimeWindowFocusRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7A8C135AC000100B0D737 /* RuntimeWindowFocusRequest.swift */; };
+		F6E7B00635AC000100B0D737 /* RuntimeReconciliationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7B00535AC000100B0D737 /* RuntimeReconciliationCoordinator.swift */; };
 		F7A8B9C235AD000100B0D737 /* RuntimeCGWindowFocusBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7A8B9C135AD000100B0D737 /* RuntimeCGWindowFocusBridge.swift */; };
 		F8A9B0C335AE000100B0D737 /* RuntimeAXRemoteWindowResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A9B0C235AE000100B0D737 /* RuntimeAXRemoteWindowResolver.swift */; };
 		F9C0D1E235AF000100B0D737 /* RuntimeChromeWindowFocusBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9C0D1E135AF000100B0D737 /* RuntimeChromeWindowFocusBridge.swift */; };
@@ -194,6 +195,7 @@
 		F50001162FA1000100B0D737 /* FlowTabUITests+SpaceFixtureEdgeInputsWorkflow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000172FA1000100B0D737 /* FlowTabUITests+SpaceFixtureEdgeInputsWorkflow.swift */; };
 		F50001172FA1000100B0D737 /* FlowTabUITests+SpaceFixtureEdgeInputsAssertions.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000182FA1000100B0D737 /* FlowTabUITests+SpaceFixtureEdgeInputsAssertions.swift */; };
 		F6E7A8BA35AC000100B0D737 /* RuntimeWindowRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7A8B935AC000100B0D737 /* RuntimeWindowRecord.swift */; };
+		F6E7B00835AC000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeReconciliationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7B00735AC000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeReconciliationCoordinator.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -399,6 +401,8 @@
 		F6E7A8B935AC000100B0D737 /* RuntimeWindowRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowRecord.swift; sourceTree = "<group>"; };
 		F6E7A8BF35AC000100B0D737 /* RuntimeWindowRecencyTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowRecencyTracker.swift; sourceTree = "<group>"; };
 		F6E7A8C135AC000100B0D737 /* RuntimeWindowFocusRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowFocusRequest.swift; sourceTree = "<group>"; };
+		F6E7B00535AC000100B0D737 /* RuntimeReconciliationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeReconciliationCoordinator.swift; sourceTree = "<group>"; };
+		F6E7B00735AC000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeReconciliationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+RuntimeReconciliationCoordinator.swift"; sourceTree = "<group>"; };
 		F7A1000135B7000100B0D737 /* SigningDefaults.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = SigningDefaults.xcconfig; sourceTree = "<group>"; };
 		F7A1000235B7000100B0D737 /* LocalSigning.example.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "LocalSigning.example.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -508,6 +512,7 @@
 				B10001112F76000100B0D737 /* FlowTabPriorityCoverageTests+CoverageGaps.swift */,
 				B10001122F76000100B0D737 /* FlowTabPriorityCoverageTests+AsyncSupport.swift */,
 				B10001132F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeSpaceClassification.swift */,
+				F6E7B00735AC000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeReconciliationCoordinator.swift */,
 				F6E7B00135AC000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeSpaceTopology.swift */,
 				F6E7B00335AC000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeWindowRecordState.swift */,
 				B10001142F76000100B0D737 /* FlowTabPriorityCoverageTests+WindowRecency.swift */,
@@ -648,6 +653,7 @@
 				F6E7A8B935AC000100B0D737 /* RuntimeWindowRecord.swift */,
 				F6E7A8BF35AC000100B0D737 /* RuntimeWindowRecencyTracker.swift */,
 				F6E7A8C135AC000100B0D737 /* RuntimeWindowFocusRequest.swift */,
+				F6E7B00535AC000100B0D737 /* RuntimeReconciliationCoordinator.swift */,
 				F6E7A8BB35AC000100B0D737 /* RuntimeWindowSpaceClassification.swift */,
 				A1B2C4342F73000100B0D737 /* RuntimeActivator.swift */,
 				A1B2C4352F73000100B0D737 /* AXLiveWindowRegistry.swift */,
@@ -1025,6 +1031,7 @@
 				D10000012FF500100B0D737 /* RuntimeSnapshotService.swift in Sources */,
 				B26010022FE000100B0D737 /* RuntimeSnapshotProvider+Diagnostics.swift in Sources */,
 				F1A2B3D42F8A000100B0D737 /* RuntimeSnapshotProvider+AppGrouping.swift in Sources */,
+				F6E7B00635AC000100B0D737 /* RuntimeReconciliationCoordinator.swift in Sources */,
 				F2B3C4E52F8C000100B0D737 /* RuntimeSnapshotProvider+CGWindowSupplement.swift in Sources */,
 				F3C4D5E62FA2000100B0D737 /* RuntimeSnapshotProvider+WindowMapping.swift in Sources */,
 				F6E7A8BE35AC000100B0D737 /* RuntimeSnapshotProvider+SpaceTopologyMapping.swift in Sources */,
@@ -1109,6 +1116,7 @@
 				B10011112F76000100B0D737 /* FlowTabPriorityCoverageTests+CoverageGaps.swift in Sources */,
 				B10011122F76000100B0D737 /* FlowTabPriorityCoverageTests+AsyncSupport.swift in Sources */,
 				B10011132F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeSpaceClassification.swift in Sources */,
+				F6E7B00835AC000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeReconciliationCoordinator.swift in Sources */,
 				F6E7B00235AC000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeSpaceTopology.swift in Sources */,
 				F6E7B00435AC000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeWindowRecordState.swift in Sources */,
 				B10011142F76000100B0D737 /* FlowTabPriorityCoverageTests+WindowRecency.swift in Sources */,
