@@ -178,7 +178,20 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
             }
             return .completed
         case .spaceTopology:
-            _ = snapshotProvider.collectCGWindowsByPID(options: [.excludeDesktopElements])
+            let cgWindowsByPID = snapshotProvider.collectCGWindowsByPID(options: [.excludeDesktopElements])
+            let affectedTargets = snapshotProvider.appReconciliationTargets(
+                affectedCGWindowIDs: request.affectedCGWindowIDs,
+                currentCGWindowsByPID: cgWindowsByPID
+            )
+            for target in affectedTargets {
+                let snapshot = snapshotProvider.focusedAppSnapshot(processIdentifier: target.pid)
+                if
+                    snapshot?.candidate.windows.isEmpty == true,
+                    snapshotProvider.isLikelyTransientAXRebuild(for: target.pid)
+                {
+                    return .transientEmptyAXSnapshot
+                }
+            }
             return .completed
         }
     }

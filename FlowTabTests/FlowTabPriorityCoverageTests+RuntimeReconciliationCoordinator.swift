@@ -105,6 +105,79 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(request?.affectedCGWindowIDs, Set<CGWindowID>([240_001, 240_002, 240_003]))
     }
 
+    func testRuntimeSnapshotProviderDerivesAffectedAppTargetsFromRecordsAndCurrentCGWindows() {
+        let provider = RuntimeSnapshotProvider()
+        let recordedWindowID = CGWindowID(240_001)
+        let currentWindowID = CGWindowID(240_002)
+        let unrelatedWindowID = CGWindowID(240_003)
+        let staleWindowID = CGWindowID(240_004)
+        let recordedPID = pid_t(1_840_501_405)
+        let currentPID = pid_t(1_840_501_406)
+        var record = RuntimeWindowRecord(
+            cgWindowID: recordedWindowID,
+            stableWindowID: "cg:\(recordedPID):\(recordedWindowID)",
+            firstSeenAt: 10
+        )
+        record.refreshCGState(
+            from: RuntimeSnapshotProvider.CGWindowEntry(
+                id: recordedWindowID,
+                title: "Recorded",
+                bounds: CGRect(x: 10, y: 10, width: 320, height: 240),
+                isOnscreen: false,
+                alpha: 1.0,
+                storeType: 1,
+                spaceIDs: [7_001]
+            ),
+            observedAt: 11
+        )
+        provider.windowMappingStateByPID[recordedPID] = RuntimeWindowMappingState(
+            windowRecordsByCGWindowID: [recordedWindowID: record]
+        )
+        let currentCGWindowsByPID: [pid_t: [RuntimeSnapshotProvider.CGWindowEntry]] = [
+            currentPID: [
+                RuntimeSnapshotProvider.CGWindowEntry(
+                    id: currentWindowID,
+                    title: "Current",
+                    bounds: CGRect(x: 20, y: 20, width: 640, height: 480),
+                    isOnscreen: true,
+                    alpha: 1.0,
+                    storeType: 1,
+                    spaceIDs: [7_002]
+                ),
+                RuntimeSnapshotProvider.CGWindowEntry(
+                    id: unrelatedWindowID,
+                    title: "Unrelated",
+                    bounds: CGRect(x: 30, y: 30, width: 640, height: 480),
+                    isOnscreen: true,
+                    alpha: 1.0,
+                    storeType: 1,
+                    spaceIDs: [7_003]
+                )
+            ]
+        ]
+
+        let targets = provider.appReconciliationTargets(
+            affectedCGWindowIDs: [recordedWindowID, currentWindowID, staleWindowID],
+            currentCGWindowsByPID: currentCGWindowsByPID
+        )
+
+        XCTAssertEqual(
+            targets,
+            [
+                RuntimeAffectedWindowReconciliationTarget(
+                    pid: recordedPID,
+                    appID: "pid:\(recordedPID)",
+                    affectedCGWindowIDs: [recordedWindowID]
+                ),
+                RuntimeAffectedWindowReconciliationTarget(
+                    pid: currentPID,
+                    appID: "pid:\(currentPID)",
+                    affectedCGWindowIDs: [currentWindowID]
+                )
+            ]
+        )
+    }
+
     func testRuntimeSnapshotServiceDrainsAppWindowChangesThroughCoordinator() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
