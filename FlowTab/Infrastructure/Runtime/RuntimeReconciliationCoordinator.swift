@@ -70,6 +70,20 @@ final class RuntimeReconciliationCoordinator {
     }
 
     @discardableResult
+    func markWindowFocusVerified(
+        _ verification: RuntimeWindowFocusVerification,
+        now: TimeInterval
+    ) -> RuntimeReconciliationRequest {
+        updateRequest(
+            target: .app(verification.ownerPID),
+            appID: verification.appID,
+            reasons: [.activationVerified],
+            affectedCGWindowIDs: verification.affectedCGWindowIDs,
+            now: now
+        )
+    }
+
+    @discardableResult
     func applySpaceTopologySnapshot(
         _ snapshot: RuntimeSpaceTopologySnapshot,
         now: TimeInterval

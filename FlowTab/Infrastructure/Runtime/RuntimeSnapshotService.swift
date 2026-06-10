@@ -15,6 +15,7 @@ protocol RuntimeSnapshotServing: Sendable {
     func currentCGWindowsByPID() -> [pid_t: [RuntimeSnapshotProvider.CGWindowEntry]]
     func signalSpaceTopologyChanged()
     func signalAppWindowsChanged(appID: String, pid: pid_t)
+    func signalWindowFocusVerified(_ verification: RuntimeWindowFocusVerification)
     func signalWindowFocusVerified(appID: String, pid: pid_t)
     func isLikelyTransientAXRebuild(for pid: pid_t) -> Bool
 }
@@ -126,17 +127,30 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
         }
     }
 
-    func signalWindowFocusVerified(appID: String, pid: pid_t) {
+    func signalWindowFocusVerified(_ verification: RuntimeWindowFocusVerification) {
         snapshotQueue.async { [self] in
             let now = Date.timeIntervalSinceReferenceDate
-            snapshotProvider.reconciliationCoordinator.markAppDirty(
-                appID: appID,
-                pid: pid,
-                reason: .activationVerified,
+            snapshotProvider.reconciliationCoordinator.markWindowFocusVerified(
+                verification,
                 now: now
             )
             drainReadyReconciliationRequestsLocked(now: now)
         }
+    }
+
+    func signalWindowFocusVerified(appID: String, pid: pid_t) {
+        signalWindowFocusVerified(
+            RuntimeWindowFocusVerification(
+                appID: appID,
+                windowID: "",
+                ownerPID: pid,
+                targetCGWindowID: nil,
+                focusedCGWindowID: nil,
+                title: "",
+                frame: nil,
+                allowedActions: []
+            )
+        )
     }
 
     func isLikelyTransientAXRebuild(for pid: pid_t) -> Bool {

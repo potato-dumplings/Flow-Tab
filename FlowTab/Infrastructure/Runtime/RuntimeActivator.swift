@@ -37,7 +37,7 @@ final class RuntimeActivator {
     var activateCurrentAppIfNeededOverride: ((NSRunningApplication) -> Bool)?
     var requestActivationOverride: ((NSRunningApplication, ((NSRunningApplication) -> Void)?) -> Void)?
     var focusWindowOverride: ((String, String, Bool, NSRunningApplication) -> Void)?
-    var windowFocusVerifiedHandler: ((String, String, pid_t, CGWindowID?, String, CGRect?, Set<WindowBindingAction>) -> Void)?
+    var windowFocusVerifiedHandler: ((RuntimeWindowFocusVerification) -> Void)?
     var windowFocusReadbackMismatchHandler: ((WindowBindingReadbackDiagnostic) -> Void)?
     var focusAXWindowOverride: ((AXUIElement, Bool, NSRunningApplication) -> Bool)?
     var liveWindowRegistry: AXLiveWindowRegistry = .shared
@@ -801,6 +801,10 @@ final class RuntimeActivator {
             return nil
         }
         return AXWindowInspector.cgWindowID(for: focusedWindow)
+    }
+
+    func currentFocusedAXWindowCGWindowIDForReconciliation(in app: NSRunningApplication) -> CGWindowID? {
+        focusedAXWindowCGWindowID(in: app)
     }
 
     private func targetCGWindowIsVisible(

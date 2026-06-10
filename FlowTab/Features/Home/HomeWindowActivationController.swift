@@ -29,17 +29,17 @@ final class HomeWindowActivationController {
             self.activationHandler = activationHandler
         } else {
             let runtimeActivator = RuntimeActivator()
-            runtimeActivator.windowFocusVerifiedHandler = { appID, windowID, ownerPID, cgWindowID, title, frame, allowedActions in
+            runtimeActivator.windowFocusVerifiedHandler = { verification in
                 windowRecencyTracker.recordVerifiedFocus(
-                    appID: appID,
-                    windowID: windowID,
-                    ownerPID: ownerPID,
-                    cgWindowID: cgWindowID,
-                    title: title,
-                    frame: frame,
-                    allowedActions: allowedActions
+                    appID: verification.appID,
+                    windowID: verification.windowID,
+                    ownerPID: verification.ownerPID,
+                    cgWindowID: verification.targetCGWindowID,
+                    title: verification.title,
+                    frame: verification.frame,
+                    allowedActions: verification.allowedActions
                 )
-                snapshotService.signalWindowFocusVerified(appID: appID, pid: ownerPID)
+                snapshotService.signalWindowFocusVerified(verification)
             }
             self.activationHandler = { target, contextsByID in
                 runtimeActivator.activate(target: target, contextsByID: contextsByID)

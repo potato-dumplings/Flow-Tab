@@ -616,9 +616,9 @@ extension FlowTabPriorityCoverageTests {
             ]
         }
 
-        var verifiedAllowedActions: [Set<WindowBindingAction>] = []
-        activator.windowFocusVerifiedHandler = { _, _, _, _, _, _, allowedActions in
-            verifiedAllowedActions.append(allowedActions)
+        var focusVerifications: [RuntimeWindowFocusVerification] = []
+        activator.windowFocusVerifiedHandler = { verification in
+            focusVerifications.append(verification)
         }
 
         let windowID = "cg:\(currentApp.processIdentifier):\(targetCGWindowID)"
@@ -649,9 +649,12 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertEqual(focusedCGWindowIDs, [targetCGWindowID])
         XCTAssertEqual(focusedAXWindowPointers, [targetPointer])
-        XCTAssertEqual(verifiedAllowedActions.count, 1)
-        XCTAssertFalse(verifiedAllowedActions[0].contains(.useForAXActivation))
-        XCTAssertFalse(verifiedAllowedActions[0].contains(.updateRecency))
+        let verification = focusVerifications.first
+        XCTAssertEqual(focusVerifications.count, 1)
+        XCTAssertEqual(verification?.targetCGWindowID, targetCGWindowID)
+        XCTAssertEqual(verification?.focusedCGWindowID, targetCGWindowID)
+        XCTAssertFalse(verification?.allowedActions.contains(.useForAXActivation) == true)
+        XCTAssertFalse(verification?.allowedActions.contains(.updateRecency) == true)
     }
 
     @MainActor
@@ -768,8 +771,8 @@ extension FlowTabPriorityCoverageTests {
         }
 
         var verifiedFocuses: [CGWindowID?] = []
-        activator.windowFocusVerifiedHandler = { _, _, _, cgWindowID, _, _, _ in
-            verifiedFocuses.append(cgWindowID)
+        activator.windowFocusVerifiedHandler = { verification in
+            verifiedFocuses.append(verification.targetCGWindowID)
         }
         var mismatchDiagnostics: [WindowBindingReadbackDiagnostic] = []
         activator.windowFocusReadbackMismatchHandler = {
@@ -871,8 +874,8 @@ extension FlowTabPriorityCoverageTests {
         }
 
         var verifiedFocuses: [CGWindowID?] = []
-        activator.windowFocusVerifiedHandler = { _, _, _, cgWindowID, _, _, _ in
-            verifiedFocuses.append(cgWindowID)
+        activator.windowFocusVerifiedHandler = { verification in
+            verifiedFocuses.append(verification.targetCGWindowID)
         }
         var mismatchDiagnostics: [WindowBindingReadbackDiagnostic] = []
         activator.windowFocusReadbackMismatchHandler = {
@@ -1645,8 +1648,8 @@ extension FlowTabPriorityCoverageTests {
         }
 
         var verifiedCGWindowIDs: [CGWindowID?] = []
-        activator.windowFocusVerifiedHandler = { _, _, _, cgWindowID, _, _, _ in
-            verifiedCGWindowIDs.append(cgWindowID)
+        activator.windowFocusVerifiedHandler = { verification in
+            verifiedCGWindowIDs.append(verification.targetCGWindowID)
         }
 
         let windowID = "cg:\(currentApp.processIdentifier):\(targetCGWindowID)"

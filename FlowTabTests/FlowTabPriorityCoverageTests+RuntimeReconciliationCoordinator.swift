@@ -74,6 +74,30 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(coordinator.readyRequests(now: 12).isEmpty)
     }
 
+    func testRuntimeReconciliationCoordinatorMarksVerifiedFocusReadbackAffectedWindows() throws {
+        let coordinator = RuntimeReconciliationCoordinator()
+
+        let request = coordinator.markWindowFocusVerified(
+            RuntimeWindowFocusVerification(
+                appID: "com.example.editor",
+                windowID: "cg:18405:240001",
+                ownerPID: 18_405,
+                targetCGWindowID: 240_001,
+                focusedCGWindowID: 240_002,
+                title: "Requested Window",
+                frame: CGRect(x: 10, y: 20, width: 800, height: 600),
+                allowedActions: WindowBindingConfidence.exact.allowedActions
+            ),
+            now: 10
+        )
+
+        XCTAssertEqual(request.target, .app(18_405))
+        XCTAssertEqual(request.appID, "com.example.editor")
+        XCTAssertEqual(request.reasons, Set([.activationVerified]))
+        XCTAssertEqual(request.affectedCGWindowIDs, Set<CGWindowID>([240_001, 240_002]))
+        XCTAssertEqual(coordinator.readyRequests(now: 10).map(\.id), [request.id])
+    }
+
     func testRuntimeSnapshotProviderRecordsSpaceTopologyThroughCoordinator() {
         let coordinator = RuntimeReconciliationCoordinator()
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
@@ -220,13 +244,25 @@ extension FlowTabPriorityCoverageTests {
             }
         )
 
-        service.signalWindowFocusVerified(appID: "com.example.editor", pid: 18_405)
+        service.signalWindowFocusVerified(
+            RuntimeWindowFocusVerification(
+                appID: "com.example.editor",
+                windowID: "cg:18405:240001",
+                ownerPID: 18_405,
+                targetCGWindowID: 240_001,
+                focusedCGWindowID: 240_001,
+                title: "Verified Window",
+                frame: CGRect(x: 10, y: 20, width: 800, height: 600),
+                allowedActions: WindowBindingConfidence.exact.allowedActions
+            )
+        )
         _ = service.lightweightAppSnapshot()
 
         let request = try XCTUnwrap(executedRequests.first)
         XCTAssertEqual(request.appID, "com.example.editor")
         XCTAssertEqual(request.target, .app(18_405))
         XCTAssertEqual(request.reasons, Set([.activationVerified]))
+        XCTAssertEqual(request.affectedCGWindowIDs, Set<CGWindowID>([240_001]))
         XCTAssertEqual(request.state, .inFlight)
         XCTAssertTrue(coordinator.readyRequests(now: Date.timeIntervalSinceReferenceDate).isEmpty)
     }

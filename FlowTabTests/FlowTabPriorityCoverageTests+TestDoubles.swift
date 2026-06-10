@@ -89,6 +89,7 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
     private var spaceTopologyChangeSignals = 0
     private var appWindowChangeSignals: [(appID: String, pid: pid_t)] = []
     private var windowFocusVerifiedSignals: [(appID: String, pid: pid_t)] = []
+    private var windowFocusVerificationSignals: [RuntimeWindowFocusVerification] = []
 
     init(
         homeSnapshotsByAppID: [String: RuntimeHomeAppSnapshot] = [:],
@@ -132,6 +133,12 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
         lock.lock()
         defer { lock.unlock() }
         return windowFocusVerifiedSignals
+    }
+
+    func windowFocusVerificationSignalsRecorded() -> [RuntimeWindowFocusVerification] {
+        lock.lock()
+        defer { lock.unlock() }
+        return windowFocusVerificationSignals
     }
 
     func snapshot() -> RuntimeSnapshot {
@@ -188,8 +195,24 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
     }
 
     func signalWindowFocusVerified(appID: String, pid: pid_t) {
+        signalWindowFocusVerified(
+            RuntimeWindowFocusVerification(
+                appID: appID,
+                windowID: "",
+                ownerPID: pid,
+                targetCGWindowID: nil,
+                focusedCGWindowID: nil,
+                title: "",
+                frame: nil,
+                allowedActions: []
+            )
+        )
+    }
+
+    func signalWindowFocusVerified(_ verification: RuntimeWindowFocusVerification) {
         lock.lock()
-        windowFocusVerifiedSignals.append((appID, pid))
+        windowFocusVerifiedSignals.append((verification.appID, verification.ownerPID))
+        windowFocusVerificationSignals.append(verification)
         lock.unlock()
     }
 

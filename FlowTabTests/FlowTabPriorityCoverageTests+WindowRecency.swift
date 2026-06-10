@@ -890,17 +890,21 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
 
         model.activator.windowFocusVerifiedHandler?(
-            appID,
-            "cg:\(currentApp.processIdentifier):240001",
-            currentApp.processIdentifier,
-            240_001,
-            "Verified Window",
-            CGRect(x: 10, y: 20, width: 800, height: 600),
-            WindowBindingConfidence.exact.allowedActions
+            RuntimeWindowFocusVerification(
+                appID: appID,
+                windowID: "cg:\(currentApp.processIdentifier):240001",
+                ownerPID: currentApp.processIdentifier,
+                targetCGWindowID: 240_001,
+                focusedCGWindowID: 240_001,
+                title: "Verified Window",
+                frame: CGRect(x: 10, y: 20, width: 800, height: 600),
+                allowedActions: WindowBindingConfidence.exact.allowedActions
+            )
         )
 
         let signals = snapshotService.windowFocusVerifiedSignalsRecorded()
         XCTAssertEqual(signals.map(\.appID), [appID])
         XCTAssertEqual(signals.map(\.pid), [currentApp.processIdentifier])
+        XCTAssertEqual(snapshotService.windowFocusVerificationSignalsRecorded().map(\.focusedCGWindowID), [240_001])
     }
 }

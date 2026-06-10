@@ -47,18 +47,35 @@ struct WindowBindingReadbackDiagnostic: Equatable {
     let allowedActions: Set<WindowBindingAction>
 }
 
+struct RuntimeWindowFocusVerification: Equatable {
+    let appID: String
+    let windowID: String
+    let ownerPID: pid_t
+    let targetCGWindowID: CGWindowID?
+    let focusedCGWindowID: CGWindowID?
+    let title: String
+    let frame: CGRect?
+    let allowedActions: Set<WindowBindingAction>
+
+    var affectedCGWindowIDs: Set<CGWindowID> {
+        Set([targetCGWindowID, focusedCGWindowID].compactMap { $0 })
+    }
+}
+
 extension RuntimeActivator {
     @discardableResult
     func reportWindowFocusVerified(_ request: WindowFocusRequest, in app: NSRunningApplication) -> Bool {
-        windowFocusVerifiedHandler?(
-            request.appID,
-            request.windowID,
-            request.ownerPID,
-            request.targetCGWindowID(expectedPID: app.processIdentifier),
-            request.title,
-            request.frame,
-            request.bindingAllowedActions
+        let verification = RuntimeWindowFocusVerification(
+            appID: request.appID,
+            windowID: request.windowID,
+            ownerPID: request.ownerPID,
+            targetCGWindowID: request.targetCGWindowID(expectedPID: app.processIdentifier),
+            focusedCGWindowID: currentFocusedAXWindowCGWindowIDForReconciliation(in: app),
+            title: request.title,
+            frame: request.frame,
+            allowedActions: request.bindingAllowedActions
         )
+        windowFocusVerifiedHandler?(verification)
         return true
     }
 }
