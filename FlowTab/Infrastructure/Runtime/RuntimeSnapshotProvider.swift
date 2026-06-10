@@ -130,9 +130,37 @@ final class RuntimeSnapshotProvider {
         let id: String
         let title: String
         let sourceTitle: String?
-        let isMinimized: Bool
+        let state: RuntimeAXWindowState
         let window: AXUIElement
         let frame: CGRect?
+
+        init(
+            index: Int,
+            id: String,
+            title: String,
+            sourceTitle: String?,
+            isMinimized: Bool,
+            isFocused: Bool = false,
+            isMain: Bool = false,
+            window: AXUIElement,
+            frame: CGRect?
+        ) {
+            self.index = index
+            self.id = id
+            self.title = title
+            self.sourceTitle = sourceTitle
+            state = RuntimeAXWindowState(
+                isMinimized: isMinimized,
+                isFocused: isFocused,
+                isMain: isMain
+            )
+            self.window = window
+            self.frame = frame
+        }
+
+        var isMinimized: Bool { state.isMinimized }
+        var isFocused: Bool { state.isFocused }
+        var isMain: Bool { state.isMain }
     }
 
     struct AXWindowStats {
@@ -722,6 +750,8 @@ final class RuntimeSnapshotProvider {
                 title: titleFromAX ?? "",
                 sourceTitle: titleFromAX,
                 isMinimized: AXWindowInspector.isMinimized(window),
+                isFocused: AXWindowInspector.isFocused(window),
+                isMain: AXWindowInspector.isMain(window),
                 window: window,
                 frame: AXWindowInspector.frame(for: window)
             )
@@ -1384,19 +1414,28 @@ final class RuntimeSnapshotProvider {
         let title: String?
         let bounds: CGRect?
         let bridgedCGWindowID: CGWindowID?
+        let isMinimized: Bool
+        let isFocused: Bool
+        let isMain: Bool
 
         init(
             id: String,
             index: Int,
             title: String? = nil,
             bounds: CGRect?,
-            bridgedCGWindowID: CGWindowID? = nil
+            bridgedCGWindowID: CGWindowID? = nil,
+            isMinimized: Bool = false,
+            isFocused: Bool = false,
+            isMain: Bool = false
         ) {
             self.id = id
             self.index = index
             self.title = title
             self.bounds = bounds
             self.bridgedCGWindowID = bridgedCGWindowID
+            self.isMinimized = isMinimized
+            self.isFocused = isFocused
+            self.isMain = isMain
         }
     }
 
@@ -1422,7 +1461,9 @@ final class RuntimeSnapshotProvider {
                 id: $0.id,
                 title: $0.title ?? "",
                 sourceTitle: $0.title,
-                isMinimized: false,
+                isMinimized: $0.isMinimized,
+                isFocused: $0.isFocused,
+                isMain: $0.isMain,
                 window: AXUIElementCreateApplication(pid + pid_t($0.index) + 1),
                 frame: $0.bounds
             )
@@ -1475,7 +1516,9 @@ final class RuntimeSnapshotProvider {
                 id: $0.id,
                 title: $0.title ?? "",
                 sourceTitle: $0.title,
-                isMinimized: false,
+                isMinimized: $0.isMinimized,
+                isFocused: $0.isFocused,
+                isMain: $0.isMain,
                 window: AXUIElementCreateApplication(pid + pid_t($0.index) + 1),
                 frame: $0.bounds
             )
@@ -1550,7 +1593,9 @@ final class RuntimeSnapshotProvider {
                 id: $0.id,
                 title: $0.title ?? "",
                 sourceTitle: $0.title,
-                isMinimized: false,
+                isMinimized: $0.isMinimized,
+                isFocused: $0.isFocused,
+                isMain: $0.isMain,
                 window: AXUIElementCreateApplication(pid + pid_t($0.index) + 1),
                 frame: $0.bounds
             )

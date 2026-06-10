@@ -1,12 +1,24 @@
 import ApplicationServices
 import Foundation
 
+struct RuntimeAXWindowState: Equatable {
+    var isMinimized: Bool
+    var isFocused: Bool
+    var isMain: Bool
+
+    static let inactive = RuntimeAXWindowState(
+        isMinimized: false,
+        isFocused: false,
+        isMain: false
+    )
+}
+
 struct RuntimeCurrentAXAttachment {
     let axWindowID: String
     var axWindow: AXUIElement
     var title: String?
     var frame: CGRect?
-    var isMinimized: Bool
+    var state: RuntimeAXWindowState
 }
 
 struct RuntimeSpaceRecoveryState {
@@ -170,7 +182,15 @@ struct RuntimeWindowRecord {
     }
 
     var isMinimized: Bool {
-        currentAXAttachment?.isMinimized ?? false
+        currentAXAttachment?.state.isMinimized ?? false
+    }
+
+    var isFocused: Bool {
+        currentAXAttachment?.state.isFocused ?? false
+    }
+
+    var isMain: Bool {
+        currentAXAttachment?.state.isMain ?? false
     }
 
     mutating func refreshCGState(
@@ -262,7 +282,7 @@ struct RuntimeWindowRecord {
             axWindow: axWindow.window,
             title: normalizedRuntimeWindowTitle(resolvedTitle) ?? resolvedTitle,
             frame: axWindow.frame,
-            isMinimized: axWindow.isMinimized
+            state: axWindow.state
         )
         lastKnownDisplayTitle = currentAXAttachment?.title ?? lastKnownDisplayTitle
         lastConfirmationSource = confirmationSource

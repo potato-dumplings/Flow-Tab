@@ -256,7 +256,8 @@ private func runtimeSnapshotAXWindowSummary(
     guard !windows.isEmpty else { return "empty" }
     let sample = windows.prefix(limit).map { window in
         let bridgeCG = AXWindowInspector.cgWindowID(for: window.window).map(String.init) ?? "nil"
-        return "\(window.id):\(runtimeSnapshotLogValue(window.sourceTitle ?? window.title)):frame=\(runtimeSnapshotFrameDescription(window.frame)):bridgeCG=\(bridgeCG)"
+        let publicState = "min=\(window.isMinimized ? 1 : 0):focused=\(window.isFocused ? 1 : 0):main=\(window.isMain ? 1 : 0)"
+        return "\(window.id):\(runtimeSnapshotLogValue(window.sourceTitle ?? window.title)):frame=\(runtimeSnapshotFrameDescription(window.frame)):bridgeCG=\(bridgeCG):\(publicState)"
     }.joined(separator: ",")
     return runtimeSnapshotSampleDescription(sample: sample, count: windows.count, limit: limit)
 }

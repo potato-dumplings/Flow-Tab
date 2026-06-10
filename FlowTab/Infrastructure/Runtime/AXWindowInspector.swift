@@ -414,11 +414,22 @@ enum AXWindowInspector {
     }
 
     static func isMinimized(_ window: AXUIElement) -> Bool {
-        var minimizedValue: CFTypeRef?
+        booleanAttribute(kAXMinimizedAttribute as CFString, for: window)
+    }
+
+    static func isFocused(_ window: AXUIElement) -> Bool {
+        booleanAttribute(kAXFocusedAttribute as CFString, for: window)
+    }
+
+    static func isMain(_ window: AXUIElement) -> Bool {
+        booleanAttribute(kAXMainAttribute as CFString, for: window)
+    }
+
+    private static func booleanAttribute(_ attribute: CFString, for window: AXUIElement) -> Bool {
+        var value: CFTypeRef?
         guard
-            AXUIElementCopyAttributeValue(window, kAXMinimizedAttribute as CFString, &minimizedValue)
-                == .success,
-            let number = minimizedValue as? NSNumber
+            AXUIElementCopyAttributeValue(window, attribute, &value) == .success,
+            let number = value as? NSNumber
         else {
             return false
         }
@@ -568,6 +579,14 @@ enum AXWindowInspectorForTesting {
 
     static func isMinimized(_ window: AXUIElement) -> Bool {
         AXWindowInspector.isMinimized(window)
+    }
+
+    static func isFocused(_ window: AXUIElement) -> Bool {
+        AXWindowInspector.isFocused(window)
+    }
+
+    static func isMain(_ window: AXUIElement) -> Bool {
+        AXWindowInspector.isMain(window)
     }
 
     static func windowsFetchLogDetails(

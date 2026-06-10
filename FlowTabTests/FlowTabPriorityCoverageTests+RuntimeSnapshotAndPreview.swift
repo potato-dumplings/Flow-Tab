@@ -532,6 +532,8 @@ extension FlowTabPriorityCoverageTests {
                 title: "Doc A",
                 sourceTitle: "Doc A",
                 isMinimized: false,
+                isFocused: true,
+                isMain: true,
                 window: AXUIElementCreateApplication(90_101),
                 frame: exactBounds
             )
@@ -577,6 +579,17 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(exactRecord.lastKnownCGTitle, "Doc A")
         XCTAssertEqual(exactRecord.lastKnownDisplayTitle, "Doc A")
         XCTAssertEqual(exactRecord.currentAXAttachment?.axWindowID, "ax:18405:0")
+        XCTAssertEqual(
+            exactRecord.currentAXAttachment?.state,
+            RuntimeAXWindowState(
+                isMinimized: false,
+                isFocused: true,
+                isMain: true
+            )
+        )
+        XCTAssertFalse(exactRecord.isMinimized)
+        XCTAssertTrue(exactRecord.isFocused)
+        XCTAssertTrue(exactRecord.isMain)
         XCTAssertEqual(exactRecord.lastExactAXWindowID, "ax:18405:0")
         XCTAssertEqual(exactRecord.spaceRecovery?.spaceIDs, [11_679])
         XCTAssertEqual(exactRecord.lastConfirmationSource, .publicExactMatch)
@@ -2273,6 +2286,83 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(assignments["ax:100:2"], 240_029)
     }
 
+    func testRuntimeSnapshotProviderTestingAXEntriesCarryPublicWindowState() throws {
+        let provider = RuntimeSnapshotProvider()
+        let pid: pid_t = 22_001
+        let bounds = CGRect(x: 20, y: 40, width: 900, height: 700)
+        let axWindows = [
+            RuntimeSnapshotProvider.AXWindowEntryForTesting(
+                id: "ax:22001:0",
+                index: 0,
+                title: "Focused Doc",
+                bounds: bounds,
+                isMinimized: true,
+                isFocused: true,
+                isMain: false
+            )
+        ]
+        let cgWindowsForTesting = [
+            RuntimeSnapshotProvider.CGWindowEntryForTesting(
+                id: 440_001,
+                title: "Focused Doc",
+                bounds: bounds,
+                isOnscreen: true,
+                alpha: 1.0,
+                storeType: 1,
+                spaceIDs: [1]
+            )
+        ]
+
+        let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+            axWindows: axWindows,
+            cgWindows: cgWindowsForTesting,
+            pid: pid
+        )
+        XCTAssertEqual(mergedEntries.first?.isMinimized, true)
+
+        _ = provider.resolvedStableWindowEntries(
+            axWindows: [
+                RuntimeSnapshotProvider.AXWindowEntry(
+                    index: 0,
+                    id: "ax:22001:0",
+                    title: "Focused Doc",
+                    sourceTitle: "Focused Doc",
+                    isMinimized: true,
+                    isFocused: true,
+                    isMain: false,
+                    window: AXUIElementCreateApplication(90_202),
+                    frame: bounds
+                )
+            ],
+            cgWindows: cgWindowsForTesting.map {
+                RuntimeSnapshotProvider.CGWindowEntry(
+                    id: $0.id,
+                    title: $0.title,
+                    bounds: $0.bounds,
+                    isOnscreen: $0.isOnscreen,
+                    alpha: $0.alpha,
+                    storeType: $0.storeType,
+                    spaceIDs: $0.spaceIDs
+                )
+            },
+            pid: pid,
+            appName: "FlowTab Test"
+        )
+
+        let record = try XCTUnwrap(provider.windowMappingStateByPID[pid]?.windowRecordsByCGWindowID[440_001])
+        XCTAssertEqual(
+            record.currentAXAttachment?.state,
+            RuntimeAXWindowState(
+                isMinimized: true,
+                isFocused: true,
+                isMain: false
+            )
+        )
+        XCTAssertTrue(record.isMinimized)
+        XCTAssertTrue(record.isFocused)
+        XCTAssertFalse(record.isMain)
+    }
+
     func testAXWindowInspectorHelpersRoundTripWindowIDsAndHandleSystemElementLookups() {
         let windowID = AXWindowInspectorForTesting.makeWindowID(pid: 123, index: 7)
         XCTAssertEqual(windowID, "ax:123:7")
@@ -2290,6 +2380,8 @@ extension FlowTabPriorityCoverageTests {
             XCTAssertTrue(isSwitchable)
         }
         XCTAssertFalse(AXWindowInspectorForTesting.isMinimized(systemElement))
+        XCTAssertFalse(AXWindowInspectorForTesting.isFocused(systemElement))
+        XCTAssertFalse(AXWindowInspectorForTesting.isMain(systemElement))
 
         if let title = AXWindowInspectorForTesting.title(for: systemElement) {
             XCTAssertFalse(title.isEmpty)

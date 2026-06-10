@@ -1397,7 +1397,8 @@ private func runtimeAXRecoveryAXWindowSummary(
         let title = runtimeAXRecoveryLogValue(window.sourceTitle ?? window.title)
         let role = runtimeAXRecoveryLogValue(AXWindowInspector.role(for: window.window))
         let subrole = runtimeAXRecoveryLogValue(AXWindowInspector.subrole(for: window.window))
-        return "\(window.id):idx=\(window.index):title=\(title):cg=\(bridgedCGWindowID):frame=\(runtimeAXRecoveryFrameDescription(window.frame)):min=\(window.isMinimized ? 1 : 0):role=\(role):subrole=\(subrole)"
+        let publicState = "min=\(window.isMinimized ? 1 : 0):focused=\(window.isFocused ? 1 : 0):main=\(window.isMain ? 1 : 0)"
+        return "\(window.id):idx=\(window.index):title=\(title):cg=\(bridgedCGWindowID):frame=\(runtimeAXRecoveryFrameDescription(window.frame)):\(publicState):role=\(role):subrole=\(subrole)"
     }.joined(separator: ",")
     return "count=\(windows.count) sample=[\(sample)]"
 }
@@ -1422,7 +1423,8 @@ private func runtimeAXRecoveryWindowIDs(
     windows
         .map { window in
             let bridgedCGWindowID = AXWindowInspector.cgWindowID(for: window.window).map(String.init) ?? "nil"
-            return "\(window.id)(cg=\(bridgedCGWindowID),title=\(runtimeAXRecoveryLogValue(window.sourceTitle ?? window.title)),frame=\(runtimeAXRecoveryFrameDescription(window.frame)))"
+            let publicState = "min=\(window.isMinimized ? 1 : 0),focused=\(window.isFocused ? 1 : 0),main=\(window.isMain ? 1 : 0)"
+            return "\(window.id)(cg=\(bridgedCGWindowID),title=\(runtimeAXRecoveryLogValue(window.sourceTitle ?? window.title)),frame=\(runtimeAXRecoveryFrameDescription(window.frame)),\(publicState))"
         }
         .joined(separator: ",")
 }
