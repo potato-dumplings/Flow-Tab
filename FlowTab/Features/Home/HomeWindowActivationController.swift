@@ -39,6 +39,7 @@ final class HomeWindowActivationController {
                     frame: frame,
                     allowedActions: allowedActions
                 )
+                snapshotService.signalWindowFocusVerified(appID: appID, pid: ownerPID)
             }
             self.activationHandler = { target, contextsByID in
                 runtimeActivator.activate(target: target, contextsByID: contextsByID)

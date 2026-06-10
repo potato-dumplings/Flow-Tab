@@ -283,7 +283,7 @@ final class LiveSwitcherModel: ObservableObject {
     ) {
         self.windowRecencyTracker = windowRecencyTracker
         runtimeSnapshotService = snapshotService
-        activator.windowFocusVerifiedHandler = { [windowRecencyTracker] appID, windowID, ownerPID, cgWindowID, title, frame, allowedActions in
+        activator.windowFocusVerifiedHandler = { [windowRecencyTracker, snapshotService] appID, windowID, ownerPID, cgWindowID, title, frame, allowedActions in
             windowRecencyTracker.recordVerifiedFocus(
                 appID: appID,
                 windowID: windowID,
@@ -293,6 +293,7 @@ final class LiveSwitcherModel: ObservableObject {
                 frame: frame,
                 allowedActions: allowedActions
             )
+            snapshotService.signalWindowFocusVerified(appID: appID, pid: ownerPID)
         }
     }
 

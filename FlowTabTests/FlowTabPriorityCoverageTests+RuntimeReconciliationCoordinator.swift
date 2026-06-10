@@ -204,6 +204,33 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(coordinator.readyRequests(now: Date.timeIntervalSinceReferenceDate).isEmpty)
     }
 
+    func testRuntimeSnapshotServiceDrainsVerifiedFocusThroughCoordinator() throws {
+        let coordinator = RuntimeReconciliationCoordinator()
+        let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
+        let lock = NSLock()
+        var executedRequests: [RuntimeReconciliationRequest] = []
+        let service = RuntimeSnapshotService(
+            label: "FlowTabTests.RuntimeSnapshotService.VerifiedFocusSignal",
+            snapshotProvider: provider,
+            reconciliationExecutor: { request, _ in
+                lock.lock()
+                executedRequests.append(request)
+                lock.unlock()
+                return .completed
+            }
+        )
+
+        service.signalWindowFocusVerified(appID: "com.example.editor", pid: 18_405)
+        _ = service.lightweightAppSnapshot()
+
+        let request = try XCTUnwrap(executedRequests.first)
+        XCTAssertEqual(request.appID, "com.example.editor")
+        XCTAssertEqual(request.target, .app(18_405))
+        XCTAssertEqual(request.reasons, Set([.activationVerified]))
+        XCTAssertEqual(request.state, .inFlight)
+        XCTAssertTrue(coordinator.readyRequests(now: Date.timeIntervalSinceReferenceDate).isEmpty)
+    }
+
     func testRuntimeSnapshotServiceSchedulesRetryWhenDrainSeesTransientEmptyAXSnapshot() throws {
         let coordinator = RuntimeReconciliationCoordinator(
             retryPolicy: RuntimeReconciliationRetryPolicy(delays: [0.1])

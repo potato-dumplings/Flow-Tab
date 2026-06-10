@@ -3,6 +3,7 @@ import Foundation
 
 enum RuntimeReconciliationReason: String, Hashable {
     case axNotification
+    case activationVerified
     case spaceTopologyChanged
     case manualRefresh
 }

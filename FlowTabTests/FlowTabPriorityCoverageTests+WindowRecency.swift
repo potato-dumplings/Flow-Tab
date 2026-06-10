@@ -878,4 +878,29 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertEqual(model.session?.apps.first?.windows.map(\.id), ["normal", "fullscreen", "incognito"])
     }
+
+    @MainActor
+    func testLiveSwitcherModelSignalsRuntimeWhenWindowFocusIsVerified() {
+        let snapshotService = RecordingRuntimeSnapshotService()
+        let model = LiveSwitcherModel(
+            windowRecencyTracker: RuntimeWindowRecencyTracker(),
+            snapshotService: snapshotService
+        )
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+
+        model.activator.windowFocusVerifiedHandler?(
+            appID,
+            "cg:\(currentApp.processIdentifier):240001",
+            currentApp.processIdentifier,
+            240_001,
+            "Verified Window",
+            CGRect(x: 10, y: 20, width: 800, height: 600),
+            WindowBindingConfidence.exact.allowedActions
+        )
+
+        let signals = snapshotService.windowFocusVerifiedSignalsRecorded()
+        XCTAssertEqual(signals.map(\.appID), [appID])
+        XCTAssertEqual(signals.map(\.pid), [currentApp.processIdentifier])
+    }
 }

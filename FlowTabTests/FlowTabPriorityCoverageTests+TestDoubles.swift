@@ -88,6 +88,7 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
     private var snapshotRequests = 0
     private var spaceTopologyChangeSignals = 0
     private var appWindowChangeSignals: [(appID: String, pid: pid_t)] = []
+    private var windowFocusVerifiedSignals: [(appID: String, pid: pid_t)] = []
 
     init(
         homeSnapshotsByAppID: [String: RuntimeHomeAppSnapshot] = [:],
@@ -125,6 +126,12 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
         lock.lock()
         defer { lock.unlock() }
         return appWindowChangeSignals
+    }
+
+    func windowFocusVerifiedSignalsRecorded() -> [(appID: String, pid: pid_t)] {
+        lock.lock()
+        defer { lock.unlock() }
+        return windowFocusVerifiedSignals
     }
 
     func snapshot() -> RuntimeSnapshot {
@@ -177,6 +184,12 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
     func signalAppWindowsChanged(appID: String, pid: pid_t) {
         lock.lock()
         appWindowChangeSignals.append((appID, pid))
+        lock.unlock()
+    }
+
+    func signalWindowFocusVerified(appID: String, pid: pid_t) {
+        lock.lock()
+        windowFocusVerifiedSignals.append((appID, pid))
         lock.unlock()
     }
 
