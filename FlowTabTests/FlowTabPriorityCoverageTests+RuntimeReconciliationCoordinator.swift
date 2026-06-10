@@ -202,6 +202,20 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
+    func testRuntimeSnapshotProviderReconcilesAppWindowsWithAffectedCGWindowScope() {
+        let provider = RuntimeSnapshotProvider()
+        let currentPID = NSRunningApplication.current.processIdentifier
+        let affectedCGWindowIDs: Set<CGWindowID> = [240_001, 240_002]
+
+        let result = provider.reconcileAppWindows(
+            processIdentifier: currentPID,
+            affectedCGWindowIDs: affectedCGWindowIDs
+        )
+
+        XCTAssertEqual(result.pid, currentPID)
+        XCTAssertEqual(result.affectedCGWindowIDs, affectedCGWindowIDs)
+    }
+
     func testRuntimeSnapshotServiceDrainsAppWindowChangesThroughCoordinator() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)

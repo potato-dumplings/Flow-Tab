@@ -7,6 +7,13 @@ struct RuntimeAffectedWindowReconciliationTarget: Equatable {
     let affectedCGWindowIDs: Set<CGWindowID>
 }
 
+struct RuntimeAppWindowReconciliationResult: Equatable {
+    let pid: pid_t
+    let affectedCGWindowIDs: Set<CGWindowID>
+    let snapshotWasEmpty: Bool
+    let isTransientEmptyAXSnapshot: Bool
+}
+
 extension RuntimeSnapshotProvider {
     @discardableResult
     func recordSpaceTopologySnapshot(
@@ -52,5 +59,20 @@ extension RuntimeSnapshotProvider {
                 affectedCGWindowIDs: affectedCGWindowIDsByPID[pid] ?? []
             )
         }
+    }
+
+    @discardableResult
+    func reconcileAppWindows(
+        processIdentifier pid: pid_t,
+        affectedCGWindowIDs: Set<CGWindowID>
+    ) -> RuntimeAppWindowReconciliationResult {
+        let snapshot = focusedAppSnapshot(processIdentifier: pid)
+        let snapshotWasEmpty = snapshot?.candidate.windows.isEmpty == true
+        return RuntimeAppWindowReconciliationResult(
+            pid: pid,
+            affectedCGWindowIDs: affectedCGWindowIDs,
+            snapshotWasEmpty: snapshotWasEmpty,
+            isTransientEmptyAXSnapshot: snapshotWasEmpty && isLikelyTransientAXRebuild(for: pid)
+        )
     }
 }

@@ -197,11 +197,11 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
     ) -> ReconciliationExecutionOutcome {
         switch request.target {
         case let .app(pid):
-            let snapshot = snapshotProvider.focusedAppSnapshot(processIdentifier: pid)
-            if
-                snapshot?.candidate.windows.isEmpty == true,
-                snapshotProvider.isLikelyTransientAXRebuild(for: pid)
-            {
+            let result = snapshotProvider.reconcileAppWindows(
+                processIdentifier: pid,
+                affectedCGWindowIDs: request.affectedCGWindowIDs
+            )
+            if result.isTransientEmptyAXSnapshot {
                 return .transientEmptyAXSnapshot
             }
             return .completed
@@ -212,11 +212,11 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
                 currentCGWindowsByPID: cgWindowsByPID
             )
             for target in affectedTargets {
-                let snapshot = snapshotProvider.focusedAppSnapshot(processIdentifier: target.pid)
-                if
-                    snapshot?.candidate.windows.isEmpty == true,
-                    snapshotProvider.isLikelyTransientAXRebuild(for: target.pid)
-                {
+                let result = snapshotProvider.reconcileAppWindows(
+                    processIdentifier: target.pid,
+                    affectedCGWindowIDs: target.affectedCGWindowIDs
+                )
+                if result.isTransientEmptyAXSnapshot {
                     return .transientEmptyAXSnapshot
                 }
             }
