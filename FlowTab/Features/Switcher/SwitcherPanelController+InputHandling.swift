@@ -326,6 +326,7 @@ extension SwitcherPanelController {
     }
 
     func handleActiveSpaceDidChange() {
+        model.signalSpaceTopologyChanged()
         guard isPanelPresented else { return }
         if shouldIgnoreActiveSpaceDidChange() {
             logSearchTrace("systemInterruption trigger=activeSpaceDidChange action=ignored reason=graceWindow \(searchTraceStateSummary())")

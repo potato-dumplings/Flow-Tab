@@ -86,6 +86,7 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
     private var requestedHomeAppIDs: [String] = []
     private var requestedFocusedPIDs: [pid_t] = []
     private var snapshotRequests = 0
+    private var spaceTopologyChangeSignals = 0
 
     init(
         homeSnapshotsByAppID: [String: RuntimeHomeAppSnapshot] = [:],
@@ -111,6 +112,12 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
         lock.lock()
         defer { lock.unlock() }
         return snapshotRequests
+    }
+
+    func spaceTopologyChangeSignalCount() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return spaceTopologyChangeSignals
     }
 
     func snapshot() -> RuntimeSnapshot {
@@ -152,6 +159,12 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
 
     func currentCGWindowsByPID() -> [pid_t: [RuntimeSnapshotProvider.CGWindowEntry]] {
         [:]
+    }
+
+    func signalSpaceTopologyChanged() {
+        lock.lock()
+        spaceTopologyChangeSignals += 1
+        lock.unlock()
     }
 
     func isLikelyTransientAXRebuild(for pid: pid_t) -> Bool {

@@ -461,7 +461,9 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelControllerActiveSpaceChangeKeepsSessionVisibleWithoutReactivatingApp() async {
-        let controller = SwitcherPanelController()
+        let snapshotService = RecordingRuntimeSnapshotService()
+        let model = LiveSwitcherModel(snapshotService: snapshotService)
+        let controller = SwitcherPanelController(model: model)
         controller.modelForTesting.snapshotProviderOverride = {
             RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
         }
@@ -488,7 +490,10 @@ extension FlowTabPriorityCoverageTests {
             timeoutNanoseconds: 1_000_000_000,
             pollIntervalNanoseconds: 10_000_000
         ) {
-            controller.lastPanelVisibilityRecoveryDiagnostic?.after.userVisible == true
+            if case .visibleConfirmed = controller.panelVisibilityRecoveryState {
+                return true
+            }
+            return false
         }
         XCTAssertTrue(didRecoverVisibility)
         XCTAssertNotNil(controller.modelForTesting.session)
@@ -497,79 +502,32 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testSwitcherPanelControllerActiveSpaceNotificationKeepsSessionVisibleWithoutReactivatingApp() async {
-        let controller = SwitcherPanelController()
-        controller.modelForTesting.snapshotProviderOverride = {
-            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
-        }
-        controller.globalPrimaryModifierPressedOverride = true
-        controller.appIsActiveOverride = false
-
-        var activateCallCount = 0
-        controller.activateApplicationIgnoringOtherAppsOverride = {
-            activateCallCount += 1
-        }
-
-        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        controller.panelOcclusionStateOverride = []
-
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 60_000_000)
-            controller.panelOcclusionStateOverride = .visible
-        }
+    func testSwitcherPanelControllerActiveSpaceNotificationSignalsRuntimeTopologyChange() async {
+        let snapshotService = RecordingRuntimeSnapshotService()
+        let model = LiveSwitcherModel(snapshotService: snapshotService)
+        let controller = SwitcherPanelController(model: model)
 
         NSWorkspace.shared.notificationCenter.post(
             name: NSWorkspace.activeSpaceDidChangeNotification,
             object: nil
         )
 
-        let didRecoverVisibility = await waitUntil(
-            "active space notification recovery confirms panel visible",
+        let didSignalRuntime = await waitUntil(
+            "active space notification signals runtime topology change",
             timeoutNanoseconds: 1_000_000_000,
             pollIntervalNanoseconds: 10_000_000
         ) {
-            controller.lastPanelVisibilityRecoveryDiagnostic?.after.userVisible == true
+            snapshotService.spaceTopologyChangeSignalCount() == 1
         }
-        XCTAssertTrue(didRecoverVisibility)
-        XCTAssertNotNil(controller.modelForTesting.session)
-        XCTAssertEqual(activateCallCount, 0)
-        XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
-    }
-
-    @MainActor
-    func testSwitcherPanelControllerActiveSpaceNotificationCancelsSessionAfterModifierRelease() async {
-        let controller = SwitcherPanelController()
-        controller.modelForTesting.snapshotProviderOverride = {
-            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
-        }
-        controller.globalPrimaryModifierPressedOverride = false
-        controller.globalMainKeyPressedOverride = false
-
-        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-
-        NSWorkspace.shared.notificationCenter.post(
-            name: NSWorkspace.activeSpaceDidChangeNotification,
-            object: nil
-        )
-
-        let didCancelSession = await waitUntil(
-            "active space notification cancels session after modifier release",
-            timeoutNanoseconds: 1_000_000_000,
-            pollIntervalNanoseconds: 10_000_000
-        ) {
-            controller.modelForTesting.session == nil
-        }
-        XCTAssertTrue(didCancelSession)
+        XCTAssertTrue(didSignalRuntime)
         XCTAssertNil(controller.modelForTesting.session)
-        XCTAssertTrue(controller.suppressHotkeyReplayUntilReleaseForTesting)
-
-        let notificationSuppressionEnded = await waitForHotkeyReplaySuppressionToEnd(panelController: controller)
-        XCTAssertTrue(notificationSuppressionEnded)
     }
 
     @MainActor
     func testSwitcherPanelControllerActiveSpaceChangeCancelsSessionAfterModifierRelease() async {
-        let controller = SwitcherPanelController()
+        let snapshotService = RecordingRuntimeSnapshotService()
+        let model = LiveSwitcherModel(snapshotService: snapshotService)
+        let controller = SwitcherPanelController(model: model)
         controller.modelForTesting.snapshotProviderOverride = {
             RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
         }

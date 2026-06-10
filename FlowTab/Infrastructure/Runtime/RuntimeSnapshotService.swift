@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import FlowTabCore
 
@@ -12,6 +13,7 @@ protocol RuntimeSnapshotServing: Sendable {
     func homeAppSnapshotSynchronously(for appID: String) -> RuntimeHomeAppSnapshot?
     func focusedAppSnapshot(processIdentifier pid: pid_t) -> RuntimeHomeAppSnapshot?
     func currentCGWindowsByPID() -> [pid_t: [RuntimeSnapshotProvider.CGWindowEntry]]
+    func signalSpaceTopologyChanged()
     func isLikelyTransientAXRebuild(for pid: pid_t) -> Bool
 }
 
@@ -86,6 +88,12 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
     func currentCGWindowsByPID() -> [pid_t: [RuntimeSnapshotProvider.CGWindowEntry]] {
         snapshotQueue.sync {
             snapshotProvider.collectCGWindowsByPID()
+        }
+    }
+
+    func signalSpaceTopologyChanged() {
+        snapshotQueue.async { [snapshotProvider] in
+            _ = snapshotProvider.collectCGWindowsByPID(options: [.excludeDesktopElements])
         }
     }
 

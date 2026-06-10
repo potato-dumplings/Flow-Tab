@@ -262,8 +262,12 @@ final class SwitcherPanelController {
         activeHotkeySessionKind != nil && model.session != nil
     }
 
-    init() {
-        model = LiveSwitcherModel()
+    convenience init() {
+        self.init(model: LiveSwitcherModel())
+    }
+
+    init(model: LiveSwitcherModel) {
+        self.model = model
         panel = SwitcherOverlayPanel(
             contentRect: NSRect(x: 0, y: 0, width: 880, height: 290),
             styleMask: SwitcherPanelWindowConfiguration.styleMask,

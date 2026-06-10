@@ -296,6 +296,10 @@ final class LiveSwitcherModel: ObservableObject {
         }
     }
 
+    func signalSpaceTopologyChanged() {
+        runtimeSnapshotService.signalSpaceTopologyChanged()
+    }
+
     var appCount: Int {
         session?.apps.count ?? 0
     }
