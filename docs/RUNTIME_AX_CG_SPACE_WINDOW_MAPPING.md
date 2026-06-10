@@ -543,7 +543,6 @@ sticky/CG-only 状态。
 
 ### 明确未实现
 
-- [ ] 将 `windowRecordsByCGID` 落成唯一主表，并补齐 `WindowRecord`、`SpaceRecoveryState` 等运行态字段，替换当前 `bindingsByCGWindowID + lastKnownCGWindowsByID` 的简化状态模型。
 - [ ] 实现 `space topology changed -> affectedCGWindowIDs -> needsReconciliation` 的维护链路，而不是仅靠下次全量快照被动刷新。
 - [ ] 实现 `space evidence timeout`、`suspectDeletedAt` 与 grace window 延迟删除流程，避免当前不在 AX 列表里的窗口因证据瞬时缺席而直接失去恢复资格。
 - [ ] 在提交流程中补齐 `Space` 恢复与私有 `CGWindowID` 激活链路：先切到目标 Space，再恢复 AX；必要时按 `CGWindowID` 做私有激活，成功后回读 `AXFocusedWindow` 并重新学习 exact binding。
@@ -551,6 +550,7 @@ sticky/CG-only 状态。
 
 ### 部分实现但仍与目标有偏差
 
+- [ ] `RuntimeWindowRecord` 与 `windowRecordsByCGWindowID` 已承担 `CGWindowID` 主表；`RuntimeWindowRecordDerivedIndexes` 已将当前 `AX -> CG`、反向 `CG -> AX`、`validCGWindowIDs` 与 `lastAXWindowIDs` 收束为主表处理结果的派生 projection，避免在 `RuntimeSnapshotProvider` 中继续双写反向索引。当前仍未完成的是把 record mutation、dirty/retry、space diff 和删除 grace 统一迁出到 reconciliation coordinator。
 - [ ] `RuntimeSpaceTopologySnapshot`、`RuntimeSpaceTopologyDiff` 与 `RuntimeSpaceTopologyProviding` 已落地，生产采集路径也改为先通过 `RuntimeSystemSpaceTopologyProvider` 取得 topology snapshot，再把 `spaceIDsByCGWindowID` 投影给 `CGWindowEntry`。当前已由 deterministic `FlowTabTests` 证明 snapshot 规范化、diff 与 `affectedCGWindowIDs` 规则；但 active-space notification 尚未消费 diff，真实多显示器 / fullscreen Space 拓扑仍缺 UI/E2E 证明。
 - [ ] `window-layer` 当前会输出 sticky 与 `space-backed`/CG-only 条目，但尚未保证每个条目都具备真实提交恢复路径，因此“只展示可提交条目”仍未完全达成。
 - [ ] unresolved/CG-only 条目当前会按 `spaceIDs` 去重；这会吞掉不同 `CGWindowID` 的独立窗口记录，与“`CGWindowID` 是长期主锚点”的模型不一致。

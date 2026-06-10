@@ -17,6 +17,61 @@ struct RuntimeSpaceRecoveryState {
     var invalidatedAt: TimeInterval?
 }
 
+struct RuntimeWindowRecordDerivedIndexes: Equatable {
+    let currentAXToCG: [String: CGWindowID]
+    let validCGWindowIDs: Set<CGWindowID>
+    let lastAXWindowIDs: Set<String>
+
+    var currentCGToAX: [CGWindowID: String] {
+        Dictionary(uniqueKeysWithValues: currentAXToCG.map { ($1, $0) })
+    }
+}
+
+struct RuntimeWindowMappingState {
+    var windowRecordsByCGWindowID: [CGWindowID: RuntimeWindowRecord]
+    private var derivedIndexes: RuntimeWindowRecordDerivedIndexes
+    var hasObservedAXWindowHandle: Bool
+    var consecutiveSnapshotsWithoutAXWindows: Int
+
+    init(
+        windowRecordsByCGWindowID: [CGWindowID: RuntimeWindowRecord] = [:],
+        currentAXToCG: [String: CGWindowID] = [:],
+        validCGWindowIDs: Set<CGWindowID> = [],
+        lastAXWindowIDs: Set<String> = [],
+        hasObservedAXWindowHandle: Bool = false,
+        consecutiveSnapshotsWithoutAXWindows: Int = 0
+    ) {
+        self.windowRecordsByCGWindowID = windowRecordsByCGWindowID
+        derivedIndexes = RuntimeWindowRecordDerivedIndexes(
+            currentAXToCG: currentAXToCG,
+            validCGWindowIDs: validCGWindowIDs,
+            lastAXWindowIDs: lastAXWindowIDs
+        )
+        self.hasObservedAXWindowHandle = hasObservedAXWindowHandle
+        self.consecutiveSnapshotsWithoutAXWindows = consecutiveSnapshotsWithoutAXWindows
+    }
+
+    var currentAXToCG: [String: CGWindowID] {
+        derivedIndexes.currentAXToCG
+    }
+
+    var currentCGToAX: [CGWindowID: String] {
+        derivedIndexes.currentCGToAX
+    }
+
+    var validCGWindowIDs: Set<CGWindowID> {
+        derivedIndexes.validCGWindowIDs
+    }
+
+    var lastAXWindowIDs: Set<String> {
+        derivedIndexes.lastAXWindowIDs
+    }
+
+    var isEmpty: Bool {
+        windowRecordsByCGWindowID.isEmpty
+    }
+}
+
 struct RuntimeWindowRecord {
     let cgWindowID: CGWindowID
     let stableWindowID: String

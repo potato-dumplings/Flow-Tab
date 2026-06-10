@@ -2,20 +2,6 @@ import AppKit
 import ApplicationServices
 import Foundation
 
-struct RuntimeWindowMappingState {
-    var windowRecordsByCGWindowID: [CGWindowID: RuntimeWindowRecord] = [:]
-    var currentAXToCG: [String: CGWindowID] = [:]
-    var currentCGToAX: [CGWindowID: String] = [:]
-    var validCGWindowIDs: Set<CGWindowID> = []
-    var lastAXWindowIDs: Set<String> = []
-    var hasObservedAXWindowHandle = false
-    var consecutiveSnapshotsWithoutAXWindows = 0
-
-    var isEmpty: Bool {
-        windowRecordsByCGWindowID.isEmpty
-    }
-}
-
 struct RuntimeWindowMappingResolution {
     let exactMatchesByAXWindowID: [String: CGWindowID]
     let windowRecordsByCGWindowID: [CGWindowID: RuntimeWindowRecord]
@@ -754,7 +740,6 @@ extension RuntimeSnapshotProvider {
             retainedCGWindowIDs.contains($0.key)
         }
         let currentAXToCG = exactMatchesByAXWindowID
-        let currentCGToAX = Dictionary(uniqueKeysWithValues: currentAXToCG.map { ($1, $0) })
         let lastAXWindowIDs: Set<String>
         if hasAXWindowsInCurrentSnapshot {
             lastAXWindowIDs = Set(axWindows.map(\.id))
@@ -766,7 +751,6 @@ extension RuntimeSnapshotProvider {
         let nextState = RuntimeWindowMappingState(
             windowRecordsByCGWindowID: windowRecordsByCGWindowID,
             currentAXToCG: currentAXToCG,
-            currentCGToAX: currentCGToAX,
             validCGWindowIDs: validCGWindowIDs,
             lastAXWindowIDs: lastAXWindowIDs,
             hasObservedAXWindowHandle: hasObservedAXWindowHandle,
