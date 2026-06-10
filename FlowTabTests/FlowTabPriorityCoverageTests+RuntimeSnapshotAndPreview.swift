@@ -2005,6 +2005,54 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(diagnostics.first?.isQuarantined == true)
     }
 
+    func testRuntimeSnapshotProviderResolveCGWindowAssignmentsUsesFocusedAXStateAsPublicTieBreaker() {
+        let bounds = CGRect(x: 100, y: 100, width: 800, height: 500)
+        let axWindows: [RuntimeSnapshotProvider.AXWindowEntryForTesting] = [
+            .init(id: "ax:310:0", index: 0, title: "Document", bounds: bounds, isFocused: true),
+            .init(id: "ax:310:1", index: 1, title: "Document", bounds: bounds)
+        ]
+        let cgWindows: [RuntimeSnapshotProvider.CGWindowEntryForTesting] = [
+            .init(id: 311, title: "Document", bounds: bounds, isOnscreen: true),
+            .init(id: 312, title: "Document", bounds: bounds, isOnscreen: true)
+        ]
+
+        let assignments = RuntimeSnapshotProvider.resolveCGWindowAssignmentsForTesting(
+            axWindows: axWindows,
+            cgWindows: cgWindows
+        )
+        let diagnostics = RuntimeSnapshotProvider.resolveCGWindowAssignmentDiagnosticsForTesting(
+            axWindows: axWindows,
+            cgWindows: cgWindows
+        )
+
+        XCTAssertEqual(assignments["ax:310:0"], 311)
+        XCTAssertEqual(assignments["ax:310:1"], 312)
+        XCTAssertTrue(diagnostics.isEmpty)
+    }
+
+    func testRuntimeSnapshotProviderResolveCGWindowAssignmentsUsesMinimizedAXStateAsPublicTieBreaker() {
+        let bounds = CGRect(x: 100, y: 100, width: 800, height: 500)
+        let axWindows: [RuntimeSnapshotProvider.AXWindowEntryForTesting] = [
+            .init(id: "ax:320:0", index: 0, title: "Document", bounds: bounds, isMinimized: true)
+        ]
+        let cgWindows: [RuntimeSnapshotProvider.CGWindowEntryForTesting] = [
+            .init(id: 321, title: "Document", bounds: bounds, isOnscreen: true),
+            .init(id: 322, title: "Document", bounds: bounds, isOnscreen: false)
+        ]
+
+        let assignments = RuntimeSnapshotProvider.resolveCGWindowAssignmentsForTesting(
+            axWindows: axWindows,
+            cgWindows: cgWindows
+        )
+        let diagnostics = RuntimeSnapshotProvider.resolveCGWindowAssignmentDiagnosticsForTesting(
+            axWindows: axWindows,
+            cgWindows: cgWindows
+        )
+
+        XCTAssertEqual(assignments["ax:320:0"], 322)
+        XCTAssertTrue(diagnostics.isEmpty)
+    }
+
     func testRuntimeSnapshotProviderPrivateExactBridgeConflictWithStickyBindingReportsDiagnosticAndUsesExactTarget() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let axWindows: [RuntimeSnapshotProvider.AXWindowEntryForTesting] = [
