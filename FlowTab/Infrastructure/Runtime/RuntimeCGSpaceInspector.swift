@@ -114,6 +114,22 @@ protocol RuntimeSpaceTopologyProviding {
     func snapshot(for windowIDs: [CGWindowID]) -> RuntimeSpaceTopologySnapshot
 }
 
+protocol RuntimeCGWindowListProviding {
+    func windowInfo(
+        options: CGWindowListOption,
+        relativeToWindow windowID: CGWindowID
+    ) -> [[String: Any]]?
+}
+
+struct RuntimeSystemCGWindowListProvider: RuntimeCGWindowListProviding {
+    func windowInfo(
+        options: CGWindowListOption,
+        relativeToWindow windowID: CGWindowID
+    ) -> [[String: Any]]? {
+        CGWindowListCopyWindowInfo(options, windowID) as? [[String: Any]]
+    }
+}
+
 struct RuntimeSystemSpaceTopologyProvider: RuntimeSpaceTopologyProviding {
     func snapshot(for windowIDs: [CGWindowID]) -> RuntimeSpaceTopologySnapshot {
         RuntimeCGSpaceInspector.topologySnapshot(for: windowIDs)

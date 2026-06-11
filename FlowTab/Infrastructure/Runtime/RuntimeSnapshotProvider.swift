@@ -223,15 +223,18 @@ final class RuntimeSnapshotProvider {
     }
 
     private static let maxConcurrentAXAppCollections = 4
+    private let cgWindowListProvider: RuntimeCGWindowListProviding
     private let spaceTopologyProvider: RuntimeSpaceTopologyProviding
     let reconciliationCoordinator: RuntimeReconciliationCoordinator
 
     var windowMappingStateByPID: [pid_t: RuntimeWindowMappingState] = [:]
 
     init(
+        cgWindowListProvider: RuntimeCGWindowListProviding = RuntimeSystemCGWindowListProvider(),
         spaceTopologyProvider: RuntimeSpaceTopologyProviding = RuntimeSystemSpaceTopologyProvider(),
         reconciliationCoordinator: RuntimeReconciliationCoordinator = RuntimeReconciliationCoordinator()
     ) {
+        self.cgWindowListProvider = cgWindowListProvider
         self.spaceTopologyProvider = spaceTopologyProvider
         self.reconciliationCoordinator = reconciliationCoordinator
     }
@@ -984,7 +987,10 @@ final class RuntimeSnapshotProvider {
     ) -> [pid_t: [CGWindowEntry]] {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
         guard
-            let rawList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]]
+            let rawList = cgWindowListProvider.windowInfo(
+                options: options,
+                relativeToWindow: kCGNullWindowID
+            )
         else {
             logSnapshotTiming(
                 "collectCGWindows",

@@ -173,6 +173,58 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(request?.affectedCGWindowIDs, Set<CGWindowID>([240_001, 240_002, 240_003]))
     }
 
+    func testRuntimeSnapshotServiceDrainsSpaceTopologySignalThroughCoordinator() throws {
+        let coordinator = RuntimeReconciliationCoordinator()
+        let affectedWindowID = CGWindowID(240_001)
+        let provider = RuntimeSnapshotProvider(
+            cgWindowListProvider: FixedRuntimeCGWindowListProvider(
+                rawWindowInfo: [
+                    makeRawCGWindowInfo(
+                        pid: 18_405,
+                        windowID: affectedWindowID,
+                        title: "Topology Target"
+                    )
+                ]
+            ),
+            spaceTopologyProvider: FixedRuntimeSpaceTopologyProvider(
+                snapshot: RuntimeSpaceTopologySnapshot(
+                    spacesByID: [
+                        7: RuntimeSpaceTopologySpace(id: 7, displayID: 1, isCurrent: true)
+                    ],
+                    windowIDsBySpaceID: [
+                        7: [affectedWindowID]
+                    ],
+                    spaceIDsByCGWindowID: [
+                        affectedWindowID: [7]
+                    ]
+                )
+            ),
+            reconciliationCoordinator: coordinator
+        )
+        let lock = NSLock()
+        var executedRequests: [RuntimeReconciliationRequest] = []
+        let service = RuntimeSnapshotService(
+            label: "FlowTabTests.RuntimeSnapshotService.SpaceTopologySignal",
+            snapshotProvider: provider,
+            reconciliationExecutor: { request, _ in
+                lock.lock()
+                executedRequests.append(request)
+                lock.unlock()
+                return .completed
+            }
+        )
+
+        service.signalSpaceTopologyChanged()
+        _ = service.lightweightAppSnapshot()
+
+        let request = try XCTUnwrap(executedRequests.first)
+        XCTAssertEqual(request.target, .spaceTopology)
+        XCTAssertEqual(request.reasons, Set([.spaceTopologyChanged]))
+        XCTAssertEqual(request.affectedCGWindowIDs, [affectedWindowID])
+        XCTAssertEqual(request.state, .inFlight)
+        XCTAssertTrue(coordinator.readyRequests(now: Date.timeIntervalSinceReferenceDate).isEmpty)
+    }
+
     func testRuntimeSnapshotProviderDerivesAffectedAppTargetsFromRecordsAndCurrentCGWindows() {
         let provider = RuntimeSnapshotProvider()
         let recordedWindowID = CGWindowID(240_001)
