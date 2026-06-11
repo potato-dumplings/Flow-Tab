@@ -7,6 +7,7 @@ protocol SpaceFixtureWindowing: AnyObject {
     var plan: SpaceFixtureWindowPlan { get }
     var applicationAccessibilityElement: Any { get }
     func show(isKey: Bool)
+    func close()
     func enterFullScreen(completion: @escaping @MainActor () -> Void)
     func updateWorkflowReadiness(windowTitles: [String])
 }
@@ -72,6 +73,7 @@ final class SpaceFixtureWindowCoordinator {
         activateApplication()
         windows.forEach { $0.updateWorkflowReadiness(windowTitles: windowTitles) }
         publishApplicationAccessibilityElements()
+        scheduleWindowCloseIfNeeded()
 
         guard !configuration.fullscreenWindowIndices.isEmpty else {
             scheduleApplicationAccessibilitySuppressionIfNeeded()
@@ -83,6 +85,18 @@ final class SpaceFixtureWindowCoordinator {
             return
         }
         scheduleFullscreenTransitions(fullscreenWindows)
+    }
+
+    private func scheduleWindowCloseIfNeeded() {
+        guard let closeWindowIndex = configuration.closeWindowIndex else { return }
+        fullscreenScheduler(configuration.closeWindowDelayMilliseconds) {
+            guard let index = self.windows.firstIndex(where: { $0.plan.index == closeWindowIndex }) else {
+                return
+            }
+            let window = self.windows.remove(at: index)
+            window.close()
+            self.publishApplicationAccessibilityElements()
+        }
     }
 
     private func orderedFullscreenWindowsForTransition() -> [any SpaceFixtureWindowing] {

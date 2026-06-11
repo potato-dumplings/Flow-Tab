@@ -8,6 +8,7 @@ private final class SpaceFixtureWindowSpy: SpaceFixtureWindowing {
     let applicationAccessibilityElement: Any
 
     private(set) var showCalls: [Bool] = []
+    private(set) var closeCallCount = 0
     private(set) var enterFullScreenCallCount = 0
     private(set) var enterFullScreenCompletions: [(@MainActor () -> Void)] = []
     private(set) var workflowReadyCalls: [[String]] = []
@@ -19,6 +20,10 @@ private final class SpaceFixtureWindowSpy: SpaceFixtureWindowing {
 
     func show(isKey: Bool) {
         showCalls.append(isKey)
+    }
+
+    func close() {
+        closeCallCount += 1
     }
 
     func enterFullScreen(completion: @escaping @MainActor () -> Void) {
@@ -470,6 +475,54 @@ extension FlowTabTests {
         XCTAssertEqual(windowSpies[0].workflowReadyCalls, [["Fixture 1", "Fixture 2"]])
         XCTAssertEqual(windowSpies[1].workflowReadyCalls, [["Fixture 1", "Fixture 2"]])
         XCTAssertEqual(scheduledCallCount, 0)
+    }
+
+    @MainActor
+    func testSpaceFixtureWindowCoordinatorSchedulesConfiguredWindowClose() {
+        let configuration = SpaceFixtureLaunchConfiguration(
+            windowCount: 2,
+            fullscreenWindowIndex: nil,
+            windowTitlePrefix: "Fixture",
+            usesStaggeredLayout: false,
+            enterFullscreenDelayMilliseconds: 500,
+            preservesDesktopAfterFullscreen: false,
+            closeWindowIndex: 2,
+            closeWindowDelayMilliseconds: 1_300
+        )
+
+        var windowSpies: [SpaceFixtureWindowSpy] = []
+        var scheduledDelays: [Int] = []
+        var scheduledActions: [(@MainActor () -> Void)] = []
+        var publishedAccessibilityElements: [[String]] = []
+
+        let coordinator = SpaceFixtureWindowCoordinator(
+            configuration: configuration,
+            visibleFrameProvider: { CGRect(x: 0, y: 0, width: 1280, height: 800) },
+            windowFactory: { plan in
+                let spy = SpaceFixtureWindowSpy(plan: plan)
+                windowSpies.append(spy)
+                return spy
+            },
+            fullscreenScheduler: { delay, action in
+                scheduledDelays.append(delay)
+                scheduledActions.append(action)
+            },
+            applicationAccessibilityElementsPublisher: { elements in
+                publishedAccessibilityElements.append(elements.compactMap { $0 as? String })
+            }
+        )
+
+        coordinator.launch()
+
+        XCTAssertEqual(windowSpies.count, 2)
+        XCTAssertEqual(scheduledDelays, [1_300])
+        XCTAssertEqual(publishedAccessibilityElements, [["ax-element-1", "ax-element-2"]])
+
+        scheduledActions[0]()
+
+        XCTAssertEqual(windowSpies[0].closeCallCount, 0)
+        XCTAssertEqual(windowSpies[1].closeCallCount, 1)
+        XCTAssertEqual(publishedAccessibilityElements, [["ax-element-1", "ax-element-2"], ["ax-element-1"]])
     }
 
     @MainActor

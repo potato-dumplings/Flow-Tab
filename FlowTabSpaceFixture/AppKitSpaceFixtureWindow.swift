@@ -46,6 +46,11 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
         window.orderFrontRegardless()
     }
 
+    func close() {
+        noisyCGSiblings?.close()
+        window.close()
+    }
+
     func enterFullScreen(completion: @escaping @MainActor () -> Void) {
         suppressNoisyFullScreenContentAccessibilityIfNeeded()
         installFullScreenCompletionObserver(completion: completion)
@@ -169,6 +174,14 @@ private final class NoisyCGSiblingWindowSet {
         for contentView in contentViews {
             contentView.updateWorkflowReadiness(windowTitles: windowTitles)
         }
+    }
+
+    func close() {
+        for window in windows {
+            window.close()
+        }
+        windows.removeAll()
+        contentViews.removeAll()
     }
 
     private func makeWindows(around hostWindow: NSWindow) -> [NSWindow] {

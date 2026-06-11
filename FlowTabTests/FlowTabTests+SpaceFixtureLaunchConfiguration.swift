@@ -67,6 +67,8 @@ extension FlowTabTests {
         XCTAssertFalse(configuration.preservesDesktopAfterFullscreen)
         XCTAssertTrue(configuration.publishesApplicationAccessibilityChildren)
         XCTAssertEqual(configuration.terminationDelayMilliseconds, 0)
+        XCTAssertNil(configuration.closeWindowIndex)
+        XCTAssertEqual(configuration.closeWindowDelayMilliseconds, 0)
     }
 
     func testSpaceFixtureLaunchConfigurationNormalizesInvalidNumericArguments() {
@@ -78,6 +80,8 @@ extension FlowTabTests {
                 "--window-title-prefix", "  ",
                 "--enter-fullscreen-delay-ms", "-25",
                 "--terminate-delay-ms", "-40",
+                "--close-window-index", "9",
+                "--close-window-delay-ms", "-50",
                 "--suppress-app-accessibility-children"
             ]
         )
@@ -89,17 +93,24 @@ extension FlowTabTests {
         XCTAssertFalse(configuration.preservesDesktopAfterFullscreen)
         XCTAssertFalse(configuration.publishesApplicationAccessibilityChildren)
         XCTAssertEqual(configuration.terminationDelayMilliseconds, 0)
+        XCTAssertNil(configuration.closeWindowIndex)
+        XCTAssertEqual(configuration.closeWindowDelayMilliseconds, 0)
     }
 
-    func testSpaceFixtureLaunchConfigurationParsesTerminationDelay() {
+    func testSpaceFixtureLaunchConfigurationParsesTerminationAndWindowCloseDelays() {
         let configuration = SpaceFixtureLaunchConfiguration(
             arguments: [
                 "FlowTabSpaceFixture",
-                "--terminate-delay-ms", "1200"
+                "--window-count", "3",
+                "--terminate-delay-ms", "1200",
+                "--close-window-index", "2",
+                "--close-window-delay-ms", "1800"
             ]
         )
 
         XCTAssertEqual(configuration.terminationDelayMilliseconds, 1200)
+        XCTAssertEqual(configuration.closeWindowIndex, 2)
+        XCTAssertEqual(configuration.closeWindowDelayMilliseconds, 1800)
     }
 
     func testSpaceFixtureWindowPlannerCreatesStaggeredPlansAndFullscreenMarker() {

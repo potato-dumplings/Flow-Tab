@@ -131,7 +131,9 @@ extension FlowTabUITests {
         fullscreenWindowIndex: Int? = 3,
         titlePrefix: String = "Workflow",
         enterFullscreenDelayMilliseconds: Int = 1_500,
-        terminationDelayMilliseconds: Int = 0
+        terminationDelayMilliseconds: Int = 0,
+        closeWindowIndex: Int? = nil,
+        closeWindowDelayMilliseconds: Int = 0
     ) -> XCUIApplication {
         terminateSpaceFixtureAppIfRunning(identity: identity)
 
@@ -145,6 +147,12 @@ extension FlowTabUITests {
         ]
         if let fullscreenWindowIndex {
             additionalArguments += ["--fullscreen-window-index", String(fullscreenWindowIndex)]
+        }
+        if let closeWindowIndex {
+            additionalArguments += [
+                "--close-window-index", String(closeWindowIndex),
+                "--close-window-delay-ms", String(closeWindowDelayMilliseconds)
+            ]
         }
 
         let app = makeSpaceFixtureApp(identity: identity, additionalArguments: additionalArguments)

@@ -48,6 +48,8 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
     let preservesDesktopAfterFullscreen: Bool
     let publishesApplicationAccessibilityChildren: Bool
     let terminationDelayMilliseconds: Int
+    let closeWindowIndex: Int?
+    let closeWindowDelayMilliseconds: Int
     let workflowName: String?
     let workflowAppID: String?
     let workflowAppName: String?
@@ -78,6 +80,8 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
         preservesDesktopAfterFullscreen: Bool,
         publishesApplicationAccessibilityChildren: Bool = true,
         terminationDelayMilliseconds: Int = 0,
+        closeWindowIndex: Int? = nil,
+        closeWindowDelayMilliseconds: Int = 0,
         workflowName: String? = nil,
         workflowAppID: String? = nil,
         workflowAppName: String? = nil
@@ -89,6 +93,8 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
         self.preservesDesktopAfterFullscreen = preservesDesktopAfterFullscreen
         self.publishesApplicationAccessibilityChildren = publishesApplicationAccessibilityChildren
         self.terminationDelayMilliseconds = max(0, terminationDelayMilliseconds)
+        self.closeWindowIndex = closeWindowIndex.flatMap { windows.indices.contains($0 - 1) ? $0 : nil }
+        self.closeWindowDelayMilliseconds = max(0, closeWindowDelayMilliseconds)
         self.workflowName = workflowName
         self.workflowAppID = workflowAppID
         self.workflowAppName = workflowAppName
@@ -102,7 +108,9 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
         enterFullscreenDelayMilliseconds: Int,
         preservesDesktopAfterFullscreen: Bool,
         publishesApplicationAccessibilityChildren: Bool = true,
-        terminationDelayMilliseconds: Int = 0
+        terminationDelayMilliseconds: Int = 0,
+        closeWindowIndex: Int? = nil,
+        closeWindowDelayMilliseconds: Int = 0
     ) {
         let normalizedWindowCount = max(Self.minimumWindowCount, windowCount)
         let normalizedFullscreenWindowIndex: Int?
@@ -135,7 +143,9 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
             enterFullscreenDelayMilliseconds: max(0, enterFullscreenDelayMilliseconds),
             preservesDesktopAfterFullscreen: preservesDesktopAfterFullscreen,
             publishesApplicationAccessibilityChildren: publishesApplicationAccessibilityChildren,
-            terminationDelayMilliseconds: terminationDelayMilliseconds
+            terminationDelayMilliseconds: terminationDelayMilliseconds,
+            closeWindowIndex: closeWindowIndex,
+            closeWindowDelayMilliseconds: closeWindowDelayMilliseconds
         )
     }
 
@@ -165,6 +175,10 @@ extension SpaceFixtureLaunchConfiguration {
             0,
             Self.intValue(after: "--terminate-delay-ms", in: arguments) ?? 0
         )
+        let normalizedCloseWindowDelayMilliseconds = max(
+            0,
+            Self.intValue(after: "--close-window-delay-ms", in: arguments) ?? 0
+        )
 
         self.init(
             windowCount: normalizedWindowCount,
@@ -176,7 +190,9 @@ extension SpaceFixtureLaunchConfiguration {
             enterFullscreenDelayMilliseconds: normalizedDelayMilliseconds,
             preservesDesktopAfterFullscreen: arguments.contains("--preserve-desktop-after-fullscreen"),
             publishesApplicationAccessibilityChildren: !arguments.contains("--suppress-app-accessibility-children"),
-            terminationDelayMilliseconds: normalizedTerminationDelayMilliseconds
+            terminationDelayMilliseconds: normalizedTerminationDelayMilliseconds,
+            closeWindowIndex: Self.intValue(after: "--close-window-index", in: arguments),
+            closeWindowDelayMilliseconds: normalizedCloseWindowDelayMilliseconds
         )
     }
 
@@ -233,6 +249,11 @@ extension SpaceFixtureLaunchConfiguration {
             terminationDelayMilliseconds: max(
                 0,
                 Self.intValue(after: "--terminate-delay-ms", in: arguments) ?? 0
+            ),
+            closeWindowIndex: Self.intValue(after: "--close-window-index", in: arguments),
+            closeWindowDelayMilliseconds: max(
+                0,
+                Self.intValue(after: "--close-window-delay-ms", in: arguments) ?? 0
             ),
             workflowName: workflowConfiguration.workflowName,
             workflowAppID: appConfiguration.appID,

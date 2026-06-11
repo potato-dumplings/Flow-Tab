@@ -174,6 +174,61 @@ extension FlowTabUITests {
         )
     }
 
+    func testRuntimeLifecycleRefreshesRealFixtureWindowSetMutation() throws {
+        let identity = spaceFixtureAppIdentity
+
+        guard assertSpaceFixtureWorkflowPermissionsAvailable() else { return }
+
+        let app = makeRealRuntimeFlowTabApp(
+            additionalArguments: [
+                "--flowtab-ui-runtime-log-level",
+                "DEBUG",
+                "--flowtab-ui-enable-verbose-logs"
+            ]
+        )
+        launchFlowTabUITestApplication(app)
+        defer {
+            if app.state == .runningForeground || app.state == .runningBackground {
+                app.terminate()
+            }
+        }
+
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 12))
+
+        let fixtureApp = launchSpaceFixtureWorkflow(
+            identity: identity,
+            windowCount: 2,
+            fullscreenWindowIndex: nil,
+            titlePrefix: "Mutation",
+            enterFullscreenDelayMilliseconds: 0,
+            closeWindowIndex: 2,
+            closeWindowDelayMilliseconds: 7_500
+        )
+        defer {
+            if fixtureApp.state == .runningForeground || fixtureApp.state == .runningBackground {
+                fixtureApp.terminate()
+                waitForSpaceFixtureApplicationToTerminate(fixtureApp)
+            }
+        }
+
+        app.activate()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 5))
+        let fixtureAppRow = openHomeTabAndSelectSpaceFixtureApp(in: app, identity: identity, timeout: 12)
+        assertValue(of: fixtureAppRow, equals: "2w", timeout: 12)
+
+        let mutationLogSnapshot = makeRuntimeLogFileSnapshot()
+        assertValue(of: fixtureAppRow, equals: "1w", timeout: 15)
+        waitForRuntimeLogFiles(
+            containing: [
+                "homeRefreshSingleApp begin appID=\(identity.bundleIdentifier)",
+                "reason=ax_window_changed"
+            ],
+            since: mutationLogSnapshot,
+            timeout: 8
+        )
+        XCTAssertNotEqual(fixtureApp.state, .notRunning)
+    }
+
     func testSwitcherPanelShowsRealSpaceFixtureWorkflowWindowCards() throws {
         runRealSpaceFixtureWorkflow(
             flowTabAdditionalArguments: [
