@@ -818,6 +818,94 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testRuntimeActivatorVerifiesFocusWhenFocusedAXCGMatchesOffscreenTargetCG() {
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let activator = RuntimeActivator()
+        activator.activateCurrentAppIfNeededOverride = { _ in false }
+        activator.focusRecoveryRetryDelaysNanoseconds = []
+
+        let axWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
+        let targetCGWindowID: CGWindowID = 245_254
+        let previousCGWindowIDOverride = AXWindowInspector.cgWindowIDOverrideForTesting
+        AXWindowInspector.cgWindowIDOverrideForTesting = { window in
+            if CFEqual(window, axWindow) {
+                return targetCGWindowID
+            }
+            return previousCGWindowIDOverride?(window)
+        }
+        defer {
+            AXWindowInspector.cgWindowIDOverrideForTesting = previousCGWindowIDOverride
+        }
+
+        activator.focusCGWindowOverride = { _, _ in false }
+        activator.focusAXWindowOverride = { window, _, _ in
+            XCTAssertTrue(CFEqual(window, axWindow))
+            return true
+        }
+        activator.focusedAXWindowOverride = { _ in axWindow }
+        activator.currentCGWindowsOverride = { pid in
+            XCTAssertEqual(pid, currentApp.processIdentifier)
+            return [
+                RuntimeSnapshotProvider.CGWindowEntry(
+                    id: targetCGWindowID,
+                    title: "Readback Target",
+                    bounds: CGRect(x: 0, y: 40, width: 960, height: 640),
+                    isOnscreen: false,
+                    alpha: 1.0,
+                    storeType: 1
+                ),
+                RuntimeSnapshotProvider.CGWindowEntry(
+                    id: 245_255,
+                    title: "Visible Other",
+                    bounds: CGRect(x: 40, y: 80, width: 800, height: 600),
+                    isOnscreen: true,
+                    alpha: 1.0,
+                    storeType: 1
+                )
+            ]
+        }
+
+        var verification: RuntimeWindowFocusVerification?
+        activator.windowFocusVerifiedHandler = {
+            verification = $0
+        }
+        var mismatchDiagnostics: [WindowBindingReadbackDiagnostic] = []
+        activator.windowFocusReadbackMismatchHandler = {
+            mismatchDiagnostics.append($0)
+        }
+
+        let windowID = "cg:\(currentApp.processIdentifier):\(targetCGWindowID)"
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windowsByID: [
+                windowID: RuntimeWindowContext(
+                    id: windowID,
+                    title: "Readback Target",
+                    isMinimized: false,
+                    ownerPID: currentApp.processIdentifier,
+                    cgWindowID: targetCGWindowID,
+                    spaceIDs: [1],
+                    activationHandleID: "ax:\(currentApp.processIdentifier):readback-focused",
+                    axWindow: axWindow,
+                    lastConfirmationSource: .publicExactMatch
+                )
+            ]
+        )
+
+        activator.activate(
+            target: .window(appID: appID, windowID: windowID, restoreIfMinimized: false),
+            contextsByID: [appID: context]
+        )
+
+        XCTAssertEqual(verification?.targetCGWindowID, targetCGWindowID)
+        XCTAssertEqual(verification?.focusedCGWindowID, targetCGWindowID)
+        XCTAssertTrue(verification?.focusedAXWindow.map { CFEqual($0, axWindow) } == true)
+        XCTAssertTrue(mismatchDiagnostics.isEmpty)
+    }
+
+    @MainActor
     func testRuntimeActivatorReportsFocusedAXCGWindowMismatchWhenVisibleTargetIsNotFocused() {
         let currentApp = NSRunningApplication.current
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"

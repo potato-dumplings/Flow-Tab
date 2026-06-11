@@ -120,6 +120,12 @@ extension FlowTabUITests {
                 timeout: 8,
                 description: "nonzero Space topology affected-window diff after \(phase.trace) confirm"
             )
+            waitForRuntimeLogFiles(
+                matching: "binding-confidence-change windowID=cg:[0-9]+:\(selection.windowNumber) cg=\(selection.windowNumber) .* source=.*->verifiedFocusReadback",
+                since: topologyLogSnapshot,
+                timeout: 8,
+                description: "verified-focus exact WindowRecord relearn after \(phase.trace) confirm"
+            )
             expectedCurrentSelection = selection
             logWorkflowSpaceObservation("\(traceLabel).afterConfirm.\(phase.trace)", app: targetApp)
         }

@@ -418,11 +418,12 @@ final class RuntimeActivator {
         )
         let focusedCGWindowID = focusedAXWindowCGWindowID(in: app)
         let focusedCGWindowMatches = focusedCGWindowID.map { $0 == targetCGWindowID } ?? true
+        let hasFocusedCGWindowMatch = focusedCGWindowID == targetCGWindowID
         RuntimeLog.debug(
             .activation,
             "focus-verify route=\(route) pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID) visible=\(isVisible ? 1 : 0) focusedCG=\(focusedCGWindowID.map(String.init) ?? "nil") windows=\(runtimeActivationCGWindowSummary(currentWindows, targetCGWindowID: targetCGWindowID))"
         )
-        if !isVisible {
+        if !isVisible, !hasFocusedCGWindowMatch {
             reportBindingReadbackMismatch(
                 request,
                 route: route,
@@ -444,7 +445,7 @@ final class RuntimeActivator {
                 in: app
             )
         }
-        return isVisible && focusedCGWindowMatches
+        return (isVisible && focusedCGWindowMatches) || hasFocusedCGWindowMatch
     }
 
     private func attemptCGWindowFocus(
