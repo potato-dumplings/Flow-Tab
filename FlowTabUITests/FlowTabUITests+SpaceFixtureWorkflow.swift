@@ -111,6 +111,69 @@ extension FlowTabUITests {
         XCTAssertTrue(waitForSwitcherSummary(in: app, containing: "apps=", timeout: 5))
     }
 
+    func testRuntimeLifecycleRefreshesRealFixtureAppLaunchAndTermination() throws {
+        let identity = spaceFixtureAppIdentity
+
+        guard assertSpaceFixtureWorkflowPermissionsAvailable() else { return }
+
+        let app = makeRealRuntimeFlowTabApp(
+            additionalArguments: [
+                "--flowtab-ui-runtime-log-level",
+                "DEBUG",
+                "--flowtab-ui-enable-verbose-logs"
+            ]
+        )
+        launchFlowTabUITestApplication(app)
+        defer {
+            if app.state == .runningForeground || app.state == .runningBackground {
+                app.terminate()
+            }
+        }
+
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 12))
+
+        let launchLogSnapshot = makeRuntimeLogFileSnapshot()
+        let fixtureApp = launchSpaceFixtureWorkflow(
+            identity: identity,
+            windowCount: 1,
+            fullscreenWindowIndex: nil,
+            titlePrefix: "Lifecycle",
+            enterFullscreenDelayMilliseconds: 0
+        )
+        defer {
+            if fixtureApp.state == .runningForeground || fixtureApp.state == .runningBackground {
+                fixtureApp.terminate()
+                waitForSpaceFixtureApplicationToTerminate(fixtureApp)
+            }
+        }
+
+        waitForRuntimeLogFiles(
+            containing: [
+                "runtimeLifecycle appLaunched appID=\(identity.bundleIdentifier)",
+                "pid="
+            ],
+            since: launchLogSnapshot,
+            timeout: 8
+        )
+
+        app.activate()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 5))
+        let fixtureAppRow = openHomeTabAndSelectSpaceFixtureApp(in: app, identity: identity, timeout: 12)
+        assertValue(of: fixtureAppRow, equals: "1w", timeout: 12)
+
+        let terminationLogSnapshot = makeRuntimeLogFileSnapshot()
+        fixtureApp.terminate()
+        XCTAssertTrue(waitForApplicationToTerminate(fixtureApp, timeout: 8))
+        waitForRuntimeLogFiles(
+            containing: [
+                "runtimeLifecycle appTerminated appID=\(identity.bundleIdentifier)",
+                "pid="
+            ],
+            since: terminationLogSnapshot,
+            timeout: 8
+        )
+    }
+
     func testSwitcherPanelShowsRealSpaceFixtureWorkflowWindowCards() throws {
         runRealSpaceFixtureWorkflow(
             flowTabAdditionalArguments: [

@@ -126,6 +126,7 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
                 reason: .appLaunched,
                 now: now
             )
+            RuntimeLog.debug(.snapshot, "runtimeLifecycle appLaunched appID=\(appID) pid=\(pid)")
             drainReadyReconciliationRequestsLocked(now: now)
         }
     }
