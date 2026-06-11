@@ -93,6 +93,56 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertNil(record.spaceRecovery?.invalidatedAt)
     }
 
+    func testRuntimeWindowRecordClearsReconciliationNeedWhenCGEvidenceReturns() {
+        let cgWindow = RuntimeSnapshotProvider.CGWindowEntry(
+            id: 243_748,
+            title: "Topology Window",
+            bounds: CGRect(x: 12, y: 124, width: 900, height: 700),
+            isOnscreen: false,
+            alpha: 1.0,
+            storeType: 1,
+            spaceIDs: [11_684]
+        )
+        var record = RuntimeWindowRecord(
+            cgWindowID: cgWindow.id,
+            stableWindowID: "cg:18405:243748",
+            firstSeenAt: 20
+        )
+
+        record.markNeedsReconciliation(observedAt: 21)
+        record.refreshCGState(from: cgWindow, observedAt: 22)
+
+        XCTAssertFalse(record.needsReconciliation)
+        XCTAssertEqual(record.lastReconciliationMarkedAt, 21)
+    }
+
+    func testRuntimeWindowRecordClearsReconciliationNeedAfterLifecycleReconciliation() {
+        let policy = RuntimeWindowRecordLifecyclePolicy(evidenceGraceInterval: 1.0)
+        var record = RuntimeWindowRecord(
+            cgWindowID: 243_749,
+            stableWindowID: "cg:18405:243749",
+            firstSeenAt: 20
+        )
+        record.spaceRecovery = RuntimeSpaceRecoveryState(
+            cgWindowID: 243_749,
+            spaceIDs: [11_685],
+            hasConfirmedActivationRoute: true,
+            lastValidatedAt: 20,
+            invalidatedAt: nil
+        )
+
+        record.markNeedsReconciliation(observedAt: 21)
+        let decision = record.reconcileLifecycle(
+            validCGWindowIDs: [],
+            observedAt: 21.2,
+            policy: policy
+        )
+
+        XCTAssertEqual(decision, .keep)
+        XCTAssertFalse(record.needsReconciliation)
+        XCTAssertEqual(record.lastReconciliationMarkedAt, 21)
+    }
+
     func testRuntimeSnapshotProviderDropsWindowRecordAfterLifecycleGraceExpires() {
         let provider = RuntimeSnapshotProvider()
         let pid: pid_t = 18_405

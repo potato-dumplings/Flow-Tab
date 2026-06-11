@@ -173,6 +173,82 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(request?.affectedCGWindowIDs, Set<CGWindowID>([240_001, 240_002, 240_003]))
     }
 
+    func testRuntimeSnapshotProviderMarksAffectedWindowRecordsForSpaceTopologyReconciliation() {
+        let coordinator = RuntimeReconciliationCoordinator()
+        let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
+        let pid = pid_t(18_405)
+        let removedSpaceWindowID = CGWindowID(240_001)
+        let addedSpaceWindowID = CGWindowID(240_002)
+        let unaffectedWindowID = CGWindowID(240_003)
+        let previous = RuntimeSpaceTopologySnapshot(
+            spacesByID: [
+                10: RuntimeSpaceTopologySpace(id: 10, displayID: 1, isCurrent: true)
+            ],
+            windowIDsBySpaceID: [
+                10: [removedSpaceWindowID]
+            ]
+        )
+        let current = RuntimeSpaceTopologySnapshot(
+            spacesByID: [
+                11: RuntimeSpaceTopologySpace(id: 11, displayID: 1, isCurrent: true)
+            ],
+            windowIDsBySpaceID: [
+                11: [addedSpaceWindowID]
+            ]
+        )
+        var removedSpaceRecord = RuntimeWindowRecord(
+            cgWindowID: removedSpaceWindowID,
+            stableWindowID: "cg:\(pid):\(removedSpaceWindowID)",
+            firstSeenAt: 1
+        )
+        removedSpaceRecord.spaceRecovery = RuntimeSpaceRecoveryState(
+            cgWindowID: removedSpaceWindowID,
+            spaceIDs: [10],
+            hasConfirmedActivationRoute: true,
+            lastValidatedAt: 1,
+            invalidatedAt: nil
+        )
+        var addedSpaceRecord = RuntimeWindowRecord(
+            cgWindowID: addedSpaceWindowID,
+            stableWindowID: "cg:\(pid):\(addedSpaceWindowID)",
+            firstSeenAt: 1
+        )
+        addedSpaceRecord.spaceRecovery = RuntimeSpaceRecoveryState(
+            cgWindowID: addedSpaceWindowID,
+            spaceIDs: [11],
+            hasConfirmedActivationRoute: true,
+            lastValidatedAt: 1,
+            invalidatedAt: nil
+        )
+        let unaffectedRecord = RuntimeWindowRecord(
+            cgWindowID: unaffectedWindowID,
+            stableWindowID: "cg:\(pid):\(unaffectedWindowID)",
+            firstSeenAt: 1
+        )
+
+        _ = provider.recordSpaceTopologySnapshot(previous, now: 1)
+        provider.windowMappingStateByPID[pid] = RuntimeWindowMappingState(
+            windowRecordsByCGWindowID: [
+                removedSpaceWindowID: removedSpaceRecord,
+                addedSpaceWindowID: addedSpaceRecord,
+                unaffectedWindowID: unaffectedRecord
+            ]
+        )
+        let diff = provider.recordSpaceTopologySnapshot(current, now: 2)
+        let records = provider.windowMappingStateByPID[pid]?.windowRecordsByCGWindowID
+
+        XCTAssertEqual(diff.removedSpaceIDs, [10])
+        XCTAssertEqual(diff.addedSpaceIDs, [11])
+        XCTAssertEqual(diff.affectedCGWindowIDs, [removedSpaceWindowID, addedSpaceWindowID])
+        XCTAssertTrue(records?[removedSpaceWindowID]?.needsReconciliation == true)
+        XCTAssertEqual(records?[removedSpaceWindowID]?.lastReconciliationMarkedAt, 2)
+        XCTAssertEqual(records?[removedSpaceWindowID]?.spaceRecovery?.invalidatedAt, 2)
+        XCTAssertTrue(records?[addedSpaceWindowID]?.needsReconciliation == true)
+        XCTAssertEqual(records?[addedSpaceWindowID]?.lastReconciliationMarkedAt, 2)
+        XCTAssertNil(records?[addedSpaceWindowID]?.spaceRecovery?.invalidatedAt)
+        XCTAssertFalse(records?[unaffectedWindowID]?.needsReconciliation == true)
+    }
+
     func testRuntimeSnapshotServiceDrainsSpaceTopologySignalThroughCoordinator() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let affectedWindowID = CGWindowID(240_001)

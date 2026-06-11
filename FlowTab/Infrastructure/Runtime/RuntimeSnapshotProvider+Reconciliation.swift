@@ -22,7 +22,36 @@ extension RuntimeSnapshotProvider {
         _ snapshot: RuntimeSpaceTopologySnapshot,
         now: TimeInterval = ProcessInfo.processInfo.systemUptime
     ) -> RuntimeSpaceTopologyDiff {
-        reconciliationCoordinator.applySpaceTopologySnapshot(snapshot, now: now)
+        let diff = reconciliationCoordinator.applySpaceTopologySnapshot(snapshot, now: now)
+        markWindowRecordsForSpaceTopologyReconciliation(diff, now: now)
+        return diff
+    }
+
+    private func markWindowRecordsForSpaceTopologyReconciliation(
+        _ diff: RuntimeSpaceTopologyDiff,
+        now: TimeInterval
+    ) {
+        guard !diff.affectedCGWindowIDs.isEmpty else { return }
+
+        for pid in windowMappingStateByPID.keys.sorted() {
+            guard var mappingState = windowMappingStateByPID[pid] else { continue }
+            var updated = false
+            for cgWindowID in diff.affectedCGWindowIDs.sorted() {
+                guard var record = mappingState.windowRecordsByCGWindowID[cgWindowID] else {
+                    continue
+                }
+                record.markNeedsReconciliation(observedAt: now)
+                if let recovery = record.spaceRecovery,
+                   !Set(recovery.spaceIDs).isDisjoint(with: diff.removedSpaceIDs) {
+                    record.invalidateSpaceRecovery(observedAt: now)
+                }
+                mappingState.windowRecordsByCGWindowID[cgWindowID] = record
+                updated = true
+            }
+            if updated {
+                windowMappingStateByPID[pid] = mappingState
+            }
+        }
     }
 
     func appReconciliationTargets(

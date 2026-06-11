@@ -112,6 +112,8 @@ struct RuntimeWindowRecord {
     let firstSeenAt: TimeInterval
     var lastSeenAt: TimeInterval
     var suspectDeletedAt: TimeInterval?
+    var needsReconciliation: Bool
+    var lastReconciliationMarkedAt: TimeInterval?
 
     init(
         cgWindowID: CGWindowID,
@@ -132,6 +134,8 @@ struct RuntimeWindowRecord {
         self.firstSeenAt = firstSeenAt
         lastSeenAt = firstSeenAt
         suspectDeletedAt = nil
+        needsReconciliation = false
+        lastReconciliationMarkedAt = nil
     }
 
     var hasStickyBinding: Bool {
@@ -220,6 +224,7 @@ struct RuntimeWindowRecord {
         }
         lastSeenAt = observedAt
         suspectDeletedAt = nil
+        clearReconciliationNeed()
     }
 
     mutating func reconcileLifecycle(
@@ -233,10 +238,12 @@ struct RuntimeWindowRecord {
                 recovery.invalidatedAt = nil
                 spaceRecovery = recovery
             }
+            clearReconciliationNeed()
             return .keep
         }
 
         guard hasStickyBinding || spaceRecovery?.hasConfirmedActivationRoute == true else {
+            clearReconciliationNeed()
             return .delete
         }
 
@@ -247,13 +254,30 @@ struct RuntimeWindowRecord {
             spaceRecovery = recovery
         }
         guard observedAt - firstSuspectAt < policy.evidenceGraceInterval else {
+            clearReconciliationNeed()
             return .delete
         }
+        clearReconciliationNeed()
         return .keep
     }
 
     mutating func clearCurrentAXAttachment() {
         currentAXAttachment = nil
+    }
+
+    mutating func markNeedsReconciliation(observedAt: TimeInterval) {
+        needsReconciliation = true
+        lastReconciliationMarkedAt = observedAt
+    }
+
+    mutating func clearReconciliationNeed() {
+        needsReconciliation = false
+    }
+
+    mutating func invalidateSpaceRecovery(observedAt: TimeInterval) {
+        guard var recovery = spaceRecovery else { return }
+        recovery.invalidatedAt = observedAt
+        spaceRecovery = recovery
     }
 
     mutating func updateFallbackDisplayStateIfNeeded() {
@@ -276,6 +300,7 @@ struct RuntimeWindowRecord {
         } else {
             lastSeenAt = observedAt
             suspectDeletedAt = nil
+            clearReconciliationNeed()
         }
         currentAXAttachment = RuntimeCurrentAXAttachment(
             axWindowID: axWindow.id,
