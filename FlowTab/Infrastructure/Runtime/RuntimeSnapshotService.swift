@@ -15,6 +15,7 @@ protocol RuntimeSnapshotServing: Sendable {
     func currentCGWindowsByPID() -> [pid_t: [RuntimeSnapshotProvider.CGWindowEntry]]
     func signalSpaceTopologyChanged()
     func signalAppWindowsChanged(appID: String, pid: pid_t)
+    func signalAppTerminated(appID: String, pid: pid_t)
     func signalWindowFocusVerified(_ verification: RuntimeWindowFocusVerification)
     func signalWindowFocusVerified(appID: String, pid: pid_t)
     func isLikelyTransientAXRebuild(for pid: pid_t) -> Bool
@@ -124,6 +125,15 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
                 now: now
             )
             drainReadyReconciliationRequestsLocked(now: now)
+        }
+    }
+
+    func signalAppTerminated(appID: String, pid: pid_t) {
+        snapshotQueue.async { [self] in
+            snapshotProvider.reconciliationCoordinator.cancelAppRequests(pid: pid)
+            snapshotProvider.clearWindowMappingState(for: pid)
+            AXLiveWindowRegistry.shared.remove(pid: pid)
+            RuntimeLog.debug(.snapshot, "runtimeLifecycle appTerminated appID=\(appID) pid=\(pid)")
         }
     }
 

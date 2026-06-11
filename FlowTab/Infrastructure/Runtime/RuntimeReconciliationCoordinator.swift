@@ -138,6 +138,10 @@ final class RuntimeReconciliationCoordinator {
         requestsByTarget.removeValue(forKey: target)
     }
 
+    func cancelAppRequests(pid: pid_t) {
+        requestsByTarget.removeValue(forKey: .app(pid))
+    }
+
     private func updateRequest(
         target: RuntimeReconciliationTarget,
         appID: String?,

@@ -98,6 +98,50 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(coordinator.readyRequests(now: 10).map(\.id), [request.id])
     }
 
+    func testRuntimeReconciliationCoordinatorCancelsTerminatedAppRequestsWithoutDroppingOtherTargets() {
+        let coordinator = RuntimeReconciliationCoordinator()
+        let terminatedPID = pid_t(18_405)
+        let otherPID = pid_t(18_406)
+
+        let terminatedRequest = coordinator.markAppDirty(
+            appID: "com.example.terminated",
+            pid: terminatedPID,
+            reason: .axNotification,
+            now: 10
+        )
+        let otherRequest = coordinator.markAppDirty(
+            appID: "com.example.other",
+            pid: otherPID,
+            reason: .manualRefresh,
+            now: 10
+        )
+        let previousTopology = RuntimeSpaceTopologySnapshot(
+            spacesByID: [
+                7: RuntimeSpaceTopologySpace(id: 7, displayID: 1, isCurrent: true)
+            ],
+            windowIDsBySpaceID: [
+                7: Set<CGWindowID>([240_001])
+            ]
+        )
+        let currentTopology = RuntimeSpaceTopologySnapshot(
+            spacesByID: [
+                7: RuntimeSpaceTopologySpace(id: 7, displayID: 1, isCurrent: true)
+            ],
+            windowIDsBySpaceID: [
+                7: Set<CGWindowID>([240_001, 240_002])
+            ]
+        )
+        _ = coordinator.applySpaceTopologySnapshot(previousTopology, now: 10)
+        _ = coordinator.applySpaceTopologySnapshot(currentTopology, now: 10)
+
+        coordinator.cancelAppRequests(pid: terminatedPID)
+
+        let remainingRequests = coordinator.readyRequests(now: 10)
+        XCTAssertFalse(remainingRequests.contains { $0.id == terminatedRequest.id })
+        XCTAssertTrue(remainingRequests.contains { $0.id == otherRequest.id })
+        XCTAssertTrue(remainingRequests.contains { $0.target == .spaceTopology })
+    }
+
     func testRuntimeSnapshotProviderRecordsSpaceTopologyThroughCoordinator() {
         let coordinator = RuntimeReconciliationCoordinator()
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
@@ -240,6 +284,38 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(request.reasons, Set([.axNotification]))
         XCTAssertEqual(request.state, .inFlight)
         XCTAssertTrue(coordinator.readyRequests(now: Date.timeIntervalSinceReferenceDate).isEmpty)
+    }
+
+    func testRuntimeSnapshotServiceClearsTerminatedAppRuntimeState() {
+        let coordinator = RuntimeReconciliationCoordinator()
+        let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
+        let pid = pid_t(18_405)
+        let cgWindowID = CGWindowID(240_001)
+        provider.windowMappingStateByPID[pid] = RuntimeWindowMappingState(
+            windowRecordsByCGWindowID: [
+                cgWindowID: RuntimeWindowRecord(
+                    cgWindowID: cgWindowID,
+                    stableWindowID: "cg:\(pid):\(cgWindowID)",
+                    firstSeenAt: 10
+                )
+            ]
+        )
+        let request = coordinator.markAppDirty(
+            appID: "com.example.terminated",
+            pid: pid,
+            reason: .axNotification,
+            now: 10
+        )
+        let service = RuntimeSnapshotService(
+            label: "FlowTabTests.RuntimeSnapshotService.AppTerminated",
+            snapshotProvider: provider
+        )
+
+        service.signalAppTerminated(appID: "com.example.terminated", pid: pid)
+        _ = service.drainReadyReconciliationRequestsSynchronouslyForTesting(now: 11)
+
+        XCTAssertNil(provider.windowMappingStateByPID[pid])
+        XCTAssertFalse(coordinator.readyRequests(now: 11).contains { $0.id == request.id })
     }
 
     func testRuntimeSnapshotServiceDrainsVerifiedFocusThroughCoordinator() throws {

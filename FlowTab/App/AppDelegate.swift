@@ -20,6 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var hotkeyObserver: NSObjectProtocol?
     private(set) var appVisibilityObserver: NSObjectProtocol?
     private(set) var languageObserver: NSObjectProtocol?
+    private(set) var workspaceLifecycleObserver: NSObjectProtocol?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Self.shared = self
@@ -35,6 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         installHotkeyObserver()
         installAppVisibilityObserver()
         installLanguageObserver()
+        installWorkspaceLifecycleObserver()
 
         installStatusItem()
         requestAccessibilityPermissionIfNeeded()
@@ -74,6 +76,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let languageObserver {
             NotificationCenter.default.removeObserver(languageObserver)
             self.languageObserver = nil
+        }
+        if let workspaceLifecycleObserver {
+            resolvedWorkspaceNotificationCenter.removeObserver(workspaceLifecycleObserver)
+            self.workspaceLifecycleObserver = nil
         }
         hotkeyMonitor?.stop()
         inAppWindowHotkeyMonitor?.stop()
@@ -300,6 +306,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Task { @MainActor [weak self] in
                 self?.installStatusItem()
             }
+        }
+    }
+
+    private func installWorkspaceLifecycleObserver() {
+        if let workspaceLifecycleObserver {
+            resolvedWorkspaceNotificationCenter.removeObserver(workspaceLifecycleObserver)
+        }
+        workspaceLifecycleObserver = resolvedWorkspaceNotificationCenter.addObserver(
+            forName: NSWorkspace.didTerminateApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self else { return }
+            guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else {
+                return
+            }
+            let appID = RuntimeSnapshotProvider.baseAppID(for: app)
+            self.resolvedRuntimeSnapshotService.signalAppTerminated(
+                appID: appID,
+                pid: app.processIdentifier
+            )
         }
     }
 

@@ -14,6 +14,8 @@ struct AppDelegateTestHooks {
     var stressRunner: (any TabSwitchStressRunning)? = nil
     var launchAtLoginManager: (any LaunchAtLoginManaging)? = nil
     var activationPolicyApplication: (any AppActivationPolicyApplying)? = nil
+    var runtimeSnapshotService: (any RuntimeSnapshotServing)? = nil
+    var workspaceNotificationCenter: NotificationCenter? = nil
 }
 
 @MainActor
@@ -42,6 +44,14 @@ extension AppDelegate {
 
     var resolvedActivationPolicyApplication: any AppActivationPolicyApplying {
         Self.testHooks.activationPolicyApplication ?? NSApp
+    }
+
+    var resolvedRuntimeSnapshotService: any RuntimeSnapshotServing {
+        Self.testHooks.runtimeSnapshotService ?? sharedRuntimeSnapshotService
+    }
+
+    var resolvedWorkspaceNotificationCenter: NotificationCenter {
+        Self.testHooks.workspaceNotificationCenter ?? NSWorkspace.shared.notificationCenter
     }
 
     func makePanelController() -> SwitcherPanelController {
@@ -92,6 +102,10 @@ extension AppDelegate {
 
     var hasLanguageObserverForTesting: Bool {
         languageObserver != nil
+    }
+
+    var hasWorkspaceLifecycleObserverForTesting: Bool {
+        workspaceLifecycleObserver != nil
     }
 
     var hasStatusItemForTesting: Bool {

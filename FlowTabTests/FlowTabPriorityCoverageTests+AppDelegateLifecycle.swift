@@ -32,7 +32,11 @@ extension FlowTabPriorityCoverageTests {
         let hotkeyFactory = SpyHotkeyMonitorFactory()
         let takeoverController = SpyCommandTabTakeoverController()
         let stressRunner = SpyStressRunner()
+        var delegate: AppDelegate?
         defer {
+            delegate?.applicationWillTerminate(
+                Notification(name: NSApplication.willTerminateNotification)
+            )
             AppDelegate.testHooks = previousHooks
             AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride = previousActivationOverride
             AccessibilityPermissionChecker.isTrustedOverrideForTesting = previousAXTrusted
@@ -67,20 +71,21 @@ extension FlowTabPriorityCoverageTests {
             stressRunner: stressRunner
         )
 
-        let delegate = AppDelegate()
-        delegate.applicationDidFinishLaunching(
+        delegate = AppDelegate()
+        delegate?.applicationDidFinishLaunching(
             Notification(name: NSApplication.didFinishLaunchingNotification)
         )
 
         XCTAssertEqual(openHomeCallCount, 1)
         XCTAssertEqual(HomeTabState.shared.selectedTab, .home)
-        XCTAssertTrue(delegate.hasPanelControllerForTesting)
-        XCTAssertTrue(delegate.hasMainHotkeyMonitorForTesting)
-        XCTAssertTrue(delegate.hasInAppHotkeyMonitorForTesting)
-        XCTAssertTrue(delegate.hasHotkeyObserverForTesting)
-        XCTAssertTrue(delegate.hasAppVisibilityObserverForTesting)
-        XCTAssertTrue(delegate.hasLanguageObserverForTesting)
-        XCTAssertTrue(delegate.hasStatusItemForTesting)
+        XCTAssertTrue(delegate?.hasPanelControllerForTesting == true)
+        XCTAssertTrue(delegate?.hasMainHotkeyMonitorForTesting == true)
+        XCTAssertTrue(delegate?.hasInAppHotkeyMonitorForTesting == true)
+        XCTAssertTrue(delegate?.hasHotkeyObserverForTesting == true)
+        XCTAssertTrue(delegate?.hasAppVisibilityObserverForTesting == true)
+        XCTAssertTrue(delegate?.hasLanguageObserverForTesting == true)
+        XCTAssertTrue(delegate?.hasWorkspaceLifecycleObserverForTesting == true)
+        XCTAssertTrue(delegate?.hasStatusItemForTesting == true)
         XCTAssertEqual(accessibilityPromptCount, 1)
         XCTAssertTrue(userDefaults.bool(forKey: AppPreferenceKeys.hasPromptedAccessibilityPermission))
         XCTAssertEqual(stressRunner.startCallCount, 1)
@@ -88,6 +93,73 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(hotkeyFactory.records.map(\.signature), [0x46544142, 0x4654574E])
         XCTAssertEqual(hotkeyFactory.records.map(\.forwardHotkeyID), [1, 101])
         XCTAssertEqual(hotkeyFactory.records.map(\.backwardHotkeyID), [2, 102])
+    }
+
+    @MainActor
+    func testAppDelegateSignalsRuntimeWhenWorkspaceAppTerminates() async {
+        guard let userDefaults = makeIsolatedUserDefaults() else { return }
+
+        let previousHooks = AppDelegate.testHooks
+        let previousSharedDelegate = AppDelegate.shared
+        let previousActivationOverride = AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride
+        let previousAXTrusted = AccessibilityPermissionChecker.isTrustedOverrideForTesting
+        let snapshotService = RecordingRuntimeSnapshotService()
+        let hotkeyFactory = SpyHotkeyMonitorFactory()
+        let stressRunner = SpyStressRunner()
+        let workspaceNotificationCenter = NotificationCenter()
+        var delegate: AppDelegate?
+        defer {
+            delegate?.applicationWillTerminate(
+                Notification(name: NSApplication.willTerminateNotification)
+            )
+            AppDelegate.testHooks = previousHooks
+            AppDelegate.shared = previousSharedDelegate
+            AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride = previousActivationOverride
+            AccessibilityPermissionChecker.isTrustedOverrideForTesting = previousAXTrusted
+            clearIsolatedUserDefaults(userDefaults)
+        }
+
+        AccessibilityPermissionChecker.isTrustedOverrideForTesting = { true }
+        AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride = {}
+        AppDelegate.testHooks = AppDelegate.TestHooks(
+            userDefaults: userDefaults,
+            makeHotkeyMonitor: { configuration, signature, forwardHotkeyID, backwardHotkeyID in
+                hotkeyFactory.make(
+                    configuration: configuration,
+                    signature: signature,
+                    forwardHotkeyID: forwardHotkeyID,
+                    backwardHotkeyID: backwardHotkeyID
+                )
+            },
+            stressRunner: stressRunner,
+            runtimeSnapshotService: snapshotService,
+            workspaceNotificationCenter: workspaceNotificationCenter
+        )
+
+        delegate = AppDelegate()
+        delegate?.applicationDidFinishLaunching(
+            Notification(name: NSApplication.didFinishLaunchingNotification)
+        )
+        let terminatedApp = NSRunningApplication.current
+
+        workspaceNotificationCenter.post(
+            name: NSWorkspace.didTerminateApplicationNotification,
+            object: nil,
+            userInfo: [NSWorkspace.applicationUserInfoKey: terminatedApp]
+        )
+
+        let didSignalRuntime = await waitUntil(
+            "workspace termination reaches runtime snapshot service",
+            timeoutNanoseconds: 1_000_000_000,
+            pollIntervalNanoseconds: 10_000_000
+        ) {
+            let signals = snapshotService.appTerminationSignalsRecorded()
+            return signals.count == 1
+                && signals.first?.appID == RuntimeSnapshotProvider.baseAppID(for: terminatedApp)
+                && signals.first?.pid == terminatedApp.processIdentifier
+        }
+
+        XCTAssertTrue(didSignalRuntime)
     }
 
     @MainActor
