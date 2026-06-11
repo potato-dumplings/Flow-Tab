@@ -16,6 +16,7 @@ protocol RuntimeSnapshotServing: Sendable {
     func signalSpaceTopologyChanged()
     func signalAppLaunched(appID: String, pid: pid_t)
     func signalAppWindowsChanged(appID: String, pid: pid_t)
+    func signalAXWindowDestroyed(appID: String, pid: pid_t, axWindowID: String)
     func signalAppTerminated(appID: String, pid: pid_t)
     func signalWindowFocusVerified(_ verification: RuntimeWindowFocusVerification)
     func signalWindowFocusVerified(appID: String, pid: pid_t)
@@ -136,6 +137,25 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
                 appID: appID,
                 pid: pid,
                 reason: .axNotification,
+                now: now
+            )
+            drainReadyReconciliationRequestsLocked(now: now)
+        }
+    }
+
+    func signalAXWindowDestroyed(appID: String, pid: pid_t, axWindowID: String) {
+        snapshotQueue.async { [self] in
+            let now = Date.timeIntervalSinceReferenceDate
+            let affectedCGWindowID = snapshotProvider.signalAXWindowDestroyed(
+                processIdentifier: pid,
+                axWindowID: axWindowID,
+                now: now
+            )
+            snapshotProvider.reconciliationCoordinator.markAppDirty(
+                appID: appID,
+                pid: pid,
+                reason: .axNotification,
+                affectedCGWindowIDs: affectedCGWindowID.map { Set([$0]) } ?? [],
                 now: now
             )
             drainReadyReconciliationRequestsLocked(now: now)

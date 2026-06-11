@@ -82,6 +82,31 @@ struct RuntimeWindowMappingState {
     var isEmpty: Bool {
         windowRecordsByCGWindowID.isEmpty
     }
+
+    @discardableResult
+    mutating func clearDestroyedAXAttachment(
+        axWindowID: String,
+        observedAt: TimeInterval
+    ) -> CGWindowID? {
+        guard let cgWindowID = derivedIndexes.currentAXToCG[axWindowID],
+              var record = windowRecordsByCGWindowID[cgWindowID] else {
+            return nil
+        }
+
+        record.clearDestroyedAXAttachment(observedAt: observedAt)
+        windowRecordsByCGWindowID[cgWindowID] = record
+
+        var currentAXToCG = derivedIndexes.currentAXToCG
+        currentAXToCG.removeValue(forKey: axWindowID)
+        var lastAXWindowIDs = derivedIndexes.lastAXWindowIDs
+        lastAXWindowIDs.remove(axWindowID)
+        derivedIndexes = RuntimeWindowRecordDerivedIndexes(
+            currentAXToCG: currentAXToCG,
+            validCGWindowIDs: derivedIndexes.validCGWindowIDs,
+            lastAXWindowIDs: lastAXWindowIDs
+        )
+        return cgWindowID
+    }
 }
 
 enum RuntimeWindowRecordLifecycleDecision: Equatable {
@@ -263,6 +288,12 @@ struct RuntimeWindowRecord {
 
     mutating func clearCurrentAXAttachment() {
         currentAXAttachment = nil
+    }
+
+    mutating func clearDestroyedAXAttachment(observedAt: TimeInterval) {
+        currentAXAttachment = nil
+        lastConfirmationSource = nil
+        markNeedsReconciliation(observedAt: observedAt)
     }
 
     mutating func markNeedsReconciliation(observedAt: TimeInterval) {

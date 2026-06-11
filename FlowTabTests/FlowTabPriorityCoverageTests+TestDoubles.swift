@@ -214,6 +214,10 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
         lock.unlock()
     }
 
+    func signalAXWindowDestroyed(appID: String, pid: pid_t, axWindowID: String) {
+        signalAppWindowsChanged(appID: appID, pid: pid)
+    }
+
     func signalAppTerminated(appID: String, pid: pid_t) {
         lock.lock()
         appTerminationSignals.append((appID, pid))

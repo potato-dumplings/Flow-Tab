@@ -115,4 +115,20 @@ extension RuntimeSnapshotProvider {
             isTransientEmptyAXSnapshot: snapshotWasEmpty && isLikelyTransientAXRebuild(for: pid)
         )
     }
+
+    @discardableResult
+    func signalAXWindowDestroyed(
+        processIdentifier pid: pid_t,
+        axWindowID: String,
+        now: TimeInterval
+    ) -> CGWindowID? {
+        guard var mappingState = windowMappingStateByPID[pid] else { return nil }
+        let affectedCGWindowID = mappingState.clearDestroyedAXAttachment(
+            axWindowID: axWindowID,
+            observedAt: now
+        )
+        guard affectedCGWindowID != nil else { return nil }
+        windowMappingStateByPID[pid] = mappingState
+        return affectedCGWindowID
+    }
 }

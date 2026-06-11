@@ -59,13 +59,14 @@ final class RuntimeReconciliationCoordinator {
         appID: String,
         pid: pid_t,
         reason: RuntimeReconciliationReason,
+        affectedCGWindowIDs: Set<CGWindowID> = [],
         now: TimeInterval
     ) -> RuntimeReconciliationRequest {
         updateRequest(
             target: .app(pid),
             appID: appID,
             reasons: [reason],
-            affectedCGWindowIDs: [],
+            affectedCGWindowIDs: affectedCGWindowIDs,
             now: now
         )
     }

@@ -20,6 +20,49 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(state.lastAXWindowIDs, Set(["ax:18405:0", "ax:18405:1"]))
     }
 
+    func testRuntimeWindowMappingStateClearsDestroyedAXAttachmentWithoutDeletingWindowRecord() {
+        let pid = pid_t(18_405)
+        let axWindowID = "ax:18405:0"
+        let cgWindowID = CGWindowID(240_001)
+        var record = RuntimeWindowRecord(
+            cgWindowID: cgWindowID,
+            stableWindowID: "cg:\(pid):\(cgWindowID)",
+            firstSeenAt: 10
+        )
+        record.currentAXAttachment = RuntimeCurrentAXAttachment(
+            axWindowID: axWindowID,
+            axWindow: AXUIElementCreateApplication(pid),
+            title: "Destroyed Window",
+            frame: CGRect(x: 10, y: 10, width: 800, height: 600),
+            state: RuntimeAXWindowState(isMinimized: false, isFocused: true, isMain: true)
+        )
+        record.lastExactAXWindowID = axWindowID
+        record.lastConfirmationSource = .publicExactMatch
+        var state = RuntimeWindowMappingState(
+            windowRecordsByCGWindowID: [cgWindowID: record],
+            currentAXToCG: [axWindowID: cgWindowID],
+            validCGWindowIDs: [cgWindowID],
+            lastAXWindowIDs: [axWindowID]
+        )
+
+        let affectedCGWindowID = state.clearDestroyedAXAttachment(
+            axWindowID: axWindowID,
+            observedAt: 11
+        )
+        let downgradedRecord = state.windowRecordsByCGWindowID[cgWindowID]
+
+        XCTAssertEqual(affectedCGWindowID, cgWindowID)
+        XCTAssertNil(downgradedRecord?.currentAXAttachment)
+        XCTAssertEqual(downgradedRecord?.lastExactAXWindowID, axWindowID)
+        XCTAssertNil(downgradedRecord?.lastConfirmationSource)
+        XCTAssertEqual(downgradedRecord?.bindingConfidence, .sticky)
+        XCTAssertTrue(downgradedRecord?.needsReconciliation == true)
+        XCTAssertEqual(downgradedRecord?.lastReconciliationMarkedAt, 11)
+        XCTAssertNil(state.currentAXToCG[axWindowID])
+        XCTAssertNil(state.currentCGToAX[cgWindowID])
+        XCTAssertFalse(state.lastAXWindowIDs.contains(axWindowID))
+    }
+
     func testRuntimeWindowRecordLifecycleKeepsRecoverableMissingEvidenceDuringGraceWindow() {
         let policy = RuntimeWindowRecordLifecyclePolicy(evidenceGraceInterval: 1.0)
         let cgWindow = RuntimeSnapshotProvider.CGWindowEntry(

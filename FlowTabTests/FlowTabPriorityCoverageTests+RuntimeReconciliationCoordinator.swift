@@ -449,6 +449,65 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(coordinator.readyRequests(now: Date.timeIntervalSinceReferenceDate).isEmpty)
     }
 
+    func testRuntimeSnapshotServiceSignalsDestroyedAXWindowThroughCoordinator() throws {
+        let coordinator = RuntimeReconciliationCoordinator()
+        let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
+        let pid = pid_t(18_405)
+        let axWindowID = "ax:18405:0"
+        let cgWindowID = CGWindowID(240_001)
+        var record = RuntimeWindowRecord(
+            cgWindowID: cgWindowID,
+            stableWindowID: "cg:\(pid):\(cgWindowID)",
+            firstSeenAt: 10
+        )
+        record.currentAXAttachment = RuntimeCurrentAXAttachment(
+            axWindowID: axWindowID,
+            axWindow: AXUIElementCreateApplication(pid),
+            title: "Destroyed Window",
+            frame: CGRect(x: 10, y: 20, width: 800, height: 600),
+            state: RuntimeAXWindowState(isMinimized: false, isFocused: true, isMain: true)
+        )
+        record.lastExactAXWindowID = axWindowID
+        record.lastConfirmationSource = .publicExactMatch
+        provider.windowMappingStateByPID[pid] = RuntimeWindowMappingState(
+            windowRecordsByCGWindowID: [cgWindowID: record],
+            currentAXToCG: [axWindowID: cgWindowID],
+            validCGWindowIDs: [cgWindowID],
+            lastAXWindowIDs: [axWindowID]
+        )
+        let lock = NSLock()
+        var executedRequests: [RuntimeReconciliationRequest] = []
+        let service = RuntimeSnapshotService(
+            label: "FlowTabTests.RuntimeSnapshotService.AXDestroyed",
+            snapshotProvider: provider,
+            reconciliationExecutor: { request, _ in
+                lock.lock()
+                executedRequests.append(request)
+                lock.unlock()
+                return .completed
+            }
+        )
+
+        service.signalAXWindowDestroyed(
+            appID: "com.example.editor",
+            pid: pid,
+            axWindowID: axWindowID
+        )
+        _ = service.lightweightAppSnapshot()
+
+        let request = try XCTUnwrap(executedRequests.first)
+        let downgradedRecord = provider.windowMappingStateByPID[pid]?
+            .windowRecordsByCGWindowID[cgWindowID]
+        XCTAssertEqual(request.target, .app(pid))
+        XCTAssertEqual(request.appID, "com.example.editor")
+        XCTAssertEqual(request.reasons, [.axNotification])
+        XCTAssertEqual(request.affectedCGWindowIDs, [cgWindowID])
+        XCTAssertNil(downgradedRecord?.currentAXAttachment)
+        XCTAssertNil(downgradedRecord?.lastConfirmationSource)
+        XCTAssertEqual(downgradedRecord?.bindingConfidence, .sticky)
+        XCTAssertTrue(downgradedRecord?.needsReconciliation == true)
+    }
+
     func testRuntimeSnapshotServiceDrainsLaunchedAppThroughCoordinator() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
