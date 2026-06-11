@@ -91,7 +91,6 @@ extension WindowBindingConfidence {
             ]
         case .provisional:
             [
-                .exposeInSwitcher,
                 .capturePreview
             ]
         case .ambiguous:

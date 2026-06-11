@@ -240,6 +240,7 @@ extension RuntimeSnapshotProvider {
                 allowsPublicAXRecovery: spaceEvidence.allowsPublicAXRecovery,
                 hasStickyBinding: false,
                 lastConfirmationSource: nil,
+                bindingConfidenceOverride: .inferred,
                 spaceEvidence: spaceEvidence
             )
         }

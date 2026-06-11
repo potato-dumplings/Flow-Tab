@@ -55,7 +55,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(WindowBindingConfidence.inferred.allowedActions.contains(.updateRecency))
         XCTAssertEqual(
             WindowBindingConfidence.provisional.allowedActions,
-            [.exposeInSwitcher, .capturePreview]
+            [.capturePreview]
         )
         XCTAssertEqual(WindowBindingConfidence.ambiguous.allowedActions, [.quarantineOnly])
         XCTAssertTrue(
@@ -74,6 +74,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(context.bindingDiagnostic.source, .privateExactBridge)
         XCTAssertTrue(context.bindingDiagnostic.allowedActions.contains(.useForAXActivation))
         XCTAssertEqual(provisionalEntry.bindingDiagnostic.confidence, .provisional)
+        XCTAssertFalse(provisionalEntry.bindingDiagnostic.allowedActions.contains(.exposeInSwitcher))
         XCTAssertFalse(provisionalEntry.bindingDiagnostic.allowedActions.contains(.useForAXActivation))
 
         let ambiguousEntry = RuntimeSnapshotProvider.WindowListEntry(
@@ -493,29 +494,33 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(mergedEntries.allSatisfy { $0.lastConfirmationSource == .privateExactBridge })
     }
 
-    func testRuntimeSnapshotProviderWindowListKeepsSpaceBackedEntriesAfterAXDisappearsWithoutStickyBinding() {
-        let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+    func testRuntimeSnapshotProviderWindowListKeepsSpaceBackedEntriesAfterAXDisappearsWithoutStickyBinding() throws {
+        let provider = RuntimeSnapshotProvider()
+        let mergedEntries = provider.resolvedStableWindowEntries(
             axWindows: [],
             cgWindows: [
-                .init(
+                RuntimeSnapshotProvider.CGWindowEntry(
                     id: 243_747,
                     title: "Recovered Window",
                     bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
                     isOnscreen: false,
+                    alpha: 1.0,
+                    storeType: 1,
                     spaceIDs: [11_679]
                 )
             ],
-            previousMatches: [:],
-            previousAXWindowIDs: ["ax:18405:0"],
-            previousCGWindowIDs: [240_029],
             pid: 18405,
             appName: "Google Chrome"
         )
 
         XCTAssertEqual(mergedEntries.map(\.windowID), ["cg:18405:243747"])
-        XCTAssertEqual(mergedEntries.first?.title, "Recovered Window")
-        XCTAssertEqual(mergedEntries.first?.cgWindowID, 243_747)
-        XCTAssertNil(mergedEntries.first?.lastConfirmationSource)
+        let entry = try XCTUnwrap(mergedEntries.first)
+        XCTAssertEqual(entry.title, "Recovered Window")
+        XCTAssertEqual(entry.cgWindowID, 243_747)
+        XCTAssertNil(entry.lastConfirmationSource)
+        XCTAssertEqual(entry.bindingConfidence, .inferred)
+        XCTAssertTrue(entry.bindingAllowedActions.contains(.exposeInSwitcher))
+        XCTAssertTrue(entry.bindingAllowedActions.contains(.useForCGActivationFallback))
     }
 
     func testRuntimeSnapshotProviderStoresCGFirstWindowRecordsAsSingleSourceOfTruth() throws {
@@ -652,21 +657,26 @@ extension FlowTabPriorityCoverageTests {
     }
 
     func testRuntimeSnapshotProviderWindowListKeepsDistinctCGOnlyEntriesSharingSameSpaceBinding() {
-        let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+        let provider = RuntimeSnapshotProvider()
+        let mergedEntries = provider.resolvedStableWindowEntries(
             axWindows: [],
             cgWindows: [
-                .init(
+                RuntimeSnapshotProvider.CGWindowEntry(
                     id: 288_544,
                     title: "Google Chrome",
                     bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
                     isOnscreen: false,
+                    alpha: 1.0,
+                    storeType: 1,
                     spaceIDs: [11_679]
                 ),
-                .init(
+                RuntimeSnapshotProvider.CGWindowEntry(
                     id: 258_323,
                     title: "Google Chrome",
                     bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
                     isOnscreen: false,
+                    alpha: 1.0,
+                    storeType: 1,
                     spaceIDs: [11_679]
                 )
             ],
@@ -676,6 +686,10 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertEqual(mergedEntries.map(\.windowID), ["cg:18405:288544", "cg:18405:258323"])
         XCTAssertEqual(mergedEntries.map(\.cgWindowID), [288_544, 258_323])
+        XCTAssertTrue(mergedEntries.allSatisfy { $0.bindingConfidence == .inferred })
+        XCTAssertTrue(mergedEntries.allSatisfy {
+            $0.bindingAllowedActions.contains(.useForCGActivationFallback)
+        })
     }
 
     func testRuntimeSnapshotProviderWindowListSuppressesCGOnlyEntryCoveredByStickySpaceBinding() {
