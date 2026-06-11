@@ -36,6 +36,16 @@ final class AXLiveWindowRegistry {
         return windowsByPID[expectedPID]?[windowID]
     }
 
+    func windowID(forKnownWindow window: AXUIElement, expectedPID: pid_t) -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let windowsByID = windowsByPID[expectedPID] else { return nil }
+        return windowsByID.keys.sorted().first { windowID in
+            guard let knownWindow = windowsByID[windowID] else { return false }
+            return CFEqual(knownWindow, window)
+        }
+    }
+
     private func makeWindowMap(pid: pid_t, windows: [AXUIElement]) -> [String: AXUIElement] {
         Dictionary(
             uniqueKeysWithValues: windows.enumerated().map { index, window in

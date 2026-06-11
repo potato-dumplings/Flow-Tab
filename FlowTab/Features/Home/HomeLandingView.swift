@@ -452,6 +452,10 @@ struct HomeLandingView: View {
             runtimeSnapshotService.signalAppWindowsChanged(appID: appID, pid: pid)
             scheduleSingleAppRefresh(appID: appID, reason: "ax_window_changed")
         }
+        windowChangeMonitor.onAXWindowDestroyed = { appID, pid, axWindowID in
+            runtimeSnapshotService.signalAXWindowDestroyed(appID: appID, pid: pid, axWindowID: axWindowID)
+            scheduleSingleAppRefresh(appID: appID, reason: "ax_window_destroyed")
+        }
         windowChangeMonitor.rebind(appSummaries)
     }
 

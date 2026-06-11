@@ -20,6 +20,7 @@ final class HomeWindowChangeMonitor {
     }
 
     var onAppWindowChanged: ((String, pid_t) -> Void)?
+    var onAXWindowDestroyed: ((String, pid_t, String) -> Void)?
 
     private var observersByPID: [pid_t: AXObserver] = [:]
     private var observerContextByPID: [pid_t: ObserverContext] = [:]
@@ -110,9 +111,21 @@ final class HomeWindowChangeMonitor {
         appIDByPID.removeValue(forKey: pid)
     }
 
-    private func emitWindowChanged(for appID: String, pid: pid_t, installedAt: TimeInterval) {
+    func handleAXNotification(
+        appID: String,
+        pid: pid_t,
+        notification: CFString,
+        element: AXUIElement,
+        installedAt: TimeInterval
+    ) {
         let now = ProcessInfo.processInfo.systemUptime
         guard now - installedAt >= observerWarmUpInterval else {
+            return
+        }
+        if notification as String == kAXUIElementDestroyedNotification as String,
+           let axWindowID = AXLiveWindowRegistry.shared.windowID(forKnownWindow: element, expectedPID: pid),
+           let onAXWindowDestroyed {
+            onAXWindowDestroyed(appID, pid, axWindowID)
             return
         }
         if let lastTimestamp = lastEventAtByAppID[appID], now - lastTimestamp < eventThrottleInterval {
@@ -122,13 +135,15 @@ final class HomeWindowChangeMonitor {
         onAppWindowChanged?(appID, pid)
     }
 
-    private static let callback: AXObserverCallback = { _, _, _, refcon in
+    private static let callback: AXObserverCallback = { _, element, notification, refcon in
         guard let refcon else { return }
         let context = Unmanaged<ObserverContext>.fromOpaque(refcon).takeUnretainedValue()
         Task { @MainActor in
-            context.monitor?.emitWindowChanged(
-                for: context.appID,
+            context.monitor?.handleAXNotification(
+                appID: context.appID,
                 pid: context.pid,
+                notification: notification,
+                element: element,
                 installedAt: context.installedAt
             )
         }
