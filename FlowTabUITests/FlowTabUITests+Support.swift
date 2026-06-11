@@ -788,6 +788,36 @@ extension FlowTabUITests {
             "Missing runtime log markers \(missingMarkers) in \(logsDirectoryURL.path). Latest logs: \(latestValue)"
         )
     }
+
+    func waitForRuntimeLogFiles(
+        matching pattern: String,
+        since snapshot: [String: UInt64],
+        timeout: TimeInterval = 8,
+        description: String
+    ) {
+        let deadline = Date().addingTimeInterval(timeout)
+        let logsDirectoryURL = runtimeLogsDirectoryURL()
+        let regex: NSRegularExpression
+        do {
+            regex = try NSRegularExpression(pattern: pattern)
+        } catch {
+            return XCTFail("Invalid runtime log regex \(pattern): \(error)")
+        }
+        var latestValue = ""
+        repeat {
+            latestValue = runtimeLogContents(since: snapshot)
+            let range = NSRange(latestValue.startIndex..<latestValue.endIndex, in: latestValue)
+            if regex.firstMatch(in: latestValue, range: range) != nil {
+                return
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.2))
+        } while Date() < deadline
+
+        XCTFail(
+            "Missing runtime log pattern \(description) / \(pattern) in \(logsDirectoryURL.path). Latest logs: \(latestValue)"
+        )
+    }
+
     func waitForRuntimeLogFiles(
         containing requiredMarkers: [String],
         containingOneOf alternativeMarkers: [String],

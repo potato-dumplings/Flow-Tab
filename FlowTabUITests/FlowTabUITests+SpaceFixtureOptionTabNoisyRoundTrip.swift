@@ -99,6 +99,7 @@ extension FlowTabUITests {
                 traceLabel: "\(traceLabel).\(phase.trace)"
             )
 
+            let topologyLogSnapshot = makeRuntimeLogFileSnapshot()
             postFlowTabUITestSwitcherCommandAndWaitForDelivery(
                 .confirm,
                 traceLabel: "\(traceLabel).confirm.\(phase.trace)"
@@ -112,6 +113,12 @@ extension FlowTabUITests {
                     timeout: 12
                 ),
                 "Noisy Option+Tab must activate the exact \(phase.targetTitle) CG window selected in \(phase.trace)."
+            )
+            waitForRuntimeLogFiles(
+                matching: #"collectCGWindows result=ready .* affected=[1-9][0-9]*"#,
+                since: topologyLogSnapshot,
+                timeout: 8,
+                description: "nonzero Space topology affected-window diff after \(phase.trace) confirm"
             )
             expectedCurrentSelection = selection
             logWorkflowSpaceObservation("\(traceLabel).afterConfirm.\(phase.trace)", app: targetApp)
