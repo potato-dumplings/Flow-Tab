@@ -9,6 +9,7 @@ extension FlowTabPriorityCoverageTests {
     func testWindowBindingSourcesExposeExplicitConfidence() {
         XCTAssertEqual(WindowBindingConfirmationSource.publicExactMatch.bindingConfidence, .exact)
         XCTAssertEqual(WindowBindingConfirmationSource.privateExactBridge.bindingConfidence, .exact)
+        XCTAssertEqual(WindowBindingConfirmationSource.verifiedFocusReadback.bindingConfidence, .exact)
         XCTAssertEqual(WindowBindingConfirmationSource.stickyBinding.bindingConfidence, .sticky)
         XCTAssertEqual(WindowBindingConfirmationSource.fullscreenContentRebinding.bindingConfidence, .inferred)
         XCTAssertEqual(WindowBindingConfirmationSource.fullscreenContentFallbackBinding.bindingConfidence, .inferred)

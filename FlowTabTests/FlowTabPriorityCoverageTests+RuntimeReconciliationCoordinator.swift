@@ -84,6 +84,7 @@ extension FlowTabPriorityCoverageTests {
                 ownerPID: 18_405,
                 targetCGWindowID: 240_001,
                 focusedCGWindowID: 240_002,
+                focusedAXWindow: nil,
                 title: "Requested Window",
                 frame: CGRect(x: 10, y: 20, width: 800, height: 600),
                 allowedActions: WindowBindingConfidence.exact.allowedActions
@@ -570,6 +571,22 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeSnapshotServiceDrainsVerifiedFocusThroughCoordinator() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
+        let pid = pid_t(18_405)
+        let focusedCGWindowID = CGWindowID(240_001)
+        let focusedAXWindow = AXUIElementCreateApplication(pid)
+        let focusedAXWindowID = AXWindowInspectorForTesting.makeWindowID(pid: pid, index: 0)
+        provider.windowMappingStateByPID[pid] = RuntimeWindowMappingState(
+            windowRecordsByCGWindowID: [
+                focusedCGWindowID: RuntimeWindowRecord(
+                    cgWindowID: focusedCGWindowID,
+                    stableWindowID: "cg:\(pid):\(focusedCGWindowID)",
+                    firstSeenAt: 1
+                )
+            ],
+            validCGWindowIDs: [focusedCGWindowID]
+        )
+        AXLiveWindowRegistry.shared.refreshSnapshot(forPID: pid, windows: [focusedAXWindow])
+        defer { AXLiveWindowRegistry.shared.remove(pid: pid) }
         let lock = NSLock()
         var executedRequests: [RuntimeReconciliationRequest] = []
         let service = RuntimeSnapshotService(
@@ -587,9 +604,10 @@ extension FlowTabPriorityCoverageTests {
             RuntimeWindowFocusVerification(
                 appID: "com.example.editor",
                 windowID: "cg:18405:240001",
-                ownerPID: 18_405,
-                targetCGWindowID: 240_001,
-                focusedCGWindowID: 240_001,
+                ownerPID: pid,
+                targetCGWindowID: focusedCGWindowID,
+                focusedCGWindowID: focusedCGWindowID,
+                focusedAXWindow: focusedAXWindow,
                 title: "Verified Window",
                 frame: CGRect(x: 10, y: 20, width: 800, height: 600),
                 allowedActions: WindowBindingConfidence.exact.allowedActions
@@ -599,10 +617,15 @@ extension FlowTabPriorityCoverageTests {
 
         let request = try XCTUnwrap(executedRequests.first)
         XCTAssertEqual(request.appID, "com.example.editor")
-        XCTAssertEqual(request.target, .app(18_405))
+        XCTAssertEqual(request.target, .app(pid))
         XCTAssertEqual(request.reasons, Set([.activationVerified]))
-        XCTAssertEqual(request.affectedCGWindowIDs, Set<CGWindowID>([240_001]))
+        XCTAssertEqual(request.affectedCGWindowIDs, Set<CGWindowID>([focusedCGWindowID]))
         XCTAssertEqual(request.state, .inFlight)
+        let record = try XCTUnwrap(provider.windowMappingStateByPID[pid]?.windowRecordsByCGWindowID[focusedCGWindowID])
+        XCTAssertEqual(record.bindingConfidence, .exact)
+        XCTAssertEqual(record.lastConfirmationSource, .verifiedFocusReadback)
+        XCTAssertEqual(record.lastExactAXWindowID, focusedAXWindowID)
+        XCTAssertEqual(provider.windowMappingStateByPID[pid]?.currentAXToCG[focusedAXWindowID], focusedCGWindowID)
         XCTAssertTrue(coordinator.readyRequests(now: Date.timeIntervalSinceReferenceDate).isEmpty)
     }
 

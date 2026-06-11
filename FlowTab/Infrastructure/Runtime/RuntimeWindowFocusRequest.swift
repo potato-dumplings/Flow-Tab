@@ -53,9 +53,33 @@ struct RuntimeWindowFocusVerification: Equatable {
     let ownerPID: pid_t
     let targetCGWindowID: CGWindowID?
     let focusedCGWindowID: CGWindowID?
+    let focusedAXWindow: AXUIElement?
     let title: String
     let frame: CGRect?
     let allowedActions: Set<WindowBindingAction>
+
+    static func == (lhs: RuntimeWindowFocusVerification, rhs: RuntimeWindowFocusVerification) -> Bool {
+        lhs.appID == rhs.appID
+            && lhs.windowID == rhs.windowID
+            && lhs.ownerPID == rhs.ownerPID
+            && lhs.targetCGWindowID == rhs.targetCGWindowID
+            && lhs.focusedCGWindowID == rhs.focusedCGWindowID
+            && axWindowsEqual(lhs.focusedAXWindow, rhs.focusedAXWindow)
+            && lhs.title == rhs.title
+            && lhs.frame == rhs.frame
+            && lhs.allowedActions == rhs.allowedActions
+    }
+
+    private static func axWindowsEqual(_ lhs: AXUIElement?, _ rhs: AXUIElement?) -> Bool {
+        switch (lhs, rhs) {
+        case (nil, nil):
+            return true
+        case let (lhs?, rhs?):
+            return CFEqual(lhs, rhs)
+        default:
+            return false
+        }
+    }
 
     var affectedCGWindowIDs: Set<CGWindowID> {
         Set([targetCGWindowID, focusedCGWindowID].compactMap { $0 })
@@ -65,12 +89,14 @@ struct RuntimeWindowFocusVerification: Equatable {
 extension RuntimeActivator {
     @discardableResult
     func reportWindowFocusVerified(_ request: WindowFocusRequest, in app: NSRunningApplication) -> Bool {
+        let focusedAXWindow = currentFocusedAXWindowForReconciliation(in: app)
         let verification = RuntimeWindowFocusVerification(
             appID: request.appID,
             windowID: request.windowID,
             ownerPID: request.ownerPID,
             targetCGWindowID: request.targetCGWindowID(expectedPID: app.processIdentifier),
-            focusedCGWindowID: currentFocusedAXWindowCGWindowIDForReconciliation(in: app),
+            focusedCGWindowID: focusedAXWindow.flatMap { AXWindowInspector.cgWindowID(for: $0) },
+            focusedAXWindow: focusedAXWindow,
             title: request.title,
             frame: request.frame,
             allowedActions: request.bindingAllowedActions

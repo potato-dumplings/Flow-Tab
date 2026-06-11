@@ -232,6 +232,7 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
                 ownerPID: pid,
                 targetCGWindowID: nil,
                 focusedCGWindowID: nil,
+                focusedAXWindow: nil,
                 title: "",
                 frame: nil,
                 allowedActions: []

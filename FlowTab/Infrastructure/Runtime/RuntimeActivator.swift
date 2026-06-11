@@ -789,8 +789,12 @@ final class RuntimeActivator {
     }
 
     private func focusedAXWindowCGWindowID(in app: NSRunningApplication) -> CGWindowID? {
+        focusedAXWindow(in: app).flatMap { AXWindowInspector.cgWindowID(for: $0) }
+    }
+
+    private func focusedAXWindow(in app: NSRunningApplication) -> AXUIElement? {
         if let focusedAXWindowOverride {
-            return focusedAXWindowOverride(app).flatMap { AXWindowInspector.cgWindowID(for: $0) }
+            return focusedAXWindowOverride(app)
         }
         guard AccessibilityPermissionChecker.isTrusted() else { return nil }
         let appElement = AXUIElementCreateApplication(app.processIdentifier)
@@ -800,11 +804,15 @@ final class RuntimeActivator {
         ) else {
             return nil
         }
-        return AXWindowInspector.cgWindowID(for: focusedWindow)
+        return focusedWindow
     }
 
     func currentFocusedAXWindowCGWindowIDForReconciliation(in app: NSRunningApplication) -> CGWindowID? {
         focusedAXWindowCGWindowID(in: app)
+    }
+
+    func currentFocusedAXWindowForReconciliation(in app: NSRunningApplication) -> AXUIElement? {
+        focusedAXWindow(in: app)
     }
 
     private func targetCGWindowIsVisible(

@@ -104,6 +104,7 @@ enum RuntimeWindowDiagnostics {
         case .stickyBinding,
              .publicExactMatch,
              .privateExactBridge,
+             .verifiedFocusReadback,
              nil:
             return false
         }

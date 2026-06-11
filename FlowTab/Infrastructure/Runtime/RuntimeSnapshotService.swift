@@ -174,6 +174,7 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
     func signalWindowFocusVerified(_ verification: RuntimeWindowFocusVerification) {
         snapshotQueue.async { [self] in
             let now = Date.timeIntervalSinceReferenceDate
+            snapshotProvider.recordWindowFocusVerification(verification, now: now)
             snapshotProvider.reconciliationCoordinator.markWindowFocusVerified(
                 verification,
                 now: now
@@ -190,6 +191,7 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
                 ownerPID: pid,
                 targetCGWindowID: nil,
                 focusedCGWindowID: nil,
+                focusedAXWindow: nil,
                 title: "",
                 frame: nil,
                 allowedActions: []

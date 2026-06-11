@@ -896,6 +896,7 @@ extension FlowTabPriorityCoverageTests {
                 ownerPID: currentApp.processIdentifier,
                 targetCGWindowID: 240_001,
                 focusedCGWindowID: 240_001,
+                focusedAXWindow: nil,
                 title: "Verified Window",
                 frame: CGRect(x: 10, y: 20, width: 800, height: 600),
                 allowedActions: WindowBindingConfidence.exact.allowedActions

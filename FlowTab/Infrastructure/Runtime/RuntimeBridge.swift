@@ -23,13 +23,14 @@ enum WindowBindingConfirmationSource: String {
     case stickyBinding
     case publicExactMatch
     case privateExactBridge
+    case verifiedFocusReadback
     case fullscreenContentRebinding
     case fullscreenContentFallbackBinding
     case desktopSiblingBinding
 
     var bindingConfidence: WindowBindingConfidence {
         switch self {
-        case .publicExactMatch, .privateExactBridge:
+        case .publicExactMatch, .privateExactBridge, .verifiedFocusReadback:
             .exact
         case .stickyBinding:
             .sticky
