@@ -105,7 +105,7 @@ extension AppDelegate {
     }
 
     var hasWorkspaceLifecycleObserverForTesting: Bool {
-        workspaceLifecycleObserver != nil
+        !workspaceLifecycleObservers.isEmpty
     }
 
     var hasStatusItemForTesting: Bool {

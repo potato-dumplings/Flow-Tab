@@ -14,6 +14,7 @@ protocol RuntimeSnapshotServing: Sendable {
     func focusedAppSnapshot(processIdentifier pid: pid_t) -> RuntimeHomeAppSnapshot?
     func currentCGWindowsByPID() -> [pid_t: [RuntimeSnapshotProvider.CGWindowEntry]]
     func signalSpaceTopologyChanged()
+    func signalAppLaunched(appID: String, pid: pid_t)
     func signalAppWindowsChanged(appID: String, pid: pid_t)
     func signalAppTerminated(appID: String, pid: pid_t)
     func signalWindowFocusVerified(_ verification: RuntimeWindowFocusVerification)
@@ -112,6 +113,19 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
         snapshotQueue.async { [self] in
             _ = snapshotProvider.collectCGWindowsByPID(options: [.excludeDesktopElements])
             drainReadyReconciliationRequestsLocked(now: Date.timeIntervalSinceReferenceDate)
+        }
+    }
+
+    func signalAppLaunched(appID: String, pid: pid_t) {
+        snapshotQueue.async { [self] in
+            let now = Date.timeIntervalSinceReferenceDate
+            snapshotProvider.reconciliationCoordinator.markAppDirty(
+                appID: appID,
+                pid: pid,
+                reason: .appLaunched,
+                now: now
+            )
+            drainReadyReconciliationRequestsLocked(now: now)
         }
     }
 

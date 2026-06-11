@@ -286,6 +286,33 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(coordinator.readyRequests(now: Date.timeIntervalSinceReferenceDate).isEmpty)
     }
 
+    func testRuntimeSnapshotServiceDrainsLaunchedAppThroughCoordinator() throws {
+        let coordinator = RuntimeReconciliationCoordinator()
+        let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
+        let lock = NSLock()
+        var executedRequests: [RuntimeReconciliationRequest] = []
+        let service = RuntimeSnapshotService(
+            label: "FlowTabTests.RuntimeSnapshotService.AppLaunchSignal",
+            snapshotProvider: provider,
+            reconciliationExecutor: { request, _ in
+                lock.lock()
+                executedRequests.append(request)
+                lock.unlock()
+                return .completed
+            }
+        )
+
+        service.signalAppLaunched(appID: "com.example.new", pid: 18_407)
+        _ = service.lightweightAppSnapshot()
+
+        let request = try XCTUnwrap(executedRequests.first)
+        XCTAssertEqual(request.target, .app(18_407))
+        XCTAssertEqual(request.appID, "com.example.new")
+        XCTAssertEqual(request.reasons, Set([.appLaunched]))
+        XCTAssertEqual(request.state, .inFlight)
+        XCTAssertTrue(coordinator.readyRequests(now: Date.timeIntervalSinceReferenceDate).isEmpty)
+    }
+
     func testRuntimeSnapshotServiceClearsTerminatedAppRuntimeState() {
         let coordinator = RuntimeReconciliationCoordinator()
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)

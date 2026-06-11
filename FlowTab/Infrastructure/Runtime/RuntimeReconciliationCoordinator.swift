@@ -4,6 +4,7 @@ import Foundation
 enum RuntimeReconciliationReason: String, Hashable {
     case axNotification
     case activationVerified
+    case appLaunched
     case spaceTopologyChanged
     case manualRefresh
 }

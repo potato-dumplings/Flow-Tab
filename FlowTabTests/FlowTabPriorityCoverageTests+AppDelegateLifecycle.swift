@@ -96,7 +96,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testAppDelegateSignalsRuntimeWhenWorkspaceAppTerminates() async {
+    func testAppDelegateSignalsRuntimeWhenWorkspaceAppsLaunchAndTerminate() async {
         guard let userDefaults = makeIsolatedUserDefaults() else { return }
 
         let previousHooks = AppDelegate.testHooks
@@ -140,26 +140,44 @@ extension FlowTabPriorityCoverageTests {
         delegate?.applicationDidFinishLaunching(
             Notification(name: NSApplication.didFinishLaunchingNotification)
         )
-        let terminatedApp = NSRunningApplication.current
+        let workspaceApp = NSRunningApplication.current
+
+        workspaceNotificationCenter.post(
+            name: NSWorkspace.didLaunchApplicationNotification,
+            object: nil,
+            userInfo: [NSWorkspace.applicationUserInfoKey: workspaceApp]
+        )
+
+        let didSignalLaunch = await waitUntil(
+            "workspace launch reaches runtime snapshot service",
+            timeoutNanoseconds: 1_000_000_000,
+            pollIntervalNanoseconds: 10_000_000
+        ) {
+            let signals = snapshotService.appLaunchSignalsRecorded()
+            return signals.count == 1
+                && signals.first?.appID == RuntimeSnapshotProvider.baseAppID(for: workspaceApp)
+                && signals.first?.pid == workspaceApp.processIdentifier
+        }
 
         workspaceNotificationCenter.post(
             name: NSWorkspace.didTerminateApplicationNotification,
             object: nil,
-            userInfo: [NSWorkspace.applicationUserInfoKey: terminatedApp]
+            userInfo: [NSWorkspace.applicationUserInfoKey: workspaceApp]
         )
 
-        let didSignalRuntime = await waitUntil(
+        let didSignalTermination = await waitUntil(
             "workspace termination reaches runtime snapshot service",
             timeoutNanoseconds: 1_000_000_000,
             pollIntervalNanoseconds: 10_000_000
         ) {
             let signals = snapshotService.appTerminationSignalsRecorded()
             return signals.count == 1
-                && signals.first?.appID == RuntimeSnapshotProvider.baseAppID(for: terminatedApp)
-                && signals.first?.pid == terminatedApp.processIdentifier
+                && signals.first?.appID == RuntimeSnapshotProvider.baseAppID(for: workspaceApp)
+                && signals.first?.pid == workspaceApp.processIdentifier
         }
 
-        XCTAssertTrue(didSignalRuntime)
+        XCTAssertTrue(didSignalLaunch)
+        XCTAssertTrue(didSignalTermination)
     }
 
     @MainActor

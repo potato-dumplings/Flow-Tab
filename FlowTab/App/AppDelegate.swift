@@ -20,7 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var hotkeyObserver: NSObjectProtocol?
     private(set) var appVisibilityObserver: NSObjectProtocol?
     private(set) var languageObserver: NSObjectProtocol?
-    private(set) var workspaceLifecycleObserver: NSObjectProtocol?
+    private(set) var workspaceLifecycleObservers: [NSObjectProtocol] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Self.shared = self
@@ -77,9 +77,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NotificationCenter.default.removeObserver(languageObserver)
             self.languageObserver = nil
         }
-        if let workspaceLifecycleObserver {
-            resolvedWorkspaceNotificationCenter.removeObserver(workspaceLifecycleObserver)
-            self.workspaceLifecycleObserver = nil
+        if !workspaceLifecycleObservers.isEmpty {
+            for observer in workspaceLifecycleObservers {
+                resolvedWorkspaceNotificationCenter.removeObserver(observer)
+            }
+            workspaceLifecycleObservers.removeAll()
         }
         hotkeyMonitor?.stop()
         inAppWindowHotkeyMonitor?.stop()
@@ -310,10 +312,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func installWorkspaceLifecycleObserver() {
-        if let workspaceLifecycleObserver {
-            resolvedWorkspaceNotificationCenter.removeObserver(workspaceLifecycleObserver)
+        if !workspaceLifecycleObservers.isEmpty {
+            for observer in workspaceLifecycleObservers {
+                resolvedWorkspaceNotificationCenter.removeObserver(observer)
+            }
+            workspaceLifecycleObservers.removeAll()
         }
-        workspaceLifecycleObserver = resolvedWorkspaceNotificationCenter.addObserver(
+        let didLaunchObserver = resolvedWorkspaceNotificationCenter.addObserver(
+            forName: NSWorkspace.didLaunchApplicationNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self else { return }
+            guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else {
+                return
+            }
+            let appID = RuntimeSnapshotProvider.baseAppID(for: app)
+            self.resolvedRuntimeSnapshotService.signalAppLaunched(
+                appID: appID,
+                pid: app.processIdentifier
+            )
+        }
+        let didTerminateObserver = resolvedWorkspaceNotificationCenter.addObserver(
             forName: NSWorkspace.didTerminateApplicationNotification,
             object: nil,
             queue: .main
@@ -328,6 +348,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 pid: app.processIdentifier
             )
         }
+        workspaceLifecycleObservers = [didLaunchObserver, didTerminateObserver]
     }
 
     func applyActivationPolicyFromPreferences() {
