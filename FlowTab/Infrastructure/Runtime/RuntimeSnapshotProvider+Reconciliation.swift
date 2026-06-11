@@ -124,7 +124,7 @@ extension RuntimeSnapshotProvider {
               let focusedCGWindowID = verification.focusedCGWindowID else {
             return
         }
-        guard var mappingState = windowMappingStateByPID[verification.ownerPID] else { return }
+        var mappingState = windowMappingStateByPID[verification.ownerPID] ?? RuntimeWindowMappingState()
 
         let axWindowID = focusedAXWindowID(
             for: focusedAXWindow,

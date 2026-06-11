@@ -629,6 +629,55 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(coordinator.readyRequests(now: Date.timeIntervalSinceReferenceDate).isEmpty)
     }
 
+    func testRuntimeSnapshotServiceSeedsVerifiedFocusRecordWithoutPriorMappingState() throws {
+        let coordinator = RuntimeReconciliationCoordinator()
+        let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
+        let pid = pid_t(18_406)
+        let focusedCGWindowID = CGWindowID(240_101)
+        let focusedAXWindow = AXUIElementCreateApplication(pid)
+        let focusedAXWindowID = AXWindowInspectorForTesting.makeWindowID(pid: pid, index: 0)
+        AXLiveWindowRegistry.shared.refreshSnapshot(forPID: pid, windows: [focusedAXWindow])
+        defer { AXLiveWindowRegistry.shared.remove(pid: pid) }
+        let lock = NSLock()
+        var executedRequests: [RuntimeReconciliationRequest] = []
+        let service = RuntimeSnapshotService(
+            label: "FlowTabTests.RuntimeSnapshotService.VerifiedFocusSeed",
+            snapshotProvider: provider,
+            reconciliationExecutor: { request, _ in
+                lock.lock()
+                executedRequests.append(request)
+                lock.unlock()
+                return .completed
+            }
+        )
+
+        service.signalWindowFocusVerified(
+            RuntimeWindowFocusVerification(
+                appID: "com.example.seed",
+                windowID: "cg:18406:240101",
+                ownerPID: pid,
+                targetCGWindowID: focusedCGWindowID,
+                focusedCGWindowID: focusedCGWindowID,
+                focusedAXWindow: focusedAXWindow,
+                title: "Seeded Verified Window",
+                frame: CGRect(x: 30, y: 40, width: 640, height: 480),
+                allowedActions: WindowBindingConfidence.exact.allowedActions
+            )
+        )
+        _ = service.lightweightAppSnapshot()
+
+        let request = try XCTUnwrap(executedRequests.first)
+        XCTAssertEqual(request.target, .app(pid))
+        XCTAssertEqual(request.affectedCGWindowIDs, Set<CGWindowID>([focusedCGWindowID]))
+        let mappingState = try XCTUnwrap(provider.windowMappingStateByPID[pid])
+        let record = try XCTUnwrap(mappingState.windowRecordsByCGWindowID[focusedCGWindowID])
+        XCTAssertEqual(record.bindingConfidence, .exact)
+        XCTAssertEqual(record.lastConfirmationSource, .verifiedFocusReadback)
+        XCTAssertEqual(record.lastExactAXWindowID, focusedAXWindowID)
+        XCTAssertEqual(mappingState.currentAXToCG[focusedAXWindowID], focusedCGWindowID)
+        XCTAssertEqual(mappingState.validCGWindowIDs, [focusedCGWindowID])
+    }
+
     func testRuntimeSnapshotServiceSchedulesRetryWhenDrainSeesTransientEmptyAXSnapshot() throws {
         let coordinator = RuntimeReconciliationCoordinator(
             retryPolicy: RuntimeReconciliationRetryPolicy(delays: [0.1])
