@@ -312,6 +312,41 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(result.affectedCGWindowIDs, affectedCGWindowIDs)
     }
 
+    func testRuntimeSnapshotProviderReconciliationResultReportsAffectedWindowRecordEvidence() {
+        let provider = RuntimeSnapshotProvider()
+        let pid = pid_t(1_840_501_407)
+        let exactWindowID = CGWindowID(240_001)
+        let provisionalWindowID = CGWindowID(240_002)
+        let missingWindowID = CGWindowID(240_003)
+        var exactRecord = RuntimeWindowRecord(
+            cgWindowID: exactWindowID,
+            stableWindowID: "cg:\(pid):\(exactWindowID)",
+            firstSeenAt: 10
+        )
+        exactRecord.lastConfirmationSource = .publicExactMatch
+        let provisionalRecord = RuntimeWindowRecord(
+            cgWindowID: provisionalWindowID,
+            stableWindowID: "cg:\(pid):\(provisionalWindowID)",
+            firstSeenAt: 10
+        )
+        provider.windowMappingStateByPID[pid] = RuntimeWindowMappingState(
+            windowRecordsByCGWindowID: [
+                exactWindowID: exactRecord,
+                provisionalWindowID: provisionalRecord
+            ]
+        )
+
+        let result = provider.reconcileAppWindows(
+            processIdentifier: pid,
+            affectedCGWindowIDs: [exactWindowID, provisionalWindowID, missingWindowID]
+        )
+
+        XCTAssertEqual(result.pid, pid)
+        XCTAssertEqual(result.affectedCGWindowIDs, [exactWindowID, provisionalWindowID, missingWindowID])
+        XCTAssertEqual(result.knownAffectedCGWindowIDs, [exactWindowID, provisionalWindowID])
+        XCTAssertEqual(result.exactAffectedCGWindowIDs, [exactWindowID])
+    }
+
     func testRuntimeSnapshotServiceDrainsAppWindowChangesThroughCoordinator() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)

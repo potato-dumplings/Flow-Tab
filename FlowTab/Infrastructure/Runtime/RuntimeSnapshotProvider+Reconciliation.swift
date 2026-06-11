@@ -10,6 +10,8 @@ struct RuntimeAffectedWindowReconciliationTarget: Equatable {
 struct RuntimeAppWindowReconciliationResult: Equatable {
     let pid: pid_t
     let affectedCGWindowIDs: Set<CGWindowID>
+    let knownAffectedCGWindowIDs: Set<CGWindowID>
+    let exactAffectedCGWindowIDs: Set<CGWindowID>
     let snapshotWasEmpty: Bool
     let isTransientEmptyAXSnapshot: Bool
 }
@@ -68,9 +70,18 @@ extension RuntimeSnapshotProvider {
     ) -> RuntimeAppWindowReconciliationResult {
         let snapshot = focusedAppSnapshot(processIdentifier: pid)
         let snapshotWasEmpty = snapshot?.candidate.windows.isEmpty == true
+        let mappingState = windowMappingStateByPID[pid]
+        let knownAffectedCGWindowIDs = mappingState.map {
+            affectedCGWindowIDs.intersection($0.windowRecordsByCGWindowID.keys)
+        } ?? []
+        let exactAffectedCGWindowIDs = knownAffectedCGWindowIDs.filter { cgWindowID in
+            mappingState?.windowRecordsByCGWindowID[cgWindowID]?.bindingConfidence == .exact
+        }
         return RuntimeAppWindowReconciliationResult(
             pid: pid,
             affectedCGWindowIDs: affectedCGWindowIDs,
+            knownAffectedCGWindowIDs: knownAffectedCGWindowIDs,
+            exactAffectedCGWindowIDs: exactAffectedCGWindowIDs,
             snapshotWasEmpty: snapshotWasEmpty,
             isTransientEmptyAXSnapshot: snapshotWasEmpty && isLikelyTransientAXRebuild(for: pid)
         )
