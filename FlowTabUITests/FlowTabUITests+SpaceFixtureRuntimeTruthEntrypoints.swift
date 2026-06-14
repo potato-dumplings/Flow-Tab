@@ -77,6 +77,7 @@ extension FlowTabUITests {
             }
         ) { _, app in
             logWorkflowSpaceObservation("\(traceLabel).beforeTrigger", app: targetApp)
+            let runtimeLogSnapshot = makeRuntimeLogFileSnapshot()
             postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.global, traceLabel: traceLabel)
             var diagnosticsSummary = try assertGlobalSwitcherWindowStateReady(
                 for: targetApp,
@@ -90,7 +91,8 @@ extension FlowTabUITests {
                     targetApp: targetApp,
                     initialDiagnosticsSummary: diagnosticsSummary,
                     primaryFullscreenTitle: fullscreenTitle,
-                    traceLabel: traceLabel
+                    traceLabel: traceLabel,
+                    runtimeLogSnapshot: runtimeLogSnapshot
                 )
                 return
             }

@@ -6,7 +6,8 @@ extension FlowTabUITests {
         targetApp: SpaceFixtureResolvedWorkflow.App,
         initialDiagnosticsSummary: XCUIElement,
         primaryFullscreenTitle: String,
-        traceLabel: String
+        traceLabel: String,
+        runtimeLogSnapshot: [String: UInt64]
     ) throws {
         let standardTitles = standardWorkflowWindowTitles(in: targetApp)
         let normalOneTitle = try XCTUnwrap(
@@ -98,6 +99,11 @@ extension FlowTabUITests {
                 diagnosticsSummary: diagnosticsSummary,
                 traceLabel: "\(traceLabel).\(phase.trace)"
             )
+            assertNoisyOptionTabWindowLayerSource(
+                selection,
+                phaseTrace: phase.trace,
+                since: runtimeLogSnapshot
+            )
 
             let topologyLogSnapshot = makeRuntimeLogFileSnapshot()
             postFlowTabUITestSwitcherCommandAndWaitForDelivery(
@@ -114,6 +120,12 @@ extension FlowTabUITests {
                 ),
                 "Noisy Option+Tab must activate the exact \(phase.targetTitle) CG window selected in \(phase.trace)."
             )
+            assertNoisyOptionTabWindowRequestSource(
+                selection,
+                appID: targetApp.identity.bundleIdentifier,
+                phaseTrace: phase.trace,
+                since: topologyLogSnapshot
+            )
             waitForRuntimeLogFiles(
                 matching: #"collectCGWindows result=ready .* affected=[1-9][0-9]*"#,
                 since: topologyLogSnapshot,
@@ -129,6 +141,36 @@ extension FlowTabUITests {
             expectedCurrentSelection = selection
             logWorkflowSpaceObservation("\(traceLabel).afterConfirm.\(phase.trace)", app: targetApp)
         }
+    }
+
+    private func assertNoisyOptionTabWindowLayerSource(
+        _ selection: RuntimeTruthWindowSelection,
+        phaseTrace: String,
+        since snapshot: [String: UInt64]
+    ) {
+        let escapedTitle = NSRegularExpression.escapedPattern(for: selection.title)
+        waitForRuntimeLogFiles(
+            matching: #"window-entries app=Chrome Fixture .*id=cg:[0-9]+:\#(selection.windowNumber):title=\#(escapedTitle)[^\n]*source=stickyBinding:spaceEvidence=(observed|inferredFromTopology)"#,
+            since: snapshot,
+            timeout: 8,
+            description: "sticky window-layer source for selected Noisy Option+Tab \(phaseTrace) window"
+        )
+    }
+
+    private func assertNoisyOptionTabWindowRequestSource(
+        _ selection: RuntimeTruthWindowSelection,
+        appID: String,
+        phaseTrace: String,
+        since snapshot: [String: UInt64]
+    ) {
+        let escapedAppID = NSRegularExpression.escapedPattern(for: appID)
+        let escapedTitle = NSRegularExpression.escapedPattern(for: selection.title)
+        waitForRuntimeLogFiles(
+            matching: #"window-request appID=\#(escapedAppID) pid=[0-9]+ windowID=cg:[0-9]+:\#(selection.windowNumber) title=\#(escapedTitle)[^\n]* sticky=true source=stickyBinding"#,
+            since: snapshot,
+            timeout: 8,
+            description: "sticky window request source for selected Noisy Option+Tab \(phaseTrace) window"
+        )
     }
 
     private func assertOptionTabWindowStateCurrentSelection(
