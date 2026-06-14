@@ -162,6 +162,7 @@ extension FlowTabTests {
                       "noisyCGSiblings": true,
                       "publishesApplicationAXWindow": false,
                       "suppressesWindowAccessibilityExposure": true,
+                      "startupState": "minimized",
                       "tabs": [
                         { "title": "Mail", "isSelected": false },
                         { "title": "Calendar", "isSelected": true }
@@ -205,6 +206,7 @@ extension FlowTabTests {
         XCTAssertTrue(configuration.windows[1].noisyCGSiblings)
         XCTAssertFalse(configuration.windows[1].publishesApplicationAXWindow)
         XCTAssertTrue(configuration.windows[1].suppressesWindowAccessibilityExposure)
+        XCTAssertEqual(configuration.windows[1].startupState, .minimized)
         XCTAssertEqual(configuration.windows[0].tabs.map(\.title), ["Docs", "PR"])
         XCTAssertEqual(configuration.windows[0].tabs.map(\.isSelected), [true, false])
         XCTAssertEqual(configuration.windows[1].tabs.map(\.isSelected), [false, true])

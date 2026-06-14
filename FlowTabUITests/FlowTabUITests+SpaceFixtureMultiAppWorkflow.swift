@@ -322,6 +322,7 @@ struct SpaceFixtureResolvedWorkflowWindowDocument: Codable {
     let noisyCGSiblings: Bool?
     let publishesApplicationAXWindow: Bool?
     let suppressesWindowAccessibilityExposure: Bool?
+    let startupState: String?
 
     var resolvedTitle: String {
         if let selectedTitle = tabs.first(where: \.isSelected)?.trimmedTitle, !selectedTitle.isEmpty {

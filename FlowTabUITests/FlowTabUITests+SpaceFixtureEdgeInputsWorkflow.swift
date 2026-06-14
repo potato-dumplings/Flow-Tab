@@ -72,6 +72,59 @@ extension FlowTabUITests {
         }
     }
 
+    func testSwitcherPanelPreviewCapturesRealMinimizedPublicAXState() throws {
+        let workflow = try configuredSwitcherEdgeInputsWorkflow()
+        let logSnapshot = makeRuntimeLogFileSnapshot()
+        let targetApp = try XCTUnwrap(
+            workflow.apps.first {
+                $0.expectedWindowTitles.filter { $0 == SpaceFixtureEdgeInputsWorkflowDefaults.sharedWindowTitle }.count == 2
+            },
+            "Edge workflow must include one app with duplicate same-title windows."
+        )
+
+        try runRealSpaceFixtureEdgeInputsWorkflow(
+            workflow,
+            flowTabAdditionalArguments: [
+                "--flowtab-ui-runtime-log-level",
+                "DEBUG",
+                "--flowtab-ui-enable-verbose-logs",
+                "--flowtab-ui-open-switcher",
+                "--flowtab-ui-listen-switcher-trigger"
+            ] + FlowTabUITestSwitcherCommandPayload.launchArguments
+        ) { _, app in
+            let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
+            XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
+            XCTAssertTrue(
+                selectEdgeWorkflowAppInSwitcherAppLayer(
+                    targetApp,
+                    app: app,
+                    diagnosticsSummary: diagnosticsSummary,
+                    timeout: 10
+                ),
+                "Switcher did not select the duplicate-window workflow app before minimized-state assertions."
+            )
+
+            app.typeKey(.downArrow, modifierFlags: [])
+            _ = waitForEdgeSwitcherWindowCards(
+                in: app,
+                expectedTitles: targetApp.expectedWindowTitles,
+                timeout: 8
+            )
+            waitForRuntimeLogFiles(
+                matching: #"chrome-topology app=Chrome Fixture .* ax=\[.*min=1.*\] cg=\[.*Shared Docs:off:spaces=\[[0-9,]*\]:frame="#,
+                since: logSnapshot,
+                timeout: 8,
+                description: "real edge workflow exposes a minimized AX window with an offscreen CG counterpart"
+            )
+            waitForRuntimeLogFiles(
+                matching: #"window-entries app=Chrome Fixture .*off:minimized=1"#,
+                since: logSnapshot,
+                timeout: 8,
+                description: "real edge workflow carries minimized public AX state into window-layer output"
+            )
+        }
+    }
+
     func testSwitcherPanelWindowSearchKeepsDuplicateRealWorkflowTitlesDistinct() throws {
         let workflow = try configuredSwitcherEdgeInputsWorkflow()
         let sharedTitle = SpaceFixtureEdgeInputsWorkflowDefaults.sharedWindowTitle

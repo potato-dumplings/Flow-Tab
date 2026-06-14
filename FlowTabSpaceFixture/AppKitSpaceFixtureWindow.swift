@@ -44,9 +44,11 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
     func show(isKey: Bool) {
         if isKey {
             window.makeKeyAndOrderFront(nil)
+            applyStartupStateIfNeeded()
             return
         }
         window.orderFrontRegardless()
+        applyStartupStateIfNeeded()
     }
 
     func close() {
@@ -68,6 +70,11 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
     private func showNoisyCGSiblingsIfNeeded() {
         guard let noisyCGSiblings else { return }
         noisyCGSiblings.show(around: window)
+    }
+
+    private func applyStartupStateIfNeeded() {
+        guard plan.startupState == .minimized else { return }
+        window.miniaturize(nil)
     }
 
     private func suppressNoisyFullScreenContentAccessibilityIfNeeded() {

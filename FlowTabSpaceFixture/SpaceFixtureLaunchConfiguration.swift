@@ -14,6 +14,7 @@ struct SpaceFixtureConfiguredWindow: Equatable {
     let noisyCGSiblings: Bool
     let publishesApplicationAXWindow: Bool
     let suppressesWindowAccessibilityExposure: Bool
+    let startupState: SpaceFixtureWindowStartupState
 
     init(
         configuredTitle: String,
@@ -22,7 +23,8 @@ struct SpaceFixtureConfiguredWindow: Equatable {
         tabs: [SpaceFixtureConfiguredTab],
         noisyCGSiblings: Bool = false,
         publishesApplicationAXWindow: Bool = true,
-        suppressesWindowAccessibilityExposure: Bool = false
+        suppressesWindowAccessibilityExposure: Bool = false,
+        startupState: SpaceFixtureWindowStartupState = .normal
     ) {
         self.configuredTitle = configuredTitle
         self.windowTitle = windowTitle
@@ -31,6 +33,7 @@ struct SpaceFixtureConfiguredWindow: Equatable {
         self.noisyCGSiblings = noisyCGSiblings
         self.publishesApplicationAXWindow = publishesApplicationAXWindow
         self.suppressesWindowAccessibilityExposure = suppressesWindowAccessibilityExposure
+        self.startupState = startupState
     }
 
     var isFullscreenTarget: Bool {
@@ -136,7 +139,8 @@ struct SpaceFixtureLaunchConfiguration: Equatable {
                 tabs: [],
                 noisyCGSiblings: false,
                 publishesApplicationAXWindow: true,
-                suppressesWindowAccessibilityExposure: false
+                suppressesWindowAccessibilityExposure: false,
+                startupState: .normal
             )
         }
 
@@ -282,7 +286,8 @@ extension SpaceFixtureLaunchConfiguration {
                 tabs: normalizedTabs,
                 noisyCGSiblings: window.noisyCGSiblings,
                 publishesApplicationAXWindow: window.publishesApplicationAXWindow,
-                suppressesWindowAccessibilityExposure: window.suppressesWindowAccessibilityExposure
+                suppressesWindowAccessibilityExposure: window.suppressesWindowAccessibilityExposure,
+                startupState: window.startupState
             )
         }
     }

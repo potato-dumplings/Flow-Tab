@@ -5,6 +5,11 @@ enum SpaceFixtureWindowMode: String, Codable, Equatable {
     case fullscreen
 }
 
+enum SpaceFixtureWindowStartupState: String, Codable, Equatable {
+    case normal
+    case minimized
+}
+
 enum SpaceFixtureLaunchConfigurationError: LocalizedError, Equatable {
     case missingWorkflowConfigPath
     case missingWorkflowAppID
@@ -131,6 +136,7 @@ struct SpaceFixtureWorkflowWindowConfiguration: Codable, Equatable {
     let noisyCGSiblings: Bool
     let publishesApplicationAXWindow: Bool
     let suppressesWindowAccessibilityExposure: Bool
+    let startupState: SpaceFixtureWindowStartupState
 
     enum CodingKeys: String, CodingKey {
         case title
@@ -139,6 +145,7 @@ struct SpaceFixtureWorkflowWindowConfiguration: Codable, Equatable {
         case noisyCGSiblings
         case publishesApplicationAXWindow
         case suppressesWindowAccessibilityExposure
+        case startupState
     }
 
     init(
@@ -147,7 +154,8 @@ struct SpaceFixtureWorkflowWindowConfiguration: Codable, Equatable {
         tabs: [SpaceFixtureWorkflowTabConfiguration],
         noisyCGSiblings: Bool = false,
         publishesApplicationAXWindow: Bool = true,
-        suppressesWindowAccessibilityExposure: Bool = false
+        suppressesWindowAccessibilityExposure: Bool = false,
+        startupState: SpaceFixtureWindowStartupState = .normal
     ) {
         self.title = title
         self.mode = mode
@@ -155,6 +163,7 @@ struct SpaceFixtureWorkflowWindowConfiguration: Codable, Equatable {
         self.noisyCGSiblings = noisyCGSiblings
         self.publishesApplicationAXWindow = publishesApplicationAXWindow
         self.suppressesWindowAccessibilityExposure = suppressesWindowAccessibilityExposure
+        self.startupState = startupState
     }
 
     init(from decoder: Decoder) throws {
@@ -171,7 +180,11 @@ struct SpaceFixtureWorkflowWindowConfiguration: Codable, Equatable {
             suppressesWindowAccessibilityExposure: try container.decodeIfPresent(
                 Bool.self,
                 forKey: .suppressesWindowAccessibilityExposure
-            ) ?? false
+            ) ?? false,
+            startupState: try container.decodeIfPresent(
+                SpaceFixtureWindowStartupState.self,
+                forKey: .startupState
+            ) ?? .normal
         )
     }
 }
