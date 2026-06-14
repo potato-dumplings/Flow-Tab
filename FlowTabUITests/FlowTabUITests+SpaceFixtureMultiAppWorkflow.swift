@@ -53,6 +53,10 @@ enum SpaceFixtureMultiAppWorkflowDefaults {
         switcherRuntimeTruthWorkflowSourceURL(named: "space-fixture-option-tab-space-backed-workflow.json")
     }
 
+    static var optionTabProvisionalHiddenRuntimeTruthWorkflowSourceURL: URL {
+        switcherRuntimeTruthWorkflowSourceURL(named: "space-fixture-option-tab-provisional-hidden-workflow.json")
+    }
+
     static var windowSearchRuntimeTruthWorkflowSourceURL: URL {
         switcherRuntimeTruthWorkflowSourceURL(named: "space-fixture-window-search-fullscreen-sibling-workflow.json")
     }

@@ -59,15 +59,95 @@ extension FlowTabUITests {
         }
     }
 
+    func testSwitcherPanelOptionTabHidesDesktopProvisionalCGOnlyWorkflowWindow() throws {
+        let workflow = try configuredProvisionalHiddenRuntimeTruthWorkflow()
+        let targetApp = try XCTUnwrap(workflow.apps.first)
+        let hiddenTitle = "Hidden CG Window"
+        var runtimeLogSnapshot = makeRuntimeLogFileSnapshot()
+
+        try runRealSpaceFixtureWorkflow(
+            workflow,
+            flowTabAdditionalArguments: runtimeTruthSwitcherLaunchArguments(),
+            waitsForFullscreenMarkers: false,
+            validatesPermissionsBeforeFixtureLaunch: true,
+            beforeFlowTabLaunch: { _ in
+                runtimeLogSnapshot = self.makeRuntimeLogFileSnapshot()
+            },
+            flowTabLaunchTraceLabel: "option.provisionalHidden"
+        ) { _, app in
+            postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.global, traceLabel: "option.provisionalHidden")
+            let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
+            XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
+
+            try postFlowTabUITestSelectSwitcherAppAndWaitForDelivery(
+                bundleIdentifier: targetApp.identity.bundleIdentifier,
+                traceLabel: "option.provisionalHidden.selectApp"
+            )
+            XCTAssertTrue(
+                waitForSwitcherAppsSummary(
+                    diagnosticsSummary,
+                    toContain: "\(targetApp.identity.bundleIdentifier):1",
+                    timeout: 4
+                ),
+                """
+                Option+Tab switcher did not count only the AX-backed user window for \(targetApp.appName).
+
+                \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
+                """
+            )
+
+            postFlowTabUITestSwitcherCommandAndWaitForDelivery(
+                .advanceDown,
+                traceLabel: "option.provisionalHidden.enterWindowState"
+            )
+            RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+            XCTAssertFalse(
+                switcherPanelDiagnosticsValue(diagnosticsSummary, key: "mode").hasPrefix("windowCycle"),
+                """
+                Option+Tab must not enter a two-window cycle when the only second window is provisional CG-only.
+
+                \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
+                """
+            )
+            XCTAssertEqual(
+                switcherPanelDiagnosticsValue(diagnosticsSummary, key: "preview"),
+                "inactive",
+                """
+                Provisional-only hidden windows must not create a visible switcher preview layer.
+
+                \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
+                """
+            )
+            XCTAssertFalse(
+                switcherPreviewTitles(from: diagnosticsSummary).contains(hiddenTitle),
+                "Desktop provisional CG-only \(hiddenTitle) must not enter the main switcher window layer."
+            )
+            assertHiddenProvisionalCGOnlyRuntimeLog(appName: targetApp.appName, since: runtimeLogSnapshot)
+        }
+    }
+
     private func configuredSpaceBackedRuntimeTruthWorkflow() throws -> SpaceFixtureResolvedWorkflow {
-        let sourceURL = SpaceFixtureMultiAppWorkflowDefaults.optionTabSpaceBackedRuntimeTruthWorkflowSourceURL
+        try configuredOptionTabRuntimeTruthWorkflow(
+            sourceURL: SpaceFixtureMultiAppWorkflowDefaults.optionTabSpaceBackedRuntimeTruthWorkflowSourceURL
+        )
+    }
+
+    private func configuredProvisionalHiddenRuntimeTruthWorkflow() throws -> SpaceFixtureResolvedWorkflow {
+        try configuredOptionTabRuntimeTruthWorkflow(
+            sourceURL: SpaceFixtureMultiAppWorkflowDefaults.optionTabProvisionalHiddenRuntimeTruthWorkflowSourceURL
+        )
+    }
+
+    private func configuredOptionTabRuntimeTruthWorkflow(
+        sourceURL: URL
+    ) throws -> SpaceFixtureResolvedWorkflow {
         do {
             let installedWorkflow = try SpaceFixtureResolvedWorkflow.configured()
             let workflow = try resolveSpaceFixtureWorkflowScenario(
                 sourceWorkflowURL: sourceURL,
                 using: installedWorkflow
             )
-            try validateSpaceBackedRuntimeTruthWorkflow(workflow)
+            try validateAXSuppressedRuntimeTruthWorkflow(workflow)
             return workflow
         } catch let error as SpaceFixtureMultiAppWorkflowError {
             switch error {
@@ -93,15 +173,15 @@ extension FlowTabUITests {
         }
     }
 
-    private func validateSpaceBackedRuntimeTruthWorkflow(_ workflow: SpaceFixtureResolvedWorkflow) throws {
+    private func validateAXSuppressedRuntimeTruthWorkflow(_ workflow: SpaceFixtureResolvedWorkflow) throws {
         guard workflow.apps.count == 1 else {
-            throw XCTSkip("Space-backed runtime truth workflow must contain exactly one fixture app.")
+            throw XCTSkip("AX-suppressed runtime truth workflow must contain exactly one fixture app.")
         }
         guard workflow.apps[0].windowCount >= 2 else {
-            throw XCTSkip("Space-backed runtime truth workflow must contain a visible readiness window and a CG-only target window.")
+            throw XCTSkip("AX-suppressed runtime truth workflow must contain a visible readiness window and a CG-only target window.")
         }
         guard workflow.hasUniqueExpectedWindowTitles else {
-            throw XCTSkip("Space-backed runtime truth workflow must define unique expected window titles.")
+            throw XCTSkip("AX-suppressed runtime truth workflow must define unique expected window titles.")
         }
     }
 
@@ -146,4 +226,18 @@ extension FlowTabUITests {
             description: "space-backed CG-only activation route"
         )
     }
+
+    private func assertHiddenProvisionalCGOnlyRuntimeLog(
+        appName: String,
+        since snapshot: [String: UInt64]
+    ) {
+        let escapedAppName = NSRegularExpression.escapedPattern(for: appName)
+        waitForRuntimeLogFiles(
+            matching: #"\#(escapedAppName) hidden-provisional-cg windows=1"#,
+            since: snapshot,
+            timeout: 8,
+            description: "desktop provisional CG-only hidden from window layer"
+        )
+    }
+
 }

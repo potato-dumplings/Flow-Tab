@@ -1,0 +1,30 @@
+{
+  "workflowName": "option-tab-provisional-hidden-cg-only",
+  "settleTimeoutMs": 4000,
+  "apps": [
+    {
+      "appID": "chrome",
+      "appName": "Chrome Fixture",
+      "bundleId": "com.example.fixture.chrome",
+      "launchOrder": 1,
+      "windows": [
+        {
+          "title": "Chrome AX Window",
+          "mode": "standard",
+          "tabs": [
+            { "title": "Chrome AX Control Tab", "isSelected": true }
+          ]
+        },
+        {
+          "title": "Hidden CG Window",
+          "mode": "standard",
+          "publishesApplicationAXWindow": false,
+          "suppressesWindowAccessibilityExposure": true,
+          "tabs": [
+            { "title": "Hidden CG Window", "isSelected": true }
+          ]
+        }
+      ]
+    }
+  ]
+}
