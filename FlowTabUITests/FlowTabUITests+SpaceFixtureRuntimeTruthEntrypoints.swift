@@ -40,6 +40,7 @@ extension FlowTabUITests {
         )
         let fullscreenTitle = try XCTUnwrap(fullscreenWindowTitle(in: targetApp))
         let standardTitle = try XCTUnwrap(firstStandardWorkflowWindowTitle(in: targetApp))
+        var runtimeLogSnapshot = makeRuntimeLogFileSnapshot()
 
         try runRealSpaceFixtureWorkflow(
             workflow,
@@ -50,6 +51,7 @@ extension FlowTabUITests {
             preservesDesktopAfterFullscreen: false,
             prelaunchesFlowTabBeforeFixture: true,
             beforeFlowTabLaunch: { _ in
+                runtimeLogSnapshot = self.makeRuntimeLogFileSnapshot()
                 self.logWorkflowSpaceObservation("\(traceLabel).beforeFlowTabLaunch", app: targetApp)
                 if allowsNoisyCGSiblings {
                     XCTAssertTrue(
@@ -77,7 +79,6 @@ extension FlowTabUITests {
             }
         ) { _, app in
             logWorkflowSpaceObservation("\(traceLabel).beforeTrigger", app: targetApp)
-            let runtimeLogSnapshot = makeRuntimeLogFileSnapshot()
             postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.global, traceLabel: traceLabel)
             var diagnosticsSummary = try assertGlobalSwitcherWindowStateReady(
                 for: targetApp,

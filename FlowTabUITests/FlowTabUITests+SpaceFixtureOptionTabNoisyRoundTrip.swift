@@ -69,6 +69,9 @@ extension FlowTabUITests {
                 )
             }
 
+            assertNoisyOptionTabFilteredCGOnlyArtifactSource(
+                since: runtimeLogSnapshot
+            )
             XCTAssertTrue(
                 waitForExactNoisyOptionTabPreviewTitles(
                     diagnosticsSummary,
@@ -141,6 +144,17 @@ extension FlowTabUITests {
             expectedCurrentSelection = selection
             logWorkflowSpaceObservation("\(traceLabel).afterConfirm.\(phase.trace)", app: targetApp)
         }
+    }
+
+    private func assertNoisyOptionTabFilteredCGOnlyArtifactSource(
+        since snapshot: [String: UInt64]
+    ) {
+        waitForRuntimeLogFiles(
+            matching: #"Chrome Fixture filtered-fullscreen-(sibling|host)-artifacts stage=(pre-dedupe|presentation) dropped=[1-9][0-9]*"#,
+            since: snapshot,
+            timeout: 8,
+            description: "Noisy Chrome Fixture filtered CG-only/fullscreen artifact source"
+        )
     }
 
     private func assertNoisyOptionTabWindowLayerSource(
