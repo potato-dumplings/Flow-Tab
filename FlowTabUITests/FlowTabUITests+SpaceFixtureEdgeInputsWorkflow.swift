@@ -23,6 +23,7 @@ private enum SpaceFixtureEdgeInputsWorkflowDefaults {
 extension FlowTabUITests {
     func testSwitcherPanelPreviewKeepsIdenticalRealWorkflowWindowsDistinct() throws {
         let workflow = try configuredSwitcherEdgeInputsWorkflow()
+        let logSnapshot = makeRuntimeLogFileSnapshot()
         let targetApp = try XCTUnwrap(
             workflow.apps.first {
                 $0.expectedWindowTitles.filter { $0 == SpaceFixtureEdgeInputsWorkflowDefaults.sharedWindowTitle }.count == 2
@@ -33,6 +34,9 @@ extension FlowTabUITests {
         try runRealSpaceFixtureEdgeInputsWorkflow(
             workflow,
             flowTabAdditionalArguments: [
+                "--flowtab-ui-runtime-log-level",
+                "DEBUG",
+                "--flowtab-ui-enable-verbose-logs",
                 "--flowtab-ui-open-switcher",
                 "--flowtab-ui-listen-switcher-trigger"
             ] + FlowTabUITestSwitcherCommandPayload.launchArguments
@@ -59,6 +63,12 @@ extension FlowTabUITests {
             XCTAssertEqual(cards.count, targetApp.expectedWindowTitles.count)
             XCTAssertEqual(Set(cards.map(\.identifier)).count, cards.count)
             XCTAssertEqual(edgeTitleCounts(cards.map(\.title)), edgeTitleCounts(targetApp.expectedWindowTitles))
+            waitForRuntimeLogFiles(
+                matching: #"binding-assignment public-state-tiebreak state=(focused|main|minimized) ax=.* cg=[0-9]+ axCandidates=[2-9][0-9]* cgCandidates=[2-9][0-9]*"#,
+                since: logSnapshot,
+                timeout: 8,
+                description: "real edge workflow resolves identical AX/CG candidates through public AX state"
+            )
         }
     }
 

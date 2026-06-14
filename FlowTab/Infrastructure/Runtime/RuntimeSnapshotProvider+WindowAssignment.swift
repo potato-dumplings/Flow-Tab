@@ -139,6 +139,7 @@ extension RuntimeSnapshotProvider {
             )
         {
             claimPublicStateAssignment(
+                state: "focused",
                 axWindowID: focusedAXWindow.id,
                 cgWindowID: frontmostCGWindowID,
                 candidateCGIDsByAXWindowID: &candidateCGIDsByAXWindowID,
@@ -159,6 +160,7 @@ extension RuntimeSnapshotProvider {
             )
         {
             claimPublicStateAssignment(
+                state: "main",
                 axWindowID: mainAXWindow.id,
                 cgWindowID: frontmostCGWindowID,
                 candidateCGIDsByAXWindowID: &candidateCGIDsByAXWindowID,
@@ -181,6 +183,7 @@ extension RuntimeSnapshotProvider {
                 continue
             }
             claimPublicStateAssignment(
+                state: "minimized",
                 axWindowID: axWindow.id,
                 cgWindowID: offscreenCandidateID,
                 candidateCGIDsByAXWindowID: &candidateCGIDsByAXWindowID,
@@ -203,11 +206,16 @@ extension RuntimeSnapshotProvider {
     }
 
     private static func claimPublicStateAssignment(
+        state: String,
         axWindowID: String,
         cgWindowID: CGWindowID,
         candidateCGIDsByAXWindowID: inout [String: Set<CGWindowID>],
         candidateAXWindowIDsByCGWindowID: inout [CGWindowID: Set<String>]
     ) {
+        let axCandidateCount = candidateCGIDsByAXWindowID[axWindowID]?.count ?? 0
+        let cgCandidateCount = candidateAXWindowIDsByCGWindowID[cgWindowID]?.count ?? 0
+        let resolvesPublicAmbiguity = axCandidateCount > 1 || cgCandidateCount > 1
+
         candidateCGIDsByAXWindowID[axWindowID] = [cgWindowID]
         candidateAXWindowIDsByCGWindowID[cgWindowID] = [axWindowID]
 
@@ -216,6 +224,13 @@ extension RuntimeSnapshotProvider {
         }
         for otherCGWindowID in candidateAXWindowIDsByCGWindowID.keys where otherCGWindowID != cgWindowID {
             candidateAXWindowIDsByCGWindowID[otherCGWindowID]?.remove(axWindowID)
+        }
+
+        if resolvesPublicAmbiguity {
+            RuntimeLog.debug(
+                .axMatch,
+                "binding-assignment public-state-tiebreak state=\(state) ax=\(axWindowID) cg=\(cgWindowID) axCandidates=\(axCandidateCount) cgCandidates=\(cgCandidateCount)"
+            )
         }
     }
 
