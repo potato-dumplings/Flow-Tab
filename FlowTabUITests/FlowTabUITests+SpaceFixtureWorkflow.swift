@@ -195,6 +195,7 @@ extension FlowTabUITests {
 
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 12))
 
+        let mutationLogSnapshot = makeRuntimeLogFileSnapshot()
         let fixtureApp = launchSpaceFixtureWorkflow(
             identity: identity,
             windowCount: 2,
@@ -216,7 +217,6 @@ extension FlowTabUITests {
         let fixtureAppRow = openHomeTabAndSelectSpaceFixtureApp(in: app, identity: identity, timeout: 12)
         assertValue(of: fixtureAppRow, equals: "2w", timeout: 12)
 
-        let mutationLogSnapshot = makeRuntimeLogFileSnapshot()
         assertValue(of: fixtureAppRow, equals: "1w", timeout: 15)
         waitForRuntimeLogFiles(
             containing: [
@@ -225,6 +225,18 @@ extension FlowTabUITests {
             ],
             since: mutationLogSnapshot,
             timeout: 8
+        )
+        waitForRuntimeLogFiles(
+            matching: #"homeAXDestroyed known appID=io[.]github[.]potato-dumplings[.]flowtab[.]spacefixture pid=[0-9]+ axWindowID=ax:[0-9]+:[0-9]+"#,
+            since: mutationLogSnapshot,
+            timeout: 8,
+            description: "known destroyed AX notification resolves to a registered window element"
+        )
+        waitForRuntimeLogFiles(
+            matching: #"runtimeAXDestroyed appID=io[.]github[.]potato-dumplings[.]flowtab[.]spacefixture pid=[0-9]+ axWindowID=ax:[0-9]+:[0-9]+ affectedCGWindowID=[0-9]+"#,
+            since: mutationLogSnapshot,
+            timeout: 8,
+            description: "known destroyed AX notification carries an affected CG window into shared runtime reconciliation"
         )
         XCTAssertNotEqual(fixtureApp.state, .notRunning)
     }

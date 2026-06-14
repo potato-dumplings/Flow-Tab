@@ -48,7 +48,7 @@ struct HomeLandingView: View {
     @State private var selectedAppRefreshTask: Task<Void, Never>?
     @State private var appRefreshTasksByID: [String: Task<Void, Never>] = [:]
     @State private var permissionWatchTask: Task<Void, Never>?
-    @State private var windowChangeMonitor = HomeWindowChangeMonitor()
+    @State private var windowChangeMonitor = RuntimeAXWindowChangeMonitor()
 
     private let appRefreshDebounceDelayNs: UInt64 = 220_000_000
     private let initialPreciseAppRefreshDelayNs: UInt64 = 900_000_000

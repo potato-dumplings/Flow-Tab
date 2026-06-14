@@ -7,7 +7,7 @@ import FlowTabCore
 
 extension FlowTabPriorityCoverageTests {
     @MainActor
-    func testHomeWindowChangeMonitorRoutesKnownDestroyedAXWindowThroughTypedCallback() {
+    func testRuntimeAXWindowChangeMonitorRoutesKnownDestroyedAXWindowThroughTypedCallback() {
         let pid: pid_t = 18_405
         let knownWindow = AXUIElementCreateApplication(pid)
         let unrelatedWindow = AXUIElementCreateApplication(pid + 1)
@@ -15,7 +15,7 @@ extension FlowTabPriorityCoverageTests {
         AXLiveWindowRegistry.shared.refreshSnapshot(forPID: pid, windows: [knownWindow])
         defer { AXLiveWindowRegistry.shared.remove(pid: pid) }
 
-        let monitor = HomeWindowChangeMonitor()
+        let monitor = RuntimeAXWindowChangeMonitor()
         var destroyedEvents: [(String, pid_t, String)] = []
         var changedEvents: [(String, pid_t)] = []
         monitor.onAXWindowDestroyed = { appID, pid, axWindowID in

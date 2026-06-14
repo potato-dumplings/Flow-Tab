@@ -36,6 +36,12 @@ final class AXLiveWindowRegistry {
         return windowsByPID[expectedPID]?[windowID]
     }
 
+    func windows(forPID pid: pid_t) -> [String: AXUIElement] {
+        lock.lock()
+        defer { lock.unlock() }
+        return windowsByPID[pid] ?? [:]
+    }
+
     func windowID(forKnownWindow window: AXUIElement, expectedPID: pid_t) -> String? {
         lock.lock()
         defer { lock.unlock() }

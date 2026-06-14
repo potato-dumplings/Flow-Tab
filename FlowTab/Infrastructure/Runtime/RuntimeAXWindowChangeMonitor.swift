@@ -4,14 +4,14 @@ import Foundation
 import FlowTabCore
 
 @MainActor
-final class HomeWindowChangeMonitor {
+final class RuntimeAXWindowChangeMonitor {
     private final class ObserverContext {
-        weak var monitor: HomeWindowChangeMonitor?
+        weak var monitor: RuntimeAXWindowChangeMonitor?
         let appID: String
         let pid: pid_t
         let installedAt: TimeInterval
 
-        init(monitor: HomeWindowChangeMonitor, appID: String, pid: pid_t) {
+        init(monitor: RuntimeAXWindowChangeMonitor, appID: String, pid: pid_t) {
             self.monitor = monitor
             self.appID = appID
             self.pid = pid
@@ -25,6 +25,7 @@ final class HomeWindowChangeMonitor {
     private var observersByPID: [pid_t: AXObserver] = [:]
     private var observerContextByPID: [pid_t: ObserverContext] = [:]
     private var appIDByPID: [pid_t: String] = [:]
+    private var destroyedWindowElementsByPID: [pid_t: [String: AXUIElement]] = [:]
     private var lastEventAtByAppID: [String: TimeInterval] = [:]
     private let eventThrottleInterval: TimeInterval = 0.16
     private let observerWarmUpInterval: TimeInterval = 0.75
@@ -54,6 +55,9 @@ final class HomeWindowChangeMonitor {
 
         for (pid, appID) in expectedByPID where observersByPID[pid] == nil {
             installObserver(pid: pid, appID: appID)
+        }
+        for pid in expectedByPID.keys {
+            syncDestroyedWindowObservers(pid: pid)
         }
     }
 
@@ -93,10 +97,21 @@ final class HomeWindowChangeMonitor {
         observersByPID[pid] = observerRef
         observerContextByPID[pid] = context
         appIDByPID[pid] = appID
+        syncDestroyedWindowObservers(pid: pid)
     }
 
     private func removeObserver(pid: pid_t) {
         guard let observer = observersByPID.removeValue(forKey: pid) else { return }
+
+        if let observedWindows = destroyedWindowElementsByPID.removeValue(forKey: pid) {
+            for windowElement in observedWindows.values {
+                AXObserverRemoveNotification(
+                    observer,
+                    windowElement,
+                    kAXUIElementDestroyedNotification as CFString
+                )
+            }
+        }
 
         let appElement = AXUIElementCreateApplication(pid)
         for notification in watchedNotifications {
@@ -109,6 +124,43 @@ final class HomeWindowChangeMonitor {
         )
         observerContextByPID.removeValue(forKey: pid)
         appIDByPID.removeValue(forKey: pid)
+    }
+
+    private func syncDestroyedWindowObservers(pid: pid_t) {
+        guard
+            let observer = observersByPID[pid],
+            let context = observerContextByPID[pid]
+        else { return }
+
+        let currentWindows = AXLiveWindowRegistry.shared.windows(forPID: pid)
+        var observedWindows = destroyedWindowElementsByPID[pid] ?? [:]
+        for (windowID, observedElement) in observedWindows {
+            guard let currentElement = currentWindows[windowID], CFEqual(currentElement, observedElement) else {
+                AXObserverRemoveNotification(
+                    observer,
+                    observedElement,
+                    kAXUIElementDestroyedNotification as CFString
+                )
+                observedWindows.removeValue(forKey: windowID)
+                continue
+            }
+        }
+
+        let contextPointer = UnsafeMutableRawPointer(Unmanaged.passUnretained(context).toOpaque())
+        for (windowID, windowElement) in currentWindows where observedWindows[windowID] == nil {
+            let addResult = AXObserverAddNotification(
+                observer,
+                windowElement,
+                kAXUIElementDestroyedNotification as CFString,
+                contextPointer
+            )
+            guard addResult == .success || addResult == .notificationAlreadyRegistered else {
+                continue
+            }
+            observedWindows[windowID] = windowElement
+        }
+
+        destroyedWindowElementsByPID[pid] = observedWindows
     }
 
     func handleAXNotification(
