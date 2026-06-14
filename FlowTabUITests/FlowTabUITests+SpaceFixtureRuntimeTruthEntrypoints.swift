@@ -436,7 +436,7 @@ extension FlowTabUITests {
         }
     }
 
-    private func assertGlobalSwitcherWindowStateReady(
+    func assertGlobalSwitcherWindowStateReady(
         for workflowApp: SpaceFixtureResolvedWorkflow.App,
         in app: XCUIApplication,
         traceLabel: String,
@@ -719,7 +719,7 @@ extension FlowTabUITests {
         return workflowApp.expectedWindowTitles.filter { !fullscreenTitles.contains($0) }
     }
 
-    private func runtimeTruthSwitcherLaunchArguments(
+    func runtimeTruthSwitcherLaunchArguments(
         additionalArguments: [String] = [],
         suppressesPanelActivation: Bool = true
     ) -> [String] {

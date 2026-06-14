@@ -237,6 +237,11 @@
 
 其中 workflow summary 当前展示的是“归一化后的窗口标题列表”，也就是 FlowTab 更关心的真实窗口标题，而不是原始配置标题。
 
+Workflow window 配置中，`publishesApplicationAXWindow` 控制该窗口是否进入 app-level
+AX children 列表；`suppressesWindowAccessibilityExposure` 则进一步控制 host
+`NSWindow` 自身是否作为 AX window 暴露。后者用于构造真实 CG/Space 可见、AX
+直接窗口列表缺席的 `space-backed` runtime 输入，不应当用于普通业务窗口场景。
+
 ## 当前构建脚本
 
 ### `build-space-fixture-app.sh`

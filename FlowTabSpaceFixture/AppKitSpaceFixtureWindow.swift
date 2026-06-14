@@ -32,6 +32,9 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
         window.setAccessibilityElement(true)
         window.setFrame(plan.frame, display: false)
         window.contentView = contentView
+        if plan.suppressesWindowAccessibilityExposure {
+            window.suppressAccessibilityExposure()
+        }
 
         self.contentView = contentView
         self.window = window

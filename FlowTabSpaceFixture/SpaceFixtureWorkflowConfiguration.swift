@@ -130,6 +130,7 @@ struct SpaceFixtureWorkflowWindowConfiguration: Codable, Equatable {
     let tabs: [SpaceFixtureWorkflowTabConfiguration]
     let noisyCGSiblings: Bool
     let publishesApplicationAXWindow: Bool
+    let suppressesWindowAccessibilityExposure: Bool
 
     enum CodingKeys: String, CodingKey {
         case title
@@ -137,6 +138,7 @@ struct SpaceFixtureWorkflowWindowConfiguration: Codable, Equatable {
         case tabs
         case noisyCGSiblings
         case publishesApplicationAXWindow
+        case suppressesWindowAccessibilityExposure
     }
 
     init(
@@ -144,13 +146,15 @@ struct SpaceFixtureWorkflowWindowConfiguration: Codable, Equatable {
         mode: SpaceFixtureWindowMode,
         tabs: [SpaceFixtureWorkflowTabConfiguration],
         noisyCGSiblings: Bool = false,
-        publishesApplicationAXWindow: Bool = true
+        publishesApplicationAXWindow: Bool = true,
+        suppressesWindowAccessibilityExposure: Bool = false
     ) {
         self.title = title
         self.mode = mode
         self.tabs = tabs
         self.noisyCGSiblings = noisyCGSiblings
         self.publishesApplicationAXWindow = publishesApplicationAXWindow
+        self.suppressesWindowAccessibilityExposure = suppressesWindowAccessibilityExposure
     }
 
     init(from decoder: Decoder) throws {
@@ -163,7 +167,11 @@ struct SpaceFixtureWorkflowWindowConfiguration: Codable, Equatable {
             publishesApplicationAXWindow: try container.decodeIfPresent(
                 Bool.self,
                 forKey: .publishesApplicationAXWindow
-            ) ?? true
+            ) ?? true,
+            suppressesWindowAccessibilityExposure: try container.decodeIfPresent(
+                Bool.self,
+                forKey: .suppressesWindowAccessibilityExposure
+            ) ?? false
         )
     }
 }

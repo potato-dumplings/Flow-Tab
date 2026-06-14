@@ -160,6 +160,8 @@ extension FlowTabTests {
                       "title": "Chrome Window 2",
                       "mode": "fullscreen",
                       "noisyCGSiblings": true,
+                      "publishesApplicationAXWindow": false,
+                      "suppressesWindowAccessibilityExposure": true,
                       "tabs": [
                         { "title": "Mail", "isSelected": false },
                         { "title": "Calendar", "isSelected": true }
@@ -198,7 +200,11 @@ extension FlowTabTests {
         XCTAssertFalse(configuration.publishesApplicationAccessibilityChildren)
         XCTAssertEqual(configuration.windows[0].configuredTitle, "Chrome Window 1")
         XCTAssertFalse(configuration.windows[0].noisyCGSiblings)
+        XCTAssertTrue(configuration.windows[0].publishesApplicationAXWindow)
+        XCTAssertFalse(configuration.windows[0].suppressesWindowAccessibilityExposure)
         XCTAssertTrue(configuration.windows[1].noisyCGSiblings)
+        XCTAssertFalse(configuration.windows[1].publishesApplicationAXWindow)
+        XCTAssertTrue(configuration.windows[1].suppressesWindowAccessibilityExposure)
         XCTAssertEqual(configuration.windows[0].tabs.map(\.title), ["Docs", "PR"])
         XCTAssertEqual(configuration.windows[0].tabs.map(\.isSelected), [true, false])
         XCTAssertEqual(configuration.windows[1].tabs.map(\.isSelected), [false, true])

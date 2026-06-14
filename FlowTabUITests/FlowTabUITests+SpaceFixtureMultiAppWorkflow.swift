@@ -49,6 +49,10 @@ enum SpaceFixtureMultiAppWorkflowDefaults {
         switcherRuntimeTruthWorkflowSourceURL(named: "space-fixture-option-tab-window-state-noisy-cg-siblings-workflow.json")
     }
 
+    static var optionTabSpaceBackedRuntimeTruthWorkflowSourceURL: URL {
+        switcherRuntimeTruthWorkflowSourceURL(named: "space-fixture-option-tab-space-backed-workflow.json")
+    }
+
     static var windowSearchRuntimeTruthWorkflowSourceURL: URL {
         switcherRuntimeTruthWorkflowSourceURL(named: "space-fixture-window-search-fullscreen-sibling-workflow.json")
     }
@@ -312,6 +316,8 @@ struct SpaceFixtureResolvedWorkflowWindowDocument: Codable {
     let mode: SpaceFixtureResolvedWorkflowWindowMode
     let tabs: [SpaceFixtureResolvedWorkflowTabDocument]
     let noisyCGSiblings: Bool?
+    let publishesApplicationAXWindow: Bool?
+    let suppressesWindowAccessibilityExposure: Bool?
 
     var resolvedTitle: String {
         if let selectedTitle = tabs.first(where: \.isSelected)?.trimmedTitle, !selectedTitle.isEmpty {

@@ -1,0 +1,30 @@
+{
+  "workflowName": "option-tab-space-backed-cg-only",
+  "settleTimeoutMs": 12000,
+  "apps": [
+    {
+      "appID": "chrome",
+      "appName": "Chrome Fixture",
+      "bundleId": "com.example.fixture.chrome",
+      "launchOrder": 1,
+      "windows": [
+        {
+          "title": "Chrome AX Window",
+          "mode": "standard",
+          "tabs": [
+            { "title": "Chrome AX Control Tab", "isSelected": true }
+          ]
+        },
+        {
+          "title": "Recovered Window",
+          "mode": "fullscreen",
+          "publishesApplicationAXWindow": false,
+          "suppressesWindowAccessibilityExposure": true,
+          "tabs": [
+            { "title": "Recovered Window", "isSelected": true }
+          ]
+        }
+      ]
+    }
+  ]
+}

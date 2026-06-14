@@ -74,6 +74,9 @@ full-screen host 的关键配置：
 - workflow window 设置 `mode: "fullscreen"`。
 - workflow window 设置 `noisyCGSiblings: true`。
 - workflow window 设置 `publishesApplicationAXWindow: false`。
+- 需要构造纯 `space-backed` CG-only 业务窗口时，workflow window 还可以设置
+  `suppressesWindowAccessibilityExposure: true`，让 host window 自身也不作为
+  AX window 暴露，只保留 CG/Space topology 事实。
 - host `ChromeLikeSpaceFixtureWindow` 在进入 full-screen 前调用
   `suppressAccessibilityExposure()`，让 app-level public AX 不把 host 当作直接可用
   的业务窗口。

@@ -22,6 +22,7 @@ struct SpaceFixtureWindowPlan: Equatable {
     let tabs: [SpaceFixtureConfiguredTab]
     let noisyCGSiblings: Bool
     let publishesApplicationAXWindow: Bool
+    let suppressesWindowAccessibilityExposure: Bool
 
     init(
         index: Int,
@@ -33,7 +34,8 @@ struct SpaceFixtureWindowPlan: Equatable {
         isFullscreenTarget: Bool,
         tabs: [SpaceFixtureConfiguredTab],
         noisyCGSiblings: Bool,
-        publishesApplicationAXWindow: Bool = true
+        publishesApplicationAXWindow: Bool = true,
+        suppressesWindowAccessibilityExposure: Bool = false
     ) {
         self.index = index
         self.totalWindowCount = totalWindowCount
@@ -45,6 +47,7 @@ struct SpaceFixtureWindowPlan: Equatable {
         self.tabs = tabs
         self.noisyCGSiblings = noisyCGSiblings
         self.publishesApplicationAXWindow = publishesApplicationAXWindow
+        self.suppressesWindowAccessibilityExposure = suppressesWindowAccessibilityExposure
     }
 
     var rootAccessibilityIdentifier: String {
@@ -131,7 +134,8 @@ enum SpaceFixtureWindowPlanner {
                 isFullscreenTarget: configuredWindow.isFullscreenTarget,
                 tabs: configuredWindow.tabs,
                 noisyCGSiblings: configuredWindow.noisyCGSiblings,
-                publishesApplicationAXWindow: configuredWindow.publishesApplicationAXWindow
+                publishesApplicationAXWindow: configuredWindow.publishesApplicationAXWindow,
+                suppressesWindowAccessibilityExposure: configuredWindow.suppressesWindowAccessibilityExposure
             )
         }
     }
