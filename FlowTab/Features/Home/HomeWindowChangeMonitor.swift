@@ -122,11 +122,17 @@ final class HomeWindowChangeMonitor {
         guard now - installedAt >= observerWarmUpInterval else {
             return
         }
-        if notification as String == kAXUIElementDestroyedNotification as String,
-           let axWindowID = AXLiveWindowRegistry.shared.windowID(forKnownWindow: element, expectedPID: pid),
-           let onAXWindowDestroyed {
-            onAXWindowDestroyed(appID, pid, axWindowID)
-            return
+        if notification as String == kAXUIElementDestroyedNotification as String {
+            if let axWindowID = AXLiveWindowRegistry.shared.windowID(forKnownWindow: element, expectedPID: pid),
+               let onAXWindowDestroyed {
+                RuntimeLog.debug(
+                    .axObserver,
+                    "homeAXDestroyed known appID=\(appID) pid=\(pid) axWindowID=\(axWindowID)"
+                )
+                onAXWindowDestroyed(appID, pid, axWindowID)
+                return
+            }
+            RuntimeLog.debug(.axObserver, "homeAXDestroyed unresolved appID=\(appID) pid=\(pid)")
         }
         if let lastTimestamp = lastEventAtByAppID[appID], now - lastTimestamp < eventThrottleInterval {
             return

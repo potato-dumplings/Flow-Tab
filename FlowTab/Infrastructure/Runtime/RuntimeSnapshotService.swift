@@ -152,6 +152,10 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
                 axWindowID: axWindowID,
                 now: now
             )
+            RuntimeLog.debug(
+                .snapshot,
+                "runtimeAXDestroyed appID=\(appID) pid=\(pid) axWindowID=\(axWindowID) affectedCGWindowID=\(affectedCGWindowID.map(String.init) ?? "none")"
+            )
             snapshotProvider.reconciliationCoordinator.markAppDirty(
                 appID: appID,
                 pid: pid,
