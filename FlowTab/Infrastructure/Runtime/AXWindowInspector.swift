@@ -319,6 +319,10 @@ enum AXWindowInspector {
         "\(windowIDPrefix):\(pid):\(index)"
     }
 
+    static func makeVerifiedFocusFallbackWindowID(pid: pid_t, cgWindowID: CGWindowID) -> String {
+        "\(windowIDPrefix):\(pid):verifiedFocus:\(cgWindowID)"
+    }
+
     static func windowIndex(from windowID: String, expectedPID: pid_t) -> Int? {
         let parts = windowID.split(separator: ":")
         guard parts.count == 3 else { return nil }
@@ -543,6 +547,10 @@ enum AXWindowInspector {
 enum AXWindowInspectorForTesting {
     static func makeWindowID(pid: pid_t, index: Int) -> String {
         AXWindowInspector.makeWindowID(pid: pid, index: index)
+    }
+
+    static func makeVerifiedFocusFallbackWindowID(pid: pid_t, cgWindowID: CGWindowID) -> String {
+        AXWindowInspector.makeVerifiedFocusFallbackWindowID(pid: pid, cgWindowID: cgWindowID)
     }
 
     static func windowIndex(from windowID: String, expectedPID: pid_t) -> Int? {

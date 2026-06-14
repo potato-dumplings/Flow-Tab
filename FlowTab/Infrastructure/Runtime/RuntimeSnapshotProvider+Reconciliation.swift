@@ -204,6 +204,10 @@ extension RuntimeSnapshotProvider {
             return currentAXWindowID
         }
         return AXLiveWindowRegistry.shared.windowID(forKnownWindow: focusedAXWindow, expectedPID: pid)
+            ?? AXWindowInspector.makeVerifiedFocusFallbackWindowID(
+                pid: pid,
+                cgWindowID: focusedCGWindowID
+            )
     }
 
     @discardableResult
