@@ -199,12 +199,26 @@ extension LiveSwitcherModel {
             return true
         }
 
+        if providerOverride == nil {
+            let snapshotReadMs = Self.monotonicMilliseconds()
+            if let pid = runtimeContextsByID[targetAppID]?.runningApp.processIdentifier {
+                snapshotService.signalAppWindowsChanged(appID: targetAppID, pid: pid)
+            }
+            completeSelectedAppWindowSnapshot(
+                nil,
+                appID: targetAppID,
+                generation: generation,
+                startMs: startMs,
+                snapshotReadMs: snapshotReadMs
+            )
+            return runtimeContextsByID[targetAppID] != nil
+        }
+
+        guard let providerOverride else { return false }
+
         DispatchQueue.global(qos: .userInitiated).async {
-            let orderedSnapshot: RuntimeHomeAppSnapshot?
-            if let overrideSnapshot = providerOverride?(targetAppID) {
-                orderedSnapshot = recencyTracker.homeSnapshotWithRecencyApplied(overrideSnapshot)
-            } else {
-                orderedSnapshot = snapshotService.homeAppSnapshotSynchronously(for: targetAppID)
+            let orderedSnapshot = providerOverride(targetAppID).map {
+                recencyTracker.homeSnapshotWithRecencyApplied($0)
             }
             let snapshotReadMs = Self.monotonicMilliseconds()
             Task { @MainActor [weak self] in

@@ -443,24 +443,24 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testLiveSwitcherModelSelectedAppWindowSnapshotUsesSharedRuntimeSnapshotService() async {
-        let appID = "com.example.shared-runtime-source"
+    func testLiveSwitcherModelSelectedAppWindowSnapshotSignalsRuntimeRepairWhenProjectionIsMissing() {
+        let appID = "com.example.missing-window-projection"
         let runningApp = NSRunningApplication.current
         let appOnlyCandidate = AppSwitchCandidate(
             id: appID,
-            displayName: "Shared Runtime Source",
-            groupID: "shared-runtime-source",
+            displayName: "Missing Window Projection",
+            groupID: "missing-window-projection",
             lastActiveAt: 100,
             windows: []
         )
         let windows = [
-            WindowCandidate(id: "shared-window-1", title: "Shared One", isMinimized: false, lastActiveAt: 20),
-            WindowCandidate(id: "shared-window-2", title: "Shared Two", isMinimized: false, lastActiveAt: 10)
+            WindowCandidate(id: "contaminated-home-window-1", title: "Home One", isMinimized: false, lastActiveAt: 20),
+            WindowCandidate(id: "contaminated-home-window-2", title: "Home Two", isMinimized: false, lastActiveAt: 10)
         ]
         let windowCandidate = AppSwitchCandidate(
             id: appID,
-            displayName: "Shared Runtime Source",
-            groupID: "shared-runtime-source",
+            displayName: "Contaminated Home Snapshot",
+            groupID: "contaminated-home-snapshot",
             lastActiveAt: 100,
             windows: windows
         )
@@ -468,8 +468,8 @@ extension FlowTabPriorityCoverageTests {
         let selectedSnapshot = RuntimeHomeAppSnapshot(
             summary: RuntimeHomeAppSummary(
                 appID: appID,
-                displayName: "Shared Runtime Source",
-                groupID: "shared-runtime-source",
+                displayName: "Contaminated Home Snapshot",
+                groupID: "contaminated-home-snapshot",
                 lastActiveAt: 100,
                 windowCount: windows.count,
                 pid: runningApp.processIdentifier
@@ -477,28 +477,34 @@ extension FlowTabPriorityCoverageTests {
             candidate: windowCandidate,
             context: context
         )
+        let freshness = RuntimeProjectionFreshness(
+            generatedAt: 12,
+            sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+            dirtyAppIDs: [],
+            dirtyPIDs: [],
+            dirtyCGWindowIDs: [],
+            pendingRepairScopes: [],
+            isCompleteForScope: true
+        )
         let snapshotService = RecordingRuntimeSnapshotService(
-            homeSnapshotsByAppID: [appID: selectedSnapshot]
+            homeSnapshotsByAppID: [appID: selectedSnapshot],
+            appSwitcherProjection: RuntimeAppSwitcherProjection(
+                apps: [appOnlyCandidate],
+                contextsByID: [appID: context],
+                freshness: freshness
+            )
         )
         let model = LiveSwitcherModel(snapshotService: snapshotService)
         model.runtimeProjectionMaintenanceEnabled = false
-        model.fastAppSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: [appOnlyCandidate], contextsByID: [:])
-        }
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertTrue(model.scheduleSelectedAppWindowSnapshotIfNeeded(for: appID))
 
-        let didLoadSelectedAppSnapshot = await waitUntil(
-            "selected app window snapshot loads from shared runtime snapshot service",
-            timeoutNanoseconds: 1_000_000_000,
-            pollIntervalNanoseconds: 10_000_000
-        ) {
-            model.session?.selectedApp.windows.map(\.id) == ["shared-window-1", "shared-window-2"]
-        }
-        XCTAssertTrue(didLoadSelectedAppSnapshot)
-        XCTAssertEqual(snapshotService.recordedHomeAppIDs(), [appID])
-        XCTAssertEqual(model.session?.selectedApp.windows.map(\.id), ["shared-window-1", "shared-window-2"])
+        XCTAssertEqual(snapshotService.recordedHomeAppIDs(), [])
+        XCTAssertEqual(snapshotService.appWindowChangeSignalsRecorded().map(\.appID), [appID])
+        XCTAssertEqual(snapshotService.appWindowChangeSignalsRecorded().map(\.pid), [runningApp.processIdentifier])
+        XCTAssertEqual(model.session?.mode, .appCycle)
+        XCTAssertEqual(model.session?.selectedApp.windows.map(\.id), [])
     }
 
     @MainActor
