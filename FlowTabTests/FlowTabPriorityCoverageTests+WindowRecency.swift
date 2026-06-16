@@ -806,7 +806,7 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
 
-        XCTAssertEqual(snapshotService.recordedFocusedPIDs(), [])
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
         XCTAssertEqual(
             model.session?.selectedApp.windows.map(\.id),
             ["fullscreen", "incognito", "normal"]

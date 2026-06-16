@@ -558,7 +558,6 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
 
-        XCTAssertEqual(snapshotService.recordedFocusedPIDs(), [])
         XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
         XCTAssertEqual(model.session?.mode, .windowCycle(appID: appID))
         XCTAssertEqual(model.session?.selectedApp.windows.map(\.id), ["focused-projected-1", "focused-projected-2"])
@@ -568,32 +567,7 @@ extension FlowTabPriorityCoverageTests {
     func testLiveSwitcherModelFocusedWindowSessionSignalsRuntimeRepairWhenProjectionIsMissing() {
         let runningApp = NSRunningApplication.current
         let appID = runningApp.bundleIdentifier ?? "pid:\(runningApp.processIdentifier)"
-        let windows = [
-            WindowCandidate(id: "contaminated-focused-window-1", title: "Focused One", isMinimized: false, lastActiveAt: 20),
-            WindowCandidate(id: "contaminated-focused-window-2", title: "Focused Two", isMinimized: false, lastActiveAt: 10)
-        ]
-        let candidate = AppSwitchCandidate(
-            id: appID,
-            displayName: "Contaminated Focused Runtime Source",
-            groupID: "contaminated-focused-runtime-source",
-            lastActiveAt: 100,
-            windows: windows
-        )
-        let focusedSnapshot = RuntimeHomeAppSnapshot(
-            summary: RuntimeHomeAppSummary(
-                appID: appID,
-                displayName: "Contaminated Focused Runtime Source",
-                groupID: "contaminated-focused-runtime-source",
-                lastActiveAt: 100,
-                windowCount: windows.count,
-                pid: runningApp.processIdentifier
-            ),
-            candidate: candidate,
-            context: makeRuntimeAppContext(appID: appID, runningApp: runningApp, windows: windows)
-        )
-        let snapshotService = RecordingRuntimeSnapshotService(
-            focusedSnapshotsByPID: [runningApp.processIdentifier: focusedSnapshot]
-        )
+        let snapshotService = RecordingRuntimeSnapshotService()
         let model = LiveSwitcherModel(snapshotService: snapshotService)
         model.frontmostApplicationOverride = { runningApp }
         model.focusedWindowIdentityOverride = { _ in nil }
@@ -601,7 +575,6 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertFalse(model.startFocusedAppWindowSession(triggerDirection: .forward))
 
-        XCTAssertEqual(snapshotService.recordedFocusedPIDs(), [])
         XCTAssertEqual(snapshotService.appWindowChangeSignalsRecorded().map(\.appID), [appID])
         XCTAssertEqual(snapshotService.appWindowChangeSignalsRecorded().map(\.pid), [runningApp.processIdentifier])
         XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)

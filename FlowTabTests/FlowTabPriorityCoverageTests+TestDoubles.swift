@@ -82,13 +82,11 @@ final class SpyMRUTracker: MRUTracking {
 final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable {
     private let lock = NSLock()
     private let homeSnapshotsByAppID: [String: RuntimeHomeAppSnapshot]
-    private let focusedSnapshotsByPID: [pid_t: RuntimeHomeAppSnapshot]
     private let appSwitcherProjection: RuntimeAppSwitcherProjection?
     private let homeSummaryProjection: RuntimeHomeSummaryProjection?
     private let currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection]
     private var committedSearchIndexProjection: RuntimeSearchIndexProjection?
     private var requestedHomeAppIDs: [String] = []
-    private var requestedFocusedPIDs: [pid_t] = []
     private var snapshotRequests = 0
     private var lightweightSnapshotRequests = 0
     private var homeSummaryRequests = 0
@@ -104,14 +102,12 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
 
     init(
         homeSnapshotsByAppID: [String: RuntimeHomeAppSnapshot] = [:],
-        focusedSnapshotsByPID: [pid_t: RuntimeHomeAppSnapshot] = [:],
         appSwitcherProjection: RuntimeAppSwitcherProjection? = nil,
         homeSummaryProjection: RuntimeHomeSummaryProjection? = nil,
         currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection] = [:],
         committedSearchIndexProjection: RuntimeSearchIndexProjection? = nil
     ) {
         self.homeSnapshotsByAppID = homeSnapshotsByAppID
-        self.focusedSnapshotsByPID = focusedSnapshotsByPID
         self.appSwitcherProjection = appSwitcherProjection
         self.homeSummaryProjection = homeSummaryProjection
         self.currentAppWindowProjectionsByAppID = currentAppWindowProjectionsByAppID
@@ -150,12 +146,6 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
         lock.lock()
         defer { lock.unlock() }
         return requestedHomeAppIDs
-    }
-
-    func recordedFocusedPIDs() -> [pid_t] {
-        lock.lock()
-        defer { lock.unlock() }
-        return requestedFocusedPIDs
     }
 
     func snapshotRequestCount() -> Int {
@@ -275,13 +265,6 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
         requestedHomeAppIDs.append(appID)
         lock.unlock()
         return homeSnapshotsByAppID[appID]
-    }
-
-    func focusedAppSnapshot(processIdentifier pid: pid_t) -> RuntimeHomeAppSnapshot? {
-        lock.lock()
-        requestedFocusedPIDs.append(pid)
-        lock.unlock()
-        return focusedSnapshotsByPID[pid]
     }
 
     func readAppSwitcherProjection() -> RuntimeAppSwitcherProjection? {

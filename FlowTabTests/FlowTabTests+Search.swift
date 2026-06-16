@@ -1071,17 +1071,17 @@ extension FlowTabTests {
         let summary = latencySummary(samples: samples)
         print(
             String(
-                format: "[ControlTabFocusedProjectionFastStartPressure] windows=%d, iterations=%d, p50=%.2fms, p95=%.2fms, max=%.2fms, focusedSnapshotCalls=%d",
+                format: "[ControlTabFocusedProjectionFastStartPressure] windows=%d, iterations=%d, p50=%.2fms, p95=%.2fms, max=%.2fms, snapshotCalls=%d",
                 windowCount,
                 iterations,
                 summary.p50,
                 summary.p95,
                 summary.max,
-                snapshotService.recordedFocusedPIDs().count
+                snapshotService.snapshotRequestCount()
             )
         )
 
-        XCTAssertEqual(snapshotService.recordedFocusedPIDs(), [])
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
         XCTAssertLessThan(summary.p95, 100)
     }
 
