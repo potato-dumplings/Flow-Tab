@@ -8,34 +8,22 @@ import FlowTabCore
 extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerInAppHotkeyReleaseCommitsFocusedWindowSession() async {
-        let controller = SwitcherPanelController()
         let currentApp = NSRunningApplication.current
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let windows = [
             WindowCandidate(id: "front-1", title: "Inbox", isMinimized: false, lastActiveAt: 30),
             WindowCandidate(id: "front-2", title: "Draft", isMinimized: false, lastActiveAt: 20)
         ]
-        controller.modelForTesting.frontmostApplicationOverride = { currentApp }
-        controller.modelForTesting.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(
-                apps: [
-                    AppSwitchCandidate(
-                        id: appID,
-                        displayName: currentApp.localizedName ?? "Current App",
-                        groupID: "current",
-                        lastActiveAt: 100,
-                        windows: windows
-                    )
-                ],
-                contextsByID: [
-                    appID: self.makeRuntimeAppContext(
-                        appID: appID,
-                        runningApp: currentApp,
-                        windows: windows
-                    )
-                ]
+        let controller = SwitcherPanelController(
+            model: LiveSwitcherModel(
+                snapshotService: makeCurrentAppWindowProjectionService(
+                    appID: appID,
+                    runningApp: currentApp,
+                    windows: windows
+                )
             )
-        }
+        )
+        controller.modelForTesting.frontmostApplicationOverride = { currentApp }
 
         var activatedTarget: ActivationTarget?
         controller.modelForTesting.activationOverride = { target, _ in
@@ -68,34 +56,22 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelVisibilityProbeIncludesContentStateForInAppSession() {
-        let controller = SwitcherPanelController()
         let currentApp = NSRunningApplication.current
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let windows = [
             WindowCandidate(id: "front-1", title: "Inbox", isMinimized: false, lastActiveAt: 30),
             WindowCandidate(id: "front-2", title: "Draft", isMinimized: false, lastActiveAt: 20)
         ]
-        controller.modelForTesting.frontmostApplicationOverride = { currentApp }
-        controller.modelForTesting.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(
-                apps: [
-                    AppSwitchCandidate(
-                        id: appID,
-                        displayName: currentApp.localizedName ?? "Current App",
-                        groupID: "current",
-                        lastActiveAt: 100,
-                        windows: windows
-                    )
-                ],
-                contextsByID: [
-                    appID: self.makeRuntimeAppContext(
-                        appID: appID,
-                        runningApp: currentApp,
-                        windows: windows
-                    )
-                ]
+        let controller = SwitcherPanelController(
+            model: LiveSwitcherModel(
+                snapshotService: makeCurrentAppWindowProjectionService(
+                    appID: appID,
+                    runningApp: currentApp,
+                    windows: windows
+                )
             )
-        }
+        )
+        controller.modelForTesting.frontmostApplicationOverride = { currentApp }
 
         XCTAssertTrue(controller.beginInAppWindowHotkeySessionForTesting())
         let summary = controller.panelContentProbeSummary()
@@ -111,10 +87,13 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelControllerGlobalHotkeyAdvanceAndReleaseCommitSession() async {
-        let controller = SwitcherPanelController()
-        controller.modelForTesting.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
-        }
+        let controller = SwitcherPanelController(
+            model: LiveSwitcherModel(
+                snapshotService: RecordingRuntimeSnapshotService(
+                    appSwitcherApps: searchScenarioApps()
+                )
+            )
+        )
 
         var activatedTarget: ActivationTarget?
         controller.modelForTesting.activationOverride = { target, _ in
@@ -142,10 +121,13 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelControllerReleaseConfirmationGenerationInvalidatesCanceledTask() {
-        let controller = SwitcherPanelController()
-        controller.modelForTesting.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
-        }
+        let controller = SwitcherPanelController(
+            model: LiveSwitcherModel(
+                snapshotService: RecordingRuntimeSnapshotService(
+                    appSwitcherApps: searchScenarioApps()
+                )
+            )
+        )
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
         controller.globalPrimaryModifierPressedOverride = false
@@ -185,6 +167,54 @@ extension FlowTabPriorityCoverageTests {
         controller.cancelPendingModifierReleaseConfirmation()
         XCTAssertNil(controller.pendingModifierReleaseConfirmationTask)
         controller.cancelSelectionForTesting()
+    }
+
+    private func makeCurrentAppWindowProjectionService(
+        appID: String,
+        runningApp: NSRunningApplication,
+        windows: [WindowCandidate]
+    ) -> RecordingRuntimeSnapshotService {
+        let candidate = AppSwitchCandidate(
+            id: appID,
+            displayName: runningApp.localizedName ?? "Current App",
+            groupID: "current",
+            lastActiveAt: 100,
+            windows: windows
+        )
+        let context = makeRuntimeAppContext(
+            appID: appID,
+            runningApp: runningApp,
+            windows: windows
+        )
+        let snapshot = RuntimeHomeAppSnapshot(
+            summary: RuntimeHomeAppSummary(
+                appID: appID,
+                displayName: candidate.displayName,
+                groupID: candidate.groupID,
+                lastActiveAt: candidate.lastActiveAt,
+                windowCount: windows.count,
+                pid: runningApp.processIdentifier
+            ),
+            candidate: candidate,
+            context: context
+        )
+        return RecordingRuntimeSnapshotService(
+            currentAppWindowProjectionsByAppID: [
+                appID: RuntimeCurrentAppWindowProjection(
+                    appID: appID,
+                    snapshot: snapshot,
+                    freshness: RuntimeProjectionFreshness(
+                        generatedAt: 10,
+                        sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+                        dirtyAppIDs: [],
+                        dirtyPIDs: [],
+                        dirtyCGWindowIDs: [],
+                        pendingRepairScopes: [],
+                        isCompleteForScope: true
+                    )
+                )
+            ]
+        )
     }
 
     @MainActor

@@ -968,16 +968,9 @@ extension FlowTabTests {
                 windows: []
             )
         }
-        let snapshot = RuntimeSnapshot(apps: apps, contextsByID: [:])
-        let model = LiveSwitcherModel()
+        let runtimeService = RecordingRuntimeSnapshotService(appSwitcherApps: apps)
+        let model = LiveSwitcherModel(snapshotService: runtimeService)
         model.frontmostApplicationOverride = { nil }
-        model.testingFastAppSnapshotProviderOverride = { snapshot }
-        var fullSnapshotCalls = 0
-        model.testingSnapshotProviderOverride = {
-            fullSnapshotCalls += 1
-            Thread.sleep(forTimeInterval: 0.2)
-            return snapshot
-        }
 
         let iterations = 120
         var samples: [Double] = []
@@ -993,17 +986,17 @@ extension FlowTabTests {
 
         print(
             String(
-                format: "[OptionTabFastStartPressure] dataset=%d apps, iterations=%d, p50=%.2fms, p95=%.2fms, max=%.2fms, fullSnapshotCalls=%d",
+                format: "[OptionTabFastStartPressure] dataset=%d apps, iterations=%d, p50=%.2fms, p95=%.2fms, max=%.2fms, maintenanceRequests=%d",
                 apps.count,
                 iterations,
                 summary.p50,
                 summary.p95,
                 summary.max,
-                fullSnapshotCalls
+                runtimeService.appSwitcherMaintenanceRequestsRecorded().count
             )
         )
 
-        XCTAssertEqual(fullSnapshotCalls, 0)
+        XCTAssertEqual(runtimeService.appSwitcherMaintenanceRequestsRecorded().count, iterations)
         XCTAssertLessThan(summary.p95, 100)
     }
 
