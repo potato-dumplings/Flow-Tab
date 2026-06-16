@@ -4,6 +4,10 @@ import FlowTabCore
 
 let sharedRuntimeSnapshotService = RuntimeSnapshotService()
 
+enum RuntimeProjectionMaintenanceReason: String, Sendable {
+    case switcherSessionStarted
+}
+
 protocol RuntimeSnapshotServing: Sendable {
     func snapshot() -> RuntimeSnapshot
     func lightweightAppSnapshot() -> RuntimeSnapshot
@@ -16,6 +20,7 @@ protocol RuntimeSnapshotServing: Sendable {
     func readHomeSummaryProjection() -> RuntimeHomeSummaryProjection?
     func readCurrentAppWindowProjection(appID: String) -> RuntimeCurrentAppWindowProjection?
     func runtimeReadModelDiagnostics() -> RuntimeReadModelDiagnostics
+    func requestAppSwitcherProjectionMaintenance(reason: RuntimeProjectionMaintenanceReason)
     func currentCGWindowsByPID() -> [pid_t: [RuntimeSnapshotProvider.CGWindowEntry]]
     func signalSpaceTopologyChanged()
     func signalAppLaunched(appID: String, pid: pid_t)
@@ -147,6 +152,28 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
 
     func runtimeReadModelDiagnostics() -> RuntimeReadModelDiagnostics {
         readModelStore.diagnostics()
+    }
+
+    func requestAppSwitcherProjectionMaintenance(reason: RuntimeProjectionMaintenanceReason) {
+        snapshotQueue.async { [self] in
+            let diagnostics = readModelStore.diagnostics()
+            let startedRequests = drainReadyReconciliationRequestsLocked(
+                now: Date.timeIntervalSinceReferenceDate
+            )
+            RuntimeLog.debug(
+                .snapshot,
+                [
+                    "runtimeMaintenance",
+                    "scope=appSwitcherProjection",
+                    "reason=\(reason.rawValue)",
+                    "dirtyApps=\(diagnostics.dirtyAppIDs.count)",
+                    "dirtyPIDs=\(diagnostics.dirtyPIDs.count)",
+                    "dirtyCGWindowIDs=\(diagnostics.dirtyCGWindowIDs.count)",
+                    "pendingScopes=\(diagnostics.pendingRepairScopes.count)",
+                    "startedRequests=\(startedRequests.count)"
+                ].joined(separator: " ")
+            )
+        }
     }
 
     func currentCGWindowsByPID() -> [pid_t: [RuntimeSnapshotProvider.CGWindowEntry]] {

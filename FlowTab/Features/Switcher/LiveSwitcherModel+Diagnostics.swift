@@ -101,7 +101,7 @@ extension LiveSwitcherModel {
         )
     }
 
-    func logBackgroundFullSnapshotRefresh(
+    func logRuntimeProjectionMaintenance(
         result: String,
         startMs: Double,
         generation: UInt64,
@@ -109,16 +109,16 @@ extension LiveSwitcherModel {
         triggerDirection: CycleDirection,
         applyGeneration: UInt64? = nil
     ) {
-        let diagnostic = BackgroundFullSnapshotRefreshDiagnostic(
+        let diagnostic = RuntimeProjectionMaintenanceDiagnostic(
             result: result,
             generation: generation,
-            currentGeneration: backgroundFullSnapshotRefreshGeneration,
+            currentGeneration: runtimeProjectionMaintenanceGeneration,
             reason: reason,
             trigger: triggerDirection.debugName,
             applyGeneration: applyGeneration,
             totalMs: Self.formatMilliseconds(Self.monotonicMilliseconds() - startMs)
         )
-        lastBackgroundFullSnapshotRefreshDiagnostic = diagnostic
+        lastRuntimeProjectionMaintenanceDiagnostic = diagnostic
         RuntimeLog.debug(
             "Snapshot",
             diagnostic.logMessage

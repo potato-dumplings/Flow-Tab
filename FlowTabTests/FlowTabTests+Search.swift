@@ -873,106 +873,71 @@ extension FlowTabTests {
     @MainActor
     func testLiveSwitcherModelSnapshotInvalidationRecordTracksReasonAndScope() {
         let model = LiveSwitcherModel()
-        model.deferredBackgroundFullSnapshotRefreshRequest = LiveSwitcherModel.BackgroundFullSnapshotRefreshRequest(
-            triggerDirection: .forward,
-            generation: model.backgroundFullSnapshotRefreshGeneration,
-            scheduledMs: 10
-        )
 
-        model.invalidateBackgroundFullSnapshotRefresh(reason: .commitSelection)
+        model.invalidateRuntimeProjectionMaintenanceRequest(reason: .commitSelection)
 
         XCTAssertEqual(model.lastSnapshotInvalidationRecord?.reason, .commitSelection)
-        XCTAssertEqual(model.lastSnapshotInvalidationRecord?.scope, .backgroundFullSnapshot)
-        XCTAssertEqual(model.lastSnapshotInvalidationRecord?.backgroundGeneration, 1)
+        XCTAssertEqual(model.lastSnapshotInvalidationRecord?.scope, .runtimeProjectionMaintenance)
+        XCTAssertEqual(model.lastSnapshotInvalidationRecord?.maintenanceGeneration, 1)
         XCTAssertEqual(model.lastSnapshotInvalidationRecord?.selectedAppWindowGeneration, 0)
-        XCTAssertEqual(model.lastSnapshotInvalidationRecord?.clearedDeferredBackgroundRequest, true)
+        XCTAssertEqual(model.lastSnapshotInvalidationRecord?.clearedDeferredMaintenanceRequest, false)
         XCTAssertTrue(
             model.lastSnapshotInvalidationRecord?.logMessage.contains("reason=commitSelection") ?? false
-        )
-
-        model.deferredBackgroundFullSnapshotRefreshRequest = LiveSwitcherModel.BackgroundFullSnapshotRefreshRequest(
-            triggerDirection: .forward,
-            generation: model.backgroundFullSnapshotRefreshGeneration,
-            scheduledMs: 20
         )
 
         model.invalidateSelectedAppWindowSnapshot(reason: .resetRuntimeState)
 
         XCTAssertEqual(model.lastSnapshotInvalidationRecord?.reason, .resetRuntimeState)
         XCTAssertEqual(model.lastSnapshotInvalidationRecord?.scope, .selectedAppWindowSnapshot)
-        XCTAssertEqual(model.lastSnapshotInvalidationRecord?.backgroundGeneration, 1)
+        XCTAssertEqual(model.lastSnapshotInvalidationRecord?.maintenanceGeneration, 1)
         XCTAssertEqual(model.lastSnapshotInvalidationRecord?.selectedAppWindowGeneration, 1)
-        XCTAssertEqual(model.lastSnapshotInvalidationRecord?.clearedDeferredBackgroundRequest, true)
+        XCTAssertEqual(model.lastSnapshotInvalidationRecord?.clearedDeferredMaintenanceRequest, false)
     }
 
     @MainActor
-    func testLiveSwitcherModelBackgroundRefreshDiagnosticTracksGenerationReasonAndApplyGeneration() {
-        let currentApp = NSRunningApplication.current
-        let appID = "com.flowtab.tests.background-refresh-diagnostic"
+    func testLiveSwitcherModelMaintenanceDiagnosticTracksGenerationReasonWithoutApply() {
+        let appID = "com.flowtab.tests.maintenance-diagnostic"
         let fastApp = AppSwitchCandidate(
             id: appID,
-            displayName: currentApp.localizedName ?? "Current App",
+            displayName: "Maintenance Diagnostic",
             groupID: "current",
             lastActiveAt: 100,
             windows: []
         )
-        let fullApp = AppSwitchCandidate(
-            id: appID,
-            displayName: currentApp.localizedName ?? "Current App",
-            groupID: "current",
-            lastActiveAt: 100,
-            windows: [
-                WindowCandidate(
-                    id: "window-1",
-                    title: "Window 1",
-                    isMinimized: false,
-                    lastActiveAt: 100
+        let snapshotService = RecordingRuntimeSnapshotService(
+            appSwitcherProjection: RuntimeAppSwitcherProjection(
+                apps: [fastApp],
+                contextsByID: [:],
+                freshness: RuntimeProjectionFreshness(
+                    generatedAt: 10,
+                    sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+                    dirtyAppIDs: [],
+                    dirtyPIDs: [],
+                    dirtyCGWindowIDs: [],
+                    pendingRepairScopes: [],
+                    isCompleteForScope: true
                 )
-            ]
+            )
         )
-        let fullContext = RuntimeAppContext(
-            appID: appID,
-            runningApp: currentApp,
-            windowsByID: [
-                "window-1": RuntimeWindowContext(
-                    id: "window-1",
-                    title: "Window 1",
-                    isMinimized: false,
-                    ownerPID: currentApp.processIdentifier
-                )
-            ]
-        )
-        let model = LiveSwitcherModel()
-        model.backgroundFullSnapshotRefreshEnabled = false
-        model.fastAppSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: [fastApp], contextsByID: [appID: fullContext])
-        }
+        let model = LiveSwitcherModel(snapshotService: snapshotService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
-        let generation = model.backgroundFullSnapshotRefreshGeneration
-        let startMs = LiveSwitcherModel.monotonicMilliseconds()
-        model.completeBackgroundFullSnapshotRefresh(
-            RuntimeSnapshot(apps: [fullApp], contextsByID: [appID: fullContext]),
-            triggerDirection: .forward,
-            generation: generation,
-            reason: .startSession,
-            startMs: startMs,
-            snapshotReadMs: startMs
-        )
+        let generation = model.runtimeProjectionMaintenanceGeneration
 
-        let diagnostic = model.lastBackgroundFullSnapshotRefreshDiagnostic
-        XCTAssertEqual(diagnostic?.result, "applied")
+        let diagnostic = model.lastRuntimeProjectionMaintenanceDiagnostic
+        XCTAssertEqual(diagnostic?.result, "maintenanceRequested")
         XCTAssertEqual(diagnostic?.generation, generation)
         XCTAssertEqual(diagnostic?.currentGeneration, generation)
         XCTAssertEqual(diagnostic?.reason, .startSession)
         XCTAssertEqual(diagnostic?.trigger, CycleDirection.forward.debugName)
-        XCTAssertEqual(diagnostic?.applyGeneration, generation)
+        XCTAssertEqual(diagnostic?.applyGeneration, nil)
         XCTAssertTrue(diagnostic?.logMessage.contains("reason=startSession") ?? false)
-        XCTAssertTrue(diagnostic?.logMessage.contains("applyGeneration=\(generation)") ?? false)
+        XCTAssertTrue(diagnostic?.logMessage.contains("applyGeneration=nil") ?? false)
+        XCTAssertEqual(snapshotService.appSwitcherMaintenanceRequestsRecorded(), [.switcherSessionStarted])
     }
 
     @MainActor
-    func testOptionTabWindowScalePressureKeepsBackgroundApplyAndPreviewCaptureBounded() {
+    func testOptionTabWindowScalePressureKeepsSelectedAppApplyAndPreviewCaptureBounded() {
         let selectedWindowCount = 1_000
         let fullSnapshot = makeOptionTabWindowScaleSnapshot(
             selectedWindowCount: selectedWindowCount,
@@ -983,7 +948,7 @@ extension FlowTabTests {
         let fastSnapshot = appOnlySnapshot(from: fullSnapshot)
         let model = LiveSwitcherModel()
         model.frontmostApplicationOverride = { nil }
-        model.backgroundFullSnapshotRefreshEnabled = false
+        model.runtimeProjectionMaintenanceEnabled = false
         model.fastAppSnapshotProviderOverride = { fastSnapshot }
         var previewCaptureCalls = 0
         model.previewCaptureOverride = { _, _, _, _ in
@@ -992,10 +957,10 @@ extension FlowTabTests {
         }
 
         let iterations = 60
-        var backgroundApplySamples: [Double] = []
+        var selectedAppApplySamples: [Double] = []
         var windowLayerEntrySamples: [Double] = []
         var visiblePreviewItemSamples: [Double] = []
-        backgroundApplySamples.reserveCapacity(iterations)
+        selectedAppApplySamples.reserveCapacity(iterations)
         windowLayerEntrySamples.reserveCapacity(iterations)
         visiblePreviewItemSamples.reserveCapacity(iterations)
         var visibleWindowCount = 0
@@ -1003,17 +968,37 @@ extension FlowTabTests {
         for _ in 0..<iterations {
             XCTAssertTrue(model.startSession(triggerDirection: .forward))
             XCTAssertEqual(model.session?.selectedApp.windows.count ?? -1, 0)
+            guard
+                let selectedAppID = model.session?.selectedApp.id,
+                let selectedApp = fullSnapshot.apps.first(where: { $0.id == selectedAppID }),
+                let selectedContext = fullSnapshot.contextsByID[selectedAppID]
+            else {
+                XCTFail("missing selected app context")
+                return
+            }
+            let selectedSnapshot = RuntimeHomeAppSnapshot(
+                summary: RuntimeHomeAppSummary(
+                    appID: selectedApp.id,
+                    displayName: selectedApp.displayName,
+                    groupID: selectedApp.groupID,
+                    lastActiveAt: selectedApp.lastActiveAt,
+                    windowCount: selectedApp.windows.count,
+                    pid: selectedContext.runningApp.processIdentifier
+                ),
+                candidate: selectedApp,
+                context: selectedContext
+            )
 
             let applyStart = DispatchTime.now().uptimeNanoseconds
             let applyStartMs = LiveSwitcherModel.monotonicMilliseconds()
-            model.completeBackgroundFullSnapshotRefresh(
-                fullSnapshot,
-                triggerDirection: .forward,
-                generation: model.backgroundFullSnapshotRefreshGeneration,
+            model.completeSelectedAppWindowSnapshot(
+                selectedSnapshot,
+                appID: selectedAppID,
+                generation: model.selectedAppWindowSnapshotGeneration,
                 startMs: applyStartMs,
                 snapshotReadMs: applyStartMs
             )
-            backgroundApplySamples.append(
+            selectedAppApplySamples.append(
                 Double(DispatchTime.now().uptimeNanoseconds - applyStart) / 1_000_000.0
             )
             XCTAssertEqual(model.session?.selectedApp.windows.count ?? -1, selectedWindowCount)
@@ -1040,24 +1025,24 @@ extension FlowTabTests {
             model.cancelSelection()
         }
 
-        let backgroundApply = latencySummary(samples: backgroundApplySamples)
+        let selectedAppApply = latencySummary(samples: selectedAppApplySamples)
         let windowLayerEntry = latencySummary(samples: windowLayerEntrySamples)
         let previewItems = latencySummary(samples: visiblePreviewItemSamples)
         print(
             String(
-                format: "[OptionTabWindowScalePressure] apps=%d, selectedWindows=%d, visibleWindows=%d, iterations=%d, applyP95=%.2fms, enterP95=%.2fms, previewItemsP95=%.2fms, previewCaptureCalls=%d",
+                format: "[OptionTabWindowScalePressure] apps=%d, selectedWindows=%d, visibleWindows=%d, iterations=%d, selectedAppApplyP95=%.2fms, enterP95=%.2fms, previewItemsP95=%.2fms, previewCaptureCalls=%d",
                 fullSnapshot.apps.count,
                 selectedWindowCount,
                 visibleWindowCount,
                 iterations,
-                backgroundApply.p95,
+                selectedAppApply.p95,
                 windowLayerEntry.p95,
                 previewItems.p95,
                 previewCaptureCalls
             )
         )
 
-        XCTAssertLessThan(backgroundApply.p95, 50)
+        XCTAssertLessThan(selectedAppApply.p95, 50)
         XCTAssertLessThan(windowLayerEntry.p95, 50)
         XCTAssertLessThan(previewItems.p95, 50)
         XCTAssertLessThanOrEqual(previewCaptureCalls, iterations * max(visibleWindowCount, 1))

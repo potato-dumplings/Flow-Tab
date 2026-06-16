@@ -102,60 +102,41 @@ final class LiveSwitcherModel: ObservableObject {
         }
     }
 
-    struct BackgroundFullSnapshotRefreshRequest {
-        let triggerDirection: CycleDirection
-        let generation: UInt64
-        let scheduledMs: Double
-        let reason: SnapshotInvalidationReason
-
-        init(
-            triggerDirection: CycleDirection,
-            generation: UInt64,
-            scheduledMs: Double,
-            reason: SnapshotInvalidationReason = .startSession
-        ) {
-            self.triggerDirection = triggerDirection
-            self.generation = generation
-            self.scheduledMs = scheduledMs
-            self.reason = reason
-        }
-    }
-
     enum SnapshotInvalidationReason: String, Equatable {
         case startSession
         case startFocusedWindowSession
         case commitSelection
         case resetSession
         case resetRuntimeState
-        case explicitBackgroundRefreshInvalidation
+        case explicitRuntimeProjectionMaintenanceInvalidation
         case explicitSelectedAppWindowInvalidation
     }
 
     enum SnapshotInvalidationScope: String, Equatable {
-        case backgroundFullSnapshot
+        case runtimeProjectionMaintenance
         case selectedAppWindowSnapshot
     }
 
     struct SnapshotInvalidationRecord: Equatable {
         let reason: SnapshotInvalidationReason
         let scope: SnapshotInvalidationScope
-        let backgroundGeneration: UInt64
+        let maintenanceGeneration: UInt64
         let selectedAppWindowGeneration: UInt64
-        let clearedDeferredBackgroundRequest: Bool
+        let clearedDeferredMaintenanceRequest: Bool
 
         var logMessage: String {
             [
                 "snapshotInvalidation",
                 "scope=\(scope.rawValue)",
                 "reason=\(reason.rawValue)",
-                "backgroundGeneration=\(backgroundGeneration)",
+                "maintenanceGeneration=\(maintenanceGeneration)",
                 "selectedAppWindowGeneration=\(selectedAppWindowGeneration)",
-                "clearedDeferredBackgroundRequest=\(clearedDeferredBackgroundRequest ? 1 : 0)"
+                "clearedDeferredMaintenanceRequest=\(clearedDeferredMaintenanceRequest ? 1 : 0)"
             ].joined(separator: " ")
         }
     }
 
-    struct BackgroundFullSnapshotRefreshDiagnostic: Equatable {
+    struct RuntimeProjectionMaintenanceDiagnostic: Equatable {
         let result: String
         let generation: UInt64
         let currentGeneration: UInt64
@@ -166,7 +147,7 @@ final class LiveSwitcherModel: ObservableObject {
 
         var logMessage: String {
             [
-                "backgroundFullSnapshotRefresh",
+                "runtimeProjectionMaintenance",
                 "result=\(result)",
                 "generation=\(generation)",
                 "currentGeneration=\(currentGeneration)",
@@ -217,7 +198,6 @@ final class LiveSwitcherModel: ObservableObject {
     var snapshotProviderOverride: (() -> RuntimeSnapshot)?
     var fastAppSnapshotProviderOverride: (() -> RuntimeSnapshot)?
     var selectedAppSnapshotProviderOverride: ((String) -> RuntimeHomeAppSnapshot?)?
-    var backgroundFullSnapshotProviderOverride: (() -> RuntimeSnapshot)?
     var frontmostApplicationOverride: (() -> NSRunningApplication?)?
     var focusedWindowIdentityOverride: ((NSRunningApplication) -> RuntimeFocusedWindowIdentity?)?
     var frontmostRuntimeWindowIDOverride: ((
@@ -266,14 +246,12 @@ final class LiveSwitcherModel: ObservableObject {
     var pendingTerminateRequest: PendingTerminateRequest?
     var lastTerminateRefreshPollingDiagnostic: TerminateRefreshPollingDiagnostic?
     var terminateAppInstanceGeneration: UInt64 = 0
-    var backgroundFullSnapshotRefreshGeneration: UInt64 = 0
-    var backgroundFullSnapshotRefreshEnabled = true
-    var backgroundFullSnapshotRefreshDelay: DispatchTimeInterval = .milliseconds(150)
-    var deferredBackgroundFullSnapshotRefreshRequest: BackgroundFullSnapshotRefreshRequest?
+    var runtimeProjectionMaintenanceGeneration: UInt64 = 0
+    var runtimeProjectionMaintenanceEnabled = true
     var selectedAppWindowSnapshotGeneration: UInt64 = 0
     var selectedAppWindowSnapshotPendingAppID: String?
     var lastSnapshotInvalidationRecord: SnapshotInvalidationRecord?
-    var lastBackgroundFullSnapshotRefreshDiagnostic: BackgroundFullSnapshotRefreshDiagnostic?
+    var lastRuntimeProjectionMaintenanceDiagnostic: RuntimeProjectionMaintenanceDiagnostic?
     var searchComputationRevision: UInt64 = 0
     var searchDebounceNanoseconds: UInt64 = 20_000_000
 
@@ -388,7 +366,7 @@ final class LiveSwitcherModel: ObservableObject {
         guard loadFastAppSnapshot(triggerDirection: triggerDirection, preferredSelectedAppID: nil) else {
             return false
         }
-        scheduleBackgroundFullSnapshotRefresh(triggerDirection: triggerDirection)
+        requestRuntimeProjectionMaintenance(triggerDirection: triggerDirection)
         return true
     }
 
@@ -861,7 +839,7 @@ final class LiveSwitcherModel: ObservableObject {
         guard var session else { return }
         let target = session.commitSelection()
         rememberedWindowIDByAppID = session.rememberedWindowIDByAppID
-        invalidateBackgroundFullSnapshotRefresh(reason: .commitSelection)
+        invalidateRuntimeProjectionMaintenanceRequest(reason: .commitSelection)
         cancelPendingTerminateRefresh()
         clearTerminateSelectedAppAnimation()
         cancelPendingSearchComputation()
@@ -888,7 +866,7 @@ final class LiveSwitcherModel: ObservableObject {
     }
 
     func resetSessionState() {
-        invalidateBackgroundFullSnapshotRefresh(reason: .resetSession)
+        invalidateRuntimeProjectionMaintenanceRequest(reason: .resetSession)
         cancelPendingTerminateRefresh()
         cancelPendingSearchComputation()
         session = nil

@@ -2896,7 +2896,7 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testLiveSwitcherModelPreviewCaptureSkipsBindingWithoutCaptureAction() {
         let model = LiveSwitcherModel()
-        model.backgroundFullSnapshotRefreshEnabled = false
+        model.runtimeProjectionMaintenanceEnabled = false
         let currentApp = NSRunningApplication.current
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let window = WindowCandidate(

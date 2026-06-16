@@ -318,7 +318,7 @@ extension FlowTabPriorityCoverageTests {
         )
         let snapshotService = RecordingRuntimeSnapshotService(appSwitcherProjection: projection)
         let model = LiveSwitcherModel(snapshotService: snapshotService)
-        model.backgroundFullSnapshotRefreshEnabled = false
+        model.runtimeProjectionMaintenanceEnabled = false
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
 
@@ -387,7 +387,7 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
         let model = LiveSwitcherModel(snapshotService: snapshotService)
-        model.backgroundFullSnapshotRefreshEnabled = false
+        model.runtimeProjectionMaintenanceEnabled = false
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertTrue(model.scheduleSelectedAppWindowSnapshotIfNeeded(for: appID))
@@ -436,7 +436,7 @@ extension FlowTabPriorityCoverageTests {
             homeSnapshotsByAppID: [appID: selectedSnapshot]
         )
         let model = LiveSwitcherModel(snapshotService: snapshotService)
-        model.backgroundFullSnapshotRefreshEnabled = false
+        model.runtimeProjectionMaintenanceEnabled = false
         model.fastAppSnapshotProviderOverride = {
             RuntimeSnapshot(apps: [appOnlyCandidate], contextsByID: [:])
         }
@@ -992,90 +992,39 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testLiveSwitcherModelDelaysBackgroundFullSnapshotWhileSelectedAppSnapshotIsPending() async {
-        let controller = SwitcherPanelController()
-        let currentApp = NSRunningApplication.current
-        let appID = "com.example.pending-window-snapshot"
-        let windows = [
-            WindowCandidate(id: "pending-1", title: "Pending One", isMinimized: false, lastActiveAt: 30),
-            WindowCandidate(id: "pending-2", title: "Pending Two", isMinimized: false, lastActiveAt: 20)
-        ]
-        let appOnlyCandidate = AppSwitchCandidate(
+    func testLiveSwitcherModelStartSessionRequestsRuntimeMaintenanceWithoutSurfaceSampling() {
+        let appID = "com.flowtab.tests.runtime-maintenance"
+        let candidate = AppSwitchCandidate(
             id: appID,
-            displayName: "Pending Snapshot",
-            groupID: "pending",
+            displayName: "Runtime Maintenance",
+            groupID: "maintenance",
             lastActiveAt: 100,
             windows: []
         )
-        let windowCandidate = AppSwitchCandidate(
-            id: appID,
-            displayName: "Pending Snapshot",
-            groupID: "pending",
-            lastActiveAt: 100,
-            windows: windows
+        let snapshotService = RecordingRuntimeSnapshotService(
+            appSwitcherProjection: RuntimeAppSwitcherProjection(
+                apps: [candidate],
+                contextsByID: [:],
+                freshness: RuntimeProjectionFreshness(
+                    generatedAt: 20,
+                    sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+                    dirtyAppIDs: [],
+                    dirtyPIDs: [],
+                    dirtyCGWindowIDs: [],
+                    pendingRepairScopes: [],
+                    isCompleteForScope: true
+                )
+            )
         )
-        let context = makeRuntimeAppContext(appID: appID, runningApp: currentApp, windows: windows)
-        let selectedSnapshot = RuntimeHomeAppSnapshot(
-            summary: RuntimeHomeAppSummary(
-                appID: appID,
-                displayName: "Pending Snapshot",
-                groupID: "pending",
-                lastActiveAt: 100,
-                windowCount: windows.count,
-                pid: currentApp.processIdentifier
-            ),
-            candidate: windowCandidate,
-            context: context
-        )
-        let lock = NSLock()
-        var backgroundFullSnapshotCalls = 0
-        func backgroundCallCount() -> Int {
-            lock.lock()
-            defer { lock.unlock() }
-            return backgroundFullSnapshotCalls
-        }
+        let model = LiveSwitcherModel(snapshotService: snapshotService)
 
-        controller.windowLayerPresentationDelayOverride = 0.01
-        controller.modelForTesting.backgroundFullSnapshotRefreshDelay = .milliseconds(20)
-        controller.modelForTesting.fastAppSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: [appOnlyCandidate], contextsByID: [:])
-        }
-        controller.modelForTesting.snapshotProviderOverride = {
-            RuntimeSnapshot(apps: [appOnlyCandidate], contextsByID: [:])
-        }
-        controller.modelForTesting.backgroundFullSnapshotProviderOverride = {
-            lock.lock()
-            backgroundFullSnapshotCalls += 1
-            lock.unlock()
-            return RuntimeSnapshot(apps: [windowCandidate], contextsByID: [appID: context])
-        }
-        controller.modelForTesting.selectedAppSnapshotProviderOverride = { _ in
-            Thread.sleep(forTimeInterval: 0.08)
-            return selectedSnapshot
-        }
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
 
-        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        controller.scheduleDelayedWindowLayerEntryForTesting()
-
-        let deferredWhilePending = await waitUntil(
-            "background full snapshot deferred while selected app snapshot is pending",
-            timeoutNanoseconds: 1_000_000_000,
-            pollIntervalNanoseconds: 10_000_000
-        ) {
-            controller.modelForTesting.deferredBackgroundFullSnapshotRefreshRequest != nil
-                && backgroundCallCount() == 0
-        }
-        XCTAssertTrue(deferredWhilePending)
-
-        let resumedAfterPendingSnapshot = await waitUntil(
-            "background full snapshot resumes after selected app snapshot completes",
-            timeoutNanoseconds: 1_000_000_000,
-            pollIntervalNanoseconds: 10_000_000
-        ) {
-            backgroundCallCount() > 0
-        }
-        XCTAssertTrue(resumedAfterPendingSnapshot)
-        controller.cancelSelectionForTesting()
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.appSwitcherMaintenanceRequestsRecorded(), [.switcherSessionStarted])
+        XCTAssertEqual(model.lastRuntimeProjectionMaintenanceDiagnostic?.result, "maintenanceRequested")
+        XCTAssertEqual(model.lastRuntimeProjectionMaintenanceDiagnostic?.applyGeneration, nil)
     }
 
     @MainActor

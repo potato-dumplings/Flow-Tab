@@ -341,7 +341,7 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testLiveSwitcherModelUsesPreviewProviderResolverForTerminalPreview() async {
         let model = LiveSwitcherModel()
-        model.backgroundFullSnapshotRefreshEnabled = false
+        model.runtimeProjectionMaintenanceEnabled = false
         let currentApp = NSRunningApplication.current
         let appID = "com.apple.Terminal"
         let windows = [
@@ -415,7 +415,7 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testLiveSwitcherModelUsesFallbackWhenTerminalProviderFails() async {
         let model = LiveSwitcherModel()
-        model.backgroundFullSnapshotRefreshEnabled = false
+        model.runtimeProjectionMaintenanceEnabled = false
         let currentApp = NSRunningApplication.current
         let appID = "com.apple.Terminal"
         let windows = [

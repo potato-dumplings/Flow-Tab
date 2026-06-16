@@ -92,6 +92,7 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
     private var lightweightSnapshotRequests = 0
     private var homeSummaryRequests = 0
     private var homeSummariesRequests = 0
+    private var appSwitcherMaintenanceRequests: [RuntimeProjectionMaintenanceReason] = []
     private var spaceTopologyChangeSignals = 0
     private var appLaunchSignals: [(appID: String, pid: pid_t)] = []
     private var appWindowChangeSignals: [(appID: String, pid: pid_t)] = []
@@ -147,6 +148,12 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
         lock.lock()
         defer { lock.unlock() }
         return homeSummaryRequests
+    }
+
+    func appSwitcherMaintenanceRequestsRecorded() -> [RuntimeProjectionMaintenanceReason] {
+        lock.lock()
+        defer { lock.unlock() }
+        return appSwitcherMaintenanceRequests
     }
 
     func spaceTopologyChangeSignalCount() -> Int {
@@ -254,6 +261,12 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
             hasHomeSummaryProjection: false,
             currentAppWindowProjectionAppIDs: []
         )
+    }
+
+    func requestAppSwitcherProjectionMaintenance(reason: RuntimeProjectionMaintenanceReason) {
+        lock.lock()
+        appSwitcherMaintenanceRequests.append(reason)
+        lock.unlock()
     }
 
     func currentCGWindowsByPID() -> [pid_t: [RuntimeSnapshotProvider.CGWindowEntry]] {
