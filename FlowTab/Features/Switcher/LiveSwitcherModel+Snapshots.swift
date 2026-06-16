@@ -376,7 +376,7 @@ extension LiveSwitcherModel {
             source = projection.freshness.isCompleteForScope
                 ? "runtimeProjection"
                 : "runtimeProjectionDirty"
-            snapshot = projection.snapshot
+            snapshot = projection.appCycleSnapshot
         } else {
             source = "runtimeSnapshotService.lightweight"
             snapshot = runtimeSnapshotService.lightweightAppSnapshot()

@@ -329,6 +329,51 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testLiveSwitcherModelDoesNotExposeDirtyProjectionWindowsAsFreshWindowCycle() {
+        let appID = "com.example.dirty-projection"
+        let staleWindows = [
+            WindowCandidate(id: "stale-1", title: "Stale One", isMinimized: false, lastActiveAt: 30),
+            WindowCandidate(id: "stale-2", title: "Stale Two", isMinimized: false, lastActiveAt: 20),
+            WindowCandidate(id: "stale-3", title: "Stale Three", isMinimized: false, lastActiveAt: 10)
+        ]
+        let staleApp = AppSwitchCandidate(
+            id: appID,
+            displayName: "Dirty Projection",
+            groupID: "dirty-projection",
+            lastActiveAt: 100,
+            windows: staleWindows
+        )
+        let projection = RuntimeAppSwitcherProjection(
+            apps: [staleApp],
+            contextsByID: [:],
+            freshness: RuntimeProjectionFreshness(
+                generatedAt: 10,
+                sourceGeneration: RuntimeReadModelGeneration(space: 1, projection: 1),
+                dirtyAppIDs: [],
+                dirtyPIDs: [],
+                dirtyCGWindowIDs: [CGWindowID(42)],
+                pendingRepairScopes: ["spaceTopology"],
+                isCompleteForScope: false
+            )
+        )
+        let snapshotService = RecordingRuntimeSnapshotService(appSwitcherProjection: projection)
+        let model = LiveSwitcherModel(snapshotService: snapshotService)
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.appSwitcherMaintenanceRequestsRecorded(), [.switcherSessionStarted])
+        XCTAssertEqual(model.session?.apps.map(\.id), [appID])
+        XCTAssertEqual(model.session?.selectedApp.windows.map(\.id), [])
+
+        model.handle(.downArrow)
+
+        XCTAssertEqual(model.session?.mode, .appCycle)
+        XCTAssertNil(model.session?.selectedWindow)
+    }
+
+    @MainActor
     func testLiveSwitcherModelSelectedAppWindowSnapshotUsesRuntimeProjectionWithoutHomeSampling() {
         let appID = "com.example.projected-current-app"
         let runningApp = NSRunningApplication.current
