@@ -1054,8 +1054,6 @@ extension FlowTabTests {
         )
         let model = LiveSwitcherModel(snapshotService: snapshotService)
         model.frontmostApplicationOverride = { runningApp }
-        model.focusedWindowIdentityOverride = { _ in nil }
-        model.frontmostRuntimeWindowIDOverride = { _, _, _ in nil }
 
         let iterations = 80
         var samples: [Double] = []

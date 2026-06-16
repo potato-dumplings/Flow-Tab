@@ -569,8 +569,6 @@ extension FlowTabPriorityCoverageTests {
         )
         let model = LiveSwitcherModel(snapshotService: snapshotService)
         model.frontmostApplicationOverride = { runningApp }
-        model.focusedWindowIdentityOverride = { _ in nil }
-        model.frontmostRuntimeWindowIDOverride = { _, _, _ in nil }
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
 
@@ -586,8 +584,6 @@ extension FlowTabPriorityCoverageTests {
         let snapshotService = RecordingRuntimeSnapshotService()
         let model = LiveSwitcherModel(snapshotService: snapshotService)
         model.frontmostApplicationOverride = { runningApp }
-        model.focusedWindowIdentityOverride = { _ in nil }
-        model.frontmostRuntimeWindowIDOverride = { _, _, _ in nil }
 
         XCTAssertFalse(model.startFocusedAppWindowSession(triggerDirection: .forward))
 

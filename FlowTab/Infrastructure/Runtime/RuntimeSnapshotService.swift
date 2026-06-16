@@ -20,7 +20,6 @@ protocol RuntimeSnapshotServing: Sendable {
     func runtimeReadModelDiagnostics() -> RuntimeReadModelDiagnostics
     func requestAppSwitcherProjectionMaintenance(reason: RuntimeProjectionMaintenanceReason)
     func requestSearchIndexFreshnessBarrier(reason: RuntimeProjectionMaintenanceReason)
-    func currentCGWindowsByPID() -> [pid_t: [RuntimeSnapshotProvider.CGWindowEntry]]
     func signalSpaceTopologyChanged()
     func signalAppLaunched(appID: String, pid: pid_t)
     func signalAppWindowsChanged(appID: String, pid: pid_t)
@@ -218,12 +217,6 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
                     "committedSearchIndex=\(committedSearchIndex == nil ? 0 : 1)"
                 ].joined(separator: " ")
             )
-        }
-    }
-
-    func currentCGWindowsByPID() -> [pid_t: [RuntimeSnapshotProvider.CGWindowEntry]] {
-        snapshotQueue.sync {
-            snapshotProvider.collectCGWindowsByPID()
         }
     }
 

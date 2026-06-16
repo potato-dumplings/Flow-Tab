@@ -352,10 +352,6 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
         lock.unlock()
     }
 
-    func currentCGWindowsByPID() -> [pid_t: [RuntimeSnapshotProvider.CGWindowEntry]] {
-        [:]
-    }
-
     func signalSpaceTopologyChanged() {
         lock.lock()
         spaceTopologyChangeSignals += 1

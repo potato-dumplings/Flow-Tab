@@ -586,14 +586,12 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
 
+        model.windowRecencyTracker.recordVerifiedFocus(
+            appID: currentAppID,
+            windowID: "current-focused",
+            context: currentContext
+        )
         model.frontmostApplicationOverride = { currentApp }
-        model.focusedWindowIdentityOverride = { _ in
-            RuntimeFocusedWindowIdentity(
-                cgWindowID: 11,
-                title: "Current Focused",
-                frame: currentFocusedFrame
-            )
-        }
         model.snapshotProviderOverride = {
             RuntimeSnapshot(
                 apps: [
@@ -636,7 +634,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testLiveSwitcherModelRecordsFocusedStickyWindowAsVerifiedFocusRecency() {
+    func testLiveSwitcherModelAppliesCommittedVerifiedFocusRecencyWithoutLiveFocusedRead() {
         let model = LiveSwitcherModel(windowRecencyTracker: RuntimeWindowRecencyTracker())
         let currentApp = NSRunningApplication.current
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
@@ -695,13 +693,11 @@ extension FlowTabPriorityCoverageTests {
         )
 
         model.frontmostApplicationOverride = { currentApp }
-        model.focusedWindowIdentityOverride = { _ in
-            RuntimeFocusedWindowIdentity(
-                cgWindowID: 42,
-                title: "Chrome Fullscreen Tab",
-                frame: fullscreenFrame
-            )
-        }
+        model.windowRecencyTracker.recordVerifiedFocus(
+            appID: appID,
+            windowID: "fullscreen",
+            context: context
+        )
 
         let updatedSnapshot = model.snapshotWithWindowRecencyApplied(snapshot)
 
@@ -712,7 +708,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testLiveSwitcherModelFocusedRuntimeProjectionRecordsFocusedStickyWindowBeforeOrdering() {
+    func testLiveSwitcherModelFocusedRuntimeProjectionUsesCommittedRecencyBeforeOrdering() {
         let currentApp = NSRunningApplication.current
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let fullscreenFrame = CGRect(x: 0, y: 37, width: 1_728, height: 1_080)
@@ -796,13 +792,11 @@ extension FlowTabPriorityCoverageTests {
             snapshotService: snapshotService
         )
         model.frontmostApplicationOverride = { currentApp }
-        model.focusedWindowIdentityOverride = { _ in
-            RuntimeFocusedWindowIdentity(
-                cgWindowID: 42,
-                title: "Chrome Fullscreen Tab",
-                frame: fullscreenFrame
-            )
-        }
+        model.windowRecencyTracker.recordVerifiedFocus(
+            appID: appID,
+            windowID: "fullscreen",
+            context: context
+        )
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
 
@@ -814,7 +808,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testLiveSwitcherModelRecordsFrontmostRuntimeWindowWhenAXFocusedWindowUnavailable() {
+    func testLiveSwitcherModelAppliesCommittedRuntimeWindowRecencyWhenProjectionOrderChanges() {
         let restoreCurrentAppVisibility = enableCurrentAppInSwitcherForTesting()
         defer { restoreCurrentAppVisibility() }
 
@@ -863,10 +857,7 @@ extension FlowTabPriorityCoverageTests {
         )
 
         var snapshotWindows = initialWindows
-        var frontmostRuntimeWindowID: String? = "fullscreen"
         model.frontmostApplicationOverride = { currentApp }
-        model.focusedWindowIdentityOverride = { _ in nil }
-        model.frontmostRuntimeWindowIDOverride = { _, _, _ in frontmostRuntimeWindowID }
         model.snapshotProviderOverride = {
             RuntimeSnapshot(
                 apps: [
@@ -885,12 +876,11 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertEqual(model.session?.apps.first?.windows.map(\.id), ["fullscreen", "incognito", "normal"])
 
-        model.windowRecencyTracker.record(appID: appID, windowID: "normal", context: context)
-        frontmostRuntimeWindowID = "normal"
+        model.windowRecencyTracker.recordVerifiedFocus(appID: appID, windowID: "normal", context: context)
         snapshotWindows = reorderedWindows
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
-        XCTAssertEqual(model.session?.apps.first?.windows.map(\.id), ["normal", "fullscreen", "incognito"])
+        XCTAssertEqual(model.session?.apps.first?.windows.map(\.id), ["normal", "incognito", "fullscreen"])
     }
 
     @MainActor
