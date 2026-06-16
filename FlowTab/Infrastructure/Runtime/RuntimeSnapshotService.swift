@@ -6,14 +6,12 @@ let sharedRuntimeSnapshotService = RuntimeSnapshotService()
 
 enum RuntimeProjectionMaintenanceReason: String, Sendable {
     case switcherSessionStarted
+    case homeProjectionMissing
     case searchFreshnessBarrier
 }
 
 protocol RuntimeSnapshotServing: Sendable {
     func fallbackRuntimeSnapshot() -> RuntimeSnapshot
-    func fallbackHomeAppSummaries() async -> [RuntimeHomeAppSummary]
-    func fallbackHomeAppSummary(for appID: String) async -> RuntimeHomeAppSummary?
-    func fallbackHomeAppSnapshot(for appID: String) async -> RuntimeHomeAppSnapshot?
     func readAppSwitcherProjection() -> RuntimeAppSwitcherProjection?
     func readHomeSummaryProjection() -> RuntimeHomeSummaryProjection?
     func readCurrentAppWindowProjection(appID: String) -> RuntimeCurrentAppWindowProjection?

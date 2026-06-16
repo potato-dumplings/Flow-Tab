@@ -356,6 +356,115 @@ extension FlowTabTests {
         XCTAssertEqual(missingProjectionService.lightweightSnapshotRequestCount(), 0)
     }
 
+    func testHomeRuntimeProjectionReaderDerivesHomeDataFromAppSwitcherProjectionWithoutSnapshotBridge() {
+        let appID = "com.example.home-app-switcher-projection"
+        let snapshot = makeHomeActivationSnapshot(
+            appID: appID,
+            windows: [
+                WindowCandidate(
+                    id: "projection-window",
+                    title: "Projection Window",
+                    isMinimized: false,
+                    lastActiveAt: 410
+                )
+            ]
+        )
+        let freshness = RuntimeProjectionFreshness(
+            generatedAt: 22,
+            sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+            dirtyAppIDs: [],
+            dirtyPIDs: [],
+            dirtyCGWindowIDs: [],
+            pendingRepairScopes: [],
+            isCompleteForScope: true
+        )
+        let snapshotService = RecordingRuntimeSnapshotService(
+            appSwitcherProjection: RuntimeAppSwitcherProjection(
+                apps: [snapshot.candidate],
+                contextsByID: [appID: snapshot.context],
+                freshness: freshness
+            )
+        )
+
+        XCTAssertEqual(
+            HomeRuntimeProjectionReader.appSummaries(from: snapshotService)?.map(\.appID),
+            [appID]
+        )
+        XCTAssertEqual(
+            HomeRuntimeProjectionReader.appSummary(for: appID, from: snapshotService)?.pid,
+            snapshot.summary.pid
+        )
+        XCTAssertEqual(
+            HomeRuntimeProjectionReader.appSnapshot(
+                for: appID,
+                from: snapshotService
+            )?.candidate.windows.map(\.id),
+            ["projection-window"]
+        )
+        XCTAssertEqual(snapshotService.homeSummariesRequestCount(), 0)
+        XCTAssertEqual(snapshotService.homeSummaryRequestCount(), 0)
+        XCTAssertEqual(snapshotService.recordedHomeAppIDs(), [])
+    }
+
+    func testHomeRuntimeRefreshReaderSignalsRuntimeRepairWhenProjectionIsMissingWithoutHomeFallback() {
+        let appID = "com.example.home-refresh-missing"
+        let cachedSnapshot = makeHomeActivationSnapshot(
+            appID: appID,
+            windows: [
+                WindowCandidate(
+                    id: "cached-window",
+                    title: "Cached Window",
+                    isMinimized: false,
+                    lastActiveAt: 420
+                )
+            ]
+        )
+        let contaminatedSnapshot = makeHomeActivationSnapshot(
+            appID: appID,
+            windows: [
+                WindowCandidate(
+                    id: "fallback-contamination",
+                    title: "Fallback Contamination",
+                    isMinimized: false,
+                    lastActiveAt: 10
+                )
+            ]
+        )
+        let snapshotService = RecordingRuntimeSnapshotService(
+            homeSnapshotsByAppID: [appID: contaminatedSnapshot]
+        )
+
+        XCTAssertEqual(
+            HomeRuntimeRefreshReader.appSummaries(
+                from: snapshotService,
+                current: [cachedSnapshot.summary]
+            ).map(\.appID),
+            [appID]
+        )
+        XCTAssertEqual(
+            HomeRuntimeRefreshReader.appSummary(
+                for: appID,
+                from: snapshotService,
+                current: [cachedSnapshot.summary]
+            )?.windowCount,
+            1
+        )
+        XCTAssertEqual(
+            HomeRuntimeRefreshReader.appSnapshot(
+                for: appID,
+                from: snapshotService,
+                current: cachedSnapshot,
+                currentSummary: cachedSnapshot.summary
+            )?.candidate.windows.map(\.id),
+            ["cached-window"]
+        )
+        XCTAssertEqual(snapshotService.homeSummariesRequestCount(), 0)
+        XCTAssertEqual(snapshotService.homeSummaryRequestCount(), 0)
+        XCTAssertEqual(snapshotService.recordedHomeAppIDs(), [])
+        XCTAssertEqual(snapshotService.appSwitcherMaintenanceRequestsRecorded(), [.homeProjectionMissing])
+        XCTAssertEqual(snapshotService.appWindowChangeSignalsRecorded().map(\.appID), [appID, appID])
+    }
+
     func testHomeAppVisibilityPresentationKeepsHiddenAppsLast() {
         let summaries = [
             makeHomeAppSummary(appID: "com.example.mail", displayName: "Mail", rank: 0),
