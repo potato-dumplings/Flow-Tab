@@ -36,11 +36,11 @@ struct RuntimeAppSwitcherProjection {
         RuntimeSnapshot(apps: apps, contextsByID: contextsByID)
     }
 
-    var appCycleSnapshot: RuntimeSnapshot {
-        guard !freshness.isCompleteForScope else { return snapshot }
+    var appCycleApps: [AppSwitchCandidate] {
+        guard !freshness.isCompleteForScope else { return apps }
         let suppressesAllWindowLists = !freshness.dirtyCGWindowIDs.isEmpty
             || (!freshness.pendingRepairScopes.isEmpty && freshness.dirtyAppIDs.isEmpty)
-        let appCycleApps = apps.map { app -> AppSwitchCandidate in
+        return apps.map { app -> AppSwitchCandidate in
             guard suppressesAllWindowLists || freshness.dirtyAppIDs.contains(app.id) else {
                 return app
             }
@@ -48,6 +48,9 @@ struct RuntimeAppSwitcherProjection {
             app.windows = []
             return app
         }
+    }
+
+    var appCycleSnapshot: RuntimeSnapshot {
         return RuntimeSnapshot(apps: appCycleApps, contextsByID: contextsByID)
     }
 }

@@ -2,20 +2,22 @@ import Foundation
 import FlowTabCore
 
 extension LiveSwitcherModel {
-    func snapshotWithHiddenAppsFiltered(_ snapshot: RuntimeSnapshot) -> RuntimeSnapshot {
+    func appSwitcherPayloadWithHiddenAppsFiltered(
+        _ payload: AppSwitcherProjectionSessionPayload
+    ) -> AppSwitcherProjectionSessionPayload {
         let visibilityFilter = AppVisibilityPreferencesStore.visibilityFilter()
-        guard !visibilityFilter.isEmpty else { return snapshot }
+        guard !visibilityFilter.isEmpty else { return payload }
 
-        let filteredApps = visibilityFilter.filteredApps(snapshot.apps)
-        guard filteredApps.count != snapshot.apps.count else { return snapshot }
+        let filteredApps = visibilityFilter.filteredApps(payload.apps)
+        guard filteredApps.count != payload.apps.count else { return payload }
 
         let visibleAppIDs = Set(filteredApps.map(\.id))
-        let filteredContexts = snapshot.contextsByID.filter { visibleAppIDs.contains($0.key) }
+        let filteredContexts = payload.contextsByID.filter { visibleAppIDs.contains($0.key) }
         RuntimeLog.debug(
             .snapshot,
-            "hiddenAppFilter hidden=\(visibilityFilter.hiddenAppIDs.count) before=\(snapshot.apps.count) after=\(filteredApps.count)"
+            "hiddenAppFilter hidden=\(visibilityFilter.hiddenAppIDs.count) before=\(payload.apps.count) after=\(filteredApps.count)"
         )
-        return RuntimeSnapshot(
+        return AppSwitcherProjectionSessionPayload(
             apps: filteredApps,
             contextsByID: filteredContexts
         )

@@ -699,10 +699,13 @@ extension FlowTabPriorityCoverageTests {
             context: context
         )
 
-        let updatedSnapshot = model.snapshotWithWindowRecencyApplied(snapshot)
+        let updatedApps = model.windowRecencyTracker.appsWithRecencyApplied(
+            snapshot.apps,
+            contextsByID: snapshot.contextsByID
+        )
 
         XCTAssertEqual(
-            updatedSnapshot.apps.first?.windows.map(\.id),
+            updatedApps.first?.windows.map(\.id),
             ["fullscreen", "incognito", "normal"]
         )
     }

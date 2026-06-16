@@ -48,7 +48,7 @@ extension LiveSwitcherModel {
         )
     }
 
-    func logLoadSnapshotEmpty(
+    func logLoadAppSwitcherProjectionSessionEmpty(
         event: String = "loadAppSwitcherProjectionSession",
         triggerDirection: CycleDirection,
         snapshotReadMs: Double,
@@ -70,10 +70,10 @@ extension LiveSwitcherModel {
         )
     }
 
-    func logLoadSnapshotReady(
+    func logLoadAppSwitcherProjectionSessionReady(
         event: String = "loadAppSwitcherProjectionSession",
         triggerDirection: CycleDirection,
-        snapshot: RuntimeSnapshot,
+        payload: AppSwitcherProjectionSessionPayload,
         snapshotReadMs: Double,
         recencyAppliedMs: Double,
         sessionReadyMs: Double,
@@ -88,8 +88,8 @@ extension LiveSwitcherModel {
                 fields: [
                     ("result", "ready"),
                     ("trigger", triggerDirection.debugName),
-                    ("apps", "\(snapshot.apps.count)"),
-                    ("windows", "\(snapshot.apps.reduce(0) { $0 + $1.windows.count })"),
+                    ("apps", "\(payload.apps.count)"),
+                    ("windows", "\(payload.windowCount)"),
                     ("snapshotMs", Self.formatMilliseconds(snapshotReadMs - startMs)),
                     ("recencyMs", Self.formatMilliseconds(recencyAppliedMs - snapshotReadMs)),
                     ("sessionBuildMs", Self.formatMilliseconds(sessionReadyMs - recencyAppliedMs)),
@@ -160,15 +160,19 @@ extension LiveSwitcherModel {
         }
     }
 
-    func logReadAppSwitcherProjectionSnapshot(source: String, snapshot: RuntimeSnapshot, durationMs: Double) {
+    func logReadAppSwitcherProjectionPayload(
+        source: String,
+        payload: AppSwitcherProjectionSessionPayload,
+        durationMs: Double
+    ) {
         RuntimeLog.debug(
             "Snapshot",
             Self.snapshotLogLine(
-                "readAppSwitcherProjectionSnapshot",
+                "readAppSwitcherProjectionPayload",
                 fields: [
                     ("source", source),
-                    ("apps", "\(snapshot.apps.count)"),
-                    ("windows", "\(snapshot.apps.reduce(0) { $0 + $1.windows.count })"),
+                    ("apps", "\(payload.apps.count)"),
+                    ("windows", "\(payload.windowCount)"),
                     ("durationMs", Self.formatMilliseconds(durationMs))
                 ]
             )

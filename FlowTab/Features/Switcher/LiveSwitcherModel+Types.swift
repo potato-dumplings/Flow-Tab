@@ -101,3 +101,33 @@ struct SearchHeaderHighlightItem {
     let title: String
     let icon: NSImage?
 }
+
+struct AppSwitcherProjectionSessionPayload {
+    let apps: [AppSwitchCandidate]
+    let contextsByID: [String: RuntimeAppContext]
+
+    var windowCount: Int {
+        apps.reduce(0) { $0 + $1.windows.count }
+    }
+
+    init(apps: [AppSwitchCandidate], contextsByID: [String: RuntimeAppContext]) {
+        self.apps = apps
+        self.contextsByID = contextsByID
+    }
+
+    init(projection: RuntimeAppSwitcherProjection) {
+        self.init(
+            apps: projection.appCycleApps,
+            contextsByID: projection.contextsByID
+        )
+    }
+
+#if DEBUG
+    init(testingSnapshot snapshot: RuntimeSnapshot) {
+        self.init(
+            apps: snapshot.apps,
+            contextsByID: snapshot.contextsByID
+        )
+    }
+#endif
+}

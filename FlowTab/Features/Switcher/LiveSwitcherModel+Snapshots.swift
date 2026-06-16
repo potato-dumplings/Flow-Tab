@@ -12,10 +12,10 @@ extension LiveSwitcherModel {
         let startMs = Self.monotonicMilliseconds()
         let previousSearchState = preserveSearchState ? searchViewState : .inactive
         cancelPendingSearchComputation()
-        let rawSnapshot = readAppSwitcherProjectionSnapshot()
+        let payload = readAppSwitcherProjectionSessionPayload()
         let snapshotReadMs = Self.monotonicMilliseconds()
-        return applyAppSwitcherProjectionSnapshot(
-            rawSnapshot,
+        return applyAppSwitcherProjectionPayload(
+            payload,
             triggerDirection: triggerDirection,
             preferredSelectedAppID: preferredSelectedAppID,
             previousSearchState: previousSearchState,
@@ -32,10 +32,10 @@ extension LiveSwitcherModel {
     ) -> Bool {
         let startMs = Self.monotonicMilliseconds()
         cancelPendingSearchComputation()
-        let rawSnapshot = readFastAppSwitcherProjectionSnapshot()
+        let payload = readFastAppSwitcherProjectionSessionPayload()
         let snapshotReadMs = Self.monotonicMilliseconds()
-        return applyAppSwitcherProjectionSnapshot(
-            rawSnapshot,
+        return applyAppSwitcherProjectionPayload(
+            payload,
             triggerDirection: triggerDirection,
             preferredSelectedAppID: preferredSelectedAppID,
             previousSearchState: .inactive,
@@ -47,8 +47,8 @@ extension LiveSwitcherModel {
     }
 
     @discardableResult
-    func applyAppSwitcherProjectionSnapshot(
-        _ rawSnapshot: RuntimeSnapshot,
+    func applyAppSwitcherProjectionPayload(
+        _ rawPayload: AppSwitcherProjectionSessionPayload,
         triggerDirection: CycleDirection,
         preferredSelectedAppID: String?,
         previousSearchState: SwitcherSearchViewState,
@@ -57,12 +57,12 @@ extension LiveSwitcherModel {
         logEvent: String,
         resetWhenEmpty: Bool
     ) -> Bool {
-        let snapshot = snapshotWithHiddenAppsFiltered(
-            snapshotWithWindowRecencyApplied(rawSnapshot)
+        let payload = appSwitcherPayloadWithHiddenAppsFiltered(
+            appSwitcherPayloadWithWindowRecencyApplied(rawPayload)
         )
         let recencyAppliedMs = Self.monotonicMilliseconds()
-        guard !snapshot.apps.isEmpty else {
-            logLoadSnapshotEmpty(
+        guard !payload.apps.isEmpty else {
+            logLoadAppSwitcherProjectionSessionEmpty(
                 event: logEvent,
                 triggerDirection: triggerDirection,
                 snapshotReadMs: snapshotReadMs,
@@ -75,12 +75,12 @@ extension LiveSwitcherModel {
             return false
         }
 
-        runtimeContextsByID = snapshot.contextsByID
+        runtimeContextsByID = payload.contextsByID
         clearPreviewSnapshotState()
         autoEnterSuppressedAppID = nil
         let preferences = SwitcherBehaviorPreferencesStore.loadSwitcherPreferences()
         var rebuiltSession = SwitcherSession(
-            apps: snapshot.apps,
+            apps: payload.apps,
             preferences: preferences,
             triggerDirection: triggerDirection,
             rememberedWindowIDByAppID: rememberedWindowIDByAppID
@@ -121,10 +121,10 @@ extension LiveSwitcherModel {
         restoreSearchStateAfterSnapshotRefreshIfNeeded(previousSearchState)
         publishSearchStateIfNeeded()
         let completeMs = Self.monotonicMilliseconds()
-        logLoadSnapshotReady(
+        logLoadAppSwitcherProjectionSessionReady(
             event: logEvent,
             triggerDirection: triggerDirection,
-            snapshot: snapshot,
+            payload: payload,
             snapshotReadMs: snapshotReadMs,
             recencyAppliedMs: recencyAppliedMs,
             sessionReadyMs: sessionReadyMs,
@@ -361,47 +361,47 @@ extension LiveSwitcherModel {
         RuntimeLog.debug(.snapshot, record.logMessage)
     }
 
-    func readAppSwitcherProjectionSnapshot() -> RuntimeSnapshot {
+    func readAppSwitcherProjectionSessionPayload() -> AppSwitcherProjectionSessionPayload {
         let startMs = Self.monotonicMilliseconds()
         let source: String
-        let snapshot: RuntimeSnapshot
-        if let testingSnapshot = makeTestingSnapshotOverride() {
-            source = "testingOverride"
-            snapshot = testingSnapshot
+        let payload: AppSwitcherProjectionSessionPayload
+        if let testingPayload = makeTestingProjectionPayloadOverride() {
+            source = testingPayload.source
+            payload = testingPayload.payload
         } else if let projection = runtimeSnapshotService.readAppSwitcherProjection() {
             source = projection.freshness.isCompleteForScope
                 ? "runtimeProjection"
                 : "runtimeProjectionDirty"
-            snapshot = projection.appCycleSnapshot
+            payload = AppSwitcherProjectionSessionPayload(projection: projection)
         } else {
             runtimeSnapshotService.requestAppSwitcherProjectionMaintenance(reason: .appLifecycleRefresh)
             source = "runtimeProjectionMissing"
-            snapshot = RuntimeSnapshot(apps: [], contextsByID: [:])
+            payload = AppSwitcherProjectionSessionPayload(apps: [], contextsByID: [:])
         }
         let durationMs = Self.monotonicMilliseconds() - startMs
-        logReadAppSwitcherProjectionSnapshot(source: source, snapshot: snapshot, durationMs: durationMs)
-        return snapshot
+        logReadAppSwitcherProjectionPayload(source: source, payload: payload, durationMs: durationMs)
+        return payload
     }
 
-    func readFastAppSwitcherProjectionSnapshot() -> RuntimeSnapshot {
+    func readFastAppSwitcherProjectionSessionPayload() -> AppSwitcherProjectionSessionPayload {
         let startMs = Self.monotonicMilliseconds()
         let source: String
-        let snapshot: RuntimeSnapshot
-        if let testingSnapshot = makeTestingFastAppSnapshotOverride() {
-            source = testingSnapshot.source
-            snapshot = testingSnapshot.snapshot
+        let payload: AppSwitcherProjectionSessionPayload
+        if let testingPayload = makeTestingFastProjectionPayloadOverride() {
+            source = testingPayload.source
+            payload = testingPayload.payload
         } else if let projection = runtimeSnapshotService.readAppSwitcherProjection() {
             source = projection.freshness.isCompleteForScope
                 ? "runtimeProjection"
                 : "runtimeProjectionDirty"
-            snapshot = projection.appCycleSnapshot
+            payload = AppSwitcherProjectionSessionPayload(projection: projection)
         } else {
             source = "runtimeProjectionMissing"
-            snapshot = RuntimeSnapshot(apps: [], contextsByID: [:])
+            payload = AppSwitcherProjectionSessionPayload(apps: [], contextsByID: [:])
         }
         let durationMs = Self.monotonicMilliseconds() - startMs
-        logReadAppSwitcherProjectionSnapshot(source: source, snapshot: snapshot, durationMs: durationMs)
-        return snapshot
+        logReadAppSwitcherProjectionPayload(source: source, payload: payload, durationMs: durationMs)
+        return payload
     }
 
     var hasTestingSnapshotProviderOverride: Bool {
@@ -412,21 +412,31 @@ extension LiveSwitcherModel {
 #endif
     }
 
-    func makeTestingSnapshotOverride() -> RuntimeSnapshot? {
+    func makeTestingProjectionPayloadOverride() -> (source: String, payload: AppSwitcherProjectionSessionPayload)? {
 #if DEBUG
-        testingSnapshotProviderOverride?()
+        guard let testingSnapshotProviderOverride else { return nil }
+        return (
+            "testingOverride",
+            AppSwitcherProjectionSessionPayload(testingSnapshot: testingSnapshotProviderOverride())
+        )
 #else
         nil
 #endif
     }
 
-    func makeTestingFastAppSnapshotOverride() -> (source: String, snapshot: RuntimeSnapshot)? {
+    func makeTestingFastProjectionPayloadOverride() -> (source: String, payload: AppSwitcherProjectionSessionPayload)? {
 #if DEBUG
         if let testingFastAppSnapshotProviderOverride {
-            return ("testingFastOverride", testingFastAppSnapshotProviderOverride())
+            return (
+                "testingFastOverride",
+                AppSwitcherProjectionSessionPayload(testingSnapshot: testingFastAppSnapshotProviderOverride())
+            )
         }
         if let testingSnapshotProviderOverride {
-            return ("testingOverride", testingSnapshotProviderOverride())
+            return (
+                "testingOverride",
+                AppSwitcherProjectionSessionPayload(testingSnapshot: testingSnapshotProviderOverride())
+            )
         }
         return nil
 #else

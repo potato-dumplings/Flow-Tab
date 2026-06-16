@@ -412,12 +412,12 @@ final class LiveSwitcherModel: ObservableObject {
         var resolvedContext: RuntimeAppContext?
 
         if hasTestingSnapshotProviderOverride {
-            let rawSnapshot = readAppSwitcherProjectionSnapshot()
+            let rawPayload = readAppSwitcherProjectionSessionPayload()
             snapshotReadMs = Self.monotonicMilliseconds()
-            let snapshot = snapshotWithWindowRecencyApplied(rawSnapshot)
+            let payload = appSwitcherPayloadWithWindowRecencyApplied(rawPayload)
             recencyAppliedMs = Self.monotonicMilliseconds()
-            resolvedAppCandidate = snapshot.apps.first(where: { $0.id == frontmostAppID })
-            resolvedContext = snapshot.contextsByID[frontmostAppID]
+            resolvedAppCandidate = payload.apps.first(where: { $0.id == frontmostAppID })
+            resolvedContext = payload.contextsByID[frontmostAppID]
         } else if let projection = runtimeSnapshotService.readCurrentAppWindowProjection(appID: frontmostAppID) {
             snapshotReadMs = Self.monotonicMilliseconds()
             let snapshot = homeSnapshotWithWindowRecencyApplied(
@@ -896,8 +896,16 @@ final class LiveSwitcherModel: ObservableObject {
         pendingTerminateRefreshTask = nil
     }
 
-    func snapshotWithWindowRecencyApplied(_ snapshot: RuntimeSnapshot) -> RuntimeSnapshot {
-        return windowRecencyTracker.snapshotWithRecencyApplied(snapshot)
+    func appSwitcherPayloadWithWindowRecencyApplied(
+        _ payload: AppSwitcherProjectionSessionPayload
+    ) -> AppSwitcherProjectionSessionPayload {
+        AppSwitcherProjectionSessionPayload(
+            apps: windowRecencyTracker.appsWithRecencyApplied(
+                payload.apps,
+                contextsByID: payload.contextsByID
+            ),
+            contextsByID: payload.contextsByID
+        )
     }
 
     private func homeSnapshotWithWindowRecencyApplied(
