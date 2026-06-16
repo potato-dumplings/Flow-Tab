@@ -11,9 +11,9 @@ enum RuntimeProjectionMaintenanceReason: String, Sendable {
 
 protocol RuntimeSnapshotServing: Sendable {
     func fallbackRuntimeSnapshot() -> RuntimeSnapshot
-    func homeAppSummaries() async -> [RuntimeHomeAppSummary]
-    func homeAppSummary(for appID: String) async -> RuntimeHomeAppSummary?
-    func homeAppSnapshot(for appID: String) async -> RuntimeHomeAppSnapshot?
+    func fallbackHomeAppSummaries() async -> [RuntimeHomeAppSummary]
+    func fallbackHomeAppSummary(for appID: String) async -> RuntimeHomeAppSummary?
+    func fallbackHomeAppSnapshot(for appID: String) async -> RuntimeHomeAppSnapshot?
     func readAppSwitcherProjection() -> RuntimeAppSwitcherProjection?
     func readHomeSummaryProjection() -> RuntimeHomeSummaryProjection?
     func readCurrentAppWindowProjection(appID: String) -> RuntimeCurrentAppWindowProjection?
@@ -99,7 +99,7 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
         }
     }
 
-    func homeAppSummaries() async -> [RuntimeHomeAppSummary] {
+    func fallbackHomeAppSummaries() async -> [RuntimeHomeAppSummary] {
         await withCheckedContinuation { continuation in
             snapshotQueue.async { [self] in
                 let summaries = snapshotProvider.homeAppSummaries()
@@ -109,7 +109,7 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
         }
     }
 
-    func homeAppSummary(for appID: String) async -> RuntimeHomeAppSummary? {
+    func fallbackHomeAppSummary(for appID: String) async -> RuntimeHomeAppSummary? {
         await withCheckedContinuation { continuation in
             snapshotQueue.async { [self] in
                 let summary = snapshotProvider.homeAppSummary(for: appID)
@@ -121,7 +121,7 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
         }
     }
 
-    func homeAppSnapshot(for appID: String) async -> RuntimeHomeAppSnapshot? {
+    func fallbackHomeAppSnapshot(for appID: String) async -> RuntimeHomeAppSnapshot? {
         await withCheckedContinuation { continuation in
             snapshotQueue.async { [self] in
                 let snapshot = snapshotProvider.homeAppSnapshot(for: appID)

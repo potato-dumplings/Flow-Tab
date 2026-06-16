@@ -269,21 +269,21 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
         return RuntimeSnapshot(apps: [], contextsByID: [:])
     }
 
-    func homeAppSummaries() async -> [RuntimeHomeAppSummary] {
+    func fallbackHomeAppSummaries() async -> [RuntimeHomeAppSummary] {
         lock.lock()
         homeSummariesRequests += 1
         lock.unlock()
         return homeSnapshotsByAppID.values.map(\.summary)
     }
 
-    func homeAppSummary(for appID: String) async -> RuntimeHomeAppSummary? {
+    func fallbackHomeAppSummary(for appID: String) async -> RuntimeHomeAppSummary? {
         lock.lock()
         homeSummaryRequests += 1
         lock.unlock()
         return homeSnapshotsByAppID[appID]?.summary
     }
 
-    func homeAppSnapshot(for appID: String) async -> RuntimeHomeAppSnapshot? {
+    func fallbackHomeAppSnapshot(for appID: String) async -> RuntimeHomeAppSnapshot? {
         lock.lock()
         requestedHomeAppIDs.append(appID)
         lock.unlock()

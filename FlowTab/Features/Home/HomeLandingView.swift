@@ -774,7 +774,7 @@ struct HomeLandingView: View {
         if let summaries = HomeRuntimeProjectionReader.appSummaries(from: runtimeSnapshotService) {
             return summaries
         }
-        return await runtimeSnapshotService.homeAppSummaries()
+        return await runtimeSnapshotService.fallbackHomeAppSummaries()
     }
 
     private func setupWindowMonitorIfCountsReady() {
@@ -794,14 +794,14 @@ struct HomeLandingView: View {
         if let summary = HomeRuntimeProjectionReader.appSummary(for: appID, from: runtimeSnapshotService) {
             return summary
         }
-        return await runtimeSnapshotService.homeAppSummary(for: appID)
+        return await runtimeSnapshotService.fallbackHomeAppSummary(for: appID)
     }
 
     private func fetchHomeAppSnapshotOnBackground(appID: String) async -> RuntimeHomeAppSnapshot? {
         if let snapshot = HomeRuntimeProjectionReader.appSnapshot(for: appID, from: runtimeSnapshotService) {
             return snapshot
         }
-        return await runtimeSnapshotService.homeAppSnapshot(for: appID)
+        return await runtimeSnapshotService.fallbackHomeAppSnapshot(for: appID)
     }
 
     private func syncSelectedApp() {

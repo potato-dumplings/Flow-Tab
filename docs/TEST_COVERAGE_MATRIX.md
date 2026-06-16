@@ -65,6 +65,7 @@ No high-value cross-layer gaps are currently tracked here.
 - 2026-06-16 Phase 5: Switcher terminate refresh now prefers `RuntimeAppSwitcherProjection` before the full snapshot bridge. `testHandleApplicationTerminatedRefreshesFromRuntimeProjectionWithoutFullSnapshot` proves post-termination session refresh can remove the terminated app from projection while recording zero full/lightweight snapshot calls.
 - 2026-06-16 Phase 5: the surface-facing runtime service API now names the full snapshot bridge `fallbackRuntimeSnapshot()`, keeping `RuntimeSnapshotProvider.snapshot()` as the provider repair primitive while preventing feature code from treating a full snapshot as a normal read-model API.
 - 2026-06-16 Phase 5: `RuntimeSnapshotServing` no longer exposes the synchronous lightweight app snapshot bridge; the remaining concrete service entry is `fallbackLightweightAppSnapshot()` for repair/test compatibility, while feature surfaces use projection reads or maintenance signals.
+- 2026-06-16 Phase 5: Home's service-facing provider-backed refresh methods are now named `fallbackHomeAppSummaries()`, `fallbackHomeAppSummary(for:)`, and `fallbackHomeAppSnapshot(for:)`; Home still reads projections first and reaches these bridges only as projection-missing repair/fallback refreshes.
 
 ## Maintenance Rules
 

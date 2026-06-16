@@ -243,7 +243,7 @@ extension FlowTabTests {
                 windowRecencyTracker: tracker
             )
 
-            let orderedSnapshot = await service.homeAppSnapshot(for: appID)
+            let orderedSnapshot = await service.fallbackHomeAppSnapshot(for: appID)
 
             XCTAssertEqual(
                 orderedSnapshot?.candidate.windows.map(\.id),
