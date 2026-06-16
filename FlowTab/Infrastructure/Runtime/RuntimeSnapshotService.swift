@@ -62,59 +62,19 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
 
     private let snapshotQueue: DispatchQueue
     private let snapshotProvider: RuntimeSnapshotProvider
-    private let windowRecencyTracker: RuntimeWindowRecencyTracker
     private let readModelStore: RuntimeReadModelStore
     private let reconciliationExecutor: ReconciliationExecutor
 
     init(
         label: String = "FlowTab.RuntimeSnapshotService",
         snapshotProvider: RuntimeSnapshotProvider = RuntimeSnapshotProvider(),
-        windowRecencyTracker: RuntimeWindowRecencyTracker = .shared,
         readModelStore: RuntimeReadModelStore = RuntimeReadModelStore(),
         reconciliationExecutor: @escaping ReconciliationExecutor = RuntimeSnapshotService.defaultReconciliationExecutor
     ) {
         snapshotQueue = DispatchQueue(label: label, qos: .utility)
         self.snapshotProvider = snapshotProvider
-        self.windowRecencyTracker = windowRecencyTracker
         self.readModelStore = readModelStore
         self.reconciliationExecutor = reconciliationExecutor
-    }
-
-    func fallbackHomeAppSummaries() async -> [RuntimeHomeAppSummary] {
-        await withCheckedContinuation { continuation in
-            snapshotQueue.async { [self] in
-                let summaries = snapshotProvider.homeAppSummaries()
-                readModelStore.commitHomeSummaries(summaries)
-                continuation.resume(returning: summaries)
-            }
-        }
-    }
-
-    func fallbackHomeAppSummary(for appID: String) async -> RuntimeHomeAppSummary? {
-        await withCheckedContinuation { continuation in
-            snapshotQueue.async { [self] in
-                let summary = snapshotProvider.homeAppSummary(for: appID)
-                if let summary {
-                    readModelStore.commitHomeSummary(summary)
-                }
-                continuation.resume(returning: summary)
-            }
-        }
-    }
-
-    func fallbackHomeAppSnapshot(for appID: String) async -> RuntimeHomeAppSnapshot? {
-        await withCheckedContinuation { continuation in
-            snapshotQueue.async { [self] in
-                let snapshot = snapshotProvider.homeAppSnapshot(for: appID)
-                    .map(windowRecencyTracker.homeSnapshotWithRecencyApplied)
-                if let snapshot {
-                    readModelStore.commitCurrentAppWindowSnapshot(snapshot)
-                }
-                continuation.resume(
-                    returning: snapshot
-                )
-            }
-        }
     }
 
     func readAppSwitcherProjection() -> RuntimeAppSwitcherProjection? {

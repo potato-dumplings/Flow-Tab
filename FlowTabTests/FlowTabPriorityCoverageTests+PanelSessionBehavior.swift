@@ -473,26 +473,7 @@ extension FlowTabPriorityCoverageTests {
             WindowCandidate(id: "contaminated-home-window-1", title: "Home One", isMinimized: false, lastActiveAt: 20),
             WindowCandidate(id: "contaminated-home-window-2", title: "Home Two", isMinimized: false, lastActiveAt: 10)
         ]
-        let windowCandidate = AppSwitchCandidate(
-            id: appID,
-            displayName: "Contaminated Home Snapshot",
-            groupID: "contaminated-home-snapshot",
-            lastActiveAt: 100,
-            windows: windows
-        )
         let context = makeRuntimeAppContext(appID: appID, runningApp: runningApp, windows: windows)
-        let selectedSnapshot = RuntimeHomeAppSnapshot(
-            summary: RuntimeHomeAppSummary(
-                appID: appID,
-                displayName: "Contaminated Home Snapshot",
-                groupID: "contaminated-home-snapshot",
-                lastActiveAt: 100,
-                windowCount: windows.count,
-                pid: runningApp.processIdentifier
-            ),
-            candidate: windowCandidate,
-            context: context
-        )
         let freshness = RuntimeProjectionFreshness(
             generatedAt: 12,
             sourceGeneration: RuntimeReadModelGeneration(projection: 1),
@@ -503,7 +484,6 @@ extension FlowTabPriorityCoverageTests {
             isCompleteForScope: true
         )
         let snapshotService = RecordingRuntimeSnapshotService(
-            homeSnapshotsByAppID: [appID: selectedSnapshot],
             appSwitcherProjection: RuntimeAppSwitcherProjection(
                 apps: [appOnlyCandidate],
                 contextsByID: [appID: context],

@@ -150,7 +150,6 @@ extension FlowTabTests {
             isCompleteForScope: true
         )
         let snapshotService = RecordingRuntimeSnapshotService(
-            homeSnapshotsByAppID: [appID: contaminatedSnapshot],
             homeSummaryProjection: RuntimeHomeSummaryProjection(
                 summaries: [contaminatedSnapshot.summary],
                 freshness: freshness
@@ -214,7 +213,7 @@ extension FlowTabTests {
         )
     }
 
-    func testHomeRuntimeSnapshotServiceAppliesWindowRecencyToHomeCandidates() async {
+    func testRuntimeWindowRecencyTrackerAppliesToProviderHomeSnapshot() async {
         await withLaunchArgumentsForTesting(["FlowTab", "--flowtab-ui-mock-runtime"]) {
             let tracker = RuntimeWindowRecencyTracker()
             let provider = RuntimeSnapshotProvider()
@@ -238,15 +237,11 @@ extension FlowTabTests {
                 frame: draftWindow.frame,
                 allowedActions: WindowBindingConfidence.exact.allowedActions
             )
-            let service = HomeRuntimeSnapshotService(
-                snapshotProvider: provider,
-                windowRecencyTracker: tracker
-            )
 
-            let orderedSnapshot = await service.fallbackHomeAppSnapshot(for: appID)
+            let orderedSnapshot = tracker.homeSnapshotWithRecencyApplied(baselineSnapshot)
 
             XCTAssertEqual(
-                orderedSnapshot?.candidate.windows.map(\.id),
+                orderedSnapshot.candidate.windows.map(\.id),
                 ["mock-mail-draft", "mock-mail-inbox"]
             )
         }
@@ -419,20 +414,7 @@ extension FlowTabTests {
                 )
             ]
         )
-        let contaminatedSnapshot = makeHomeActivationSnapshot(
-            appID: appID,
-            windows: [
-                WindowCandidate(
-                    id: "fallback-contamination",
-                    title: "Fallback Contamination",
-                    isMinimized: false,
-                    lastActiveAt: 10
-                )
-            ]
-        )
-        let snapshotService = RecordingRuntimeSnapshotService(
-            homeSnapshotsByAppID: [appID: contaminatedSnapshot]
-        )
+        let snapshotService = RecordingRuntimeSnapshotService()
 
         XCTAssertEqual(
             HomeRuntimeRefreshReader.appSummaries(

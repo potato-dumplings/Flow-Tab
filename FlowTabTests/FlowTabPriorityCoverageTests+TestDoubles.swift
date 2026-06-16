@@ -81,15 +81,11 @@ final class SpyMRUTracker: MRUTracking {
 
 final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable {
     private let lock = NSLock()
-    private let homeSnapshotsByAppID: [String: RuntimeHomeAppSnapshot]
     private var appSwitcherProjection: RuntimeAppSwitcherProjection?
     private let homeSummaryProjection: RuntimeHomeSummaryProjection?
     private let currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection]
     private var committedSearchIndexProjection: RuntimeSearchIndexProjection?
-    private var requestedHomeAppIDs: [String] = []
     private var lightweightSnapshotRequests = 0
-    private var homeSummaryRequests = 0
-    private var homeSummariesRequests = 0
     private var appSwitcherMaintenanceRequests: [RuntimeProjectionMaintenanceReason] = []
     private var searchIndexFreshnessBarrierRequests: [RuntimeProjectionMaintenanceReason] = []
     private var spaceTopologyChangeSignals = 0
@@ -100,13 +96,11 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
     private var windowFocusVerificationSignals: [RuntimeWindowFocusVerification] = []
 
     init(
-        homeSnapshotsByAppID: [String: RuntimeHomeAppSnapshot] = [:],
         appSwitcherProjection: RuntimeAppSwitcherProjection? = nil,
         homeSummaryProjection: RuntimeHomeSummaryProjection? = nil,
         currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection] = [:],
         committedSearchIndexProjection: RuntimeSearchIndexProjection? = nil
     ) {
-        self.homeSnapshotsByAppID = homeSnapshotsByAppID
         self.appSwitcherProjection = appSwitcherProjection
         self.homeSummaryProjection = homeSummaryProjection
         self.currentAppWindowProjectionsByAppID = currentAppWindowProjectionsByAppID
@@ -142,9 +136,7 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
     }
 
     func recordedHomeAppIDs() -> [String] {
-        lock.lock()
-        defer { lock.unlock() }
-        return requestedHomeAppIDs
+        []
     }
 
     func snapshotRequestCount() -> Int {
@@ -181,15 +173,11 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
     }
 
     func homeSummariesRequestCount() -> Int {
-        lock.lock()
-        defer { lock.unlock() }
-        return homeSummariesRequests
+        0
     }
 
     func homeSummaryRequestCount() -> Int {
-        lock.lock()
-        defer { lock.unlock() }
-        return homeSummaryRequests
+        0
     }
 
     func appSwitcherMaintenanceRequestsRecorded() -> [RuntimeProjectionMaintenanceReason] {
@@ -250,27 +238,6 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
             generatedAt: generatedAt
         )
         lock.unlock()
-    }
-
-    func fallbackHomeAppSummaries() async -> [RuntimeHomeAppSummary] {
-        lock.lock()
-        homeSummariesRequests += 1
-        lock.unlock()
-        return homeSnapshotsByAppID.values.map(\.summary)
-    }
-
-    func fallbackHomeAppSummary(for appID: String) async -> RuntimeHomeAppSummary? {
-        lock.lock()
-        homeSummaryRequests += 1
-        lock.unlock()
-        return homeSnapshotsByAppID[appID]?.summary
-    }
-
-    func fallbackHomeAppSnapshot(for appID: String) async -> RuntimeHomeAppSnapshot? {
-        lock.lock()
-        requestedHomeAppIDs.append(appID)
-        lock.unlock()
-        return homeSnapshotsByAppID[appID]
     }
 
     func readAppSwitcherProjection() -> RuntimeAppSwitcherProjection? {
