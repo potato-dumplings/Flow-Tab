@@ -181,6 +181,59 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(staleProjection.freshness.pendingRepairScopes, ["appWindows:com.example.browser"])
     }
 
+    func testRuntimeReadModelStoreStagesScopedSearchRepairAndCommitsFreshGeneration() throws {
+        let store = RuntimeReadModelStore()
+        let committedApps = searchScenarioApps()
+        let repairedApp = AppSwitchCandidate(
+            id: "com.example.browser",
+            displayName: "Browser",
+            groupID: "web",
+            lastActiveAt: 320,
+            windows: [
+                WindowCandidate(
+                    id: "browser-2",
+                    title: "Fresh Docs",
+                    isMinimized: false,
+                    lastActiveAt: 320
+                )
+            ]
+        )
+        store.commitAppSwitcherSnapshot(
+            RuntimeSnapshot(apps: committedApps, contextsByID: [:]),
+            generatedAt: 10
+        )
+        store.markAppWindowsDirty(
+            appID: repairedApp.id,
+            pid: 42_101,
+            pendingScope: "appWindows:\(repairedApp.id)"
+        )
+
+        let staged = try XCTUnwrap(
+            store.stageSearchIndexAppSnapshot(
+                makeRuntimeHomeAppSnapshot(app: repairedApp, pid: 42_101),
+                generatedAt: 20
+            )
+        )
+        XCTAssertEqual(staged.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID), ["browser-2"])
+        XCTAssertEqual(store.readCommittedSearchIndexForSearch().readiness, .stale)
+        XCTAssertEqual(
+            store.readCommittedSearchIndexProjection()?.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),
+            ["browser-1"]
+        )
+
+        let committed = try XCTUnwrap(store.commitStagedSearchIndex(generatedAt: 21))
+
+        XCTAssertTrue(committed.freshness.isCompleteForScope)
+        XCTAssertEqual(store.readCommittedSearchIndexForSearch().readiness, .ready)
+        XCTAssertEqual(
+            store.readCommittedSearchIndexProjection()?.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),
+            ["browser-2"]
+        )
+        let diagnostics = store.diagnostics()
+        XCTAssertTrue(diagnostics.dirtyAppIDs.isEmpty)
+        XCTAssertFalse(diagnostics.hasStagingSearchIndex)
+    }
+
     func testRuntimeReconciliationCoordinatorMarksSpaceTopologyAffectedWindows() {
         let coordinator = RuntimeReconciliationCoordinator()
         let previous = RuntimeSpaceTopologySnapshot(
@@ -1065,5 +1118,159 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(executedRequests.map(\.id), [highPriority.id, lowPriority.id])
         XCTAssertEqual(executedRequests.map(\.priority), [.high, .low])
         XCTAssertTrue(coordinator.readyRequests(now: 11).isEmpty)
+    }
+
+    func testRuntimeSnapshotServiceSearchFreshnessBarrierCommitsRepairedSearchGeneration() throws {
+        let coordinator = RuntimeReconciliationCoordinator()
+        let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
+        let store = RuntimeReadModelStore()
+        let committedApps = searchScenarioApps()
+        let repairedApp = AppSwitchCandidate(
+            id: "com.example.browser",
+            displayName: "Browser",
+            groupID: "web",
+            lastActiveAt: 320,
+            windows: [
+                WindowCandidate(
+                    id: "browser-fresh",
+                    title: "Fresh Runtime Docs",
+                    isMinimized: false,
+                    lastActiveAt: 320
+                )
+            ]
+        )
+        let pid = pid_t(42_102)
+        store.commitAppSwitcherSnapshot(
+            RuntimeSnapshot(apps: committedApps, contextsByID: [:]),
+            generatedAt: 10
+        )
+        store.markAppWindowsDirty(
+            appID: repairedApp.id,
+            pid: pid,
+            pendingScope: "appWindows:\(repairedApp.id)"
+        )
+        coordinator.markAppDirty(
+            appID: repairedApp.id,
+            pid: pid,
+            reason: .axNotification,
+            now: 10
+        )
+        let expectation = expectation(description: "search freshness barrier commits repaired index")
+        let service = RuntimeSnapshotService(
+            label: "FlowTabTests.RuntimeSnapshotService.SearchFreshnessBarrierCommit",
+            snapshotProvider: provider,
+            readModelStore: store,
+            reconciliationExecutor: { _, _ in
+                expectation.fulfill()
+                return .completedWithRepairedSnapshots([
+                    self.makeRuntimeHomeAppSnapshot(app: repairedApp, pid: pid)
+                ])
+            }
+        )
+
+        XCTAssertEqual(store.readCommittedSearchIndexForSearch().readiness, .stale)
+        service.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
+        wait(for: [expectation], timeout: 1)
+        _ = service.drainReadyReconciliationRequestsSynchronouslyForTesting(now: 11)
+
+        let read = store.readCommittedSearchIndexForSearch()
+        let projection = try XCTUnwrap(read.projection)
+        XCTAssertEqual(read.readiness, .ready)
+        XCTAssertEqual(
+            projection.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),
+            ["browser-fresh"]
+        )
+        let diagnostics = store.diagnostics()
+        XCTAssertTrue(diagnostics.dirtyAppIDs.isEmpty)
+        XCTAssertFalse(diagnostics.hasStagingSearchIndex)
+    }
+
+    func testRuntimeSnapshotServiceSearchFreshnessBarrierKeepsCommittedIndexStaleWhenRepairDefers() throws {
+        let coordinator = RuntimeReconciliationCoordinator(
+            retryPolicy: RuntimeReconciliationRetryPolicy(delays: [0.5])
+        )
+        let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
+        let store = RuntimeReadModelStore()
+        let committedApps = searchScenarioApps()
+        let repairedApp = AppSwitchCandidate(
+            id: "com.example.browser",
+            displayName: "Browser",
+            groupID: "web",
+            lastActiveAt: 320,
+            windows: [
+                WindowCandidate(
+                    id: "browser-deferred",
+                    title: "Deferred Runtime Docs",
+                    isMinimized: false,
+                    lastActiveAt: 320
+                )
+            ]
+        )
+        let pid = pid_t(42_103)
+        store.commitAppSwitcherSnapshot(
+            RuntimeSnapshot(apps: committedApps, contextsByID: [:]),
+            generatedAt: 10
+        )
+        store.markAppWindowsDirty(
+            appID: repairedApp.id,
+            pid: pid,
+            pendingScope: "appWindows:\(repairedApp.id)"
+        )
+        store.stageSearchIndexAppSnapshot(
+            makeRuntimeHomeAppSnapshot(app: repairedApp, pid: pid),
+            generatedAt: 20
+        )
+        coordinator.markAppDirty(
+            appID: repairedApp.id,
+            pid: pid,
+            reason: .axNotification,
+            now: 10
+        )
+        let expectation = expectation(description: "search freshness barrier defers repair")
+        let service = RuntimeSnapshotService(
+            label: "FlowTabTests.RuntimeSnapshotService.SearchFreshnessBarrierDeferred",
+            snapshotProvider: provider,
+            readModelStore: store,
+            reconciliationExecutor: { _, _ in
+                expectation.fulfill()
+                return .transientEmptyAXSnapshot
+            }
+        )
+
+        service.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
+        wait(for: [expectation], timeout: 1)
+        _ = service.drainReadyReconciliationRequestsSynchronouslyForTesting(now: 10.1)
+
+        let read = store.readCommittedSearchIndexForSearch()
+        let projection = try XCTUnwrap(read.projection)
+        XCTAssertEqual(read.readiness, .stale)
+        XCTAssertEqual(
+            projection.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),
+            ["browser-1"]
+        )
+        XCTAssertTrue(store.diagnostics().hasStagingSearchIndex)
+        XCTAssertTrue(coordinator.readyRequests(now: 10.49).isEmpty)
+    }
+
+    private func makeRuntimeHomeAppSnapshot(
+        app: AppSwitchCandidate,
+        pid: pid_t
+    ) -> RuntimeHomeAppSnapshot {
+        RuntimeHomeAppSnapshot(
+            summary: RuntimeHomeAppSummary(
+                appID: app.id,
+                displayName: app.displayName,
+                groupID: app.groupID,
+                lastActiveAt: app.lastActiveAt,
+                windowCount: app.windows.count,
+                pid: pid
+            ),
+            candidate: app,
+            context: makeRuntimeAppContext(
+                appID: app.id,
+                runningApp: .current,
+                windows: app.windows
+            )
+        )
     }
 }

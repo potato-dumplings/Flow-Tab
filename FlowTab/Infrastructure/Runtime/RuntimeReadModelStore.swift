@@ -229,6 +229,39 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     }
 
     @discardableResult
+    func stageSearchIndexAppSnapshot(
+        _ snapshot: RuntimeHomeAppSnapshot,
+        generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
+    ) -> RuntimeSearchIndexProjection? {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard let base = stagingSearchIndex ?? committedSearchIndex else { return nil }
+        let appEntry = buildSearchAppIndexEntryLocked(app: snapshot.candidate)
+        let windowEntries = buildSearchWindowIndexEntriesLocked(
+            app: snapshot.candidate,
+            appSearchIndex: appEntry.searchIndex
+        )
+        var appEntries = base.appEntries
+        if let index = appEntries.firstIndex(where: { $0.appID == snapshot.summary.appID }) {
+            appEntries[index] = appEntry
+        } else {
+            appEntries.append(appEntry)
+        }
+        let mergedWindowEntries = base.windowEntries.filter { $0.appID != snapshot.summary.appID }
+            + windowEntries
+        stagingSearchIndex = RuntimeSearchIndexProjection(
+            appEntries: appEntries,
+            windowEntries: mergedWindowEntries,
+            freshness: freshnessLocked(
+                generatedAt: generatedAt,
+                isCompleteForScope: false
+            )
+        )
+        return stagingSearchIndex
+    }
+
+    @discardableResult
     func commitStagedSearchIndex(
         clearsDirtyState: Bool = true,
         generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
@@ -444,27 +477,15 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         generatedAt: TimeInterval,
         isCompleteForScope: Bool
     ) -> RuntimeSearchIndexProjection {
-        let appEntries = apps.map { app in
-            RuntimeSearchAppIndexEntry(
-                appID: app.id,
-                appDisplayName: app.displayName,
-                searchIndex: SearchTextMatcher.buildIndex(for: app.displayName, identifier: app.id)
-            )
-        }
+        let appEntries = apps.map(buildSearchAppIndexEntryLocked)
         let appSearchIndexes = Dictionary(uniqueKeysWithValues: appEntries.map { ($0.appID, $0.searchIndex) })
-        let windowEntries = apps.flatMap { app in
+        let windowEntries = apps.flatMap { app -> [RuntimeSearchWindowIndexEntry] in
             let appSearchIndex = appSearchIndexes[app.id]
                 ?? SearchTextMatcher.buildIndex(for: app.displayName, identifier: app.id)
-            return app.windows.map { window in
-                RuntimeSearchWindowIndexEntry(
-                    appID: app.id,
-                    appDisplayName: app.displayName,
-                    windowID: window.id,
-                    windowTitle: window.title.trimmingCharacters(in: .whitespacesAndNewlines),
-                    windowSearchIndex: SearchTextMatcher.buildIndex(for: window.title),
-                    appSearchIndex: appSearchIndex
-                )
-            }
+            return buildSearchWindowIndexEntriesLocked(
+                app: app,
+                appSearchIndex: appSearchIndex
+            )
         }
         return RuntimeSearchIndexProjection(
             appEntries: appEntries,
@@ -474,5 +495,29 @@ final class RuntimeReadModelStore: @unchecked Sendable {
                 isCompleteForScope: isCompleteForScope && !isDirtyLocked
             )
         )
+    }
+
+    private func buildSearchAppIndexEntryLocked(app: AppSwitchCandidate) -> RuntimeSearchAppIndexEntry {
+        RuntimeSearchAppIndexEntry(
+            appID: app.id,
+            appDisplayName: app.displayName,
+            searchIndex: SearchTextMatcher.buildIndex(for: app.displayName, identifier: app.id)
+        )
+    }
+
+    private func buildSearchWindowIndexEntriesLocked(
+        app: AppSwitchCandidate,
+        appSearchIndex: SearchTextMatcher.Index
+    ) -> [RuntimeSearchWindowIndexEntry] {
+        app.windows.map { window in
+            RuntimeSearchWindowIndexEntry(
+                appID: app.id,
+                appDisplayName: app.displayName,
+                windowID: window.id,
+                windowTitle: window.title.trimmingCharacters(in: .whitespacesAndNewlines),
+                windowSearchIndex: SearchTextMatcher.buildIndex(for: window.title),
+                appSearchIndex: appSearchIndex
+            )
+        }
     }
 }

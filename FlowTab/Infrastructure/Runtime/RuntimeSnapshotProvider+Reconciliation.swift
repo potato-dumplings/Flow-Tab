@@ -7,11 +7,12 @@ struct RuntimeAffectedWindowReconciliationTarget: Equatable {
     let affectedCGWindowIDs: Set<CGWindowID>
 }
 
-struct RuntimeAppWindowReconciliationResult: Equatable {
+struct RuntimeAppWindowReconciliationResult {
     let pid: pid_t
     let affectedCGWindowIDs: Set<CGWindowID>
     let knownAffectedCGWindowIDs: Set<CGWindowID>
     let exactAffectedCGWindowIDs: Set<CGWindowID>
+    let snapshot: RuntimeHomeAppSnapshot?
     let snapshotWasEmpty: Bool
     let isTransientEmptyAXSnapshot: Bool
 }
@@ -111,6 +112,7 @@ extension RuntimeSnapshotProvider {
             affectedCGWindowIDs: affectedCGWindowIDs,
             knownAffectedCGWindowIDs: knownAffectedCGWindowIDs,
             exactAffectedCGWindowIDs: exactAffectedCGWindowIDs,
+            snapshot: snapshot,
             snapshotWasEmpty: snapshotWasEmpty,
             isTransientEmptyAXSnapshot: snapshotWasEmpty && isLikelyTransientAXRebuild(for: pid)
         )

@@ -136,6 +136,10 @@ final class RuntimeReconciliationCoordinator {
             }
     }
 
+    func hasPendingRequests() -> Bool {
+        !requestsByTarget.isEmpty
+    }
+
     @discardableResult
     func startRequest(id: UInt64) -> RuntimeReconciliationRequest? {
         guard let target = target(for: id) else { return nil }
