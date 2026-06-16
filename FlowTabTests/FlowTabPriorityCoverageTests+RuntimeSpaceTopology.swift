@@ -137,4 +137,40 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(diff.currentSignature, current.signature)
         XCTAssertEqual(diff.currentSignature.displays.first?.fullscreenWindowIDBySpaceID, [10: 240_002])
     }
+
+    func testRuntimeSpaceTopologyDiffSignatureLogFieldsSummarizeDisplayTopology() {
+        let previous = RuntimeSpaceTopologySnapshot(
+            currentSpaceIDByDisplay: [1: 10],
+            spacesByID: [
+                10: RuntimeSpaceTopologySpace(id: 10, displayID: 1, isCurrent: true)
+            ],
+            windowIDsBySpaceID: [
+                10: Set<CGWindowID>([240_001])
+            ]
+        )
+        let current = RuntimeSpaceTopologySnapshot(
+            currentSpaceIDByDisplay: [1: 11],
+            spacesByID: [
+                10: RuntimeSpaceTopologySpace(id: 10, displayID: 1, isCurrent: false),
+                11: RuntimeSpaceTopologySpace(id: 11, displayID: 1, isCurrent: true)
+            ],
+            windowIDsBySpaceID: [
+                10: Set<CGWindowID>([240_001]),
+                11: Set<CGWindowID>([240_002, 240_003])
+            ],
+            fullscreenWindowIDBySpaceID: [
+                11: 240_002
+            ]
+        )
+
+        let fields = Dictionary(uniqueKeysWithValues: current.diff(from: previous).signatureLogFields)
+
+        XCTAssertEqual(fields["signatureChanged"], "1")
+        XCTAssertEqual(fields["signatureDisplays"], "1")
+        XCTAssertEqual(fields["signatureSpaces"], "2")
+        XCTAssertEqual(fields["signatureWindows"], "3")
+        XCTAssertEqual(fields["signatureFullscreen"], "1")
+        XCTAssertEqual(fields["signature"], "d=1,current=11,spaces=2,windows=3,fullscreen=1")
+        XCTAssertFalse(fields["signature"]?.contains(" ") == true)
+    }
 }

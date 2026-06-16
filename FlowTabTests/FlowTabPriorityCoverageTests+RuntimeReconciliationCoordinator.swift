@@ -455,6 +455,10 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(diff.affectedCGWindowIDs, Set<CGWindowID>([240_001, 240_002, 240_003]))
         XCTAssertEqual(request?.target, .spaceTopology)
         XCTAssertEqual(request?.affectedCGWindowIDs, Set<CGWindowID>([240_001, 240_002, 240_003]))
+        XCTAssertEqual(
+            Dictionary(uniqueKeysWithValues: diff.signatureLogFields)["signature"],
+            "d=1,current=10,spaces=2,windows=2,fullscreen=0"
+        )
     }
 
     func testRuntimeSnapshotProviderMarksAffectedWindowRecordsForSpaceTopologyReconciliation() {

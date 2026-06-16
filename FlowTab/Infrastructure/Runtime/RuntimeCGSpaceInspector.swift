@@ -79,6 +79,32 @@ struct RuntimeSpaceTopologySignature: Equatable, Sendable {
             }
         }
     }
+
+    var trackedSpaceCount: Int {
+        displays.reduce(0) { $0 + $1.spaceIDs.count }
+    }
+
+    var trackedWindowCount: Int {
+        Set(displays.flatMap { display in
+            display.windowIDsBySpaceID.values.flatMap { $0 }
+        }).count
+    }
+
+    var fullscreenWindowCount: Int {
+        Set(displays.flatMap { display in
+            display.fullscreenWindowIDBySpaceID.values
+        }).count
+    }
+
+    var diagnosticSummary: String {
+        guard !displays.isEmpty else { return "none" }
+        return displays.map { display in
+            let displayID = display.displayID.map(String.init) ?? "nil"
+            let currentSpaceID = display.currentSpaceID.map(String.init) ?? "nil"
+            let windowCount = Set(display.windowIDsBySpaceID.values.flatMap { $0 }).count
+            return "d=\(displayID),current=\(currentSpaceID),spaces=\(display.spaceIDs.count),windows=\(windowCount),fullscreen=\(display.fullscreenWindowIDBySpaceID.count)"
+        }.joined(separator: "|")
+    }
 }
 
 struct RuntimeSpaceTopologySnapshot: Equatable {
@@ -196,6 +222,17 @@ struct RuntimeSpaceTopologyDiff: Equatable {
 
     var hasSignatureChange: Bool {
         previousSignature != currentSignature
+    }
+
+    var signatureLogFields: [(String, String)] {
+        [
+            ("signatureChanged", hasSignatureChange ? "1" : "0"),
+            ("signatureDisplays", "\(currentSignature.displays.count)"),
+            ("signatureSpaces", "\(currentSignature.trackedSpaceCount)"),
+            ("signatureWindows", "\(currentSignature.trackedWindowCount)"),
+            ("signatureFullscreen", "\(currentSignature.fullscreenWindowCount)"),
+            ("signature", currentSignature.diagnosticSummary)
+        ]
     }
 }
 

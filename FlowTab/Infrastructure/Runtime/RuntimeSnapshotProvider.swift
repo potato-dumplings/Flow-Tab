@@ -1042,6 +1042,7 @@ final class RuntimeSnapshotProvider {
         )
         let spaceReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let scope = options.contains(.optionOnScreenOnly) ? "onscreen" : "all"
+        let signatureLogFields = spaceTopologyDiff.signatureLogFields
         logSnapshotTiming(
             "collectCGWindows",
             fields: [
@@ -1051,7 +1052,8 @@ final class RuntimeSnapshotProvider {
                 ("accepted", "\(windowIDs.count)"),
                 ("pids", "\(windowsByPID.count)"),
                 ("spaceIDs", "\(spaceIDsByWindowID.count)"),
-                ("affected", "\(spaceTopologyDiff.affectedCGWindowIDs.count)"),
+                ("affected", "\(spaceTopologyDiff.affectedCGWindowIDs.count)")
+            ] + signatureLogFields + [
                 ("copyMs", formatSnapshotMilliseconds(copyReadyMs - startMs)),
                 ("parseMs", formatSnapshotMilliseconds(parseReadyMs - copyReadyMs)),
                 ("spaceMs", formatSnapshotMilliseconds(spaceReadyMs - parseReadyMs)),
