@@ -283,7 +283,6 @@ extension FlowTabTests {
         XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
 
         let refreshedApps = initialApps.filter { $0.id != terminatedAppID }
-        snapshotService.installAppSwitcherProjection(apps: refreshedApps)
 
         let layoutRefreshed = expectation(description: "layout refreshed from runtime projection")
         model.onSessionLayoutChanged = { layoutRefreshed.fulfill() }
@@ -293,6 +292,15 @@ extension FlowTabTests {
         await fulfillment(of: [layoutRefreshed], timeout: 1.0)
         XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
         XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(
+            snapshotService.appTerminationSignalsRecorded().map(\.appID),
+            [terminatedAppID]
+        )
+        XCTAssertFalse(
+            snapshotService.readCommittedSearchIndexProjection()?.appEntries.contains {
+                $0.appID == terminatedAppID
+            } ?? true
+        )
         XCTAssertEqual(model.appCount, refreshedApps.count)
         XCTAssertFalse(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? true)
     }

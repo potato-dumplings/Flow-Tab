@@ -87,7 +87,6 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
     private let currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection]
     private var committedSearchIndexProjection: RuntimeSearchIndexProjection?
     private var requestedHomeAppIDs: [String] = []
-    private var snapshotRequests = 0
     private var lightweightSnapshotRequests = 0
     private var homeSummaryRequests = 0
     private var homeSummariesRequests = 0
@@ -149,9 +148,7 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
     }
 
     func snapshotRequestCount() -> Int {
-        lock.lock()
-        defer { lock.unlock() }
-        return snapshotRequests
+        0
     }
 
     func lightweightSnapshotRequestCount() -> Int {
@@ -253,13 +250,6 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
             generatedAt: generatedAt
         )
         lock.unlock()
-    }
-
-    func fallbackRuntimeSnapshot() -> RuntimeSnapshot {
-        lock.lock()
-        snapshotRequests += 1
-        lock.unlock()
-        return RuntimeSnapshot(apps: [], contextsByID: [:])
     }
 
     func fallbackLightweightAppSnapshot() -> RuntimeSnapshot {
@@ -377,6 +367,19 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
     func signalAppTerminated(appID: String, pid: pid_t) {
         lock.lock()
         appTerminationSignals.append((appID, pid))
+        if let projection = appSwitcherProjection {
+            appSwitcherProjection = RuntimeAppSwitcherProjection(
+                apps: projection.apps.filter { $0.id != appID },
+                contextsByID: projection.contextsByID.filter { $0.key != appID },
+                freshness: projection.freshness
+            )
+        }
+        if let projection = committedSearchIndexProjection {
+            committedSearchIndexProjection = projection.removingApp(
+                appID,
+                freshness: projection.freshness
+            )
+        }
         lock.unlock()
     }
 

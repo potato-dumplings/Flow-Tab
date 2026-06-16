@@ -81,6 +81,44 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(diagnostics.currentAppWindowProjectionAppIDs, [app.id])
     }
 
+    func testRuntimeReadModelStoreRemovesTerminatedAppFromCommittedProjectionsAndSearch() throws {
+        let store = RuntimeReadModelStore()
+        let apps = searchScenarioApps()
+        let terminatedApp = try XCTUnwrap(apps.first)
+        let remainingApps = Array(apps.dropFirst())
+        let pid = NSRunningApplication.current.processIdentifier
+
+        store.commitAppSwitcherSnapshot(
+            RuntimeSnapshot(apps: apps, contextsByID: [:]),
+            generatedAt: 10
+        )
+
+        store.markAppTerminated(appID: terminatedApp.id, pid: pid)
+
+        let appProjection = try XCTUnwrap(store.readAppSwitcherProjection())
+        XCTAssertEqual(appProjection.apps.map(\.id), remainingApps.map(\.id))
+        XCTAssertNil(appProjection.contextsByID[terminatedApp.id])
+        XCTAssertTrue(appProjection.freshness.isCompleteForScope)
+        XCTAssertEqual(appProjection.freshness.sourceGeneration.appLifecycle, 1)
+        XCTAssertEqual(appProjection.freshness.sourceGeneration.projection, 2)
+
+        let searchRead = store.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(searchRead.readiness, .ready)
+        XCTAssertFalse(searchRead.projection?.appEntries.contains { $0.appID == terminatedApp.id } ?? true)
+        XCTAssertFalse(searchRead.projection?.windowEntries.contains { $0.appID == terminatedApp.id } ?? true)
+        XCTAssertEqual(
+            searchRead.projection?.appEntries.map(\.appID),
+            remainingApps.map(\.id)
+        )
+
+        store.markAppTerminated(appID: terminatedApp.id, pid: pid)
+
+        let duplicateSignalProjection = try XCTUnwrap(store.readAppSwitcherProjection())
+        XCTAssertEqual(duplicateSignalProjection.apps.map(\.id), remainingApps.map(\.id))
+        XCTAssertEqual(duplicateSignalProjection.freshness.sourceGeneration.appLifecycle, 1)
+        XCTAssertEqual(duplicateSignalProjection.freshness.sourceGeneration.projection, 2)
+    }
+
     func testRuntimeSnapshotServiceOwnsReadModelStoreForSnapshotBridgeAndDirtySignals() {
         let coordinator = RuntimeReconciliationCoordinator()
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)

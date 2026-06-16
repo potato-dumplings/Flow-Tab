@@ -6,12 +6,12 @@ let sharedRuntimeSnapshotService = RuntimeSnapshotService()
 
 enum RuntimeProjectionMaintenanceReason: String, Sendable {
     case switcherSessionStarted
+    case appLifecycleRefresh
     case homeProjectionMissing
     case searchFreshnessBarrier
 }
 
 protocol RuntimeSnapshotServing: Sendable {
-    func fallbackRuntimeSnapshot() -> RuntimeSnapshot
     func readAppSwitcherProjection() -> RuntimeAppSwitcherProjection?
     func readHomeSummaryProjection() -> RuntimeHomeSummaryProjection?
     func readCurrentAppWindowProjection(appID: String) -> RuntimeCurrentAppWindowProjection?
@@ -297,11 +297,11 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
     }
 
     func signalAppTerminated(appID: String, pid: pid_t) {
+        readModelStore.markAppTerminated(appID: appID, pid: pid)
         snapshotQueue.async { [self] in
             snapshotProvider.reconciliationCoordinator.cancelAppRequests(pid: pid)
             snapshotProvider.clearWindowMappingState(for: pid)
             AXLiveWindowRegistry.shared.remove(pid: pid)
-            readModelStore.markAppTerminated(appID: appID, pid: pid)
             RuntimeLog.debug(.snapshot, "runtimeLifecycle appTerminated appID=\(appID) pid=\(pid)")
         }
     }

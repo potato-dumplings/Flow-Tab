@@ -87,6 +87,17 @@ struct RuntimeSearchIndexProjection: Equatable, Sendable {
     let windowEntries: [RuntimeSearchWindowIndexEntry]
     var freshness: RuntimeProjectionFreshness
 
+    func removingApp(
+        _ appID: String,
+        freshness: RuntimeProjectionFreshness
+    ) -> RuntimeSearchIndexProjection {
+        RuntimeSearchIndexProjection(
+            appEntries: appEntries.filter { $0.appID != appID },
+            windowEntries: windowEntries.filter { $0.appID != appID },
+            freshness: freshness
+        )
+    }
+
     func filteringApps(using visibilityFilter: AppVisibilityFilter) -> RuntimeSearchIndexProjection {
         guard !visibilityFilter.isEmpty else { return self }
         let filteredAppEntries = appEntries.filter { visibilityFilter.includes(appID: $0.appID) }
@@ -343,17 +354,68 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
 
+        let hadAppSwitcherState = appSwitcherProjection?.apps.contains { $0.id == appID } == true
+            || appSwitcherProjection?.contextsByID[appID] != nil
+        let hadHomeState = homeSummaryProjection?.summaries.contains { $0.appID == appID } == true
+        let hadCurrentAppState = currentAppWindowProjectionsByAppID[appID] != nil
+        let hadCommittedSearchState = committedSearchIndex?.appEntries.contains { $0.appID == appID } == true
+            || committedSearchIndex?.windowEntries.contains { $0.appID == appID } == true
+        let hadStagingSearchState = stagingSearchIndex?.appEntries.contains { $0.appID == appID } == true
+            || stagingSearchIndex?.windowEntries.contains { $0.appID == appID } == true
+        let hadDirtyState = dirtyAppIDs.contains(appID)
+            || dirtyPIDs.contains(pid)
+            || pendingRepairScopes.contains { $0.contains(appID) }
+        guard hadAppSwitcherState
+            || hadHomeState
+            || hadCurrentAppState
+            || hadCommittedSearchState
+            || hadStagingSearchState
+            || hadDirtyState
+        else {
+            return
+        }
+
+        let generatedAt = Date.timeIntervalSinceReferenceDate
         generation.appLifecycle &+= 1
+        markProjectionCommittedLocked()
         dirtyAppIDs.remove(appID)
         dirtyPIDs.remove(pid)
         pendingRepairScopes = pendingRepairScopes.filter { !$0.contains(appID) }
         currentAppWindowProjectionsByAppID.removeValue(forKey: appID)
+        if let projection = appSwitcherProjection {
+            appSwitcherProjection = RuntimeAppSwitcherProjection(
+                apps: projection.apps.filter { $0.id != appID },
+                contextsByID: projection.contextsByID.filter { $0.key != appID },
+                freshness: freshnessLocked(
+                    generatedAt: generatedAt,
+                    isCompleteForScope: !isDirtyLocked
+                )
+            )
+        }
         if let summaries = homeSummaryProjection?.summaries.filter({ $0.appID != appID }) {
             homeSummaryProjection = RuntimeHomeSummaryProjection(
                 summaries: summaries,
                 freshness: freshnessLocked(
-                    generatedAt: Date.timeIntervalSinceReferenceDate,
+                    generatedAt: generatedAt,
                     isCompleteForScope: !isDirtyLocked
+                )
+            )
+        }
+        if let projection = committedSearchIndex {
+            committedSearchIndex = projection.removingApp(
+                appID,
+                freshness: freshnessLocked(
+                    generatedAt: generatedAt,
+                    isCompleteForScope: !isDirtyLocked
+                )
+            )
+        }
+        if let projection = stagingSearchIndex {
+            stagingSearchIndex = projection.removingApp(
+                appID,
+                freshness: freshnessLocked(
+                    generatedAt: generatedAt,
+                    isCompleteForScope: false
                 )
             )
         }

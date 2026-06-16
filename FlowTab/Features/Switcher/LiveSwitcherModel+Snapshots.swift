@@ -6,7 +6,8 @@ extension LiveSwitcherModel {
         triggerDirection: CycleDirection,
         preferredSelectedAppID: String?,
         animateAppStripUpdate _: Bool = false,
-        preserveSearchState: Bool = false
+        preserveSearchState: Bool = false,
+        resetWhenEmpty: Bool = true
     ) -> Bool {
         let startMs = Self.monotonicMilliseconds()
         let previousSearchState = preserveSearchState ? searchViewState : .inactive
@@ -21,7 +22,7 @@ extension LiveSwitcherModel {
             startMs: startMs,
             snapshotReadMs: snapshotReadMs,
             logEvent: "loadSnapshot",
-            resetWhenEmpty: true
+            resetWhenEmpty: resetWhenEmpty
         )
     }
 
@@ -373,8 +374,9 @@ extension LiveSwitcherModel {
                 : "runtimeProjectionDirty"
             snapshot = projection.appCycleSnapshot
         } else {
-            source = "runtimeSnapshotFallback"
-            snapshot = runtimeSnapshotService.fallbackRuntimeSnapshot()
+            runtimeSnapshotService.requestAppSwitcherProjectionMaintenance(reason: .appLifecycleRefresh)
+            source = "runtimeProjectionMissing"
+            snapshot = RuntimeSnapshot(apps: [], contextsByID: [:])
         }
         let durationMs = Self.monotonicMilliseconds() - startMs
         logMakeSnapshot(source: source, snapshot: snapshot, durationMs: durationMs)

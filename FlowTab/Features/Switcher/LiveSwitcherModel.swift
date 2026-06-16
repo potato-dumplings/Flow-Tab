@@ -715,11 +715,13 @@ final class LiveSwitcherModel: ObservableObject {
         if matchesPending {
             pendingTerminateRequest = nil
         }
+        runtimeSnapshotService.signalAppTerminated(appID: appID, pid: pid)
         let refreshed = loadSnapshot(
             triggerDirection: .forward,
             preferredSelectedAppID: matchesPending ? pendingRequest?.preferredSelectedAppID : nil,
             animateAppStripUpdate: true,
-            preserveSearchState: searchViewState.isActive
+            preserveSearchState: searchViewState.isActive,
+            resetWhenEmpty: false
         )
         RuntimeLog.info(
             .session,
