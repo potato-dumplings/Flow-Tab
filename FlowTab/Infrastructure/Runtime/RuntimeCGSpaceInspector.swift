@@ -8,6 +8,79 @@ struct RuntimeSpaceTopologySpace: Equatable {
     let isCurrent: Bool
 }
 
+struct RuntimeDisplaySpaceSignature: Equatable, Sendable {
+    let displayID: CGDirectDisplayID?
+    let currentSpaceID: Int?
+    let spaceIDs: [Int]
+    let windowIDsBySpaceID: [Int: [CGWindowID]]
+    let fullscreenWindowIDBySpaceID: [Int: CGWindowID]
+}
+
+struct RuntimeSpaceTopologySignature: Equatable, Sendable {
+    let displays: [RuntimeDisplaySpaceSignature]
+
+    init(displays: [RuntimeDisplaySpaceSignature]) {
+        self.displays = displays
+    }
+
+    init(snapshot: RuntimeSpaceTopologySnapshot) {
+        var spaceIDsByDisplay: [CGDirectDisplayID?: Set<Int>] = [:]
+        for spaceID in snapshot.windowIDsBySpaceID.keys {
+            spaceIDsByDisplay[snapshot.spacesByID[spaceID]?.displayID, default: []].insert(spaceID)
+        }
+        for spaceID in snapshot.fullscreenWindowIDBySpaceID.keys {
+            spaceIDsByDisplay[snapshot.spacesByID[spaceID]?.displayID, default: []].insert(spaceID)
+        }
+        for (spaceID, space) in snapshot.spacesByID {
+            spaceIDsByDisplay[space.displayID, default: []].insert(spaceID)
+        }
+        for (displayID, currentSpaceID) in snapshot.currentSpaceIDByDisplay {
+            spaceIDsByDisplay[displayID, default: []].insert(currentSpaceID)
+        }
+
+        displays = spaceIDsByDisplay.map { displayID, spaceIDs in
+            let sortedSpaceIDs = spaceIDs.sorted()
+            let currentSpaceID = displayID.flatMap { snapshot.currentSpaceIDByDisplay[$0] }
+                ?? sortedSpaceIDs.first { snapshot.spacesByID[$0]?.isCurrent == true }
+            let windowIDsBySpaceID = Dictionary(
+                uniqueKeysWithValues: sortedSpaceIDs.map { spaceID in
+                    (
+                        spaceID,
+                        Array(snapshot.windowIDsBySpaceID[spaceID, default: []]).sorted()
+                    )
+                }
+            )
+            let fullscreenWindowIDBySpaceID = Dictionary(
+                uniqueKeysWithValues: sortedSpaceIDs.compactMap { spaceID -> (Int, CGWindowID)? in
+                    guard let windowID = snapshot.fullscreenWindowIDBySpaceID[spaceID] else {
+                        return nil
+                    }
+                    return (spaceID, windowID)
+                }
+            )
+            return RuntimeDisplaySpaceSignature(
+                displayID: displayID,
+                currentSpaceID: currentSpaceID,
+                spaceIDs: sortedSpaceIDs,
+                windowIDsBySpaceID: windowIDsBySpaceID,
+                fullscreenWindowIDBySpaceID: fullscreenWindowIDBySpaceID
+            )
+        }
+        .sorted { lhs, rhs in
+            switch (lhs.displayID, rhs.displayID) {
+            case let (.some(lhsID), .some(rhsID)):
+                lhsID < rhsID
+            case (.some, .none):
+                true
+            case (.none, .some):
+                false
+            case (.none, .none):
+                false
+            }
+        }
+    }
+}
+
 struct RuntimeSpaceTopologySnapshot: Equatable {
     var currentSpaceIDByDisplay: [CGDirectDisplayID: Int]
     var spacesByID: [Int: RuntimeSpaceTopologySpace]
@@ -52,16 +125,24 @@ struct RuntimeSpaceTopologySnapshot: Equatable {
         }
     }
 
+    var signature: RuntimeSpaceTopologySignature {
+        RuntimeSpaceTopologySignature(snapshot: self)
+    }
+
     func diff(from previous: RuntimeSpaceTopologySnapshot?) -> RuntimeSpaceTopologyDiff {
+        let currentSignature = signature
         guard let previous else {
             let allSpaceIDs = Set(spacesByID.keys)
             return RuntimeSpaceTopologyDiff(
                 addedSpaceIDs: allSpaceIDs,
                 removedSpaceIDs: [],
                 changedSpaceIDs: allSpaceIDs,
-                affectedCGWindowIDs: Set(spaceIDsByCGWindowID.keys)
+                affectedCGWindowIDs: Set(spaceIDsByCGWindowID.keys),
+                previousSignature: nil,
+                currentSignature: currentSignature
             )
         }
+        let previousSignature = previous.signature
 
         let previousSpaceIDs = Set(previous.spacesByID.keys)
         let currentSpaceIDs = Set(spacesByID.keys)
@@ -98,7 +179,9 @@ struct RuntimeSpaceTopologySnapshot: Equatable {
             addedSpaceIDs: addedSpaceIDs,
             removedSpaceIDs: removedSpaceIDs,
             changedSpaceIDs: changedSpaceIDs,
-            affectedCGWindowIDs: affectedWindowIDs
+            affectedCGWindowIDs: affectedWindowIDs,
+            previousSignature: previousSignature,
+            currentSignature: currentSignature
         )
     }
 }
@@ -108,6 +191,12 @@ struct RuntimeSpaceTopologyDiff: Equatable {
     let removedSpaceIDs: Set<Int>
     let changedSpaceIDs: Set<Int>
     let affectedCGWindowIDs: Set<CGWindowID>
+    let previousSignature: RuntimeSpaceTopologySignature?
+    let currentSignature: RuntimeSpaceTopologySignature
+
+    var hasSignatureChange: Bool {
+        previousSignature != currentSignature
+    }
 }
 
 protocol RuntimeSpaceTopologyProviding {

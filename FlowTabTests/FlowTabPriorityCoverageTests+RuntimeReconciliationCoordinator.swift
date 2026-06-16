@@ -261,6 +261,9 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertEqual(diff.changedSpaceIDs, Set([10, 11]))
         XCTAssertEqual(diff.affectedCGWindowIDs, Set<CGWindowID>([240_001, 240_002, 240_003]))
+        XCTAssertTrue(diff.hasSignatureChange)
+        XCTAssertEqual(diff.previousSignature, previous.signature)
+        XCTAssertEqual(diff.currentSignature, current.signature)
         XCTAssertEqual(request?.target, .spaceTopology)
         XCTAssertEqual(request?.reasons, Set([.spaceTopologyChanged]))
         XCTAssertEqual(request?.affectedCGWindowIDs, Set<CGWindowID>([240_001, 240_002, 240_003]))
