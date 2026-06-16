@@ -606,10 +606,13 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerMouseDownOutsideSearchCancelsSession() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
-            let controller = SwitcherPanelController()
-            controller.modelForTesting.snapshotProviderOverride = {
-                RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
-            }
+            let controller = SwitcherPanelController(
+                model: LiveSwitcherModel(
+                    snapshotService: RecordingRuntimeSnapshotService(
+                        appSwitcherApps: self.searchScenarioApps()
+                    )
+                )
+            )
 
             XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
             XCTAssertTrue(controller.modelForTesting.enterSearchMode())

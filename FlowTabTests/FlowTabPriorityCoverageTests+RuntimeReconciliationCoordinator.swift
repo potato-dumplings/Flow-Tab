@@ -21,6 +21,14 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(appProjection.freshness.generatedAt, generatedAt)
         XCTAssertTrue(appProjection.freshness.isCompleteForScope)
         XCTAssertEqual(appProjection.freshness.sourceGeneration.projection, 1)
+        let searchProjection = try XCTUnwrap(store.readCommittedSearchIndexProjection())
+        XCTAssertEqual(searchProjection.appEntries.map(\.appID), apps.map(\.id))
+        XCTAssertEqual(
+            searchProjection.windowEntries.map(\.windowID),
+            apps.flatMap(\.windows).map(\.id)
+        )
+        XCTAssertEqual(searchProjection.freshness.generatedAt, generatedAt)
+        XCTAssertTrue(searchProjection.freshness.isCompleteForScope)
 
         store.markAppWindowsDirty(
             appID: app.id,
@@ -99,6 +107,32 @@ extension FlowTabPriorityCoverageTests {
         let postLightweightDiagnostics = service.runtimeReadModelDiagnostics()
         XCTAssertEqual(postLightweightDiagnostics.dirtyAppIDs, ["com.example.editor"])
         XCTAssertEqual(postLightweightDiagnostics.dirtyPIDs, [18_405])
+    }
+
+    func testRuntimeReadModelStoreKeepsStagingSearchIndexHiddenUntilCommit() throws {
+        let store = RuntimeReadModelStore()
+        let snapshot = RuntimeSnapshot(apps: searchScenarioApps(), contextsByID: [:])
+
+        store.stageSearchIndexSnapshot(snapshot, generatedAt: 20)
+
+        XCTAssertNil(store.readCommittedSearchIndexProjection())
+        var diagnostics = store.diagnostics()
+        XCTAssertFalse(diagnostics.hasCommittedSearchIndex)
+        XCTAssertTrue(diagnostics.hasStagingSearchIndex)
+
+        let committed = try XCTUnwrap(
+            store.commitStagedSearchIndex(generatedAt: 21)
+        )
+
+        XCTAssertEqual(committed.freshness.generatedAt, 21)
+        XCTAssertTrue(committed.freshness.isCompleteForScope)
+        XCTAssertEqual(
+            store.readCommittedSearchIndexProjection()?.windowEntries.map(\.windowID),
+            snapshot.apps.flatMap(\.windows).map(\.id)
+        )
+        diagnostics = store.diagnostics()
+        XCTAssertTrue(diagnostics.hasCommittedSearchIndex)
+        XCTAssertFalse(diagnostics.hasStagingSearchIndex)
     }
 
     func testRuntimeReconciliationCoordinatorMarksSpaceTopologyAffectedWindows() {

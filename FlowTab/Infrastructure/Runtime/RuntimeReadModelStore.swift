@@ -52,6 +52,38 @@ struct RuntimeCurrentAppWindowProjection {
     var freshness: RuntimeProjectionFreshness
 }
 
+struct RuntimeSearchAppIndexEntry: Equatable, Sendable {
+    let appID: String
+    let appDisplayName: String
+    let searchIndex: SearchTextMatcher.Index
+}
+
+struct RuntimeSearchWindowIndexEntry: Equatable, Sendable {
+    let appID: String
+    let appDisplayName: String
+    let windowID: String
+    let windowTitle: String
+    let windowSearchIndex: SearchTextMatcher.Index
+    let appSearchIndex: SearchTextMatcher.Index
+}
+
+struct RuntimeSearchIndexProjection: Equatable, Sendable {
+    let appEntries: [RuntimeSearchAppIndexEntry]
+    let windowEntries: [RuntimeSearchWindowIndexEntry]
+    var freshness: RuntimeProjectionFreshness
+
+    func filteringApps(using visibilityFilter: AppVisibilityFilter) -> RuntimeSearchIndexProjection {
+        guard !visibilityFilter.isEmpty else { return self }
+        let filteredAppEntries = appEntries.filter { visibilityFilter.includes(appID: $0.appID) }
+        let visibleAppIDs = Set(filteredAppEntries.map(\.appID))
+        return RuntimeSearchIndexProjection(
+            appEntries: filteredAppEntries,
+            windowEntries: windowEntries.filter { visibleAppIDs.contains($0.appID) },
+            freshness: freshness
+        )
+    }
+}
+
 struct RuntimeReadModelDiagnostics: Equatable {
     let generation: RuntimeReadModelGeneration
     let dirtyAppIDs: Set<String>
@@ -60,6 +92,8 @@ struct RuntimeReadModelDiagnostics: Equatable {
     let pendingRepairScopes: Set<String>
     let hasAppSwitcherProjection: Bool
     let hasHomeSummaryProjection: Bool
+    let hasCommittedSearchIndex: Bool
+    let hasStagingSearchIndex: Bool
     let currentAppWindowProjectionAppIDs: Set<String>
 }
 
@@ -73,6 +107,8 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     private var appSwitcherProjection: RuntimeAppSwitcherProjection?
     private var homeSummaryProjection: RuntimeHomeSummaryProjection?
     private var currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection] = [:]
+    private var committedSearchIndex: RuntimeSearchIndexProjection?
+    private var stagingSearchIndex: RuntimeSearchIndexProjection?
 
     func commitAppSwitcherSnapshot(
         _ snapshot: RuntimeSnapshot,
@@ -91,6 +127,14 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             contextsByID: snapshot.contextsByID,
             freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: !isDirtyLocked)
         )
+        if clearsDirtyState {
+            committedSearchIndex = buildSearchIndexLocked(
+                apps: snapshot.apps,
+                generatedAt: generatedAt,
+                isCompleteForScope: true
+            )
+            stagingSearchIndex = nil
+        }
     }
 
     func commitHomeSummaries(
@@ -149,6 +193,42 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             snapshot: snapshot,
             freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: true)
         )
+    }
+
+    func stageSearchIndexSnapshot(
+        _ snapshot: RuntimeSnapshot,
+        generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
+    ) {
+        lock.lock()
+        defer { lock.unlock() }
+
+        stagingSearchIndex = buildSearchIndexLocked(
+            apps: snapshot.apps,
+            generatedAt: generatedAt,
+            isCompleteForScope: false
+        )
+    }
+
+    @discardableResult
+    func commitStagedSearchIndex(
+        clearsDirtyState: Bool = true,
+        generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
+    ) -> RuntimeSearchIndexProjection? {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard let staged = stagingSearchIndex else { return nil }
+        markProjectionCommittedLocked()
+        if clearsDirtyState {
+            clearDirtyStateLocked()
+        }
+        committedSearchIndex = RuntimeSearchIndexProjection(
+            appEntries: staged.appEntries,
+            windowEntries: staged.windowEntries,
+            freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: !isDirtyLocked)
+        )
+        stagingSearchIndex = nil
+        return committedSearchIndex
     }
 
     func markAppLifecycleDirty(appID: String, pid: pid_t, pendingScope: String) {
@@ -251,6 +331,18 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         return projection
     }
 
+    func readCommittedSearchIndexProjection() -> RuntimeSearchIndexProjection? {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard var projection = committedSearchIndex else { return nil }
+        projection.freshness = freshnessLocked(
+            generatedAt: projection.freshness.generatedAt,
+            isCompleteForScope: !isDirtyLocked
+        )
+        return projection
+    }
+
     func diagnostics() -> RuntimeReadModelDiagnostics {
         lock.lock()
         defer { lock.unlock() }
@@ -263,6 +355,8 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             pendingRepairScopes: pendingRepairScopes,
             hasAppSwitcherProjection: appSwitcherProjection != nil,
             hasHomeSummaryProjection: homeSummaryProjection != nil,
+            hasCommittedSearchIndex: committedSearchIndex != nil,
+            hasStagingSearchIndex: stagingSearchIndex != nil,
             currentAppWindowProjectionAppIDs: Set(currentAppWindowProjectionsByAppID.keys)
         )
     }
@@ -303,6 +397,43 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             dirtyCGWindowIDs: dirtyCGWindowIDs,
             pendingRepairScopes: pendingRepairScopes,
             isCompleteForScope: isCompleteForScope
+        )
+    }
+
+    private func buildSearchIndexLocked(
+        apps: [AppSwitchCandidate],
+        generatedAt: TimeInterval,
+        isCompleteForScope: Bool
+    ) -> RuntimeSearchIndexProjection {
+        let appEntries = apps.map { app in
+            RuntimeSearchAppIndexEntry(
+                appID: app.id,
+                appDisplayName: app.displayName,
+                searchIndex: SearchTextMatcher.buildIndex(for: app.displayName, identifier: app.id)
+            )
+        }
+        let appSearchIndexes = Dictionary(uniqueKeysWithValues: appEntries.map { ($0.appID, $0.searchIndex) })
+        let windowEntries = apps.flatMap { app in
+            let appSearchIndex = appSearchIndexes[app.id]
+                ?? SearchTextMatcher.buildIndex(for: app.displayName, identifier: app.id)
+            return app.windows.map { window in
+                RuntimeSearchWindowIndexEntry(
+                    appID: app.id,
+                    appDisplayName: app.displayName,
+                    windowID: window.id,
+                    windowTitle: window.title.trimmingCharacters(in: .whitespacesAndNewlines),
+                    windowSearchIndex: SearchTextMatcher.buildIndex(for: window.title),
+                    appSearchIndex: appSearchIndex
+                )
+            }
+        }
+        return RuntimeSearchIndexProjection(
+            appEntries: appEntries,
+            windowEntries: windowEntries,
+            freshness: freshnessLocked(
+                generatedAt: generatedAt,
+                isCompleteForScope: isCompleteForScope && !isDirtyLocked
+            )
         )
     }
 }

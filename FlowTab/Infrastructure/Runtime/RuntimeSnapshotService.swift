@@ -19,6 +19,7 @@ protocol RuntimeSnapshotServing: Sendable {
     func readAppSwitcherProjection() -> RuntimeAppSwitcherProjection?
     func readHomeSummaryProjection() -> RuntimeHomeSummaryProjection?
     func readCurrentAppWindowProjection(appID: String) -> RuntimeCurrentAppWindowProjection?
+    func readCommittedSearchIndexProjection() -> RuntimeSearchIndexProjection?
     func runtimeReadModelDiagnostics() -> RuntimeReadModelDiagnostics
     func requestAppSwitcherProjectionMaintenance(reason: RuntimeProjectionMaintenanceReason)
     func currentCGWindowsByPID() -> [pid_t: [RuntimeSnapshotProvider.CGWindowEntry]]
@@ -148,6 +149,10 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
 
     func readCurrentAppWindowProjection(appID: String) -> RuntimeCurrentAppWindowProjection? {
         readModelStore.readCurrentAppWindowProjection(appID: appID)
+    }
+
+    func readCommittedSearchIndexProjection() -> RuntimeSearchIndexProjection? {
+        readModelStore.readCommittedSearchIndexProjection()
     }
 
     func runtimeReadModelDiagnostics() -> RuntimeReadModelDiagnostics {

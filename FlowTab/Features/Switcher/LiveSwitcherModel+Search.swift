@@ -12,7 +12,13 @@ extension LiveSwitcherModel {
         guard let session, case .appCycle = session.mode else { return false }
         cancelPendingSearchComputation()
         sessionAppsByID = Dictionary(uniqueKeysWithValues: session.apps.map { ($0.id, $0) })
-        searchCoordinator.rebuildIndex(with: session.apps)
+        guard rebuildSearchIndexFromCommittedProjection(reason: "enterSearchMode") else {
+            RuntimeLog.debug(
+                .searchModel,
+                "enterSearchMode changed=0 reason=noCommittedSearchIndex sessionAppCount=\(session.apps.count)"
+            )
+            return false
+        }
         let defaultScope = SearchInteractionPreferencesStore.loadDefaultScope()
         let changed = searchCoordinator.activate(defaultScope: defaultScope)
         publishSearchStateIfNeeded()
@@ -30,6 +36,34 @@ extension LiveSwitcherModel {
         guard changed else { return false }
         publishSearchStateIfNeeded()
         scheduleSearchComputation(resetSelection: true, debounced: false)
+        return true
+    }
+
+    @discardableResult
+    func rebuildSearchIndexFromCommittedProjection(reason: String) -> Bool {
+        guard let projection = runtimeSnapshotService.readCommittedSearchIndexProjection() else {
+            RuntimeLog.debug(.searchModel, "searchIndexSource reason=\(reason) source=none")
+            return false
+        }
+        let searchProjection = projection.filteringApps(
+            using: AppVisibilityPreferencesStore.visibilityFilter()
+        )
+        searchCoordinator.rebuildIndex(with: searchProjection)
+        RuntimeLog.debug(
+            .searchModel,
+            [
+                "searchIndexSource",
+                "reason=\(reason)",
+                "source=committedRuntimeIndex",
+                "apps=\(searchProjection.appEntries.count)",
+                "windows=\(searchProjection.windowEntries.count)",
+                "complete=\(projection.freshness.isCompleteForScope ? 1 : 0)",
+                "dirtyApps=\(projection.freshness.dirtyAppIDs.count)",
+                "dirtyPIDs=\(projection.freshness.dirtyPIDs.count)",
+                "dirtyCGWindowIDs=\(projection.freshness.dirtyCGWindowIDs.count)",
+                "pendingScopes=\(projection.freshness.pendingRepairScopes.count)"
+            ].joined(separator: " ")
+        )
         return true
     }
 

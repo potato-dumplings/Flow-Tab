@@ -86,6 +86,7 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
     private let appSwitcherProjection: RuntimeAppSwitcherProjection?
     private let homeSummaryProjection: RuntimeHomeSummaryProjection?
     private let currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection]
+    private var committedSearchIndexProjection: RuntimeSearchIndexProjection?
     private var requestedHomeAppIDs: [String] = []
     private var requestedFocusedPIDs: [pid_t] = []
     private var snapshotRequests = 0
@@ -105,13 +106,43 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
         focusedSnapshotsByPID: [pid_t: RuntimeHomeAppSnapshot] = [:],
         appSwitcherProjection: RuntimeAppSwitcherProjection? = nil,
         homeSummaryProjection: RuntimeHomeSummaryProjection? = nil,
-        currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection] = [:]
+        currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection] = [:],
+        committedSearchIndexProjection: RuntimeSearchIndexProjection? = nil
     ) {
         self.homeSnapshotsByAppID = homeSnapshotsByAppID
         self.focusedSnapshotsByPID = focusedSnapshotsByPID
         self.appSwitcherProjection = appSwitcherProjection
         self.homeSummaryProjection = homeSummaryProjection
         self.currentAppWindowProjectionsByAppID = currentAppWindowProjectionsByAppID
+        self.committedSearchIndexProjection = committedSearchIndexProjection
+    }
+
+    convenience init(
+        appSwitcherApps apps: [AppSwitchCandidate],
+        contextsByID: [String: RuntimeAppContext] = [:],
+        committedSearchApps: [AppSwitchCandidate]? = nil,
+        generatedAt: TimeInterval = 10
+    ) {
+        let freshness = RuntimeProjectionFreshness(
+            generatedAt: generatedAt,
+            sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+            dirtyAppIDs: [],
+            dirtyPIDs: [],
+            dirtyCGWindowIDs: [],
+            pendingRepairScopes: [],
+            isCompleteForScope: true
+        )
+        self.init(
+            appSwitcherProjection: RuntimeAppSwitcherProjection(
+                apps: apps,
+                contextsByID: contextsByID,
+                freshness: freshness
+            ),
+            committedSearchIndexProjection: Self.committedSearchIndexProjection(
+                for: committedSearchApps ?? apps,
+                generatedAt: generatedAt
+            )
+        )
     }
 
     func recordedHomeAppIDs() -> [String] {
@@ -192,6 +223,18 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
         return windowFocusVerificationSignals
     }
 
+    func installCommittedSearchIndex(
+        for apps: [AppSwitchCandidate],
+        generatedAt: TimeInterval = 10
+    ) {
+        lock.lock()
+        committedSearchIndexProjection = Self.committedSearchIndexProjection(
+            for: apps,
+            generatedAt: generatedAt
+        )
+        lock.unlock()
+    }
+
     func snapshot() -> RuntimeSnapshot {
         lock.lock()
         snapshotRequests += 1
@@ -250,8 +293,17 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
         return currentAppWindowProjectionsByAppID[appID]
     }
 
+    func readCommittedSearchIndexProjection() -> RuntimeSearchIndexProjection? {
+        lock.lock()
+        defer { lock.unlock() }
+        return committedSearchIndexProjection
+    }
+
     func runtimeReadModelDiagnostics() -> RuntimeReadModelDiagnostics {
-        RuntimeReadModelDiagnostics(
+        lock.lock()
+        let hasCommittedSearchIndex = committedSearchIndexProjection != nil
+        lock.unlock()
+        return RuntimeReadModelDiagnostics(
             generation: RuntimeReadModelGeneration(),
             dirtyAppIDs: [],
             dirtyPIDs: [],
@@ -259,6 +311,8 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
             pendingRepairScopes: [],
             hasAppSwitcherProjection: false,
             hasHomeSummaryProjection: false,
+            hasCommittedSearchIndex: hasCommittedSearchIndex,
+            hasStagingSearchIndex: false,
             currentAppWindowProjectionAppIDs: []
         )
     }
@@ -326,6 +380,34 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
 
     func isLikelyTransientAXRebuild(for pid: pid_t) -> Bool {
         false
+    }
+
+    private static func committedSearchIndexProjection(
+        for apps: [AppSwitchCandidate],
+        generatedAt: TimeInterval
+    ) -> RuntimeSearchIndexProjection {
+        let store = RuntimeReadModelStore()
+        store.commitAppSwitcherSnapshot(
+            RuntimeSnapshot(apps: apps, contextsByID: [:]),
+            generatedAt: generatedAt
+        )
+        return store.readCommittedSearchIndexProjection()!
+    }
+}
+
+@MainActor
+extension LiveSwitcherModel {
+    func installSnapshotProviderOverrideForTesting(
+        _ provider: @escaping () -> RuntimeSnapshot,
+        committedSearchApps: [AppSwitchCandidate]? = nil
+    ) {
+        snapshotProviderOverride = provider
+        guard let recordingService = runtimeSnapshotService as? RecordingRuntimeSnapshotService else {
+            return
+        }
+        recordingService.installCommittedSearchIndex(
+            for: committedSearchApps ?? provider().apps
+        )
     }
 }
 

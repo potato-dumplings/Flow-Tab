@@ -670,7 +670,13 @@ extension FlowTabPriorityCoverageTests {
             }
         )
         let hotkeyFactory = SpyHotkeyMonitorFactory()
-        let panelController = SwitcherPanelController()
+        let panelController = SwitcherPanelController(
+            model: LiveSwitcherModel(
+                snapshotService: RecordingRuntimeSnapshotService(
+                    appSwitcherApps: self.searchScenarioApps()
+                )
+            )
+        )
         let currentApp = NSRunningApplication.current
         let currentAppID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let currentAppWindows = [
@@ -934,7 +940,13 @@ extension FlowTabPriorityCoverageTests {
         let hotkeyFactory = SpyHotkeyMonitorFactory()
         let takeoverController = SpyCommandTabTakeoverController()
         let stressRunner = SpyStressRunner()
-        let panelController = SwitcherPanelController()
+        let panelController = SwitcherPanelController(
+            model: LiveSwitcherModel(
+                snapshotService: RecordingRuntimeSnapshotService(
+                    appSwitcherApps: searchScenarioApps()
+                )
+            )
+        )
         var delegate: AppDelegate?
         defer {
             delegate?.applicationWillTerminate(
@@ -959,10 +971,6 @@ extension FlowTabPriorityCoverageTests {
             )
             RuntimeDiagnostics.shared.clear()
             clearIsolatedUserDefaults(userDefaults)
-        }
-
-        panelController.modelForTesting.snapshotProviderOverride = {
-            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
         }
 
         userDefaults.set(false, forKey: AppPreferenceKeys.showShortcutHint)

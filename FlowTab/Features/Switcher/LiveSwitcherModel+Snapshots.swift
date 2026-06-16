@@ -112,7 +112,7 @@ extension LiveSwitcherModel {
         }
         let sessionReadyMs = Self.monotonicMilliseconds()
         if previousSearchState.isActive {
-            searchCoordinator.rebuildIndex(with: rebuiltSession.apps)
+            _ = rebuildSearchIndexFromCommittedProjection(reason: "snapshotRefresh")
         } else {
             _ = searchCoordinator.exit()
         }

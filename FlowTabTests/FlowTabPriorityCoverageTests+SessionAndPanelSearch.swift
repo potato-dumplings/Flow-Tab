@@ -40,10 +40,11 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testLiveSwitcherModelCancelSelectionResetsSessionAndSearchState() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
-            let model = LiveSwitcherModel()
-            model.snapshotProviderOverride = {
-                RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
-            }
+            let model = LiveSwitcherModel(
+                snapshotService: RecordingRuntimeSnapshotService(
+                    appSwitcherApps: self.searchScenarioApps()
+                )
+            )
 
             XCTAssertTrue(model.startSession(triggerDirection: .forward))
             XCTAssertTrue(model.enterSearchMode())
@@ -63,10 +64,11 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testLiveSwitcherModelEnterSearchModeAndApplySelectedAppResult() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
-            let model = LiveSwitcherModel()
-            model.snapshotProviderOverride = {
-                RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
-            }
+            let model = LiveSwitcherModel(
+                snapshotService: RecordingRuntimeSnapshotService(
+                    appSwitcherApps: self.searchScenarioApps()
+                )
+            )
 
             XCTAssertTrue(model.startSession(triggerDirection: .forward))
             XCTAssertTrue(model.enterSearchMode())
@@ -91,10 +93,11 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testLiveSwitcherModelApplySelectedWindowSearchResultEntersWindowCycle() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .window) {
-            let model = LiveSwitcherModel()
-            model.snapshotProviderOverride = {
-                RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
-            }
+            let model = LiveSwitcherModel(
+                snapshotService: RecordingRuntimeSnapshotService(
+                    appSwitcherApps: self.searchScenarioApps()
+                )
+            )
 
             XCTAssertTrue(model.startSession(triggerDirection: .forward))
             XCTAssertTrue(model.enterSearchMode())
@@ -119,7 +122,6 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testLiveSwitcherModelWindowSearchCommitActivatesSelectedWindowTarget() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .window) {
-            let model = LiveSwitcherModel()
             let apps = self.searchScenarioApps()
             let contextsByID = Dictionary(
                 uniqueKeysWithValues: apps.map { app in
@@ -133,9 +135,12 @@ extension FlowTabPriorityCoverageTests {
                     )
                 }
             )
-            model.snapshotProviderOverride = {
-                RuntimeSnapshot(apps: apps, contextsByID: contextsByID)
-            }
+            let model = LiveSwitcherModel(
+                snapshotService: RecordingRuntimeSnapshotService(
+                    appSwitcherApps: apps,
+                    contextsByID: contextsByID
+                )
+            )
 
             var activatedTarget: ActivationTarget?
             var activatedContextIDs: Set<String> = []
@@ -251,10 +256,13 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerPointerSearchResultSelectionFocusesResults() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
-            let controller = SwitcherPanelController()
-            controller.modelForTesting.snapshotProviderOverride = {
-                RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
-            }
+            let controller = SwitcherPanelController(
+                model: LiveSwitcherModel(
+                    snapshotService: RecordingRuntimeSnapshotService(
+                        appSwitcherApps: self.searchScenarioApps()
+                    )
+                )
+            )
 
             XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
             XCTAssertTrue(controller.enterSearchModeIfPossible())
@@ -358,10 +366,13 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerPointerSearchResultClickCommitsImmediatelyWithoutPointerMovement() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
-            let controller = SwitcherPanelController()
-            controller.modelForTesting.snapshotProviderOverride = {
-                RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
-            }
+            let controller = SwitcherPanelController(
+                model: LiveSwitcherModel(
+                    snapshotService: RecordingRuntimeSnapshotService(
+                        appSwitcherApps: self.searchScenarioApps()
+                    )
+                )
+            )
             var activatedTarget: ActivationTarget?
             controller.modelForTesting.activationOverride = { target, _ in
                 activatedTarget = target
@@ -503,10 +514,13 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerSearchTabTogglesScope() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
-            let controller = SwitcherPanelController()
-            controller.modelForTesting.snapshotProviderOverride = {
-                RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
-            }
+            let controller = SwitcherPanelController(
+                model: LiveSwitcherModel(
+                    snapshotService: RecordingRuntimeSnapshotService(
+                        appSwitcherApps: self.searchScenarioApps()
+                    )
+                )
+            )
 
             XCTAssertTrue(controller.modelForTesting.startSession(triggerDirection: .forward))
             XCTAssertTrue(controller.modelForTesting.enterSearchMode())
@@ -522,10 +536,13 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerSearchArrowKeysOnlyReturnToInputFromFirstResult() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
-            let controller = SwitcherPanelController()
-            controller.modelForTesting.snapshotProviderOverride = {
-                RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
-            }
+            let controller = SwitcherPanelController(
+                model: LiveSwitcherModel(
+                    snapshotService: RecordingRuntimeSnapshotService(
+                        appSwitcherApps: self.searchScenarioApps()
+                    )
+                )
+            )
 
             XCTAssertTrue(controller.modelForTesting.startSession(triggerDirection: .forward))
             XCTAssertTrue(controller.modelForTesting.enterSearchMode())
@@ -551,10 +568,13 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerSearchWrapRequestsScrollBackToFirstResult() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
-            let controller = SwitcherPanelController()
-            controller.modelForTesting.snapshotProviderOverride = {
-                RuntimeSnapshot(apps: self.searchWrapScenarioApps(), contextsByID: [:])
-            }
+            let controller = SwitcherPanelController(
+                model: LiveSwitcherModel(
+                    snapshotService: RecordingRuntimeSnapshotService(
+                        appSwitcherApps: self.searchWrapScenarioApps()
+                    )
+                )
+            )
 
             var scrollRequests: [String] = []
             controller.modelForTesting.onSearchResultScrollRequestForTesting = { resultID in
@@ -605,10 +625,13 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerSearchSizingUsesCompleteVisibleRowBudget() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
-            let controller = SwitcherPanelController()
-            controller.modelForTesting.snapshotProviderOverride = {
-                RuntimeSnapshot(apps: self.layoutScenarioApps(count: 10), contextsByID: [:])
-            }
+            let controller = SwitcherPanelController(
+                model: LiveSwitcherModel(
+                    snapshotService: RecordingRuntimeSnapshotService(
+                        appSwitcherApps: self.layoutScenarioApps(count: 10)
+                    )
+                )
+            )
 
             XCTAssertTrue(controller.modelForTesting.startSession(triggerDirection: .forward))
             XCTAssertTrue(controller.modelForTesting.enterSearchMode())
@@ -643,11 +666,14 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerSearchEntryExpandsBelowCenteredAppLayer() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
-            let controller = SwitcherPanelController()
+            let controller = SwitcherPanelController(
+                model: LiveSwitcherModel(
+                    snapshotService: RecordingRuntimeSnapshotService(
+                        appSwitcherApps: self.layoutScenarioApps(count: 10)
+                    )
+                )
+            )
             let visibleFrame = CGRect(x: 0, y: 0, width: 1440, height: 900)
-            controller.modelForTesting.snapshotProviderOverride = {
-                RuntimeSnapshot(apps: self.layoutScenarioApps(count: 10), contextsByID: [:])
-            }
 
             XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
             controller.updatePanelSizeForTesting(visibleFrame: visibleFrame)
@@ -673,10 +699,13 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerSearchHeightChangeKeepsPresentedPanelAnchoredAtTop() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
-            let controller = SwitcherPanelController()
-            controller.modelForTesting.snapshotProviderOverride = {
-                RuntimeSnapshot(apps: self.layoutScenarioApps(count: 10), contextsByID: [:])
-            }
+            let controller = SwitcherPanelController(
+                model: LiveSwitcherModel(
+                    snapshotService: RecordingRuntimeSnapshotService(
+                        appSwitcherApps: self.layoutScenarioApps(count: 10)
+                    )
+                )
+            )
 
             XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
             XCTAssertTrue(controller.enterSearchModeIfPossible())
@@ -706,10 +735,13 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerSearchEnterAppliesSelectionAndEscapeExitsSearch() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
-            let controller = SwitcherPanelController()
-            controller.modelForTesting.snapshotProviderOverride = {
-                RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
-            }
+            let controller = SwitcherPanelController(
+                model: LiveSwitcherModel(
+                    snapshotService: RecordingRuntimeSnapshotService(
+                        appSwitcherApps: self.searchScenarioApps()
+                    )
+                )
+            )
 
             XCTAssertTrue(controller.modelForTesting.startSession(triggerDirection: .forward))
             XCTAssertTrue(controller.modelForTesting.enterSearchMode())
@@ -808,10 +840,13 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerEnterStartsSearchFromMainSwitcher() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
-            let controller = SwitcherPanelController()
-            controller.modelForTesting.snapshotProviderOverride = {
-                RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
-            }
+            let controller = SwitcherPanelController(
+                model: LiveSwitcherModel(
+                    snapshotService: RecordingRuntimeSnapshotService(
+                        appSwitcherApps: self.searchScenarioApps()
+                    )
+                )
+            )
 
             XCTAssertTrue(controller.modelForTesting.startSession(triggerDirection: .forward))
 
@@ -841,11 +876,14 @@ extension FlowTabPriorityCoverageTests {
                 FlowTabTestLaunchOptions.environmentOverrideForTesting = previousLaunchEnvironment
             }
 
-            let controller = SwitcherPanelController()
             let apps = searchScenarioApps()
-            controller.modelForTesting.snapshotProviderOverride = {
-                RuntimeSnapshot(apps: apps, contextsByID: [:])
-            }
+            let controller = SwitcherPanelController(
+                model: LiveSwitcherModel(
+                    snapshotService: RecordingRuntimeSnapshotService(
+                        appSwitcherApps: apps
+                    )
+                )
+            )
 
             FlowTabUITestBootstrapper.presentInitialUIIfNeeded(panelController: controller)
 
@@ -876,10 +914,13 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerMarkedTextPassesSearchShortcutKeysThrough() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
-            let controller = SwitcherPanelController()
-            controller.modelForTesting.snapshotProviderOverride = {
-                RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
-            }
+            let controller = SwitcherPanelController(
+                model: LiveSwitcherModel(
+                    snapshotService: RecordingRuntimeSnapshotService(
+                        appSwitcherApps: self.searchScenarioApps()
+                    )
+                )
+            )
 
             XCTAssertTrue(controller.modelForTesting.startSession(triggerDirection: .forward))
             XCTAssertTrue(controller.modelForTesting.enterSearchMode())

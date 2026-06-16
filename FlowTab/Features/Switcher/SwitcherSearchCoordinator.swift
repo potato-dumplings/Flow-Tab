@@ -198,6 +198,36 @@ final class SwitcherSearchCoordinator {
         state = .inactive
     }
 
+    func rebuildIndex(with projection: RuntimeSearchIndexProjection) {
+        cancelPendingRebuild()
+        appEntries = projection.appEntries.map { app in
+            AppEntry(
+                appID: app.appID,
+                appDisplayName: app.appDisplayName,
+                searchIndex: app.searchIndex
+            )
+        }
+        windowEntries = projection.windowEntries.map { window in
+            WindowEntry(
+                appID: window.appID,
+                appDisplayName: window.appDisplayName,
+                windowID: window.windowID,
+                windowTitle: window.windowTitle,
+                windowSearchIndex: window.windowSearchIndex,
+                appSearchIndex: window.appSearchIndex
+            )
+        }
+        appInvertedIndex = Self.buildScopeInvertedIndex(from: appEntries.map(\.searchIndex))
+        windowInvertedIndex = Self.buildScopeInvertedIndex(
+            from: windowEntries.map { window in
+                window.windowSearchIndex.mergingCoarseTerms(with: window.appSearchIndex)
+            }
+        )
+        appMatchCache = nil
+        windowMatchCache = nil
+        state = .inactive
+    }
+
     @discardableResult
     func activate(defaultScope: SwitcherSearchScope = .app) -> Bool {
         guard !appEntries.isEmpty else { return false }
