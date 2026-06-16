@@ -80,14 +80,6 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
         self.reconciliationExecutor = reconciliationExecutor
     }
 
-    func fallbackLightweightAppSnapshot() -> RuntimeSnapshot {
-        snapshotQueue.sync { [self] in
-            let snapshot = snapshotProvider.lightweightAppSnapshot()
-            readModelStore.commitAppSwitcherSnapshot(snapshot, clearsDirtyState: false)
-            return snapshot
-        }
-    }
-
     func fallbackHomeAppSummaries() async -> [RuntimeHomeAppSummary] {
         await withCheckedContinuation { continuation in
             snapshotQueue.async { [self] in

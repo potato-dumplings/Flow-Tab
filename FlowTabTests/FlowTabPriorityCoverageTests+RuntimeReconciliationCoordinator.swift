@@ -119,19 +119,33 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(duplicateSignalProjection.freshness.sourceGeneration.projection, 2)
     }
 
-    func testRuntimeSnapshotServiceOwnsReadModelStoreForSnapshotBridgeAndDirtySignals() {
+    func testRuntimeSnapshotServiceOwnsReadModelStoreForProjectionReadsAndDirtySignals() {
         let coordinator = RuntimeReconciliationCoordinator()
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
+        let seededApp = AppSwitchCandidate(
+            id: "com.example.seeded",
+            displayName: "Seeded",
+            groupID: "seeded",
+            lastActiveAt: 100,
+            windows: []
+        )
+        let seededSnapshot = RuntimeSnapshot(apps: [seededApp], contextsByID: [:])
+        let readModelStore = RuntimeReadModelStore()
+        readModelStore.commitAppSwitcherSnapshot(
+            seededSnapshot,
+            clearsDirtyState: false,
+            generatedAt: 1
+        )
         let service = RuntimeSnapshotService(
             label: "FlowTabTests.RuntimeSnapshotService.ReadModelStore",
             snapshotProvider: provider,
+            readModelStore: readModelStore,
             reconciliationExecutor: { _, _ in .completed }
         )
 
-        let snapshot = service.fallbackLightweightAppSnapshot()
         let appProjection = service.readAppSwitcherProjection()
 
-        XCTAssertEqual(appProjection?.apps.map(\.id), snapshot.apps.map(\.id))
+        XCTAssertEqual(appProjection?.apps.map(\.id), seededSnapshot.apps.map(\.id))
         XCTAssertTrue(service.runtimeReadModelDiagnostics().hasAppSwitcherProjection)
 
         service.signalAppWindowsChanged(appID: "com.example.editor", pid: 18_405)
@@ -146,12 +160,6 @@ extension FlowTabPriorityCoverageTests {
             ["appWindows:com.example.editor"]
         )
         XCTAssertFalse(service.readAppSwitcherProjection()?.freshness.isCompleteForScope ?? true)
-
-        _ = service.fallbackLightweightAppSnapshot()
-
-        let postLightweightDiagnostics = service.runtimeReadModelDiagnostics()
-        XCTAssertEqual(postLightweightDiagnostics.dirtyAppIDs, ["com.example.editor"])
-        XCTAssertEqual(postLightweightDiagnostics.dirtyPIDs, [18_405])
     }
 
     func testRuntimeReadModelStoreKeepsStagingSearchIndexHiddenUntilCommit() throws {
@@ -623,7 +631,7 @@ extension FlowTabPriorityCoverageTests {
         )
 
         service.signalSpaceTopologyChanged()
-        _ = service.fallbackLightweightAppSnapshot()
+        _ = service.drainReadyReconciliationRequestsSynchronouslyForTesting()
 
         let request = try XCTUnwrap(executedRequests.first)
         XCTAssertEqual(request.target, .spaceTopology)
@@ -772,7 +780,7 @@ extension FlowTabPriorityCoverageTests {
         )
 
         service.signalAppWindowsChanged(appID: "com.example.editor", pid: 18_405)
-        _ = service.fallbackLightweightAppSnapshot()
+        _ = service.drainReadyReconciliationRequestsSynchronouslyForTesting()
 
         let request = try XCTUnwrap(executedRequests.first)
         XCTAssertEqual(request.appID, "com.example.editor")
@@ -825,7 +833,7 @@ extension FlowTabPriorityCoverageTests {
             pid: pid,
             axWindowID: axWindowID
         )
-        _ = service.fallbackLightweightAppSnapshot()
+        _ = service.drainReadyReconciliationRequestsSynchronouslyForTesting()
 
         let request = try XCTUnwrap(executedRequests.first)
         let downgradedRecord = provider.windowMappingStateByPID[pid]?
@@ -857,7 +865,7 @@ extension FlowTabPriorityCoverageTests {
         )
 
         service.signalAppLaunched(appID: "com.example.new", pid: 18_407)
-        _ = service.fallbackLightweightAppSnapshot()
+        _ = service.drainReadyReconciliationRequestsSynchronouslyForTesting()
 
         let request = try XCTUnwrap(executedRequests.first)
         XCTAssertEqual(request.target, .app(18_407))
@@ -998,7 +1006,7 @@ extension FlowTabPriorityCoverageTests {
                 allowedActions: WindowBindingConfidence.exact.allowedActions
             )
         )
-        _ = service.fallbackLightweightAppSnapshot()
+        _ = service.drainReadyReconciliationRequestsSynchronouslyForTesting()
 
         let request = try XCTUnwrap(executedRequests.first)
         XCTAssertEqual(request.appID, "com.example.editor")
@@ -1049,7 +1057,7 @@ extension FlowTabPriorityCoverageTests {
                 allowedActions: WindowBindingConfidence.exact.allowedActions
             )
         )
-        _ = service.fallbackLightweightAppSnapshot()
+        _ = service.drainReadyReconciliationRequestsSynchronouslyForTesting()
 
         let request = try XCTUnwrap(executedRequests.first)
         XCTAssertEqual(request.target, .app(pid))
@@ -1101,7 +1109,7 @@ extension FlowTabPriorityCoverageTests {
                 allowedActions: WindowBindingConfidence.exact.allowedActions
             )
         )
-        _ = service.fallbackLightweightAppSnapshot()
+        _ = service.drainReadyReconciliationRequestsSynchronouslyForTesting()
 
         let request = try XCTUnwrap(executedRequests.first)
         XCTAssertEqual(request.target, .app(pid))

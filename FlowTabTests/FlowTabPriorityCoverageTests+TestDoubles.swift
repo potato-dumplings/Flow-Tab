@@ -252,13 +252,6 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
         lock.unlock()
     }
 
-    func fallbackLightweightAppSnapshot() -> RuntimeSnapshot {
-        lock.lock()
-        lightweightSnapshotRequests += 1
-        lock.unlock()
-        return RuntimeSnapshot(apps: [], contextsByID: [:])
-    }
-
     func fallbackHomeAppSummaries() async -> [RuntimeHomeAppSummary] {
         lock.lock()
         homeSummariesRequests += 1
