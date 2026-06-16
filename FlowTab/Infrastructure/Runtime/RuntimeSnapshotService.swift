@@ -80,14 +80,6 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
         self.reconciliationExecutor = reconciliationExecutor
     }
 
-    func fallbackRuntimeSnapshot() -> RuntimeSnapshot {
-        snapshotQueue.sync { [self] in
-            let snapshot = snapshotProvider.snapshot()
-            readModelStore.commitAppSwitcherSnapshot(snapshot)
-            return snapshot
-        }
-    }
-
     func fallbackLightweightAppSnapshot() -> RuntimeSnapshot {
         snapshotQueue.sync { [self] in
             let snapshot = snapshotProvider.lightweightAppSnapshot()
