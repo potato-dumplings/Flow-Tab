@@ -49,7 +49,7 @@ extension LiveSwitcherModel {
     }
 
     func logLoadSnapshotEmpty(
-        event: String = "loadSnapshot",
+        event: String = "loadAppSwitcherProjectionSession",
         triggerDirection: CycleDirection,
         snapshotReadMs: Double,
         recencyAppliedMs: Double,
@@ -71,7 +71,7 @@ extension LiveSwitcherModel {
     }
 
     func logLoadSnapshotReady(
-        event: String = "loadSnapshot",
+        event: String = "loadAppSwitcherProjectionSession",
         triggerDirection: CycleDirection,
         snapshot: RuntimeSnapshot,
         snapshotReadMs: Double,
@@ -160,11 +160,11 @@ extension LiveSwitcherModel {
         }
     }
 
-    func logMakeSnapshot(source: String, snapshot: RuntimeSnapshot, durationMs: Double) {
+    func logReadAppSwitcherProjectionSnapshot(source: String, snapshot: RuntimeSnapshot, durationMs: Double) {
         RuntimeLog.debug(
             "Snapshot",
             Self.snapshotLogLine(
-                "makeSnapshot",
+                "readAppSwitcherProjectionSnapshot",
                 fields: [
                     ("source", source),
                     ("apps", "\(snapshot.apps.count)"),

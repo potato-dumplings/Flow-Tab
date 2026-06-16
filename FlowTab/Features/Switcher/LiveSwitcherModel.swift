@@ -383,7 +383,7 @@ final class LiveSwitcherModel: ObservableObject {
         clearTerminateSelectedAppAnimation()
         overlayStyle = .appAndWindow
         titleBarStyleInferenceEnabled = false
-        guard loadFastAppSnapshot(triggerDirection: triggerDirection, preferredSelectedAppID: nil) else {
+        guard loadFastAppSwitcherProjectionSession(triggerDirection: triggerDirection, preferredSelectedAppID: nil) else {
             requestRuntimeProjectionMaintenance(triggerDirection: triggerDirection)
             return false
         }
@@ -412,7 +412,7 @@ final class LiveSwitcherModel: ObservableObject {
         var resolvedContext: RuntimeAppContext?
 
         if hasTestingSnapshotProviderOverride {
-            let rawSnapshot = makeSnapshot()
+            let rawSnapshot = readAppSwitcherProjectionSnapshot()
             snapshotReadMs = Self.monotonicMilliseconds()
             let snapshot = snapshotWithWindowRecencyApplied(rawSnapshot)
             recencyAppliedMs = Self.monotonicMilliseconds()
@@ -718,7 +718,7 @@ final class LiveSwitcherModel: ObservableObject {
             pendingTerminateRequest = nil
         }
         runtimeSnapshotService.signalAppTerminated(appID: appID, pid: pid)
-        let refreshed = loadSnapshot(
+        let refreshed = loadAppSwitcherProjectionSession(
             triggerDirection: .forward,
             preferredSelectedAppID: matchesPending ? pendingRequest?.preferredSelectedAppID : nil,
             animateAppStripUpdate: true,

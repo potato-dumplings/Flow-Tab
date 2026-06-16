@@ -2,7 +2,7 @@ import Foundation
 import FlowTabCore
 
 extension LiveSwitcherModel {
-    func loadSnapshot(
+    func loadAppSwitcherProjectionSession(
         triggerDirection: CycleDirection,
         preferredSelectedAppID: String?,
         animateAppStripUpdate _: Bool = false,
@@ -12,42 +12,42 @@ extension LiveSwitcherModel {
         let startMs = Self.monotonicMilliseconds()
         let previousSearchState = preserveSearchState ? searchViewState : .inactive
         cancelPendingSearchComputation()
-        let rawSnapshot = makeSnapshot()
+        let rawSnapshot = readAppSwitcherProjectionSnapshot()
         let snapshotReadMs = Self.monotonicMilliseconds()
-        return applySnapshot(
+        return applyAppSwitcherProjectionSnapshot(
             rawSnapshot,
             triggerDirection: triggerDirection,
             preferredSelectedAppID: preferredSelectedAppID,
             previousSearchState: previousSearchState,
             startMs: startMs,
             snapshotReadMs: snapshotReadMs,
-            logEvent: "loadSnapshot",
+            logEvent: "loadAppSwitcherProjectionSession",
             resetWhenEmpty: resetWhenEmpty
         )
     }
 
-    func loadFastAppSnapshot(
+    func loadFastAppSwitcherProjectionSession(
         triggerDirection: CycleDirection,
         preferredSelectedAppID: String?
     ) -> Bool {
         let startMs = Self.monotonicMilliseconds()
         cancelPendingSearchComputation()
-        let rawSnapshot = makeFastAppSnapshot()
+        let rawSnapshot = readFastAppSwitcherProjectionSnapshot()
         let snapshotReadMs = Self.monotonicMilliseconds()
-        return applySnapshot(
+        return applyAppSwitcherProjectionSnapshot(
             rawSnapshot,
             triggerDirection: triggerDirection,
             preferredSelectedAppID: preferredSelectedAppID,
             previousSearchState: .inactive,
             startMs: startMs,
             snapshotReadMs: snapshotReadMs,
-            logEvent: "loadFastAppSnapshot",
+            logEvent: "loadFastAppSwitcherProjectionSession",
             resetWhenEmpty: true
         )
     }
 
     @discardableResult
-    func applySnapshot(
+    func applyAppSwitcherProjectionSnapshot(
         _ rawSnapshot: RuntimeSnapshot,
         triggerDirection: CycleDirection,
         preferredSelectedAppID: String?,
@@ -113,7 +113,7 @@ extension LiveSwitcherModel {
         }
         let sessionReadyMs = Self.monotonicMilliseconds()
         if previousSearchState.isActive {
-            _ = rebuildSearchIndexFromCommittedProjection(reason: "snapshotRefresh")
+            _ = rebuildSearchIndexFromCommittedProjection(reason: "appSwitcherProjectionRefresh")
         } else {
             _ = searchCoordinator.exit()
         }
@@ -361,7 +361,7 @@ extension LiveSwitcherModel {
         RuntimeLog.debug(.snapshot, record.logMessage)
     }
 
-    func makeSnapshot() -> RuntimeSnapshot {
+    func readAppSwitcherProjectionSnapshot() -> RuntimeSnapshot {
         let startMs = Self.monotonicMilliseconds()
         let source: String
         let snapshot: RuntimeSnapshot
@@ -379,11 +379,11 @@ extension LiveSwitcherModel {
             snapshot = RuntimeSnapshot(apps: [], contextsByID: [:])
         }
         let durationMs = Self.monotonicMilliseconds() - startMs
-        logMakeSnapshot(source: source, snapshot: snapshot, durationMs: durationMs)
+        logReadAppSwitcherProjectionSnapshot(source: source, snapshot: snapshot, durationMs: durationMs)
         return snapshot
     }
 
-    func makeFastAppSnapshot() -> RuntimeSnapshot {
+    func readFastAppSwitcherProjectionSnapshot() -> RuntimeSnapshot {
         let startMs = Self.monotonicMilliseconds()
         let source: String
         let snapshot: RuntimeSnapshot
@@ -400,7 +400,7 @@ extension LiveSwitcherModel {
             snapshot = RuntimeSnapshot(apps: [], contextsByID: [:])
         }
         let durationMs = Self.monotonicMilliseconds() - startMs
-        logMakeSnapshot(source: source, snapshot: snapshot, durationMs: durationMs)
+        logReadAppSwitcherProjectionSnapshot(source: source, snapshot: snapshot, durationMs: durationMs)
         return snapshot
     }
 
