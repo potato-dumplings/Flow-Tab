@@ -373,8 +373,8 @@ extension LiveSwitcherModel {
                 : "runtimeProjectionDirty"
             snapshot = projection.appCycleSnapshot
         } else {
-            source = "runtimeSnapshotService"
-            snapshot = runtimeSnapshotService.snapshot()
+            source = "runtimeSnapshotFallback"
+            snapshot = runtimeSnapshotService.fallbackRuntimeSnapshot()
         }
         let durationMs = Self.monotonicMilliseconds() - startMs
         logMakeSnapshot(source: source, snapshot: snapshot, durationMs: durationMs)

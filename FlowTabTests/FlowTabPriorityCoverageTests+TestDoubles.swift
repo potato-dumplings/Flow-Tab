@@ -255,7 +255,7 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
         lock.unlock()
     }
 
-    func snapshot() -> RuntimeSnapshot {
+    func fallbackRuntimeSnapshot() -> RuntimeSnapshot {
         lock.lock()
         snapshotRequests += 1
         lock.unlock()

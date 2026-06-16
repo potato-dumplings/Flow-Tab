@@ -10,7 +10,7 @@ enum RuntimeProjectionMaintenanceReason: String, Sendable {
 }
 
 protocol RuntimeSnapshotServing: Sendable {
-    func snapshot() -> RuntimeSnapshot
+    func fallbackRuntimeSnapshot() -> RuntimeSnapshot
     func lightweightAppSnapshot() -> RuntimeSnapshot
     func homeAppSummaries() async -> [RuntimeHomeAppSummary]
     func homeAppSummary(for appID: String) async -> RuntimeHomeAppSummary?
@@ -84,7 +84,7 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
         self.reconciliationExecutor = reconciliationExecutor
     }
 
-    func snapshot() -> RuntimeSnapshot {
+    func fallbackRuntimeSnapshot() -> RuntimeSnapshot {
         snapshotQueue.sync { [self] in
             let snapshot = snapshotProvider.snapshot()
             readModelStore.commitAppSwitcherSnapshot(snapshot)
