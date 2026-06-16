@@ -1,8 +1,106 @@
+import AppKit
 import CoreGraphics
 import XCTest
 @testable import FlowTab
 
 extension FlowTabPriorityCoverageTests {
+    func testRuntimeReadModelStoreCommitsProjectionsAndMarksDirtyMetadata() throws {
+        let store = RuntimeReadModelStore()
+        let apps = searchScenarioApps()
+        let app = try XCTUnwrap(apps.first)
+        let pid = NSRunningApplication.current.processIdentifier
+        let generatedAt = TimeInterval(42)
+
+        store.commitAppSwitcherSnapshot(
+            RuntimeSnapshot(apps: apps, contextsByID: [:]),
+            generatedAt: generatedAt
+        )
+
+        var appProjection = try XCTUnwrap(store.readAppSwitcherProjection())
+        XCTAssertEqual(appProjection.apps.map(\.id), apps.map(\.id))
+        XCTAssertEqual(appProjection.freshness.generatedAt, generatedAt)
+        XCTAssertTrue(appProjection.freshness.isCompleteForScope)
+        XCTAssertEqual(appProjection.freshness.sourceGeneration.projection, 1)
+
+        store.markAppWindowsDirty(
+            appID: app.id,
+            pid: pid,
+            pendingScope: "appWindows:\(app.id)"
+        )
+
+        appProjection = try XCTUnwrap(store.readAppSwitcherProjection())
+        XCTAssertFalse(appProjection.freshness.isCompleteForScope)
+        XCTAssertEqual(appProjection.freshness.dirtyAppIDs, [app.id])
+        XCTAssertEqual(appProjection.freshness.dirtyPIDs, [pid])
+        XCTAssertEqual(appProjection.freshness.pendingRepairScopes, ["appWindows:\(app.id)"])
+        XCTAssertEqual(appProjection.freshness.sourceGeneration.axDirty, 1)
+
+        let summary = RuntimeHomeAppSummary(
+            appID: app.id,
+            displayName: app.displayName,
+            groupID: app.groupID,
+            lastActiveAt: app.lastActiveAt,
+            windowCount: app.windows.count,
+            pid: pid
+        )
+        let snapshot = RuntimeHomeAppSnapshot(
+            summary: summary,
+            candidate: app,
+            context: makeRuntimeAppContext(
+                appID: app.id,
+                runningApp: .current,
+                windows: app.windows
+            )
+        )
+
+        store.commitCurrentAppWindowSnapshot(snapshot, generatedAt: generatedAt + 1)
+
+        let currentAppProjection = try XCTUnwrap(
+            store.readCurrentAppWindowProjection(appID: app.id)
+        )
+        XCTAssertEqual(currentAppProjection.snapshot.candidate.id, app.id)
+        XCTAssertTrue(currentAppProjection.freshness.isCompleteForScope)
+        XCTAssertEqual(currentAppProjection.freshness.sourceGeneration.projection, 2)
+        let diagnostics = store.diagnostics()
+        XCTAssertTrue(diagnostics.dirtyAppIDs.isEmpty)
+        XCTAssertEqual(diagnostics.currentAppWindowProjectionAppIDs, [app.id])
+    }
+
+    func testRuntimeSnapshotServiceOwnsReadModelStoreForSnapshotBridgeAndDirtySignals() {
+        let coordinator = RuntimeReconciliationCoordinator()
+        let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
+        let service = RuntimeSnapshotService(
+            label: "FlowTabTests.RuntimeSnapshotService.ReadModelStore",
+            snapshotProvider: provider,
+            reconciliationExecutor: { _, _ in .completed }
+        )
+
+        let snapshot = service.lightweightAppSnapshot()
+        let appProjection = service.readAppSwitcherProjection()
+
+        XCTAssertEqual(appProjection?.apps.map(\.id), snapshot.apps.map(\.id))
+        XCTAssertTrue(service.runtimeReadModelDiagnostics().hasAppSwitcherProjection)
+
+        service.signalAppWindowsChanged(appID: "com.example.editor", pid: 18_405)
+        _ = service.drainReadyReconciliationRequestsSynchronouslyForTesting(now: 10)
+
+        let diagnostics = service.runtimeReadModelDiagnostics()
+        XCTAssertEqual(diagnostics.dirtyAppIDs, ["com.example.editor"])
+        XCTAssertEqual(diagnostics.dirtyPIDs, [18_405])
+        XCTAssertEqual(diagnostics.generation.axDirty, 1)
+        XCTAssertEqual(
+            service.readAppSwitcherProjection()?.freshness.pendingRepairScopes,
+            ["appWindows:com.example.editor"]
+        )
+        XCTAssertFalse(service.readAppSwitcherProjection()?.freshness.isCompleteForScope ?? true)
+
+        _ = service.lightweightAppSnapshot()
+
+        let postLightweightDiagnostics = service.runtimeReadModelDiagnostics()
+        XCTAssertEqual(postLightweightDiagnostics.dirtyAppIDs, ["com.example.editor"])
+        XCTAssertEqual(postLightweightDiagnostics.dirtyPIDs, [18_405])
+    }
+
     func testRuntimeReconciliationCoordinatorMarksSpaceTopologyAffectedWindows() {
         let coordinator = RuntimeReconciliationCoordinator()
         let previous = RuntimeSpaceTopologySnapshot(

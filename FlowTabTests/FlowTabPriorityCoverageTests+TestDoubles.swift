@@ -192,6 +192,31 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
         return focusedSnapshotsByPID[pid]
     }
 
+    func readAppSwitcherProjection() -> RuntimeAppSwitcherProjection? {
+        nil
+    }
+
+    func readHomeSummaryProjection() -> RuntimeHomeSummaryProjection? {
+        nil
+    }
+
+    func readCurrentAppWindowProjection(appID _: String) -> RuntimeCurrentAppWindowProjection? {
+        nil
+    }
+
+    func runtimeReadModelDiagnostics() -> RuntimeReadModelDiagnostics {
+        RuntimeReadModelDiagnostics(
+            generation: RuntimeReadModelGeneration(),
+            dirtyAppIDs: [],
+            dirtyPIDs: [],
+            dirtyCGWindowIDs: [],
+            pendingRepairScopes: [],
+            hasAppSwitcherProjection: false,
+            hasHomeSummaryProjection: false,
+            currentAppWindowProjectionAppIDs: []
+        )
+    }
+
     func currentCGWindowsByPID() -> [pid_t: [RuntimeSnapshotProvider.CGWindowEntry]] {
         [:]
     }

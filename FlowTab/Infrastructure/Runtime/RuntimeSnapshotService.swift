@@ -12,6 +12,10 @@ protocol RuntimeSnapshotServing: Sendable {
     func homeAppSnapshot(for appID: String) async -> RuntimeHomeAppSnapshot?
     func homeAppSnapshotSynchronously(for appID: String) -> RuntimeHomeAppSnapshot?
     func focusedAppSnapshot(processIdentifier pid: pid_t) -> RuntimeHomeAppSnapshot?
+    func readAppSwitcherProjection() -> RuntimeAppSwitcherProjection?
+    func readHomeSummaryProjection() -> RuntimeHomeSummaryProjection?
+    func readCurrentAppWindowProjection(appID: String) -> RuntimeCurrentAppWindowProjection?
+    func runtimeReadModelDiagnostics() -> RuntimeReadModelDiagnostics
     func currentCGWindowsByPID() -> [pid_t: [RuntimeSnapshotProvider.CGWindowEntry]]
     func signalSpaceTopologyChanged()
     func signalAppLaunched(appID: String, pid: pid_t)
@@ -37,36 +41,45 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
     private let snapshotQueue: DispatchQueue
     private let snapshotProvider: RuntimeSnapshotProvider
     private let windowRecencyTracker: RuntimeWindowRecencyTracker
+    private let readModelStore: RuntimeReadModelStore
     private let reconciliationExecutor: ReconciliationExecutor
 
     init(
         label: String = "FlowTab.RuntimeSnapshotService",
         snapshotProvider: RuntimeSnapshotProvider = RuntimeSnapshotProvider(),
         windowRecencyTracker: RuntimeWindowRecencyTracker = .shared,
+        readModelStore: RuntimeReadModelStore = RuntimeReadModelStore(),
         reconciliationExecutor: @escaping ReconciliationExecutor = RuntimeSnapshotService.defaultReconciliationExecutor
     ) {
         snapshotQueue = DispatchQueue(label: label, qos: .utility)
         self.snapshotProvider = snapshotProvider
         self.windowRecencyTracker = windowRecencyTracker
+        self.readModelStore = readModelStore
         self.reconciliationExecutor = reconciliationExecutor
     }
 
     func snapshot() -> RuntimeSnapshot {
-        snapshotQueue.sync {
-            snapshotProvider.snapshot()
+        snapshotQueue.sync { [self] in
+            let snapshot = snapshotProvider.snapshot()
+            readModelStore.commitAppSwitcherSnapshot(snapshot)
+            return snapshot
         }
     }
 
     func lightweightAppSnapshot() -> RuntimeSnapshot {
-        snapshotQueue.sync {
-            snapshotProvider.lightweightAppSnapshot()
+        snapshotQueue.sync { [self] in
+            let snapshot = snapshotProvider.lightweightAppSnapshot()
+            readModelStore.commitAppSwitcherSnapshot(snapshot, clearsDirtyState: false)
+            return snapshot
         }
     }
 
     func homeAppSummaries() async -> [RuntimeHomeAppSummary] {
         await withCheckedContinuation { continuation in
             snapshotQueue.async { [self] in
-                continuation.resume(returning: snapshotProvider.homeAppSummaries())
+                let summaries = snapshotProvider.homeAppSummaries()
+                readModelStore.commitHomeSummaries(summaries)
+                continuation.resume(returning: summaries)
             }
         }
     }
@@ -74,7 +87,11 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
     func homeAppSummary(for appID: String) async -> RuntimeHomeAppSummary? {
         await withCheckedContinuation { continuation in
             snapshotQueue.async { [self] in
-                continuation.resume(returning: snapshotProvider.homeAppSummary(for: appID))
+                let summary = snapshotProvider.homeAppSummary(for: appID)
+                if let summary {
+                    readModelStore.commitHomeSummary(summary)
+                }
+                continuation.resume(returning: summary)
             }
         }
     }
@@ -83,8 +100,12 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
         await withCheckedContinuation { continuation in
             snapshotQueue.async { [self] in
                 let snapshot = snapshotProvider.homeAppSnapshot(for: appID)
+                    .map(windowRecencyTracker.homeSnapshotWithRecencyApplied)
+                if let snapshot {
+                    readModelStore.commitCurrentAppWindowSnapshot(snapshot)
+                }
                 continuation.resume(
-                    returning: snapshot.map(windowRecencyTracker.homeSnapshotWithRecencyApplied)
+                    returning: snapshot
                 )
             }
         }
@@ -93,15 +114,39 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
     func homeAppSnapshotSynchronously(for appID: String) -> RuntimeHomeAppSnapshot? {
         snapshotQueue.sync { [self] in
             let snapshot = snapshotProvider.homeAppSnapshot(for: appID)
-            return snapshot.map(windowRecencyTracker.homeSnapshotWithRecencyApplied)
+                .map(windowRecencyTracker.homeSnapshotWithRecencyApplied)
+            if let snapshot {
+                readModelStore.commitCurrentAppWindowSnapshot(snapshot)
+            }
+            return snapshot
         }
     }
 
     func focusedAppSnapshot(processIdentifier pid: pid_t) -> RuntimeHomeAppSnapshot? {
         snapshotQueue.sync { [self] in
             let snapshot = snapshotProvider.focusedAppSnapshot(processIdentifier: pid)
-            return snapshot.map(windowRecencyTracker.homeSnapshotWithRecencyApplied)
+                .map(windowRecencyTracker.homeSnapshotWithRecencyApplied)
+            if let snapshot {
+                readModelStore.commitCurrentAppWindowSnapshot(snapshot)
+            }
+            return snapshot
         }
+    }
+
+    func readAppSwitcherProjection() -> RuntimeAppSwitcherProjection? {
+        readModelStore.readAppSwitcherProjection()
+    }
+
+    func readHomeSummaryProjection() -> RuntimeHomeSummaryProjection? {
+        readModelStore.readHomeSummaryProjection()
+    }
+
+    func readCurrentAppWindowProjection(appID: String) -> RuntimeCurrentAppWindowProjection? {
+        readModelStore.readCurrentAppWindowProjection(appID: appID)
+    }
+
+    func runtimeReadModelDiagnostics() -> RuntimeReadModelDiagnostics {
+        readModelStore.diagnostics()
     }
 
     func currentCGWindowsByPID() -> [pid_t: [RuntimeSnapshotProvider.CGWindowEntry]] {
@@ -113,6 +158,10 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
     func signalSpaceTopologyChanged() {
         snapshotQueue.async { [self] in
             _ = snapshotProvider.collectCGWindowsByPID(options: [.excludeDesktopElements])
+            readModelStore.markSpaceTopologyDirty(
+                affectedCGWindowIDs: [],
+                pendingScope: "spaceTopology"
+            )
             drainReadyReconciliationRequestsLocked(now: Date.timeIntervalSinceReferenceDate)
         }
     }
@@ -120,6 +169,11 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
     func signalAppLaunched(appID: String, pid: pid_t) {
         snapshotQueue.async { [self] in
             let now = Date.timeIntervalSinceReferenceDate
+            readModelStore.markAppLifecycleDirty(
+                appID: appID,
+                pid: pid,
+                pendingScope: "appLaunched:\(appID)"
+            )
             snapshotProvider.reconciliationCoordinator.markAppDirty(
                 appID: appID,
                 pid: pid,
@@ -134,6 +188,11 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
     func signalAppWindowsChanged(appID: String, pid: pid_t) {
         snapshotQueue.async { [self] in
             let now = Date.timeIntervalSinceReferenceDate
+            readModelStore.markAppWindowsDirty(
+                appID: appID,
+                pid: pid,
+                pendingScope: "appWindows:\(appID)"
+            )
             snapshotProvider.reconciliationCoordinator.markAppDirty(
                 appID: appID,
                 pid: pid,
@@ -151,6 +210,11 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
                 processIdentifier: pid,
                 axWindowID: axWindowID,
                 now: now
+            )
+            readModelStore.markAppWindowsDirty(
+                appID: appID,
+                pid: pid,
+                pendingScope: "axWindowDestroyed:\(appID)"
             )
             RuntimeLog.debug(
                 .snapshot,
@@ -172,6 +236,7 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
             snapshotProvider.reconciliationCoordinator.cancelAppRequests(pid: pid)
             snapshotProvider.clearWindowMappingState(for: pid)
             AXLiveWindowRegistry.shared.remove(pid: pid)
+            readModelStore.markAppTerminated(appID: appID, pid: pid)
             RuntimeLog.debug(.snapshot, "runtimeLifecycle appTerminated appID=\(appID) pid=\(pid)")
         }
     }
@@ -180,6 +245,11 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
         snapshotQueue.async { [self] in
             let now = Date.timeIntervalSinceReferenceDate
             snapshotProvider.recordWindowFocusVerification(verification, now: now)
+            readModelStore.markWindowFocusVerified(
+                appID: verification.appID,
+                pid: verification.ownerPID,
+                affectedCGWindowIDs: Set([verification.targetCGWindowID, verification.focusedCGWindowID].compactMap { $0 })
+            )
             snapshotProvider.reconciliationCoordinator.markWindowFocusVerified(
                 verification,
                 now: now
