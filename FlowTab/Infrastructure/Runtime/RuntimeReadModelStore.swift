@@ -212,6 +212,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             snapshot: snapshot,
             freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: true)
         )
+        upsertAppSwitcherSnapshotLocked(snapshot, generatedAt: generatedAt)
     }
 
     func stageSearchIndexSnapshot(
@@ -455,6 +456,32 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         dirtyAppIDs.remove(appID)
         dirtyPIDs.remove(pid)
         pendingRepairScopes = pendingRepairScopes.filter { !$0.contains(appID) }
+    }
+
+    private func upsertAppSwitcherSnapshotLocked(
+        _ snapshot: RuntimeHomeAppSnapshot,
+        generatedAt: TimeInterval
+    ) {
+        var apps = appSwitcherProjection?.apps ?? []
+        if let index = apps.firstIndex(where: { $0.id == snapshot.candidate.id }) {
+            apps[index] = snapshot.candidate
+        } else {
+            apps.append(snapshot.candidate)
+        }
+        apps.sort { lhs, rhs in
+            if lhs.lastActiveAt == rhs.lastActiveAt {
+                return lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName) == .orderedAscending
+            }
+            return lhs.lastActiveAt > rhs.lastActiveAt
+        }
+
+        var contextsByID = appSwitcherProjection?.contextsByID ?? [:]
+        contextsByID[snapshot.context.appID] = snapshot.context
+        appSwitcherProjection = RuntimeAppSwitcherProjection(
+            apps: apps,
+            contextsByID: contextsByID,
+            freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: !isDirtyLocked)
+        )
     }
 
     private func freshnessLocked(

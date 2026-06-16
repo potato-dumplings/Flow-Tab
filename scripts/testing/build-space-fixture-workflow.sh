@@ -176,7 +176,7 @@ while IFS=$'\t' read -r APP_ID APP_NAME BUNDLE_ID; do
     exit 1
   fi
 
-  VARIANT_APP_NAME="$(sanitize_app_bundle_name "${APP_NAME}").app"
+  VARIANT_APP_NAME="$(sanitize_app_bundle_name "${APP_NAME}-${BUNDLE_ID}").app"
   VARIANT_APP_PATH="${OUTPUT_DIR}/${VARIANT_APP_NAME}"
   INFO_PLIST_PATH="${VARIANT_APP_PATH}/Contents/Info.plist"
 

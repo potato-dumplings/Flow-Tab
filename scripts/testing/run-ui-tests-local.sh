@@ -64,10 +64,13 @@ import sys
 resolved_path = sys.argv[1]
 expected_workflow = "multi-app-home-window-counts"
 expected_apps = {
-    "finder": "com.example.fixture.finder",
-    "chrome": "com.example.fixture.chrome",
-    "notes": "com.example.fixture.notes",
+    "finder": ("Finder Fixture", "com.example.fixture.finder"),
+    "chrome": ("Chrome Fixture", "com.example.fixture.chrome"),
+    "notes": ("Notes Fixture", "com.example.fixture.notes"),
 }
+
+def sanitized_app_bundle_name(app_name, bundle_id):
+    return f"{app_name}-{bundle_id}.app".replace("/", "-").replace(":", "-")
 
 try:
     with open(resolved_path, encoding="utf-8") as handle:
@@ -90,7 +93,7 @@ if not isinstance(apps, list):
     raise SystemExit(1)
 
 apps_by_id = {str(app.get("appID", "")).strip(): app for app in apps}
-for app_id, expected_bundle_id in expected_apps.items():
+for app_id, (expected_app_name, expected_bundle_id) in expected_apps.items():
     app = apps_by_id.get(app_id)
     if app is None:
         print(f"missing fixture app {app_id}")
@@ -104,6 +107,32 @@ for app_id, expected_bundle_id in expected_apps.items():
     app_path = str(app.get("appPath", "")).strip()
     if not app_path or not os.path.isdir(app_path):
         print(f"fixture app {app_id} path is missing: {app_path}")
+        raise SystemExit(1)
+
+    expected_basename = sanitized_app_bundle_name(expected_app_name, expected_bundle_id)
+    actual_basename = os.path.basename(app_path)
+    if actual_basename != expected_basename:
+        print(f"fixture app {app_id} path is {actual_basename!r}, expected {expected_basename!r}")
+        raise SystemExit(1)
+
+    plist_path = os.path.join(app_path, "Contents", "Info.plist")
+    try:
+        import plistlib
+        with open(plist_path, "rb") as handle:
+            plist = plistlib.load(handle)
+    except FileNotFoundError:
+        print(f"fixture app {app_id} Info.plist is missing: {plist_path}")
+        raise SystemExit(1)
+    except Exception as error:
+        print(f"fixture app {app_id} Info.plist is unreadable: {error}")
+        raise SystemExit(1)
+
+    actual_bundle_id = str(plist.get("CFBundleIdentifier", "")).strip()
+    if actual_bundle_id != expected_bundle_id:
+        print(
+            f"fixture app {app_id} Info.plist bundle id is {actual_bundle_id!r}, "
+            f"expected {expected_bundle_id!r}"
+        )
         raise SystemExit(1)
 PY
   )"; then

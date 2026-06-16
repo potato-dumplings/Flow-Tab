@@ -70,6 +70,12 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(currentAppProjection.snapshot.candidate.id, app.id)
         XCTAssertTrue(currentAppProjection.freshness.isCompleteForScope)
         XCTAssertEqual(currentAppProjection.freshness.sourceGeneration.projection, 2)
+        let repairedAppProjection = try XCTUnwrap(store.readAppSwitcherProjection())
+        XCTAssertEqual(
+            repairedAppProjection.apps.first(where: { $0.id == app.id })?.windows.map(\.id),
+            app.windows.map(\.id)
+        )
+        XCTAssertNotNil(repairedAppProjection.contextsByID[app.id])
         let diagnostics = store.diagnostics()
         XCTAssertTrue(diagnostics.dirtyAppIDs.isEmpty)
         XCTAssertEqual(diagnostics.currentAppWindowProjectionAppIDs, [app.id])
@@ -821,6 +827,60 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(request.reasons, Set([.appLaunched]))
         XCTAssertEqual(request.state, .inFlight)
         XCTAssertTrue(coordinator.readyRequests(now: Date.timeIntervalSinceReferenceDate).isEmpty)
+    }
+
+    func testRuntimeSnapshotServiceCommitsLaunchedAppRepairIntoAppSwitcherProjection() throws {
+        let coordinator = RuntimeReconciliationCoordinator()
+        let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
+        let store = RuntimeReadModelStore()
+        let existingApp = AppSwitchCandidate(
+            id: "com.example.existing",
+            displayName: "Existing",
+            groupID: "example",
+            lastActiveAt: 100,
+            windows: []
+        )
+        let repairedApp = AppSwitchCandidate(
+            id: "com.example.new",
+            displayName: "New",
+            groupID: "example",
+            lastActiveAt: 300,
+            windows: [
+                WindowCandidate(
+                    id: "new-window",
+                    title: "New Window",
+                    isMinimized: false,
+                    lastActiveAt: 300
+                )
+            ]
+        )
+        let pid = pid_t(18_407)
+        store.commitAppSwitcherSnapshot(
+            RuntimeSnapshot(apps: [existingApp], contextsByID: [:]),
+            generatedAt: 10
+        )
+        let service = RuntimeSnapshotService(
+            label: "FlowTabTests.RuntimeSnapshotService.AppLaunchRepairCommit",
+            snapshotProvider: provider,
+            readModelStore: store,
+            reconciliationExecutor: { _, _ in
+                .completedWithRepairedSnapshots([
+                    self.makeRuntimeHomeAppSnapshot(app: repairedApp, pid: pid)
+                ])
+            }
+        )
+
+        service.signalAppLaunched(appID: repairedApp.id, pid: pid)
+        _ = service.drainReadyReconciliationRequestsSynchronouslyForTesting(now: 11)
+
+        let projection = try XCTUnwrap(store.readAppSwitcherProjection())
+        XCTAssertEqual(projection.apps.map(\.id), [repairedApp.id, existingApp.id])
+        XCTAssertEqual(
+            projection.apps.first(where: { $0.id == repairedApp.id })?.windows.map(\.id),
+            ["new-window"]
+        )
+        XCTAssertNotNil(projection.contextsByID[repairedApp.id])
+        XCTAssertTrue(projection.freshness.isCompleteForScope)
     }
 
     func testRuntimeSnapshotServiceClearsTerminatedAppRuntimeState() {

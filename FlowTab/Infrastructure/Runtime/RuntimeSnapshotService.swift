@@ -188,9 +188,10 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
     func requestAppSwitcherProjectionMaintenance(reason: RuntimeProjectionMaintenanceReason) {
         snapshotQueue.async { [self] in
             let diagnostics = readModelStore.diagnostics()
-            let startedRequests = drainReadyReconciliationRequestsLocked(
+            let drainResult = drainReadyReconciliationRequestsWithResultLocked(
                 now: Date.timeIntervalSinceReferenceDate
             )
+            commitRepairedSnapshotsLocked(drainResult.repairedSnapshots)
             RuntimeLog.debug(
                 .snapshot,
                 [
@@ -201,7 +202,9 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
                     "dirtyPIDs=\(diagnostics.dirtyPIDs.count)",
                     "dirtyCGWindowIDs=\(diagnostics.dirtyCGWindowIDs.count)",
                     "pendingScopes=\(diagnostics.pendingRepairScopes.count)",
-                    "startedRequests=\(startedRequests.count)"
+                    "startedRequests=\(drainResult.startedRequests.count)",
+                    "completedRequests=\(drainResult.completedCount)",
+                    "repairedApps=\(drainResult.repairedSnapshots.count)"
                 ].joined(separator: " ")
             )
         }
@@ -213,6 +216,7 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
             let drainResult = drainReadyReconciliationRequestsWithResultLocked(
                 now: Date.timeIntervalSinceReferenceDate
             )
+            commitRepairedSnapshotsLocked(drainResult.repairedSnapshots)
             for snapshot in drainResult.repairedSnapshots {
                 readModelStore.stageSearchIndexAppSnapshot(snapshot)
             }
@@ -386,7 +390,15 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
 
     @discardableResult
     private func drainReadyReconciliationRequestsLocked(now: TimeInterval) -> [RuntimeReconciliationRequest] {
-        drainReadyReconciliationRequestsWithResultLocked(now: now).startedRequests
+        let result = drainReadyReconciliationRequestsWithResultLocked(now: now)
+        commitRepairedSnapshotsLocked(result.repairedSnapshots)
+        return result.startedRequests
+    }
+
+    private func commitRepairedSnapshotsLocked(_ snapshots: [RuntimeHomeAppSnapshot]) {
+        for snapshot in snapshots {
+            readModelStore.commitCurrentAppWindowSnapshot(snapshot)
+        }
     }
 
     private func drainReadyReconciliationRequestsWithResultLocked(now: TimeInterval) -> ReconciliationDrainResult {

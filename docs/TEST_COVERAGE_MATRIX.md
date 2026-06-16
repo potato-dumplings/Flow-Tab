@@ -51,6 +51,11 @@ Use this matrix when deciding whether a feature has enough automated evidence ac
 
 No high-value cross-layer gaps are currently tracked here.
 
+## Recent Validation Notes
+
+- 2026-06-16 Phase 5: `RuntimeReadModelStore` now proves current-app repair snapshots upsert the app switcher projection, and `RuntimeSnapshotService` proves launched-app repair snapshots commit into the app switcher projection before hot-path reads depend on it.
+- 2026-06-16 Phase 5: the Space fixture workflow now builds bundle-id-scoped app bundle paths and the UI wrapper validates each fixture bundle path plus `Info.plist` bundle identifier before reuse, preventing stale LaunchServices/app-path contamination from hiding real runtime ownership failures.
+
 ## Maintenance Rules
 
 - Update this file when adding a feature, fixing a user-visible bug, or changing the meaning of an existing test.
