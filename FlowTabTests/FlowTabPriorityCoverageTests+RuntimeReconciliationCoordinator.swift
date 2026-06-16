@@ -162,6 +162,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(initial.id, coalesced.id)
         XCTAssertEqual(started.state, .inFlight)
         XCTAssertEqual(retry.reasons, Set([.axNotification, .manualRefresh]))
+        XCTAssertEqual(retry.priority, .normal)
         XCTAssertEqual(retry.state, .waitingRetry)
         XCTAssertEqual(retry.attempt, 1)
         XCTAssertEqual(retry.notBefore, 11.1, accuracy: 0.0001)
@@ -170,6 +171,53 @@ extension FlowTabPriorityCoverageTests {
 
         coordinator.completeRequest(id: retry.id)
         XCTAssertTrue(coordinator.readyRequests(now: 12).isEmpty)
+    }
+
+    func testRuntimeReconciliationCoordinatorPromotesPriorityAndBypassesRetryBackoff() throws {
+        let coordinator = RuntimeReconciliationCoordinator(
+            retryPolicy: RuntimeReconciliationRetryPolicy(delays: [5])
+        )
+        let pid = pid_t(18_405)
+        let dirty = coordinator.markAppDirty(
+            appID: "com.example.editor",
+            pid: pid,
+            reason: .manualRefresh,
+            now: 10
+        )
+        let started = try XCTUnwrap(coordinator.startRequest(id: dirty.id))
+        let retry = try XCTUnwrap(
+            coordinator.scheduleRetryAfterTransientEmptyAXSnapshot(
+                id: started.id,
+                now: 10.5
+            )
+        )
+
+        XCTAssertEqual(retry.priority, .low)
+        XCTAssertTrue(coordinator.readyRequests(now: 11).isEmpty)
+
+        let promoted = coordinator.markWindowFocusVerified(
+            RuntimeWindowFocusVerification(
+                appID: "com.example.editor",
+                windowID: "cg:18405:240001",
+                ownerPID: pid,
+                targetCGWindowID: 240_001,
+                focusedCGWindowID: 240_002,
+                focusedAXWindow: nil,
+                title: "Verified Window",
+                frame: CGRect(x: 10, y: 20, width: 800, height: 600),
+                allowedActions: WindowBindingConfidence.exact.allowedActions
+            ),
+            now: 11
+        )
+
+        XCTAssertEqual(promoted.id, dirty.id)
+        XCTAssertEqual(promoted.priority, .high)
+        XCTAssertEqual(promoted.state, .pending)
+        XCTAssertEqual(promoted.attempt, 0)
+        XCTAssertEqual(promoted.notBefore, 11, accuracy: 0.0001)
+        XCTAssertEqual(promoted.reasons, Set([.manualRefresh, .activationVerified]))
+        XCTAssertEqual(promoted.affectedCGWindowIDs, Set<CGWindowID>([240_001, 240_002]))
+        XCTAssertEqual(coordinator.readyRequests(now: 11).map(\.id), [dirty.id])
     }
 
     func testRuntimeReconciliationCoordinatorMarksVerifiedFocusReadbackAffectedWindows() throws {
@@ -193,6 +241,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(request.target, .app(18_405))
         XCTAssertEqual(request.appID, "com.example.editor")
         XCTAssertEqual(request.reasons, Set([.activationVerified]))
+        XCTAssertEqual(request.priority, .high)
         XCTAssertEqual(request.affectedCGWindowIDs, Set<CGWindowID>([240_001, 240_002]))
         XCTAssertEqual(coordinator.readyRequests(now: 10).map(\.id), [request.id])
     }
@@ -858,5 +907,44 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(retry.target, .app(18_405))
         XCTAssertEqual(retry.state, .waitingRetry)
         XCTAssertEqual(retry.attempt, 1)
+    }
+
+    func testRuntimeSnapshotServiceMaintenanceRequestDrainsReadyRequestsBySchedulerPriority() {
+        let coordinator = RuntimeReconciliationCoordinator()
+        let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
+        let lowPriority = coordinator.markAppDirty(
+            appID: "com.example.low",
+            pid: 18_405,
+            reason: .manualRefresh,
+            now: 10
+        )
+        let highPriority = coordinator.markAppDirty(
+            appID: "com.example.high",
+            pid: 18_406,
+            reason: .appLaunched,
+            now: 10.1
+        )
+        let lock = NSLock()
+        var executedRequests: [RuntimeReconciliationRequest] = []
+        let expectation = expectation(description: "runtime maintenance drains ready requests")
+        expectation.expectedFulfillmentCount = 2
+        let service = RuntimeSnapshotService(
+            label: "FlowTabTests.RuntimeSnapshotService.MaintenancePriority",
+            snapshotProvider: provider,
+            reconciliationExecutor: { request, _ in
+                lock.lock()
+                executedRequests.append(request)
+                lock.unlock()
+                expectation.fulfill()
+                return .completed
+            }
+        )
+
+        service.requestAppSwitcherProjectionMaintenance(reason: .switcherSessionStarted)
+        wait(for: [expectation], timeout: 1)
+
+        XCTAssertEqual(executedRequests.map(\.id), [highPriority.id, lowPriority.id])
+        XCTAssertEqual(executedRequests.map(\.priority), [.high, .low])
+        XCTAssertTrue(coordinator.readyRequests(now: 11).isEmpty)
     }
 }

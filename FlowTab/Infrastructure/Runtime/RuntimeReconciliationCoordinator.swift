@@ -7,6 +7,27 @@ enum RuntimeReconciliationReason: String, Hashable {
     case appLaunched
     case spaceTopologyChanged
     case manualRefresh
+
+    var schedulerPriority: RuntimeReconciliationPriority {
+        switch self {
+        case .activationVerified, .appLaunched:
+            .high
+        case .axNotification, .spaceTopologyChanged:
+            .normal
+        case .manualRefresh:
+            .low
+        }
+    }
+}
+
+enum RuntimeReconciliationPriority: Int, Comparable {
+    case low = 0
+    case normal = 10
+    case high = 20
+
+    static func < (lhs: RuntimeReconciliationPriority, rhs: RuntimeReconciliationPriority) -> Bool {
+        lhs.rawValue < rhs.rawValue
+    }
 }
 
 enum RuntimeReconciliationTarget: Hashable {
@@ -38,6 +59,7 @@ struct RuntimeReconciliationRequest: Equatable, Identifiable {
     let target: RuntimeReconciliationTarget
     var appID: String?
     var reasons: Set<RuntimeReconciliationReason>
+    var priority: RuntimeReconciliationPriority
     var affectedCGWindowIDs: Set<CGWindowID>
     var state: RuntimeReconciliationState
     var attempt: Int
@@ -106,7 +128,12 @@ final class RuntimeReconciliationCoordinator {
     func readyRequests(now: TimeInterval) -> [RuntimeReconciliationRequest] {
         requestsByTarget.values
             .filter { $0.notBefore <= now && $0.state != .inFlight }
-            .sorted { $0.id < $1.id }
+            .sorted {
+                if $0.priority == $1.priority {
+                    return $0.id < $1.id
+                }
+                return $0.priority > $1.priority
+            }
     }
 
     @discardableResult
@@ -156,6 +183,7 @@ final class RuntimeReconciliationCoordinator {
             target: target,
             appID: appID,
             reasons: [],
+            priority: reasons.schedulerPriority,
             affectedCGWindowIDs: [],
             state: .pending,
             attempt: 0,
@@ -164,16 +192,30 @@ final class RuntimeReconciliationCoordinator {
         if requestsByTarget[target] == nil {
             nextRequestID += 1
         }
+        let incomingPriority = reasons.schedulerPriority
+        let promoted = incomingPriority > request.priority
         request.appID = request.appID ?? appID
         request.reasons.formUnion(reasons)
+        request.priority = max(request.priority, incomingPriority)
         request.affectedCGWindowIDs.formUnion(affectedCGWindowIDs)
         request.state = .pending
-        request.notBefore = min(request.notBefore, now)
+        if promoted {
+            request.attempt = 0
+            request.notBefore = now
+        } else {
+            request.notBefore = min(request.notBefore, now)
+        }
         requestsByTarget[target] = request
         return request
     }
 
     private func target(for id: UInt64) -> RuntimeReconciliationTarget? {
         requestsByTarget.first { $0.value.id == id }?.key
+    }
+}
+
+private extension Set where Element == RuntimeReconciliationReason {
+    var schedulerPriority: RuntimeReconciliationPriority {
+        map(\.schedulerPriority).max() ?? .normal
     }
 }
