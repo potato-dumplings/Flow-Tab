@@ -130,10 +130,10 @@ extension FlowTabUITests {
                 since: topologyLogSnapshot
             )
             waitForRuntimeLogFiles(
-                matching: #"collectCGWindows result=ready .* affected=[1-9][0-9]*"#,
+                matching: #"collectCGWindows result=ready .* affected=[1-9][0-9]* signatureChanged=1 signatureDisplays=[1-9][0-9]* signatureSpaces=[1-9][0-9]* signatureWindows=[1-9][0-9]* signatureFullscreen=[0-9]+ signature=d=.*spaces=[1-9][0-9]*,windows=[1-9][0-9]*,fullscreen=[0-9]+"#,
                 since: topologyLogSnapshot,
                 timeout: 8,
-                description: "nonzero Space topology affected-window diff after \(phase.trace) confirm"
+                description: "nonzero Space topology affected-window diff and signature diagnostics after \(phase.trace) confirm"
             )
             waitForRuntimeLogFiles(
                 matching: "binding-confidence-change windowID=cg:[0-9]+:\(selection.windowNumber) cg=\(selection.windowNumber) .* source=.*->verifiedFocusReadback",
