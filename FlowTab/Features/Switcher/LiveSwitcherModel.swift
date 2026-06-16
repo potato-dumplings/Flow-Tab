@@ -395,6 +395,7 @@ final class LiveSwitcherModel: ObservableObject {
         overlayStyle = .appAndWindow
         titleBarStyleInferenceEnabled = false
         guard loadFastAppSnapshot(triggerDirection: triggerDirection, preferredSelectedAppID: nil) else {
+            requestRuntimeProjectionMaintenance(triggerDirection: triggerDirection)
             return false
         }
         requestRuntimeProjectionMaintenance(triggerDirection: triggerDirection)

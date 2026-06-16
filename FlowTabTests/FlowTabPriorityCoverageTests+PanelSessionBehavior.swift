@@ -329,6 +329,22 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testLiveSwitcherModelRequestsMaintenanceWhenAppSwitcherProjectionIsMissing() {
+        let snapshotService = RecordingRuntimeSnapshotService()
+        let model = LiveSwitcherModel(snapshotService: snapshotService)
+
+        XCTAssertFalse(model.startSession(triggerDirection: .forward))
+
+        XCTAssertNil(model.session)
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(
+            snapshotService.appSwitcherMaintenanceRequestsRecorded(),
+            [.switcherSessionStarted]
+        )
+    }
+
+    @MainActor
     func testLiveSwitcherModelDoesNotExposeDirtyProjectionWindowsAsFreshWindowCycle() {
         let appID = "com.example.dirty-projection"
         let staleWindows = [
