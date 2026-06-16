@@ -115,6 +115,14 @@ Search quick regression for the current high-window deterministic path:
 
 Full search pressure still requires external `%CPU` and `RSS` sampling for at least `30s` per scenario. Use `performance-pressure-workflow.md` for the required dataset, cadence, and reporting fields.
 
+Runtime topology pressure for the representative noisy fullscreen/off-space fixture path:
+
+```bash
+./scripts/perf/runtime-topology-pressure.sh 0.5
+```
+
+The wrapper runs the four-window Noisy Option+Tab UI fixture and samples the `FlowTab` process CPU/RSS into `./.build-local/runtime-topology-pressure/`. Use it when validating Space topology, fullscreen/off-space activation, or repeated topology-aware panel interaction pressure.
+
 ## Validation Report Shape
 
 Use this compact shape unless the task needs a full handoff:
