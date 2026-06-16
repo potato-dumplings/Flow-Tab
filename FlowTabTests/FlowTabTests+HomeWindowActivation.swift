@@ -64,41 +64,119 @@ extension FlowTabTests {
     }
 
     @MainActor
-    func testHomeWindowActivationControllerActivatesSelectedHomeWindowWithSnapshotContext() {
-        withLaunchArgumentsForTesting(["FlowTab", "--flowtab-ui-mock-runtime"]) {
-            var capturedTarget: ActivationTarget?
-            var capturedContextsByID: [String: RuntimeAppContext] = [:]
-            let controller = HomeWindowActivationController(
-                snapshotService: RuntimeSnapshotService(
-                    label: "FlowTabTests.HomeActivation.RuntimeSnapshotService",
-                    snapshotProvider: RuntimeSnapshotProvider()
-                ),
-                preferencesProvider: { .default },
-                activationHandler: { target, contextsByID in
-                    capturedTarget = target
-                    capturedContextsByID = contextsByID
-                }
-            )
-
-            controller.activateWindow(
-                appID: "com.flowtab.mock.mail",
-                windowID: "mock-mail-draft"
-            )
-
-            XCTAssertEqual(
-                capturedTarget,
-                .window(
-                    appID: "com.flowtab.mock.mail",
-                    windowID: "mock-mail-draft",
-                    restoreIfMinimized: false
+    func testHomeWindowActivationControllerUsesRuntimeProjectionWithoutHomeSnapshotBridge() {
+        let appID = "com.example.projected-home-activation"
+        let snapshot = makeHomeActivationSnapshot(
+            appID: appID,
+            windows: [
+                WindowCandidate(
+                    id: "projected-draft",
+                    title: "Projected Draft",
+                    isMinimized: false,
+                    lastActiveAt: 400
                 )
+            ]
+        )
+        let freshness = RuntimeProjectionFreshness(
+            generatedAt: 25,
+            sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+            dirtyAppIDs: [],
+            dirtyPIDs: [],
+            dirtyCGWindowIDs: [],
+            pendingRepairScopes: [],
+            isCompleteForScope: true
+        )
+        let snapshotService = RecordingRuntimeSnapshotService(
+            currentAppWindowProjectionsByAppID: [
+                appID: RuntimeCurrentAppWindowProjection(
+                    appID: appID,
+                    snapshot: snapshot,
+                    freshness: freshness
+                )
+            ]
+        )
+        var capturedTarget: ActivationTarget?
+        var capturedContextsByID: [String: RuntimeAppContext] = [:]
+        let controller = HomeWindowActivationController(
+            snapshotService: snapshotService,
+            preferencesProvider: { .default },
+            activationHandler: { target, contextsByID in
+                capturedTarget = target
+                capturedContextsByID = contextsByID
+            }
+        )
+
+        controller.activateWindow(
+            appID: appID,
+            windowID: "projected-draft"
+        )
+
+        XCTAssertEqual(
+            capturedTarget,
+            .window(
+                appID: appID,
+                windowID: "projected-draft",
+                restoreIfMinimized: false
             )
-            XCTAssertEqual(
-                capturedContextsByID["com.flowtab.mock.mail"]?.windowsByID["mock-mail-draft"]?.title,
-                "Draft"
+        )
+        XCTAssertEqual(
+            capturedContextsByID[appID]?.windowsByID["projected-draft"]?.title,
+            "Projected Draft"
+        )
+        XCTAssertEqual(snapshotService.recordedHomeAppIDs(), [])
+    }
+
+    @MainActor
+    func testHomeWindowActivationControllerSignalsRuntimeRepairWhenProjectionIsMissing() {
+        let appID = "com.example.missing-home-activation-projection"
+        let contaminatedSnapshot = makeHomeActivationSnapshot(
+            appID: appID,
+            windows: [
+                WindowCandidate(
+                    id: "contaminated-draft",
+                    title: "Contaminated Draft",
+                    isMinimized: false,
+                    lastActiveAt: 400
+                )
+            ]
+        )
+        let freshness = RuntimeProjectionFreshness(
+            generatedAt: 26,
+            sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+            dirtyAppIDs: [],
+            dirtyPIDs: [],
+            dirtyCGWindowIDs: [],
+            pendingRepairScopes: [],
+            isCompleteForScope: true
+        )
+        let snapshotService = RecordingRuntimeSnapshotService(
+            homeSnapshotsByAppID: [appID: contaminatedSnapshot],
+            homeSummaryProjection: RuntimeHomeSummaryProjection(
+                summaries: [contaminatedSnapshot.summary],
+                freshness: freshness
             )
-            XCTAssertNil(capturedContextsByID["com.flowtab.mock.browser"])
-        }
+        )
+        var capturedTarget: ActivationTarget?
+        let controller = HomeWindowActivationController(
+            snapshotService: snapshotService,
+            preferencesProvider: { .default },
+            activationHandler: { target, _ in
+                capturedTarget = target
+            }
+        )
+
+        controller.activateWindow(
+            appID: appID,
+            windowID: "contaminated-draft"
+        )
+
+        XCTAssertNil(capturedTarget)
+        XCTAssertEqual(snapshotService.recordedHomeAppIDs(), [])
+        XCTAssertEqual(snapshotService.appWindowChangeSignalsRecorded().map(\.appID), [appID])
+        XCTAssertEqual(
+            snapshotService.appWindowChangeSignalsRecorded().map(\.pid),
+            [contaminatedSnapshot.summary.pid]
+        )
     }
 
     @MainActor

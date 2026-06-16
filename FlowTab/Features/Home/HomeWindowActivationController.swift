@@ -52,17 +52,28 @@ final class HomeWindowActivationController {
         windowID: String,
         snapshot: RuntimeHomeAppSnapshot? = nil
     ) {
-        let resolvedSnapshot = snapshot ?? snapshotService.homeAppSnapshotSynchronously(for: appID)
+        let resolvedSnapshot = snapshot ?? HomeRuntimeProjectionReader.appSnapshot(
+            for: appID,
+            from: snapshotService
+        )
         guard let request = Self.makeActivationRequest(
             snapshot: resolvedSnapshot,
             appID: appID,
             windowID: windowID,
             preferences: preferencesProvider()
         ) else {
+            signalActivationProjectionMissing(appID: appID)
             return
         }
 
         activationHandler(request.target, request.contextsByID)
+    }
+
+    private func signalActivationProjectionMissing(appID: String) {
+        let pid = HomeRuntimeProjectionReader.appSummary(for: appID, from: snapshotService)?.pid
+            ?? snapshotService.readAppSwitcherProjection()?.contextsByID[appID]?.runningApp.processIdentifier
+        guard let pid, pid != 0 else { return }
+        snapshotService.signalAppWindowsChanged(appID: appID, pid: pid)
     }
 
     static func makeActivationRequest(
