@@ -262,7 +262,7 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
         return RuntimeSnapshot(apps: [], contextsByID: [:])
     }
 
-    func lightweightAppSnapshot() -> RuntimeSnapshot {
+    func fallbackLightweightAppSnapshot() -> RuntimeSnapshot {
         lock.lock()
         lightweightSnapshotRequests += 1
         lock.unlock()
