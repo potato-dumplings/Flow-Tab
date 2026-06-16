@@ -367,6 +367,11 @@ extension LiveSwitcherModel {
         if let snapshotProviderOverride {
             source = "override"
             snapshot = snapshotProviderOverride()
+        } else if let projection = runtimeSnapshotService.readAppSwitcherProjection() {
+            source = projection.freshness.isCompleteForScope
+                ? "runtimeProjection"
+                : "runtimeProjectionDirty"
+            snapshot = projection.appCycleSnapshot
         } else {
             source = "runtimeSnapshotService"
             snapshot = runtimeSnapshotService.snapshot()

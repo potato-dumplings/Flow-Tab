@@ -269,6 +269,35 @@ extension FlowTabTests {
     }
 
     @MainActor
+    func testHandleApplicationTerminatedRefreshesFromRuntimeProjectionWithoutFullSnapshot() async {
+        let initialApps = terminateScenarioApps()
+        let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: initialApps)
+        let model = LiveSwitcherModel(snapshotService: snapshotService)
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        guard let terminatedAppID = model.session?.selectedApp.id else {
+            XCTFail("Expected an active session before termination refresh")
+            return
+        }
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+
+        let refreshedApps = initialApps.filter { $0.id != terminatedAppID }
+        snapshotService.installAppSwitcherProjection(apps: refreshedApps)
+
+        let layoutRefreshed = expectation(description: "layout refreshed from runtime projection")
+        model.onSessionLayoutChanged = { layoutRefreshed.fulfill() }
+
+        XCTAssertTrue(model.handleApplicationTerminated(appID: terminatedAppID, pid: 42_012))
+
+        await fulfillment(of: [layoutRefreshed], timeout: 1.0)
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(model.appCount, refreshedApps.count)
+        XCTAssertFalse(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? true)
+    }
+
+    @MainActor
     func testTerminateSelectedAppUnitStopsPollingAfterTimeoutWhenAppStillRunning() async {
         let model = LiveSwitcherModel()
         let initialApps = terminateScenarioApps()

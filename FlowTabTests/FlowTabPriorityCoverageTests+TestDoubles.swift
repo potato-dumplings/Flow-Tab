@@ -82,7 +82,7 @@ final class SpyMRUTracker: MRUTracking {
 final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable {
     private let lock = NSLock()
     private let homeSnapshotsByAppID: [String: RuntimeHomeAppSnapshot]
-    private let appSwitcherProjection: RuntimeAppSwitcherProjection?
+    private var appSwitcherProjection: RuntimeAppSwitcherProjection?
     private let homeSummaryProjection: RuntimeHomeSummaryProjection?
     private let currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection]
     private var committedSearchIndexProjection: RuntimeSearchIndexProjection?
@@ -158,6 +158,29 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
         lock.lock()
         defer { lock.unlock() }
         return lightweightSnapshotRequests
+    }
+
+    func installAppSwitcherProjection(
+        apps: [AppSwitchCandidate],
+        contextsByID: [String: RuntimeAppContext] = [:],
+        generatedAt: TimeInterval = 10
+    ) {
+        let freshness = RuntimeProjectionFreshness(
+            generatedAt: generatedAt,
+            sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+            dirtyAppIDs: [],
+            dirtyPIDs: [],
+            dirtyCGWindowIDs: [],
+            pendingRepairScopes: [],
+            isCompleteForScope: true
+        )
+        lock.lock()
+        defer { lock.unlock() }
+        appSwitcherProjection = RuntimeAppSwitcherProjection(
+            apps: apps,
+            contextsByID: contextsByID,
+            freshness: freshness
+        )
     }
 
     func homeSummariesRequestCount() -> Int {
@@ -268,6 +291,8 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
     }
 
     func readAppSwitcherProjection() -> RuntimeAppSwitcherProjection? {
+        lock.lock()
+        defer { lock.unlock() }
         return appSwitcherProjection
     }
 
