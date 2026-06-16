@@ -787,6 +787,77 @@ extension FlowTabTests {
         XCTAssertFalse(probe.isEmpty)
     }
 
+    @MainActor
+    func testLiveSwitcherModelSearchPressureReadsReadyCommittedIndexWithoutSampling() {
+        let defaults = UserDefaults.standard
+        let previousSearchEnabled = defaults.object(forKey: AppPreferenceKeys.searchEnabled)
+        let previousSearchDefaultScope = defaults.object(forKey: AppPreferenceKeys.searchDefaultScope)
+        defer {
+            restoreUserDefaultsValue(
+                previousSearchEnabled,
+                forKey: AppPreferenceKeys.searchEnabled,
+                userDefaults: defaults
+            )
+            restoreUserDefaultsValue(
+                previousSearchDefaultScope,
+                forKey: AppPreferenceKeys.searchDefaultScope,
+                userDefaults: defaults
+            )
+        }
+
+        defaults.set(true, forKey: AppPreferenceKeys.searchEnabled)
+        defaults.set(SwitcherSearchScope.window.rawValue, forKey: AppPreferenceKeys.searchDefaultScope)
+
+        let apps = makeBenchmarkApps(appCount: 400, windowsPerApp: 25)
+        let windowCount = apps.reduce(0) { $0 + $1.windows.count }
+        let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: apps)
+        let model = LiveSwitcherModel(snapshotService: snapshotService)
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+
+        let enterStart = DispatchTime.now().uptimeNanoseconds
+        XCTAssertTrue(model.enterSearchMode())
+        let enterMs = nanosToMilliseconds(DispatchTime.now().uptimeNanoseconds - enterStart)
+
+        XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.readiness, .ready)
+        XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.appCount, apps.count)
+        XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.windowCount, windowCount)
+        XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.requestedFreshnessBarrier, false)
+        XCTAssertTrue(model.lastSearchIndexReadDiagnostic?.isCompleteForScope ?? false)
+        XCTAssertEqual(snapshotService.searchIndexFreshnessBarrierRequestsRecorded(), [])
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+
+        let queries = benchmarkQueries()
+        let rounds = 3
+        let queryStart = DispatchTime.now().uptimeNanoseconds
+        runBaselineQueries(queries, on: model.searchCoordinator, rounds: rounds)
+        let queryMs = nanosToMilliseconds(DispatchTime.now().uptimeNanoseconds - queryStart)
+        let queryCount = queries.count * rounds
+        let qps = Double(queryCount) / max(0.001, queryMs / 1000.0)
+
+        print(
+            String(
+                format: "[CommittedSearchIndexPressure] dataset=%d apps / %d windows, rounds=%d, enter=%.2fms, query=%.2fms, queries=%d, throughput=%.2f qps, snapshotCalls=%d, lightweightCalls=%d, freshnessBarrierRequests=%d",
+                apps.count,
+                windowCount,
+                rounds,
+                enterMs,
+                queryMs,
+                queryCount,
+                qps,
+                snapshotService.snapshotRequestCount(),
+                snapshotService.lightweightSnapshotRequestCount(),
+                snapshotService.searchIndexFreshnessBarrierRequestsRecorded().count
+            )
+        )
+
+        XCTAssertFalse(searchResultIDs(query: "weixin", on: model.searchCoordinator).isEmpty)
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.searchIndexFreshnessBarrierRequestsRecorded(), [])
+    }
+
     func testSearchPressureWindowScopeSegmentedQueries() {
         let apps = makeBenchmarkApps(appCount: 400, windowsPerApp: 25)
         let queries = segmentedBenchmarkQueries()
