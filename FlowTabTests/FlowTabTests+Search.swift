@@ -771,6 +771,106 @@ extension FlowTabTests {
     }
 
     @MainActor
+    func testControlTabFocusedProjectionFastStartPressureIgnoresFocusedSnapshotBridge() {
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeSnapshotProvider.baseAppID(for: runningApp)
+        let windowCount = 1_000
+        let windows = (0..<windowCount).map { index in
+            WindowCandidate(
+                id: "focused-projection-window-\(index)",
+                title: "Focused Projection Document \(index)",
+                isMinimized: false,
+                lastActiveAt: TimeInterval(windowCount - index)
+            )
+        }
+        let candidate = AppSwitchCandidate(
+            id: appID,
+            displayName: runningApp.localizedName ?? "Focused Projection App",
+            groupID: "focused-projection",
+            lastActiveAt: TimeInterval(windowCount),
+            windows: windows
+        )
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: runningApp,
+            windowsByID: Dictionary(
+                uniqueKeysWithValues: windows.enumerated().map { index, window in
+                    (
+                        window.id,
+                        RuntimeWindowContext(
+                            id: window.id,
+                            title: window.title,
+                            isMinimized: window.isMinimized,
+                            ownerPID: runningApp.processIdentifier,
+                            cgWindowID: CGWindowID(20_000 + index)
+                        )
+                    )
+                }
+            )
+        )
+        let snapshot = RuntimeHomeAppSnapshot(
+            summary: RuntimeHomeAppSummary(
+                appID: appID,
+                displayName: candidate.displayName,
+                groupID: candidate.groupID,
+                lastActiveAt: candidate.lastActiveAt,
+                windowCount: windows.count,
+                pid: runningApp.processIdentifier
+            ),
+            candidate: candidate,
+            context: context
+        )
+        let snapshotService = RecordingRuntimeSnapshotService(
+            currentAppWindowProjectionsByAppID: [
+                appID: RuntimeCurrentAppWindowProjection(
+                    appID: appID,
+                    snapshot: snapshot,
+                    freshness: RuntimeProjectionFreshness(
+                        generatedAt: 30,
+                        sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+                        dirtyAppIDs: [],
+                        dirtyPIDs: [],
+                        dirtyCGWindowIDs: [],
+                        pendingRepairScopes: [],
+                        isCompleteForScope: true
+                    )
+                )
+            ]
+        )
+        let model = LiveSwitcherModel(snapshotService: snapshotService)
+        model.frontmostApplicationOverride = { runningApp }
+        model.focusedWindowIdentityOverride = { _ in nil }
+        model.frontmostRuntimeWindowIDOverride = { _, _, _ in nil }
+
+        let iterations = 80
+        var samples: [Double] = []
+        samples.reserveCapacity(iterations)
+        for _ in 0..<iterations {
+            let start = DispatchTime.now().uptimeNanoseconds
+            XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
+            samples.append(Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000.0)
+            XCTAssertEqual(model.session?.selectedApp.windows.count ?? -1, windowCount)
+            model.cancelSelection()
+        }
+
+        let summary = latencySummary(samples: samples)
+        print(
+            String(
+                format: "[ControlTabFocusedProjectionFastStartPressure] windows=%d, iterations=%d, p50=%.2fms, p95=%.2fms, max=%.2fms, focusedSnapshotCalls=%d",
+                windowCount,
+                iterations,
+                summary.p50,
+                summary.p95,
+                summary.max,
+                snapshotService.recordedFocusedPIDs().count
+            )
+        )
+
+        XCTAssertEqual(snapshotService.recordedFocusedPIDs(), [])
+        XCTAssertLessThan(summary.p95, 100)
+    }
+
+    @MainActor
     func testLiveSwitcherModelSnapshotInvalidationRecordTracksReasonAndScope() {
         let model = LiveSwitcherModel()
         model.deferredBackgroundFullSnapshotRefreshRequest = LiveSwitcherModel.BackgroundFullSnapshotRefreshRequest(

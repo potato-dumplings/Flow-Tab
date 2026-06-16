@@ -419,6 +419,16 @@ final class LiveSwitcherModel: ObservableObject {
             recencyAppliedMs = Self.monotonicMilliseconds()
             resolvedAppCandidate = snapshot.apps.first(where: { $0.id == frontmostAppID })
             resolvedContext = snapshot.contextsByID[frontmostAppID]
+        } else if let projection = runtimeSnapshotService.readCurrentAppWindowProjection(appID: frontmostAppID) {
+            snapshotReadMs = Self.monotonicMilliseconds()
+            let snapshot = homeSnapshotWithWindowRecencyApplied(
+                projection.snapshot,
+                appID: frontmostAppID,
+                frontmostApp: frontmostApp
+            )
+            recencyAppliedMs = Self.monotonicMilliseconds()
+            resolvedAppCandidate = snapshot.candidate
+            resolvedContext = snapshot.context
         } else {
             let focusedSnapshot = runtimeSnapshotService.focusedAppSnapshot(
                 processIdentifier: frontmostApp.processIdentifier

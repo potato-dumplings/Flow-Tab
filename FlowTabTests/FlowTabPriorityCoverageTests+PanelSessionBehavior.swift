@@ -457,6 +457,63 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testLiveSwitcherModelFocusedWindowSessionUsesRuntimeProjectionWithoutFocusedSampling() {
+        let runningApp = NSRunningApplication.current
+        let appID = runningApp.bundleIdentifier ?? "pid:\(runningApp.processIdentifier)"
+        let windows = [
+            WindowCandidate(id: "focused-projected-1", title: "Focused Projected One", isMinimized: false, lastActiveAt: 20),
+            WindowCandidate(id: "focused-projected-2", title: "Focused Projected Two", isMinimized: false, lastActiveAt: 10)
+        ]
+        let candidate = AppSwitchCandidate(
+            id: appID,
+            displayName: "Focused Runtime Projection",
+            groupID: "focused-runtime-projection",
+            lastActiveAt: 100,
+            windows: windows
+        )
+        let snapshot = RuntimeHomeAppSnapshot(
+            summary: RuntimeHomeAppSummary(
+                appID: appID,
+                displayName: "Focused Runtime Projection",
+                groupID: "focused-runtime-projection",
+                lastActiveAt: 100,
+                windowCount: windows.count,
+                pid: runningApp.processIdentifier
+            ),
+            candidate: candidate,
+            context: makeRuntimeAppContext(appID: appID, runningApp: runningApp, windows: windows)
+        )
+        let snapshotService = RecordingRuntimeSnapshotService(
+            currentAppWindowProjectionsByAppID: [
+                appID: RuntimeCurrentAppWindowProjection(
+                    appID: appID,
+                    snapshot: snapshot,
+                    freshness: RuntimeProjectionFreshness(
+                        generatedAt: 12,
+                        sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+                        dirtyAppIDs: [],
+                        dirtyPIDs: [],
+                        dirtyCGWindowIDs: [],
+                        pendingRepairScopes: [],
+                        isCompleteForScope: true
+                    )
+                )
+            ]
+        )
+        let model = LiveSwitcherModel(snapshotService: snapshotService)
+        model.frontmostApplicationOverride = { runningApp }
+        model.focusedWindowIdentityOverride = { _ in nil }
+        model.frontmostRuntimeWindowIDOverride = { _, _, _ in nil }
+
+        XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
+
+        XCTAssertEqual(snapshotService.recordedFocusedPIDs(), [])
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(model.session?.mode, .windowCycle(appID: appID))
+        XCTAssertEqual(model.session?.selectedApp.windows.map(\.id), ["focused-projected-1", "focused-projected-2"])
+    }
+
+    @MainActor
     func testLiveSwitcherModelFocusedWindowSessionUsesFocusedRuntimeSnapshotSource() {
         let runningApp = NSRunningApplication.current
         let appID = runningApp.bundleIdentifier ?? "pid:\(runningApp.processIdentifier)"
