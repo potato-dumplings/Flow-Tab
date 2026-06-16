@@ -271,10 +271,6 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
     }
 
     func homeAppSnapshot(for appID: String) async -> RuntimeHomeAppSnapshot? {
-        return homeAppSnapshotSynchronously(for: appID)
-    }
-
-    func homeAppSnapshotSynchronously(for appID: String) -> RuntimeHomeAppSnapshot? {
         lock.lock()
         requestedHomeAppIDs.append(appID)
         lock.unlock()

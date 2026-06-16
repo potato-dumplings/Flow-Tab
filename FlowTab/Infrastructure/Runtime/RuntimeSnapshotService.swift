@@ -15,7 +15,6 @@ protocol RuntimeSnapshotServing: Sendable {
     func homeAppSummaries() async -> [RuntimeHomeAppSummary]
     func homeAppSummary(for appID: String) async -> RuntimeHomeAppSummary?
     func homeAppSnapshot(for appID: String) async -> RuntimeHomeAppSnapshot?
-    func homeAppSnapshotSynchronously(for appID: String) -> RuntimeHomeAppSnapshot?
     func focusedAppSnapshot(processIdentifier pid: pid_t) -> RuntimeHomeAppSnapshot?
     func readAppSwitcherProjection() -> RuntimeAppSwitcherProjection?
     func readHomeSummaryProjection() -> RuntimeHomeSummaryProjection?
@@ -136,17 +135,6 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
                     returning: snapshot
                 )
             }
-        }
-    }
-
-    func homeAppSnapshotSynchronously(for appID: String) -> RuntimeHomeAppSnapshot? {
-        snapshotQueue.sync { [self] in
-            let snapshot = snapshotProvider.homeAppSnapshot(for: appID)
-                .map(windowRecencyTracker.homeSnapshotWithRecencyApplied)
-            if let snapshot {
-                readModelStore.commitCurrentAppWindowSnapshot(snapshot)
-            }
-            return snapshot
         }
     }
 
