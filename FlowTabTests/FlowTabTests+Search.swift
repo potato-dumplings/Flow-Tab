@@ -564,6 +564,102 @@ extension FlowTabTests {
     }
 
     @MainActor
+    func testLiveSwitcherModelSearchUsesStaleCommittedIndexAndRequestsFreshnessBarrier() {
+        let defaults = UserDefaults.standard
+        let previousSearchEnabled = defaults.object(forKey: AppPreferenceKeys.searchEnabled)
+        let previousSearchDefaultScope = defaults.object(forKey: AppPreferenceKeys.searchDefaultScope)
+        defer {
+            restoreUserDefaultsValue(
+                previousSearchEnabled,
+                forKey: AppPreferenceKeys.searchEnabled,
+                userDefaults: defaults
+            )
+            restoreUserDefaultsValue(
+                previousSearchDefaultScope,
+                forKey: AppPreferenceKeys.searchDefaultScope,
+                userDefaults: defaults
+            )
+        }
+
+        defaults.set(true, forKey: AppPreferenceKeys.searchEnabled)
+        defaults.set(SwitcherSearchScope.window.rawValue, forKey: AppPreferenceKeys.searchDefaultScope)
+
+        let sessionApp = AppSwitchCandidate(
+            id: "com.example.session",
+            displayName: "Session",
+            groupID: "session",
+            lastActiveAt: 100,
+            windows: []
+        )
+        let committedSearchApp = AppSwitchCandidate(
+            id: "com.example.committed",
+            displayName: "Committed Browser",
+            groupID: "committed",
+            lastActiveAt: 90,
+            windows: [
+                WindowCandidate(
+                    id: "committed-stale-docs",
+                    title: "Runtime Stale Docs",
+                    isMinimized: false,
+                    lastActiveAt: 90
+                )
+            ]
+        )
+        let store = RuntimeReadModelStore()
+        store.commitAppSwitcherSnapshot(
+            RuntimeSnapshot(apps: [committedSearchApp], contextsByID: [:]),
+            generatedAt: 10
+        )
+        store.markAppWindowsDirty(
+            appID: committedSearchApp.id,
+            pid: 42_300,
+            pendingScope: "appWindows:\(committedSearchApp.id)"
+        )
+        let staleSearchProjection = store.readCommittedSearchIndexForSearch().projection
+        let snapshotService = RecordingRuntimeSnapshotService(
+            appSwitcherProjection: RuntimeAppSwitcherProjection(
+                apps: [sessionApp],
+                contextsByID: [:],
+                freshness: RuntimeProjectionFreshness(
+                    generatedAt: 10,
+                    sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+                    dirtyAppIDs: [],
+                    dirtyPIDs: [],
+                    dirtyCGWindowIDs: [],
+                    pendingRepairScopes: [],
+                    isCompleteForScope: true
+                )
+            ),
+            committedSearchIndexProjection: staleSearchProjection
+        )
+        let model = LiveSwitcherModel(snapshotService: snapshotService)
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        XCTAssertTrue(model.enterSearchMode())
+        XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.readiness, .stale)
+        XCTAssertEqual(
+            snapshotService.searchIndexFreshnessBarrierRequestsRecorded(),
+            [.searchFreshnessBarrier]
+        )
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+
+        XCTAssertTrue(
+            model.searchCoordinator.replaceQueryWithoutRebuild(
+                "docs",
+                cursorPosition: 4
+            )
+        )
+        model.searchCoordinator.rebuildResults(resetSelection: true)
+        model.publishSearchStateIfNeeded()
+
+        XCTAssertEqual(
+            model.searchViewState.results.map(\.kind),
+            [.window(appID: "com.example.committed", windowID: "committed-stale-docs")]
+        )
+    }
+
+    @MainActor
     func testLiveSwitcherModelSearchDoesNotFallbackToSessionAppsWithoutCommittedIndex() {
         let defaults = UserDefaults.standard
         let previousSearchEnabled = defaults.object(forKey: AppPreferenceKeys.searchEnabled)

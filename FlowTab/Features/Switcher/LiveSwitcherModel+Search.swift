@@ -41,29 +41,44 @@ extension LiveSwitcherModel {
 
     @discardableResult
     func rebuildSearchIndexFromCommittedProjection(reason: String) -> Bool {
-        guard let projection = runtimeSnapshotService.readCommittedSearchIndexProjection() else {
+        let read = runtimeSnapshotService.readCommittedSearchIndexForSearch()
+        guard let projection = read.projection else {
+            lastSearchIndexReadDiagnostic = SearchIndexReadDiagnostic(
+                reason: reason,
+                readiness: read.readiness,
+                appCount: 0,
+                windowCount: 0,
+                isCompleteForScope: false,
+                dirtyAppCount: 0,
+                dirtyPIDCount: 0,
+                dirtyCGWindowIDCount: 0,
+                pendingRepairScopeCount: 0,
+                requestedFreshnessBarrier: false
+            )
             RuntimeLog.debug(.searchModel, "searchIndexSource reason=\(reason) source=none")
             return false
+        }
+        if read.shouldRequestFreshnessBarrier {
+            runtimeSnapshotService.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
         }
         let searchProjection = projection.filteringApps(
             using: AppVisibilityPreferencesStore.visibilityFilter()
         )
-        searchCoordinator.rebuildIndex(with: searchProjection)
-        RuntimeLog.debug(
-            .searchModel,
-            [
-                "searchIndexSource",
-                "reason=\(reason)",
-                "source=committedRuntimeIndex",
-                "apps=\(searchProjection.appEntries.count)",
-                "windows=\(searchProjection.windowEntries.count)",
-                "complete=\(projection.freshness.isCompleteForScope ? 1 : 0)",
-                "dirtyApps=\(projection.freshness.dirtyAppIDs.count)",
-                "dirtyPIDs=\(projection.freshness.dirtyPIDs.count)",
-                "dirtyCGWindowIDs=\(projection.freshness.dirtyCGWindowIDs.count)",
-                "pendingScopes=\(projection.freshness.pendingRepairScopes.count)"
-            ].joined(separator: " ")
+        let diagnostic = SearchIndexReadDiagnostic(
+            reason: reason,
+            readiness: read.readiness,
+            appCount: searchProjection.appEntries.count,
+            windowCount: searchProjection.windowEntries.count,
+            isCompleteForScope: projection.freshness.isCompleteForScope,
+            dirtyAppCount: projection.freshness.dirtyAppIDs.count,
+            dirtyPIDCount: projection.freshness.dirtyPIDs.count,
+            dirtyCGWindowIDCount: projection.freshness.dirtyCGWindowIDs.count,
+            pendingRepairScopeCount: projection.freshness.pendingRepairScopes.count,
+            requestedFreshnessBarrier: read.shouldRequestFreshnessBarrier
         )
+        lastSearchIndexReadDiagnostic = diagnostic
+        searchCoordinator.rebuildIndex(with: searchProjection)
+        RuntimeLog.debug(.searchModel, diagnostic.logMessage)
         return true
     }
 

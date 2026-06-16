@@ -6,6 +6,7 @@ let sharedRuntimeSnapshotService = RuntimeSnapshotService()
 
 enum RuntimeProjectionMaintenanceReason: String, Sendable {
     case switcherSessionStarted
+    case searchFreshnessBarrier
 }
 
 protocol RuntimeSnapshotServing: Sendable {
@@ -20,8 +21,10 @@ protocol RuntimeSnapshotServing: Sendable {
     func readHomeSummaryProjection() -> RuntimeHomeSummaryProjection?
     func readCurrentAppWindowProjection(appID: String) -> RuntimeCurrentAppWindowProjection?
     func readCommittedSearchIndexProjection() -> RuntimeSearchIndexProjection?
+    func readCommittedSearchIndexForSearch() -> RuntimeSearchIndexRead
     func runtimeReadModelDiagnostics() -> RuntimeReadModelDiagnostics
     func requestAppSwitcherProjectionMaintenance(reason: RuntimeProjectionMaintenanceReason)
+    func requestSearchIndexFreshnessBarrier(reason: RuntimeProjectionMaintenanceReason)
     func currentCGWindowsByPID() -> [pid_t: [RuntimeSnapshotProvider.CGWindowEntry]]
     func signalSpaceTopologyChanged()
     func signalAppLaunched(appID: String, pid: pid_t)
@@ -155,6 +158,10 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
         readModelStore.readCommittedSearchIndexProjection()
     }
 
+    func readCommittedSearchIndexForSearch() -> RuntimeSearchIndexRead {
+        readModelStore.readCommittedSearchIndexForSearch()
+    }
+
     func runtimeReadModelDiagnostics() -> RuntimeReadModelDiagnostics {
         readModelStore.diagnostics()
     }
@@ -170,6 +177,28 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
                 [
                     "runtimeMaintenance",
                     "scope=appSwitcherProjection",
+                    "reason=\(reason.rawValue)",
+                    "dirtyApps=\(diagnostics.dirtyAppIDs.count)",
+                    "dirtyPIDs=\(diagnostics.dirtyPIDs.count)",
+                    "dirtyCGWindowIDs=\(diagnostics.dirtyCGWindowIDs.count)",
+                    "pendingScopes=\(diagnostics.pendingRepairScopes.count)",
+                    "startedRequests=\(startedRequests.count)"
+                ].joined(separator: " ")
+            )
+        }
+    }
+
+    func requestSearchIndexFreshnessBarrier(reason: RuntimeProjectionMaintenanceReason) {
+        snapshotQueue.async { [self] in
+            let diagnostics = readModelStore.diagnostics()
+            let startedRequests = drainReadyReconciliationRequestsLocked(
+                now: Date.timeIntervalSinceReferenceDate
+            )
+            RuntimeLog.debug(
+                .snapshot,
+                [
+                    "runtimeMaintenance",
+                    "scope=searchIndex",
                     "reason=\(reason.rawValue)",
                     "dirtyApps=\(diagnostics.dirtyAppIDs.count)",
                     "dirtyPIDs=\(diagnostics.dirtyPIDs.count)",

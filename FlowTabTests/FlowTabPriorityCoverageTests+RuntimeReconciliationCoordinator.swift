@@ -2,6 +2,7 @@ import AppKit
 import CoreGraphics
 import XCTest
 @testable import FlowTab
+import FlowTabCore
 
 extension FlowTabPriorityCoverageTests {
     func testRuntimeReadModelStoreCommitsProjectionsAndMarksDirtyMetadata() throws {
@@ -133,6 +134,51 @@ extension FlowTabPriorityCoverageTests {
         diagnostics = store.diagnostics()
         XCTAssertTrue(diagnostics.hasCommittedSearchIndex)
         XCTAssertFalse(diagnostics.hasStagingSearchIndex)
+    }
+
+    func testRuntimeReadModelStoreSearchReadinessTracksDirtyMetadataWithoutReadingStaging() throws {
+        let store = RuntimeReadModelStore()
+        let committedSnapshot = RuntimeSnapshot(apps: searchScenarioApps(), contextsByID: [:])
+        let stagedSnapshot = RuntimeSnapshot(
+            apps: [
+                AppSwitchCandidate(
+                    id: "com.example.staging-only",
+                    displayName: "Staging Only",
+                    groupID: "staging",
+                    lastActiveAt: 99,
+                    windows: [
+                        WindowCandidate(
+                            id: "staging-window",
+                            title: "Staging Window",
+                            isMinimized: false,
+                            lastActiveAt: 99
+                        )
+                    ]
+                )
+            ],
+            contextsByID: [:]
+        )
+        store.commitAppSwitcherSnapshot(committedSnapshot, generatedAt: 10)
+
+        var read = store.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(read.readiness, .ready)
+        XCTAssertEqual(read.projection?.appEntries.map(\.appID), committedSnapshot.apps.map(\.id))
+
+        store.markAppWindowsDirty(
+            appID: "com.example.browser",
+            pid: 42_100,
+            pendingScope: "appWindows:com.example.browser"
+        )
+        store.stageSearchIndexSnapshot(stagedSnapshot, generatedAt: 20)
+
+        read = store.readCommittedSearchIndexForSearch()
+        let staleProjection = try XCTUnwrap(read.projection)
+        XCTAssertEqual(read.readiness, .stale)
+        XCTAssertEqual(staleProjection.appEntries.map(\.appID), committedSnapshot.apps.map(\.id))
+        XCTAssertFalse(staleProjection.appEntries.map(\.appID).contains("com.example.staging-only"))
+        XCTAssertEqual(staleProjection.freshness.dirtyAppIDs, ["com.example.browser"])
+        XCTAssertEqual(staleProjection.freshness.dirtyPIDs, [42_100])
+        XCTAssertEqual(staleProjection.freshness.pendingRepairScopes, ["appWindows:com.example.browser"])
     }
 
     func testRuntimeReconciliationCoordinatorMarksSpaceTopologyAffectedWindows() {
@@ -975,6 +1021,45 @@ extension FlowTabPriorityCoverageTests {
         )
 
         service.requestAppSwitcherProjectionMaintenance(reason: .switcherSessionStarted)
+        wait(for: [expectation], timeout: 1)
+
+        XCTAssertEqual(executedRequests.map(\.id), [highPriority.id, lowPriority.id])
+        XCTAssertEqual(executedRequests.map(\.priority), [.high, .low])
+        XCTAssertTrue(coordinator.readyRequests(now: 11).isEmpty)
+    }
+
+    func testRuntimeSnapshotServiceSearchFreshnessBarrierDrainsReadyRequestsBySchedulerPriority() {
+        let coordinator = RuntimeReconciliationCoordinator()
+        let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
+        let lowPriority = coordinator.markAppDirty(
+            appID: "com.example.low",
+            pid: 18_405,
+            reason: .manualRefresh,
+            now: 10
+        )
+        let highPriority = coordinator.markAppDirty(
+            appID: "com.example.high",
+            pid: 18_406,
+            reason: .appLaunched,
+            now: 10.1
+        )
+        let lock = NSLock()
+        var executedRequests: [RuntimeReconciliationRequest] = []
+        let expectation = expectation(description: "search freshness barrier drains ready requests")
+        expectation.expectedFulfillmentCount = 2
+        let service = RuntimeSnapshotService(
+            label: "FlowTabTests.RuntimeSnapshotService.SearchFreshnessBarrier",
+            snapshotProvider: provider,
+            reconciliationExecutor: { request, _ in
+                lock.lock()
+                executedRequests.append(request)
+                lock.unlock()
+                expectation.fulfill()
+                return .completed
+            }
+        )
+
+        service.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
         wait(for: [expectation], timeout: 1)
 
         XCTAssertEqual(executedRequests.map(\.id), [highPriority.id, lowPriority.id])

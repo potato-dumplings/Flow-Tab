@@ -94,6 +94,7 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
     private var homeSummaryRequests = 0
     private var homeSummariesRequests = 0
     private var appSwitcherMaintenanceRequests: [RuntimeProjectionMaintenanceReason] = []
+    private var searchIndexFreshnessBarrierRequests: [RuntimeProjectionMaintenanceReason] = []
     private var spaceTopologyChangeSignals = 0
     private var appLaunchSignals: [(appID: String, pid: pid_t)] = []
     private var appWindowChangeSignals: [(appID: String, pid: pid_t)] = []
@@ -185,6 +186,12 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
         lock.lock()
         defer { lock.unlock() }
         return appSwitcherMaintenanceRequests
+    }
+
+    func searchIndexFreshnessBarrierRequestsRecorded() -> [RuntimeProjectionMaintenanceReason] {
+        lock.lock()
+        defer { lock.unlock() }
+        return searchIndexFreshnessBarrierRequests
     }
 
     func spaceTopologyChangeSignalCount() -> Int {
@@ -299,6 +306,18 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
         return committedSearchIndexProjection
     }
 
+    func readCommittedSearchIndexForSearch() -> RuntimeSearchIndexRead {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let projection = committedSearchIndexProjection else {
+            return RuntimeSearchIndexRead(projection: nil, readiness: .missing)
+        }
+        return RuntimeSearchIndexRead(
+            projection: projection,
+            readiness: projection.freshness.isCompleteForScope ? .ready : .stale
+        )
+    }
+
     func runtimeReadModelDiagnostics() -> RuntimeReadModelDiagnostics {
         lock.lock()
         let hasCommittedSearchIndex = committedSearchIndexProjection != nil
@@ -320,6 +339,12 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
     func requestAppSwitcherProjectionMaintenance(reason: RuntimeProjectionMaintenanceReason) {
         lock.lock()
         appSwitcherMaintenanceRequests.append(reason)
+        lock.unlock()
+    }
+
+    func requestSearchIndexFreshnessBarrier(reason: RuntimeProjectionMaintenanceReason) {
+        lock.lock()
+        searchIndexFreshnessBarrierRequests.append(reason)
         lock.unlock()
     }
 

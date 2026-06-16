@@ -84,6 +84,25 @@ struct RuntimeSearchIndexProjection: Equatable, Sendable {
     }
 }
 
+enum RuntimeSearchIndexReadiness: String, Equatable, Sendable {
+    case ready
+    case stale
+    case missing
+}
+
+struct RuntimeSearchIndexRead: Equatable, Sendable {
+    let projection: RuntimeSearchIndexProjection?
+    let readiness: RuntimeSearchIndexReadiness
+
+    var freshness: RuntimeProjectionFreshness? {
+        projection?.freshness
+    }
+
+    var shouldRequestFreshnessBarrier: Bool {
+        readiness == .stale
+    }
+}
+
 struct RuntimeReadModelDiagnostics: Equatable {
     let generation: RuntimeReadModelGeneration
     let dirtyAppIDs: Set<String>
@@ -341,6 +360,26 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             isCompleteForScope: !isDirtyLocked
         )
         return projection
+    }
+
+    func readCommittedSearchIndexForSearch() -> RuntimeSearchIndexRead {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard var projection = committedSearchIndex else {
+            return RuntimeSearchIndexRead(
+                projection: nil,
+                readiness: .missing
+            )
+        }
+        projection.freshness = freshnessLocked(
+            generatedAt: projection.freshness.generatedAt,
+            isCompleteForScope: !isDirtyLocked
+        )
+        return RuntimeSearchIndexRead(
+            projection: projection,
+            readiness: projection.freshness.isCompleteForScope ? .ready : .stale
+        )
     }
 
     func diagnostics() -> RuntimeReadModelDiagnostics {

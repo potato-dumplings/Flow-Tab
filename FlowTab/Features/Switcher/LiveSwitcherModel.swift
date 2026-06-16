@@ -159,6 +159,36 @@ final class LiveSwitcherModel: ObservableObject {
         }
     }
 
+    struct SearchIndexReadDiagnostic: Equatable {
+        let reason: String
+        let readiness: RuntimeSearchIndexReadiness
+        let appCount: Int
+        let windowCount: Int
+        let isCompleteForScope: Bool
+        let dirtyAppCount: Int
+        let dirtyPIDCount: Int
+        let dirtyCGWindowIDCount: Int
+        let pendingRepairScopeCount: Int
+        let requestedFreshnessBarrier: Bool
+
+        var logMessage: String {
+            [
+                "searchIndexSource",
+                "reason=\(reason)",
+                "source=committedRuntimeIndex",
+                "readiness=\(readiness.rawValue)",
+                "apps=\(appCount)",
+                "windows=\(windowCount)",
+                "complete=\(isCompleteForScope ? 1 : 0)",
+                "dirtyApps=\(dirtyAppCount)",
+                "dirtyPIDs=\(dirtyPIDCount)",
+                "dirtyCGWindowIDs=\(dirtyCGWindowIDCount)",
+                "pendingScopes=\(pendingRepairScopeCount)",
+                "freshnessBarrierRequested=\(requestedFreshnessBarrier ? 1 : 0)"
+            ].joined(separator: " ")
+        }
+    }
+
     @Published var session: SwitcherSession? {
         didSet {
             guard let session else {
@@ -252,6 +282,7 @@ final class LiveSwitcherModel: ObservableObject {
     var selectedAppWindowSnapshotPendingAppID: String?
     var lastSnapshotInvalidationRecord: SnapshotInvalidationRecord?
     var lastRuntimeProjectionMaintenanceDiagnostic: RuntimeProjectionMaintenanceDiagnostic?
+    var lastSearchIndexReadDiagnostic: SearchIndexReadDiagnostic?
     var searchComputationRevision: UInt64 = 0
     var searchDebounceNanoseconds: UInt64 = 20_000_000
 
