@@ -137,7 +137,7 @@ extension LiveSwitcherModel {
 
     func requestRuntimeProjectionMaintenance(triggerDirection: CycleDirection) {
         guard runtimeProjectionMaintenanceEnabled else { return }
-        guard snapshotProviderOverride == nil else { return }
+        guard !hasTestingSnapshotProviderOverride else { return }
 
         runtimeProjectionMaintenanceGeneration &+= 1
         let startMs = Self.monotonicMilliseconds()
@@ -365,9 +365,9 @@ extension LiveSwitcherModel {
         let startMs = Self.monotonicMilliseconds()
         let source: String
         let snapshot: RuntimeSnapshot
-        if let snapshotProviderOverride {
-            source = "override"
-            snapshot = snapshotProviderOverride()
+        if let testingSnapshot = makeTestingSnapshotOverride() {
+            source = "testingOverride"
+            snapshot = testingSnapshot
         } else if let projection = runtimeSnapshotService.readAppSwitcherProjection() {
             source = projection.freshness.isCompleteForScope
                 ? "runtimeProjection"
@@ -387,12 +387,9 @@ extension LiveSwitcherModel {
         let startMs = Self.monotonicMilliseconds()
         let source: String
         let snapshot: RuntimeSnapshot
-        if let fastAppSnapshotProviderOverride {
-            source = "fastOverride"
-            snapshot = fastAppSnapshotProviderOverride()
-        } else if let snapshotProviderOverride {
-            source = "override"
-            snapshot = snapshotProviderOverride()
+        if let testingSnapshot = makeTestingFastAppSnapshotOverride() {
+            source = testingSnapshot.source
+            snapshot = testingSnapshot.snapshot
         } else if let projection = runtimeSnapshotService.readAppSwitcherProjection() {
             source = projection.freshness.isCompleteForScope
                 ? "runtimeProjection"
@@ -405,5 +402,35 @@ extension LiveSwitcherModel {
         let durationMs = Self.monotonicMilliseconds() - startMs
         logMakeSnapshot(source: source, snapshot: snapshot, durationMs: durationMs)
         return snapshot
+    }
+
+    var hasTestingSnapshotProviderOverride: Bool {
+#if DEBUG
+        testingSnapshotProviderOverride != nil
+#else
+        false
+#endif
+    }
+
+    func makeTestingSnapshotOverride() -> RuntimeSnapshot? {
+#if DEBUG
+        testingSnapshotProviderOverride?()
+#else
+        nil
+#endif
+    }
+
+    func makeTestingFastAppSnapshotOverride() -> (source: String, snapshot: RuntimeSnapshot)? {
+#if DEBUG
+        if let testingFastAppSnapshotProviderOverride {
+            return ("testingFastOverride", testingFastAppSnapshotProviderOverride())
+        }
+        if let testingSnapshotProviderOverride {
+            return ("testingOverride", testingSnapshotProviderOverride())
+        }
+        return nil
+#else
+        nil
+#endif
     }
 }

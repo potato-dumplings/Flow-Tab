@@ -971,9 +971,9 @@ extension FlowTabTests {
         let snapshot = RuntimeSnapshot(apps: apps, contextsByID: [:])
         let model = LiveSwitcherModel()
         model.frontmostApplicationOverride = { nil }
-        model.fastAppSnapshotProviderOverride = { snapshot }
+        model.testingFastAppSnapshotProviderOverride = { snapshot }
         var fullSnapshotCalls = 0
-        model.snapshotProviderOverride = {
+        model.testingSnapshotProviderOverride = {
             fullSnapshotCalls += 1
             Thread.sleep(forTimeInterval: 0.2)
             return snapshot
@@ -1019,9 +1019,9 @@ extension FlowTabTests {
         let fastSnapshot = appOnlySnapshot(from: fullSnapshot)
         let model = LiveSwitcherModel()
         model.frontmostApplicationOverride = { nil }
-        model.fastAppSnapshotProviderOverride = { fastSnapshot }
+        model.testingFastAppSnapshotProviderOverride = { fastSnapshot }
         var fullSnapshotCalls = 0
-        model.snapshotProviderOverride = {
+        model.testingSnapshotProviderOverride = {
             fullSnapshotCalls += 1
             Thread.sleep(forTimeInterval: 0.2)
             return fullSnapshot
@@ -1233,7 +1233,7 @@ extension FlowTabTests {
         let model = LiveSwitcherModel()
         model.frontmostApplicationOverride = { nil }
         model.runtimeProjectionMaintenanceEnabled = false
-        model.fastAppSnapshotProviderOverride = { fastSnapshot }
+        model.testingFastAppSnapshotProviderOverride = { fastSnapshot }
         var previewCaptureCalls = 0
         model.previewCaptureOverride = { _, _, _, _ in
             previewCaptureCalls += 1

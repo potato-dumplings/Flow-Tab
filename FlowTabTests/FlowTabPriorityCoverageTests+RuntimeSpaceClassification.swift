@@ -436,7 +436,7 @@ extension FlowTabPriorityCoverageTests {
         )
         let model = LiveSwitcherModel()
         model.frontmostApplicationOverride = { currentApp }
-        model.snapshotProviderOverride = { snapshot }
+        model.testingSnapshotProviderOverride = { snapshot }
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         let globalWindowIDs = model.session?.apps.first(where: { $0.id == appID })?.windows.map(\.id) ?? []

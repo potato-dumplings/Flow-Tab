@@ -2634,7 +2634,7 @@ extension FlowTabPriorityCoverageTests {
         )
 
         model.frontmostApplicationOverride = { currentApp }
-        model.snapshotProviderOverride = {
+        model.testingSnapshotProviderOverride = {
             RuntimeSnapshot(
                 apps: [
                     AppSwitchCandidate(
@@ -2694,7 +2694,7 @@ extension FlowTabPriorityCoverageTests {
         )
 
         model.frontmostApplicationOverride = { currentApp }
-        model.snapshotProviderOverride = {
+        model.testingSnapshotProviderOverride = {
             RuntimeSnapshot(
                 apps: [
                     AppSwitchCandidate(
@@ -2771,7 +2771,7 @@ extension FlowTabPriorityCoverageTests {
         )
 
         model.frontmostApplicationOverride = { currentApp }
-        model.snapshotProviderOverride = {
+        model.testingSnapshotProviderOverride = {
             RuntimeSnapshot(
                 apps: [
                     AppSwitchCandidate(
@@ -2849,7 +2849,7 @@ extension FlowTabPriorityCoverageTests {
         )
 
         model.frontmostApplicationOverride = { currentApp }
-        model.snapshotProviderOverride = {
+        model.testingSnapshotProviderOverride = {
             RuntimeSnapshot(
                 apps: [
                     AppSwitchCandidate(
@@ -2922,7 +2922,7 @@ extension FlowTabPriorityCoverageTests {
         )
 
         model.frontmostApplicationOverride = { currentApp }
-        model.snapshotProviderOverride = {
+        model.testingSnapshotProviderOverride = {
             RuntimeSnapshot(
                 apps: [
                     AppSwitchCandidate(

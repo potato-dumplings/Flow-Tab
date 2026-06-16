@@ -218,8 +218,10 @@ final class LiveSwitcherModel: ObservableObject {
     var onSearchStateChanged: (() -> Void)?
     var onSessionLayoutChanged: (() -> Void)?
     var onSearchResultScrollRequestForTesting: ((String) -> Void)?
-    var snapshotProviderOverride: (() -> RuntimeSnapshot)?
-    var fastAppSnapshotProviderOverride: (() -> RuntimeSnapshot)?
+#if DEBUG
+    var testingSnapshotProviderOverride: (() -> RuntimeSnapshot)?
+    var testingFastAppSnapshotProviderOverride: (() -> RuntimeSnapshot)?
+#endif
     var selectedAppSnapshotProviderOverride: ((String) -> RuntimeHomeAppSnapshot?)?
     var frontmostApplicationOverride: (() -> NSRunningApplication?)?
     var activationOverride: ((ActivationTarget, [String: RuntimeAppContext]) -> Void)?
@@ -409,7 +411,7 @@ final class LiveSwitcherModel: ObservableObject {
         var resolvedAppCandidate: AppSwitchCandidate?
         var resolvedContext: RuntimeAppContext?
 
-        if snapshotProviderOverride != nil {
+        if hasTestingSnapshotProviderOverride {
             let rawSnapshot = makeSnapshot()
             snapshotReadMs = Self.monotonicMilliseconds()
             let snapshot = snapshotWithWindowRecencyApplied(rawSnapshot)

@@ -704,7 +704,7 @@ extension FlowTabPriorityCoverageTests {
             clearIsolatedUserDefaults(userDefaults)
         }
 
-        panelController.modelForTesting.snapshotProviderOverride = {
+        panelController.modelForTesting.testingSnapshotProviderOverride = {
             RuntimeSnapshot(
                 apps: [
                     AppSwitchCandidate(
@@ -1079,7 +1079,7 @@ extension FlowTabPriorityCoverageTests {
             clearIsolatedUserDefaults(userDefaults)
         }
 
-        panelController.modelForTesting.snapshotProviderOverride = {
+        panelController.modelForTesting.testingSnapshotProviderOverride = {
             snapshotCallCount += 1
             let apps: [AppSwitchCandidate]
             switch snapshotCallCount {
@@ -1172,7 +1172,7 @@ extension FlowTabPriorityCoverageTests {
             clearIsolatedUserDefaults(userDefaults)
         }
 
-        panelController.modelForTesting.snapshotProviderOverride = {
+        panelController.modelForTesting.testingSnapshotProviderOverride = {
             RuntimeSnapshot(apps: [], contextsByID: [:])
         }
 

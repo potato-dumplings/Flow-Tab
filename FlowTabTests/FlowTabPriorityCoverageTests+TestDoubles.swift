@@ -389,7 +389,7 @@ extension LiveSwitcherModel {
         _ provider: @escaping () -> RuntimeSnapshot,
         committedSearchApps: [AppSwitchCandidate]? = nil
     ) {
-        snapshotProviderOverride = provider
+        testingSnapshotProviderOverride = provider
         guard let recordingService = runtimeSnapshotService as? RecordingRuntimeSnapshotService else {
             return
         }

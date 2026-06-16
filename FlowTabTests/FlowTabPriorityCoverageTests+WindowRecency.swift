@@ -592,7 +592,7 @@ extension FlowTabPriorityCoverageTests {
             context: currentContext
         )
         model.frontmostApplicationOverride = { currentApp }
-        model.snapshotProviderOverride = {
+        model.testingSnapshotProviderOverride = {
             RuntimeSnapshot(
                 apps: [
                     AppSwitchCandidate(
@@ -858,7 +858,7 @@ extension FlowTabPriorityCoverageTests {
 
         var snapshotWindows = initialWindows
         model.frontmostApplicationOverride = { currentApp }
-        model.snapshotProviderOverride = {
+        model.testingSnapshotProviderOverride = {
             RuntimeSnapshot(
                 apps: [
                     AppSwitchCandidate(

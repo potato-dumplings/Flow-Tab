@@ -31,7 +31,7 @@ extension FlowTabPriorityCoverageTests {
             runningApp: currentApp,
             windows: windows
         )
-        model.fastAppSnapshotProviderOverride = {
+        model.testingFastAppSnapshotProviderOverride = {
             RuntimeSnapshot(apps: [app], contextsByID: [appID: context])
         }
 
@@ -90,7 +90,7 @@ extension FlowTabPriorityCoverageTests {
             runningApp: currentApp,
             windows: windows
         )
-        model.fastAppSnapshotProviderOverride = {
+        model.testingFastAppSnapshotProviderOverride = {
             RuntimeSnapshot(apps: [app], contextsByID: [appID: context])
         }
 
@@ -148,7 +148,7 @@ extension FlowTabPriorityCoverageTests {
             runningApp: currentApp,
             windows: windows
         )
-        model.fastAppSnapshotProviderOverride = {
+        model.testingFastAppSnapshotProviderOverride = {
             RuntimeSnapshot(apps: [app], contextsByID: [appID: context])
         }
 
@@ -223,7 +223,7 @@ extension FlowTabPriorityCoverageTests {
             runningApp: currentApp,
             windows: windows
         )
-        model.fastAppSnapshotProviderOverride = {
+        model.testingFastAppSnapshotProviderOverride = {
             RuntimeSnapshot(apps: [app], contextsByID: [appID: context])
         }
 
@@ -286,7 +286,7 @@ extension FlowTabPriorityCoverageTests {
             runningApp: currentApp,
             windows: windows
         )
-        model.fastAppSnapshotProviderOverride = {
+        model.testingFastAppSnapshotProviderOverride = {
             RuntimeSnapshot(apps: [app], contextsByID: [appID: context])
         }
 
@@ -373,7 +373,7 @@ extension FlowTabPriorityCoverageTests {
             runningApp: currentApp,
             windows: windows
         )
-        model.fastAppSnapshotProviderOverride = {
+        model.testingFastAppSnapshotProviderOverride = {
             RuntimeSnapshot(apps: [app], contextsByID: [appID: context])
         }
 
@@ -442,7 +442,7 @@ extension FlowTabPriorityCoverageTests {
             runningApp: currentApp,
             windows: windows
         )
-        model.fastAppSnapshotProviderOverride = {
+        model.testingFastAppSnapshotProviderOverride = {
             RuntimeSnapshot(apps: [app], contextsByID: [appID: context])
         }
 

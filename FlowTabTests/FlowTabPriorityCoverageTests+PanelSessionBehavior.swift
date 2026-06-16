@@ -16,7 +16,7 @@ extension FlowTabPriorityCoverageTests {
             WindowCandidate(id: "front-2", title: "Draft", isMinimized: false, lastActiveAt: 20)
         ]
         controller.modelForTesting.frontmostApplicationOverride = { currentApp }
-        controller.modelForTesting.snapshotProviderOverride = {
+        controller.modelForTesting.testingSnapshotProviderOverride = {
             RuntimeSnapshot(
                 apps: [
                     AppSwitchCandidate(
@@ -76,7 +76,7 @@ extension FlowTabPriorityCoverageTests {
             WindowCandidate(id: "front-2", title: "Draft", isMinimized: false, lastActiveAt: 20)
         ]
         controller.modelForTesting.frontmostApplicationOverride = { currentApp }
-        controller.modelForTesting.snapshotProviderOverride = {
+        controller.modelForTesting.testingSnapshotProviderOverride = {
             RuntimeSnapshot(
                 apps: [
                     AppSwitchCandidate(
@@ -112,7 +112,7 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerGlobalHotkeyAdvanceAndReleaseCommitSession() async {
         let controller = SwitcherPanelController()
-        controller.modelForTesting.snapshotProviderOverride = {
+        controller.modelForTesting.testingSnapshotProviderOverride = {
             RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
         }
 
@@ -143,7 +143,7 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerReleaseConfirmationGenerationInvalidatesCanceledTask() {
         let controller = SwitcherPanelController()
-        controller.modelForTesting.snapshotProviderOverride = {
+        controller.modelForTesting.testingSnapshotProviderOverride = {
             RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
         }
 
@@ -228,7 +228,7 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerPresentationSessionGenerationTracksSessionLifecycle() {
         let controller = SwitcherPanelController()
-        controller.modelForTesting.snapshotProviderOverride = {
+        controller.modelForTesting.testingSnapshotProviderOverride = {
             RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
         }
 
@@ -272,10 +272,10 @@ extension FlowTabPriorityCoverageTests {
         }
         var fullSnapshotCalls = 0
         controller.modelForTesting.frontmostApplicationOverride = { nil }
-        controller.modelForTesting.fastAppSnapshotProviderOverride = {
+        controller.modelForTesting.testingFastAppSnapshotProviderOverride = {
             RuntimeSnapshot(apps: fastApps, contextsByID: [:])
         }
-        controller.modelForTesting.snapshotProviderOverride = {
+        controller.modelForTesting.testingSnapshotProviderOverride = {
             fullSnapshotCalls += 1
             Thread.sleep(forTimeInterval: 0.2)
             return RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
@@ -576,7 +576,7 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerDownArrowInAppCycleEntersWindowLayer() {
         let controller = SwitcherPanelController()
-        controller.modelForTesting.snapshotProviderOverride = {
+        controller.modelForTesting.testingSnapshotProviderOverride = {
             RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
         }
 
@@ -598,7 +598,7 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerFlagsChangedReleaseConfirmationEndsSession() async {
         let controller = SwitcherPanelController()
-        controller.modelForTesting.snapshotProviderOverride = {
+        controller.modelForTesting.testingSnapshotProviderOverride = {
             RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
         }
 
@@ -646,7 +646,7 @@ extension FlowTabPriorityCoverageTests {
         let snapshotService = RecordingRuntimeSnapshotService()
         let model = LiveSwitcherModel(snapshotService: snapshotService)
         let controller = SwitcherPanelController(model: model)
-        controller.modelForTesting.snapshotProviderOverride = {
+        controller.modelForTesting.testingSnapshotProviderOverride = {
             RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
         }
         controller.globalPrimaryModifierPressedOverride = true
@@ -710,7 +710,7 @@ extension FlowTabPriorityCoverageTests {
         let snapshotService = RecordingRuntimeSnapshotService()
         let model = LiveSwitcherModel(snapshotService: snapshotService)
         let controller = SwitcherPanelController(model: model)
-        controller.modelForTesting.snapshotProviderOverride = {
+        controller.modelForTesting.testingSnapshotProviderOverride = {
             RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
         }
         controller.globalPrimaryModifierPressedOverride = false
@@ -732,7 +732,7 @@ extension FlowTabPriorityCoverageTests {
         let initialApps = terminateScenarioApps()
         var snapshotReadCount = 0
         var terminatedAppID: String?
-        controller.modelForTesting.snapshotProviderOverride = {
+        controller.modelForTesting.testingSnapshotProviderOverride = {
             defer { snapshotReadCount += 1 }
             guard snapshotReadCount > 0, let terminatedAppID else {
                 return RuntimeSnapshot(apps: initialApps, contextsByID: [:])
@@ -768,7 +768,7 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerTerminateRequestProtectsPanelResignAfterModifierRelease() async {
         let controller = SwitcherPanelController()
-        controller.modelForTesting.snapshotProviderOverride = {
+        controller.modelForTesting.testingSnapshotProviderOverride = {
             RuntimeSnapshot(apps: self.terminateScenarioApps(), contextsByID: [:])
         }
         controller.modelForTesting.terminateRequestOverride = { _ in
@@ -804,7 +804,7 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerRecoverableOcclusionKeepsSessionVisible() async {
         let occlusionController = SwitcherPanelController()
-        occlusionController.modelForTesting.snapshotProviderOverride = {
+        occlusionController.modelForTesting.testingSnapshotProviderOverride = {
             RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
         }
         occlusionController.globalPrimaryModifierPressedOverride = true
@@ -834,7 +834,7 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerSystemInterruptionsCancelSessionAndSuppressReplayUntilRelease() async {
         let controller = SwitcherPanelController()
-        controller.modelForTesting.snapshotProviderOverride = {
+        controller.modelForTesting.testingSnapshotProviderOverride = {
             RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
         }
         controller.globalPrimaryModifierPressedOverride = false
@@ -869,7 +869,7 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerDelayedAutoEnterWindowLayerTriggersAfterConfiguredDelay() async {
         let controller = SwitcherPanelController()
-        controller.modelForTesting.snapshotProviderOverride = {
+        controller.modelForTesting.testingSnapshotProviderOverride = {
             RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
         }
         controller.windowLayerPresentationDelayOverride = 0.01
@@ -901,7 +901,7 @@ extension FlowTabPriorityCoverageTests {
     func testSwitcherPanelControllerDelayedAutoEnterWindowLayerUsesPreferenceDelay() async {
         await withTemporaryWindowLayerAutoEnterDelay(0.01) {
             let controller = SwitcherPanelController()
-            controller.modelForTesting.snapshotProviderOverride = {
+            controller.modelForTesting.testingSnapshotProviderOverride = {
                 RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
             }
 
@@ -969,10 +969,10 @@ extension FlowTabPriorityCoverageTests {
         var selectedSnapshotRequests: [String] = []
 
         controller.windowLayerPresentationDelayOverride = 0.01
-        controller.modelForTesting.fastAppSnapshotProviderOverride = {
+        controller.modelForTesting.testingFastAppSnapshotProviderOverride = {
             RuntimeSnapshot(apps: [appOnlyCandidate], contextsByID: [:])
         }
-        controller.modelForTesting.snapshotProviderOverride = {
+        controller.modelForTesting.testingSnapshotProviderOverride = {
             RuntimeSnapshot(apps: [appOnlyCandidate], contextsByID: [:])
         }
         controller.modelForTesting.selectedAppSnapshotProviderOverride = { requestedAppID in
@@ -1050,7 +1050,7 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerShowSkipsHidingRegularWindowsWhileAppIsActive() {
         let controller = SwitcherPanelController()
-        controller.modelForTesting.snapshotProviderOverride = {
+        controller.modelForTesting.testingSnapshotProviderOverride = {
             RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
         }
         controller.appIsActiveOverride = true
@@ -1069,7 +1069,7 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerShowStillHidesRegularWindowsWhileAppIsInactive() {
         let controller = SwitcherPanelController()
-        controller.modelForTesting.snapshotProviderOverride = {
+        controller.modelForTesting.testingSnapshotProviderOverride = {
             RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
         }
         controller.appIsActiveOverride = false
@@ -1088,7 +1088,7 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerFewAppsShrinkPanelWidthWithoutChangingSpacing() {
         let controller = SwitcherPanelController()
-        controller.modelForTesting.snapshotProviderOverride = {
+        controller.modelForTesting.testingSnapshotProviderOverride = {
             RuntimeSnapshot(apps: self.layoutScenarioApps(count: 5), contextsByID: [:])
         }
 
@@ -1106,7 +1106,7 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerManyAppsReduceTileSizeWhileKeepingSpacingConstant() {
         let controller = SwitcherPanelController()
-        controller.modelForTesting.snapshotProviderOverride = {
+        controller.modelForTesting.testingSnapshotProviderOverride = {
             RuntimeSnapshot(apps: self.layoutScenarioApps(count: 20), contextsByID: [:])
         }
 
@@ -1125,7 +1125,7 @@ extension FlowTabPriorityCoverageTests {
     func testSwitcherPanelControllerPreviewLayerUsesWindowPreviewWidthForSingleAppManyWindows() {
         let controller = SwitcherPanelController()
         let app = manyWindowLayoutApp(windowCount: 100)
-        controller.modelForTesting.snapshotProviderOverride = {
+        controller.modelForTesting.testingSnapshotProviderOverride = {
             RuntimeSnapshot(apps: [app], contextsByID: [:])
         }
 
@@ -1146,7 +1146,7 @@ extension FlowTabPriorityCoverageTests {
         let controller = SwitcherPanelController()
         let app = manyWindowLayoutApp(windowCount: 100)
         let visibleFrame = CGRect(x: 0, y: 0, width: 1440, height: 900)
-        controller.modelForTesting.snapshotProviderOverride = {
+        controller.modelForTesting.testingSnapshotProviderOverride = {
             RuntimeSnapshot(apps: [app], contextsByID: [:])
         }
 

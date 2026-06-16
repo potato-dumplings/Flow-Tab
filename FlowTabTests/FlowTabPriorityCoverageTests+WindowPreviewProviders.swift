@@ -386,7 +386,7 @@ extension FlowTabPriorityCoverageTests {
             specialProviders: [specialProvider],
             genericProvider: genericProvider
         )
-        model.fastAppSnapshotProviderOverride = {
+        model.testingFastAppSnapshotProviderOverride = {
             RuntimeSnapshot(apps: [app], contextsByID: [appID: context])
         }
 
@@ -460,7 +460,7 @@ extension FlowTabPriorityCoverageTests {
             specialProviders: [specialProvider],
             genericProvider: genericProvider
         )
-        model.fastAppSnapshotProviderOverride = {
+        model.testingFastAppSnapshotProviderOverride = {
             RuntimeSnapshot(apps: [app], contextsByID: [appID: context])
         }
 

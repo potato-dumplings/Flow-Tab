@@ -9,7 +9,7 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testLiveSwitcherModelStartSessionLoadsSnapshotAndCommitActivatesPreferredTarget() {
         let model = LiveSwitcherModel()
-        model.snapshotProviderOverride = {
+        model.testingSnapshotProviderOverride = {
             RuntimeSnapshot(apps: self.commitScenarioApps(), contextsByID: [:])
         }
 
@@ -182,7 +182,7 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerPointerAppSelectionRequiresPointerMovement() {
         let controller = SwitcherPanelController()
-        controller.modelForTesting.snapshotProviderOverride = {
+        controller.modelForTesting.testingSnapshotProviderOverride = {
             RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
         }
 
@@ -215,7 +215,7 @@ extension FlowTabPriorityCoverageTests {
             windows: windows
         )
         controller.modelForTesting.frontmostApplicationOverride = { currentApp }
-        controller.modelForTesting.snapshotProviderOverride = {
+        controller.modelForTesting.testingSnapshotProviderOverride = {
             RuntimeSnapshot(
                 apps: [
                     AppSwitchCandidate(
@@ -293,7 +293,7 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerPointerAppClickCommitsImmediatelyWithoutPointerMovement() {
         let controller = SwitcherPanelController()
-        controller.modelForTesting.snapshotProviderOverride = {
+        controller.modelForTesting.testingSnapshotProviderOverride = {
             RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
         }
         var activatedTarget: ActivationTarget?
@@ -330,7 +330,7 @@ extension FlowTabPriorityCoverageTests {
             windows: windows
         )
         controller.modelForTesting.frontmostApplicationOverride = { currentApp }
-        controller.modelForTesting.snapshotProviderOverride = {
+        controller.modelForTesting.testingSnapshotProviderOverride = {
             RuntimeSnapshot(
                 apps: [
                     AppSwitchCandidate(
@@ -780,7 +780,7 @@ extension FlowTabPriorityCoverageTests {
         )
 
         model.frontmostApplicationOverride = { currentApp }
-        model.snapshotProviderOverride = {
+        model.testingSnapshotProviderOverride = {
             RuntimeSnapshot(
                 apps: [
                     AppSwitchCandidate(
@@ -820,7 +820,7 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testLiveSwitcherModelAutoEnterWindowLayerSuppressesImmediateReentryAfterManualExit() {
         let model = LiveSwitcherModel()
-        model.snapshotProviderOverride = {
+        model.testingSnapshotProviderOverride = {
             RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
         }
 
@@ -940,7 +940,7 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerQuitShortcutTriggersTerminateSelectedAppFlow() async {
         let controller = SwitcherPanelController()
-        controller.modelForTesting.snapshotProviderOverride = {
+        controller.modelForTesting.testingSnapshotProviderOverride = {
             RuntimeSnapshot(apps: self.terminateScenarioApps(), contextsByID: [:])
         }
         controller.modelForTesting.terminateRequestOverride = { _ in
@@ -975,7 +975,7 @@ extension FlowTabPriorityCoverageTests {
                 RuntimeSnapshot(apps: initialApps, contextsByID: [:]),
                 RuntimeSnapshot(apps: refreshedApps, contextsByID: [:])
             ]
-            controller.modelForTesting.snapshotProviderOverride = {
+            controller.modelForTesting.testingSnapshotProviderOverride = {
                 snapshots.removeFirst()
             }
             controller.modelForTesting.terminateRequestOverride = { _ in

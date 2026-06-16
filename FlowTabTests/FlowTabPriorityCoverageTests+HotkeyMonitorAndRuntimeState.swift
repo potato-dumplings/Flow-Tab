@@ -731,7 +731,7 @@ extension FlowTabPriorityCoverageTests {
             RuntimeSnapshot(apps: refreshedApps, contextsByID: [:])
         ]
         var snapshotReadCount = 0
-        model.snapshotProviderOverride = {
+        model.testingSnapshotProviderOverride = {
             snapshotReadCount += 1
             return snapshots.removeFirst()
         }
@@ -817,7 +817,7 @@ extension FlowTabPriorityCoverageTests {
         let model = LiveSwitcherModel()
         let initialApps = terminateScenarioApps()
         var snapshotReadCount = 0
-        model.snapshotProviderOverride = {
+        model.testingSnapshotProviderOverride = {
             snapshotReadCount += 1
             return RuntimeSnapshot(apps: initialApps, contextsByID: [:])
         }

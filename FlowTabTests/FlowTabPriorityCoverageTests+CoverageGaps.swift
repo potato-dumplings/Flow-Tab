@@ -6,7 +6,7 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testLiveSwitcherModelWindowLayerNavigationCommitsSessionWindowTarget() {
         let model = LiveSwitcherModel()
-        model.snapshotProviderOverride = {
+        model.testingSnapshotProviderOverride = {
             RuntimeSnapshot(apps: self.commitScenarioApps(), contextsByID: [:])
         }
 

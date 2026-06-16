@@ -20,7 +20,7 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelVisibilityRecoveryStateTracksPresentationLifecycle() {
         let controller = SwitcherPanelController()
-        controller.modelForTesting.snapshotProviderOverride = {
+        controller.modelForTesting.testingSnapshotProviderOverride = {
             RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
         }
 
@@ -72,7 +72,7 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelVisibilityRecoveryDiagnosticRecordsBeforeAndAfterSnapshots() async {
         let controller = SwitcherPanelController()
-        controller.modelForTesting.snapshotProviderOverride = {
+        controller.modelForTesting.testingSnapshotProviderOverride = {
             RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
         }
         controller.panelVisibilityOverride = true
@@ -113,7 +113,7 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherInitialVisibilityRecoveryRapidOpenClosePressureDoesNotReplayStaleTasks() async {
         let controller = SwitcherPanelController()
-        controller.modelForTesting.snapshotProviderOverride = {
+        controller.modelForTesting.testingSnapshotProviderOverride = {
             RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
         }
         controller.globalPrimaryModifierPressedOverride = true

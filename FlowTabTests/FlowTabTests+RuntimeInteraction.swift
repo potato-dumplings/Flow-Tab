@@ -160,7 +160,7 @@ extension FlowTabTests {
         let initialApps = terminateScenarioApps()
         var snapshots: [RuntimeSnapshot] = [makeRuntimeSnapshot(apps: initialApps)]
         var snapshotReadCount = 0
-        model.snapshotProviderOverride = {
+        model.testingSnapshotProviderOverride = {
             snapshotReadCount += 1
             XCTAssertFalse(snapshots.isEmpty)
             return snapshots.removeFirst()
@@ -220,7 +220,7 @@ extension FlowTabTests {
         let initialApps = terminateScenarioApps()
         var snapshots: [RuntimeSnapshot] = [makeRuntimeSnapshot(apps: initialApps)]
         var snapshotReadCount = 0
-        model.snapshotProviderOverride = {
+        model.testingSnapshotProviderOverride = {
             snapshotReadCount += 1
             XCTAssertFalse(snapshots.isEmpty)
             return snapshots.removeFirst()
@@ -311,7 +311,7 @@ extension FlowTabTests {
         let initialApps = terminateScenarioApps()
         var snapshots: [RuntimeSnapshot] = [makeRuntimeSnapshot(apps: initialApps)]
         var snapshotReadCount = 0
-        model.snapshotProviderOverride = {
+        model.testingSnapshotProviderOverride = {
             snapshotReadCount += 1
             XCTAssertFalse(snapshots.isEmpty)
             return snapshots.removeFirst()
@@ -376,7 +376,7 @@ extension FlowTabTests {
             makeRuntimeSnapshot(apps: initialApps)
         ]
         var snapshotReadCount = 0
-        model.snapshotProviderOverride = {
+        model.testingSnapshotProviderOverride = {
             snapshotReadCount += 1
             XCTAssertFalse(snapshots.isEmpty)
             return snapshots.removeFirst()
@@ -417,7 +417,7 @@ extension FlowTabTests {
         let initialApps = terminateScenarioApps()
         var snapshots: [RuntimeSnapshot] = [makeRuntimeSnapshot(apps: initialApps)]
         var snapshotReadCount = 0
-        model.snapshotProviderOverride = {
+        model.testingSnapshotProviderOverride = {
             snapshotReadCount += 1
             XCTAssertFalse(snapshots.isEmpty)
             return snapshots.removeFirst()
