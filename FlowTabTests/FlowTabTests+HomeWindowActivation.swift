@@ -174,6 +174,67 @@ extension FlowTabTests {
         }
     }
 
+    func testHomeRuntimeProjectionReaderUsesRuntimeProjectionsWithoutSnapshotBridge() {
+        let appID = "com.example.home-projection"
+        let snapshot = makeHomeActivationSnapshot(
+            appID: appID,
+            windows: [
+                WindowCandidate(
+                    id: "home-projected-1",
+                    title: "Home Projected One",
+                    isMinimized: false,
+                    lastActiveAt: 400
+                )
+            ]
+        )
+        let freshness = RuntimeProjectionFreshness(
+            generatedAt: 20,
+            sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+            dirtyAppIDs: [],
+            dirtyPIDs: [],
+            dirtyCGWindowIDs: [],
+            pendingRepairScopes: [],
+            isCompleteForScope: true
+        )
+        let snapshotService = RecordingRuntimeSnapshotService(
+            homeSummaryProjection: RuntimeHomeSummaryProjection(
+                summaries: [snapshot.summary],
+                freshness: freshness
+            ),
+            currentAppWindowProjectionsByAppID: [
+                appID: RuntimeCurrentAppWindowProjection(
+                    appID: appID,
+                    snapshot: snapshot,
+                    freshness: freshness
+                )
+            ]
+        )
+
+        XCTAssertEqual(
+            HomeRuntimeProjectionReader.appSummaries(from: snapshotService)?.map(\.appID),
+            [appID]
+        )
+        XCTAssertEqual(
+            HomeRuntimeProjectionReader.lightweightAppSummaries(from: snapshotService)?.map(\.appID),
+            [appID]
+        )
+        XCTAssertEqual(
+            HomeRuntimeProjectionReader.appSummary(for: appID, from: snapshotService)?.windowCount,
+            1
+        )
+        XCTAssertEqual(
+            HomeRuntimeProjectionReader.appSnapshot(
+                for: appID,
+                from: snapshotService
+            )?.candidate.windows.map(\.id),
+            ["home-projected-1"]
+        )
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.homeSummariesRequestCount(), 0)
+        XCTAssertEqual(snapshotService.homeSummaryRequestCount(), 0)
+        XCTAssertEqual(snapshotService.recordedHomeAppIDs(), [])
+    }
+
     func testHomeAppVisibilityPresentationKeepsHiddenAppsLast() {
         let summaries = [
             makeHomeAppSummary(appID: "com.example.mail", displayName: "Mail", rank: 0),

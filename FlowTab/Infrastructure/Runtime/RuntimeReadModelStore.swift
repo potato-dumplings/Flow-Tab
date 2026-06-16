@@ -31,11 +31,19 @@ struct RuntimeAppSwitcherProjection {
     let apps: [AppSwitchCandidate]
     let contextsByID: [String: RuntimeAppContext]
     var freshness: RuntimeProjectionFreshness
+
+    var snapshot: RuntimeSnapshot {
+        RuntimeSnapshot(apps: apps, contextsByID: contextsByID)
+    }
 }
 
 struct RuntimeHomeSummaryProjection {
     let summaries: [RuntimeHomeAppSummary]
     var freshness: RuntimeProjectionFreshness
+
+    func summary(for appID: String) -> RuntimeHomeAppSummary? {
+        summaries.first { $0.appID == appID }
+    }
 }
 
 struct RuntimeCurrentAppWindowProjection {

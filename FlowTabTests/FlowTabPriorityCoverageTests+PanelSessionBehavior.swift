@@ -293,6 +293,111 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testLiveSwitcherModelStartsAppSessionFromRuntimeProjectionWithoutLightweightSampling() {
+        let apps = searchScenarioApps().map { app in
+            AppSwitchCandidate(
+                id: app.id,
+                displayName: app.displayName,
+                groupID: app.groupID,
+                lastActiveAt: app.lastActiveAt,
+                windows: []
+            )
+        }
+        let projection = RuntimeAppSwitcherProjection(
+            apps: apps,
+            contextsByID: [:],
+            freshness: RuntimeProjectionFreshness(
+                generatedAt: 10,
+                sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+                dirtyAppIDs: [],
+                dirtyPIDs: [],
+                dirtyCGWindowIDs: [],
+                pendingRepairScopes: [],
+                isCompleteForScope: true
+            )
+        )
+        let snapshotService = RecordingRuntimeSnapshotService(appSwitcherProjection: projection)
+        let model = LiveSwitcherModel(snapshotService: snapshotService)
+        model.backgroundFullSnapshotRefreshEnabled = false
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(model.session?.apps.map(\.id), apps.map(\.id))
+        XCTAssertEqual(model.session?.apps.flatMap(\.windows).count, 0)
+    }
+
+    @MainActor
+    func testLiveSwitcherModelSelectedAppWindowSnapshotUsesRuntimeProjectionWithoutHomeSampling() {
+        let appID = "com.example.projected-current-app"
+        let runningApp = NSRunningApplication.current
+        let appOnlyCandidate = AppSwitchCandidate(
+            id: appID,
+            displayName: "Projected Runtime Source",
+            groupID: "projected-runtime-source",
+            lastActiveAt: 100,
+            windows: []
+        )
+        let windows = [
+            WindowCandidate(id: "projected-window-1", title: "Projected One", isMinimized: false, lastActiveAt: 20),
+            WindowCandidate(id: "projected-window-2", title: "Projected Two", isMinimized: false, lastActiveAt: 10)
+        ]
+        let windowCandidate = AppSwitchCandidate(
+            id: appID,
+            displayName: "Projected Runtime Source",
+            groupID: "projected-runtime-source",
+            lastActiveAt: 100,
+            windows: windows
+        )
+        let context = makeRuntimeAppContext(appID: appID, runningApp: runningApp, windows: windows)
+        let selectedSnapshot = RuntimeHomeAppSnapshot(
+            summary: RuntimeHomeAppSummary(
+                appID: appID,
+                displayName: "Projected Runtime Source",
+                groupID: "projected-runtime-source",
+                lastActiveAt: 100,
+                windowCount: windows.count,
+                pid: runningApp.processIdentifier
+            ),
+            candidate: windowCandidate,
+            context: context
+        )
+        let freshness = RuntimeProjectionFreshness(
+            generatedAt: 11,
+            sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+            dirtyAppIDs: [],
+            dirtyPIDs: [],
+            dirtyCGWindowIDs: [],
+            pendingRepairScopes: [],
+            isCompleteForScope: true
+        )
+        let snapshotService = RecordingRuntimeSnapshotService(
+            appSwitcherProjection: RuntimeAppSwitcherProjection(
+                apps: [appOnlyCandidate],
+                contextsByID: [:],
+                freshness: freshness
+            ),
+            currentAppWindowProjectionsByAppID: [
+                appID: RuntimeCurrentAppWindowProjection(
+                    appID: appID,
+                    snapshot: selectedSnapshot,
+                    freshness: freshness
+                )
+            ]
+        )
+        let model = LiveSwitcherModel(snapshotService: snapshotService)
+        model.backgroundFullSnapshotRefreshEnabled = false
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        XCTAssertTrue(model.scheduleSelectedAppWindowSnapshotIfNeeded(for: appID))
+
+        XCTAssertEqual(snapshotService.recordedHomeAppIDs(), [])
+        XCTAssertEqual(model.session?.selectedApp.windows.map(\.id), ["projected-window-1", "projected-window-2"])
+        XCTAssertEqual(model.runtimeContextsByID[appID]?.windowsByID["projected-window-1"]?.title, "Projected One")
+    }
+
+    @MainActor
     func testLiveSwitcherModelSelectedAppWindowSnapshotUsesSharedRuntimeSnapshotService() async {
         let appID = "com.example.shared-runtime-source"
         let runningApp = NSRunningApplication.current

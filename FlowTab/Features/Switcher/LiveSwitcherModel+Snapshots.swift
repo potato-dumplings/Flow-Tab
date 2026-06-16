@@ -303,6 +303,20 @@ extension LiveSwitcherModel {
             "selectedAppWindowSnapshot result=scheduled appID=\(targetAppID)"
         )
 
+        if
+            providerOverride == nil,
+            let projection = snapshotService.readCurrentAppWindowProjection(appID: targetAppID)
+        {
+            completeSelectedAppWindowSnapshot(
+                projection.snapshot,
+                appID: targetAppID,
+                generation: generation,
+                startMs: startMs,
+                snapshotReadMs: Self.monotonicMilliseconds()
+            )
+            return true
+        }
+
         DispatchQueue.global(qos: .userInitiated).async {
             let orderedSnapshot: RuntimeHomeAppSnapshot?
             if let overrideSnapshot = providerOverride?(targetAppID) {
@@ -496,6 +510,11 @@ extension LiveSwitcherModel {
         } else if let snapshotProviderOverride {
             source = "override"
             snapshot = snapshotProviderOverride()
+        } else if let projection = runtimeSnapshotService.readAppSwitcherProjection() {
+            source = projection.freshness.isCompleteForScope
+                ? "runtimeProjection"
+                : "runtimeProjectionDirty"
+            snapshot = projection.snapshot
         } else {
             source = "runtimeSnapshotService.lightweight"
             snapshot = runtimeSnapshotService.lightweightAppSnapshot()

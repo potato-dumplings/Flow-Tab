@@ -83,9 +83,15 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
     private let lock = NSLock()
     private let homeSnapshotsByAppID: [String: RuntimeHomeAppSnapshot]
     private let focusedSnapshotsByPID: [pid_t: RuntimeHomeAppSnapshot]
+    private let appSwitcherProjection: RuntimeAppSwitcherProjection?
+    private let homeSummaryProjection: RuntimeHomeSummaryProjection?
+    private let currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection]
     private var requestedHomeAppIDs: [String] = []
     private var requestedFocusedPIDs: [pid_t] = []
     private var snapshotRequests = 0
+    private var lightweightSnapshotRequests = 0
+    private var homeSummaryRequests = 0
+    private var homeSummariesRequests = 0
     private var spaceTopologyChangeSignals = 0
     private var appLaunchSignals: [(appID: String, pid: pid_t)] = []
     private var appWindowChangeSignals: [(appID: String, pid: pid_t)] = []
@@ -95,10 +101,16 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
 
     init(
         homeSnapshotsByAppID: [String: RuntimeHomeAppSnapshot] = [:],
-        focusedSnapshotsByPID: [pid_t: RuntimeHomeAppSnapshot] = [:]
+        focusedSnapshotsByPID: [pid_t: RuntimeHomeAppSnapshot] = [:],
+        appSwitcherProjection: RuntimeAppSwitcherProjection? = nil,
+        homeSummaryProjection: RuntimeHomeSummaryProjection? = nil,
+        currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection] = [:]
     ) {
         self.homeSnapshotsByAppID = homeSnapshotsByAppID
         self.focusedSnapshotsByPID = focusedSnapshotsByPID
+        self.appSwitcherProjection = appSwitcherProjection
+        self.homeSummaryProjection = homeSummaryProjection
+        self.currentAppWindowProjectionsByAppID = currentAppWindowProjectionsByAppID
     }
 
     func recordedHomeAppIDs() -> [String] {
@@ -117,6 +129,24 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
         lock.lock()
         defer { lock.unlock() }
         return snapshotRequests
+    }
+
+    func lightweightSnapshotRequestCount() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return lightweightSnapshotRequests
+    }
+
+    func homeSummariesRequestCount() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return homeSummariesRequests
+    }
+
+    func homeSummaryRequestCount() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return homeSummaryRequests
     }
 
     func spaceTopologyChangeSignalCount() -> Int {
@@ -163,19 +193,28 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
     }
 
     func lightweightAppSnapshot() -> RuntimeSnapshot {
-        RuntimeSnapshot(apps: [], contextsByID: [:])
+        lock.lock()
+        lightweightSnapshotRequests += 1
+        lock.unlock()
+        return RuntimeSnapshot(apps: [], contextsByID: [:])
     }
 
     func homeAppSummaries() async -> [RuntimeHomeAppSummary] {
-        homeSnapshotsByAppID.values.map(\.summary)
+        lock.lock()
+        homeSummariesRequests += 1
+        lock.unlock()
+        return homeSnapshotsByAppID.values.map(\.summary)
     }
 
     func homeAppSummary(for appID: String) async -> RuntimeHomeAppSummary? {
-        homeSnapshotsByAppID[appID]?.summary
+        lock.lock()
+        homeSummaryRequests += 1
+        lock.unlock()
+        return homeSnapshotsByAppID[appID]?.summary
     }
 
     func homeAppSnapshot(for appID: String) async -> RuntimeHomeAppSnapshot? {
-        homeAppSnapshotSynchronously(for: appID)
+        return homeAppSnapshotSynchronously(for: appID)
     }
 
     func homeAppSnapshotSynchronously(for appID: String) -> RuntimeHomeAppSnapshot? {
@@ -193,15 +232,15 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
     }
 
     func readAppSwitcherProjection() -> RuntimeAppSwitcherProjection? {
-        nil
+        return appSwitcherProjection
     }
 
     func readHomeSummaryProjection() -> RuntimeHomeSummaryProjection? {
-        nil
+        return homeSummaryProjection
     }
 
-    func readCurrentAppWindowProjection(appID _: String) -> RuntimeCurrentAppWindowProjection? {
-        nil
+    func readCurrentAppWindowProjection(appID: String) -> RuntimeCurrentAppWindowProjection? {
+        return currentAppWindowProjectionsByAppID[appID]
     }
 
     func runtimeReadModelDiagnostics() -> RuntimeReadModelDiagnostics {
