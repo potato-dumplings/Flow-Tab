@@ -783,20 +783,7 @@ struct HomeLandingView: View {
     }
 
     private func lightweightHomeAppSummaries() -> [RuntimeHomeAppSummary] {
-        if let summaries = HomeRuntimeProjectionReader.lightweightAppSummaries(from: runtimeSnapshotService) {
-            return summaries
-        }
-        let snapshot = runtimeSnapshotService.lightweightAppSnapshot()
-        return snapshot.apps.map { app in
-            return RuntimeHomeAppSummary(
-                appID: app.id,
-                displayName: app.displayName,
-                groupID: app.groupID,
-                lastActiveAt: app.lastActiveAt,
-                windowCount: 0,
-                pid: snapshot.contextsByID[app.id]?.runningApp.processIdentifier ?? 0
-            )
-        }
+        HomeInitialAppSummaryReader.lightweightAppSummaries(from: runtimeSnapshotService)
     }
 
     private func formatHomeMilliseconds(_ value: Double) -> String {

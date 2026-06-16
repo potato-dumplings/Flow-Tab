@@ -235,6 +235,49 @@ extension FlowTabTests {
         XCTAssertEqual(snapshotService.recordedHomeAppIDs(), [])
     }
 
+    func testHomeInitialAppSummaryReaderDoesNotUseLightweightSnapshotFallback() {
+        let appID = "com.example.home-initial-projection"
+        let projectionApp = AppSwitchCandidate(
+            id: appID,
+            displayName: "Initial Projection",
+            groupID: "initial",
+            lastActiveAt: 300,
+            windows: [
+                WindowCandidate(id: "initial-window", title: "Initial", isMinimized: false, lastActiveAt: 300)
+            ]
+        )
+        let freshness = RuntimeProjectionFreshness(
+            generatedAt: 21,
+            sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+            dirtyAppIDs: [],
+            dirtyPIDs: [],
+            dirtyCGWindowIDs: [],
+            pendingRepairScopes: [],
+            isCompleteForScope: true
+        )
+        let projectionService = RecordingRuntimeSnapshotService(
+            appSwitcherProjection: RuntimeAppSwitcherProjection(
+                apps: [projectionApp],
+                contextsByID: [:],
+                freshness: freshness
+            )
+        )
+
+        XCTAssertEqual(
+            HomeInitialAppSummaryReader.lightweightAppSummaries(from: projectionService).map(\.appID),
+            [appID]
+        )
+        XCTAssertEqual(projectionService.lightweightSnapshotRequestCount(), 0)
+
+        let missingProjectionService = RecordingRuntimeSnapshotService()
+
+        XCTAssertEqual(
+            HomeInitialAppSummaryReader.lightweightAppSummaries(from: missingProjectionService),
+            []
+        )
+        XCTAssertEqual(missingProjectionService.lightweightSnapshotRequestCount(), 0)
+    }
+
     func testHomeAppVisibilityPresentationKeepsHiddenAppsLast() {
         let summaries = [
             makeHomeAppSummary(appID: "com.example.mail", displayName: "Mail", rank: 0),

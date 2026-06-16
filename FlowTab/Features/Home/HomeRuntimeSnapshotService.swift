@@ -41,3 +41,9 @@ enum HomeRuntimeProjectionReader {
         service.readCurrentAppWindowProjection(appID: appID)?.snapshot
     }
 }
+
+enum HomeInitialAppSummaryReader {
+    static func lightweightAppSummaries(from service: any RuntimeSnapshotServing) -> [RuntimeHomeAppSummary] {
+        HomeRuntimeProjectionReader.lightweightAppSummaries(from: service) ?? []
+    }
+}
