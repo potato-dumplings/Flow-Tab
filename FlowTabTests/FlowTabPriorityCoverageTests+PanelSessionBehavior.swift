@@ -559,25 +559,25 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testLiveSwitcherModelFocusedWindowSessionUsesFocusedRuntimeSnapshotSource() {
+    func testLiveSwitcherModelFocusedWindowSessionSignalsRuntimeRepairWhenProjectionIsMissing() {
         let runningApp = NSRunningApplication.current
         let appID = runningApp.bundleIdentifier ?? "pid:\(runningApp.processIdentifier)"
         let windows = [
-            WindowCandidate(id: "focused-window-1", title: "Focused One", isMinimized: false, lastActiveAt: 20),
-            WindowCandidate(id: "focused-window-2", title: "Focused Two", isMinimized: false, lastActiveAt: 10)
+            WindowCandidate(id: "contaminated-focused-window-1", title: "Focused One", isMinimized: false, lastActiveAt: 20),
+            WindowCandidate(id: "contaminated-focused-window-2", title: "Focused Two", isMinimized: false, lastActiveAt: 10)
         ]
         let candidate = AppSwitchCandidate(
             id: appID,
-            displayName: "Focused Runtime Source",
-            groupID: "focused-runtime-source",
+            displayName: "Contaminated Focused Runtime Source",
+            groupID: "contaminated-focused-runtime-source",
             lastActiveAt: 100,
             windows: windows
         )
         let focusedSnapshot = RuntimeHomeAppSnapshot(
             summary: RuntimeHomeAppSummary(
                 appID: appID,
-                displayName: "Focused Runtime Source",
-                groupID: "focused-runtime-source",
+                displayName: "Contaminated Focused Runtime Source",
+                groupID: "contaminated-focused-runtime-source",
                 lastActiveAt: 100,
                 windowCount: windows.count,
                 pid: runningApp.processIdentifier
@@ -593,12 +593,13 @@ extension FlowTabPriorityCoverageTests {
         model.focusedWindowIdentityOverride = { _ in nil }
         model.frontmostRuntimeWindowIDOverride = { _, _, _ in nil }
 
-        XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
+        XCTAssertFalse(model.startFocusedAppWindowSession(triggerDirection: .forward))
 
-        XCTAssertEqual(snapshotService.recordedFocusedPIDs(), [runningApp.processIdentifier])
+        XCTAssertEqual(snapshotService.recordedFocusedPIDs(), [])
+        XCTAssertEqual(snapshotService.appWindowChangeSignalsRecorded().map(\.appID), [appID])
+        XCTAssertEqual(snapshotService.appWindowChangeSignalsRecorded().map(\.pid), [runningApp.processIdentifier])
         XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(model.session?.mode, .windowCycle(appID: appID))
-        XCTAssertEqual(model.session?.selectedApp.windows.map(\.id), ["focused-window-1", "focused-window-2"])
+        XCTAssertNil(model.session)
     }
 
     @MainActor

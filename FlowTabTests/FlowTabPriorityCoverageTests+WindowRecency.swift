@@ -712,7 +712,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testLiveSwitcherModelFocusedRuntimeSnapshotRecordsFocusedStickyWindowBeforeOrdering() {
+    func testLiveSwitcherModelFocusedRuntimeProjectionRecordsFocusedStickyWindowBeforeOrdering() {
         let currentApp = NSRunningApplication.current
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let fullscreenFrame = CGRect(x: 0, y: 37, width: 1_728, height: 1_080)
@@ -775,7 +775,21 @@ extension FlowTabPriorityCoverageTests {
             context: context
         )
         let snapshotService = RecordingRuntimeSnapshotService(
-            focusedSnapshotsByPID: [currentApp.processIdentifier: focusedSnapshot]
+            currentAppWindowProjectionsByAppID: [
+                appID: RuntimeCurrentAppWindowProjection(
+                    appID: appID,
+                    snapshot: focusedSnapshot,
+                    freshness: RuntimeProjectionFreshness(
+                        generatedAt: 12,
+                        sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+                        dirtyAppIDs: [],
+                        dirtyPIDs: [],
+                        dirtyCGWindowIDs: [],
+                        pendingRepairScopes: [],
+                        isCompleteForScope: true
+                    )
+                )
+            ]
         )
         let model = LiveSwitcherModel(
             windowRecencyTracker: RuntimeWindowRecencyTracker(),
@@ -792,7 +806,7 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
 
-        XCTAssertEqual(snapshotService.recordedFocusedPIDs(), [currentApp.processIdentifier])
+        XCTAssertEqual(snapshotService.recordedFocusedPIDs(), [])
         XCTAssertEqual(
             model.session?.selectedApp.windows.map(\.id),
             ["fullscreen", "incognito", "normal"]
