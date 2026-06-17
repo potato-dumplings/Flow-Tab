@@ -670,19 +670,62 @@ extension FlowTabPriorityCoverageTests {
             }
         )
         let hotkeyFactory = SpyHotkeyMonitorFactory()
-        let panelController = SwitcherPanelController(
-            model: LiveSwitcherModel(
-                snapshotService: RecordingRuntimeSnapshotService(
-                    appSwitcherApps: self.searchScenarioApps()
-                )
-            )
-        )
         let currentApp = NSRunningApplication.current
         let currentAppID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let currentAppWindows = [
             WindowCandidate(id: "current-1", title: "Inbox", isMinimized: false, lastActiveAt: 400),
             WindowCandidate(id: "current-2", title: "Draft", isMinimized: false, lastActiveAt: 390)
         ]
+        let currentAppCandidate = AppSwitchCandidate(
+            id: currentAppID,
+            displayName: currentApp.localizedName ?? "Current App",
+            groupID: "current",
+            lastActiveAt: 400,
+            windows: currentAppWindows
+        )
+        let currentAppContext = makeRuntimeAppContext(
+            appID: currentAppID,
+            runningApp: currentApp,
+            windows: currentAppWindows
+        )
+        let currentAppSnapshot = RuntimeHomeAppSnapshot(
+            summary: RuntimeHomeAppSummary(
+                appID: currentAppID,
+                displayName: currentAppCandidate.displayName,
+                groupID: currentAppCandidate.groupID,
+                lastActiveAt: currentAppCandidate.lastActiveAt,
+                windowCount: currentAppWindows.count,
+                pid: currentApp.processIdentifier
+            ),
+            candidate: currentAppCandidate,
+            context: currentAppContext
+        )
+        let projectionFreshness = RuntimeProjectionFreshness(
+            generatedAt: 400,
+            sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+            dirtyAppIDs: [],
+            dirtyPIDs: [],
+            dirtyCGWindowIDs: [],
+            pendingRepairScopes: [],
+            isCompleteForScope: true
+        )
+        let snapshotService = RecordingRuntimeSnapshotService(
+            appSwitcherProjection: RuntimeAppSwitcherProjection(
+                apps: [currentAppCandidate] + searchScenarioApps(),
+                contextsByID: [currentAppID: currentAppContext],
+                freshness: projectionFreshness
+            ),
+            currentAppWindowProjectionsByAppID: [
+                currentAppID: RuntimeCurrentAppWindowProjection(
+                    appID: currentAppID,
+                    snapshot: currentAppSnapshot,
+                    freshness: projectionFreshness
+                )
+            ]
+        )
+        let panelController = SwitcherPanelController(
+            model: LiveSwitcherModel(snapshotService: snapshotService)
+        )
         var delegate: AppDelegate?
         defer {
             delegate?.applicationWillTerminate(
@@ -704,26 +747,6 @@ extension FlowTabPriorityCoverageTests {
             clearIsolatedUserDefaults(userDefaults)
         }
 
-        panelController.modelForTesting.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(
-                apps: [
-                    AppSwitchCandidate(
-                        id: currentAppID,
-                        displayName: currentApp.localizedName ?? "Current App",
-                        groupID: "current",
-                        lastActiveAt: 400,
-                        windows: currentAppWindows
-                    )
-                ] + self.searchScenarioApps(),
-                contextsByID: [
-                    currentAppID: self.makeRuntimeAppContext(
-                        appID: currentAppID,
-                        runningApp: currentApp,
-                        windows: currentAppWindows
-                    )
-                ]
-            )
-        }
         panelController.modelForTesting.frontmostApplicationOverride = { currentApp }
         AccessibilityPermissionChecker.isTrustedOverrideForTesting = { true }
         AccessibilityPermissionChecker.requestPermissionOverrideForTesting = { true }
@@ -810,6 +833,8 @@ extension FlowTabPriorityCoverageTests {
 
         mainRecord.monitor.onHotkeyPressed?(false)
         panelController.panelVisibilityOverride = true
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         XCTAssertNotNil(panelController.modelForTesting.session)
         let initialSelectedAppID = panelController.modelForTesting.selectedApp?.id
 
@@ -843,6 +868,8 @@ extension FlowTabPriorityCoverageTests {
         panelController.ignoreHotkeyPressesUntil = 0
         inAppRecord.monitor.onHotkeyPressed?(false)
         panelController.panelVisibilityOverride = true
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         XCTAssertEqual(panelController.activeHotkeySessionKind, .inAppWindowSwitcher)
         XCTAssertEqual(panelController.modelForTesting.session?.mode, .windowCycle(appID: currentAppID))
         let initialSelectedWindowID = panelController.modelForTesting.session?.selectedWindow?.id
