@@ -416,32 +416,64 @@ extension FlowTabPriorityCoverageTests {
                 )
             )
         })
-        let snapshot = RuntimeSnapshot(
-            apps: [
-                AppSwitchCandidate(
-                    id: appID,
-                    displayName: currentApp.localizedName ?? "Current App",
-                    groupID: "current",
-                    lastActiveAt: 100,
-                    windows: windows
-                )
-            ],
-            contextsByID: [
-                appID: RuntimeAppContext(
+        let candidate = AppSwitchCandidate(
+            id: appID,
+            displayName: currentApp.localizedName ?? "Current App",
+            groupID: "current",
+            lastActiveAt: 100,
+            windows: windows
+        )
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windowsByID: contexts
+        )
+        let focusedSnapshot = RuntimeHomeAppSnapshot(
+            summary: RuntimeHomeAppSummary(
+                appID: appID,
+                displayName: candidate.displayName,
+                groupID: candidate.groupID,
+                lastActiveAt: candidate.lastActiveAt,
+                windowCount: windows.count,
+                pid: pid
+            ),
+            candidate: candidate,
+            context: context
+        )
+        let freshness = RuntimeProjectionFreshness(
+            generatedAt: 10,
+            sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+            dirtyAppIDs: [],
+            dirtyPIDs: [],
+            dirtyCGWindowIDs: [],
+            pendingRepairScopes: [],
+            isCompleteForScope: true
+        )
+        let snapshotService = RecordingRuntimeSnapshotService(
+            appSwitcherProjection: RuntimeAppSwitcherProjection(
+                apps: [candidate],
+                contextsByID: [appID: context],
+                freshness: freshness
+            ),
+            currentAppWindowProjectionsByAppID: [
+                appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
-                    runningApp: currentApp,
-                    windowsByID: contexts
+                    snapshot: focusedSnapshot,
+                    freshness: freshness
                 )
             ]
         )
-        let model = LiveSwitcherModel()
+        let model = LiveSwitcherModel(snapshotService: snapshotService)
         model.frontmostApplicationOverride = { currentApp }
-        model.testingSnapshotProviderOverride = { snapshot }
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         let globalWindowIDs = model.session?.apps.first(where: { $0.id == appID })?.windows.map(\.id) ?? []
         model.cancelSelection()
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         let focusedWindowIDs = model.session?.apps.first?.windows.map(\.id) ?? []
         let expectedWindowIDs: Set<String> = ["cg:\(pid):243747", "cg:\(pid):240101"]
 
