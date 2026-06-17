@@ -36,7 +36,7 @@
 		A1B2C4162F73000100B0D737 /* LiveSwitcherModel+Search.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4062F73000100B0D737 /* LiveSwitcherModel+Search.swift */; };
 		A1B2C4172F73000100B0D737 /* LiveSwitcherModel+Types.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4072F73000100B0D737 /* LiveSwitcherModel+Types.swift */; };
 		B25010012FD000100B0D737 /* LiveSwitcherModel+Diagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = B25000012FD000100B0D737 /* LiveSwitcherModel+Diagnostics.swift */; };
-		B27010012FF000100B0D737 /* LiveSwitcherModel+Snapshots.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27000012FF000100B0D737 /* LiveSwitcherModel+Snapshots.swift */; };
+		B27010012FF000100B0D737 /* LiveSwitcherModel+Projections.swift in Sources */ = {isa = PBXBuildFile; fileRef = B27000012FF000100B0D737 /* LiveSwitcherModel+Projections.swift */; };
 		A9V110022F91000100B0D737 /* LiveSwitcherModel+AppVisibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9V100022F91000100B0D737 /* LiveSwitcherModel+AppVisibility.swift */; };
 		B26010032FE000100B0D737 /* SwitcherPanelController+PresentationDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26000032FE000100B0D737 /* SwitcherPanelController+PresentationDiagnostics.swift */; };
 		A1B2C4182F73000100B0D737 /* SwitcherSearchCoordinator+Compute.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4082F73000100B0D737 /* SwitcherSearchCoordinator+Compute.swift */; };
@@ -253,7 +253,7 @@
 		A1B2C4062F73000100B0D737 /* LiveSwitcherModel+Search.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LiveSwitcherModel+Search.swift"; sourceTree = "<group>"; };
 		A1B2C4072F73000100B0D737 /* LiveSwitcherModel+Types.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LiveSwitcherModel+Types.swift"; sourceTree = "<group>"; };
 		B25000012FD000100B0D737 /* LiveSwitcherModel+Diagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LiveSwitcherModel+Diagnostics.swift"; sourceTree = "<group>"; };
-		B27000012FF000100B0D737 /* LiveSwitcherModel+Snapshots.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LiveSwitcherModel+Snapshots.swift"; sourceTree = "<group>"; };
+		B27000012FF000100B0D737 /* LiveSwitcherModel+Projections.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LiveSwitcherModel+Projections.swift"; sourceTree = "<group>"; };
 		A9V100022F91000100B0D737 /* LiveSwitcherModel+AppVisibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LiveSwitcherModel+AppVisibility.swift"; sourceTree = "<group>"; };
 		B26000032FE000100B0D737 /* SwitcherPanelController+PresentationDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelController+PresentationDiagnostics.swift"; sourceTree = "<group>"; };
 		A1B2C4082F73000100B0D737 /* SwitcherSearchCoordinator+Compute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherSearchCoordinator+Compute.swift"; sourceTree = "<group>"; };
@@ -620,7 +620,7 @@
 				A1B2C4062F73000100B0D737 /* LiveSwitcherModel+Search.swift */,
 				A1B2C4072F73000100B0D737 /* LiveSwitcherModel+Types.swift */,
 				B25000012FD000100B0D737 /* LiveSwitcherModel+Diagnostics.swift */,
-				B27000012FF000100B0D737 /* LiveSwitcherModel+Snapshots.swift */,
+				B27000012FF000100B0D737 /* LiveSwitcherModel+Projections.swift */,
 				A9V100022F91000100B0D737 /* LiveSwitcherModel+AppVisibility.swift */,
 				A1B2C3E32F73000100B0D737 /* SwitcherPanelOverlayView.swift */,
 				D4A000123610000100B0D737 /* SwitcherPointerSelection.swift */,
@@ -1084,7 +1084,7 @@
 				A1B2C4162F73000100B0D737 /* LiveSwitcherModel+Search.swift in Sources */,
 				A1B2C4172F73000100B0D737 /* LiveSwitcherModel+Types.swift in Sources */,
 				B25010012FD000100B0D737 /* LiveSwitcherModel+Diagnostics.swift in Sources */,
-				B27010012FF000100B0D737 /* LiveSwitcherModel+Snapshots.swift in Sources */,
+				B27010012FF000100B0D737 /* LiveSwitcherModel+Projections.swift in Sources */,
 				A9V110022F91000100B0D737 /* LiveSwitcherModel+AppVisibility.swift in Sources */,
 				A1B2C3F32F73000100B0D737 /* SwitcherPanelOverlayView.swift in Sources */,
 				D4A000223610000100B0D737 /* SwitcherPointerSelection.swift in Sources */,

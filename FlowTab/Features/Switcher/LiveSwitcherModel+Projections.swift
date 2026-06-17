@@ -176,14 +176,14 @@ extension LiveSwitcherModel {
         let generation = selectedAppWindowProjectionGeneration
         selectedAppWindowProjectionPendingAppID = targetAppID
         let startMs = Self.monotonicMilliseconds()
-        let snapshotService = runtimeSnapshotService
+        let runtimeService = runtimeSnapshotService
 
         RuntimeLog.debug(
             "Projection",
             "selectedAppWindowProjection result=scheduled appID=\(targetAppID)"
         )
 
-        if let projection = snapshotService.readCurrentAppWindowProjection(appID: targetAppID) {
+        if let projection = runtimeService.readCurrentAppWindowProjection(appID: targetAppID) {
             completeSelectedAppWindowProjection(
                 projection.homeAppSnapshot,
                 appID: targetAppID,
@@ -196,7 +196,7 @@ extension LiveSwitcherModel {
 
         let projectionReadMs = Self.monotonicMilliseconds()
         if let pid = runtimeContextsByID[targetAppID]?.runningApp.processIdentifier {
-            snapshotService.signalAppWindowsChanged(appID: targetAppID, pid: pid)
+            runtimeService.signalAppWindowsChanged(appID: targetAppID, pid: pid)
         }
         completeSelectedAppWindowProjection(
             nil,
@@ -331,7 +331,7 @@ extension LiveSwitcherModel {
             clearedDeferredMaintenanceRequest: clearedDeferredMaintenanceRequest
         )
         lastProjectionInvalidationRecord = record
-        RuntimeLog.debug(.snapshot, record.logMessage)
+        RuntimeLog.debug("Projection", record.logMessage)
     }
 
     func readAppSwitcherProjectionSessionPayload() -> AppSwitcherProjectionSessionPayload {
