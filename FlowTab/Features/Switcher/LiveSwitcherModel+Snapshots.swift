@@ -176,19 +176,14 @@ extension LiveSwitcherModel {
         let generation = selectedAppWindowSnapshotGeneration
         selectedAppWindowSnapshotPendingAppID = targetAppID
         let startMs = Self.monotonicMilliseconds()
-        let providerOverride = selectedAppSnapshotProviderOverride
         let snapshotService = runtimeSnapshotService
-        let recencyTracker = windowRecencyTracker
 
         RuntimeLog.debug(
             "Snapshot",
             "selectedAppWindowSnapshot result=scheduled appID=\(targetAppID)"
         )
 
-        if
-            providerOverride == nil,
-            let projection = snapshotService.readCurrentAppWindowProjection(appID: targetAppID)
-        {
+        if let projection = snapshotService.readCurrentAppWindowProjection(appID: targetAppID) {
             completeSelectedAppWindowSnapshot(
                 projection.homeAppSnapshot,
                 appID: targetAppID,
@@ -199,39 +194,18 @@ extension LiveSwitcherModel {
             return true
         }
 
-        if providerOverride == nil {
-            let snapshotReadMs = Self.monotonicMilliseconds()
-            if let pid = runtimeContextsByID[targetAppID]?.runningApp.processIdentifier {
-                snapshotService.signalAppWindowsChanged(appID: targetAppID, pid: pid)
-            }
-            completeSelectedAppWindowSnapshot(
-                nil,
-                appID: targetAppID,
-                generation: generation,
-                startMs: startMs,
-                snapshotReadMs: snapshotReadMs
-            )
-            return runtimeContextsByID[targetAppID] != nil
+        let snapshotReadMs = Self.monotonicMilliseconds()
+        if let pid = runtimeContextsByID[targetAppID]?.runningApp.processIdentifier {
+            snapshotService.signalAppWindowsChanged(appID: targetAppID, pid: pid)
         }
-
-        guard let providerOverride else { return false }
-
-        DispatchQueue.global(qos: .userInitiated).async {
-            let orderedSnapshot = providerOverride(targetAppID).map {
-                recencyTracker.homeSnapshotWithRecencyApplied($0)
-            }
-            let snapshotReadMs = Self.monotonicMilliseconds()
-            Task { @MainActor [weak self] in
-                self?.completeSelectedAppWindowSnapshot(
-                    orderedSnapshot,
-                    appID: targetAppID,
-                    generation: generation,
-                    startMs: startMs,
-                    snapshotReadMs: snapshotReadMs
-                )
-            }
-        }
-        return true
+        completeSelectedAppWindowSnapshot(
+            nil,
+            appID: targetAppID,
+            generation: generation,
+            startMs: startMs,
+            snapshotReadMs: snapshotReadMs
+        )
+        return runtimeContextsByID[targetAppID] != nil
     }
 
     func completeSelectedAppWindowSnapshot(

@@ -218,7 +218,6 @@ final class LiveSwitcherModel: ObservableObject {
     var onSearchStateChanged: (() -> Void)?
     var onSessionLayoutChanged: (() -> Void)?
     var onSearchResultScrollRequestForTesting: ((String) -> Void)?
-    var selectedAppSnapshotProviderOverride: ((String) -> RuntimeHomeAppSnapshot?)?
     var frontmostApplicationOverride: (() -> NSRunningApplication?)?
     var activationOverride: ((ActivationTarget, [String: RuntimeAppContext]) -> Void)?
     var terminateRequestOverride: ((String) -> (sent: Bool, pid: pid_t))?
