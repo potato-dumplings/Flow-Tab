@@ -1144,27 +1144,27 @@ extension FlowTabTests {
     }
 
     @MainActor
-    func testLiveSwitcherModelSnapshotInvalidationRecordTracksReasonAndScope() {
+    func testLiveSwitcherModelProjectionInvalidationRecordTracksReasonAndScope() {
         let model = LiveSwitcherModel()
 
         model.invalidateRuntimeProjectionMaintenanceRequest(reason: .commitSelection)
 
-        XCTAssertEqual(model.lastSnapshotInvalidationRecord?.reason, .commitSelection)
-        XCTAssertEqual(model.lastSnapshotInvalidationRecord?.scope, .runtimeProjectionMaintenance)
-        XCTAssertEqual(model.lastSnapshotInvalidationRecord?.maintenanceGeneration, 1)
-        XCTAssertEqual(model.lastSnapshotInvalidationRecord?.selectedAppWindowGeneration, 0)
-        XCTAssertEqual(model.lastSnapshotInvalidationRecord?.clearedDeferredMaintenanceRequest, false)
+        XCTAssertEqual(model.lastProjectionInvalidationRecord?.reason, .commitSelection)
+        XCTAssertEqual(model.lastProjectionInvalidationRecord?.scope, .runtimeProjectionMaintenance)
+        XCTAssertEqual(model.lastProjectionInvalidationRecord?.maintenanceGeneration, 1)
+        XCTAssertEqual(model.lastProjectionInvalidationRecord?.selectedAppWindowProjectionGeneration, 0)
+        XCTAssertEqual(model.lastProjectionInvalidationRecord?.clearedDeferredMaintenanceRequest, false)
         XCTAssertTrue(
-            model.lastSnapshotInvalidationRecord?.logMessage.contains("reason=commitSelection") ?? false
+            model.lastProjectionInvalidationRecord?.logMessage.contains("reason=commitSelection") ?? false
         )
 
         model.invalidateSelectedAppWindowProjection(reason: .resetRuntimeState)
 
-        XCTAssertEqual(model.lastSnapshotInvalidationRecord?.reason, .resetRuntimeState)
-        XCTAssertEqual(model.lastSnapshotInvalidationRecord?.scope, .selectedAppWindowProjection)
-        XCTAssertEqual(model.lastSnapshotInvalidationRecord?.maintenanceGeneration, 1)
-        XCTAssertEqual(model.lastSnapshotInvalidationRecord?.selectedAppWindowGeneration, 1)
-        XCTAssertEqual(model.lastSnapshotInvalidationRecord?.clearedDeferredMaintenanceRequest, false)
+        XCTAssertEqual(model.lastProjectionInvalidationRecord?.reason, .resetRuntimeState)
+        XCTAssertEqual(model.lastProjectionInvalidationRecord?.scope, .selectedAppWindowProjection)
+        XCTAssertEqual(model.lastProjectionInvalidationRecord?.maintenanceGeneration, 1)
+        XCTAssertEqual(model.lastProjectionInvalidationRecord?.selectedAppWindowProjectionGeneration, 1)
+        XCTAssertEqual(model.lastProjectionInvalidationRecord?.clearedDeferredMaintenanceRequest, false)
     }
 
     @MainActor

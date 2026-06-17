@@ -105,7 +105,7 @@ extension LiveSwitcherModel {
         result: String,
         startMs: Double,
         generation: UInt64,
-        reason: SnapshotInvalidationReason,
+        reason: ProjectionInvalidationReason,
         triggerDirection: CycleDirection,
         applyGeneration: UInt64? = nil
     ) {

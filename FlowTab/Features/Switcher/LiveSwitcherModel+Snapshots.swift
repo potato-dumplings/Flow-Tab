@@ -151,10 +151,10 @@ extension LiveSwitcherModel {
     }
 
     func invalidateRuntimeProjectionMaintenanceRequest(
-        reason: SnapshotInvalidationReason = .explicitRuntimeProjectionMaintenanceInvalidation
+        reason: ProjectionInvalidationReason = .explicitRuntimeProjectionMaintenanceInvalidation
     ) {
         runtimeProjectionMaintenanceGeneration &+= 1
-        recordSnapshotInvalidation(
+        recordProjectionInvalidation(
             reason: reason,
             scope: .runtimeProjectionMaintenance,
             clearedDeferredMaintenanceRequest: false
@@ -307,30 +307,30 @@ extension LiveSwitcherModel {
     }
 
     func invalidateSelectedAppWindowProjection(
-        reason: SnapshotInvalidationReason = .explicitSelectedAppWindowInvalidation
+        reason: ProjectionInvalidationReason = .explicitSelectedAppWindowProjectionInvalidation
     ) {
         selectedAppWindowProjectionGeneration &+= 1
         selectedAppWindowProjectionPendingAppID = nil
-        recordSnapshotInvalidation(
+        recordProjectionInvalidation(
             reason: reason,
             scope: .selectedAppWindowProjection,
             clearedDeferredMaintenanceRequest: false
         )
     }
 
-    func recordSnapshotInvalidation(
-        reason: SnapshotInvalidationReason,
-        scope: SnapshotInvalidationScope,
+    func recordProjectionInvalidation(
+        reason: ProjectionInvalidationReason,
+        scope: ProjectionInvalidationScope,
         clearedDeferredMaintenanceRequest: Bool
     ) {
-        let record = SnapshotInvalidationRecord(
+        let record = ProjectionInvalidationRecord(
             reason: reason,
             scope: scope,
             maintenanceGeneration: runtimeProjectionMaintenanceGeneration,
-            selectedAppWindowGeneration: selectedAppWindowProjectionGeneration,
+            selectedAppWindowProjectionGeneration: selectedAppWindowProjectionGeneration,
             clearedDeferredMaintenanceRequest: clearedDeferredMaintenanceRequest
         )
-        lastSnapshotInvalidationRecord = record
+        lastProjectionInvalidationRecord = record
         RuntimeLog.debug(.snapshot, record.logMessage)
     }
 

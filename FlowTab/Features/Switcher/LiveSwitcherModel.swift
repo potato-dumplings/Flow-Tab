@@ -95,35 +95,35 @@ final class LiveSwitcherModel: ObservableObject {
         }
     }
 
-    enum SnapshotInvalidationReason: String, Equatable {
+    enum ProjectionInvalidationReason: String, Equatable {
         case startSession
         case startFocusedWindowSession
         case commitSelection
         case resetSession
         case resetRuntimeState
         case explicitRuntimeProjectionMaintenanceInvalidation
-        case explicitSelectedAppWindowInvalidation
+        case explicitSelectedAppWindowProjectionInvalidation
     }
 
-    enum SnapshotInvalidationScope: String, Equatable {
+    enum ProjectionInvalidationScope: String, Equatable {
         case runtimeProjectionMaintenance
         case selectedAppWindowProjection
     }
 
-    struct SnapshotInvalidationRecord: Equatable {
-        let reason: SnapshotInvalidationReason
-        let scope: SnapshotInvalidationScope
+    struct ProjectionInvalidationRecord: Equatable {
+        let reason: ProjectionInvalidationReason
+        let scope: ProjectionInvalidationScope
         let maintenanceGeneration: UInt64
-        let selectedAppWindowGeneration: UInt64
+        let selectedAppWindowProjectionGeneration: UInt64
         let clearedDeferredMaintenanceRequest: Bool
 
         var logMessage: String {
             [
-                "snapshotInvalidation",
+                "projectionInvalidation",
                 "scope=\(scope.rawValue)",
                 "reason=\(reason.rawValue)",
                 "maintenanceGeneration=\(maintenanceGeneration)",
-                "selectedAppWindowGeneration=\(selectedAppWindowGeneration)",
+                "selectedAppWindowProjectionGeneration=\(selectedAppWindowProjectionGeneration)",
                 "clearedDeferredMaintenanceRequest=\(clearedDeferredMaintenanceRequest ? 1 : 0)"
             ].joined(separator: " ")
         }
@@ -133,7 +133,7 @@ final class LiveSwitcherModel: ObservableObject {
         let result: String
         let generation: UInt64
         let currentGeneration: UInt64
-        let reason: SnapshotInvalidationReason
+        let reason: ProjectionInvalidationReason
         let trigger: String
         let applyGeneration: UInt64?
         let totalMs: String
@@ -264,7 +264,7 @@ final class LiveSwitcherModel: ObservableObject {
     var runtimeProjectionMaintenanceEnabled = true
     var selectedAppWindowProjectionGeneration: UInt64 = 0
     var selectedAppWindowProjectionPendingAppID: String?
-    var lastSnapshotInvalidationRecord: SnapshotInvalidationRecord?
+    var lastProjectionInvalidationRecord: ProjectionInvalidationRecord?
     var lastRuntimeProjectionMaintenanceDiagnostic: RuntimeProjectionMaintenanceDiagnostic?
     var lastSearchIndexReadDiagnostic: SearchIndexReadDiagnostic?
     var searchComputationRevision: UInt64 = 0
