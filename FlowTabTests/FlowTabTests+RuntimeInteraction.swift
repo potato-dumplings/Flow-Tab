@@ -158,7 +158,7 @@ extension FlowTabTests {
     func testTerminateSelectedAppBehaviorKeepsAppUntilProcessActuallyExits() async {
         let initialApps = terminateScenarioApps()
         let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: initialApps)
-        let model = LiveSwitcherModel(snapshotService: snapshotService)
+        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         guard let terminatedAppID = model.session?.selectedApp.id else {
@@ -214,7 +214,7 @@ extension FlowTabTests {
     func testTerminateSelectedAppBehaviorRefreshesWithoutPollingDelayWhenProcessAlreadyExited() async {
         let initialApps = terminateScenarioApps()
         let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: initialApps)
-        let model = LiveSwitcherModel(snapshotService: snapshotService)
+        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         guard let terminatedAppID = model.session?.selectedApp.id else {
@@ -264,7 +264,7 @@ extension FlowTabTests {
     func testHandleApplicationTerminatedRefreshesFromRuntimeProjectionWithoutFullSnapshot() async {
         let initialApps = terminateScenarioApps()
         let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: initialApps)
-        let model = LiveSwitcherModel(snapshotService: snapshotService)
+        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         guard let terminatedAppID = model.session?.selectedApp.id else {
@@ -301,7 +301,7 @@ extension FlowTabTests {
     func testTerminateSelectedAppUnitStopsPollingAfterTimeoutWhenAppStillRunning() async {
         let initialApps = terminateScenarioApps()
         let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: initialApps)
-        let model = LiveSwitcherModel(snapshotService: snapshotService)
+        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         guard let terminatedAppID = model.session?.selectedApp.id else {
@@ -377,7 +377,7 @@ extension FlowTabTests {
             appSwitcherApps: initialApps,
             contextsByID: contextsByID
         )
-        let model = LiveSwitcherModel(snapshotService: snapshotService)
+        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         guard let terminatedAppID = model.session?.selectedApp.id else {
@@ -416,7 +416,7 @@ extension FlowTabTests {
     func testTerminateSelectedAppUnitRefreshesOnWorkspaceTerminateAfterPollingTimeout() async {
         let initialApps = terminateScenarioApps()
         let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: initialApps)
-        let model = LiveSwitcherModel(snapshotService: snapshotService)
+        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         guard let terminatedAppID = model.session?.selectedApp.id else {

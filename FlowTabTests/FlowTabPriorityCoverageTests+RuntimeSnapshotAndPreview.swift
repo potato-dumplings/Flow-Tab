@@ -2643,7 +2643,7 @@ extension FlowTabPriorityCoverageTests {
             candidate: candidate,
             context: context
         )
-        let model = LiveSwitcherModel(snapshotService: snapshotService)
+        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
 
         model.frontmostApplicationOverride = { currentApp }
 
@@ -2703,7 +2703,7 @@ extension FlowTabPriorityCoverageTests {
             candidate: candidate,
             context: context
         )
-        let model = LiveSwitcherModel(snapshotService: snapshotService)
+        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
 
         model.frontmostApplicationOverride = { currentApp }
 
@@ -2780,7 +2780,7 @@ extension FlowTabPriorityCoverageTests {
             candidate: candidate,
             context: context
         )
-        let model = LiveSwitcherModel(snapshotService: snapshotService)
+        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
 
         model.frontmostApplicationOverride = { currentApp }
 
@@ -2860,7 +2860,7 @@ extension FlowTabPriorityCoverageTests {
             candidate: candidate,
             context: context
         )
-        let model = LiveSwitcherModel(snapshotService: snapshotService)
+        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
 
         model.frontmostApplicationOverride = { currentApp }
 
@@ -2932,7 +2932,7 @@ extension FlowTabPriorityCoverageTests {
             candidate: candidate,
             context: context
         )
-        let model = LiveSwitcherModel(snapshotService: snapshotService)
+        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
         model.runtimeProjectionMaintenanceEnabled = false
 
         model.frontmostApplicationOverride = { currentApp }

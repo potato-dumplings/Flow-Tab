@@ -728,7 +728,7 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
         let panelController = SwitcherPanelController(
-            model: LiveSwitcherModel(snapshotService: snapshotService)
+            model: LiveSwitcherModel(runtimeProjectionService: snapshotService)
         )
         var delegate: AppDelegate?
         defer {
@@ -973,7 +973,7 @@ extension FlowTabPriorityCoverageTests {
         let stressRunner = SpyStressRunner()
         let panelController = SwitcherPanelController(
             model: LiveSwitcherModel(
-                snapshotService: RecordingRuntimeSnapshotService(
+                runtimeProjectionService: RecordingRuntimeSnapshotService(
                     appSwitcherApps: searchScenarioApps()
                 )
             )
@@ -1095,7 +1095,7 @@ extension FlowTabPriorityCoverageTests {
         let multiAppSnapshot = Array(searchScenarioApps().prefix(2))
         let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: [multiAppSnapshot[0]])
         let panelController = SwitcherPanelController(
-            model: LiveSwitcherModel(snapshotService: snapshotService)
+            model: LiveSwitcherModel(runtimeProjectionService: snapshotService)
         )
         var delegate: AppDelegate?
         defer {
@@ -1190,7 +1190,7 @@ extension FlowTabPriorityCoverageTests {
         let hotkeyFactory = SpyHotkeyMonitorFactory()
         let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: [])
         let panelController = SwitcherPanelController(
-            model: LiveSwitcherModel(snapshotService: snapshotService)
+            model: LiveSwitcherModel(runtimeProjectionService: snapshotService)
         )
         var delegate: AppDelegate?
         defer {

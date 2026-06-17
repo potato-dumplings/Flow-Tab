@@ -594,7 +594,7 @@ extension FlowTabPriorityCoverageTests {
         )
         let model = LiveSwitcherModel(
             windowRecencyTracker: RuntimeWindowRecencyTracker(),
-            snapshotService: snapshotService
+            runtimeProjectionService: snapshotService
         )
         model.windowRecencyTracker.recordVerifiedFocus(
             appID: currentAppID,
@@ -775,7 +775,7 @@ extension FlowTabPriorityCoverageTests {
         )
         let model = LiveSwitcherModel(
             windowRecencyTracker: RuntimeWindowRecencyTracker(),
-            snapshotService: snapshotService
+            runtimeProjectionService: snapshotService
         )
         model.frontmostApplicationOverride = { currentApp }
         model.windowRecencyTracker.recordVerifiedFocus(
@@ -855,7 +855,7 @@ extension FlowTabPriorityCoverageTests {
         )
         let model = LiveSwitcherModel(
             windowRecencyTracker: RuntimeWindowRecencyTracker(),
-            snapshotService: snapshotService
+            runtimeProjectionService: snapshotService
         )
         model.frontmostApplicationOverride = { currentApp }
 
@@ -889,7 +889,7 @@ extension FlowTabPriorityCoverageTests {
         let snapshotService = RecordingRuntimeSnapshotService()
         let model = LiveSwitcherModel(
             windowRecencyTracker: RuntimeWindowRecencyTracker(),
-            snapshotService: snapshotService
+            runtimeProjectionService: snapshotService
         )
         let currentApp = NSRunningApplication.current
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"

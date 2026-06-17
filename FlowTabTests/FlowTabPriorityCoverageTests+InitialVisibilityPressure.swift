@@ -14,7 +14,7 @@ extension FlowTabPriorityCoverageTests {
         )
         return (
             SwitcherPanelController(
-                model: LiveSwitcherModel(snapshotService: snapshotService)
+                model: LiveSwitcherModel(runtimeProjectionService: snapshotService)
             ),
             snapshotService
         )

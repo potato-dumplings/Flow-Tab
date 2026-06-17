@@ -403,7 +403,7 @@ extension FlowTabTests {
         defaults.set(SwitcherSearchScope.app.rawValue, forKey: AppPreferenceKeys.searchDefaultScope)
 
         let model = LiveSwitcherModel(
-            snapshotService: RecordingRuntimeSnapshotService(
+            runtimeProjectionService: RecordingRuntimeSnapshotService(
                 appSwitcherApps: terminateScenarioApps()
             )
         )
@@ -481,7 +481,7 @@ extension FlowTabTests {
             ]
         )
         let model = LiveSwitcherModel(
-            snapshotService: RecordingRuntimeSnapshotService(
+            runtimeProjectionService: RecordingRuntimeSnapshotService(
                 appSwitcherApps: [currentApp, browserApp]
             )
         )
@@ -539,7 +539,7 @@ extension FlowTabTests {
             ]
         )
         let model = LiveSwitcherModel(
-            snapshotService: RecordingRuntimeSnapshotService(
+            runtimeProjectionService: RecordingRuntimeSnapshotService(
                 appSwitcherApps: [sessionOnlyApp],
                 committedSearchApps: [committedSearchApp]
             )
@@ -633,7 +633,7 @@ extension FlowTabTests {
             ),
             committedSearchIndexProjection: staleSearchProjection
         )
-        let model = LiveSwitcherModel(snapshotService: snapshotService)
+        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertTrue(model.enterSearchMode())
@@ -697,7 +697,7 @@ extension FlowTabTests {
             ]
         )
         let model = LiveSwitcherModel(
-            snapshotService: RecordingRuntimeSnapshotService(
+            runtimeProjectionService: RecordingRuntimeSnapshotService(
                 appSwitcherProjection: RuntimeAppSwitcherProjection(
                     apps: [searchableSessionApp],
                     contextsByID: [:],
@@ -821,7 +821,7 @@ extension FlowTabTests {
         let apps = makeBenchmarkApps(appCount: 400, windowsPerApp: 25)
         let windowCount = apps.reduce(0) { $0 + $1.windows.count }
         let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: apps)
-        let model = LiveSwitcherModel(snapshotService: snapshotService)
+        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
 
@@ -980,7 +980,7 @@ extension FlowTabTests {
             )
         }
         let runtimeService = RecordingRuntimeSnapshotService(appSwitcherApps: apps)
-        let model = LiveSwitcherModel(snapshotService: runtimeService)
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeService)
         model.frontmostApplicationOverride = { nil }
 
         let iterations = 120
@@ -1023,7 +1023,7 @@ extension FlowTabTests {
         let runtimeService = RecordingRuntimeSnapshotService(
             appSwitcherApps: appOnlyAppSwitcherApps(from: projectionSeed.apps)
         )
-        let model = LiveSwitcherModel(snapshotService: runtimeService)
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeService)
         model.frontmostApplicationOverride = { nil }
 
         let iterations = 80
@@ -1126,7 +1126,7 @@ extension FlowTabTests {
                 )
             ]
         )
-        let model = LiveSwitcherModel(snapshotService: snapshotService)
+        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
         model.frontmostApplicationOverride = { runningApp }
 
         let iterations = 80
@@ -1206,7 +1206,7 @@ extension FlowTabTests {
                 )
             )
         )
-        let model = LiveSwitcherModel(snapshotService: snapshotService)
+        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         let generation = model.runtimeProjectionMaintenanceGeneration
@@ -1233,7 +1233,7 @@ extension FlowTabTests {
             includeRuntimeContexts: true
         )
         let model = LiveSwitcherModel(
-            snapshotService: RecordingRuntimeSnapshotService(
+            runtimeProjectionService: RecordingRuntimeSnapshotService(
                 appSwitcherApps: appOnlyAppSwitcherApps(from: projectionSeed.apps)
             )
         )

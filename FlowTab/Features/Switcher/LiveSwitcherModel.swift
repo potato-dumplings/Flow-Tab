@@ -281,7 +281,7 @@ final class LiveSwitcherModel: ObservableObject {
 
     init(
         windowRecencyTracker: RuntimeWindowRecencyTracker = .shared,
-        snapshotService runtimeProjectionService: any RuntimeSnapshotServing = sharedRuntimeSnapshotService
+        runtimeProjectionService: any RuntimeSnapshotServing = sharedRuntimeSnapshotService
     ) {
         self.windowRecencyTracker = windowRecencyTracker
         self.runtimeProjectionService = runtimeProjectionService

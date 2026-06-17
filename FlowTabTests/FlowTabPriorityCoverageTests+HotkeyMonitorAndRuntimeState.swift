@@ -725,7 +725,7 @@ extension FlowTabPriorityCoverageTests {
     func testLiveSwitcherModelHandleApplicationTerminatedRefreshesSessionAndKeepsPreferredNextSelection() async {
         let initialApps = terminateScenarioApps()
         let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: initialApps)
-        let model = LiveSwitcherModel(snapshotService: snapshotService)
+        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
@@ -752,7 +752,7 @@ extension FlowTabPriorityCoverageTests {
             let snapshotService = RecordingRuntimeSnapshotService(
                 appSwitcherApps: initialApps
             )
-            let model = LiveSwitcherModel(snapshotService: snapshotService)
+            let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
             let refreshedApps = initialApps.filter { $0.id != "com.example.code" }
 
             XCTAssertTrue(model.startSession(triggerDirection: .forward))
@@ -804,7 +804,7 @@ extension FlowTabPriorityCoverageTests {
     func testLiveSwitcherModelHandleApplicationTerminatedIgnoresUntrackedApp() {
         let initialApps = terminateScenarioApps()
         let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: initialApps)
-        let model = LiveSwitcherModel(snapshotService: snapshotService)
+        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)

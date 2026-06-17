@@ -279,7 +279,7 @@ extension FlowTabPriorityCoverageTests {
             generatedAt: generatedAt
         )
         return (
-            model: LiveSwitcherModel(snapshotService: snapshotService),
+            model: LiveSwitcherModel(runtimeProjectionService: snapshotService),
             snapshotService: snapshotService
         )
     }
