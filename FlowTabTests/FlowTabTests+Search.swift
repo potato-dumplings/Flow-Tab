@@ -1003,14 +1003,15 @@ extension FlowTabTests {
     @MainActor
     func testOptionTabFastStartPressureIgnoresLargeFrontmostWindowSet() {
         let selectedWindowCount = 1_000
-        let fullSnapshot = makeOptionTabWindowScaleSnapshot(
+        let projectionSeed = makeOptionTabWindowScaleProjectionSeed(
             selectedWindowCount: selectedWindowCount,
             extraAppCount: 120,
             largeWindowAppIndex: 0,
             includeRuntimeContexts: false
         )
-        let fastSnapshot = appOnlySnapshot(from: fullSnapshot)
-        let runtimeService = RecordingRuntimeSnapshotService(appSwitcherApps: fastSnapshot.apps)
+        let runtimeService = RecordingRuntimeSnapshotService(
+            appSwitcherApps: appOnlyAppSwitcherApps(from: projectionSeed.apps)
+        )
         let model = LiveSwitcherModel(snapshotService: runtimeService)
         model.frontmostApplicationOverride = { nil }
 
@@ -1029,7 +1030,7 @@ extension FlowTabTests {
         print(
             String(
                 format: "[OptionTabFrontmostWindowScalePressure] apps=%d, frontmostWindows=%d, iterations=%d, p50=%.2fms, p95=%.2fms, max=%.2fms, maintenanceRequests=%d",
-                fullSnapshot.apps.count,
+                projectionSeed.apps.count,
                 selectedWindowCount,
                 iterations,
                 summary.p50,
@@ -1210,15 +1211,16 @@ extension FlowTabTests {
     @MainActor
     func testOptionTabWindowScalePressureKeepsSelectedAppApplyAndPreviewCaptureBounded() {
         let selectedWindowCount = 1_000
-        let fullSnapshot = makeOptionTabWindowScaleSnapshot(
+        let projectionSeed = makeOptionTabWindowScaleProjectionSeed(
             selectedWindowCount: selectedWindowCount,
             extraAppCount: 80,
             largeWindowAppIndex: 1,
             includeRuntimeContexts: true
         )
-        let fastSnapshot = appOnlySnapshot(from: fullSnapshot)
         let model = LiveSwitcherModel(
-            snapshotService: RecordingRuntimeSnapshotService(appSwitcherApps: fastSnapshot.apps)
+            snapshotService: RecordingRuntimeSnapshotService(
+                appSwitcherApps: appOnlyAppSwitcherApps(from: projectionSeed.apps)
+            )
         )
         model.frontmostApplicationOverride = { nil }
         model.runtimeProjectionMaintenanceEnabled = false
@@ -1242,8 +1244,8 @@ extension FlowTabTests {
             XCTAssertEqual(model.session?.selectedApp.windows.count ?? -1, 0)
             guard
                 let selectedAppID = model.session?.selectedApp.id,
-                let selectedApp = fullSnapshot.apps.first(where: { $0.id == selectedAppID }),
-                let selectedContext = fullSnapshot.contextsByID[selectedAppID]
+                let selectedApp = projectionSeed.apps.first(where: { $0.id == selectedAppID }),
+                let selectedContext = projectionSeed.contextsByID[selectedAppID]
             else {
                 XCTFail("missing selected app context")
                 return
@@ -1303,7 +1305,7 @@ extension FlowTabTests {
         print(
             String(
                 format: "[OptionTabWindowScalePressure] apps=%d, selectedWindows=%d, visibleWindows=%d, iterations=%d, selectedAppApplyP95=%.2fms, enterP95=%.2fms, previewItemsP95=%.2fms, previewCaptureCalls=%d",
-                fullSnapshot.apps.count,
+                projectionSeed.apps.count,
                 selectedWindowCount,
                 visibleWindowCount,
                 iterations,
@@ -1320,12 +1322,12 @@ extension FlowTabTests {
         XCTAssertLessThanOrEqual(previewCaptureCalls, iterations * max(visibleWindowCount, 1))
     }
 
-    private func makeOptionTabWindowScaleSnapshot(
+    private func makeOptionTabWindowScaleProjectionSeed(
         selectedWindowCount: Int,
         extraAppCount: Int,
         largeWindowAppIndex: Int,
         includeRuntimeContexts: Bool
-    ) -> RuntimeSnapshot {
+    ) -> (apps: [AppSwitchCandidate], contextsByID: [String: RuntimeAppContext]) {
         let selectedWindows = (0..<selectedWindowCount).map { index in
             WindowCandidate(
                 id: "frontmost-window-\(index)",
@@ -1344,7 +1346,7 @@ extension FlowTabTests {
         var apps = makeBenchmarkApps(appCount: extraAppCount, windowsPerApp: 1)
         apps.insert(largeWindowApp, at: min(max(0, largeWindowAppIndex), apps.count))
         guard includeRuntimeContexts else {
-            return RuntimeSnapshot(apps: apps, contextsByID: [:])
+            return (apps, [:])
         }
 
         let runningApp = NSRunningApplication.current
@@ -1366,25 +1368,19 @@ extension FlowTabTests {
             runningApp: runningApp,
             windowsByID: selectedWindowContexts
         )
-        return RuntimeSnapshot(
-            apps: apps,
-            contextsByID: [largeWindowApp.id: selectedContext]
-        )
+        return (apps, [largeWindowApp.id: selectedContext])
     }
 
-    private func appOnlySnapshot(from snapshot: RuntimeSnapshot) -> RuntimeSnapshot {
-        RuntimeSnapshot(
-            apps: snapshot.apps.map { app in
-                AppSwitchCandidate(
-                    id: app.id,
-                    displayName: app.displayName,
-                    groupID: app.groupID,
-                    lastActiveAt: app.lastActiveAt,
-                    windows: []
-                )
-            },
-            contextsByID: [:]
-        )
+    private func appOnlyAppSwitcherApps(from apps: [AppSwitchCandidate]) -> [AppSwitchCandidate] {
+        apps.map { app in
+            AppSwitchCandidate(
+                id: app.id,
+                displayName: app.displayName,
+                groupID: app.groupID,
+                lastActiveAt: app.lastActiveAt,
+                windows: []
+            )
+        }
     }
 
 }

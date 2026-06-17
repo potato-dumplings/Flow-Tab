@@ -184,9 +184,6 @@ extension FlowTabTests {
             )
         ]
     }
-    func makeRuntimeSnapshot(apps: [AppSwitchCandidate]) -> RuntimeSnapshot {
-        RuntimeSnapshot(apps: apps, contextsByID: [:])
-    }
     func makeBenchmarkApps(appCount: Int, windowsPerApp: Int) -> [AppSwitchCandidate] {
         precondition(appCount > 0)
         precondition(windowsPerApp > 0)
