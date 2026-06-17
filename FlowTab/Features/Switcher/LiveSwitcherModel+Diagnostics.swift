@@ -125,19 +125,19 @@ extension LiveSwitcherModel {
         )
     }
 
-    func logSelectedAppWindowSnapshot(
+    func logSelectedAppWindowProjection(
         result: String,
         appID: String,
-        snapshot: RuntimeHomeAppSnapshot?,
+        homeAppSnapshot: RuntimeHomeAppSnapshot?,
         startMs: Double,
-        snapshotReadMs: Double,
+        projectionReadMs: Double,
         applyEndMs: Double
     ) {
-        let windowCount = snapshot?.candidate.windows.count ?? 0
-        let pidCount = snapshot.map { selectedSnapshot in
-            Set(selectedSnapshot.context.windowsByID.values.map { context in
+        let windowCount = homeAppSnapshot?.candidate.windows.count ?? 0
+        let pidCount = homeAppSnapshot.map { selectedHomeAppSnapshot in
+            Set(selectedHomeAppSnapshot.context.windowsByID.values.map { context in
                 if context.ownerPID == 0 {
-                    return selectedSnapshot.context.runningApp.processIdentifier
+                    return selectedHomeAppSnapshot.context.runningApp.processIdentifier
                 }
                 return context.ownerPID
             }).count
@@ -148,11 +148,11 @@ extension LiveSwitcherModel {
             ("appID", appID),
             ("pids", "\(pidCount)"),
             ("windows", "\(windowCount)"),
-            ("snapshotMs", Self.formatMilliseconds(snapshotReadMs - startMs)),
-            ("applyMs", Self.formatMilliseconds(applyEndMs - snapshotReadMs)),
+            ("projectionMs", Self.formatMilliseconds(projectionReadMs - startMs)),
+            ("applyMs", Self.formatMilliseconds(applyEndMs - projectionReadMs)),
             ("totalMs", Self.formatMilliseconds(totalMs))
         ]
-        let message = Self.snapshotLogLine("selectedAppWindowSnapshot", fields: fields)
+        let message = Self.snapshotLogLine("selectedAppWindowProjection", fields: fields)
         if totalMs > 100 {
             RuntimeLog.warning(.snapshot, message)
         } else {

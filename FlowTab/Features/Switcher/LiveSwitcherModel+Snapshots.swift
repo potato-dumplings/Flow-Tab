@@ -162,112 +162,112 @@ extension LiveSwitcherModel {
     }
 
     @discardableResult
-    func scheduleSelectedAppWindowSnapshotIfNeeded(for appID: String? = nil) -> Bool {
+    func scheduleSelectedAppWindowProjectionIfNeeded(for appID: String? = nil) -> Bool {
         guard let currentSession = session else { return false }
         guard case .appCycle = currentSession.mode else { return false }
         let targetAppID = appID ?? currentSession.selectedApp.id
         guard targetAppID == currentSession.selectedApp.id else { return false }
         guard currentSession.selectedApp.windows.isEmpty else { return false }
-        if selectedAppWindowSnapshotPendingAppID == targetAppID {
+        if selectedAppWindowProjectionPendingAppID == targetAppID {
             return false
         }
 
-        selectedAppWindowSnapshotGeneration &+= 1
-        let generation = selectedAppWindowSnapshotGeneration
-        selectedAppWindowSnapshotPendingAppID = targetAppID
+        selectedAppWindowProjectionGeneration &+= 1
+        let generation = selectedAppWindowProjectionGeneration
+        selectedAppWindowProjectionPendingAppID = targetAppID
         let startMs = Self.monotonicMilliseconds()
         let snapshotService = runtimeSnapshotService
 
         RuntimeLog.debug(
             "Snapshot",
-            "selectedAppWindowSnapshot result=scheduled appID=\(targetAppID)"
+            "selectedAppWindowProjection result=scheduled appID=\(targetAppID)"
         )
 
         if let projection = snapshotService.readCurrentAppWindowProjection(appID: targetAppID) {
-            completeSelectedAppWindowSnapshot(
+            completeSelectedAppWindowProjection(
                 projection.homeAppSnapshot,
                 appID: targetAppID,
                 generation: generation,
                 startMs: startMs,
-                snapshotReadMs: Self.monotonicMilliseconds()
+                projectionReadMs: Self.monotonicMilliseconds()
             )
             return true
         }
 
-        let snapshotReadMs = Self.monotonicMilliseconds()
+        let projectionReadMs = Self.monotonicMilliseconds()
         if let pid = runtimeContextsByID[targetAppID]?.runningApp.processIdentifier {
             snapshotService.signalAppWindowsChanged(appID: targetAppID, pid: pid)
         }
-        completeSelectedAppWindowSnapshot(
+        completeSelectedAppWindowProjection(
             nil,
             appID: targetAppID,
             generation: generation,
             startMs: startMs,
-            snapshotReadMs: snapshotReadMs
+            projectionReadMs: projectionReadMs
         )
         return runtimeContextsByID[targetAppID] != nil
     }
 
-    func completeSelectedAppWindowSnapshot(
-        _ snapshot: RuntimeHomeAppSnapshot?,
+    func completeSelectedAppWindowProjection(
+        _ homeAppSnapshot: RuntimeHomeAppSnapshot?,
         appID: String,
         generation: UInt64,
         startMs: Double,
-        snapshotReadMs: Double
+        projectionReadMs: Double
     ) {
         defer {
-            if selectedAppWindowSnapshotPendingAppID == appID {
-                selectedAppWindowSnapshotPendingAppID = nil
+            if selectedAppWindowProjectionPendingAppID == appID {
+                selectedAppWindowProjectionPendingAppID = nil
             }
         }
-        guard generation == selectedAppWindowSnapshotGeneration else {
-            logSelectedAppWindowSnapshot(
+        guard generation == selectedAppWindowProjectionGeneration else {
+            logSelectedAppWindowProjection(
                 result: "staleGeneration",
                 appID: appID,
-                snapshot: snapshot,
+                homeAppSnapshot: homeAppSnapshot,
                 startMs: startMs,
-                snapshotReadMs: snapshotReadMs,
+                projectionReadMs: projectionReadMs,
                 applyEndMs: Self.monotonicMilliseconds()
             )
             return
         }
-        guard let snapshot else {
-            logSelectedAppWindowSnapshot(
+        guard let homeAppSnapshot else {
+            logSelectedAppWindowProjection(
                 result: "missing",
                 appID: appID,
-                snapshot: nil,
+                homeAppSnapshot: nil,
                 startMs: startMs,
-                snapshotReadMs: snapshotReadMs,
+                projectionReadMs: projectionReadMs,
                 applyEndMs: Self.monotonicMilliseconds()
             )
             return
         }
         guard let currentSession = session, currentSession.selectedApp.id == appID else {
-            logSelectedAppWindowSnapshot(
+            logSelectedAppWindowProjection(
                 result: "staleSelection",
                 appID: appID,
-                snapshot: snapshot,
+                homeAppSnapshot: homeAppSnapshot,
                 startMs: startMs,
-                snapshotReadMs: snapshotReadMs,
+                projectionReadMs: projectionReadMs,
                 applyEndMs: Self.monotonicMilliseconds()
             )
             return
         }
         guard let appIndex = currentSession.apps.firstIndex(where: { $0.id == appID }) else {
-            logSelectedAppWindowSnapshot(
+            logSelectedAppWindowProjection(
                 result: "missingSessionApp",
                 appID: appID,
-                snapshot: snapshot,
+                homeAppSnapshot: homeAppSnapshot,
                 startMs: startMs,
-                snapshotReadMs: snapshotReadMs,
+                projectionReadMs: projectionReadMs,
                 applyEndMs: Self.monotonicMilliseconds()
             )
             return
         }
 
         var apps = currentSession.apps
-        apps[appIndex] = snapshot.candidate
-        runtimeContextsByID[appID] = snapshot.context
+        apps[appIndex] = homeAppSnapshot.candidate
+        runtimeContextsByID[appID] = homeAppSnapshot.context
         let preservesWindowLayerPreview: Bool
         if case .windowCycle(let windowLayerAppID) = currentSession.mode, windowLayerAppID == appID {
             preservesWindowLayerPreview = true
@@ -295,25 +295,25 @@ extension LiveSwitcherModel {
 
         session = rebuiltSession
         let applyEndMs = Self.monotonicMilliseconds()
-        logSelectedAppWindowSnapshot(
+        logSelectedAppWindowProjection(
             result: "applied",
             appID: appID,
-            snapshot: snapshot,
+            homeAppSnapshot: homeAppSnapshot,
             startMs: startMs,
-            snapshotReadMs: snapshotReadMs,
+            projectionReadMs: projectionReadMs,
             applyEndMs: applyEndMs
         )
         onSessionLayoutChanged?()
     }
 
-    func invalidateSelectedAppWindowSnapshot(
+    func invalidateSelectedAppWindowProjection(
         reason: SnapshotInvalidationReason = .explicitSelectedAppWindowInvalidation
     ) {
-        selectedAppWindowSnapshotGeneration &+= 1
-        selectedAppWindowSnapshotPendingAppID = nil
+        selectedAppWindowProjectionGeneration &+= 1
+        selectedAppWindowProjectionPendingAppID = nil
         recordSnapshotInvalidation(
             reason: reason,
-            scope: .selectedAppWindowSnapshot,
+            scope: .selectedAppWindowProjection,
             clearedDeferredMaintenanceRequest: false
         )
     }
@@ -327,7 +327,7 @@ extension LiveSwitcherModel {
             reason: reason,
             scope: scope,
             maintenanceGeneration: runtimeProjectionMaintenanceGeneration,
-            selectedAppWindowGeneration: selectedAppWindowSnapshotGeneration,
+            selectedAppWindowGeneration: selectedAppWindowProjectionGeneration,
             clearedDeferredMaintenanceRequest: clearedDeferredMaintenanceRequest
         )
         lastSnapshotInvalidationRecord = record

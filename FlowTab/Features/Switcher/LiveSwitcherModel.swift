@@ -107,7 +107,7 @@ final class LiveSwitcherModel: ObservableObject {
 
     enum SnapshotInvalidationScope: String, Equatable {
         case runtimeProjectionMaintenance
-        case selectedAppWindowSnapshot
+        case selectedAppWindowProjection
     }
 
     struct SnapshotInvalidationRecord: Equatable {
@@ -262,8 +262,8 @@ final class LiveSwitcherModel: ObservableObject {
     var terminateAppInstanceGeneration: UInt64 = 0
     var runtimeProjectionMaintenanceGeneration: UInt64 = 0
     var runtimeProjectionMaintenanceEnabled = true
-    var selectedAppWindowSnapshotGeneration: UInt64 = 0
-    var selectedAppWindowSnapshotPendingAppID: String?
+    var selectedAppWindowProjectionGeneration: UInt64 = 0
+    var selectedAppWindowProjectionPendingAppID: String?
     var lastSnapshotInvalidationRecord: SnapshotInvalidationRecord?
     var lastRuntimeProjectionMaintenanceDiagnostic: RuntimeProjectionMaintenanceDiagnostic?
     var lastSearchIndexReadDiagnostic: SearchIndexReadDiagnostic?
@@ -374,7 +374,7 @@ final class LiveSwitcherModel: ObservableObject {
 
     func startSession(triggerDirection: CycleDirection) -> Bool {
         cancelPendingTerminateRefresh()
-        invalidateSelectedAppWindowSnapshot(reason: .startSession)
+        invalidateSelectedAppWindowProjection(reason: .startSession)
         clearTerminateSelectedAppAnimation()
         overlayStyle = .appAndWindow
         titleBarStyleInferenceEnabled = false
@@ -389,7 +389,7 @@ final class LiveSwitcherModel: ObservableObject {
     func startFocusedAppWindowSession(triggerDirection: CycleDirection) -> Bool {
         let startMs = Self.monotonicMilliseconds()
         cancelPendingTerminateRefresh()
-        invalidateSelectedAppWindowSnapshot(reason: .startFocusedWindowSession)
+        invalidateSelectedAppWindowProjection(reason: .startFocusedWindowSession)
         clearTerminateSelectedAppAnimation()
         overlayStyle = .windowOnly
         titleBarStyleInferenceEnabled = true
@@ -866,7 +866,7 @@ final class LiveSwitcherModel: ObservableObject {
     }
 
     func resetRuntimeState() {
-        invalidateSelectedAppWindowSnapshot(reason: .resetRuntimeState)
+        invalidateSelectedAppWindowProjection(reason: .resetRuntimeState)
         runtimeContextsByID = [:]
         clearPreviewSnapshotState()
         autoEnterSuppressedAppID = nil

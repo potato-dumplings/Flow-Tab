@@ -430,7 +430,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testLiveSwitcherModelSelectedAppWindowSnapshotUsesRuntimeProjectionWithoutHomeSampling() {
+    func testLiveSwitcherModelSelectedAppWindowProjectionUsesRuntimeProjectionWithoutHomeSampling() {
         let appID = "com.example.projected-current-app"
         let runningApp = NSRunningApplication.current
         let appOnlyCandidate = AppSwitchCandidate(
@@ -491,7 +491,7 @@ extension FlowTabPriorityCoverageTests {
         model.runtimeProjectionMaintenanceEnabled = false
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
-        XCTAssertTrue(model.scheduleSelectedAppWindowSnapshotIfNeeded(for: appID))
+        XCTAssertTrue(model.scheduleSelectedAppWindowProjectionIfNeeded(for: appID))
 
         XCTAssertEqual(snapshotService.recordedHomeAppIDs(), [])
         XCTAssertEqual(model.session?.selectedApp.windows.map(\.id), ["projected-window-1", "projected-window-2"])
@@ -499,7 +499,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testLiveSwitcherModelSelectedAppWindowSnapshotSignalsRuntimeRepairWhenProjectionIsMissing() {
+    func testLiveSwitcherModelSelectedAppWindowProjectionSignalsRuntimeRepairWhenProjectionIsMissing() {
         let appID = "com.example.missing-window-projection"
         let runningApp = NSRunningApplication.current
         let appOnlyCandidate = AppSwitchCandidate(
@@ -534,7 +534,7 @@ extension FlowTabPriorityCoverageTests {
         model.runtimeProjectionMaintenanceEnabled = false
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
-        XCTAssertTrue(model.scheduleSelectedAppWindowSnapshotIfNeeded(for: appID))
+        XCTAssertTrue(model.scheduleSelectedAppWindowProjectionIfNeeded(for: appID))
 
         XCTAssertEqual(snapshotService.recordedHomeAppIDs(), [])
         XCTAssertEqual(snapshotService.appWindowChangeSignalsRecorded().map(\.appID), [appID])

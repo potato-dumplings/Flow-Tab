@@ -192,11 +192,11 @@ extension SwitcherPanelController {
         }
 
         let deadlineMs = delayedWindowLayerDeadlineMs ?? nowMs
-        let requestedSnapshot = model.scheduleSelectedAppWindowSnapshotIfNeeded(for: selectedAppID)
+        let requestedProjection = model.scheduleSelectedAppWindowProjectionIfNeeded(for: selectedAppID)
         guard model.canAutoEnterWindowLayer else {
             RuntimeLog.debug(
                 .autoEnter,
-                "pending appID=\(selectedAppID) requestedSnapshot=\(requestedSnapshot) deadlineMs=\(formatMilliseconds(deadlineMs)) \(self.model.debugSelectionSummary())"
+                "pending appID=\(selectedAppID) requestedProjection=\(requestedProjection) deadlineMs=\(formatMilliseconds(deadlineMs)) \(self.model.debugSelectionSummary())"
             )
             return
         }

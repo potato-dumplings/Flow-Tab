@@ -1158,10 +1158,10 @@ extension FlowTabTests {
             model.lastSnapshotInvalidationRecord?.logMessage.contains("reason=commitSelection") ?? false
         )
 
-        model.invalidateSelectedAppWindowSnapshot(reason: .resetRuntimeState)
+        model.invalidateSelectedAppWindowProjection(reason: .resetRuntimeState)
 
         XCTAssertEqual(model.lastSnapshotInvalidationRecord?.reason, .resetRuntimeState)
-        XCTAssertEqual(model.lastSnapshotInvalidationRecord?.scope, .selectedAppWindowSnapshot)
+        XCTAssertEqual(model.lastSnapshotInvalidationRecord?.scope, .selectedAppWindowProjection)
         XCTAssertEqual(model.lastSnapshotInvalidationRecord?.maintenanceGeneration, 1)
         XCTAssertEqual(model.lastSnapshotInvalidationRecord?.selectedAppWindowGeneration, 1)
         XCTAssertEqual(model.lastSnapshotInvalidationRecord?.clearedDeferredMaintenanceRequest, false)
@@ -1266,12 +1266,12 @@ extension FlowTabTests {
 
             let applyStart = DispatchTime.now().uptimeNanoseconds
             let applyStartMs = LiveSwitcherModel.monotonicMilliseconds()
-            model.completeSelectedAppWindowSnapshot(
+            model.completeSelectedAppWindowProjection(
                 selectedSnapshot,
                 appID: selectedAppID,
-                generation: model.selectedAppWindowSnapshotGeneration,
+                generation: model.selectedAppWindowProjectionGeneration,
                 startMs: applyStartMs,
-                snapshotReadMs: applyStartMs
+                projectionReadMs: applyStartMs
             )
             selectedAppApplySamples.append(
                 Double(DispatchTime.now().uptimeNanoseconds - applyStart) / 1_000_000.0
