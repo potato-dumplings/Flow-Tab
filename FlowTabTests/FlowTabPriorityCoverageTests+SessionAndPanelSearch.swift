@@ -205,35 +205,25 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelControllerPointerWindowSelectionUsesWindowOnlySession() {
-        let controller = SwitcherPanelController()
         let currentApp = NSRunningApplication.current
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let windows = [
             WindowCandidate(id: "front-1", title: "Primary", isMinimized: false, lastActiveAt: 300),
             WindowCandidate(id: "front-2", title: "Secondary", isMinimized: false, lastActiveAt: 290)
         ]
-        let context = makeRuntimeAppContext(
+        let snapshotService = makeCurrentAppWindowProjectionService(
             appID: appID,
             runningApp: currentApp,
             windows: windows
         )
+        let controller = SwitcherPanelController(
+            model: LiveSwitcherModel(snapshotService: snapshotService)
+        )
         controller.modelForTesting.frontmostApplicationOverride = { currentApp }
-        controller.modelForTesting.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(
-                apps: [
-                    AppSwitchCandidate(
-                        id: appID,
-                        displayName: currentApp.localizedName ?? "Current App",
-                        groupID: "current",
-                        lastActiveAt: 300,
-                        windows: windows
-                    )
-                ],
-                contextsByID: [appID: context]
-            )
-        }
 
         XCTAssertTrue(controller.beginInAppWindowHotkeySessionForTesting())
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         let initialSelectedWindowID = controller.modelForTesting.session?.selectedWindow?.id
         controller.pointerSelectionGate.reset(currentLocation: .zero)
 
@@ -322,39 +312,29 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelControllerPointerWindowClickCommitsImmediatelyWithoutPointerMovement() {
-        let controller = SwitcherPanelController()
         let currentApp = NSRunningApplication.current
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let windows = [
             WindowCandidate(id: "front-1", title: "Primary", isMinimized: false, lastActiveAt: 300),
             WindowCandidate(id: "front-2", title: "Secondary", isMinimized: false, lastActiveAt: 290)
         ]
-        let context = makeRuntimeAppContext(
+        let snapshotService = makeCurrentAppWindowProjectionService(
             appID: appID,
             runningApp: currentApp,
             windows: windows
         )
+        let controller = SwitcherPanelController(
+            model: LiveSwitcherModel(snapshotService: snapshotService)
+        )
         controller.modelForTesting.frontmostApplicationOverride = { currentApp }
-        controller.modelForTesting.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(
-                apps: [
-                    AppSwitchCandidate(
-                        id: appID,
-                        displayName: currentApp.localizedName ?? "Current App",
-                        groupID: "current",
-                        lastActiveAt: 300,
-                        windows: windows
-                    )
-                ],
-                contextsByID: [appID: context]
-            )
-        }
         var activatedTarget: ActivationTarget?
         controller.modelForTesting.activationOverride = { target, _ in
             activatedTarget = target
         }
 
         XCTAssertTrue(controller.beginInAppWindowHotkeySessionForTesting())
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         controller.pointerSelectionGate.reset(currentLocation: .zero)
 
         controller.commitSwitcherWindowByPointerClick(appID: appID, windowID: "front-2")

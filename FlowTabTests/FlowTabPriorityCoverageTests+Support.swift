@@ -188,6 +188,49 @@ extension FlowTabPriorityCoverageTests {
             windowsByID: windowsByID
         )
     }
+    func makeCurrentAppWindowProjectionService(
+        appID: String,
+        runningApp: NSRunningApplication,
+        windows: [WindowCandidate],
+        generatedAt: TimeInterval = 10
+    ) -> RecordingRuntimeSnapshotService {
+        let candidate = AppSwitchCandidate(
+            id: appID,
+            displayName: runningApp.localizedName ?? "Current App",
+            groupID: "current",
+            lastActiveAt: generatedAt,
+            windows: windows
+        )
+        let snapshot = RuntimeHomeAppSnapshot(
+            summary: RuntimeHomeAppSummary(
+                appID: appID,
+                displayName: candidate.displayName,
+                groupID: candidate.groupID,
+                lastActiveAt: candidate.lastActiveAt,
+                windowCount: windows.count,
+                pid: runningApp.processIdentifier
+            ),
+            candidate: candidate,
+            context: makeRuntimeAppContext(appID: appID, runningApp: runningApp, windows: windows)
+        )
+        return RecordingRuntimeSnapshotService(
+            currentAppWindowProjectionsByAppID: [
+                appID: RuntimeCurrentAppWindowProjection(
+                    appID: appID,
+                    snapshot: snapshot,
+                    freshness: RuntimeProjectionFreshness(
+                        generatedAt: generatedAt,
+                        sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+                        dirtyAppIDs: [],
+                        dirtyPIDs: [],
+                        dirtyCGWindowIDs: [],
+                        pendingRepairScopes: [],
+                        isCompleteForScope: true
+                    )
+                )
+            ]
+        )
+    }
     func makeIsolatedUserDefaults() -> UserDefaults? {
         let suiteName = "FlowTabPriorityCoverageTests.\(UUID().uuidString)"
         guard let userDefaults = UserDefaults(suiteName: suiteName) else {
