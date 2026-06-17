@@ -946,8 +946,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testSwitcherPanelControllerDelayedAutoEnterPreservesDeadlineForLateSelectedAppSnapshot() async {
-        let controller = SwitcherPanelController()
+    func testSwitcherPanelControllerDelayedAutoEnterUsesCommittedSelectedAppProjection() async {
         let currentApp = NSRunningApplication.current
         let appID = "com.example.deferred-window-snapshot"
         let windows = [
@@ -981,48 +980,60 @@ extension FlowTabPriorityCoverageTests {
             candidate: windowCandidate,
             context: context
         )
-        let requestsLock = NSLock()
-        var selectedSnapshotRequests: [String] = []
-
+        let freshness = RuntimeProjectionFreshness(
+            generatedAt: 12,
+            sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+            dirtyAppIDs: [],
+            dirtyPIDs: [],
+            dirtyCGWindowIDs: [],
+            pendingRepairScopes: [],
+            isCompleteForScope: true
+        )
+        let snapshotService = RecordingRuntimeSnapshotService(
+            appSwitcherProjection: RuntimeAppSwitcherProjection(
+                apps: [appOnlyCandidate],
+                contextsByID: [:],
+                freshness: freshness
+            ),
+            currentAppWindowProjectionsByAppID: [
+                appID: RuntimeCurrentAppWindowProjection(
+                    appID: appID,
+                    snapshot: selectedSnapshot,
+                    freshness: freshness
+                )
+            ]
+        )
+        let controller = SwitcherPanelController(
+            model: LiveSwitcherModel(
+                snapshotService: snapshotService
+            )
+        )
         controller.windowLayerPresentationDelayOverride = 0.01
-        controller.modelForTesting.testingFastAppSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: [appOnlyCandidate], contextsByID: [:])
-        }
-        controller.modelForTesting.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: [appOnlyCandidate], contextsByID: [:])
-        }
-        controller.modelForTesting.selectedAppSnapshotProviderOverride = { requestedAppID in
-            requestsLock.lock()
-            selectedSnapshotRequests.append(requestedAppID)
-            requestsLock.unlock()
-            Thread.sleep(forTimeInterval: 0.04)
-            return selectedSnapshot
-        }
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
         XCTAssertEqual(controller.modelForTesting.session?.selectedApp.windows.count, 0)
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
 
         controller.scheduleDelayedWindowLayerEntryForTesting()
 
-        let didPreserveDeadline = await waitUntil(
-            "delayed auto-enter waits for late selected app snapshot before switching",
+        let didUseProjection = await waitUntil(
+            "delayed auto-enter uses committed selected-app projection before switching",
             timeoutNanoseconds: 1_000_000_000,
             pollIntervalNanoseconds: 10_000_000
         ) {
-            requestsLock.lock()
-            let recordedRequests = selectedSnapshotRequests
-            requestsLock.unlock()
-            return recordedRequests == [appID]
-                && controller.modelForTesting.session?.mode == .windowCycle(appID: appID)
+            controller.modelForTesting.session?.mode == .windowCycle(appID: appID)
         }
-        XCTAssertTrue(didPreserveDeadline)
-        requestsLock.lock()
-        let recordedRequests = selectedSnapshotRequests
-        requestsLock.unlock()
-        XCTAssertEqual(recordedRequests, [appID])
+        XCTAssertTrue(didUseProjection)
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         XCTAssertEqual(
             controller.modelForTesting.session?.mode,
             .windowCycle(appID: appID)
+        )
+        XCTAssertEqual(
+            controller.modelForTesting.session?.selectedApp.windows.map(\.id),
+            ["deferred-1", "deferred-2"]
         )
         controller.cancelSelectionForTesting()
     }
