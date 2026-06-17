@@ -929,16 +929,11 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerQuitFrontmostAppInAppLayerKeepsSessionAfterAutomaticTerminationRefresh() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
-            let controller = SwitcherPanelController()
             let initialApps = self.terminateScenarioApps()
-            let refreshedApps = initialApps.filter { $0.id != "com.example.code" }
-            var snapshots = [
-                RuntimeSnapshot(apps: initialApps, contextsByID: [:]),
-                RuntimeSnapshot(apps: refreshedApps, contextsByID: [:])
-            ]
-            controller.modelForTesting.testingSnapshotProviderOverride = {
-                snapshots.removeFirst()
-            }
+            let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: initialApps)
+            let controller = SwitcherPanelController(
+                model: LiveSwitcherModel(snapshotService: snapshotService)
+            )
             controller.modelForTesting.terminateRequestOverride = { _ in
                 (sent: true, pid: 42_100)
             }
@@ -946,8 +941,18 @@ extension FlowTabPriorityCoverageTests {
             controller.modelForTesting.isProcessRunningOverride = { _ in false }
 
             XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-            XCTAssertEqual(controller.modelForTesting.selectedApp?.id, "com.example.code")
+            guard let sessionBeforeTermination = controller.modelForTesting.session else {
+                XCTFail("Expected an active session before automatic terminate refresh")
+                return
+            }
+            let terminatedAppID = sessionBeforeTermination.selectedApp.id
+            let remainingAppIDs = sessionBeforeTermination.apps.map(\.id).filter { $0 != terminatedAppID }
+            let expectedSelectedAppID = remainingAppIDs[
+                min(sessionBeforeTermination.selectedAppIndex, remainingAppIDs.count - 1)
+            ]
             XCTAssertFalse(controller.modelForTesting.isSearchActive)
+            XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+            XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
 
             let layoutRefreshed = expectation(
                 description: "layout refreshed automatically after terminating frontmost app in app layer"
@@ -967,7 +972,11 @@ extension FlowTabPriorityCoverageTests {
 
             XCTAssertNotNil(controller.modelForTesting.session)
             XCTAssertEqual(controller.modelForTesting.appCount, 2)
-            XCTAssertEqual(controller.modelForTesting.selectedApp?.id, "com.example.browser")
+            XCTAssertEqual(controller.modelForTesting.selectedApp?.id, expectedSelectedAppID)
+            XCTAssertFalse(controller.modelForTesting.session?.apps.contains { $0.id == terminatedAppID } ?? true)
+            XCTAssertEqual(snapshotService.appTerminationSignalsRecorded().map(\.appID), [terminatedAppID])
+            XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+            XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
             XCTAssertFalse(controller.modelForTesting.isSearchActive)
             controller.cancelSelectionForTesting()
         }
