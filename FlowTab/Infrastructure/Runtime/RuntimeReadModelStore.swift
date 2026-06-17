@@ -236,15 +236,15 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         upsertAppSwitcherSnapshotLocked(snapshot, generatedAt: generatedAt)
     }
 
-    func stageSearchIndexSnapshot(
-        _ snapshot: RuntimeSnapshot,
+    func stageSearchIndexApps(
+        _ apps: [AppSwitchCandidate],
         generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
     ) {
         lock.lock()
         defer { lock.unlock() }
 
         stagingSearchIndex = buildSearchIndexLocked(
-            apps: snapshot.apps,
+            apps: apps,
             generatedAt: generatedAt,
             isCompleteForScope: false
         )

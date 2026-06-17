@@ -208,9 +208,9 @@ extension FlowTabPriorityCoverageTests {
 
     func testRuntimeReadModelStoreKeepsStagingSearchIndexHiddenUntilCommit() throws {
         let store = RuntimeReadModelStore()
-        let snapshot = RuntimeSnapshot(apps: searchScenarioApps(), contextsByID: [:])
+        let apps = searchScenarioApps()
 
-        store.stageSearchIndexSnapshot(snapshot, generatedAt: 20)
+        store.stageSearchIndexApps(apps, generatedAt: 20)
 
         XCTAssertNil(store.readCommittedSearchIndexProjection())
         var diagnostics = store.diagnostics()
@@ -225,7 +225,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(committed.freshness.isCompleteForScope)
         XCTAssertEqual(
             store.readCommittedSearchIndexProjection()?.windowEntries.map(\.windowID),
-            snapshot.apps.flatMap(\.windows).map(\.id)
+            apps.flatMap(\.windows).map(\.id)
         )
         diagnostics = store.diagnostics()
         XCTAssertTrue(diagnostics.hasCommittedSearchIndex)
@@ -235,25 +235,22 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeReadModelStoreSearchReadinessTracksDirtyMetadataWithoutReadingStaging() throws {
         let store = RuntimeReadModelStore()
         let committedSnapshot = RuntimeSnapshot(apps: searchScenarioApps(), contextsByID: [:])
-        let stagedSnapshot = RuntimeSnapshot(
-            apps: [
-                AppSwitchCandidate(
-                    id: "com.example.staging-only",
-                    displayName: "Staging Only",
-                    groupID: "staging",
-                    lastActiveAt: 99,
-                    windows: [
-                        WindowCandidate(
-                            id: "staging-window",
-                            title: "Staging Window",
-                            isMinimized: false,
-                            lastActiveAt: 99
-                        )
-                    ]
-                )
-            ],
-            contextsByID: [:]
-        )
+        let stagedApps = [
+            AppSwitchCandidate(
+                id: "com.example.staging-only",
+                displayName: "Staging Only",
+                groupID: "staging",
+                lastActiveAt: 99,
+                windows: [
+                    WindowCandidate(
+                        id: "staging-window",
+                        title: "Staging Window",
+                        isMinimized: false,
+                        lastActiveAt: 99
+                    )
+                ]
+            )
+        ]
         store.commitAppSwitcherSnapshot(committedSnapshot, generatedAt: 10)
 
         var read = store.readCommittedSearchIndexForSearch()
@@ -265,7 +262,7 @@ extension FlowTabPriorityCoverageTests {
             pid: 42_100,
             pendingScope: "appWindows:com.example.browser"
         )
-        store.stageSearchIndexSnapshot(stagedSnapshot, generatedAt: 20)
+        store.stageSearchIndexApps(stagedApps, generatedAt: 20)
 
         read = store.readCommittedSearchIndexForSearch()
         let staleProjection = try XCTUnwrap(read.projection)

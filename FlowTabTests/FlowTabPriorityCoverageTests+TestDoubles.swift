@@ -262,12 +262,6 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
         return currentAppWindowProjectionsByAppID[appID]
     }
 
-    func readCommittedSearchIndexProjection() -> RuntimeSearchIndexProjection? {
-        lock.lock()
-        defer { lock.unlock() }
-        return committedSearchIndexProjection
-    }
-
     func readCommittedSearchIndexForSearch() -> RuntimeSearchIndexRead {
         lock.lock()
         defer { lock.unlock() }
@@ -405,7 +399,7 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
             RuntimeSnapshot(apps: apps, contextsByID: [:]),
             generatedAt: generatedAt
         )
-        return store.readCommittedSearchIndexProjection()!
+        return store.readCommittedSearchIndexForSearch().projection!
     }
 }
 

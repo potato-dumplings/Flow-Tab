@@ -289,7 +289,7 @@ extension FlowTabTests {
             [terminatedAppID]
         )
         XCTAssertFalse(
-            snapshotService.readCommittedSearchIndexProjection()?.appEntries.contains {
+            snapshotService.readCommittedSearchIndexForSearch().projection?.appEntries.contains {
                 $0.appID == terminatedAppID
             } ?? true
         )
