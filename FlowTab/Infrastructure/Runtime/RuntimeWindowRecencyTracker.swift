@@ -224,23 +224,14 @@ final class RuntimeWindowRecencyTracker: @unchecked Sendable {
         }
     }
 
-    func snapshotWithRecencyApplied(_ snapshot: RuntimeSnapshot) -> RuntimeSnapshot {
-        return RuntimeSnapshot(
-            apps: appsWithRecencyApplied(snapshot.apps, contextsByID: snapshot.contextsByID),
-            contextsByID: snapshot.contextsByID
-        )
-    }
-
     func homeSnapshotWithRecencyApplied(
         _ snapshot: RuntimeHomeAppSnapshot
     ) -> RuntimeHomeAppSnapshot {
-        let orderedSnapshot = snapshotWithRecencyApplied(
-            RuntimeSnapshot(
-                apps: [snapshot.candidate],
-                contextsByID: [snapshot.context.appID: snapshot.context]
-            )
+        let orderedApps = appsWithRecencyApplied(
+            [snapshot.candidate],
+            contextsByID: [snapshot.context.appID: snapshot.context]
         )
-        guard let candidate = orderedSnapshot.apps.first else {
+        guard let candidate = orderedApps.first else {
             return snapshot
         }
         return RuntimeHomeAppSnapshot(

@@ -74,22 +74,16 @@ extension FlowTabPriorityCoverageTests {
             allowedActions: WindowBindingConfidence.sticky.allowedActions
         )
 
-        let updatedSnapshot = tracker.snapshotWithRecencyApplied(
-            RuntimeSnapshot(
-                apps: [
-                    AppSwitchCandidate(
-                        id: appID,
-                        displayName: "Chrome Fixture",
-                        groupID: "chrome",
-                        lastActiveAt: 100,
-                        windows: windows
-                    )
-                ],
-                contextsByID: [appID: context]
-            )
+        let updatedApps = recencyAppliedApps(
+            tracker,
+            appID: appID,
+            displayName: "Chrome Fixture",
+            groupID: "chrome",
+            windows: windows,
+            context: context
         )
 
-        XCTAssertEqual(updatedSnapshot.apps.first?.windows.map(\.id), ["first", "second"])
+        XCTAssertEqual(updatedApps.first?.windows.map(\.id), ["first", "second"])
     }
 
     func testRuntimeWindowRecencyTrackerRecordsVerifiedFocusOnlyWhenBindingCanActivate() {
@@ -123,19 +117,6 @@ extension FlowTabPriorityCoverageTests {
                 )
             ]
         )
-        let snapshot = RuntimeSnapshot(
-            apps: [
-                AppSwitchCandidate(
-                    id: appID,
-                    displayName: "Verified Focus Fixture",
-                    groupID: "verified-focus",
-                    lastActiveAt: 100,
-                    windows: windows
-                )
-            ],
-            contextsByID: [appID: context]
-        )
-
         now = 900
         tracker.recordVerifiedFocus(
             appID: appID,
@@ -147,7 +128,14 @@ extension FlowTabPriorityCoverageTests {
             allowedActions: WindowBindingConfidence.provisional.allowedActions
         )
         XCTAssertEqual(
-            tracker.snapshotWithRecencyApplied(snapshot).apps.first?.windows.map(\.id),
+            recencyAppliedWindowIDs(
+                tracker,
+                appID: appID,
+                displayName: "Verified Focus Fixture",
+                groupID: "verified-focus",
+                windows: windows,
+                context: context
+            ),
             ["first", "second"]
         )
 
@@ -163,7 +151,14 @@ extension FlowTabPriorityCoverageTests {
         )
 
         XCTAssertEqual(
-            tracker.snapshotWithRecencyApplied(snapshot).apps.first?.windows.map(\.id),
+            recencyAppliedWindowIDs(
+                tracker,
+                appID: appID,
+                displayName: "Verified Focus Fixture",
+                groupID: "verified-focus",
+                windows: windows,
+                context: context
+            ),
             ["second", "first"]
         )
     }
@@ -222,21 +217,15 @@ extension FlowTabPriorityCoverageTests {
             frame: normalFrame
         )
 
-        let updatedSnapshot = tracker.snapshotWithRecencyApplied(
-            RuntimeSnapshot(
-                apps: [
-                    AppSwitchCandidate(
-                        id: appID,
-                        displayName: "Chrome Fixture",
-                        groupID: "chrome",
-                        lastActiveAt: 100,
-                        windows: windows
-                    )
-                ],
-                contextsByID: [appID: context]
-            )
+        let updatedApps = recencyAppliedApps(
+            tracker,
+            appID: appID,
+            displayName: "Chrome Fixture",
+            groupID: "chrome",
+            windows: windows,
+            context: context
         )
-        var session = SwitcherSession(apps: updatedSnapshot.apps)
+        var session = SwitcherSession(apps: updatedApps)
 
         XCTAssertTrue(session.enterWindowCycle(allowSingleWindow: true))
         XCTAssertEqual(session.selectedWindow?.id, "normal")
@@ -278,19 +267,6 @@ extension FlowTabPriorityCoverageTests {
                 )
             ]
         )
-        let snapshot = RuntimeSnapshot(
-            apps: [
-                AppSwitchCandidate(
-                    id: appID,
-                    displayName: "Semantic Recency Fixture",
-                    groupID: "semantic",
-                    lastActiveAt: 100,
-                    windows: windows
-                )
-            ],
-            contextsByID: [appID: context]
-        )
-
         tracker.record(
             appID: appID,
             windowID: "old-runtime-id",
@@ -302,13 +278,27 @@ extension FlowTabPriorityCoverageTests {
 
         now = 105
         XCTAssertEqual(
-            tracker.snapshotWithRecencyApplied(snapshot).apps.first?.windows.map(\.id),
+            recencyAppliedWindowIDs(
+                tracker,
+                appID: appID,
+                displayName: "Semantic Recency Fixture",
+                groupID: "semantic",
+                windows: windows,
+                context: context
+            ),
             ["new-runtime-id", "other"]
         )
 
         now = 120
         XCTAssertEqual(
-            tracker.snapshotWithRecencyApplied(snapshot).apps.first?.windows.map(\.id),
+            recencyAppliedWindowIDs(
+                tracker,
+                appID: appID,
+                displayName: "Semantic Recency Fixture",
+                groupID: "semantic",
+                windows: windows,
+                context: context
+            ),
             ["other", "new-runtime-id"]
         )
     }
@@ -350,19 +340,6 @@ extension FlowTabPriorityCoverageTests {
                 )
             ]
         )
-        let snapshot = RuntimeSnapshot(
-            apps: [
-                AppSwitchCandidate(
-                    id: appID,
-                    displayName: "Semantic Generation Recency Fixture",
-                    groupID: "semantic-generation",
-                    lastActiveAt: 100,
-                    windows: windows
-                )
-            ],
-            contextsByID: [appID: context]
-        )
-
         tracker.record(
             appID: appID,
             windowID: "old-runtime-id",
@@ -374,11 +351,25 @@ extension FlowTabPriorityCoverageTests {
 
         now = 105
         XCTAssertEqual(
-            tracker.snapshotWithRecencyApplied(snapshot).apps.first?.windows.map(\.id),
+            recencyAppliedWindowIDs(
+                tracker,
+                appID: appID,
+                displayName: "Semantic Generation Recency Fixture",
+                groupID: "semantic-generation",
+                windows: windows,
+                context: context
+            ),
             ["new-runtime-id", "other"]
         )
         XCTAssertEqual(
-            tracker.snapshotWithRecencyApplied(snapshot).apps.first?.windows.map(\.id),
+            recencyAppliedWindowIDs(
+                tracker,
+                appID: appID,
+                displayName: "Semantic Generation Recency Fixture",
+                groupID: "semantic-generation",
+                windows: windows,
+                context: context
+            ),
             ["other", "new-runtime-id"]
         )
     }
@@ -417,23 +408,17 @@ extension FlowTabPriorityCoverageTests {
         now = 900
         tracker.record(appID: appID, windowID: "normal", context: context)
 
-        let updatedSnapshot = tracker.snapshotWithRecencyApplied(
-            RuntimeSnapshot(
-                apps: [
-                    AppSwitchCandidate(
-                        id: appID,
-                        displayName: "Chrome Fixture",
-                        groupID: "chrome",
-                        lastActiveAt: 100,
-                        windows: windows
-                    )
-                ],
-                contextsByID: [appID: context]
-            )
+        let updatedApps = recencyAppliedApps(
+            tracker,
+            appID: appID,
+            displayName: "Chrome Fixture",
+            groupID: "chrome",
+            windows: windows,
+            context: context
         )
 
         XCTAssertEqual(
-            updatedSnapshot.apps.first?.windows.map(\.id),
+            updatedApps.first?.windows.map(\.id),
             ["normal", "fullscreen", "incognito", "second-fullscreen"]
         )
     }
@@ -682,19 +667,6 @@ extension FlowTabPriorityCoverageTests {
                 )
             ]
         )
-        let snapshot = RuntimeSnapshot(
-            apps: [
-                AppSwitchCandidate(
-                    id: appID,
-                    displayName: "Chrome Fixture",
-                    groupID: "chrome",
-                    lastActiveAt: 100,
-                    windows: windows
-                )
-            ],
-            contextsByID: [appID: context]
-        )
-
         model.frontmostApplicationOverride = { currentApp }
         model.windowRecencyTracker.recordVerifiedFocus(
             appID: appID,
@@ -702,9 +674,13 @@ extension FlowTabPriorityCoverageTests {
             context: context
         )
 
-        let updatedApps = model.windowRecencyTracker.appsWithRecencyApplied(
-            snapshot.apps,
-            contextsByID: snapshot.contextsByID
+        let updatedApps = recencyAppliedApps(
+            model.windowRecencyTracker,
+            appID: appID,
+            displayName: "Chrome Fixture",
+            groupID: "chrome",
+            windows: windows,
+            context: context
         )
 
         XCTAssertEqual(
@@ -932,5 +908,46 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(signals.map(\.appID), [appID])
         XCTAssertEqual(signals.map(\.pid), [currentApp.processIdentifier])
         XCTAssertEqual(snapshotService.windowFocusVerificationSignalsRecorded().map(\.focusedCGWindowID), [240_001])
+    }
+
+    private func recencyAppliedWindowIDs(
+        _ tracker: RuntimeWindowRecencyTracker,
+        appID: String,
+        displayName: String,
+        groupID: String,
+        windows: [WindowCandidate],
+        context: RuntimeAppContext
+    ) -> [String]? {
+        let apps = recencyAppliedApps(
+            tracker,
+            appID: appID,
+            displayName: displayName,
+            groupID: groupID,
+            windows: windows,
+            context: context
+        )
+        return apps.first?.windows.map(\.id)
+    }
+
+    private func recencyAppliedApps(
+        _ tracker: RuntimeWindowRecencyTracker,
+        appID: String,
+        displayName: String,
+        groupID: String,
+        windows: [WindowCandidate],
+        context: RuntimeAppContext
+    ) -> [AppSwitchCandidate] {
+        tracker.appsWithRecencyApplied(
+            [
+                AppSwitchCandidate(
+                    id: appID,
+                    displayName: displayName,
+                    groupID: groupID,
+                    lastActiveAt: 100,
+                    windows: windows
+                )
+            ],
+            contextsByID: [appID: context]
+        )
     }
 }
