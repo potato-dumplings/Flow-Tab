@@ -217,7 +217,9 @@ extension FlowTabPriorityCoverageTests {
             currentAppWindowProjectionsByAppID: [
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
-                    homeAppSnapshot: snapshot,
+                    currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
+                        homeAppSnapshot: snapshot
+                    ),
                     freshness: RuntimeProjectionFreshness(
                         generatedAt: generatedAt,
                         sourceGeneration: RuntimeReadModelGeneration(projection: 1),
@@ -241,17 +243,19 @@ extension FlowTabPriorityCoverageTests {
             currentAppWindowProjectionsByAppID: [
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
-                    homeAppSnapshot: RuntimeHomeAppSnapshot(
-                        summary: RuntimeHomeAppSummary(
-                            appID: appID,
-                            displayName: candidate.displayName,
-                            groupID: candidate.groupID,
-                            lastActiveAt: candidate.lastActiveAt,
-                            windowCount: candidate.windows.count,
-                            pid: context.runningApp.processIdentifier
-                        ),
-                        candidate: candidate,
-                        context: context
+                    currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
+                        homeAppSnapshot: RuntimeHomeAppSnapshot(
+                            summary: RuntimeHomeAppSummary(
+                                appID: appID,
+                                displayName: candidate.displayName,
+                                groupID: candidate.groupID,
+                                lastActiveAt: candidate.lastActiveAt,
+                                windowCount: candidate.windows.count,
+                                pid: context.runningApp.processIdentifier
+                            ),
+                            candidate: candidate,
+                            context: context
+                        )
                     ),
                     freshness: RuntimeProjectionFreshness(
                         generatedAt: generatedAt,

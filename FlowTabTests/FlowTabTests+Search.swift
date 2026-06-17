@@ -1099,7 +1099,9 @@ extension FlowTabTests {
             currentAppWindowProjectionsByAppID: [
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
-                    homeAppSnapshot: snapshot,
+                    currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
+                        homeAppSnapshot: snapshot
+                    ),
                     freshness: RuntimeProjectionFreshness(
                         generatedAt: 30,
                         sourceGeneration: RuntimeReadModelGeneration(projection: 1),

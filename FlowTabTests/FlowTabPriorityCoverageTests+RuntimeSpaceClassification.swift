@@ -458,7 +458,9 @@ extension FlowTabPriorityCoverageTests {
             currentAppWindowProjectionsByAppID: [
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
-                    homeAppSnapshot: focusedSnapshot,
+                    currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
+                        homeAppSnapshot: focusedSnapshot
+                    ),
                     freshness: freshness
                 )
             ]

@@ -202,7 +202,9 @@ extension FlowTabPriorityCoverageTests {
             currentAppWindowProjectionsByAppID: [
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
-                    homeAppSnapshot: snapshot,
+                    currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
+                        homeAppSnapshot: snapshot
+                    ),
                     freshness: RuntimeProjectionFreshness(
                         generatedAt: 10,
                         sourceGeneration: RuntimeReadModelGeneration(projection: 1),
@@ -482,7 +484,9 @@ extension FlowTabPriorityCoverageTests {
             currentAppWindowProjectionsByAppID: [
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
-                    homeAppSnapshot: selectedSnapshot,
+                    currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
+                        homeAppSnapshot: selectedSnapshot
+                    ),
                     freshness: freshness
                 )
             ]
@@ -574,7 +578,9 @@ extension FlowTabPriorityCoverageTests {
             currentAppWindowProjectionsByAppID: [
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
-                    homeAppSnapshot: snapshot,
+                    currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
+                        homeAppSnapshot: snapshot
+                    ),
                     freshness: RuntimeProjectionFreshness(
                         generatedAt: 12,
                         sourceGeneration: RuntimeReadModelGeneration(projection: 1),
@@ -1000,7 +1006,9 @@ extension FlowTabPriorityCoverageTests {
             currentAppWindowProjectionsByAppID: [
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
-                    homeAppSnapshot: selectedSnapshot,
+                    currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
+                        homeAppSnapshot: selectedSnapshot
+                    ),
                     freshness: freshness
                 )
             ]

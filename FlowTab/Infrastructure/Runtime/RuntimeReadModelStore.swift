@@ -99,18 +99,6 @@ struct RuntimeCurrentAppWindowProjection {
         self.freshness = freshness
     }
 
-    init(
-        appID: String,
-        homeAppSnapshot: RuntimeHomeAppSnapshot,
-        freshness: RuntimeProjectionFreshness
-    ) {
-        self.init(
-            appID: appID,
-            currentAppWindowPayload: RuntimeCurrentAppWindowPayload(homeAppSnapshot: homeAppSnapshot),
-            freshness: freshness
-        )
-    }
-
     var homeAppSnapshot: RuntimeHomeAppSnapshot {
         currentAppWindowPayload.homeAppSnapshot
     }
