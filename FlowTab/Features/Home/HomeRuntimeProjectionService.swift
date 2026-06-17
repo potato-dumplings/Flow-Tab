@@ -49,7 +49,7 @@ enum HomeRuntimeProjectionReader {
         )
     }
 
-    static func appSnapshot(
+    static func appDetailProjection(
         for appID: String,
         from service: any RuntimeProjectionServing
     ) -> RuntimeHomeAppSnapshot? {
@@ -120,21 +120,21 @@ enum HomeRuntimeRefreshReader {
         return currentSummary
     }
 
-    static func appSnapshot(
+    static func appDetailProjection(
         for appID: String,
         from service: any RuntimeProjectionServing,
-        current snapshot: RuntimeHomeAppSnapshot?,
+        current detailProjection: RuntimeHomeAppSnapshot?,
         currentSummary: RuntimeHomeAppSummary?
     ) -> RuntimeHomeAppSnapshot? {
-        if let projectionSnapshot = HomeRuntimeProjectionReader.appSnapshot(for: appID, from: service) {
+        if let projectionSnapshot = HomeRuntimeProjectionReader.appDetailProjection(for: appID, from: service) {
             return projectionSnapshot
         }
         signalMissingProjection(
             appID: appID,
-            summary: snapshot?.summary ?? currentSummary,
+            summary: detailProjection?.summary ?? currentSummary,
             service: service
         )
-        return snapshot
+        return detailProjection
     }
 
     private static func signalMissingProjection(

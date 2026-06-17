@@ -564,7 +564,7 @@ extension FlowTabTests {
     }
 
     @MainActor
-    func testLiveSwitcherModelSearchUsesStaleCommittedIndexAndRequestsFreshnessBarrier() {
+    func testLiveSwitcherModelSearchReportsDegradedStaleCommittedIndexUntilFreshnessBarrierCommits() {
         let defaults = UserDefaults.standard
         let previousSearchEnabled = defaults.object(forKey: AppPreferenceKeys.searchEnabled)
         let previousSearchDefaultScope = defaults.object(forKey: AppPreferenceKeys.searchDefaultScope)
@@ -643,9 +643,11 @@ extension FlowTabTests {
         }
         XCTAssertEqual(diagnostic.readiness, .stale)
         XCTAssertEqual(diagnostic.resultState, .degradedStaleCommittedResult)
+        XCTAssertNotEqual(diagnostic.resultState, .latestCommittedResult)
         XCTAssertFalse(diagnostic.committedIndexCoversCurrentGeneration)
         XCTAssertTrue(diagnostic.logMessage.contains("resultState=degradedStaleCommittedResult"))
         XCTAssertTrue(diagnostic.logMessage.contains("committedIndexCoversCurrentGeneration=0"))
+        XCTAssertFalse(diagnostic.logMessage.contains("resultState=latestCommittedResult"))
         XCTAssertFalse(diagnostic.logMessage.contains("complete="))
         XCTAssertEqual(
             snapshotService.searchIndexFreshnessBarrierRequestsRecorded(),

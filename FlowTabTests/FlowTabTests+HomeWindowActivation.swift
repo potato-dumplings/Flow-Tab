@@ -22,7 +22,7 @@ extension FlowTabTests {
         preferences.autoRestoreMinimizedWindowOnSwitch = false
 
         let request = HomeWindowActivationController.makeActivationRequest(
-            snapshot: snapshot,
+            detailProjection: snapshot,
             appID: appID,
             windowID: "mail-archive",
             preferences: preferences
@@ -51,7 +51,7 @@ extension FlowTabTests {
         preferences.autoRestoreMinimizedWindowOnSwitch = true
 
         let request = HomeWindowActivationController.makeActivationRequest(
-            snapshot: snapshot,
+            detailProjection: snapshot,
             appID: appID,
             windowID: "mail-archive",
             preferences: preferences
@@ -208,7 +208,7 @@ extension FlowTabTests {
         controller.activateWindow(
             appID: appID,
             windowID: "cached-mail",
-            snapshot: snapshot
+            detailProjection: snapshot
         )
 
         XCTAssertEqual(
@@ -304,7 +304,7 @@ extension FlowTabTests {
             1
         )
         XCTAssertEqual(
-            HomeRuntimeProjectionReader.appSnapshot(
+            HomeRuntimeProjectionReader.appDetailProjection(
                 for: appID,
                 from: snapshotService
             )?.candidate.windows.map(\.id),
@@ -398,7 +398,7 @@ extension FlowTabTests {
             snapshot.summary.pid
         )
         XCTAssertEqual(
-            HomeRuntimeProjectionReader.appSnapshot(
+            HomeRuntimeProjectionReader.appDetailProjection(
                 for: appID,
                 from: snapshotService
             )?.candidate.windows.map(\.id),
@@ -440,7 +440,7 @@ extension FlowTabTests {
             1
         )
         XCTAssertEqual(
-            HomeRuntimeRefreshReader.appSnapshot(
+            HomeRuntimeRefreshReader.appDetailProjection(
                 for: appID,
                 from: snapshotService,
                 current: cachedSnapshot,

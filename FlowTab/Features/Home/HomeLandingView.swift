@@ -41,7 +41,7 @@ struct HomeLandingView: View {
     @State private var appSummaries: [RuntimeHomeAppSummary] = []
     @State private var hiddenAppIDs = AppVisibilityPreferencesStore.loadHiddenAppIDs()
     @State private var windowsByAppID: [String: [WindowCandidate]] = [:]
-    @State private var homeSnapshotsByAppID: [String: RuntimeHomeAppSnapshot] = [:]
+    @State private var homeDetailProjectionsByAppID: [String: RuntimeHomeAppSnapshot] = [:]
     @State private var loadingWindowCountAppIDs: Set<String> = []
     @State private var selectedAppID: String?
     @State private var appSummariesRefreshTask: Task<Void, Never>?
@@ -560,7 +560,7 @@ struct HomeLandingView: View {
         HomeWindowActivationController.shared.activateWindow(
             appID: appID,
             windowID: windowID,
-            snapshot: homeSnapshotsByAppID[appID]
+            detailProjection: homeDetailProjectionsByAppID[appID]
         )
     }
 
@@ -630,7 +630,7 @@ struct HomeLandingView: View {
         loadingWindowCountAppIDs.removeAll()
         let validAppIDs = Set(summaries.map(\.appID))
         windowsByAppID = windowsByAppID.filter { validAppIDs.contains($0.key) }
-        homeSnapshotsByAppID = homeSnapshotsByAppID.filter { validAppIDs.contains($0.key) }
+        homeDetailProjectionsByAppID = homeDetailProjectionsByAppID.filter { validAppIDs.contains($0.key) }
         syncSelectedApp()
         setupWindowMonitorIfNeeded()
         persistCache(updateRunningSignature: true)
@@ -690,10 +690,10 @@ struct HomeLandingView: View {
             "homeRefreshSingleApp begin appID=\(appID) updateWindows=\(updateWindows) reason=\(reason)"
         )
         if updateWindows {
-            let snapshot = await fetchHomeAppSnapshotOnBackground(appID: appID)
+            let detailProjection = await fetchHomeAppDetailProjectionOnBackground(appID: appID)
             guard !Task.isCancelled else { return }
 
-            guard let snapshot else {
+            guard let detailProjection else {
                 if HomeInitialAppSummaryUpdatePolicy.shouldCommitSingleAppSummary(
                     appID: appID,
                     selectedAppID: currentSelectedAppID,
@@ -704,7 +704,7 @@ struct HomeLandingView: View {
                 if loadingWindowCountAppIDs.isEmpty {
                     appSummaries.removeAll { $0.appID == appID }
                     windowsByAppID.removeValue(forKey: appID)
-                    homeSnapshotsByAppID.removeValue(forKey: appID)
+                    homeDetailProjectionsByAppID.removeValue(forKey: appID)
                     syncSelectedApp()
                     setupWindowMonitorIfNeeded()
                     persistCache()
@@ -726,21 +726,21 @@ struct HomeLandingView: View {
             )
             if shouldCommitSummary {
                 if let existingIndex = appSummaries.firstIndex(where: { $0.appID == appID }) {
-                    appSummaries[existingIndex] = snapshot.summary
+                    appSummaries[existingIndex] = detailProjection.summary
                 } else {
-                    appSummaries.append(snapshot.summary)
+                    appSummaries.append(detailProjection.summary)
                 }
                 loadingWindowCountAppIDs.remove(appID)
             }
-            windowsByAppID[appID] = snapshot.candidate.windows
-            homeSnapshotsByAppID[appID] = snapshot
+            windowsByAppID[appID] = detailProjection.candidate.windows
+            homeDetailProjectionsByAppID[appID] = detailProjection
         } else {
             let summary = await fetchHomeAppSummaryOnBackground(appID: appID)
             guard !Task.isCancelled else { return }
             guard let summary else {
                 appSummaries.removeAll { $0.appID == appID }
                 windowsByAppID.removeValue(forKey: appID)
-                homeSnapshotsByAppID.removeValue(forKey: appID)
+                homeDetailProjectionsByAppID.removeValue(forKey: appID)
                 syncSelectedApp()
                 setupWindowMonitorIfNeeded()
                 persistCache()
@@ -798,11 +798,11 @@ struct HomeLandingView: View {
         )
     }
 
-    private func fetchHomeAppSnapshotOnBackground(appID: String) async -> RuntimeHomeAppSnapshot? {
-        HomeRuntimeRefreshReader.appSnapshot(
+    private func fetchHomeAppDetailProjectionOnBackground(appID: String) async -> RuntimeHomeAppSnapshot? {
+        HomeRuntimeRefreshReader.appDetailProjection(
             for: appID,
             from: runtimeProjectionService,
-            current: homeSnapshotsByAppID[appID],
+            current: homeDetailProjectionsByAppID[appID],
             currentSummary: appSummaries.first { $0.appID == appID }
         )
     }

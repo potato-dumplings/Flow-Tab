@@ -50,14 +50,14 @@ final class HomeWindowActivationController {
     func activateWindow(
         appID: String,
         windowID: String,
-        snapshot: RuntimeHomeAppSnapshot? = nil
+        detailProjection: RuntimeHomeAppSnapshot? = nil
     ) {
-        let resolvedSnapshot = snapshot ?? HomeRuntimeProjectionReader.appSnapshot(
+        let resolvedDetailProjection = detailProjection ?? HomeRuntimeProjectionReader.appDetailProjection(
             for: appID,
             from: runtimeProjectionService
         )
         guard let request = Self.makeActivationRequest(
-            snapshot: resolvedSnapshot,
+            detailProjection: resolvedDetailProjection,
             appID: appID,
             windowID: windowID,
             preferences: preferencesProvider()
@@ -77,20 +77,20 @@ final class HomeWindowActivationController {
     }
 
     static func makeActivationRequest(
-        snapshot: RuntimeHomeAppSnapshot?,
+        detailProjection: RuntimeHomeAppSnapshot?,
         appID: String,
         windowID: String,
         preferences: SwitcherPreferences
     ) -> ActivationRequest? {
-        guard let snapshot, snapshot.candidate.id == appID else { return nil }
+        guard let detailProjection, detailProjection.candidate.id == appID else { return nil }
 
-        var session = SwitcherSession(apps: [snapshot.candidate], preferences: preferences)
+        var session = SwitcherSession(apps: [detailProjection.candidate], preferences: preferences)
         guard session.selectWindow(appID: appID, windowID: windowID) else { return nil }
         guard let target = session.commitSelection() else { return nil }
 
         return ActivationRequest(
             target: target,
-            contextsByID: [snapshot.context.appID: snapshot.context]
+            contextsByID: [detailProjection.context.appID: detailProjection.context]
         )
     }
 }
