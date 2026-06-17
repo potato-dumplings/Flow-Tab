@@ -103,7 +103,7 @@ extension FlowTabPriorityCoverageTests {
         let previousSharedDelegate = AppDelegate.shared
         let previousActivationOverride = AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride
         let previousAXTrusted = AccessibilityPermissionChecker.isTrustedOverrideForTesting
-        let snapshotService = RecordingRuntimeSnapshotService()
+        let snapshotService = RecordingRuntimeProjectionService()
         let hotkeyFactory = SpyHotkeyMonitorFactory()
         let stressRunner = SpyStressRunner()
         let workspaceNotificationCenter = NotificationCenter()
@@ -709,7 +709,7 @@ extension FlowTabPriorityCoverageTests {
             pendingRepairScopes: [],
             isCompleteForScope: true
         )
-        let snapshotService = RecordingRuntimeSnapshotService(
+        let snapshotService = RecordingRuntimeProjectionService(
             appSwitcherProjection: RuntimeAppSwitcherProjection(
                 apps: [currentAppCandidate] + searchScenarioApps(),
                 contextsByID: [currentAppID: currentAppContext],
@@ -973,7 +973,7 @@ extension FlowTabPriorityCoverageTests {
         let stressRunner = SpyStressRunner()
         let panelController = SwitcherPanelController(
             model: LiveSwitcherModel(
-                runtimeProjectionService: RecordingRuntimeSnapshotService(
+                runtimeProjectionService: RecordingRuntimeProjectionService(
                     appSwitcherApps: searchScenarioApps()
                 )
             )
@@ -1093,7 +1093,7 @@ extension FlowTabPriorityCoverageTests {
         let previousLaunchEnvironment = FlowTabTestLaunchOptions.environmentOverrideForTesting
         let hotkeyFactory = SpyHotkeyMonitorFactory()
         let multiAppSnapshot = Array(searchScenarioApps().prefix(2))
-        let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: [multiAppSnapshot[0]])
+        let snapshotService = RecordingRuntimeProjectionService(appSwitcherApps: [multiAppSnapshot[0]])
         let panelController = SwitcherPanelController(
             model: LiveSwitcherModel(runtimeProjectionService: snapshotService)
         )
@@ -1188,7 +1188,7 @@ extension FlowTabPriorityCoverageTests {
         let previousLaunchArguments = FlowTabTestLaunchOptions.argumentsOverrideForTesting
         let previousLaunchEnvironment = FlowTabTestLaunchOptions.environmentOverrideForTesting
         let hotkeyFactory = SpyHotkeyMonitorFactory()
-        let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: [])
+        let snapshotService = RecordingRuntimeProjectionService(appSwitcherApps: [])
         let panelController = SwitcherPanelController(
             model: LiveSwitcherModel(runtimeProjectionService: snapshotService)
         )

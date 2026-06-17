@@ -193,7 +193,7 @@ extension FlowTabPriorityCoverageTests {
         runningApp: NSRunningApplication,
         windows: [WindowCandidate],
         generatedAt: TimeInterval = 10
-    ) -> RecordingRuntimeSnapshotService {
+    ) -> RecordingRuntimeProjectionService {
         let candidate = AppSwitchCandidate(
             id: appID,
             displayName: runningApp.localizedName ?? "Current App",
@@ -214,7 +214,7 @@ extension FlowTabPriorityCoverageTests {
             candidate: candidate,
             context: context
         )
-        return RecordingRuntimeSnapshotService(
+        return RecordingRuntimeProjectionService(
             currentAppWindowProjectionsByAppID: [
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
@@ -237,8 +237,8 @@ extension FlowTabPriorityCoverageTests {
         candidate: AppSwitchCandidate,
         context: RuntimeAppContext,
         generatedAt: TimeInterval = 10
-    ) -> RecordingRuntimeSnapshotService {
-        RecordingRuntimeSnapshotService(
+    ) -> RecordingRuntimeProjectionService {
+        RecordingRuntimeProjectionService(
             currentAppWindowProjectionsByAppID: [
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
@@ -272,8 +272,8 @@ extension FlowTabPriorityCoverageTests {
         app: AppSwitchCandidate,
         context: RuntimeAppContext,
         generatedAt: TimeInterval = 10
-    ) -> (model: LiveSwitcherModel, snapshotService: RecordingRuntimeSnapshotService) {
-        let snapshotService = RecordingRuntimeSnapshotService(
+    ) -> (model: LiveSwitcherModel, snapshotService: RecordingRuntimeProjectionService) {
+        let snapshotService = RecordingRuntimeProjectionService(
             appSwitcherApps: [app],
             contextsByID: [app.id: context],
             generatedAt: generatedAt

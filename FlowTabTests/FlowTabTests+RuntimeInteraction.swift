@@ -157,7 +157,7 @@ extension FlowTabTests {
     @MainActor
     func testTerminateSelectedAppBehaviorKeepsAppUntilProcessActuallyExits() async {
         let initialApps = terminateScenarioApps()
-        let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: initialApps)
+        let snapshotService = RecordingRuntimeProjectionService(appSwitcherApps: initialApps)
         let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
@@ -213,7 +213,7 @@ extension FlowTabTests {
     @MainActor
     func testTerminateSelectedAppBehaviorRefreshesWithoutPollingDelayWhenProcessAlreadyExited() async {
         let initialApps = terminateScenarioApps()
-        let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: initialApps)
+        let snapshotService = RecordingRuntimeProjectionService(appSwitcherApps: initialApps)
         let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
@@ -263,7 +263,7 @@ extension FlowTabTests {
     @MainActor
     func testHandleApplicationTerminatedRefreshesFromRuntimeProjectionWithoutFullSnapshot() async {
         let initialApps = terminateScenarioApps()
-        let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: initialApps)
+        let snapshotService = RecordingRuntimeProjectionService(appSwitcherApps: initialApps)
         let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
@@ -300,7 +300,7 @@ extension FlowTabTests {
     @MainActor
     func testTerminateSelectedAppUnitStopsPollingAfterTimeoutWhenAppStillRunning() async {
         let initialApps = terminateScenarioApps()
-        let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: initialApps)
+        let snapshotService = RecordingRuntimeProjectionService(appSwitcherApps: initialApps)
         let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
@@ -373,7 +373,7 @@ extension FlowTabTests {
                 )
             }
         )
-        let snapshotService = RecordingRuntimeSnapshotService(
+        let snapshotService = RecordingRuntimeProjectionService(
             appSwitcherApps: initialApps,
             contextsByID: contextsByID
         )
@@ -415,7 +415,7 @@ extension FlowTabTests {
     @MainActor
     func testTerminateSelectedAppUnitRefreshesOnWorkspaceTerminateAfterPollingTimeout() async {
         let initialApps = terminateScenarioApps()
-        let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: initialApps)
+        let snapshotService = RecordingRuntimeProjectionService(appSwitcherApps: initialApps)
         let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))

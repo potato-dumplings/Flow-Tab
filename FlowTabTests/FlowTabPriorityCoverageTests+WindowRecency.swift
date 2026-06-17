@@ -570,7 +570,7 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
 
-        let snapshotService = RecordingRuntimeSnapshotService(
+        let snapshotService = RecordingRuntimeProjectionService(
             appSwitcherApps: [
                 AppSwitchCandidate(
                     id: currentAppID,
@@ -752,7 +752,7 @@ extension FlowTabPriorityCoverageTests {
             ),
             context: context
         )
-        let snapshotService = RecordingRuntimeSnapshotService(
+        let snapshotService = RecordingRuntimeProjectionService(
             currentAppWindowProjectionsByAppID: [
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
@@ -841,7 +841,7 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
 
-        let snapshotService = RecordingRuntimeSnapshotService(
+        let snapshotService = RecordingRuntimeProjectionService(
             appSwitcherApps: [
                 AppSwitchCandidate(
                     id: appID,
@@ -886,7 +886,7 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testLiveSwitcherModelSignalsRuntimeWhenWindowFocusIsVerified() {
-        let snapshotService = RecordingRuntimeSnapshotService()
+        let snapshotService = RecordingRuntimeProjectionService()
         let model = LiveSwitcherModel(
             windowRecencyTracker: RuntimeWindowRecencyTracker(),
             runtimeProjectionService: snapshotService

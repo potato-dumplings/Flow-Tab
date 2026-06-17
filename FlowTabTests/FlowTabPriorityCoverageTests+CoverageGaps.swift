@@ -6,7 +6,7 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testLiveSwitcherModelWindowLayerNavigationCommitsSessionWindowTarget() {
         let model = LiveSwitcherModel(
-            runtimeProjectionService: RecordingRuntimeSnapshotService(
+            runtimeProjectionService: RecordingRuntimeProjectionService(
                 appSwitcherApps: commitScenarioApps()
             )
         )

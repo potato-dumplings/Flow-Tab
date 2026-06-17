@@ -449,7 +449,7 @@ extension FlowTabPriorityCoverageTests {
             pendingRepairScopes: [],
             isCompleteForScope: true
         )
-        let snapshotService = RecordingRuntimeSnapshotService(
+        let snapshotService = RecordingRuntimeProjectionService(
             appSwitcherProjection: RuntimeAppSwitcherProjection(
                 apps: [candidate],
                 contextsByID: [appID: context],

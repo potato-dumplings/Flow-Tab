@@ -79,7 +79,7 @@ final class SpyMRUTracker: MRUTracking {
     }
 }
 
-final class RecordingRuntimeSnapshotService: RuntimeProjectionServing, @unchecked Sendable {
+final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchecked Sendable {
     private let lock = NSLock()
     private var appSwitcherProjection: RuntimeAppSwitcherProjection?
     private let homeSummaryProjection: RuntimeHomeSummaryProjection?

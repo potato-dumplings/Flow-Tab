@@ -7,9 +7,9 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     private func makeInitialVisibilityProjectionPanelController() -> (
         controller: SwitcherPanelController,
-        snapshotService: RecordingRuntimeSnapshotService
+        snapshotService: RecordingRuntimeProjectionService
     ) {
-        let snapshotService = RecordingRuntimeSnapshotService(
+        let snapshotService = RecordingRuntimeProjectionService(
             appSwitcherApps: searchScenarioApps()
         )
         return (

@@ -86,7 +86,7 @@ extension FlowTabTests {
             pendingRepairScopes: [],
             isCompleteForScope: true
         )
-        let snapshotService = RecordingRuntimeSnapshotService(
+        let snapshotService = RecordingRuntimeProjectionService(
             currentAppWindowProjectionsByAppID: [
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
@@ -153,7 +153,7 @@ extension FlowTabTests {
             pendingRepairScopes: [],
             isCompleteForScope: true
         )
-        let snapshotService = RecordingRuntimeSnapshotService(
+        let snapshotService = RecordingRuntimeProjectionService(
             homeSummaryProjection: RuntimeHomeSummaryProjection(
                 summaries: [contaminatedSnapshot.summary],
                 freshness: freshness
@@ -273,7 +273,7 @@ extension FlowTabTests {
             pendingRepairScopes: [],
             isCompleteForScope: true
         )
-        let snapshotService = RecordingRuntimeSnapshotService(
+        let snapshotService = RecordingRuntimeProjectionService(
             homeSummaryProjection: RuntimeHomeSummaryProjection(
                 summaries: [snapshot.summary],
                 freshness: freshness
@@ -336,7 +336,7 @@ extension FlowTabTests {
             pendingRepairScopes: [],
             isCompleteForScope: true
         )
-        let projectionService = RecordingRuntimeSnapshotService(
+        let projectionService = RecordingRuntimeProjectionService(
             appSwitcherProjection: RuntimeAppSwitcherProjection(
                 apps: [projectionApp],
                 contextsByID: [:],
@@ -350,7 +350,7 @@ extension FlowTabTests {
         )
         XCTAssertEqual(projectionService.lightweightSnapshotRequestCount(), 0)
 
-        let missingProjectionService = RecordingRuntimeSnapshotService()
+        let missingProjectionService = RecordingRuntimeProjectionService()
 
         XCTAssertEqual(
             HomeInitialAppSummaryReader.appSummaries(from: missingProjectionService),
@@ -381,7 +381,7 @@ extension FlowTabTests {
             pendingRepairScopes: [],
             isCompleteForScope: true
         )
-        let snapshotService = RecordingRuntimeSnapshotService(
+        let snapshotService = RecordingRuntimeProjectionService(
             appSwitcherProjection: RuntimeAppSwitcherProjection(
                 apps: [snapshot.candidate],
                 contextsByID: [appID: snapshot.context],
@@ -422,7 +422,7 @@ extension FlowTabTests {
                 )
             ]
         )
-        let snapshotService = RecordingRuntimeSnapshotService()
+        let snapshotService = RecordingRuntimeProjectionService()
 
         XCTAssertEqual(
             HomeRuntimeRefreshReader.appSummaries(

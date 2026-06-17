@@ -2,7 +2,7 @@ import CoreGraphics
 import Foundation
 import FlowTabCore
 
-let sharedRuntimeProjectionService = RuntimeSnapshotService()
+let sharedRuntimeProjectionService = RuntimeProjectionService()
 
 enum RuntimeProjectionMaintenanceReason: String, Sendable {
     case switcherSessionStarted
@@ -29,7 +29,7 @@ protocol RuntimeProjectionServing: Sendable {
     func isLikelyTransientAXRebuild(for pid: pid_t) -> Bool
 }
 
-final class RuntimeSnapshotService: RuntimeProjectionServing, @unchecked Sendable {
+final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Sendable {
     enum ReconciliationExecutionOutcome {
         case completed
         case completedWithRepairedCurrentAppWindowPayloads([RuntimeCurrentAppWindowPayload])
@@ -65,10 +65,10 @@ final class RuntimeSnapshotService: RuntimeProjectionServing, @unchecked Sendabl
     private let reconciliationExecutor: ReconciliationExecutor
 
     init(
-        label: String = "FlowTab.RuntimeSnapshotService",
+        label: String = "FlowTab.RuntimeProjectionService",
         snapshotProvider: RuntimeSnapshotProvider = RuntimeSnapshotProvider(),
         readModelStore: RuntimeReadModelStore = RuntimeReadModelStore(),
-        reconciliationExecutor: @escaping ReconciliationExecutor = RuntimeSnapshotService.defaultReconciliationExecutor
+        reconciliationExecutor: @escaping ReconciliationExecutor = RuntimeProjectionService.defaultReconciliationExecutor
     ) {
         snapshotQueue = DispatchQueue(label: label, qos: .utility)
         self.snapshotProvider = snapshotProvider

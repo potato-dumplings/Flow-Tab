@@ -1,560 +1,943 @@
 # Runtime AX/CG/Space Window Mapping
 
-## 目标
+## 文档定位
 
-- `window-layer` 只展示可切换、可恢复、可稳定维护的窗口条目，不暴露死条目或短暂幻觉。
-- 构建阶段与维护阶段使用一致的对账管线，保证启动期与运行期行为一致。
+这份文档是 FlowTab runtime 的地基图纸，不是逐条补丁清单。
 
-## 实现模型概览
+它定义的是目标形态：
 
-为实现上述目标，运行时模型围绕四件事展开：
+- runtime 长期维护底层状态，而不是长期维护一份大 `RuntimeSnapshot`。
+- `RuntimeSnapshot`、Home summary、Switcher app/window 列表、search index 都是从底层状态投影出来的读模型。
+- 热路径只能读已维护好的投影，不能排队等待 CG/AX/Space 采样。
+- 全量 snapshot 是 repair/fallback，不是 `Option+Tab`、`Control+Tab`、Search 或 Home 的主流程。
+- activation 可以用缓存选择目标，但必须用提交后的系统回读验证结果。
 
-1. 用 `CGWindowID` 维护长期稳定身份。
-2. 用 `CG -> AX` 句柄承担“这次能不能切过去”。
-3. 用 `CG -> Space` 关系回答“这个窗口当前能不能被找回到正确 Space”。
-4. 用私有精确桥接或提交后的回读学习，把公开信息无法唯一确定的窗口重新拉回 exact binding。
+## 核心目标
 
-概览上，运行时会把可恢复窗口理解为三类：
+1. `window-layer` 只展示可切换、可恢复、可稳定维护的窗口条目，不暴露死条目或短暂幻觉。
+2. 构建阶段与维护阶段使用一致的 reconciliation 管线，启动期、后台维护期、交互期行为一致。
+3. `Option+Tab` 首帧稳定读取 app 投影，不触发全量 AX/CG/Space 重采样。
+4. `Control+Tab` 和当前 app window layer 只读取当前 app 投影，不依赖所有 app 的窗口已完成。
+5. Search 读取持续维护且原子提交的 committed search index；进入 Search 时先做轻量 freshness validation，确认该 index 已覆盖最新 app lifecycle、CG、Space 与 AX dirty generation。若未覆盖，必须先完成 bounded freshness barrier 并提交新 generation；Search 不读取 repair 中间态，也不把旧索引或部分索引伪装成最新完整结果。
+6. Home 读取摘要投影，只刷新可见或选中的 app/window 详情。
+7. 真实系统拓扑变化通过 dirty signal、局部 pullback、retry/backoff、projection rebuild 闭环吸收。
 
-- `exact binding`: 当前已经唯一确认 `AX <-> CG` 对应关系，既知道“它是谁”，也有当前优先使用的 AX 激活句柄。
-- `sticky binding`: 某个 `CGWindowID` 历史上曾被 exact 确认过；即使当前 AX attachment 暂时丢失，只要没有硬删除信号，仍保留这份长期绑定。
-- `space-backed window`: 当前没有 AX exact，也没有历史 sticky binding，但已经确认 `CG -> Space` 关系，并且提交阶段仍有机会先切回目标 Space 再恢复 AX 激活。
+## 总体架构
 
-## 角色划分
+目标 runtime 由四层组成：
 
-### `CGWindowID`
+1. **Source inputs**
+   - `NSWorkspace` / running apps
+   - `CGWindowList`
+   - `AX` app/window tree
+   - `CG -> Space` topology
+   - activation 后的 focused-window readback
 
-- 负责长期稳定身份。
-- 是 sticky binding 的主锚点。
-- 适合回答“这个窗口长期上是谁”。
-- 是启动阶段最先建立的主记录。
-- 不直接承担第三方窗口激活。
+2. **RuntimeReadModelStore**
+   - app directory
+   - `RuntimeWindowRecord` 主表
+   - Space topology state
+   - freshness/confidence/dirty metadata
+   - projection cache
 
-### `AXWindowID` 与 `AXUIElement`
+3. **RuntimeMaintenanceScheduler**
+   - dirty app / dirty window / dirty Space 队列
+   - priority / coalescing / cancellation / retry / backoff
+   - bounded sampling and repair
 
-- `AXWindowID` 只是当前快照下的索引键。
-- `AXUIElement` 是当前提交时最优先的激活句柄。
-- 适合回答“我现在能不能切它”。
-- 不适合独自承担跨重排、跨全屏、跨恢复的长期身份。
+4. **Feature surfaces**
+   - Switcher app cycle
+   - Switcher current-app window cycle
+   - Switcher search
+   - Home summaries and selected rows
+   - activation service
 
-### 私有 exact bridge
+关键约束：
 
-- 当前使用 `_AXUIElementGetWindow` 作为 `AX -> CG` 精确桥接。
-- 只在公开路径无法形成唯一匹配时才触发。
-- 只负责把当前 AX 句柄精确映射到 `CGWindowID`。
-- 优先于继续扩大猜测匹配，不优先于已经成立的公开唯一匹配。
-- 不负责替代整套公开匹配逻辑。
+- `RuntimeReadModelStore` 是长期状态核心。
+- `RuntimeSnapshotProvider` 是采集、reconciliation 和投影构建边界，不是所有 surface 的状态机中心。
+- feature surface 只发 dirty signal 或读 projection，不自己扩张 topology reconciliation 状态机。
+- projection 可丢弃、可重建、可带 freshness metadata；它不是长期真相。
 
-### `CG -> Space` 关系
+## 为什么不能只做 RuntimeSnapshotCache
 
-- 是独立于 `AX <-> CG exact binding` 的恢复证据。
-- 适合回答“当前没有 AX 时，这个 CG 窗口能不能先切回它所在的 Space”。
-- 不等价于历史 sticky binding，但可以单独支撑提交阶段的恢复路径。
-- 当 `AX` 暂时不可确认时，仍可让 `CGWindowID` 保持为可恢复条目，而不是直接丢弃。
+`RuntimeSnapshot` 是结果，不是地基。
 
-### 私有窗口激活 fallback
+如果把当前 `snapshot()` 的结果缓存起来，再命名为 `RuntimeSnapshotCache`，但底层仍然在 hot path 上调用同一条 snapshot/sampling queue，就只是换了名字。正确拆分是：
 
-- 只在用户明确提交某个窗口、且当前没有 AX 句柄时才考虑。
-- 用于按 `CGWindowID` 激活目标窗口。
-- 激活成功后必须立刻回读 AX 焦点窗口，并重新学习 exact binding。
+- 底层维护 `RuntimeWindowRecord`、app directory、Space topology、dirty/reconciliation 队列。
+- projection store 从这些底层状态生成面向 surface 的读模型。
+- hot path 读取 projection store，不进入 CG/AX/Space 采样队列。
+- full snapshot 只作为 repair、fallback、diagnostic 或迁移期兼容入口。
 
-## 基本原则
+## RuntimeReadModelStore
 
-1. `AXWindowID` 不是长期稳定身份。
-   当前实现里的 `AXWindowID` 只是快照索引键，不能作为跨快照长期主键。
+目标 store 维护以下长期状态。
 
-2. sticky binding 必须以 `CGWindowID` 为主锚点维护。
-   一旦某个窗口被精确确认，后续只要没有收到硬删除信号，就继续保留其历史绑定。
+### appDirectory
 
-3. 公开信息优先，私有桥接其次。
-   对当前 AX 窗口，先尝试用 focused/main、标题、frame、最小化状态等公开信息做唯一匹配；只有公开路径不能唯一确认时，才调用 `_AXUIElementGetWindow` 做精确桥接。
+按 app identity 聚合运行中 app：
 
-4. 被动快照阶段不能做有副作用的探测。
-   任何会切前台窗口、切 Space、打断用户的私有激活，只能发生在明确的用户提交时。
+- `appID`
+- bundle identifier / fallback pid id
+- display name
+- primary pid
+- grouped pids
+- launch state
+- app-layer visibility state
+- preference-derived app-layer eligibility
+- last active rank / recency
+- freshness metadata
 
-5. 启动阶段先完成 `CG-first` 建模。
-   启动或全量重建时，先以 `validCG` 建立主记录，再补 `AX <-> CG` 与 `CG -> Space` 关系；不能要求所有窗口先匹配到 AX 才算存在。
+约束：
 
-6. `window-layer` 不承载死条目。
-   如果某个条目既不能通过当前 AX 激活，也没有历史 sticky binding、`CG -> Space` 关系或其他可确认的后续恢复路径，就不应进入主窗口切换路径。
+- app-layer 偏好只依赖 app 层事实时，不应额外读取 AX window tree。
+- 例如“隐藏某 app”是 app-layer 过滤；不需要为了判断这个 app 是否被用户隐藏而拉 AX。
+- 只有偏好语义真的依赖窗口事实时，才读取 window projection 或触发 scoped repair。
 
-7. 删除只接受强删除信号或连续缺席超时。
-   当前可见于 AX 的窗口以 `AX destroyed` 为强删除或强降级信号；当前不在 AX 列表里的窗口以 `space evidence timeout` 为延迟删除信号；整个应用只在 `pid terminated` 时清空全部状态。
+### windowRecordsByCGWindowID
 
-## 术语
+以 `CGWindowID` 为主键维护长期窗口身份。
 
-- `AX Window`: 来自 Accessibility API 的窗口对象。
-- `CG Window`: 来自 `CGWindowListCopyWindowInfo` 的窗口对象。
-- `validCG`: 当前进程下满足有效性约束的 CG 窗口集合。
-- `exact binding`: 已确认唯一的 `AX <-> CG` 绑定。
-- `sticky binding`: 以 `CGWindowID` 为主键长期保留的 exact binding。
-- `space-backed window`: 当前没有 AX exact，也没有历史 sticky binding，但已确认 `CG -> Space` 关系、并具备提交恢复路径的窗口条目。
-- `current attachment`: 当前快照里 sticky binding 关联到的 AX 快照键。
-- `unresolved AX`: 当前快照中尚未形成 exact binding 的 AX 窗口。
-- `unresolved CG`: 当前快照中尚未形成 exact binding 的 CG 窗口。
-- `exact bridge`: 能直接给出 `AX -> CG` 精确映射的能力，当前首选 `_AXUIElementGetWindow`。
-- `private activation fallback`: 当当前没有 AX 句柄时，按 `CGWindowID` 激活窗口的私有兜底能力。
-- `provisional CG-only`: 只有 CG 观测、尚未获得 AX、sticky 或 Space 证据的短期候选条目。
-
-## 运行态数据
-
-每个 `pid` 的运行态长期应收敛为一个 `CG-first` 主表和若干派生索引：
-
-- `windowRecordsByCGID: [CGWindowID: WindowRecord]`
-- `currentAXToCG: [AXWindowID: CGWindowID]`
-- `currentCGToAX: [CGWindowID: AXWindowID]`
-- `validCGIDs: Set<CGWindowID>`
-- `lastAXIDs: Set<AXWindowID>`
-- `currentSpaceSnapshot: SpaceSnapshot`
-
-其中 `WindowRecord` 至少需要包含：
+`RuntimeWindowRecord` 至少包含：
 
 - `cgWindowID`
 - `stableWindowID`
+- `ownerPID`
 - `lastKnownCGTitle`
 - `lastKnownCGFrame`
 - `currentAXAttachment`
 - `lastExactAXWindowID`
 - `lastConfirmationSource`
 - `lastExactConfirmedAt`
+- `publicAXState`
 - `spaceRecovery`
+- `allowedActions`
+- `bindingConfidence`
 - `firstSeenAt`
 - `lastSeenAt`
 - `suspectDeletedAt`
+- `needsReconciliation`
+- `freshness`
 
-其中 `SpaceRecoveryState` 至少需要包含：
+其中 `currentAXAttachment` 是当前可用激活句柄；`lastExactAXWindowID` 和 `lastExactConfirmedAt` 是 sticky binding 的历史证据；`spaceRecovery` 是恢复路线证据；`publicAXState` 保存 minimized/focused/main 等公开 AX 状态。
 
-- `cgWindowID`
-- `spaceIDs`
-- `hasConfirmedActivationRoute`
-- `lastValidatedAt`
-- `invalidatedAt`
+约束：
 
-其中 `SpaceSnapshot` 至少需要包含：
+- `CGWindowID` 是长期窗口身份主锚点。
+- `AXWindowID` 只服务当前或短周期采样，不承担跨快照长期身份。
+- `AXUIElement` 是提交时的激活句柄，不是持久主键。
+- `spaceRecovery` 是 `RuntimeWindowRecord` 的字段，不是另一份并列真相。
+- 旧的 sticky map、space recovery map、当前 AX 索引都应收敛为主表派生状态。
+
+### derived indexes
+
+这些索引从主表派生：
+
+- `currentAXToCG: [AXWindowID: CGWindowID]`
+- `currentCGToAX: [CGWindowID: AXWindowID]`
+- `validCGWindowIDsByPID`
+- `lastAXWindowIDsByPID`
+- `recordsByPID`
+- `recordsByAppID`
+- `dirtyRecordsByPID`
+- `searchableRecordIDs`
+
+约束：
+
+- 派生索引可以重建，不能和主表双写出第二份事实。
+- 如果索引和主表冲突，以主表为准并重建索引。
+
+### spaceTopology
+
+Space topology 至少维护：
 
 - `currentSpaceIDByDisplay`
 - `spacesByID`
 - `windowIDsBySpaceID`
 - `spaceIDsByCGWindowID`
 - `fullscreenWindowIDBySpaceID`
+- `lastSignature`
+- `lastValidatedAt`
 
-约束如下：
+目标状态不只保存某个窗口的临时 `spaceIDs` 查询结果，而是维护一份可 diff 的拓扑视图。它回答：
 
-- `CGWindowID` 是 `WindowRecord` 的主键，也是长期唯一真相层。
-- `AXWindowID` 只服务于当前快照和短周期增量，不承担长期身份。
-- `currentAXToCG/currentCGToAX` 代表当前快照视图，是 `WindowRecord` 的派生索引。
-- `spaceRecovery` 是 `WindowRecord` 的一个字段，而不是与 `WindowRecord` 并列的第二份真相。
-- 旧的 `stickyBindingsByCGID` 与 `spaceRecoveryByCGID` 若仍存在实现层投影，应被视为 `windowRecordsByCGID` 的投影，而不是独立主数据。
+- 当前系统有哪些 Space。
+- 每个 display 当前处于哪个 Space。
+- 某个 `CGWindowID` 当前属于哪些 Space。
+- 哪些 Space 或 fullscreen 归属发生了变化。
+- 哪些 `CGWindowID` 受拓扑变化影响。
 
-## `SpaceSnapshot`
+### projection cache
 
-`CG -> Space` 不应只表现为一条临时查询结果，而应维护成一份可 diff 的快照。
+projection cache 是 read model，不是 source of truth：
 
-推荐的快照来源与职责如下：
+- `appSwitcherProjection`
+- `currentAppWindowProjection`
+- `homeSummaryProjection`
+- `homeAppWindowProjection`
+- `committedSearchIndex`
+- `stagingSearchIndex`
+- `activationTargetProjection`
 
-1. 通过 `CGSCopyManagedDisplaySpaces` 获取按 display 分组的 Space 拓扑。
-2. 通过 `CGSCopySpacesForWindows` 或 `SLSCopySpacesForWindows` 获取 `cgWindowID -> [spaceID]` 关系。
-3. 将两者合并成 `SpaceSnapshot`，供运行态 diff 与恢复路径判断使用。
+每份 projection 都必须带 freshness/confidence metadata：
 
-`SpaceSnapshot` 的职责不是直接替代 `WindowRecord`，而是回答三件事：
+- `generatedAt`
+- `sourceGeneration`
+- `dirtyAppIDs`
+- `dirtyPIDs`
+- `dirtyCGWindowIDs`
+- `pendingRepairScopes`
+- `isCompleteForScope`
+- `coveredAppLifecycleGeneration`
+- `coveredCGGeneration`
+- `coveredSpaceGeneration`
+- `coveredAXDirtyGeneration`
+- `committedGeneration`
 
-1. 当前系统里有哪些 `spaceID`。
-2. 某个 `CGWindowID` 当前属于哪些 `spaceID`。
-3. 某个 `spaceID` 的窗口集合或 fullscreen 归属是否发生了拓扑变化。
+除 Search 以外，如果 projection 不完整，要明确暴露 pending/dirty，而不是假装完整。
 
-每次生成新快照后，都应与上一份快照做 diff。diff 至少需要产出：
+Search 是更强约束：Search surface 只能读取 `committedSearchIndex`。`stagingSearchIndex` 只允许 runtime maintenance 写入和验证，不能被 Search 直接读取。pending/dirty 可以作为内部 barrier 或日志状态存在，但不能成为正常搜索结果的一部分。
 
-- `removedSpaceIDs`
-- `addedSpaceIDs`
-- `changedSpaceIDs`
-- `affectedCGWindowIDs`
+## 角色划分
 
-这些 diff 结果不直接删除窗口条目，而是把相关 `WindowRecord` 标记为 `needsReconciliation`。
+### CGWindowID
 
-## 统一绑定管线
+- 负责长期稳定窗口身份。
+- 是 sticky binding 的主锚点。
+- 适合回答“这个窗口长期是谁”。
+- 是启动阶段和运行期 reconciliation 最先建立的记录。
+- 不直接承担第三方窗口激活。
 
-构建阶段与维护阶段共用同一条绑定管线。差别只在于什么时候触发、以及遇到硬删除信号时如何清理。
+### AXWindowID 与 AXUIElement
 
-对单个 `pid` 的一次绑定处理，按以下顺序执行：
+- `AXWindowID` 是当前采样或 registry 下的短周期索引键。
+- `AXUIElement` 是当前提交时优先使用的激活句柄。
+- 适合回答“现在能不能用公开 AX 激活它”。
+- 不适合独自承担跨重排、跨全屏、跨恢复的长期身份。
 
-1. 枚举当前 AX 可切换窗口列表。
-2. 枚举当前 CG 窗口列表，并过滤得到 `validCG`。
-3. 对每个 `validCG` 先建立 `CG-first` 主记录，并尽可能补 `CG -> Space` 恢复状态。
-4. 对每个当前 AX 窗口，先尝试使用 focused/main、标题、frame、最小化状态等公开信息做唯一匹配。
-5. 若公开路径能形成唯一匹配，则建立 exact binding，并写入或刷新 sticky binding。
-6. 若公开路径仍不能唯一确认，则调用 `_AXUIElementGetWindow` 做 `AX -> CG` 精确桥接。
-7. 若私有 exact bridge 成功，且返回的 `CGWindowID` 属于 `validCG`，则建立 exact binding，并写入或刷新 sticky binding。
-8. 对仍 unresolved 的新窗口，不做猜测性长期绑定；若其具备 `CG -> Space` 恢复证据，则保留为 `space-backed window`，否则仅保留为 `provisional CG-only` 候选。
-9. 对仍 unresolved 但已存在历史 sticky binding 的 `CGWindowID`，只要没有收到硬删除信号，就继续保留该 sticky binding。
-10. 保存 `windowRecordsByCGID`、`currentAXToCG`、`currentCGToAX`、`validCGIDs`、`lastAXIDs` 与 `currentSpaceSnapshot`。
+### public AX state
 
-这条管线表达的是两个关键政策：
+公开 AX state 包括：
+
+- focused
+- main
+- minimized
+- title
+- frame
+- role/subrole
+- allowed actions
+
+这些状态用于公开匹配、tie-breaker、window-layer exposure 和 activation 选择。但它们仍然附着到 `RuntimeWindowRecord.currentAXAttachment`，不能在 Switcher、Home、activation 各自保存一份局部判断。
+
+### exact bridge
+
+当前 exact bridge 使用 `_AXUIElementGetWindow` 形成 `AX -> CG` 精确映射。
+
+约束：
+
+- 公开信息能唯一匹配时，优先使用公开路径。
+- 公开路径不能唯一匹配时，exact bridge 用来学习当前 `AX <-> CG`。
+- exact bridge 不替代公开匹配，不替代 Space topology，不替代提交后的 readback。
+
+### CG -> Space
+
+`CG -> Space` 是独立于 `AX <-> CG exact binding` 的恢复证据。
+
+它适合回答：
+
+- 当前没有 AX attachment 时，窗口是否仍属于可识别 Space。
+- fullscreen/off-space 窗口是否可以通过 Space recovery 找回。
+- Space topology 变化后，哪些窗口需要局部 reconciliation。
+
+它不等价于 sticky binding，但可以独立支撑提交恢复路径。
+
+### private activation fallback
+
+私有 `CGWindowID` 激活只能用于明确的用户提交路径：
+
+1. 用户选择一个窗口。
+2. 当前没有可靠 AX activation handle。
+3. record 有明确 target `CGWindowID` 和恢复证据。
+4. 执行私有 fallback。
+5. 立刻回读 focused AX/CG。
+6. 用 readback 重新写入 exact evidence。
+
+被动采样、projection 构建、Home 刷新、Search index rebuild 不能做有副作用的激活探测。
+
+## WindowRecord 状态机
+
+窗口状态从 `RuntimeWindowRecord` 派生，而不是维护多套并列状态。
+
+### exact
+
+条件：
+
+- 当前 AX attachment 与 `CGWindowID` 已唯一确认。
+- confirmation source 可以是 public unique match、exact bridge 或 verified focus readback。
+
+用途：
+
+- 可进入 window layer。
+- 可优先使用 AX 激活。
+- 可刷新 sticky evidence。
+
+### sticky
+
+条件：
+
+- 历史上曾经 exact。
+- 当前 AX attachment 暂时缺席或不可确认。
+- 没有硬删除信号。
+
+用途：
+
+- 保留长期身份。
+- 等待 AX notification、Space topology change、active-space retry 或 scoped repair 恢复 exact。
+- 不因为一次采样缺席立即删除。
+
+### space-backed
+
+条件：
+
+- 当前没有 AX exact。
+- 没有足够 sticky activation handle。
+- 但 `CG -> Space` 已确认，且有提交恢复路径。
+
+用途：
+
+- 支撑 fullscreen/off-space/current-space 外窗口恢复。
+- 可进入 window layer，但必须标注 `hasConfirmedActivationRoute`。
+- 提交时优先走 Space recovery，再读回 AX/CG 验证。
+
+### provisional CG-only
+
+条件：
+
+- 当前只有 CG 观测。
+- 没有 AX exact。
+- 没有 sticky evidence。
+- 没有 Space recovery 或恢复路线未确认。
+
+用途：
+
+- 短期候选。
+- 可参与后续 reconciliation。
+- 不应进入主 window layer。
+
+### deleted
+
+条件：
+
+- `pid terminated`。
+- 已知 AX window destroyed 且没有保留 sticky/Space 恢复理由。
+- AX、CG、Space 三层证据在 grace window 内持续缺席。
+- Space recovery 超时且 CG/AX 也持续缺席。
+
+约束：
+
+- 删除接受强删除信号或连续缺席超时。
+- 单次 AX 空结果不是删除证明。
+- 单次 Space topology diff 不是删除证明，只能标脏并局部 pullback。
+
+## Space Topology 策略
+
+### 快速判定
+
+Space 是否变化不能只靠全量 window snapshot。目标策略是维护轻量 topology signature：
+
+- displays 集合
+- current space per display
+- space ids per display
+- fullscreen space/window signature
+- known window membership generation
+
+当 signature 未变化时：
+
+- 不需要重跑全量 Space reconciliation。
+- 只对明确 dirty app/window 做局部 pullback。
+
+当 signature 变化时：
+
+- 生成 `RuntimeSpaceTopologyDiff`。
+- 产出 `addedSpaceIDs`、`removedSpaceIDs`、`changedSpaceIDs`、`affectedCGWindowIDs`。
+- 只标记受影响 app/window dirty。
+- 对 current/recent/visible scopes 优先 pullback。
+
+### normal 与 fullscreen 变化
+
+normal -> fullscreen 通常表现为：
+
+- 新 fullscreen Space 出现，或目标 window 移入 fullscreen Space。
+- display current Space 变化。
+- `fullscreenWindowIDBySpaceID` 变化。
+
+fullscreen -> normal 通常表现为：
+
+- fullscreen Space 移除，或目标 window 离开 fullscreen Space。
+- removed/changed Space 影响原 fullscreen window。
+- target `CGWindowID` 的 `spaceIDs` 变化。
+
+目标 runtime 不需要每次都完整拉所有 AX tree 才知道这些变化。它应先通过 Space signature/diff 判断拓扑是否变了，再把受影响 `CGWindowID` 转成 app/pid scoped repair。
+
+### 系统权威视图
+
+目标形态需要接近系统权威的 Space/window 视图：
+
+- display-level Space topology 来自 managed display Spaces。
+- window membership 来自 `CGSCopySpacesForWindows` / `SLSCopySpacesForWindows`。
+- CG window facts 来自 `CGWindowList`。
+- AX 只作为 activation handle、public state、dirty/repair input。
+
+如果生产环境只能先从当前 CG window list 推导 Space metadata，则必须把它标为迁移中实现，而不是最终权威模型。
+
+## Reconciliation 管线
+
+构建阶段、后台维护阶段、用户提交后的 readback 都进入同一条 reconciliation 管线。差别只在 scope、priority、触发原因和允许的副作用。
+
+单个 app/pid 的 pipeline：
+
+1. 读取 app directory，确认 app/pid scope。
+2. 采集 scoped CG facts。
+3. 必要时采集 scoped AX windows。
+4. 必要时读取 scoped Space membership。
+5. 对每个 valid `CGWindowID` 先 ensure `RuntimeWindowRecord`。
+6. 用 public AX state 尝试唯一匹配。
+7. public 唯一匹配成功时写入 exact evidence。
+8. public 不能唯一时，必要且允许时调用 exact bridge。
+9. exact bridge 成功时写入 exact evidence。
+10. 对 unresolved CG 更新 sticky/space-backed/provisional 状态。
+11. 对 unresolved AX 不做猜测性长期绑定。
+12. 更新派生索引。
+13. 更新 freshness/confidence/dirty metadata。
+14. rebuild affected projections。
+
+政策：
 
 - 无法唯一确认时，不扩大猜测匹配。
 - 一次快照重新变歧义，不等于历史 sticky binding 被证伪。
-- `CG -> Space` 是独立证据层，不应因为暂时没有 AX exact 就被忽略。
+- `CG -> Space` 是独立证据层，不应因暂时没有 AX exact 就被忽略。
+- scoped repair 只修受影响范围，不把每个入口都升级成全局 full snapshot。
 
-## 状态转换
+## RuntimeMaintenanceScheduler
 
-运行时窗口状态应从 `WindowRecord` 派生，而不是维护四套并列主数据。推荐的派生状态与转换如下：
+`RuntimeMaintenanceScheduler` 负责把各种事件收敛成有边界的维护任务。
 
-1. `provisional -> exact`
-   当公开唯一匹配或私有 exact bridge 成功时，建立 `AX <-> CG exact binding`。
-2. `provisional -> space-backed`
-   当当前没有 AX exact，但 `CG -> Space` 已确认且存在提交恢复路径时，升级为 `space-backed`。
-3. `exact -> sticky`
-   当当前 AX attachment 丢失，但历史 exact 仍成立且没有硬删除信号时，降级为 `sticky`。
-4. `sticky -> exact`
-   当后续 reconciliation 重新恢复 AX exact 时，回到 `exact`。
-5. `space-backed -> exact`
-   当切回目标 Space 或后续快照使 AX 恢复时，升级为 `exact`。
-6. `space-backed -> provisional`
-   当 `CG -> Space` 恢复证据失效，但 `CGWindowID` 仍然存在于 `validCG` 中时，暂时降级为 `provisional`。
-7. `provisional -> deleted`
-   当该条目在 grace window 内持续缺席于 AX、CG、Space 三类证据时，才真正删除。
-8. `sticky/space-backed -> deleted`
-   仅在命中强删除信号，或在 grace window 内确认 AX、CG、Space 三类证据持续缺席时发生。
+### 输入事件
 
-## 构建阶段
+- app launched
+- app terminated
+- AX app/window changed
+- AX window destroyed
+- Space topology changed
+- active Space changed
+- Home visible app rows changed
+- Home selected app changed
+- Switcher opened
+- Switcher entered current-app window cycle
+- Switcher search activated
+- activation target selected
+- activation focused readback verified
+- periodic stale repair tick
 
-构建阶段包括应用启动后的首次建模，以及需要对某个 `pid` 做全量重建的场景。
+### dirty scopes
 
-### 启动或全量重建
+- `dirtyApp(appID, pid, reason)`
+- `dirtyWindow(CGWindowID, reason)`
+- `dirtySpaceTopology(reason)`
+- `dirtyProjection(kind, reason)`
+- `staleScope(scope, age)`
 
-1. 对每个 `pid` 执行一次统一绑定管线。
-2. 启动阶段先以 `validCG` 建立主记录，再补 `AX <-> CG` 与 `CG -> Space` 关系。
-3. 当前快照能重新确认的窗口，直接恢复 exact binding。
-4. 当前快照暂时无法重新确认，但历史 sticky binding 仍在、且未收到硬删除信号的窗口，继续保留 sticky binding。
-5. 当前没有 AX exact、但 `CG -> Space` 已确认且提交阶段存在恢复路径的窗口，保留为 `space-backed window`。
-6. 对首次出现且无法唯一确认的新窗口，不建立猜测性长期绑定；若仍没有 Space 或其他恢复证据，只保留为短期 `provisional CG-only` 候选。
-7. 只有在没有 AX exact、没有历史 sticky binding、没有 `CG -> Space` 关系、也没有其他已确认恢复路径，且超出 `provisional` 的 grace window 后，条目才真正丢弃。
+### priority
 
-构建阶段的核心目标不是“把所有窗口都展示出来”，而是“给主窗口切换路径输出可提交的条目”。
+优先级从高到低：
 
-## 维护阶段
+1. activation readback target/readback `CGWindowID`
+2. current focused app
+3. Switcher selected app / current window-cycle app
+4. Search active and dirty searchable windows
+5. Home selected app
+6. Home visible rows
+7. recently active apps
+8. AX/Space dirty apps
+9. stale periodic repair
+10. full repair fallback
 
-维护阶段与构建阶段属于同一类型，都在执行同一条绑定管线，只是触发入口来自 AX 增量事件或进程生命周期事件。
+### 调度规则
 
-### AX 通知语义与局部刷新
+- 相同 app/pid dirty 合并。
+- 相同 `CGWindowID` dirty 合并。
+- 后来的高优先级 scoped repair 可以取消或越过低优先级 full repair。
+- AX 空结果使用短间隔 retry，不立刻删除。
+- 连续失败进入 backoff。
+- 用户热路径不等待 maintenance queue drain。
+- 每轮维护有 bounded batch，避免一次性扫完整个系统。
 
-AX 通知应被视为“某个应用发生了变化”的脏信号，而不是最终窗口真相。运行时策略应满足以下约束：
+## Projection Contracts
 
-1. 通知粒度至少要定位到 `pid` 或 `appID`，并且只刷新受影响应用的数据，不把单应用事件升级为全量应用重建。
-2. 通知载荷通常不提供完整窗口增量，不足以直接维护最终状态；收到通知后仍需对该应用回拉一次当前 `AXWindows` 快照并重新跑 reconciliation。
-3. 在同一次事件序列中，`AXWindows` 可能短暂返回空数组再恢复，因此“通知到达”与“最终窗口集合稳定”不是同一时刻。
+### appSwitcherProjection
 
-实践上，运行日志中出现 `rawWindows=0` 并不自动等价于“该应用当前没有可切换窗口”；最终展示应以 reconciliation 结果为准。
+用途：
 
-### 普通维护事件
+- `Option+Tab` 首帧 app cycle。
 
-以下事件都应重新跑一次统一绑定管线，或对受影响窗口做局部等价处理：
+读取要求：
 
-- `AX created`
-- `focused`
-- `main`
-- `minimized`
-- `deminiaturized`
+- 只读 projection store。
+- 不进入 `snapshotQueue.sync`。
+- 不触发 CG/AX/Space 采样。
+- 不等待 background full snapshot。
 
-维护策略如下：
+内容：
 
-1. 先尝试公开唯一匹配。
-2. 公开路径无法唯一确认时，再尝试私有 exact bridge。
-3. 若形成 exact binding，立即刷新 sticky binding 的标题、frame 和当前 attachment。
-4. 若仍无法确认，则保持 unresolved，不做猜测性长期绑定；若存在 `CG -> Space` 恢复证据，则保留为 `space-backed window`。
-5. 这类事件默认只修复和增强绑定，不主动解绑历史 sticky binding。
+- app id
+- display name
+- group id
+- app recency rank
+- app-layer visibility eligibility
+- coarse window availability/freshness
+- selected app hint
 
-### sticky 复用中的标题刷新策略
+约束：
 
-为避免“绑定后标题卡死在旧值”，sticky 复用应区分两条路径：
+- app cycle 不需要所有 app 的完整 window layer。
+- 如果 window count 或 minimized facts 不新鲜，只能以 freshness 表达，不阻塞面板出现。
 
-1. `lastKnownAXWindowID` 命中时，仍使用 `title + frame` 的可复用校验，避免索引复用导致的误绑。
-2. 若 `lastKnownAXWindowID` 未命中，但 `CFEqual(currentAX.window, previousBinding.axWindow)` 成立，则应直接复用该 AX 句柄，不再因标题或 frame 变化拒绝复用。
+### currentAppWindowProjection
 
-第二条是关键约束：当 AX 元素身份稳定时，标题变化是正常现象，不应被当作解绑或拒绝复用信号。复用后应在当前 reconciliation 内立刻用最新 `AX sourceTitle` 重新计算并覆盖 `binding.title`，并同步刷新 `binding.frame` 与最小化状态。
+用途：
 
-这意味着标题刷新依赖的是“下一次该应用进入 reconciliation”，而不是“必须收到某个专门的标题通知”。任何会触发该应用重跑快照与绑定管线的入口都可刷新标题。
+- `Control+Tab`
+- `Option+Tab` 进入当前/选中 app window cycle
 
-### 通知后 `AXWindows` 拉空
+读取要求：
 
-当通知已到达，但对该应用回拉 `AXWindows` 得到空结果时，默认按“瞬时空窗”处理，而不是直接删窗：
+- 只读当前 app 或选中 app 的 maintained projection。
+- 如果该 app dirty，面板先显示现有可信窗口，再异步触发 scoped repair。
+- 不因为其他 app 未维护完成而阻塞。
 
-1. 先保留该应用已有的 `sticky` 与 `space-backed` 记录，只把当前 `exact` attachment 视为暂时缺席。
-2. 以该应用为粒度做短间隔重试（例如 `100ms / 300ms / 800ms`），每次重试仍走同一条绑定管线。
-3. 重试窗口期间，允许 `rawWindows=0` 与 `switchableWindows>0` 并存；这是“AX 瞬时缺席 + sticky/CG/Space 兜底”状态，不是异常。
-4. 只有在 grace window 内连续多次 reconciliation 都缺席于 AX、CG、Space 三类证据时，才进入真正删除流程。
-5. 进程退出(`pid terminated`)仍是唯一允许立即清空该应用全部记录的最强信号。
+内容：
 
-该策略的目标是避免把 AX 树重建期间的短暂空返回误判为“窗口已消失”。
+- exact/sticky/space-backed 可展示窗口
+- activation handle metadata
+- Space recovery metadata
+- public AX state
+- freshness/confidence
 
-### AX 树重建高概率判定
+### searchWindowProjection
 
-针对“历史上可切换、但当前快照 AX 列表瞬时拉空”的场景，运行时增加了按快照计数的高概率判定：
+用途：
 
-1. 状态字段：
-   - `hasObservedAXWindowHandle`
-   - `consecutiveSnapshotsWithoutAXWindows`
-2. 判定条件：
-   - 历史上该 `pid` 曾观测到 AX 窗口；
-   - 当前快照 `axWindows.isEmpty`；
-   - `consecutiveSnapshotsWithoutAXWindows <= 3`（按快照次数，不是绝对时间）。
-3. 判定成立时：
-   - 认为“疑似 AX 树重建中”；
-   - 对 `spaceIDs == [1]` 的窗口不立即隐藏，继续保留 sticky/CG 侧可恢复条目。
-4. 判定失效时：
-   - 当连续缺失快照超过阈值（第 4 次）后，恢复严格策略；
-   - `spaceIDs == [1]` 且无当前 AX 句柄的条目会被隐藏。
+- Switcher search 的 window 搜索。
 
-该策略只放宽短窗口内的可见性，不改变强删除信号优先级，也不绕过最终删除条件。
+读取要求：
 
-### 通知路径与首页稳定行为对齐
+- 只读取原子提交的 `committedSearchIndex`。
+- Search 打开时先执行 freshness validation，对比 committed index 覆盖的 app lifecycle、CG signature、Space signature、AX dirty generation 与 runtime 当前 generation。
+- 如果 committed index 已覆盖当前 generation，Search 立即读取并保持该 generation 内结果稳定。
+- 如果 committed index 未覆盖当前 generation，必须先执行 bounded freshness barrier：只对 dirty/current/selected/recent/affected scopes 做 scoped repair，构建 `stagingSearchIndex`，验证通过后原子提交为新的 `committedSearchIndex`。
+- Search 不读取 `stagingSearchIndex`，不读取 repair 中间态，不把旧 index 或部分 index 当作最新完整结果。
+- search index 来自 `RuntimeWindowRecord` 主表和 app directory，不来自当前 session 的偶然完整程度。
 
-通知维护路径应尽量向首页首次打开时的“稳定优先”行为对齐，避免业务结果直接暴露 AX 瞬时抖动：
+内容：
 
-1. 通知只负责标记受影响 `pid/appID` 为 `dirty`，不应在回调边缘直接提交“空窗口结果”。
-2. 对 `dirty` 应用走统一的去抖刷新窗口；若首次回拉 `rawWindows=0`，应在短重试窗口内继续回拉，而不是立刻覆盖为 0 窗口状态。
-3. 在重试窗口内，如果历史快照已有可提交窗口，应优先保留历史快照（`sticky`、`space-backed` 与可确认 `CG` 证据），直到获得新的稳定快照或命中删除条件。
-4. 只有在 grace window 内连续多次 reconciliation 都缺席于 AX、CG、Space 三类证据时，才允许把该应用窗口状态提交为空。
+- searchable app entries
+- searchable window entries
+- committed generation
+- committed-at timestamp
+- covered app lifecycle generation
+- covered CG signature generation
+- covered Space signature generation
+- covered AX dirty generation
+- completeness proof for the committed scope
 
-这意味着运行日志允许出现瞬时 `rawWindows=0`，但 UI 与提交路径应继续保持“稳定可切换”输出。
+约束：
 
-### `space topology changed`
+- 两次搜索读取同一个 committed generation 时，结果必须稳定；后台 maintenance 不能把半成品增量暴露给正在搜索的用户。
+- dirty/pending 是内部 barrier、日志或阻断状态，不是 Search 的正常结果状态。
+- Search 激活可以提升相关 stale repair 优先级，但不能同步拉全量 AX tree 才开始搜索。
+- 如果 freshness barrier 在预算内无法提交新 generation，Search 不能进入最新搜索结果态；当前行为可以返回 last committed index，但必须显式标记为 degraded/stale committed result 并携带 dirty/freshness metadata，不能命名、记录或展示为 fresh/complete/latest result。
 
-以下情况都应被视为 Space 拓扑变化，而不是窗口删除信号：
+### homeSummaryProjection
 
-- `NSWorkspace.activeSpaceDidChangeNotification`
-- `SpaceSnapshot` diff 中出现 `removedSpaceIDs`
-- `SpaceSnapshot` diff 中出现 `changedSpaceIDs`
-- fullscreen Space 关闭、迁移或回落到普通桌面
-
-维护策略如下：
-
-1. 刷新整份 `SpaceSnapshot`。
-2. 计算 `affectedCGWindowIDs`，并把相关 `WindowRecord` 标记为 `needsReconciliation`。
-3. 若某个 `spaceID` 消失，只失效对应的 `spaceRecovery`，不直接删除 `WindowRecord`。
-4. 立即对 `affectedCGWindowIDs` 重新跑 reconciliation。
-5. reconciliation 后只允许以下结果：
-   - 窗口重新进入 AX，升级为 `exact`
-   - 窗口仍有 `CG -> Space` 关系，保留为 `space-backed`
-   - 窗口只剩 `validCG`，降为 `provisional`
-   - 窗口同时失去 AX、CG、Space 三类证据，进入 `suspectDeleted` 与 grace window
-
-### 硬删除维护事件
-
-#### `AX destroyed`
-
-1. 找到被移除 AX 对应的当前快照键。
-2. 若其当前关联到某个 `WindowRecord`，先移除当前 AX attachment。
-3. 若该记录仍有历史 exact，则降级为 `sticky`，而不是立刻删除。
-4. 删除当前快照里的 `currentAXToCG/currentCGToAX` 关联。
-5. 刷新 `validCG`，并立即跑一次 reconciliation。
-
-#### `pid terminated`
-
-1. 清空该 `pid` 下全部 `WindowRecord`。
-2. 清空 `currentAXToCG/currentCGToAX`。
-3. 清空 `validCGIDs/lastAXIDs`。
-4. 清空与该 `pid` 关联的 `SpaceSnapshot` 投影与恢复状态。
-
-#### `space evidence timeout`
-
-这类事件专门处理“当前本来就不在 AX 列表里”的 `space-backed` 或 `provisional` 窗口。
-
-1. 若某个 `WindowRecord` 当前没有 AX attachment，且不在 `validCGIDs` 中，也不在 `currentSpaceSnapshot.spaceIDsByCGWindowID` 中，则标记 `suspectDeletedAt`。
-2. 若该条目在后续 reconciliation 中重新出现在 AX、CG 或 Space 任一证据层里，清除 `suspectDeletedAt`，恢复正常状态。
-3. 只有当该条目连续 `2` 到 `3` 次 reconciliation 都缺席，或超过建议的 `500ms` 到 `1500ms` grace window，才真正删除该 `WindowRecord`。
-4. 对于 fullscreen Space 关闭后的窗口：
-   - 若窗口回到普通桌面并重新进入 AX，应在 grace window 内升级回 `exact`
-   - 若窗口直接关闭，应在 grace window 内连续缺席后删除
-
-## 删除信号优先级
-
-删除窗口记录时，信号强度按以下优先级处理：
-
-1. `pid terminated`
-   最强删除信号，可立即清空该应用下全部记录。
-2. `AX destroyed`
-   只对当前可见于 AX 的 `exact/sticky` 记录构成强删除或强降级信号。
-3. `space topology changed`
-   不是删除信号，只能失效 `spaceRecovery` 并触发 reconciliation。
-4. `space evidence timeout`
-   只对当前不在 AX 列表里的 `space-backed/provisional` 记录构成延迟删除信号。
-
-## `window-layer` 输出规则
-
-对每个应用的窗口输出按以下规则构建：
-
-1. 先输出当前存在 AX 句柄、且已形成 exact binding 的条目。
-2. 再输出 sticky binding 仍有效、虽然当前暂时没有 AX，但已知提交阶段存在恢复路径的 CG-backed 条目。
-3. 再输出没有历史 sticky binding、但 `CG -> Space` 已确认且具备提交恢复路径的 `space-backed window`。
-4. 对仅有 CG 信息、且没有历史 sticky binding、也没有 `CG -> Space` 或其他已确认提交路径的新 `provisional CG-only` 条目，不进入主窗口切换路径，只保留在内部候选池。
-5. 对既不能切换、也不能稳定展示的死条目，只允许进入诊断或调试视图，不进入主 `window-layer`。
-6. 当命中“疑似 AX 树重建中”判定时，`spaceIDs == [1]` 的历史可恢复条目允许在短窗口内继续展示；超过阈值后必须回落到严格过滤。
-
-这条规则的目标是：
-
-- 不把死条目暴露给用户。
-- 不因为一次歧义快照就让原本可切换的窗口消失。
-- 不因为启动时暂时匹配不上 AX 就把仍可通过 Space 找回的窗口直接丢掉。
-- 让主窗口切换路径始终服务于“可切换可展示”。
-
-## 用户窗口候选列表排序契约
-
-任何会展示给用户选择、或会被用户提交后激活的窗口候选列表，都必须使用同一套
-app-local recency 规则。这个约束覆盖但不限于：
-
-- global switcher 选中 app 后进入的 window state。
-- in-app window switcher。
-- Home 的 app window list。
-- window-scope search 结果里可直接激活的窗口条目。
-
-接入新入口时，不要直接拿 `RuntimeSnapshotProvider` 输出的 `candidate.windows`
-原始顺序作为 UI 顺序或提交顺序。先经过 `RuntimeWindowRecencyTracker.shared` 的
-recency overlay，再交给 UI、session 或 activation target resolution。若新入口的
-数据形态不是 `RuntimeSnapshot` 或 `RuntimeHomeAppSnapshot`，应在
-`RuntimeWindowRecencyTracker` 增加共享 adapter，而不是在入口本地重新实现排序。
-
-排序规则是：
-
-1. FlowTab 成功激活某个具体窗口后，记录 app identity、stable window identity、
-   `CGWindowID`、title/frame 语义证据和 timestamp。
-2. 打开可选择窗口候选列表时，只允许刷新当前 frontmost app 中能够精确匹配的
-   focused/runtime window recency。
-3. 对每个 app 单独 overlay 自己的 recency；A app 当前 focused window 不允许影响
-   B app 的窗口候选顺序。
-4. 已记录且仍能可靠匹配的窗口排在 fallback 窗口之前；多个已记录窗口按最近激活优先。
-5. 没有可靠 recency 记录、或记录无法匹配当前候选时，才回退到 runtime snapshot 的
-   原始 presentation order。
-
-唯一例外是 raw runtime snapshot、日志和诊断视图。这些输出可以保留底层
-presentation order，用来解释系统当前给 FlowTab 的输入；它们不能直接代表用户候选
-列表的最终展示顺序。
-
-## 提交流程
-
-用户在 `window-layer` 提交某个窗口时，按以下顺序执行：
-
-1. 若条目有当前 AX 句柄，优先走 AX 激活。
-2. 若条目没有当前 AX 句柄，先尝试基于当前 sticky binding 和当前快照重跑公开 AX 恢复路径。
-3. 若公开恢复成功，回到 AX 激活路径。
-4. 若公开恢复失败，但条目存在 `CG -> Space` 恢复路径，则先切到目标 Space。
-5. 切到目标 Space 后，立刻重跑 AX 恢复路径；若恢复成功，回到 AX 激活路径。
-6. 若仍未恢复 AX，但条目支持私有窗口激活 fallback，则按 `CGWindowID` 做私有激活。
-7. 私有激活成功后，立刻回读 `AXFocusedWindow` 或等价焦点窗口。
-8. 对回读到的 AX 窗口再次调用 `_AXUIElementGetWindow`，重新确认 exact binding，并刷新 sticky binding。
-9. 若提交失败，则保留已有 sticky binding 或 `CG -> Space` 恢复状态，不因单次提交失败解绑。
-
-### 当前 RuntimeActivator 路线
-
-当前产品实现不直接设置当前 Space。提交成功的证明仍然是用户选择的目标
-`CGWindowID` 在提交后变为 `isOnscreen`，而不是 app 变 frontmost、Space ID
-变化，或某个菜单项被选中。
-
-`RuntimeActivator` 的通用路线按下面的证据顺序执行：
-
-1. 若目标有 `CGWindowID`，先通过 `RuntimeCGWindowFocusBridge` 请求系统聚焦该
-   CG window。
-2. 若有直接 AX handle 或 live registry handle，再走 AX raise/main/focused。
-3. 若允许 public AX recovery，扫描 public/remote AX windows，用目标
-   `CGWindowID`、title 与 frame 重新恢复 exact target。
-4. 如果 CG focus 已被系统接受，但首次 verify 时目标还不可见，则在 AX recovery
-   扫描后重新读取 CGWindowList；若目标 `CGWindowID` 已经 `isOnscreen`，直接报告
-   focus verified，并记录该 CG window。
-5. 对 full-screen topology，必要时再尝试 related AX surface 与 same-space CG
-   surface。
-6. 所有路线都必须回到同一个成功标准：目标 `CGWindowID` 变为 `isOnscreen`。
-
-### Chrome 内部窗口兜底
-
-Chrome 是当前已知的特殊应用：在 Chrome full-screen Space 中切回某些 normal
-Chrome window 时，系统 CG focus 可能返回 accepted，但 public AX 列表不给出目标
-AX handle，目标 `CGWindowID` 也不会立刻变为 `isOnscreen`。这会让通用路线停在
-sticky/CG-only 状态。
-
-为覆盖这个已确认形态，`RuntimeActivator` 在通用 CG/AX/recovery/same-space 路线
-未能 verify 之后，才允许对 `com.google.Chrome` 走 Chrome 内部窗口兜底：
-
-1. 通过 Apple Events 枚举 Chrome 自己的 `window id`、window name、active tab
-   title 与 bounds。该路线需要 macOS Automation 权限，并由 Info.plist 中的
-   `NSAppleEventsUsageDescription` 说明用途。
-2. 按 FlowTab 已有目标证据做候选评分：优先匹配 title/active tab title，其次匹配
-   frame/bounds。
-3. 若多个 Chrome 内部候选同分，使用当前 CGWindowList 中同 title、近似同 frame 的
-   sibling 顺序，把目标 `CGWindowID` 映射到同序号的 Chrome `window id`。这样只
-   尝试一个最可能候选，避免连续 focus 多个 Chrome 窗口导致来回跳。
-4. 对选中的 Chrome `window id` 执行 `set index ... to 1` 与 `activate`。
-5. Chrome 返回的 front window id 只说明 Chrome 接受了内部聚焦请求；FlowTab 仍然
-   必须重新 verify 目标 `CGWindowID` 是否 `isOnscreen`。只有 verify 成功才记录为
-   `focus verified`。
-
-这不是 Window menu 路线，也不是 Space switching 路线。它只发生在用户明确提交
-某个 Chrome 窗口之后，并且不改变 FlowTab 的窗口身份主锚点：最终成功证据仍然是
-用户选择的同一个 `CGWindowID`。
-
-## 不会触发解绑的情况
-
-以下情况都不应主动解绑 sticky binding：
-
-- 某次全量重建时重新证明失败。
-- CG 临时没扫到。
-- 某个 `spaceID` 在一次拓扑变化后消失。
-- 标题变化。
-- frame 变化。
-- 当前没有 AX 句柄。
-- 快照顺序变化。
-
-原因很简单：
-
-- 这些都可能只是观测不足。
-- 它们不是窗口已经被硬删除的证据。
-- `spaceID` 变化或消失只会失效恢复路径，不会单独构成删除 `CGWindowID` 主记录的证据。
-
-## 边界与限制
-
-1. 若某个窗口首次出现时就处于“无历史、标题完全一致、几何完全一致、AX 不可区分、私有 exact bridge 不可用”的状态，仅靠公开 API 无法精确确定它。
-2. 若私有窗口激活能力在某个 macOS 版本不可用，则该类极小概率首次歧义场景仍可能无法首轮精确学习。
-3. 私有 API 存在系统兼容性与上架风险，应通过独立 wrapper 与运行时符号探测隔离。
-4. 任何被动快照流程都不得通过激活窗口来“试探绑定”，避免对用户造成可见副作用。
-
-## 实现检查清单
-
-- sticky binding 以 `CGWindowID` 为主键，而不是以 `AXWindowID` 为主键。
-- 启动阶段先建立 `CG-first` 主记录，再补 AX 与 Space 关系。
-- `windowRecordsByCGID` 是唯一主表，AX、CG、Space 的缓存都是它的字段或派生索引。
-- `SpaceSnapshot` 是可 diff 的运行态快照，而不是一次性查询结果。
-- 构建阶段与维护阶段共用同一条绑定管线。
-- 公开唯一匹配优先于私有 exact bridge。
-- `_AXUIElementGetWindow` 已被封装为独立私有 bridge。
-- `CG -> Space` 被视为独立证据层，而不是 sticky binding 的附属条件。
-- `space topology changed` 只触发 reconciliation，不直接触发窗口删除。
-- 对当前不在 AX 列表里的窗口，删除条件依赖 `space evidence timeout`，而不是 `AX destroyed`。
-- 当前 AX attachment 的解绑以 `AX destroyed` 为强信号；当前不在 AX 列表里的窗口删除依赖 `space evidence timeout`。
-- 整个 `pid` 的状态清理仅发生在进程退出。
-- 已知 `AXWindowID` 的 destroyed 信号可通过 shared `RuntimeSnapshotService.signalAXWindowDestroyed(appID:pid:axWindowID:)` 进入 runtime：`RuntimeWindowRecord` 会清除 current AX attachment、移除当前 `AX -> CG` / `CG -> AX` 派生索引、保留历史 exact 作为 sticky 证据，并标记该 record 需要 reconciliation；`RuntimeAXWindowChangeMonitor` 会监听 app-level AX notifications，并根据 `AXLiveWindowRegistry` 中的已知 window elements 注册 per-window destroyed notification，destroyed callback 若携带可由 registry 识别的既有 window element，会走该 shared runtime 入口，解析不到时只退回普通 app dirty。
-- 一次重建失败、CG 暂时缺席、标题变化、frame 变化，都不会主动解绑 sticky binding。
-- AX 通知只作为脏信号；通知后以受影响 `pid/appID` 做局部回拉与 reconciliation，若 `AXWindows` 瞬时为空，先重试并保留 sticky/space-backed，不做立即删除。
-- 通知维护路径与首页稳定策略保持一致：先去抖与重试，再决定是否提交空窗口状态。
-- 当前 AX attachment 统一保存 public AX window state（minimized / focused / main），该状态归属 `RuntimeWindowRecord` 主表，而不是 Switcher、Home 或 activation surface 的局部副本。
-- public AX state 真正收窄候选歧义时会记录 `binding-assignment public-state-tiebreak ... axCandidates=... cgCandidates=...`，用于区分真实拓扑里“靠 focused/main/minimized 解开候选”的路径与普通唯一标题/frame 匹配。
-- `window-layer` 采用 exact、sticky、space-backed、provisional 四层判断，只展示可提交的窗口条目，不展示无法激活的死条目。
-- 已实现“AX 树重建高概率判定”：当 `hasObservedAXWindowHandle=true` 且 `consecutiveSnapshotsWithoutAXWindows` 在阈值内时，短暂放行 `spaceIDs == [1]` 的可恢复条目，超过阈值后回落到严格隐藏策略。
-- sticky 复用时，若 `CFEqual` 命中历史 `AXUIElement`，必须允许在标题或 frame 变化时继续复用，并在该次 reconciliation 刷新标题与几何信息。
-- 存在覆盖“sticky 绑定保持不变、AX 标题更新后应刷新输出标题”的回归测试：`FlowTabPriorityCoverageTests.testRuntimeSnapshotProviderWindowListKeepsStickyMatchesWhenAXTitlesChange`。
-
-## 当前地基状态与保留 gap（2026-06-14 代码核对）
-
-以下条目基于当前实现与本文档目标的对照结果整理，用于区分已经落地的地基能力与仍需真实系统拓扑证明的边界 gap。
-
-### 已落地的地基能力与保留真实拓扑 gap
-
-- **已落地，保留 gap**：实现 `space topology changed -> affectedCGWindowIDs -> needsReconciliation` 的维护链路，而不是仅靠下次全量快照被动刷新。当前 `RuntimeSnapshotService` 处理 Space topology signal/request 时已能采集 CG window facts、记录 topology diff，并将 `affectedCGWindowIDs` 通过当前 CG 采集结果与 `RuntimeWindowRecord` 主表派生为受影响 app/pid target，对这些 target 做局部 app snapshot pullback；`RuntimeSnapshotProvider.recordSpaceTopologySnapshot(...)` 也会把 diff 中受影响的既有 `RuntimeWindowRecord` 标记为 `needsReconciliation`，并在 removed Space 命中该 record 的 `spaceRecovery.spaceIDs` 时只失效 recovery 证据、不直接删除 record。CG window fact source 已有 `RuntimeCGWindowListProviding` 边界，便于 service 层用 deterministic CG/Space fixture 证明 active-space/topology signal consumption。代表性 fullscreen/off-space commit route 已由 `FlowTabUITests.testSwitcherPanelOptionTabWindowStateRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithNoisyCGSiblingsWithoutAppAXWindows` 在 2026-06-11 当前代码上证明 four-window Noisy fixture 的真实 `CGWindowID` 往返激活，并在每次真实 confirm 后通过 runtime log 断言 `collectCGWindows` 采集到了非零 `affected` Space topology diff；真实多显示器 / 更广 fullscreen Space 拓扑仍缺 UI/E2E 证明。
-- **已落地，保留 gap**：在提交流程中补齐 `Space` 恢复与私有 `CGWindowID` 激活链路：先切到目标 Space，再恢复 AX；必要时按 `CGWindowID` 做私有激活，成功后回读 `AXFocusedWindow` 并重新学习 exact binding。当前 activation verified-focus 回调已生成 `RuntimeWindowFocusVerification`，把提交目标 `CGWindowID`、提交后回读到的 `AXFocusedWindow -> CGWindowID` 与 focused AX handle 一起送入 shared `RuntimeSnapshotService.signalWindowFocusVerified(...)`；service 会先让 `RuntimeSnapshotProvider` 把 focused AX readback 记录为 `.verifiedFocusReadback` exact `RuntimeWindowRecord` evidence，并更新 CG-first 主表派生的 `AX -> CG` 索引，即使该 pid 此前没有既有 mapping state 也能由空 `RuntimeWindowMappingState` seed 主表。若 focused AX handle 不在 `AXLiveWindowRegistry` 中，provider 会基于 `pid + focusedCGWindowID` 生成 verified-focus fallback AX id，避免只回落到 coordinator pullback 而丢失 direct exact relearn；该非 registry fallback 已由 deterministic `FlowTabPriorityCoverageTests.testRuntimeSnapshotServiceSeedsVerifiedFocusRecordWhenFocusedAXWindowIsNotInRegistry` 覆盖。随后 service 仍以 `.activationVerified` dirty reason 和 affected `CGWindowID` 集进入 `RuntimeReconciliationCoordinator`。默认 executor 已通过 `RuntimeSnapshotProvider.reconcileAppWindows(processIdentifier:affectedCGWindowIDs:)` 显式消费该 scope 做 app-local pullback，并在 pullback 后返回 `knownAffectedCGWindowIDs` 与 `exactAffectedCGWindowIDs`，从 CG-first WindowRecord 主表暴露 affected 窗口是否已知、是否具备 exact binding 的确定性证据。代表性 Option+Tab fullscreen sibling UI 用例已证明真实 `CGWindowID` 从 fullscreen Space 切到 normal sibling 再回到 fullscreen sibling，并在每次真实 confirm 后通过 runtime log 断言对应 target `CGWindowID` 发生 `source=.*->verifiedFocusReadback` 的 exact WindowRecord 重新学习；真实 UI/E2E 仍未单独强制出 registry 无法解析 focused AX handle 的系统形态。
-- **已落地，保留 gap**：将 AX 通知维护路径收敛为“只标脏 + 受影响 `pid/appID` 局部回拉 + 去抖重试 + reconciliation”，而不是仅刷新 raw AX snapshot 缓存。当前 runtime AX window-change monitor 已将 `appID/pid` dirty signal 送入 shared `RuntimeSnapshotService.signalAppWindowsChanged(...)` 并写入 `RuntimeReconciliationCoordinator`；`RuntimeSnapshotService` 已能 drain ready requests，按统一 executor 对 app dirty 做局部 app snapshot pullback，并在 transient empty AX snapshot 时交回 coordinator 安排 retry。已知 `AXWindowID` 的 destroyed 信号也已有 shared `RuntimeSnapshotService.signalAXWindowDestroyed(appID:pid:axWindowID:)` 入口，会将 current attachment 降级为 sticky 历史、移除当前 AX 派生索引，并把受影响 `CGWindowID` 带入 coordinator app dirty request；`RuntimeAXWindowChangeMonitor` 会根据 `AXLiveWindowRegistry` 中的 known AX window elements 注册 per-window destroyed notification，destroyed callback 若携带可由 registry 识别的 window element，会解析为当前快照内 `AXWindowID` 并走该入口，解析不到时仍只标普通 app dirty。runtime AX monitor 现在会记录 `homeAXDestroyed known/unresolved`，runtime service 会记录 `runtimeAXDestroyed ... affectedCGWindowID=...`，用于区分真实 notification 是否进入 typed destroyed 入口。2026-06-14 的真实 fixture window-close UI/E2E 已证明该场景通过 per-window destroyed observer 记录 `homeAXDestroyed known`，进入 `runtimeAXDestroyed ... affectedCGWindowID=...` typed 入口，并仍通过局部 refresh 将 Home 从 `2w` 更新为 `1w`。Space topology request 也已消费 `affectedCGWindowIDs`，从 provider 的 CG-first WindowRecord 主表与当前 CG 采集结果派生 app/pid 局部回拉目标，再通过 `RuntimeSnapshotProvider.reconcileAppWindows(processIdentifier:affectedCGWindowIDs:)` 执行 app-local pullback；该返回值会从 pullback 后的 WindowRecord 主表报告 known/exact affected 窗口集合。代表性 noisy fullscreen/off-space UI/E2E 已证明真实 confirm 后会采集非零 affected topology diff。
-
-### 已落地但保留边界验证 gap
-
-- **已落地，保留 gap**：`RuntimeReconciliationCoordinator` 已落地，集中表达 dirty app、Space topology diff 产生的 `affectedCGWindowIDs`、verified-focus readback 产生的 `affectedCGWindowIDs`、`pending/inFlight/waitingRetry` 状态，以及 AX 空快照短间隔 retry policy。`RuntimeSnapshotProvider` 采集到 `RuntimeSpaceTopologySnapshot` 后已交给 coordinator 记录 diff，不再在 provider 内新增 Space diff/affected-window 调度状态；受影响 WindowRecord 的 `needsReconciliation` 标记归属 CG-first 主表，且在 CG evidence refresh 或 lifecycle reconciliation 消费后清除。Switcher 的 active-space notification 已改为触发 shared `RuntimeSnapshotService.signalSpaceTopologyChanged()`，runtime AX window-change monitor 已改为触发 shared `RuntimeSnapshotService.signalAppWindowsChanged(appID:pid:)`，activation verified-focus 回调也已改为触发 shared `RuntimeSnapshotService.signalWindowFocusVerified(_:)` 并传入 `RuntimeWindowFocusVerification`，AppDelegate 的 workspace app-launched/app-terminated observers 也已改为触发 shared `RuntimeSnapshotService.signalAppLaunched(appID:pid:)` / `signalAppTerminated(appID:pid:)`，已知 AX destroyed 信号也有 shared `RuntimeSnapshotService.signalAXWindowDestroyed(appID:pid:axWindowID:)` 入口，runtime AX window-change monitor 在 callback element 可由 `AXLiveWindowRegistry` 解析时会走该入口，这些 surface 都由 runtime service/provider/coordinator 路径接收 topology、app-window、verified-focus、AX destroyed 或 process-lifecycle 信号，而不是在 panel/Home surface 新增 topology reconciliation 状态。`RuntimeSnapshotService` 已增加统一 drain 层，启动 ready requests、执行 app 局部 pullback 或 Space topology refresh，并由 coordinator 完成或安排 retry；Space topology signal 已经能通过 injectable CG window fact source 与 injectable Space topology provider，在 service 层产生并 drain `.spaceTopologyChanged` request；Space topology request 已将 affected CG 窗口派生为 app/pid target 后通过 provider app-local reconciliation API 回拉，verified-focus request 已将 target/readback CG 窗口直接写入 app request 的 affected set 并传入同一 API，且 registry-resolvable focused AX readback 会在 coordinator pullback 前写为 `.verifiedFocusReadback` exact WindowRecord evidence，无既有 mapping state 时也会 seed CG-first 主表；`app launched` 已作为 `.appLaunched` dirty reason 进入同一 app-local pullback，`pid terminated` 已由 runtime service 统一取消对应 app request、清空该 pid 的 WindowRecord mapping state，并移除 AX live registry 条目。当前已由 deterministic `FlowTabTests` 证明 dirty coalescing、Space affected-window request、affected WindowRecord needsReconciliation marking、removed-space recovery invalidation without record deletion、known-AXWindowID destroyed downgrade to sticky history、known destroyed AX element typed routing、destroyed affected-CG app dirty signaling、affected app target derivation、app-local affected scope preservation、post-pullback affected/exact WindowRecord evidence reporting、verified-focus readback exact WindowRecord recording、verified-focus readback no-prior-state seeding、launched-app dirty pullback、terminated-app request cancellation、retry 调度规则、provider consumption、Switcher active-space signal、service-level topology signal consumption、service-to-coordinator app-window dirty signal、AppDelegate app-launch/app-termination signal、typed verified-focus affected-window signal、drain completion 与 transient-empty retry scheduling；代表性 noisy fullscreen/off-space `FlowTabUITests` 也已证明真实 confirm 后 runtime 采集到非零 affected topology diff，并为每个真实 confirm 写回 `verifiedFocusReadback` exact WindowRecord evidence；`FlowTabUITests.testRuntimeLifecycleRefreshesRealFixtureAppLaunchAndTermination` 已证明 FlowTab 运行中真实 fixture app launch 会进入 `.appLaunched` runtime lifecycle、Home 可刷新出新 app/window，真实 process termination 会进入 shared runtime cleanup；`FlowTabUITests.testRuntimeLifecycleRefreshesRealFixtureWindowSetMutation` 已证明真实 fixture app 仍运行时关闭一个窗口会触发 known AX destroyed window element typed route、进入 shared runtime `runtimeAXDestroyed ... affectedCGWindowID=...`，并将 Home app row 从 `2w` 更新为 `1w`。真实多显示器 / 更广 fullscreen Space 拓扑证明仍未完成。
-- **已落地，保留 gap**：`RuntimeWindowRecord` 与 `windowRecordsByCGWindowID` 已承担 `CGWindowID` 主表；`RuntimeWindowRecordDerivedIndexes` 已将当前 `AX -> CG`、反向 `CG -> AX`、`validCGWindowIDs` 与 `lastAXWindowIDs` 收束为主表处理结果的派生 projection，避免在 `RuntimeSnapshotProvider` 中继续双写反向索引。`RuntimeAXWindowState` 已把 public AX window state（minimized / focused / main）收束到 `AXWindowEntry` 与 `RuntimeCurrentAXAttachment`，由 WindowRecord 主表保存当前 AX attachment 状态；相关 runtime snapshot / activation recovery diagnostics 也会输出这些 public 状态，避免在 Switcher、Home 或 activation surface 上各自维护局部副本。public assignment 已将 focused/main 作为前台 on-screen CG 候选 tie-breaker、将 minimized 作为唯一 offscreen CG 候选 tie-breaker，用于在标题/frame 已形成候选集合后收窄公开匹配；`FlowTabUITests.testSwitcherPanelPreviewKeepsIdenticalRealWorkflowWindowsDistinct` 现在会在真实 edge workflow 的重复同标题窗口进入 window layer 时，断言 runtime 文件日志出现 `binding-assignment public-state-tiebreak` 且 `axCandidates/cgCandidates` 均大于 1，从而证明代表性真实多窗口拓扑确实走过 public AX state tie-breaker，而不仅是 mock 规则。`FlowTabUITests.testSwitcherPanelPreviewCapturesRealMinimizedPublicAXState` 还证明同一 edge workflow 能产生真实 minimized AX state、offscreen CG counterpart，并把该状态带入 `window-entries ... off:minimized=1` 的 window-layer 输出。`RuntimeWindowRecordLifecyclePolicy` / `reconcileLifecycle` 已统一表达 `suspectDeletedAt`、Space 恢复证据失效时间与 grace window 删除规则，`RuntimeSnapshotProvider` 只消费该 record lifecycle decision，不再用散落的 “validCG 或 sticky 或 spaceRecovery 即永久保留” filter；window-layer 的 CG 候选也已从主表派生出当前 valid CG + retained synthesized records，使 in-grace sticky 与 space-backed records 在当前 CG 缺席时仍能输出。Space topology affected-window 执行目标也已从该主表和当前 CG 事实派生；提交 verified-focus 后的 target/readback `CGWindowID` 已进入 coordinator app-local pullback 的 affected set，registry-resolvable focused AX readback 与 non-registry focused AX fallback id 都会直接更新 CG-first WindowRecord exact evidence，无既有 mapping state 时也能 seed 主表；`pid terminated` 已成为唯一会立即清空对应 pid WindowRecord state 的 shared runtime lifecycle signal。代表性 fullscreen/off-space `CGWindowID` commit、registry-resolvable verified-focus exact relearn、non-registry verified-focus fallback exact relearn 的 behavior 证明、代表性真实 public-state tie-breaker、以及代表性真实 minimized public AX state capture/output 已覆盖；真实 UI/E2E 仍未单独强制出 non-registry focused AX readback 的系统形态，也未单独强制 minimized public-state tie-breaker。
-- **已落地，保留 gap**：`RuntimeSpaceTopologySnapshot`、`RuntimeSpaceTopologyDiff` 与 `RuntimeSpaceTopologyProviding` 已落地，生产采集路径也改为先通过 `RuntimeSystemSpaceTopologyProvider` 取得 topology snapshot，再把 `spaceIDsByCGWindowID` 投影给 `CGWindowEntry`。当前已由 deterministic `FlowTabTests` 证明 snapshot 规范化、diff 与 `affectedCGWindowIDs` 规则；代表性 noisy fullscreen/off-space `FlowTabUITests` 已证明真实 active-space/topology 变化会被 runtime 采集为非零 affected diff。真实多显示器 / 更广 fullscreen Space 拓扑仍缺 UI/E2E 证明。
-- **已落地，保留 gap**：`window-layer` 当前会输出 sticky 与 `space-backed`/CG-only 条目，并已停止让同一 `spaceIDs` 下的不同 CG-only `CGWindowID` 互相去重；只有同 Space 的 sticky 记录会压掉较弱的非 sticky 候选，以保留 `CGWindowID` 主锚点。当前 action contract 已收紧：纯 `provisional` 条目不再声明 `exposeInSwitcher`，provider 输出的 `space-backed` CG-only 条目会显式提升为 `inferred` 并携带 `useForCGActivationFallback`，从代码层把“可展示”绑定到“具备提交恢复路径”。代表性 fullscreen/off-Space workflow 已由 `FlowTabUITests.testSwitcherPanelOptionTabWindowStateRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithNoisyCGSiblingsWithoutAppAXWindows` 证明 four-window Noisy fixture 的 staged recency-prefix、真实 `CGWindowID` 往返提交、每个被选目标在 `window-entries` 中以 `source=stickyBinding` 输出，并覆盖 `spaceEvidence=observed` 与 `spaceEvidence=inferredFromTopology` 两类 sticky window-layer 输出；同一 UI/E2E 还断言 confirm 阶段 `window-request ... sticky=true source=stickyBinding`，再由真实 frontmost CGWindowID 与 `verifiedFocusReadback` exact 重新学习收口。该 Noisy workflow 还会在 FlowTab 启动后的真实 runtime 日志中断言 `Chrome Fixture filtered-fullscreen-...-artifacts ... dropped=...`，并在 UI 层保持 preview titles 精确等于四个用户窗口，从而证明代表性 fullscreen/CG-only artifact 噪声没有进入主窗口切换路径。代表性纯 `space-backed` CG-only 输出与提交已由 `FlowTabUITests.testSwitcherPanelOptionTabCommitsSpaceBackedCGOnlyWorkflowWindow` 在真实 fixture workflow 中证明：目标窗口以 `publishesApplicationAXWindow=false` 与 `suppressesWindowAccessibilityExposure=true` 从 AX 直接窗口列表缺席，但仍由 CG/Space topology 在 `window-entries` 中以 `ax=0`、`sticky=0`、`source=nil`、`spaceEvidence=inferredFromFullscreenGeometry`、`publicAXRecovery=1` 输出，confirm 阶段记录 `window-request ... ax=0 sticky=false source=nil publicAXRecovery=1` 与 `focus-attempt route=cg`，并最终回到精确目标 `CGWindowID`。代表性 pure provisional / desktop Space 1 未匹配 CG-only 非曝光已由 `FlowTabUITests.testSwitcherPanelOptionTabHidesDesktopProvisionalCGOnlyWorkflowWindow` 证明：同一 fixture app 中 AX-backed 控制窗口仍在 app strip 计为 `1w`，AX-suppressed desktop CG-only 窗口不会创建 windowCycle/preview，runtime 日志记录 `hidden-provisional-cg windows=1`。当前仍未完成的是更广真实拓扑里的逐路径提交与非曝光证明。
-- **已落地，保留 gap**：sticky 与 `space-backed` 条目的缺证删除已经具备 record-level grace，window-layer 也已能输出 in-grace retained records；activation verified-focus 也已触发 shared runtime 局部回拉入口，registry-resolvable focused AX readback 和 non-registry focused AX fallback id 都会直接写回 CG-first exact WindowRecord evidence。代表性 fullscreen/off-space `CGWindowID` 激活及提交后 `verifiedFocusReadback` exact 重新学习已由 UI/E2E 覆盖；non-registry focused AX fallback direct exact relearn 已有 behavior 证明，但仍缺单独强制该系统形态的生产 UI/E2E。
-- **已落地，保留 gap**：公开唯一匹配已使用标题、frame、focused/main 前台候选与 minimized/offscreen 候选作为 public assignment 规则。代表性 edge workflow 已用真实重复同标题窗口证明 public AX state tie-breaker 会在多候选 AX/CG 拓扑中触发；同一 fixture 现在也通过真实 minimized startup state 证明 AX 可读到 minimized public state、CG 对应窗口处于 offscreen，并最终进入 `window-entries ... off:minimized=1` 输出。当前仍未完成的是更广 focused/main 状态排列、minimized public-state tie-breaker 的真实触发证明，以及多显示器/fullscreen 组合下的 UI/E2E 覆盖。此外它们只收窄已由标题/frame 建立的候选集合，不替代私有 exact bridge 或 Space topology recovery。
+用途：
+
+- Home app 列表。
+
+读取要求：
+
+- 读取 app summaries。
+- 可见 rows 和 selected app 可触发较高优先级 scoped repair。
+- Home 不应迫使 hotkey app cycle 等待全局窗口维护。
+
+内容：
+
+- app summary
+- window count / visible count / minimized count
+- freshness/confidence
+- selected app detail projection
+
+### activationTargetProjection
+
+用途：
+
+- 用户提交 app/window 后选择最合适激活路线。
+
+读取要求：
+
+- 可以读取 cached target route。
+- 提交后必须 readback。
+- readback 是写回 exact evidence 的入口。
+
+内容：
+
+- target `CGWindowID`
+- preferred AX handle
+- fallback AX route
+- Space recovery route
+- private CG fallback eligibility
+- expected verification target
+
+## Activation Contract
+
+activation 是唯一允许有副作用恢复探测的路径。
+
+窗口提交顺序：
+
+1. 如果当前 exact AX handle 可用，优先 AX activation。
+2. 如果 public AX recovery 可行，尝试 public recovery。
+3. 如果 record 是 space-backed，先恢复目标 Space，再尝试 AX recovery。
+4. 如果没有 AX handle 但 record 具备明确 `CGWindowID` 和 fallback eligibility，执行 private CG activation fallback。
+5. 提交后读取 focused AX/CG。
+6. 如果 readback target 与提交目标一致，写入 `.verifiedFocusReadback` exact evidence。
+7. 如果 readback 不一致，标记 target/readback scopes dirty，并降级该 activation route confidence。
+
+成功条件：
+
+- 不能只看“命令执行成功”。
+- 必须用 focused readback 或可等价证明确认目标窗口真的成为当前窗口。
+- readback 不能解析到 registry 中既有 AX handle 时，也要能基于 pid + focused `CGWindowID` seed exact record。
+
+## Snapshot 的新位置
+
+`snapshot()` 在目标形态中保留，但降级为：
+
+- repair fallback
+- migration compatibility
+- diagnostic command
+- cold start bootstrap 的最后兜底
+- test fixture assembly helper
+
+它不再是：
+
+- `Option+Tab` 首帧主流程。
+- `Control+Tab` 当前 app window 主流程。
+- Search index 主来源。
+- Home summary 主来源。
+- 每个 topology dirty signal 的默认处理方式。
+
+任何新的 `snapshot` cache 如果仍挂在同一条采样队列上，仍然会被后台 CG/AX/Space 工作拖住，所以不满足目标。
+
+## Full Snapshot Repair Policy
+
+允许 full snapshot 的场景：
+
+- cold start 后没有任何可用 read model。
+- projection generation 与底层主表不可恢复地冲突。
+- coordinator 多次 scoped repair backoff 后仍不能收敛。
+- 用户显式打开诊断/日志/修复入口。
+- 测试或开发需要构造完整系统观测。
+
+full snapshot 完成后：
+
+- 不能直接替换所有长期状态。
+- 必须拆成 app/window/space facts 后进入 reconciliation。
+- 只能更新受影响 projections。
+- 如果用户已经进入 window/search 状态，不能用过期 full snapshot 覆盖当前交互状态。
+
+## AX Notification 策略
+
+AX notification 不是绝对可靠的系统权威事件源，但很适合作为 dirty signal。
+
+原则：
+
+- 收到 AX app/window changed：标记对应 app dirty。
+- 收到已知 AX window destroyed：定位关联 `CGWindowID`，清除 current attachment，保留 sticky evidence，标记 affected window dirty。
+- 收到无法识别的 destroyed：退回 app dirty，不猜测删除哪个 record。
+- AX 空列表：进入 transient retry，不直接清空窗口。
+- AX notification 缺失：由 periodic stale repair 和 Space/CG diff 补漏。
+
+不依赖 AX notification 保证：
+
+- 所有窗口变化必达。
+- 通知顺序完全可靠。
+- destroyed 一定携带可识别 window element。
+- AX tree 永远不会短暂为空。
+
+## 删除与失效
+
+### pid terminated
+
+- 取消该 pid pending/in-flight requests。
+- 清空该 pid 的 `RuntimeWindowRecord` 状态。
+- 移除 AX live registry 条目。
+- rebuild affected projections。
+
+### known AX destroyed
+
+- 清除 current AX attachment。
+- 删除当前 `AX -> CG` / `CG -> AX` 派生索引。
+- 保留历史 exact/sticky evidence。
+- 标记 record needs reconciliation。
+- 如果之后 CG/Space 也持续缺席，进入删除 grace。
+
+### Space removed/changed
+
+- invalidates matching `spaceRecovery` evidence。
+- 标记 affected `CGWindowID` dirty。
+- 不直接删除 record。
+
+### continuous absence timeout
+
+只有 AX、CG、Space 三层证据在 grace window 内持续缺席，才删除 record。
+
+## Surface Ownership
+
+### Switcher
+
+Switcher 负责：
+
+- 面板生命周期。
+- app/window/search interaction state。
+- 读取 runtime projections。
+- 发送 selected/current/search dirty signal。
+- 执行用户提交 activation。
+
+Switcher 不负责：
+
+- 自己维护 Space topology diff。
+- 自己维护 AX retry/backoff。
+- 自己维护 window identity 主表。
+- 打开面板时同步跑 full snapshot。
+
+### Home
+
+Home 负责：
+
+- 展示 app summaries。
+- 展示 selected app 详情。
+- 把 visible/selected scopes 反馈给 runtime scheduler。
+
+Home 不负责：
+
+- 为 Switcher 维护窗口真相。
+- 自己扩张 AX/Space reconciliation 状态机。
+
+### Runtime infrastructure
+
+Runtime infrastructure 负责：
+
+- source input adapters。
+- `RuntimeReadModelStore`。
+- `RuntimeMaintenanceScheduler`。
+- reconciliation coordinator。
+- projection builders。
+- activation verification writeback。
+
+## 当前实现迁移说明
+
+当前代码已经有一部分目标地基：
+
+- CG-first `RuntimeWindowRecord` 主表。
+- `RuntimeSpaceTopologySnapshot` / `RuntimeSpaceTopologyDiff`。
+- `RuntimeSpaceTopologyProviding`。
+- `RuntimeReconciliationCoordinator`。
+- app-local affected `CGWindowID` pullback。
+- verified-focus target/readback 写回。
+- public AX state 参与匹配。
+- `RuntimeReadModelStore` Phase 1 P0 已作为 runtime-owned projection cache 边界落地：`RuntimeProjectionService` 持有 store，repair/maintenance 返回数据时会提交 app switcher、Home summary、current-app window projection；app lifecycle、AX/window dirty、Space topology 和 activation verified signals 会写入 generation/dirty/pending repair metadata。
+
+但当前实现仍有迁移对象：
+
+- service 层 `RuntimeProjectionService.fallbackRuntimeSnapshot()` full snapshot bridge 与 concrete-only `fallbackLightweightAppSnapshot()` lightweight bridge 均已删除；`RuntimeProjectionServing` 已不再暴露 full snapshot bridge、同步 lightweight bridge 或 `currentCGWindowsByPID()` live CG z-order read，Switcher/Home 的 P0 首读路径已优先读取 projection，`Option+Tab` 缺 app-switcher projection 时只请求 shared runtime maintenance，不再同步调用 lightweight snapshot bridge；`Control+Tab` 缺 current-app projection 时只发送 runtime dirty/repair signal，不再同步调用 focused snapshot bridge。service-facing focused snapshot 兼容入口已删除，provider 内部 `focusedAppSnapshot(processIdentifier:)` 只保留为 app-local reconciliation repair pullback。
+- `RuntimeSnapshotProvider.snapshot()` 仍会枚举 running apps 并进入 `collectWindowData(for:)`，其内部会取 onscreen/all CG 和 AX window data。该路径应降级为 repair/fallback。
+- Phase 3 P0 已移除 Switcher session-start 后的 surface-owned background full snapshot delayed/apply path；`LiveSwitcherModel` 只向 `RuntimeProjectionService.requestAppSwitcherProjectionMaintenance(reason:)` 发送 runtime maintenance request，旧 full snapshot bridge 不再由 Switcher open 后台路径调用。
+- Search 已迁移到 maintained `committedSearchIndex` read，runtime maintenance 在 internal `stagingSearchIndex` 验证通过后再原子提交；真实 committed/staging UI proof 与外部 pressure proof 仍是 gap。
+- Space topology 生产路径已有 snapshot/diff 与 display-level signature；`collectCGWindows` diagnostic 已输出 signature change/display/space/window summary。代表性 noisy fullscreen fixture UI 的 signature 断言仍需等当前真实应用选择污染解除后补齐；系统权威 fullscreen owner、多显示器与更广真实拓扑 pressure 仍需继续推进。
+
+## 迁移阶段
+
+### Phase 1: Store 与 projection 边界
+
+状态（2026-06-16）：P0 已落地；P1 的 priority / coalescing / promoted backoff bypass 已落地；P2 保留。
+
+- 引入或扩展 `RuntimeReadModelStore`。
+- 明确主表、派生索引、projection cache。
+- 给每个 projection 增加 freshness/confidence/dirty metadata。
+- 保留现有 snapshot API 作为兼容入口。
+
+已落地的 P0：
+
+- 新增 `RuntimeReadModelStore`，集中维护 `appSwitcherProjection`、`homeSummaryProjection`、`currentAppWindowProjection`、generation、dirty app/pid/CGWindowID 与 pending repair scope metadata。
+- `RuntimeProjectionService` 成为 read model store owner；旧 provider 采样桥只负责生成兼容数据，service 负责提交 projection 或标脏 metadata。
+- `RuntimeProjectionServing` 暴露 projection read seam：`readAppSwitcherProjection()`、`readHomeSummaryProjection()`、`readCurrentAppWindowProjection(appID:)` 与 `runtimeReadModelDiagnostics()`，供 Phase 2 迁移 hot-path read API。
+- app/window dirty、app launch/termination、AX destroyed、Space topology、activation verified-focus signal 均会进入 store generation/dirty metadata，避免 Switcher、Home、Search 各自扩张 surface-local freshness state。
+
+仍保留的 P1/P2：
+
+- projection builders 仍由旧 snapshot/home/focused 兼容桥提交，尚未完全从底层 `RuntimeWindowRecord`、app directory、Space topology 主表独立 rebuild。
+- Switcher/Home 首帧只读 projection 的 P0 已在 Phase 2 落地；旧采样桥仍作为 service-owned repair/fallback 兼容入口，不是目标热路径。
+- Search committed/staging index 未在本阶段实现，必须等 store/generation seam 稳定后推进。
+
+验证：
+
+- deterministic tests 证明主表与派生索引一致。
+- projection rebuild 不依赖 feature surface 局部状态。
+- `FlowTabPriorityCoverageTests.testRuntimeReadModelStoreCommitsProjectionsAndMarksDirtyMetadata` 证明 store commit/read、generation、dirty metadata 与 current-app projection scope。
+- `FlowTabPriorityCoverageTests.testRuntimeProjectionServiceOwnsReadModelStoreForProjectionReadsAndDirtySignals` 证明 service owns store，旧 repair bridge 会提交 app projection，dirty signal 会标脏 projection metadata。
+
+### Phase 2: Hot path read API
+
+状态（2026-06-16）：P0 已落地，P1/P2 保留。
+
+- 新增 `readAppSwitcherProjection()`。
+- 新增 `readCurrentAppWindowProjection(appID/pid)`。
+- 新增 `readSearchWindowProjection()`。
+- 新增 Home summary/detail projection read。
+- 这些 read API 不进入 sampling queue，不触发 CG/AX/Space 采样。
+
+已落地的 P0：
+
+- `LiveSwitcherModel` 的 app-layer fast snapshot 只读取 `RuntimeAppSwitcherProjection`；projection 存在时不会调用 `lightweightAppSnapshot()` 或全量 snapshot provider，projection 缺失时返回空首帧并请求 shared runtime projection maintenance。
+- Switcher terminate refresh 不再读取 full snapshot bridge；`RuntimeReadModelStore.markAppTerminated` 会同步从 committed app-switcher projection 和 committed search index 移除 terminated app，Switcher 只读取更新后的 projection，projection 缺失时只请求 shared runtime maintenance 并保留当前 session。
+- `RuntimeProjectionServing` 已不再向 feature surface 暴露泛化的 `snapshot()` 方法或 full snapshot bridge。`RuntimeSnapshotProvider.snapshot()` 仍保留为 provider 内部 full builder / repair primitive。
+- `RuntimeProjectionServing` 已不再向 feature surface 暴露同步 `lightweightAppSnapshot()` 方法；`RuntimeProjectionService.fallbackLightweightAppSnapshot()` 和 provider `lightweightAppSnapshot()` 已删除，feature surface 只能读 app-switcher projection 或发送 runtime maintenance signal。
+- `RuntimeProjectionServing` 已不再向 feature surface 暴露 Home provider-backed refresh bridge；Home summary/detail refresh 只能读取 Home/current-app projection 或 app-switcher projection，projection 缺失时返回当前 committed UI state 并发送 shared runtime maintenance/app-window dirty signal。
+- selected/current app window refresh 只读取 `RuntimeCurrentAppWindowProjection`；projection 存在时不会调用 Home snapshot bridge，projection 缺失时只向 shared runtime 发送 app-window dirty signal 并保持 app-cycle 投影状态。
+- Home window activation 使用调用方传入的 cached snapshot 或 `RuntimeCurrentAppWindowProjection` 构造 activation target；缺 projection 时只向 shared runtime 发送 app-window dirty signal，不再同步调用 Home snapshot bridge。
+- 迁移期 `RuntimeProjectionServing.homeAppSnapshotSynchronously` 兼容入口已删除；生产 surface 无法再通过 shared runtime service 重新引入该同步 Home snapshot bridge。
+- `Control+Tab` focused-current-app startup 只读取 `RuntimeCurrentAppWindowProjection`；projection 存在时不会调用 `focusedAppSnapshot(processIdentifier:)`，projection 缺失时只向 shared runtime 发送 app-window dirty signal 并降级退出。
+- 迁移期 `RuntimeProjectionServing.focusedAppSnapshot(processIdentifier:)` 兼容入口已删除；生产 surface 无法再通过 shared runtime service 重新引入该同步 focused snapshot bridge。
+- `LiveSwitcherModel` startup recency 不再读取 live focused AX 或 live CG z-order；`Option+Tab` / `Control+Tab` 仅应用 committed `RuntimeWindowRecencyTracker` evidence 和 projection order，`RuntimeProjectionServing` 也不再向 feature surface 暴露 `currentCGWindowsByPID()`。
+- Home summary、lightweight summary fallback、single app summary、selected app detail 通过 `HomeRuntimeProjectionReader`/`HomeRuntimeRefreshReader` 读取 projection；projection 缺失时不再调用旧 Home snapshot service，concrete `RuntimeProjectionService` 的 provider-backed Home fallback bridge 已删除。
+- `RuntimeAppSwitcherProjection.snapshot` 与 `RuntimeHomeSummaryProjection.summary(for:)` 作为 shared projection helper，避免 surface 复制 snapshot assembly 或 summary lookup 状态。
+
+仍保留的 P1/P2：
+
+- `readSearchWindowProjection()` 未在本阶段实现；Search 必须在 committed/staging index 阶段推进，不能成为第二个 runtime store。
+- Switcher session-start background full snapshot 已在 Phase 3 P0 降级为 runtime-owned projection maintenance request；priority/coalescing/cancellation/backoff breadth 仍留给 Phase 3 P1/P2。
+- 本阶段新增的是 behavior/pressure 证明；真实 UI/E2E 拓扑 proof 沿用既有 fixture 覆盖，未新增专门的 projection-read UI 断言。
+
+验证：
+
+- targeted unit/behavior 证明 hot read 不调用采样 provider。
+- pressure proof 记录 `Option+Tab` / `Control+Tab` 首帧不被后台 maintenance 阻塞。
+- `FlowTabPriorityCoverageTests.testLiveSwitcherModelStartsAppSessionFromRuntimeProjectionWithoutLightweightSampling` 证明 app switcher projection 存在时不会调用 lightweight snapshot 或 full snapshot bridge。
+- `FlowTabPriorityCoverageTests.testLiveSwitcherModelSelectedAppWindowSnapshotUsesRuntimeProjectionWithoutHomeSampling` 证明 selected/current app window projection 存在时不会调用 Home snapshot bridge；`testLiveSwitcherModelSelectedAppWindowSnapshotSignalsRuntimeRepairWhenProjectionIsMissing` 证明 projection 缺失时即使旧 Home snapshot bridge 有污染数据也不会被读取，只会发送 shared runtime app-window dirty signal。
+- `FlowTabTests.testHomeWindowActivationControllerUsesRuntimeProjectionWithoutHomeSnapshotBridge` 证明 Home window activation 可直接使用 runtime current-app window projection 提交 activation target 且不读取 Home snapshot bridge；`testHomeWindowActivationControllerSignalsRuntimeRepairWhenProjectionIsMissing` 证明 projection 缺失时即使旧 Home snapshot bridge 有污染数据也不会被读取，只会发送 shared runtime app-window dirty signal。
+- `FlowTabPriorityCoverageTests.testLiveSwitcherModelFocusedWindowSessionUsesRuntimeProjectionWithoutFocusedSampling` 证明 `Control+Tab` focused-current-app projection 存在时不会调用 focused snapshot bridge；`testLiveSwitcherModelFocusedWindowSessionSignalsRuntimeRepairWhenProjectionIsMissing` 证明 projection 缺失时即使旧 focused snapshot bridge 有污染数据也不会被读取，只会发送 shared runtime app-window dirty signal。
+- `FlowTabTests.testHomeRuntimeProjectionReaderUsesRuntimeProjectionsWithoutSnapshotBridge` 证明 Home summary/detail projection read 不调用 lightweight/home summary/home detail snapshot bridge；`testHomeRuntimeProjectionReaderDerivesHomeDataFromAppSwitcherProjectionWithoutSnapshotBridge` 证明 Home 可从 app-switcher projection 派生 summary/detail；`testHomeRuntimeRefreshReaderSignalsRuntimeRepairWhenProjectionIsMissingWithoutHomeFallback` 证明 projection 缺失时污染的 Home fallback 数据不会被读取，只发送 shared runtime maintenance/app-window dirty signal 并保留当前 committed UI state。
+- `FlowTabPriorityCoverageTests.testRuntimeReadModelStoreRemovesTerminatedAppFromCommittedProjectionsAndSearch` 证明 terminated app lifecycle signal 由 `RuntimeReadModelStore` 幂等地同步剪掉 committed app-switcher projection 与 committed search index；`FlowTabTests.testHandleApplicationTerminatedRefreshesFromRuntimeProjectionWithoutFullSnapshot` 证明 Switcher termination refresh 只消费该 runtime projection，记录 runtime termination signal，并保持 full/lightweight snapshot call count 为 0。
+- `FlowTabTests.testOptionTabWindowScalePressureKeepsSelectedAppApplyAndPreviewCaptureBounded` 本轮重跑通过，81 apps / 1,000 selected windows / 60 iterations 下 `selectedAppApplyP95=1.46ms`、`enterP95=0.03ms`、`previewItemsP95=0.35ms`、`previewCaptureCalls=360`。
+- `FlowTabTests.testOptionTabFastStartPressureStaysUnderHundredMilliseconds` 与 `FlowTabTests.testOptionTabFastStartPressureIgnoresLargeFrontmostWindowSet` 本轮重跑通过，`fullSnapshotCalls=0`，p95 分别为 0.90ms 和 0.61ms。
+- `FlowTabPriorityCoverageTests.testLiveSwitcherModelAppliesCommittedVerifiedFocusRecencyWithoutLiveFocusedRead`、`testLiveSwitcherModelFocusedRuntimeProjectionUsesCommittedRecencyBeforeOrdering` 和 `testLiveSwitcherModelAppliesCommittedRuntimeWindowRecencyWhenProjectionOrderChanges` 证明 committed recency/projection order 已替代 startup live focused AX / live CG z-order sampling。
+- `FlowTabTests.testControlTabFocusedProjectionFastStartPressureIgnoresFocusedSnapshotBridge` 证明 1,000-window current-app projection 下 `Control+Tab` focused startup p95 为 0.32ms，`snapshotCalls=0`。
+
+### Phase 3: Scheduler 取代 background full snapshot
+
+状态（2026-06-16）：P0 已落地，P1/P2 保留。
+
+- Switcher open 只读 projection，并标记 selected/current/search scopes。
+- background full snapshot 改为 low-priority repair。
+- dirty app/window/space 统一进入 scheduler。
+- scheduler 支持 priority、coalescing、cancellation、retry/backoff。
+
+已落地的 P0：
+
+- `LiveSwitcherModel` 不再持有 `BackgroundFullSnapshotRefreshRequest`、deferred background full snapshot request、background full snapshot provider override 或 delayed/apply worker。
+- `startSession` 的后续维护入口改为 `requestRuntimeProjectionMaintenance(triggerDirection:)`，只调用 `RuntimeProjectionService.requestAppSwitcherProjectionMaintenance(reason: .switcherSessionStarted)`。
+- `RuntimeProjectionService` 在自己的 `snapshotQueue` 内处理 app switcher projection maintenance request，读取 store diagnostics、drain 已有 reconciliation requests，并记录 `runtimeMaintenance` 日志；不从 Switcher surface 同步或异步拉 full snapshot bridge。
+- Switcher 只保留 runtime projection maintenance generation/diagnostic/invalidation，用于取消和日志，不再保存 surface-local full snapshot result 或 repair state。
+
+已落地的 P1：
+
+- `RuntimeReconciliationCoordinator` 已给 dirty reason 建立 scheduler priority：activation verified / app launched 为 high，AX notification / Space topology 为 normal，manual refresh 为 low。
+- coalesced request 会保留最高 priority；低优先级 request 在 retry/backoff 中收到高优先级 dirty signal 时会提升为 pending、重置 attempt，并绕过旧 retry `notBefore`。
+- ready request drain 现在按 priority 优先、同 priority 按 request id 稳定排序；`RuntimeProjectionService.requestAppSwitcherProjectionMaintenance(reason:)` 通过 shared coordinator 顺序 drain ready requests，而不是让 Switcher surface 自己维护 retry/debounce/pending scheduler。
+
+仍保留的 P1/P2：
+
+- full repair fallback 还没有单独建模为可被 high-priority scoped repair 越过或取消的 target；完整 cancellation 与更广 retry/backoff policy 仍需扩展。
+- service 层 full snapshot fallback 已从 `RuntimeProjectionService` 删除；full builder 仍存在于 provider primitive `RuntimeSnapshotProvider.snapshot()`，性质是 repair/diagnostic 或迁移兼容输入，不是 feature-facing API，也不是 Switcher session-start 或 termination refresh 路径。
+- selected/current/search scope priority 还未完整建模；Search committed/staging index 需在 Phase 4 推进。
+- 真实 UI/E2E 与多拓扑 pressure proof 本轮未新增；现有证明是 behavior + deterministic pressure。
+
+验证：
+
+- `FlowTabPriorityCoverageTests.testLiveSwitcherModelStartSessionRequestsRuntimeMaintenanceWithoutSurfaceSampling` 证明 app switcher projection 存在时，`startSession` 只请求 runtime maintenance，且不调用 full/lightweight snapshot bridge。
+- `FlowTabTests.testLiveSwitcherModelMaintenanceDiagnosticTracksGenerationReasonWithoutApply` 证明 maintenance diagnostic 记录 generation/reason，`applyGeneration=nil`，不会把后台结果 apply 回 surface session。
+- `FlowTabPriorityCoverageTests.testRuntimeReconciliationCoordinatorPromotesPriorityAndBypassesRetryBackoff` 证明 high-priority activation verified signal 可以提升已有 low-priority retry request，重置 attempt 并绕过 retry backoff。
+- `FlowTabPriorityCoverageTests.testRuntimeProjectionServiceMaintenanceRequestDrainsReadyRequestsBySchedulerPriority` 证明 runtime maintenance drain 按 shared coordinator priority 执行 high-priority request，再执行 low-priority request。
+- `FlowTabTests.testOptionTabWindowScalePressureKeepsSelectedAppApplyAndPreviewCaptureBounded` 证明 1,000-window selected-app projection/snapshot apply、window-layer entry 和 current-page preview item 生成保持 bounded；本轮 p95 分别为 0.68ms、0.01ms、0.24ms。
+- `FlowTabPriorityCoverageTests` 全量 324 tests 通过，证明 scheduler priority/coalescing 改动和 shared switcher/runtime seam 未破坏既有行为。
+- P2 待补：selected/current/search priority、full repair 被 high-priority scoped repair 越过或取消、真实 topology UI/E2E 与 pressure proof。
+
+### Phase 4: Search read model
+
+- Search index 从 `RuntimeWindowRecord` + app directory 投影。
+- Search index 分为 internal staging 与 surface-readable committed 两层。
+- 日常 maintenance 持续用 dirty/current/recent/affected scopes 更新 staging，并在验证 generation 覆盖后原子提交 committed index。
+- Search 激活先做 freshness validation；若 committed index 未覆盖当前 app/CG/Space/AX dirty generation，则执行 bounded freshness barrier，成功提交新 generation 后再进入最新搜索。
+- 当前迁移状态：Search 已改为读取 runtime-owned committed index；`RuntimeReadModelStore` 提供 ready/stale/missing freshness read，stale 时仍返回 last committed index + dirty metadata，并由 `RuntimeProjectionService` 发起 bounded runtime maintenance drain。completed scoped repair 会先写 internal staging，再在 coordinator 无未完成 repair 时原子提交 fresh committed search generation；deferred repair 继续暴露 degraded/stale committed result + dirty metadata，不回退到 session completeness、同步 full sampling，也不把该结果命名为 fresh/complete/latest。
+- dirty/pending app 只能作为 barrier/blocker/log 状态，不作为正常搜索结果状态。
+- Search 激活可以提升 repair priority，但不能同步拉全量 AX tree 才开始搜索。
+
+验证：
+
+- session window 不完整时，Search 仍只读取 committed search index，不依赖 session completeness。
+- 同一 committed generation 下连续搜索结果稳定。
+- background repair 中间态不会暴露给 Search。
+- freshness barrier 未完成时，不能把旧/部分 index 标记为最新完整。
+
+### Phase 5: Space signature 与真实拓扑证明
+
+- 建立 display-level Space signature。
+- normal/fullscreen 转换通过 signature/diff 快速判定。
+- affected `CGWindowID` 转 scoped app repair。
+- 当前迁移状态：`RuntimeSpaceTopologySnapshot` 已能派生 display-level signature，signature 覆盖 current space、space membership、window membership 与 fullscreen window；`RuntimeSpaceTopologyDiff` 携带 previous/current signature，normal/fullscreen 状态变化可通过 signature/diff 标记 affected `CGWindowID` 并进入已有 scoped repair。runtime `collectCGWindows` diagnostic 已携带 signature summary；真实 noisy fullscreen fixture UI 已在每次确认激活后断言 `signatureChanged`、display/space/window/fullscreen count 与 signature summary，代表性真实 Space signature proof 已闭环。
+- 补真实 fullscreen、多显示器、off-space、same-space CG-only、non-registry focused readback UI/E2E proof。
+
+验证：
+
+- deterministic Space diff。
+- real UI/E2E topology path。
+- runtime logs 证明 target `CGWindowID`、affected diff、verified readback。
+
+## 完成标准
+
+不能把 mock-only 或局部 fallback 当完成。完成标准是：
+
+- `Option+Tab` 首帧只读 app projection。
+- `Control+Tab` 只读 current app window projection。
+- Search 只读原子提交的 committed search index；进入 Search 前完成 freshness validation，必要时完成 bounded freshness barrier 并提交新 generation。
+- Home 读 summary/detail projection，不驱动 hotkey 全局采样。
+- full snapshot 不再是 surface 主流程。
+- AX notification 只作为 dirty/repair input，不作为唯一真相。
+- Space topology 有 signature/diff/affected-window 闭环。
+- activation 有 verified readback 写回。
+- runtime logs 能证明真实 target `CGWindowID` 经过预期路径。
+- required unit/behavior/UI/pressure proof 都按场景落地；未证明项留作 known gap。
+
+## Known Gaps
+
+当前文档目标下仍需显式保留这些 gap，直到代码和验证都闭环：
+
+- hot-path read APIs 的 P0 已从 Switcher/Home 首屏采样队列中解耦；selected/current app window refresh 和 Home window activation 已移除缺 projection 时的 `homeAppSnapshotSynchronously` fallback，改为 dirty signal + projection-only 状态；Home initial app summary 已移除缺 projection 时的 `lightweightAppSnapshot()` 同步 fallback，Home summary/detail refresh 已从 service-facing Home fallback bridge 迁移到 Home/current-app/app-switcher projection read + shared runtime maintenance signal；Switcher startup recency 已移除 live focused AX 与 live CG z-order read seam，改为 committed recency/projection order；Switcher termination refresh 已由 runtime store 同步剪枝 committed projection/search index，不再走 feature-facing full snapshot fallback；Search read model 已进入 runtime-owned committed index/freshness-read/fresh-generation commit 边界，deterministic committed-index pressure 已证明 `LiveSwitcherModel` Search hot path 在 400 apps / 10,000 windows 下不调用 full/lightweight snapshot 且不请求 freshness barrier；真实 UI/E2E committed/staging proof 与外部 pressure proof 仍需补齐。
+- `RuntimeReadModelStore` 与 projection cache 的 P0 边界已落地；仍需把 projection builders 从旧 snapshot 兼容桥迁移到底层主表生成。
+- Switcher session-start background full snapshot 已降级为 runtime-owned maintenance request；scheduler priority/coalescing/promoted-backoff P1 已落地，full repair fallback target、cancellation、selected/current/search priority 仍需补齐。
+- search index 已从 session completeness 迁移到 committed runtime index read，并补齐 stale/dirty freshness read、bounded maintenance request、completed scoped repair 后 fresh generation commit；deterministic committed-index pressure 已覆盖 ready index 的 Search entry/query hot path，仍需补真实 committed/staging UI proof 与外部 pressure proof。
+- Space signature P0 已落到 deterministic model/diff、runtime diagnostic fields 与代表性 noisy fullscreen fixture UI signature proof；`scripts/perf/runtime-topology-pressure.sh` 已提供外部 CPU/RSS wrapper，非 sandbox 复跑通过 70 个 0.5s 样本（CPU avg/p95/max 29.37/59.50/84.70，RSS avg/p95/max 112.12/174.67/202.70MB）。首次 pressure wrapper 运行曾暴露 dirty app-switcher projection 可在 pending repair 未 ready 时把 5-window stale Chrome Fixture 列表当正常 window cycle 呈现，而 runtime `window-entries` 已修复回 4；当前 `appCycleSnapshot` 已让 dirty app-switcher projection 在 app-cycle 热路径压制 stale window lists，行为回归测试先失败后通过，外部 wrapper 复跑也通过 70 个 0.5s 样本（CPU avg/p95/max 31.63/55.50/78.80，RSS avg/p95/max 118.34/180.17/207.23MB）。系统权威 fullscreen owner、多显示器 Space/window 视图仍需补齐。
+- 更广 fullscreen Space 拓扑、多显示器组合、normal/fullscreen 往返仍需真实 UI/E2E proof。
+- non-registry focused AX readback 的真实系统形态仍需 UI/E2E proof。
+- focused/main/minimized public AX tie-breaker 仍需更广状态排列 proof。
+- minimized tie-breaker、多显示器 fullscreen 组合、真实逐路径提交与非曝光证明仍需补覆盖。

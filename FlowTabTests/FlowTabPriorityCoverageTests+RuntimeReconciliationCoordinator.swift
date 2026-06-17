@@ -167,7 +167,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(searchRead.projection?.appEntries.contains { $0.appID == activeApp.id } ?? true)
     }
 
-    func testRuntimeSnapshotServiceOwnsReadModelStoreForProjectionReadsAndDirtySignals() {
+    func testRuntimeProjectionServiceOwnsReadModelStoreForProjectionReadsAndDirtySignals() {
         let coordinator = RuntimeReconciliationCoordinator()
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
         let seededApp = AppSwitchCandidate(
@@ -184,8 +184,8 @@ extension FlowTabPriorityCoverageTests {
             clearsDirtyState: false,
             generatedAt: 1
         )
-        let service = RuntimeSnapshotService(
-            label: "FlowTabTests.RuntimeSnapshotService.ReadModelStore",
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.ReadModelStore",
             snapshotProvider: provider,
             readModelStore: readModelStore,
             reconciliationExecutor: { _, _ in .completed }
@@ -643,7 +643,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(records?[unaffectedWindowID]?.needsReconciliation == true)
     }
 
-    func testRuntimeSnapshotServiceDrainsSpaceTopologySignalThroughCoordinator() throws {
+    func testRuntimeProjectionServiceDrainsSpaceTopologySignalThroughCoordinator() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let affectedWindowID = CGWindowID(240_001)
         let provider = RuntimeSnapshotProvider(
@@ -673,8 +673,8 @@ extension FlowTabPriorityCoverageTests {
         )
         let lock = NSLock()
         var executedRequests: [RuntimeReconciliationRequest] = []
-        let service = RuntimeSnapshotService(
-            label: "FlowTabTests.RuntimeSnapshotService.SpaceTopologySignal",
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.SpaceTopologySignal",
             snapshotProvider: provider,
             reconciliationExecutor: { request, _ in
                 lock.lock()
@@ -817,13 +817,13 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(result.exactAffectedCGWindowIDs, [exactWindowID])
     }
 
-    func testRuntimeSnapshotServiceDrainsAppWindowChangesThroughCoordinator() throws {
+    func testRuntimeProjectionServiceDrainsAppWindowChangesThroughCoordinator() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
         let lock = NSLock()
         var executedRequests: [RuntimeReconciliationRequest] = []
-        let service = RuntimeSnapshotService(
-            label: "FlowTabTests.RuntimeSnapshotService.AppWindowSignal",
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.AppWindowSignal",
             snapshotProvider: provider,
             reconciliationExecutor: { request, _ in
                 lock.lock()
@@ -843,7 +843,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(coordinator.readyRequests(now: Date.timeIntervalSinceReferenceDate).isEmpty)
     }
 
-    func testRuntimeSnapshotServiceSignalsDestroyedAXWindowThroughCoordinator() throws {
+    func testRuntimeProjectionServiceSignalsDestroyedAXWindowThroughCoordinator() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
         let pid = pid_t(18_405)
@@ -871,8 +871,8 @@ extension FlowTabPriorityCoverageTests {
         )
         let lock = NSLock()
         var executedRequests: [RuntimeReconciliationRequest] = []
-        let service = RuntimeSnapshotService(
-            label: "FlowTabTests.RuntimeSnapshotService.AXDestroyed",
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.AXDestroyed",
             snapshotProvider: provider,
             reconciliationExecutor: { request, _ in
                 lock.lock()
@@ -902,13 +902,13 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(downgradedRecord?.needsReconciliation == true)
     }
 
-    func testRuntimeSnapshotServiceDrainsLaunchedAppThroughCoordinator() throws {
+    func testRuntimeProjectionServiceDrainsLaunchedAppThroughCoordinator() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
         let lock = NSLock()
         var executedRequests: [RuntimeReconciliationRequest] = []
-        let service = RuntimeSnapshotService(
-            label: "FlowTabTests.RuntimeSnapshotService.AppLaunchSignal",
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.AppLaunchSignal",
             snapshotProvider: provider,
             reconciliationExecutor: { request, _ in
                 lock.lock()
@@ -929,7 +929,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(coordinator.readyRequests(now: Date.timeIntervalSinceReferenceDate).isEmpty)
     }
 
-    func testRuntimeSnapshotServiceCommitsLaunchedAppRepairIntoAppSwitcherProjection() throws {
+    func testRuntimeProjectionServiceCommitsLaunchedAppRepairIntoAppSwitcherProjection() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
         let store = RuntimeReadModelStore()
@@ -960,8 +960,8 @@ extension FlowTabPriorityCoverageTests {
             contextsByID: [:],
             generatedAt: 10
         )
-        let service = RuntimeSnapshotService(
-            label: "FlowTabTests.RuntimeSnapshotService.AppLaunchRepairCommit",
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.AppLaunchRepairCommit",
             snapshotProvider: provider,
             readModelStore: store,
             reconciliationExecutor: { _, _ in
@@ -984,7 +984,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(projection.freshness.isCompleteForScope)
     }
 
-    func testRuntimeSnapshotServiceClearsTerminatedAppRuntimeState() {
+    func testRuntimeProjectionServiceClearsTerminatedAppRuntimeState() {
         let coordinator = RuntimeReconciliationCoordinator()
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
         let pid = pid_t(18_405)
@@ -1004,8 +1004,8 @@ extension FlowTabPriorityCoverageTests {
             reason: .axNotification,
             now: 10
         )
-        let service = RuntimeSnapshotService(
-            label: "FlowTabTests.RuntimeSnapshotService.AppTerminated",
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.AppTerminated",
             snapshotProvider: provider
         )
 
@@ -1016,7 +1016,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(coordinator.readyRequests(now: 11).contains { $0.id == request.id })
     }
 
-    func testRuntimeSnapshotServiceDrainsVerifiedFocusThroughCoordinator() throws {
+    func testRuntimeProjectionServiceDrainsVerifiedFocusThroughCoordinator() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
         let pid = pid_t(18_405)
@@ -1037,8 +1037,8 @@ extension FlowTabPriorityCoverageTests {
         defer { AXLiveWindowRegistry.shared.remove(pid: pid) }
         let lock = NSLock()
         var executedRequests: [RuntimeReconciliationRequest] = []
-        let service = RuntimeSnapshotService(
-            label: "FlowTabTests.RuntimeSnapshotService.VerifiedFocusSignal",
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.VerifiedFocusSignal",
             snapshotProvider: provider,
             reconciliationExecutor: { request, _ in
                 lock.lock()
@@ -1077,7 +1077,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(coordinator.readyRequests(now: Date.timeIntervalSinceReferenceDate).isEmpty)
     }
 
-    func testRuntimeSnapshotServiceSeedsVerifiedFocusRecordWithoutPriorMappingState() throws {
+    func testRuntimeProjectionServiceSeedsVerifiedFocusRecordWithoutPriorMappingState() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
         let pid = pid_t(18_406)
@@ -1088,8 +1088,8 @@ extension FlowTabPriorityCoverageTests {
         defer { AXLiveWindowRegistry.shared.remove(pid: pid) }
         let lock = NSLock()
         var executedRequests: [RuntimeReconciliationRequest] = []
-        let service = RuntimeSnapshotService(
-            label: "FlowTabTests.RuntimeSnapshotService.VerifiedFocusSeed",
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.VerifiedFocusSeed",
             snapshotProvider: provider,
             reconciliationExecutor: { request, _ in
                 lock.lock()
@@ -1126,7 +1126,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(mappingState.validCGWindowIDs, [focusedCGWindowID])
     }
 
-    func testRuntimeSnapshotServiceSeedsVerifiedFocusRecordWhenFocusedAXWindowIsNotInRegistry() throws {
+    func testRuntimeProjectionServiceSeedsVerifiedFocusRecordWhenFocusedAXWindowIsNotInRegistry() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
         let pid = pid_t(18_407)
@@ -1140,8 +1140,8 @@ extension FlowTabPriorityCoverageTests {
         defer { AXLiveWindowRegistry.shared.remove(pid: pid) }
         let lock = NSLock()
         var executedRequests: [RuntimeReconciliationRequest] = []
-        let service = RuntimeSnapshotService(
-            label: "FlowTabTests.RuntimeSnapshotService.VerifiedFocusFallbackAXID",
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.VerifiedFocusFallbackAXID",
             snapshotProvider: provider,
             reconciliationExecutor: { request, _ in
                 lock.lock()
@@ -1179,13 +1179,13 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(mappingState.validCGWindowIDs, [focusedCGWindowID])
     }
 
-    func testRuntimeSnapshotServiceSchedulesRetryWhenDrainSeesTransientEmptyAXSnapshot() throws {
+    func testRuntimeProjectionServiceSchedulesRetryWhenDrainSeesTransientEmptyAXSnapshot() throws {
         let coordinator = RuntimeReconciliationCoordinator(
             retryPolicy: RuntimeReconciliationRetryPolicy(delays: [0.1])
         )
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
-        let service = RuntimeSnapshotService(
-            label: "FlowTabTests.RuntimeSnapshotService.TransientAXRetry",
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.TransientAXRetry",
             snapshotProvider: provider,
             reconciliationExecutor: { _, _ in
                 .transientEmptyAXSnapshot
@@ -1210,7 +1210,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(retry.attempt, 1)
     }
 
-    func testRuntimeSnapshotServiceMaintenanceRequestDrainsReadyRequestsBySchedulerPriority() {
+    func testRuntimeProjectionServiceMaintenanceRequestDrainsReadyRequestsBySchedulerPriority() {
         let coordinator = RuntimeReconciliationCoordinator()
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
         let lowPriority = coordinator.markAppDirty(
@@ -1229,8 +1229,8 @@ extension FlowTabPriorityCoverageTests {
         var executedRequests: [RuntimeReconciliationRequest] = []
         let expectation = expectation(description: "runtime maintenance drains ready requests")
         expectation.expectedFulfillmentCount = 2
-        let service = RuntimeSnapshotService(
-            label: "FlowTabTests.RuntimeSnapshotService.MaintenancePriority",
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.MaintenancePriority",
             snapshotProvider: provider,
             reconciliationExecutor: { request, _ in
                 lock.lock()
@@ -1249,7 +1249,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(coordinator.readyRequests(now: 11).isEmpty)
     }
 
-    func testRuntimeSnapshotServiceSearchFreshnessBarrierDrainsReadyRequestsBySchedulerPriority() {
+    func testRuntimeProjectionServiceSearchFreshnessBarrierDrainsReadyRequestsBySchedulerPriority() {
         let coordinator = RuntimeReconciliationCoordinator()
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
         let lowPriority = coordinator.markAppDirty(
@@ -1268,8 +1268,8 @@ extension FlowTabPriorityCoverageTests {
         var executedRequests: [RuntimeReconciliationRequest] = []
         let expectation = expectation(description: "search freshness barrier drains ready requests")
         expectation.expectedFulfillmentCount = 2
-        let service = RuntimeSnapshotService(
-            label: "FlowTabTests.RuntimeSnapshotService.SearchFreshnessBarrier",
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.SearchFreshnessBarrier",
             snapshotProvider: provider,
             reconciliationExecutor: { request, _ in
                 lock.lock()
@@ -1288,7 +1288,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(coordinator.readyRequests(now: 11).isEmpty)
     }
 
-    func testRuntimeSnapshotServiceSearchFreshnessBarrierCommitsRepairedSearchGeneration() throws {
+    func testRuntimeProjectionServiceSearchFreshnessBarrierCommitsRepairedSearchGeneration() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
         let store = RuntimeReadModelStore()
@@ -1325,8 +1325,8 @@ extension FlowTabPriorityCoverageTests {
             now: 10
         )
         let expectation = expectation(description: "search freshness barrier commits repaired index")
-        let service = RuntimeSnapshotService(
-            label: "FlowTabTests.RuntimeSnapshotService.SearchFreshnessBarrierCommit",
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.SearchFreshnessBarrierCommit",
             snapshotProvider: provider,
             readModelStore: store,
             reconciliationExecutor: { _, _ in
@@ -1354,7 +1354,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(diagnostics.hasStagingSearchIndex)
     }
 
-    func testRuntimeSnapshotServiceSearchFreshnessBarrierKeepsCommittedIndexStaleWhenRepairDefers() throws {
+    func testRuntimeProjectionServiceSearchFreshnessBarrierKeepsCommittedIndexStaleWhenRepairDefers() throws {
         let coordinator = RuntimeReconciliationCoordinator(
             retryPolicy: RuntimeReconciliationRetryPolicy(delays: [0.5])
         )
@@ -1397,8 +1397,8 @@ extension FlowTabPriorityCoverageTests {
             now: 10
         )
         let expectation = expectation(description: "search freshness barrier defers repair")
-        let service = RuntimeSnapshotService(
-            label: "FlowTabTests.RuntimeSnapshotService.SearchFreshnessBarrierDeferred",
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.SearchFreshnessBarrierDeferred",
             snapshotProvider: provider,
             readModelStore: store,
             reconciliationExecutor: { _, _ in
