@@ -32,10 +32,6 @@ struct RuntimeAppSwitcherProjection {
     let contextsByID: [String: RuntimeAppContext]
     var freshness: RuntimeProjectionFreshness
 
-    var snapshot: RuntimeSnapshot {
-        RuntimeSnapshot(apps: apps, contextsByID: contextsByID)
-    }
-
     var appCycleApps: [AppSwitchCandidate] {
         guard !freshness.isCompleteForScope else { return apps }
         let suppressesAllWindowLists = !freshness.dirtyCGWindowIDs.isEmpty
@@ -48,10 +44,6 @@ struct RuntimeAppSwitcherProjection {
             app.windows = []
             return app
         }
-    }
-
-    var appCycleSnapshot: RuntimeSnapshot {
-        return RuntimeSnapshot(apps: appCycleApps, contextsByID: contextsByID)
     }
 }
 

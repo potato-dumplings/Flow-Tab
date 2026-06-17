@@ -121,13 +121,4 @@ struct AppSwitcherProjectionSessionPayload {
             contextsByID: projection.contextsByID
         )
     }
-
-#if DEBUG
-    init(testingSnapshot snapshot: RuntimeSnapshot) {
-        self.init(
-            apps: snapshot.apps,
-            contextsByID: snapshot.contextsByID
-        )
-    }
-#endif
 }
