@@ -179,7 +179,7 @@ extension LiveSwitcherModel {
         let runtimeService = runtimeProjectionService
 
         RuntimeLog.debug(
-            "Projection",
+            .projection,
             "selectedAppWindowProjection result=scheduled appID=\(targetAppID)"
         )
 
@@ -331,7 +331,7 @@ extension LiveSwitcherModel {
             clearedDeferredMaintenanceRequest: clearedDeferredMaintenanceRequest
         )
         lastProjectionInvalidationRecord = record
-        RuntimeLog.debug("Projection", record.logMessage)
+        RuntimeLog.debug(.projection, record.logMessage)
     }
 
     func readAppSwitcherProjectionSessionPayload() -> AppSwitcherProjectionSessionPayload {

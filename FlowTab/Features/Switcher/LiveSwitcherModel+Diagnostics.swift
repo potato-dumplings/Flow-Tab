@@ -2,7 +2,7 @@ import Foundation
 import FlowTabCore
 
 extension LiveSwitcherModel {
-    private static let projectionLogCategory = "Projection"
+    private static let projectionLogCategory: RuntimeLogCategory = .projection
 
     nonisolated static func monotonicMilliseconds() -> Double {
         ProcessInfo.processInfo.systemUptime * 1_000

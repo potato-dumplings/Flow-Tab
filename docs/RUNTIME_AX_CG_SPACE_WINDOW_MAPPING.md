@@ -484,7 +484,7 @@ fullscreen -> normal 通常表现为：
 读取要求：
 
 - 只读 projection store。
-- 不进入 `snapshotQueue.sync`。
+- 不进入 runtime maintenance/sampling queue 的同步等待。
 - 不触发 CG/AX/Space 采样。
 - 不等待 background full snapshot。
 
@@ -856,7 +856,7 @@ Runtime infrastructure 负责：
 
 - `LiveSwitcherModel` 不再持有 `BackgroundFullSnapshotRefreshRequest`、deferred background full snapshot request、background full snapshot provider override 或 delayed/apply worker。
 - `startSession` 的后续维护入口改为 `requestRuntimeProjectionMaintenance(triggerDirection:)`，只调用 `RuntimeProjectionService.requestAppSwitcherProjectionMaintenance(reason: .switcherSessionStarted)`。
-- `RuntimeProjectionService` 在自己的 `snapshotQueue` 内处理 app switcher projection maintenance request，读取 store diagnostics、drain 已有 reconciliation requests，并记录 `runtimeMaintenance` 日志；不从 Switcher surface 同步或异步拉 full snapshot bridge。
+- `RuntimeProjectionService` 在自己的 `maintenanceQueue` 内处理 app switcher projection maintenance request，读取 store diagnostics、drain 已有 reconciliation requests，并用 `Projection` log category 记录 `runtimeMaintenance` / lifecycle / destroyed-window 信号；不从 Switcher surface 同步或异步拉 full snapshot bridge。
 - Switcher 只保留 runtime projection maintenance generation/diagnostic/invalidation，用于取消和日志，不再保存 surface-local full snapshot result 或 repair state。
 
 已落地的 P1：

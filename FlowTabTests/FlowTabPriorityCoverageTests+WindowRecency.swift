@@ -29,6 +29,8 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(diagnostic.logMessage.contains("action=apply_low_confidence_ordering"))
         XCTAssertEqual(RuntimeLogCategory.resolve("Recency"), .recency)
         XCTAssertTrue(RuntimeLogCategory.recency.isVerboseOnlyBelowWarning)
+        XCTAssertEqual(RuntimeLogCategory.resolve("Projection"), .projection)
+        XCTAssertTrue(RuntimeLogCategory.projection.isVerboseOnlyBelowWarning)
     }
 
     func testRuntimeWindowRecencyTrackerSkipsRecordWhenBindingDisallowsRecency() {

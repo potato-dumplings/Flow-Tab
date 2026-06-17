@@ -59,7 +59,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         RuntimeSnapshotProvider
     ) -> ReconciliationExecutionOutcome
 
-    private let snapshotQueue: DispatchQueue
+    private let maintenanceQueue: DispatchQueue
     private let snapshotProvider: RuntimeSnapshotProvider
     private let readModelStore: RuntimeReadModelStore
     private let reconciliationExecutor: ReconciliationExecutor
@@ -70,7 +70,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         readModelStore: RuntimeReadModelStore = RuntimeReadModelStore(),
         reconciliationExecutor: @escaping ReconciliationExecutor = RuntimeProjectionService.defaultReconciliationExecutor
     ) {
-        snapshotQueue = DispatchQueue(label: label, qos: .utility)
+        maintenanceQueue = DispatchQueue(label: label, qos: .utility)
         self.snapshotProvider = snapshotProvider
         self.readModelStore = readModelStore
         self.reconciliationExecutor = reconciliationExecutor
@@ -97,14 +97,14 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     }
 
     func requestAppSwitcherProjectionMaintenance(reason: RuntimeProjectionMaintenanceReason) {
-        snapshotQueue.async { [self] in
+        maintenanceQueue.async { [self] in
             let diagnostics = readModelStore.diagnostics()
             let drainResult = drainReadyReconciliationRequestsWithResultLocked(
                 now: Date.timeIntervalSinceReferenceDate
             )
             commitRepairedCurrentAppWindowPayloadsLocked(drainResult.repairedCurrentAppWindowPayloads)
             RuntimeLog.debug(
-                .snapshot,
+                .projection,
                 [
                     "runtimeMaintenance",
                     "scope=appSwitcherProjection",
@@ -122,7 +122,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     }
 
     func requestSearchIndexFreshnessBarrier(reason: RuntimeProjectionMaintenanceReason) {
-        snapshotQueue.async { [self] in
+        maintenanceQueue.async { [self] in
             let diagnostics = readModelStore.diagnostics()
             let drainResult = drainReadyReconciliationRequestsWithResultLocked(
                 now: Date.timeIntervalSinceReferenceDate
@@ -139,7 +139,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 ? readModelStore.commitStagedSearchIndex()
                 : nil
             RuntimeLog.debug(
-                .snapshot,
+                .projection,
                 [
                     "runtimeMaintenance",
                     "scope=searchIndex",
@@ -160,7 +160,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     }
 
     func signalSpaceTopologyChanged() {
-        snapshotQueue.async { [self] in
+        maintenanceQueue.async { [self] in
             _ = snapshotProvider.collectCGWindowsByPID(options: [.excludeDesktopElements])
             readModelStore.markSpaceTopologyDirty(
                 affectedCGWindowIDs: [],
@@ -171,7 +171,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     }
 
     func signalAppLaunched(appID: String, pid: pid_t) {
-        snapshotQueue.async { [self] in
+        maintenanceQueue.async { [self] in
             let now = Date.timeIntervalSinceReferenceDate
             readModelStore.markAppLifecycleDirty(
                 appID: appID,
@@ -184,13 +184,13 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 reason: .appLaunched,
                 now: now
             )
-            RuntimeLog.debug(.snapshot, "runtimeLifecycle appLaunched appID=\(appID) pid=\(pid)")
+            RuntimeLog.debug(.projection, "runtimeLifecycle appLaunched appID=\(appID) pid=\(pid)")
             drainReadyReconciliationRequestsLocked(now: now)
         }
     }
 
     func signalAppWindowsChanged(appID: String, pid: pid_t) {
-        snapshotQueue.async { [self] in
+        maintenanceQueue.async { [self] in
             let now = Date.timeIntervalSinceReferenceDate
             readModelStore.markAppWindowsDirty(
                 appID: appID,
@@ -208,7 +208,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     }
 
     func signalAXWindowDestroyed(appID: String, pid: pid_t, axWindowID: String) {
-        snapshotQueue.async { [self] in
+        maintenanceQueue.async { [self] in
             let now = Date.timeIntervalSinceReferenceDate
             let affectedCGWindowID = snapshotProvider.signalAXWindowDestroyed(
                 processIdentifier: pid,
@@ -221,7 +221,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 pendingScope: "axWindowDestroyed:\(appID)"
             )
             RuntimeLog.debug(
-                .snapshot,
+                .projection,
                 "runtimeAXDestroyed appID=\(appID) pid=\(pid) axWindowID=\(axWindowID) affectedCGWindowID=\(affectedCGWindowID.map(String.init) ?? "none")"
             )
             snapshotProvider.reconciliationCoordinator.markAppDirty(
@@ -237,16 +237,16 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
 
     func signalAppTerminated(appID: String, pid: pid_t) {
         readModelStore.markAppTerminated(appID: appID, pid: pid)
-        snapshotQueue.async { [self] in
+        maintenanceQueue.async { [self] in
             snapshotProvider.reconciliationCoordinator.cancelAppRequests(pid: pid)
             snapshotProvider.clearWindowMappingState(for: pid)
             AXLiveWindowRegistry.shared.remove(pid: pid)
-            RuntimeLog.debug(.snapshot, "runtimeLifecycle appTerminated appID=\(appID) pid=\(pid)")
+            RuntimeLog.debug(.projection, "runtimeLifecycle appTerminated appID=\(appID) pid=\(pid)")
         }
     }
 
     func signalWindowFocusVerified(_ verification: RuntimeWindowFocusVerification) {
-        snapshotQueue.async { [self] in
+        maintenanceQueue.async { [self] in
             let now = Date.timeIntervalSinceReferenceDate
             snapshotProvider.recordWindowFocusVerification(verification, now: now)
             readModelStore.markWindowFocusVerified(
@@ -279,7 +279,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     }
 
     func isLikelyTransientAXRebuild(for pid: pid_t) -> Bool {
-        snapshotQueue.sync {
+        maintenanceQueue.sync {
             snapshotProvider.isLikelyTransientAXRebuild(for: pid)
         }
     }
@@ -288,7 +288,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     func drainReadyReconciliationRequestsSynchronouslyForTesting(
         now: TimeInterval = Date.timeIntervalSinceReferenceDate
     ) -> [RuntimeReconciliationRequest] {
-        snapshotQueue.sync {
+        maintenanceQueue.sync {
             drainReadyReconciliationRequestsLocked(now: now)
         }
     }
