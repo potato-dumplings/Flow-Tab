@@ -723,20 +723,13 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testLiveSwitcherModelHandleApplicationTerminatedRefreshesSessionAndKeepsPreferredNextSelection() async {
-        let model = LiveSwitcherModel()
         let initialApps = terminateScenarioApps()
-        let refreshedApps = initialApps.filter { $0.id != "com.example.code" }
-        var snapshots = [
-            RuntimeSnapshot(apps: initialApps, contextsByID: [:]),
-            RuntimeSnapshot(apps: refreshedApps, contextsByID: [:])
-        ]
-        var snapshotReadCount = 0
-        model.testingSnapshotProviderOverride = {
-            snapshotReadCount += 1
-            return snapshots.removeFirst()
-        }
+        let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: initialApps)
+        let model = LiveSwitcherModel(snapshotService: snapshotService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         XCTAssertEqual(model.selectedApp?.id, "com.example.code")
 
         let layoutRefreshed = expectation(description: "layout refreshed after app termination")
@@ -745,7 +738,9 @@ extension FlowTabPriorityCoverageTests {
         model.handleApplicationTerminated(appID: "com.example.code", pid: 42_300)
 
         await fulfillment(of: [layoutRefreshed], timeout: 1.0)
-        XCTAssertEqual(snapshotReadCount, 2)
+        XCTAssertEqual(snapshotService.appTerminationSignalsRecorded().map(\.appID), ["com.example.code"])
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         XCTAssertEqual(model.appCount, 2)
         XCTAssertEqual(model.selectedApp?.id, "com.example.browser")
     }
@@ -814,20 +809,20 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testLiveSwitcherModelHandleApplicationTerminatedIgnoresUntrackedApp() {
-        let model = LiveSwitcherModel()
         let initialApps = terminateScenarioApps()
-        var snapshotReadCount = 0
-        model.testingSnapshotProviderOverride = {
-            snapshotReadCount += 1
-            return RuntimeSnapshot(apps: initialApps, contextsByID: [:])
-        }
+        let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: initialApps)
+        let model = LiveSwitcherModel(snapshotService: snapshotService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         let selectedAppID = model.selectedApp?.id
 
         model.handleApplicationTerminated(appID: "com.example.unrelated", pid: 99_999)
 
-        XCTAssertEqual(snapshotReadCount, 1)
+        XCTAssertTrue(snapshotService.appTerminationSignalsRecorded().isEmpty)
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         XCTAssertEqual(model.appCount, initialApps.count)
         XCTAssertEqual(model.selectedApp?.id, selectedAppID)
     }
