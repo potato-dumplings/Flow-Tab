@@ -266,6 +266,22 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
     }
+    @MainActor
+    func makeAppSwitcherProjectionModel(
+        app: AppSwitchCandidate,
+        context: RuntimeAppContext,
+        generatedAt: TimeInterval = 10
+    ) -> (model: LiveSwitcherModel, snapshotService: RecordingRuntimeSnapshotService) {
+        let snapshotService = RecordingRuntimeSnapshotService(
+            appSwitcherApps: [app],
+            contextsByID: [app.id: context],
+            generatedAt: generatedAt
+        )
+        return (
+            model: LiveSwitcherModel(snapshotService: snapshotService),
+            snapshotService: snapshotService
+        )
+    }
     func makeIsolatedUserDefaults() -> UserDefaults? {
         let suiteName = "FlowTabPriorityCoverageTests.\(UUID().uuidString)"
         guard let userDefaults = UserDefaults(suiteName: suiteName) else {

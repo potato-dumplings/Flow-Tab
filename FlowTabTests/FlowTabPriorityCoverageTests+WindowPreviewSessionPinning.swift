@@ -7,8 +7,6 @@ import FlowTabCore
 extension FlowTabPriorityCoverageTests {
     @MainActor
     func testLiveSwitcherModelStandardWindowPreviewRequestsVisiblePageBeforeDeferredPreheat() async {
-        let model = LiveSwitcherModel()
-        model.runtimeProjectionMaintenanceEnabled = false
         let currentApp = NSRunningApplication.current
         let appID = "com.flowtab.tests.preview-preheat"
         let windows = (0..<20).map { index in
@@ -31,9 +29,8 @@ extension FlowTabPriorityCoverageTests {
             runningApp: currentApp,
             windows: windows
         )
-        model.testingFastAppSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: [app], contextsByID: [appID: context])
-        }
+        let (model, snapshotService) = makeAppSwitcherProjectionModel(app: app, context: context)
+        model.runtimeProjectionMaintenanceEnabled = false
 
         let allCapturesFinished = expectation(description: "deferred previews captured after visible page")
         var capturedTitles: [String] = []
@@ -51,6 +48,8 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         XCTAssertTrue(model.previewCaptureAttemptedKeys.isEmpty)
 
         let visibleRange = 0..<10
@@ -66,8 +65,6 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testLiveSwitcherModelLargeWindowPreviewBatchStaysBoundedToVisiblePageAndProviderPolicy() async {
-        let model = LiveSwitcherModel()
-        model.runtimeProjectionMaintenanceEnabled = false
         let currentApp = NSRunningApplication.current
         let appID = "com.flowtab.tests.large-preview"
         let windows = (0..<1_000).map { index in
@@ -90,9 +87,8 @@ extension FlowTabPriorityCoverageTests {
             runningApp: currentApp,
             windows: windows
         )
-        model.testingFastAppSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: [app], contextsByID: [appID: context])
-        }
+        let (model, snapshotService) = makeAppSwitcherProjectionModel(app: app, context: context)
+        model.runtimeProjectionMaintenanceEnabled = false
 
         let visibleBatchStarted = expectation(description: "large visible preview batch started")
         let batchStateLock = NSLock()
@@ -107,6 +103,8 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
 
         let visibleRange = 240..<256
         let initialSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: visibleRange)
@@ -124,8 +122,6 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testLiveSwitcherModelPinnedVisiblePreviewSurvivesCacheEvictionUntilSessionEnds() {
-        let model = LiveSwitcherModel()
-        model.runtimeProjectionMaintenanceEnabled = false
         let currentApp = NSRunningApplication.current
         let appID = "com.flowtab.tests.preview-session-pinning"
         let windows = (0..<12).map { index in
@@ -148,9 +144,8 @@ extension FlowTabPriorityCoverageTests {
             runningApp: currentApp,
             windows: windows
         )
-        model.testingFastAppSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: [app], contextsByID: [appID: context])
-        }
+        let (model, snapshotService) = makeAppSwitcherProjectionModel(app: app, context: context)
+        model.runtimeProjectionMaintenanceEnabled = false
 
         enum PreviewPhase {
             case available
@@ -171,6 +166,8 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
 
         let visibleRange = 0..<6
         let initialSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: visibleRange)
@@ -190,6 +187,8 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
 
         let restartedSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: visibleRange)
         XCTAssertEqual(restartedSnapshot.count, visibleRange.count)
@@ -199,8 +198,6 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testLiveSwitcherModelVisiblePageCanRecaptureDeferredPreviewAfterCacheEviction() async {
-        let model = LiveSwitcherModel()
-        model.runtimeProjectionMaintenanceEnabled = false
         let currentApp = NSRunningApplication.current
         let appID = "com.flowtab.tests.preview-deferred-recapture"
         let windows = (0..<12).map { index in
@@ -223,9 +220,8 @@ extension FlowTabPriorityCoverageTests {
             runningApp: currentApp,
             windows: windows
         )
-        model.testingFastAppSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: [app], contextsByID: [appID: context])
-        }
+        let (model, snapshotService) = makeAppSwitcherProjectionModel(app: app, context: context)
+        model.runtimeProjectionMaintenanceEnabled = false
 
         let deferredCapturesFinished = expectation(description: "deferred previews captured")
         var captureCallCount = 0
@@ -243,6 +239,8 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
 
         let firstVisibleRange = 0..<6
         let firstPage = model.windowPreviewSnapshotForTesting(visibleRange: firstVisibleRange)
@@ -262,8 +260,6 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testLiveSwitcherModelRuntimeVisiblePreviewWaitsForBatchBeforeShowingPage() async {
-        let model = LiveSwitcherModel()
-        model.runtimeProjectionMaintenanceEnabled = false
         let currentApp = NSRunningApplication.current
         let appID = "com.flowtab.tests.preview-visible-batch"
         let windows = (0..<6).map { index in
@@ -286,9 +282,8 @@ extension FlowTabPriorityCoverageTests {
             runningApp: currentApp,
             windows: windows
         )
-        model.testingFastAppSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: [app], contextsByID: [appID: context])
-        }
+        let (model, snapshotService) = makeAppSwitcherProjectionModel(app: app, context: context)
+        model.runtimeProjectionMaintenanceEnabled = false
 
         let batchStarted = expectation(description: "visible preview batch started")
         let batchReleased = DispatchSemaphore(value: 0)
@@ -313,6 +308,8 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
 
         let visibleRange = 0..<6
         let initialSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: visibleRange)
@@ -349,8 +346,6 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testLiveSwitcherModelRuntimeVisiblePreviewShowsFallbackAfterBatchFailure() async {
-        let model = LiveSwitcherModel()
-        model.runtimeProjectionMaintenanceEnabled = false
         let currentApp = NSRunningApplication.current
         let appID = "com.flowtab.tests.preview-visible-batch-failure"
         let windows = (0..<4).map { index in
@@ -373,9 +368,8 @@ extension FlowTabPriorityCoverageTests {
             runningApp: currentApp,
             windows: windows
         )
-        model.testingFastAppSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: [app], contextsByID: [appID: context])
-        }
+        let (model, snapshotService) = makeAppSwitcherProjectionModel(app: app, context: context)
+        model.runtimeProjectionMaintenanceEnabled = false
 
         let batchStarted = expectation(description: "failed visible preview batch started")
         let batchReleased = DispatchSemaphore(value: 0)
@@ -389,6 +383,8 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
 
         let visibleRange = 0..<4
         let initialSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: visibleRange)
@@ -418,8 +414,6 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testLiveSwitcherModelPreviewBatchFailureUsesProviderReasonForRetryState() async {
-        let model = LiveSwitcherModel()
-        model.runtimeProjectionMaintenanceEnabled = false
         let currentApp = NSRunningApplication.current
         let appID = "com.flowtab.tests.preview-provider-failure"
         let windows = (0..<3).map { index in
@@ -442,9 +436,8 @@ extension FlowTabPriorityCoverageTests {
             runningApp: currentApp,
             windows: windows
         )
-        model.testingFastAppSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: [app], contextsByID: [appID: context])
-        }
+        let (model, snapshotService) = makeAppSwitcherProjectionModel(app: app, context: context)
+        model.runtimeProjectionMaintenanceEnabled = false
 
         var batchCallCount = 0
         model.previewCaptureBatchOutcomeOverride = { requests in
@@ -454,6 +447,8 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
 
         let visibleRange = 0..<3
         let batchPublished = expectation(description: "provider failure preview batch published")
