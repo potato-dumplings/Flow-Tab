@@ -220,7 +220,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         )
     }
 
-    func commitCurrentAppWindowSnapshot(
+    func commitCurrentAppWindowProjection(
         _ snapshot: RuntimeHomeAppSnapshot,
         generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
     ) {
@@ -234,7 +234,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             snapshot: snapshot,
             freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: true)
         )
-        upsertAppSwitcherSnapshotLocked(snapshot, generatedAt: generatedAt)
+        upsertAppSwitcherProjectionLocked(snapshot, generatedAt: generatedAt)
     }
 
     func stageSearchIndexApps(
@@ -538,7 +538,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         pendingRepairScopes = pendingRepairScopes.filter { !$0.contains(appID) }
     }
 
-    private func upsertAppSwitcherSnapshotLocked(
+    private func upsertAppSwitcherProjectionLocked(
         _ snapshot: RuntimeHomeAppSnapshot,
         generatedAt: TimeInterval
     ) {

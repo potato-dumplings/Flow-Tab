@@ -65,7 +65,7 @@ extension FlowTabPriorityCoverageTests {
             )
         )
 
-        store.commitCurrentAppWindowSnapshot(snapshot, generatedAt: generatedAt + 1)
+        store.commitCurrentAppWindowProjection(snapshot, generatedAt: generatedAt + 1)
 
         let currentAppProjection = try XCTUnwrap(
             store.readCurrentAppWindowProjection(appID: app.id)

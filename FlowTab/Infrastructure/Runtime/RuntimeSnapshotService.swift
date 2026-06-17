@@ -302,7 +302,7 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
 
     private func commitRepairedSnapshotsLocked(_ snapshots: [RuntimeHomeAppSnapshot]) {
         for snapshot in snapshots {
-            readModelStore.commitCurrentAppWindowSnapshot(snapshot)
+            readModelStore.commitCurrentAppWindowProjection(snapshot)
         }
     }
 
