@@ -409,22 +409,6 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
     }
 }
 
-@MainActor
-extension LiveSwitcherModel {
-    func installSnapshotProviderOverrideForTesting(
-        _ provider: @escaping () -> RuntimeSnapshot,
-        committedSearchApps: [AppSwitchCandidate]? = nil
-    ) {
-        testingSnapshotProviderOverride = provider
-        guard let recordingService = runtimeSnapshotService as? RecordingRuntimeSnapshotService else {
-            return
-        }
-        recordingService.installCommittedSearchIndex(
-            for: committedSearchApps ?? provider().apps
-        )
-    }
-}
-
 struct FixedRuntimeCGWindowListProvider: RuntimeCGWindowListProviding {
     let rawWindowInfo: [[String: Any]]
 

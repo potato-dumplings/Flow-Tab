@@ -137,7 +137,6 @@ extension LiveSwitcherModel {
 
     func requestRuntimeProjectionMaintenance(triggerDirection: CycleDirection) {
         guard runtimeProjectionMaintenanceEnabled else { return }
-        guard !hasTestingSnapshotProviderOverride else { return }
 
         runtimeProjectionMaintenanceGeneration &+= 1
         let startMs = Self.monotonicMilliseconds()
@@ -365,10 +364,7 @@ extension LiveSwitcherModel {
         let startMs = Self.monotonicMilliseconds()
         let source: String
         let payload: AppSwitcherProjectionSessionPayload
-        if let testingPayload = makeTestingProjectionPayloadOverride() {
-            source = testingPayload.source
-            payload = testingPayload.payload
-        } else if let projection = runtimeSnapshotService.readAppSwitcherProjection() {
+        if let projection = runtimeSnapshotService.readAppSwitcherProjection() {
             source = projection.freshness.isCompleteForScope
                 ? "runtimeProjection"
                 : "runtimeProjectionDirty"
@@ -387,10 +383,7 @@ extension LiveSwitcherModel {
         let startMs = Self.monotonicMilliseconds()
         let source: String
         let payload: AppSwitcherProjectionSessionPayload
-        if let testingPayload = makeTestingFastProjectionPayloadOverride() {
-            source = testingPayload.source
-            payload = testingPayload.payload
-        } else if let projection = runtimeSnapshotService.readAppSwitcherProjection() {
+        if let projection = runtimeSnapshotService.readAppSwitcherProjection() {
             source = projection.freshness.isCompleteForScope
                 ? "runtimeProjection"
                 : "runtimeProjectionDirty"
@@ -404,43 +397,4 @@ extension LiveSwitcherModel {
         return payload
     }
 
-    var hasTestingSnapshotProviderOverride: Bool {
-#if DEBUG
-        testingSnapshotProviderOverride != nil
-#else
-        false
-#endif
-    }
-
-    func makeTestingProjectionPayloadOverride() -> (source: String, payload: AppSwitcherProjectionSessionPayload)? {
-#if DEBUG
-        guard let testingSnapshotProviderOverride else { return nil }
-        return (
-            "testingOverride",
-            AppSwitcherProjectionSessionPayload(testingSnapshot: testingSnapshotProviderOverride())
-        )
-#else
-        nil
-#endif
-    }
-
-    func makeTestingFastProjectionPayloadOverride() -> (source: String, payload: AppSwitcherProjectionSessionPayload)? {
-#if DEBUG
-        if let testingFastAppSnapshotProviderOverride {
-            return (
-                "testingFastOverride",
-                AppSwitcherProjectionSessionPayload(testingSnapshot: testingFastAppSnapshotProviderOverride())
-            )
-        }
-        if let testingSnapshotProviderOverride {
-            return (
-                "testingOverride",
-                AppSwitcherProjectionSessionPayload(testingSnapshot: testingSnapshotProviderOverride())
-            )
-        }
-        return nil
-#else
-        nil
-#endif
-    }
 }

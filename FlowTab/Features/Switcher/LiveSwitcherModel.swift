@@ -218,10 +218,6 @@ final class LiveSwitcherModel: ObservableObject {
     var onSearchStateChanged: (() -> Void)?
     var onSessionLayoutChanged: (() -> Void)?
     var onSearchResultScrollRequestForTesting: ((String) -> Void)?
-#if DEBUG
-    var testingSnapshotProviderOverride: (() -> RuntimeSnapshot)?
-    var testingFastAppSnapshotProviderOverride: (() -> RuntimeSnapshot)?
-#endif
     var selectedAppSnapshotProviderOverride: ((String) -> RuntimeHomeAppSnapshot?)?
     var frontmostApplicationOverride: (() -> NSRunningApplication?)?
     var activationOverride: ((ActivationTarget, [String: RuntimeAppContext]) -> Void)?
@@ -411,14 +407,7 @@ final class LiveSwitcherModel: ObservableObject {
         var resolvedAppCandidate: AppSwitchCandidate?
         var resolvedContext: RuntimeAppContext?
 
-        if hasTestingSnapshotProviderOverride {
-            let rawPayload = readAppSwitcherProjectionSessionPayload()
-            snapshotReadMs = Self.monotonicMilliseconds()
-            let payload = appSwitcherPayloadWithWindowRecencyApplied(rawPayload)
-            recencyAppliedMs = Self.monotonicMilliseconds()
-            resolvedAppCandidate = payload.apps.first(where: { $0.id == frontmostAppID })
-            resolvedContext = payload.contextsByID[frontmostAppID]
-        } else if let projection = runtimeSnapshotService.readCurrentAppWindowProjection(appID: frontmostAppID) {
+        if let projection = runtimeSnapshotService.readCurrentAppWindowProjection(appID: frontmostAppID) {
             snapshotReadMs = Self.monotonicMilliseconds()
             let snapshot = homeSnapshotWithWindowRecencyApplied(
                 projection.snapshot

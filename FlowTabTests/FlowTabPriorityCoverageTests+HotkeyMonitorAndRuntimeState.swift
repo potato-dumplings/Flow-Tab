@@ -749,19 +749,11 @@ extension FlowTabPriorityCoverageTests {
     func testLiveSwitcherModelHandleApplicationTerminatedPreservesSearchStateDuringRefresh() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
             let initialApps = self.searchScenarioApps()
-            let model = LiveSwitcherModel(
-                snapshotService: RecordingRuntimeSnapshotService(
-                    appSwitcherApps: initialApps
-                )
+            let snapshotService = RecordingRuntimeSnapshotService(
+                appSwitcherApps: initialApps
             )
+            let model = LiveSwitcherModel(snapshotService: snapshotService)
             let refreshedApps = initialApps.filter { $0.id != "com.example.code" }
-            var snapshots = [
-                RuntimeSnapshot(apps: initialApps, contextsByID: [:]),
-                RuntimeSnapshot(apps: refreshedApps, contextsByID: [:])
-            ]
-            model.installSnapshotProviderOverrideForTesting({
-                snapshots.removeFirst()
-            }, committedSearchApps: initialApps)
 
             XCTAssertTrue(model.startSession(triggerDirection: .forward))
             XCTAssertTrue(model.enterSearchMode())
@@ -782,6 +774,7 @@ extension FlowTabPriorityCoverageTests {
 
             let layoutRefreshed = expectation(description: "layout refreshed while preserving search state")
             model.onSessionLayoutChanged = { layoutRefreshed.fulfill() }
+            snapshotService.installAppSwitcherProjection(apps: refreshedApps)
 
             model.handleApplicationTerminated(appID: "com.example.code", pid: 42_300)
 
