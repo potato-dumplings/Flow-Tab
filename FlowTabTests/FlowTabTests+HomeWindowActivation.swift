@@ -296,7 +296,7 @@ extension FlowTabTests {
             [appID]
         )
         XCTAssertEqual(
-            HomeRuntimeProjectionReader.lightweightAppSummaries(from: snapshotService)?.map(\.appID),
+            HomeRuntimeProjectionReader.initialAppSummaries(from: snapshotService)?.map(\.appID),
             [appID]
         )
         XCTAssertEqual(
@@ -345,7 +345,7 @@ extension FlowTabTests {
         )
 
         XCTAssertEqual(
-            HomeInitialAppSummaryReader.lightweightAppSummaries(from: projectionService).map(\.appID),
+            HomeInitialAppSummaryReader.appSummaries(from: projectionService).map(\.appID),
             [appID]
         )
         XCTAssertEqual(projectionService.lightweightSnapshotRequestCount(), 0)
@@ -353,7 +353,7 @@ extension FlowTabTests {
         let missingProjectionService = RecordingRuntimeSnapshotService()
 
         XCTAssertEqual(
-            HomeInitialAppSummaryReader.lightweightAppSummaries(from: missingProjectionService),
+            HomeInitialAppSummaryReader.appSummaries(from: missingProjectionService),
             []
         )
         XCTAssertEqual(missingProjectionService.lightweightSnapshotRequestCount(), 0)

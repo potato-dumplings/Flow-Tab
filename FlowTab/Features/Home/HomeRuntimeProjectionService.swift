@@ -17,7 +17,7 @@ enum HomeRuntimeProjectionReader {
         }
     }
 
-    static func lightweightAppSummaries(from service: any RuntimeSnapshotServing) -> [RuntimeHomeAppSummary]? {
+    static func initialAppSummaries(from service: any RuntimeSnapshotServing) -> [RuntimeHomeAppSummary]? {
         if let homeProjection = service.readHomeSummaryProjection() {
             return homeProjection.summaries
         }
@@ -151,7 +151,7 @@ enum HomeRuntimeRefreshReader {
 }
 
 enum HomeInitialAppSummaryReader {
-    static func lightweightAppSummaries(from service: any RuntimeSnapshotServing) -> [RuntimeHomeAppSummary] {
-        HomeRuntimeProjectionReader.lightweightAppSummaries(from: service) ?? []
+    static func appSummaries(from service: any RuntimeSnapshotServing) -> [RuntimeHomeAppSummary] {
+        HomeRuntimeProjectionReader.initialAppSummaries(from: service) ?? []
     }
 }

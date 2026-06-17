@@ -783,7 +783,7 @@ struct HomeLandingView: View {
     }
 
     private func lightweightHomeAppSummaries() -> [RuntimeHomeAppSummary] {
-        HomeInitialAppSummaryReader.lightweightAppSummaries(from: runtimeProjectionService)
+        HomeInitialAppSummaryReader.appSummaries(from: runtimeProjectionService)
     }
 
     private func formatHomeMilliseconds(_ value: Double) -> String {
