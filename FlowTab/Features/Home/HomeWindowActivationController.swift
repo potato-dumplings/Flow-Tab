@@ -10,19 +10,19 @@ final class HomeWindowActivationController {
 
     static let shared = HomeWindowActivationController()
 
-    private let snapshotService: any RuntimeSnapshotServing
+    private let runtimeProjectionService: any RuntimeSnapshotServing
     private let preferencesProvider: () -> SwitcherPreferences
     private let activationHandler: (ActivationTarget, [String: RuntimeAppContext]) -> Void
 
     init(
-        snapshotService: any RuntimeSnapshotServing = sharedRuntimeSnapshotService,
+        runtimeProjectionService: any RuntimeSnapshotServing = sharedRuntimeSnapshotService,
         preferencesProvider: @escaping () -> SwitcherPreferences = {
             SwitcherBehaviorPreferencesStore.loadSwitcherPreferences()
         },
         windowRecencyTracker: RuntimeWindowRecencyTracker = .shared,
         activationHandler: ((ActivationTarget, [String: RuntimeAppContext]) -> Void)? = nil
     ) {
-        self.snapshotService = snapshotService
+        self.runtimeProjectionService = runtimeProjectionService
         self.preferencesProvider = preferencesProvider
 
         if let activationHandler {
@@ -39,7 +39,7 @@ final class HomeWindowActivationController {
                     frame: verification.frame,
                     allowedActions: verification.allowedActions
                 )
-                snapshotService.signalWindowFocusVerified(verification)
+                runtimeProjectionService.signalWindowFocusVerified(verification)
             }
             self.activationHandler = { target, contextsByID in
                 runtimeActivator.activate(target: target, contextsByID: contextsByID)
@@ -54,7 +54,7 @@ final class HomeWindowActivationController {
     ) {
         let resolvedSnapshot = snapshot ?? HomeRuntimeProjectionReader.appSnapshot(
             for: appID,
-            from: snapshotService
+            from: runtimeProjectionService
         )
         guard let request = Self.makeActivationRequest(
             snapshot: resolvedSnapshot,
@@ -70,10 +70,10 @@ final class HomeWindowActivationController {
     }
 
     private func signalActivationProjectionMissing(appID: String) {
-        let pid = HomeRuntimeProjectionReader.appSummary(for: appID, from: snapshotService)?.pid
-            ?? snapshotService.readAppSwitcherProjection()?.contextsByID[appID]?.runningApp.processIdentifier
+        let pid = HomeRuntimeProjectionReader.appSummary(for: appID, from: runtimeProjectionService)?.pid
+            ?? runtimeProjectionService.readAppSwitcherProjection()?.contextsByID[appID]?.runningApp.processIdentifier
         guard let pid, pid != 0 else { return }
-        snapshotService.signalAppWindowsChanged(appID: appID, pid: pid)
+        runtimeProjectionService.signalAppWindowsChanged(appID: appID, pid: pid)
     }
 
     static func makeActivationRequest(

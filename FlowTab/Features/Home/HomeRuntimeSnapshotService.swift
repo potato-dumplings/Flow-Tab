@@ -1,9 +1,7 @@
 import Foundation
 import FlowTabCore
 
-let homeRuntimeSnapshotService = sharedRuntimeSnapshotService
-
-typealias HomeRuntimeSnapshotService = RuntimeSnapshotService
+let homeRuntimeProjectionService = sharedRuntimeSnapshotService
 
 enum HomeRuntimeProjectionReader {
     static func appSummaries(from service: any RuntimeSnapshotServing) -> [RuntimeHomeAppSummary]? {

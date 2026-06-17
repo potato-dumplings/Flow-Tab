@@ -14,17 +14,17 @@ struct HomeLandingView: View {
     let isActive: Bool
     let appLanguage: AppLanguage
     let openSettings: () -> Void
-    private let runtimeSnapshotService: any RuntimeSnapshotServing
+    private let runtimeProjectionService: any RuntimeSnapshotServing
 
     init(
         isActive: Bool,
         appLanguage: AppLanguage,
-        runtimeSnapshotService: any RuntimeSnapshotServing = homeRuntimeSnapshotService,
+        runtimeProjectionService: any RuntimeSnapshotServing = homeRuntimeProjectionService,
         openSettings: @escaping () -> Void
     ) {
         self.isActive = isActive
         self.appLanguage = appLanguage
-        self.runtimeSnapshotService = runtimeSnapshotService
+        self.runtimeProjectionService = runtimeProjectionService
         self.openSettings = openSettings
     }
 
@@ -411,7 +411,7 @@ struct HomeLandingView: View {
     private func noSwitchableWindowsSubtitle(for app: RuntimeHomeAppSummary) -> String {
         if
             accessibilityTrusted,
-            homeRuntimeSnapshotService.isLikelyTransientAXRebuild(for: app.pid)
+            runtimeProjectionService.isLikelyTransientAXRebuild(for: app.pid)
         {
             return AppStrings.text(.homeWaitCacheUpdate, language: appLanguage)
         }
@@ -449,11 +449,11 @@ struct HomeLandingView: View {
         }
 
         windowChangeMonitor.onAppWindowChanged = { appID, pid in
-            runtimeSnapshotService.signalAppWindowsChanged(appID: appID, pid: pid)
+            runtimeProjectionService.signalAppWindowsChanged(appID: appID, pid: pid)
             scheduleSingleAppRefresh(appID: appID, reason: "ax_window_changed")
         }
         windowChangeMonitor.onAXWindowDestroyed = { appID, pid, axWindowID in
-            runtimeSnapshotService.signalAXWindowDestroyed(appID: appID, pid: pid, axWindowID: axWindowID)
+            runtimeProjectionService.signalAXWindowDestroyed(appID: appID, pid: pid, axWindowID: axWindowID)
             scheduleSingleAppRefresh(appID: appID, reason: "ax_window_destroyed")
         }
         windowChangeMonitor.rebind(appSummaries)
@@ -772,7 +772,7 @@ struct HomeLandingView: View {
 
     private func fetchHomeAppSummariesOnBackground() async -> [RuntimeHomeAppSummary] {
         HomeRuntimeRefreshReader.appSummaries(
-            from: runtimeSnapshotService,
+            from: runtimeProjectionService,
             current: appSummaries
         )
     }
@@ -783,7 +783,7 @@ struct HomeLandingView: View {
     }
 
     private func lightweightHomeAppSummaries() -> [RuntimeHomeAppSummary] {
-        HomeInitialAppSummaryReader.lightweightAppSummaries(from: runtimeSnapshotService)
+        HomeInitialAppSummaryReader.lightweightAppSummaries(from: runtimeProjectionService)
     }
 
     private func formatHomeMilliseconds(_ value: Double) -> String {
@@ -793,7 +793,7 @@ struct HomeLandingView: View {
     private func fetchHomeAppSummaryOnBackground(appID: String) async -> RuntimeHomeAppSummary? {
         HomeRuntimeRefreshReader.appSummary(
             for: appID,
-            from: runtimeSnapshotService,
+            from: runtimeProjectionService,
             current: appSummaries
         )
     }
@@ -801,7 +801,7 @@ struct HomeLandingView: View {
     private func fetchHomeAppSnapshotOnBackground(appID: String) async -> RuntimeHomeAppSnapshot? {
         HomeRuntimeRefreshReader.appSnapshot(
             for: appID,
-            from: runtimeSnapshotService,
+            from: runtimeProjectionService,
             current: homeSnapshotsByAppID[appID],
             currentSummary: appSummaries.first { $0.appID == appID }
         )
