@@ -218,6 +218,17 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    private func makeAppSwitcherProjectionPanelController() -> SwitcherPanelController {
+        SwitcherPanelController(
+            model: LiveSwitcherModel(
+                snapshotService: RecordingRuntimeSnapshotService(
+                    appSwitcherApps: searchScenarioApps()
+                )
+            )
+        )
+    }
+
+    @MainActor
     func testSwitcherPanelControllerModifierReleaseConfirmationPolicyOwnsTimingConstants() {
         let controller = SwitcherPanelController()
 
@@ -602,10 +613,7 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelControllerDownArrowInAppCycleEntersWindowLayer() {
-        let controller = SwitcherPanelController()
-        controller.modelForTesting.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
-        }
+        let controller = makeAppSwitcherProjectionPanelController()
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
         let selectedAppID = controller.modelForTesting.selectedApp?.id
@@ -624,10 +632,7 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelControllerFlagsChangedReleaseConfirmationEndsSession() async {
-        let controller = SwitcherPanelController()
-        controller.modelForTesting.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
-        }
+        let controller = makeAppSwitcherProjectionPanelController()
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
         controller.globalPrimaryModifierPressedOverride = false
@@ -670,12 +675,9 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelControllerActiveSpaceChangeKeepsSessionVisibleWithoutReactivatingApp() async {
-        let snapshotService = RecordingRuntimeSnapshotService()
+        let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: searchScenarioApps())
         let model = LiveSwitcherModel(snapshotService: snapshotService)
         let controller = SwitcherPanelController(model: model)
-        controller.modelForTesting.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
-        }
         controller.globalPrimaryModifierPressedOverride = true
         controller.appIsActiveOverride = false
 
@@ -734,12 +736,9 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelControllerActiveSpaceChangeCancelsSessionAfterModifierRelease() async {
-        let snapshotService = RecordingRuntimeSnapshotService()
+        let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: searchScenarioApps())
         let model = LiveSwitcherModel(snapshotService: snapshotService)
         let controller = SwitcherPanelController(model: model)
-        controller.modelForTesting.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
-        }
         controller.globalPrimaryModifierPressedOverride = false
         controller.globalMainKeyPressedOverride = false
 
@@ -830,10 +829,7 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelControllerRecoverableOcclusionKeepsSessionVisible() async {
-        let occlusionController = SwitcherPanelController()
-        occlusionController.modelForTesting.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
-        }
+        let occlusionController = makeAppSwitcherProjectionPanelController()
         occlusionController.globalPrimaryModifierPressedOverride = true
 
         XCTAssertTrue(occlusionController.beginGlobalHotkeySessionForTesting())
@@ -860,10 +856,7 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelControllerSystemInterruptionsCancelSessionAndSuppressReplayUntilRelease() async {
-        let controller = SwitcherPanelController()
-        controller.modelForTesting.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
-        }
+        let controller = makeAppSwitcherProjectionPanelController()
         controller.globalPrimaryModifierPressedOverride = false
         controller.globalMainKeyPressedOverride = false
 
@@ -895,10 +888,7 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelControllerDelayedAutoEnterWindowLayerTriggersAfterConfiguredDelay() async {
-        let controller = SwitcherPanelController()
-        controller.modelForTesting.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
-        }
+        let controller = makeAppSwitcherProjectionPanelController()
         controller.windowLayerPresentationDelayOverride = 0.01
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
@@ -927,10 +917,7 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerDelayedAutoEnterWindowLayerUsesPreferenceDelay() async {
         await withTemporaryWindowLayerAutoEnterDelay(0.01) {
-            let controller = SwitcherPanelController()
-            controller.modelForTesting.testingSnapshotProviderOverride = {
-                RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
-            }
+            let controller = makeAppSwitcherProjectionPanelController()
 
             XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
             XCTAssertEqual(controller.modelForTesting.session?.mode, .appCycle)
