@@ -32,15 +32,15 @@ protocol RuntimeSnapshotServing: Sendable {
 final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable {
     enum ReconciliationExecutionOutcome {
         case completed
-        case completedWithRepairedSnapshots([RuntimeHomeAppSnapshot])
+        case completedWithRepairedCurrentAppWindowPayloads([RuntimeCurrentAppWindowPayload])
         case transientEmptyAXSnapshot
 
-        var repairedSnapshots: [RuntimeHomeAppSnapshot] {
+        var repairedCurrentAppWindowPayloads: [RuntimeCurrentAppWindowPayload] {
             switch self {
             case .completed:
                 []
-            case let .completedWithRepairedSnapshots(snapshots):
-                snapshots
+            case let .completedWithRepairedCurrentAppWindowPayloads(payloads):
+                payloads
             case .transientEmptyAXSnapshot:
                 []
             }
@@ -51,7 +51,7 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
         var startedRequests: [RuntimeReconciliationRequest] = []
         var completedCount = 0
         var deferredCount = 0
-        var repairedSnapshots: [RuntimeHomeAppSnapshot] = []
+        var repairedCurrentAppWindowPayloads: [RuntimeCurrentAppWindowPayload] = []
     }
 
     typealias ReconciliationExecutor = (
@@ -102,7 +102,7 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
             let drainResult = drainReadyReconciliationRequestsWithResultLocked(
                 now: Date.timeIntervalSinceReferenceDate
             )
-            commitRepairedSnapshotsLocked(drainResult.repairedSnapshots)
+            commitRepairedCurrentAppWindowPayloadsLocked(drainResult.repairedCurrentAppWindowPayloads)
             RuntimeLog.debug(
                 .snapshot,
                 [
@@ -115,7 +115,7 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
                     "pendingScopes=\(diagnostics.pendingRepairScopes.count)",
                     "startedRequests=\(drainResult.startedRequests.count)",
                     "completedRequests=\(drainResult.completedCount)",
-                    "repairedApps=\(drainResult.repairedSnapshots.count)"
+                    "repairedApps=\(drainResult.repairedCurrentAppWindowPayloads.count)"
                 ].joined(separator: " ")
             )
         }
@@ -127,9 +127,9 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
             let drainResult = drainReadyReconciliationRequestsWithResultLocked(
                 now: Date.timeIntervalSinceReferenceDate
             )
-            commitRepairedSnapshotsLocked(drainResult.repairedSnapshots)
-            for snapshot in drainResult.repairedSnapshots {
-                readModelStore.stageSearchIndexApp(snapshot.candidate)
+            commitRepairedCurrentAppWindowPayloadsLocked(drainResult.repairedCurrentAppWindowPayloads)
+            for payload in drainResult.repairedCurrentAppWindowPayloads {
+                readModelStore.stageSearchIndexApp(payload.candidate)
             }
             let hasPendingRequests = snapshotProvider.reconciliationCoordinator.hasPendingRequests()
             let shouldCommitStagedSearchIndex = drainResult.completedCount > 0
@@ -152,7 +152,7 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
                     "completedRequests=\(drainResult.completedCount)",
                     "deferredRequests=\(drainResult.deferredCount)",
                     "pendingRequests=\(hasPendingRequests ? 1 : 0)",
-                    "repairedSearchApps=\(drainResult.repairedSnapshots.count)",
+                    "repairedSearchApps=\(drainResult.repairedCurrentAppWindowPayloads.count)",
                     "committedSearchIndex=\(committedSearchIndex == nil ? 0 : 1)"
                 ].joined(separator: " ")
             )
@@ -296,13 +296,15 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
     @discardableResult
     private func drainReadyReconciliationRequestsLocked(now: TimeInterval) -> [RuntimeReconciliationRequest] {
         let result = drainReadyReconciliationRequestsWithResultLocked(now: now)
-        commitRepairedSnapshotsLocked(result.repairedSnapshots)
+        commitRepairedCurrentAppWindowPayloadsLocked(result.repairedCurrentAppWindowPayloads)
         return result.startedRequests
     }
 
-    private func commitRepairedSnapshotsLocked(_ snapshots: [RuntimeHomeAppSnapshot]) {
-        for snapshot in snapshots {
-            readModelStore.commitCurrentAppWindowProjection(snapshot)
+    private func commitRepairedCurrentAppWindowPayloadsLocked(
+        _ payloads: [RuntimeCurrentAppWindowPayload]
+    ) {
+        for payload in payloads {
+            readModelStore.commitCurrentAppWindowProjection(payload)
         }
     }
 
@@ -317,10 +319,12 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
             result.startedRequests.append(startedRequest)
             let outcome = reconciliationExecutor(startedRequest, snapshotProvider)
             switch outcome {
-            case .completed, .completedWithRepairedSnapshots:
+            case .completed, .completedWithRepairedCurrentAppWindowPayloads:
                 coordinator.completeRequest(id: startedRequest.id)
                 result.completedCount += 1
-                result.repairedSnapshots.append(contentsOf: outcome.repairedSnapshots)
+                result.repairedCurrentAppWindowPayloads.append(
+                    contentsOf: outcome.repairedCurrentAppWindowPayloads
+                )
             case .transientEmptyAXSnapshot:
                 _ = coordinator.scheduleRetryAfterTransientEmptyAXSnapshot(
                     id: startedRequest.id,
@@ -346,7 +350,9 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
                 return .transientEmptyAXSnapshot
             }
             if let snapshot = result.snapshot {
-                return .completedWithRepairedSnapshots([snapshot])
+                return .completedWithRepairedCurrentAppWindowPayloads([
+                    RuntimeCurrentAppWindowPayload(homeAppSnapshot: snapshot)
+                ])
             }
             return .completed
         case .spaceTopology:
@@ -355,7 +361,7 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
                 affectedCGWindowIDs: request.affectedCGWindowIDs,
                 currentCGWindowsByPID: cgWindowsByPID
             )
-            var repairedSnapshots: [RuntimeHomeAppSnapshot] = []
+            var repairedCurrentAppWindowPayloads: [RuntimeCurrentAppWindowPayload] = []
             for target in affectedTargets {
                 let result = snapshotProvider.reconcileAppWindows(
                     processIdentifier: target.pid,
@@ -365,11 +371,15 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
                     return .transientEmptyAXSnapshot
                 }
                 if let snapshot = result.snapshot {
-                    repairedSnapshots.append(snapshot)
+                    repairedCurrentAppWindowPayloads.append(
+                        RuntimeCurrentAppWindowPayload(homeAppSnapshot: snapshot)
+                    )
                 }
             }
-            if !repairedSnapshots.isEmpty {
-                return .completedWithRepairedSnapshots(repairedSnapshots)
+            if !repairedCurrentAppWindowPayloads.isEmpty {
+                return .completedWithRepairedCurrentAppWindowPayloads(
+                    repairedCurrentAppWindowPayloads
+                )
             }
             return .completed
         }

@@ -275,16 +275,6 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     }
 
     func commitCurrentAppWindowProjection(
-        _ snapshot: RuntimeHomeAppSnapshot,
-        generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
-    ) {
-        commitCurrentAppWindowProjection(
-            RuntimeCurrentAppWindowPayload(homeAppSnapshot: snapshot),
-            generatedAt: generatedAt
-        )
-    }
-
-    func commitCurrentAppWindowProjection(
         _ payload: RuntimeCurrentAppWindowPayload,
         generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
     ) {

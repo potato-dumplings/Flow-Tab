@@ -55,7 +55,7 @@ extension FlowTabPriorityCoverageTests {
             windowCount: app.windows.count,
             pid: pid
         )
-        let snapshot = RuntimeHomeAppSnapshot(
+        let payload = RuntimeCurrentAppWindowPayload(
             summary: summary,
             candidate: app,
             context: makeRuntimeAppContext(
@@ -65,7 +65,7 @@ extension FlowTabPriorityCoverageTests {
             )
         )
 
-        store.commitCurrentAppWindowProjection(snapshot, generatedAt: generatedAt + 1)
+        store.commitCurrentAppWindowProjection(payload, generatedAt: generatedAt + 1)
 
         let currentAppProjection = try XCTUnwrap(
             store.readCurrentAppWindowProjection(appID: app.id)
@@ -965,8 +965,8 @@ extension FlowTabPriorityCoverageTests {
             snapshotProvider: provider,
             readModelStore: store,
             reconciliationExecutor: { _, _ in
-                .completedWithRepairedSnapshots([
-                    self.makeRuntimeHomeAppSnapshot(app: repairedApp, pid: pid)
+                .completedWithRepairedCurrentAppWindowPayloads([
+                    self.makeRuntimeCurrentAppWindowPayload(app: repairedApp, pid: pid)
                 ])
             }
         )
@@ -1331,8 +1331,8 @@ extension FlowTabPriorityCoverageTests {
             readModelStore: store,
             reconciliationExecutor: { _, _ in
                 expectation.fulfill()
-                return .completedWithRepairedSnapshots([
-                    self.makeRuntimeHomeAppSnapshot(app: repairedApp, pid: pid)
+                return .completedWithRepairedCurrentAppWindowPayloads([
+                    self.makeRuntimeCurrentAppWindowPayload(app: repairedApp, pid: pid)
                 ])
             }
         )
@@ -1422,11 +1422,11 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(coordinator.readyRequests(now: 10.49).isEmpty)
     }
 
-    private func makeRuntimeHomeAppSnapshot(
+    private func makeRuntimeCurrentAppWindowPayload(
         app: AppSwitchCandidate,
         pid: pid_t
-    ) -> RuntimeHomeAppSnapshot {
-        RuntimeHomeAppSnapshot(
+    ) -> RuntimeCurrentAppWindowPayload {
+        RuntimeCurrentAppWindowPayload(
             summary: RuntimeHomeAppSummary(
                 appID: app.id,
                 displayName: app.displayName,
