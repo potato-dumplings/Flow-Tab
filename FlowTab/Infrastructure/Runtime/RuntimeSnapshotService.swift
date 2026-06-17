@@ -129,7 +129,7 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
             )
             commitRepairedSnapshotsLocked(drainResult.repairedSnapshots)
             for snapshot in drainResult.repairedSnapshots {
-                readModelStore.stageSearchIndexAppSnapshot(snapshot)
+                readModelStore.stageSearchIndexApp(snapshot.candidate)
             }
             let hasPendingRequests = snapshotProvider.reconciliationCoordinator.hasPendingRequests()
             let shouldCommitStagedSearchIndex = drainResult.completedCount > 0

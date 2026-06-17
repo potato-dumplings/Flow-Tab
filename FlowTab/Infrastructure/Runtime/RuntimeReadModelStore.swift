@@ -252,26 +252,26 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     }
 
     @discardableResult
-    func stageSearchIndexAppSnapshot(
-        _ snapshot: RuntimeHomeAppSnapshot,
+    func stageSearchIndexApp(
+        _ app: AppSwitchCandidate,
         generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
     ) -> RuntimeSearchIndexProjection? {
         lock.lock()
         defer { lock.unlock() }
 
         guard let base = stagingSearchIndex ?? committedSearchIndex else { return nil }
-        let appEntry = buildSearchAppIndexEntryLocked(app: snapshot.candidate)
+        let appEntry = buildSearchAppIndexEntryLocked(app: app)
         let windowEntries = buildSearchWindowIndexEntriesLocked(
-            app: snapshot.candidate,
+            app: app,
             appSearchIndex: appEntry.searchIndex
         )
         var appEntries = base.appEntries
-        if let index = appEntries.firstIndex(where: { $0.appID == snapshot.summary.appID }) {
+        if let index = appEntries.firstIndex(where: { $0.appID == app.id }) {
             appEntries[index] = appEntry
         } else {
             appEntries.append(appEntry)
         }
-        let mergedWindowEntries = base.windowEntries.filter { $0.appID != snapshot.summary.appID }
+        let mergedWindowEntries = base.windowEntries.filter { $0.appID != app.id }
             + windowEntries
         stagingSearchIndex = RuntimeSearchIndexProjection(
             appEntries: appEntries,

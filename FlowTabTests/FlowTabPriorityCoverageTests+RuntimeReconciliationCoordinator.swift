@@ -313,8 +313,8 @@ extension FlowTabPriorityCoverageTests {
         )
 
         let staged = try XCTUnwrap(
-            store.stageSearchIndexAppSnapshot(
-                makeRuntimeHomeAppSnapshot(app: repairedApp, pid: 42_101),
+            store.stageSearchIndexApp(
+                repairedApp,
                 generatedAt: 20
             )
         )
@@ -1384,8 +1384,8 @@ extension FlowTabPriorityCoverageTests {
             pid: pid,
             pendingScope: "appWindows:\(repairedApp.id)"
         )
-        store.stageSearchIndexAppSnapshot(
-            makeRuntimeHomeAppSnapshot(app: repairedApp, pid: pid),
+        store.stageSearchIndexApp(
+            repairedApp,
             generatedAt: 20
         )
         coordinator.markAppDirty(
