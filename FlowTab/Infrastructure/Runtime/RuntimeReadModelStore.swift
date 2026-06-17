@@ -150,8 +150,9 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     private var committedSearchIndex: RuntimeSearchIndexProjection?
     private var stagingSearchIndex: RuntimeSearchIndexProjection?
 
-    func commitAppSwitcherSnapshot(
-        _ snapshot: RuntimeSnapshot,
+    func commitAppSwitcherProjection(
+        apps: [AppSwitchCandidate],
+        contextsByID: [String: RuntimeAppContext],
         clearsDirtyState: Bool = true,
         generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
     ) {
@@ -163,13 +164,13 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             clearDirtyStateLocked()
         }
         appSwitcherProjection = RuntimeAppSwitcherProjection(
-            apps: snapshot.apps,
-            contextsByID: snapshot.contextsByID,
+            apps: apps,
+            contextsByID: contextsByID,
             freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: !isDirtyLocked)
         )
         if clearsDirtyState {
             committedSearchIndex = buildSearchIndexLocked(
-                apps: snapshot.apps,
+                apps: apps,
                 generatedAt: generatedAt,
                 isCompleteForScope: true
             )

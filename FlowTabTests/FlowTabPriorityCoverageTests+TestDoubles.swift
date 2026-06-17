@@ -395,8 +395,9 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
         generatedAt: TimeInterval
     ) -> RuntimeSearchIndexProjection {
         let store = RuntimeReadModelStore()
-        store.commitAppSwitcherSnapshot(
-            RuntimeSnapshot(apps: apps, contextsByID: [:]),
+        store.commitAppSwitcherProjection(
+            apps: apps,
+            contextsByID: [:],
             generatedAt: generatedAt
         )
         return store.readCommittedSearchIndexForSearch().projection!

@@ -606,8 +606,9 @@ extension FlowTabTests {
             ]
         )
         let store = RuntimeReadModelStore()
-        store.commitAppSwitcherSnapshot(
-            RuntimeSnapshot(apps: [committedSearchApp], contextsByID: [:]),
+        store.commitAppSwitcherProjection(
+            apps: [committedSearchApp],
+            contextsByID: [:],
             generatedAt: 10
         )
         store.markAppWindowsDirty(

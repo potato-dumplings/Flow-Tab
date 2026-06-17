@@ -12,8 +12,9 @@ extension FlowTabPriorityCoverageTests {
         let pid = NSRunningApplication.current.processIdentifier
         let generatedAt = TimeInterval(42)
 
-        store.commitAppSwitcherSnapshot(
-            RuntimeSnapshot(apps: apps, contextsByID: [:]),
+        store.commitAppSwitcherProjection(
+            apps: apps,
+            contextsByID: [:],
             generatedAt: generatedAt
         )
 
@@ -90,8 +91,9 @@ extension FlowTabPriorityCoverageTests {
         let remainingApps = Array(apps.dropFirst())
         let pid = NSRunningApplication.current.processIdentifier
 
-        store.commitAppSwitcherSnapshot(
-            RuntimeSnapshot(apps: apps, contextsByID: [:]),
+        store.commitAppSwitcherProjection(
+            apps: apps,
+            contextsByID: [:],
             generatedAt: 10
         )
 
@@ -132,11 +134,9 @@ extension FlowTabPriorityCoverageTests {
             windows: activeApp.windows
         )
 
-        store.commitAppSwitcherSnapshot(
-            RuntimeSnapshot(
-                apps: apps,
-                contextsByID: [activeApp.id: context]
-            ),
+        store.commitAppSwitcherProjection(
+            apps: apps,
+            contextsByID: [activeApp.id: context],
             generatedAt: 10
         )
 
@@ -175,10 +175,10 @@ extension FlowTabPriorityCoverageTests {
             lastActiveAt: 100,
             windows: []
         )
-        let seededSnapshot = RuntimeSnapshot(apps: [seededApp], contextsByID: [:])
         let readModelStore = RuntimeReadModelStore()
-        readModelStore.commitAppSwitcherSnapshot(
-            seededSnapshot,
+        readModelStore.commitAppSwitcherProjection(
+            apps: [seededApp],
+            contextsByID: [:],
             clearsDirtyState: false,
             generatedAt: 1
         )
@@ -191,7 +191,7 @@ extension FlowTabPriorityCoverageTests {
 
         let appProjection = service.readAppSwitcherProjection()
 
-        XCTAssertEqual(appProjection?.apps.map(\.id), seededSnapshot.apps.map(\.id))
+        XCTAssertEqual(appProjection?.apps.map(\.id), [seededApp.id])
         XCTAssertTrue(service.runtimeReadModelDiagnostics().hasAppSwitcherProjection)
 
         service.signalAppWindowsChanged(appID: "com.example.editor", pid: 18_405)
@@ -240,7 +240,7 @@ extension FlowTabPriorityCoverageTests {
 
     func testRuntimeReadModelStoreSearchReadinessTracksDirtyMetadataWithoutReadingStaging() throws {
         let store = RuntimeReadModelStore()
-        let committedSnapshot = RuntimeSnapshot(apps: searchScenarioApps(), contextsByID: [:])
+        let committedApps = searchScenarioApps()
         let stagedApps = [
             AppSwitchCandidate(
                 id: "com.example.staging-only",
@@ -257,11 +257,15 @@ extension FlowTabPriorityCoverageTests {
                 ]
             )
         ]
-        store.commitAppSwitcherSnapshot(committedSnapshot, generatedAt: 10)
+        store.commitAppSwitcherProjection(
+            apps: committedApps,
+            contextsByID: [:],
+            generatedAt: 10
+        )
 
         var read = store.readCommittedSearchIndexForSearch()
         XCTAssertEqual(read.readiness, .ready)
-        XCTAssertEqual(read.projection?.appEntries.map(\.appID), committedSnapshot.apps.map(\.id))
+        XCTAssertEqual(read.projection?.appEntries.map(\.appID), committedApps.map(\.id))
 
         store.markAppWindowsDirty(
             appID: "com.example.browser",
@@ -273,7 +277,7 @@ extension FlowTabPriorityCoverageTests {
         read = store.readCommittedSearchIndexForSearch()
         let staleProjection = try XCTUnwrap(read.projection)
         XCTAssertEqual(read.readiness, .stale)
-        XCTAssertEqual(staleProjection.appEntries.map(\.appID), committedSnapshot.apps.map(\.id))
+        XCTAssertEqual(staleProjection.appEntries.map(\.appID), committedApps.map(\.id))
         XCTAssertFalse(staleProjection.appEntries.map(\.appID).contains("com.example.staging-only"))
         XCTAssertEqual(staleProjection.freshness.dirtyAppIDs, ["com.example.browser"])
         XCTAssertEqual(staleProjection.freshness.dirtyPIDs, [42_100])
@@ -297,8 +301,9 @@ extension FlowTabPriorityCoverageTests {
                 )
             ]
         )
-        store.commitAppSwitcherSnapshot(
-            RuntimeSnapshot(apps: committedApps, contextsByID: [:]),
+        store.commitAppSwitcherProjection(
+            apps: committedApps,
+            contextsByID: [:],
             generatedAt: 10
         )
         store.markAppWindowsDirty(
@@ -948,8 +953,9 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
         let pid = pid_t(18_407)
-        store.commitAppSwitcherSnapshot(
-            RuntimeSnapshot(apps: [existingApp], contextsByID: [:]),
+        store.commitAppSwitcherProjection(
+            apps: [existingApp],
+            contextsByID: [:],
             generatedAt: 10
         )
         let service = RuntimeSnapshotService(
@@ -1300,8 +1306,9 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
         let pid = pid_t(42_102)
-        store.commitAppSwitcherSnapshot(
-            RuntimeSnapshot(apps: committedApps, contextsByID: [:]),
+        store.commitAppSwitcherProjection(
+            apps: committedApps,
+            contextsByID: [:],
             generatedAt: 10
         )
         store.markAppWindowsDirty(
@@ -1367,8 +1374,9 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
         let pid = pid_t(42_103)
-        store.commitAppSwitcherSnapshot(
-            RuntimeSnapshot(apps: committedApps, contextsByID: [:]),
+        store.commitAppSwitcherProjection(
+            apps: committedApps,
+            contextsByID: [:],
             generatedAt: 10
         )
         store.markAppWindowsDirty(
