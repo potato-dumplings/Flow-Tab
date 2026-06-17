@@ -750,51 +750,25 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testLiveSwitcherModelStartFocusedAppWindowSessionUsesFrontmostAppSnapshot() {
-        let model = LiveSwitcherModel()
+    func testLiveSwitcherModelStartFocusedAppWindowSessionUsesCurrentAppProjection() {
         let currentApp = NSRunningApplication.current
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let windows = [
             WindowCandidate(id: "front-1", title: "Inbox", isMinimized: false, lastActiveAt: 30),
             WindowCandidate(id: "front-2", title: "Draft", isMinimized: false, lastActiveAt: 20)
         ]
-        let context = makeRuntimeAppContext(
+        let snapshotService = makeCurrentAppWindowProjectionService(
             appID: appID,
             runningApp: currentApp,
             windows: windows
         )
+        let model = LiveSwitcherModel(snapshotService: snapshotService)
 
         model.frontmostApplicationOverride = { currentApp }
-        model.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(
-                apps: [
-                    AppSwitchCandidate(
-                        id: appID,
-                        displayName: currentApp.localizedName ?? "Current App",
-                        groupID: "current",
-                        lastActiveAt: 100,
-                        windows: windows
-                    ),
-                    AppSwitchCandidate(
-                        id: "com.example.other",
-                        displayName: "Other",
-                        groupID: "other",
-                        lastActiveAt: 50,
-                        windows: [
-                            WindowCandidate(
-                                id: "other-1",
-                                title: "Other",
-                                isMinimized: false,
-                                lastActiveAt: 50
-                            )
-                        ]
-                    )
-                ],
-                contextsByID: [appID: context]
-            )
-        }
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         XCTAssertEqual(model.overlayStyle, .windowOnly)
         XCTAssertTrue(model.isPreviewLayerMode)
         XCTAssertEqual(model.previewWindowCount, 2)
