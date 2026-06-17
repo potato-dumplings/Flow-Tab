@@ -1010,15 +1010,9 @@ extension FlowTabTests {
             includeRuntimeContexts: false
         )
         let fastSnapshot = appOnlySnapshot(from: fullSnapshot)
-        let model = LiveSwitcherModel()
+        let runtimeService = RecordingRuntimeSnapshotService(appSwitcherApps: fastSnapshot.apps)
+        let model = LiveSwitcherModel(snapshotService: runtimeService)
         model.frontmostApplicationOverride = { nil }
-        model.testingFastAppSnapshotProviderOverride = { fastSnapshot }
-        var fullSnapshotCalls = 0
-        model.testingSnapshotProviderOverride = {
-            fullSnapshotCalls += 1
-            Thread.sleep(forTimeInterval: 0.2)
-            return fullSnapshot
-        }
 
         let iterations = 80
         var samples: [Double] = []
@@ -1034,18 +1028,18 @@ extension FlowTabTests {
         let summary = latencySummary(samples: samples)
         print(
             String(
-                format: "[OptionTabFrontmostWindowScalePressure] apps=%d, frontmostWindows=%d, iterations=%d, p50=%.2fms, p95=%.2fms, max=%.2fms, fullSnapshotCalls=%d",
+                format: "[OptionTabFrontmostWindowScalePressure] apps=%d, frontmostWindows=%d, iterations=%d, p50=%.2fms, p95=%.2fms, max=%.2fms, maintenanceRequests=%d",
                 fullSnapshot.apps.count,
                 selectedWindowCount,
                 iterations,
                 summary.p50,
                 summary.p95,
                 summary.max,
-                fullSnapshotCalls
+                runtimeService.appSwitcherMaintenanceRequestsRecorded().count
             )
         )
 
-        XCTAssertEqual(fullSnapshotCalls, 0)
+        XCTAssertEqual(runtimeService.appSwitcherMaintenanceRequestsRecorded().count, iterations)
         XCTAssertLessThan(summary.p95, 100)
     }
 
@@ -1223,10 +1217,11 @@ extension FlowTabTests {
             includeRuntimeContexts: true
         )
         let fastSnapshot = appOnlySnapshot(from: fullSnapshot)
-        let model = LiveSwitcherModel()
+        let model = LiveSwitcherModel(
+            snapshotService: RecordingRuntimeSnapshotService(appSwitcherApps: fastSnapshot.apps)
+        )
         model.frontmostApplicationOverride = { nil }
         model.runtimeProjectionMaintenanceEnabled = false
-        model.testingFastAppSnapshotProviderOverride = { fastSnapshot }
         var previewCaptureCalls = 0
         model.previewCaptureOverride = { _, _, _, _ in
             previewCaptureCalls += 1
