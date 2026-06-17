@@ -52,9 +52,11 @@ enum HomeRuntimeProjectionReader {
     static func appDetailProjection(
         for appID: String,
         from service: any RuntimeProjectionServing
-    ) -> RuntimeHomeAppSnapshot? {
+    ) -> RuntimeHomeAppDetailProjection? {
         if let projection = service.readCurrentAppWindowProjection(appID: appID) {
-            return homeSnapshot(from: projection.currentAppWindowPayload)
+            return RuntimeHomeAppDetailProjection(
+                currentAppWindowPayload: projection.currentAppWindowPayload
+            )
         }
         guard
             let appProjection = service.readAppSwitcherProjection(),
@@ -63,20 +65,10 @@ enum HomeRuntimeProjectionReader {
         else {
             return nil
         }
-        return RuntimeHomeAppSnapshot(
+        return RuntimeHomeAppDetailProjection(
             summary: homeSummary(for: app, context: context),
             candidate: app,
             context: context
-        )
-    }
-
-    private static func homeSnapshot(
-        from payload: RuntimeCurrentAppWindowPayload
-    ) -> RuntimeHomeAppSnapshot {
-        RuntimeHomeAppSnapshot(
-            summary: payload.summary,
-            candidate: payload.candidate,
-            context: payload.context
         )
     }
 
@@ -123,11 +115,11 @@ enum HomeRuntimeRefreshReader {
     static func appDetailProjection(
         for appID: String,
         from service: any RuntimeProjectionServing,
-        current detailProjection: RuntimeHomeAppSnapshot?,
+        current detailProjection: RuntimeHomeAppDetailProjection?,
         currentSummary: RuntimeHomeAppSummary?
-    ) -> RuntimeHomeAppSnapshot? {
-        if let projectionSnapshot = HomeRuntimeProjectionReader.appDetailProjection(for: appID, from: service) {
-            return projectionSnapshot
+    ) -> RuntimeHomeAppDetailProjection? {
+        if let projection = HomeRuntimeProjectionReader.appDetailProjection(for: appID, from: service) {
+            return projection
         }
         signalMissingProjection(
             appID: appID,

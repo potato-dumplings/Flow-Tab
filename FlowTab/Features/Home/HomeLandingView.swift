@@ -41,7 +41,7 @@ struct HomeLandingView: View {
     @State private var appSummaries: [RuntimeHomeAppSummary] = []
     @State private var hiddenAppIDs = AppVisibilityPreferencesStore.loadHiddenAppIDs()
     @State private var windowsByAppID: [String: [WindowCandidate]] = [:]
-    @State private var homeDetailProjectionsByAppID: [String: RuntimeHomeAppSnapshot] = [:]
+    @State private var homeDetailProjectionsByAppID: [String: RuntimeHomeAppDetailProjection] = [:]
     @State private var loadingWindowCountAppIDs: Set<String> = []
     @State private var selectedAppID: String?
     @State private var appSummariesRefreshTask: Task<Void, Never>?
@@ -798,7 +798,7 @@ struct HomeLandingView: View {
         )
     }
 
-    private func fetchHomeAppDetailProjectionOnBackground(appID: String) async -> RuntimeHomeAppSnapshot? {
+    private func fetchHomeAppDetailProjectionOnBackground(appID: String) async -> RuntimeHomeAppDetailProjection? {
         HomeRuntimeRefreshReader.appDetailProjection(
             for: appID,
             from: runtimeProjectionService,

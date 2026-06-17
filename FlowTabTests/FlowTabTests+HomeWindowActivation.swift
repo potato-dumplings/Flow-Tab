@@ -7,7 +7,7 @@ extension FlowTabTests {
     @MainActor
     func testHomeWindowActivationRequestUsesSwitcherPreferencesForMinimizedWindowFallback() {
         let appID = "com.example.mail"
-        let snapshot = makeHomeActivationSnapshot(
+        let detailProjection = makeHomeActivationDetailProjection(
             appID: appID,
             windows: [
                 WindowCandidate(
@@ -22,7 +22,7 @@ extension FlowTabTests {
         preferences.autoRestoreMinimizedWindowOnSwitch = false
 
         let request = HomeWindowActivationController.makeActivationRequest(
-            detailProjection: snapshot,
+            detailProjection: detailProjection,
             appID: appID,
             windowID: "mail-archive",
             preferences: preferences
@@ -36,7 +36,7 @@ extension FlowTabTests {
     @MainActor
     func testHomeWindowActivationRequestBuildsRestoringWindowTargetWhenPreferenceAllowsIt() {
         let appID = "com.example.mail"
-        let snapshot = makeHomeActivationSnapshot(
+        let detailProjection = makeHomeActivationDetailProjection(
             appID: appID,
             windows: [
                 WindowCandidate(
@@ -51,7 +51,7 @@ extension FlowTabTests {
         preferences.autoRestoreMinimizedWindowOnSwitch = true
 
         let request = HomeWindowActivationController.makeActivationRequest(
-            detailProjection: snapshot,
+            detailProjection: detailProjection,
             appID: appID,
             windowID: "mail-archive",
             preferences: preferences
@@ -66,7 +66,7 @@ extension FlowTabTests {
     @MainActor
     func testHomeWindowActivationControllerUsesRuntimeProjectionWithoutHomeSnapshotBridge() {
         let appID = "com.example.projected-home-activation"
-        let snapshot = makeHomeActivationSnapshot(
+        let detailProjection = makeHomeActivationDetailProjection(
             appID: appID,
             windows: [
                 WindowCandidate(
@@ -91,9 +91,9 @@ extension FlowTabTests {
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
                     currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
-                        summary: snapshot.summary,
-                        candidate: snapshot.candidate,
-                        context: snapshot.context
+                        summary: detailProjection.summary,
+                        candidate: detailProjection.candidate,
+                        context: detailProjection.context
                     ),
                     freshness: freshness
                 )
@@ -133,7 +133,7 @@ extension FlowTabTests {
     @MainActor
     func testHomeWindowActivationControllerSignalsRuntimeRepairWhenProjectionIsMissing() {
         let appID = "com.example.missing-home-activation-projection"
-        let contaminatedSnapshot = makeHomeActivationSnapshot(
+        let contaminatedDetailProjection = makeHomeActivationDetailProjection(
             appID: appID,
             windows: [
                 WindowCandidate(
@@ -155,7 +155,7 @@ extension FlowTabTests {
         )
         let snapshotService = RecordingRuntimeProjectionService(
             homeSummaryProjection: RuntimeHomeSummaryProjection(
-                summaries: [contaminatedSnapshot.summary],
+                summaries: [contaminatedDetailProjection.summary],
                 freshness: freshness
             )
         )
@@ -178,14 +178,14 @@ extension FlowTabTests {
         XCTAssertEqual(snapshotService.appWindowChangeSignalsRecorded().map(\.appID), [appID])
         XCTAssertEqual(
             snapshotService.appWindowChangeSignalsRecorded().map(\.pid),
-            [contaminatedSnapshot.summary.pid]
+            [contaminatedDetailProjection.summary.pid]
         )
     }
 
     @MainActor
-    func testHomeWindowActivationControllerUsesProvidedHomeSnapshot() {
+    func testHomeWindowActivationControllerUsesProvidedDetailProjection() {
         let appID = "com.example.cached"
-        let snapshot = makeHomeActivationSnapshot(
+        let detailProjection = makeHomeActivationDetailProjection(
             appID: appID,
             windows: [
                 WindowCandidate(
@@ -208,7 +208,7 @@ extension FlowTabTests {
         controller.activateWindow(
             appID: appID,
             windowID: "cached-mail",
-            detailProjection: snapshot
+            detailProjection: detailProjection
         )
 
         XCTAssertEqual(
@@ -253,7 +253,7 @@ extension FlowTabTests {
 
     func testHomeRuntimeProjectionReaderUsesRuntimeProjectionsWithoutSnapshotBridge() {
         let appID = "com.example.home-projection"
-        let snapshot = makeHomeActivationSnapshot(
+        let detailProjection = makeHomeActivationDetailProjection(
             appID: appID,
             windows: [
                 WindowCandidate(
@@ -275,16 +275,16 @@ extension FlowTabTests {
         )
         let snapshotService = RecordingRuntimeProjectionService(
             homeSummaryProjection: RuntimeHomeSummaryProjection(
-                summaries: [snapshot.summary],
+                summaries: [detailProjection.summary],
                 freshness: freshness
             ),
             currentAppWindowProjectionsByAppID: [
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
                     currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
-                        summary: snapshot.summary,
-                        candidate: snapshot.candidate,
-                        context: snapshot.context
+                        summary: detailProjection.summary,
+                        candidate: detailProjection.candidate,
+                        context: detailProjection.context
                     ),
                     freshness: freshness
                 )
@@ -361,7 +361,7 @@ extension FlowTabTests {
 
     func testHomeRuntimeProjectionReaderDerivesHomeDataFromAppSwitcherProjectionWithoutSnapshotBridge() {
         let appID = "com.example.home-app-switcher-projection"
-        let snapshot = makeHomeActivationSnapshot(
+        let detailProjection = makeHomeActivationDetailProjection(
             appID: appID,
             windows: [
                 WindowCandidate(
@@ -383,8 +383,8 @@ extension FlowTabTests {
         )
         let snapshotService = RecordingRuntimeProjectionService(
             appSwitcherProjection: RuntimeAppSwitcherProjection(
-                apps: [snapshot.candidate],
-                contextsByID: [appID: snapshot.context],
+                apps: [detailProjection.candidate],
+                contextsByID: [appID: detailProjection.context],
                 freshness: freshness
             )
         )
@@ -395,7 +395,7 @@ extension FlowTabTests {
         )
         XCTAssertEqual(
             HomeRuntimeProjectionReader.appSummary(for: appID, from: snapshotService)?.pid,
-            snapshot.summary.pid
+            detailProjection.summary.pid
         )
         XCTAssertEqual(
             HomeRuntimeProjectionReader.appDetailProjection(
@@ -411,7 +411,7 @@ extension FlowTabTests {
 
     func testHomeRuntimeRefreshReaderSignalsRuntimeRepairWhenProjectionIsMissingWithoutHomeFallback() {
         let appID = "com.example.home-refresh-missing"
-        let cachedSnapshot = makeHomeActivationSnapshot(
+        let cachedDetailProjection = makeHomeActivationDetailProjection(
             appID: appID,
             windows: [
                 WindowCandidate(
@@ -427,7 +427,7 @@ extension FlowTabTests {
         XCTAssertEqual(
             HomeRuntimeRefreshReader.appSummaries(
                 from: snapshotService,
-                current: [cachedSnapshot.summary]
+                current: [cachedDetailProjection.summary]
             ).map(\.appID),
             [appID]
         )
@@ -435,7 +435,7 @@ extension FlowTabTests {
             HomeRuntimeRefreshReader.appSummary(
                 for: appID,
                 from: snapshotService,
-                current: [cachedSnapshot.summary]
+                current: [cachedDetailProjection.summary]
             )?.windowCount,
             1
         )
@@ -443,8 +443,8 @@ extension FlowTabTests {
             HomeRuntimeRefreshReader.appDetailProjection(
                 for: appID,
                 from: snapshotService,
-                current: cachedSnapshot,
-                currentSummary: cachedSnapshot.summary
+                current: cachedDetailProjection,
+                currentSummary: cachedDetailProjection.summary
             )?.candidate.windows.map(\.id),
             ["cached-window"]
         )
@@ -537,10 +537,10 @@ extension FlowTabTests {
         XCTAssertEqual(stats.totalWindows, .loading)
     }
 
-    private func makeHomeActivationSnapshot(
+    private func makeHomeActivationDetailProjection(
         appID: String,
         windows: [WindowCandidate]
-    ) -> RuntimeHomeAppSnapshot {
+    ) -> RuntimeHomeAppDetailProjection {
         let runningApp = NSRunningApplication.current
         let candidate = AppSwitchCandidate(
             id: appID,
@@ -575,7 +575,7 @@ extension FlowTabTests {
             windowCount: windows.count,
             pid: runningApp.processIdentifier
         )
-        return RuntimeHomeAppSnapshot(summary: summary, candidate: candidate, context: context)
+        return RuntimeHomeAppDetailProjection(summary: summary, candidate: candidate, context: context)
     }
 
     private func makeHomeAppSummary(

@@ -50,7 +50,7 @@ final class HomeWindowActivationController {
     func activateWindow(
         appID: String,
         windowID: String,
-        detailProjection: RuntimeHomeAppSnapshot? = nil
+        detailProjection: RuntimeHomeAppDetailProjection? = nil
     ) {
         let resolvedDetailProjection = detailProjection ?? HomeRuntimeProjectionReader.appDetailProjection(
             for: appID,
@@ -77,7 +77,7 @@ final class HomeWindowActivationController {
     }
 
     static func makeActivationRequest(
-        detailProjection: RuntimeHomeAppSnapshot?,
+        detailProjection: RuntimeHomeAppDetailProjection?,
         appID: String,
         windowID: String,
         preferences: SwitcherPreferences

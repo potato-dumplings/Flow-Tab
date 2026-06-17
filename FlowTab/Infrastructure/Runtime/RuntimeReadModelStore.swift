@@ -69,6 +69,26 @@ struct RuntimeCurrentAppWindowPayload {
 
 }
 
+struct RuntimeHomeAppDetailProjection {
+    let summary: RuntimeHomeAppSummary
+    let candidate: AppSwitchCandidate
+    let context: RuntimeAppContext
+
+    init(summary: RuntimeHomeAppSummary, candidate: AppSwitchCandidate, context: RuntimeAppContext) {
+        self.summary = summary
+        self.candidate = candidate
+        self.context = context
+    }
+
+    init(currentAppWindowPayload payload: RuntimeCurrentAppWindowPayload) {
+        self.init(
+            summary: payload.summary,
+            candidate: payload.candidate,
+            context: payload.context
+        )
+    }
+}
+
 struct RuntimeCurrentAppWindowProjection {
     let appID: String
     let currentAppWindowPayload: RuntimeCurrentAppWindowPayload
