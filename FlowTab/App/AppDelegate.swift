@@ -328,7 +328,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 return
             }
             let appID = RuntimeSnapshotProvider.baseAppID(for: app)
-            self.resolvedRuntimeSnapshotService.signalAppLaunched(
+            self.resolvedRuntimeProjectionService.signalAppLaunched(
                 appID: appID,
                 pid: app.processIdentifier
             )
@@ -343,7 +343,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 return
             }
             let appID = RuntimeSnapshotProvider.baseAppID(for: app)
-            self.resolvedRuntimeSnapshotService.signalAppTerminated(
+            self.resolvedRuntimeProjectionService.signalAppTerminated(
                 appID: appID,
                 pid: app.processIdentifier
             )

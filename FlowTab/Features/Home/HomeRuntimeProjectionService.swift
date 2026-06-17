@@ -1,10 +1,10 @@
 import Foundation
 import FlowTabCore
 
-let homeRuntimeProjectionService = sharedRuntimeSnapshotService
+let homeRuntimeProjectionService = sharedRuntimeProjectionService
 
 enum HomeRuntimeProjectionReader {
-    static func appSummaries(from service: any RuntimeSnapshotServing) -> [RuntimeHomeAppSummary]? {
+    static func appSummaries(from service: any RuntimeProjectionServing) -> [RuntimeHomeAppSummary]? {
         if let homeProjection = service.readHomeSummaryProjection() {
             return homeProjection.summaries
         }
@@ -17,7 +17,7 @@ enum HomeRuntimeProjectionReader {
         }
     }
 
-    static func initialAppSummaries(from service: any RuntimeSnapshotServing) -> [RuntimeHomeAppSummary]? {
+    static func initialAppSummaries(from service: any RuntimeProjectionServing) -> [RuntimeHomeAppSummary]? {
         if let homeProjection = service.readHomeSummaryProjection() {
             return homeProjection.summaries
         }
@@ -32,7 +32,7 @@ enum HomeRuntimeProjectionReader {
 
     static func appSummary(
         for appID: String,
-        from service: any RuntimeSnapshotServing
+        from service: any RuntimeProjectionServing
     ) -> RuntimeHomeAppSummary? {
         if let summary = service.readHomeSummaryProjection()?.summary(for: appID) {
             return summary
@@ -51,7 +51,7 @@ enum HomeRuntimeProjectionReader {
 
     static func appSnapshot(
         for appID: String,
-        from service: any RuntimeSnapshotServing
+        from service: any RuntimeProjectionServing
     ) -> RuntimeHomeAppSnapshot? {
         if let projection = service.readCurrentAppWindowProjection(appID: appID) {
             return homeSnapshot(from: projection.currentAppWindowPayload)
@@ -97,7 +97,7 @@ enum HomeRuntimeProjectionReader {
 
 enum HomeRuntimeRefreshReader {
     static func appSummaries(
-        from service: any RuntimeSnapshotServing,
+        from service: any RuntimeProjectionServing,
         current summaries: [RuntimeHomeAppSummary]
     ) -> [RuntimeHomeAppSummary] {
         guard let projectionSummaries = HomeRuntimeProjectionReader.appSummaries(from: service) else {
@@ -109,7 +109,7 @@ enum HomeRuntimeRefreshReader {
 
     static func appSummary(
         for appID: String,
-        from service: any RuntimeSnapshotServing,
+        from service: any RuntimeProjectionServing,
         current summaries: [RuntimeHomeAppSummary]
     ) -> RuntimeHomeAppSummary? {
         if let summary = HomeRuntimeProjectionReader.appSummary(for: appID, from: service) {
@@ -122,7 +122,7 @@ enum HomeRuntimeRefreshReader {
 
     static func appSnapshot(
         for appID: String,
-        from service: any RuntimeSnapshotServing,
+        from service: any RuntimeProjectionServing,
         current snapshot: RuntimeHomeAppSnapshot?,
         currentSummary: RuntimeHomeAppSummary?
     ) -> RuntimeHomeAppSnapshot? {
@@ -140,7 +140,7 @@ enum HomeRuntimeRefreshReader {
     private static func signalMissingProjection(
         appID: String,
         summary: RuntimeHomeAppSummary?,
-        service: any RuntimeSnapshotServing
+        service: any RuntimeProjectionServing
     ) {
         guard let pid = summary?.pid, pid > 0 else {
             service.requestAppSwitcherProjectionMaintenance(reason: .homeProjectionMissing)
@@ -151,7 +151,7 @@ enum HomeRuntimeRefreshReader {
 }
 
 enum HomeInitialAppSummaryReader {
-    static func appSummaries(from service: any RuntimeSnapshotServing) -> [RuntimeHomeAppSummary] {
+    static func appSummaries(from service: any RuntimeProjectionServing) -> [RuntimeHomeAppSummary] {
         HomeRuntimeProjectionReader.initialAppSummaries(from: service) ?? []
     }
 }

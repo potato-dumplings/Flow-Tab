@@ -2,7 +2,7 @@ import CoreGraphics
 import Foundation
 import FlowTabCore
 
-let sharedRuntimeSnapshotService = RuntimeSnapshotService()
+let sharedRuntimeProjectionService = RuntimeSnapshotService()
 
 enum RuntimeProjectionMaintenanceReason: String, Sendable {
     case switcherSessionStarted
@@ -11,7 +11,7 @@ enum RuntimeProjectionMaintenanceReason: String, Sendable {
     case searchFreshnessBarrier
 }
 
-protocol RuntimeSnapshotServing: Sendable {
+protocol RuntimeProjectionServing: Sendable {
     func readAppSwitcherProjection() -> RuntimeAppSwitcherProjection?
     func readHomeSummaryProjection() -> RuntimeHomeSummaryProjection?
     func readCurrentAppWindowProjection(appID: String) -> RuntimeCurrentAppWindowProjection?
@@ -29,7 +29,7 @@ protocol RuntimeSnapshotServing: Sendable {
     func isLikelyTransientAXRebuild(for pid: pid_t) -> Bool
 }
 
-final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable {
+final class RuntimeSnapshotService: RuntimeProjectionServing, @unchecked Sendable {
     enum ReconciliationExecutionOutcome {
         case completed
         case completedWithRepairedCurrentAppWindowPayloads([RuntimeCurrentAppWindowPayload])

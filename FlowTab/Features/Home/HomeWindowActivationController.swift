@@ -10,12 +10,12 @@ final class HomeWindowActivationController {
 
     static let shared = HomeWindowActivationController()
 
-    private let runtimeProjectionService: any RuntimeSnapshotServing
+    private let runtimeProjectionService: any RuntimeProjectionServing
     private let preferencesProvider: () -> SwitcherPreferences
     private let activationHandler: (ActivationTarget, [String: RuntimeAppContext]) -> Void
 
     init(
-        runtimeProjectionService: any RuntimeSnapshotServing = sharedRuntimeSnapshotService,
+        runtimeProjectionService: any RuntimeProjectionServing = sharedRuntimeProjectionService,
         preferencesProvider: @escaping () -> SwitcherPreferences = {
             SwitcherBehaviorPreferencesStore.loadSwitcherPreferences()
         },

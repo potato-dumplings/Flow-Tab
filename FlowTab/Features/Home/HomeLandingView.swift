@@ -14,12 +14,12 @@ struct HomeLandingView: View {
     let isActive: Bool
     let appLanguage: AppLanguage
     let openSettings: () -> Void
-    private let runtimeProjectionService: any RuntimeSnapshotServing
+    private let runtimeProjectionService: any RuntimeProjectionServing
 
     init(
         isActive: Bool,
         appLanguage: AppLanguage,
-        runtimeProjectionService: any RuntimeSnapshotServing = homeRuntimeProjectionService,
+        runtimeProjectionService: any RuntimeProjectionServing = homeRuntimeProjectionService,
         openSettings: @escaping () -> Void
     ) {
         self.isActive = isActive

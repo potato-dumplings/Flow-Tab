@@ -213,7 +213,7 @@ final class LiveSwitcherModel: ObservableObject {
     @Published var searchLayoutMeasurements: SwitcherSearchLayoutMeasurements = .fallback
     @Published var terminatingAppID: String?
 
-    let runtimeProjectionService: any RuntimeSnapshotServing
+    let runtimeProjectionService: any RuntimeProjectionServing
     let activator = RuntimeActivator()
     let iconProvider = AppIconProvider()
     let searchCoordinator = SwitcherSearchCoordinator()
@@ -281,7 +281,7 @@ final class LiveSwitcherModel: ObservableObject {
 
     init(
         windowRecencyTracker: RuntimeWindowRecencyTracker = .shared,
-        runtimeProjectionService: any RuntimeSnapshotServing = sharedRuntimeSnapshotService
+        runtimeProjectionService: any RuntimeProjectionServing = sharedRuntimeProjectionService
     ) {
         self.windowRecencyTracker = windowRecencyTracker
         self.runtimeProjectionService = runtimeProjectionService

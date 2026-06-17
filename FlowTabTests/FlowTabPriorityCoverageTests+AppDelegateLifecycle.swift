@@ -132,7 +132,7 @@ extension FlowTabPriorityCoverageTests {
                 )
             },
             stressRunner: stressRunner,
-            runtimeSnapshotService: snapshotService,
+            runtimeProjectionService: snapshotService,
             workspaceNotificationCenter: workspaceNotificationCenter
         )
 

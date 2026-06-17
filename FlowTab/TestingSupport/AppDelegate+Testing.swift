@@ -14,7 +14,7 @@ struct AppDelegateTestHooks {
     var stressRunner: (any TabSwitchStressRunning)? = nil
     var launchAtLoginManager: (any LaunchAtLoginManaging)? = nil
     var activationPolicyApplication: (any AppActivationPolicyApplying)? = nil
-    var runtimeSnapshotService: (any RuntimeSnapshotServing)? = nil
+    var runtimeProjectionService: (any RuntimeProjectionServing)? = nil
     var workspaceNotificationCenter: NotificationCenter? = nil
 }
 
@@ -46,8 +46,8 @@ extension AppDelegate {
         Self.testHooks.activationPolicyApplication ?? NSApp
     }
 
-    var resolvedRuntimeSnapshotService: any RuntimeSnapshotServing {
-        Self.testHooks.runtimeSnapshotService ?? sharedRuntimeSnapshotService
+    var resolvedRuntimeProjectionService: any RuntimeProjectionServing {
+        Self.testHooks.runtimeProjectionService ?? sharedRuntimeProjectionService
     }
 
     var resolvedWorkspaceNotificationCenter: NotificationCenter {
