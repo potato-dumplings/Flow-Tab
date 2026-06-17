@@ -425,7 +425,7 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
-    func testRuntimeWindowRecencyTrackerAppliesSameOrderingToHomeSnapshots() {
+    func testRuntimeWindowRecencyTrackerAppliesSameOrderingToCurrentAppPayload() {
         var now: TimeInterval = 500
         let tracker = RuntimeWindowRecencyTracker(clock: { now })
         let currentApp = NSRunningApplication.current
@@ -452,7 +452,7 @@ extension FlowTabPriorityCoverageTests {
                 )
             })
         )
-        let snapshot = RuntimeHomeAppSnapshot(
+        let payload = RuntimeCurrentAppWindowPayload(
             summary: RuntimeHomeAppSummary(
                 appID: appID,
                 displayName: "Home Fixture",
@@ -474,13 +474,13 @@ extension FlowTabPriorityCoverageTests {
         now = 800
         tracker.record(appID: appID, windowID: "second", context: context)
 
-        let updatedSnapshot = tracker.homeSnapshotWithRecencyApplied(snapshot)
+        let updatedPayload = tracker.currentAppWindowPayloadWithRecencyApplied(payload)
 
         XCTAssertEqual(
-            updatedSnapshot.candidate.windows.map(\.id),
+            updatedPayload.candidate.windows.map(\.id),
             ["second", "first", "third"]
         )
-        XCTAssertEqual(updatedSnapshot.summary.windowCount, 3)
+        XCTAssertEqual(updatedPayload.summary.windowCount, 3)
     }
 
     @MainActor

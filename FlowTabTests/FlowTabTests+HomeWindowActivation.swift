@@ -217,7 +217,7 @@ extension FlowTabTests {
         )
     }
 
-    func testRuntimeWindowRecencyTrackerAppliesToProviderHomeSnapshot() async {
+    func testRuntimeWindowRecencyTrackerAppliesToProviderRepairPayload() async {
         await withLaunchArgumentsForTesting(["FlowTab", "--flowtab-ui-mock-runtime"]) {
             let tracker = RuntimeWindowRecencyTracker()
             let provider = RuntimeSnapshotProvider()
@@ -242,10 +242,16 @@ extension FlowTabTests {
                 allowedActions: WindowBindingConfidence.exact.allowedActions
             )
 
-            let orderedSnapshot = tracker.homeSnapshotWithRecencyApplied(baselineSnapshot)
+            let orderedPayload = tracker.currentAppWindowPayloadWithRecencyApplied(
+                RuntimeCurrentAppWindowPayload(
+                    summary: baselineSnapshot.summary,
+                    candidate: baselineSnapshot.candidate,
+                    context: baselineSnapshot.context
+                )
+            )
 
             XCTAssertEqual(
-                orderedSnapshot.candidate.windows.map(\.id),
+                orderedPayload.candidate.windows.map(\.id),
                 ["mock-mail-draft", "mock-mail-inbox"]
             )
         }
