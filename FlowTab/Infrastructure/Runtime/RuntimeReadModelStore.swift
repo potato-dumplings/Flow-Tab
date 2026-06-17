@@ -56,10 +56,64 @@ struct RuntimeHomeSummaryProjection {
     }
 }
 
+struct RuntimeCurrentAppWindowPayload {
+    let summary: RuntimeHomeAppSummary
+    let candidate: AppSwitchCandidate
+    let context: RuntimeAppContext
+
+    init(summary: RuntimeHomeAppSummary, candidate: AppSwitchCandidate, context: RuntimeAppContext) {
+        self.summary = summary
+        self.candidate = candidate
+        self.context = context
+    }
+
+    init(homeAppSnapshot: RuntimeHomeAppSnapshot) {
+        self.init(
+            summary: homeAppSnapshot.summary,
+            candidate: homeAppSnapshot.candidate,
+            context: homeAppSnapshot.context
+        )
+    }
+
+    var homeAppSnapshot: RuntimeHomeAppSnapshot {
+        RuntimeHomeAppSnapshot(
+            summary: summary,
+            candidate: candidate,
+            context: context
+        )
+    }
+}
+
 struct RuntimeCurrentAppWindowProjection {
     let appID: String
-    let homeAppSnapshot: RuntimeHomeAppSnapshot
+    let currentAppWindowPayload: RuntimeCurrentAppWindowPayload
     var freshness: RuntimeProjectionFreshness
+
+    init(
+        appID: String,
+        currentAppWindowPayload: RuntimeCurrentAppWindowPayload,
+        freshness: RuntimeProjectionFreshness
+    ) {
+        self.appID = appID
+        self.currentAppWindowPayload = currentAppWindowPayload
+        self.freshness = freshness
+    }
+
+    init(
+        appID: String,
+        homeAppSnapshot: RuntimeHomeAppSnapshot,
+        freshness: RuntimeProjectionFreshness
+    ) {
+        self.init(
+            appID: appID,
+            currentAppWindowPayload: RuntimeCurrentAppWindowPayload(homeAppSnapshot: homeAppSnapshot),
+            freshness: freshness
+        )
+    }
+
+    var homeAppSnapshot: RuntimeHomeAppSnapshot {
+        currentAppWindowPayload.homeAppSnapshot
+    }
 }
 
 struct RuntimeSearchAppIndexEntry: Equatable, Sendable {
@@ -224,17 +278,27 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         _ snapshot: RuntimeHomeAppSnapshot,
         generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
     ) {
+        commitCurrentAppWindowProjection(
+            RuntimeCurrentAppWindowPayload(homeAppSnapshot: snapshot),
+            generatedAt: generatedAt
+        )
+    }
+
+    func commitCurrentAppWindowProjection(
+        _ payload: RuntimeCurrentAppWindowPayload,
+        generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
+    ) {
         lock.lock()
         defer { lock.unlock() }
 
         markProjectionCommittedLocked()
-        clearDirtyStateForAppLocked(appID: snapshot.summary.appID, pid: snapshot.summary.pid)
-        currentAppWindowProjectionsByAppID[snapshot.summary.appID] = RuntimeCurrentAppWindowProjection(
-            appID: snapshot.summary.appID,
-            homeAppSnapshot: snapshot,
+        clearDirtyStateForAppLocked(appID: payload.summary.appID, pid: payload.summary.pid)
+        currentAppWindowProjectionsByAppID[payload.summary.appID] = RuntimeCurrentAppWindowProjection(
+            appID: payload.summary.appID,
+            currentAppWindowPayload: payload,
             freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: true)
         )
-        upsertAppSwitcherProjectionLocked(snapshot, generatedAt: generatedAt)
+        upsertAppSwitcherProjectionLocked(payload, generatedAt: generatedAt)
     }
 
     func stageSearchIndexApps(
@@ -427,7 +491,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         if let context = appSwitcherProjection?.contextsByID[appID] {
             knownPIDs.insert(context.runningApp.processIdentifier)
         }
-        if let context = currentAppWindowProjectionsByAppID[appID]?.homeAppSnapshot.context {
+        if let context = currentAppWindowProjectionsByAppID[appID]?.currentAppWindowPayload.context {
             knownPIDs.insert(context.runningApp.processIdentifier)
         }
         if let summary = homeSummaryProjection?.summary(for: appID) {
@@ -466,7 +530,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
 
         guard var projection = currentAppWindowProjectionsByAppID[appID] else { return nil }
         let isScopeDirty = dirtyAppIDs.contains(appID)
-            || dirtyPIDs.contains(projection.homeAppSnapshot.summary.pid)
+            || dirtyPIDs.contains(projection.currentAppWindowPayload.summary.pid)
             || !dirtyCGWindowIDs.isEmpty
             || !pendingRepairScopes.isEmpty
         projection.freshness = freshnessLocked(
@@ -539,14 +603,14 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     }
 
     private func upsertAppSwitcherProjectionLocked(
-        _ snapshot: RuntimeHomeAppSnapshot,
+        _ payload: RuntimeCurrentAppWindowPayload,
         generatedAt: TimeInterval
     ) {
         var apps = appSwitcherProjection?.apps ?? []
-        if let index = apps.firstIndex(where: { $0.id == snapshot.candidate.id }) {
-            apps[index] = snapshot.candidate
+        if let index = apps.firstIndex(where: { $0.id == payload.candidate.id }) {
+            apps[index] = payload.candidate
         } else {
-            apps.append(snapshot.candidate)
+            apps.append(payload.candidate)
         }
         apps.sort { lhs, rhs in
             if lhs.lastActiveAt == rhs.lastActiveAt {
@@ -556,7 +620,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         }
 
         var contextsByID = appSwitcherProjection?.contextsByID ?? [:]
-        contextsByID[snapshot.context.appID] = snapshot.context
+        contextsByID[payload.context.appID] = payload.context
         appSwitcherProjection = RuntimeAppSwitcherProjection(
             apps: apps,
             contextsByID: contextsByID,

@@ -70,7 +70,9 @@ extension FlowTabPriorityCoverageTests {
         let currentAppProjection = try XCTUnwrap(
             store.readCurrentAppWindowProjection(appID: app.id)
         )
-        XCTAssertEqual(currentAppProjection.homeAppSnapshot.candidate.id, app.id)
+        XCTAssertEqual(currentAppProjection.currentAppWindowPayload.candidate.id, app.id)
+        XCTAssertEqual(currentAppProjection.currentAppWindowPayload.summary.appID, app.id)
+        XCTAssertEqual(currentAppProjection.currentAppWindowPayload.context.appID, app.id)
         XCTAssertTrue(currentAppProjection.freshness.isCompleteForScope)
         XCTAssertEqual(currentAppProjection.freshness.sourceGeneration.projection, 2)
         let repairedAppProjection = try XCTUnwrap(store.readAppSwitcherProjection())

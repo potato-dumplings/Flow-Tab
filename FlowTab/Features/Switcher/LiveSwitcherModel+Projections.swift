@@ -185,7 +185,7 @@ extension LiveSwitcherModel {
 
         if let projection = runtimeService.readCurrentAppWindowProjection(appID: targetAppID) {
             completeSelectedAppWindowProjection(
-                projection.homeAppSnapshot,
+                projection.currentAppWindowPayload.homeAppSnapshot,
                 appID: targetAppID,
                 generation: generation,
                 startMs: startMs,
