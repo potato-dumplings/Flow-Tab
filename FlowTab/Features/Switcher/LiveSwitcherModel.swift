@@ -401,13 +401,13 @@ final class LiveSwitcherModel: ObservableObject {
         let frontmostReadyMs = Self.monotonicMilliseconds()
 
         let frontmostAppID = RuntimeSnapshotProvider.baseAppID(for: frontmostApp)
-        let snapshotReadMs: Double
+        let projectionReadMs: Double
         let recencyAppliedMs: Double
         var resolvedAppCandidate: AppSwitchCandidate?
         var resolvedContext: RuntimeAppContext?
 
         if let projection = runtimeSnapshotService.readCurrentAppWindowProjection(appID: frontmostAppID) {
-            snapshotReadMs = Self.monotonicMilliseconds()
+            projectionReadMs = Self.monotonicMilliseconds()
             let snapshot = homeSnapshotWithWindowRecencyApplied(
                 projection.homeAppSnapshot
             )
@@ -415,7 +415,7 @@ final class LiveSwitcherModel: ObservableObject {
             resolvedAppCandidate = snapshot.candidate
             resolvedContext = snapshot.context
         } else {
-            snapshotReadMs = Self.monotonicMilliseconds()
+            projectionReadMs = Self.monotonicMilliseconds()
             runtimeSnapshotService.signalAppWindowsChanged(
                 appID: frontmostAppID,
                 pid: frontmostApp.processIdentifier
@@ -429,7 +429,7 @@ final class LiveSwitcherModel: ObservableObject {
                 result: "missingFrontmostApp",
                 frontmostAppID: frontmostAppID,
                 frontmostReadyMs: frontmostReadyMs,
-                snapshotReadMs: snapshotReadMs,
+                projectionReadMs: projectionReadMs,
                 recencyAppliedMs: recencyAppliedMs,
                 completeMs: failedMs,
                 startMs: startMs
@@ -444,7 +444,7 @@ final class LiveSwitcherModel: ObservableObject {
                 result: "noWindows",
                 frontmostAppID: frontmostAppID,
                 frontmostReadyMs: frontmostReadyMs,
-                snapshotReadMs: snapshotReadMs,
+                projectionReadMs: projectionReadMs,
                 recencyAppliedMs: recencyAppliedMs,
                 completeMs: failedMs,
                 startMs: startMs
@@ -477,7 +477,7 @@ final class LiveSwitcherModel: ObservableObject {
             result: "ready",
             frontmostAppID: frontmostAppID,
             frontmostReadyMs: frontmostReadyMs,
-            snapshotReadMs: snapshotReadMs,
+            projectionReadMs: projectionReadMs,
             recencyAppliedMs: recencyAppliedMs,
             completeMs: completeMs,
             startMs: startMs,
@@ -655,7 +655,7 @@ final class LiveSwitcherModel: ObservableObject {
         }
     }
 
-    func restoreSearchStateAfterSnapshotRefreshIfNeeded(
+    func restoreSearchStateAfterProjectionRefreshIfNeeded(
         _ previousState: SwitcherSearchViewState
     ) {
         guard previousState.isActive else { return }

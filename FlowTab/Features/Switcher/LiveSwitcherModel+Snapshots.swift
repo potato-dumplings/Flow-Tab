@@ -13,14 +13,14 @@ extension LiveSwitcherModel {
         let previousSearchState = preserveSearchState ? searchViewState : .inactive
         cancelPendingSearchComputation()
         let payload = readAppSwitcherProjectionSessionPayload()
-        let snapshotReadMs = Self.monotonicMilliseconds()
+        let projectionReadMs = Self.monotonicMilliseconds()
         return applyAppSwitcherProjectionPayload(
             payload,
             triggerDirection: triggerDirection,
             preferredSelectedAppID: preferredSelectedAppID,
             previousSearchState: previousSearchState,
             startMs: startMs,
-            snapshotReadMs: snapshotReadMs,
+            projectionReadMs: projectionReadMs,
             logEvent: "loadAppSwitcherProjectionSession",
             resetWhenEmpty: resetWhenEmpty
         )
@@ -33,14 +33,14 @@ extension LiveSwitcherModel {
         let startMs = Self.monotonicMilliseconds()
         cancelPendingSearchComputation()
         let payload = readFastAppSwitcherProjectionSessionPayload()
-        let snapshotReadMs = Self.monotonicMilliseconds()
+        let projectionReadMs = Self.monotonicMilliseconds()
         return applyAppSwitcherProjectionPayload(
             payload,
             triggerDirection: triggerDirection,
             preferredSelectedAppID: preferredSelectedAppID,
             previousSearchState: .inactive,
             startMs: startMs,
-            snapshotReadMs: snapshotReadMs,
+            projectionReadMs: projectionReadMs,
             logEvent: "loadFastAppSwitcherProjectionSession",
             resetWhenEmpty: true
         )
@@ -53,7 +53,7 @@ extension LiveSwitcherModel {
         preferredSelectedAppID: String?,
         previousSearchState: SwitcherSearchViewState,
         startMs: Double,
-        snapshotReadMs: Double,
+        projectionReadMs: Double,
         logEvent: String,
         resetWhenEmpty: Bool
     ) -> Bool {
@@ -65,7 +65,7 @@ extension LiveSwitcherModel {
             logLoadAppSwitcherProjectionSessionEmpty(
                 event: logEvent,
                 triggerDirection: triggerDirection,
-                snapshotReadMs: snapshotReadMs,
+                projectionReadMs: projectionReadMs,
                 recencyAppliedMs: recencyAppliedMs,
                 startMs: startMs
             )
@@ -118,14 +118,14 @@ extension LiveSwitcherModel {
             _ = searchCoordinator.exit()
         }
         let indexReadyMs = Self.monotonicMilliseconds()
-        restoreSearchStateAfterSnapshotRefreshIfNeeded(previousSearchState)
+        restoreSearchStateAfterProjectionRefreshIfNeeded(previousSearchState)
         publishSearchStateIfNeeded()
         let completeMs = Self.monotonicMilliseconds()
         logLoadAppSwitcherProjectionSessionReady(
             event: logEvent,
             triggerDirection: triggerDirection,
             payload: payload,
-            snapshotReadMs: snapshotReadMs,
+            projectionReadMs: projectionReadMs,
             recencyAppliedMs: recencyAppliedMs,
             sessionReadyMs: sessionReadyMs,
             indexReadyMs: indexReadyMs,
@@ -179,7 +179,7 @@ extension LiveSwitcherModel {
         let snapshotService = runtimeSnapshotService
 
         RuntimeLog.debug(
-            "Snapshot",
+            "Projection",
             "selectedAppWindowProjection result=scheduled appID=\(targetAppID)"
         )
 

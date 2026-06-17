@@ -2,6 +2,8 @@ import Foundation
 import FlowTabCore
 
 extension LiveSwitcherModel {
+    private static let projectionLogCategory = "Projection"
+
     nonisolated static func monotonicMilliseconds() -> Double {
         ProcessInfo.processInfo.systemUptime * 1_000
     }
@@ -9,8 +11,8 @@ extension LiveSwitcherModel {
     func logStartFocusedWindowSessionNoFrontmost(startMs: Double) {
         let failedMs = Self.monotonicMilliseconds() - startMs
         RuntimeLog.debug(
-            "Snapshot",
-            Self.snapshotLogLine(
+            Self.projectionLogCategory,
+            Self.projectionLogLine(
                 "startFocusedWindowSession",
                 fields: [
                     ("result", "noFrontmostApp"),
@@ -24,21 +26,21 @@ extension LiveSwitcherModel {
         result: String,
         frontmostAppID: String,
         frontmostReadyMs: Double,
-        snapshotReadMs: Double,
+        projectionReadMs: Double,
         recencyAppliedMs: Double,
         completeMs: Double,
         startMs: Double,
         windows: Int? = nil
     ) {
         RuntimeLog.debug(
-            "Snapshot",
-            Self.snapshotLogLine(
+            Self.projectionLogCategory,
+            Self.projectionLogLine(
                 "startFocusedWindowSession",
                 fields: startFocusedWindowSessionLogFields(
                     result: result,
                     frontmostAppID: frontmostAppID,
                     frontmostReadyMs: frontmostReadyMs,
-                    snapshotReadMs: snapshotReadMs,
+                    projectionReadMs: projectionReadMs,
                     recencyAppliedMs: recencyAppliedMs,
                     completeMs: completeMs,
                     startMs: startMs,
@@ -51,19 +53,19 @@ extension LiveSwitcherModel {
     func logLoadAppSwitcherProjectionSessionEmpty(
         event: String = "loadAppSwitcherProjectionSession",
         triggerDirection: CycleDirection,
-        snapshotReadMs: Double,
+        projectionReadMs: Double,
         recencyAppliedMs: Double,
         startMs: Double
     ) {
         RuntimeLog.debug(
-            "Snapshot",
-            Self.snapshotLogLine(
+            Self.projectionLogCategory,
+            Self.projectionLogLine(
                 event,
                 fields: [
                     ("result", "empty"),
                     ("trigger", triggerDirection.debugName),
-                    ("snapshotMs", Self.formatMilliseconds(snapshotReadMs - startMs)),
-                    ("recencyMs", Self.formatMilliseconds(recencyAppliedMs - snapshotReadMs)),
+                    ("projectionMs", Self.formatMilliseconds(projectionReadMs - startMs)),
+                    ("recencyMs", Self.formatMilliseconds(recencyAppliedMs - projectionReadMs)),
                     ("totalMs", Self.formatMilliseconds(recencyAppliedMs - startMs))
                 ]
             )
@@ -74,7 +76,7 @@ extension LiveSwitcherModel {
         event: String = "loadAppSwitcherProjectionSession",
         triggerDirection: CycleDirection,
         payload: AppSwitcherProjectionSessionPayload,
-        snapshotReadMs: Double,
+        projectionReadMs: Double,
         recencyAppliedMs: Double,
         sessionReadyMs: Double,
         indexReadyMs: Double,
@@ -82,16 +84,16 @@ extension LiveSwitcherModel {
         startMs: Double
     ) {
         RuntimeLog.debug(
-            "Snapshot",
-            Self.snapshotLogLine(
+            Self.projectionLogCategory,
+            Self.projectionLogLine(
                 event,
                 fields: [
                     ("result", "ready"),
                     ("trigger", triggerDirection.debugName),
                     ("apps", "\(payload.apps.count)"),
                     ("windows", "\(payload.windowCount)"),
-                    ("snapshotMs", Self.formatMilliseconds(snapshotReadMs - startMs)),
-                    ("recencyMs", Self.formatMilliseconds(recencyAppliedMs - snapshotReadMs)),
+                    ("projectionMs", Self.formatMilliseconds(projectionReadMs - startMs)),
+                    ("recencyMs", Self.formatMilliseconds(recencyAppliedMs - projectionReadMs)),
                     ("sessionBuildMs", Self.formatMilliseconds(sessionReadyMs - recencyAppliedMs)),
                     ("indexMs", Self.formatMilliseconds(indexReadyMs - sessionReadyMs)),
                     ("publishMs", Self.formatMilliseconds(completeMs - indexReadyMs)),
@@ -120,7 +122,7 @@ extension LiveSwitcherModel {
         )
         lastRuntimeProjectionMaintenanceDiagnostic = diagnostic
         RuntimeLog.debug(
-            "Snapshot",
+            Self.projectionLogCategory,
             diagnostic.logMessage
         )
     }
@@ -152,11 +154,11 @@ extension LiveSwitcherModel {
             ("applyMs", Self.formatMilliseconds(applyEndMs - projectionReadMs)),
             ("totalMs", Self.formatMilliseconds(totalMs))
         ]
-        let message = Self.snapshotLogLine("selectedAppWindowProjection", fields: fields)
+        let message = Self.projectionLogLine("selectedAppWindowProjection", fields: fields)
         if totalMs > 100 {
-            RuntimeLog.warning(.snapshot, message)
+            RuntimeLog.warning(Self.projectionLogCategory, message)
         } else {
-            RuntimeLog.debug(.snapshot, message)
+            RuntimeLog.debug(Self.projectionLogCategory, message)
         }
     }
 
@@ -166,8 +168,8 @@ extension LiveSwitcherModel {
         durationMs: Double
     ) {
         RuntimeLog.debug(
-            "Snapshot",
-            Self.snapshotLogLine(
+            Self.projectionLogCategory,
+            Self.projectionLogLine(
                 "readAppSwitcherProjectionPayload",
                 fields: [
                     ("source", source),
@@ -183,7 +185,7 @@ extension LiveSwitcherModel {
         result: String,
         frontmostAppID: String,
         frontmostReadyMs: Double,
-        snapshotReadMs: Double,
+        projectionReadMs: Double,
         recencyAppliedMs: Double,
         completeMs: Double,
         startMs: Double,
@@ -198,8 +200,8 @@ extension LiveSwitcherModel {
         }
         fields.append(contentsOf: [
             ("frontmostMs", Self.formatMilliseconds(frontmostReadyMs - startMs)),
-            ("snapshotMs", Self.formatMilliseconds(snapshotReadMs - frontmostReadyMs)),
-            ("recencyMs", Self.formatMilliseconds(recencyAppliedMs - snapshotReadMs)),
+            ("projectionMs", Self.formatMilliseconds(projectionReadMs - frontmostReadyMs)),
+            ("recencyMs", Self.formatMilliseconds(recencyAppliedMs - projectionReadMs)),
             ("sessionBuildMs", Self.formatMilliseconds(completeMs - recencyAppliedMs)),
             ("totalMs", Self.formatMilliseconds(completeMs - startMs))
         ])
@@ -210,7 +212,7 @@ extension LiveSwitcherModel {
         String(format: "%.3f", value)
     }
 
-    private static func snapshotLogLine(_ prefix: String, fields: [(String, String)]) -> String {
+    private static func projectionLogLine(_ prefix: String, fields: [(String, String)]) -> String {
         ([prefix] + fields.map { "\($0.0)=\($0.1)" }).joined(separator: " ")
     }
 }
