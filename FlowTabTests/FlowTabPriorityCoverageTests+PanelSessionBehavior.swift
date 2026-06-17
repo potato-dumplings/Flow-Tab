@@ -218,11 +218,13 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    private func makeAppSwitcherProjectionPanelController() -> SwitcherPanelController {
+    private func makeAppSwitcherProjectionPanelController(
+        apps: [AppSwitchCandidate]? = nil
+    ) -> SwitcherPanelController {
         SwitcherPanelController(
             model: LiveSwitcherModel(
                 snapshotService: RecordingRuntimeSnapshotService(
-                    appSwitcherApps: searchScenarioApps()
+                    appSwitcherApps: apps ?? searchScenarioApps()
                 )
             )
         )
@@ -1076,10 +1078,7 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelControllerShowSkipsHidingRegularWindowsWhileAppIsActive() {
-        let controller = SwitcherPanelController()
-        controller.modelForTesting.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
-        }
+        let controller = makeAppSwitcherProjectionPanelController()
         controller.appIsActiveOverride = true
 
         var hideCallCount = 0
@@ -1095,10 +1094,7 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelControllerShowStillHidesRegularWindowsWhileAppIsInactive() {
-        let controller = SwitcherPanelController()
-        controller.modelForTesting.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
-        }
+        let controller = makeAppSwitcherProjectionPanelController()
         controller.appIsActiveOverride = false
 
         var hideCallCount = 0
@@ -1114,10 +1110,9 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelControllerFewAppsShrinkPanelWidthWithoutChangingSpacing() {
-        let controller = SwitcherPanelController()
-        controller.modelForTesting.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: self.layoutScenarioApps(count: 5), contextsByID: [:])
-        }
+        let controller = makeAppSwitcherProjectionPanelController(
+            apps: layoutScenarioApps(count: 5)
+        )
 
         XCTAssertTrue(controller.modelForTesting.startSession(triggerDirection: .forward))
 
@@ -1132,10 +1127,9 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelControllerManyAppsReduceTileSizeWhileKeepingSpacingConstant() {
-        let controller = SwitcherPanelController()
-        controller.modelForTesting.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: self.layoutScenarioApps(count: 20), contextsByID: [:])
-        }
+        let controller = makeAppSwitcherProjectionPanelController(
+            apps: layoutScenarioApps(count: 20)
+        )
 
         XCTAssertTrue(controller.modelForTesting.startSession(triggerDirection: .forward))
 
@@ -1150,11 +1144,8 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelControllerPreviewLayerUsesWindowPreviewWidthForSingleAppManyWindows() {
-        let controller = SwitcherPanelController()
         let app = manyWindowLayoutApp(windowCount: 100)
-        controller.modelForTesting.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: [app], contextsByID: [:])
-        }
+        let controller = makeAppSwitcherProjectionPanelController(apps: [app])
 
         XCTAssertTrue(controller.modelForTesting.startSession(triggerDirection: .forward))
         XCTAssertTrue(controller.modelForTesting.autoEnterWindowLayerIfPossible())
@@ -1170,12 +1161,9 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelControllerPreviewLayerExpandsBelowCenteredAppLayer() {
-        let controller = SwitcherPanelController()
         let app = manyWindowLayoutApp(windowCount: 100)
+        let controller = makeAppSwitcherProjectionPanelController(apps: [app])
         let visibleFrame = CGRect(x: 0, y: 0, width: 1440, height: 900)
-        controller.modelForTesting.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: [app], contextsByID: [:])
-        }
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
 
