@@ -351,7 +351,7 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
             }
             if let snapshot = result.snapshot {
                 return .completedWithRepairedCurrentAppWindowPayloads([
-                    RuntimeCurrentAppWindowPayload(homeAppSnapshot: snapshot)
+                    currentAppWindowPayload(from: snapshot)
                 ])
             }
             return .completed
@@ -372,7 +372,7 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
                 }
                 if let snapshot = result.snapshot {
                     repairedCurrentAppWindowPayloads.append(
-                        RuntimeCurrentAppWindowPayload(homeAppSnapshot: snapshot)
+                        currentAppWindowPayload(from: snapshot)
                     )
                 }
             }
@@ -383,5 +383,15 @@ final class RuntimeSnapshotService: RuntimeSnapshotServing, @unchecked Sendable 
             }
             return .completed
         }
+    }
+
+    private static func currentAppWindowPayload(
+        from snapshot: RuntimeHomeAppSnapshot
+    ) -> RuntimeCurrentAppWindowPayload {
+        RuntimeCurrentAppWindowPayload(
+            summary: snapshot.summary,
+            candidate: snapshot.candidate,
+            context: snapshot.context
+        )
     }
 }

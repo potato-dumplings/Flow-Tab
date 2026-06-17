@@ -56,7 +56,7 @@ enum HomeRuntimeProjectionReader {
         from service: any RuntimeSnapshotServing
     ) -> RuntimeHomeAppSnapshot? {
         if let projection = service.readCurrentAppWindowProjection(appID: appID) {
-            return projection.currentAppWindowPayload.homeAppSnapshot
+            return homeSnapshot(from: projection.currentAppWindowPayload)
         }
         guard
             let appProjection = service.readAppSwitcherProjection(),
@@ -69,6 +69,16 @@ enum HomeRuntimeProjectionReader {
             summary: homeSummary(for: app, context: context),
             candidate: app,
             context: context
+        )
+    }
+
+    private static func homeSnapshot(
+        from payload: RuntimeCurrentAppWindowPayload
+    ) -> RuntimeHomeAppSnapshot {
+        RuntimeHomeAppSnapshot(
+            summary: payload.summary,
+            candidate: payload.candidate,
+            context: payload.context
         )
     }
 

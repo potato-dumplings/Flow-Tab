@@ -201,7 +201,8 @@ extension FlowTabPriorityCoverageTests {
             lastActiveAt: generatedAt,
             windows: windows
         )
-        let snapshot = RuntimeHomeAppSnapshot(
+        let context = makeRuntimeAppContext(appID: appID, runningApp: runningApp, windows: windows)
+        let payload = RuntimeCurrentAppWindowPayload(
             summary: RuntimeHomeAppSummary(
                 appID: appID,
                 displayName: candidate.displayName,
@@ -211,15 +212,13 @@ extension FlowTabPriorityCoverageTests {
                 pid: runningApp.processIdentifier
             ),
             candidate: candidate,
-            context: makeRuntimeAppContext(appID: appID, runningApp: runningApp, windows: windows)
+            context: context
         )
         return RecordingRuntimeSnapshotService(
             currentAppWindowProjectionsByAppID: [
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
-                    currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
-                        homeAppSnapshot: snapshot
-                    ),
+                    currentAppWindowPayload: payload,
                     freshness: RuntimeProjectionFreshness(
                         generatedAt: generatedAt,
                         sourceGeneration: RuntimeReadModelGeneration(projection: 1),
@@ -244,18 +243,16 @@ extension FlowTabPriorityCoverageTests {
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
                     currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
-                        homeAppSnapshot: RuntimeHomeAppSnapshot(
-                            summary: RuntimeHomeAppSummary(
-                                appID: appID,
-                                displayName: candidate.displayName,
-                                groupID: candidate.groupID,
-                                lastActiveAt: candidate.lastActiveAt,
-                                windowCount: candidate.windows.count,
-                                pid: context.runningApp.processIdentifier
-                            ),
-                            candidate: candidate,
-                            context: context
-                        )
+                        summary: RuntimeHomeAppSummary(
+                            appID: appID,
+                            displayName: candidate.displayName,
+                            groupID: candidate.groupID,
+                            lastActiveAt: candidate.lastActiveAt,
+                            windowCount: candidate.windows.count,
+                            pid: context.runningApp.processIdentifier
+                        ),
+                        candidate: candidate,
+                        context: context
                     ),
                     freshness: RuntimeProjectionFreshness(
                         generatedAt: generatedAt,

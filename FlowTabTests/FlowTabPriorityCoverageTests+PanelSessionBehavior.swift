@@ -203,7 +203,9 @@ extension FlowTabPriorityCoverageTests {
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
                     currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
-                        homeAppSnapshot: snapshot
+                        summary: snapshot.summary,
+                        candidate: snapshot.candidate,
+                        context: snapshot.context
                     ),
                     freshness: RuntimeProjectionFreshness(
                         generatedAt: 10,
@@ -485,7 +487,9 @@ extension FlowTabPriorityCoverageTests {
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
                     currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
-                        homeAppSnapshot: selectedSnapshot
+                        summary: selectedSnapshot.summary,
+                        candidate: selectedSnapshot.candidate,
+                        context: selectedSnapshot.context
                     ),
                     freshness: freshness
                 )
@@ -579,7 +583,9 @@ extension FlowTabPriorityCoverageTests {
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
                     currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
-                        homeAppSnapshot: snapshot
+                        summary: snapshot.summary,
+                        candidate: snapshot.candidate,
+                        context: snapshot.context
                     ),
                     freshness: RuntimeProjectionFreshness(
                         generatedAt: 12,
@@ -1007,7 +1013,9 @@ extension FlowTabPriorityCoverageTests {
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
                     currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
-                        homeAppSnapshot: selectedSnapshot
+                        summary: selectedSnapshot.summary,
+                        candidate: selectedSnapshot.candidate,
+                        context: selectedSnapshot.context
                     ),
                     freshness: freshness
                 )

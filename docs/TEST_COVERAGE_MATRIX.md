@@ -53,6 +53,7 @@ No high-value cross-layer gaps are currently tracked here.
 
 ## Recent Validation Notes
 
+- 2026-06-17 Phase 5: `RuntimeCurrentAppWindowPayload` and `RuntimeCurrentAppWindowProjection` no longer expose Home snapshot compatibility initializers or accessors. Provider repair conversion is isolated inside `RuntimeSnapshotService`, and Home's legacy `RuntimeHomeAppSnapshot` shape is now rebuilt only at the Home projection-reader boundary.
 - 2026-06-17 Phase 5: `RuntimeCurrentAppWindowProjection` construction now requires `RuntimeCurrentAppWindowPayload`; the previous `homeAppSnapshot:` projection initializer was removed and current-app projection test fixtures now wrap provider/Home compatibility snapshots before entering the projection boundary.
 - 2026-06-17 Phase 5: Runtime reconciliation completion now hands `RuntimeCurrentAppWindowPayload` into `RuntimeSnapshotService`/`RuntimeReadModelStore`, and `RuntimeReadModelStore.commitCurrentAppWindowProjection(...)` no longer accepts a `RuntimeHomeAppSnapshot` write boundary. Provider repair primitives may still convert their compatibility Home snapshot into a payload before committing current-app/search projections.
 - 2026-06-17 Phase 5: Switcher focused-current-app startup and selected-app window projection completion now consume `RuntimeCurrentAppWindowPayload` directly, with recency applied to the payload before session construction. The `RuntimeHomeAppSnapshot` compatibility shape remains for Home readers/provider repair bridges only, not as the Switcher projection read payload.

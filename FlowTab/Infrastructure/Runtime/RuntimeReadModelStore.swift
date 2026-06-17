@@ -67,21 +67,6 @@ struct RuntimeCurrentAppWindowPayload {
         self.context = context
     }
 
-    init(homeAppSnapshot: RuntimeHomeAppSnapshot) {
-        self.init(
-            summary: homeAppSnapshot.summary,
-            candidate: homeAppSnapshot.candidate,
-            context: homeAppSnapshot.context
-        )
-    }
-
-    var homeAppSnapshot: RuntimeHomeAppSnapshot {
-        RuntimeHomeAppSnapshot(
-            summary: summary,
-            candidate: candidate,
-            context: context
-        )
-    }
 }
 
 struct RuntimeCurrentAppWindowProjection {
@@ -99,9 +84,6 @@ struct RuntimeCurrentAppWindowProjection {
         self.freshness = freshness
     }
 
-    var homeAppSnapshot: RuntimeHomeAppSnapshot {
-        currentAppWindowPayload.homeAppSnapshot
-    }
 }
 
 struct RuntimeSearchAppIndexEntry: Equatable, Sendable {

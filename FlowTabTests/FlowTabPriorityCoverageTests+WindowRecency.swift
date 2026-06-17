@@ -757,7 +757,9 @@ extension FlowTabPriorityCoverageTests {
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
                     currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
-                        homeAppSnapshot: focusedSnapshot
+                        summary: focusedSnapshot.summary,
+                        candidate: focusedSnapshot.candidate,
+                        context: focusedSnapshot.context
                     ),
                     freshness: RuntimeProjectionFreshness(
                         generatedAt: 12,
