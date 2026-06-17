@@ -140,7 +140,7 @@ extension LiveSwitcherModel {
 
         runtimeProjectionMaintenanceGeneration &+= 1
         let startMs = Self.monotonicMilliseconds()
-        runtimeSnapshotService.requestAppSwitcherProjectionMaintenance(reason: .switcherSessionStarted)
+        runtimeProjectionService.requestAppSwitcherProjectionMaintenance(reason: .switcherSessionStarted)
         logRuntimeProjectionMaintenance(
             result: "maintenanceRequested",
             startMs: startMs,
@@ -176,7 +176,7 @@ extension LiveSwitcherModel {
         let generation = selectedAppWindowProjectionGeneration
         selectedAppWindowProjectionPendingAppID = targetAppID
         let startMs = Self.monotonicMilliseconds()
-        let runtimeService = runtimeSnapshotService
+        let runtimeService = runtimeProjectionService
 
         RuntimeLog.debug(
             "Projection",
@@ -338,13 +338,13 @@ extension LiveSwitcherModel {
         let startMs = Self.monotonicMilliseconds()
         let source: String
         let payload: AppSwitcherProjectionSessionPayload
-        if let projection = runtimeSnapshotService.readAppSwitcherProjection() {
+        if let projection = runtimeProjectionService.readAppSwitcherProjection() {
             source = projection.freshness.isCompleteForScope
                 ? "runtimeProjection"
                 : "runtimeProjectionDirty"
             payload = AppSwitcherProjectionSessionPayload(projection: projection)
         } else {
-            runtimeSnapshotService.requestAppSwitcherProjectionMaintenance(reason: .appLifecycleRefresh)
+            runtimeProjectionService.requestAppSwitcherProjectionMaintenance(reason: .appLifecycleRefresh)
             source = "runtimeProjectionMissing"
             payload = AppSwitcherProjectionSessionPayload(apps: [], contextsByID: [:])
         }
@@ -357,7 +357,7 @@ extension LiveSwitcherModel {
         let startMs = Self.monotonicMilliseconds()
         let source: String
         let payload: AppSwitcherProjectionSessionPayload
-        if let projection = runtimeSnapshotService.readAppSwitcherProjection() {
+        if let projection = runtimeProjectionService.readAppSwitcherProjection() {
             source = projection.freshness.isCompleteForScope
                 ? "runtimeProjection"
                 : "runtimeProjectionDirty"

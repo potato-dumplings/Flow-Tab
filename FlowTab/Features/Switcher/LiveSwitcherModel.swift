@@ -213,7 +213,7 @@ final class LiveSwitcherModel: ObservableObject {
     @Published var searchLayoutMeasurements: SwitcherSearchLayoutMeasurements = .fallback
     @Published var terminatingAppID: String?
 
-    let runtimeSnapshotService: any RuntimeSnapshotServing
+    let runtimeProjectionService: any RuntimeSnapshotServing
     let activator = RuntimeActivator()
     let iconProvider = AppIconProvider()
     let searchCoordinator = SwitcherSearchCoordinator()
@@ -281,11 +281,11 @@ final class LiveSwitcherModel: ObservableObject {
 
     init(
         windowRecencyTracker: RuntimeWindowRecencyTracker = .shared,
-        snapshotService: any RuntimeSnapshotServing = sharedRuntimeSnapshotService
+        snapshotService runtimeProjectionService: any RuntimeSnapshotServing = sharedRuntimeSnapshotService
     ) {
         self.windowRecencyTracker = windowRecencyTracker
-        runtimeSnapshotService = snapshotService
-        activator.windowFocusVerifiedHandler = { [windowRecencyTracker, snapshotService] verification in
+        self.runtimeProjectionService = runtimeProjectionService
+        activator.windowFocusVerifiedHandler = { [windowRecencyTracker, runtimeProjectionService] verification in
             windowRecencyTracker.recordVerifiedFocus(
                 appID: verification.appID,
                 windowID: verification.windowID,
@@ -295,12 +295,12 @@ final class LiveSwitcherModel: ObservableObject {
                 frame: verification.frame,
                 allowedActions: verification.allowedActions
             )
-            snapshotService.signalWindowFocusVerified(verification)
+            runtimeProjectionService.signalWindowFocusVerified(verification)
         }
     }
 
     func signalSpaceTopologyChanged() {
-        runtimeSnapshotService.signalSpaceTopologyChanged()
+        runtimeProjectionService.signalSpaceTopologyChanged()
     }
 
     var appCount: Int {
@@ -415,7 +415,7 @@ final class LiveSwitcherModel: ObservableObject {
         var resolvedAppCandidate: AppSwitchCandidate?
         var resolvedContext: RuntimeAppContext?
 
-        if let projection = runtimeSnapshotService.readCurrentAppWindowProjection(appID: frontmostAppID) {
+        if let projection = runtimeProjectionService.readCurrentAppWindowProjection(appID: frontmostAppID) {
             projectionReadMs = Self.monotonicMilliseconds()
             let payload = currentAppWindowPayloadWithWindowRecencyApplied(
                 projection.currentAppWindowPayload
@@ -425,7 +425,7 @@ final class LiveSwitcherModel: ObservableObject {
             resolvedContext = payload.context
         } else {
             projectionReadMs = Self.monotonicMilliseconds()
-            runtimeSnapshotService.signalAppWindowsChanged(
+            runtimeProjectionService.signalAppWindowsChanged(
                 appID: frontmostAppID,
                 pid: frontmostApp.processIdentifier
             )
@@ -714,7 +714,7 @@ final class LiveSwitcherModel: ObservableObject {
         if matchesPending {
             pendingTerminateRequest = nil
         }
-        runtimeSnapshotService.signalAppTerminated(appID: appID, pid: pid)
+        runtimeProjectionService.signalAppTerminated(appID: appID, pid: pid)
         let refreshed = loadAppSwitcherProjectionSession(
             triggerDirection: .forward,
             preferredSelectedAppID: matchesPending ? pendingRequest?.preferredSelectedAppID : nil,

@@ -41,7 +41,7 @@ extension LiveSwitcherModel {
 
     @discardableResult
     func rebuildSearchIndexFromCommittedProjection(reason: String) -> Bool {
-        let read = runtimeSnapshotService.readCommittedSearchIndexForSearch()
+        let read = runtimeProjectionService.readCommittedSearchIndexForSearch()
         guard let projection = read.projection else {
             lastSearchIndexReadDiagnostic = SearchIndexReadDiagnostic(
                 reason: reason,
@@ -60,7 +60,7 @@ extension LiveSwitcherModel {
             return false
         }
         if read.shouldRequestFreshnessBarrier {
-            runtimeSnapshotService.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
+            runtimeProjectionService.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
         }
         let searchProjection = projection.filteringApps(
             using: AppVisibilityPreferencesStore.visibilityFilter()
