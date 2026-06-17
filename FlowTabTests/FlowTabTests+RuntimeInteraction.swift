@@ -156,15 +156,9 @@ extension FlowTabTests {
 
     @MainActor
     func testTerminateSelectedAppBehaviorKeepsAppUntilProcessActuallyExits() async {
-        let model = LiveSwitcherModel()
         let initialApps = terminateScenarioApps()
-        var snapshots: [RuntimeSnapshot] = [makeRuntimeSnapshot(apps: initialApps)]
-        var snapshotReadCount = 0
-        model.testingSnapshotProviderOverride = {
-            snapshotReadCount += 1
-            XCTAssertFalse(snapshots.isEmpty)
-            return snapshots.removeFirst()
-        }
+        let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: initialApps)
+        let model = LiveSwitcherModel(snapshotService: snapshotService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         guard let terminatedAppID = model.session?.selectedApp.id else {
@@ -173,7 +167,6 @@ extension FlowTabTests {
         }
 
         let appsAfterTermination = initialApps.filter { $0.id != terminatedAppID }
-        snapshots.append(makeRuntimeSnapshot(apps: appsAfterTermination))
 
         model.terminateRequestOverride = { _ in (sent: true, pid: 42_000) }
         model.terminateRefreshPollIntervalNs = 2_000_000
@@ -190,14 +183,17 @@ extension FlowTabTests {
 
         let result = model.terminateSelectedApp()
         XCTAssertEqual(result, .updatedSession)
-        XCTAssertEqual(snapshotReadCount, 1)
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         XCTAssertEqual(model.appCount, initialApps.count)
         XCTAssertTrue(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? false)
         XCTAssertEqual(model.terminatingAppID, terminatedAppID)
 
         await fulfillment(of: [layoutRefreshed], timeout: 1.0)
-        XCTAssertEqual(snapshotReadCount, 2)
         XCTAssertGreaterThanOrEqual(processCheckCount, 2)
+        XCTAssertEqual(snapshotService.appTerminationSignalsRecorded().map(\.appID), [terminatedAppID])
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         XCTAssertEqual(model.appCount, appsAfterTermination.count)
         XCTAssertFalse(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? true)
         XCTAssertNil(model.terminatingAppID)
@@ -216,15 +212,9 @@ extension FlowTabTests {
 
     @MainActor
     func testTerminateSelectedAppBehaviorRefreshesWithoutPollingDelayWhenProcessAlreadyExited() async {
-        let model = LiveSwitcherModel()
         let initialApps = terminateScenarioApps()
-        var snapshots: [RuntimeSnapshot] = [makeRuntimeSnapshot(apps: initialApps)]
-        var snapshotReadCount = 0
-        model.testingSnapshotProviderOverride = {
-            snapshotReadCount += 1
-            XCTAssertFalse(snapshots.isEmpty)
-            return snapshots.removeFirst()
-        }
+        let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: initialApps)
+        let model = LiveSwitcherModel(snapshotService: snapshotService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         guard let terminatedAppID = model.session?.selectedApp.id else {
@@ -233,7 +223,6 @@ extension FlowTabTests {
         }
 
         let appsAfterTermination = initialApps.filter { $0.id != terminatedAppID }
-        snapshots.append(makeRuntimeSnapshot(apps: appsAfterTermination))
 
         model.terminateRequestOverride = { _ in (sent: true, pid: 42_010) }
         model.terminateRefreshPollIntervalNs = 5_000_000_000
@@ -250,11 +239,14 @@ extension FlowTabTests {
 
         let result = model.terminateSelectedApp()
         XCTAssertEqual(result, .updatedSession)
-        XCTAssertEqual(snapshotReadCount, 1)
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
 
         await fulfillment(of: [layoutRefreshed], timeout: 0.5)
-        XCTAssertEqual(snapshotReadCount, 2)
         XCTAssertEqual(processCheckCount, 1)
+        XCTAssertEqual(snapshotService.appTerminationSignalsRecorded().map(\.appID), [terminatedAppID])
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         XCTAssertEqual(model.appCount, appsAfterTermination.count)
         XCTAssertFalse(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? true)
         XCTAssertNil(model.terminatingAppID)
@@ -307,15 +299,9 @@ extension FlowTabTests {
 
     @MainActor
     func testTerminateSelectedAppUnitStopsPollingAfterTimeoutWhenAppStillRunning() async {
-        let model = LiveSwitcherModel()
         let initialApps = terminateScenarioApps()
-        var snapshots: [RuntimeSnapshot] = [makeRuntimeSnapshot(apps: initialApps)]
-        var snapshotReadCount = 0
-        model.testingSnapshotProviderOverride = {
-            snapshotReadCount += 1
-            XCTAssertFalse(snapshots.isEmpty)
-            return snapshots.removeFirst()
-        }
+        let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: initialApps)
+        let model = LiveSwitcherModel(snapshotService: snapshotService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         guard let terminatedAppID = model.session?.selectedApp.id else {
@@ -338,7 +324,8 @@ extension FlowTabTests {
 
         let result = model.terminateSelectedApp()
         XCTAssertEqual(result, .updatedSession)
-        XCTAssertEqual(snapshotReadCount, 1)
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         XCTAssertEqual(model.appCount, initialApps.count)
         XCTAssertTrue(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? false)
         XCTAssertEqual(model.terminatingAppID, terminatedAppID)
@@ -349,7 +336,9 @@ extension FlowTabTests {
         await fulfillment(of: [noDeferredLayoutRefresh], timeout: 0.01)
         XCTAssertTrue(didReachTerminateTimeout)
         XCTAssertGreaterThan(processCheckCount, 0)
-        XCTAssertEqual(snapshotReadCount, 1)
+        XCTAssertTrue(snapshotService.appTerminationSignalsRecorded().isEmpty)
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         XCTAssertEqual(model.appCount, initialApps.count)
         XCTAssertTrue(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? false)
         XCTAssertNil(model.terminatingAppID)
@@ -413,15 +402,9 @@ extension FlowTabTests {
 
     @MainActor
     func testTerminateSelectedAppUnitRefreshesOnWorkspaceTerminateAfterPollingTimeout() async {
-        let model = LiveSwitcherModel()
         let initialApps = terminateScenarioApps()
-        var snapshots: [RuntimeSnapshot] = [makeRuntimeSnapshot(apps: initialApps)]
-        var snapshotReadCount = 0
-        model.testingSnapshotProviderOverride = {
-            snapshotReadCount += 1
-            XCTAssertFalse(snapshots.isEmpty)
-            return snapshots.removeFirst()
-        }
+        let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: initialApps)
+        let model = LiveSwitcherModel(snapshotService: snapshotService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         guard let terminatedAppID = model.session?.selectedApp.id else {
@@ -430,7 +413,6 @@ extension FlowTabTests {
         }
 
         let appsAfterTermination = initialApps.filter { $0.id != terminatedAppID }
-        snapshots.append(makeRuntimeSnapshot(apps: appsAfterTermination))
 
         model.terminateRequestOverride = { _ in (sent: true, pid: 42_002) }
         model.terminateRefreshPollIntervalNs = 2_000_000
@@ -451,7 +433,8 @@ extension FlowTabTests {
 
         let result = model.terminateSelectedApp()
         XCTAssertEqual(result, .updatedSession)
-        XCTAssertEqual(snapshotReadCount, 1)
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         XCTAssertEqual(model.appCount, initialApps.count)
         XCTAssertTrue(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? false)
 
@@ -461,14 +444,18 @@ extension FlowTabTests {
         XCTAssertTrue(didReachTerminateTimeout)
         XCTAssertGreaterThan(processCheckCount, 0)
         XCTAssertEqual(layoutRefreshCount, 0)
-        XCTAssertEqual(snapshotReadCount, 1)
+        XCTAssertTrue(snapshotService.appTerminationSignalsRecorded().isEmpty)
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         XCTAssertNil(model.terminatingAppID)
 
         model.handleApplicationTerminated(appID: terminatedAppID, pid: 42_002)
 
         await fulfillment(of: [deferredLayoutRefresh], timeout: 1.0)
         XCTAssertEqual(layoutRefreshCount, 1)
-        XCTAssertEqual(snapshotReadCount, 2)
+        XCTAssertEqual(snapshotService.appTerminationSignalsRecorded().map(\.appID), [terminatedAppID])
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         XCTAssertEqual(model.appCount, appsAfterTermination.count)
         XCTAssertFalse(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? true)
         model.cancelSelection()
