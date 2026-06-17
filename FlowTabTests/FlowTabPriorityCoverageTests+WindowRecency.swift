@@ -501,7 +501,6 @@ extension FlowTabPriorityCoverageTests {
         let restoreCurrentAppVisibility = enableCurrentAppInSwitcherForTesting()
         defer { restoreCurrentAppVisibility() }
 
-        let model = LiveSwitcherModel(windowRecencyTracker: RuntimeWindowRecencyTracker())
         let currentApp = NSRunningApplication.current
         let currentAppID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let otherAppID = "com.example.other"
@@ -586,38 +585,42 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
 
+        let snapshotService = RecordingRuntimeSnapshotService(
+            appSwitcherApps: [
+                AppSwitchCandidate(
+                    id: currentAppID,
+                    displayName: "Current",
+                    groupID: "current",
+                    lastActiveAt: 100,
+                    windows: currentWindows
+                ),
+                AppSwitchCandidate(
+                    id: otherAppID,
+                    displayName: "Other",
+                    groupID: "other",
+                    lastActiveAt: 90,
+                    windows: otherWindows
+                )
+            ],
+            contextsByID: [
+                currentAppID: currentContext,
+                otherAppID: otherContext
+            ]
+        )
+        let model = LiveSwitcherModel(
+            windowRecencyTracker: RuntimeWindowRecencyTracker(),
+            snapshotService: snapshotService
+        )
         model.windowRecencyTracker.recordVerifiedFocus(
             appID: currentAppID,
             windowID: "current-focused",
             context: currentContext
         )
         model.frontmostApplicationOverride = { currentApp }
-        model.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(
-                apps: [
-                    AppSwitchCandidate(
-                        id: currentAppID,
-                        displayName: "Current",
-                        groupID: "current",
-                        lastActiveAt: 100,
-                        windows: currentWindows
-                    ),
-                    AppSwitchCandidate(
-                        id: otherAppID,
-                        displayName: "Other",
-                        groupID: "other",
-                        lastActiveAt: 90,
-                        windows: otherWindows
-                    )
-                ],
-                contextsByID: [
-                    currentAppID: currentContext,
-                    otherAppID: otherContext
-                ]
-            )
-        }
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         XCTAssertEqual(model.selectedApp?.id, otherAppID)
 
         model.handle(.downArrow)
@@ -815,7 +818,6 @@ extension FlowTabPriorityCoverageTests {
         let restoreCurrentAppVisibility = enableCurrentAppInSwitcherForTesting()
         defer { restoreCurrentAppVisibility() }
 
-        let model = LiveSwitcherModel(windowRecencyTracker: RuntimeWindowRecencyTracker())
         let currentApp = NSRunningApplication.current
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let initialWindows = [
@@ -859,30 +861,46 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
 
-        var snapshotWindows = initialWindows
+        let snapshotService = RecordingRuntimeSnapshotService(
+            appSwitcherApps: [
+                AppSwitchCandidate(
+                    id: appID,
+                    displayName: "Chrome Fixture",
+                    groupID: "chrome",
+                    lastActiveAt: 100,
+                    windows: initialWindows
+                )
+            ],
+            contextsByID: [appID: context]
+        )
+        let model = LiveSwitcherModel(
+            windowRecencyTracker: RuntimeWindowRecencyTracker(),
+            snapshotService: snapshotService
+        )
         model.frontmostApplicationOverride = { currentApp }
-        model.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(
-                apps: [
-                    AppSwitchCandidate(
-                        id: appID,
-                        displayName: "Chrome Fixture",
-                        groupID: "chrome",
-                        lastActiveAt: 100,
-                        windows: snapshotWindows
-                    )
-                ],
-                contextsByID: [appID: context]
-            )
-        }
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         XCTAssertEqual(model.session?.apps.first?.windows.map(\.id), ["fullscreen", "incognito", "normal"])
 
         model.windowRecencyTracker.recordVerifiedFocus(appID: appID, windowID: "normal", context: context)
-        snapshotWindows = reorderedWindows
+        snapshotService.installAppSwitcherProjection(
+            apps: [
+                AppSwitchCandidate(
+                    id: appID,
+                    displayName: "Chrome Fixture",
+                    groupID: "chrome",
+                    lastActiveAt: 100,
+                    windows: reorderedWindows
+                )
+            ],
+            contextsByID: [appID: context]
+        )
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         XCTAssertEqual(model.session?.apps.first?.windows.map(\.id), ["normal", "incognito", "fullscreen"])
     }
 
