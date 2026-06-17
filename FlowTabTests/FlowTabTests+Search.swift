@@ -1251,7 +1251,7 @@ extension FlowTabTests {
                 XCTFail("missing selected app context")
                 return
             }
-            let selectedSnapshot = RuntimeHomeAppSnapshot(
+            let selectedPayload = RuntimeCurrentAppWindowPayload(
                 summary: RuntimeHomeAppSummary(
                     appID: selectedApp.id,
                     displayName: selectedApp.displayName,
@@ -1267,7 +1267,7 @@ extension FlowTabTests {
             let applyStart = DispatchTime.now().uptimeNanoseconds
             let applyStartMs = LiveSwitcherModel.monotonicMilliseconds()
             model.completeSelectedAppWindowProjection(
-                selectedSnapshot,
+                selectedPayload,
                 appID: selectedAppID,
                 generation: model.selectedAppWindowProjectionGeneration,
                 startMs: applyStartMs,

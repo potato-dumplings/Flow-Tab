@@ -241,6 +241,23 @@ final class RuntimeWindowRecencyTracker: @unchecked Sendable {
         )
     }
 
+    func currentAppWindowPayloadWithRecencyApplied(
+        _ payload: RuntimeCurrentAppWindowPayload
+    ) -> RuntimeCurrentAppWindowPayload {
+        let orderedApps = appsWithRecencyApplied(
+            [payload.candidate],
+            contextsByID: [payload.context.appID: payload.context]
+        )
+        guard let candidate = orderedApps.first else {
+            return payload
+        }
+        return RuntimeCurrentAppWindowPayload(
+            summary: payload.summary,
+            candidate: candidate,
+            context: payload.context
+        )
+    }
+
     func removeAll() {
         lock.lock()
         recordsByAppID.removeAll()

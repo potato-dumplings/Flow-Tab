@@ -130,16 +130,16 @@ extension LiveSwitcherModel {
     func logSelectedAppWindowProjection(
         result: String,
         appID: String,
-        homeAppSnapshot: RuntimeHomeAppSnapshot?,
+        currentAppWindowPayload: RuntimeCurrentAppWindowPayload?,
         startMs: Double,
         projectionReadMs: Double,
         applyEndMs: Double
     ) {
-        let windowCount = homeAppSnapshot?.candidate.windows.count ?? 0
-        let pidCount = homeAppSnapshot.map { selectedHomeAppSnapshot in
-            Set(selectedHomeAppSnapshot.context.windowsByID.values.map { context in
+        let windowCount = currentAppWindowPayload?.candidate.windows.count ?? 0
+        let pidCount = currentAppWindowPayload.map { payload in
+            Set(payload.context.windowsByID.values.map { context in
                 if context.ownerPID == 0 {
-                    return selectedHomeAppSnapshot.context.runningApp.processIdentifier
+                    return payload.context.runningApp.processIdentifier
                 }
                 return context.ownerPID
             }).count

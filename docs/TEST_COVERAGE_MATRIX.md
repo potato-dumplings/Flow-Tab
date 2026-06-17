@@ -53,6 +53,7 @@ No high-value cross-layer gaps are currently tracked here.
 
 ## Recent Validation Notes
 
+- 2026-06-17 Phase 5: Switcher focused-current-app startup and selected-app window projection completion now consume `RuntimeCurrentAppWindowPayload` directly, with recency applied to the payload before session construction. The `RuntimeHomeAppSnapshot` compatibility shape remains for Home readers/provider repair bridges only, not as the Switcher projection read payload.
 - 2026-06-16 Phase 5: `RuntimeReadModelStore` now proves current-app repair snapshots upsert the app switcher projection, and `RuntimeSnapshotService` proves launched-app repair snapshots commit into the app switcher projection before hot-path reads depend on it.
 - 2026-06-16 Phase 5: the Space fixture workflow now builds bundle-id-scoped app bundle paths and the UI wrapper validates each fixture bundle path plus `Info.plist` bundle identifier before reuse, preventing stale LaunchServices/app-path contamination from hiding real runtime ownership failures.
 - 2026-06-16 Phase 5: the four-window Noisy Option+Tab fixture now asserts real `collectCGWindows` Space signature diagnostics (`signatureChanged`, display/space/window/fullscreen counts, and signature summary) after activation, closing the representative Space signature real UI proof gap while broader multi-display/system-owner and stale projection race coverage remain open.

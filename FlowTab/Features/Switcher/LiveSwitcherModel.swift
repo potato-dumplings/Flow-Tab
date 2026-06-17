@@ -408,12 +408,12 @@ final class LiveSwitcherModel: ObservableObject {
 
         if let projection = runtimeSnapshotService.readCurrentAppWindowProjection(appID: frontmostAppID) {
             projectionReadMs = Self.monotonicMilliseconds()
-            let snapshot = homeSnapshotWithWindowRecencyApplied(
-                projection.currentAppWindowPayload.homeAppSnapshot
+            let payload = currentAppWindowPayloadWithWindowRecencyApplied(
+                projection.currentAppWindowPayload
             )
             recencyAppliedMs = Self.monotonicMilliseconds()
-            resolvedAppCandidate = snapshot.candidate
-            resolvedContext = snapshot.context
+            resolvedAppCandidate = payload.candidate
+            resolvedContext = payload.context
         } else {
             projectionReadMs = Self.monotonicMilliseconds()
             runtimeSnapshotService.signalAppWindowsChanged(
@@ -896,10 +896,10 @@ final class LiveSwitcherModel: ObservableObject {
         )
     }
 
-    private func homeSnapshotWithWindowRecencyApplied(
-        _ snapshot: RuntimeHomeAppSnapshot
-    ) -> RuntimeHomeAppSnapshot {
-        return windowRecencyTracker.homeSnapshotWithRecencyApplied(snapshot)
+    private func currentAppWindowPayloadWithWindowRecencyApplied(
+        _ payload: RuntimeCurrentAppWindowPayload
+    ) -> RuntimeCurrentAppWindowPayload {
+        return windowRecencyTracker.currentAppWindowPayloadWithRecencyApplied(payload)
     }
 
     func resolveFrontmostApplication() -> NSRunningApplication? {

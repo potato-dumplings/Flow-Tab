@@ -185,7 +185,7 @@ extension LiveSwitcherModel {
 
         if let projection = runtimeService.readCurrentAppWindowProjection(appID: targetAppID) {
             completeSelectedAppWindowProjection(
-                projection.currentAppWindowPayload.homeAppSnapshot,
+                projection.currentAppWindowPayload,
                 appID: targetAppID,
                 generation: generation,
                 startMs: startMs,
@@ -209,7 +209,7 @@ extension LiveSwitcherModel {
     }
 
     func completeSelectedAppWindowProjection(
-        _ homeAppSnapshot: RuntimeHomeAppSnapshot?,
+        _ currentAppWindowPayload: RuntimeCurrentAppWindowPayload?,
         appID: String,
         generation: UInt64,
         startMs: Double,
@@ -224,18 +224,18 @@ extension LiveSwitcherModel {
             logSelectedAppWindowProjection(
                 result: "staleGeneration",
                 appID: appID,
-                homeAppSnapshot: homeAppSnapshot,
+                currentAppWindowPayload: currentAppWindowPayload,
                 startMs: startMs,
                 projectionReadMs: projectionReadMs,
                 applyEndMs: Self.monotonicMilliseconds()
             )
             return
         }
-        guard let homeAppSnapshot else {
+        guard let currentAppWindowPayload else {
             logSelectedAppWindowProjection(
                 result: "missing",
                 appID: appID,
-                homeAppSnapshot: nil,
+                currentAppWindowPayload: nil,
                 startMs: startMs,
                 projectionReadMs: projectionReadMs,
                 applyEndMs: Self.monotonicMilliseconds()
@@ -246,7 +246,7 @@ extension LiveSwitcherModel {
             logSelectedAppWindowProjection(
                 result: "staleSelection",
                 appID: appID,
-                homeAppSnapshot: homeAppSnapshot,
+                currentAppWindowPayload: currentAppWindowPayload,
                 startMs: startMs,
                 projectionReadMs: projectionReadMs,
                 applyEndMs: Self.monotonicMilliseconds()
@@ -257,7 +257,7 @@ extension LiveSwitcherModel {
             logSelectedAppWindowProjection(
                 result: "missingSessionApp",
                 appID: appID,
-                homeAppSnapshot: homeAppSnapshot,
+                currentAppWindowPayload: currentAppWindowPayload,
                 startMs: startMs,
                 projectionReadMs: projectionReadMs,
                 applyEndMs: Self.monotonicMilliseconds()
@@ -266,8 +266,8 @@ extension LiveSwitcherModel {
         }
 
         var apps = currentSession.apps
-        apps[appIndex] = homeAppSnapshot.candidate
-        runtimeContextsByID[appID] = homeAppSnapshot.context
+        apps[appIndex] = currentAppWindowPayload.candidate
+        runtimeContextsByID[appID] = currentAppWindowPayload.context
         let preservesWindowLayerPreview: Bool
         if case .windowCycle(let windowLayerAppID) = currentSession.mode, windowLayerAppID == appID {
             preservesWindowLayerPreview = true
@@ -298,7 +298,7 @@ extension LiveSwitcherModel {
         logSelectedAppWindowProjection(
             result: "applied",
             appID: appID,
-            homeAppSnapshot: homeAppSnapshot,
+            currentAppWindowPayload: currentAppWindowPayload,
             startMs: startMs,
             projectionReadMs: projectionReadMs,
             applyEndMs: applyEndMs
