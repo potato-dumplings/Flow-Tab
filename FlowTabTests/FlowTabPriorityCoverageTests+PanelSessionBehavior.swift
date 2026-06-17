@@ -257,10 +257,13 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelControllerPresentationSessionGenerationTracksSessionLifecycle() {
-        let controller = SwitcherPanelController()
-        controller.modelForTesting.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
-        }
+        let controller = SwitcherPanelController(
+            model: LiveSwitcherModel(
+                snapshotService: RecordingRuntimeSnapshotService(
+                    appSwitcherApps: searchScenarioApps()
+                )
+            )
+        )
 
         XCTAssertEqual(controller.presentationSessionGeneration, 0)
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
@@ -289,8 +292,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testSwitcherPanelControllerGlobalHotkeyStartsFromFastAppSnapshot() {
-        let controller = SwitcherPanelController()
+    func testSwitcherPanelControllerGlobalHotkeyStartsFromAppSwitcherProjection() {
         let fastApps = searchScenarioApps().map { app in
             AppSwitchCandidate(
                 id: app.id,
@@ -300,23 +302,18 @@ extension FlowTabPriorityCoverageTests {
                 windows: []
             )
         }
-        var fullSnapshotCalls = 0
+        let runtimeService = RecordingRuntimeSnapshotService(appSwitcherApps: fastApps)
+        let controller = SwitcherPanelController(
+            model: LiveSwitcherModel(snapshotService: runtimeService)
+        )
         controller.modelForTesting.frontmostApplicationOverride = { nil }
-        controller.modelForTesting.testingFastAppSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: fastApps, contextsByID: [:])
-        }
-        controller.modelForTesting.testingSnapshotProviderOverride = {
-            fullSnapshotCalls += 1
-            Thread.sleep(forTimeInterval: 0.2)
-            return RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
-        }
 
         let start = DispatchTime.now().uptimeNanoseconds
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
         let elapsedMs = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000.0
 
         XCTAssertLessThan(elapsedMs, 100)
-        XCTAssertEqual(fullSnapshotCalls, 0)
+        XCTAssertEqual(runtimeService.appSwitcherMaintenanceRequestsRecorded(), [.switcherSessionStarted])
         XCTAssertEqual(controller.modelForTesting.session?.apps.count, fastApps.count)
         XCTAssertEqual(controller.modelForTesting.session?.apps.first?.windows.count, 0)
         controller.cancelSelectionForTesting()
