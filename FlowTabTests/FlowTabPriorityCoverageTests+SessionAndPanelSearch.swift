@@ -182,12 +182,14 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelControllerPointerAppSelectionRequiresPointerMovement() {
-        let controller = SwitcherPanelController()
-        controller.modelForTesting.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
-        }
+        let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: searchScenarioApps())
+        let controller = SwitcherPanelController(
+            model: LiveSwitcherModel(snapshotService: snapshotService)
+        )
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         let initialSelectedAppID = controller.modelForTesting.selectedApp?.id
 
         controller.pointerSelectionGate.reset(currentLocation: .zero)
@@ -293,16 +295,18 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelControllerPointerAppClickCommitsImmediatelyWithoutPointerMovement() {
-        let controller = SwitcherPanelController()
-        controller.modelForTesting.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
-        }
+        let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: searchScenarioApps())
+        let controller = SwitcherPanelController(
+            model: LiveSwitcherModel(snapshotService: snapshotService)
+        )
         var activatedTarget: ActivationTarget?
         controller.modelForTesting.activationOverride = { target, _ in
             activatedTarget = target
         }
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         controller.pointerSelectionGate.reset(currentLocation: .zero)
 
         controller.commitSwitcherAppByPointerClick(appID: "com.example.browser")
