@@ -475,18 +475,6 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         return projection
     }
 
-    func readCommittedSearchIndexProjection() -> RuntimeSearchIndexProjection? {
-        lock.lock()
-        defer { lock.unlock() }
-
-        guard var projection = committedSearchIndex else { return nil }
-        projection.freshness = freshnessLocked(
-            generatedAt: projection.freshness.generatedAt,
-            isCompleteForScope: !isDirtyLocked
-        )
-        return projection
-    }
-
     func readCommittedSearchIndexForSearch() -> RuntimeSearchIndexRead {
         lock.lock()
         defer { lock.unlock() }

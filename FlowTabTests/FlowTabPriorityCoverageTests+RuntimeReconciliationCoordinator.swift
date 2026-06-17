@@ -22,7 +22,9 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(appProjection.freshness.generatedAt, generatedAt)
         XCTAssertTrue(appProjection.freshness.isCompleteForScope)
         XCTAssertEqual(appProjection.freshness.sourceGeneration.projection, 1)
-        let searchProjection = try XCTUnwrap(store.readCommittedSearchIndexProjection())
+        let searchRead = store.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(searchRead.readiness, .ready)
+        let searchProjection = try XCTUnwrap(searchRead.projection)
         XCTAssertEqual(searchProjection.appEntries.map(\.appID), apps.map(\.id))
         XCTAssertEqual(
             searchProjection.windowEntries.map(\.windowID),
@@ -212,7 +214,9 @@ extension FlowTabPriorityCoverageTests {
 
         store.stageSearchIndexApps(apps, generatedAt: 20)
 
-        XCTAssertNil(store.readCommittedSearchIndexProjection())
+        var read = store.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(read.readiness, .missing)
+        XCTAssertNil(read.projection)
         var diagnostics = store.diagnostics()
         XCTAssertFalse(diagnostics.hasCommittedSearchIndex)
         XCTAssertTrue(diagnostics.hasStagingSearchIndex)
@@ -223,8 +227,10 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertEqual(committed.freshness.generatedAt, 21)
         XCTAssertTrue(committed.freshness.isCompleteForScope)
+        read = store.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(read.readiness, .ready)
         XCTAssertEqual(
-            store.readCommittedSearchIndexProjection()?.windowEntries.map(\.windowID),
+            read.projection?.windowEntries.map(\.windowID),
             apps.flatMap(\.windows).map(\.id)
         )
         diagnostics = store.diagnostics()
@@ -310,7 +316,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(staged.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID), ["browser-2"])
         XCTAssertEqual(store.readCommittedSearchIndexForSearch().readiness, .stale)
         XCTAssertEqual(
-            store.readCommittedSearchIndexProjection()?.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),
+            store.readCommittedSearchIndexForSearch().projection?.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),
             ["browser-1"]
         )
 
@@ -319,7 +325,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(committed.freshness.isCompleteForScope)
         XCTAssertEqual(store.readCommittedSearchIndexForSearch().readiness, .ready)
         XCTAssertEqual(
-            store.readCommittedSearchIndexProjection()?.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),
+            store.readCommittedSearchIndexForSearch().projection?.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),
             ["browser-2"]
         )
         let diagnostics = store.diagnostics()
