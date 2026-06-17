@@ -778,12 +778,12 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testLiveSwitcherModelAutoEnterWindowLayerSuppressesImmediateReentryAfterManualExit() {
-        let model = LiveSwitcherModel()
-        model.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: self.searchScenarioApps(), contextsByID: [:])
-        }
+        let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: searchScenarioApps())
+        let model = LiveSwitcherModel(snapshotService: snapshotService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         XCTAssertEqual(model.session?.mode, .appCycle)
         XCTAssertTrue(model.canAutoEnterWindowLayer)
         XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
