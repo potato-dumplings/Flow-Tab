@@ -358,18 +358,26 @@ extension FlowTabTests {
 
     @MainActor
     func testTerminateSelectedAppUnitKeepsPendingInstanceWhenSameBundleDifferentPIDTerminates() async {
-        let model = LiveSwitcherModel()
         let initialApps = terminateScenarioApps()
-        var snapshots: [RuntimeSnapshot] = [
-            makeRuntimeSnapshot(apps: initialApps),
-            makeRuntimeSnapshot(apps: initialApps)
-        ]
-        var snapshotReadCount = 0
-        model.testingSnapshotProviderOverride = {
-            snapshotReadCount += 1
-            XCTAssertFalse(snapshots.isEmpty)
-            return snapshots.removeFirst()
-        }
+        let currentApp = NSRunningApplication.current
+        let activePID = currentApp.processIdentifier
+        let contextsByID = Dictionary(
+            uniqueKeysWithValues: initialApps.map { app in
+                (
+                    app.id,
+                    RuntimeAppContext(
+                        appID: app.id,
+                        runningApp: currentApp,
+                        windowsByID: [:]
+                    )
+                )
+            }
+        )
+        let snapshotService = RecordingRuntimeSnapshotService(
+            appSwitcherApps: initialApps,
+            contextsByID: contextsByID
+        )
+        let model = LiveSwitcherModel(snapshotService: snapshotService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         guard let terminatedAppID = model.session?.selectedApp.id else {
@@ -377,7 +385,7 @@ extension FlowTabTests {
             return
         }
 
-        model.terminateRequestOverride = { _ in (sent: true, pid: 42_003) }
+        model.terminateRequestOverride = { _ in (sent: true, pid: activePID) }
         model.terminateRefreshPollIntervalNs = 1_000_000_000
         model.terminateRefreshTimeoutNs = 1_000_000_000
         model.isProcessRunningOverride = { _ in true }
@@ -385,15 +393,19 @@ extension FlowTabTests {
         let result = model.terminateSelectedApp()
         XCTAssertEqual(result, .updatedSession)
         XCTAssertEqual(model.pendingTerminateRequest?.appID, terminatedAppID)
-        XCTAssertEqual(model.pendingTerminateRequest?.pid, 42_003)
+        XCTAssertEqual(model.pendingTerminateRequest?.pid, activePID)
         XCTAssertEqual(model.pendingTerminateRequest?.generation, 1)
         XCTAssertEqual(model.terminatingAppID, terminatedAppID)
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
 
-        XCTAssertTrue(model.handleApplicationTerminated(appID: terminatedAppID, pid: 42_004))
+        XCTAssertTrue(model.handleApplicationTerminated(appID: terminatedAppID, pid: activePID + 1))
 
-        XCTAssertEqual(snapshotReadCount, 2)
+        XCTAssertEqual(snapshotService.appTerminationSignalsRecorded().map(\.appID), [terminatedAppID])
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         XCTAssertEqual(model.pendingTerminateRequest?.appID, terminatedAppID)
-        XCTAssertEqual(model.pendingTerminateRequest?.pid, 42_003)
+        XCTAssertEqual(model.pendingTerminateRequest?.pid, activePID)
         XCTAssertEqual(model.pendingTerminateRequest?.generation, 1)
         XCTAssertEqual(model.terminatingAppID, terminatedAppID)
         XCTAssertTrue(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? false)

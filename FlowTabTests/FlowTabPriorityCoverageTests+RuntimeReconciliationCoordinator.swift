@@ -119,6 +119,50 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(duplicateSignalProjection.freshness.sourceGeneration.projection, 2)
     }
 
+    func testRuntimeReadModelStorePreservesRunningInstanceWhenSameBundleDifferentPIDTerminates() throws {
+        let store = RuntimeReadModelStore()
+        let apps = terminateScenarioApps()
+        let activeApp = try XCTUnwrap(apps.first)
+        let activePID = NSRunningApplication.current.processIdentifier
+        let context = makeRuntimeAppContext(
+            appID: activeApp.id,
+            runningApp: .current,
+            windows: activeApp.windows
+        )
+
+        store.commitAppSwitcherSnapshot(
+            RuntimeSnapshot(
+                apps: apps,
+                contextsByID: [activeApp.id: context]
+            ),
+            generatedAt: 10
+        )
+
+        store.markAppTerminated(appID: activeApp.id, pid: activePID + 1)
+
+        var appProjection = try XCTUnwrap(store.readAppSwitcherProjection())
+        XCTAssertEqual(appProjection.apps.map(\.id), apps.map(\.id))
+        XCTAssertEqual(
+            appProjection.contextsByID[activeApp.id]?.runningApp.processIdentifier,
+            activePID
+        )
+        XCTAssertEqual(appProjection.freshness.sourceGeneration.appLifecycle, 0)
+        XCTAssertEqual(appProjection.freshness.sourceGeneration.projection, 1)
+        var searchRead = store.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(searchRead.readiness, .ready)
+        XCTAssertTrue(searchRead.projection?.appEntries.contains { $0.appID == activeApp.id } ?? false)
+
+        store.markAppTerminated(appID: activeApp.id, pid: activePID)
+
+        appProjection = try XCTUnwrap(store.readAppSwitcherProjection())
+        XCTAssertFalse(appProjection.apps.contains { $0.id == activeApp.id })
+        XCTAssertNil(appProjection.contextsByID[activeApp.id])
+        XCTAssertEqual(appProjection.freshness.sourceGeneration.appLifecycle, 1)
+        XCTAssertEqual(appProjection.freshness.sourceGeneration.projection, 2)
+        searchRead = store.readCommittedSearchIndexForSearch()
+        XCTAssertFalse(searchRead.projection?.appEntries.contains { $0.appID == activeApp.id } ?? true)
+    }
+
     func testRuntimeSnapshotServiceOwnsReadModelStoreForProjectionReadsAndDirtySignals() {
         let coordinator = RuntimeReconciliationCoordinator()
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)

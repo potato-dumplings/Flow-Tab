@@ -357,6 +357,11 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
 
+        guard shouldRemoveTerminatedAppLocked(appID: appID, pid: pid) else {
+            dirtyPIDs.remove(pid)
+            return
+        }
+
         let hadAppSwitcherState = appSwitcherProjection?.apps.contains { $0.id == appID } == true
             || appSwitcherProjection?.contextsByID[appID] != nil
         let hadHomeState = homeSummaryProjection?.summaries.contains { $0.appID == appID } == true
@@ -422,6 +427,20 @@ final class RuntimeReadModelStore: @unchecked Sendable {
                 )
             )
         }
+    }
+
+    private func shouldRemoveTerminatedAppLocked(appID: String, pid: pid_t) -> Bool {
+        var knownPIDs = Set<pid_t>()
+        if let context = appSwitcherProjection?.contextsByID[appID] {
+            knownPIDs.insert(context.runningApp.processIdentifier)
+        }
+        if let context = currentAppWindowProjectionsByAppID[appID]?.snapshot.context {
+            knownPIDs.insert(context.runningApp.processIdentifier)
+        }
+        if let summary = homeSummaryProjection?.summary(for: appID) {
+            knownPIDs.insert(summary.pid)
+        }
+        return knownPIDs.isEmpty || knownPIDs.contains(pid)
     }
 
     func readAppSwitcherProjection() -> RuntimeAppSwitcherProjection? {

@@ -327,6 +327,10 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
     func signalAppTerminated(appID: String, pid: pid_t) {
         lock.lock()
         appTerminationSignals.append((appID, pid))
+        guard shouldRemoveTerminatedApp(appID: appID, pid: pid) else {
+            lock.unlock()
+            return
+        }
         if let projection = appSwitcherProjection {
             appSwitcherProjection = RuntimeAppSwitcherProjection(
                 apps: projection.apps.filter { $0.id != appID },
@@ -341,6 +345,20 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
             )
         }
         lock.unlock()
+    }
+
+    private func shouldRemoveTerminatedApp(appID: String, pid: pid_t) -> Bool {
+        var knownPIDs = Set<pid_t>()
+        if let context = appSwitcherProjection?.contextsByID[appID] {
+            knownPIDs.insert(context.runningApp.processIdentifier)
+        }
+        if let context = currentAppWindowProjectionsByAppID[appID]?.snapshot.context {
+            knownPIDs.insert(context.runningApp.processIdentifier)
+        }
+        if let summary = homeSummaryProjection?.summary(for: appID) {
+            knownPIDs.insert(summary.pid)
+        }
+        return knownPIDs.isEmpty || knownPIDs.contains(pid)
     }
 
     func signalWindowFocusVerified(appID: String, pid: pid_t) {
