@@ -898,16 +898,18 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelControllerQuitShortcutTriggersTerminateSelectedAppFlow() async {
-        let controller = SwitcherPanelController()
-        controller.modelForTesting.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: self.terminateScenarioApps(), contextsByID: [:])
-        }
+        let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: terminateScenarioApps())
+        let controller = SwitcherPanelController(
+            model: LiveSwitcherModel(snapshotService: snapshotService)
+        )
         controller.modelForTesting.terminateRequestOverride = { _ in
             (sent: true, pid: 42_100)
         }
         controller.modelForTesting.isProcessRunningOverride = { _ in true }
 
         XCTAssertTrue(controller.modelForTesting.startSession(triggerDirection: .forward))
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         let selectedAppID = controller.modelForTesting.selectedApp?.id
         let hotkeyConfiguration = SwitcherHotkeyPreferencesStore.load()
 
