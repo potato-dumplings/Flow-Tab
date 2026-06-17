@@ -1077,7 +1077,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testAppDelegateLaunchOpenSwitcherWaitsForStableSnapshotBeforeKeepingPanelOpen() async {
+    func testAppDelegateLaunchOpenSwitcherWaitsForStableProjectionBeforeKeepingPanelOpen() async {
         guard let userDefaults = makeIsolatedUserDefaults() else { return }
 
         let previousHooks = AppDelegate.testHooks
@@ -1088,10 +1088,12 @@ extension FlowTabPriorityCoverageTests {
         let previousLaunchArguments = FlowTabTestLaunchOptions.argumentsOverrideForTesting
         let previousLaunchEnvironment = FlowTabTestLaunchOptions.environmentOverrideForTesting
         let hotkeyFactory = SpyHotkeyMonitorFactory()
-        let panelController = SwitcherPanelController()
-        var delegate: AppDelegate?
         let multiAppSnapshot = Array(searchScenarioApps().prefix(2))
-        var snapshotCallCount = 0
+        let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: [multiAppSnapshot[0]])
+        let panelController = SwitcherPanelController(
+            model: LiveSwitcherModel(snapshotService: snapshotService)
+        )
+        var delegate: AppDelegate?
         defer {
             delegate?.applicationWillTerminate(
                 Notification(name: NSApplication.willTerminateNotification)
@@ -1104,18 +1106,6 @@ extension FlowTabPriorityCoverageTests {
             FlowTabTestLaunchOptions.argumentsOverrideForTesting = previousLaunchArguments
             FlowTabTestLaunchOptions.environmentOverrideForTesting = previousLaunchEnvironment
             clearIsolatedUserDefaults(userDefaults)
-        }
-
-        panelController.modelForTesting.testingSnapshotProviderOverride = {
-            snapshotCallCount += 1
-            let apps: [AppSwitchCandidate]
-            switch snapshotCallCount {
-            case 1:
-                apps = [multiAppSnapshot[0]]
-            default:
-                apps = multiAppSnapshot
-            }
-            return RuntimeSnapshot(apps: apps, contextsByID: [:])
         }
 
         FlowTabTestLaunchOptions.argumentsOverrideForTesting = [
@@ -1149,18 +1139,30 @@ extension FlowTabPriorityCoverageTests {
         appDelegate.applicationDidFinishLaunching(
             Notification(name: NSApplication.didFinishLaunchingNotification)
         )
-        let didOpenSeededSwitcher = await waitUntil(
-            "launch open switcher loads seeded multi-app snapshot",
+        let didReadInitialProjection = await waitUntil(
+            "launch open switcher reads initial app-switcher projection",
             timeoutNanoseconds: 2_000_000_000,
             pollIntervalNanoseconds: 25_000_000
         ) {
-            snapshotCallCount >= 3
+            snapshotService.appSwitcherProjectionReadCount() >= 1
+        }
+        XCTAssertTrue(didReadInitialProjection)
+
+        snapshotService.installAppSwitcherProjection(apps: multiAppSnapshot)
+        let didOpenSeededSwitcher = await waitUntil(
+            "launch open switcher loads seeded multi-app projection",
+            timeoutNanoseconds: 2_000_000_000,
+            pollIntervalNanoseconds: 25_000_000
+        ) {
+            snapshotService.appSwitcherProjectionReadCount() >= 3
                 && panelController.modelForTesting.appCount == multiAppSnapshot.count
                 && panelController.modelForTesting.session?.apps.map(\.id) == multiAppSnapshot.map(\.id)
         }
         XCTAssertTrue(didOpenSeededSwitcher)
 
-        XCTAssertGreaterThanOrEqual(snapshotCallCount, 3)
+        XCTAssertGreaterThanOrEqual(snapshotService.appSwitcherProjectionReadCount(), 3)
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         XCTAssertEqual(panelController.modelForTesting.appCount, multiAppSnapshot.count)
         XCTAssertEqual(
             panelController.modelForTesting.session?.apps.map(\.id),
@@ -1182,7 +1184,10 @@ extension FlowTabPriorityCoverageTests {
         let previousLaunchArguments = FlowTabTestLaunchOptions.argumentsOverrideForTesting
         let previousLaunchEnvironment = FlowTabTestLaunchOptions.environmentOverrideForTesting
         let hotkeyFactory = SpyHotkeyMonitorFactory()
-        let panelController = SwitcherPanelController()
+        let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: [])
+        let panelController = SwitcherPanelController(
+            model: LiveSwitcherModel(snapshotService: snapshotService)
+        )
         var delegate: AppDelegate?
         defer {
             delegate?.applicationWillTerminate(
@@ -1197,10 +1202,6 @@ extension FlowTabPriorityCoverageTests {
             FlowTabTestLaunchOptions.environmentOverrideForTesting = previousLaunchEnvironment
             RuntimeDiagnostics.shared.clear()
             clearIsolatedUserDefaults(userDefaults)
-        }
-
-        panelController.modelForTesting.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: [], contextsByID: [:])
         }
 
         RuntimeDiagnostics.shared.clear()
@@ -1253,6 +1254,8 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertNil(panelController.modelForTesting.session)
         XCTAssertFalse(panelController.modelForTesting.isSearchActive)
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         XCTAssertEqual(hotkeyFactory.records.count, 2)
 
         let lines = await RuntimeDiagnostics.shared.readRecentLines(limit: 40, minimumLevel: .debug)

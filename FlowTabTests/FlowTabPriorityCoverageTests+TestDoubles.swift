@@ -85,6 +85,7 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
     private let homeSummaryProjection: RuntimeHomeSummaryProjection?
     private let currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection]
     private var committedSearchIndexProjection: RuntimeSearchIndexProjection?
+    private var appSwitcherProjectionReads = 0
     private var lightweightSnapshotRequests = 0
     private var appSwitcherMaintenanceRequests: [RuntimeProjectionMaintenanceReason] = []
     private var searchIndexFreshnessBarrierRequests: [RuntimeProjectionMaintenanceReason] = []
@@ -147,6 +148,12 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
         lock.lock()
         defer { lock.unlock() }
         return lightweightSnapshotRequests
+    }
+
+    func appSwitcherProjectionReadCount() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return appSwitcherProjectionReads
     }
 
     func installAppSwitcherProjection(
@@ -243,6 +250,7 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
     func readAppSwitcherProjection() -> RuntimeAppSwitcherProjection? {
         lock.lock()
         defer { lock.unlock() }
+        appSwitcherProjectionReads += 1
         return appSwitcherProjection
     }
 
