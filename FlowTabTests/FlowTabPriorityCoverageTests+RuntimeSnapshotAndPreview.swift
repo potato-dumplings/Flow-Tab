@@ -2620,34 +2620,32 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testLiveSwitcherModelWindowPreviewUsesCaptureCacheAcrossReads() {
-        let model = LiveSwitcherModel()
         let currentApp = NSRunningApplication.current
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let windows = [
             WindowCandidate(id: "front-1", title: "Inbox", isMinimized: false, lastActiveAt: 30),
             WindowCandidate(id: "front-2", title: "Draft", isMinimized: false, lastActiveAt: 20)
         ]
+        let candidate = AppSwitchCandidate(
+            id: appID,
+            displayName: currentApp.localizedName ?? "Current App",
+            groupID: "current",
+            lastActiveAt: 100,
+            windows: windows
+        )
         let context = makeRuntimeAppContext(
             appID: appID,
             runningApp: currentApp,
             windows: windows
         )
+        let snapshotService = makeCurrentAppWindowProjectionService(
+            appID: appID,
+            candidate: candidate,
+            context: context
+        )
+        let model = LiveSwitcherModel(snapshotService: snapshotService)
 
         model.frontmostApplicationOverride = { currentApp }
-        model.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(
-                apps: [
-                    AppSwitchCandidate(
-                        id: appID,
-                        displayName: currentApp.localizedName ?? "Current App",
-                        groupID: "current",
-                        lastActiveAt: 100,
-                        windows: windows
-                    )
-                ],
-                contextsByID: [appID: context]
-            )
-        }
 
         var captureCallCount = 0
         model.previewCaptureOverride = { _, _, title, _ in
@@ -2662,6 +2660,8 @@ extension FlowTabPriorityCoverageTests {
         }
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
 
         let firstSnapshot = model.windowPreviewSnapshotForTesting()
         let secondSnapshot = model.windowPreviewSnapshotForTesting()
@@ -2681,33 +2681,31 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testLiveSwitcherModelPreviewCacheIdentityIgnoresTitleChanges() {
-        let model = LiveSwitcherModel()
         let currentApp = NSRunningApplication.current
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let windows = [
             WindowCandidate(id: "front-1", title: "Inbox", isMinimized: false, lastActiveAt: 30)
         ]
+        let candidate = AppSwitchCandidate(
+            id: appID,
+            displayName: currentApp.localizedName ?? "Current App",
+            groupID: "current",
+            lastActiveAt: 100,
+            windows: windows
+        )
         let context = makeRuntimeAppContext(
             appID: appID,
             runningApp: currentApp,
             windows: windows
         )
+        let snapshotService = makeCurrentAppWindowProjectionService(
+            appID: appID,
+            candidate: candidate,
+            context: context
+        )
+        let model = LiveSwitcherModel(snapshotService: snapshotService)
 
         model.frontmostApplicationOverride = { currentApp }
-        model.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(
-                apps: [
-                    AppSwitchCandidate(
-                        id: appID,
-                        displayName: currentApp.localizedName ?? "Current App",
-                        groupID: "current",
-                        lastActiveAt: 100,
-                        windows: windows
-                    )
-                ],
-                contextsByID: [appID: context]
-            )
-        }
 
         var captureCallCount = 0
         model.previewCaptureOverride = { _, _, _, _ in
@@ -2720,6 +2718,8 @@ extension FlowTabPriorityCoverageTests {
         }
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         let initialSnapshot = model.windowPreviewSnapshotForTesting()
         XCTAssertEqual(captureCallCount, 1)
         XCTAssertTrue(initialSnapshot.first?.hasImage == true)
@@ -2757,34 +2757,32 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testLiveSwitcherModelFocusedWindowSessionFreezesPreviewSnapshotUntilSessionEnds() {
-        let model = LiveSwitcherModel()
         let currentApp = NSRunningApplication.current
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let windows = [
             WindowCandidate(id: "front-1", title: "Inbox", isMinimized: false, lastActiveAt: 30),
             WindowCandidate(id: "front-2", title: "Draft", isMinimized: false, lastActiveAt: 20)
         ]
+        let candidate = AppSwitchCandidate(
+            id: appID,
+            displayName: currentApp.localizedName ?? "Current App",
+            groupID: "current",
+            lastActiveAt: 100,
+            windows: windows
+        )
         let context = makeRuntimeAppContext(
             appID: appID,
             runningApp: currentApp,
             windows: windows
         )
+        let snapshotService = makeCurrentAppWindowProjectionService(
+            appID: appID,
+            candidate: candidate,
+            context: context
+        )
+        let model = LiveSwitcherModel(snapshotService: snapshotService)
 
         model.frontmostApplicationOverride = { currentApp }
-        model.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(
-                apps: [
-                    AppSwitchCandidate(
-                        id: appID,
-                        displayName: currentApp.localizedName ?? "Current App",
-                        groupID: "current",
-                        lastActiveAt: 100,
-                        windows: windows
-                    )
-                ],
-                contextsByID: [appID: context]
-            )
-        }
 
         enum PreviewPhase {
             case initial
@@ -2810,6 +2808,8 @@ extension FlowTabPriorityCoverageTests {
         }
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         let initialSnapshot = model.windowPreviewSnapshotForTesting()
         XCTAssertEqual(initialSnapshot.count, 2)
         XCTAssertTrue(initialSnapshot.allSatisfy(\.hasImage))
@@ -2828,6 +2828,8 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertNil(model.session)
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         let restartedSnapshot = model.windowPreviewSnapshotForTesting()
         XCTAssertEqual(restartedSnapshot.count, 2)
         XCTAssertTrue(restartedSnapshot.allSatisfy { !$0.hasImage })
@@ -2836,33 +2838,31 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testLiveSwitcherModelPreviewCaptureFailureStateRetriesNextGeneration() {
-        let model = LiveSwitcherModel()
         let currentApp = NSRunningApplication.current
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let windows = [
             WindowCandidate(id: "front-1", title: "Inbox", isMinimized: false, lastActiveAt: 30)
         ]
+        let candidate = AppSwitchCandidate(
+            id: appID,
+            displayName: currentApp.localizedName ?? "Current App",
+            groupID: "current",
+            lastActiveAt: 100,
+            windows: windows
+        )
         let context = makeRuntimeAppContext(
             appID: appID,
             runningApp: currentApp,
             windows: windows
         )
+        let snapshotService = makeCurrentAppWindowProjectionService(
+            appID: appID,
+            candidate: candidate,
+            context: context
+        )
+        let model = LiveSwitcherModel(snapshotService: snapshotService)
 
         model.frontmostApplicationOverride = { currentApp }
-        model.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(
-                apps: [
-                    AppSwitchCandidate(
-                        id: appID,
-                        displayName: currentApp.localizedName ?? "Current App",
-                        groupID: "current",
-                        lastActiveAt: 100,
-                        windows: windows
-                    )
-                ],
-                contextsByID: [appID: context]
-            )
-        }
 
         var captureCallCount = 0
         model.previewCaptureOverride = { _, _, _, _ in
@@ -2871,6 +2871,8 @@ extension FlowTabPriorityCoverageTests {
         }
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
 
         let firstSnapshot = model.windowPreviewSnapshotForTesting()
         XCTAssertEqual(firstSnapshot.count, 1)
@@ -2895,8 +2897,6 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testLiveSwitcherModelPreviewCaptureSkipsBindingWithoutCaptureAction() {
-        let model = LiveSwitcherModel()
-        model.runtimeProjectionMaintenanceEnabled = false
         let currentApp = NSRunningApplication.current
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let window = WindowCandidate(
@@ -2904,6 +2904,13 @@ extension FlowTabPriorityCoverageTests {
             title: "Ambiguous Window",
             isMinimized: false,
             lastActiveAt: 30
+        )
+        let candidate = AppSwitchCandidate(
+            id: appID,
+            displayName: currentApp.localizedName ?? "Current App",
+            groupID: "current",
+            lastActiveAt: 100,
+            windows: [window]
         )
         let context = RuntimeAppContext(
             appID: appID,
@@ -2920,22 +2927,15 @@ extension FlowTabPriorityCoverageTests {
                 )
             ]
         )
+        let snapshotService = makeCurrentAppWindowProjectionService(
+            appID: appID,
+            candidate: candidate,
+            context: context
+        )
+        let model = LiveSwitcherModel(snapshotService: snapshotService)
+        model.runtimeProjectionMaintenanceEnabled = false
 
         model.frontmostApplicationOverride = { currentApp }
-        model.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(
-                apps: [
-                    AppSwitchCandidate(
-                        id: appID,
-                        displayName: currentApp.localizedName ?? "Current App",
-                        groupID: "current",
-                        lastActiveAt: 100,
-                        windows: [window]
-                    )
-                ],
-                contextsByID: [appID: context]
-            )
-        }
 
         var captureCallCount = 0
         model.previewCaptureOverride = { _, _, _, _ in
@@ -2948,6 +2948,8 @@ extension FlowTabPriorityCoverageTests {
         }
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
 
         let snapshot = model.windowPreviewSnapshotForTesting()
 

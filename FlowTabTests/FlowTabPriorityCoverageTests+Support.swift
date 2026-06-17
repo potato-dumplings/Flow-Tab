@@ -231,6 +231,41 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
     }
+    func makeCurrentAppWindowProjectionService(
+        appID: String,
+        candidate: AppSwitchCandidate,
+        context: RuntimeAppContext,
+        generatedAt: TimeInterval = 10
+    ) -> RecordingRuntimeSnapshotService {
+        RecordingRuntimeSnapshotService(
+            currentAppWindowProjectionsByAppID: [
+                appID: RuntimeCurrentAppWindowProjection(
+                    appID: appID,
+                    snapshot: RuntimeHomeAppSnapshot(
+                        summary: RuntimeHomeAppSummary(
+                            appID: appID,
+                            displayName: candidate.displayName,
+                            groupID: candidate.groupID,
+                            lastActiveAt: candidate.lastActiveAt,
+                            windowCount: candidate.windows.count,
+                            pid: context.runningApp.processIdentifier
+                        ),
+                        candidate: candidate,
+                        context: context
+                    ),
+                    freshness: RuntimeProjectionFreshness(
+                        generatedAt: generatedAt,
+                        sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+                        dirtyAppIDs: [],
+                        dirtyPIDs: [],
+                        dirtyCGWindowIDs: [],
+                        pendingRepairScopes: [],
+                        isCompleteForScope: true
+                    )
+                )
+            ]
+        )
+    }
     func makeIsolatedUserDefaults() -> UserDefaults? {
         let suiteName = "FlowTabPriorityCoverageTests.\(UUID().uuidString)"
         guard let userDefaults = UserDefaults(suiteName: suiteName) else {
