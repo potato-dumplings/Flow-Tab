@@ -637,7 +637,16 @@ extension FlowTabTests {
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertTrue(model.enterSearchMode())
-        XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.readiness, .stale)
+        guard let diagnostic = model.lastSearchIndexReadDiagnostic else {
+            XCTFail("missing search index read diagnostic")
+            return
+        }
+        XCTAssertEqual(diagnostic.readiness, .stale)
+        XCTAssertEqual(diagnostic.resultState, .degradedStaleCommittedResult)
+        XCTAssertFalse(diagnostic.committedIndexCoversCurrentGeneration)
+        XCTAssertTrue(diagnostic.logMessage.contains("resultState=degradedStaleCommittedResult"))
+        XCTAssertTrue(diagnostic.logMessage.contains("committedIndexCoversCurrentGeneration=0"))
+        XCTAssertFalse(diagnostic.logMessage.contains("complete="))
         XCTAssertEqual(
             snapshotService.searchIndexFreshnessBarrierRequestsRecorded(),
             [.searchFreshnessBarrier]
@@ -824,7 +833,8 @@ extension FlowTabTests {
         XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.appCount, apps.count)
         XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.windowCount, windowCount)
         XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.requestedFreshnessBarrier, false)
-        XCTAssertTrue(model.lastSearchIndexReadDiagnostic?.isCompleteForScope ?? false)
+        XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.resultState, .latestCommittedResult)
+        XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.committedIndexCoversCurrentGeneration, true)
         XCTAssertEqual(snapshotService.searchIndexFreshnessBarrierRequestsRecorded(), [])
         XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
         XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)

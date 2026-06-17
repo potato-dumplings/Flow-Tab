@@ -53,6 +53,7 @@ No high-value cross-layer gaps are currently tracked here.
 
 ## Recent Validation Notes
 
+- 2026-06-17 Phase 5: Search stale committed-index reads now report `degradedStaleCommittedResult` and `committedIndexCoversCurrentGeneration=0` in the Search-facing diagnostic/log path. A stale committed index can still provide degraded results while requesting the bounded freshness barrier, but it is no longer named or logged as a fresh/complete latest-result state.
 - 2026-06-17 Phase 5: `RuntimeCurrentAppWindowPayload` and `RuntimeCurrentAppWindowProjection` no longer expose Home snapshot compatibility initializers or accessors. Provider repair conversion is isolated inside `RuntimeSnapshotService`, and Home's legacy `RuntimeHomeAppSnapshot` shape is now rebuilt only at the Home projection-reader boundary.
 - 2026-06-17 Phase 5: `RuntimeCurrentAppWindowProjection` construction now requires `RuntimeCurrentAppWindowPayload`; the previous `homeAppSnapshot:` projection initializer was removed and current-app projection test fixtures now wrap provider/Home compatibility snapshots before entering the projection boundary.
 - 2026-06-17 Phase 5: Runtime reconciliation completion now hands `RuntimeCurrentAppWindowPayload` into `RuntimeSnapshotService`/`RuntimeReadModelStore`, and `RuntimeReadModelStore.commitCurrentAppWindowProjection(...)` no longer accepts a `RuntimeHomeAppSnapshot` write boundary. Provider repair primitives may still convert their compatibility Home snapshot into a payload before committing current-app/search projections.

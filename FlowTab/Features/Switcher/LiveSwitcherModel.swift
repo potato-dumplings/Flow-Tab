@@ -153,11 +153,18 @@ final class LiveSwitcherModel: ObservableObject {
     }
 
     struct SearchIndexReadDiagnostic: Equatable {
+        enum ResultState: String, Equatable {
+            case latestCommittedResult
+            case degradedStaleCommittedResult
+            case missingCommittedIndex
+        }
+
         let reason: String
         let readiness: RuntimeSearchIndexReadiness
+        let resultState: ResultState
         let appCount: Int
         let windowCount: Int
-        let isCompleteForScope: Bool
+        let committedIndexCoversCurrentGeneration: Bool
         let dirtyAppCount: Int
         let dirtyPIDCount: Int
         let dirtyCGWindowIDCount: Int
@@ -170,9 +177,11 @@ final class LiveSwitcherModel: ObservableObject {
                 "reason=\(reason)",
                 "source=committedRuntimeIndex",
                 "readiness=\(readiness.rawValue)",
+                "resultState=\(resultState.rawValue)",
                 "apps=\(appCount)",
                 "windows=\(windowCount)",
-                "complete=\(isCompleteForScope ? 1 : 0)",
+                "committedIndexCoversCurrentGeneration=\(committedIndexCoversCurrentGeneration ? 1 : 0)",
+                "degraded=\(resultState == .degradedStaleCommittedResult ? 1 : 0)",
                 "dirtyApps=\(dirtyAppCount)",
                 "dirtyPIDs=\(dirtyPIDCount)",
                 "dirtyCGWindowIDs=\(dirtyCGWindowIDCount)",
