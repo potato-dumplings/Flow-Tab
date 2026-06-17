@@ -354,7 +354,7 @@ final class RecordingRuntimeSnapshotService: RuntimeSnapshotServing, @unchecked 
         if let context = appSwitcherProjection?.contextsByID[appID] {
             knownPIDs.insert(context.runningApp.processIdentifier)
         }
-        if let context = currentAppWindowProjectionsByAppID[appID]?.snapshot.context {
+        if let context = currentAppWindowProjectionsByAppID[appID]?.homeAppSnapshot.context {
             knownPIDs.insert(context.runningApp.processIdentifier)
         }
         if let summary = homeSummaryProjection?.summary(for: appID) {

@@ -202,7 +202,7 @@ extension FlowTabPriorityCoverageTests {
             currentAppWindowProjectionsByAppID: [
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
-                    snapshot: snapshot,
+                    homeAppSnapshot: snapshot,
                     freshness: RuntimeProjectionFreshness(
                         generatedAt: 10,
                         sourceGeneration: RuntimeReadModelGeneration(projection: 1),
@@ -482,7 +482,7 @@ extension FlowTabPriorityCoverageTests {
             currentAppWindowProjectionsByAppID: [
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
-                    snapshot: selectedSnapshot,
+                    homeAppSnapshot: selectedSnapshot,
                     freshness: freshness
                 )
             ]
@@ -574,7 +574,7 @@ extension FlowTabPriorityCoverageTests {
             currentAppWindowProjectionsByAppID: [
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
-                    snapshot: snapshot,
+                    homeAppSnapshot: snapshot,
                     freshness: RuntimeProjectionFreshness(
                         generatedAt: 12,
                         sourceGeneration: RuntimeReadModelGeneration(projection: 1),
@@ -1000,7 +1000,7 @@ extension FlowTabPriorityCoverageTests {
             currentAppWindowProjectionsByAppID: [
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
-                    snapshot: selectedSnapshot,
+                    homeAppSnapshot: selectedSnapshot,
                     freshness: freshness
                 )
             ]

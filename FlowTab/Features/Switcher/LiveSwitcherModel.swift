@@ -410,7 +410,7 @@ final class LiveSwitcherModel: ObservableObject {
         if let projection = runtimeSnapshotService.readCurrentAppWindowProjection(appID: frontmostAppID) {
             snapshotReadMs = Self.monotonicMilliseconds()
             let snapshot = homeSnapshotWithWindowRecencyApplied(
-                projection.snapshot
+                projection.homeAppSnapshot
             )
             recencyAppliedMs = Self.monotonicMilliseconds()
             resolvedAppCandidate = snapshot.candidate

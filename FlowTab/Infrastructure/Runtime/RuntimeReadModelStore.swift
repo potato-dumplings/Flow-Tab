@@ -58,7 +58,7 @@ struct RuntimeHomeSummaryProjection {
 
 struct RuntimeCurrentAppWindowProjection {
     let appID: String
-    let snapshot: RuntimeHomeAppSnapshot
+    let homeAppSnapshot: RuntimeHomeAppSnapshot
     var freshness: RuntimeProjectionFreshness
 }
 
@@ -231,7 +231,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         clearDirtyStateForAppLocked(appID: snapshot.summary.appID, pid: snapshot.summary.pid)
         currentAppWindowProjectionsByAppID[snapshot.summary.appID] = RuntimeCurrentAppWindowProjection(
             appID: snapshot.summary.appID,
-            snapshot: snapshot,
+            homeAppSnapshot: snapshot,
             freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: true)
         )
         upsertAppSwitcherProjectionLocked(snapshot, generatedAt: generatedAt)
@@ -427,7 +427,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         if let context = appSwitcherProjection?.contextsByID[appID] {
             knownPIDs.insert(context.runningApp.processIdentifier)
         }
-        if let context = currentAppWindowProjectionsByAppID[appID]?.snapshot.context {
+        if let context = currentAppWindowProjectionsByAppID[appID]?.homeAppSnapshot.context {
             knownPIDs.insert(context.runningApp.processIdentifier)
         }
         if let summary = homeSummaryProjection?.summary(for: appID) {
@@ -466,7 +466,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
 
         guard var projection = currentAppWindowProjectionsByAppID[appID] else { return nil }
         let isScopeDirty = dirtyAppIDs.contains(appID)
-            || dirtyPIDs.contains(projection.snapshot.summary.pid)
+            || dirtyPIDs.contains(projection.homeAppSnapshot.summary.pid)
             || !dirtyCGWindowIDs.isEmpty
             || !pendingRepairScopes.isEmpty
         projection.freshness = freshnessLocked(

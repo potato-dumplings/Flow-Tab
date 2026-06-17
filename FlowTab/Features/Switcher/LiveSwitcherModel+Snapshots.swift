@@ -190,7 +190,7 @@ extension LiveSwitcherModel {
             let projection = snapshotService.readCurrentAppWindowProjection(appID: targetAppID)
         {
             completeSelectedAppWindowSnapshot(
-                projection.snapshot,
+                projection.homeAppSnapshot,
                 appID: targetAppID,
                 generation: generation,
                 startMs: startMs,
