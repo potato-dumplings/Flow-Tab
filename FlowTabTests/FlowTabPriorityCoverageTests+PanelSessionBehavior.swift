@@ -754,33 +754,31 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelControllerTerminateRefreshIgnoresFollowUpActiveSpaceChangeAfterModifierRelease() async {
-        let controller = SwitcherPanelController()
         let initialApps = terminateScenarioApps()
-        var snapshotReadCount = 0
-        var terminatedAppID: String?
-        controller.modelForTesting.testingSnapshotProviderOverride = {
-            defer { snapshotReadCount += 1 }
-            guard snapshotReadCount > 0, let terminatedAppID else {
-                return RuntimeSnapshot(apps: initialApps, contextsByID: [:])
-            }
-            return RuntimeSnapshot(
-                apps: initialApps.filter { $0.id != terminatedAppID },
-                contextsByID: [:]
+        let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: initialApps)
+        let controller = SwitcherPanelController(
+            model: LiveSwitcherModel(
+                snapshotService: snapshotService
             )
-        }
+        )
         controller.globalPrimaryModifierPressedOverride = false
         controller.globalMainKeyPressedOverride = false
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        terminatedAppID = controller.modelForTesting.selectedApp?.id
+        let terminatedAppID = controller.modelForTesting.selectedApp?.id
         guard let terminatedAppID else {
             XCTFail("Expected selected app before terminate refresh")
             return
         }
         XCTAssertEqual(controller.modelForTesting.selectedApp?.id, terminatedAppID)
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
 
         controller.handleWorkspaceApplicationTerminatedForTesting(appID: terminatedAppID, pid: 42_300)
 
+        XCTAssertEqual(snapshotService.appTerminationSignalsRecorded().map(\.appID), [terminatedAppID])
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         XCTAssertNotNil(controller.modelForTesting.session)
         XCTAssertFalse(controller.modelForTesting.session?.apps.contains { $0.id == terminatedAppID } ?? true)
 
@@ -793,10 +791,12 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelControllerTerminateRequestProtectsPanelResignAfterModifierRelease() async {
-        let controller = SwitcherPanelController()
-        controller.modelForTesting.testingSnapshotProviderOverride = {
-            RuntimeSnapshot(apps: self.terminateScenarioApps(), contextsByID: [:])
-        }
+        let snapshotService = RecordingRuntimeSnapshotService(appSwitcherApps: terminateScenarioApps())
+        let controller = SwitcherPanelController(
+            model: LiveSwitcherModel(
+                snapshotService: snapshotService
+            )
+        )
         controller.modelForTesting.terminateRequestOverride = { _ in
             (sent: true, pid: 42_301)
         }
@@ -806,6 +806,8 @@ extension FlowTabPriorityCoverageTests {
         controller.appIsActiveOverride = false
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
         let selectedAppID = controller.modelForTesting.selectedApp?.id
 
         controller.terminateSelectedApp()
