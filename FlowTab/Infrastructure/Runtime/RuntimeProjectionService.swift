@@ -3,6 +3,7 @@ import Foundation
 import FlowTabCore
 
 let sharedRuntimeProjectionService = RuntimeProjectionService()
+let runtimeSearchFreshnessBarrierMaxReadyRepairs = 4
 
 enum RuntimeProjectionMaintenanceReason: String, Sendable {
     case switcherSessionStarted
@@ -125,7 +126,8 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         maintenanceQueue.async { [self] in
             let diagnostics = readModelStore.diagnostics()
             let drainResult = drainReadyReconciliationRequestsWithResultLocked(
-                now: Date.timeIntervalSinceReferenceDate
+                now: Date.timeIntervalSinceReferenceDate,
+                maxRequests: runtimeSearchFreshnessBarrierMaxReadyRepairs
             )
             commitRepairedCurrentAppWindowPayloadsLocked(drainResult.repairedCurrentAppWindowPayloads)
             readModelStore.stageSearchIndexCurrentAppWindowPayloads(
@@ -149,6 +151,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                     "dirtyCGWindowIDs=\(diagnostics.dirtyCGWindowIDs.count)",
                     "pendingScopes=\(diagnostics.pendingRepairScopes.count)",
                     "startedRequests=\(drainResult.startedRequests.count)",
+                    "maxReadyRepairs=\(runtimeSearchFreshnessBarrierMaxReadyRepairs)",
                     "completedRequests=\(drainResult.completedCount)",
                     "deferredRequests=\(drainResult.deferredCount)",
                     "pendingRequests=\(hasPendingRequests ? 1 : 0)",
@@ -310,9 +313,13 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         }
     }
 
-    private func drainReadyReconciliationRequestsWithResultLocked(now: TimeInterval) -> ReconciliationDrainResult {
+    private func drainReadyReconciliationRequestsWithResultLocked(
+        now: TimeInterval,
+        maxRequests: Int? = nil
+    ) -> ReconciliationDrainResult {
         let coordinator = snapshotProvider.reconciliationCoordinator
-        let requests = coordinator.readyRequests(now: now)
+        let readyRequests = coordinator.readyRequests(now: now)
+        let requests = maxRequests.map { Array(readyRequests.prefix($0)) } ?? readyRequests
         var result = ReconciliationDrainResult()
         result.startedRequests.reserveCapacity(requests.count)
 

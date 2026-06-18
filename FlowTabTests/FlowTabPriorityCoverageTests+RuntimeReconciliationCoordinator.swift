@@ -1375,25 +1375,43 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeProjectionServiceSearchFreshnessBarrierDrainsReadyRequestsBySchedulerPriority() {
         let coordinator = RuntimeReconciliationCoordinator()
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
-        let lowPriority = coordinator.markAppDirty(
-            appID: "com.example.low",
-            pid: 18_405,
-            reason: .manualRefresh,
-            now: 10
+        let store = RuntimeReadModelStore()
+        let committedApps = searchScenarioApps()
+        store.commitAppSwitcherProjection(
+            apps: committedApps,
+            contextsByID: [:],
+            generatedAt: 10
         )
-        let highPriority = coordinator.markAppDirty(
-            appID: "com.example.high",
-            pid: 18_406,
-            reason: .appLaunched,
-            now: 10.1
-        )
+        var requests: [RuntimeReconciliationRequest] = []
+        for index in 0...runtimeSearchFreshnessBarrierMaxReadyRepairs {
+            let appID = "com.example.search-barrier-\(index)"
+            let pid = pid_t(18_405 + index)
+            store.markAppWindowsDirty(
+                appID: appID,
+                pid: pid,
+                pendingScope: "appWindows:\(appID)"
+            )
+            requests.append(
+                coordinator.markAppDirty(
+                    appID: appID,
+                    pid: pid,
+                    reason: index == 1 ? .appLaunched : .manualRefresh,
+                    now: 10 + Double(index) / 10
+                )
+            )
+        }
+        let highPriority = requests[1]
+        let expectedExecuted = [highPriority] + requests
+            .filter { $0.id != highPriority.id }
+            .prefix(runtimeSearchFreshnessBarrierMaxReadyRepairs - 1)
         let lock = NSLock()
         var executedRequests: [RuntimeReconciliationRequest] = []
         let expectation = expectation(description: "search freshness barrier drains ready requests")
-        expectation.expectedFulfillmentCount = 2
+        expectation.expectedFulfillmentCount = runtimeSearchFreshnessBarrierMaxReadyRepairs
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.SearchFreshnessBarrier",
             snapshotProvider: provider,
+            readModelStore: store,
             reconciliationExecutor: { request, _ in
                 lock.lock()
                 executedRequests.append(request)
@@ -1406,9 +1424,21 @@ extension FlowTabPriorityCoverageTests {
         service.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
         wait(for: [expectation], timeout: 1)
 
-        XCTAssertEqual(executedRequests.map(\.id), [highPriority.id, lowPriority.id])
-        XCTAssertEqual(executedRequests.map(\.priority), [.high, .low])
-        XCTAssertTrue(coordinator.readyRequests(now: 11).isEmpty)
+        XCTAssertEqual(executedRequests.map(\.id), expectedExecuted.map(\.id))
+        XCTAssertEqual(executedRequests.map(\.priority).first, .high)
+        XCTAssertEqual(
+            executedRequests.dropFirst().map(\.priority),
+            Array(repeating: .low, count: runtimeSearchFreshnessBarrierMaxReadyRepairs - 1)
+        )
+        XCTAssertEqual(coordinator.readyRequests(now: 11).count, 1)
+        let read = store.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(read.readiness, .staleCommitted)
+        XCTAssertEqual(read.resultState, .degradedStaleCommittedResult)
+        XCTAssertEqual(
+            read.projection?.appEntries.map(\.appID),
+            committedApps.map(\.id)
+        )
+        XCTAssertFalse(store.diagnostics().hasStagingSearchIndex)
     }
 
     func testRuntimeProjectionServiceSearchFreshnessBarrierCommitsRepairedSearchGeneration() throws {
