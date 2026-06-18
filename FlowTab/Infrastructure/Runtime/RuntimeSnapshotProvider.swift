@@ -247,12 +247,15 @@ final class RuntimeSnapshotProvider {
                 "provider",
                 fields: [
                     ("result", "uiTestDataset"),
-                    ("apps", "\(uiTestRuntimeDataset.snapshot.apps.count)"),
-                    ("windows", "\(uiTestRuntimeDataset.snapshot.apps.reduce(0) { $0 + $1.windows.count })"),
+                    ("apps", "\(uiTestRuntimeDataset.appSwitcherApps.count)"),
+                    ("windows", "\(uiTestRuntimeDataset.appSwitcherApps.reduce(0) { $0 + $1.windows.count })"),
                     ("totalMs", formatSnapshotMilliseconds(completeMs - startMs))
                 ]
             )
-            return uiTestRuntimeDataset.snapshot
+            return RuntimeSnapshot(
+                apps: uiTestRuntimeDataset.appSwitcherApps,
+                contextsByID: uiTestRuntimeDataset.appSwitcherContextsByID
+            )
         }
         let runningAppsStartMs = RuntimePerformanceClock.monotonicMilliseconds()
         let runningApps = filteredRunningApplications()

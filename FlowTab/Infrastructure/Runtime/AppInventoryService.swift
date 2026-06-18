@@ -70,7 +70,7 @@ final class AppInventoryService: @unchecked Sendable {
 
     private func uiTestRuntimeRecords() -> [InstalledAppRecord] {
         guard let dataset = RuntimeSnapshotProvider.uiTestRuntimeDataset() else { return [] }
-        return dataset.snapshot.apps.map { app in
+        return dataset.appSwitcherApps.map { app in
             InstalledAppRecord(
                 id: app.id,
                 displayName: app.displayName,
