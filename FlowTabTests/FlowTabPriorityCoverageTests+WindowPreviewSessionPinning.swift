@@ -29,7 +29,7 @@ extension FlowTabPriorityCoverageTests {
             runningApp: currentApp,
             windows: windows
         )
-        let (model, snapshotService) = makeAppSwitcherProjectionModel(app: app, context: context)
+        let (model, runtimeProjectionService) = makeAppSwitcherProjectionModel(app: app, context: context)
         model.runtimeProjectionMaintenanceEnabled = false
 
         let allCapturesFinished = expectation(description: "deferred previews captured after visible page")
@@ -48,8 +48,8 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
         XCTAssertTrue(model.previewCaptureAttemptedKeys.isEmpty)
 
         let visibleRange = 0..<10
@@ -87,7 +87,7 @@ extension FlowTabPriorityCoverageTests {
             runningApp: currentApp,
             windows: windows
         )
-        let (model, snapshotService) = makeAppSwitcherProjectionModel(app: app, context: context)
+        let (model, runtimeProjectionService) = makeAppSwitcherProjectionModel(app: app, context: context)
         model.runtimeProjectionMaintenanceEnabled = false
 
         let visibleBatchStarted = expectation(description: "large visible preview batch started")
@@ -103,8 +103,8 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
 
         let visibleRange = 240..<256
         let initialSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: visibleRange)
@@ -144,7 +144,7 @@ extension FlowTabPriorityCoverageTests {
             runningApp: currentApp,
             windows: windows
         )
-        let (model, snapshotService) = makeAppSwitcherProjectionModel(app: app, context: context)
+        let (model, runtimeProjectionService) = makeAppSwitcherProjectionModel(app: app, context: context)
         model.runtimeProjectionMaintenanceEnabled = false
 
         enum PreviewPhase {
@@ -166,8 +166,8 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
 
         let visibleRange = 0..<6
         let initialSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: visibleRange)
@@ -187,8 +187,8 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
 
         let restartedSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: visibleRange)
         XCTAssertEqual(restartedSnapshot.count, visibleRange.count)
@@ -220,7 +220,7 @@ extension FlowTabPriorityCoverageTests {
             runningApp: currentApp,
             windows: windows
         )
-        let (model, snapshotService) = makeAppSwitcherProjectionModel(app: app, context: context)
+        let (model, runtimeProjectionService) = makeAppSwitcherProjectionModel(app: app, context: context)
         model.runtimeProjectionMaintenanceEnabled = false
 
         let deferredCapturesFinished = expectation(description: "deferred previews captured")
@@ -239,8 +239,8 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
 
         let firstVisibleRange = 0..<6
         let firstPage = model.windowPreviewSnapshotForTesting(visibleRange: firstVisibleRange)
@@ -282,7 +282,7 @@ extension FlowTabPriorityCoverageTests {
             runningApp: currentApp,
             windows: windows
         )
-        let (model, snapshotService) = makeAppSwitcherProjectionModel(app: app, context: context)
+        let (model, runtimeProjectionService) = makeAppSwitcherProjectionModel(app: app, context: context)
         model.runtimeProjectionMaintenanceEnabled = false
 
         let batchStarted = expectation(description: "visible preview batch started")
@@ -308,8 +308,8 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
 
         let visibleRange = 0..<6
         let initialSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: visibleRange)
@@ -368,7 +368,7 @@ extension FlowTabPriorityCoverageTests {
             runningApp: currentApp,
             windows: windows
         )
-        let (model, snapshotService) = makeAppSwitcherProjectionModel(app: app, context: context)
+        let (model, runtimeProjectionService) = makeAppSwitcherProjectionModel(app: app, context: context)
         model.runtimeProjectionMaintenanceEnabled = false
 
         let batchStarted = expectation(description: "failed visible preview batch started")
@@ -383,8 +383,8 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
 
         let visibleRange = 0..<4
         let initialSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: visibleRange)
@@ -436,7 +436,7 @@ extension FlowTabPriorityCoverageTests {
             runningApp: currentApp,
             windows: windows
         )
-        let (model, snapshotService) = makeAppSwitcherProjectionModel(app: app, context: context)
+        let (model, runtimeProjectionService) = makeAppSwitcherProjectionModel(app: app, context: context)
         model.runtimeProjectionMaintenanceEnabled = false
 
         var batchCallCount = 0
@@ -447,8 +447,8 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
 
         let visibleRange = 0..<3
         let batchPublished = expectation(description: "provider failure preview batch published")

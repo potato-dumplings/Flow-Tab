@@ -272,15 +272,15 @@ extension FlowTabPriorityCoverageTests {
         app: AppSwitchCandidate,
         context: RuntimeAppContext,
         generatedAt: TimeInterval = 10
-    ) -> (model: LiveSwitcherModel, snapshotService: RecordingRuntimeProjectionService) {
-        let snapshotService = RecordingRuntimeProjectionService(
+    ) -> (model: LiveSwitcherModel, runtimeProjectionService: RecordingRuntimeProjectionService) {
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
             appSwitcherApps: [app],
             contextsByID: [app.id: context],
             generatedAt: generatedAt
         )
         return (
-            model: LiveSwitcherModel(runtimeProjectionService: snapshotService),
-            snapshotService: snapshotService
+            model: LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService),
+            runtimeProjectionService: runtimeProjectionService
         )
     }
     func makeIsolatedUserDefaults() -> UserDefaults? {

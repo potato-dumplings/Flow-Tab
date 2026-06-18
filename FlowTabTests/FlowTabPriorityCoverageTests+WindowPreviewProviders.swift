@@ -368,7 +368,7 @@ extension FlowTabPriorityCoverageTests {
             runningApp: currentApp,
             windows: windows
         )
-        let (model, snapshotService) = makeAppSwitcherProjectionModel(app: app, context: context)
+        let (model, runtimeProjectionService) = makeAppSwitcherProjectionModel(app: app, context: context)
         model.runtimeProjectionMaintenanceEnabled = false
         let specialProvider = FakeSpecialWindowPreviewProvider(
             supportedAppID: appID,
@@ -389,8 +389,8 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
 
         let published = expectation(description: "terminal preview provider published results")
         var cancellables: Set<AnyCancellable> = []
@@ -441,7 +441,7 @@ extension FlowTabPriorityCoverageTests {
             runningApp: currentApp,
             windows: windows
         )
-        let (model, snapshotService) = makeAppSwitcherProjectionModel(app: app, context: context)
+        let (model, runtimeProjectionService) = makeAppSwitcherProjectionModel(app: app, context: context)
         model.runtimeProjectionMaintenanceEnabled = false
         let specialProvider = FakeSpecialWindowPreviewProvider(
             supportedAppID: appID,
@@ -462,8 +462,8 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
 
         let published = expectation(description: "terminal preview failure published")
         var cancellables: Set<AnyCancellable> = []
