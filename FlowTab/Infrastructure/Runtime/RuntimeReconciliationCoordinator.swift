@@ -8,6 +8,7 @@ enum RuntimeReconciliationReason: String, Hashable {
     case searchFreshnessBarrier
     case selectedCurrentAppWindows
     case spaceTopologyChanged
+    case fullRepairFallback
     case manualRefresh
 
     var schedulerPriority: RuntimeReconciliationPriority {
@@ -16,7 +17,7 @@ enum RuntimeReconciliationReason: String, Hashable {
             .high
         case .axNotification, .spaceTopologyChanged:
             .normal
-        case .manualRefresh:
+        case .fullRepairFallback, .manualRefresh:
             .low
         }
     }
@@ -35,6 +36,7 @@ enum RuntimeReconciliationPriority: Int, Comparable {
 enum RuntimeReconciliationTarget: Hashable {
     case app(pid_t)
     case spaceTopology
+    case fullRepair
 }
 
 enum RuntimeReconciliationState: String, Equatable {
@@ -117,7 +119,7 @@ final class RuntimeReconciliationCoordinator {
         let diff = snapshot.diff(from: currentSpaceTopologySnapshot)
         currentSpaceTopologySnapshot = snapshot
         guard !diff.affectedCGWindowIDs.isEmpty else { return diff }
-        updateRequest(
+        _ = updateRequest(
             target: .spaceTopology,
             appID: nil,
             reasons: [.spaceTopologyChanged],
@@ -127,9 +129,27 @@ final class RuntimeReconciliationCoordinator {
         return diff
     }
 
-    func readyRequests(now: TimeInterval) -> [RuntimeReconciliationRequest] {
+    @discardableResult
+    func scheduleFullRepairFallback(now: TimeInterval) -> RuntimeReconciliationRequest {
+        updateRequest(
+            target: .fullRepair,
+            appID: nil,
+            reasons: [.fullRepairFallback],
+            affectedCGWindowIDs: [],
+            now: now
+        )
+    }
+
+    func readyRequests(
+        now: TimeInterval,
+        includeFullRepair: Bool = true
+    ) -> [RuntimeReconciliationRequest] {
         requestsByTarget.values
-            .filter { $0.notBefore <= now && $0.state != .inFlight }
+            .filter {
+                $0.notBefore <= now
+                    && $0.state != .inFlight
+                    && (includeFullRepair || $0.target != .fullRepair)
+            }
             .sorted {
                 if $0.priority == $1.priority {
                     return $0.id < $1.id
@@ -145,10 +165,14 @@ final class RuntimeReconciliationCoordinator {
     @discardableResult
     func promotePendingRequests(
         reason: RuntimeReconciliationReason,
-        now: TimeInterval
+        now: TimeInterval,
+        includeFullRepair: Bool = false
     ) -> [RuntimeReconciliationRequest] {
         requestsByTarget.values
-            .filter { $0.state != .inFlight }
+            .filter {
+                $0.state != .inFlight
+                    && (includeFullRepair || $0.target != .fullRepair)
+            }
             .sorted { $0.id < $1.id }
             .map { request in
                 updateRequest(
@@ -231,11 +255,25 @@ final class RuntimeReconciliationCoordinator {
             request.notBefore = min(request.notBefore, now)
         }
         requestsByTarget[target] = request
+        cancelPendingFullRepairForHighPriorityScopedRepair(
+            target: target,
+            incomingPriority: incomingPriority
+        )
         return request
     }
 
     private func target(for id: UInt64) -> RuntimeReconciliationTarget? {
         requestsByTarget.first { $0.value.id == id }?.key
+    }
+
+    private func cancelPendingFullRepairForHighPriorityScopedRepair(
+        target: RuntimeReconciliationTarget,
+        incomingPriority: RuntimeReconciliationPriority
+    ) {
+        guard target != .fullRepair, incomingPriority == .high else { return }
+        guard let fullRepair = requestsByTarget[.fullRepair] else { return }
+        guard fullRepair.state != .inFlight, fullRepair.priority < incomingPriority else { return }
+        requestsByTarget.removeValue(forKey: .fullRepair)
     }
 }
 

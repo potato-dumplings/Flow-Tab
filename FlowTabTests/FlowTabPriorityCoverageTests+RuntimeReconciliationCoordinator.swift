@@ -575,6 +575,26 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(coordinator.readyRequests(now: 11).map(\.id), [dirty.id])
     }
 
+    func testRuntimeReconciliationCoordinatorCancelsPendingFullRepairForHighPriorityScopedRepair() {
+        let coordinator = RuntimeReconciliationCoordinator()
+        let fullRepair = coordinator.scheduleFullRepairFallback(now: 10)
+
+        let scopedRepair = coordinator.markAppDirty(
+            appID: "com.example.editor",
+            pid: 18_405,
+            reason: .selectedCurrentAppWindows,
+            now: 10.1
+        )
+
+        let readyRequests = coordinator.readyRequests(now: 10.1)
+        XCTAssertEqual(fullRepair.target, .fullRepair)
+        XCTAssertEqual(fullRepair.reasons, Set([.fullRepairFallback]))
+        XCTAssertEqual(fullRepair.priority, .low)
+        XCTAssertEqual(readyRequests.map(\.id), [scopedRepair.id])
+        XCTAssertEqual(readyRequests.map(\.target), [.app(18_405)])
+        XCTAssertFalse(readyRequests.contains { $0.id == fullRepair.id })
+    }
+
     func testRuntimeReconciliationCoordinatorMarksVerifiedFocusReadbackAffectedWindows() throws {
         let coordinator = RuntimeReconciliationCoordinator()
 
@@ -1399,6 +1419,48 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(coordinator.readyRequests(now: 11).isEmpty)
     }
 
+    func testRuntimeProjectionServiceMaintenanceSchedulesLowPriorityFullRepairWhenProjectionMissing() throws {
+        let coordinator = RuntimeReconciliationCoordinator()
+        let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
+        let store = RuntimeReadModelStore()
+        let repairedApp = AppSwitchCandidate(
+            id: "com.example.full-repair",
+            displayName: "Full Repair",
+            groupID: "full",
+            lastActiveAt: 42,
+            windows: []
+        )
+        let lock = NSLock()
+        var executedRequests: [RuntimeReconciliationRequest] = []
+        let expectation = expectation(description: "runtime maintenance executes full repair fallback")
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.FullRepairFallback",
+            snapshotProvider: provider,
+            readModelStore: store,
+            reconciliationExecutor: { request, _ in
+                lock.lock()
+                executedRequests.append(request)
+                lock.unlock()
+                expectation.fulfill()
+                return .completedWithFullRepairSnapshot(
+                    RuntimeSnapshot(apps: [repairedApp], contextsByID: [:])
+                )
+            }
+        )
+
+        service.requestAppSwitcherProjectionMaintenance(reason: .switcherSessionStarted)
+        wait(for: [expectation], timeout: 1)
+        service.waitForMaintenanceQueueForTesting()
+
+        XCTAssertEqual(executedRequests.map(\.target), [.fullRepair])
+        XCTAssertEqual(executedRequests.map(\.priority), [.low])
+        XCTAssertEqual(executedRequests.first?.reasons, Set([.fullRepairFallback]))
+        let projection = try XCTUnwrap(store.readAppSwitcherProjection())
+        XCTAssertEqual(projection.apps.map(\.id), [repairedApp.id])
+        XCTAssertTrue(projection.freshness.isCompleteForScope)
+        XCTAssertTrue(coordinator.readyRequests(now: 11).isEmpty)
+    }
+
     func testRuntimeProjectionServiceSearchFreshnessBarrierPromotesAndBoundsReadyRepairs() throws {
         let coordinator = RuntimeReconciliationCoordinator(
             retryPolicy: RuntimeReconciliationRetryPolicy(delays: [60])
@@ -1482,6 +1544,61 @@ extension FlowTabPriorityCoverageTests {
             committedApps.map(\.id)
         )
         XCTAssertFalse(store.diagnostics().hasStagingSearchIndex)
+    }
+
+    func testRuntimeProjectionServiceSearchFreshnessBarrierDoesNotPromoteOrDrainFullRepairFallback() throws {
+        let coordinator = RuntimeReconciliationCoordinator()
+        let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
+        let store = RuntimeReadModelStore()
+        let committedApps = searchScenarioApps()
+        let dirtyApp = try XCTUnwrap(committedApps.first)
+        let pid = pid_t(42_104)
+        store.commitAppSwitcherProjection(
+            apps: committedApps,
+            contextsByID: [:],
+            generatedAt: 10
+        )
+        store.markAppWindowsDirty(
+            appID: dirtyApp.id,
+            pid: pid,
+            pendingScope: "appWindows:\(dirtyApp.id)"
+        )
+        let fullRepair = coordinator.scheduleFullRepairFallback(now: 10)
+        coordinator.markAppDirty(
+            appID: dirtyApp.id,
+            pid: pid,
+            reason: .manualRefresh,
+            now: 10.1
+        )
+        let lock = NSLock()
+        var executedRequests: [RuntimeReconciliationRequest] = []
+        let expectation = expectation(description: "search barrier drains scoped repair only")
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.SearchBarrierSkipsFullRepair",
+            snapshotProvider: provider,
+            readModelStore: store,
+            reconciliationExecutor: { request, _ in
+                lock.lock()
+                executedRequests.append(request)
+                lock.unlock()
+                expectation.fulfill()
+                return .completed
+            }
+        )
+
+        service.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
+        wait(for: [expectation], timeout: 1)
+        service.waitForMaintenanceQueueForTesting()
+
+        XCTAssertEqual(executedRequests.map(\.target), [.app(pid)])
+        XCTAssertTrue(executedRequests.allSatisfy { $0.reasons.contains(.searchFreshnessBarrier) })
+        let remaining = coordinator.readyRequests(now: Date.timeIntervalSinceReferenceDate + 1)
+        XCTAssertFalse(executedRequests.contains { $0.id == fullRepair.id })
+        XCTAssertFalse(remaining.contains { $0.id == fullRepair.id })
+        let read = store.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(read.readiness, .staleCommitted)
+        XCTAssertEqual(read.resultState, .degradedStaleCommittedResult)
+        XCTAssertFalse(read.committedIndexCoversCurrentGeneration)
     }
 
     func testRuntimeProjectionServiceSearchFreshnessBarrierCommitsRepairedSearchGeneration() throws {

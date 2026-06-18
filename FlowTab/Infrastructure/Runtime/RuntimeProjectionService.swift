@@ -34,12 +34,13 @@ protocol RuntimeProjectionServing: Sendable {
 final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Sendable {
     enum ReconciliationExecutionOutcome {
         case completed
+        case completedWithFullRepairSnapshot(RuntimeSnapshot)
         case completedWithRepairedCurrentAppWindowPayloads([RuntimeCurrentAppWindowPayload])
         case transientEmptyAXSnapshot
 
         var repairedCurrentAppWindowPayloads: [RuntimeCurrentAppWindowPayload] {
             switch self {
-            case .completed:
+            case .completed, .completedWithFullRepairSnapshot:
                 []
             case let .completedWithRepairedCurrentAppWindowPayloads(payloads):
                 payloads
@@ -53,6 +54,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         var startedRequests: [RuntimeReconciliationRequest] = []
         var completedCount = 0
         var deferredCount = 0
+        var fullRepairSnapshots: [RuntimeSnapshot] = []
         var repairedCurrentAppWindowPayloads: [RuntimeCurrentAppWindowPayload] = []
     }
 
@@ -101,9 +103,15 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     func requestAppSwitcherProjectionMaintenance(reason: RuntimeProjectionMaintenanceReason) {
         maintenanceQueue.async { [self] in
             let diagnostics = readModelStore.diagnostics()
+            let now = Date.timeIntervalSinceReferenceDate
+            if !diagnostics.hasAppSwitcherProjection
+                && !snapshotProvider.reconciliationCoordinator.hasPendingRequests() {
+                snapshotProvider.reconciliationCoordinator.scheduleFullRepairFallback(now: now)
+            }
             let drainResult = drainReadyReconciliationRequestsWithResultLocked(
-                now: Date.timeIntervalSinceReferenceDate
+                now: now
             )
+            commitFullRepairSnapshotsLocked(drainResult.fullRepairSnapshots)
             commitRepairedCurrentAppWindowPayloadsLocked(drainResult.repairedCurrentAppWindowPayloads)
             RuntimeLog.debug(
                 .projection,
@@ -117,6 +125,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                     "pendingScopes=\(diagnostics.pendingRepairScopes.count)",
                     "startedRequests=\(drainResult.startedRequests.count)",
                     "completedRequests=\(drainResult.completedCount)",
+                    "fullRepairSnapshots=\(drainResult.fullRepairSnapshots.count)",
                     "repairedApps=\(drainResult.repairedCurrentAppWindowPayloads.count)"
                 ].joined(separator: " ")
             )
@@ -133,7 +142,8 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             )
             let drainResult = drainReadyReconciliationRequestsWithResultLocked(
                 now: now,
-                maxRequests: runtimeSearchFreshnessBarrierMaxReadyRepairs
+                maxRequests: runtimeSearchFreshnessBarrierMaxReadyRepairs,
+                includeFullRepair: false
             )
             commitRepairedCurrentAppWindowPayloadsLocked(drainResult.repairedCurrentAppWindowPayloads)
             readModelStore.stageSearchIndexCurrentAppWindowPayloads(
@@ -323,11 +333,26 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         }
     }
 
+    func waitForMaintenanceQueueForTesting() {
+        maintenanceQueue.sync {}
+    }
+
     @discardableResult
     private func drainReadyReconciliationRequestsLocked(now: TimeInterval) -> [RuntimeReconciliationRequest] {
         let result = drainReadyReconciliationRequestsWithResultLocked(now: now)
         commitRepairedCurrentAppWindowPayloadsLocked(result.repairedCurrentAppWindowPayloads)
         return result.startedRequests
+    }
+
+    private func commitFullRepairSnapshotsLocked(
+        _ snapshots: [RuntimeSnapshot]
+    ) {
+        for snapshot in snapshots {
+            readModelStore.commitAppSwitcherProjection(
+                apps: snapshot.apps,
+                contextsByID: snapshot.contextsByID
+            )
+        }
     }
 
     private func commitRepairedCurrentAppWindowPayloadsLocked(
@@ -340,10 +365,14 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
 
     private func drainReadyReconciliationRequestsWithResultLocked(
         now: TimeInterval,
-        maxRequests: Int? = nil
+        maxRequests: Int? = nil,
+        includeFullRepair: Bool = true
     ) -> ReconciliationDrainResult {
         let coordinator = snapshotProvider.reconciliationCoordinator
-        let readyRequests = coordinator.readyRequests(now: now)
+        let readyRequests = coordinator.readyRequests(
+            now: now,
+            includeFullRepair: includeFullRepair
+        )
         let requests = maxRequests.map { Array(readyRequests.prefix($0)) } ?? readyRequests
         var result = ReconciliationDrainResult()
         result.startedRequests.reserveCapacity(requests.count)
@@ -353,9 +382,12 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             result.startedRequests.append(startedRequest)
             let outcome = reconciliationExecutor(startedRequest, snapshotProvider)
             switch outcome {
-            case .completed, .completedWithRepairedCurrentAppWindowPayloads:
+            case .completed, .completedWithFullRepairSnapshot, .completedWithRepairedCurrentAppWindowPayloads:
                 coordinator.completeRequest(id: startedRequest.id)
                 result.completedCount += 1
+                if case let .completedWithFullRepairSnapshot(snapshot) = outcome {
+                    result.fullRepairSnapshots.append(snapshot)
+                }
                 result.repairedCurrentAppWindowPayloads.append(
                     contentsOf: outcome.repairedCurrentAppWindowPayloads
                 )
@@ -389,6 +421,8 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 ])
             }
             return .completed
+        case .fullRepair:
+            return .completedWithFullRepairSnapshot(snapshotProvider.snapshot())
         case .spaceTopology:
             let cgWindowsByPID = snapshotProvider.collectCGWindowsWithSpaceTopologyDiff(
                 options: [.excludeDesktopElements]
