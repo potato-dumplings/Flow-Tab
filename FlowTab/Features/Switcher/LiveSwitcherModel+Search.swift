@@ -46,10 +46,10 @@ extension LiveSwitcherModel {
             lastSearchIndexReadDiagnostic = SearchIndexReadDiagnostic(
                 reason: reason,
                 readiness: read.readiness,
-                resultState: .missingCommittedIndex,
+                resultState: read.resultState,
                 appCount: 0,
                 windowCount: 0,
-                committedIndexCoversCurrentGeneration: false,
+                committedIndexCoversCurrentGeneration: read.committedIndexCoversCurrentGeneration,
                 dirtyAppCount: 0,
                 dirtyPIDCount: 0,
                 dirtyCGWindowIDCount: 0,
@@ -68,12 +68,10 @@ extension LiveSwitcherModel {
         let diagnostic = SearchIndexReadDiagnostic(
             reason: reason,
             readiness: read.readiness,
-            resultState: read.readiness == .currentGenerationCommitted
-                ? .verifiedCurrentGenerationCommittedResult
-                : .degradedStaleCommittedResult,
+            resultState: read.resultState,
             appCount: searchProjection.appEntries.count,
             windowCount: searchProjection.windowEntries.count,
-            committedIndexCoversCurrentGeneration: read.readiness == .currentGenerationCommitted,
+            committedIndexCoversCurrentGeneration: read.committedIndexCoversCurrentGeneration,
             dirtyAppCount: projection.freshness.dirtyAppIDs.count,
             dirtyPIDCount: projection.freshness.dirtyPIDs.count,
             dirtyCGWindowIDCount: projection.freshness.dirtyCGWindowIDs.count,

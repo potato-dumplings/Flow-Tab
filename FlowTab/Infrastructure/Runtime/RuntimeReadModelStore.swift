@@ -162,9 +162,32 @@ enum RuntimeSearchIndexReadiness: String, Equatable, Sendable {
     case missingCommittedIndex
 }
 
+enum RuntimeSearchIndexResultState: String, Equatable, Sendable {
+    case verifiedCurrentGenerationCommittedResult
+    case degradedStaleCommittedResult
+    case missingCommittedIndex
+}
+
 struct RuntimeSearchIndexRead: Equatable, Sendable {
     let projection: RuntimeSearchIndexProjection?
     let readiness: RuntimeSearchIndexReadiness
+    let resultState: RuntimeSearchIndexResultState
+
+    init(
+        projection: RuntimeSearchIndexProjection?,
+        readiness: RuntimeSearchIndexReadiness
+    ) {
+        self.projection = projection
+        self.readiness = readiness
+        switch readiness {
+        case .currentGenerationCommitted:
+            resultState = .verifiedCurrentGenerationCommittedResult
+        case .staleCommitted:
+            resultState = .degradedStaleCommittedResult
+        case .missingCommittedIndex:
+            resultState = .missingCommittedIndex
+        }
+    }
 
     var freshness: RuntimeProjectionFreshness? {
         projection?.freshness
@@ -172,6 +195,10 @@ struct RuntimeSearchIndexRead: Equatable, Sendable {
 
     var shouldRequestFreshnessBarrier: Bool {
         readiness == .staleCommitted
+    }
+
+    var committedIndexCoversCurrentGeneration: Bool {
+        readiness == .currentGenerationCommitted
     }
 }
 

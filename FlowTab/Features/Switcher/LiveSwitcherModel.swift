@@ -153,15 +153,9 @@ final class LiveSwitcherModel: ObservableObject {
     }
 
     struct SearchIndexReadDiagnostic: Equatable {
-        enum ResultState: String, Equatable {
-            case verifiedCurrentGenerationCommittedResult
-            case degradedStaleCommittedResult
-            case missingCommittedIndex
-        }
-
         let reason: String
         let readiness: RuntimeSearchIndexReadiness
-        let resultState: ResultState
+        let resultState: RuntimeSearchIndexResultState
         let appCount: Int
         let windowCount: Int
         let committedIndexCoversCurrentGeneration: Bool

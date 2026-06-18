@@ -258,6 +258,8 @@ extension FlowTabPriorityCoverageTests {
 
         var read = store.readCommittedSearchIndexForSearch()
         XCTAssertEqual(read.readiness, .missingCommittedIndex)
+        XCTAssertEqual(read.resultState, .missingCommittedIndex)
+        XCTAssertFalse(read.committedIndexCoversCurrentGeneration)
         XCTAssertNil(read.projection)
         var diagnostics = store.diagnostics()
         XCTAssertFalse(diagnostics.hasCommittedSearchIndex)
@@ -271,6 +273,8 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(committed.freshness.isCompleteForScope)
         read = store.readCommittedSearchIndexForSearch()
         XCTAssertEqual(read.readiness, .currentGenerationCommitted)
+        XCTAssertEqual(read.resultState, .verifiedCurrentGenerationCommittedResult)
+        XCTAssertTrue(read.committedIndexCoversCurrentGeneration)
         XCTAssertEqual(
             read.projection?.windowEntries.map(\.windowID),
             apps.flatMap(\.windows).map(\.id)
@@ -307,6 +311,8 @@ extension FlowTabPriorityCoverageTests {
 
         var read = store.readCommittedSearchIndexForSearch()
         XCTAssertEqual(read.readiness, .currentGenerationCommitted)
+        XCTAssertEqual(read.resultState, .verifiedCurrentGenerationCommittedResult)
+        XCTAssertTrue(read.committedIndexCoversCurrentGeneration)
         XCTAssertEqual(read.projection?.appEntries.map(\.appID), committedApps.map(\.id))
 
         store.markAppWindowsDirty(
@@ -319,6 +325,8 @@ extension FlowTabPriorityCoverageTests {
         read = store.readCommittedSearchIndexForSearch()
         let staleProjection = try XCTUnwrap(read.projection)
         XCTAssertEqual(read.readiness, .staleCommitted)
+        XCTAssertEqual(read.resultState, .degradedStaleCommittedResult)
+        XCTAssertFalse(read.committedIndexCoversCurrentGeneration)
         XCTAssertEqual(staleProjection.appEntries.map(\.appID), committedApps.map(\.id))
         XCTAssertFalse(staleProjection.appEntries.map(\.appID).contains("com.example.staging-only"))
         XCTAssertEqual(staleProjection.freshness.dirtyAppIDs, ["com.example.browser"])
