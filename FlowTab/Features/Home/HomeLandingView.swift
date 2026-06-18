@@ -514,7 +514,7 @@ struct HomeLandingView: View {
     private func scheduleRefreshIfRunningAppsChanged(reason: String) {
         guard !appSummaries.isEmpty, loadingWindowCountAppIDs.isEmpty else {
             RuntimeLog.debug(
-                .snapshot,
+                .projection,
                 "homeSkipRunningAppsRefresh reason=\(reason) phase=initializing apps=\(appSummaries.count) loadingCounts=\(loadingWindowCountAppIDs.count)"
             )
             return
@@ -567,19 +567,19 @@ struct HomeLandingView: View {
     private func scheduleInitialAppSummariesRefresh(reason: String) {
         appSummariesRefreshTask?.cancel()
         appSummariesRefreshTask = Task { @MainActor in
-            RuntimeLog.debug(.snapshot, "homeInitialRefresh begin reason=\(reason)")
-            await refreshInitialLightweightAppSummaries()
+            RuntimeLog.debug(.projection, "homeInitialProjectionRead begin reason=\(reason)")
+            await refreshInitialAppSummaryProjection()
             guard accessibilityTrusted else {
                 RuntimeLog.debug(
-                    .snapshot,
-                    "homeInitialRefresh preciseSkipped reason=\(reason) accessibilityTrusted=false"
+                    .projection,
+                    "homeInitialProjectionRead detailSkipped reason=\(reason) accessibilityTrusted=false"
                 )
                 appSummariesRefreshTask = nil
                 return
             }
             RuntimeLog.debug(
-                .snapshot,
-                "homeInitialRefresh preciseScheduled reason=\(reason) delayMs=900"
+                .projection,
+                "homeInitialProjectionRead detailScheduled reason=\(reason) delayMs=900"
             )
             try? await Task.sleep(nanoseconds: initialPreciseAppRefreshDelayNs)
             await refreshAppSummaries(reason: reason)
@@ -596,9 +596,9 @@ struct HomeLandingView: View {
         }
     }
 
-    private func refreshInitialLightweightAppSummaries() async {
+    private func refreshInitialAppSummaryProjection() async {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let summaries = lightweightHomeAppSummaries()
+        let summaries = initialHomeAppSummaryProjections()
         guard !Task.isCancelled, appSummaries.isEmpty else { return }
         guard !summaries.isEmpty else { return }
 
@@ -611,19 +611,19 @@ struct HomeLandingView: View {
             scheduleSelectedAppRefresh(
                 appID: selectedAppID,
                 force: true,
-                reason: "selected_after_initial_lightweight"
+                reason: "selected_after_initial_projection"
             )
         }
         RuntimeLog.debug(
-            .snapshot,
-            "homeInitialLightweight result=ready apps=\(summaries.count) selected=\(currentSelectedAppID ?? "nil") loadingCounts=\(loadingWindowCountAppIDs.count) accessibilityTrusted=\(accessibilityTrusted) totalMs=\(formatHomeMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))"
+            .projection,
+            "homeInitialProjectionRead result=ready apps=\(summaries.count) selected=\(currentSelectedAppID ?? "nil") loadingCounts=\(loadingWindowCountAppIDs.count) accessibilityTrusted=\(accessibilityTrusted) totalMs=\(formatHomeMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))"
         )
     }
 
     private func refreshAppSummaries(reason: String) async {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
-        RuntimeLog.debug(.snapshot, "homeRefreshAppSummaries begin reason=\(reason)")
-        let summaries = await fetchHomeAppSummariesOnBackground()
+        RuntimeLog.debug(.projection, "homeRefreshAppSummaryProjection begin reason=\(reason)")
+        let summaries = await readHomeAppSummaryProjections()
         guard !Task.isCancelled else { return }
 
         appSummaries = summaries
@@ -645,8 +645,8 @@ struct HomeLandingView: View {
             )
         }
         RuntimeLog.debug(
-            .snapshot,
-            "homeRefreshAppSummaries result=ready reason=\(reason) apps=\(summaries.count) totalMs=\(formatHomeMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))"
+            .projection,
+            "homeRefreshAppSummaryProjection result=ready reason=\(reason) apps=\(summaries.count) totalMs=\(formatHomeMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))"
         )
     }
 
@@ -686,11 +686,11 @@ struct HomeLandingView: View {
         guard !Task.isCancelled else { return }
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
         RuntimeLog.debug(
-            .snapshot,
-            "homeRefreshSingleApp begin appID=\(appID) updateWindows=\(updateWindows) reason=\(reason)"
+            .projection,
+            "homeRefreshSingleAppProjection begin appID=\(appID) updateWindows=\(updateWindows) reason=\(reason)"
         )
         if updateWindows {
-            let detailProjection = await fetchHomeAppDetailProjectionOnBackground(appID: appID)
+            let detailProjection = await readHomeAppDetailProjection(appID: appID)
             guard !Task.isCancelled else { return }
 
             guard let detailProjection else {
@@ -735,7 +735,7 @@ struct HomeLandingView: View {
             windowsByAppID[appID] = detailProjection.candidate.windows
             homeDetailProjectionsByAppID[appID] = detailProjection
         } else {
-            let summary = await fetchHomeAppSummaryOnBackground(appID: appID)
+            let summary = await readHomeAppSummaryProjection(appID: appID)
             guard !Task.isCancelled else { return }
             guard let summary else {
                 appSummaries.removeAll { $0.appID == appID }
@@ -765,12 +765,12 @@ struct HomeLandingView: View {
         setupWindowMonitorIfCountsReady()
         persistCache()
         RuntimeLog.debug(
-            .snapshot,
-            "homeRefreshSingleApp result=ready appID=\(appID) updateWindows=\(updateWindows) reason=\(reason) windows=\(windowsByAppID[appID]?.count ?? -1) totalMs=\(formatHomeMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))"
+            .projection,
+            "homeRefreshSingleAppProjection result=ready appID=\(appID) updateWindows=\(updateWindows) reason=\(reason) windows=\(windowsByAppID[appID]?.count ?? -1) totalMs=\(formatHomeMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))"
         )
     }
 
-    private func fetchHomeAppSummariesOnBackground() async -> [RuntimeHomeAppSummary] {
+    private func readHomeAppSummaryProjections() async -> [RuntimeHomeAppSummary] {
         HomeRuntimeRefreshReader.appSummaries(
             from: runtimeProjectionService,
             current: appSummaries
@@ -782,7 +782,7 @@ struct HomeLandingView: View {
         setupWindowMonitorIfNeeded()
     }
 
-    private func lightweightHomeAppSummaries() -> [RuntimeHomeAppSummary] {
+    private func initialHomeAppSummaryProjections() -> [RuntimeHomeAppSummary] {
         HomeInitialAppSummaryReader.appSummaries(from: runtimeProjectionService)
     }
 
@@ -790,7 +790,7 @@ struct HomeLandingView: View {
         String(format: "%.3f", value)
     }
 
-    private func fetchHomeAppSummaryOnBackground(appID: String) async -> RuntimeHomeAppSummary? {
+    private func readHomeAppSummaryProjection(appID: String) async -> RuntimeHomeAppSummary? {
         HomeRuntimeRefreshReader.appSummary(
             for: appID,
             from: runtimeProjectionService,
@@ -798,7 +798,7 @@ struct HomeLandingView: View {
         )
     }
 
-    private func fetchHomeAppDetailProjectionOnBackground(appID: String) async -> RuntimeHomeAppDetailProjection? {
+    private func readHomeAppDetailProjection(appID: String) async -> RuntimeHomeAppDetailProjection? {
         HomeRuntimeRefreshReader.appDetailProjection(
             for: appID,
             from: runtimeProjectionService,
