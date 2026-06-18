@@ -1647,8 +1647,7 @@ final class RuntimeSnapshotProvider {
     }
 
     static func baseAppID(for app: NSRunningApplication) -> String {
-        let pid = app.processIdentifier
-        return app.bundleIdentifier ?? "pid:\(pid)"
+        RuntimeAppIdentity.appID(for: app)
     }
 
     static func stableLastActiveValue(forRank rank: Int) -> TimeInterval {

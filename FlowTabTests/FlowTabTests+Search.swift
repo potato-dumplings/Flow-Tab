@@ -1062,7 +1062,7 @@ extension FlowTabTests {
     @MainActor
     func testControlTabFocusedProjectionFastStartPressureIgnoresFocusedSnapshotBridge() {
         let runningApp = NSRunningApplication.current
-        let appID = RuntimeSnapshotProvider.baseAppID(for: runningApp)
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
         let windowCount = 1_000
         let windows = (0..<windowCount).map { index in
             WindowCandidate(

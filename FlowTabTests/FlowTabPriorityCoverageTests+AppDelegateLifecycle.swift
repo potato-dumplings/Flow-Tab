@@ -103,7 +103,7 @@ extension FlowTabPriorityCoverageTests {
         let previousSharedDelegate = AppDelegate.shared
         let previousActivationOverride = AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride
         let previousAXTrusted = AccessibilityPermissionChecker.isTrustedOverrideForTesting
-        let snapshotService = RecordingRuntimeProjectionService()
+        let runtimeProjectionService = RecordingRuntimeProjectionService()
         let hotkeyFactory = SpyHotkeyMonitorFactory()
         let stressRunner = SpyStressRunner()
         let workspaceNotificationCenter = NotificationCenter()
@@ -132,7 +132,7 @@ extension FlowTabPriorityCoverageTests {
                 )
             },
             stressRunner: stressRunner,
-            runtimeProjectionService: snapshotService,
+            runtimeProjectionService: runtimeProjectionService,
             workspaceNotificationCenter: workspaceNotificationCenter
         )
 
@@ -149,13 +149,13 @@ extension FlowTabPriorityCoverageTests {
         )
 
         let didSignalLaunch = await waitUntil(
-            "workspace launch reaches runtime snapshot service",
+            "workspace launch reaches runtime projection service",
             timeoutNanoseconds: 1_000_000_000,
             pollIntervalNanoseconds: 10_000_000
         ) {
-            let signals = snapshotService.appLaunchSignalsRecorded()
+            let signals = runtimeProjectionService.appLaunchSignalsRecorded()
             return signals.count == 1
-                && signals.first?.appID == RuntimeSnapshotProvider.baseAppID(for: workspaceApp)
+                && signals.first?.appID == RuntimeAppIdentity.appID(for: workspaceApp)
                 && signals.first?.pid == workspaceApp.processIdentifier
         }
 
@@ -166,13 +166,13 @@ extension FlowTabPriorityCoverageTests {
         )
 
         let didSignalTermination = await waitUntil(
-            "workspace termination reaches runtime snapshot service",
+            "workspace termination reaches runtime projection service",
             timeoutNanoseconds: 1_000_000_000,
             pollIntervalNanoseconds: 10_000_000
         ) {
-            let signals = snapshotService.appTerminationSignalsRecorded()
+            let signals = runtimeProjectionService.appTerminationSignalsRecorded()
             return signals.count == 1
-                && signals.first?.appID == RuntimeSnapshotProvider.baseAppID(for: workspaceApp)
+                && signals.first?.appID == RuntimeAppIdentity.appID(for: workspaceApp)
                 && signals.first?.pid == workspaceApp.processIdentifier
         }
 

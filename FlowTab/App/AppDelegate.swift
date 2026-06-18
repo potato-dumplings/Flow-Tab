@@ -327,7 +327,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else {
                 return
             }
-            let appID = RuntimeSnapshotProvider.baseAppID(for: app)
+            let appID = RuntimeAppIdentity.appID(for: app)
             self.resolvedRuntimeProjectionService.signalAppLaunched(
                 appID: appID,
                 pid: app.processIdentifier
@@ -342,7 +342,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else {
                 return
             }
-            let appID = RuntimeSnapshotProvider.baseAppID(for: app)
+            let appID = RuntimeAppIdentity.appID(for: app)
             self.resolvedRuntimeProjectionService.signalAppTerminated(
                 appID: appID,
                 pid: app.processIdentifier

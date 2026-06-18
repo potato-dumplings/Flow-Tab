@@ -409,7 +409,7 @@ final class LiveSwitcherModel: ObservableObject {
         }
         let frontmostReadyMs = Self.monotonicMilliseconds()
 
-        let frontmostAppID = RuntimeSnapshotProvider.baseAppID(for: frontmostApp)
+        let frontmostAppID = RuntimeAppIdentity.appID(for: frontmostApp)
         let projectionReadMs: Double
         let recencyAppliedMs: Double
         var resolvedAppCandidate: AppSwitchCandidate?

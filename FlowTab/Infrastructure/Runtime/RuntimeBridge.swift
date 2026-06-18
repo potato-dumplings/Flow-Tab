@@ -19,6 +19,13 @@ struct RuntimeAppContext {
     let windowsByID: [String: RuntimeWindowContext]
 }
 
+enum RuntimeAppIdentity {
+    static func appID(for app: NSRunningApplication) -> String {
+        let pid = app.processIdentifier
+        return app.bundleIdentifier ?? "pid:\(pid)"
+    }
+}
+
 enum WindowBindingConfirmationSource: String {
     case stickyBinding
     case publicExactMatch
