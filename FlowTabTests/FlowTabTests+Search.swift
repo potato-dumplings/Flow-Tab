@@ -643,11 +643,11 @@ extension FlowTabTests {
         }
         XCTAssertEqual(diagnostic.readiness, .staleCommitted)
         XCTAssertEqual(diagnostic.resultState, .degradedStaleCommittedResult)
-        XCTAssertNotEqual(diagnostic.resultState, .currentGenerationCommittedResult)
+        XCTAssertNotEqual(diagnostic.resultState, .verifiedCurrentGenerationCommittedResult)
         XCTAssertFalse(diagnostic.committedIndexCoversCurrentGeneration)
         XCTAssertTrue(diagnostic.logMessage.contains("resultState=degradedStaleCommittedResult"))
         XCTAssertTrue(diagnostic.logMessage.contains("committedIndexCoversCurrentGeneration=0"))
-        XCTAssertFalse(diagnostic.logMessage.contains("resultState=currentGenerationCommittedResult"))
+        XCTAssertFalse(diagnostic.logMessage.contains("resultState=verifiedCurrentGenerationCommittedResult"))
         XCTAssertFalse(diagnostic.logMessage.contains("resultState=latestCommittedResult"))
         XCTAssertFalse(diagnostic.logMessage.contains("resultState=freshResult"))
         XCTAssertFalse(diagnostic.logMessage.contains("resultState=completeResult"))
@@ -838,7 +838,10 @@ extension FlowTabTests {
         XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.appCount, apps.count)
         XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.windowCount, windowCount)
         XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.requestedFreshnessBarrier, false)
-        XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.resultState, .currentGenerationCommittedResult)
+        XCTAssertEqual(
+            model.lastSearchIndexReadDiagnostic?.resultState,
+            .verifiedCurrentGenerationCommittedResult
+        )
         XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.committedIndexCoversCurrentGeneration, true)
         XCTAssertEqual(runtimeProjectionService.searchIndexFreshnessBarrierRequestsRecorded(), [])
         XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)

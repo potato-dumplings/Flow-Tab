@@ -154,7 +154,7 @@ final class LiveSwitcherModel: ObservableObject {
 
     struct SearchIndexReadDiagnostic: Equatable {
         enum ResultState: String, Equatable {
-            case currentGenerationCommittedResult
+            case verifiedCurrentGenerationCommittedResult
             case degradedStaleCommittedResult
             case missingCommittedIndex
         }

@@ -69,7 +69,7 @@ extension LiveSwitcherModel {
             reason: reason,
             readiness: read.readiness,
             resultState: read.readiness == .currentGenerationCommitted
-                ? .currentGenerationCommittedResult
+                ? .verifiedCurrentGenerationCommittedResult
                 : .degradedStaleCommittedResult,
             appCount: searchProjection.appEntries.count,
             windowCount: searchProjection.windowEntries.count,
