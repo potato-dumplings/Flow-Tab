@@ -266,11 +266,11 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         lock.lock()
         defer { lock.unlock() }
         guard let projection = committedSearchIndexProjection else {
-            return RuntimeSearchIndexRead(projection: nil, readiness: .missing)
+            return RuntimeSearchIndexRead(projection: nil, readiness: .missingCommittedIndex)
         }
         return RuntimeSearchIndexRead(
             projection: projection,
-            readiness: projection.freshness.isCompleteForScope ? .ready : .stale
+            readiness: projection.freshness.isCompleteForScope ? .currentGenerationCommitted : .staleCommitted
         )
     }
 

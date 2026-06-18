@@ -24,7 +24,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(appProjection.freshness.isCompleteForScope)
         XCTAssertEqual(appProjection.freshness.sourceGeneration.projection, 1)
         let searchRead = store.readCommittedSearchIndexForSearch()
-        XCTAssertEqual(searchRead.readiness, .ready)
+        XCTAssertEqual(searchRead.readiness, .currentGenerationCommitted)
         let searchProjection = try XCTUnwrap(searchRead.projection)
         XCTAssertEqual(searchProjection.appEntries.map(\.appID), apps.map(\.id))
         XCTAssertEqual(
@@ -149,7 +149,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(appProjection.freshness.sourceGeneration.projection, 2)
 
         let searchRead = store.readCommittedSearchIndexForSearch()
-        XCTAssertEqual(searchRead.readiness, .ready)
+        XCTAssertEqual(searchRead.readiness, .currentGenerationCommitted)
         XCTAssertFalse(searchRead.projection?.appEntries.contains { $0.appID == terminatedApp.id } ?? true)
         XCTAssertFalse(searchRead.projection?.windowEntries.contains { $0.appID == terminatedApp.id } ?? true)
         XCTAssertEqual(
@@ -193,7 +193,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(appProjection.freshness.sourceGeneration.appLifecycle, 0)
         XCTAssertEqual(appProjection.freshness.sourceGeneration.projection, 1)
         var searchRead = store.readCommittedSearchIndexForSearch()
-        XCTAssertEqual(searchRead.readiness, .ready)
+        XCTAssertEqual(searchRead.readiness, .currentGenerationCommitted)
         XCTAssertTrue(searchRead.projection?.appEntries.contains { $0.appID == activeApp.id } ?? false)
 
         store.markAppTerminated(appID: activeApp.id, pid: activePID)
@@ -257,7 +257,7 @@ extension FlowTabPriorityCoverageTests {
         store.stageSearchIndexApps(apps, generatedAt: 20)
 
         var read = store.readCommittedSearchIndexForSearch()
-        XCTAssertEqual(read.readiness, .missing)
+        XCTAssertEqual(read.readiness, .missingCommittedIndex)
         XCTAssertNil(read.projection)
         var diagnostics = store.diagnostics()
         XCTAssertFalse(diagnostics.hasCommittedSearchIndex)
@@ -270,7 +270,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(committed.freshness.generatedAt, 21)
         XCTAssertTrue(committed.freshness.isCompleteForScope)
         read = store.readCommittedSearchIndexForSearch()
-        XCTAssertEqual(read.readiness, .ready)
+        XCTAssertEqual(read.readiness, .currentGenerationCommitted)
         XCTAssertEqual(
             read.projection?.windowEntries.map(\.windowID),
             apps.flatMap(\.windows).map(\.id)
@@ -306,7 +306,7 @@ extension FlowTabPriorityCoverageTests {
         )
 
         var read = store.readCommittedSearchIndexForSearch()
-        XCTAssertEqual(read.readiness, .ready)
+        XCTAssertEqual(read.readiness, .currentGenerationCommitted)
         XCTAssertEqual(read.projection?.appEntries.map(\.appID), committedApps.map(\.id))
 
         store.markAppWindowsDirty(
@@ -318,7 +318,7 @@ extension FlowTabPriorityCoverageTests {
 
         read = store.readCommittedSearchIndexForSearch()
         let staleProjection = try XCTUnwrap(read.projection)
-        XCTAssertEqual(read.readiness, .stale)
+        XCTAssertEqual(read.readiness, .staleCommitted)
         XCTAssertEqual(staleProjection.appEntries.map(\.appID), committedApps.map(\.id))
         XCTAssertFalse(staleProjection.appEntries.map(\.appID).contains("com.example.staging-only"))
         XCTAssertEqual(staleProjection.freshness.dirtyAppIDs, ["com.example.browser"])
@@ -326,7 +326,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(staleProjection.freshness.pendingRepairScopes, ["appWindows:com.example.browser"])
     }
 
-    func testRuntimeReadModelStoreStagesScopedSearchRepairAndCommitsFreshGeneration() throws {
+    func testRuntimeReadModelStoreStagesScopedSearchRepairAndCommitsNewCommittedGeneration() throws {
         let store = RuntimeReadModelStore()
         let committedApps = searchScenarioApps()
         let repairedApp = AppSwitchCandidate(
@@ -361,7 +361,7 @@ extension FlowTabPriorityCoverageTests {
             )
         )
         XCTAssertEqual(staged.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID), ["browser-2"])
-        XCTAssertEqual(store.readCommittedSearchIndexForSearch().readiness, .stale)
+        XCTAssertEqual(store.readCommittedSearchIndexForSearch().readiness, .staleCommitted)
         XCTAssertEqual(
             store.readCommittedSearchIndexForSearch().projection?.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),
             ["browser-1"]
@@ -370,7 +370,7 @@ extension FlowTabPriorityCoverageTests {
         let committed = try XCTUnwrap(store.commitStagedSearchIndex(generatedAt: 21))
 
         XCTAssertTrue(committed.freshness.isCompleteForScope)
-        XCTAssertEqual(store.readCommittedSearchIndexForSearch().readiness, .ready)
+        XCTAssertEqual(store.readCommittedSearchIndexForSearch().readiness, .currentGenerationCommitted)
         XCTAssertEqual(
             store.readCommittedSearchIndexForSearch().projection?.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),
             ["browser-2"]
@@ -430,7 +430,7 @@ extension FlowTabPriorityCoverageTests {
         )
 
         XCTAssertEqual(staged.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID), ["browser-payload"])
-        XCTAssertEqual(store.readCommittedSearchIndexForSearch().readiness, .stale)
+        XCTAssertEqual(store.readCommittedSearchIndexForSearch().readiness, .staleCommitted)
         XCTAssertEqual(
             store.readCommittedSearchIndexForSearch().projection?.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),
             ["browser-1"]
@@ -1452,14 +1452,14 @@ extension FlowTabPriorityCoverageTests {
             }
         )
 
-        XCTAssertEqual(store.readCommittedSearchIndexForSearch().readiness, .stale)
+        XCTAssertEqual(store.readCommittedSearchIndexForSearch().readiness, .staleCommitted)
         service.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
         wait(for: [expectation], timeout: 1)
         _ = service.drainReadyReconciliationRequestsSynchronouslyForTesting(now: 11)
 
         let read = store.readCommittedSearchIndexForSearch()
         let projection = try XCTUnwrap(read.projection)
-        XCTAssertEqual(read.readiness, .ready)
+        XCTAssertEqual(read.readiness, .currentGenerationCommitted)
         XCTAssertEqual(
             projection.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),
             ["browser-fresh"]
@@ -1528,7 +1528,7 @@ extension FlowTabPriorityCoverageTests {
 
         let read = store.readCommittedSearchIndexForSearch()
         let projection = try XCTUnwrap(read.projection)
-        XCTAssertEqual(read.readiness, .stale)
+        XCTAssertEqual(read.readiness, .staleCommitted)
         XCTAssertEqual(
             projection.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),
             ["browser-1"]

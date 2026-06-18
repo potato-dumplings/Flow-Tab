@@ -641,7 +641,7 @@ extension FlowTabTests {
             XCTFail("missing search index read diagnostic")
             return
         }
-        XCTAssertEqual(diagnostic.readiness, .stale)
+        XCTAssertEqual(diagnostic.readiness, .staleCommitted)
         XCTAssertEqual(diagnostic.resultState, .degradedStaleCommittedResult)
         XCTAssertNotEqual(diagnostic.resultState, .latestCommittedResult)
         XCTAssertFalse(diagnostic.committedIndexCoversCurrentGeneration)
@@ -802,7 +802,7 @@ extension FlowTabTests {
     }
 
     @MainActor
-    func testLiveSwitcherModelSearchPressureReadsReadyCommittedIndexWithoutSampling() {
+    func testLiveSwitcherModelSearchPressureReadsCurrentGenerationCommittedIndexWithoutSampling() {
         let defaults = UserDefaults.standard
         let previousSearchEnabled = defaults.object(forKey: AppPreferenceKeys.searchEnabled)
         let previousSearchDefaultScope = defaults.object(forKey: AppPreferenceKeys.searchDefaultScope)
@@ -833,7 +833,7 @@ extension FlowTabTests {
         XCTAssertTrue(model.enterSearchMode())
         let enterMs = nanosToMilliseconds(DispatchTime.now().uptimeNanoseconds - enterStart)
 
-        XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.readiness, .ready)
+        XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.readiness, .currentGenerationCommitted)
         XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.appCount, apps.count)
         XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.windowCount, windowCount)
         XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.requestedFreshnessBarrier, false)

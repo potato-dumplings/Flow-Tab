@@ -157,9 +157,9 @@ struct RuntimeSearchIndexProjection: Equatable, Sendable {
 }
 
 enum RuntimeSearchIndexReadiness: String, Equatable, Sendable {
-    case ready
-    case stale
-    case missing
+    case currentGenerationCommitted
+    case staleCommitted
+    case missingCommittedIndex
 }
 
 struct RuntimeSearchIndexRead: Equatable, Sendable {
@@ -171,7 +171,7 @@ struct RuntimeSearchIndexRead: Equatable, Sendable {
     }
 
     var shouldRequestFreshnessBarrier: Bool {
-        readiness == .stale
+        readiness == .staleCommitted
     }
 }
 
@@ -537,7 +537,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         guard var projection = committedSearchIndex else {
             return RuntimeSearchIndexRead(
                 projection: nil,
-                readiness: .missing
+                readiness: .missingCommittedIndex
             )
         }
         projection.freshness = freshnessLocked(
@@ -546,7 +546,9 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         )
         return RuntimeSearchIndexRead(
             projection: projection,
-            readiness: projection.freshness.isCompleteForScope ? .ready : .stale
+            readiness: projection.freshness.isCompleteForScope
+                ? .currentGenerationCommitted
+                : .staleCommitted
         )
     }
 
