@@ -222,11 +222,11 @@ extension FlowTabTests {
             let tracker = RuntimeWindowRecencyTracker()
             let provider = RuntimeSnapshotProvider()
             let appID = "com.flowtab.mock.mail"
-            guard let baselineRepairPayload = provider.homeAppWindowRepairPayload(for: appID) else {
+            guard let appWindowRepairPayload = provider.appWindowRepairPayload(for: appID) else {
                 XCTFail("Expected mock repair payload for \(appID)")
                 return
             }
-            guard let draftWindow = baselineRepairPayload.context.windowsByID["mock-mail-draft"] else {
+            guard let draftWindow = appWindowRepairPayload.context.windowsByID["mock-mail-draft"] else {
                 XCTFail("Expected mock mail draft context")
                 return
             }
@@ -234,7 +234,7 @@ extension FlowTabTests {
                 appID: appID,
                 windowID: "mock-mail-draft",
                 ownerPID: draftWindow.ownerPID == 0
-                    ? baselineRepairPayload.context.runningApp.processIdentifier
+                    ? appWindowRepairPayload.context.runningApp.processIdentifier
                     : draftWindow.ownerPID,
                 cgWindowID: draftWindow.cgWindowID,
                 title: draftWindow.title,
@@ -244,9 +244,9 @@ extension FlowTabTests {
 
             let orderedPayload = tracker.currentAppWindowPayloadWithRecencyApplied(
                 RuntimeCurrentAppWindowPayload(
-                    summary: baselineRepairPayload.summary,
-                    candidate: baselineRepairPayload.candidate,
-                    context: baselineRepairPayload.context
+                    summary: appWindowRepairPayload.summary,
+                    candidate: appWindowRepairPayload.candidate,
+                    context: appWindowRepairPayload.context
                 )
             )
 

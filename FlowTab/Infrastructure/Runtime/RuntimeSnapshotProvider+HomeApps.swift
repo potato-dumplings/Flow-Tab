@@ -72,7 +72,7 @@ extension RuntimeSnapshotProvider {
         return summaries
     }
 
-    func homeAppWindowRepairPayload(for appID: String) -> RuntimeAppWindowRepairPayload? {
+    func appWindowRepairPayload(for appID: String) -> RuntimeAppWindowRepairPayload? {
         if let uiTestRuntimeDataset = Self.uiTestRuntimeDataset() {
             return uiTestRuntimeDataset.repairPayloadsByAppID[appID]
         }

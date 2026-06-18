@@ -324,14 +324,14 @@ extension FlowTabTests {
             XCTAssertEqual(summary?.windowCount, 1)
             XCTAssertNil(provider.homeAppSummary(for: "com.flowtab.mock.missing"))
 
-            let homeRepairPayload = provider.homeAppWindowRepairPayload(for: "com.flowtab.mock.mail")
-            XCTAssertNotNil(homeRepairPayload)
-            XCTAssertEqual(homeRepairPayload?.candidate.id, "com.flowtab.mock.mail")
-            XCTAssertEqual(homeRepairPayload?.candidate.windows.map(\.id), ["mock-mail-inbox", "mock-mail-draft"])
-            XCTAssertEqual(homeRepairPayload?.summary.windowCount, 2)
-            XCTAssertEqual(homeRepairPayload?.context.appID, "com.flowtab.mock.mail")
-            XCTAssertEqual(homeRepairPayload?.context.windowsByID.count, 2)
-            XCTAssertNil(provider.homeAppWindowRepairPayload(for: "com.flowtab.mock.missing"))
+            let appWindowRepairPayload = provider.appWindowRepairPayload(for: "com.flowtab.mock.mail")
+            XCTAssertNotNil(appWindowRepairPayload)
+            XCTAssertEqual(appWindowRepairPayload?.candidate.id, "com.flowtab.mock.mail")
+            XCTAssertEqual(appWindowRepairPayload?.candidate.windows.map(\.id), ["mock-mail-inbox", "mock-mail-draft"])
+            XCTAssertEqual(appWindowRepairPayload?.summary.windowCount, 2)
+            XCTAssertEqual(appWindowRepairPayload?.context.appID, "com.flowtab.mock.mail")
+            XCTAssertEqual(appWindowRepairPayload?.context.windowsByID.count, 2)
+            XCTAssertNil(provider.appWindowRepairPayload(for: "com.flowtab.mock.missing"))
         }
     }
 
@@ -339,11 +339,11 @@ extension FlowTabTests {
         withLaunchArgumentsForTesting(["FlowTab", "--flowtab-ui-mock-runtime"]) {
             let provider = RuntimeSnapshotProvider()
 
-            let mailRepairPayload = provider.homeAppWindowRepairPayload(for: "com.flowtab.mock.mail")
+            let mailRepairPayload = provider.appWindowRepairPayload(for: "com.flowtab.mock.mail")
             XCTAssertEqual(mailRepairPayload?.candidate.windows.map(\.title), ["Inbox", "Draft"])
             XCTAssertFalse(mailRepairPayload?.candidate.windows.contains(where: { $0.title == "Docs" }) ?? true)
 
-            let browserRepairPayload = provider.homeAppWindowRepairPayload(for: "com.flowtab.mock.browser")
+            let browserRepairPayload = provider.appWindowRepairPayload(for: "com.flowtab.mock.browser")
             XCTAssertEqual(browserRepairPayload?.candidate.windows.map(\.title), ["Docs"])
             XCTAssertFalse(browserRepairPayload?.candidate.windows.contains(where: { $0.title == "Inbox" }) ?? true)
         }
@@ -383,11 +383,11 @@ extension FlowTabTests {
             XCTAssertNotNil(summary)
             XCTAssertEqual(summary?.windowCount, 5)
 
-            let homeRepairPayload = provider.homeAppWindowRepairPayload(for: "com.flowtab.mock.browser")
-            XCTAssertNotNil(homeRepairPayload)
-            XCTAssertEqual(homeRepairPayload?.summary.windowCount, 5)
-            XCTAssertEqual(homeRepairPayload?.candidate.windows.map(\.id), expectedWindowIDs)
-            XCTAssertEqual(homeRepairPayload?.context.windowsByID.count, 5)
+            let appWindowRepairPayload = provider.appWindowRepairPayload(for: "com.flowtab.mock.browser")
+            XCTAssertNotNil(appWindowRepairPayload)
+            XCTAssertEqual(appWindowRepairPayload?.summary.windowCount, 5)
+            XCTAssertEqual(appWindowRepairPayload?.candidate.windows.map(\.id), expectedWindowIDs)
+            XCTAssertEqual(appWindowRepairPayload?.context.windowsByID.count, 5)
         }
     }
 
@@ -421,11 +421,11 @@ extension FlowTabTests {
             XCTAssertEqual(summaries.first?.appID, "com.flowtab.mock.browser")
             XCTAssertEqual(summaries.first?.windowCount, 5)
 
-            let homeRepairPayload = provider.homeAppWindowRepairPayload(for: "com.flowtab.mock.browser")
-            XCTAssertNotNil(homeRepairPayload)
-            XCTAssertEqual(homeRepairPayload?.summary.windowCount, 5)
-            XCTAssertEqual(homeRepairPayload?.candidate.windows.map(\.id), expectedWindowIDs)
-            XCTAssertEqual(homeRepairPayload?.context.windowsByID.count, 5)
+            let appWindowRepairPayload = provider.appWindowRepairPayload(for: "com.flowtab.mock.browser")
+            XCTAssertNotNil(appWindowRepairPayload)
+            XCTAssertEqual(appWindowRepairPayload?.summary.windowCount, 5)
+            XCTAssertEqual(appWindowRepairPayload?.candidate.windows.map(\.id), expectedWindowIDs)
+            XCTAssertEqual(appWindowRepairPayload?.context.windowsByID.count, 5)
         }
     }
 
@@ -446,9 +446,9 @@ extension FlowTabTests {
                 ["Normal 1", "Normal 2", "Fullscreen 3", "Fullscreen 4", "Fullscreen 5"]
             )
 
-            let homeRepairPayload = provider.homeAppWindowRepairPayload(for: "com.flowtab.mock.browser")
+            let appWindowRepairPayload = provider.appWindowRepairPayload(for: "com.flowtab.mock.browser")
             XCTAssertEqual(
-                homeRepairPayload?.candidate.windows.map(\.title),
+                appWindowRepairPayload?.candidate.windows.map(\.title),
                 ["Normal 1", "Normal 2", "Fullscreen 3", "Fullscreen 4", "Fullscreen 5"]
             )
         }
@@ -500,11 +500,11 @@ extension FlowTabTests {
             XCTAssertEqual(summary?.appID, targetID)
             XCTAssertEqual(summary?.windowCount, 0)
 
-            let homeRepairPayload = provider.homeAppWindowRepairPayload(for: targetID)
-            XCTAssertNotNil(homeRepairPayload)
-            XCTAssertEqual(homeRepairPayload?.candidate.id, targetID)
-            XCTAssertEqual(homeRepairPayload?.candidate.windows.count, 0)
-            XCTAssertEqual(homeRepairPayload?.context.windowsByID.count, 0)
+            let appWindowRepairPayload = provider.appWindowRepairPayload(for: targetID)
+            XCTAssertNotNil(appWindowRepairPayload)
+            XCTAssertEqual(appWindowRepairPayload?.candidate.id, targetID)
+            XCTAssertEqual(appWindowRepairPayload?.candidate.windows.count, 0)
+            XCTAssertEqual(appWindowRepairPayload?.context.windowsByID.count, 0)
         }
     }
 
