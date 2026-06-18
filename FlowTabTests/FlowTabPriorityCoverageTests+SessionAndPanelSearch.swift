@@ -41,14 +41,15 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testLiveSwitcherModelCancelSelectionResetsSessionAndSearchState() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
-            let model = LiveSwitcherModel(
-                runtimeProjectionService: RecordingRuntimeProjectionService(
-                    appSwitcherApps: self.searchScenarioApps()
-                )
+            let runtimeProjectionService = RecordingRuntimeProjectionService(
+                appSwitcherApps: self.searchScenarioApps()
             )
+            let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
 
             XCTAssertTrue(model.startSession(triggerDirection: .forward))
             XCTAssertTrue(model.enterSearchMode())
+            XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+            XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
             XCTAssertTrue(model.isSearchActive)
             XCTAssertEqual(model.searchScope, .app)
 
@@ -65,14 +66,15 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testLiveSwitcherModelEnterSearchModeAndApplySelectedAppResult() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
-            let model = LiveSwitcherModel(
-                runtimeProjectionService: RecordingRuntimeProjectionService(
-                    appSwitcherApps: self.searchScenarioApps()
-                )
+            let runtimeProjectionService = RecordingRuntimeProjectionService(
+                appSwitcherApps: self.searchScenarioApps()
             )
+            let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
 
             XCTAssertTrue(model.startSession(triggerDirection: .forward))
             XCTAssertTrue(model.enterSearchMode())
+            XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+            XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
             XCTAssertTrue(model.isSearchActive)
             XCTAssertEqual(model.searchScope, .app)
             XCTAssertGreaterThanOrEqual(model.searchResultCount, 3)
@@ -94,14 +96,15 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testLiveSwitcherModelApplySelectedWindowSearchResultEntersWindowCycle() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .window) {
-            let model = LiveSwitcherModel(
-                runtimeProjectionService: RecordingRuntimeProjectionService(
-                    appSwitcherApps: self.searchScenarioApps()
-                )
+            let runtimeProjectionService = RecordingRuntimeProjectionService(
+                appSwitcherApps: self.searchScenarioApps()
             )
+            let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
 
             XCTAssertTrue(model.startSession(triggerDirection: .forward))
             XCTAssertTrue(model.enterSearchMode())
+            XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+            XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
             XCTAssertEqual(model.searchScope, .window)
             XCTAssertGreaterThanOrEqual(model.searchResultCount, 4)
 
@@ -136,12 +139,11 @@ extension FlowTabPriorityCoverageTests {
                     )
                 }
             )
-            let model = LiveSwitcherModel(
-                runtimeProjectionService: RecordingRuntimeProjectionService(
-                    appSwitcherApps: apps,
-                    contextsByID: contextsByID
-                )
+            let runtimeProjectionService = RecordingRuntimeProjectionService(
+                appSwitcherApps: apps,
+                contextsByID: contextsByID
             )
+            let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
 
             var activatedTarget: ActivationTarget?
             var activatedContextIDs: Set<String> = []
@@ -152,6 +154,8 @@ extension FlowTabPriorityCoverageTests {
 
             XCTAssertTrue(model.startSession(triggerDirection: .forward))
             XCTAssertTrue(model.enterSearchMode())
+            XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+            XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
             XCTAssertTrue(
                 model.searchCoordinator.replaceQueryWithoutRebuild(
                     "README",

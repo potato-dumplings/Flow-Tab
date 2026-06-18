@@ -903,6 +903,7 @@ Runtime infrastructure 负责：
 - 同一 committed generation 下连续搜索结果稳定。
 - background repair 中间态不会暴露给 Search。
 - freshness barrier 未完成时，不能把旧/部分 index 标记为最新完整。
+- `FlowTabPriorityCoverageTests+SessionAndPanelSearch` 的 model-level Search/session result apply cases 从 runtime-owned committed projection service 启动，并断言 Search entry / app result apply / window result apply / window target commit 不调用 full/lightweight snapshot 请求。
 
 ### Phase 5: Space signature 与真实拓扑证明
 
