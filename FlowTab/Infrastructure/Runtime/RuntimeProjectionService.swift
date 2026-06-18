@@ -353,12 +353,14 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             }
             if let repairPayload = result.repairPayload {
                 return .completedWithRepairedCurrentAppWindowPayloads([
-                    currentAppWindowPayload(from: repairPayload)
+                    RuntimeCurrentAppWindowPayload(repairPayload: repairPayload)
                 ])
             }
             return .completed
         case .spaceTopology:
-            let cgWindowsByPID = snapshotProvider.collectCGWindowsByPID(options: [.excludeDesktopElements])
+            let cgWindowsByPID = snapshotProvider.collectCGWindowsWithSpaceTopologyDiff(
+                options: [.excludeDesktopElements]
+            ).windowsByPID
             let affectedTargets = snapshotProvider.appReconciliationTargets(
                 affectedCGWindowIDs: request.affectedCGWindowIDs,
                 currentCGWindowsByPID: cgWindowsByPID
@@ -374,7 +376,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 }
                 if let repairPayload = result.repairPayload {
                     repairedCurrentAppWindowPayloads.append(
-                        currentAppWindowPayload(from: repairPayload)
+                        RuntimeCurrentAppWindowPayload(repairPayload: repairPayload)
                     )
                 }
             }
@@ -385,15 +387,5 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             }
             return .completed
         }
-    }
-
-    private static func currentAppWindowPayload(
-        from repairPayload: RuntimeAppWindowRepairPayload
-    ) -> RuntimeCurrentAppWindowPayload {
-        RuntimeCurrentAppWindowPayload(
-            summary: repairPayload.summary,
-            candidate: repairPayload.candidate,
-            context: repairPayload.context
-        )
     }
 }

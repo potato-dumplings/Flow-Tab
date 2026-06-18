@@ -67,6 +67,13 @@ struct RuntimeCurrentAppWindowPayload {
         self.context = context
     }
 
+    init(repairPayload: RuntimeAppWindowRepairPayload) {
+        self.init(
+            summary: repairPayload.summary,
+            candidate: repairPayload.candidate,
+            context: repairPayload.context
+        )
+    }
 }
 
 struct RuntimeHomeAppDetailProjection {
