@@ -531,22 +531,26 @@ extension FlowTabPriorityCoverageTests {
             pendingRepairScopes: [],
             isCompleteForScope: true
         )
-        let snapshotService = RecordingRuntimeProjectionService(
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
             appSwitcherProjection: RuntimeAppSwitcherProjection(
                 apps: [appOnlyCandidate],
                 contextsByID: [appID: context],
                 freshness: freshness
             )
         )
-        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
         model.runtimeProjectionMaintenanceEnabled = false
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertTrue(model.scheduleSelectedAppWindowProjectionIfNeeded(for: appID))
 
-        XCTAssertEqual(snapshotService.recordedHomeAppIDs(), [])
-        XCTAssertEqual(snapshotService.appWindowChangeSignalsRecorded().map(\.appID), [appID])
-        XCTAssertEqual(snapshotService.appWindowChangeSignalsRecorded().map(\.pid), [runningApp.processIdentifier])
+        XCTAssertEqual(runtimeProjectionService.recordedHomeAppIDs(), [])
+        XCTAssertTrue(runtimeProjectionService.appWindowChangeSignalsRecorded().isEmpty)
+        XCTAssertEqual(runtimeProjectionService.selectedCurrentAppWindowChangeSignalsRecorded().map(\.appID), [appID])
+        XCTAssertEqual(
+            runtimeProjectionService.selectedCurrentAppWindowChangeSignalsRecorded().map(\.pid),
+            [runningApp.processIdentifier]
+        )
         XCTAssertEqual(model.session?.mode, .appCycle)
         XCTAssertEqual(model.session?.selectedApp.windows.map(\.id), [])
     }
@@ -613,15 +617,19 @@ extension FlowTabPriorityCoverageTests {
     func testLiveSwitcherModelFocusedWindowSessionSignalsRuntimeRepairWhenProjectionIsMissing() {
         let runningApp = NSRunningApplication.current
         let appID = runningApp.bundleIdentifier ?? "pid:\(runningApp.processIdentifier)"
-        let snapshotService = RecordingRuntimeProjectionService()
-        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
+        let runtimeProjectionService = RecordingRuntimeProjectionService()
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
         model.frontmostApplicationOverride = { runningApp }
 
         XCTAssertFalse(model.startFocusedAppWindowSession(triggerDirection: .forward))
 
-        XCTAssertEqual(snapshotService.appWindowChangeSignalsRecorded().map(\.appID), [appID])
-        XCTAssertEqual(snapshotService.appWindowChangeSignalsRecorded().map(\.pid), [runningApp.processIdentifier])
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertTrue(runtimeProjectionService.appWindowChangeSignalsRecorded().isEmpty)
+        XCTAssertEqual(runtimeProjectionService.selectedCurrentAppWindowChangeSignalsRecorded().map(\.appID), [appID])
+        XCTAssertEqual(
+            runtimeProjectionService.selectedCurrentAppWindowChangeSignalsRecorded().map(\.pid),
+            [runningApp.processIdentifier]
+        )
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
         XCTAssertNil(model.session)
     }
 

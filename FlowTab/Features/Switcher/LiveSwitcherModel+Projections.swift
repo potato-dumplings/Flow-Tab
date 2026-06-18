@@ -196,7 +196,7 @@ extension LiveSwitcherModel {
 
         let projectionReadMs = Self.monotonicMilliseconds()
         if let pid = runtimeContextsByID[targetAppID]?.runningApp.processIdentifier {
-            runtimeService.signalAppWindowsChanged(appID: targetAppID, pid: pid)
+            runtimeService.signalSelectedCurrentAppWindowsChanged(appID: targetAppID, pid: pid)
         }
         completeSelectedAppWindowProjection(
             nil,

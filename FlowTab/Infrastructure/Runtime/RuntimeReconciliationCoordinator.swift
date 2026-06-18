@@ -6,12 +6,13 @@ enum RuntimeReconciliationReason: String, Hashable {
     case activationVerified
     case appLaunched
     case searchFreshnessBarrier
+    case selectedCurrentAppWindows
     case spaceTopologyChanged
     case manualRefresh
 
     var schedulerPriority: RuntimeReconciliationPriority {
         switch self {
-        case .activationVerified, .appLaunched, .searchFreshnessBarrier:
+        case .activationVerified, .appLaunched, .searchFreshnessBarrier, .selectedCurrentAppWindows:
             .high
         case .axNotification, .spaceTopologyChanged:
             .normal

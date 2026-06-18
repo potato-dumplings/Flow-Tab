@@ -23,6 +23,7 @@ protocol RuntimeProjectionServing: Sendable {
     func signalSpaceTopologyChanged()
     func signalAppLaunched(appID: String, pid: pid_t)
     func signalAppWindowsChanged(appID: String, pid: pid_t)
+    func signalSelectedCurrentAppWindowsChanged(appID: String, pid: pid_t)
     func signalAXWindowDestroyed(appID: String, pid: pid_t, axWindowID: String)
     func signalAppTerminated(appID: String, pid: pid_t)
     func signalWindowFocusVerified(_ verification: RuntimeWindowFocusVerification)
@@ -212,6 +213,24 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 appID: appID,
                 pid: pid,
                 reason: .axNotification,
+                now: now
+            )
+            drainReadyReconciliationRequestsLocked(now: now)
+        }
+    }
+
+    func signalSelectedCurrentAppWindowsChanged(appID: String, pid: pid_t) {
+        maintenanceQueue.async { [self] in
+            let now = Date.timeIntervalSinceReferenceDate
+            readModelStore.markAppWindowsDirty(
+                appID: appID,
+                pid: pid,
+                pendingScope: "selectedCurrentAppWindows:\(appID)"
+            )
+            snapshotProvider.reconciliationCoordinator.markAppDirty(
+                appID: appID,
+                pid: pid,
+                reason: .selectedCurrentAppWindows,
                 now: now
             )
             drainReadyReconciliationRequestsLocked(now: now)

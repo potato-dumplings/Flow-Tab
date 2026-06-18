@@ -962,6 +962,33 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(coordinator.readyRequests(now: Date.timeIntervalSinceReferenceDate).isEmpty)
     }
 
+    func testRuntimeProjectionServiceDrainsSelectedCurrentAppWindowChangesAtHighPriority() throws {
+        let coordinator = RuntimeReconciliationCoordinator()
+        let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
+        let lock = NSLock()
+        var executedRequests: [RuntimeReconciliationRequest] = []
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.SelectedCurrentAppWindowSignal",
+            snapshotProvider: provider,
+            reconciliationExecutor: { request, _ in
+                lock.lock()
+                executedRequests.append(request)
+                lock.unlock()
+                return .completed
+            }
+        )
+
+        service.signalSelectedCurrentAppWindowsChanged(appID: "com.example.editor", pid: 18_405)
+        _ = service.drainReadyReconciliationRequestsSynchronouslyForTesting()
+
+        let request = try XCTUnwrap(executedRequests.first)
+        XCTAssertEqual(request.appID, "com.example.editor")
+        XCTAssertEqual(request.reasons, Set([.selectedCurrentAppWindows]))
+        XCTAssertEqual(request.priority, .high)
+        XCTAssertEqual(request.state, .inFlight)
+        XCTAssertTrue(coordinator.readyRequests(now: Date.timeIntervalSinceReferenceDate).isEmpty)
+    }
+
     func testRuntimeProjectionServiceSignalsDestroyedAXWindowThroughCoordinator() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)

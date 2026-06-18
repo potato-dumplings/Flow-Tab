@@ -419,7 +419,7 @@ final class LiveSwitcherModel: ObservableObject {
             resolvedContext = payload.context
         } else {
             projectionReadMs = Self.monotonicMilliseconds()
-            runtimeProjectionService.signalAppWindowsChanged(
+            runtimeProjectionService.signalSelectedCurrentAppWindowsChanged(
                 appID: frontmostAppID,
                 pid: frontmostApp.processIdentifier
             )

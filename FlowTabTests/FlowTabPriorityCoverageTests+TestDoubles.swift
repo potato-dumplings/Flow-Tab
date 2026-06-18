@@ -92,6 +92,7 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     private var spaceTopologyChangeSignals = 0
     private var appLaunchSignals: [(appID: String, pid: pid_t)] = []
     private var appWindowChangeSignals: [(appID: String, pid: pid_t)] = []
+    private var selectedCurrentAppWindowChangeSignals: [(appID: String, pid: pid_t)] = []
     private var appTerminationSignals: [(appID: String, pid: pid_t)] = []
     private var windowFocusVerifiedSignals: [(appID: String, pid: pid_t)] = []
     private var windowFocusVerificationSignals: [RuntimeWindowFocusVerification] = []
@@ -217,6 +218,12 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         return appWindowChangeSignals
     }
 
+    func selectedCurrentAppWindowChangeSignalsRecorded() -> [(appID: String, pid: pid_t)] {
+        lock.lock()
+        defer { lock.unlock() }
+        return selectedCurrentAppWindowChangeSignals
+    }
+
     func appTerminationSignalsRecorded() -> [(appID: String, pid: pid_t)] {
         lock.lock()
         defer { lock.unlock() }
@@ -319,6 +326,12 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     func signalAppWindowsChanged(appID: String, pid: pid_t) {
         lock.lock()
         appWindowChangeSignals.append((appID, pid))
+        lock.unlock()
+    }
+
+    func signalSelectedCurrentAppWindowsChanged(appID: String, pid: pid_t) {
+        lock.lock()
+        selectedCurrentAppWindowChangeSignals.append((appID, pid))
         lock.unlock()
     }
 
