@@ -648,6 +648,8 @@ extension FlowTabTests {
         XCTAssertTrue(diagnostic.logMessage.contains("resultState=degradedStaleCommittedResult"))
         XCTAssertTrue(diagnostic.logMessage.contains("committedIndexCoversCurrentGeneration=0"))
         XCTAssertFalse(diagnostic.logMessage.contains("resultState=latestCommittedResult"))
+        XCTAssertFalse(diagnostic.logMessage.contains("resultState=freshResult"))
+        XCTAssertFalse(diagnostic.logMessage.contains("resultState=completeResult"))
         XCTAssertFalse(diagnostic.logMessage.contains("complete="))
         XCTAssertEqual(
             snapshotService.searchIndexFreshnessBarrierRequestsRecorded(),
