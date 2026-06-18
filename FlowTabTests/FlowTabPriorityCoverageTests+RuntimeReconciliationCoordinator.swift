@@ -81,6 +81,11 @@ extension FlowTabPriorityCoverageTests {
             app.windows.map(\.id)
         )
         XCTAssertNotNil(repairedAppProjection.contextsByID[app.id])
+        let homeProjection = try XCTUnwrap(store.readHomeSummaryProjection())
+        XCTAssertEqual(homeProjection.summaries.map(\.appID), apps.map(\.id))
+        XCTAssertEqual(homeProjection.summary(for: app.id)?.windowCount, app.windows.count)
+        XCTAssertEqual(homeProjection.freshness.generatedAt, generatedAt + 1)
+        XCTAssertTrue(homeProjection.freshness.isCompleteForScope)
         let diagnostics = store.diagnostics()
         XCTAssertTrue(diagnostics.dirtyAppIDs.isEmpty)
         XCTAssertEqual(diagnostics.currentAppWindowProjectionAppIDs, [app.id])
@@ -1088,6 +1093,10 @@ extension FlowTabPriorityCoverageTests {
         )
         XCTAssertNotNil(projection.contextsByID[repairedApp.id])
         XCTAssertTrue(projection.freshness.isCompleteForScope)
+        let homeProjection = try XCTUnwrap(store.readHomeSummaryProjection())
+        XCTAssertEqual(homeProjection.summaries.map(\.appID), [repairedApp.id, existingApp.id])
+        XCTAssertEqual(homeProjection.summary(for: repairedApp.id)?.windowCount, 1)
+        XCTAssertTrue(homeProjection.freshness.isCompleteForScope)
     }
 
     func testRuntimeProjectionServiceClearsTerminatedAppRuntimeState() {

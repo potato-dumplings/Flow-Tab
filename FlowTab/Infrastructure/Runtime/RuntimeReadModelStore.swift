@@ -253,22 +253,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
 
         markProjectionCommittedLocked()
         clearDirtyStateForAppLocked(appID: summary.appID, pid: summary.pid)
-        var summaries = homeSummaryProjection?.summaries ?? []
-        if let index = summaries.firstIndex(where: { $0.appID == summary.appID }) {
-            summaries[index] = summary
-        } else {
-            summaries.append(summary)
-        }
-        summaries.sort { lhs, rhs in
-            if lhs.lastActiveAt == rhs.lastActiveAt {
-                return lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName) == .orderedAscending
-            }
-            return lhs.lastActiveAt > rhs.lastActiveAt
-        }
-        homeSummaryProjection = RuntimeHomeSummaryProjection(
-            summaries: summaries,
-            freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: true)
-        )
+        upsertHomeSummaryProjectionLocked(summary, generatedAt: generatedAt)
     }
 
     func commitCurrentAppWindowProjection(
@@ -285,6 +270,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             currentAppWindowPayload: payload,
             freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: true)
         )
+        upsertHomeSummaryProjectionLocked(payload.summary, generatedAt: generatedAt)
         upsertAppSwitcherProjectionLocked(payload, generatedAt: generatedAt)
     }
 
@@ -629,6 +615,49 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             apps: apps,
             contextsByID: contextsByID,
             freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: !isDirtyLocked)
+        )
+    }
+
+    private func upsertHomeSummaryProjectionLocked(
+        _ summary: RuntimeHomeAppSummary,
+        generatedAt: TimeInterval
+    ) {
+        var summaries = homeSummaryProjection?.summaries
+            ?? appSwitcherProjection?.apps.map { app in
+                homeSummaryLocked(
+                    for: app,
+                    context: appSwitcherProjection?.contextsByID[app.id]
+                )
+            }
+            ?? []
+        if let index = summaries.firstIndex(where: { $0.appID == summary.appID }) {
+            summaries[index] = summary
+        } else {
+            summaries.append(summary)
+        }
+        summaries.sort { lhs, rhs in
+            if lhs.lastActiveAt == rhs.lastActiveAt {
+                return lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName) == .orderedAscending
+            }
+            return lhs.lastActiveAt > rhs.lastActiveAt
+        }
+        homeSummaryProjection = RuntimeHomeSummaryProjection(
+            summaries: summaries,
+            freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: !isDirtyLocked)
+        )
+    }
+
+    private func homeSummaryLocked(
+        for app: AppSwitchCandidate,
+        context: RuntimeAppContext?
+    ) -> RuntimeHomeAppSummary {
+        RuntimeHomeAppSummary(
+            appID: app.id,
+            displayName: app.displayName,
+            groupID: app.groupID,
+            lastActiveAt: app.lastActiveAt,
+            windowCount: app.windows.count,
+            pid: context?.runningApp.processIdentifier ?? 0
         )
     }
 
