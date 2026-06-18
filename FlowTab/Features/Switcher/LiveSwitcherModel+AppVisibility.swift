@@ -14,7 +14,7 @@ extension LiveSwitcherModel {
         let visibleAppIDs = Set(filteredApps.map(\.id))
         let filteredContexts = payload.contextsByID.filter { visibleAppIDs.contains($0.key) }
         RuntimeLog.debug(
-            .snapshot,
+            .projection,
             "hiddenAppFilter hidden=\(visibilityFilter.hiddenAppIDs.count) before=\(payload.apps.count) after=\(filteredApps.count)"
         )
         return AppSwitcherProjectionSessionPayload(
