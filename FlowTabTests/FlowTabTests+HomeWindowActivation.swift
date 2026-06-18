@@ -86,7 +86,7 @@ extension FlowTabTests {
             pendingRepairScopes: [],
             isCompleteForScope: true
         )
-        let snapshotService = RecordingRuntimeProjectionService(
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
             currentAppWindowProjectionsByAppID: [
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
@@ -102,7 +102,7 @@ extension FlowTabTests {
         var capturedTarget: ActivationTarget?
         var capturedContextsByID: [String: RuntimeAppContext] = [:]
         let controller = HomeWindowActivationController(
-            runtimeProjectionService: snapshotService,
+            runtimeProjectionService: runtimeProjectionService,
             preferencesProvider: { .default },
             activationHandler: { target, contextsByID in
                 capturedTarget = target
@@ -127,7 +127,7 @@ extension FlowTabTests {
             capturedContextsByID[appID]?.windowsByID["projected-draft"]?.title,
             "Projected Draft"
         )
-        XCTAssertEqual(snapshotService.recordedHomeAppIDs(), [])
+        XCTAssertEqual(runtimeProjectionService.recordedHomeAppIDs(), [])
     }
 
     @MainActor
@@ -153,7 +153,7 @@ extension FlowTabTests {
             pendingRepairScopes: [],
             isCompleteForScope: true
         )
-        let snapshotService = RecordingRuntimeProjectionService(
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
             homeSummaryProjection: RuntimeHomeSummaryProjection(
                 summaries: [contaminatedDetailProjection.summary],
                 freshness: freshness
@@ -161,7 +161,7 @@ extension FlowTabTests {
         )
         var capturedTarget: ActivationTarget?
         let controller = HomeWindowActivationController(
-            runtimeProjectionService: snapshotService,
+            runtimeProjectionService: runtimeProjectionService,
             preferencesProvider: { .default },
             activationHandler: { target, _ in
                 capturedTarget = target
@@ -174,10 +174,10 @@ extension FlowTabTests {
         )
 
         XCTAssertNil(capturedTarget)
-        XCTAssertEqual(snapshotService.recordedHomeAppIDs(), [])
-        XCTAssertEqual(snapshotService.appWindowChangeSignalsRecorded().map(\.appID), [appID])
+        XCTAssertEqual(runtimeProjectionService.recordedHomeAppIDs(), [])
+        XCTAssertEqual(runtimeProjectionService.appWindowChangeSignalsRecorded().map(\.appID), [appID])
         XCTAssertEqual(
-            snapshotService.appWindowChangeSignalsRecorded().map(\.pid),
+            runtimeProjectionService.appWindowChangeSignalsRecorded().map(\.pid),
             [contaminatedDetailProjection.summary.pid]
         )
     }
@@ -279,7 +279,7 @@ extension FlowTabTests {
             pendingRepairScopes: [],
             isCompleteForScope: true
         )
-        let snapshotService = RecordingRuntimeProjectionService(
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
             homeSummaryProjection: RuntimeHomeSummaryProjection(
                 summaries: [detailProjection.summary],
                 freshness: freshness
@@ -298,28 +298,28 @@ extension FlowTabTests {
         )
 
         XCTAssertEqual(
-            HomeRuntimeProjectionReader.appSummaries(from: snapshotService)?.map(\.appID),
+            HomeRuntimeProjectionReader.appSummaries(from: runtimeProjectionService)?.map(\.appID),
             [appID]
         )
         XCTAssertEqual(
-            HomeRuntimeProjectionReader.initialAppSummaries(from: snapshotService)?.map(\.appID),
+            HomeRuntimeProjectionReader.initialAppSummaries(from: runtimeProjectionService)?.map(\.appID),
             [appID]
         )
         XCTAssertEqual(
-            HomeRuntimeProjectionReader.appSummary(for: appID, from: snapshotService)?.windowCount,
+            HomeRuntimeProjectionReader.appSummary(for: appID, from: runtimeProjectionService)?.windowCount,
             1
         )
         XCTAssertEqual(
             HomeRuntimeProjectionReader.appDetailProjection(
                 for: appID,
-                from: snapshotService
+                from: runtimeProjectionService
             )?.candidate.windows.map(\.id),
             ["home-projected-1"]
         )
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.homeSummariesRequestCount(), 0)
-        XCTAssertEqual(snapshotService.homeSummaryRequestCount(), 0)
-        XCTAssertEqual(snapshotService.recordedHomeAppIDs(), [])
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.homeSummariesRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.homeSummaryRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.recordedHomeAppIDs(), [])
     }
 
     func testHomeInitialAppSummaryReaderDoesNotUseLightweightSnapshotFallback() {
@@ -387,7 +387,7 @@ extension FlowTabTests {
             pendingRepairScopes: [],
             isCompleteForScope: true
         )
-        let snapshotService = RecordingRuntimeProjectionService(
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
             appSwitcherProjection: RuntimeAppSwitcherProjection(
                 apps: [detailProjection.candidate],
                 contextsByID: [appID: detailProjection.context],
@@ -396,23 +396,23 @@ extension FlowTabTests {
         )
 
         XCTAssertEqual(
-            HomeRuntimeProjectionReader.appSummaries(from: snapshotService)?.map(\.appID),
+            HomeRuntimeProjectionReader.appSummaries(from: runtimeProjectionService)?.map(\.appID),
             [appID]
         )
         XCTAssertEqual(
-            HomeRuntimeProjectionReader.appSummary(for: appID, from: snapshotService)?.pid,
+            HomeRuntimeProjectionReader.appSummary(for: appID, from: runtimeProjectionService)?.pid,
             detailProjection.summary.pid
         )
         XCTAssertEqual(
             HomeRuntimeProjectionReader.appDetailProjection(
                 for: appID,
-                from: snapshotService
+                from: runtimeProjectionService
             )?.candidate.windows.map(\.id),
             ["projection-window"]
         )
-        XCTAssertEqual(snapshotService.homeSummariesRequestCount(), 0)
-        XCTAssertEqual(snapshotService.homeSummaryRequestCount(), 0)
-        XCTAssertEqual(snapshotService.recordedHomeAppIDs(), [])
+        XCTAssertEqual(runtimeProjectionService.homeSummariesRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.homeSummaryRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.recordedHomeAppIDs(), [])
     }
 
     func testHomeRuntimeRefreshReaderSignalsRuntimeRepairWhenProjectionIsMissingWithoutHomeFallback() {
@@ -428,11 +428,11 @@ extension FlowTabTests {
                 )
             ]
         )
-        let snapshotService = RecordingRuntimeProjectionService()
+        let runtimeProjectionService = RecordingRuntimeProjectionService()
 
         XCTAssertEqual(
             HomeRuntimeRefreshReader.appSummaries(
-                from: snapshotService,
+                from: runtimeProjectionService,
                 current: [cachedDetailProjection.summary]
             ).map(\.appID),
             [appID]
@@ -440,7 +440,7 @@ extension FlowTabTests {
         XCTAssertEqual(
             HomeRuntimeRefreshReader.appSummary(
                 for: appID,
-                from: snapshotService,
+                from: runtimeProjectionService,
                 current: [cachedDetailProjection.summary]
             )?.windowCount,
             1
@@ -448,17 +448,17 @@ extension FlowTabTests {
         XCTAssertEqual(
             HomeRuntimeRefreshReader.appDetailProjection(
                 for: appID,
-                from: snapshotService,
+                from: runtimeProjectionService,
                 current: cachedDetailProjection,
                 currentSummary: cachedDetailProjection.summary
             )?.candidate.windows.map(\.id),
             ["cached-window"]
         )
-        XCTAssertEqual(snapshotService.homeSummariesRequestCount(), 0)
-        XCTAssertEqual(snapshotService.homeSummaryRequestCount(), 0)
-        XCTAssertEqual(snapshotService.recordedHomeAppIDs(), [])
-        XCTAssertEqual(snapshotService.appSwitcherMaintenanceRequestsRecorded(), [.homeProjectionMissing])
-        XCTAssertEqual(snapshotService.appWindowChangeSignalsRecorded().map(\.appID), [appID, appID])
+        XCTAssertEqual(runtimeProjectionService.homeSummariesRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.homeSummaryRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.recordedHomeAppIDs(), [])
+        XCTAssertEqual(runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(), [.homeProjectionMissing])
+        XCTAssertEqual(runtimeProjectionService.appWindowChangeSignalsRecorded().map(\.appID), [appID, appID])
     }
 
     func testHomeAppVisibilityPresentationKeepsHiddenAppsLast() {
