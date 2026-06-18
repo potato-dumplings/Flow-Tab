@@ -673,9 +673,11 @@ extension FlowTabPriorityCoverageTests {
         )
         let lock = NSLock()
         var executedRequests: [RuntimeReconciliationRequest] = []
+        let readModelStore = RuntimeReadModelStore()
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.SpaceTopologySignal",
             snapshotProvider: provider,
+            readModelStore: readModelStore,
             reconciliationExecutor: { request, _ in
                 lock.lock()
                 executedRequests.append(request)
@@ -692,6 +694,10 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(request.reasons, Set([.spaceTopologyChanged]))
         XCTAssertEqual(request.affectedCGWindowIDs, [affectedWindowID])
         XCTAssertEqual(request.state, .inFlight)
+        let diagnostics = readModelStore.diagnostics()
+        XCTAssertEqual(diagnostics.dirtyCGWindowIDs, [affectedWindowID])
+        XCTAssertEqual(diagnostics.generation.space, 1)
+        XCTAssertEqual(diagnostics.pendingRepairScopes, ["spaceTopology"])
         XCTAssertTrue(coordinator.readyRequests(now: Date.timeIntervalSinceReferenceDate).isEmpty)
     }
 

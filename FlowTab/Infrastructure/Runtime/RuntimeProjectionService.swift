@@ -161,9 +161,11 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
 
     func signalSpaceTopologyChanged() {
         maintenanceQueue.async { [self] in
-            _ = snapshotProvider.collectCGWindowsByPID(options: [.excludeDesktopElements])
+            let collection = snapshotProvider.collectCGWindowsWithSpaceTopologyDiff(
+                options: [.excludeDesktopElements]
+            )
             readModelStore.markSpaceTopologyDirty(
-                affectedCGWindowIDs: [],
+                affectedCGWindowIDs: collection.spaceTopologyDiff?.affectedCGWindowIDs ?? [],
                 pendingScope: "spaceTopology"
             )
             drainReadyReconciliationRequestsLocked(now: Date.timeIntervalSinceReferenceDate)

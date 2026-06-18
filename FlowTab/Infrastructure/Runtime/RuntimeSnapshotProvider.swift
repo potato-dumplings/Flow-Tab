@@ -125,6 +125,11 @@ final class RuntimeSnapshotProvider {
         }
     }
 
+    struct CGWindowCollection {
+        let windowsByPID: [pid_t: [CGWindowEntry]]
+        let spaceTopologyDiff: RuntimeSpaceTopologyDiff?
+    }
+
     struct AXWindowEntry {
         let index: Int
         let id: String
@@ -988,6 +993,12 @@ final class RuntimeSnapshotProvider {
     func collectCGWindowsByPID(
         options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
     ) -> [pid_t: [CGWindowEntry]] {
+        collectCGWindowsWithSpaceTopologyDiff(options: options).windowsByPID
+    }
+
+    func collectCGWindowsWithSpaceTopologyDiff(
+        options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
+    ) -> CGWindowCollection {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
         guard
             let rawList = cgWindowListProvider.windowInfo(
@@ -1003,7 +1014,7 @@ final class RuntimeSnapshotProvider {
                     ("totalMs", formatSnapshotMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))
                 ]
             )
-            return [:]
+            return CGWindowCollection(windowsByPID: [:], spaceTopologyDiff: nil)
         }
         let copyReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
 
@@ -1063,9 +1074,14 @@ final class RuntimeSnapshotProvider {
                 ("totalMs", formatSnapshotMilliseconds(spaceReadyMs - startMs))
             ]
         )
-        guard !spaceIDsByWindowID.isEmpty else { return windowsByPID }
+        guard !spaceIDsByWindowID.isEmpty else {
+            return CGWindowCollection(
+                windowsByPID: windowsByPID,
+                spaceTopologyDiff: spaceTopologyDiff
+            )
+        }
 
-        return Dictionary(uniqueKeysWithValues: windowsByPID.map { pid, windows in
+        let enrichedWindowsByPID = Dictionary(uniqueKeysWithValues: windowsByPID.map { pid, windows in
             (
                 pid,
                 windows.map { window in
@@ -1081,6 +1097,10 @@ final class RuntimeSnapshotProvider {
                 }
             )
         })
+        return CGWindowCollection(
+            windowsByPID: enrichedWindowsByPID,
+            spaceTopologyDiff: spaceTopologyDiff
+        )
     }
 
     func collectAppRankByPID(for runningApps: [NSRunningApplication]) -> [pid_t: Int] {
