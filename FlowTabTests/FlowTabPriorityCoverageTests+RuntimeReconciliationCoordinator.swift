@@ -375,6 +375,71 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(diagnostics.hasStagingSearchIndex)
     }
 
+    func testRuntimeReadModelStoreStagesSearchRepairFromCurrentAppProjectionPayload() throws {
+        let store = RuntimeReadModelStore()
+        let committedApps = searchScenarioApps()
+        let repairedApp = AppSwitchCandidate(
+            id: "com.example.browser",
+            displayName: "Browser",
+            groupID: "web",
+            lastActiveAt: 330,
+            windows: [
+                WindowCandidate(
+                    id: "browser-payload",
+                    title: "Payload Runtime Docs",
+                    isMinimized: false,
+                    lastActiveAt: 330
+                )
+            ]
+        )
+        let pid = pid_t(42_103)
+        let payload = RuntimeCurrentAppWindowPayload(
+            summary: RuntimeHomeAppSummary(
+                appID: repairedApp.id,
+                displayName: repairedApp.displayName,
+                groupID: repairedApp.groupID,
+                lastActiveAt: repairedApp.lastActiveAt,
+                windowCount: repairedApp.windows.count,
+                pid: pid
+            ),
+            candidate: repairedApp,
+            context: makeRuntimeAppContext(
+                appID: repairedApp.id,
+                runningApp: .current,
+                windows: repairedApp.windows
+            )
+        )
+        store.commitAppSwitcherProjection(
+            apps: committedApps,
+            contextsByID: [:],
+            generatedAt: 10
+        )
+        store.markAppWindowsDirty(
+            appID: repairedApp.id,
+            pid: pid,
+            pendingScope: "appWindows:\(repairedApp.id)"
+        )
+
+        let staged = try XCTUnwrap(
+            store.stageSearchIndexCurrentAppWindowPayloads([payload], generatedAt: 20)
+        )
+
+        XCTAssertEqual(staged.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID), ["browser-payload"])
+        XCTAssertEqual(store.readCommittedSearchIndexForSearch().readiness, .stale)
+        XCTAssertEqual(
+            store.readCommittedSearchIndexForSearch().projection?.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),
+            ["browser-1"]
+        )
+
+        let committed = try XCTUnwrap(store.commitStagedSearchIndex(generatedAt: 21))
+
+        XCTAssertTrue(committed.freshness.isCompleteForScope)
+        XCTAssertEqual(
+            store.readCommittedSearchIndexForSearch().projection?.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),
+            ["browser-payload"]
+        )
+    }
+
     func testRuntimeReconciliationCoordinatorMarksSpaceTopologyAffectedWindows() {
         let coordinator = RuntimeReconciliationCoordinator()
         let previous = RuntimeSpaceTopologySnapshot(

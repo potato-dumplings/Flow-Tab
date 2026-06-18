@@ -336,6 +336,23 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     }
 
     @discardableResult
+    func stageSearchIndexCurrentAppWindowPayloads(
+        _ payloads: [RuntimeCurrentAppWindowPayload],
+        generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
+    ) -> RuntimeSearchIndexProjection? {
+        guard !payloads.isEmpty else { return nil }
+
+        var stagedProjection: RuntimeSearchIndexProjection?
+        for payload in payloads {
+            stagedProjection = stageSearchIndexApp(
+                payload.candidate,
+                generatedAt: generatedAt
+            )
+        }
+        return stagedProjection
+    }
+
+    @discardableResult
     func commitStagedSearchIndex(
         clearsDirtyState: Bool = true,
         generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
