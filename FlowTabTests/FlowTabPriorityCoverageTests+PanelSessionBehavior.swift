@@ -186,7 +186,7 @@ extension FlowTabPriorityCoverageTests {
             runningApp: runningApp,
             windows: windows
         )
-        let snapshot = RuntimeHomeAppSnapshot(
+        let repairPayload = RuntimeAppWindowRepairPayload(
             summary: RuntimeHomeAppSummary(
                 appID: appID,
                 displayName: candidate.displayName,
@@ -203,9 +203,9 @@ extension FlowTabPriorityCoverageTests {
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
                     currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
-                        summary: snapshot.summary,
-                        candidate: snapshot.candidate,
-                        context: snapshot.context
+                        summary: repairPayload.summary,
+                        candidate: repairPayload.candidate,
+                        context: repairPayload.context
                     ),
                     freshness: RuntimeProjectionFreshness(
                         generatedAt: 10,
@@ -456,7 +456,7 @@ extension FlowTabPriorityCoverageTests {
             windows: windows
         )
         let context = makeRuntimeAppContext(appID: appID, runningApp: runningApp, windows: windows)
-        let selectedSnapshot = RuntimeHomeAppSnapshot(
+        let selectedRepairPayload = RuntimeAppWindowRepairPayload(
             summary: RuntimeHomeAppSummary(
                 appID: appID,
                 displayName: "Projected Runtime Source",
@@ -487,9 +487,9 @@ extension FlowTabPriorityCoverageTests {
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
                     currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
-                        summary: selectedSnapshot.summary,
-                        candidate: selectedSnapshot.candidate,
-                        context: selectedSnapshot.context
+                        summary: selectedRepairPayload.summary,
+                        candidate: selectedRepairPayload.candidate,
+                        context: selectedRepairPayload.context
                     ),
                     freshness: freshness
                 )
@@ -566,7 +566,7 @@ extension FlowTabPriorityCoverageTests {
             lastActiveAt: 100,
             windows: windows
         )
-        let snapshot = RuntimeHomeAppSnapshot(
+        let repairPayload = RuntimeAppWindowRepairPayload(
             summary: RuntimeHomeAppSummary(
                 appID: appID,
                 displayName: "Focused Runtime Projection",
@@ -583,9 +583,9 @@ extension FlowTabPriorityCoverageTests {
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
                     currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
-                        summary: snapshot.summary,
-                        candidate: snapshot.candidate,
-                        context: snapshot.context
+                        summary: repairPayload.summary,
+                        candidate: repairPayload.candidate,
+                        context: repairPayload.context
                     ),
                     freshness: RuntimeProjectionFreshness(
                         generatedAt: 12,
@@ -982,7 +982,7 @@ extension FlowTabPriorityCoverageTests {
             windows: windows
         )
         let context = makeRuntimeAppContext(appID: appID, runningApp: currentApp, windows: windows)
-        let selectedSnapshot = RuntimeHomeAppSnapshot(
+        let selectedRepairPayload = RuntimeAppWindowRepairPayload(
             summary: RuntimeHomeAppSummary(
                 appID: appID,
                 displayName: "Deferred Snapshot",
@@ -1013,9 +1013,9 @@ extension FlowTabPriorityCoverageTests {
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
                     currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
-                        summary: selectedSnapshot.summary,
-                        candidate: selectedSnapshot.candidate,
-                        context: selectedSnapshot.context
+                        summary: selectedRepairPayload.summary,
+                        candidate: selectedRepairPayload.candidate,
+                        context: selectedRepairPayload.context
                     ),
                     freshness: freshness
                 )

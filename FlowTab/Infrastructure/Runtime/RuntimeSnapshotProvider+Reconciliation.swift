@@ -12,9 +12,9 @@ struct RuntimeAppWindowReconciliationResult {
     let affectedCGWindowIDs: Set<CGWindowID>
     let knownAffectedCGWindowIDs: Set<CGWindowID>
     let exactAffectedCGWindowIDs: Set<CGWindowID>
-    let snapshot: RuntimeHomeAppSnapshot?
-    let snapshotWasEmpty: Bool
-    let isTransientEmptyAXSnapshot: Bool
+    let repairPayload: RuntimeAppWindowRepairPayload?
+    let repairPayloadWasEmpty: Bool
+    let isTransientEmptyAXRepairPayload: Bool
 }
 
 extension RuntimeSnapshotProvider {
@@ -98,8 +98,8 @@ extension RuntimeSnapshotProvider {
         processIdentifier pid: pid_t,
         affectedCGWindowIDs: Set<CGWindowID>
     ) -> RuntimeAppWindowReconciliationResult {
-        let snapshot = focusedAppSnapshot(processIdentifier: pid)
-        let snapshotWasEmpty = snapshot?.candidate.windows.isEmpty == true
+        let repairPayload = focusedAppWindowRepairPayload(processIdentifier: pid)
+        let repairPayloadWasEmpty = repairPayload?.candidate.windows.isEmpty == true
         let mappingState = windowMappingStateByPID[pid]
         let knownAffectedCGWindowIDs = mappingState.map {
             affectedCGWindowIDs.intersection($0.windowRecordsByCGWindowID.keys)
@@ -112,9 +112,9 @@ extension RuntimeSnapshotProvider {
             affectedCGWindowIDs: affectedCGWindowIDs,
             knownAffectedCGWindowIDs: knownAffectedCGWindowIDs,
             exactAffectedCGWindowIDs: exactAffectedCGWindowIDs,
-            snapshot: snapshot,
-            snapshotWasEmpty: snapshotWasEmpty,
-            isTransientEmptyAXSnapshot: snapshotWasEmpty && isLikelyTransientAXRebuild(for: pid)
+            repairPayload: repairPayload,
+            repairPayloadWasEmpty: repairPayloadWasEmpty,
+            isTransientEmptyAXRepairPayload: repairPayloadWasEmpty && isLikelyTransientAXRebuild(for: pid)
         )
     }
 

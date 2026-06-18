@@ -72,9 +72,9 @@ extension RuntimeSnapshotProvider {
         return summaries
     }
 
-    func homeAppSnapshot(for appID: String) -> RuntimeHomeAppSnapshot? {
+    func homeAppWindowRepairPayload(for appID: String) -> RuntimeAppWindowRepairPayload? {
         if let uiTestRuntimeDataset = Self.uiTestRuntimeDataset() {
-            return uiTestRuntimeDataset.snapshotsByAppID[appID]
+            return uiTestRuntimeDataset.repairPayloadsByAppID[appID]
         }
         let runningApps = filteredRunningApplications()
         let matchingApps = runningApps.filter { Self.baseAppID(for: $0) == appID }
@@ -106,7 +106,7 @@ extension RuntimeSnapshotProvider {
             return nil
         }
 
-        return makeHomeAppSnapshot(
+        return makeAppWindowRepairPayload(
             appID: appID,
             app: app,
             appGroup: matchingApps,
@@ -116,22 +116,22 @@ extension RuntimeSnapshotProvider {
         )
     }
 
-    func focusedAppSnapshot(processIdentifier pid: pid_t) -> RuntimeHomeAppSnapshot? {
+    func focusedAppWindowRepairPayload(processIdentifier pid: pid_t) -> RuntimeAppWindowRepairPayload? {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
         if let uiTestRuntimeDataset = Self.uiTestRuntimeDataset() {
-            let snapshot = uiTestRuntimeDataset.snapshotsByAppID.values.first {
+            let repairPayload = uiTestRuntimeDataset.repairPayloadsByAppID.values.first {
                 $0.summary.pid == pid
             }
             logSnapshotTiming(
-                "focusedAppSnapshot",
+                "focusedAppWindowRepairPayload",
                 fields: [
-                    ("result", snapshot == nil ? "missingPID" : "uiTestDataset"),
+                    ("result", repairPayload == nil ? "missingPID" : "uiTestDataset"),
                     ("pid", "\(pid)"),
-                    ("windows", "\(snapshot?.candidate.windows.count ?? 0)"),
+                    ("windows", "\(repairPayload?.candidate.windows.count ?? 0)"),
                     ("totalMs", formatSnapshotMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))
                 ]
             )
-            return snapshot
+            return repairPayload
         }
 
         let runningAppsStartMs = RuntimePerformanceClock.monotonicMilliseconds()
@@ -141,7 +141,7 @@ extension RuntimeSnapshotProvider {
             ?? NSRunningApplication(processIdentifier: pid)
         else {
             logSnapshotTiming(
-                "focusedAppSnapshot",
+                "focusedAppWindowRepairPayload",
                 fields: [
                     ("result", "missingRunningApp"),
                     ("pid", "\(pid)"),
@@ -180,7 +180,7 @@ extension RuntimeSnapshotProvider {
         if hideMinimizedAppsFromAppLayer && !windows.isEmpty && !windows.contains(where: { !$0.isMinimized }) {
             let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
             logSnapshotTiming(
-                "focusedAppSnapshot",
+                "focusedAppWindowRepairPayload",
                 fields: [
                     ("result", "minimizedOnly"),
                     ("appID", appID),
@@ -200,7 +200,7 @@ extension RuntimeSnapshotProvider {
             return nil
         }
 
-        let snapshot = makeHomeAppSnapshot(
+        let repairPayload = makeAppWindowRepairPayload(
             appID: appID,
             app: app,
             appGroup: focusedApps,
@@ -210,12 +210,12 @@ extension RuntimeSnapshotProvider {
         )
         let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
         logSnapshotTiming(
-            "focusedAppSnapshot",
+            "focusedAppWindowRepairPayload",
             fields: [
-                ("result", snapshot.candidate.windows.isEmpty ? "empty" : "ready"),
+                ("result", repairPayload.candidate.windows.isEmpty ? "empty" : "ready"),
                 ("appID", appID),
                 ("pid", "\(pid)"),
-                ("windows", "\(snapshot.candidate.windows.count)"),
+                ("windows", "\(repairPayload.candidate.windows.count)"),
                 ("knownApps", "\(runningApps.count)"),
                 ("axApps", "\(focusedApps.count)"),
                 ("runningAppsMs", formatSnapshotMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
@@ -227,17 +227,17 @@ extension RuntimeSnapshotProvider {
                 ("totalMs", formatSnapshotMilliseconds(completeMs - startMs))
             ]
         )
-        return snapshot
+        return repairPayload
     }
 
-    private func makeHomeAppSnapshot(
+    private func makeAppWindowRepairPayload(
         appID: String,
         app: NSRunningApplication,
         appGroup: [NSRunningApplication],
         windows: [WindowListEntry],
         rankByPID: [pid_t: Int],
         rankFallback: Int
-    ) -> RuntimeHomeAppSnapshot {
+    ) -> RuntimeAppWindowRepairPayload {
         let now = Date.timeIntervalSinceReferenceDate
         let displayName = app.localizedName ?? appID
         let rank = preferredRankForAppGroup(
@@ -297,7 +297,7 @@ extension RuntimeSnapshotProvider {
             windowCount: windows.count,
             pid: app.processIdentifier
         )
-        return RuntimeHomeAppSnapshot(
+        return RuntimeAppWindowRepairPayload(
             summary: summary,
             candidate: candidate,
             context: context

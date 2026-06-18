@@ -89,17 +89,17 @@ enum FlowTabUITestBootstrapper {
     private static func seedWindowRecencyIfNeeded() {
         guard let seed = FlowTabTestLaunchOptions.seededWindowRecency else { return }
         let provider = RuntimeSnapshotProvider()
-        guard let snapshot = provider.homeAppSnapshot(for: seed.appID) else {
+        guard let repairPayload = provider.homeAppWindowRepairPayload(for: seed.appID) else {
             RuntimeLog.info(
                 "UITest",
-                "failed to seed window recency appID=\(seed.appID) windowID=\(seed.windowID) reason=missing_snapshot"
+                "failed to seed window recency appID=\(seed.appID) windowID=\(seed.windowID) reason=missing_repair_payload"
             )
             return
         }
         RuntimeWindowRecencyTracker.shared.record(
             appID: seed.appID,
             windowID: seed.windowID,
-            context: snapshot.context
+            context: repairPayload.context
         )
         RuntimeLog.info(
             "UITest",

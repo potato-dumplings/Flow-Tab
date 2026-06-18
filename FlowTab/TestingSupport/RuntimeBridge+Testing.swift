@@ -70,7 +70,7 @@ extension RuntimeSnapshotProvider {
     struct UITestRuntimeDataset {
         let snapshot: RuntimeSnapshot
         let summaries: [RuntimeHomeAppSummary]
-        let snapshotsByAppID: [String: RuntimeHomeAppSnapshot]
+        let repairPayloadsByAppID: [String: RuntimeAppWindowRepairPayload]
     }
 
     private typealias UITestAppDefinition = (
@@ -436,7 +436,7 @@ extension RuntimeSnapshotProvider {
             }
         )
 
-        let snapshotsByAppID = Dictionary(
+        let repairPayloadsByAppID = Dictionary(
             uniqueKeysWithValues: appDefinitions.enumerated().map { index, definition in
                 let windowContexts = Dictionary(uniqueKeysWithValues: definition.windows.map { window in
                     (
@@ -457,12 +457,12 @@ extension RuntimeSnapshotProvider {
                     runningApp: runningApp,
                     windowsByID: windowContexts
                 )
-                let snapshot = RuntimeHomeAppSnapshot(
+                let repairPayload = RuntimeAppWindowRepairPayload(
                     summary: summaries[index],
                     candidate: candidates[index],
                     context: context
                 )
-                return (definition.appID, snapshot)
+                return (definition.appID, repairPayload)
             }
         )
 
@@ -472,7 +472,7 @@ extension RuntimeSnapshotProvider {
                 contextsByID: FlowTabTestLaunchOptions.enablesMockHotkeyEffects ? contextsByAppID : [:]
             ),
             summaries: summaries,
-            snapshotsByAppID: snapshotsByAppID
+            repairPayloadsByAppID: repairPayloadsByAppID
         )
     }
 

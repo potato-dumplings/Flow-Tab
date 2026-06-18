@@ -736,7 +736,7 @@ extension FlowTabPriorityCoverageTests {
                 )
             ]
         )
-        let focusedSnapshot = RuntimeHomeAppSnapshot(
+        let focusedRepairPayload = RuntimeAppWindowRepairPayload(
             summary: RuntimeHomeAppSummary(
                 appID: appID,
                 displayName: "Chrome Fixture",
@@ -759,9 +759,9 @@ extension FlowTabPriorityCoverageTests {
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
                     currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
-                        summary: focusedSnapshot.summary,
-                        candidate: focusedSnapshot.candidate,
-                        context: focusedSnapshot.context
+                        summary: focusedRepairPayload.summary,
+                        candidate: focusedRepairPayload.candidate,
+                        context: focusedRepairPayload.context
                     ),
                     freshness: RuntimeProjectionFreshness(
                         generatedAt: 12,

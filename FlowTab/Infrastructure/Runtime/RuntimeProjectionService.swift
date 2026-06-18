@@ -346,12 +346,12 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 processIdentifier: pid,
                 affectedCGWindowIDs: request.affectedCGWindowIDs
             )
-            if result.isTransientEmptyAXSnapshot {
+            if result.isTransientEmptyAXRepairPayload {
                 return .transientEmptyAXSnapshot
             }
-            if let snapshot = result.snapshot {
+            if let repairPayload = result.repairPayload {
                 return .completedWithRepairedCurrentAppWindowPayloads([
-                    currentAppWindowPayload(from: snapshot)
+                    currentAppWindowPayload(from: repairPayload)
                 ])
             }
             return .completed
@@ -367,12 +367,12 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                     processIdentifier: target.pid,
                     affectedCGWindowIDs: target.affectedCGWindowIDs
                 )
-                if result.isTransientEmptyAXSnapshot {
+                if result.isTransientEmptyAXRepairPayload {
                     return .transientEmptyAXSnapshot
                 }
-                if let snapshot = result.snapshot {
+                if let repairPayload = result.repairPayload {
                     repairedCurrentAppWindowPayloads.append(
-                        currentAppWindowPayload(from: snapshot)
+                        currentAppWindowPayload(from: repairPayload)
                     )
                 }
             }
@@ -386,12 +386,12 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     }
 
     private static func currentAppWindowPayload(
-        from snapshot: RuntimeHomeAppSnapshot
+        from repairPayload: RuntimeAppWindowRepairPayload
     ) -> RuntimeCurrentAppWindowPayload {
         RuntimeCurrentAppWindowPayload(
-            summary: snapshot.summary,
-            candidate: snapshot.candidate,
-            context: snapshot.context
+            summary: repairPayload.summary,
+            candidate: repairPayload.candidate,
+            context: repairPayload.context
         )
     }
 }

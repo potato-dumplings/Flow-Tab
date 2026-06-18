@@ -222,7 +222,7 @@ struct RuntimeHomeAppSummary: Equatable, Identifiable {
     var id: String { appID }
 }
 
-struct RuntimeHomeAppSnapshot {
+struct RuntimeAppWindowRepairPayload {
     let summary: RuntimeHomeAppSummary
     let candidate: AppSwitchCandidate
     let context: RuntimeAppContext
