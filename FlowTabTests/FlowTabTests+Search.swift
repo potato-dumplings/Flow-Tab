@@ -617,7 +617,7 @@ extension FlowTabTests {
             pendingScope: "appWindows:\(committedSearchApp.id)"
         )
         let staleSearchProjection = store.readCommittedSearchIndexForSearch().projection
-        let snapshotService = RecordingRuntimeProjectionService(
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
             appSwitcherProjection: RuntimeAppSwitcherProjection(
                 apps: [sessionApp],
                 contextsByID: [:],
@@ -633,7 +633,7 @@ extension FlowTabTests {
             ),
             committedSearchIndexProjection: staleSearchProjection
         )
-        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertTrue(model.enterSearchMode())
@@ -652,11 +652,11 @@ extension FlowTabTests {
         XCTAssertFalse(diagnostic.logMessage.contains("resultState=completeResult"))
         XCTAssertFalse(diagnostic.logMessage.contains("complete="))
         XCTAssertEqual(
-            snapshotService.searchIndexFreshnessBarrierRequestsRecorded(),
+            runtimeProjectionService.searchIndexFreshnessBarrierRequestsRecorded(),
             [.searchFreshnessBarrier]
         )
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
 
         XCTAssertTrue(
             model.searchCoordinator.replaceQueryWithoutRebuild(
@@ -824,8 +824,8 @@ extension FlowTabTests {
 
         let apps = makeBenchmarkApps(appCount: 400, windowsPerApp: 25)
         let windowCount = apps.reduce(0) { $0 + $1.windows.count }
-        let snapshotService = RecordingRuntimeProjectionService(appSwitcherApps: apps)
-        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
+        let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: apps)
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
 
@@ -839,9 +839,9 @@ extension FlowTabTests {
         XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.requestedFreshnessBarrier, false)
         XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.resultState, .latestCommittedResult)
         XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.committedIndexCoversCurrentGeneration, true)
-        XCTAssertEqual(snapshotService.searchIndexFreshnessBarrierRequestsRecorded(), [])
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.searchIndexFreshnessBarrierRequestsRecorded(), [])
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
 
         let queries = benchmarkQueries()
         let rounds = 3
@@ -861,16 +861,16 @@ extension FlowTabTests {
                 queryMs,
                 queryCount,
                 qps,
-                snapshotService.snapshotRequestCount(),
-                snapshotService.lightweightSnapshotRequestCount(),
-                snapshotService.searchIndexFreshnessBarrierRequestsRecorded().count
+                runtimeProjectionService.snapshotRequestCount(),
+                runtimeProjectionService.lightweightSnapshotRequestCount(),
+                runtimeProjectionService.searchIndexFreshnessBarrierRequestsRecorded().count
             )
         )
 
         XCTAssertFalse(searchResultIDs(query: "weixin", on: model.searchCoordinator).isEmpty)
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.searchIndexFreshnessBarrierRequestsRecorded(), [])
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.searchIndexFreshnessBarrierRequestsRecorded(), [])
     }
 
     func testSearchPressureWindowScopeSegmentedQueries() {
@@ -1109,7 +1109,7 @@ extension FlowTabTests {
             candidate: candidate,
             context: context
         )
-        let snapshotService = RecordingRuntimeProjectionService(
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
             currentAppWindowProjectionsByAppID: [
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
@@ -1130,7 +1130,7 @@ extension FlowTabTests {
                 )
             ]
         )
-        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
         model.frontmostApplicationOverride = { runningApp }
 
         let iterations = 80
@@ -1153,11 +1153,11 @@ extension FlowTabTests {
                 summary.p50,
                 summary.p95,
                 summary.max,
-                snapshotService.snapshotRequestCount()
+                runtimeProjectionService.snapshotRequestCount()
             )
         )
 
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
         XCTAssertLessThan(summary.p95, 100)
     }
 
@@ -1195,7 +1195,7 @@ extension FlowTabTests {
             lastActiveAt: 100,
             windows: []
         )
-        let snapshotService = RecordingRuntimeProjectionService(
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
             appSwitcherProjection: RuntimeAppSwitcherProjection(
                 apps: [fastApp],
                 contextsByID: [:],
@@ -1210,7 +1210,7 @@ extension FlowTabTests {
                 )
             )
         )
-        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         let generation = model.runtimeProjectionMaintenanceGeneration
@@ -1224,7 +1224,7 @@ extension FlowTabTests {
         XCTAssertEqual(diagnostic?.applyGeneration, nil)
         XCTAssertTrue(diagnostic?.logMessage.contains("reason=startSession") ?? false)
         XCTAssertTrue(diagnostic?.logMessage.contains("applyGeneration=nil") ?? false)
-        XCTAssertEqual(snapshotService.appSwitcherMaintenanceRequestsRecorded(), [.switcherSessionStarted])
+        XCTAssertEqual(runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(), [.switcherSessionStarted])
     }
 
     @MainActor
