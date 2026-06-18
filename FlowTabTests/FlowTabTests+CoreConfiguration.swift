@@ -312,17 +312,17 @@ extension FlowTabTests {
             XCTAssertEqual(snapshot.apps.first?.id, "com.flowtab.mock.mail")
             XCTAssertEqual(snapshot.apps.first?.windows.count, 2)
 
-            let summaries = provider.homeAppSummaries()
+            let summaries = provider.homeSummaryProjections()
             XCTAssertEqual(summaries.count, 6)
             XCTAssertEqual(summaries.first?.appID, "com.flowtab.mock.mail")
             XCTAssertEqual(summaries.first?.windowCount, 2)
             XCTAssertEqual(summaries.last?.appID, "com.flowtab.mock.file-transfer-assistant")
 
-            let summary = provider.homeAppSummary(for: "com.flowtab.mock.browser")
+            let summary = provider.homeSummaryProjection(for: "com.flowtab.mock.browser")
             XCTAssertNotNil(summary)
             XCTAssertEqual(summary?.displayName, "Mock Browser")
             XCTAssertEqual(summary?.windowCount, 1)
-            XCTAssertNil(provider.homeAppSummary(for: "com.flowtab.mock.missing"))
+            XCTAssertNil(provider.homeSummaryProjection(for: "com.flowtab.mock.missing"))
 
             let appWindowRepairPayload = provider.appWindowRepairPayload(for: "com.flowtab.mock.mail")
             XCTAssertNotNil(appWindowRepairPayload)
@@ -374,12 +374,12 @@ extension FlowTabTests {
             XCTAssertEqual(snapshot.apps.first?.windows.count, 5)
             XCTAssertEqual(snapshot.apps.first?.windows.map(\.id), expectedWindowIDs)
 
-            let summaries = provider.homeAppSummaries()
+            let summaries = provider.homeSummaryProjections()
             XCTAssertEqual(summaries.count, 1)
             XCTAssertEqual(summaries.first?.appID, "com.flowtab.mock.browser")
             XCTAssertEqual(summaries.first?.windowCount, 5)
 
-            let summary = provider.homeAppSummary(for: "com.flowtab.mock.browser")
+            let summary = provider.homeSummaryProjection(for: "com.flowtab.mock.browser")
             XCTAssertNotNil(summary)
             XCTAssertEqual(summary?.windowCount, 5)
 
@@ -416,7 +416,7 @@ extension FlowTabTests {
             XCTAssertEqual(snapshot.apps.first?.windows.count, 5)
             XCTAssertEqual(snapshot.apps.first?.windows.map(\.id), expectedWindowIDs)
 
-            let summaries = provider.homeAppSummaries()
+            let summaries = provider.homeSummaryProjections()
             XCTAssertEqual(summaries.count, 1)
             XCTAssertEqual(summaries.first?.appID, "com.flowtab.mock.browser")
             XCTAssertEqual(summaries.first?.windowCount, 5)
@@ -486,7 +486,7 @@ extension FlowTabTests {
             XCTAssertTrue(snapshot.apps.allSatisfy { $0.windows.isEmpty })
             XCTAssertTrue(snapshot.contextsByID.values.allSatisfy { $0.windowsByID.isEmpty })
 
-            let summaries = provider.homeAppSummaries()
+            let summaries = provider.homeSummaryProjections()
             XCTAssertFalse(summaries.isEmpty)
             XCTAssertTrue(summaries.allSatisfy { $0.windowCount == 0 })
 
@@ -495,7 +495,7 @@ extension FlowTabTests {
                 return
             }
 
-            let summary = provider.homeAppSummary(for: targetID)
+            let summary = provider.homeSummaryProjection(for: targetID)
             XCTAssertNotNil(summary)
             XCTAssertEqual(summary?.appID, targetID)
             XCTAssertEqual(summary?.windowCount, 0)

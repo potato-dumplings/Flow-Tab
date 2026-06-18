@@ -3,7 +3,7 @@ import Foundation
 import FlowTabCore
 
 extension RuntimeSnapshotProvider {
-    func homeAppSummaries() -> [RuntimeHomeAppSummary] {
+    func homeSummaryProjections() -> [RuntimeHomeAppSummary] {
         if let uiTestRuntimeDataset = Self.uiTestRuntimeDataset() {
             return uiTestRuntimeDataset.summaries
         }
@@ -304,7 +304,7 @@ extension RuntimeSnapshotProvider {
         )
     }
 
-    func homeAppSummary(for appID: String) -> RuntimeHomeAppSummary? {
+    func homeSummaryProjection(for appID: String) -> RuntimeHomeAppSummary? {
         if let uiTestRuntimeDataset = Self.uiTestRuntimeDataset() {
             return uiTestRuntimeDataset.summaries.first(where: { $0.appID == appID })
         }
