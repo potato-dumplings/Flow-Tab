@@ -125,8 +125,13 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     func requestSearchIndexFreshnessBarrier(reason: RuntimeProjectionMaintenanceReason) {
         maintenanceQueue.async { [self] in
             let diagnostics = readModelStore.diagnostics()
+            let now = Date.timeIntervalSinceReferenceDate
+            let promotedRequests = snapshotProvider.reconciliationCoordinator.promotePendingRequests(
+                reason: .searchFreshnessBarrier,
+                now: now
+            )
             let drainResult = drainReadyReconciliationRequestsWithResultLocked(
-                now: Date.timeIntervalSinceReferenceDate,
+                now: now,
                 maxRequests: runtimeSearchFreshnessBarrierMaxReadyRepairs
             )
             commitRepairedCurrentAppWindowPayloadsLocked(drainResult.repairedCurrentAppWindowPayloads)
@@ -150,6 +155,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                     "dirtyPIDs=\(diagnostics.dirtyPIDs.count)",
                     "dirtyCGWindowIDs=\(diagnostics.dirtyCGWindowIDs.count)",
                     "pendingScopes=\(diagnostics.pendingRepairScopes.count)",
+                    "promotedRequests=\(promotedRequests.count)",
                     "startedRequests=\(drainResult.startedRequests.count)",
                     "maxReadyRepairs=\(runtimeSearchFreshnessBarrierMaxReadyRepairs)",
                     "completedRequests=\(drainResult.completedCount)",

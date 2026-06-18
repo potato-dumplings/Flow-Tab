@@ -5,12 +5,13 @@ enum RuntimeReconciliationReason: String, Hashable {
     case axNotification
     case activationVerified
     case appLaunched
+    case searchFreshnessBarrier
     case spaceTopologyChanged
     case manualRefresh
 
     var schedulerPriority: RuntimeReconciliationPriority {
         switch self {
-        case .activationVerified, .appLaunched:
+        case .activationVerified, .appLaunched, .searchFreshnessBarrier:
             .high
         case .axNotification, .spaceTopologyChanged:
             .normal
@@ -138,6 +139,25 @@ final class RuntimeReconciliationCoordinator {
 
     func hasPendingRequests() -> Bool {
         !requestsByTarget.isEmpty
+    }
+
+    @discardableResult
+    func promotePendingRequests(
+        reason: RuntimeReconciliationReason,
+        now: TimeInterval
+    ) -> [RuntimeReconciliationRequest] {
+        requestsByTarget.values
+            .filter { $0.state != .inFlight }
+            .sorted { $0.id < $1.id }
+            .map { request in
+                updateRequest(
+                    target: request.target,
+                    appID: request.appID,
+                    reasons: [reason],
+                    affectedCGWindowIDs: request.affectedCGWindowIDs,
+                    now: now
+                )
+            }
     }
 
     @discardableResult
