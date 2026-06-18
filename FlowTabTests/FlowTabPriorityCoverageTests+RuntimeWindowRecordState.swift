@@ -1,8 +1,80 @@
+import AppKit
 import CoreGraphics
 import XCTest
 @testable import FlowTab
 
 extension FlowTabPriorityCoverageTests {
+    func testRuntimeAppWindowRepairPayloadOwnsProjectionSeedAssembly() throws {
+        let app = NSRunningApplication.current
+        let appID = "com.example.seeded-projection"
+        let frame = CGRect(x: 10, y: 20, width: 300, height: 200)
+        let payload = RuntimeAppWindowRepairPayload(
+            appID: appID,
+            displayName: "Seeded Projection",
+            groupID: "seeded",
+            summaryLastActiveAt: -2,
+            candidateLastActiveAt: 120,
+            pid: app.processIdentifier,
+            runningApp: app,
+            windowSeeds: [
+                RuntimeAppWindowProjectionSeed(
+                    windowID: "seed-window-a",
+                    title: "Seed Window A",
+                    isMinimized: false,
+                    lastActiveAt: 119,
+                    ownerPID: app.processIdentifier,
+                    cgWindowID: 42_001,
+                    spaceIDs: [3, 1, 3],
+                    activationHandleID: "ax:seed-window-a",
+                    frame: frame,
+                    allowsPublicAXRecovery: true,
+                    hasStickyBinding: true,
+                    lastConfirmationSource: .verifiedFocusReadback,
+                    bindingCandidateCount: 3
+                ),
+                RuntimeAppWindowProjectionSeed(
+                    windowID: "seed-window-b",
+                    title: "Seed Window B",
+                    isMinimized: true,
+                    lastActiveAt: 118,
+                    ownerPID: app.processIdentifier,
+                    cgWindowID: nil
+                )
+            ]
+        )
+
+        XCTAssertEqual(payload.summary.appID, appID)
+        XCTAssertEqual(payload.summary.displayName, "Seeded Projection")
+        XCTAssertEqual(payload.summary.groupID, "seeded")
+        XCTAssertEqual(payload.summary.lastActiveAt, -2)
+        XCTAssertEqual(payload.summary.windowCount, 2)
+        XCTAssertEqual(payload.summary.pid, app.processIdentifier)
+        XCTAssertEqual(payload.candidate.id, appID)
+        XCTAssertEqual(payload.candidate.displayName, "Seeded Projection")
+        XCTAssertEqual(payload.candidate.lastActiveAt, 120)
+        XCTAssertEqual(payload.candidate.windows.map(\.id), ["seed-window-a", "seed-window-b"])
+        XCTAssertEqual(payload.candidate.windows.map(\.lastActiveAt), [119, 118])
+        XCTAssertEqual(payload.context.appID, appID)
+        XCTAssertTrue(payload.context.runningApp === app)
+
+        let seededContext = try XCTUnwrap(payload.context.windowsByID["seed-window-a"])
+        XCTAssertEqual(seededContext.title, "Seed Window A")
+        XCTAssertEqual(seededContext.ownerPID, app.processIdentifier)
+        XCTAssertEqual(seededContext.cgWindowID, 42_001)
+        XCTAssertEqual(seededContext.spaceIDs, [1, 3])
+        XCTAssertEqual(seededContext.activationHandleID, "ax:seed-window-a")
+        XCTAssertEqual(seededContext.frame, frame)
+        XCTAssertTrue(seededContext.allowsPublicAXRecovery)
+        XCTAssertTrue(seededContext.hasStickyBinding)
+        XCTAssertEqual(seededContext.lastConfirmationSource, .verifiedFocusReadback)
+        XCTAssertEqual(seededContext.bindingConfidence, .exact)
+        XCTAssertEqual(seededContext.bindingCandidateCount, 3)
+
+        let minimizedContext = try XCTUnwrap(payload.context.windowsByID["seed-window-b"])
+        XCTAssertTrue(minimizedContext.isMinimized)
+        XCTAssertEqual(minimizedContext.bindingConfidence, .provisional)
+    }
+
     func testRuntimeWindowMappingStateDerivesReverseAXCGIndex() {
         let state = RuntimeWindowMappingState(
             currentAXToCG: [

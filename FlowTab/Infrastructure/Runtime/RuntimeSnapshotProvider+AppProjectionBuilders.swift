@@ -245,62 +245,35 @@ extension RuntimeSnapshotProvider {
             rankByPID: rankByPID,
             fallback: rankFallback
         )
-        let windowCandidates = windows.enumerated().map { entryIndex, entry in
-            WindowCandidate(
-                id: entry.windowID,
-                title: entry.title,
-                isMinimized: entry.isMinimized,
-                lastActiveAt: now - Double(entryIndex)
-            )
-        }
-        let candidate = AppSwitchCandidate(
-            id: appID,
+        let groupID = Self.groupID(for: app.bundleIdentifier, fallbackName: displayName)
+        return RuntimeAppWindowRepairPayload(
+            appID: appID,
             displayName: displayName,
-            groupID: Self.groupID(for: app.bundleIdentifier, fallbackName: displayName),
-            lastActiveAt: now - Double(rank),
-            windows: windowCandidates
-        )
-        let windowContexts = Dictionary(
-            uniqueKeysWithValues: windows.map {
-                let id = $0.windowID
-                return (
-                    id,
-                    RuntimeWindowContext(
-                        id: id,
-                        title: $0.title,
-                        isMinimized: $0.isMinimized,
-                        ownerPID: $0.ownerPID,
-                        cgWindowID: $0.cgWindowID,
-                        spaceIDs: $0.spaceIDs,
-                        inferredTitleBarStyle: nil,
-                        activationHandleID: $0.activationHandleID,
-                        axWindow: $0.axWindow,
-                        frame: $0.frame,
-                        allowsPublicAXRecovery: $0.allowsPublicAXRecovery,
-                        hasStickyBinding: $0.hasStickyBinding,
-                        lastConfirmationSource: $0.lastConfirmationSource,
-                        spaceEvidence: $0.spaceEvidence
-                    )
+            groupID: groupID,
+            summaryLastActiveAt: Self.stableLastActiveValue(forRank: rank),
+            candidateLastActiveAt: now - Double(rank),
+            pid: app.processIdentifier,
+            runningApp: app,
+            windowSeeds: windows.enumerated().map { entryIndex, entry in
+                RuntimeAppWindowProjectionSeed(
+                    windowID: entry.windowID,
+                    title: entry.title,
+                    isMinimized: entry.isMinimized,
+                    lastActiveAt: now - Double(entryIndex),
+                    ownerPID: entry.ownerPID,
+                    cgWindowID: entry.cgWindowID,
+                    spaceIDs: entry.spaceIDs,
+                    activationHandleID: entry.activationHandleID,
+                    axWindow: entry.axWindow,
+                    frame: entry.frame,
+                    allowsPublicAXRecovery: entry.allowsPublicAXRecovery,
+                    hasStickyBinding: entry.hasStickyBinding,
+                    lastConfirmationSource: entry.lastConfirmationSource,
+                    bindingConfidenceOverride: entry.bindingConfidenceOverride,
+                    bindingCandidateCount: entry.bindingCandidateCount,
+                    spaceEvidence: entry.spaceEvidence
                 )
             }
-        )
-        let context = RuntimeAppContext(
-            appID: appID,
-            runningApp: app,
-            windowsByID: windowContexts
-        )
-        let summary = RuntimeHomeAppSummary(
-            appID: appID,
-            displayName: displayName,
-            groupID: Self.groupID(for: app.bundleIdentifier, fallbackName: displayName),
-            lastActiveAt: Self.stableLastActiveValue(forRank: rank),
-            windowCount: windows.count,
-            pid: app.processIdentifier
-        )
-        return RuntimeAppWindowRepairPayload(
-            summary: summary,
-            candidate: candidate,
-            context: context
         )
     }
 
