@@ -203,7 +203,7 @@ extension FlowTabTests {
                 "--flowtab-ui-record-hotkey-reload-diagnostics"
             ]
         ) {
-            XCTAssertTrue(FlowTabTestLaunchOptions.usesMockRuntimeSnapshot)
+            XCTAssertTrue(FlowTabTestLaunchOptions.usesMockRuntimeProjection)
             XCTAssertTrue(FlowTabTestLaunchOptions.resetsUserDefaultsOnLaunch)
             XCTAssertEqual(FlowTabTestLaunchOptions.accessibilityTrustedOverride, true)
             XCTAssertEqual(FlowTabTestLaunchOptions.screenCaptureTrustedOverride, false)
@@ -251,7 +251,7 @@ extension FlowTabTests {
             environment: [:]
         ) {
             XCTAssertFalse(FlowTabTestLaunchOptions.isRunningUITests)
-            XCTAssertFalse(FlowTabTestLaunchOptions.usesMockRuntimeSnapshot)
+            XCTAssertFalse(FlowTabTestLaunchOptions.usesMockRuntimeProjection)
             XCTAssertFalse(FlowTabTestLaunchOptions.resetsUserDefaultsOnLaunch)
             XCTAssertFalse(FlowTabTestLaunchOptions.opensSwitcherOnLaunch)
             XCTAssertFalse(FlowTabTestLaunchOptions.entersSearchOnLaunch)

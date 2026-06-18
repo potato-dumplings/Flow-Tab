@@ -362,7 +362,7 @@ extension RuntimeSnapshotProvider {
     }
 
     static func uiTestRuntimeDataset() -> UITestRuntimeDataset? {
-        guard FlowTabTestLaunchOptions.usesMockRuntimeSnapshot else { return nil }
+        guard FlowTabTestLaunchOptions.usesMockRuntimeProjection else { return nil }
 
         let runningApp = NSRunningApplication.current
         let availableAppDefinitions = uiTestAppDefinitions(variant: FlowTabTestLaunchOptions.mockRuntimeVariant)

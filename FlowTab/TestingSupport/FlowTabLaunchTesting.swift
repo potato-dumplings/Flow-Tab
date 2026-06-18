@@ -42,7 +42,7 @@ enum FlowTabTestLaunchOptions {
         environmentOverrideForTesting ?? ProcessInfo.processInfo.environment
     }
 
-    static var usesMockRuntimeSnapshot: Bool {
+    static var usesMockRuntimeProjection: Bool {
         containsUITestArgument("--flowtab-ui-mock-runtime")
     }
 
