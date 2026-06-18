@@ -813,7 +813,7 @@ Runtime infrastructure 负责：
 已落地的 P0：
 
 - `LiveSwitcherModel` 的 app-layer fast snapshot 只读取 `RuntimeAppSwitcherProjection`；projection 存在时不会调用 `lightweightAppSnapshot()` 或全量 snapshot provider，projection 缺失时返回空首帧并请求 shared runtime projection maintenance。
-- Switcher terminate refresh 不再读取 full snapshot bridge；`RuntimeReadModelStore.markAppTerminated` 会同步从 committed app-switcher projection 和 committed search index 移除 terminated app，Switcher 只读取更新后的 projection，projection 缺失时只请求 shared runtime maintenance 并保留当前 session。
+- Switcher terminate refresh 不再读取 full snapshot bridge；`RuntimeReadModelStore.markAppTerminated` 会同步从 committed app-switcher projection 和 committed search index 移除 terminated app，Switcher 只读取更新后的 projection，projection 缺失时只请求 shared runtime maintenance 并保留当前 session。Termination behavior tests now name their injected `RecordingRuntimeProjectionService` fixture `runtimeProjectionService`; full/lightweight snapshot counters remain old-path regression oracles.
 - `RuntimeProjectionServing` 已不再向 feature surface 暴露泛化的 `snapshot()` 方法或 full snapshot bridge。`RuntimeSnapshotProvider.snapshot()` 仍保留为 provider 内部 full builder / repair primitive。
 - `RuntimeProjectionServing` 已不再向 feature surface 暴露同步 `lightweightAppSnapshot()` 方法；`RuntimeProjectionService.fallbackLightweightAppSnapshot()` 和 provider `lightweightAppSnapshot()` 已删除，feature surface 只能读 app-switcher projection 或发送 runtime maintenance signal。
 - `RuntimeProjectionServing` 已不再向 feature surface 暴露 Home provider-backed refresh bridge；Home summary/detail refresh 只能读取 Home/current-app projection 或 app-switcher projection，projection 缺失时返回当前 committed UI state 并发送 shared runtime maintenance/app-window dirty signal。
