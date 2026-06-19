@@ -8,7 +8,7 @@ extension RuntimeSnapshotProvider {
             return uiTestRuntimeDataset.currentAppWindowPayloadsByAppID[appID]
         }
         let runningApps = filteredRunningApplications()
-        let matchingApps = runningApps.filter { Self.baseAppID(for: $0) == appID }
+        let matchingApps = runningApps.filter { RuntimeAppIdentity.appID(for: $0) == appID }
         guard !matchingApps.isEmpty else { return nil }
 
         let rankByPID = collectAppRankByPID(for: runningApps)
@@ -99,7 +99,7 @@ extension RuntimeSnapshotProvider {
         )
         let axReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let rankByPID = [pid: 0]
-        let appID = Self.baseAppID(for: app)
+        let appID = RuntimeAppIdentity.appID(for: app)
         let windows = mergedWindowEntries(
             for: focusedApps,
             windowsByPID: windowsByPID,

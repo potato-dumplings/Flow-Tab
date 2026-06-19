@@ -295,7 +295,7 @@ final class RuntimeSnapshotProvider {
             rankByPID: windowData.rankByPID
         )
         let mergedWindowsByPrimaryPID = Dictionary(uniqueKeysWithValues: selectedApps.map { app in
-            let appGroup = appsGroupedByBaseID[Self.baseAppID(for: app)] ?? [app]
+            let appGroup = appsGroupedByBaseID[RuntimeAppIdentity.appID(for: app)] ?? [app]
             return (
                 app.processIdentifier,
                 mergedWindowEntries(
@@ -344,7 +344,7 @@ final class RuntimeSnapshotProvider {
         let rowsStartMs = RuntimePerformanceClock.monotonicMilliseconds()
         for (index, app) in appLayerCandidates.enumerated() {
             let pid = app.processIdentifier
-            let baseAppID = Self.baseAppID(for: app)
+            let baseAppID = RuntimeAppIdentity.appID(for: app)
             let appGroup = appsGroupedByBaseID[baseAppID] ?? [app]
             let appID = baseAppID
             let displayName = app.localizedName ?? baseAppID
@@ -1543,7 +1543,7 @@ final class RuntimeSnapshotProvider {
         windowsByPID: [pid_t: [WindowListEntry]],
         rankByPID: [pid_t: Int]
     ) -> [NSRunningApplication] {
-        let grouped = Dictionary(grouping: runningApps, by: Self.baseAppID(for:))
+        let grouped = Dictionary(grouping: runningApps, by: RuntimeAppIdentity.appID(for:))
         var selected: [NSRunningApplication] = []
         selected.reserveCapacity(grouped.count)
 
@@ -1585,7 +1585,7 @@ final class RuntimeSnapshotProvider {
         windowCountByPID: [pid_t: Int],
         rankByPID: [pid_t: Int]
     ) -> [NSRunningApplication] {
-        let grouped = Dictionary(grouping: runningApps, by: Self.baseAppID(for:))
+        let grouped = Dictionary(grouping: runningApps, by: RuntimeAppIdentity.appID(for:))
         var selected: [NSRunningApplication] = []
         selected.reserveCapacity(grouped.count)
 
@@ -1648,10 +1648,6 @@ final class RuntimeSnapshotProvider {
         let rankScore = 10_000 - min(rankByPID[pid] ?? 10_000, 10_000)
         let launchScore = Int(app.launchDate?.timeIntervalSince1970 ?? 0) % 10_000
         return hasWindowsScore + windowCountScore + rankScore + launchScore
-    }
-
-    static func baseAppID(for app: NSRunningApplication) -> String {
-        RuntimeAppIdentity.appID(for: app)
     }
 
     static func stableLastActiveValue(forRank rank: Int) -> TimeInterval {

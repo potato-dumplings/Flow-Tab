@@ -478,7 +478,7 @@ extension RuntimeSnapshotProvider {
         runningApp: NSRunningApplication,
         fallbackIndex: Int
     ) -> pid_t {
-        if definition.appID == baseAppID(for: runningApp) {
+        if definition.appID == RuntimeAppIdentity.appID(for: runningApp) {
             return runningApp.processIdentifier
         }
         if FlowTabTestLaunchOptions.enablesMockHotkeyEffects {
@@ -491,7 +491,7 @@ extension RuntimeSnapshotProvider {
         for definition: UITestAppDefinition,
         runningApp: NSRunningApplication
     ) -> pid_t {
-        if definition.appID == baseAppID(for: runningApp) {
+        if definition.appID == RuntimeAppIdentity.appID(for: runningApp) {
             return runningApp.processIdentifier
         }
         return FlowTabTestLaunchOptions.enablesMockHotkeyEffects

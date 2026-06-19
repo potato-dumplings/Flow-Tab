@@ -3,7 +3,7 @@ import Foundation
 
 extension RuntimeSnapshotProvider {
     func groupedAppsByBaseID(_ apps: [NSRunningApplication]) -> [String: [NSRunningApplication]] {
-        Dictionary(grouping: apps, by: Self.baseAppID(for:))
+        Dictionary(grouping: apps, by: RuntimeAppIdentity.appID(for:))
     }
 
     func sortedAppsWithinGroup(

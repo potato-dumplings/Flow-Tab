@@ -79,14 +79,14 @@ extension RuntimeSnapshotProvider {
 
         let appIDsByPID = Dictionary(
             uniqueKeysWithValues: filteredRunningApplications().map { app in
-                (app.processIdentifier, Self.baseAppID(for: app))
+                (app.processIdentifier, RuntimeAppIdentity.appID(for: app))
             }
         )
         return affectedCGWindowIDsByPID.keys.sorted().map { pid in
             RuntimeAffectedWindowReconciliationTarget(
                 pid: pid,
                 appID: appIDsByPID[pid]
-                    ?? NSRunningApplication(processIdentifier: pid).map(Self.baseAppID(for:))
+                    ?? NSRunningApplication(processIdentifier: pid).map(RuntimeAppIdentity.appID(for:))
                     ?? "pid:\(pid)",
                 affectedCGWindowIDs: affectedCGWindowIDsByPID[pid] ?? []
             )
