@@ -268,30 +268,6 @@ struct RuntimeCurrentAppWindowPayload {
     }
 }
 
-enum RuntimeAppLayerProjectionFilter {
-    static func shouldIncludeRunningApplication(
-        activationPolicy: NSApplication.ActivationPolicy,
-        isTerminated: Bool,
-        pid: pid_t,
-        currentPID: pid_t,
-        includeCurrentProcessInAppLayer: Bool
-    ) -> Bool {
-        activationPolicy == .regular
-            && !isTerminated
-            && (includeCurrentProcessInAppLayer || pid != currentPID)
-    }
-
-    static func shouldIncludeAppInAppLayer(
-        hasWindows: Bool,
-        hasVisibleWindow: Bool,
-        hideMinimizedAppsFromAppLayer: Bool
-    ) -> Bool {
-        guard hideMinimizedAppsFromAppLayer else { return true }
-        guard hasWindows else { return true }
-        return hasVisibleWindow
-    }
-}
-
 enum RuntimeFullRepairProjectionAssembler {
     static func payload(
         fromCurrentAppWindowProjectionInputs inputs: [RuntimeCurrentAppWindowProjectionAssemblyInput],
