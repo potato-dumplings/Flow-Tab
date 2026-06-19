@@ -12,8 +12,10 @@ extension RuntimeSnapshotProvider {
         guard !matchingApps.isEmpty else { return nil }
 
         let rankByPID = collectAppRankByPID(for: runningApps)
-        let cgWindowsByPID = collectCGWindowsByPID()
-        let allCGWindowsByPID = collectCGWindowsByPID(options: [.optionAll, .excludeDesktopElements])
+        let cgWindowsByPID = collectCGWindowsWithSpaceTopologyDiff().windowsByPID
+        let allCGWindowsByPID = collectCGWindowsWithSpaceTopologyDiff(
+            options: [.optionAll, .excludeDesktopElements]
+        ).windowsByPID
         let windowsByPID = collectAXWindowData(
             for: matchingApps,
             cgWindowsByPID: cgWindowsByPID,
@@ -87,9 +89,11 @@ extension RuntimeSnapshotProvider {
         cleanupWindowMappingState(for: runningApps)
         AXLiveWindowRegistry.shared.prune(to: runningApps)
         let cleanupReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let cgWindowsByPID = collectCGWindowsByPID()
+        let cgWindowsByPID = collectCGWindowsWithSpaceTopologyDiff().windowsByPID
         let onScreenCGReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let allCGWindowsByPID = collectCGWindowsByPID(options: [.optionAll, .excludeDesktopElements])
+        let allCGWindowsByPID = collectCGWindowsWithSpaceTopologyDiff(
+            options: [.optionAll, .excludeDesktopElements]
+        ).windowsByPID
         let allCGReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let focusedApps = [app]
         let windowsByPID = collectAXWindowData(

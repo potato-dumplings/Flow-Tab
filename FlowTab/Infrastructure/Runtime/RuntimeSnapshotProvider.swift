@@ -539,9 +539,11 @@ final class RuntimeSnapshotProvider {
         let cleanupReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         AXLiveWindowRegistry.shared.prune(to: runningApps)
         let pruneReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let onScreenCGWindowsByPID = collectCGWindowsByPID()
+        let onScreenCGWindowsByPID = collectCGWindowsWithSpaceTopologyDiff().windowsByPID
         let onScreenCGReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let allCGWindowsByPID = collectCGWindowsByPID(options: [.optionAll, .excludeDesktopElements])
+        let allCGWindowsByPID = collectCGWindowsWithSpaceTopologyDiff(
+            options: [.optionAll, .excludeDesktopElements]
+        ).windowsByPID
         let allCGReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let axWindowsByPID = collectAXWindowData(
             for: runningApps,
@@ -992,12 +994,6 @@ final class RuntimeSnapshotProvider {
             )
         }
         return statsByPID
-    }
-
-    func collectCGWindowsByPID(
-        options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
-    ) -> [pid_t: [CGWindowEntry]] {
-        collectCGWindowsWithSpaceTopologyDiff(options: options).windowsByPID
     }
 
     func collectCGWindowsWithSpaceTopologyDiff(
