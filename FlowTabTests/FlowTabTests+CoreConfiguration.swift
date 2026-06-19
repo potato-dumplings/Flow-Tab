@@ -331,6 +331,21 @@ extension FlowTabTests {
         }
     }
 
+    func testAppInventoryServiceReadsUITestRuntimeProjectionDataset() {
+        withLaunchArgumentsForTesting(["FlowTab", "--flowtab-ui-mock-runtime"]) {
+            let recordsByID = Dictionary(
+                uniqueKeysWithValues: AppInventoryService().installedApps().map { ($0.id, $0) }
+            )
+
+            XCTAssertEqual(recordsByID["com.flowtab.mock.mail"]?.displayName, "Mock Mail")
+            XCTAssertEqual(recordsByID["com.flowtab.mock.mail"]?.bundleIdentifier, "com.flowtab.mock.mail")
+            XCTAssertNil(recordsByID["com.flowtab.mock.mail"]?.path)
+            XCTAssertTrue(recordsByID["com.flowtab.mock.mail"]?.isRunning == true)
+            XCTAssertEqual(recordsByID["com.flowtab.mock.browser"]?.displayName, "Mock Browser")
+            XCTAssertEqual(recordsByID["com.flowtab.mock.file-transfer-assistant"]?.displayName, "文件传输助手")
+        }
+    }
+
     func testRuntimeProjectionServiceDefaultFullRepairCommitsProviderProjectionPayload() throws {
         withLaunchArgumentsForTesting(["FlowTab", "--flowtab-ui-mock-runtime"]) {
             let store = RuntimeReadModelStore()

@@ -69,7 +69,7 @@ final class AppInventoryService: @unchecked Sendable {
     }
 
     private func uiTestRuntimeRecords() -> [InstalledAppRecord] {
-        guard let dataset = RuntimeSnapshotProvider.uiTestRuntimeDataset() else { return [] }
+        guard let dataset = FlowTabUITestRuntimeProjectionDataset.current() else { return [] }
         return dataset.appSwitcherApps.map { app in
             InstalledAppRecord(
                 id: app.id,

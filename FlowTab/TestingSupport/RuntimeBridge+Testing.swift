@@ -66,12 +66,10 @@ enum FlowTabUITestMockRuntimeEffects {
     }
 }
 
-extension RuntimeSnapshotProvider {
-    struct UITestRuntimeDataset {
-        let appSwitcherApps: [AppSwitchCandidate]
-        let appSwitcherContextsByID: [String: RuntimeAppContext]
-        let currentAppWindowPayloadsByAppID: [String: RuntimeCurrentAppWindowPayload]
-    }
+struct FlowTabUITestRuntimeProjectionDataset {
+    let appSwitcherApps: [AppSwitchCandidate]
+    let appSwitcherContextsByID: [String: RuntimeAppContext]
+    let currentAppWindowPayloadsByAppID: [String: RuntimeCurrentAppWindowPayload]
 
     private typealias UITestAppDefinition = (
         appID: String,
@@ -360,7 +358,7 @@ extension RuntimeSnapshotProvider {
         }
     }
 
-    static func uiTestRuntimeDataset() -> UITestRuntimeDataset? {
+    static func current() -> FlowTabUITestRuntimeProjectionDataset? {
         guard FlowTabTestLaunchOptions.usesMockRuntimeProjection else { return nil }
 
         let runningApp = NSRunningApplication.current
@@ -468,7 +466,7 @@ extension RuntimeSnapshotProvider {
             }
         )
 
-        return UITestRuntimeDataset(
+        return FlowTabUITestRuntimeProjectionDataset(
             appSwitcherApps: candidates,
             appSwitcherContextsByID: FlowTabTestLaunchOptions.enablesMockHotkeyEffects ? contextsByAppID : [:],
             currentAppWindowPayloadsByAppID: currentAppWindowPayloadsByAppID

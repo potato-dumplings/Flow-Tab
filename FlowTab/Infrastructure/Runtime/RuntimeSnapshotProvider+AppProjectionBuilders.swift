@@ -56,7 +56,7 @@ extension RuntimeSnapshotProvider {
 
     private func fullRepairProjectionPayload(timingEvent: String) -> RuntimeFullRepairProjectionPayload {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
-        if let uiTestRuntimeDataset = Self.uiTestRuntimeDataset() {
+        if let uiTestRuntimeDataset = FlowTabUITestRuntimeProjectionDataset.current() {
             let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
             logProjectionTiming(
                 timingEvent,
@@ -215,7 +215,7 @@ extension RuntimeSnapshotProvider {
     }
 
     func currentAppWindowPayload(for appID: String) -> RuntimeCurrentAppWindowPayload? {
-        if let uiTestRuntimeDataset = Self.uiTestRuntimeDataset() {
+        if let uiTestRuntimeDataset = FlowTabUITestRuntimeProjectionDataset.current() {
             return uiTestRuntimeDataset.currentAppWindowPayloadsByAppID[appID]
         }
         let runningApps = filteredRunningApplications()
@@ -279,7 +279,7 @@ extension RuntimeSnapshotProvider {
 
     func focusedCurrentAppWindowPayload(processIdentifier pid: pid_t) -> RuntimeCurrentAppWindowPayload? {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
-        if let uiTestRuntimeDataset = Self.uiTestRuntimeDataset() {
+        if let uiTestRuntimeDataset = FlowTabUITestRuntimeProjectionDataset.current() {
             let payload = uiTestRuntimeDataset.currentAppWindowPayloadsByAppID.values.first {
                 $0.summary.pid == pid
             }

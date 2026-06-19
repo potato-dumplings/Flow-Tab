@@ -327,8 +327,13 @@
 
 - `testRuntimeSnapshotProviderUsesProjectionPayloadForUITestMockDatasetWhenLaunchFlagEnabled`
   场景：UI test 启动参数要求使用 Mock Runtime 数据集。
-  步骤：注入 `--flowtab-ui-mock-runtime` 后读取 `RuntimeSnapshotProvider.fullRepairProjectionPayload()`，并保留一次 legacy `snapshot()` 兼容包装断言。
-  验证：projection payload 中的应用数量、首尾应用、窗口数、repair payload summary 与上下文映射都与 Mock 数据集一致；`snapshot()` 只包装同一 payload。
+  步骤：注入 `--flowtab-ui-mock-runtime` 后读取 `RuntimeSnapshotProvider.fullRepairProjectionPayload()` 和 current-app projection payload。
+  验证：projection payload 中的应用数量、首尾应用、窗口数、current-app summary 与上下文映射都与 Mock projection dataset 一致，不经过 legacy `snapshot()` 包装。
+
+- `testAppInventoryServiceReadsUITestRuntimeProjectionDataset`
+  场景：Settings app inventory 在 UI test mock runtime 下需要显示 projection seed 中的 mock apps。
+  步骤：注入 `--flowtab-ui-mock-runtime` 后读取 `AppInventoryService.installedApps()`。
+  验证：Mock Mail、Mock Browser 和文件传输助手来自 `FlowTabUITestRuntimeProjectionDataset`，保持 running/bundle/path metadata 稳定，不通过 provider-owned dataset API。
 
 - `testRuntimeSnapshotProviderRealPathWithoutAccessibilityBuildsConsistentProjectionPayload`
   场景：真实运行路径下没有无障碍权限。
