@@ -169,7 +169,7 @@ extension FlowTabPriorityCoverageTests {
             )
         ]
         let cgWindows = [
-            RuntimeSnapshotProvider.CGWindowEntry(
+            RuntimeCGWindowEntry(
                 id: 455,
                 title: "Inbox - Gmail",
                 bounds: frame,
@@ -177,7 +177,7 @@ extension FlowTabPriorityCoverageTests {
                 alpha: 1,
                 storeType: 1
             ),
-            RuntimeSnapshotProvider.CGWindowEntry(
+            RuntimeCGWindowEntry(
                 id: 456,
                 title: "Inbox - Gmail",
                 bounds: frame,
@@ -223,7 +223,7 @@ extension FlowTabPriorityCoverageTests {
             )
         ]
         let cgWindows = [
-            RuntimeSnapshotProvider.CGWindowEntry(
+            RuntimeCGWindowEntry(
                 id: 455,
                 title: nil,
                 bounds: frame,
@@ -231,7 +231,7 @@ extension FlowTabPriorityCoverageTests {
                 alpha: 1,
                 storeType: 1
             ),
-            RuntimeSnapshotProvider.CGWindowEntry(
+            RuntimeCGWindowEntry(
                 id: 456,
                 title: nil,
                 bounds: frame,

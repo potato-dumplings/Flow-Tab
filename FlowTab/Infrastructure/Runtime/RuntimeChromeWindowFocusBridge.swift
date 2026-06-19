@@ -263,7 +263,7 @@ struct RuntimeChromeWindowFocusBridge {
         targetCGWindowID: CGWindowID,
         fallbackTitle: String,
         fallbackFrame: CGRect?,
-        currentCGWindows: [RuntimeSnapshotProvider.CGWindowEntry]
+        currentCGWindows: [RuntimeCGWindowEntry]
     ) -> Candidate? {
         candidateDecision(
             candidates,
@@ -279,7 +279,7 @@ struct RuntimeChromeWindowFocusBridge {
         targetCGWindowID: CGWindowID,
         fallbackTitle: String,
         fallbackFrame: CGRect?,
-        currentCGWindows: [RuntimeSnapshotProvider.CGWindowEntry]
+        currentCGWindows: [RuntimeCGWindowEntry]
     ) -> CandidateDecision {
         if let error = query.error {
             return .unavailable(reason: "candidate-query-error:\(error)")
@@ -298,7 +298,7 @@ struct RuntimeChromeWindowFocusBridge {
         targetCGWindowID: CGWindowID,
         fallbackTitle: String,
         fallbackFrame: CGRect?,
-        currentCGWindows: [RuntimeSnapshotProvider.CGWindowEntry]
+        currentCGWindows: [RuntimeCGWindowEntry]
     ) -> CandidateDecision {
         guard let firstCandidate = candidates.first else {
             return .unavailable(reason: "no-candidates")
@@ -478,7 +478,7 @@ struct RuntimeChromeWindowFocusBridge {
         targetCGWindowID: CGWindowID,
         fallbackTitle: String,
         fallbackFrame: CGRect?,
-        currentCGWindows: [RuntimeSnapshotProvider.CGWindowEntry]
+        currentCGWindows: [RuntimeCGWindowEntry]
     ) -> Int? {
         guard
             let targetWindow = currentCGWindows.first(where: { $0.id == targetCGWindowID }),
