@@ -434,13 +434,11 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 processIdentifier: pid,
                 affectedCGWindowIDs: request.affectedCGWindowIDs
             )
-            if result.isTransientEmptyAXRepairPayload {
+            if result.isTransientEmptyCurrentAppWindowPayload {
                 return .transientEmptyAXSnapshot
             }
-            if let repairPayload = result.repairPayload {
-                return .completedWithRepairedCurrentAppWindowPayloads([
-                    RuntimeCurrentAppWindowPayload(repairPayload: repairPayload)
-                ])
+            if let payload = result.currentAppWindowPayload {
+                return .completedWithRepairedCurrentAppWindowPayloads([payload])
             }
             return .completed
         case .fullRepair:
@@ -459,13 +457,11 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                     processIdentifier: target.pid,
                     affectedCGWindowIDs: target.affectedCGWindowIDs
                 )
-                if result.isTransientEmptyAXRepairPayload {
+                if result.isTransientEmptyCurrentAppWindowPayload {
                     return .transientEmptyAXSnapshot
                 }
-                if let repairPayload = result.repairPayload {
-                    repairedCurrentAppWindowPayloads.append(
-                        RuntimeCurrentAppWindowPayload(repairPayload: repairPayload)
-                    )
+                if let payload = result.currentAppWindowPayload {
+                    repairedCurrentAppWindowPayloads.append(payload)
                 }
             }
             if !repairedCurrentAppWindowPayloads.isEmpty {
