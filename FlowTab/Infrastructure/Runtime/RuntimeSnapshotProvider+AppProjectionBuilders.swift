@@ -3,12 +3,6 @@ import Foundation
 import FlowTabCore
 
 extension RuntimeSnapshotProvider {
-    func appWindowRepairPayload(for appID: String) -> RuntimeAppWindowRepairPayload? {
-        currentAppWindowPayload(for: appID).map {
-            RuntimeAppWindowRepairPayload(currentAppWindowPayload: $0)
-        }
-    }
-
     func currentAppWindowPayload(for appID: String) -> RuntimeCurrentAppWindowPayload? {
         if let uiTestRuntimeDataset = Self.uiTestRuntimeDataset() {
             return uiTestRuntimeDataset.currentAppWindowPayloadsByAppID[appID]
@@ -51,12 +45,6 @@ extension RuntimeSnapshotProvider {
             rankByPID: rankByPID,
             rankFallback: 10_000
         )
-    }
-
-    func focusedAppWindowRepairPayload(processIdentifier pid: pid_t) -> RuntimeAppWindowRepairPayload? {
-        focusedCurrentAppWindowPayload(processIdentifier: pid).map {
-            RuntimeAppWindowRepairPayload(currentAppWindowPayload: $0)
-        }
     }
 
     func focusedCurrentAppWindowPayload(processIdentifier pid: pid_t) -> RuntimeCurrentAppWindowPayload? {

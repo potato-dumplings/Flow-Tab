@@ -327,13 +327,6 @@ extension FlowTabTests {
             XCTAssertEqual(currentAppWindowPayload?.context.appID, "com.flowtab.mock.mail")
             XCTAssertEqual(currentAppWindowPayload?.context.windowsByID.count, 2)
 
-            let compatibilityRepairPayload = provider.appWindowRepairPayload(for: "com.flowtab.mock.mail")
-            XCTAssertEqual(compatibilityRepairPayload?.candidate.id, currentAppWindowPayload?.candidate.id)
-            XCTAssertEqual(
-                compatibilityRepairPayload?.candidate.windows.map(\.id),
-                currentAppWindowPayload?.candidate.windows.map(\.id)
-            )
-
             let browserPayload = provider.currentAppWindowPayload(for: "com.flowtab.mock.browser")
             XCTAssertEqual(browserPayload?.summary.displayName, "Mock Browser")
             XCTAssertEqual(browserPayload?.summary.windowCount, 1)
