@@ -1467,8 +1467,8 @@ extension FlowTabPriorityCoverageTests {
                 executedRequests.append(request)
                 lock.unlock()
                 expectation.fulfill()
-                return .completedWithFullRepairSnapshot(
-                    RuntimeSnapshot(apps: [repairedApp], contextsByID: [:])
+                return .completedWithFullRepairProjection(
+                    RuntimeFullRepairProjectionPayload(apps: [repairedApp], contextsByID: [:])
                 )
             }
         )
@@ -1959,8 +1959,8 @@ extension FlowTabPriorityCoverageTests {
                 case .app:
                     return .transientEmptyAXSnapshot
                 case .fullRepair:
-                    return .completedWithFullRepairSnapshot(
-                        RuntimeSnapshot(apps: [repairedApp], contextsByID: [:])
+                    return .completedWithFullRepairProjection(
+                        RuntimeFullRepairProjectionPayload(apps: [repairedApp], contextsByID: [:])
                     )
                 case .spaceTopology:
                     return .completed
