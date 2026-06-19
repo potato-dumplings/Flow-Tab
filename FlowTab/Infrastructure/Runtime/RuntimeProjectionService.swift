@@ -36,10 +36,10 @@ protocol RuntimeProjectionRepairProviding: AnyObject {
 
     func collectCGWindowsWithSpaceTopologyDiff(
         options: CGWindowListOption
-    ) -> RuntimeSnapshotProvider.CGWindowCollection
+    ) -> RuntimeCGWindowCollection
     func appReconciliationTargets(
         affectedCGWindowIDs: Set<CGWindowID>,
-        currentCGWindowsByPID: [pid_t: [RuntimeSnapshotProvider.CGWindowEntry]]
+        currentCGWindowsByPID: [pid_t: [RuntimeCGWindowEntry]]
     ) -> [RuntimeAffectedWindowReconciliationTarget]
     func reconcileAppWindows(
         processIdentifier pid: pid_t,

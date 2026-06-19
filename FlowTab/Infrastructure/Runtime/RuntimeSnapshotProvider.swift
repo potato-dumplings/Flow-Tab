@@ -3,7 +3,43 @@ import ApplicationServices
 import Foundation
 import FlowTabCore
 
+struct RuntimeCGWindowEntry {
+    let id: CGWindowID
+    let title: String?
+    let bounds: CGRect?
+    let isOnscreen: Bool
+    let alpha: Double
+    let storeType: Int
+    let spaceIDs: [Int]
+
+    init(
+        id: CGWindowID,
+        title: String?,
+        bounds: CGRect?,
+        isOnscreen: Bool,
+        alpha: Double,
+        storeType: Int,
+        spaceIDs: [Int] = []
+    ) {
+        self.id = id
+        self.title = title
+        self.bounds = bounds
+        self.isOnscreen = isOnscreen
+        self.alpha = alpha
+        self.storeType = storeType
+        self.spaceIDs = spaceIDs
+    }
+}
+
+struct RuntimeCGWindowCollection {
+    let windowsByPID: [pid_t: [RuntimeCGWindowEntry]]
+    let spaceTopologyDiff: RuntimeSpaceTopologyDiff?
+}
+
 final class RuntimeSnapshotProvider {
+    typealias CGWindowEntry = RuntimeCGWindowEntry
+    typealias CGWindowCollection = RuntimeCGWindowCollection
+
     struct WindowListEntry {
         let windowID: String
         let title: String
@@ -116,39 +152,6 @@ final class RuntimeSnapshotProvider {
                 )
             }
         }
-    }
-
-    struct CGWindowEntry {
-        let id: CGWindowID
-        let title: String?
-        let bounds: CGRect?
-        let isOnscreen: Bool
-        let alpha: Double
-        let storeType: Int
-        let spaceIDs: [Int]
-
-        init(
-            id: CGWindowID,
-            title: String?,
-            bounds: CGRect?,
-            isOnscreen: Bool,
-            alpha: Double,
-            storeType: Int,
-            spaceIDs: [Int] = []
-        ) {
-            self.id = id
-            self.title = title
-            self.bounds = bounds
-            self.isOnscreen = isOnscreen
-            self.alpha = alpha
-            self.storeType = storeType
-            self.spaceIDs = spaceIDs
-        }
-    }
-
-    struct CGWindowCollection {
-        let windowsByPID: [pid_t: [CGWindowEntry]]
-        let spaceTopologyDiff: RuntimeSpaceTopologyDiff?
     }
 
     struct AXWindowEntry {
