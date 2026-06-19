@@ -42,7 +42,7 @@ final class RuntimeActivator {
     var focusAXWindowOverride: ((AXUIElement, Bool, NSRunningApplication) -> Bool)?
     var liveWindowRegistry: AXLiveWindowRegistry = .shared
     var currentAXWindowsOverride: ((NSRunningApplication) -> [AXUIElement])?
-    var currentCGWindowsOverride: ((pid_t) -> [RuntimeSnapshotProvider.CGWindowEntry])?
+    var currentCGWindowsOverride: ((pid_t) -> [RuntimeCGWindowEntry])?
     var axWindowFrameOverride: ((AXUIElement) -> CGRect?)?
     var axWindowTitleOverride: ((AXUIElement) -> String?)?
     var focusedAXWindowOverride: ((NSRunningApplication) -> AXUIElement?)?
@@ -764,7 +764,7 @@ final class RuntimeActivator {
         reason: WindowBindingReadbackMismatchReason,
         targetCGWindowID: CGWindowID?,
         focusedCGWindowID: CGWindowID? = nil,
-        currentWindows: [RuntimeSnapshotProvider.CGWindowEntry],
+        currentWindows: [RuntimeCGWindowEntry],
         in app: NSRunningApplication
     ) {
         let visibleCGWindowIDs = currentWindows
@@ -830,7 +830,7 @@ final class RuntimeActivator {
     private func targetCGWindowIsVisible(
         _ targetCGWindowID: CGWindowID?,
         in _: NSRunningApplication,
-        currentWindows: [RuntimeSnapshotProvider.CGWindowEntry]
+        currentWindows: [RuntimeCGWindowEntry]
     ) -> Bool {
         guard let targetCGWindowID else { return true }
         return currentWindows.contains { window in
@@ -1025,7 +1025,7 @@ final class RuntimeActivator {
         return focusResult.isAccepted
     }
 
-    private func currentCGWindows(forPID pid: pid_t) -> [RuntimeSnapshotProvider.CGWindowEntry] {
+    private func currentCGWindows(forPID pid: pid_t) -> [RuntimeCGWindowEntry] {
         if let currentCGWindowsOverride {
             return currentCGWindowsOverride(pid)
         }
@@ -1039,7 +1039,7 @@ final class RuntimeActivator {
         }
 
         var windowIDs: [CGWindowID] = []
-        let windows: [RuntimeSnapshotProvider.CGWindowEntry] = rawList.compactMap { item in
+        let windows: [RuntimeCGWindowEntry] = rawList.compactMap { item in
             guard let ownerPID = item[kCGWindowOwnerPID as String] as? pid_t, ownerPID == pid else {
                 return nil
             }
@@ -1056,7 +1056,7 @@ final class RuntimeActivator {
             let alpha = (item[kCGWindowAlpha as String] as? NSNumber)?.doubleValue ?? 1.0
             let storeType = (item[kCGWindowStoreType as String] as? NSNumber)?.intValue ?? 1
             windowIDs.append(cgWindowID)
-            return RuntimeSnapshotProvider.CGWindowEntry(
+            return RuntimeCGWindowEntry(
                 id: cgWindowID,
                 title: title,
                 bounds: bounds,
@@ -1068,7 +1068,7 @@ final class RuntimeActivator {
         let spaceIDsByWindowID = RuntimeCGSpaceInspector.spaceIDsByWindowID(windowIDs)
         guard !spaceIDsByWindowID.isEmpty else { return windows }
         return windows.map { window in
-            RuntimeSnapshotProvider.CGWindowEntry(
+            RuntimeCGWindowEntry(
                 id: window.id,
                 title: window.title,
                 bounds: window.bounds,
@@ -1148,7 +1148,7 @@ private func runtimeActivationFrontmostDescription() -> String {
 }
 
 private func runtimeActivationCGWindowSummary(
-    _ windows: [RuntimeSnapshotProvider.CGWindowEntry],
+    _ windows: [RuntimeCGWindowEntry],
     targetCGWindowID: CGWindowID
 ) -> String {
     let firstOnscreen = windows.first(where: { $0.isOnscreen }).map { window in
@@ -1176,15 +1176,15 @@ private func runtimeActivationLogValue(_ value: String) -> String {
 }
 
 private func runtimeCGWindowLooksLikeFullscreenActivationTarget(
-    _ window: RuntimeSnapshotProvider.CGWindowEntry
+    _ window: RuntimeCGWindowEntry
 ) -> Bool {
     RuntimeWindowTopologyClassifier.hasOffDesktopSpace(spaceIDs: window.spaceIDs)
         && RuntimeWindowTopologyClassifier.isLikelyFullscreenContent(bounds: window.bounds)
 }
 
 private func runtimeCGWindowSharesOffDesktopSpace(
-    _ lhs: RuntimeSnapshotProvider.CGWindowEntry,
-    with rhs: RuntimeSnapshotProvider.CGWindowEntry
+    _ lhs: RuntimeCGWindowEntry,
+    with rhs: RuntimeCGWindowEntry
 ) -> Bool {
     let lhsSpaceIDs = Set(
         RuntimeWindowTopologyClassifier.normalizedSpaceIDs(lhs.spaceIDs)
@@ -1200,7 +1200,7 @@ private func runtimeCGWindowSharesOffDesktopSpace(
 }
 
 private func runtimeCGWindowLooksLikeRelatedFullscreenAXSurface(
-    _ window: RuntimeSnapshotProvider.CGWindowEntry,
+    _ window: RuntimeCGWindowEntry,
     targetFrame: CGRect?
 ) -> Bool {
     guard
@@ -1219,7 +1219,7 @@ private func runtimeCGWindowLooksLikeRelatedFullscreenAXSurface(
 }
 
 private func runtimeCGWindowLooksLikeSameSpaceActivationSurface(
-    _ window: RuntimeSnapshotProvider.CGWindowEntry,
+    _ window: RuntimeCGWindowEntry,
     targetFrame: CGRect?
 ) -> Bool {
     guard window.storeType == 1 else { return false }
@@ -1242,8 +1242,8 @@ private func runtimeCGWindowLooksLikeSameSpaceActivationSurface(
 }
 
 private func runtimeCGSameSpaceActivationCandidateSort(
-    _ lhs: RuntimeSnapshotProvider.CGWindowEntry,
-    _ rhs: RuntimeSnapshotProvider.CGWindowEntry
+    _ lhs: RuntimeCGWindowEntry,
+    _ rhs: RuntimeCGWindowEntry
 ) -> Bool {
     let lhsArea = runtimeCGWindowArea(lhs)
     let rhsArea = runtimeCGWindowArea(rhs)
@@ -1253,7 +1253,7 @@ private func runtimeCGSameSpaceActivationCandidateSort(
     return lhs.id < rhs.id
 }
 
-private func runtimeCGWindowArea(_ window: RuntimeSnapshotProvider.CGWindowEntry) -> CGFloat {
+private func runtimeCGWindowArea(_ window: RuntimeCGWindowEntry) -> CGFloat {
     guard let bounds = window.bounds?.standardized else { return 0 }
     return bounds.width * bounds.height
 }
