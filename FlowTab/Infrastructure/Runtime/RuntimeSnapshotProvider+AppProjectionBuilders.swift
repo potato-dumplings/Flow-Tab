@@ -130,7 +130,7 @@ extension RuntimeSnapshotProvider {
         )
         let selectionReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         RuntimeLog.debug(
-            .snapshot,
+            .projection,
             "selectedApps=\(selectedApps.count) appLayerCandidates=\(appLayerCandidates.count) hideMinimized=\(hideMinimizedAppsFromAppLayer)"
         )
 
@@ -167,7 +167,7 @@ extension RuntimeSnapshotProvider {
 
             let windows = mergedWindowsByPrimaryPID[pid] ?? []
             RuntimeLog.debug(
-                .snapshot,
+                .projection,
                 "\(displayName) pid=\(pid) appID=\(appID) windows=\(windows.count)"
             )
 
