@@ -62,6 +62,94 @@ struct RuntimeAppDirectoryEntry: Equatable {
     }
 }
 
+struct RuntimeAppDirectoryState: Equatable {
+    private var entriesByPID: [pid_t: RuntimeAppDirectoryEntry] = [:]
+    private(set) var generatedAt: TimeInterval?
+
+    var isInitialized: Bool {
+        generatedAt != nil
+    }
+
+    var entryPIDs: Set<pid_t> {
+        Set(entriesByPID.keys)
+    }
+
+    mutating func replace(
+        entries: [RuntimeAppDirectoryEntry],
+        generatedAt: TimeInterval
+    ) {
+        entriesByPID = Dictionary(
+            uniqueKeysWithValues: Self.sortedUniqueEntries(entries).map { ($0.pid, $0) }
+        )
+        self.generatedAt = generatedAt
+    }
+
+    mutating func upsert(
+        entries: [RuntimeAppDirectoryEntry],
+        generatedAt: TimeInterval
+    ) {
+        guard !entries.isEmpty else { return }
+
+        for entry in entries {
+            entriesByPID[entry.pid] = entry
+        }
+        self.generatedAt = generatedAt
+    }
+
+    mutating func remove(
+        pid: pid_t,
+        generatedAt: TimeInterval
+    ) {
+        guard isInitialized else { return }
+
+        entriesByPID.removeValue(forKey: pid)
+        self.generatedAt = generatedAt
+    }
+
+    mutating func remove(
+        appID: String,
+        pid: pid_t,
+        generatedAt: TimeInterval
+    ) {
+        guard isInitialized else { return }
+
+        entriesByPID = entriesByPID.filter { _, entry in
+            entry.appID != appID && entry.pid != pid
+        }
+        self.generatedAt = generatedAt
+    }
+
+    func entries(forAppID appID: String) -> [RuntimeAppDirectoryEntry] {
+        Self.sortedUniqueEntries(Array(entriesByPID.values)).filter { $0.appID == appID }
+    }
+
+    func projection(
+        freshness: (TimeInterval) -> RuntimeProjectionFreshness
+    ) -> RuntimeAppDirectoryProjection? {
+        guard let generatedAt else { return nil }
+        return RuntimeAppDirectoryProjection(
+            entries: Self.sortedUniqueEntries(Array(entriesByPID.values)),
+            freshness: freshness(generatedAt)
+        )
+    }
+
+    private static func sortedUniqueEntries(
+        _ entries: [RuntimeAppDirectoryEntry]
+    ) -> [RuntimeAppDirectoryEntry] {
+        var entriesByPID: [pid_t: RuntimeAppDirectoryEntry] = [:]
+        for entry in entries {
+            entriesByPID[entry.pid] = entry
+        }
+        return entriesByPID.values
+            .sorted { lhs, rhs in
+                if lhs.appID == rhs.appID {
+                    return lhs.pid < rhs.pid
+                }
+                return lhs.appID.localizedCaseInsensitiveCompare(rhs.appID) == .orderedAscending
+            }
+    }
+}
+
 struct RuntimeAppDirectory {
     private let apps: [NSRunningApplication]
     private let candidateAppBundlePaths: Set<String>

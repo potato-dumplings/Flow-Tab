@@ -5,6 +5,18 @@ import XCTest
 import FlowTabCore
 
 extension FlowTabPriorityCoverageTests {
+    private func appDirectoryStateFreshness(_ generatedAt: TimeInterval) -> RuntimeProjectionFreshness {
+        RuntimeProjectionFreshness(
+            generatedAt: generatedAt,
+            sourceGeneration: RuntimeReadModelGeneration(),
+            dirtyAppIDs: [],
+            dirtyPIDs: [],
+            dirtyCGWindowIDs: [],
+            pendingRepairScopes: [],
+            isCompleteForScope: true
+        )
+    }
+
     func testRuntimeReadModelStoreCommitsProjectionsAndMarksDirtyMetadata() throws {
         let store = RuntimeReadModelStore()
         let apps = searchScenarioApps()
@@ -238,6 +250,60 @@ extension FlowTabPriorityCoverageTests {
         )
 
         XCTAssertTrue(payload.appDirectoryEntries.isEmpty)
+    }
+
+    func testRuntimeAppDirectoryStateOwnsPIDKeyedReplacementAndProjectionDerivation() throws {
+        var state = RuntimeAppDirectoryState()
+        let firstEntry = RuntimeAppDirectoryEntry(
+            pid: 100,
+            appID: "com.example.mail",
+            bundleIdentifier: "com.example.mail.stale",
+            localizedName: "Stale Mail",
+            launchDate: nil
+        )
+        let repairedEntry = RuntimeAppDirectoryEntry(
+            pid: firstEntry.pid,
+            appID: firstEntry.appID,
+            bundleIdentifier: "com.example.mail",
+            localizedName: "Mail",
+            launchDate: nil
+        )
+        let secondEntry = RuntimeAppDirectoryEntry(
+            pid: 101,
+            appID: "com.example.notes",
+            bundleIdentifier: "com.example.notes",
+            localizedName: "Notes",
+            launchDate: nil
+        )
+
+        XCTAssertNil(state.projection(freshness: appDirectoryStateFreshness))
+        XCTAssertFalse(state.isInitialized)
+
+        state.upsert(entries: [], generatedAt: 9)
+        XCTAssertNil(state.projection(freshness: appDirectoryStateFreshness))
+
+        state.replace(entries: [firstEntry, repairedEntry], generatedAt: 10)
+        var projection = try XCTUnwrap(state.projection(freshness: appDirectoryStateFreshness))
+        XCTAssertEqual(projection.entries, [repairedEntry])
+        XCTAssertEqual(projection.freshness.generatedAt, 10)
+        XCTAssertEqual(state.entryPIDs, [100])
+
+        state.upsert(entries: [secondEntry], generatedAt: 11)
+        projection = try XCTUnwrap(state.projection(freshness: appDirectoryStateFreshness))
+        XCTAssertEqual(projection.entries.map(\.pid), [100, 101])
+        XCTAssertEqual(projection.entries(forAppID: secondEntry.appID), [secondEntry])
+        XCTAssertEqual(projection.freshness.generatedAt, 11)
+
+        state.remove(pid: firstEntry.pid, generatedAt: 12)
+        projection = try XCTUnwrap(state.projection(freshness: appDirectoryStateFreshness))
+        XCTAssertEqual(projection.entries, [secondEntry])
+        XCTAssertEqual(projection.freshness.generatedAt, 12)
+
+        state.remove(appID: secondEntry.appID, pid: secondEntry.pid, generatedAt: 13)
+        projection = try XCTUnwrap(state.projection(freshness: appDirectoryStateFreshness))
+        XCTAssertTrue(projection.entries.isEmpty)
+        XCTAssertEqual(projection.freshness.generatedAt, 13)
+        XCTAssertTrue(state.isInitialized)
     }
 
     func testRuntimeReadModelStoreDerivesAppDirectoryProjectionFromPIDKeyedState() throws {
