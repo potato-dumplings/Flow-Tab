@@ -536,6 +536,7 @@ fullscreen -> normal 通常表现为：
 - Search 打开时先执行 freshness validation，对比 committed index 覆盖的 app lifecycle、CG signature、Space signature、AX dirty generation 与 runtime 当前 generation。
 - 如果 committed index 已覆盖当前 generation，Search 立即读取并保持该 generation 内结果稳定。
 - 如果 committed index 未覆盖当前 generation，必须先执行 bounded freshness barrier：只对 dirty/current/selected/recent/affected scopes 做 scoped repair，构建 `stagingSearchIndex`，验证通过后原子提交为新的 `committedSearchIndex`。
+- bounded freshness barrier 被请求但尚未提交新 generation 时，Search 当前读到的只能是 last committed index，并且必须标记为 `degradedStaleCommittedResult` / stale committed read，携带 dirty/freshness metadata；不能把这个状态命名为 fresh、complete、latest 或 current-generation committed。
 - Search 不读取 `stagingSearchIndex`，不读取 repair 中间态，不把旧 index 或部分 index 当作最新完整结果。
 - search index 来自 `RuntimeWindowRecord` 主表和 app directory，不来自当前 session 的偶然完整程度。
 

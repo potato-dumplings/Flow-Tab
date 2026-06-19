@@ -1717,6 +1717,11 @@ extension FlowTabPriorityCoverageTests {
         let read = store.readCommittedSearchIndexForSearch()
         let projection = try XCTUnwrap(read.projection)
         XCTAssertEqual(read.readiness, .staleCommitted)
+        XCTAssertEqual(read.resultState, .degradedStaleCommittedResult)
+        XCTAssertFalse(read.committedIndexCoversCurrentGeneration)
+        XCTAssertEqual(read.freshness?.dirtyAppIDs, [repairedApp.id])
+        XCTAssertEqual(read.freshness?.dirtyPIDs, [pid])
+        XCTAssertEqual(read.freshness?.pendingRepairScopes, ["appWindows:\(repairedApp.id)"])
         XCTAssertEqual(
             projection.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),
             ["browser-1"]
