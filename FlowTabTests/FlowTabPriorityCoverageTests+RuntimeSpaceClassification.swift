@@ -241,8 +241,7 @@ extension FlowTabPriorityCoverageTests {
                     id: "ax:18405:0",
                     index: 0,
                     title: "Fullscreen Doc",
-                    bounds: fullscreenBounds,
-                    bridgedCGWindowID: 240_001
+                    bounds: fullscreenBounds
                 )
             ],
             cgWindows: [
@@ -261,6 +260,7 @@ extension FlowTabPriorityCoverageTests {
                     spaceIDs: [11_679]
                 )
             ],
+            exactBridgeMatches: ["ax:18405:0": 240_001],
             pid: 18_405,
             appName: "Google Chrome"
         )
@@ -495,8 +495,7 @@ extension FlowTabPriorityCoverageTests {
                     id: "ax:18405:0",
                     index: 0,
                     title: "Fullscreen Doc",
-                    bounds: fullscreenBounds,
-                    bridgedCGWindowID: 240_001
+                    bounds: fullscreenBounds
                 ),
                 .init(
                     id: "ax:18405:1",
@@ -528,6 +527,7 @@ extension FlowTabPriorityCoverageTests {
                     spaceIDs: [1]
                 )
             ],
+            exactBridgeMatches: ["ax:18405:0": 240_001],
             pid: 18_405,
             appName: "Google Chrome"
         )
@@ -556,15 +556,13 @@ extension FlowTabPriorityCoverageTests {
                     id: "ax:18405:0",
                     index: 0,
                     title: "Notes Inbox",
-                    bounds: desktopSiblingBounds,
-                    bridgedCGWindowID: 240_101
+                    bounds: desktopSiblingBounds
                 ),
                 .init(
                     id: "ax:18405:947",
                     index: 947,
                     title: "Notes Focus",
-                    bounds: fullscreenBounds,
-                    bridgedCGWindowID: 243_747
+                    bounds: fullscreenBounds
                 )
             ],
             cgWindows: [
@@ -589,6 +587,10 @@ extension FlowTabPriorityCoverageTests {
                     isOnscreen: false,
                     spaceIDs: [11_679]
                 )
+            ],
+            exactBridgeMatches: [
+                "ax:18405:0": 240_101,
+                "ax:18405:947": 243_747
             ],
             pid: 18_405,
             appName: "Notes Fixture"
@@ -611,15 +613,13 @@ extension FlowTabPriorityCoverageTests {
                     id: "ax:18405:0",
                     index: 0,
                     title: "Notes Inbox",
-                    bounds: desktopSiblingBounds,
-                    bridgedCGWindowID: 240_101
+                    bounds: desktopSiblingBounds
                 ),
                 .init(
                     id: "ax:18405:947",
                     index: 947,
                     title: "Notes Focus",
-                    bounds: fullscreenBounds,
-                    bridgedCGWindowID: 243_747
+                    bounds: fullscreenBounds
                 )
             ],
             cgWindows: [
@@ -644,6 +644,10 @@ extension FlowTabPriorityCoverageTests {
                     isOnscreen: true,
                     spaceIDs: [11_679]
                 )
+            ],
+            exactBridgeMatches: [
+                "ax:18405:0": 240_101,
+                "ax:18405:947": 243_747
             ],
             pid: 18_405,
             appName: "Notes Fixture"

@@ -5,6 +5,42 @@ import XCTest
 @testable import FlowTab
 import FlowTabCore
 
+extension RuntimeAXWindowEntry {
+    init(
+        id: String,
+        index: Int,
+        title: String? = nil,
+        bounds: CGRect?,
+        isMinimized: Bool = false,
+        isFocused: Bool = false,
+        isMain: Bool = false,
+        pid: pid_t? = nil
+    ) {
+        let elementPID = (pid ?? Self.fixturePID(from: id)) + pid_t(index) + 1
+        self.init(
+            index: index,
+            id: id,
+            title: title ?? "",
+            sourceTitle: title,
+            isMinimized: isMinimized,
+            isFocused: isFocused,
+            isMain: isMain,
+            window: AXUIElementCreateApplication(elementPID),
+            frame: bounds
+        )
+    }
+
+    private static func fixturePID(from id: String) -> pid_t {
+        let parts = id.split(separator: ":")
+        guard parts.count >= 3,
+              parts.first == "ax",
+              let pid = pid_t(String(parts[1])) else {
+            return 100
+        }
+        return pid
+    }
+}
+
 extension FlowTabPriorityCoverageTests {
     func testWindowBindingSourcesExposeExplicitConfidence() {
         XCTAssertEqual(WindowBindingConfirmationSource.publicExactMatch.bindingConfidence, .exact)
@@ -592,15 +628,13 @@ extension FlowTabPriorityCoverageTests {
                     id: "ax:18405:0",
                     index: 0,
                     title: "Google 搜索 - Google Chrome",
-                    bounds: fullscreenBounds,
-                    bridgedCGWindowID: 240_001
+                    bounds: fullscreenBounds
                 ),
                 .init(
                     id: "ax:18405:1",
                     index: 1,
                     title: "Google 搜索 - Google Chrome",
-                    bounds: fullscreenBounds,
-                    bridgedCGWindowID: 240_002
+                    bounds: fullscreenBounds
                 )
             ],
             cgWindows: [
@@ -616,6 +650,10 @@ extension FlowTabPriorityCoverageTests {
                     bounds: fullscreenBounds,
                     isOnscreen: true
                 )
+            ],
+            exactBridgeMatches: [
+                "ax:18405:0": 240_001,
+                "ax:18405:1": 240_002
             ],
             pid: 18405,
             appName: "Google Chrome"
@@ -919,50 +957,43 @@ extension FlowTabPriorityCoverageTests {
                     id: "ax:chrome:normal",
                     index: 0,
                     title: "Chrome Normal Tab",
-                    bounds: normalFrame,
-                    bridgedCGWindowID: 147_870
+                    bounds: normalFrame
                 ),
                 .init(
                     id: "ax:chrome:incognito",
                     index: 1,
                     title: "Chrome Incognito Tab",
-                    bounds: incognitoFrame,
-                    bridgedCGWindowID: 147_873
+                    bounds: incognitoFrame
                 ),
                 .init(
                     id: "ax:chrome:fullscreen-host",
                     index: 2,
                     title: "Chrome Fullscreen Tab",
-                    bounds: fullscreenFrame,
-                    bridgedCGWindowID: 147_871
+                    bounds: fullscreenFrame
                 ),
                 .init(
                     id: "ax:chrome:second-fullscreen-host",
                     index: 3,
                     title: "Chrome Second Fullscreen Tab",
-                    bounds: fullscreenFrame,
-                    bridgedCGWindowID: 147_872
+                    bounds: fullscreenFrame
                 ),
                 .init(
                     id: "ax:chrome:fullscreen-content",
                     index: 4,
                     title: "Chrome Fullscreen Tab",
-                    bounds: fullscreenContentFrame,
-                    bridgedCGWindowID: 147_910
+                    bounds: fullscreenContentFrame
                 ),
                 .init(
                     id: "ax:chrome:second-fullscreen-content",
                     index: 5,
                     title: "Chrome Second Fullscreen Tab",
-                    bounds: fullscreenContentFrame,
-                    bridgedCGWindowID: 147_911
+                    bounds: fullscreenContentFrame
                 ),
                 .init(
                     id: "ax:chrome:desktop-helper",
                     index: 6,
                     title: appName,
-                    bounds: fullscreenBandFrame,
-                    bridgedCGWindowID: 147_881
+                    bounds: fullscreenBandFrame
                 )
             ],
             cgWindows: [
@@ -1030,6 +1061,15 @@ extension FlowTabPriorityCoverageTests {
                     spaceIDs: [1]
                 )
             ],
+            exactBridgeMatches: [
+                "ax:chrome:normal": 147_870,
+                "ax:chrome:incognito": 147_873,
+                "ax:chrome:fullscreen-host": 147_871,
+                "ax:chrome:second-fullscreen-host": 147_872,
+                "ax:chrome:fullscreen-content": 147_910,
+                "ax:chrome:second-fullscreen-content": 147_911,
+                "ax:chrome:desktop-helper": 147_881
+            ],
             previousMatches: [
                 "ax:chrome:normal": 147_870,
                 "ax:chrome:fullscreen-host": 147_871,
@@ -1084,22 +1124,19 @@ extension FlowTabPriorityCoverageTests {
                     id: "ax:chrome:normal",
                     index: 0,
                     title: "Chrome Normal Tab",
-                    bounds: normalFrame,
-                    bridgedCGWindowID: 151_139
+                    bounds: normalFrame
                 ),
                 .init(
                     id: "ax:chrome:incognito",
                     index: 1,
                     title: "Chrome Incognito Tab",
-                    bounds: incognitoFrame,
-                    bridgedCGWindowID: 151_142
+                    bounds: incognitoFrame
                 ),
                 .init(
                     id: "ax:chrome:fullscreen",
                     index: 2,
                     title: "Chrome Fullscreen Tab",
-                    bounds: fullscreenFrame,
-                    bridgedCGWindowID: 151_178
+                    bounds: fullscreenFrame
                 )
             ],
             cgWindows: [
@@ -1125,6 +1162,11 @@ extension FlowTabPriorityCoverageTests {
                     spaceIDs: [7_177]
                 )
             ],
+            exactBridgeMatches: [
+                "ax:chrome:normal": 151_139,
+                "ax:chrome:incognito": 151_142,
+                "ax:chrome:fullscreen": 151_178
+            ],
             pid: 64_785,
             appName: appName
         )
@@ -1148,29 +1190,25 @@ extension FlowTabPriorityCoverageTests {
                     id: "ax:chrome:normal",
                     index: 0,
                     title: "Chrome Normal Tab",
-                    bounds: normalFrame,
-                    bridgedCGWindowID: 151_401
+                    bounds: normalFrame
                 ),
                 .init(
                     id: "ax:chrome:incognito",
                     index: 1,
                     title: "Chrome Incognito Tab",
-                    bounds: incognitoFrame,
-                    bridgedCGWindowID: 151_402
+                    bounds: incognitoFrame
                 ),
                 .init(
                     id: "ax:chrome:fullscreen-content",
                     index: 2,
                     title: "Chrome Fullscreen Tab",
-                    bounds: fullscreenContentFrame,
-                    bridgedCGWindowID: 151_403
+                    bounds: fullscreenContentFrame
                 ),
                 .init(
                     id: "ax:chrome:second-fullscreen-content",
                     index: 3,
                     title: "Chrome Second Fullscreen Tab",
-                    bounds: fullscreenContentFrame,
-                    bridgedCGWindowID: 151_404
+                    bounds: fullscreenContentFrame
                 )
             ],
             cgWindows: [
@@ -1202,6 +1240,12 @@ extension FlowTabPriorityCoverageTests {
                     isOnscreen: false,
                     spaceIDs: [1]
                 )
+            ],
+            exactBridgeMatches: [
+                "ax:chrome:normal": 151_401,
+                "ax:chrome:incognito": 151_402,
+                "ax:chrome:fullscreen-content": 151_403,
+                "ax:chrome:second-fullscreen-content": 151_404
             ],
             pid: 67_097,
             appName: appName
@@ -1235,29 +1279,25 @@ extension FlowTabPriorityCoverageTests {
                     id: "ax:chrome:normal",
                     index: 0,
                     title: "Chrome Normal Tab",
-                    bounds: normalFrame,
-                    bridgedCGWindowID: 151_321
+                    bounds: normalFrame
                 ),
                 .init(
                     id: "ax:chrome:incognito",
                     index: 1,
                     title: "Chrome Incognito Tab",
-                    bounds: incognitoFrame,
-                    bridgedCGWindowID: 151_324
+                    bounds: incognitoFrame
                 ),
                 .init(
                     id: "ax:chrome:second-fullscreen-content",
                     index: 2,
                     title: "Chrome Second Fullscreen Tab",
-                    bounds: fullscreenContentFrame,
-                    bridgedCGWindowID: 151_332
+                    bounds: fullscreenContentFrame
                 ),
                 .init(
                     id: "ax:chrome:fullscreen-content",
                     index: 3,
                     title: "Chrome Fullscreen Tab",
-                    bounds: fullscreenContentFrame,
-                    bridgedCGWindowID: 151_360
+                    bounds: fullscreenContentFrame
                 )
             ],
             cgWindows: [
@@ -1297,6 +1337,12 @@ extension FlowTabPriorityCoverageTests {
                     spaceIDs: [7_189]
                 )
             ],
+            exactBridgeMatches: [
+                "ax:chrome:normal": 151_321,
+                "ax:chrome:incognito": 151_324,
+                "ax:chrome:second-fullscreen-content": 151_332,
+                "ax:chrome:fullscreen-content": 151_360
+            ],
             pid: 67_097,
             appName: appName
         )
@@ -1319,15 +1365,13 @@ extension FlowTabPriorityCoverageTests {
                     id: "ax:chrome:browser",
                     index: 0,
                     title: "Docs - Google Chrome - Profile",
-                    bounds: browserFrame,
-                    bridgedCGWindowID: 151_421
+                    bounds: browserFrame
                 ),
                 .init(
                     id: "ax:chrome:find-overlay",
                     index: 1,
                     title: "Find in page",
-                    bounds: findOverlayFrame,
-                    bridgedCGWindowID: 151_422
+                    bounds: findOverlayFrame
                 )
             ],
             cgWindows: [
@@ -1345,6 +1389,10 @@ extension FlowTabPriorityCoverageTests {
                     isOnscreen: true,
                     spaceIDs: [1]
                 )
+            ],
+            exactBridgeMatches: [
+                "ax:chrome:browser": 151_421,
+                "ax:chrome:find-overlay": 151_422
             ],
             pid: 67_097,
             appName: appName
@@ -2067,7 +2115,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     func testRuntimeSnapshotProviderResolveCGWindowAssignmentsUsesGeometryWithDuplicateTitles() {
-        let axWindows: [RuntimeSnapshotProvider.AXWindowEntryForTesting] = [
+        let axWindows: [RuntimeAXWindowEntry] = [
             .init(id: "ax:100:0", index: 0, title: "Document", bounds: CGRect(x: 10, y: 10, width: 600, height: 420)),
             .init(id: "ax:100:1", index: 1, title: "Document", bounds: CGRect(x: 640, y: 10, width: 600, height: 420))
         ]
@@ -2094,7 +2142,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     func testRuntimeSnapshotProviderResolveCGWindowAssignmentsRequiresTitleHitAndSkipsAmbiguousMatches() {
-        let axWindows: [RuntimeSnapshotProvider.AXWindowEntryForTesting] = [
+        let axWindows: [RuntimeAXWindowEntry] = [
             .init(id: "ax:200:2", index: 2, bounds: CGRect(x: 100, y: 100, width: 800, height: 500)),
             .init(id: "ax:200:0", index: 0, bounds: nil)
         ]
@@ -2116,7 +2164,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     func testRuntimeSnapshotProviderResolveCGWindowAssignmentsReportsAmbiguousDiagnostics() {
-        let axWindows: [RuntimeSnapshotProvider.AXWindowEntryForTesting] = [
+        let axWindows: [RuntimeAXWindowEntry] = [
             .init(
                 id: "ax:300:0",
                 index: 0,
@@ -2161,7 +2209,7 @@ extension FlowTabPriorityCoverageTests {
 
     func testRuntimeSnapshotProviderResolveCGWindowAssignmentsUsesFocusedAXStateAsPublicTieBreaker() {
         let bounds = CGRect(x: 100, y: 100, width: 800, height: 500)
-        let axWindows: [RuntimeSnapshotProvider.AXWindowEntryForTesting] = [
+        let axWindows: [RuntimeAXWindowEntry] = [
             .init(id: "ax:310:0", index: 0, title: "Document", bounds: bounds, isFocused: true),
             .init(id: "ax:310:1", index: 1, title: "Document", bounds: bounds)
         ]
@@ -2186,7 +2234,7 @@ extension FlowTabPriorityCoverageTests {
 
     func testRuntimeSnapshotProviderResolveCGWindowAssignmentsUsesMinimizedAXStateAsPublicTieBreaker() {
         let bounds = CGRect(x: 100, y: 100, width: 800, height: 500)
-        let axWindows: [RuntimeSnapshotProvider.AXWindowEntryForTesting] = [
+        let axWindows: [RuntimeAXWindowEntry] = [
             .init(id: "ax:320:0", index: 0, title: "Document", bounds: bounds, isMinimized: true)
         ]
         let cgWindows: [RuntimeCGWindowEntry] = [
@@ -2209,13 +2257,12 @@ extension FlowTabPriorityCoverageTests {
 
     func testRuntimeSnapshotProviderPrivateExactBridgeConflictWithStickyBindingReportsDiagnosticAndUsesExactTarget() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
-        let axWindows: [RuntimeSnapshotProvider.AXWindowEntryForTesting] = [
+        let axWindows: [RuntimeAXWindowEntry] = [
             .init(
                 id: "ax:100:0",
                 index: 0,
                 title: "百度一下，你就知道",
-                bounds: fullscreenBounds,
-                bridgedCGWindowID: 202
+                bounds: fullscreenBounds
             )
         ]
         let cgWindows: [RuntimeCGWindowEntry] = [
@@ -2226,6 +2273,7 @@ extension FlowTabPriorityCoverageTests {
         let assignments = RuntimeSnapshotProvider.resolveCGWindowAssignmentsForTesting(
             axWindows: axWindows,
             cgWindows: cgWindows,
+            exactBridgeMatches: ["ax:100:0": 202],
             previousMatches: ["ax:100:0": 101],
             previousAXWindowIDs: ["ax:100:0"],
             previousCGWindowIDs: [101],
@@ -2235,6 +2283,7 @@ extension FlowTabPriorityCoverageTests {
         let diagnostics = RuntimeSnapshotProvider.resolveCGWindowAssignmentDiagnosticsForTesting(
             axWindows: axWindows,
             cgWindows: cgWindows,
+            exactBridgeMatches: ["ax:100:0": 202],
             previousMatches: ["ax:100:0": 101],
             previousAXWindowIDs: ["ax:100:0"],
             previousCGWindowIDs: [101],
@@ -2258,7 +2307,7 @@ extension FlowTabPriorityCoverageTests {
 
     func testRuntimeSnapshotProviderReportsAmbiguousFullscreenTopologyFallbackDiagnostics() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
-        let axWindows: [RuntimeSnapshotProvider.AXWindowEntryForTesting] = [
+        let axWindows: [RuntimeAXWindowEntry] = [
             .init(
                 id: "ax:400:0",
                 index: 0,
@@ -2375,28 +2424,30 @@ extension FlowTabPriorityCoverageTests {
                     id: "ax:100:0",
                     index: 0,
                     title: "百度一下，你就知道",
-                    bounds: fullscreenBounds,
-                    bridgedCGWindowID: 243_747
+                    bounds: fullscreenBounds
                 ),
                 .init(
                     id: "ax:100:1",
                     index: 1,
                     title: "百度一下，你就知道",
-                    bounds: fullscreenBounds,
-                    bridgedCGWindowID: 243_679
+                    bounds: fullscreenBounds
                 ),
                 .init(
                     id: "ax:100:2",
                     index: 2,
                     title: "百度一下，你就知道",
-                    bounds: fullscreenBounds,
-                    bridgedCGWindowID: 240_029
+                    bounds: fullscreenBounds
                 )
             ],
             cgWindows: [
                 .init(id: 243_747, title: "百度一下，你就知道", bounds: fullscreenBounds),
                 .init(id: 243_679, title: "百度一下，你就知道", bounds: fullscreenBounds),
                 .init(id: 240_029, title: "百度一下，你就知道", bounds: fullscreenBounds)
+            ],
+            exactBridgeMatches: [
+                "ax:100:0": 243_747,
+                "ax:100:1": 243_679,
+                "ax:100:2": 240_029
             ],
             pid: 100,
             appName: "Google Chrome"
@@ -2440,7 +2491,7 @@ extension FlowTabPriorityCoverageTests {
 
     func testRuntimeSnapshotProviderResolveCGWindowAssignmentsUsesExactTitlesToBreakFullscreenGeometryTies() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
-        let axWindows: [RuntimeSnapshotProvider.AXWindowEntryForTesting] = [
+        let axWindows: [RuntimeAXWindowEntry] = [
             .init(
                 id: "ax:100:0",
                 index: 0,
@@ -2493,7 +2544,7 @@ extension FlowTabPriorityCoverageTests {
         let pid: pid_t = 22_001
         let bounds = CGRect(x: 20, y: 40, width: 900, height: 700)
         let axWindows = [
-            RuntimeSnapshotProvider.AXWindowEntryForTesting(
+            RuntimeAXWindowEntry(
                 id: "ax:22001:0",
                 index: 0,
                 title: "Focused Doc",

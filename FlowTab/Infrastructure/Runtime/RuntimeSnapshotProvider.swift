@@ -757,40 +757,10 @@ final class RuntimeSnapshotProvider {
         )
     }
 
-    struct AXWindowEntryForTesting {
-        let id: String
-        let index: Int
-        let title: String?
-        let bounds: CGRect?
-        let bridgedCGWindowID: CGWindowID?
-        let isMinimized: Bool
-        let isFocused: Bool
-        let isMain: Bool
-
-        init(
-            id: String,
-            index: Int,
-            title: String? = nil,
-            bounds: CGRect?,
-            bridgedCGWindowID: CGWindowID? = nil,
-            isMinimized: Bool = false,
-            isFocused: Bool = false,
-            isMain: Bool = false
-        ) {
-            self.id = id
-            self.index = index
-            self.title = title
-            self.bounds = bounds
-            self.bridgedCGWindowID = bridgedCGWindowID
-            self.isMinimized = isMinimized
-            self.isFocused = isFocused
-            self.isMain = isMain
-        }
-    }
-
     static func resolveCGWindowAssignmentsForTesting(
-        axWindows: [AXWindowEntryForTesting],
+        axWindows: [RuntimeAXWindowEntry],
         cgWindows: [RuntimeCGWindowEntry],
+        exactBridgeMatches: [String: CGWindowID] = [:],
         previousMatches: [String: CGWindowID] = [:],
         previousAXWindowIDs: Set<String> = [],
         previousCGWindowIDs: Set<CGWindowID> = [],
@@ -804,29 +774,16 @@ final class RuntimeSnapshotProvider {
             previousCGWindowIDs: previousCGWindowIDs,
             pid: pid
         )
-        let axEntries = axWindows.map {
-            RuntimeAXWindowEntry(
-                index: $0.index,
-                id: $0.id,
-                title: $0.title ?? "",
-                sourceTitle: $0.title,
-                isMinimized: $0.isMinimized,
-                isFocused: $0.isFocused,
-                isMain: $0.isMain,
-                window: AXUIElementCreateApplication(pid + pid_t($0.index) + 1),
-                frame: $0.bounds
-            )
-        }
         let previousExactBridgeOverride = AXWindowInspector.cgWindowIDOverrideForTesting
         AXWindowInspector.cgWindowIDOverrideForTesting = exactBridgeOverrideForTesting(
-            axEntries: axEntries,
-            requestedWindowIDsByAXWindowID: requestedWindowIDsByAXWindowIDForTesting(axWindows)
+            axEntries: axWindows,
+            requestedWindowIDsByAXWindowID: exactBridgeMatches
         )
         defer {
             AXWindowInspector.cgWindowIDOverrideForTesting = previousExactBridgeOverride
         }
         return provider.resolveStableWindowMapping(
-            axWindows: axEntries,
+            axWindows: axWindows,
             cgWindows: cgWindows,
             pid: pid,
             appName: appName
@@ -834,8 +791,9 @@ final class RuntimeSnapshotProvider {
     }
 
     static func resolveCGWindowAssignmentDiagnosticsForTesting(
-        axWindows: [AXWindowEntryForTesting],
+        axWindows: [RuntimeAXWindowEntry],
         cgWindows: [RuntimeCGWindowEntry],
+        exactBridgeMatches: [String: CGWindowID] = [:],
         previousMatches: [String: CGWindowID] = [:],
         previousAXWindowIDs: Set<String> = [],
         previousCGWindowIDs: Set<CGWindowID> = [],
@@ -849,29 +807,16 @@ final class RuntimeSnapshotProvider {
             previousCGWindowIDs: previousCGWindowIDs,
             pid: pid
         )
-        let axEntries = axWindows.map {
-            RuntimeAXWindowEntry(
-                index: $0.index,
-                id: $0.id,
-                title: $0.title ?? "",
-                sourceTitle: $0.title,
-                isMinimized: $0.isMinimized,
-                isFocused: $0.isFocused,
-                isMain: $0.isMain,
-                window: AXUIElementCreateApplication(pid + pid_t($0.index) + 1),
-                frame: $0.bounds
-            )
-        }
         let previousExactBridgeOverride = AXWindowInspector.cgWindowIDOverrideForTesting
         AXWindowInspector.cgWindowIDOverrideForTesting = exactBridgeOverrideForTesting(
-            axEntries: axEntries,
-            requestedWindowIDsByAXWindowID: requestedWindowIDsByAXWindowIDForTesting(axWindows)
+            axEntries: axWindows,
+            requestedWindowIDsByAXWindowID: exactBridgeMatches
         )
         defer {
             AXWindowInspector.cgWindowIDOverrideForTesting = previousExactBridgeOverride
         }
         return provider.resolveStableWindowMapping(
-            axWindows: axEntries,
+            axWindows: axWindows,
             cgWindows: cgWindows,
             pid: pid,
             appName: appName
@@ -891,8 +836,9 @@ final class RuntimeSnapshotProvider {
     }
 
     static func resolveWindowEntriesForTesting(
-        axWindows: [AXWindowEntryForTesting],
+        axWindows: [RuntimeAXWindowEntry],
         cgWindows: [RuntimeCGWindowEntry],
+        exactBridgeMatches: [String: CGWindowID] = [:],
         previousMatches: [String: CGWindowID] = [:],
         previousAXWindowIDs: Set<String> = [],
         previousCGWindowIDs: Set<CGWindowID> = [],
@@ -906,29 +852,16 @@ final class RuntimeSnapshotProvider {
             previousCGWindowIDs: previousCGWindowIDs,
             pid: pid
         )
-        let axEntries = axWindows.map {
-            RuntimeAXWindowEntry(
-                index: $0.index,
-                id: $0.id,
-                title: $0.title ?? "",
-                sourceTitle: $0.title,
-                isMinimized: $0.isMinimized,
-                isFocused: $0.isFocused,
-                isMain: $0.isMain,
-                window: AXUIElementCreateApplication(pid + pid_t($0.index) + 1),
-                frame: $0.bounds
-            )
-        }
         let previousExactBridgeOverride = AXWindowInspector.cgWindowIDOverrideForTesting
         AXWindowInspector.cgWindowIDOverrideForTesting = exactBridgeOverrideForTesting(
-            axEntries: axEntries,
-            requestedWindowIDsByAXWindowID: requestedWindowIDsByAXWindowIDForTesting(axWindows)
+            axEntries: axWindows,
+            requestedWindowIDsByAXWindowID: exactBridgeMatches
         )
         defer {
             AXWindowInspector.cgWindowIDOverrideForTesting = previousExactBridgeOverride
         }
         return provider.resolvedWindowEntries(
-            axWindows: axEntries,
+            axWindows: axWindows,
             cgWindows: cgWindows,
             pid: pid,
             appName: appName
@@ -961,17 +894,6 @@ final class RuntimeSnapshotProvider {
         return { window in
             requestedWindowIDsByPointer[Unmanaged.passUnretained(window).toOpaque()]
         }
-    }
-
-    private static func requestedWindowIDsByAXWindowIDForTesting(
-        _ axWindows: [AXWindowEntryForTesting]
-    ) -> [String: CGWindowID] {
-        [String: CGWindowID](
-            uniqueKeysWithValues: axWindows.compactMap { axWindow in
-                guard let bridgedCGWindowID = axWindow.bridgedCGWindowID else { return nil }
-                return (axWindow.id, bridgedCGWindowID)
-            }
-        )
     }
 
     private static func windowMappingStateForTesting(
