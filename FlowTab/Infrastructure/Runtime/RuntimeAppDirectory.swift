@@ -30,7 +30,7 @@ enum RuntimeAppLayerProjectionFilter {
     }
 }
 
-struct RuntimeAppDirectoryEntry {
+struct RuntimeAppDirectoryEntry: Equatable {
     let pid: pid_t
     let appID: String
     let bundleIdentifier: String?

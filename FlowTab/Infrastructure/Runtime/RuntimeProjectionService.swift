@@ -439,6 +439,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             readModelStore.commitAppSwitcherProjection(
                 apps: payload.apps,
                 contextsByID: payload.contextsByID,
+                appDirectoryEntries: payload.appDirectoryEntries,
                 clearsDirtyState: clearsDirtyState
             )
             if clearsDirtyState {

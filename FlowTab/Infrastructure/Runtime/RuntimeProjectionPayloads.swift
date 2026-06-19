@@ -7,6 +7,18 @@ import FlowTabCore
 struct RuntimeFullRepairProjectionPayload {
     let apps: [AppSwitchCandidate]
     let contextsByID: [String: RuntimeAppContext]
+    let appDirectoryEntries: [RuntimeAppDirectoryEntry]
+
+    init(
+        apps: [AppSwitchCandidate],
+        contextsByID: [String: RuntimeAppContext],
+        appDirectoryEntries: [RuntimeAppDirectoryEntry]? = nil
+    ) {
+        self.apps = apps
+        self.contextsByID = contextsByID
+        self.appDirectoryEntries = appDirectoryEntries
+            ?? contextsByID.values.map { RuntimeAppDirectoryEntry(app: $0.runningApp) }
+    }
 }
 
 struct RuntimeAppContext {
@@ -132,6 +144,7 @@ struct RuntimeCurrentAppWindowProjectionAssemblyInput {
     let pid: pid_t
     let runningApp: NSRunningApplication
     let windowSeeds: [RuntimeAppWindowProjectionSeed]
+    let appDirectoryEntries: [RuntimeAppDirectoryEntry]
 
     init(
         appID: String,
@@ -141,7 +154,8 @@ struct RuntimeCurrentAppWindowProjectionAssemblyInput {
         candidateLastActiveAt: TimeInterval,
         pid: pid_t,
         runningApp: NSRunningApplication,
-        windowSeeds: [RuntimeAppWindowProjectionSeed]
+        windowSeeds: [RuntimeAppWindowProjectionSeed],
+        appDirectoryEntries: [RuntimeAppDirectoryEntry]? = nil
     ) {
         self.appID = appID
         self.displayName = displayName
@@ -151,6 +165,8 @@ struct RuntimeCurrentAppWindowProjectionAssemblyInput {
         self.pid = pid
         self.runningApp = runningApp
         self.windowSeeds = windowSeeds
+        self.appDirectoryEntries = appDirectoryEntries
+            ?? [RuntimeAppDirectoryEntry(app: runningApp)]
     }
 
     init(
@@ -176,7 +192,8 @@ struct RuntimeCurrentAppWindowProjectionAssemblyInput {
             candidateLastActiveAt: generatedAt - Double(rank),
             pid: app.processIdentifier,
             runningApp: app,
-            windowSeeds: windowSeeds
+            windowSeeds: windowSeeds,
+            appDirectoryEntries: appGroup.map(RuntimeAppDirectoryEntry.init(app:))
         )
     }
 }
@@ -185,11 +202,19 @@ struct RuntimeCurrentAppWindowPayload {
     let summary: RuntimeHomeAppSummary
     let candidate: AppSwitchCandidate
     let context: RuntimeAppContext
+    let appDirectoryEntries: [RuntimeAppDirectoryEntry]
 
-    init(summary: RuntimeHomeAppSummary, candidate: AppSwitchCandidate, context: RuntimeAppContext) {
+    init(
+        summary: RuntimeHomeAppSummary,
+        candidate: AppSwitchCandidate,
+        context: RuntimeAppContext,
+        appDirectoryEntries: [RuntimeAppDirectoryEntry]? = nil
+    ) {
         self.summary = summary
         self.candidate = candidate
         self.context = context
+        self.appDirectoryEntries = appDirectoryEntries
+            ?? [RuntimeAppDirectoryEntry(app: context.runningApp)]
     }
 
     private init(
@@ -200,7 +225,8 @@ struct RuntimeCurrentAppWindowPayload {
         candidateLastActiveAt: TimeInterval,
         pid: pid_t,
         runningApp: NSRunningApplication,
-        windowSeeds: [RuntimeAppWindowProjectionSeed]
+        windowSeeds: [RuntimeAppWindowProjectionSeed],
+        appDirectoryEntries: [RuntimeAppDirectoryEntry]
     ) {
         let windowCandidates = windowSeeds.map(\.candidate)
         let windowContexts = Dictionary(
@@ -228,7 +254,8 @@ struct RuntimeCurrentAppWindowPayload {
                 appID: appID,
                 runningApp: runningApp,
                 windowsByID: windowContexts
-            )
+            ),
+            appDirectoryEntries: appDirectoryEntries
         )
     }
 
@@ -241,7 +268,8 @@ struct RuntimeCurrentAppWindowPayload {
             candidateLastActiveAt: input.candidateLastActiveAt,
             pid: input.pid,
             runningApp: input.runningApp,
-            windowSeeds: input.windowSeeds
+            windowSeeds: input.windowSeeds,
+            appDirectoryEntries: input.appDirectoryEntries
         )
     }
 }
@@ -284,7 +312,8 @@ enum RuntimeFullRepairProjectionAssembler {
 
         return RuntimeFullRepairProjectionPayload(
             apps: rows.map(\.candidate),
-            contextsByID: contextsByID
+            contextsByID: contextsByID,
+            appDirectoryEntries: currentAppWindowPayloads.flatMap(\.appDirectoryEntries)
         )
     }
 }

@@ -759,6 +759,7 @@ Runtime infrastructure 负责：
 - verified-focus target/readback 写回。
 - public AX state 参与匹配。
 - `RuntimeReadModelStore` Phase 1 P0 已作为 runtime-owned projection cache 边界落地：`RuntimeProjectionService` 持有 store，repair/maintenance 返回数据时会提交 app switcher、Home summary、current-app window projection；app lifecycle、AX/window dirty、Space topology 和 activation verified signals 会写入 generation/dirty/pending repair metadata。
+- `RuntimeReadModelStore` 现在也维护 committed `RuntimeAppDirectoryProjection`：full repair 与 current-app repair payload 会携带 `RuntimeAppDirectoryEntry` evidence，store 在提交 app-switcher/current-app projection 的同一事务里 replace/upsert app directory，并给 app directory read 暴露 generation/freshness/dirty metadata。app directory 因此不再只是 repair-provider builder 的局部 grouping helper；但 entries 仍来自 repair/fallback payload，尚未升级为独立长期 fact source。
 - `RuntimeReadModelStore.commitCurrentAppWindowProjection(_:)` 现在在同一 store transaction 内同步维护 current-app、app-switcher 与 Home summary projection，并从既有 Home/app-switcher projection 作为 base 后 upsert repaired summary；scoped current-app payload 不再只刷新 window/detail 投影后让 Home summary 依赖 surface fallback 派生，也不会把单 app repair 暴露成完整 Home list。
 - Space topology signal、runtime repair-provider full repair builder 与 current-app projection payload builder 现在都通过 `collectCGWindowsWithSpaceTopologyDiff` 消费 provider 记录的 `RuntimeSpaceTopologyDiff`，并把 `affectedCGWindowIDs` 写入 `RuntimeReadModelStore` 的 dirty/freshness metadata；旧 `collectCGWindowsByPID` 兼容包装已删除。
 - `RuntimeCurrentAppWindowPayload` 现在拥有 app-window projection seed 到 Home summary、app-switcher candidate、`RuntimeAppContext` 的组装规则；repair-provider 的 `currentAppWindowPayload(for:)` 与 `focusedCurrentAppWindowPayload(processIdentifier:)` 直接产出 current-app projection payload，`RuntimeAppWindowReconciliationResult` 直接携带 `currentAppWindowPayload`，`RuntimeProjectionService` drain 只消费 projection payload，不再接触 repair-shaped result 或维护 snapshot/repair-shaped conversion helper。
@@ -803,6 +804,7 @@ Runtime infrastructure 负责：
 已落地的 P0：
 
 - 新增 `RuntimeReadModelStore`，集中维护 `appSwitcherProjection`、`homeSummaryProjection`、`currentAppWindowProjection`、generation、dirty app/pid/CGWindowID 与 pending repair scope metadata。
+- `RuntimeReadModelStore` 集中维护 committed `appDirectoryProjection`，full/current-app repair payload 中的 app directory entries 会随 projection commit 写入 store，并在 app/window dirty、app termination 与 read diagnostics 中带出 freshness/generation metadata。
 - `RuntimeProjectionService` 成为 read model store owner；旧 provider 采样桥只负责生成兼容数据，service 负责提交 projection 或标脏 metadata。
 - `RuntimeProjectionServing` 暴露 projection read seam：`readAppSwitcherProjection()`、`readHomeSummaryProjection()`、`readCurrentAppWindowProjection(appID:)` 与 `runtimeReadModelDiagnostics()`，供 Phase 2 迁移 hot-path read API。
 - app/window dirty、app launch/termination、AX destroyed、Space topology、activation verified-focus signal 均会进入 store generation/dirty metadata，避免 Switcher、Home、Search 各自扩张 surface-local freshness state。
@@ -810,6 +812,7 @@ Runtime infrastructure 负责：
 仍保留的 P1/P2：
 
 - projection builders 仍由旧 snapshot/home/focused 兼容桥提交，尚未完全从底层 `RuntimeWindowRecord`、app directory、Space topology 主表独立 rebuild。
+- committed app directory projection 已进入 `RuntimeReadModelStore` ownership，但 app directory entries 仍由 repair-provider full/current-app payload 提供；独立维护的 app directory fact source、同 appID 多 PID termination 后的 scoped partial repair 策略，以及从 WindowRecord/app directory/topology 主表直接 rebuild projection 仍是 Phase 5 gap。
 - Switcher/Home 首帧只读 projection 的 P0 已在 Phase 2 落地；旧采样桥仍作为 service-owned repair/fallback 兼容入口，不是目标热路径。
 - Search committed/staging index 已在 Phase 4 落地到 `RuntimeReadModelStore` ownership；Phase 1 的剩余 gap 不再是 Search index 缺失，而是 projection builders 尚未完全从底层 `RuntimeWindowRecord`、app directory、Space topology 主表独立 rebuild。
 
