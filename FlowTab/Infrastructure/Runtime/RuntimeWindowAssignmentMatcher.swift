@@ -1,7 +1,7 @@
 import CoreGraphics
 import Foundation
 
-extension RuntimeSnapshotProvider {
+enum RuntimeWindowAssignmentMatcher {
     static func matchCGWindowAssignments(
         axWindows: [RuntimeAXWindowEntry],
         cgWindows: [RuntimeCGWindowEntry],

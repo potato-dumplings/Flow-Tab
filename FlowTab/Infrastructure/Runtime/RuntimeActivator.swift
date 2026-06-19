@@ -1114,7 +1114,7 @@ final class RuntimeActivator {
                 frame: axWindowFrame(for: window)
             )
         }
-        guard let recovery = RuntimeSnapshotProvider.recoverAXWindowFromPublicSourcesWithDiagnostics(
+        guard let recovery = RuntimeAXWindowRecovery.recoverAXWindowFromPublicSourcesWithDiagnostics(
             targetCGWindowID: targetCGWindowID,
             expectedTitle: expectedTitle,
             expectedFrame: expectedFrame,
