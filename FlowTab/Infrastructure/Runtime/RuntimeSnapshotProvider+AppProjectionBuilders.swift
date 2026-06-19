@@ -190,24 +190,7 @@ extension RuntimeSnapshotProvider {
             pid: app.processIdentifier,
             runningApp: app,
             windowSeeds: windows.enumerated().map { entryIndex, entry in
-                RuntimeAppWindowProjectionSeed(
-                    windowID: entry.windowID,
-                    title: entry.title,
-                    isMinimized: entry.isMinimized,
-                    lastActiveAt: now - Double(entryIndex),
-                    ownerPID: entry.ownerPID,
-                    cgWindowID: entry.cgWindowID,
-                    spaceIDs: entry.spaceIDs,
-                    activationHandleID: entry.activationHandleID,
-                    axWindow: entry.axWindow,
-                    frame: entry.frame,
-                    allowsPublicAXRecovery: entry.allowsPublicAXRecovery,
-                    hasStickyBinding: entry.hasStickyBinding,
-                    lastConfirmationSource: entry.lastConfirmationSource,
-                    bindingConfidenceOverride: entry.bindingConfidenceOverride,
-                    bindingCandidateCount: entry.bindingCandidateCount,
-                    spaceEvidence: entry.spaceEvidence
-                )
+                entry.projectionSeed(lastActiveAt: now - Double(entryIndex))
             }
         )
     }

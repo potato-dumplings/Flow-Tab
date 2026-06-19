@@ -103,6 +103,51 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(ambiguousContext.bindingAllowedActions.contains(.capturePreview))
     }
 
+    func testRuntimeSnapshotProviderWindowListEntryProjectionSeedPreservesRuntimeEvidence() {
+        let spaceEvidence = RuntimeSpaceEvidence(
+            cgWindowID: 204,
+            spaceIDs: [3, 7],
+            confidence: .inferredFromTopology,
+            displayID: 99,
+            source: "unit"
+        )
+        let entry = RuntimeSnapshotProvider.WindowListEntry(
+            windowID: "cg:4242:204",
+            title: "Runtime Evidence",
+            isMinimized: true,
+            ownerPID: 4_242,
+            cgWindowID: 204,
+            activationHandleID: "ax:4242:204",
+            frame: CGRect(x: 10, y: 20, width: 300, height: 200),
+            spaceIDs: [7, 3, 3],
+            isOnscreen: false,
+            allowsPublicAXRecovery: true,
+            hasStickyBinding: true,
+            lastConfirmationSource: .desktopSiblingBinding,
+            bindingConfidenceOverride: .inferred,
+            bindingCandidateCount: 3,
+            spaceEvidence: spaceEvidence
+        )
+
+        let seed = entry.projectionSeed(lastActiveAt: 12_345)
+
+        XCTAssertEqual(seed.candidate.id, "cg:4242:204")
+        XCTAssertEqual(seed.candidate.title, "Runtime Evidence")
+        XCTAssertEqual(seed.candidate.isMinimized, true)
+        XCTAssertEqual(seed.candidate.lastActiveAt, 12_345)
+        XCTAssertEqual(seed.context.ownerPID, 4_242)
+        XCTAssertEqual(seed.context.cgWindowID, 204)
+        XCTAssertEqual(seed.context.spaceIDs, [3, 7])
+        XCTAssertEqual(seed.context.activationHandleID, "ax:4242:204")
+        XCTAssertEqual(seed.context.frame, CGRect(x: 10, y: 20, width: 300, height: 200))
+        XCTAssertEqual(seed.context.allowsPublicAXRecovery, true)
+        XCTAssertEqual(seed.context.hasStickyBinding, true)
+        XCTAssertEqual(seed.context.lastConfirmationSource, .desktopSiblingBinding)
+        XCTAssertEqual(seed.context.bindingConfidence, .inferred)
+        XCTAssertEqual(seed.context.bindingCandidateCount, 3)
+        XCTAssertEqual(seed.context.spaceEvidence, spaceEvidence)
+    }
+
     func testRuntimeWindowRecordOnlyExactMatchesUpdateStickyHistory() {
         let currentApp = NSRunningApplication.current
         let cgWindow = RuntimeSnapshotProvider.CGWindowEntry(

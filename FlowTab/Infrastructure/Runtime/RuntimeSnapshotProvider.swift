@@ -52,6 +52,27 @@ final class RuntimeSnapshotProvider {
             )
         }
 
+        func projectionSeed(lastActiveAt: TimeInterval) -> RuntimeAppWindowProjectionSeed {
+            RuntimeAppWindowProjectionSeed(
+                windowID: windowID,
+                title: title,
+                isMinimized: isMinimized,
+                lastActiveAt: lastActiveAt,
+                ownerPID: ownerPID,
+                cgWindowID: cgWindowID,
+                spaceIDs: spaceIDs,
+                activationHandleID: activationHandleID,
+                axWindow: axWindow,
+                frame: frame,
+                allowsPublicAXRecovery: allowsPublicAXRecovery,
+                hasStickyBinding: hasStickyBinding,
+                lastConfirmationSource: lastConfirmationSource,
+                bindingConfidenceOverride: bindingConfidenceOverride,
+                bindingCandidateCount: bindingCandidateCount,
+                spaceEvidence: spaceEvidence
+            )
+        }
+
         init(
             windowID: String,
             title: String,
@@ -354,60 +375,25 @@ final class RuntimeSnapshotProvider {
                 .snapshot,
                 "\(displayName) pid=\(pid) appID=\(appID) windows=\(windows.count)"
             )
-            let windowCandidates = windows.enumerated().map { entryIndex, entry in
-                WindowCandidate(
-                    id: entry.windowID,
-                    title: entry.title,
-                    isMinimized: entry.isMinimized,
-                    lastActiveAt: now - Double(entryIndex)
-                )
-            }
 
             let rank = preferredRankForAppGroup(
                 appGroup,
                 rankByPID: windowData.rankByPID,
                 fallback: 10_000 + index
             )
-            let candidate = AppSwitchCandidate(
-                id: appID,
+            let payload = RuntimeCurrentAppWindowPayload(
+                appID: appID,
                 displayName: displayName,
                 groupID: Self.groupID(for: app.bundleIdentifier, fallbackName: displayName),
-                lastActiveAt: now - Double(rank),
-                windows: windowCandidates
-            )
-
-            let windowContexts = Dictionary(
-                uniqueKeysWithValues: windows.map {
-                    let id = $0.windowID
-                    return (
-                        id,
-                        RuntimeWindowContext(
-                            id: id,
-                            title: $0.title,
-                            isMinimized: $0.isMinimized,
-                            ownerPID: $0.ownerPID,
-                            cgWindowID: $0.cgWindowID,
-                            spaceIDs: $0.spaceIDs,
-                            inferredTitleBarStyle: nil,
-                            activationHandleID: $0.activationHandleID,
-                            axWindow: $0.axWindow,
-                            frame: $0.frame,
-                            allowsPublicAXRecovery: $0.allowsPublicAXRecovery,
-                            hasStickyBinding: $0.hasStickyBinding,
-                            lastConfirmationSource: $0.lastConfirmationSource,
-                            bindingConfidenceOverride: $0.bindingConfidenceOverride,
-                            bindingCandidateCount: $0.bindingCandidateCount,
-                            spaceEvidence: $0.spaceEvidence
-                        )
-                    )
+                summaryLastActiveAt: Self.stableLastActiveValue(forRank: rank),
+                candidateLastActiveAt: now - Double(rank),
+                pid: pid,
+                runningApp: app,
+                windowSeeds: windows.enumerated().map { entryIndex, entry in
+                    entry.projectionSeed(lastActiveAt: now - Double(entryIndex))
                 }
             )
-            let context = RuntimeAppContext(
-                appID: appID,
-                runningApp: app,
-                windowsByID: windowContexts
-            )
-            rows.append((candidate, context))
+            rows.append((payload.candidate, payload.context))
         }
         let rowsReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
 
