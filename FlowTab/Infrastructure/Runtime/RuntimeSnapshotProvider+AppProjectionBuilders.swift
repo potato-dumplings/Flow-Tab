@@ -119,9 +119,13 @@ extension RuntimeSnapshotProvider {
         })
         let hideMinimizedAppsFromAppLayer =
             SwitcherBehaviorPreferencesStore.loadHideMinimizedAppsFromAppLayer()
-        let appLayerCandidates = filterAppsForAppLayer(
-            selectedApps,
+        let appLayerWindowStatsByPID = RuntimeAppDirectory.windowStats(
+            for: selectedApps,
             windowsByPID: mergedWindowsByPrimaryPID,
+            isVisibleWindow: { !$0.isMinimized }
+        )
+        let appLayerCandidates = RuntimeAppDirectory(apps: selectedApps).filterAppLayerCandidates(
+            windowStatsByPID: appLayerWindowStatsByPID,
             hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
         )
         let selectionReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
@@ -413,33 +417,6 @@ extension RuntimeSnapshotProvider {
                 includeCurrentProcessInAppLayer: includeCurrentProcessInAppLayer
             )
         }
-    }
-
-    func filterAppsForAppLayer(
-        _ apps: [NSRunningApplication],
-        windowsByPID: [pid_t: [WindowListEntry]],
-        hideMinimizedAppsFromAppLayer: Bool
-    ) -> [NSRunningApplication] {
-        let windowStatsByPID = RuntimeAppDirectory.windowStats(
-            for: apps,
-            windowsByPID: windowsByPID,
-            isVisibleWindow: { !$0.isMinimized }
-        )
-        return RuntimeAppDirectory(apps: apps).filterAppLayerCandidates(
-            windowStatsByPID: windowStatsByPID,
-            hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
-        )
-    }
-
-    func filterAppsForAppLayer(
-        _ apps: [NSRunningApplication],
-        windowStatsByPID: [pid_t: RuntimeAppWindowStats],
-        hideMinimizedAppsFromAppLayer: Bool
-    ) -> [NSRunningApplication] {
-        RuntimeAppDirectory(apps: apps).filterAppLayerCandidates(
-            windowStatsByPID: windowStatsByPID,
-            hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
-        )
     }
 
 }
