@@ -185,3 +185,131 @@ struct RuntimeFullRepairProjectionAssemblyRow {
     let pid: pid_t
     let candidate: AppSwitchCandidate
 }
+
+enum RuntimeAppLayerProjectionFilter {
+    static func shouldIncludeAppInAppLayer(
+        hasWindows: Bool,
+        hasVisibleWindow: Bool,
+        hideMinimizedAppsFromAppLayer: Bool
+    ) -> Bool {
+        guard hideMinimizedAppsFromAppLayer else { return true }
+        guard hasWindows else { return true }
+        return hasVisibleWindow
+    }
+}
+
+enum RuntimeFullRepairProjectionAssembler {
+    static func payload(
+        fromCurrentAppWindowPayloads currentAppWindowPayloads: [RuntimeCurrentAppWindowPayload],
+        duplicateContextHandler: ((String) -> Void)? = nil
+    ) -> RuntimeFullRepairProjectionPayload {
+        let rows = currentAppWindowPayloads
+            .map { payload in
+                (candidate: payload.candidate, context: payload.context)
+            }
+            .sorted { lhs, rhs in
+                if lhs.candidate.lastActiveAt == rhs.candidate.lastActiveAt {
+                    return lhs.candidate.displayName.localizedCaseInsensitiveCompare(
+                        rhs.candidate.displayName
+                    ) == .orderedAscending
+                }
+                return lhs.candidate.lastActiveAt > rhs.candidate.lastActiveAt
+            }
+
+        var contextsByID: [String: RuntimeAppContext] = [:]
+        for row in rows {
+            if contextsByID[row.context.appID] != nil {
+                duplicateContextHandler?(row.context.appID)
+            }
+            contextsByID[row.context.appID] = row.context
+        }
+
+        return RuntimeFullRepairProjectionPayload(
+            apps: rows.map(\.candidate),
+            contextsByID: contextsByID
+        )
+    }
+
+    static func assembleRows(
+        apps: [RuntimeFullRepairProjectionAssemblyApp],
+        windowsByPID: [pid_t: [RuntimeFullRepairProjectionAssemblyWindow]],
+        rankByPID: [pid_t: Int],
+        hideMinimizedAppsFromAppLayer: Bool,
+        now: TimeInterval
+    ) -> [RuntimeFullRepairProjectionAssemblyRow] {
+        let groupedApps = Dictionary(grouping: apps, by: baseAppID(for:))
+        var rows: [RuntimeFullRepairProjectionAssemblyRow] = []
+        rows.reserveCapacity(groupedApps.count)
+
+        for group in groupedApps.values {
+            guard let app = group.max(by: { lhs, rhs in
+                score(for: lhs, windowsByPID: windowsByPID, rankByPID: rankByPID)
+                    < score(for: rhs, windowsByPID: windowsByPID, rankByPID: rankByPID)
+            }) else {
+                continue
+            }
+            let appID = baseAppID(for: app)
+            let displayName = app.localizedName ?? appID
+            let windows = group
+                .sorted(by: { lhs, rhs in
+                    score(for: lhs, windowsByPID: windowsByPID, rankByPID: rankByPID)
+                        > score(for: rhs, windowsByPID: windowsByPID, rankByPID: rankByPID)
+                })
+                .flatMap { groupApp in
+                    windowsByPID[groupApp.pid] ?? []
+                }
+            guard RuntimeAppLayerProjectionFilter.shouldIncludeAppInAppLayer(
+                hasWindows: !windows.isEmpty,
+                hasVisibleWindow: windows.contains(where: { !$0.isMinimized }),
+                hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
+            ) else {
+                continue
+            }
+            let rank = group.compactMap { groupApp in
+                rankByPID[groupApp.pid]
+            }.min() ?? (10_000 + rows.count)
+            let candidate = AppSwitchCandidate(
+                id: appID,
+                displayName: displayName,
+                groupID: RuntimeAppIdentity.groupID(for: app.bundleIdentifier, fallbackName: displayName),
+                lastActiveAt: now - Double(rank),
+                windows: windows.enumerated().map { entryIndex, entry in
+                    WindowCandidate(
+                        id: entry.windowID,
+                        title: entry.title,
+                        isMinimized: entry.isMinimized,
+                        lastActiveAt: now - Double(entryIndex)
+                    )
+                }
+            )
+            rows.append(RuntimeFullRepairProjectionAssemblyRow(pid: app.pid, candidate: candidate))
+        }
+
+        rows.sort { lhs, rhs in
+            if lhs.candidate.lastActiveAt == rhs.candidate.lastActiveAt {
+                return lhs.candidate.displayName.localizedCaseInsensitiveCompare(
+                    rhs.candidate.displayName
+                ) == .orderedAscending
+            }
+            return lhs.candidate.lastActiveAt > rhs.candidate.lastActiveAt
+        }
+        return rows
+    }
+
+    private static func baseAppID(for app: RuntimeFullRepairProjectionAssemblyApp) -> String {
+        app.bundleIdentifier ?? "pid:\(app.pid)"
+    }
+
+    private static func score(
+        for app: RuntimeFullRepairProjectionAssemblyApp,
+        windowsByPID: [pid_t: [RuntimeFullRepairProjectionAssemblyWindow]],
+        rankByPID: [pid_t: Int]
+    ) -> Int {
+        let windows = windowsByPID[app.pid] ?? []
+        let hasWindowsScore = windows.isEmpty ? 0 : 1_000_000
+        let windowCountScore = min(windows.count, 9_999) * 100
+        let rankScore = 10_000 - min(rankByPID[app.pid] ?? 10_000, 10_000)
+        let launchScore = Int(app.launchDate?.timeIntervalSince1970 ?? 0) % 10_000
+        return hasWindowsScore + windowCountScore + rankScore + launchScore
+    }
+}

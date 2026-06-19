@@ -770,18 +770,7 @@ final class RuntimeSnapshotProvider {
     }
 
     static func groupID(for bundleIdentifier: String?, fallbackName: String) -> String {
-        guard let bundleIdentifier else {
-            return String(fallbackName.prefix(1)).lowercased()
-        }
-
-        let components = bundleIdentifier.split(separator: ".")
-        if components.count >= 2 {
-            return String(components[1])
-        }
-        if let first = components.first {
-            return String(first)
-        }
-        return "apps"
+        RuntimeAppIdentity.groupID(for: bundleIdentifier, fallbackName: fallbackName)
     }
 
     static func groupIDForTesting(bundleIdentifier: String?, fallbackName: String) -> String {

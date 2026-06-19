@@ -218,21 +218,21 @@ extension FlowTabPriorityCoverageTests {
         )
 
         XCTAssertTrue(
-            RuntimeSnapshotProvider.shouldIncludeAppInAppLayer(
+            RuntimeAppLayerProjectionFilter.shouldIncludeAppInAppLayer(
                 hasWindows: false,
                 hasVisibleWindow: false,
                 hideMinimizedAppsFromAppLayer: true
             )
         )
         XCTAssertFalse(
-            RuntimeSnapshotProvider.shouldIncludeAppInAppLayer(
+            RuntimeAppLayerProjectionFilter.shouldIncludeAppInAppLayer(
                 hasWindows: true,
                 hasVisibleWindow: false,
                 hideMinimizedAppsFromAppLayer: true
             )
         )
         XCTAssertTrue(
-            RuntimeSnapshotProvider.shouldIncludeAppInAppLayer(
+            RuntimeAppLayerProjectionFilter.shouldIncludeAppInAppLayer(
                 hasWindows: true,
                 hasVisibleWindow: true,
                 hideMinimizedAppsFromAppLayer: true

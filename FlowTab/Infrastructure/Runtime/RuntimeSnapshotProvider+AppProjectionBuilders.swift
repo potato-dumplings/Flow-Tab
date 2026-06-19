@@ -3,10 +3,6 @@ import Foundation
 import FlowTabCore
 
 extension RuntimeSnapshotProvider {
-    typealias FullRepairProjectionAssemblyApp = RuntimeFullRepairProjectionAssemblyApp
-    typealias FullRepairProjectionAssemblyWindow = RuntimeFullRepairProjectionAssemblyWindow
-    typealias FullRepairProjectionAssemblyRow = RuntimeFullRepairProjectionAssemblyRow
-
     func fullRepairProjectionPayload() -> RuntimeFullRepairProjectionPayload {
         fullRepairProjectionPayload(timingEvent: "fullRepairProjectionPayload")
     }
@@ -148,8 +144,8 @@ extension RuntimeSnapshotProvider {
         }
         let now = Date.timeIntervalSinceReferenceDate
 
-        var rows: [(candidate: AppSwitchCandidate, context: RuntimeAppContext)] = []
-        rows.reserveCapacity(appLayerCandidates.count)
+        var currentAppPayloads: [RuntimeCurrentAppWindowPayload] = []
+        currentAppPayloads.reserveCapacity(appLayerCandidates.count)
 
         let rowsStartMs = RuntimePerformanceClock.monotonicMilliseconds()
         for (index, app) in appLayerCandidates.enumerated() {
@@ -182,26 +178,15 @@ extension RuntimeSnapshotProvider {
                     entry.projectionSeed(lastActiveAt: now - Double(entryIndex))
                 }
             )
-            rows.append((payload.candidate, payload.context))
+            currentAppPayloads.append(payload)
         }
         let rowsReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-
-        rows.sort { lhs, rhs in
-            if lhs.candidate.lastActiveAt == rhs.candidate.lastActiveAt {
-                return lhs.candidate.displayName.localizedCaseInsensitiveCompare(
-                    rhs.candidate.displayName
-                ) == .orderedAscending
+        let payload = RuntimeFullRepairProjectionAssembler.payload(
+            fromCurrentAppWindowPayloads: currentAppPayloads,
+            duplicateContextHandler: { appID in
+                RuntimeLog.debug(.projection, "duplicate appID fallback overwrite=\(appID)")
             }
-            return lhs.candidate.lastActiveAt > rhs.candidate.lastActiveAt
-        }
-
-        var contextsByID: [String: RuntimeAppContext] = [:]
-        for row in rows {
-            if contextsByID[row.context.appID] != nil {
-                RuntimeLog.debug(.projection, "duplicate appID fallback overwrite=\(row.context.appID)")
-            }
-            contextsByID[row.context.appID] = row.context
-        }
+        )
         let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
 
         logProjectionTiming(
@@ -211,8 +196,8 @@ extension RuntimeSnapshotProvider {
                 ("runningApps", "\(runningApps.count)"),
                 ("selectedApps", "\(selectedApps.count)"),
                 ("appLayerCandidates", "\(appLayerCandidates.count)"),
-                ("windows", "\(rows.reduce(0) { $0 + $1.candidate.windows.count })"),
-                ("contexts", "\(contextsByID.count)"),
+                ("windows", "\(payload.apps.reduce(0) { $0 + $1.windows.count })"),
+                ("contexts", "\(payload.contextsByID.count)"),
                 ("runningAppsMs", formatProjectionMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
                 ("windowDataMs", formatProjectionMilliseconds(windowDataReadyMs - windowDataStartMs)),
                 ("selectionMs", formatProjectionMilliseconds(selectionReadyMs - selectionStartMs)),
@@ -222,87 +207,7 @@ extension RuntimeSnapshotProvider {
             ]
         )
 
-        return RuntimeFullRepairProjectionPayload(
-            apps: rows.map(\.candidate),
-            contextsByID: contextsByID
-        )
-    }
-
-    static func assembleFullRepairProjectionRowsForTesting(
-        apps: [FullRepairProjectionAssemblyApp],
-        windowsByPID: [pid_t: [FullRepairProjectionAssemblyWindow]],
-        rankByPID: [pid_t: Int],
-        hideMinimizedAppsFromAppLayer: Bool,
-        now: TimeInterval
-    ) -> [FullRepairProjectionAssemblyRow] {
-        func baseAppID(for app: FullRepairProjectionAssemblyApp) -> String {
-            app.bundleIdentifier ?? "pid:\(app.pid)"
-        }
-
-        func score(for app: FullRepairProjectionAssemblyApp) -> Int {
-            let windows = windowsByPID[app.pid] ?? []
-            let hasWindowsScore = windows.isEmpty ? 0 : 1_000_000
-            let windowCountScore = min(windows.count, 9_999) * 100
-            let rankScore = 10_000 - min(rankByPID[app.pid] ?? 10_000, 10_000)
-            let launchScore = Int(app.launchDate?.timeIntervalSince1970 ?? 0) % 10_000
-            return hasWindowsScore + windowCountScore + rankScore + launchScore
-        }
-
-        let groupedApps = Dictionary(grouping: apps, by: baseAppID(for:))
-        var rows: [FullRepairProjectionAssemblyRow] = []
-        rows.reserveCapacity(groupedApps.count)
-
-        for group in groupedApps.values {
-            guard let app = group.max(by: { lhs, rhs in
-                score(for: lhs) < score(for: rhs)
-            }) else {
-                continue
-            }
-            let appID = baseAppID(for: app)
-            let displayName = app.localizedName ?? appID
-            let windows = group
-                .sorted(by: { lhs, rhs in
-                    score(for: lhs) > score(for: rhs)
-                })
-                .flatMap { groupApp in
-                    windowsByPID[groupApp.pid] ?? []
-                }
-            guard shouldIncludeAppInAppLayer(
-                hasWindows: !windows.isEmpty,
-                hasVisibleWindow: windows.contains(where: { !$0.isMinimized }),
-                hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
-            ) else {
-                continue
-            }
-            let rank = group.compactMap { groupApp in
-                rankByPID[groupApp.pid]
-            }.min() ?? (10_000 + rows.count)
-            let candidate = AppSwitchCandidate(
-                id: appID,
-                displayName: displayName,
-                groupID: groupID(for: app.bundleIdentifier, fallbackName: displayName),
-                lastActiveAt: now - Double(rank),
-                windows: windows.enumerated().map { entryIndex, entry in
-                    WindowCandidate(
-                        id: entry.windowID,
-                        title: entry.title,
-                        isMinimized: entry.isMinimized,
-                        lastActiveAt: now - Double(entryIndex)
-                    )
-                }
-            )
-            rows.append(FullRepairProjectionAssemblyRow(pid: app.pid, candidate: candidate))
-        }
-
-        rows.sort { lhs, rhs in
-            if lhs.candidate.lastActiveAt == rhs.candidate.lastActiveAt {
-                return lhs.candidate.displayName.localizedCaseInsensitiveCompare(
-                    rhs.candidate.displayName
-                ) == .orderedAscending
-            }
-            return lhs.candidate.lastActiveAt > rhs.candidate.lastActiveAt
-        }
-        return rows
+        return payload
     }
 
     func currentAppWindowPayload(for appID: String) -> RuntimeCurrentAppWindowPayload? {
@@ -560,9 +465,11 @@ extension RuntimeSnapshotProvider {
         hasVisibleWindow: Bool,
         hideMinimizedAppsFromAppLayer: Bool
     ) -> Bool {
-        guard hideMinimizedAppsFromAppLayer else { return true }
-        guard hasWindows else { return true }
-        return hasVisibleWindow
+        RuntimeAppLayerProjectionFilter.shouldIncludeAppInAppLayer(
+            hasWindows: hasWindows,
+            hasVisibleWindow: hasVisibleWindow,
+            hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
+        )
     }
 
     func filterAppsForAppLayer(

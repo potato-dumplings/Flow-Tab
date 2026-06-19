@@ -13,6 +13,21 @@ enum RuntimeAppIdentity {
         let pid = app.processIdentifier
         return app.bundleIdentifier ?? "pid:\(pid)"
     }
+
+    static func groupID(for bundleIdentifier: String?, fallbackName: String) -> String {
+        guard let bundleIdentifier else {
+            return String(fallbackName.prefix(1)).lowercased()
+        }
+
+        let components = bundleIdentifier.split(separator: ".")
+        if components.count >= 2 {
+            return String(components[1])
+        }
+        if let first = components.first {
+            return String(first)
+        }
+        return "apps"
+    }
 }
 
 enum WindowBindingConfirmationSource: String {
