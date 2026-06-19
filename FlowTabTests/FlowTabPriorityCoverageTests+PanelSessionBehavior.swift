@@ -360,30 +360,30 @@ extension FlowTabPriorityCoverageTests {
                 isCompleteForScope: true
             )
         )
-        let snapshotService = RecordingRuntimeProjectionService(appSwitcherProjection: projection)
-        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
+        let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherProjection: projection)
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
         model.runtimeProjectionMaintenanceEnabled = false
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
 
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
         XCTAssertEqual(model.session?.apps.map(\.id), apps.map(\.id))
         XCTAssertEqual(model.session?.apps.flatMap(\.windows).count, 0)
     }
 
     @MainActor
     func testLiveSwitcherModelRequestsMaintenanceWhenAppSwitcherProjectionIsMissing() {
-        let snapshotService = RecordingRuntimeProjectionService()
-        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
+        let runtimeProjectionService = RecordingRuntimeProjectionService()
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
 
         XCTAssertFalse(model.startSession(triggerDirection: .forward))
 
         XCTAssertNil(model.session)
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
         XCTAssertEqual(
-            snapshotService.appSwitcherMaintenanceRequestsRecorded(),
+            runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(),
             [.switcherSessionStarted]
         )
     }
@@ -416,14 +416,14 @@ extension FlowTabPriorityCoverageTests {
                 isCompleteForScope: false
             )
         )
-        let snapshotService = RecordingRuntimeProjectionService(appSwitcherProjection: projection)
-        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
+        let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherProjection: projection)
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
 
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.appSwitcherMaintenanceRequestsRecorded(), [.switcherSessionStarted])
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(), [.switcherSessionStarted])
         XCTAssertEqual(model.session?.apps.map(\.id), [appID])
         XCTAssertEqual(model.session?.selectedApp.windows.map(\.id), [])
 
@@ -477,7 +477,7 @@ extension FlowTabPriorityCoverageTests {
             pendingRepairScopes: [],
             isCompleteForScope: true
         )
-        let snapshotService = RecordingRuntimeProjectionService(
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
             appSwitcherProjection: RuntimeAppSwitcherProjection(
                 apps: [appOnlyCandidate],
                 contextsByID: [:],
@@ -495,13 +495,13 @@ extension FlowTabPriorityCoverageTests {
                 )
             ]
         )
-        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
         model.runtimeProjectionMaintenanceEnabled = false
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertTrue(model.scheduleSelectedAppWindowProjectionIfNeeded(for: appID))
 
-        XCTAssertEqual(snapshotService.recordedHomeAppIDs(), [])
+        XCTAssertEqual(runtimeProjectionService.recordedHomeAppIDs(), [])
         XCTAssertEqual(model.session?.selectedApp.windows.map(\.id), ["projected-window-1", "projected-window-2"])
         XCTAssertEqual(model.runtimeContextsByID[appID]?.windowsByID["projected-window-1"]?.title, "Projected One")
     }
@@ -582,7 +582,7 @@ extension FlowTabPriorityCoverageTests {
             candidate: candidate,
             context: makeRuntimeAppContext(appID: appID, runningApp: runningApp, windows: windows)
         )
-        let snapshotService = RecordingRuntimeProjectionService(
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
             currentAppWindowProjectionsByAppID: [
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
@@ -603,12 +603,12 @@ extension FlowTabPriorityCoverageTests {
                 )
             ]
         )
-        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
         model.frontmostApplicationOverride = { runningApp }
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
 
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
         XCTAssertEqual(model.session?.mode, .windowCycle(appID: appID))
         XCTAssertEqual(model.session?.selectedApp.windows.map(\.id), ["focused-projected-1", "focused-projected-2"])
     }
@@ -697,8 +697,8 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelControllerActiveSpaceChangeKeepsSessionVisibleWithoutReactivatingApp() async {
-        let snapshotService = RecordingRuntimeProjectionService(appSwitcherApps: searchScenarioApps())
-        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
+        let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: searchScenarioApps())
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
         let controller = SwitcherPanelController(model: model)
         controller.globalPrimaryModifierPressedOverride = true
         controller.appIsActiveOverride = false
@@ -736,8 +736,8 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelControllerActiveSpaceNotificationSignalsRuntimeTopologyChange() async {
-        let snapshotService = RecordingRuntimeProjectionService()
-        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
+        let runtimeProjectionService = RecordingRuntimeProjectionService()
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
         let controller = SwitcherPanelController(model: model)
 
         NSWorkspace.shared.notificationCenter.post(
@@ -750,7 +750,7 @@ extension FlowTabPriorityCoverageTests {
             timeoutNanoseconds: 1_000_000_000,
             pollIntervalNanoseconds: 10_000_000
         ) {
-            snapshotService.spaceTopologyChangeSignalCount() == 1
+            runtimeProjectionService.spaceTopologyChangeSignalCount() == 1
         }
         XCTAssertTrue(didSignalRuntime)
         XCTAssertNil(controller.modelForTesting.session)
@@ -758,8 +758,8 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelControllerActiveSpaceChangeCancelsSessionAfterModifierRelease() async {
-        let snapshotService = RecordingRuntimeProjectionService(appSwitcherApps: searchScenarioApps())
-        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
+        let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: searchScenarioApps())
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
         let controller = SwitcherPanelController(model: model)
         controller.globalPrimaryModifierPressedOverride = false
         controller.globalMainKeyPressedOverride = false
@@ -777,10 +777,10 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testSwitcherPanelControllerTerminateRefreshIgnoresFollowUpActiveSpaceChangeAfterModifierRelease() async {
         let initialApps = terminateScenarioApps()
-        let snapshotService = RecordingRuntimeProjectionService(appSwitcherApps: initialApps)
+        let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: initialApps)
         let controller = SwitcherPanelController(
             model: LiveSwitcherModel(
-                runtimeProjectionService: snapshotService
+                runtimeProjectionService: runtimeProjectionService
             )
         )
         controller.globalPrimaryModifierPressedOverride = false
@@ -793,14 +793,14 @@ extension FlowTabPriorityCoverageTests {
             return
         }
         XCTAssertEqual(controller.modelForTesting.selectedApp?.id, terminatedAppID)
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
 
         controller.handleWorkspaceApplicationTerminatedForTesting(appID: terminatedAppID, pid: 42_300)
 
-        XCTAssertEqual(snapshotService.appTerminationSignalsRecorded().map(\.appID), [terminatedAppID])
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.appTerminationSignalsRecorded().map(\.appID), [terminatedAppID])
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
         XCTAssertNotNil(controller.modelForTesting.session)
         XCTAssertFalse(controller.modelForTesting.session?.apps.contains { $0.id == terminatedAppID } ?? true)
 
@@ -813,10 +813,10 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelControllerTerminateRequestProtectsPanelResignAfterModifierRelease() async {
-        let snapshotService = RecordingRuntimeProjectionService(appSwitcherApps: terminateScenarioApps())
+        let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: terminateScenarioApps())
         let controller = SwitcherPanelController(
             model: LiveSwitcherModel(
-                runtimeProjectionService: snapshotService
+                runtimeProjectionService: runtimeProjectionService
             )
         )
         controller.modelForTesting.terminateRequestOverride = { _ in
@@ -828,8 +828,8 @@ extension FlowTabPriorityCoverageTests {
         controller.appIsActiveOverride = false
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
         let selectedAppID = controller.modelForTesting.selectedApp?.id
 
         controller.terminateSelectedApp()
@@ -1011,7 +1011,7 @@ extension FlowTabPriorityCoverageTests {
             pendingRepairScopes: [],
             isCompleteForScope: true
         )
-        let snapshotService = RecordingRuntimeProjectionService(
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
             appSwitcherProjection: RuntimeAppSwitcherProjection(
                 apps: [appOnlyCandidate],
                 contextsByID: [:],
@@ -1031,15 +1031,15 @@ extension FlowTabPriorityCoverageTests {
         )
         let controller = SwitcherPanelController(
             model: LiveSwitcherModel(
-                runtimeProjectionService: snapshotService
+                runtimeProjectionService: runtimeProjectionService
             )
         )
         controller.windowLayerPresentationDelayOverride = 0.01
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
         XCTAssertEqual(controller.modelForTesting.session?.selectedApp.windows.count, 0)
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
 
         controller.scheduleDelayedWindowLayerEntryForTesting()
 
@@ -1051,8 +1051,8 @@ extension FlowTabPriorityCoverageTests {
             controller.modelForTesting.session?.mode == .windowCycle(appID: appID)
         }
         XCTAssertTrue(didUseProjection)
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
         XCTAssertEqual(
             controller.modelForTesting.session?.mode,
             .windowCycle(appID: appID)
@@ -1074,7 +1074,7 @@ extension FlowTabPriorityCoverageTests {
             lastActiveAt: 100,
             windows: []
         )
-        let snapshotService = RecordingRuntimeProjectionService(
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
             appSwitcherProjection: RuntimeAppSwitcherProjection(
                 apps: [candidate],
                 contextsByID: [:],
@@ -1089,13 +1089,13 @@ extension FlowTabPriorityCoverageTests {
                 )
             )
         )
-        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
 
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.appSwitcherMaintenanceRequestsRecorded(), [.switcherSessionStarted])
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(), [.switcherSessionStarted])
         XCTAssertEqual(model.lastRuntimeProjectionMaintenanceDiagnostic?.result, "maintenanceRequested")
         XCTAssertEqual(model.lastRuntimeProjectionMaintenanceDiagnostic?.applyGeneration, nil)
     }

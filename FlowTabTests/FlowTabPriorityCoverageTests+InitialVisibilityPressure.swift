@@ -7,16 +7,16 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     private func makeInitialVisibilityProjectionPanelController() -> (
         controller: SwitcherPanelController,
-        snapshotService: RecordingRuntimeProjectionService
+        runtimeProjectionService: RecordingRuntimeProjectionService
     ) {
-        let snapshotService = RecordingRuntimeProjectionService(
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
             appSwitcherApps: searchScenarioApps()
         )
         return (
             SwitcherPanelController(
-                model: LiveSwitcherModel(runtimeProjectionService: snapshotService)
+                model: LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
             ),
-            snapshotService
+            runtimeProjectionService
         )
     }
 
@@ -35,12 +35,12 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelVisibilityRecoveryStateTracksPresentationLifecycle() {
-        let (controller, snapshotService) = makeInitialVisibilityProjectionPanelController()
+        let (controller, runtimeProjectionService) = makeInitialVisibilityProjectionPanelController()
 
         XCTAssertEqual(controller.panelVisibilityRecoveryState, .idle)
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
 
         let initialGeneration = controller.beginInitialPresentationVisibilityTracking(
             trigger: "state_initial"
@@ -86,14 +86,14 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelVisibilityRecoveryDiagnosticRecordsBeforeAndAfterSnapshots() async {
-        let (controller, snapshotService) = makeInitialVisibilityProjectionPanelController()
+        let (controller, runtimeProjectionService) = makeInitialVisibilityProjectionPanelController()
         controller.panelVisibilityOverride = true
         controller.panelOcclusionStateOverride = []
         controller.appIsActiveOverride = false
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
 
         await controller.performPanelVisibilityRecoveryAttempt(
             trigger: "diagnostic_recovery",
@@ -126,7 +126,7 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherInitialVisibilityRecoveryRapidOpenClosePressureDoesNotReplayStaleTasks() async {
-        let (controller, snapshotService) = makeInitialVisibilityProjectionPanelController()
+        let (controller, runtimeProjectionService) = makeInitialVisibilityProjectionPanelController()
         controller.globalPrimaryModifierPressedOverride = true
 
         let defaults = UserDefaults.standard
@@ -158,8 +158,8 @@ extension FlowTabPriorityCoverageTests {
 
         for index in 0..<iterationCount {
             XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting(), "iteration \(index)")
-            XCTAssertEqual(snapshotService.snapshotRequestCount(), 0, "iteration \(index)")
-            XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0, "iteration \(index)")
+            XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0, "iteration \(index)")
+            XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0, "iteration \(index)")
             controller.panelVisibilityOverride = false
 
             let trigger = "\(triggerPrefix)_\(index)"
@@ -220,8 +220,8 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(didSettleRecoveryState)
 
         XCTAssertNil(controller.modelForTesting.session)
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
         XCTAssertFalse(controller.hasActivePresentationSession)
         XCTAssertNil(controller.panelPresentationRecoveryTask)
         XCTAssertEqual(controller.initialPresentationVisibilityDeadline, 0, accuracy: 0.0001)

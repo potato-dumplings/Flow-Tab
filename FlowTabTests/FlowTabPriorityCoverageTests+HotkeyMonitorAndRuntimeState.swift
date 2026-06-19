@@ -724,12 +724,12 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testLiveSwitcherModelHandleApplicationTerminatedRefreshesSessionAndKeepsPreferredNextSelection() async {
         let initialApps = terminateScenarioApps()
-        let snapshotService = RecordingRuntimeProjectionService(appSwitcherApps: initialApps)
-        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
+        let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: initialApps)
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
         XCTAssertEqual(model.selectedApp?.id, "com.example.code")
 
         let layoutRefreshed = expectation(description: "layout refreshed after app termination")
@@ -738,9 +738,9 @@ extension FlowTabPriorityCoverageTests {
         model.handleApplicationTerminated(appID: "com.example.code", pid: 42_300)
 
         await fulfillment(of: [layoutRefreshed], timeout: 1.0)
-        XCTAssertEqual(snapshotService.appTerminationSignalsRecorded().map(\.appID), ["com.example.code"])
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.appTerminationSignalsRecorded().map(\.appID), ["com.example.code"])
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
         XCTAssertEqual(model.appCount, 2)
         XCTAssertEqual(model.selectedApp?.id, "com.example.browser")
     }
@@ -749,10 +749,10 @@ extension FlowTabPriorityCoverageTests {
     func testLiveSwitcherModelHandleApplicationTerminatedPreservesSearchStateDuringRefresh() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
             let initialApps = self.searchScenarioApps()
-            let snapshotService = RecordingRuntimeProjectionService(
+            let runtimeProjectionService = RecordingRuntimeProjectionService(
                 appSwitcherApps: initialApps
             )
-            let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
+            let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
             let refreshedApps = initialApps.filter { $0.id != "com.example.code" }
 
             XCTAssertTrue(model.startSession(triggerDirection: .forward))
@@ -774,7 +774,7 @@ extension FlowTabPriorityCoverageTests {
 
             let layoutRefreshed = expectation(description: "layout refreshed while preserving search state")
             model.onSessionLayoutChanged = { layoutRefreshed.fulfill() }
-            snapshotService.installAppSwitcherProjection(apps: refreshedApps)
+            runtimeProjectionService.installAppSwitcherProjection(apps: refreshedApps)
 
             model.handleApplicationTerminated(appID: "com.example.code", pid: 42_300)
 
@@ -803,19 +803,19 @@ extension FlowTabPriorityCoverageTests {
     @MainActor
     func testLiveSwitcherModelHandleApplicationTerminatedIgnoresUntrackedApp() {
         let initialApps = terminateScenarioApps()
-        let snapshotService = RecordingRuntimeProjectionService(appSwitcherApps: initialApps)
-        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
+        let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: initialApps)
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
         let selectedAppID = model.selectedApp?.id
 
         model.handleApplicationTerminated(appID: "com.example.unrelated", pid: 99_999)
 
-        XCTAssertTrue(snapshotService.appTerminationSignalsRecorded().isEmpty)
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertTrue(runtimeProjectionService.appTerminationSignalsRecorded().isEmpty)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
         XCTAssertEqual(model.appCount, initialApps.count)
         XCTAssertEqual(model.selectedApp?.id, selectedAppID)
     }

@@ -2638,12 +2638,12 @@ extension FlowTabPriorityCoverageTests {
             runningApp: currentApp,
             windows: windows
         )
-        let snapshotService = makeCurrentAppWindowProjectionService(
+        let runtimeProjectionService = makeCurrentAppWindowProjectionService(
             appID: appID,
             candidate: candidate,
             context: context
         )
-        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
 
         model.frontmostApplicationOverride = { currentApp }
 
@@ -2660,8 +2660,8 @@ extension FlowTabPriorityCoverageTests {
         }
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
 
         let firstSnapshot = model.windowPreviewSnapshotForTesting()
         let secondSnapshot = model.windowPreviewSnapshotForTesting()
@@ -2698,12 +2698,12 @@ extension FlowTabPriorityCoverageTests {
             runningApp: currentApp,
             windows: windows
         )
-        let snapshotService = makeCurrentAppWindowProjectionService(
+        let runtimeProjectionService = makeCurrentAppWindowProjectionService(
             appID: appID,
             candidate: candidate,
             context: context
         )
-        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
 
         model.frontmostApplicationOverride = { currentApp }
 
@@ -2718,8 +2718,8 @@ extension FlowTabPriorityCoverageTests {
         }
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
         let initialSnapshot = model.windowPreviewSnapshotForTesting()
         XCTAssertEqual(captureCallCount, 1)
         XCTAssertTrue(initialSnapshot.first?.hasImage == true)
@@ -2775,12 +2775,12 @@ extension FlowTabPriorityCoverageTests {
             runningApp: currentApp,
             windows: windows
         )
-        let snapshotService = makeCurrentAppWindowProjectionService(
+        let runtimeProjectionService = makeCurrentAppWindowProjectionService(
             appID: appID,
             candidate: candidate,
             context: context
         )
-        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
 
         model.frontmostApplicationOverride = { currentApp }
 
@@ -2808,8 +2808,8 @@ extension FlowTabPriorityCoverageTests {
         }
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
         let initialSnapshot = model.windowPreviewSnapshotForTesting()
         XCTAssertEqual(initialSnapshot.count, 2)
         XCTAssertTrue(initialSnapshot.allSatisfy(\.hasImage))
@@ -2828,8 +2828,8 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertNil(model.session)
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
         let restartedSnapshot = model.windowPreviewSnapshotForTesting()
         XCTAssertEqual(restartedSnapshot.count, 2)
         XCTAssertTrue(restartedSnapshot.allSatisfy { !$0.hasImage })
@@ -2855,12 +2855,12 @@ extension FlowTabPriorityCoverageTests {
             runningApp: currentApp,
             windows: windows
         )
-        let snapshotService = makeCurrentAppWindowProjectionService(
+        let runtimeProjectionService = makeCurrentAppWindowProjectionService(
             appID: appID,
             candidate: candidate,
             context: context
         )
-        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
 
         model.frontmostApplicationOverride = { currentApp }
 
@@ -2871,8 +2871,8 @@ extension FlowTabPriorityCoverageTests {
         }
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
 
         let firstSnapshot = model.windowPreviewSnapshotForTesting()
         XCTAssertEqual(firstSnapshot.count, 1)
@@ -2927,12 +2927,12 @@ extension FlowTabPriorityCoverageTests {
                 )
             ]
         )
-        let snapshotService = makeCurrentAppWindowProjectionService(
+        let runtimeProjectionService = makeCurrentAppWindowProjectionService(
             appID: appID,
             candidate: candidate,
             context: context
         )
-        let model = LiveSwitcherModel(runtimeProjectionService: snapshotService)
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
         model.runtimeProjectionMaintenanceEnabled = false
 
         model.frontmostApplicationOverride = { currentApp }
@@ -2948,8 +2948,8 @@ extension FlowTabPriorityCoverageTests {
         }
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
 
         let snapshot = model.windowPreviewSnapshotForTesting()
 

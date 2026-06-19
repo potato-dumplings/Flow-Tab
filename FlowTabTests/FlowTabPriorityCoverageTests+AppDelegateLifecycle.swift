@@ -709,7 +709,7 @@ extension FlowTabPriorityCoverageTests {
             pendingRepairScopes: [],
             isCompleteForScope: true
         )
-        let snapshotService = RecordingRuntimeProjectionService(
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
             appSwitcherProjection: RuntimeAppSwitcherProjection(
                 apps: [currentAppCandidate] + searchScenarioApps(),
                 contextsByID: [currentAppID: currentAppContext],
@@ -728,7 +728,7 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
         let panelController = SwitcherPanelController(
-            model: LiveSwitcherModel(runtimeProjectionService: snapshotService)
+            model: LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
         )
         var delegate: AppDelegate?
         defer {
@@ -837,8 +837,8 @@ extension FlowTabPriorityCoverageTests {
 
         mainRecord.monitor.onHotkeyPressed?(false)
         panelController.panelVisibilityOverride = true
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
         XCTAssertNotNil(panelController.modelForTesting.session)
         let initialSelectedAppID = panelController.modelForTesting.selectedApp?.id
 
@@ -872,8 +872,8 @@ extension FlowTabPriorityCoverageTests {
         panelController.ignoreHotkeyPressesUntil = 0
         inAppRecord.monitor.onHotkeyPressed?(false)
         panelController.panelVisibilityOverride = true
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
         XCTAssertEqual(panelController.activeHotkeySessionKind, .inAppWindowSwitcher)
         XCTAssertEqual(panelController.modelForTesting.session?.mode, .windowCycle(appID: currentAppID))
         let initialSelectedWindowID = panelController.modelForTesting.session?.selectedWindow?.id
@@ -1093,9 +1093,9 @@ extension FlowTabPriorityCoverageTests {
         let previousLaunchEnvironment = FlowTabTestLaunchOptions.environmentOverrideForTesting
         let hotkeyFactory = SpyHotkeyMonitorFactory()
         let multiAppSnapshot = Array(searchScenarioApps().prefix(2))
-        let snapshotService = RecordingRuntimeProjectionService(appSwitcherApps: [multiAppSnapshot[0]])
+        let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: [multiAppSnapshot[0]])
         let panelController = SwitcherPanelController(
-            model: LiveSwitcherModel(runtimeProjectionService: snapshotService)
+            model: LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
         )
         var delegate: AppDelegate?
         defer {
@@ -1148,25 +1148,25 @@ extension FlowTabPriorityCoverageTests {
             timeoutNanoseconds: 2_000_000_000,
             pollIntervalNanoseconds: 25_000_000
         ) {
-            snapshotService.appSwitcherProjectionReadCount() >= 1
+            runtimeProjectionService.appSwitcherProjectionReadCount() >= 1
         }
         XCTAssertTrue(didReadInitialProjection)
 
-        snapshotService.installAppSwitcherProjection(apps: multiAppSnapshot)
+        runtimeProjectionService.installAppSwitcherProjection(apps: multiAppSnapshot)
         let didOpenSeededSwitcher = await waitUntil(
             "launch open switcher loads seeded multi-app projection",
             timeoutNanoseconds: 2_000_000_000,
             pollIntervalNanoseconds: 25_000_000
         ) {
-            snapshotService.appSwitcherProjectionReadCount() >= 3
+            runtimeProjectionService.appSwitcherProjectionReadCount() >= 3
                 && panelController.modelForTesting.appCount == multiAppSnapshot.count
                 && panelController.modelForTesting.session?.apps.map(\.id) == multiAppSnapshot.map(\.id)
         }
         XCTAssertTrue(didOpenSeededSwitcher)
 
-        XCTAssertGreaterThanOrEqual(snapshotService.appSwitcherProjectionReadCount(), 3)
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertGreaterThanOrEqual(runtimeProjectionService.appSwitcherProjectionReadCount(), 3)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
         XCTAssertEqual(panelController.modelForTesting.appCount, multiAppSnapshot.count)
         XCTAssertEqual(
             panelController.modelForTesting.session?.apps.map(\.id),
@@ -1188,9 +1188,9 @@ extension FlowTabPriorityCoverageTests {
         let previousLaunchArguments = FlowTabTestLaunchOptions.argumentsOverrideForTesting
         let previousLaunchEnvironment = FlowTabTestLaunchOptions.environmentOverrideForTesting
         let hotkeyFactory = SpyHotkeyMonitorFactory()
-        let snapshotService = RecordingRuntimeProjectionService(appSwitcherApps: [])
+        let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: [])
         let panelController = SwitcherPanelController(
-            model: LiveSwitcherModel(runtimeProjectionService: snapshotService)
+            model: LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
         )
         var delegate: AppDelegate?
         defer {
@@ -1258,8 +1258,8 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertNil(panelController.modelForTesting.session)
         XCTAssertFalse(panelController.modelForTesting.isSearchActive)
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
         XCTAssertEqual(hotkeyFactory.records.count, 2)
 
         let lines = await RuntimeDiagnostics.shared.readRecentLines(limit: 40, minimumLevel: .debug)

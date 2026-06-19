@@ -572,7 +572,7 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
 
-        let snapshotService = RecordingRuntimeProjectionService(
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
             appSwitcherApps: [
                 AppSwitchCandidate(
                     id: currentAppID,
@@ -596,7 +596,7 @@ extension FlowTabPriorityCoverageTests {
         )
         let model = LiveSwitcherModel(
             windowRecencyTracker: RuntimeWindowRecencyTracker(),
-            runtimeProjectionService: snapshotService
+            runtimeProjectionService: runtimeProjectionService
         )
         model.windowRecencyTracker.recordVerifiedFocus(
             appID: currentAppID,
@@ -606,8 +606,8 @@ extension FlowTabPriorityCoverageTests {
         model.frontmostApplicationOverride = { currentApp }
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
         XCTAssertEqual(model.selectedApp?.id, otherAppID)
 
         model.handle(.downArrow)
@@ -754,7 +754,7 @@ extension FlowTabPriorityCoverageTests {
             ),
             context: context
         )
-        let snapshotService = RecordingRuntimeProjectionService(
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
             currentAppWindowProjectionsByAppID: [
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
@@ -777,7 +777,7 @@ extension FlowTabPriorityCoverageTests {
         )
         let model = LiveSwitcherModel(
             windowRecencyTracker: RuntimeWindowRecencyTracker(),
-            runtimeProjectionService: snapshotService
+            runtimeProjectionService: runtimeProjectionService
         )
         model.frontmostApplicationOverride = { currentApp }
         model.windowRecencyTracker.recordVerifiedFocus(
@@ -788,7 +788,7 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
 
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
         XCTAssertEqual(
             model.session?.selectedApp.windows.map(\.id),
             ["fullscreen", "incognito", "normal"]
@@ -843,7 +843,7 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
 
-        let snapshotService = RecordingRuntimeProjectionService(
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
             appSwitcherApps: [
                 AppSwitchCandidate(
                     id: appID,
@@ -857,17 +857,17 @@ extension FlowTabPriorityCoverageTests {
         )
         let model = LiveSwitcherModel(
             windowRecencyTracker: RuntimeWindowRecencyTracker(),
-            runtimeProjectionService: snapshotService
+            runtimeProjectionService: runtimeProjectionService
         )
         model.frontmostApplicationOverride = { currentApp }
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
         XCTAssertEqual(model.session?.apps.first?.windows.map(\.id), ["fullscreen", "incognito", "normal"])
 
         model.windowRecencyTracker.recordVerifiedFocus(appID: appID, windowID: "normal", context: context)
-        snapshotService.installAppSwitcherProjection(
+        runtimeProjectionService.installAppSwitcherProjection(
             apps: [
                 AppSwitchCandidate(
                     id: appID,
@@ -881,17 +881,17 @@ extension FlowTabPriorityCoverageTests {
         )
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
-        XCTAssertEqual(snapshotService.snapshotRequestCount(), 0)
-        XCTAssertEqual(snapshotService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
         XCTAssertEqual(model.session?.apps.first?.windows.map(\.id), ["normal", "incognito", "fullscreen"])
     }
 
     @MainActor
     func testLiveSwitcherModelSignalsRuntimeWhenWindowFocusIsVerified() {
-        let snapshotService = RecordingRuntimeProjectionService()
+        let runtimeProjectionService = RecordingRuntimeProjectionService()
         let model = LiveSwitcherModel(
             windowRecencyTracker: RuntimeWindowRecencyTracker(),
-            runtimeProjectionService: snapshotService
+            runtimeProjectionService: runtimeProjectionService
         )
         let currentApp = NSRunningApplication.current
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
@@ -910,10 +910,10 @@ extension FlowTabPriorityCoverageTests {
             )
         )
 
-        let signals = snapshotService.windowFocusVerifiedSignalsRecorded()
+        let signals = runtimeProjectionService.windowFocusVerifiedSignalsRecorded()
         XCTAssertEqual(signals.map(\.appID), [appID])
         XCTAssertEqual(signals.map(\.pid), [currentApp.processIdentifier])
-        XCTAssertEqual(snapshotService.windowFocusVerificationSignalsRecorded().map(\.focusedCGWindowID), [240_001])
+        XCTAssertEqual(runtimeProjectionService.windowFocusVerificationSignalsRecorded().map(\.focusedCGWindowID), [240_001])
     }
 
     private func recencyAppliedWindowIDs(

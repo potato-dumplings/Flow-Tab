@@ -794,7 +794,7 @@ Runtime infrastructure 负责：
 
 - projection builders 仍由旧 snapshot/home/focused 兼容桥提交，尚未完全从底层 `RuntimeWindowRecord`、app directory、Space topology 主表独立 rebuild。
 - Switcher/Home 首帧只读 projection 的 P0 已在 Phase 2 落地；旧采样桥仍作为 service-owned repair/fallback 兼容入口，不是目标热路径。
-- Search committed/staging index 未在本阶段实现，必须等 store/generation seam 稳定后推进。
+- Search committed/staging index 已在 Phase 4 落地到 `RuntimeReadModelStore` ownership；Phase 1 的剩余 gap 不再是 Search index 缺失，而是 projection builders 尚未完全从底层 `RuntimeWindowRecord`、app directory、Space topology 主表独立 rebuild。
 
 验证：
 
@@ -833,7 +833,7 @@ Runtime infrastructure 负责：
 
 仍保留的 P1/P2：
 
-- `readSearchWindowProjection()` 未在本阶段实现；Search 必须在 committed/staging index 阶段推进，不能成为第二个 runtime store。
+- Search hot-path read 已由 Phase 4 的 committed/staging index 和 readiness-bearing `readCommittedSearchIndexForSearch()` 承接；不再新增 surface-facing `readSearchWindowProjection()`，避免 Search 成为第二个 runtime store。
 - Switcher session-start background full snapshot 已在 Phase 3 P0 降级为 runtime-owned projection maintenance request；priority/coalescing/cancellation/backoff breadth 仍留给 Phase 3 P1/P2。
 - 本阶段新增的是 behavior/pressure 证明；真实 UI/E2E 拓扑 proof 沿用既有 fixture 覆盖，未新增专门的 projection-read UI 断言。
 
