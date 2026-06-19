@@ -423,110 +423,31 @@ extension RuntimeSnapshotProvider {
         windowsByPID: [pid_t: [WindowListEntry]],
         hideMinimizedAppsFromAppLayer: Bool
     ) -> [NSRunningApplication] {
-        let candidateAppBundlePaths = Self.appBundlePaths(for: apps)
-
-        return apps.filter { app in
+        let windowStatsByPID = Dictionary(uniqueKeysWithValues: apps.map { app in
             let windows = windowsByPID[app.processIdentifier] ?? []
-            guard !Self.shouldHideZeroWindowNestedApp(
-                hasWindows: !windows.isEmpty,
-                bundleURL: app.bundleURL,
-                candidateAppBundlePaths: candidateAppBundlePaths
-            ) else {
-                let appName = app.localizedName ?? app.bundleIdentifier ?? "pid:\(app.processIdentifier)"
-                RuntimeLog.debug(.projection, "skip nested zero-window app=\(appName) pid=\(app.processIdentifier)")
-                return false
-            }
-            let hasVisibleWindow = windows.contains(where: { !$0.isMinimized })
-            guard RuntimeAppLayerProjectionFilter.shouldIncludeAppInAppLayer(
-                hasWindows: !windows.isEmpty,
-                hasVisibleWindow: hasVisibleWindow,
-                hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
-            ) else {
-                let appName = app.localizedName ?? app.bundleIdentifier ?? "pid:\(app.processIdentifier)"
-                RuntimeLog.debug(.projection, "skip minimized-only app=\(appName) pid=\(app.processIdentifier)")
-                return false
-            }
-            return true
-        }
+            return (
+                app.processIdentifier,
+                RuntimeAppWindowStats(
+                    windowCount: windows.count,
+                    hasVisibleWindow: windows.contains(where: { !$0.isMinimized })
+                )
+            )
+        })
+        return RuntimeAppDirectory(apps: apps).filterAppLayerCandidates(
+            windowStatsByPID: windowStatsByPID,
+            hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
+        )
     }
 
     func filterAppsForAppLayer(
         _ apps: [NSRunningApplication],
-        windowStatsByPID: [pid_t: AXWindowStats],
+        windowStatsByPID: [pid_t: RuntimeAppWindowStats],
         hideMinimizedAppsFromAppLayer: Bool
     ) -> [NSRunningApplication] {
-        let candidateAppBundlePaths = Self.appBundlePaths(for: apps)
-
-        return apps.filter { app in
-            let stats = windowStatsByPID[app.processIdentifier]
-                ?? AXWindowStats(windowCount: 0, hasVisibleWindow: false)
-            guard !Self.shouldHideZeroWindowNestedApp(
-                hasWindows: stats.windowCount > 0,
-                bundleURL: app.bundleURL,
-                candidateAppBundlePaths: candidateAppBundlePaths
-            ) else {
-                let appName = app.localizedName ?? app.bundleIdentifier ?? "pid:\(app.processIdentifier)"
-                RuntimeLog.debug(.projection, "skip nested zero-window app=\(appName) pid=\(app.processIdentifier)")
-                return false
-            }
-            guard RuntimeAppLayerProjectionFilter.shouldIncludeAppInAppLayer(
-                hasWindows: stats.windowCount > 0,
-                hasVisibleWindow: stats.hasVisibleWindow,
-                hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
-            ) else {
-                let appName = app.localizedName ?? app.bundleIdentifier ?? "pid:\(app.processIdentifier)"
-                RuntimeLog.debug(.projection, "skip minimized-only app=\(appName) pid=\(app.processIdentifier)")
-                return false
-            }
-            return true
-        }
-    }
-
-    private static func appBundlePaths(for apps: [NSRunningApplication]) -> Set<String> {
-        Set(apps.compactMap { standardizedAppBundlePath(for: $0.bundleURL) })
-    }
-
-    static func shouldHideZeroWindowNestedApp(
-        hasWindows: Bool,
-        bundleURL: URL?,
-        candidateAppBundlePaths: Set<String>
-    ) -> Bool {
-        guard !hasWindows else { return false }
-        guard
-            let bundlePath = standardizedAppBundlePath(for: bundleURL),
-            candidateAppBundlePaths.count > 1
-        else {
-            return false
-        }
-
-        return appBundleAncestorPaths(for: bundlePath).contains { candidateAppBundlePaths.contains($0) }
-    }
-
-    static func standardizedAppBundlePath(for bundleURL: URL?) -> String? {
-        guard let bundleURL else { return nil }
-        let standardizedURL = bundleURL.standardizedFileURL
-        guard standardizedURL.pathExtension.caseInsensitiveCompare("app") == .orderedSame else {
-            return nil
-        }
-        return standardizedURL.path
-    }
-
-    private static func appBundleAncestorPaths(for bundlePath: String) -> [String] {
-        var ancestorPaths: [String] = []
-        var currentURL = URL(fileURLWithPath: bundlePath).deletingLastPathComponent()
-
-        while currentURL.path != "/" {
-            let standardizedURL = currentURL.standardizedFileURL
-            if standardizedURL.pathExtension.caseInsensitiveCompare("app") == .orderedSame {
-                ancestorPaths.append(standardizedURL.path)
-            }
-
-            let parentURL = currentURL.deletingLastPathComponent()
-            guard parentURL.path != currentURL.path else { break }
-            currentURL = parentURL
-        }
-
-        return ancestorPaths
+        RuntimeAppDirectory(apps: apps).filterAppLayerCandidates(
+            windowStatsByPID: windowStatsByPID,
+            hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
+        )
     }
 
 }

@@ -118,11 +118,6 @@ final class RuntimeSnapshotProvider {
         }
     }
 
-    struct AXWindowStats {
-        let windowCount: Int
-        let hasVisibleWindow: Bool
-    }
-
     struct AXAppWindowCollection {
         let app: NSRunningApplication
         let appName: String
@@ -550,13 +545,13 @@ final class RuntimeSnapshotProvider {
         return normalizedTitle.caseInsensitiveCompare(normalizedAppName) == .orderedSame
     }
 
-    func collectAXWindowStats(for runningApps: [NSRunningApplication]) -> [pid_t: AXWindowStats] {
+    func collectAXWindowStats(for runningApps: [NSRunningApplication]) -> [pid_t: RuntimeAppWindowStats] {
         guard AccessibilityPermissionChecker.isTrusted() else {
             RuntimeLog.warning(.ax, "not trusted; all app windows will be reported as 0")
             return [:]
         }
 
-        var statsByPID: [pid_t: AXWindowStats] = [:]
+        var statsByPID: [pid_t: RuntimeAppWindowStats] = [:]
         for app in runningApps {
             let windows = AXWindowInspector.windows(for: app)
             guard !windows.isEmpty else { continue }
@@ -571,7 +566,7 @@ final class RuntimeSnapshotProvider {
                 }
             }
             guard count > 0 else { continue }
-            statsByPID[app.processIdentifier] = AXWindowStats(
+            statsByPID[app.processIdentifier] = RuntimeAppWindowStats(
                 windowCount: count,
                 hasVisibleWindow: hasVisibleWindow
             )

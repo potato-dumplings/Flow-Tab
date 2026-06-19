@@ -29,35 +29,15 @@ extension FlowTabPriorityCoverageTests {
             bundlePath: "/Applications/Visual Studio Code.app"
         )
 
-        let provider = RuntimeSnapshotProvider()
-        let filteredApps = provider.filterAppsForAppLayer(
-            [
-                hostApp,
-                nestedAppEx,
-                nestedMiniProgram,
-                ordinaryZeroWindowApp
-            ],
-            windowsByPID: [
-                hostApp.processIdentifier: [
-                    RuntimeSnapshotProvider.WindowListEntry(
-                        windowID: "cg:10:100",
-                        title: "微信",
-                        isMinimized: false,
-                        cgWindowID: 100
-                    ),
-                    RuntimeSnapshotProvider.WindowListEntry(
-                        windowID: "cg:10:101",
-                        title: "微信（窗口）",
-                        isMinimized: false,
-                        cgWindowID: 101
-                    ),
-                    RuntimeSnapshotProvider.WindowListEntry(
-                        windowID: "cg:10:102",
-                        title: "Mock Mini Program Window",
-                        isMinimized: false,
-                        cgWindowID: 102
-                    )
-                ]
+        let apps = [
+            hostApp,
+            nestedAppEx,
+            nestedMiniProgram,
+            ordinaryZeroWindowApp
+        ]
+        let filteredApps = RuntimeAppDirectory(apps: apps).filterAppLayerCandidates(
+            windowStatsByPID: [
+                hostApp.processIdentifier: RuntimeAppWindowStats(windowCount: 3, hasVisibleWindow: true)
             ],
             hideMinimizedAppsFromAppLayer: false
         )
@@ -85,29 +65,14 @@ extension FlowTabPriorityCoverageTests {
             bundlePath: "/Applications/Host.app/Contents/Helpers/Host Helper.app"
         )
 
-        let provider = RuntimeSnapshotProvider()
-        let filteredApps = provider.filterAppsForAppLayer(
-            [
-                hostApp,
-                nestedApp
-            ],
-            windowsByPID: [
-                hostApp.processIdentifier: [
-                    RuntimeSnapshotProvider.WindowListEntry(
-                        windowID: "cg:10:100",
-                        title: "Host",
-                        isMinimized: false,
-                        cgWindowID: 100
-                    )
-                ],
-                nestedApp.processIdentifier: [
-                    RuntimeSnapshotProvider.WindowListEntry(
-                        windowID: "cg:11:200",
-                        title: "Helper Window",
-                        isMinimized: false,
-                        cgWindowID: 200
-                    )
-                ]
+        let apps = [
+            hostApp,
+            nestedApp
+        ]
+        let filteredApps = RuntimeAppDirectory(apps: apps).filterAppLayerCandidates(
+            windowStatsByPID: [
+                hostApp.processIdentifier: RuntimeAppWindowStats(windowCount: 1, hasVisibleWindow: true),
+                nestedApp.processIdentifier: RuntimeAppWindowStats(windowCount: 1, hasVisibleWindow: true)
             ],
             hideMinimizedAppsFromAppLayer: false
         )
@@ -147,16 +112,15 @@ extension FlowTabPriorityCoverageTests {
             bundlePath: "/Applications/Mock Top Level Zero Window.app"
         )
 
-        let provider = RuntimeSnapshotProvider()
-        let filteredApps = provider.filterAppsForAppLayer(
-            [
-                hostApp,
-                nestedAppEx,
-                nestedMiniProgram,
-                ordinaryZeroWindowApp
-            ],
+        let apps = [
+            hostApp,
+            nestedAppEx,
+            nestedMiniProgram,
+            ordinaryZeroWindowApp
+        ]
+        let filteredApps = RuntimeAppDirectory(apps: apps).filterAppLayerCandidates(
             windowStatsByPID: [
-                hostApp.processIdentifier: .init(windowCount: 3, hasVisibleWindow: true)
+                hostApp.processIdentifier: RuntimeAppWindowStats(windowCount: 3, hasVisibleWindow: true)
             ],
             hideMinimizedAppsFromAppLayer: false
         )
@@ -184,15 +148,14 @@ extension FlowTabPriorityCoverageTests {
             bundlePath: "/Applications/Host.app/Contents/Helpers/Host Helper.app"
         )
 
-        let provider = RuntimeSnapshotProvider()
-        let filteredApps = provider.filterAppsForAppLayer(
-            [
-                hostApp,
-                nestedApp
-            ],
+        let apps = [
+            hostApp,
+            nestedApp
+        ]
+        let filteredApps = RuntimeAppDirectory(apps: apps).filterAppLayerCandidates(
             windowStatsByPID: [
-                hostApp.processIdentifier: .init(windowCount: 1, hasVisibleWindow: true),
-                nestedApp.processIdentifier: .init(windowCount: 1, hasVisibleWindow: true)
+                hostApp.processIdentifier: RuntimeAppWindowStats(windowCount: 1, hasVisibleWindow: true),
+                nestedApp.processIdentifier: RuntimeAppWindowStats(windowCount: 1, hasVisibleWindow: true)
             ],
             hideMinimizedAppsFromAppLayer: false
         )

@@ -50,8 +50,8 @@ extension RuntimeSnapshotProvider {
 
     static func mergedWindowStats(
         processIDs: [pid_t],
-        windowStatsByPID: [pid_t: AXWindowStats]
-    ) -> AXWindowStats {
+        windowStatsByPID: [pid_t: RuntimeAppWindowStats]
+    ) -> RuntimeAppWindowStats {
         var windowCount = 0
         var hasVisibleWindow = false
         for pid in processIDs {
@@ -59,13 +59,13 @@ extension RuntimeSnapshotProvider {
             windowCount += stats.windowCount
             hasVisibleWindow = hasVisibleWindow || stats.hasVisibleWindow
         }
-        return AXWindowStats(windowCount: windowCount, hasVisibleWindow: hasVisibleWindow)
+        return RuntimeAppWindowStats(windowCount: windowCount, hasVisibleWindow: hasVisibleWindow)
     }
 
     static func mergedWindowStatsForTesting(
         processIDs: [pid_t],
-        windowStatsByPID: [pid_t: AXWindowStats]
-    ) -> AXWindowStats {
+        windowStatsByPID: [pid_t: RuntimeAppWindowStats]
+    ) -> RuntimeAppWindowStats {
         mergedWindowStats(processIDs: processIDs, windowStatsByPID: windowStatsByPID)
     }
 }

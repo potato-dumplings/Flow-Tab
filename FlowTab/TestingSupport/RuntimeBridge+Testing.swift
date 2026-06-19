@@ -370,7 +370,9 @@ extension RuntimeSnapshotProvider {
                     || !FlowTabUITestMockRuntimeEffects.isTerminated(appID: definition.appID)
             }
         let candidateAppBundlePaths = Set(
-            availableAppDefinitions.compactMap { standardizedAppBundlePath(for: $0.bundleURL) }
+            availableAppDefinitions.compactMap {
+                RuntimeAppDirectory.standardizedAppBundlePath(for: $0.bundleURL)
+            }
         )
         let appDefinitions = availableAppDefinitions
             .filter { definition in
@@ -514,7 +516,7 @@ extension RuntimeSnapshotProvider {
         let hideMinimizedAppsFromAppLayer =
             SwitcherBehaviorPreferencesStore.loadHideMinimizedAppsFromAppLayer()
         let hasVisibleWindow = definition.windows.contains { !$0.isMinimized }
-        guard !shouldHideZeroWindowNestedApp(
+        guard !RuntimeAppDirectory.shouldHideZeroWindowNestedApp(
             hasWindows: !definition.windows.isEmpty,
             bundleURL: definition.bundleURL,
             candidateAppBundlePaths: candidateAppBundlePaths
