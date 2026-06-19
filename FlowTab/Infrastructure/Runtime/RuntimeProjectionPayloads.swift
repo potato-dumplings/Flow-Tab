@@ -12,11 +12,11 @@ struct RuntimeFullRepairProjectionPayload {
     init(
         apps: [AppSwitchCandidate],
         contextsByID: [String: RuntimeAppContext],
-        appDirectoryEntries: [RuntimeAppDirectoryEntry]? = nil
+        appDirectoryEntries: [RuntimeAppDirectoryEntry]
     ) {
         self.apps = apps
         self.contextsByID = contextsByID
-        self.appDirectoryEntries = appDirectoryEntries ?? []
+        self.appDirectoryEntries = appDirectoryEntries
     }
 }
 

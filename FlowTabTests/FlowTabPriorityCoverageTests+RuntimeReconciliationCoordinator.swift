@@ -246,7 +246,8 @@ extension FlowTabPriorityCoverageTests {
 
         let payload = RuntimeFullRepairProjectionPayload(
             apps: [app],
-            contextsByID: [app.id: context]
+            contextsByID: [app.id: context],
+            appDirectoryEntries: []
         )
 
         XCTAssertTrue(payload.appDirectoryEntries.isEmpty)
@@ -2310,7 +2311,11 @@ extension FlowTabPriorityCoverageTests {
                     return .transientEmptyCurrentAppWindowPayload
                 case .fullRepair:
                     return .completedWithFullRepairProjection(
-                        RuntimeFullRepairProjectionPayload(apps: [repairedApp], contextsByID: [:])
+                        RuntimeFullRepairProjectionPayload(
+                            apps: [repairedApp],
+                            contextsByID: [:],
+                            appDirectoryEntries: []
+                        )
                     )
                 case .spaceTopology:
                     return .completed
