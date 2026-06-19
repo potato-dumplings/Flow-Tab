@@ -351,7 +351,6 @@ extension FlowTabTests {
             let store = RuntimeReadModelStore()
             let service = RuntimeProjectionService(
                 label: "FlowTabTests.RuntimeProjectionService.DefaultFullRepair",
-                repairProvider: RuntimeSnapshotProvider(),
                 readModelStore: store
             )
 

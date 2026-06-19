@@ -59,7 +59,74 @@ protocol RuntimeProjectionRepairProviding: AnyObject {
     func isLikelyTransientAXRebuild(for pid: pid_t) -> Bool
 }
 
-extension RuntimeSnapshotProvider: RuntimeProjectionRepairProviding {}
+final class RuntimeProjectionRepairProvider: RuntimeProjectionRepairProviding {
+    private let snapshotProvider: RuntimeSnapshotProvider
+
+    init(snapshotProvider: RuntimeSnapshotProvider = RuntimeSnapshotProvider()) {
+        self.snapshotProvider = snapshotProvider
+    }
+
+    var reconciliationCoordinator: RuntimeReconciliationCoordinator {
+        snapshotProvider.reconciliationCoordinator
+    }
+
+    func collectCGWindowsWithSpaceTopologyDiff(
+        options: CGWindowListOption
+    ) -> RuntimeCGWindowCollection {
+        snapshotProvider.collectCGWindowsWithSpaceTopologyDiff(options: options)
+    }
+
+    func appReconciliationTargets(
+        affectedCGWindowIDs: Set<CGWindowID>,
+        currentCGWindowsByPID: [pid_t: [RuntimeCGWindowEntry]]
+    ) -> [RuntimeAffectedWindowReconciliationTarget] {
+        snapshotProvider.appReconciliationTargets(
+            affectedCGWindowIDs: affectedCGWindowIDs,
+            currentCGWindowsByPID: currentCGWindowsByPID
+        )
+    }
+
+    func reconcileAppWindows(
+        processIdentifier pid: pid_t,
+        affectedCGWindowIDs: Set<CGWindowID>
+    ) -> RuntimeAppWindowReconciliationResult {
+        snapshotProvider.reconcileAppWindows(
+            processIdentifier: pid,
+            affectedCGWindowIDs: affectedCGWindowIDs
+        )
+    }
+
+    func fullRepairProjectionPayload() -> RuntimeFullRepairProjectionPayload {
+        snapshotProvider.fullRepairProjectionPayload()
+    }
+
+    func signalAXWindowDestroyed(
+        processIdentifier pid: pid_t,
+        axWindowID: String,
+        now: TimeInterval
+    ) -> CGWindowID? {
+        snapshotProvider.signalAXWindowDestroyed(
+            processIdentifier: pid,
+            axWindowID: axWindowID,
+            now: now
+        )
+    }
+
+    func clearWindowMappingState(for pid: pid_t) {
+        snapshotProvider.clearWindowMappingState(for: pid)
+    }
+
+    func recordWindowFocusVerification(
+        _ verification: RuntimeWindowFocusVerification,
+        now: TimeInterval
+    ) {
+        snapshotProvider.recordWindowFocusVerification(verification, now: now)
+    }
+
+    func isLikelyTransientAXRebuild(for pid: pid_t) -> Bool {
+        snapshotProvider.isLikelyTransientAXRebuild(for: pid)
+    }
+}
 
 final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Sendable {
     enum ReconciliationExecutionOutcome {
@@ -105,7 +172,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
 
     init(
         label: String = "FlowTab.RuntimeProjectionService",
-        repairProvider: RuntimeProjectionRepairProviding = RuntimeSnapshotProvider(),
+        repairProvider: RuntimeProjectionRepairProviding = RuntimeProjectionRepairProvider(),
         readModelStore: RuntimeReadModelStore = RuntimeReadModelStore(),
         reconciliationExecutor: @escaping ReconciliationExecutor = RuntimeProjectionService.defaultReconciliationExecutor
     ) {
