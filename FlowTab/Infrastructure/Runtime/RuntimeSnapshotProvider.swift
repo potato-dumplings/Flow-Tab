@@ -244,14 +244,6 @@ final class RuntimeSnapshotProvider {
         self.reconciliationCoordinator = reconciliationCoordinator
     }
 
-    func snapshot() -> RuntimeSnapshot {
-        let payload = fullRepairProjectionPayload(timingEvent: "provider")
-        return RuntimeSnapshot(
-            apps: payload.apps,
-            contextsByID: payload.contextsByID
-        )
-    }
-
     func fullRepairProjectionPayload() -> RuntimeFullRepairProjectionPayload {
         fullRepairProjectionPayload(timingEvent: "fullRepairProjectionPayload")
     }

@@ -312,10 +312,6 @@ extension FlowTabTests {
             XCTAssertEqual(fullRepairPayload.apps.first?.id, "com.flowtab.mock.mail")
             XCTAssertEqual(fullRepairPayload.apps.first?.windows.count, 2)
 
-            let snapshot = provider.snapshot()
-            XCTAssertEqual(snapshot.apps.map(\.id), fullRepairPayload.apps.map(\.id))
-            XCTAssertEqual(snapshot.contextsByID.count, fullRepairPayload.contextsByID.count)
-
             let currentAppWindowPayload = provider.currentAppWindowPayload(for: "com.flowtab.mock.mail")
             XCTAssertNotNil(currentAppWindowPayload)
             XCTAssertEqual(currentAppWindowPayload?.candidate.id, "com.flowtab.mock.mail")

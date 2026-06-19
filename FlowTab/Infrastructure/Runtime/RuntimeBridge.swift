@@ -8,11 +8,6 @@ enum WindowTitleBarStyleGuess: String {
     case light
 }
 
-struct RuntimeSnapshot {
-    let apps: [AppSwitchCandidate]
-    let contextsByID: [String: RuntimeAppContext]
-}
-
 struct RuntimeFullRepairProjectionPayload {
     let apps: [AppSwitchCandidate]
     let contextsByID: [String: RuntimeAppContext]
