@@ -212,7 +212,8 @@ extension FlowTabPriorityCoverageTests {
                 pid: runningApp.processIdentifier
             ),
             candidate: candidate,
-            context: context
+            context: context,
+            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: runningApp)]
         )
         return RecordingRuntimeProjectionService(
             currentAppWindowProjectionsByAppID: [
@@ -252,7 +253,8 @@ extension FlowTabPriorityCoverageTests {
                             pid: context.runningApp.processIdentifier
                         ),
                         candidate: candidate,
-                        context: context
+                        context: context,
+                        appDirectoryEntries: [RuntimeAppDirectoryEntry(app: context.runningApp)]
                     ),
                     freshness: RuntimeProjectionFreshness(
                         generatedAt: generatedAt,

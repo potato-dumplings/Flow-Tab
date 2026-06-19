@@ -727,7 +727,8 @@ extension FlowTabPriorityCoverageTests {
                 appID: repairedApp.id,
                 runningApp: .current,
                 windows: repairedApp.windows
-            )
+            ),
+            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: .current)]
         )
         store.commitAppSwitcherProjection(
             apps: committedApps,
@@ -2384,7 +2385,8 @@ extension FlowTabPriorityCoverageTests {
                 appID: app.id,
                 runningApp: .current,
                 windows: app.windows
-            )
+            ),
+            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: .current)]
         )
     }
 }

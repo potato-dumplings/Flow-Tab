@@ -196,7 +196,8 @@ extension FlowTabPriorityCoverageTests {
                 pid: runningApp.processIdentifier
             ),
             candidate: candidate,
-            context: context
+            context: context,
+            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: runningApp)]
         )
         return RecordingRuntimeProjectionService(
             currentAppWindowProjectionsByAppID: [
@@ -462,7 +463,8 @@ extension FlowTabPriorityCoverageTests {
                 pid: runningApp.processIdentifier
             ),
             candidate: windowCandidate,
-            context: context
+            context: context,
+            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: runningApp)]
         )
         let freshness = RuntimeProjectionFreshness(
             generatedAt: 11,
@@ -562,6 +564,7 @@ extension FlowTabPriorityCoverageTests {
             lastActiveAt: 100,
             windows: windows
         )
+        let context = makeRuntimeAppContext(appID: appID, runningApp: runningApp, windows: windows)
         let currentAppWindowPayload = RuntimeCurrentAppWindowPayload(
             summary: RuntimeHomeAppSummary(
                 appID: appID,
@@ -572,7 +575,8 @@ extension FlowTabPriorityCoverageTests {
                 pid: runningApp.processIdentifier
             ),
             candidate: candidate,
-            context: makeRuntimeAppContext(appID: appID, runningApp: runningApp, windows: windows)
+            context: context,
+            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: runningApp)]
         )
         let runtimeProjectionService = RecordingRuntimeProjectionService(
             currentAppWindowProjectionsByAppID: [
@@ -988,7 +992,8 @@ extension FlowTabPriorityCoverageTests {
                 pid: currentApp.processIdentifier
             ),
             candidate: windowCandidate,
-            context: context
+            context: context,
+            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: currentApp)]
         )
         let freshness = RuntimeProjectionFreshness(
             generatedAt: 12,

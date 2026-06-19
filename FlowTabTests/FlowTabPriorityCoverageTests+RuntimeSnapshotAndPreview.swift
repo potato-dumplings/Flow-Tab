@@ -285,7 +285,8 @@ extension FlowTabPriorityCoverageTests {
                     candidateLastActiveAt: 997,
                     pid: 30,
                     runningApp: currentApp,
-                    windowSeeds: []
+                    windowSeeds: [],
+                    appDirectoryEntries: []
                 ),
                 RuntimeCurrentAppWindowProjectionAssemblyInput(
                     appID: "com.example.mail",
@@ -312,7 +313,8 @@ extension FlowTabPriorityCoverageTests {
                             ownerPID: 11,
                             cgWindowID: 12
                         )
-                    ]
+                    ],
+                    appDirectoryEntries: []
                 )
             ],
             appDirectoryEntries: appDirectoryEntries
@@ -423,7 +425,8 @@ extension FlowTabPriorityCoverageTests {
                             bindingCandidateCount: 1,
                             spaceEvidence: evidence
                         )
-                    ]
+                    ],
+                    appDirectoryEntries: []
                 ),
                 RuntimeCurrentAppWindowProjectionAssemblyInput(
                     appID: "com.example.beta",
@@ -433,7 +436,8 @@ extension FlowTabPriorityCoverageTests {
                     candidateLastActiveAt: 3_000,
                     pid: 711,
                     runningApp: currentApp,
-                    windowSeeds: []
+                    windowSeeds: [],
+                    appDirectoryEntries: []
                 )
             ]
         )
@@ -1892,7 +1896,8 @@ extension FlowTabPriorityCoverageTests {
                             ownerPID: 41,
                             cgWindowID: 41
                         )
-                    ]
+                    ],
+                    appDirectoryEntries: []
                 ),
                 RuntimeCurrentAppWindowProjectionAssemblyInput(
                     appID: "pid:42",
@@ -1911,7 +1916,8 @@ extension FlowTabPriorityCoverageTests {
                             ownerPID: 42,
                             cgWindowID: 42
                         )
-                    ]
+                    ],
+                    appDirectoryEntries: []
                 )
             ]
         )

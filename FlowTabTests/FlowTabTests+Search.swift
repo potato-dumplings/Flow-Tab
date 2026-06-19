@@ -1112,7 +1112,8 @@ extension FlowTabTests {
                 pid: runningApp.processIdentifier
             ),
             candidate: candidate,
-            context: context
+            context: context,
+            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: runningApp)]
         )
         let runtimeProjectionService = RecordingRuntimeProjectionService(
             currentAppWindowProjectionsByAppID: [
@@ -1280,7 +1281,8 @@ extension FlowTabTests {
                     pid: selectedContext.runningApp.processIdentifier
                 ),
                 candidate: selectedApp,
-                context: selectedContext
+                context: selectedContext,
+                appDirectoryEntries: [RuntimeAppDirectoryEntry(app: selectedContext.runningApp)]
             )
 
             let applyStart = DispatchTime.now().uptimeNanoseconds

@@ -40,7 +40,8 @@ extension FlowTabPriorityCoverageTests {
                     ownerPID: app.processIdentifier,
                     cgWindowID: nil
                 )
-            ]
+            ],
+            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: app)]
         )
         let payload = RuntimeCurrentAppWindowPayload(assemblyInput: assemblyInput)
 

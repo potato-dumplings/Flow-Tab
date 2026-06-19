@@ -482,7 +482,8 @@ extension FlowTabPriorityCoverageTests {
                 lastActiveAt: 100,
                 windows: windows
             ),
-            context: context
+            context: context,
+            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: currentApp)]
         )
 
         now = 800
@@ -495,6 +496,7 @@ extension FlowTabPriorityCoverageTests {
             ["second", "first", "third"]
         )
         XCTAssertEqual(updatedPayload.summary.windowCount, 3)
+        XCTAssertEqual(updatedPayload.appDirectoryEntries, payload.appDirectoryEntries)
     }
 
     @MainActor
@@ -766,7 +768,8 @@ extension FlowTabPriorityCoverageTests {
                 lastActiveAt: 100,
                 windows: windows
             ),
-            context: context
+            context: context,
+            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: currentApp)]
         )
         let runtimeProjectionService = RecordingRuntimeProjectionService(
             currentAppWindowProjectionsByAppID: [

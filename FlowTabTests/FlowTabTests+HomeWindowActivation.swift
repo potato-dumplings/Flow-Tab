@@ -93,7 +93,10 @@ extension FlowTabTests {
                     currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
                         summary: detailProjection.summary,
                         candidate: detailProjection.candidate,
-                        context: detailProjection.context
+                        context: detailProjection.context,
+                        appDirectoryEntries: [
+                            RuntimeAppDirectoryEntry(app: detailProjection.context.runningApp)
+                        ]
                     ),
                     freshness: freshness
                 )
@@ -286,7 +289,10 @@ extension FlowTabTests {
                     currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
                         summary: detailProjection.summary,
                         candidate: detailProjection.candidate,
-                        context: detailProjection.context
+                        context: detailProjection.context,
+                        appDirectoryEntries: [
+                            RuntimeAppDirectoryEntry(app: detailProjection.context.runningApp)
+                        ]
                     ),
                     freshness: freshness
                 )

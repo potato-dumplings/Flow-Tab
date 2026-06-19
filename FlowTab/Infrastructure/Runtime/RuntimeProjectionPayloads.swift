@@ -154,7 +154,7 @@ struct RuntimeCurrentAppWindowProjectionAssemblyInput {
         pid: pid_t,
         runningApp: NSRunningApplication,
         windowSeeds: [RuntimeAppWindowProjectionSeed],
-        appDirectoryEntries: [RuntimeAppDirectoryEntry]? = nil
+        appDirectoryEntries: [RuntimeAppDirectoryEntry]
     ) {
         self.appID = appID
         self.displayName = displayName
@@ -165,7 +165,6 @@ struct RuntimeCurrentAppWindowProjectionAssemblyInput {
         self.runningApp = runningApp
         self.windowSeeds = windowSeeds
         self.appDirectoryEntries = appDirectoryEntries
-            ?? [RuntimeAppDirectoryEntry(app: runningApp)]
     }
 
     init(
@@ -207,13 +206,12 @@ struct RuntimeCurrentAppWindowPayload {
         summary: RuntimeHomeAppSummary,
         candidate: AppSwitchCandidate,
         context: RuntimeAppContext,
-        appDirectoryEntries: [RuntimeAppDirectoryEntry]? = nil
+        appDirectoryEntries: [RuntimeAppDirectoryEntry]
     ) {
         self.summary = summary
         self.candidate = candidate
         self.context = context
         self.appDirectoryEntries = appDirectoryEntries
-            ?? [RuntimeAppDirectoryEntry(app: context.runningApp)]
     }
 
     private init(

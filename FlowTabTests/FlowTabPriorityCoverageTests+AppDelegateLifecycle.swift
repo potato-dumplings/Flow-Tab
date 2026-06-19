@@ -700,7 +700,8 @@ extension FlowTabPriorityCoverageTests {
                 pid: currentApp.processIdentifier
             ),
             candidate: currentAppCandidate,
-            context: currentAppContext
+            context: currentAppContext,
+            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: currentApp)]
         )
         let projectionFreshness = RuntimeProjectionFreshness(
             generatedAt: 400,

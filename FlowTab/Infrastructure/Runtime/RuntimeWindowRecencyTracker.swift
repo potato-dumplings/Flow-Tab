@@ -237,7 +237,8 @@ final class RuntimeWindowRecencyTracker: @unchecked Sendable {
         return RuntimeCurrentAppWindowPayload(
             summary: payload.summary,
             candidate: candidate,
-            context: payload.context
+            context: payload.context,
+            appDirectoryEntries: payload.appDirectoryEntries
         )
     }
 
