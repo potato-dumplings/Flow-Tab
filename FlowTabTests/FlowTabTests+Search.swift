@@ -609,6 +609,7 @@ extension FlowTabTests {
         store.commitAppSwitcherProjection(
             apps: [committedSearchApp],
             contextsByID: [:],
+            appDirectoryEntries: nil,
             generatedAt: 10
         )
         store.markAppWindowsDirty(

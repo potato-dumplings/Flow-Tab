@@ -421,6 +421,7 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         store.commitAppSwitcherProjection(
             apps: apps,
             contextsByID: [:],
+            appDirectoryEntries: nil,
             generatedAt: generatedAt
         )
         return store.readCommittedSearchIndexForSearch().projection!

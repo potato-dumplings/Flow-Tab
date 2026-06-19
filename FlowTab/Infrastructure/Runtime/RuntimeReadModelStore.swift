@@ -231,7 +231,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     func commitAppSwitcherProjection(
         apps: [AppSwitchCandidate],
         contextsByID: [String: RuntimeAppContext],
-        appDirectoryEntries: [RuntimeAppDirectoryEntry]? = nil,
+        appDirectoryEntries: [RuntimeAppDirectoryEntry]?,
         clearsDirtyState: Bool = true,
         generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
     ) {

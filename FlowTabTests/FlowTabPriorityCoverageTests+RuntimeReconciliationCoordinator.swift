@@ -228,6 +228,7 @@ extension FlowTabPriorityCoverageTests {
         store.commitAppSwitcherProjection(
             apps: [app],
             contextsByID: [app.id: context],
+            appDirectoryEntries: nil,
             generatedAt: 64
         )
 
@@ -373,6 +374,7 @@ extension FlowTabPriorityCoverageTests {
         store.commitAppSwitcherProjection(
             apps: apps,
             contextsByID: [:],
+            appDirectoryEntries: nil,
             generatedAt: 12
         )
 
@@ -517,6 +519,7 @@ extension FlowTabPriorityCoverageTests {
         readModelStore.commitAppSwitcherProjection(
             apps: [seededApp],
             contextsByID: [:],
+            appDirectoryEntries: nil,
             clearsDirtyState: false,
             generatedAt: 1
         )
@@ -602,6 +605,7 @@ extension FlowTabPriorityCoverageTests {
         store.commitAppSwitcherProjection(
             apps: committedApps,
             contextsByID: [:],
+            appDirectoryEntries: nil,
             generatedAt: 10
         )
 
@@ -650,6 +654,7 @@ extension FlowTabPriorityCoverageTests {
         store.commitAppSwitcherProjection(
             apps: committedApps,
             contextsByID: [:],
+            appDirectoryEntries: nil,
             generatedAt: 10
         )
         store.markAppWindowsDirty(
@@ -727,6 +732,7 @@ extension FlowTabPriorityCoverageTests {
         store.commitAppSwitcherProjection(
             apps: committedApps,
             contextsByID: [:],
+            appDirectoryEntries: nil,
             generatedAt: 10
         )
         store.markAppWindowsDirty(
@@ -1470,6 +1476,7 @@ extension FlowTabPriorityCoverageTests {
         store.commitAppSwitcherProjection(
             apps: [existingApp],
             contextsByID: [:],
+            appDirectoryEntries: nil,
             generatedAt: 10
         )
         let service = RuntimeProjectionService(
@@ -1840,6 +1847,7 @@ extension FlowTabPriorityCoverageTests {
         store.commitAppSwitcherProjection(
             apps: committedApps,
             contextsByID: [:],
+            appDirectoryEntries: nil,
             generatedAt: 10
         )
         var requests: [RuntimeReconciliationRequest] = []
@@ -1925,6 +1933,7 @@ extension FlowTabPriorityCoverageTests {
         store.commitAppSwitcherProjection(
             apps: committedApps,
             contextsByID: [:],
+            appDirectoryEntries: nil,
             generatedAt: 10
         )
         store.markAppWindowsDirty(
@@ -1993,6 +2002,7 @@ extension FlowTabPriorityCoverageTests {
         store.commitAppSwitcherProjection(
             apps: committedApps,
             contextsByID: [:],
+            appDirectoryEntries: nil,
             generatedAt: 10
         )
         store.markAppWindowsDirty(
@@ -2063,6 +2073,7 @@ extension FlowTabPriorityCoverageTests {
         store.commitAppSwitcherProjection(
             apps: committedApps,
             contextsByID: [:],
+            appDirectoryEntries: nil,
             generatedAt: 10
         )
         store.markAppWindowsDirty(
@@ -2134,6 +2145,7 @@ extension FlowTabPriorityCoverageTests {
         store.commitAppSwitcherProjection(
             apps: committedApps,
             contextsByID: [:],
+            appDirectoryEntries: nil,
             generatedAt: 10
         )
         store.markAppWindowsDirty(
@@ -2207,6 +2219,7 @@ extension FlowTabPriorityCoverageTests {
         store.commitAppSwitcherProjection(
             apps: committedApps,
             contextsByID: [:],
+            appDirectoryEntries: nil,
             generatedAt: 10
         )
         store.markAppWindowsDirty(
@@ -2279,6 +2292,7 @@ extension FlowTabPriorityCoverageTests {
         store.commitAppSwitcherProjection(
             apps: committedApps,
             contextsByID: [:],
+            appDirectoryEntries: nil,
             generatedAt: 10
         )
         store.markAppWindowsDirty(
