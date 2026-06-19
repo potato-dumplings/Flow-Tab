@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import FlowTabCore
 
-extension RuntimeSnapshotProvider {
+extension RuntimeProjectionRepairProvider {
     func fullRepairProjectionPayload() -> RuntimeFullRepairProjectionPayload {
         fullRepairProjectionPayload(timingEvent: "fullRepairProjectionPayload")
     }
@@ -12,25 +12,25 @@ extension RuntimeSnapshotProvider {
         rankByPID: [pid_t: Int]
     ) {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
-        cleanupWindowMappingState(for: runningApps)
+        snapshotProvider.cleanupWindowMappingState(for: runningApps)
         let cleanupReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         AXLiveWindowRegistry.shared.prune(to: runningApps)
         let pruneReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let onScreenCGWindowsByPID = collectCGWindowsWithSpaceTopologyDiff().windowsByPID
+        let onScreenCGWindowsByPID = snapshotProvider.collectCGWindowsWithSpaceTopologyDiff().windowsByPID
         let onScreenCGReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let allCGWindowsByPID = collectCGWindowsWithSpaceTopologyDiff(
+        let allCGWindowsByPID = snapshotProvider.collectCGWindowsWithSpaceTopologyDiff(
             options: [.optionAll, .excludeDesktopElements]
         ).windowsByPID
         let allCGReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let axWindowsByPID = collectAXWindowData(
+        let axWindowsByPID = snapshotProvider.collectAXWindowData(
             for: runningApps,
             cgWindowsByPID: onScreenCGWindowsByPID,
             allCGWindowsByPID: allCGWindowsByPID
         )
         let axReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let rankByPID = collectAppRankByPID(for: runningApps)
+        let rankByPID = snapshotProvider.collectAppRankByPID(for: runningApps)
         let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
-        logProjectionTiming(
+        snapshotProvider.logProjectionTiming(
             "collectWindowData",
             fields: [
                 ("apps", "\(runningApps.count)"),
@@ -38,13 +38,13 @@ extension RuntimeSnapshotProvider {
                 ("allCGWindows", "\(allCGWindowsByPID.values.reduce(0) { $0 + $1.count })"),
                 ("windowPIDs", "\(axWindowsByPID.count)"),
                 ("rankPIDs", "\(rankByPID.count)"),
-                ("cleanupMs", formatProjectionMilliseconds(cleanupReadyMs - startMs)),
-                ("registryPruneMs", formatProjectionMilliseconds(pruneReadyMs - cleanupReadyMs)),
-                ("onscreenCGMs", formatProjectionMilliseconds(onScreenCGReadyMs - pruneReadyMs)),
-                ("allCGMs", formatProjectionMilliseconds(allCGReadyMs - onScreenCGReadyMs)),
-                ("axMs", formatProjectionMilliseconds(axReadyMs - allCGReadyMs)),
-                ("rankMs", formatProjectionMilliseconds(completeMs - axReadyMs)),
-                ("totalMs", formatProjectionMilliseconds(completeMs - startMs))
+                ("cleanupMs", snapshotProvider.formatProjectionMilliseconds(cleanupReadyMs - startMs)),
+                ("registryPruneMs", snapshotProvider.formatProjectionMilliseconds(pruneReadyMs - cleanupReadyMs)),
+                ("onscreenCGMs", snapshotProvider.formatProjectionMilliseconds(onScreenCGReadyMs - pruneReadyMs)),
+                ("allCGMs", snapshotProvider.formatProjectionMilliseconds(allCGReadyMs - onScreenCGReadyMs)),
+                ("axMs", snapshotProvider.formatProjectionMilliseconds(axReadyMs - allCGReadyMs)),
+                ("rankMs", snapshotProvider.formatProjectionMilliseconds(completeMs - axReadyMs)),
+                ("totalMs", snapshotProvider.formatProjectionMilliseconds(completeMs - startMs))
             ]
         )
         // Keep a single source of truth for window counting and selection: AX window list.
@@ -58,13 +58,13 @@ extension RuntimeSnapshotProvider {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
         if let uiTestRuntimeDataset = FlowTabUITestRuntimeProjectionDataset.current() {
             let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
-            logProjectionTiming(
+            snapshotProvider.logProjectionTiming(
                 timingEvent,
                 fields: [
                     ("result", "uiTestDataset"),
                     ("apps", "\(uiTestRuntimeDataset.appSwitcherApps.count)"),
                     ("windows", "\(uiTestRuntimeDataset.appSwitcherApps.reduce(0) { $0 + $1.windows.count })"),
-                    ("totalMs", formatProjectionMilliseconds(completeMs - startMs))
+                    ("totalMs", snapshotProvider.formatProjectionMilliseconds(completeMs - startMs))
                 ]
             )
             return RuntimeFullRepairProjectionPayload(
@@ -77,13 +77,13 @@ extension RuntimeSnapshotProvider {
         let runningAppsReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
 
         guard !runningApps.isEmpty else {
-            logProjectionTiming(
+            snapshotProvider.logProjectionTiming(
                 timingEvent,
                 fields: [
                     ("result", "empty"),
                     ("reason", "noRunningApps"),
-                    ("runningAppsMs", formatProjectionMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
-                    ("totalMs", formatProjectionMilliseconds(runningAppsReadyMs - startMs))
+                    ("runningAppsMs", snapshotProvider.formatProjectionMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
+                    ("totalMs", snapshotProvider.formatProjectionMilliseconds(runningAppsReadyMs - startMs))
                 ]
             )
             return RuntimeFullRepairProjectionPayload(apps: [], contextsByID: [:])
@@ -136,7 +136,7 @@ extension RuntimeSnapshotProvider {
 
         guard !appLayerCandidates.isEmpty else {
             let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
-            logProjectionTiming(
+            snapshotProvider.logProjectionTiming(
                 timingEvent,
                 fields: [
                     ("result", "empty"),
@@ -144,10 +144,10 @@ extension RuntimeSnapshotProvider {
                     ("runningApps", "\(runningApps.count)"),
                     ("selectedApps", "\(selectedApps.count)"),
                     ("windows", "\(windowData.windowsByPID.values.reduce(0) { $0 + $1.count })"),
-                    ("runningAppsMs", formatProjectionMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
-                    ("windowDataMs", formatProjectionMilliseconds(windowDataReadyMs - windowDataStartMs)),
-                    ("selectionMs", formatProjectionMilliseconds(selectionReadyMs - selectionStartMs)),
-                    ("totalMs", formatProjectionMilliseconds(completeMs - startMs))
+                    ("runningAppsMs", snapshotProvider.formatProjectionMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
+                    ("windowDataMs", snapshotProvider.formatProjectionMilliseconds(windowDataReadyMs - windowDataStartMs)),
+                    ("selectionMs", snapshotProvider.formatProjectionMilliseconds(selectionReadyMs - selectionStartMs)),
+                    ("totalMs", snapshotProvider.formatProjectionMilliseconds(completeMs - startMs))
                 ]
             )
             return RuntimeFullRepairProjectionPayload(apps: [], contextsByID: [:])
@@ -193,7 +193,7 @@ extension RuntimeSnapshotProvider {
         )
         let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
 
-        logProjectionTiming(
+        snapshotProvider.logProjectionTiming(
             timingEvent,
             fields: [
                 ("result", "ready"),
@@ -202,12 +202,12 @@ extension RuntimeSnapshotProvider {
                 ("appLayerCandidates", "\(appLayerCandidates.count)"),
                 ("windows", "\(payload.apps.reduce(0) { $0 + $1.windows.count })"),
                 ("contexts", "\(payload.contextsByID.count)"),
-                ("runningAppsMs", formatProjectionMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
-                ("windowDataMs", formatProjectionMilliseconds(windowDataReadyMs - windowDataStartMs)),
-                ("selectionMs", formatProjectionMilliseconds(selectionReadyMs - selectionStartMs)),
-                ("rowsMs", formatProjectionMilliseconds(rowsReadyMs - rowsStartMs)),
-                ("sortContextMs", formatProjectionMilliseconds(completeMs - rowsReadyMs)),
-                ("totalMs", formatProjectionMilliseconds(completeMs - startMs))
+                ("runningAppsMs", snapshotProvider.formatProjectionMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
+                ("windowDataMs", snapshotProvider.formatProjectionMilliseconds(windowDataReadyMs - windowDataStartMs)),
+                ("selectionMs", snapshotProvider.formatProjectionMilliseconds(selectionReadyMs - selectionStartMs)),
+                ("rowsMs", snapshotProvider.formatProjectionMilliseconds(rowsReadyMs - rowsStartMs)),
+                ("sortContextMs", snapshotProvider.formatProjectionMilliseconds(completeMs - rowsReadyMs)),
+                ("totalMs", snapshotProvider.formatProjectionMilliseconds(completeMs - startMs))
             ]
         )
 
@@ -222,12 +222,12 @@ extension RuntimeSnapshotProvider {
         let matchingApps = runningApps.filter { RuntimeAppIdentity.appID(for: $0) == appID }
         guard !matchingApps.isEmpty else { return nil }
 
-        let rankByPID = collectAppRankByPID(for: runningApps)
-        let cgWindowsByPID = collectCGWindowsWithSpaceTopologyDiff().windowsByPID
-        let allCGWindowsByPID = collectCGWindowsWithSpaceTopologyDiff(
+        let rankByPID = snapshotProvider.collectAppRankByPID(for: runningApps)
+        let cgWindowsByPID = snapshotProvider.collectCGWindowsWithSpaceTopologyDiff().windowsByPID
+        let allCGWindowsByPID = snapshotProvider.collectCGWindowsWithSpaceTopologyDiff(
             options: [.optionAll, .excludeDesktopElements]
         ).windowsByPID
-        let windowsByPID = collectAXWindowData(
+        let windowsByPID = snapshotProvider.collectAXWindowData(
             for: matchingApps,
             cgWindowsByPID: cgWindowsByPID,
             allCGWindowsByPID: allCGWindowsByPID
@@ -283,13 +283,13 @@ extension RuntimeSnapshotProvider {
             let payload = uiTestRuntimeDataset.currentAppWindowPayloadsByAppID.values.first {
                 $0.summary.pid == pid
             }
-            logProjectionTiming(
+            snapshotProvider.logProjectionTiming(
                 "focusedCurrentAppWindowPayload",
                 fields: [
                     ("result", payload == nil ? "missingPID" : "uiTestDataset"),
                     ("pid", "\(pid)"),
                     ("windows", "\(payload?.candidate.windows.count ?? 0)"),
-                    ("totalMs", formatProjectionMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))
+                    ("totalMs", snapshotProvider.formatProjectionMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))
                 ]
             )
             return payload
@@ -301,30 +301,30 @@ extension RuntimeSnapshotProvider {
         guard let app = runningApps.first(where: { $0.processIdentifier == pid })
             ?? NSRunningApplication(processIdentifier: pid)
         else {
-            logProjectionTiming(
+            snapshotProvider.logProjectionTiming(
                 "focusedCurrentAppWindowPayload",
                 fields: [
                     ("result", "missingRunningApp"),
                     ("pid", "\(pid)"),
                     ("knownApps", "\(runningApps.count)"),
-                    ("runningAppsMs", formatProjectionMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
-                    ("totalMs", formatProjectionMilliseconds(runningAppsReadyMs - startMs))
+                    ("runningAppsMs", snapshotProvider.formatProjectionMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
+                    ("totalMs", snapshotProvider.formatProjectionMilliseconds(runningAppsReadyMs - startMs))
                 ]
             )
             return nil
         }
 
-        cleanupWindowMappingState(for: runningApps)
+        snapshotProvider.cleanupWindowMappingState(for: runningApps)
         AXLiveWindowRegistry.shared.prune(to: runningApps)
         let cleanupReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let cgWindowsByPID = collectCGWindowsWithSpaceTopologyDiff().windowsByPID
+        let cgWindowsByPID = snapshotProvider.collectCGWindowsWithSpaceTopologyDiff().windowsByPID
         let onScreenCGReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let allCGWindowsByPID = collectCGWindowsWithSpaceTopologyDiff(
+        let allCGWindowsByPID = snapshotProvider.collectCGWindowsWithSpaceTopologyDiff(
             options: [.optionAll, .excludeDesktopElements]
         ).windowsByPID
         let allCGReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let focusedApps = [app]
-        let windowsByPID = collectAXWindowData(
+        let windowsByPID = snapshotProvider.collectAXWindowData(
             for: focusedApps,
             cgWindowsByPID: cgWindowsByPID,
             allCGWindowsByPID: allCGWindowsByPID
@@ -352,7 +352,7 @@ extension RuntimeSnapshotProvider {
             hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
         ) {
             let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
-            logProjectionTiming(
+            snapshotProvider.logProjectionTiming(
                 "focusedCurrentAppWindowPayload",
                 fields: [
                     ("result", "minimizedOnly"),
@@ -361,13 +361,13 @@ extension RuntimeSnapshotProvider {
                     ("windows", "\(windows.count)"),
                     ("knownApps", "\(runningApps.count)"),
                     ("axApps", "\(focusedApps.count)"),
-                    ("runningAppsMs", formatProjectionMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
-                    ("cleanupMs", formatProjectionMilliseconds(cleanupReadyMs - runningAppsReadyMs)),
-                    ("onscreenCGMs", formatProjectionMilliseconds(onScreenCGReadyMs - cleanupReadyMs)),
-                    ("allCGMs", formatProjectionMilliseconds(allCGReadyMs - onScreenCGReadyMs)),
-                    ("axMs", formatProjectionMilliseconds(axReadyMs - allCGReadyMs)),
-                    ("rowsMs", formatProjectionMilliseconds(rowsReadyMs - axReadyMs)),
-                    ("totalMs", formatProjectionMilliseconds(completeMs - startMs))
+                    ("runningAppsMs", snapshotProvider.formatProjectionMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
+                    ("cleanupMs", snapshotProvider.formatProjectionMilliseconds(cleanupReadyMs - runningAppsReadyMs)),
+                    ("onscreenCGMs", snapshotProvider.formatProjectionMilliseconds(onScreenCGReadyMs - cleanupReadyMs)),
+                    ("allCGMs", snapshotProvider.formatProjectionMilliseconds(allCGReadyMs - onScreenCGReadyMs)),
+                    ("axMs", snapshotProvider.formatProjectionMilliseconds(axReadyMs - allCGReadyMs)),
+                    ("rowsMs", snapshotProvider.formatProjectionMilliseconds(rowsReadyMs - axReadyMs)),
+                    ("totalMs", snapshotProvider.formatProjectionMilliseconds(completeMs - startMs))
                 ]
             )
             return nil
@@ -388,7 +388,7 @@ extension RuntimeSnapshotProvider {
             )
         )
         let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
-        logProjectionTiming(
+        snapshotProvider.logProjectionTiming(
             "focusedCurrentAppWindowPayload",
             fields: [
                 ("result", payload.candidate.windows.isEmpty ? "empty" : "ready"),
@@ -397,13 +397,13 @@ extension RuntimeSnapshotProvider {
                 ("windows", "\(payload.candidate.windows.count)"),
                 ("knownApps", "\(runningApps.count)"),
                 ("axApps", "\(focusedApps.count)"),
-                ("runningAppsMs", formatProjectionMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
-                ("cleanupMs", formatProjectionMilliseconds(cleanupReadyMs - runningAppsReadyMs)),
-                ("onscreenCGMs", formatProjectionMilliseconds(onScreenCGReadyMs - cleanupReadyMs)),
-                ("allCGMs", formatProjectionMilliseconds(allCGReadyMs - onScreenCGReadyMs)),
-                ("axMs", formatProjectionMilliseconds(axReadyMs - allCGReadyMs)),
-                ("rowsMs", formatProjectionMilliseconds(rowsReadyMs - axReadyMs)),
-                ("totalMs", formatProjectionMilliseconds(completeMs - startMs))
+                ("runningAppsMs", snapshotProvider.formatProjectionMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
+                ("cleanupMs", snapshotProvider.formatProjectionMilliseconds(cleanupReadyMs - runningAppsReadyMs)),
+                ("onscreenCGMs", snapshotProvider.formatProjectionMilliseconds(onScreenCGReadyMs - cleanupReadyMs)),
+                ("allCGMs", snapshotProvider.formatProjectionMilliseconds(allCGReadyMs - onScreenCGReadyMs)),
+                ("axMs", snapshotProvider.formatProjectionMilliseconds(axReadyMs - allCGReadyMs)),
+                ("rowsMs", snapshotProvider.formatProjectionMilliseconds(rowsReadyMs - axReadyMs)),
+                ("totalMs", snapshotProvider.formatProjectionMilliseconds(completeMs - startMs))
             ]
         )
         return payload

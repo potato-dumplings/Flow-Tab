@@ -325,9 +325,9 @@
 
 来源：`FlowTabTests/FlowTabTests.swift`
 
-- `testRuntimeSnapshotProviderUsesProjectionPayloadForUITestMockDatasetWhenLaunchFlagEnabled`
+- `testRuntimeProjectionRepairProviderUsesProjectionPayloadForUITestMockDatasetWhenLaunchFlagEnabled`
   场景：UI test 启动参数要求使用 Mock Runtime 数据集。
-  步骤：注入 `--flowtab-ui-mock-runtime` 后读取 `RuntimeSnapshotProvider.fullRepairProjectionPayload()` 和 current-app projection payload。
+  步骤：注入 `--flowtab-ui-mock-runtime` 后读取 `RuntimeProjectionRepairProvider.fullRepairProjectionPayload()` 和 current-app projection payload。
   验证：projection payload 中的应用数量、首尾应用、窗口数、current-app summary 与上下文映射都与 Mock projection dataset 一致，不经过 legacy `snapshot()` 包装。
 
 - `testAppInventoryServiceReadsUITestRuntimeProjectionDataset`
@@ -335,7 +335,7 @@
   步骤：注入 `--flowtab-ui-mock-runtime` 后读取 `AppInventoryService.installedApps()`。
   验证：Mock Mail、Mock Browser 和文件传输助手来自 `FlowTabUITestRuntimeProjectionDataset`，保持 running/bundle/path metadata 稳定，不通过 provider-owned dataset API。
 
-- `testRuntimeSnapshotProviderRealPathWithoutAccessibilityBuildsConsistentProjectionPayload`
+- `testRuntimeProjectionRepairProviderRealPathWithoutAccessibilityBuildsConsistentProjectionPayload`
   场景：真实运行路径下没有无障碍权限。
   步骤：关闭无障碍权限、开启“在 Command-Tab 中显示”和“隐藏最小化应用”，再读取 full-repair projection payload 与 app-window repair payload。
   验证：projection payload 会只保留应用层信息、窗口数组为空、上下文数量与应用数量一致，repair payload summary 也同步为零窗口。

@@ -45,7 +45,7 @@
 		A1B2C4392F73000100B0D737 /* AccessibilityPermissionChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4302F73000100B0D737 /* AccessibilityPermissionChecker.swift */; };
 		A1B2C43A2F73000100B0D737 /* SystemAppMRUTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4312F73000100B0D737 /* SystemAppMRUTracker.swift */; };
 		A1B2C43B2F73000100B0D737 /* RuntimeSnapshotProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4322F73000100B0D737 /* RuntimeSnapshotProvider.swift */; };
-		A1B2C43C2F73000100B0D737 /* RuntimeSnapshotProvider+AppProjectionBuilders.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4332F73000100B0D737 /* RuntimeSnapshotProvider+AppProjectionBuilders.swift */; };
+		A1B2C43C2F73000100B0D737 /* RuntimeProjectionRepairProvider+ProjectionBuilders.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4332F73000100B0D737 /* RuntimeProjectionRepairProvider+ProjectionBuilders.swift */; };
 		D10000012FF500100B0D737 /* RuntimeProjectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000022FF500100B0D737 /* RuntimeProjectionService.swift */; };
 		B26010012FE000100B0D737 /* RuntimePerformanceClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26000012FE000100B0D737 /* RuntimePerformanceClock.swift */; };
 		B26010022FE000100B0D737 /* RuntimeSnapshotProvider+Diagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26000022FE000100B0D737 /* RuntimeSnapshotProvider+Diagnostics.swift */; };
@@ -265,7 +265,7 @@
 		A1B2C4302F73000100B0D737 /* AccessibilityPermissionChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityPermissionChecker.swift; sourceTree = "<group>"; };
 		A1B2C4312F73000100B0D737 /* SystemAppMRUTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAppMRUTracker.swift; sourceTree = "<group>"; };
 		A1B2C4322F73000100B0D737 /* RuntimeSnapshotProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeSnapshotProvider.swift; sourceTree = "<group>"; };
-		A1B2C4332F73000100B0D737 /* RuntimeSnapshotProvider+AppProjectionBuilders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RuntimeSnapshotProvider+AppProjectionBuilders.swift"; sourceTree = "<group>"; };
+		A1B2C4332F73000100B0D737 /* RuntimeProjectionRepairProvider+ProjectionBuilders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RuntimeProjectionRepairProvider+ProjectionBuilders.swift"; sourceTree = "<group>"; };
 		D10000022FF500100B0D737 /* RuntimeProjectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionService.swift; sourceTree = "<group>"; };
 		B26000012FE000100B0D737 /* RuntimePerformanceClock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimePerformanceClock.swift; sourceTree = "<group>"; };
 		B26000022FE000100B0D737 /* RuntimeSnapshotProvider+Diagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RuntimeSnapshotProvider+Diagnostics.swift"; sourceTree = "<group>"; };
@@ -660,7 +660,7 @@
 				A1B2C4302F73000100B0D737 /* AccessibilityPermissionChecker.swift */,
 				A1B2C4312F73000100B0D737 /* SystemAppMRUTracker.swift */,
 				A1B2C4322F73000100B0D737 /* RuntimeSnapshotProvider.swift */,
-				A1B2C4332F73000100B0D737 /* RuntimeSnapshotProvider+AppProjectionBuilders.swift */,
+				A1B2C4332F73000100B0D737 /* RuntimeProjectionRepairProvider+ProjectionBuilders.swift */,
 				D10000022FF500100B0D737 /* RuntimeProjectionService.swift */,
 				B26000022FE000100B0D737 /* RuntimeSnapshotProvider+Diagnostics.swift */,
 				F2B3C4D52F8C000100B0D737 /* RuntimeSnapshotProvider+CGWindowSupplement.swift */,
@@ -1052,7 +1052,7 @@
 				A1B2C4392F73000100B0D737 /* AccessibilityPermissionChecker.swift in Sources */,
 				A1B2C43A2F73000100B0D737 /* SystemAppMRUTracker.swift in Sources */,
 				A1B2C43B2F73000100B0D737 /* RuntimeSnapshotProvider.swift in Sources */,
-				A1B2C43C2F73000100B0D737 /* RuntimeSnapshotProvider+AppProjectionBuilders.swift in Sources */,
+				A1B2C43C2F73000100B0D737 /* RuntimeProjectionRepairProvider+ProjectionBuilders.swift in Sources */,
 				D10000012FF500100B0D737 /* RuntimeProjectionService.swift in Sources */,
 				B26010022FE000100B0D737 /* RuntimeSnapshotProvider+Diagnostics.swift in Sources */,
 				F6E7B00635AC000100B0D737 /* RuntimeReconciliationCoordinator.swift in Sources */,

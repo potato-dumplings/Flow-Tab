@@ -217,12 +217,12 @@ extension FlowTabTests {
         )
     }
 
-    func testRuntimeWindowRecencyTrackerAppliesToProviderCurrentAppPayload() async {
+    func testRuntimeWindowRecencyTrackerAppliesToRuntimeProjectionRepairProviderCurrentAppPayload() async {
         await withLaunchArgumentsForTesting(["FlowTab", "--flowtab-ui-mock-runtime"]) {
             let tracker = RuntimeWindowRecencyTracker()
-            let provider = RuntimeSnapshotProvider()
+            let repairProvider = RuntimeProjectionRepairProvider()
             let appID = "com.flowtab.mock.mail"
-            guard let currentAppPayload = provider.currentAppWindowPayload(for: appID) else {
+            guard let currentAppPayload = repairProvider.currentAppWindowPayload(for: appID) else {
                 XCTFail("Expected mock current-app payload for \(appID)")
                 return
             }

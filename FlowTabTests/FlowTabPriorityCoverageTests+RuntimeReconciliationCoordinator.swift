@@ -830,8 +830,9 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(coordinator.readyRequests(now: Date.timeIntervalSinceReferenceDate).isEmpty)
     }
 
-    func testRuntimeSnapshotProviderDerivesAffectedAppTargetsFromRecordsAndCurrentCGWindows() {
+    func testRuntimeProjectionRepairProviderDerivesAffectedAppTargetsFromRecordsAndCurrentCGWindows() {
         let provider = RuntimeSnapshotProvider()
+        let repairProvider = RuntimeProjectionRepairProvider(snapshotProvider: provider)
         let recordedWindowID = CGWindowID(240_001)
         let currentWindowID = CGWindowID(240_002)
         let unrelatedWindowID = CGWindowID(240_003)
@@ -881,7 +882,7 @@ extension FlowTabPriorityCoverageTests {
             ]
         ]
 
-        let targets = provider.appReconciliationTargets(
+        let targets = repairProvider.appReconciliationTargets(
             affectedCGWindowIDs: [recordedWindowID, currentWindowID, staleWindowID],
             currentCGWindowsByPID: currentCGWindowsByPID
         )
@@ -903,12 +904,13 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
-    func testRuntimeSnapshotProviderReconcilesAppWindowsWithAffectedCGWindowScope() {
+    func testRuntimeProjectionRepairProviderReconcilesAppWindowsWithAffectedCGWindowScope() {
         let provider = RuntimeSnapshotProvider()
+        let repairProvider = RuntimeProjectionRepairProvider(snapshotProvider: provider)
         let currentPID = NSRunningApplication.current.processIdentifier
         let affectedCGWindowIDs: Set<CGWindowID> = [240_001, 240_002]
 
-        let result = provider.reconcileAppWindows(
+        let result = repairProvider.reconcileAppWindows(
             processIdentifier: currentPID,
             affectedCGWindowIDs: affectedCGWindowIDs
         )
@@ -917,8 +919,9 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(result.affectedCGWindowIDs, affectedCGWindowIDs)
     }
 
-    func testRuntimeSnapshotProviderReconciliationResultReportsAffectedWindowRecordEvidence() {
+    func testRuntimeProjectionRepairProviderReconciliationResultReportsAffectedWindowRecordEvidence() {
         let provider = RuntimeSnapshotProvider()
+        let repairProvider = RuntimeProjectionRepairProvider(snapshotProvider: provider)
         let pid = pid_t(1_840_501_407)
         let exactWindowID = CGWindowID(240_001)
         let provisionalWindowID = CGWindowID(240_002)
@@ -941,7 +944,7 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
 
-        let result = provider.reconcileAppWindows(
+        let result = repairProvider.reconcileAppWindows(
             processIdentifier: pid,
             affectedCGWindowIDs: [exactWindowID, provisionalWindowID, missingWindowID]
         )
