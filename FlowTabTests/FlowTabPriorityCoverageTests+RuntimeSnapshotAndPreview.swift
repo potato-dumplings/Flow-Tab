@@ -361,8 +361,8 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(alphaWindow?.spaceEvidence, evidence)
     }
 
-    func testRuntimeSnapshotProviderMergedWindowStatsCombinesCountsAcrossProcessIDs() {
-        let mergedStats = RuntimeSnapshotProvider.mergedWindowStatsForTesting(
+    func testRuntimeAppDirectoryMergedWindowStatsCombinesCountsAcrossProcessIDs() {
+        let mergedStats = RuntimeAppDirectory.mergedWindowStats(
             processIDs: [101, 102, 103],
             windowStatsByPID: [
                 101: .init(windowCount: 2, hasVisibleWindow: false),

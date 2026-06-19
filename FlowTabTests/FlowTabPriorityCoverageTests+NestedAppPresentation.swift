@@ -168,6 +168,64 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
     }
+
+    func testRuntimeAppDirectorySelectsPrimaryAppsByWindowStatsBeforeRank() {
+        let primaryWithWindows = FakeRunningApplication(
+            pid: 20,
+            bundleIdentifier: "com.example.editor",
+            localizedName: "Editor",
+            bundlePath: "/Applications/Editor.app"
+        )
+        let rankPreferredHelper = FakeRunningApplication(
+            pid: 90,
+            bundleIdentifier: "com.example.editor",
+            localizedName: "Editor Helper",
+            bundlePath: "/Applications/Editor.app/Contents/Helpers/Editor Helper.app"
+        )
+        let otherApp = FakeRunningApplication(
+            pid: 40,
+            bundleIdentifier: "com.example.viewer",
+            localizedName: "Viewer",
+            bundlePath: "/Applications/Viewer.app"
+        )
+
+        let directory = RuntimeAppDirectory(apps: [rankPreferredHelper, primaryWithWindows, otherApp])
+        let windowStatsByPID: [pid_t: RuntimeAppWindowStats] = [
+            primaryWithWindows.processIdentifier: RuntimeAppWindowStats(windowCount: 2, hasVisibleWindow: true),
+            rankPreferredHelper.processIdentifier: RuntimeAppWindowStats(windowCount: 0, hasVisibleWindow: false),
+            otherApp.processIdentifier: RuntimeAppWindowStats(windowCount: 1, hasVisibleWindow: true)
+        ]
+        let rankByPID: [pid_t: Int] = [
+            rankPreferredHelper.processIdentifier: 0,
+            primaryWithWindows.processIdentifier: 8,
+            otherApp.processIdentifier: 3
+        ]
+
+        let selectedApps = directory.selectPrimaryApps(
+            windowStatsByPID: windowStatsByPID,
+            rankByPID: rankByPID
+        )
+        let sortedEditorGroup = directory.sortedAppsWithinGroup(
+            [rankPreferredHelper, primaryWithWindows],
+            windowStatsByPID: windowStatsByPID,
+            rankByPID: rankByPID
+        )
+
+        XCTAssertTrue(selectedApps.contains { $0 === primaryWithWindows })
+        XCTAssertTrue(selectedApps.contains { $0 === otherApp })
+        XCTAssertFalse(selectedApps.contains { $0 === rankPreferredHelper })
+        XCTAssertTrue(sortedEditorGroup.first === primaryWithWindows)
+        XCTAssertEqual(
+            directory.preferredRank(
+                for: [rankPreferredHelper, primaryWithWindows],
+                rankByPID: rankByPID,
+                fallback: 10_000
+            ),
+            0
+        )
+        XCTAssertEqual(RuntimeAppDirectory.stableLastActiveValue(forRank: 3), -3)
+        XCTAssertEqual(RuntimeAppDirectory.stableLastActiveValue(forRank: -2), 0)
+    }
 }
 
 private final class FakeRunningApplication: NSRunningApplication {

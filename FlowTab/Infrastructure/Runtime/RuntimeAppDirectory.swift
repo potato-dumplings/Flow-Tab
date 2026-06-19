@@ -15,6 +15,65 @@ struct RuntimeAppDirectory {
         candidateAppBundlePaths = Set(apps.compactMap { Self.standardizedAppBundlePath(for: $0.bundleURL) })
     }
 
+    func groupedAppsByAppID() -> [String: [NSRunningApplication]] {
+        Dictionary(grouping: apps, by: RuntimeAppIdentity.appID(for:))
+    }
+
+    func selectPrimaryApps(
+        windowStatsByPID: [pid_t: RuntimeAppWindowStats],
+        rankByPID: [pid_t: Int]
+    ) -> [NSRunningApplication] {
+        let grouped = groupedAppsByAppID()
+        var selected: [NSRunningApplication] = []
+        selected.reserveCapacity(grouped.count)
+
+        for (appID, group) in grouped {
+            guard group.count > 1 else {
+                if let app = group.first {
+                    selected.append(app)
+                }
+                continue
+            }
+
+            let sorted = sortedAppsWithinGroup(
+                group,
+                windowStatsByPID: windowStatsByPID,
+                rankByPID: rankByPID
+            )
+            guard let primary = sorted.first else { continue }
+            selected.append(primary)
+
+            let droppedPIDs = sorted.dropFirst().map(\.processIdentifier)
+            RuntimeLog.debug(
+                .projection,
+                "dedupe appID=\(appID) keepPID=\(primary.processIdentifier) dropPIDs=\(droppedPIDs)"
+            )
+        }
+
+        return selected
+    }
+
+    func sortedAppsWithinGroup(
+        _ group: [NSRunningApplication],
+        windowStatsByPID: [pid_t: RuntimeAppWindowStats],
+        rankByPID: [pid_t: Int]
+    ) -> [NSRunningApplication] {
+        group.sorted { lhs, rhs in
+            score(for: lhs, windowStatsByPID: windowStatsByPID, rankByPID: rankByPID)
+                > score(for: rhs, windowStatsByPID: windowStatsByPID, rankByPID: rankByPID)
+        }
+    }
+
+    func preferredRank(
+        for group: [NSRunningApplication],
+        rankByPID: [pid_t: Int],
+        fallback: Int
+    ) -> Int {
+        group.compactMap { app in
+            rankByPID[app.processIdentifier]
+        }.min() ?? fallback
+    }
+
     func filterAppLayerCandidates(
         windowStatsByPID: [pid_t: RuntimeAppWindowStats],
         hideMinimizedAppsFromAppLayer: Bool
@@ -40,6 +99,24 @@ struct RuntimeAppDirectory {
             }
             return true
         }
+    }
+
+    static func mergedWindowStats(
+        processIDs: [pid_t],
+        windowStatsByPID: [pid_t: RuntimeAppWindowStats]
+    ) -> RuntimeAppWindowStats {
+        var windowCount = 0
+        var hasVisibleWindow = false
+        for pid in processIDs {
+            guard let stats = windowStatsByPID[pid] else { continue }
+            windowCount += stats.windowCount
+            hasVisibleWindow = hasVisibleWindow || stats.hasVisibleWindow
+        }
+        return RuntimeAppWindowStats(windowCount: windowCount, hasVisibleWindow: hasVisibleWindow)
+    }
+
+    static func stableLastActiveValue(forRank rank: Int) -> TimeInterval {
+        -Double(max(rank, 0))
     }
 
     static func shouldHideZeroWindowNestedApp(
@@ -83,6 +160,20 @@ struct RuntimeAppDirectory {
         }
 
         return ancestorPaths
+    }
+
+    private func score(
+        for app: NSRunningApplication,
+        windowStatsByPID: [pid_t: RuntimeAppWindowStats],
+        rankByPID: [pid_t: Int]
+    ) -> Int {
+        let pid = app.processIdentifier
+        let windowCount = windowStatsByPID[pid]?.windowCount ?? 0
+        let hasWindowsScore = windowCount > 0 ? 1_000_000 : 0
+        let windowCountScore = min(windowCount, 9_999) * 100
+        let rankScore = 10_000 - min(rankByPID[pid] ?? 10_000, 10_000)
+        let launchScore = Int(app.launchDate?.timeIntervalSince1970 ?? 0) % 10_000
+        return hasWindowsScore + windowCountScore + rankScore + launchScore
     }
 
     private func logSkippedApp(_ app: NSRunningApplication, reason: String) {

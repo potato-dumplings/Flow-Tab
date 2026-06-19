@@ -94,10 +94,10 @@ extension RuntimeSnapshotProvider {
         let windowData = collectWindowData(for: runningApps)
         let windowDataReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let selectionStartMs = windowDataReadyMs
-        let appsGroupedByBaseID = groupedAppsByBaseID(runningApps)
-        let selectedApps = selectPrimaryApps(
-            from: runningApps,
-            windowsByPID: windowData.windowsByPID,
+        let appDirectory = RuntimeAppDirectory(apps: runningApps)
+        let appsGroupedByBaseID = appDirectory.groupedAppsByAppID()
+        let selectedApps = appDirectory.selectPrimaryApps(
+            windowStatsByPID: windowStatsByPID(for: runningApps, windowsByPID: windowData.windowsByPID),
             rankByPID: windowData.rankByPID
         )
         let mergedWindowsByPrimaryPID = Dictionary(uniqueKeysWithValues: selectedApps.map { app in
@@ -161,8 +161,8 @@ extension RuntimeSnapshotProvider {
                 "\(displayName) pid=\(pid) appID=\(appID) windows=\(windows.count)"
             )
 
-            let rank = preferredRankForAppGroup(
-                appGroup,
+            let rank = appDirectory.preferredRank(
+                for: appGroup,
                 rankByPID: windowData.rankByPID,
                 fallback: 10_000 + index
             )
@@ -170,7 +170,7 @@ extension RuntimeSnapshotProvider {
                 appID: appID,
                 displayName: displayName,
                 groupID: RuntimeAppIdentity.groupID(for: app.bundleIdentifier, fallbackName: displayName),
-                summaryLastActiveAt: Self.stableLastActiveValue(forRank: rank),
+                summaryLastActiveAt: RuntimeAppDirectory.stableLastActiveValue(forRank: rank),
                 candidateLastActiveAt: now - Double(rank),
                 pid: pid,
                 runningApp: app,
@@ -228,9 +228,10 @@ extension RuntimeSnapshotProvider {
             cgWindowsByPID: cgWindowsByPID,
             allCGWindowsByPID: allCGWindowsByPID
         )
-        let sortedApps = sortedAppsWithinGroup(
+        let appDirectory = RuntimeAppDirectory(apps: matchingApps)
+        let sortedApps = appDirectory.sortedAppsWithinGroup(
             matchingApps,
-            windowsByPID: windowsByPID,
+            windowStatsByPID: windowStatsByPID(for: matchingApps, windowsByPID: windowsByPID),
             rankByPID: rankByPID
         )
         guard let app = sortedApps.first else { return nil }
@@ -382,8 +383,8 @@ extension RuntimeSnapshotProvider {
     ) -> RuntimeCurrentAppWindowPayload {
         let now = Date.timeIntervalSinceReferenceDate
         let displayName = app.localizedName ?? appID
-        let rank = preferredRankForAppGroup(
-            appGroup,
+        let rank = RuntimeAppDirectory(apps: appGroup).preferredRank(
+            for: appGroup,
             rankByPID: rankByPID,
             fallback: rankFallback
         )
@@ -393,7 +394,7 @@ extension RuntimeSnapshotProvider {
                 appID: appID,
                 displayName: displayName,
                 groupID: groupID,
-                summaryLastActiveAt: Self.stableLastActiveValue(forRank: rank),
+                summaryLastActiveAt: RuntimeAppDirectory.stableLastActiveValue(forRank: rank),
                 candidateLastActiveAt: now - Double(rank),
                 pid: app.processIdentifier,
                 runningApp: app,
