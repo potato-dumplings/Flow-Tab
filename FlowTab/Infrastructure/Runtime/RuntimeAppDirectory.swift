@@ -144,6 +144,21 @@ struct RuntimeAppDirectory {
         }
     }
 
+    func mergedWindows<Window>(
+        for group: [NSRunningApplication],
+        windowsByPID: [pid_t: [Window]],
+        windowStatsByPID: [pid_t: RuntimeAppWindowStats],
+        rankByPID: [pid_t: Int]
+    ) -> [Window] {
+        sortedAppsWithinGroup(
+            group,
+            windowStatsByPID: windowStatsByPID,
+            rankByPID: rankByPID
+        ).flatMap { app in
+            windowsByPID[app.processIdentifier] ?? []
+        }
+    }
+
     static func sortedEntriesWithinGroup(
         _ group: [RuntimeAppDirectoryEntry],
         windowStatsByPID: [pid_t: RuntimeAppWindowStats],
@@ -216,6 +231,35 @@ struct RuntimeAppDirectory {
             hasVisibleWindow = hasVisibleWindow || stats.hasVisibleWindow
         }
         return RuntimeAppWindowStats(windowCount: windowCount, hasVisibleWindow: hasVisibleWindow)
+    }
+
+    static func windowStats<Window>(
+        for entries: [RuntimeAppDirectoryEntry],
+        windowsByPID: [pid_t: [Window]],
+        isVisibleWindow: (Window) -> Bool
+    ) -> [pid_t: RuntimeAppWindowStats] {
+        Dictionary(uniqueKeysWithValues: entries.map { entry in
+            let windows = windowsByPID[entry.pid] ?? []
+            return (
+                entry.pid,
+                RuntimeAppWindowStats(
+                    windowCount: windows.count,
+                    hasVisibleWindow: windows.contains(where: isVisibleWindow)
+                )
+            )
+        })
+    }
+
+    static func windowStats<Window>(
+        for apps: [NSRunningApplication],
+        windowsByPID: [pid_t: [Window]],
+        isVisibleWindow: (Window) -> Bool
+    ) -> [pid_t: RuntimeAppWindowStats] {
+        windowStats(
+            for: apps.map(RuntimeAppDirectoryEntry.init(app:)),
+            windowsByPID: windowsByPID,
+            isVisibleWindow: isVisibleWindow
+        )
     }
 
     static func stableLastActiveValue(forRank rank: Int) -> TimeInterval {

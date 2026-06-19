@@ -205,9 +205,25 @@ extension FlowTabPriorityCoverageTests {
             windowStatsByPID: windowStatsByPID,
             rankByPID: rankByPID
         )
+        let windowsByPID: [pid_t: [String]] = [
+            primaryWithWindows.processIdentifier: ["primary-1", "primary-2"],
+            rankPreferredHelper.processIdentifier: [],
+            otherApp.processIdentifier: ["viewer-1"]
+        ]
+        let statsFromWindows = RuntimeAppDirectory.windowStats(
+            for: [rankPreferredHelper, primaryWithWindows, otherApp],
+            windowsByPID: windowsByPID,
+            isVisibleWindow: { _ in true }
+        )
         let sortedEditorGroup = directory.sortedAppsWithinGroup(
             [rankPreferredHelper, primaryWithWindows],
             windowStatsByPID: windowStatsByPID,
+            rankByPID: rankByPID
+        )
+        let mergedEditorWindows = directory.mergedWindows(
+            for: [rankPreferredHelper, primaryWithWindows],
+            windowsByPID: windowsByPID,
+            windowStatsByPID: statsFromWindows,
             rankByPID: rankByPID
         )
         let selectedEntries = RuntimeAppDirectory.selectPrimaryEntries(
@@ -234,7 +250,10 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(selectedApps.contains { $0 === primaryWithWindows })
         XCTAssertTrue(selectedApps.contains { $0 === otherApp })
         XCTAssertFalse(selectedApps.contains { $0 === rankPreferredHelper })
+        XCTAssertEqual(statsFromWindows[primaryWithWindows.processIdentifier]?.windowCount, 2)
+        XCTAssertEqual(statsFromWindows[rankPreferredHelper.processIdentifier]?.windowCount, 0)
         XCTAssertTrue(sortedEditorGroup.first === primaryWithWindows)
+        XCTAssertEqual(mergedEditorWindows, ["primary-1", "primary-2"])
         XCTAssertEqual(selectedEntries.map(\.pid), [primaryWithWindows.processIdentifier])
         XCTAssertEqual(
             directory.preferredRank(

@@ -96,17 +96,23 @@ extension RuntimeSnapshotProvider {
         let selectionStartMs = windowDataReadyMs
         let appDirectory = RuntimeAppDirectory(apps: runningApps)
         let appsGroupedByBaseID = appDirectory.groupedAppsByAppID()
+        let windowStatsByPID = RuntimeAppDirectory.windowStats(
+            for: runningApps,
+            windowsByPID: windowData.windowsByPID,
+            isVisibleWindow: { !$0.isMinimized }
+        )
         let selectedApps = appDirectory.selectPrimaryApps(
-            windowStatsByPID: windowStatsByPID(for: runningApps, windowsByPID: windowData.windowsByPID),
+            windowStatsByPID: windowStatsByPID,
             rankByPID: windowData.rankByPID
         )
         let mergedWindowsByPrimaryPID = Dictionary(uniqueKeysWithValues: selectedApps.map { app in
             let appGroup = appsGroupedByBaseID[RuntimeAppIdentity.appID(for: app)] ?? [app]
             return (
                 app.processIdentifier,
-                mergedWindowEntries(
+                appDirectory.mergedWindows(
                     for: appGroup,
                     windowsByPID: windowData.windowsByPID,
+                    windowStatsByPID: windowStatsByPID,
                     rankByPID: windowData.rankByPID
                 )
             )
@@ -229,16 +235,22 @@ extension RuntimeSnapshotProvider {
             allCGWindowsByPID: allCGWindowsByPID
         )
         let appDirectory = RuntimeAppDirectory(apps: matchingApps)
+        let windowStatsByPID = RuntimeAppDirectory.windowStats(
+            for: matchingApps,
+            windowsByPID: windowsByPID,
+            isVisibleWindow: { !$0.isMinimized }
+        )
         let sortedApps = appDirectory.sortedAppsWithinGroup(
             matchingApps,
-            windowStatsByPID: windowStatsByPID(for: matchingApps, windowsByPID: windowsByPID),
+            windowStatsByPID: windowStatsByPID,
             rankByPID: rankByPID
         )
         guard let app = sortedApps.first else { return nil }
 
-        let windows = mergedWindowEntries(
+        let windows = appDirectory.mergedWindows(
             for: sortedApps,
             windowsByPID: windowsByPID,
+            windowStatsByPID: windowStatsByPID,
             rankByPID: rankByPID
         )
         let hideMinimizedAppsFromAppLayer =
@@ -312,9 +324,15 @@ extension RuntimeSnapshotProvider {
         let axReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let rankByPID = [pid: 0]
         let appID = RuntimeAppIdentity.appID(for: app)
-        let windows = mergedWindowEntries(
+        let windowStatsByPID = RuntimeAppDirectory.windowStats(
             for: focusedApps,
             windowsByPID: windowsByPID,
+            isVisibleWindow: { !$0.isMinimized }
+        )
+        let windows = RuntimeAppDirectory(apps: focusedApps).mergedWindows(
+            for: focusedApps,
+            windowsByPID: windowsByPID,
+            windowStatsByPID: windowStatsByPID,
             rankByPID: rankByPID
         )
         let rowsReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
@@ -424,16 +442,11 @@ extension RuntimeSnapshotProvider {
         windowsByPID: [pid_t: [WindowListEntry]],
         hideMinimizedAppsFromAppLayer: Bool
     ) -> [NSRunningApplication] {
-        let windowStatsByPID = Dictionary(uniqueKeysWithValues: apps.map { app in
-            let windows = windowsByPID[app.processIdentifier] ?? []
-            return (
-                app.processIdentifier,
-                RuntimeAppWindowStats(
-                    windowCount: windows.count,
-                    hasVisibleWindow: windows.contains(where: { !$0.isMinimized })
-                )
-            )
-        })
+        let windowStatsByPID = RuntimeAppDirectory.windowStats(
+            for: apps,
+            windowsByPID: windowsByPID,
+            isVisibleWindow: { !$0.isMinimized }
+        )
         return RuntimeAppDirectory(apps: apps).filterAppLayerCandidates(
             windowStatsByPID: windowStatsByPID,
             hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
