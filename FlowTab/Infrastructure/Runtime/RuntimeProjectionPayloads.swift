@@ -100,6 +100,29 @@ struct RuntimeAppWindowProjectionSeed {
     }
 }
 
+extension RuntimeSnapshotProvider.WindowListEntry {
+    func projectionSeed(lastActiveAt: TimeInterval) -> RuntimeAppWindowProjectionSeed {
+        RuntimeAppWindowProjectionSeed(
+            windowID: windowID,
+            title: title,
+            isMinimized: isMinimized,
+            lastActiveAt: lastActiveAt,
+            ownerPID: ownerPID,
+            cgWindowID: cgWindowID,
+            spaceIDs: spaceIDs,
+            activationHandleID: activationHandleID,
+            axWindow: axWindow,
+            frame: frame,
+            allowsPublicAXRecovery: allowsPublicAXRecovery,
+            hasStickyBinding: hasStickyBinding,
+            lastConfirmationSource: lastConfirmationSource,
+            bindingConfidenceOverride: bindingConfidenceOverride,
+            bindingCandidateCount: bindingCandidateCount,
+            spaceEvidence: spaceEvidence
+        )
+    }
+}
+
 struct RuntimeCurrentAppWindowProjectionAssemblyInput {
     let appID: String
     let displayName: String
