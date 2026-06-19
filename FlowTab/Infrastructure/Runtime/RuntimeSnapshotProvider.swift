@@ -769,14 +769,6 @@ final class RuntimeSnapshotProvider {
         return rankByPID
     }
 
-    static func groupID(for bundleIdentifier: String?, fallbackName: String) -> String {
-        RuntimeAppIdentity.groupID(for: bundleIdentifier, fallbackName: fallbackName)
-    }
-
-    static func groupIDForTesting(bundleIdentifier: String?, fallbackName: String) -> String {
-        groupID(for: bundleIdentifier, fallbackName: fallbackName)
-    }
-
     static func resolvedAXWindowTitleForTesting(
         sourceTitle: String?,
         matchedCGTitle: String?,

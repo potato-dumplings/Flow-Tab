@@ -1012,8 +1012,8 @@
 
 来源：`FlowTabTests/FlowTabPriorityCoverageTests.swift`
 
-- `testRuntimeSnapshotProviderVisibilityHelpersCoverCurrentProcessAndMinimizedApps`
-  场景：快照筛选工具同时处理当前进程和“仅最小化窗口”应用。
+- `testRuntimeAppLayerProjectionFilterCoversCurrentProcessAndMinimizedApps`
+  场景：runtime app-layer projection filter 同时处理当前进程和“仅最小化窗口”应用。
   步骤：分别传入不同 activation policy、终止状态、PID 与最小化策略组合。
   验证：只有满足条件的应用会进入应用层；当关闭“隐藏仅最小化应用”时，最小化应用也可保留。
 
@@ -1057,9 +1057,9 @@
   步骤：分别测试超大、正常和极小尺寸，并对真实图像执行缩放。
   验证：超大图按比例压缩到上限，正常尺寸不变，极小尺寸至少保留 `1x1`。
 
-- `testRuntimeSnapshotProviderGroupIDMappingCoversFallbackAndBundleShapes`
+- `testRuntimeAppIdentityGroupIDMappingCoversFallbackAndBundleShapes`
   场景：分组 ID 推导需要覆盖无 bundle ID、标准三段 bundle ID、单段 bundle ID 和空字符串。
-  步骤：调用 `groupIDForTesting` 测试四种输入。
+  步骤：调用 `RuntimeAppIdentity.groupID` 测试四种输入。
   验证：分组 ID 分别回退为首字母、组织段、原 bundle ID 或通用 `apps`。
 
 - `testRuntimeSnapshotProviderResolveCGWindowIDCoversExactInsensitiveFallbackAndExhaustedCases`

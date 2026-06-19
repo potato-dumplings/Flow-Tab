@@ -1941,31 +1941,31 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(unchangedImage?.height, 300)
     }
 
-    func testRuntimeSnapshotProviderGroupIDMappingCoversFallbackAndBundleShapes() {
+    func testRuntimeAppIdentityGroupIDMappingCoversFallbackAndBundleShapes() {
         XCTAssertEqual(
-            RuntimeSnapshotProvider.groupIDForTesting(
-                bundleIdentifier: nil,
+            RuntimeAppIdentity.groupID(
+                for: nil,
                 fallbackName: "Notes"
             ),
             "n"
         )
         XCTAssertEqual(
-            RuntimeSnapshotProvider.groupIDForTesting(
-                bundleIdentifier: "com.example.mail",
+            RuntimeAppIdentity.groupID(
+                for: "com.example.mail",
                 fallbackName: "Mail"
             ),
             "example"
         )
         XCTAssertEqual(
-            RuntimeSnapshotProvider.groupIDForTesting(
-                bundleIdentifier: "singleton",
+            RuntimeAppIdentity.groupID(
+                for: "singleton",
                 fallbackName: "Single"
             ),
             "singleton"
         )
         XCTAssertEqual(
-            RuntimeSnapshotProvider.groupIDForTesting(
-                bundleIdentifier: "",
+            RuntimeAppIdentity.groupID(
+                for: "",
                 fallbackName: "Empty"
             ),
             "apps"

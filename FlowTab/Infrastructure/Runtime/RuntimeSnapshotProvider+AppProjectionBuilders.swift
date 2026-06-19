@@ -169,7 +169,7 @@ extension RuntimeSnapshotProvider {
             let payload = RuntimeCurrentAppWindowPayload(
                 appID: appID,
                 displayName: displayName,
-                groupID: Self.groupID(for: app.bundleIdentifier, fallbackName: displayName),
+                groupID: RuntimeAppIdentity.groupID(for: app.bundleIdentifier, fallbackName: displayName),
                 summaryLastActiveAt: Self.stableLastActiveValue(forRank: rank),
                 candidateLastActiveAt: now - Double(rank),
                 pid: pid,
@@ -387,7 +387,7 @@ extension RuntimeSnapshotProvider {
             rankByPID: rankByPID,
             fallback: rankFallback
         )
-        let groupID = Self.groupID(for: app.bundleIdentifier, fallbackName: displayName)
+        let groupID = RuntimeAppIdentity.groupID(for: app.bundleIdentifier, fallbackName: displayName)
         return RuntimeCurrentAppWindowPayload(
             appID: appID,
             displayName: displayName,
@@ -406,7 +406,7 @@ extension RuntimeSnapshotProvider {
         let currentPID = ProcessInfo.processInfo.processIdentifier
         let includeCurrentProcessInAppLayer = AppVisibilityPreferencesStore.loadShowInCommandTab()
         return NSWorkspace.shared.runningApplications.filter {
-            Self.shouldIncludeRunningApplication(
+            RuntimeAppLayerProjectionFilter.shouldIncludeRunningApplication(
                 activationPolicy: $0.activationPolicy,
                 isTerminated: $0.isTerminated,
                 pid: $0.processIdentifier,
@@ -414,18 +414,6 @@ extension RuntimeSnapshotProvider {
                 includeCurrentProcessInAppLayer: includeCurrentProcessInAppLayer
             )
         }
-    }
-
-    static func shouldIncludeRunningApplication(
-        activationPolicy: NSApplication.ActivationPolicy,
-        isTerminated: Bool,
-        pid: pid_t,
-        currentPID: pid_t,
-        includeCurrentProcessInAppLayer: Bool
-    ) -> Bool {
-        activationPolicy == .regular
-            && !isTerminated
-            && (includeCurrentProcessInAppLayer || pid != currentPID)
     }
 
     func filterAppsForAppLayer(
@@ -447,7 +435,7 @@ extension RuntimeSnapshotProvider {
                 return false
             }
             let hasVisibleWindow = windows.contains(where: { !$0.isMinimized })
-            guard Self.shouldIncludeAppInAppLayer(
+            guard RuntimeAppLayerProjectionFilter.shouldIncludeAppInAppLayer(
                 hasWindows: !windows.isEmpty,
                 hasVisibleWindow: hasVisibleWindow,
                 hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
@@ -458,18 +446,6 @@ extension RuntimeSnapshotProvider {
             }
             return true
         }
-    }
-
-    static func shouldIncludeAppInAppLayer(
-        hasWindows: Bool,
-        hasVisibleWindow: Bool,
-        hideMinimizedAppsFromAppLayer: Bool
-    ) -> Bool {
-        RuntimeAppLayerProjectionFilter.shouldIncludeAppInAppLayer(
-            hasWindows: hasWindows,
-            hasVisibleWindow: hasVisibleWindow,
-            hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
-        )
     }
 
     func filterAppsForAppLayer(
@@ -491,7 +467,7 @@ extension RuntimeSnapshotProvider {
                 RuntimeLog.debug(.projection, "skip nested zero-window app=\(appName) pid=\(app.processIdentifier)")
                 return false
             }
-            guard Self.shouldIncludeAppInAppLayer(
+            guard RuntimeAppLayerProjectionFilter.shouldIncludeAppInAppLayer(
                 hasWindows: stats.windowCount > 0,
                 hasVisibleWindow: stats.hasVisibleWindow,
                 hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer

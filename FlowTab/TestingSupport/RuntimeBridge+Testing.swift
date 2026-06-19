@@ -521,7 +521,7 @@ extension RuntimeSnapshotProvider {
         ) else {
             return false
         }
-        return shouldIncludeAppInAppLayer(
+        return RuntimeAppLayerProjectionFilter.shouldIncludeAppInAppLayer(
             hasWindows: !definition.windows.isEmpty,
             hasVisibleWindow: hasVisibleWindow,
             hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer

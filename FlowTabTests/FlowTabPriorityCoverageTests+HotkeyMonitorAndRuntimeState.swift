@@ -179,9 +179,9 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(events, ["press-forward", "release-backward"])
     }
 
-    func testRuntimeSnapshotProviderVisibilityHelpersCoverCurrentProcessAndMinimizedApps() {
+    func testRuntimeAppLayerProjectionFilterCoversCurrentProcessAndMinimizedApps() {
         XCTAssertFalse(
-            RuntimeSnapshotProvider.shouldIncludeRunningApplication(
+            RuntimeAppLayerProjectionFilter.shouldIncludeRunningApplication(
                 activationPolicy: .accessory,
                 isTerminated: false,
                 pid: 10,
@@ -190,7 +190,7 @@ extension FlowTabPriorityCoverageTests {
             )
         )
         XCTAssertFalse(
-            RuntimeSnapshotProvider.shouldIncludeRunningApplication(
+            RuntimeAppLayerProjectionFilter.shouldIncludeRunningApplication(
                 activationPolicy: .regular,
                 isTerminated: true,
                 pid: 10,
@@ -199,7 +199,7 @@ extension FlowTabPriorityCoverageTests {
             )
         )
         XCTAssertFalse(
-            RuntimeSnapshotProvider.shouldIncludeRunningApplication(
+            RuntimeAppLayerProjectionFilter.shouldIncludeRunningApplication(
                 activationPolicy: .regular,
                 isTerminated: false,
                 pid: 99,
@@ -208,7 +208,7 @@ extension FlowTabPriorityCoverageTests {
             )
         )
         XCTAssertTrue(
-            RuntimeSnapshotProvider.shouldIncludeRunningApplication(
+            RuntimeAppLayerProjectionFilter.shouldIncludeRunningApplication(
                 activationPolicy: .regular,
                 isTerminated: false,
                 pid: 99,
