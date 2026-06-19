@@ -134,7 +134,7 @@ extension FlowTabPriorityCoverageTests {
         let frame = CGRect(x: 100, y: 100, width: 900, height: 620)
         let entries = provider.resolvedStableWindowEntries(
             axWindows: [
-                RuntimeSnapshotProvider.AXWindowEntry(
+                RuntimeAXWindowEntry(
                     index: 0,
                     id: "ax:18405:0",
                     title: "Stale Space",

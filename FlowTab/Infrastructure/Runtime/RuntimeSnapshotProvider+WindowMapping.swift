@@ -59,7 +59,7 @@ extension RuntimeSnapshotProvider {
     }
 
     func resolvedStableWindowEntries(
-        axWindows: [AXWindowEntry],
+        axWindows: [RuntimeAXWindowEntry],
         cgWindows: [RuntimeCGWindowEntry],
         pid: pid_t,
         appName: String,
@@ -513,7 +513,7 @@ extension RuntimeSnapshotProvider {
     }
 
     func resolveStableWindowMapping(
-        axWindows: [AXWindowEntry],
+        axWindows: [RuntimeAXWindowEntry],
         cgWindows: [RuntimeCGWindowEntry],
         pid: pid_t,
         appName: String,
@@ -827,7 +827,7 @@ extension RuntimeSnapshotProvider {
         _ matches: [String: CGWindowID],
         source: WindowBindingConfirmationSource,
         pid: pid_t,
-        currentAXWindowsByID: [String: AXWindowEntry],
+        currentAXWindowsByID: [String: RuntimeAXWindowEntry],
         knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry],
         appName: String,
         observedAt: TimeInterval,
@@ -918,9 +918,9 @@ extension RuntimeSnapshotProvider {
 
     private func resolveStickyAXWindow(
         for record: RuntimeWindowRecord,
-        axWindows: [AXWindowEntry],
+        axWindows: [RuntimeAXWindowEntry],
         assignedAXWindowIDs: Set<String>
-    ) -> AXWindowEntry? {
+    ) -> RuntimeAXWindowEntry? {
         if
             let lastKnownAXWindowID = record.lastExactAXWindowID,
             let exactIDMatch = axWindows.first(where: {
@@ -944,7 +944,7 @@ extension RuntimeSnapshotProvider {
 
     private static func stickyBindingConflictDiagnostic(
         record: RuntimeWindowRecord,
-        reusedAXWindow: AXWindowEntry,
+        reusedAXWindow: RuntimeAXWindowEntry,
         validCGWindowIDs: Set<CGWindowID>
     ) -> WindowBindingDiagnostic? {
         guard let exactCGWindowID = AXWindowInspector.cgWindowID(for: reusedAXWindow.window) else {
@@ -969,7 +969,7 @@ extension RuntimeSnapshotProvider {
     }
 
     private static func resolvePrivateExactBridgeMatches(
-        axWindows: [AXWindowEntry],
+        axWindows: [RuntimeAXWindowEntry],
         validCGWindowIDs: Set<CGWindowID>,
         assignedCGWindowIDs: Set<CGWindowID>
     ) -> [String: CGWindowID] {
@@ -995,10 +995,10 @@ extension RuntimeSnapshotProvider {
         targetCGWindowID: CGWindowID?,
         expectedTitle: String,
         expectedFrame: CGRect?,
-        windows: [AXWindowEntry],
+        windows: [RuntimeAXWindowEntry],
         cgWindows: [RuntimeCGWindowEntry],
         appName: String?
-    ) -> AXWindowEntry? {
+    ) -> RuntimeAXWindowEntry? {
         recoverAXWindowFromPublicSourcesWithDiagnostics(
             targetCGWindowID: targetCGWindowID,
             expectedTitle: expectedTitle,
@@ -1010,7 +1010,7 @@ extension RuntimeSnapshotProvider {
     }
 
     struct AXWindowRecoveryDiagnosticResult {
-        let window: AXWindowEntry
+        let window: RuntimeAXWindowEntry
         let reason: String
     }
 
@@ -1018,7 +1018,7 @@ extension RuntimeSnapshotProvider {
         targetCGWindowID: CGWindowID?,
         expectedTitle: String,
         expectedFrame: CGRect?,
-        windows: [AXWindowEntry],
+        windows: [RuntimeAXWindowEntry],
         cgWindows: [RuntimeCGWindowEntry],
         appName: String?
     ) -> AXWindowRecoveryDiagnosticResult? {
@@ -1346,7 +1346,7 @@ private func runtimeKnownCGWindowsByID(
 
 private func stickyBindingCanReuse(
     _ record: RuntimeWindowRecord,
-    axWindow: RuntimeSnapshotProvider.AXWindowEntry
+    axWindow: RuntimeAXWindowEntry
 ) -> Bool {
     let normalizedBindingTitle = normalizedRuntimeWindowTitle(record.displayTitle)
     let normalizedAXTitle = normalizedRuntimeWindowTitle(axWindow.sourceTitle ?? axWindow.title)
@@ -1395,7 +1395,7 @@ private func runtimeSupplementalCGWindowTitle(
 }
 
 private func runtimeAXRecoveryAXWindowSummary(
-    _ windows: [RuntimeSnapshotProvider.AXWindowEntry]
+    _ windows: [RuntimeAXWindowEntry]
 ) -> String {
     let sample = windows.prefix(12).map { window in
         let bridgedCGWindowID = AXWindowInspector.cgWindowID(for: window.window).map(String.init) ?? "nil"
@@ -1423,7 +1423,7 @@ private func runtimeAXRecoveryCGWindowSummary(
 }
 
 private func runtimeAXRecoveryWindowIDs(
-    _ windows: [RuntimeSnapshotProvider.AXWindowEntry]
+    _ windows: [RuntimeAXWindowEntry]
 ) -> String {
     windows
         .map { window in

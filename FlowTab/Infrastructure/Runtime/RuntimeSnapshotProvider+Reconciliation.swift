@@ -138,7 +138,7 @@ extension RuntimeSnapshotProvider {
         guard let axWindowID else { return }
         let focusedTitle = AXWindowInspector.title(for: focusedAXWindow)
 
-        let focusedAXEntry = AXWindowEntry(
+        let focusedAXEntry = RuntimeAXWindowEntry(
             index: AXWindowInspector.windowIndex(from: axWindowID, expectedPID: verification.ownerPID) ?? 0,
             id: axWindowID,
             title: focusedTitle ?? verification.title,

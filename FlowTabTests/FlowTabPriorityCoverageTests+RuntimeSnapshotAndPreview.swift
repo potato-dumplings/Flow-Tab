@@ -159,7 +159,7 @@ extension FlowTabPriorityCoverageTests {
             storeType: 1,
             spaceIDs: [8_401]
         )
-        let inferredAXWindow = RuntimeSnapshotProvider.AXWindowEntry(
+        let inferredAXWindow = RuntimeAXWindowEntry(
             index: 0,
             id: "ax:\(currentApp.processIdentifier):inferred",
             title: "Fullscreen Candidate",
@@ -189,7 +189,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertNil(record.lastExactAXWindow)
         XCTAssertNil(record.lastExactConfirmedAt)
 
-        let exactAXWindow = RuntimeSnapshotProvider.AXWindowEntry(
+        let exactAXWindow = RuntimeAXWindowEntry(
             index: 1,
             id: "ax:\(currentApp.processIdentifier):exact",
             title: "Fullscreen Candidate",
@@ -577,7 +577,7 @@ extension FlowTabPriorityCoverageTests {
         let recoveryBounds = CGRect(x: 0, y: 124, width: 1_728, height: 993)
 
         let axWindows = [
-            RuntimeSnapshotProvider.AXWindowEntry(
+            RuntimeAXWindowEntry(
                 index: 0,
                 id: "ax:18405:0",
                 title: "Doc A",
@@ -1285,7 +1285,7 @@ extension FlowTabPriorityCoverageTests {
             )
         ]
         let initialAXWindows = [
-            RuntimeSnapshotProvider.AXWindowEntry(
+            RuntimeAXWindowEntry(
                 index: 0,
                 id: "ax:18405:0",
                 title: "Recovered Window",
@@ -1365,8 +1365,8 @@ extension FlowTabPriorityCoverageTests {
             )
         }
 
-        func axWindow(for index: Int) -> RuntimeSnapshotProvider.AXWindowEntry {
-            RuntimeSnapshotProvider.AXWindowEntry(
+        func axWindow(for index: Int) -> RuntimeAXWindowEntry {
+            RuntimeAXWindowEntry(
                 index: index,
                 id: "ax:18405:\(index)",
                 title: title(for: index),
@@ -1416,7 +1416,7 @@ extension FlowTabPriorityCoverageTests {
             )
         ]
         let initialAXWindows = [
-            RuntimeSnapshotProvider.AXWindowEntry(
+            RuntimeAXWindowEntry(
                 index: 0,
                 id: "ax:18405:0",
                 title: "Recovered Window",
@@ -1473,7 +1473,7 @@ extension FlowTabPriorityCoverageTests {
             )
         ]
         let initialAXWindows = [
-            RuntimeSnapshotProvider.AXWindowEntry(
+            RuntimeAXWindowEntry(
                 index: 0,
                 id: "ax:18405:0",
                 title: "Recovered Window",
@@ -1521,7 +1521,7 @@ extension FlowTabPriorityCoverageTests {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
 
         let firstAXWindows = [
-            RuntimeSnapshotProvider.AXWindowEntry(
+            RuntimeAXWindowEntry(
                 index: 0,
                 id: "ax:18405:0",
                 title: "Doc A",
@@ -1530,7 +1530,7 @@ extension FlowTabPriorityCoverageTests {
                 window: AXUIElementCreateApplication(90_001),
                 frame: fullscreenBounds
             ),
-            RuntimeSnapshotProvider.AXWindowEntry(
+            RuntimeAXWindowEntry(
                 index: 1,
                 id: "ax:18405:1",
                 title: "Doc B",
@@ -1568,7 +1568,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(Set(firstEntries.compactMap(\.cgWindowID)), Set<CGWindowID>([240_001, 240_002]))
 
         let secondAXWindows = [
-            RuntimeSnapshotProvider.AXWindowEntry(
+            RuntimeAXWindowEntry(
                 index: 0,
                 id: "ax:18405:0",
                 title: "Doc A (Updated)",
@@ -1577,7 +1577,7 @@ extension FlowTabPriorityCoverageTests {
                 window: firstAXWindows[0].window,
                 frame: fullscreenBounds
             ),
-            RuntimeSnapshotProvider.AXWindowEntry(
+            RuntimeAXWindowEntry(
                 index: 1,
                 id: "ax:18405:1",
                 title: "Doc B (Updated)",
@@ -2430,7 +2430,7 @@ extension FlowTabPriorityCoverageTests {
 
         _ = provider.resolvedStableWindowEntries(
             axWindows: [
-                RuntimeSnapshotProvider.AXWindowEntry(
+                RuntimeAXWindowEntry(
                     index: 0,
                     id: "ax:22001:0",
                     title: "Focused Doc",

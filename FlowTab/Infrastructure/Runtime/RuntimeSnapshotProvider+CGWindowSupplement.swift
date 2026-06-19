@@ -223,7 +223,7 @@ extension RuntimeSnapshotProvider {
         finalWindowsFetchResult: AXWindowInspector.WindowsFetchResult,
         includeRemoteAXWindows: Bool,
         publicSwitchableWindowCount: Int,
-        axWindows: [AXWindowEntry],
+        axWindows: [RuntimeAXWindowEntry],
         cgWindows: [RuntimeCGWindowEntry]
     ) {
         RuntimeLog.debug(
@@ -250,7 +250,7 @@ extension RuntimeSnapshotProvider {
 }
 
 private func runtimeSnapshotAXWindowSummary(
-    _ windows: [RuntimeSnapshotProvider.AXWindowEntry],
+    _ windows: [RuntimeAXWindowEntry],
     limit: Int = 12
 ) -> String {
     guard !windows.isEmpty else { return "empty" }

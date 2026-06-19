@@ -1104,7 +1104,7 @@ final class RuntimeActivator {
         let cgWindows = currentCGWindows(forPID: app.processIdentifier)
         let axEntries = windows.enumerated().map { index, window in
             let title = axWindowTitle(for: window)
-            return RuntimeSnapshotProvider.AXWindowEntry(
+            return RuntimeAXWindowEntry(
                 index: index,
                 id: AXWindowInspector.makeWindowID(pid: app.processIdentifier, index: index),
                 title: title ?? expectedTitle,

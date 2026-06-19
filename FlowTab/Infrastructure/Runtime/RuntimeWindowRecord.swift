@@ -13,6 +13,44 @@ struct RuntimeAXWindowState: Equatable {
     )
 }
 
+struct RuntimeAXWindowEntry {
+    let index: Int
+    let id: String
+    let title: String
+    let sourceTitle: String?
+    let state: RuntimeAXWindowState
+    let window: AXUIElement
+    let frame: CGRect?
+
+    init(
+        index: Int,
+        id: String,
+        title: String,
+        sourceTitle: String?,
+        isMinimized: Bool,
+        isFocused: Bool = false,
+        isMain: Bool = false,
+        window: AXUIElement,
+        frame: CGRect?
+    ) {
+        self.index = index
+        self.id = id
+        self.title = title
+        self.sourceTitle = sourceTitle
+        state = RuntimeAXWindowState(
+            isMinimized: isMinimized,
+            isFocused: isFocused,
+            isMain: isMain
+        )
+        self.window = window
+        self.frame = frame
+    }
+
+    var isMinimized: Bool { state.isMinimized }
+    var isFocused: Bool { state.isFocused }
+    var isMain: Bool { state.isMain }
+}
+
 struct RuntimeCurrentAXAttachment {
     let axWindowID: String
     var axWindow: AXUIElement
@@ -318,7 +356,7 @@ struct RuntimeWindowRecord {
     }
 
     mutating func applyExactMatch(
-        axWindow: RuntimeSnapshotProvider.AXWindowEntry,
+        axWindow: RuntimeAXWindowEntry,
         resolvedTitle: String,
         confirmationSource: WindowBindingConfirmationSource,
         observedAt: TimeInterval,

@@ -9,7 +9,7 @@ struct RuntimeWindowMatchResolution {
 extension RuntimeSnapshotProvider {
     static func resolveFullscreenContentRebindings(
         matches: [String: CGWindowID],
-        axWindows: [AXWindowEntry],
+        axWindows: [RuntimeAXWindowEntry],
         cgWindows: [RuntimeCGWindowEntry],
         assignedCGWindowIDs: Set<CGWindowID>,
         appName: String
@@ -80,7 +80,7 @@ extension RuntimeSnapshotProvider {
     }
 
     static func resolveDesktopSiblingAXBindings(
-        axWindows: [AXWindowEntry],
+        axWindows: [RuntimeAXWindowEntry],
         cgWindows: [RuntimeCGWindowEntry],
         assignedCGWindowIDs: Set<CGWindowID>,
         appName: String
@@ -189,7 +189,7 @@ extension RuntimeSnapshotProvider {
     }
 
     static func resolveFullscreenContentFallbackBindings(
-        axWindows: [AXWindowEntry],
+        axWindows: [RuntimeAXWindowEntry],
         cgWindows: [RuntimeCGWindowEntry],
         assignedCGWindowIDs: Set<CGWindowID>,
         appName: String
@@ -203,7 +203,7 @@ extension RuntimeSnapshotProvider {
     }
 
     static func resolveFullscreenContentFallbackBindingsWithDiagnostics(
-        axWindows: [AXWindowEntry],
+        axWindows: [RuntimeAXWindowEntry],
         cgWindows: [RuntimeCGWindowEntry],
         assignedCGWindowIDs: Set<CGWindowID>,
         appName: String

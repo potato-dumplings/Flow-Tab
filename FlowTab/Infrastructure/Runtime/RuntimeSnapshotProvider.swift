@@ -118,44 +118,6 @@ final class RuntimeSnapshotProvider {
         }
     }
 
-    struct AXWindowEntry {
-        let index: Int
-        let id: String
-        let title: String
-        let sourceTitle: String?
-        let state: RuntimeAXWindowState
-        let window: AXUIElement
-        let frame: CGRect?
-
-        init(
-            index: Int,
-            id: String,
-            title: String,
-            sourceTitle: String?,
-            isMinimized: Bool,
-            isFocused: Bool = false,
-            isMain: Bool = false,
-            window: AXUIElement,
-            frame: CGRect?
-        ) {
-            self.index = index
-            self.id = id
-            self.title = title
-            self.sourceTitle = sourceTitle
-            state = RuntimeAXWindowState(
-                isMinimized: isMinimized,
-                isFocused: isFocused,
-                isMain: isMain
-            )
-            self.window = window
-            self.frame = frame
-        }
-
-        var isMinimized: Bool { state.isMinimized }
-        var isFocused: Bool { state.isFocused }
-        var isMain: Bool { state.isMain }
-    }
-
     struct AXWindowStats {
         let windowCount: Int
         let hasVisibleWindow: Bool
@@ -171,7 +133,7 @@ final class RuntimeSnapshotProvider {
         let shouldIncludeRemoteAXWindows: Bool
         let windowsFetchResult: AXWindowInspector.WindowsFetchResult
         let windows: [AXUIElement]
-        let axEntries: [AXWindowEntry]
+        let axEntries: [RuntimeAXWindowEntry]
         let cgPrepMs: Double
         let publicFetchMs: Double
         let publicSwitchableMs: Double
@@ -371,7 +333,7 @@ final class RuntimeSnapshotProvider {
             : publicWindowsFetchResult
         let windows = windowsFetchResult.windows
         let finalFetchReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let axEntries = windows.enumerated().compactMap { windowIndex, window -> AXWindowEntry? in
+        let axEntries = windows.enumerated().compactMap { windowIndex, window -> RuntimeAXWindowEntry? in
             guard AXWindowInspector.isSwitchable(window) else {
                 let role = AXWindowInspector.role(for: window) ?? "unknown"
                 RuntimeLog.debug(.ax, "\(appName) skip[\(windowIndex)] role=\(role)")
@@ -382,7 +344,7 @@ final class RuntimeSnapshotProvider {
                 index: windowIndex
             )
             let titleFromAX = AXWindowInspector.title(for: window)
-            return AXWindowEntry(
+            return RuntimeAXWindowEntry(
                 index: windowIndex,
                 id: windowID,
                 title: titleFromAX ?? "",
@@ -513,7 +475,7 @@ final class RuntimeSnapshotProvider {
     }
 
     private func resolvedWindowEntries(
-        axWindows: [AXWindowEntry],
+        axWindows: [RuntimeAXWindowEntry],
         cgWindows: [RuntimeCGWindowEntry],
         pid: pid_t,
         appName: String,
@@ -897,7 +859,7 @@ final class RuntimeSnapshotProvider {
             pid: pid
         )
         let axEntries = axWindows.map {
-            AXWindowEntry(
+            RuntimeAXWindowEntry(
                 index: $0.index,
                 id: $0.id,
                 title: $0.title ?? "",
@@ -952,7 +914,7 @@ final class RuntimeSnapshotProvider {
             pid: pid
         )
         let axEntries = axWindows.map {
-            AXWindowEntry(
+            RuntimeAXWindowEntry(
                 index: $0.index,
                 id: $0.id,
                 title: $0.title ?? "",
@@ -1029,7 +991,7 @@ final class RuntimeSnapshotProvider {
             pid: pid
         )
         let axEntries = axWindows.map {
-            AXWindowEntry(
+            RuntimeAXWindowEntry(
                 index: $0.index,
                 id: $0.id,
                 title: $0.title ?? "",
@@ -1079,7 +1041,7 @@ final class RuntimeSnapshotProvider {
     }
 
     private static func exactBridgeOverrideForTesting(
-        axEntries: [AXWindowEntry],
+        axEntries: [RuntimeAXWindowEntry],
         requestedWindowIDsByAXWindowID: [String: CGWindowID]
     ) -> ((AXUIElement) -> CGWindowID?)? {
         guard !requestedWindowIDsByAXWindowID.isEmpty else { return nil }
