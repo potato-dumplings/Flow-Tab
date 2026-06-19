@@ -342,43 +342,4 @@ struct RuntimeAppWindowRepairPayload {
         )
     }
 
-    init(
-        appID: String,
-        displayName: String,
-        groupID: String,
-        summaryLastActiveAt: TimeInterval,
-        candidateLastActiveAt: TimeInterval,
-        pid: pid_t,
-        runningApp: NSRunningApplication,
-        windowSeeds: [RuntimeAppWindowProjectionSeed]
-    ) {
-        let windowCandidates = windowSeeds.map(\.candidate)
-        let windowContexts = Dictionary(
-            uniqueKeysWithValues: windowSeeds.map { seed in
-                (seed.windowID, seed.context)
-            }
-        )
-        self.init(
-            summary: RuntimeHomeAppSummary(
-                appID: appID,
-                displayName: displayName,
-                groupID: groupID,
-                lastActiveAt: summaryLastActiveAt,
-                windowCount: windowSeeds.count,
-                pid: pid
-            ),
-            candidate: AppSwitchCandidate(
-                id: appID,
-                displayName: displayName,
-                groupID: groupID,
-                lastActiveAt: candidateLastActiveAt,
-                windows: windowCandidates
-            ),
-            context: RuntimeAppContext(
-                appID: appID,
-                runningApp: runningApp,
-                windowsByID: windowContexts
-            )
-        )
-    }
 }
