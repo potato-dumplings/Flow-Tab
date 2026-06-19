@@ -33,6 +33,20 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(RuntimeLogCategory.projection.isVerboseOnlyBelowWarning)
     }
 
+    func testRuntimeSnapshotProviderProjectionTimingLineUsesProjectionBoundaryFields() {
+        XCTAssertEqual(
+            RuntimeSnapshotProvider.projectionTimingLine(
+                "fullRepairProjectionPayload",
+                fields: [
+                    ("result", "ready"),
+                    ("apps", "3"),
+                    ("totalMs", "1.25")
+                ]
+            ),
+            "fullRepairProjectionPayload result=ready apps=3 totalMs=1.25"
+        )
+    }
+
     func testRuntimeWindowRecencyTrackerSkipsRecordWhenBindingDisallowsRecency() {
         var now: TimeInterval = 500
         let tracker = RuntimeWindowRecencyTracker(clock: { now })
