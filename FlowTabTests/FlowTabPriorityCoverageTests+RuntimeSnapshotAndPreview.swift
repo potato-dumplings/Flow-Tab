@@ -214,76 +214,55 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(record.lastExactConfirmedAt, 12)
     }
 
-    func testRuntimeFullRepairProjectionAssemblerSelectsPrimaryRowsAndFiltersMinimizedOnlyApps() {
-        let rows = RuntimeFullRepairProjectionAssembler.assembleRows(
-            apps: [
-                RuntimeFullRepairProjectionAssemblyApp(
-                    pid: 10,
-                    bundleIdentifier: "com.example.mail",
-                    localizedName: "Mail",
-                    launchDate: Date(timeIntervalSince1970: 100)
-                ),
-                RuntimeFullRepairProjectionAssemblyApp(
-                    pid: 11,
-                    bundleIdentifier: "com.example.mail",
-                    localizedName: "Mail",
-                    launchDate: Date(timeIntervalSince1970: 200)
-                ),
-                RuntimeFullRepairProjectionAssemblyApp(
-                    pid: 20,
-                    bundleIdentifier: "com.example.chat",
-                    localizedName: "Chat",
-                    launchDate: Date(timeIntervalSince1970: 150)
-                ),
-                RuntimeFullRepairProjectionAssemblyApp(
+    func testRuntimeFullRepairProjectionAssemblerSortsCurrentAppInputsAndBuildsContexts() {
+        let currentApp = NSRunningApplication.current
+        let payload = RuntimeFullRepairProjectionAssembler.payload(
+            fromCurrentAppWindowProjectionInputs: [
+                RuntimeCurrentAppWindowProjectionAssemblyInput(
+                    appID: "com.example.notes",
+                    displayName: "Notes",
+                    groupID: "example",
+                    summaryLastActiveAt: -3,
+                    candidateLastActiveAt: 997,
                     pid: 30,
-                    bundleIdentifier: "com.example.notes",
-                    localizedName: "Notes",
-                    launchDate: Date(timeIntervalSince1970: 50)
+                    runningApp: currentApp,
+                    windowSeeds: []
+                ),
+                RuntimeCurrentAppWindowProjectionAssemblyInput(
+                    appID: "com.example.mail",
+                    displayName: "Mail",
+                    groupID: "example",
+                    summaryLastActiveAt: 0,
+                    candidateLastActiveAt: 1_000,
+                    pid: 11,
+                    runningApp: currentApp,
+                    windowSeeds: [
+                        RuntimeAppWindowProjectionSeed(
+                            windowID: "mail-1",
+                            title: "Inbox",
+                            isMinimized: false,
+                            lastActiveAt: 1_000,
+                            ownerPID: 11,
+                            cgWindowID: 11
+                        ),
+                        RuntimeAppWindowProjectionSeed(
+                            windowID: "mail-2",
+                            title: "Draft",
+                            isMinimized: false,
+                            lastActiveAt: 999,
+                            ownerPID: 11,
+                            cgWindowID: 12
+                        )
+                    ]
                 )
-            ],
-            windowsByPID: [
-                10: [
-                    RuntimeFullRepairProjectionAssemblyWindow(
-                        windowID: "mail-legacy",
-                        title: "Inbox",
-                        isMinimized: false,
-                        cgWindowID: 10
-                    )
-                ],
-                11: [
-                    RuntimeFullRepairProjectionAssemblyWindow(
-                        windowID: "mail-1",
-                        title: "Inbox",
-                        isMinimized: false,
-                        cgWindowID: 11
-                    ),
-                    RuntimeFullRepairProjectionAssemblyWindow(
-                        windowID: "mail-2",
-                        title: "Draft",
-                        isMinimized: false,
-                        cgWindowID: 12
-                    )
-                ],
-                20: [
-                    RuntimeFullRepairProjectionAssemblyWindow(
-                        windowID: "chat-1",
-                        title: "Standup",
-                        isMinimized: true,
-                        cgWindowID: 20
-                    )
-                ]
-            ],
-            rankByPID: [11: 0, 20: 1, 10: 2, 30: 3],
-            hideMinimizedAppsFromAppLayer: true,
-            now: 1_000
+            ]
         )
 
-        XCTAssertEqual(rows.map(\.pid), [11, 30])
-        XCTAssertEqual(rows.first?.candidate.id, "com.example.mail")
-        XCTAssertEqual(rows.first?.candidate.windows.map(\.id), ["mail-1", "mail-2", "mail-legacy"])
-        XCTAssertEqual(rows.last?.candidate.id, "com.example.notes")
-        XCTAssertTrue(rows.allSatisfy { $0.candidate.id != "com.example.chat" })
+        XCTAssertEqual(payload.apps.map(\.id), ["com.example.mail", "com.example.notes"])
+        XCTAssertEqual(payload.apps.first?.windows.map(\.id), ["mail-1", "mail-2"])
+        XCTAssertEqual(payload.contextsByID.keys.sorted(), ["com.example.mail", "com.example.notes"])
+        XCTAssertEqual(payload.contextsByID["com.example.mail"]?.windowsByID["mail-1"]?.cgWindowID, 11)
+        XCTAssertEqual(payload.contextsByID["com.example.mail"]?.windowsByID["mail-2"]?.ownerPID, 11)
     }
 
     func testRuntimeFullRepairProjectionAssemblerBuildsPayloadContextsFromCurrentAppInputs() {
@@ -1758,48 +1737,56 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(title, "百度一下，你就知道 - Google Chrome - test2")
     }
 
-    func testRuntimeFullRepairProjectionAssemblerIncludesMinimizedAppsWhenFilterDisabledAndUsesFallbackGroup() {
-        let rows = RuntimeFullRepairProjectionAssembler.assembleRows(
-            apps: [
-                RuntimeFullRepairProjectionAssemblyApp(
+    func testRuntimeFullRepairProjectionAssemblerPreservesMinimizedSeedsAndFallbackGroupIDs() {
+        let currentApp = NSRunningApplication.current
+        let payload = RuntimeFullRepairProjectionAssembler.payload(
+            fromCurrentAppWindowProjectionInputs: [
+                RuntimeCurrentAppWindowProjectionAssemblyInput(
+                    appID: "pid:41",
+                    displayName: "Zulu",
+                    groupID: "z",
+                    summaryLastActiveAt: -5,
+                    candidateLastActiveAt: 1_995,
                     pid: 41,
-                    bundleIdentifier: nil,
-                    localizedName: "Zulu",
-                    launchDate: Date(timeIntervalSince1970: 100)
+                    runningApp: currentApp,
+                    windowSeeds: [
+                        RuntimeAppWindowProjectionSeed(
+                            windowID: "z-1",
+                            title: "Zulu Window",
+                            isMinimized: true,
+                            lastActiveAt: 2_000,
+                            ownerPID: 41,
+                            cgWindowID: 41
+                        )
+                    ]
                 ),
-                RuntimeFullRepairProjectionAssemblyApp(
+                RuntimeCurrentAppWindowProjectionAssemblyInput(
+                    appID: "pid:42",
+                    displayName: "Alpha",
+                    groupID: "a",
+                    summaryLastActiveAt: -5,
+                    candidateLastActiveAt: 1_995,
                     pid: 42,
-                    bundleIdentifier: nil,
-                    localizedName: "Alpha",
-                    launchDate: Date(timeIntervalSince1970: 100)
+                    runningApp: currentApp,
+                    windowSeeds: [
+                        RuntimeAppWindowProjectionSeed(
+                            windowID: "a-1",
+                            title: "Alpha Window",
+                            isMinimized: true,
+                            lastActiveAt: 2_000,
+                            ownerPID: 42,
+                            cgWindowID: 42
+                        )
+                    ]
                 )
-            ],
-            windowsByPID: [
-                41: [
-                    RuntimeFullRepairProjectionAssemblyWindow(
-                        windowID: "z-1",
-                        title: "Zulu Window",
-                        isMinimized: true,
-                        cgWindowID: 41
-                    )
-                ],
-                42: [
-                    RuntimeFullRepairProjectionAssemblyWindow(
-                        windowID: "a-1",
-                        title: "Alpha Window",
-                        isMinimized: true,
-                        cgWindowID: 42
-                    )
-                ]
-            ],
-            rankByPID: [41: 5, 42: 5],
-            hideMinimizedAppsFromAppLayer: false,
-            now: 2_000
+            ]
         )
 
-        XCTAssertEqual(rows.map(\.pid), [42, 41])
-        XCTAssertEqual(rows.map(\.candidate.groupID), ["a", "z"])
-        XCTAssertTrue(rows.allSatisfy { $0.candidate.windows.first?.isMinimized == true })
+        XCTAssertEqual(payload.apps.map(\.id), ["pid:42", "pid:41"])
+        XCTAssertEqual(payload.apps.map(\.groupID), ["a", "z"])
+        XCTAssertTrue(payload.apps.allSatisfy { $0.windows.first?.isMinimized == true })
+        XCTAssertEqual(payload.contextsByID["pid:42"]?.windowsByID["a-1"]?.cgWindowID, 42)
+        XCTAssertEqual(payload.contextsByID["pid:41"]?.windowsByID["z-1"]?.ownerPID, 41)
     }
 
     func testRuntimeWindowPreviewProviderGuessesDarkLightAndUnknownTitleBars() {
