@@ -276,7 +276,7 @@ struct RuntimeCurrentAppWindowPayload {
 enum RuntimeFullRepairProjectionAssembler {
     static func payload(
         fromCurrentAppWindowProjectionInputs inputs: [RuntimeCurrentAppWindowProjectionAssemblyInput],
-        appDirectoryEntries: [RuntimeAppDirectoryEntry]? = nil,
+        appDirectoryEntries: [RuntimeAppDirectoryEntry] = [],
         duplicateContextHandler: ((String) -> Void)? = nil
     ) -> RuntimeFullRepairProjectionPayload {
         payload(
@@ -288,7 +288,7 @@ enum RuntimeFullRepairProjectionAssembler {
 
     private static func payload(
         fromCurrentAppWindowPayloads currentAppWindowPayloads: [RuntimeCurrentAppWindowPayload],
-        appDirectoryEntries: [RuntimeAppDirectoryEntry]? = nil,
+        appDirectoryEntries: [RuntimeAppDirectoryEntry] = [],
         duplicateContextHandler: ((String) -> Void)? = nil
     ) -> RuntimeFullRepairProjectionPayload {
         let rows = currentAppWindowPayloads
@@ -316,7 +316,6 @@ enum RuntimeFullRepairProjectionAssembler {
             apps: rows.map(\.candidate),
             contextsByID: contextsByID,
             appDirectoryEntries: appDirectoryEntries
-                ?? currentAppWindowPayloads.flatMap(\.appDirectoryEntries)
         )
     }
 }

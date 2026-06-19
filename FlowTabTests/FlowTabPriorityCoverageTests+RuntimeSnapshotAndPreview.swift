@@ -326,6 +326,35 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(payload.appDirectoryEntries, appDirectoryEntries)
     }
 
+    func testRuntimeFullRepairProjectionAssemblerDoesNotInferAppDirectoryFromCurrentAppInputs() {
+        let currentApp = NSRunningApplication.current
+        let payload = RuntimeFullRepairProjectionAssembler.payload(
+            fromCurrentAppWindowProjectionInputs: [
+                RuntimeCurrentAppWindowProjectionAssemblyInput(
+                    appID: "com.example.current",
+                    app: currentApp,
+                    appGroup: [currentApp],
+                    rankByPID: [currentApp.processIdentifier: 0],
+                    rankFallback: 0,
+                    generatedAt: 100,
+                    windowSeeds: [
+                        RuntimeAppWindowProjectionSeed(
+                            windowID: "current-1",
+                            title: "Current",
+                            isMinimized: false,
+                            lastActiveAt: 100,
+                            ownerPID: currentApp.processIdentifier
+                        )
+                    ]
+                )
+            ]
+        )
+
+        XCTAssertEqual(payload.apps.map(\.id), ["com.example.current"])
+        XCTAssertTrue(payload.contextsByID.keys.contains("com.example.current"))
+        XCTAssertTrue(payload.appDirectoryEntries.isEmpty)
+    }
+
     func testRuntimeCurrentAppWindowProjectionAssemblyInputBuildsRankedPayloadFacts() {
         let currentApp = NSRunningApplication.current
         let pid = currentApp.processIdentifier
