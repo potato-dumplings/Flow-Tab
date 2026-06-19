@@ -192,7 +192,7 @@ struct RuntimeCurrentAppWindowPayload {
         self.context = context
     }
 
-    init(
+    private init(
         appID: String,
         displayName: String,
         groupID: String,

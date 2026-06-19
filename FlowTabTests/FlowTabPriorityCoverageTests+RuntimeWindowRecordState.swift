@@ -4,11 +4,11 @@ import XCTest
 @testable import FlowTab
 
 extension FlowTabPriorityCoverageTests {
-    func testRuntimeCurrentAppWindowPayloadOwnsProjectionSeedAssembly() throws {
+    func testRuntimeCurrentAppWindowPayloadBuildsProjectionSeedFactsThroughAssemblyInput() throws {
         let app = NSRunningApplication.current
         let appID = "com.example.seeded-projection"
         let frame = CGRect(x: 10, y: 20, width: 300, height: 200)
-        let payload = RuntimeCurrentAppWindowPayload(
+        let assemblyInput = RuntimeCurrentAppWindowProjectionAssemblyInput(
             appID: appID,
             displayName: "Seeded Projection",
             groupID: "seeded",
@@ -42,6 +42,7 @@ extension FlowTabPriorityCoverageTests {
                 )
             ]
         )
+        let payload = RuntimeCurrentAppWindowPayload(assemblyInput: assemblyInput)
 
         XCTAssertEqual(payload.summary.appID, appID)
         XCTAssertEqual(payload.summary.displayName, "Seeded Projection")
