@@ -153,11 +153,11 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 includeFullRepair: false
             )
             commitRepairedCurrentAppWindowPayloadsLocked(drainResult.repairedCurrentAppWindowPayloads)
-            readModelStore.stageSearchIndexCurrentAppWindowPayloads(
+            let stagedSearchIndex = readModelStore.stageSearchIndexCurrentAppWindowPayloads(
                 drainResult.repairedCurrentAppWindowPayloads
             )
             let hasPendingRequests = snapshotProvider.reconciliationCoordinator.hasPendingRequests()
-            let shouldCommitStagedSearchIndex = drainResult.completedCount > 0
+            let shouldCommitStagedSearchIndex = stagedSearchIndex != nil
                 && drainResult.deferredCount == 0
                 && !hasPendingRequests
             let committedSearchIndex = shouldCommitStagedSearchIndex

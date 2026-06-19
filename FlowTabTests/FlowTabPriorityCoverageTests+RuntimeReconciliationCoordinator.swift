@@ -1760,6 +1760,77 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(coordinator.readyRequests(now: 10.49).isEmpty)
     }
 
+    func testRuntimeProjectionServiceSearchFreshnessBarrierDoesNotCommitStaleStagingWithoutRepairPayload() throws {
+        let coordinator = RuntimeReconciliationCoordinator()
+        let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
+        let store = RuntimeReadModelStore()
+        let committedApps = searchScenarioApps()
+        let stagedApp = AppSwitchCandidate(
+            id: "com.example.browser",
+            displayName: "Browser",
+            groupID: "web",
+            lastActiveAt: 320,
+            windows: [
+                WindowCandidate(
+                    id: "browser-stale-staging",
+                    title: "Stale Staging Runtime Docs",
+                    isMinimized: false,
+                    lastActiveAt: 320
+                )
+            ]
+        )
+        let pid = pid_t(42_107)
+        store.commitAppSwitcherProjection(
+            apps: committedApps,
+            contextsByID: [:],
+            generatedAt: 10
+        )
+        store.markAppWindowsDirty(
+            appID: stagedApp.id,
+            pid: pid,
+            pendingScope: "appWindows:\(stagedApp.id)"
+        )
+        store.stageSearchIndexApp(
+            stagedApp,
+            generatedAt: 20
+        )
+        coordinator.markAppDirty(
+            appID: stagedApp.id,
+            pid: pid,
+            reason: .axNotification,
+            now: 10
+        )
+        let expectation = expectation(description: "search freshness barrier completes without repair payload")
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.SearchFreshnessBarrierStaleStaging",
+            snapshotProvider: provider,
+            readModelStore: store,
+            reconciliationExecutor: { _, _ in
+                expectation.fulfill()
+                return .completed
+            }
+        )
+
+        service.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
+        wait(for: [expectation], timeout: 1)
+        service.waitForMaintenanceQueueForTesting()
+
+        let read = store.readCommittedSearchIndexForSearch()
+        let projection = try XCTUnwrap(read.projection)
+        XCTAssertEqual(read.readiness, .staleCommitted)
+        XCTAssertEqual(read.resultState, .degradedStaleCommittedResult)
+        XCTAssertEqual(
+            projection.windowEntries.filter { $0.appID == stagedApp.id }.map(\.windowID),
+            ["browser-1"]
+        )
+        let diagnostics = store.diagnostics()
+        XCTAssertEqual(diagnostics.dirtyAppIDs, [stagedApp.id])
+        XCTAssertEqual(diagnostics.dirtyPIDs, [pid])
+        XCTAssertEqual(diagnostics.pendingRepairScopes, ["appWindows:\(stagedApp.id)"])
+        XCTAssertTrue(diagnostics.hasStagingSearchIndex)
+        XCTAssertTrue(coordinator.readyRequests(now: 11).isEmpty)
+    }
+
     func testRuntimeProjectionServiceSearchFreshnessBarrierKeepsCommittedIndexStaleWhenRetryExhaustsToFullRepairFallback() throws {
         let coordinator = RuntimeReconciliationCoordinator(
             retryPolicy: RuntimeReconciliationRetryPolicy(delays: [])
