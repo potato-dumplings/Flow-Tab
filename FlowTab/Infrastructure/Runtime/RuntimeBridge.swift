@@ -334,6 +334,14 @@ struct RuntimeAppWindowRepairPayload {
         self.context = context
     }
 
+    init(currentAppWindowPayload payload: RuntimeCurrentAppWindowPayload) {
+        self.init(
+            summary: payload.summary,
+            candidate: payload.candidate,
+            context: payload.context
+        )
+    }
+
     init(
         appID: String,
         displayName: String,

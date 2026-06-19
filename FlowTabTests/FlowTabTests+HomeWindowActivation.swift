@@ -217,16 +217,16 @@ extension FlowTabTests {
         )
     }
 
-    func testRuntimeWindowRecencyTrackerAppliesToProviderRepairPayload() async {
+    func testRuntimeWindowRecencyTrackerAppliesToProviderCurrentAppPayload() async {
         await withLaunchArgumentsForTesting(["FlowTab", "--flowtab-ui-mock-runtime"]) {
             let tracker = RuntimeWindowRecencyTracker()
             let provider = RuntimeSnapshotProvider()
             let appID = "com.flowtab.mock.mail"
-            guard let appWindowRepairPayload = provider.appWindowRepairPayload(for: appID) else {
-                XCTFail("Expected mock repair payload for \(appID)")
+            guard let currentAppPayload = provider.currentAppWindowPayload(for: appID) else {
+                XCTFail("Expected mock current-app payload for \(appID)")
                 return
             }
-            guard let draftWindow = appWindowRepairPayload.context.windowsByID["mock-mail-draft"] else {
+            guard let draftWindow = currentAppPayload.context.windowsByID["mock-mail-draft"] else {
                 XCTFail("Expected mock mail draft context")
                 return
             }
@@ -234,7 +234,7 @@ extension FlowTabTests {
                 appID: appID,
                 windowID: "mock-mail-draft",
                 ownerPID: draftWindow.ownerPID == 0
-                    ? appWindowRepairPayload.context.runningApp.processIdentifier
+                    ? currentAppPayload.context.runningApp.processIdentifier
                     : draftWindow.ownerPID,
                 cgWindowID: draftWindow.cgWindowID,
                 title: draftWindow.title,
@@ -243,11 +243,7 @@ extension FlowTabTests {
             )
 
             let orderedPayload = tracker.currentAppWindowPayloadWithRecencyApplied(
-                RuntimeCurrentAppWindowPayload(
-                    summary: appWindowRepairPayload.summary,
-                    candidate: appWindowRepairPayload.candidate,
-                    context: appWindowRepairPayload.context
-                )
+                currentAppPayload
             )
 
             XCTAssertEqual(

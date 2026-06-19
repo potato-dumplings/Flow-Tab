@@ -4,11 +4,11 @@ import XCTest
 @testable import FlowTab
 
 extension FlowTabPriorityCoverageTests {
-    func testRuntimeAppWindowRepairPayloadOwnsProjectionSeedAssembly() throws {
+    func testRuntimeCurrentAppWindowPayloadOwnsProjectionSeedAssembly() throws {
         let app = NSRunningApplication.current
         let appID = "com.example.seeded-projection"
         let frame = CGRect(x: 10, y: 20, width: 300, height: 200)
-        let payload = RuntimeAppWindowRepairPayload(
+        let payload = RuntimeCurrentAppWindowPayload(
             appID: appID,
             displayName: "Seeded Projection",
             groupID: "seeded",
@@ -73,6 +73,11 @@ extension FlowTabPriorityCoverageTests {
         let minimizedContext = try XCTUnwrap(payload.context.windowsByID["seed-window-b"])
         XCTAssertTrue(minimizedContext.isMinimized)
         XCTAssertEqual(minimizedContext.bindingConfidence, .provisional)
+
+        let repairPayload = RuntimeAppWindowRepairPayload(currentAppWindowPayload: payload)
+        XCTAssertEqual(repairPayload.summary.appID, payload.summary.appID)
+        XCTAssertEqual(repairPayload.candidate.windows.map(\.id), payload.candidate.windows.map(\.id))
+        XCTAssertEqual(repairPayload.context.windowsByID.keys.sorted(), payload.context.windowsByID.keys.sorted())
     }
 
     func testRuntimeWindowMappingStateDerivesReverseAXCGIndex() {

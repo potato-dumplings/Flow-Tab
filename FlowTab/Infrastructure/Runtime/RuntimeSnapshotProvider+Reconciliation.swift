@@ -98,8 +98,7 @@ extension RuntimeSnapshotProvider {
         processIdentifier pid: pid_t,
         affectedCGWindowIDs: Set<CGWindowID>
     ) -> RuntimeAppWindowReconciliationResult {
-        let repairPayload = focusedAppWindowRepairPayload(processIdentifier: pid)
-        let currentAppWindowPayload = repairPayload.map(RuntimeCurrentAppWindowPayload.init)
+        let currentAppWindowPayload = focusedCurrentAppWindowPayload(processIdentifier: pid)
         let currentAppWindowPayloadWasEmpty = currentAppWindowPayload?.candidate.windows.isEmpty == true
         let mappingState = windowMappingStateByPID[pid]
         let knownAffectedCGWindowIDs = mappingState.map {
