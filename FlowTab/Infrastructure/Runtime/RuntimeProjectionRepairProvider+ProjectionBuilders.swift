@@ -69,12 +69,14 @@ extension RuntimeProjectionRepairProvider {
             )
             return RuntimeFullRepairProjectionPayload(
                 apps: uiTestRuntimeDataset.appSwitcherApps,
-                contextsByID: uiTestRuntimeDataset.appSwitcherContextsByID
+                contextsByID: uiTestRuntimeDataset.appSwitcherContextsByID,
+                appDirectoryEntries: uiTestRuntimeDataset.appDirectoryEntries
             )
         }
         let runningAppsStartMs = RuntimePerformanceClock.monotonicMilliseconds()
         let runningApps = filteredRunningApplications()
         let runningAppsReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let appDirectoryEntries = runningApps.map(RuntimeAppDirectoryEntry.init(app:))
 
         guard !runningApps.isEmpty else {
             snapshotProvider.logProjectionTiming(
@@ -150,7 +152,11 @@ extension RuntimeProjectionRepairProvider {
                     ("totalMs", snapshotProvider.formatProjectionMilliseconds(completeMs - startMs))
                 ]
             )
-            return RuntimeFullRepairProjectionPayload(apps: [], contextsByID: [:])
+            return RuntimeFullRepairProjectionPayload(
+                apps: [],
+                contextsByID: [:],
+                appDirectoryEntries: appDirectoryEntries
+            )
         }
         let now = Date.timeIntervalSinceReferenceDate
 
@@ -187,6 +193,7 @@ extension RuntimeProjectionRepairProvider {
         let rowsReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let payload = RuntimeFullRepairProjectionAssembler.payload(
             fromCurrentAppWindowProjectionInputs: currentAppProjectionInputs,
+            appDirectoryEntries: appDirectoryEntries,
             duplicateContextHandler: { appID in
                 RuntimeLog.debug(.projection, "duplicate appID fallback overwrite=\(appID)")
             }

@@ -252,6 +252,29 @@ extension FlowTabPriorityCoverageTests {
 
     func testRuntimeFullRepairProjectionAssemblerSortsCurrentAppInputsAndBuildsContexts() {
         let currentApp = NSRunningApplication.current
+        let appDirectoryEntries = [
+            RuntimeAppDirectoryEntry(
+                pid: 11,
+                appID: "com.example.mail",
+                bundleIdentifier: "com.example.mail",
+                localizedName: "Mail",
+                launchDate: nil
+            ),
+            RuntimeAppDirectoryEntry(
+                pid: 30,
+                appID: "com.example.notes",
+                bundleIdentifier: "com.example.notes",
+                localizedName: "Notes",
+                launchDate: nil
+            ),
+            RuntimeAppDirectoryEntry(
+                pid: 44,
+                appID: "com.example.helper",
+                bundleIdentifier: "com.example.helper",
+                localizedName: "Helper",
+                launchDate: nil
+            )
+        ]
         let payload = RuntimeFullRepairProjectionAssembler.payload(
             fromCurrentAppWindowProjectionInputs: [
                 RuntimeCurrentAppWindowProjectionAssemblyInput(
@@ -291,7 +314,8 @@ extension FlowTabPriorityCoverageTests {
                         )
                     ]
                 )
-            ]
+            ],
+            appDirectoryEntries: appDirectoryEntries
         )
 
         XCTAssertEqual(payload.apps.map(\.id), ["com.example.mail", "com.example.notes"])
@@ -299,6 +323,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(payload.contextsByID.keys.sorted(), ["com.example.mail", "com.example.notes"])
         XCTAssertEqual(payload.contextsByID["com.example.mail"]?.windowsByID["mail-1"]?.cgWindowID, 11)
         XCTAssertEqual(payload.contextsByID["com.example.mail"]?.windowsByID["mail-2"]?.ownerPID, 11)
+        XCTAssertEqual(payload.appDirectoryEntries, appDirectoryEntries)
     }
 
     func testRuntimeCurrentAppWindowProjectionAssemblyInputBuildsRankedPayloadFacts() {

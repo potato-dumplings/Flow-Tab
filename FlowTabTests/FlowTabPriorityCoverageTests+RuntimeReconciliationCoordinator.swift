@@ -1476,6 +1476,22 @@ extension FlowTabPriorityCoverageTests {
             lastActiveAt: 42,
             windows: []
         )
+        let appDirectoryEntries = [
+            RuntimeAppDirectoryEntry(
+                pid: 51_001,
+                appID: repairedApp.id,
+                bundleIdentifier: "com.example.full-repair",
+                localizedName: repairedApp.displayName,
+                launchDate: nil
+            ),
+            RuntimeAppDirectoryEntry(
+                pid: 51_002,
+                appID: "com.example.full-repair-helper",
+                bundleIdentifier: "com.example.full-repair-helper",
+                localizedName: "Full Repair Helper",
+                launchDate: nil
+            )
+        ]
         let lock = NSLock()
         var executedRequests: [RuntimeReconciliationRequest] = []
         let expectation = expectation(description: "runtime maintenance executes full repair fallback")
@@ -1489,7 +1505,11 @@ extension FlowTabPriorityCoverageTests {
                 lock.unlock()
                 expectation.fulfill()
                 return .completedWithFullRepairProjection(
-                    RuntimeFullRepairProjectionPayload(apps: [repairedApp], contextsByID: [:])
+                    RuntimeFullRepairProjectionPayload(
+                        apps: [repairedApp],
+                        contextsByID: [:],
+                        appDirectoryEntries: appDirectoryEntries
+                    )
                 )
             }
         )
@@ -1504,6 +1524,9 @@ extension FlowTabPriorityCoverageTests {
         let projection = try XCTUnwrap(store.readAppSwitcherProjection())
         XCTAssertEqual(projection.apps.map(\.id), [repairedApp.id])
         XCTAssertTrue(projection.freshness.isCompleteForScope)
+        let appDirectoryProjection = try XCTUnwrap(store.readAppDirectoryProjection())
+        XCTAssertEqual(appDirectoryProjection.entries, appDirectoryEntries)
+        XCTAssertTrue(appDirectoryProjection.freshness.isCompleteForScope)
         XCTAssertTrue(coordinator.readyRequests(now: 11).isEmpty)
     }
 

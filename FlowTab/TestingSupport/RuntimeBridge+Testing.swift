@@ -70,6 +70,7 @@ struct FlowTabUITestRuntimeProjectionDataset {
     let appSwitcherApps: [AppSwitchCandidate]
     let appSwitcherContextsByID: [String: RuntimeAppContext]
     let currentAppWindowPayloadsByAppID: [String: RuntimeCurrentAppWindowPayload]
+    let appDirectoryEntries: [RuntimeAppDirectoryEntry]
 
     private typealias UITestAppDefinition = (
         appID: String,
@@ -404,6 +405,15 @@ struct FlowTabUITestRuntimeProjectionDataset {
                 )
             )
         }
+        let appDirectoryEntries = appDefinitions.enumerated().map { index, definition in
+            RuntimeAppDirectoryEntry(
+                pid: summaries[index].pid,
+                appID: definition.appID,
+                bundleIdentifier: definition.appID,
+                localizedName: definition.name,
+                launchDate: nil
+            )
+        }
 
         let contextsByAppID = Dictionary(
             uniqueKeysWithValues: appDefinitions.map { definition in
@@ -460,7 +470,8 @@ struct FlowTabUITestRuntimeProjectionDataset {
                 let currentAppWindowPayload = RuntimeCurrentAppWindowPayload(
                     summary: summaries[index],
                     candidate: candidates[index],
-                    context: context
+                    context: context,
+                    appDirectoryEntries: [appDirectoryEntries[index]]
                 )
                 return (definition.appID, currentAppWindowPayload)
             }
@@ -469,7 +480,8 @@ struct FlowTabUITestRuntimeProjectionDataset {
         return FlowTabUITestRuntimeProjectionDataset(
             appSwitcherApps: candidates,
             appSwitcherContextsByID: FlowTabTestLaunchOptions.enablesMockHotkeyEffects ? contextsByAppID : [:],
-            currentAppWindowPayloadsByAppID: currentAppWindowPayloadsByAppID
+            currentAppWindowPayloadsByAppID: currentAppWindowPayloadsByAppID,
+            appDirectoryEntries: appDirectoryEntries
         )
     }
 
