@@ -167,19 +167,13 @@ extension RuntimeSnapshotProvider {
                 "\(displayName) pid=\(pid) appID=\(appID) windows=\(windows.count)"
             )
 
-            let rank = appDirectory.preferredRank(
-                for: appGroup,
-                rankByPID: windowData.rankByPID,
-                fallback: 10_000 + index
-            )
             let input = RuntimeCurrentAppWindowProjectionAssemblyInput(
                 appID: appID,
-                displayName: displayName,
-                groupID: RuntimeAppIdentity.groupID(for: app.bundleIdentifier, fallbackName: displayName),
-                summaryLastActiveAt: RuntimeAppDirectory.stableLastActiveValue(forRank: rank),
-                candidateLastActiveAt: now - Double(rank),
-                pid: pid,
-                runningApp: app,
+                app: app,
+                appGroup: appGroup,
+                rankByPID: windowData.rankByPID,
+                rankFallback: 10_000 + index,
+                generatedAt: now,
                 windowSeeds: windows.enumerated().map { entryIndex, entry in
                     entry.projectionSeed(lastActiveAt: now - Double(entryIndex))
                 }
@@ -259,13 +253,17 @@ extension RuntimeSnapshotProvider {
             return nil
         }
 
-        return makeCurrentAppWindowPayload(
+        let now = Date.timeIntervalSinceReferenceDate
+        return RuntimeCurrentAppWindowPayload(
             appID: appID,
             app: app,
             appGroup: matchingApps,
-            windows: windows,
             rankByPID: rankByPID,
-            rankFallback: 10_000
+            rankFallback: 10_000,
+            generatedAt: now,
+            windowSeeds: windows.enumerated().map { entryIndex, entry in
+                entry.projectionSeed(lastActiveAt: now - Double(entryIndex))
+            }
         )
     }
 
@@ -361,13 +359,17 @@ extension RuntimeSnapshotProvider {
             return nil
         }
 
-        let payload = makeCurrentAppWindowPayload(
+        let now = Date.timeIntervalSinceReferenceDate
+        let payload = RuntimeCurrentAppWindowPayload(
             appID: appID,
             app: app,
             appGroup: focusedApps,
-            windows: windows,
             rankByPID: rankByPID,
-            rankFallback: 0
+            rankFallback: 0,
+            generatedAt: now,
+            windowSeeds: windows.enumerated().map { entryIndex, entry in
+                entry.projectionSeed(lastActiveAt: now - Double(entryIndex))
+            }
         )
         let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
         logProjectionTiming(
@@ -389,38 +391,6 @@ extension RuntimeSnapshotProvider {
             ]
         )
         return payload
-    }
-
-    private func makeCurrentAppWindowPayload(
-        appID: String,
-        app: NSRunningApplication,
-        appGroup: [NSRunningApplication],
-        windows: [WindowListEntry],
-        rankByPID: [pid_t: Int],
-        rankFallback: Int
-    ) -> RuntimeCurrentAppWindowPayload {
-        let now = Date.timeIntervalSinceReferenceDate
-        let displayName = app.localizedName ?? appID
-        let rank = RuntimeAppDirectory(apps: appGroup).preferredRank(
-            for: appGroup,
-            rankByPID: rankByPID,
-            fallback: rankFallback
-        )
-        let groupID = RuntimeAppIdentity.groupID(for: app.bundleIdentifier, fallbackName: displayName)
-        return RuntimeCurrentAppWindowPayload(
-            assemblyInput: RuntimeCurrentAppWindowProjectionAssemblyInput(
-                appID: appID,
-                displayName: displayName,
-                groupID: groupID,
-                summaryLastActiveAt: RuntimeAppDirectory.stableLastActiveValue(forRank: rank),
-                candidateLastActiveAt: now - Double(rank),
-                pid: app.processIdentifier,
-                runningApp: app,
-                windowSeeds: windows.enumerated().map { entryIndex, entry in
-                    entry.projectionSeed(lastActiveAt: now - Double(entryIndex))
-                }
-            )
-        )
     }
 
     func filteredRunningApplications() -> [NSRunningApplication] {

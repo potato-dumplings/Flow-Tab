@@ -265,6 +265,38 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(payload.contextsByID["com.example.mail"]?.windowsByID["mail-2"]?.ownerPID, 11)
     }
 
+    func testRuntimeCurrentAppWindowProjectionAssemblyInputBuildsRankedPayloadFacts() {
+        let currentApp = NSRunningApplication.current
+        let pid = currentApp.processIdentifier
+        let input = RuntimeCurrentAppWindowProjectionAssemblyInput(
+            appID: "com.example.current",
+            app: currentApp,
+            appGroup: [currentApp],
+            rankByPID: [pid: 4],
+            rankFallback: 10_000,
+            generatedAt: 1_000,
+            windowSeeds: [
+                RuntimeAppWindowProjectionSeed(
+                    windowID: "current-1",
+                    title: "Current Window",
+                    isMinimized: false,
+                    lastActiveAt: 999,
+                    ownerPID: pid,
+                    cgWindowID: 400
+                )
+            ]
+        )
+        let payload = RuntimeCurrentAppWindowPayload(assemblyInput: input)
+
+        XCTAssertEqual(input.summaryLastActiveAt, -4)
+        XCTAssertEqual(input.candidateLastActiveAt, 996)
+        XCTAssertEqual(input.pid, pid)
+        XCTAssertEqual(payload.summary.appID, "com.example.current")
+        XCTAssertEqual(payload.summary.windowCount, 1)
+        XCTAssertEqual(payload.candidate.windows.map(\.id), ["current-1"])
+        XCTAssertEqual(payload.context.windowsByID["current-1"]?.cgWindowID, 400)
+    }
+
     func testRuntimeFullRepairProjectionAssemblerBuildsPayloadContextsFromCurrentAppInputs() {
         let currentApp = NSRunningApplication.current
         let evidence = RuntimeSpaceEvidence(

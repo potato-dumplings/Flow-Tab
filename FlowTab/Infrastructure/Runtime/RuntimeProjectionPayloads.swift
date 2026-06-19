@@ -109,6 +109,53 @@ struct RuntimeCurrentAppWindowProjectionAssemblyInput {
     let pid: pid_t
     let runningApp: NSRunningApplication
     let windowSeeds: [RuntimeAppWindowProjectionSeed]
+
+    init(
+        appID: String,
+        displayName: String,
+        groupID: String,
+        summaryLastActiveAt: TimeInterval,
+        candidateLastActiveAt: TimeInterval,
+        pid: pid_t,
+        runningApp: NSRunningApplication,
+        windowSeeds: [RuntimeAppWindowProjectionSeed]
+    ) {
+        self.appID = appID
+        self.displayName = displayName
+        self.groupID = groupID
+        self.summaryLastActiveAt = summaryLastActiveAt
+        self.candidateLastActiveAt = candidateLastActiveAt
+        self.pid = pid
+        self.runningApp = runningApp
+        self.windowSeeds = windowSeeds
+    }
+
+    init(
+        appID: String,
+        app: NSRunningApplication,
+        appGroup: [NSRunningApplication],
+        rankByPID: [pid_t: Int],
+        rankFallback: Int,
+        generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate,
+        windowSeeds: [RuntimeAppWindowProjectionSeed]
+    ) {
+        let displayName = app.localizedName ?? appID
+        let rank = RuntimeAppDirectory(apps: appGroup).preferredRank(
+            for: appGroup,
+            rankByPID: rankByPID,
+            fallback: rankFallback
+        )
+        self.init(
+            appID: appID,
+            displayName: displayName,
+            groupID: RuntimeAppIdentity.groupID(for: app.bundleIdentifier, fallbackName: displayName),
+            summaryLastActiveAt: RuntimeAppDirectory.stableLastActiveValue(forRank: rank),
+            candidateLastActiveAt: generatedAt - Double(rank),
+            pid: app.processIdentifier,
+            runningApp: app,
+            windowSeeds: windowSeeds
+        )
+    }
 }
 
 struct RuntimeCurrentAppWindowPayload {
@@ -172,6 +219,28 @@ struct RuntimeCurrentAppWindowPayload {
             pid: input.pid,
             runningApp: input.runningApp,
             windowSeeds: input.windowSeeds
+        )
+    }
+
+    init(
+        appID: String,
+        app: NSRunningApplication,
+        appGroup: [NSRunningApplication],
+        rankByPID: [pid_t: Int],
+        rankFallback: Int,
+        generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate,
+        windowSeeds: [RuntimeAppWindowProjectionSeed]
+    ) {
+        self.init(
+            assemblyInput: RuntimeCurrentAppWindowProjectionAssemblyInput(
+                appID: appID,
+                app: app,
+                appGroup: appGroup,
+                rankByPID: rankByPID,
+                rankFallback: rankFallback,
+                generatedAt: generatedAt,
+                windowSeeds: windowSeeds
+            )
         )
     }
 }
