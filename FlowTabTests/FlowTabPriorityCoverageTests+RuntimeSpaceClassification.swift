@@ -428,7 +428,7 @@ extension FlowTabPriorityCoverageTests {
             runningApp: currentApp,
             windowsByID: contexts
         )
-        let focusedRepairPayload = RuntimeAppWindowRepairPayload(
+        let focusedCurrentAppWindowPayload = RuntimeCurrentAppWindowPayload(
             summary: RuntimeHomeAppSummary(
                 appID: appID,
                 displayName: candidate.displayName,
@@ -458,11 +458,7 @@ extension FlowTabPriorityCoverageTests {
             currentAppWindowProjectionsByAppID: [
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
-                    currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
-                        summary: focusedRepairPayload.summary,
-                        candidate: focusedRepairPayload.candidate,
-                        context: focusedRepairPayload.context
-                    ),
+                    currentAppWindowPayload: focusedCurrentAppWindowPayload,
                     freshness: freshness
                 )
             ]

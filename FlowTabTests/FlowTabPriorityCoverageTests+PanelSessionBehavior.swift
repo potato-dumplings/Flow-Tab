@@ -186,7 +186,7 @@ extension FlowTabPriorityCoverageTests {
             runningApp: runningApp,
             windows: windows
         )
-        let repairPayload = RuntimeAppWindowRepairPayload(
+        let currentAppWindowPayload = RuntimeCurrentAppWindowPayload(
             summary: RuntimeHomeAppSummary(
                 appID: appID,
                 displayName: candidate.displayName,
@@ -202,11 +202,7 @@ extension FlowTabPriorityCoverageTests {
             currentAppWindowProjectionsByAppID: [
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
-                    currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
-                        summary: repairPayload.summary,
-                        candidate: repairPayload.candidate,
-                        context: repairPayload.context
-                    ),
+                    currentAppWindowPayload: currentAppWindowPayload,
                     freshness: RuntimeProjectionFreshness(
                         generatedAt: 10,
                         sourceGeneration: RuntimeReadModelGeneration(projection: 1),
@@ -456,7 +452,7 @@ extension FlowTabPriorityCoverageTests {
             windows: windows
         )
         let context = makeRuntimeAppContext(appID: appID, runningApp: runningApp, windows: windows)
-        let selectedRepairPayload = RuntimeAppWindowRepairPayload(
+        let selectedCurrentAppWindowPayload = RuntimeCurrentAppWindowPayload(
             summary: RuntimeHomeAppSummary(
                 appID: appID,
                 displayName: "Projected Runtime Source",
@@ -486,11 +482,7 @@ extension FlowTabPriorityCoverageTests {
             currentAppWindowProjectionsByAppID: [
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
-                    currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
-                        summary: selectedRepairPayload.summary,
-                        candidate: selectedRepairPayload.candidate,
-                        context: selectedRepairPayload.context
-                    ),
+                    currentAppWindowPayload: selectedCurrentAppWindowPayload,
                     freshness: freshness
                 )
             ]
@@ -570,7 +562,7 @@ extension FlowTabPriorityCoverageTests {
             lastActiveAt: 100,
             windows: windows
         )
-        let repairPayload = RuntimeAppWindowRepairPayload(
+        let currentAppWindowPayload = RuntimeCurrentAppWindowPayload(
             summary: RuntimeHomeAppSummary(
                 appID: appID,
                 displayName: "Focused Runtime Projection",
@@ -586,11 +578,7 @@ extension FlowTabPriorityCoverageTests {
             currentAppWindowProjectionsByAppID: [
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
-                    currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
-                        summary: repairPayload.summary,
-                        candidate: repairPayload.candidate,
-                        context: repairPayload.context
-                    ),
+                    currentAppWindowPayload: currentAppWindowPayload,
                     freshness: RuntimeProjectionFreshness(
                         generatedAt: 12,
                         sourceGeneration: RuntimeReadModelGeneration(projection: 1),
@@ -990,7 +978,7 @@ extension FlowTabPriorityCoverageTests {
             windows: windows
         )
         let context = makeRuntimeAppContext(appID: appID, runningApp: currentApp, windows: windows)
-        let selectedRepairPayload = RuntimeAppWindowRepairPayload(
+        let selectedCurrentAppWindowPayload = RuntimeCurrentAppWindowPayload(
             summary: RuntimeHomeAppSummary(
                 appID: appID,
                 displayName: "Deferred Snapshot",
@@ -1020,11 +1008,7 @@ extension FlowTabPriorityCoverageTests {
             currentAppWindowProjectionsByAppID: [
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
-                    currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
-                        summary: selectedRepairPayload.summary,
-                        candidate: selectedRepairPayload.candidate,
-                        context: selectedRepairPayload.context
-                    ),
+                    currentAppWindowPayload: selectedCurrentAppWindowPayload,
                     freshness: freshness
                 )
             ]

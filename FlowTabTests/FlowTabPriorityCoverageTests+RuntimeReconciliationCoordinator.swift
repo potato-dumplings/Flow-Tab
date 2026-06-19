@@ -91,43 +91,6 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(diagnostics.currentAppWindowProjectionAppIDs, [app.id])
     }
 
-    func testRuntimeAppWindowRepairPayloadWrapsCurrentAppProjectionPayloadForCompatibility() throws {
-        let app = try XCTUnwrap(searchScenarioApps().first)
-        let pid = NSRunningApplication.current.processIdentifier
-        let summary = RuntimeHomeAppSummary(
-            appID: app.id,
-            displayName: app.displayName,
-            groupID: app.groupID,
-            lastActiveAt: app.lastActiveAt,
-            windowCount: app.windows.count,
-            pid: pid
-        )
-        let context = makeRuntimeAppContext(
-            appID: app.id,
-            runningApp: .current,
-            windows: app.windows
-        )
-        let currentAppPayload = RuntimeCurrentAppWindowPayload(
-            summary: summary,
-            candidate: app,
-            context: context
-        )
-
-        let repairPayload = RuntimeAppWindowRepairPayload(
-            currentAppWindowPayload: currentAppPayload
-        )
-
-        XCTAssertEqual(repairPayload.summary.appID, app.id)
-        XCTAssertEqual(repairPayload.summary.windowCount, app.windows.count)
-        XCTAssertEqual(repairPayload.candidate.id, app.id)
-        XCTAssertEqual(repairPayload.candidate.windows.map(\.id), app.windows.map(\.id))
-        XCTAssertEqual(repairPayload.context.appID, app.id)
-        XCTAssertEqual(
-            repairPayload.context.windowsByID.keys.sorted(),
-            app.windows.map(\.id).sorted()
-        )
-    }
-
     func testRuntimeReadModelStoreRemovesTerminatedAppFromCommittedProjectionsAndSearch() throws {
         let store = RuntimeReadModelStore()
         let apps = searchScenarioApps()

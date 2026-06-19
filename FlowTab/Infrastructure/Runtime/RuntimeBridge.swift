@@ -318,28 +318,3 @@ struct RuntimeHomeAppSummary: Equatable, Identifiable {
 
     var id: String { appID }
 }
-
-struct RuntimeAppWindowRepairPayload {
-    let summary: RuntimeHomeAppSummary
-    let candidate: AppSwitchCandidate
-    let context: RuntimeAppContext
-
-    init(
-        summary: RuntimeHomeAppSummary,
-        candidate: AppSwitchCandidate,
-        context: RuntimeAppContext
-    ) {
-        self.summary = summary
-        self.candidate = candidate
-        self.context = context
-    }
-
-    init(currentAppWindowPayload payload: RuntimeCurrentAppWindowPayload) {
-        self.init(
-            summary: payload.summary,
-            candidate: payload.candidate,
-            context: payload.context
-        )
-    }
-
-}

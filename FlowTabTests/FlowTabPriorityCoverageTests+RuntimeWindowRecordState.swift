@@ -74,10 +74,9 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(minimizedContext.isMinimized)
         XCTAssertEqual(minimizedContext.bindingConfidence, .provisional)
 
-        let repairPayload = RuntimeAppWindowRepairPayload(currentAppWindowPayload: payload)
-        XCTAssertEqual(repairPayload.summary.appID, payload.summary.appID)
-        XCTAssertEqual(repairPayload.candidate.windows.map(\.id), payload.candidate.windows.map(\.id))
-        XCTAssertEqual(repairPayload.context.windowsByID.keys.sorted(), payload.context.windowsByID.keys.sorted())
+        XCTAssertEqual(payload.summary.appID, appID)
+        XCTAssertEqual(payload.candidate.windows.map(\.id), ["seed-window-a", "seed-window-b"])
+        XCTAssertEqual(payload.context.windowsByID.keys.sorted(), ["seed-window-a", "seed-window-b"])
     }
 
     func testRuntimeWindowMappingStateDerivesReverseAXCGIndex() {

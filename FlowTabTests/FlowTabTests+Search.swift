@@ -1101,7 +1101,7 @@ extension FlowTabTests {
                 }
             )
         )
-        let repairPayload = RuntimeAppWindowRepairPayload(
+        let currentAppWindowPayload = RuntimeCurrentAppWindowPayload(
             summary: RuntimeHomeAppSummary(
                 appID: appID,
                 displayName: candidate.displayName,
@@ -1117,11 +1117,7 @@ extension FlowTabTests {
             currentAppWindowProjectionsByAppID: [
                 appID: RuntimeCurrentAppWindowProjection(
                     appID: appID,
-                    currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
-                        summary: repairPayload.summary,
-                        candidate: repairPayload.candidate,
-                        context: repairPayload.context
-                    ),
+                    currentAppWindowPayload: currentAppWindowPayload,
                     freshness: RuntimeProjectionFreshness(
                         generatedAt: 30,
                         sourceGeneration: RuntimeReadModelGeneration(projection: 1),
