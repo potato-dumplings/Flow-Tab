@@ -257,7 +257,7 @@ enum RuntimeFullRepairProjectionAssembler {
         )
     }
 
-    static func payload(
+    private static func payload(
         fromCurrentAppWindowPayloads currentAppWindowPayloads: [RuntimeCurrentAppWindowPayload],
         duplicateContextHandler: ((String) -> Void)? = nil
     ) -> RuntimeFullRepairProjectionPayload {
