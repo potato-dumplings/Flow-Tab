@@ -283,27 +283,44 @@ enum RuntimeFullRepairProjectionAssembler {
         hideMinimizedAppsFromAppLayer: Bool,
         now: TimeInterval
     ) -> [RuntimeFullRepairProjectionAssemblyRow] {
-        let groupedApps = Dictionary(grouping: apps, by: baseAppID(for:))
+        let appsByPID = Dictionary(uniqueKeysWithValues: apps.map { app in
+            (app.pid, app)
+        })
+        let appDirectoryEntries = apps.map(\.appDirectoryEntry)
+        let windowStatsByPID = Dictionary(uniqueKeysWithValues: apps.map { app in
+            let windows = windowsByPID[app.pid] ?? []
+            return (
+                app.pid,
+                RuntimeAppWindowStats(
+                    windowCount: windows.count,
+                    hasVisibleWindow: windows.contains(where: { !$0.isMinimized })
+                )
+            )
+        })
+        let groupedApps = RuntimeAppDirectory.groupedEntriesByAppID(appDirectoryEntries)
         var rows: [RuntimeFullRepairProjectionAssemblyRow] = []
         rows.reserveCapacity(groupedApps.count)
 
         for group in groupedApps.values {
-            guard let app = group.max(by: { lhs, rhs in
-                score(for: lhs, windowsByPID: windowsByPID, rankByPID: rankByPID)
-                    < score(for: rhs, windowsByPID: windowsByPID, rankByPID: rankByPID)
-            }) else {
+            guard
+                let primaryEntry = RuntimeAppDirectory.primaryEntry(
+                    in: group,
+                    windowStatsByPID: windowStatsByPID,
+                    rankByPID: rankByPID
+                ),
+                let app = appsByPID[primaryEntry.pid]
+            else {
                 continue
             }
-            let appID = baseAppID(for: app)
+            let appID = primaryEntry.appID
             let displayName = app.localizedName ?? appID
-            let windows = group
-                .sorted(by: { lhs, rhs in
-                    score(for: lhs, windowsByPID: windowsByPID, rankByPID: rankByPID)
-                        > score(for: rhs, windowsByPID: windowsByPID, rankByPID: rankByPID)
-                })
-                .flatMap { groupApp in
-                    windowsByPID[groupApp.pid] ?? []
-                }
+            let windows = RuntimeAppDirectory.sortedEntriesWithinGroup(
+                group,
+                windowStatsByPID: windowStatsByPID,
+                rankByPID: rankByPID
+            ).flatMap { groupApp in
+                windowsByPID[groupApp.pid] ?? []
+            }
             guard RuntimeAppLayerProjectionFilter.shouldIncludeAppInAppLayer(
                 hasWindows: !windows.isEmpty,
                 hasVisibleWindow: windows.contains(where: { !$0.isMinimized }),
@@ -311,9 +328,11 @@ enum RuntimeFullRepairProjectionAssembler {
             ) else {
                 continue
             }
-            let rank = group.compactMap { groupApp in
-                rankByPID[groupApp.pid]
-            }.min() ?? (10_000 + rows.count)
+            let rank = RuntimeAppDirectory.preferredRank(
+                for: group,
+                rankByPID: rankByPID,
+                fallback: 10_000 + rows.count
+            )
             let candidate = AppSwitchCandidate(
                 id: appID,
                 displayName: displayName,
@@ -341,21 +360,16 @@ enum RuntimeFullRepairProjectionAssembler {
         }
         return rows
     }
+}
 
-    private static func baseAppID(for app: RuntimeFullRepairProjectionAssemblyApp) -> String {
-        app.bundleIdentifier ?? "pid:\(app.pid)"
-    }
-
-    private static func score(
-        for app: RuntimeFullRepairProjectionAssemblyApp,
-        windowsByPID: [pid_t: [RuntimeFullRepairProjectionAssemblyWindow]],
-        rankByPID: [pid_t: Int]
-    ) -> Int {
-        let windows = windowsByPID[app.pid] ?? []
-        let hasWindowsScore = windows.isEmpty ? 0 : 1_000_000
-        let windowCountScore = min(windows.count, 9_999) * 100
-        let rankScore = 10_000 - min(rankByPID[app.pid] ?? 10_000, 10_000)
-        let launchScore = Int(app.launchDate?.timeIntervalSince1970 ?? 0) % 10_000
-        return hasWindowsScore + windowCountScore + rankScore + launchScore
+private extension RuntimeFullRepairProjectionAssemblyApp {
+    var appDirectoryEntry: RuntimeAppDirectoryEntry {
+        RuntimeAppDirectoryEntry(
+            pid: pid,
+            appID: bundleIdentifier ?? "pid:\(pid)",
+            bundleIdentifier: bundleIdentifier,
+            localizedName: localizedName,
+            launchDate: launchDate
+        )
     }
 }

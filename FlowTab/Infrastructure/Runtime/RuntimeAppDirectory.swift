@@ -6,6 +6,38 @@ struct RuntimeAppWindowStats {
     let hasVisibleWindow: Bool
 }
 
+struct RuntimeAppDirectoryEntry {
+    let pid: pid_t
+    let appID: String
+    let bundleIdentifier: String?
+    let localizedName: String?
+    let launchDate: Date?
+
+    init(
+        pid: pid_t,
+        appID: String,
+        bundleIdentifier: String?,
+        localizedName: String?,
+        launchDate: Date?
+    ) {
+        self.pid = pid
+        self.appID = appID
+        self.bundleIdentifier = bundleIdentifier
+        self.localizedName = localizedName
+        self.launchDate = launchDate
+    }
+
+    init(app: NSRunningApplication) {
+        self.init(
+            pid: app.processIdentifier,
+            appID: RuntimeAppIdentity.appID(for: app),
+            bundleIdentifier: app.bundleIdentifier,
+            localizedName: app.localizedName,
+            launchDate: app.launchDate
+        )
+    }
+}
+
 struct RuntimeAppDirectory {
     private let apps: [NSRunningApplication]
     private let candidateAppBundlePaths: Set<String>
@@ -19,38 +51,80 @@ struct RuntimeAppDirectory {
         Dictionary(grouping: apps, by: RuntimeAppIdentity.appID(for:))
     }
 
+    static func groupedEntriesByAppID(
+        _ entries: [RuntimeAppDirectoryEntry]
+    ) -> [String: [RuntimeAppDirectoryEntry]] {
+        Dictionary(grouping: entries, by: \.appID)
+    }
+
     func selectPrimaryApps(
         windowStatsByPID: [pid_t: RuntimeAppWindowStats],
         rankByPID: [pid_t: Int]
     ) -> [NSRunningApplication] {
-        let grouped = groupedAppsByAppID()
-        var selected: [NSRunningApplication] = []
-        selected.reserveCapacity(grouped.count)
-
-        for (appID, group) in grouped {
-            guard group.count > 1 else {
-                if let app = group.first {
-                    selected.append(app)
-                }
-                continue
-            }
-
-            let sorted = sortedAppsWithinGroup(
-                group,
-                windowStatsByPID: windowStatsByPID,
-                rankByPID: rankByPID
-            )
-            guard let primary = sorted.first else { continue }
-            selected.append(primary)
-
-            let droppedPIDs = sorted.dropFirst().map(\.processIdentifier)
+        let appsByPID = Dictionary(uniqueKeysWithValues: apps.map { app in
+            (app.processIdentifier, app)
+        })
+        let selectedEntries = Self.selectPrimaryEntries(
+            from: apps.map(RuntimeAppDirectoryEntry.init(app:)),
+            windowStatsByPID: windowStatsByPID,
+            rankByPID: rankByPID
+        ) { appID, primaryPID, droppedPIDs in
             RuntimeLog.debug(
                 .projection,
-                "dedupe appID=\(appID) keepPID=\(primary.processIdentifier) dropPIDs=\(droppedPIDs)"
+                "dedupe appID=\(appID) keepPID=\(primaryPID) dropPIDs=\(droppedPIDs)"
             )
         }
 
+        return selectedEntries.compactMap { entry in
+            appsByPID[entry.pid]
+        }
+    }
+
+    static func selectPrimaryEntries(
+        from entries: [RuntimeAppDirectoryEntry],
+        windowStatsByPID: [pid_t: RuntimeAppWindowStats],
+        rankByPID: [pid_t: Int],
+        duplicateHandler: ((String, pid_t, [pid_t]) -> Void)? = nil
+    ) -> [RuntimeAppDirectoryEntry] {
+        let grouped = groupedEntriesByAppID(entries)
+        var selected: [RuntimeAppDirectoryEntry] = []
+        selected.reserveCapacity(grouped.count)
+
+        for (appID, group) in grouped {
+            guard
+                let primary = primaryEntry(
+                    in: group,
+                    windowStatsByPID: windowStatsByPID,
+                    rankByPID: rankByPID
+                )
+            else {
+                continue
+            }
+            selected.append(primary)
+
+            if group.count > 1 {
+                let sorted = sortedEntriesWithinGroup(
+                    group,
+                    windowStatsByPID: windowStatsByPID,
+                    rankByPID: rankByPID
+                )
+                duplicateHandler?(appID, primary.pid, sorted.dropFirst().map(\.pid))
+            }
+        }
+
         return selected
+    }
+
+    static func primaryEntry(
+        in group: [RuntimeAppDirectoryEntry],
+        windowStatsByPID: [pid_t: RuntimeAppWindowStats],
+        rankByPID: [pid_t: Int]
+    ) -> RuntimeAppDirectoryEntry? {
+        sortedEntriesWithinGroup(
+            group,
+            windowStatsByPID: windowStatsByPID,
+            rankByPID: rankByPID
+        ).first
     }
 
     func sortedAppsWithinGroup(
@@ -58,6 +132,23 @@ struct RuntimeAppDirectory {
         windowStatsByPID: [pid_t: RuntimeAppWindowStats],
         rankByPID: [pid_t: Int]
     ) -> [NSRunningApplication] {
+        let appsByPID = Dictionary(uniqueKeysWithValues: group.map { app in
+            (app.processIdentifier, app)
+        })
+        return Self.sortedEntriesWithinGroup(
+            group.map(RuntimeAppDirectoryEntry.init(app:)),
+            windowStatsByPID: windowStatsByPID,
+            rankByPID: rankByPID
+        ).compactMap { entry in
+            appsByPID[entry.pid]
+        }
+    }
+
+    static func sortedEntriesWithinGroup(
+        _ group: [RuntimeAppDirectoryEntry],
+        windowStatsByPID: [pid_t: RuntimeAppWindowStats],
+        rankByPID: [pid_t: Int]
+    ) -> [RuntimeAppDirectoryEntry] {
         group.sorted { lhs, rhs in
             score(for: lhs, windowStatsByPID: windowStatsByPID, rankByPID: rankByPID)
                 > score(for: rhs, windowStatsByPID: windowStatsByPID, rankByPID: rankByPID)
@@ -69,8 +160,20 @@ struct RuntimeAppDirectory {
         rankByPID: [pid_t: Int],
         fallback: Int
     ) -> Int {
-        group.compactMap { app in
-            rankByPID[app.processIdentifier]
+        Self.preferredRank(
+            for: group.map(RuntimeAppDirectoryEntry.init(app:)),
+            rankByPID: rankByPID,
+            fallback: fallback
+        )
+    }
+
+    static func preferredRank(
+        for group: [RuntimeAppDirectoryEntry],
+        rankByPID: [pid_t: Int],
+        fallback: Int
+    ) -> Int {
+        group.compactMap { entry in
+            rankByPID[entry.pid]
         }.min() ?? fallback
     }
 
@@ -162,17 +265,17 @@ struct RuntimeAppDirectory {
         return ancestorPaths
     }
 
-    private func score(
-        for app: NSRunningApplication,
+    private static func score(
+        for entry: RuntimeAppDirectoryEntry,
         windowStatsByPID: [pid_t: RuntimeAppWindowStats],
         rankByPID: [pid_t: Int]
     ) -> Int {
-        let pid = app.processIdentifier
+        let pid = entry.pid
         let windowCount = windowStatsByPID[pid]?.windowCount ?? 0
         let hasWindowsScore = windowCount > 0 ? 1_000_000 : 0
         let windowCountScore = min(windowCount, 9_999) * 100
         let rankScore = 10_000 - min(rankByPID[pid] ?? 10_000, 10_000)
-        let launchScore = Int(app.launchDate?.timeIntervalSince1970 ?? 0) % 10_000
+        let launchScore = Int(entry.launchDate?.timeIntervalSince1970 ?? 0) % 10_000
         return hasWindowsScore + windowCountScore + rankScore + launchScore
     }
 

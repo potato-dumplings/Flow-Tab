@@ -210,11 +210,32 @@ extension FlowTabPriorityCoverageTests {
             windowStatsByPID: windowStatsByPID,
             rankByPID: rankByPID
         )
+        let selectedEntries = RuntimeAppDirectory.selectPrimaryEntries(
+            from: [
+                RuntimeAppDirectoryEntry(
+                    pid: rankPreferredHelper.processIdentifier,
+                    appID: "com.example.editor",
+                    bundleIdentifier: "com.example.editor",
+                    localizedName: "Editor Helper",
+                    launchDate: rankPreferredHelper.launchDate
+                ),
+                RuntimeAppDirectoryEntry(
+                    pid: primaryWithWindows.processIdentifier,
+                    appID: "com.example.editor",
+                    bundleIdentifier: "com.example.editor",
+                    localizedName: "Editor",
+                    launchDate: primaryWithWindows.launchDate
+                )
+            ],
+            windowStatsByPID: windowStatsByPID,
+            rankByPID: rankByPID
+        )
 
         XCTAssertTrue(selectedApps.contains { $0 === primaryWithWindows })
         XCTAssertTrue(selectedApps.contains { $0 === otherApp })
         XCTAssertFalse(selectedApps.contains { $0 === rankPreferredHelper })
         XCTAssertTrue(sortedEditorGroup.first === primaryWithWindows)
+        XCTAssertEqual(selectedEntries.map(\.pid), [primaryWithWindows.processIdentifier])
         XCTAssertEqual(
             directory.preferredRank(
                 for: [rankPreferredHelper, primaryWithWindows],
