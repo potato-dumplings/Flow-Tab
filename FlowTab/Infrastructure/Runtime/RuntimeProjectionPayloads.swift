@@ -100,6 +100,17 @@ struct RuntimeAppWindowProjectionSeed {
     }
 }
 
+struct RuntimeCurrentAppWindowProjectionAssemblyInput {
+    let appID: String
+    let displayName: String
+    let groupID: String
+    let summaryLastActiveAt: TimeInterval
+    let candidateLastActiveAt: TimeInterval
+    let pid: pid_t
+    let runningApp: NSRunningApplication
+    let windowSeeds: [RuntimeAppWindowProjectionSeed]
+}
+
 struct RuntimeCurrentAppWindowPayload {
     let summary: RuntimeHomeAppSummary
     let candidate: AppSwitchCandidate
@@ -148,6 +159,19 @@ struct RuntimeCurrentAppWindowPayload {
                 runningApp: runningApp,
                 windowsByID: windowContexts
             )
+        )
+    }
+
+    init(assemblyInput input: RuntimeCurrentAppWindowProjectionAssemblyInput) {
+        self.init(
+            appID: input.appID,
+            displayName: input.displayName,
+            groupID: input.groupID,
+            summaryLastActiveAt: input.summaryLastActiveAt,
+            candidateLastActiveAt: input.candidateLastActiveAt,
+            pid: input.pid,
+            runningApp: input.runningApp,
+            windowSeeds: input.windowSeeds
         )
     }
 }
@@ -211,6 +235,16 @@ enum RuntimeAppLayerProjectionFilter {
 }
 
 enum RuntimeFullRepairProjectionAssembler {
+    static func payload(
+        fromCurrentAppWindowProjectionInputs inputs: [RuntimeCurrentAppWindowProjectionAssemblyInput],
+        duplicateContextHandler: ((String) -> Void)? = nil
+    ) -> RuntimeFullRepairProjectionPayload {
+        payload(
+            fromCurrentAppWindowPayloads: inputs.map(RuntimeCurrentAppWindowPayload.init(assemblyInput:)),
+            duplicateContextHandler: duplicateContextHandler
+        )
+    }
+
     static func payload(
         fromCurrentAppWindowPayloads currentAppWindowPayloads: [RuntimeCurrentAppWindowPayload],
         duplicateContextHandler: ((String) -> Void)? = nil

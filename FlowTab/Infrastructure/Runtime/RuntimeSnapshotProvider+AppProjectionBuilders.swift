@@ -144,8 +144,8 @@ extension RuntimeSnapshotProvider {
         }
         let now = Date.timeIntervalSinceReferenceDate
 
-        var currentAppPayloads: [RuntimeCurrentAppWindowPayload] = []
-        currentAppPayloads.reserveCapacity(appLayerCandidates.count)
+        var currentAppProjectionInputs: [RuntimeCurrentAppWindowProjectionAssemblyInput] = []
+        currentAppProjectionInputs.reserveCapacity(appLayerCandidates.count)
 
         let rowsStartMs = RuntimePerformanceClock.monotonicMilliseconds()
         for (index, app) in appLayerCandidates.enumerated() {
@@ -166,7 +166,7 @@ extension RuntimeSnapshotProvider {
                 rankByPID: windowData.rankByPID,
                 fallback: 10_000 + index
             )
-            let payload = RuntimeCurrentAppWindowPayload(
+            let input = RuntimeCurrentAppWindowProjectionAssemblyInput(
                 appID: appID,
                 displayName: displayName,
                 groupID: RuntimeAppIdentity.groupID(for: app.bundleIdentifier, fallbackName: displayName),
@@ -178,11 +178,11 @@ extension RuntimeSnapshotProvider {
                     entry.projectionSeed(lastActiveAt: now - Double(entryIndex))
                 }
             )
-            currentAppPayloads.append(payload)
+            currentAppProjectionInputs.append(input)
         }
         let rowsReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let payload = RuntimeFullRepairProjectionAssembler.payload(
-            fromCurrentAppWindowPayloads: currentAppPayloads,
+            fromCurrentAppWindowProjectionInputs: currentAppProjectionInputs,
             duplicateContextHandler: { appID in
                 RuntimeLog.debug(.projection, "duplicate appID fallback overwrite=\(appID)")
             }
@@ -389,16 +389,18 @@ extension RuntimeSnapshotProvider {
         )
         let groupID = RuntimeAppIdentity.groupID(for: app.bundleIdentifier, fallbackName: displayName)
         return RuntimeCurrentAppWindowPayload(
-            appID: appID,
-            displayName: displayName,
-            groupID: groupID,
-            summaryLastActiveAt: Self.stableLastActiveValue(forRank: rank),
-            candidateLastActiveAt: now - Double(rank),
-            pid: app.processIdentifier,
-            runningApp: app,
-            windowSeeds: windows.enumerated().map { entryIndex, entry in
-                entry.projectionSeed(lastActiveAt: now - Double(entryIndex))
-            }
+            assemblyInput: RuntimeCurrentAppWindowProjectionAssemblyInput(
+                appID: appID,
+                displayName: displayName,
+                groupID: groupID,
+                summaryLastActiveAt: Self.stableLastActiveValue(forRank: rank),
+                candidateLastActiveAt: now - Double(rank),
+                pid: app.processIdentifier,
+                runningApp: app,
+                windowSeeds: windows.enumerated().map { entryIndex, entry in
+                    entry.projectionSeed(lastActiveAt: now - Double(entryIndex))
+                }
+            )
         )
     }
 

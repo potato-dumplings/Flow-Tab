@@ -286,6 +286,81 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(rows.allSatisfy { $0.candidate.id != "com.example.chat" })
     }
 
+    func testRuntimeFullRepairProjectionAssemblerBuildsPayloadContextsFromCurrentAppInputs() {
+        let currentApp = NSRunningApplication.current
+        let evidence = RuntimeSpaceEvidence(
+            cgWindowID: 710,
+            spaceIDs: [5, 2],
+            confidence: .observed,
+            displayID: 44,
+            source: "unit"
+        )
+        let payload = RuntimeFullRepairProjectionAssembler.payload(
+            fromCurrentAppWindowProjectionInputs: [
+                RuntimeCurrentAppWindowProjectionAssemblyInput(
+                    appID: "com.example.alpha",
+                    displayName: "Alpha",
+                    groupID: "alpha",
+                    summaryLastActiveAt: -2,
+                    candidateLastActiveAt: 2_000,
+                    pid: 710,
+                    runningApp: currentApp,
+                    windowSeeds: [
+                        RuntimeAppWindowProjectionSeed(
+                            windowID: "alpha-window",
+                            title: "Alpha Window",
+                            isMinimized: false,
+                            lastActiveAt: 2_000,
+                            ownerPID: 710,
+                            cgWindowID: 710,
+                            spaceIDs: [5, 2, 2],
+                            activationHandleID: "ax:710:window",
+                            frame: CGRect(x: 1, y: 2, width: 300, height: 200),
+                            allowsPublicAXRecovery: true,
+                            hasStickyBinding: true,
+                            lastConfirmationSource: .verifiedFocusReadback,
+                            bindingCandidateCount: 1,
+                            spaceEvidence: evidence
+                        )
+                    ]
+                ),
+                RuntimeCurrentAppWindowProjectionAssemblyInput(
+                    appID: "com.example.beta",
+                    displayName: "Beta",
+                    groupID: "beta",
+                    summaryLastActiveAt: -1,
+                    candidateLastActiveAt: 3_000,
+                    pid: 711,
+                    runningApp: currentApp,
+                    windowSeeds: []
+                )
+            ]
+        )
+
+        XCTAssertEqual(payload.apps.map(\.id), ["com.example.beta", "com.example.alpha"])
+        XCTAssertEqual(payload.contextsByID.keys.sorted(), ["com.example.alpha", "com.example.beta"])
+
+        let alpha = payload.apps.first { $0.id == "com.example.alpha" }
+        XCTAssertEqual(alpha?.displayName, "Alpha")
+        XCTAssertEqual(alpha?.windows.map(\.id), ["alpha-window"])
+
+        let alphaContext = payload.contextsByID["com.example.alpha"]
+        let alphaWindow = alphaContext?.windowsByID["alpha-window"]
+        XCTAssertEqual(alphaContext?.appID, "com.example.alpha")
+        XCTAssertTrue(alphaContext?.runningApp === currentApp)
+        XCTAssertEqual(alphaWindow?.ownerPID, 710)
+        XCTAssertEqual(alphaWindow?.cgWindowID, 710)
+        XCTAssertEqual(alphaWindow?.spaceIDs, [2, 5])
+        XCTAssertEqual(alphaWindow?.activationHandleID, "ax:710:window")
+        XCTAssertEqual(alphaWindow?.frame, CGRect(x: 1, y: 2, width: 300, height: 200))
+        XCTAssertEqual(alphaWindow?.allowsPublicAXRecovery, true)
+        XCTAssertEqual(alphaWindow?.hasStickyBinding, true)
+        XCTAssertEqual(alphaWindow?.lastConfirmationSource, .verifiedFocusReadback)
+        XCTAssertEqual(alphaWindow?.bindingConfidence, .exact)
+        XCTAssertEqual(alphaWindow?.bindingCandidateCount, 1)
+        XCTAssertEqual(alphaWindow?.spaceEvidence, evidence)
+    }
+
     func testRuntimeSnapshotProviderMergedWindowStatsCombinesCountsAcrossProcessIDs() {
         let mergedStats = RuntimeSnapshotProvider.mergedWindowStatsForTesting(
             processIDs: [101, 102, 103],
