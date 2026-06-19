@@ -18,7 +18,7 @@
 2. 构建阶段与维护阶段使用一致的 reconciliation 管线，启动期、后台维护期、交互期行为一致。
 3. `Option+Tab` 首帧稳定读取 app 投影，不触发全量 AX/CG/Space 重采样。
 4. `Control+Tab` 和当前 app window layer 只读取当前 app 投影，不依赖所有 app 的窗口已完成。
-5. Search 读取持续维护且原子提交的 committed search index；进入 Search 时先做轻量 freshness validation，确认该 index 已覆盖最新 app lifecycle、CG、Space 与 AX dirty generation。若未覆盖，必须先完成 bounded freshness barrier 并提交新 generation；Search 不读取 repair 中间态，也不把旧索引或部分索引伪装成最新完整结果。
+5. Search 读取持续维护且原子提交的 committed search index；进入 Search 时先做轻量 freshness validation，确认该 index 已覆盖最新 app lifecycle、CG、Space 与 AX dirty generation。若未覆盖，只有 bounded freshness barrier 成功提交新 generation 后才能进入最新结果态；barrier 未提交时只能返回 degraded/stale committed result 与 dirty/freshness metadata。Search 不读取 repair 中间态，也不把旧索引或部分索引伪装成最新完整结果。
 6. Home 读取摘要投影，只刷新可见或选中的 app/window 详情。
 7. 真实系统拓扑变化通过 dirty signal、局部 pullback、retry/backoff、projection rebuild 闭环吸收。
 
@@ -914,7 +914,7 @@ Runtime infrastructure 负责：
 - Search index 从 `RuntimeWindowRecord` + app directory 投影。
 - Search index 分为 internal staging 与 surface-readable committed 两层。
 - 日常 maintenance 持续用 dirty/current/recent/affected scopes 更新 staging，并在验证 generation 覆盖后原子提交 committed index。
-- Search 激活先做 freshness validation；若 committed index 未覆盖当前 app/CG/Space/AX dirty generation，则执行 bounded freshness barrier，成功提交新 generation 后再进入最新搜索。
+- Search 激活先做 freshness validation；若 committed index 未覆盖当前 app/CG/Space/AX dirty generation，则执行 bounded freshness barrier。只有 barrier 成功提交新 committed generation 后，Search 才能进入最新搜索结果态；未提交时的当前行为必须保持 `degradedStaleCommittedResult` / stale committed read。
 - 当前迁移状态：Search 已改为读取 runtime-owned committed index；`RuntimeReadModelStore` 提供 `currentGenerationCommitted` / `staleCommitted` / `missingCommittedIndex` freshness read，并由 `RuntimeSearchIndexRead` 同步返回 surface 必须记录的 result state。`staleCommitted` 时仍返回 last committed index + dirty metadata，并由 `RuntimeProjectionService` 发起 bounded runtime maintenance drain。Search freshness barrier 会把 pending/waiting retry repair 提升为 high-priority `searchFreshnessBarrier` request，每次只 drain 固定数量的 ready scoped repair；只有 completed scoped repair 先写 internal staging、验证 coordinator 无未完成 repair、并原子提交新 committed generation 后，Search 才能进入 `verifiedCurrentGenerationCommittedResult`。completed request 若没有本轮 repaired payload，则不能借用历史 staging 提交新 committed generation。barrier 未提交、repair deferred、batch bound 后仍有 pending repair，或 retry exhausted 后执行 low-priority full repair fallback 但仍有 dirty metadata 时，当前行为必须暴露为 `degradedStaleCommittedResult` + dirty/freshness metadata，不回退到 session completeness、同步 full sampling，也不把该结果命名为 fresh/complete/latest。Search 行为测试的注入 fixture 也使用 `runtimeProjectionService` 命名；full/lightweight snapshot 计数只作为旧路径未被调用的 regression oracle。
 - dirty/pending app 只能作为 barrier/blocker/log 状态，不作为正常搜索结果状态。
 - Search 激活可以提升 repair priority，但不能同步拉全量 AX tree 才开始搜索。
@@ -947,7 +947,7 @@ Runtime infrastructure 负责：
 
 - `Option+Tab` 首帧只读 app projection。
 - `Control+Tab` 只读 current app window projection。
-- Search 只读原子提交的 committed search index；进入 Search 前完成 freshness validation，必要时完成 bounded freshness barrier 并提交新 generation。
+- Search 只读原子提交的 committed search index；进入 Search 前完成 freshness validation。必要时只有 bounded freshness barrier 成功提交新 generation，才能进入最新搜索结果态；否则只能返回 degraded/stale committed result 与 dirty/freshness metadata。
 - Home 读 summary/detail projection，不驱动 hotkey 全局采样。
 - full snapshot 不再是 surface 主流程。
 - AX notification 只作为 dirty/repair input，不作为唯一真相。
