@@ -57,7 +57,7 @@ extension RuntimeSnapshotProvider {
 
     func appReconciliationTargets(
         affectedCGWindowIDs: Set<CGWindowID>,
-        currentCGWindowsByPID: [pid_t: [CGWindowEntry]]
+        currentCGWindowsByPID: [pid_t: [RuntimeCGWindowEntry]]
     ) -> [RuntimeAffectedWindowReconciliationTarget] {
         guard !affectedCGWindowIDs.isEmpty else { return [] }
 

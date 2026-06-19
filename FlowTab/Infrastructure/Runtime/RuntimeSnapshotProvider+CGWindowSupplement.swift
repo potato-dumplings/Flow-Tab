@@ -17,7 +17,7 @@ extension RuntimeSnapshotProvider {
         to entries: [WindowListEntry],
         appName: String,
         pid: pid_t,
-        allCGWindows: [CGWindowEntry],
+        allCGWindows: [RuntimeCGWindowEntry],
         matchedCGWindowIDs: Set<CGWindowID> = []
     ) -> [WindowListEntry] {
         let unmatchedCGWindows = selectSupplementalOffSpaceCGWindows(
@@ -54,8 +54,8 @@ extension RuntimeSnapshotProvider {
 
     func selectSupplementalOffSpaceCGWindows(
         existingCGWindowIDs: Set<CGWindowID>,
-        allCGWindows: [CGWindowEntry]
-    ) -> [CGWindowEntry] {
+        allCGWindows: [RuntimeCGWindowEntry]
+    ) -> [RuntimeCGWindowEntry] {
         allCGWindows.filter { window in
             !existingCGWindowIDs.contains(window.id) && Self.cgWindowPassesValidityConstraints(window)
         }
@@ -69,7 +69,7 @@ extension RuntimeSnapshotProvider {
         return provider.selectSupplementalOffSpaceCGWindows(
             existingCGWindowIDs: existingCGWindowIDs,
             allCGWindows: allCGWindows.map {
-                CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: $0.id,
                     title: $0.title,
                     bounds: $0.bounds,
@@ -100,7 +100,7 @@ extension RuntimeSnapshotProvider {
         _ = cachedAXTitlesByCGWindowID
         return RuntimeSnapshotProvider().resolvedTitleForSupplementalCGWindow(
             appName: appName,
-            cgWindow: CGWindowEntry(
+            cgWindow: RuntimeCGWindowEntry(
                 id: cgWindow.id,
                 title: cgWindow.title,
                 bounds: cgWindow.bounds,
@@ -167,7 +167,7 @@ extension RuntimeSnapshotProvider {
             appName: appName,
             pid: pid,
             allCGWindows: allCGWindows.map {
-                CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: $0.id,
                     title: $0.title,
                     bounds: $0.bounds,
@@ -192,7 +192,7 @@ extension RuntimeSnapshotProvider {
         }
     }
 
-    static func cgWindowPassesValidityConstraints(_ window: CGWindowEntry) -> Bool {
+    static func cgWindowPassesValidityConstraints(_ window: RuntimeCGWindowEntry) -> Bool {
         guard window.alpha > validCGWindowAlphaThreshold else { return false }
         guard window.storeType == standardBufferedStoreType else { return false }
         guard let bounds = window.bounds?.standardized else { return false }
@@ -203,7 +203,7 @@ extension RuntimeSnapshotProvider {
 
     private func resolvedTitleForSupplementalCGWindow(
         appName: String,
-        cgWindow: CGWindowEntry
+        cgWindow: RuntimeCGWindowEntry
     ) -> String {
         normalizedWindowTitle(cgWindow.title)
             ?? normalizedWindowTitle(appName)
@@ -224,7 +224,7 @@ extension RuntimeSnapshotProvider {
         includeRemoteAXWindows: Bool,
         publicSwitchableWindowCount: Int,
         axWindows: [AXWindowEntry],
-        cgWindows: [CGWindowEntry]
+        cgWindows: [RuntimeCGWindowEntry]
     ) {
         RuntimeLog.debug(
             .snapshot,

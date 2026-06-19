@@ -4,7 +4,7 @@ import Foundation
 extension RuntimeSnapshotProvider {
     static func matchCGWindowAssignments(
         axWindows: [AXWindowEntry],
-        cgWindows: [CGWindowEntry],
+        cgWindows: [RuntimeCGWindowEntry],
         appName: String? = nil,
         previousMatches: [String: CGWindowID] = [:]
     ) -> [String: CGWindowID] {
@@ -18,7 +18,7 @@ extension RuntimeSnapshotProvider {
 
     static func matchCGWindowAssignmentsWithDiagnostics(
         axWindows: [AXWindowEntry],
-        cgWindows: [CGWindowEntry],
+        cgWindows: [RuntimeCGWindowEntry],
         appName: String? = nil,
         previousMatches: [String: CGWindowID] = [:]
     ) -> RuntimeWindowAssignmentMatchResult {
@@ -122,7 +122,7 @@ extension RuntimeSnapshotProvider {
 
     private static func refineCandidateAssignmentsWithPublicAXState(
         axWindows: [AXWindowEntry],
-        cgWindows: [CGWindowEntry],
+        cgWindows: [RuntimeCGWindowEntry],
         candidateCGIDsByAXWindowID: inout [String: Set<CGWindowID>],
         candidateAXWindowIDsByCGWindowID: inout [CGWindowID: Set<String>]
     ) {
@@ -194,7 +194,7 @@ extension RuntimeSnapshotProvider {
 
     private static func frontmostOnscreenCGWindowID(
         for axWindow: AXWindowEntry,
-        cgWindows: [CGWindowEntry],
+        cgWindows: [RuntimeCGWindowEntry],
         candidateCGIDsByAXWindowID: [String: Set<CGWindowID>]
     ) -> CGWindowID? {
         guard let candidateCGWindowIDs = candidateCGIDsByAXWindowID[axWindow.id] else {
@@ -271,7 +271,7 @@ extension RuntimeSnapshotProvider {
 
     private static func exactCandidateMatch(
         axWindow: AXWindowEntry,
-        cgWindow: CGWindowEntry,
+        cgWindow: RuntimeCGWindowEntry,
         appName: String?
     ) -> Bool {
         guard cgWindowPassesValidityConstraints(cgWindow) else { return false }

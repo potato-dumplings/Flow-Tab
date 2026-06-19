@@ -490,7 +490,7 @@ extension FlowTabPriorityCoverageTests {
         activator.currentCGWindowsOverride = { pid in
             XCTAssertEqual(pid, currentApp.processIdentifier)
             return [
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: targetCGWindowID,
                     title: "Fullscreen Target",
                     bounds: targetFrame,
@@ -559,7 +559,7 @@ extension FlowTabPriorityCoverageTests {
         activator.currentCGWindowsOverride = { pid in
             XCTAssertEqual(pid, currentApp.processIdentifier)
             return [
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: targetCGWindowID,
                     title: "Ambiguous Fullscreen",
                     bounds: targetFrame,
@@ -567,7 +567,7 @@ extension FlowTabPriorityCoverageTests {
                     alpha: 1.0,
                     storeType: 1
                 ),
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: otherCGWindowID,
                     title: "Ambiguous Fullscreen",
                     bounds: targetFrame,
@@ -660,7 +660,7 @@ extension FlowTabPriorityCoverageTests {
         activator.currentCGWindowsOverride = { pid in
             XCTAssertEqual(pid, currentApp.processIdentifier)
             return [
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: 243_679,
                     title: "Google 搜索 - Google Chrome - test3",
                     bounds: fullscreenFrame,
@@ -668,7 +668,7 @@ extension FlowTabPriorityCoverageTests {
                     alpha: 1.0,
                     storeType: 1
                 ),
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: 243_747,
                     title: "Google 搜索 - Google Chrome - test1",
                     bounds: fullscreenFrame,
@@ -676,7 +676,7 @@ extension FlowTabPriorityCoverageTests {
                     alpha: 1.0,
                     storeType: 1
                 ),
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: 240_029,
                     title: "Google 搜索 - Google Chrome - test5",
                     bounds: fullscreenFrame,

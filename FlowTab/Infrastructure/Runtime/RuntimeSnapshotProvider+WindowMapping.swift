@@ -60,7 +60,7 @@ extension RuntimeSnapshotProvider {
 
     func resolvedStableWindowEntries(
         axWindows: [AXWindowEntry],
-        cgWindows: [CGWindowEntry],
+        cgWindows: [RuntimeCGWindowEntry],
         pid: pid_t,
         appName: String,
         remoteScanCompleteness: RuntimeAXRemoteWindowResolver.RemoteScanCompleteness? = nil
@@ -313,7 +313,7 @@ extension RuntimeSnapshotProvider {
     private func filterFullscreenHostArtifactEntries(
         _ entries: [WindowListEntry],
         allEntries: [WindowListEntry],
-        knownCGWindowsByID: [CGWindowID: CGWindowEntry],
+        knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry],
         appName: String,
         hasFullscreenTopology: Bool,
         stage: String
@@ -355,7 +355,7 @@ extension RuntimeSnapshotProvider {
     private func filterFullscreenSiblingArtifactEntries(
         _ entries: [WindowListEntry],
         allEntries: [WindowListEntry],
-        knownCGWindowsByID: [CGWindowID: CGWindowEntry],
+        knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry],
         appName: String,
         hasFullscreenTopology: Bool,
         stage: String
@@ -401,7 +401,7 @@ extension RuntimeSnapshotProvider {
 
     private func filterAuxiliaryOverlayEntries(
         _ entries: [WindowListEntry],
-        knownCGWindowsByID: [CGWindowID: CGWindowEntry],
+        knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry],
         appName: String,
         stage: String
     ) -> [WindowListEntry] {
@@ -443,7 +443,7 @@ extension RuntimeSnapshotProvider {
         _ entries: [WindowListEntry],
         prioritizesOnscreen: Bool = false,
         cgWindowOrderByID: [CGWindowID: Int] = [:],
-        knownCGWindowsByID: [CGWindowID: CGWindowEntry] = [:],
+        knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry] = [:],
         appName: String = ""
     ) -> [WindowListEntry] {
         let hasRelatedFullscreenTopology = prioritizesOnscreen
@@ -514,7 +514,7 @@ extension RuntimeSnapshotProvider {
 
     func resolveStableWindowMapping(
         axWindows: [AXWindowEntry],
-        cgWindows: [CGWindowEntry],
+        cgWindows: [RuntimeCGWindowEntry],
         pid: pid_t,
         appName: String,
         remoteScanCompleteness: RuntimeAXRemoteWindowResolver.RemoteScanCompleteness? = nil
@@ -828,7 +828,7 @@ extension RuntimeSnapshotProvider {
         source: WindowBindingConfirmationSource,
         pid: pid_t,
         currentAXWindowsByID: [String: AXWindowEntry],
-        knownCGWindowsByID: [CGWindowID: CGWindowEntry],
+        knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry],
         appName: String,
         observedAt: TimeInterval,
         windowRecordsByCGWindowID: inout [CGWindowID: RuntimeWindowRecord],
@@ -863,7 +863,7 @@ extension RuntimeSnapshotProvider {
 
     private func suppressUnmatchedAXEntriesCoveredByStickySpace(
         _ entries: [WindowListEntry],
-        knownCGWindowsByID: [CGWindowID: CGWindowEntry],
+        knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry],
         appName: String
     ) -> [WindowListEntry] {
         let stickySpaceKeys = Set(entries.compactMap { entry -> String? in
@@ -996,7 +996,7 @@ extension RuntimeSnapshotProvider {
         expectedTitle: String,
         expectedFrame: CGRect?,
         windows: [AXWindowEntry],
-        cgWindows: [CGWindowEntry],
+        cgWindows: [RuntimeCGWindowEntry],
         appName: String?
     ) -> AXWindowEntry? {
         recoverAXWindowFromPublicSourcesWithDiagnostics(
@@ -1019,7 +1019,7 @@ extension RuntimeSnapshotProvider {
         expectedTitle: String,
         expectedFrame: CGRect?,
         windows: [AXWindowEntry],
-        cgWindows: [CGWindowEntry],
+        cgWindows: [RuntimeCGWindowEntry],
         appName: String?
     ) -> AXWindowRecoveryDiagnosticResult? {
         RuntimeLog.debug(

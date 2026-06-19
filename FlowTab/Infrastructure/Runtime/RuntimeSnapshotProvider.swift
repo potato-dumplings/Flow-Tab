@@ -4,9 +4,6 @@ import Foundation
 import FlowTabCore
 
 final class RuntimeSnapshotProvider {
-    typealias CGWindowEntry = RuntimeCGWindowEntry
-    typealias CGWindowCollection = RuntimeCGWindowCollection
-
     struct WindowListEntry {
         let windowID: String
         let title: String
@@ -167,8 +164,8 @@ final class RuntimeSnapshotProvider {
     struct AXAppWindowCollection {
         let app: NSRunningApplication
         let appName: String
-        let cgWindows: [CGWindowEntry]
-        let allCGWindows: [CGWindowEntry]
+        let cgWindows: [RuntimeCGWindowEntry]
+        let allCGWindows: [RuntimeCGWindowEntry]
         let publicWindowsFetchResult: AXWindowInspector.WindowsFetchResult
         let publicSwitchableWindowCount: Int
         let shouldIncludeRemoteAXWindows: Bool
@@ -203,8 +200,8 @@ final class RuntimeSnapshotProvider {
 
     func collectAXWindowData(
         for runningApps: [NSRunningApplication],
-        cgWindowsByPID: [pid_t: [CGWindowEntry]],
-        allCGWindowsByPID: [pid_t: [CGWindowEntry]] = [:]
+        cgWindowsByPID: [pid_t: [RuntimeCGWindowEntry]],
+        allCGWindowsByPID: [pid_t: [RuntimeCGWindowEntry]] = [:]
     ) -> [pid_t: [WindowListEntry]] {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
         guard AccessibilityPermissionChecker.isTrusted() else {
@@ -327,8 +324,8 @@ final class RuntimeSnapshotProvider {
 
     private func collectAXAppWindowCollections(
         for runningApps: [NSRunningApplication],
-        cgWindowsByPID: [pid_t: [CGWindowEntry]],
-        allCGWindowsByPID: [pid_t: [CGWindowEntry]]
+        cgWindowsByPID: [pid_t: [RuntimeCGWindowEntry]],
+        allCGWindowsByPID: [pid_t: [RuntimeCGWindowEntry]]
     ) -> [AXAppWindowCollection] {
         Self.collectBoundedAXAppResults(count: runningApps.count) { [self] index in
             collectAXAppWindowCollection(
@@ -343,8 +340,8 @@ final class RuntimeSnapshotProvider {
     private func collectAXAppWindowCollection(
         index: Int,
         app: NSRunningApplication,
-        cgWindowsByPID: [pid_t: [CGWindowEntry]],
-        allCGWindowsByPID: [pid_t: [CGWindowEntry]]
+        cgWindowsByPID: [pid_t: [RuntimeCGWindowEntry]],
+        allCGWindowsByPID: [pid_t: [RuntimeCGWindowEntry]]
     ) -> AXAppWindowCollection {
         let appStartMs = RuntimePerformanceClock.monotonicMilliseconds()
         let appName = app.localizedName ?? app.bundleIdentifier ?? "pid:\(app.processIdentifier)"
@@ -454,7 +451,7 @@ final class RuntimeSnapshotProvider {
     }
 
     private func shouldIncludeRemoteAXWindows(
-        allCGWindows: [CGWindowEntry],
+        allCGWindows: [RuntimeCGWindowEntry],
         publicSwitchableWindowCount: Int,
         publicFetchSucceeded: Bool
     ) -> Bool {
@@ -470,8 +467,8 @@ final class RuntimeSnapshotProvider {
     }
 
     private func userFacingCGWindowsForRemoteAXDecision(
-        _ allCGWindows: [CGWindowEntry]
-    ) -> [CGWindowEntry] {
+        _ allCGWindows: [RuntimeCGWindowEntry]
+    ) -> [RuntimeCGWindowEntry] {
         let validCGWindows = selectSupplementalOffSpaceCGWindows(
             existingCGWindowIDs: [],
             allCGWindows: allCGWindows
@@ -493,9 +490,9 @@ final class RuntimeSnapshotProvider {
     }
 
     private func markCurrentOnscreenCGWindows(
-        _ allCGWindows: [CGWindowEntry],
-        onscreenCGWindows: [CGWindowEntry]
-    ) -> [CGWindowEntry] {
+        _ allCGWindows: [RuntimeCGWindowEntry],
+        onscreenCGWindows: [RuntimeCGWindowEntry]
+    ) -> [RuntimeCGWindowEntry] {
         let onscreenCGWindowIDs = Set(onscreenCGWindows.map(\.id))
         guard !onscreenCGWindowIDs.isEmpty else { return allCGWindows }
 
@@ -503,7 +500,7 @@ final class RuntimeSnapshotProvider {
             guard onscreenCGWindowIDs.contains(window.id), !window.isOnscreen else {
                 return window
             }
-            return CGWindowEntry(
+            return RuntimeCGWindowEntry(
                 id: window.id,
                 title: window.title,
                 bounds: window.bounds,
@@ -517,7 +514,7 @@ final class RuntimeSnapshotProvider {
 
     private func resolvedWindowEntries(
         axWindows: [AXWindowEntry],
-        cgWindows: [CGWindowEntry],
+        cgWindows: [RuntimeCGWindowEntry],
         pid: pid_t,
         appName: String,
         remoteScanCompleteness: RuntimeAXRemoteWindowResolver.RemoteScanCompleteness? = nil
@@ -622,7 +619,7 @@ final class RuntimeSnapshotProvider {
 
     func collectCGWindowsWithSpaceTopologyDiff(
         options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
-    ) -> CGWindowCollection {
+    ) -> RuntimeCGWindowCollection {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
         guard
             let rawList = cgWindowListProvider.windowInfo(
@@ -638,11 +635,11 @@ final class RuntimeSnapshotProvider {
                     ("totalMs", formatSnapshotMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))
                 ]
             )
-            return CGWindowCollection(windowsByPID: [:], spaceTopologyDiff: nil)
+            return RuntimeCGWindowCollection(windowsByPID: [:], spaceTopologyDiff: nil)
         }
         let copyReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
 
-        var windowsByPID: [pid_t: [CGWindowEntry]] = [:]
+        var windowsByPID: [pid_t: [RuntimeCGWindowEntry]] = [:]
         var windowIDs: [CGWindowID] = []
         for item in rawList {
             guard let ownerPID = item[kCGWindowOwnerPID as String] as? pid_t else { continue }
@@ -660,7 +657,7 @@ final class RuntimeSnapshotProvider {
             let storeType = (item[kCGWindowStoreType as String] as? NSNumber)?.intValue ?? 1
             windowIDs.append(cgWindowID)
             windowsByPID[ownerPID, default: []].append(
-                CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: cgWindowID,
                     title: title,
                     bounds: bounds,
@@ -699,7 +696,7 @@ final class RuntimeSnapshotProvider {
             ]
         )
         guard !spaceIDsByWindowID.isEmpty else {
-            return CGWindowCollection(
+            return RuntimeCGWindowCollection(
                 windowsByPID: windowsByPID,
                 spaceTopologyDiff: spaceTopologyDiff
             )
@@ -709,7 +706,7 @@ final class RuntimeSnapshotProvider {
             (
                 pid,
                 windows.map { window in
-                    CGWindowEntry(
+                    RuntimeCGWindowEntry(
                         id: window.id,
                         title: window.title,
                         bounds: window.bounds,
@@ -721,7 +718,7 @@ final class RuntimeSnapshotProvider {
                 }
             )
         })
-        return CGWindowCollection(
+        return RuntimeCGWindowCollection(
             windowsByPID: enrichedWindowsByPID,
             spaceTopologyDiff: spaceTopologyDiff
         )
@@ -923,7 +920,7 @@ final class RuntimeSnapshotProvider {
         return provider.resolveStableWindowMapping(
             axWindows: axEntries,
             cgWindows: cgWindows.map {
-                CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: $0.id,
                     title: $0.title,
                     bounds: $0.bounds,
@@ -978,7 +975,7 @@ final class RuntimeSnapshotProvider {
         return provider.resolveStableWindowMapping(
             axWindows: axEntries,
             cgWindows: cgWindows.map {
-                CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: $0.id,
                     title: $0.title,
                     bounds: $0.bounds,
@@ -1000,7 +997,7 @@ final class RuntimeSnapshotProvider {
     ) -> Bool {
         RuntimeSnapshotProvider().shouldIncludeRemoteAXWindows(
             allCGWindows: allCGWindows.map {
-                CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: $0.id,
                     title: $0.title,
                     bounds: $0.bounds,
@@ -1055,7 +1052,7 @@ final class RuntimeSnapshotProvider {
         return provider.resolvedWindowEntries(
             axWindows: axEntries,
             cgWindows: cgWindows.map {
-                CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: $0.id,
                     title: $0.title,
                     bounds: $0.bounds,

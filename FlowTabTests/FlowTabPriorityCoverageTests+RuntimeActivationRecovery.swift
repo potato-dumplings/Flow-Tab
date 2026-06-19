@@ -335,7 +335,7 @@ extension FlowTabPriorityCoverageTests {
                 verifiedVisibleTarget.fulfill()
             }
             return [
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: targetCGWindowID,
                     title: "Fullscreen Target",
                     bounds: targetFrame,
@@ -407,7 +407,7 @@ extension FlowTabPriorityCoverageTests {
             XCTAssertEqual(pid, currentApp.processIdentifier)
             cgWindowReadCount += 1
             return [
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: targetCGWindowID,
                     title: "CG Only Target",
                     bounds: targetFrame,
@@ -528,7 +528,7 @@ extension FlowTabPriorityCoverageTests {
         activator.currentCGWindowsOverride = { pid in
             XCTAssertEqual(pid, currentApp.processIdentifier)
             return [
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: targetCGWindowID,
                     title: "Inferred Target",
                     bounds: CGRect(x: 0, y: 40, width: 960, height: 640),
@@ -604,7 +604,7 @@ extension FlowTabPriorityCoverageTests {
         activator.currentCGWindowsOverride = { pid in
             XCTAssertEqual(pid, currentApp.processIdentifier)
             return [
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: targetCGWindowID,
                     title: "Sticky Target",
                     bounds: CGRect(x: 0, y: 40, width: 960, height: 640),
@@ -691,7 +691,7 @@ extension FlowTabPriorityCoverageTests {
         activator.currentCGWindowsOverride = { pid in
             XCTAssertEqual(pid, currentApp.processIdentifier)
             return [
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: targetCGWindowID,
                     title: "Sticky Target",
                     bounds: CGRect(x: 0, y: 40, width: 960, height: 640),
@@ -751,7 +751,7 @@ extension FlowTabPriorityCoverageTests {
         activator.currentCGWindowsOverride = { pid in
             XCTAssertEqual(pid, currentApp.processIdentifier)
             return [
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: targetCGWindowID,
                     title: "Readback Target",
                     bounds: CGRect(x: 0, y: 40, width: 960, height: 640),
@@ -759,7 +759,7 @@ extension FlowTabPriorityCoverageTests {
                     alpha: 1.0,
                     storeType: 1
                 ),
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: 245_253,
                     title: "Visible Other",
                     bounds: CGRect(x: 40, y: 80, width: 800, height: 600),
@@ -847,7 +847,7 @@ extension FlowTabPriorityCoverageTests {
         activator.currentCGWindowsOverride = { pid in
             XCTAssertEqual(pid, currentApp.processIdentifier)
             return [
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: targetCGWindowID,
                     title: "Readback Target",
                     bounds: CGRect(x: 0, y: 40, width: 960, height: 640),
@@ -855,7 +855,7 @@ extension FlowTabPriorityCoverageTests {
                     alpha: 1.0,
                     storeType: 1
                 ),
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: 245_255,
                     title: "Visible Other",
                     bounds: CGRect(x: 40, y: 80, width: 800, height: 600),
@@ -940,7 +940,7 @@ extension FlowTabPriorityCoverageTests {
         activator.currentCGWindowsOverride = { pid in
             XCTAssertEqual(pid, currentApp.processIdentifier)
             return [
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: targetCGWindowID,
                     title: "Visible Target",
                     bounds: CGRect(x: 0, y: 40, width: 960, height: 640),
@@ -949,7 +949,7 @@ extension FlowTabPriorityCoverageTests {
                     storeType: 1,
                     spaceIDs: [1]
                 ),
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: focusedCGWindowID,
                     title: "Focused Other",
                     bounds: CGRect(x: 40, y: 80, width: 800, height: 600),
@@ -1037,7 +1037,7 @@ extension FlowTabPriorityCoverageTests {
         activator.currentCGWindowsOverride = { pid in
             XCTAssertEqual(pid, currentApp.processIdentifier)
             return [
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: targetCGWindowID,
                     title: "CG Bridge Target",
                     bounds: targetFrame,
@@ -1119,7 +1119,7 @@ extension FlowTabPriorityCoverageTests {
         activator.currentCGWindowsOverride = { pid in
             XCTAssertEqual(pid, currentApp.processIdentifier)
             return [
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: sameTitleCGWindowID,
                     title: "New Tab",
                     bounds: sameTitleFrame,
@@ -1128,7 +1128,7 @@ extension FlowTabPriorityCoverageTests {
                     storeType: 1,
                     spaceIDs: [1]
                 ),
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: targetCGWindowID,
                     title: "New Tab",
                     bounds: targetFrame,
@@ -1199,7 +1199,7 @@ extension FlowTabPriorityCoverageTests {
         activator.currentCGWindowsOverride = { pid in
             XCTAssertEqual(pid, currentApp.processIdentifier)
             return [
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: relatedCGWindowID,
                     title: "Chrome Fullscreen Tab",
                     bounds: relatedFrame,
@@ -1207,7 +1207,7 @@ extension FlowTabPriorityCoverageTests {
                     alpha: 1.0,
                     storeType: 1
                 ),
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: targetCGWindowID,
                     title: "Chrome Fullscreen Tab",
                     bounds: targetFrame,
@@ -1312,7 +1312,7 @@ extension FlowTabPriorityCoverageTests {
             XCTAssertEqual(pid, currentApp.processIdentifier)
             let targetIsVisible = focusedWindowPointers.last == relatedPointer
             return [
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: targetCGWindowID,
                     title: "Chrome Fullscreen Tab",
                     bounds: targetFrame,
@@ -1321,7 +1321,7 @@ extension FlowTabPriorityCoverageTests {
                     storeType: 1,
                     spaceIDs: [7_120]
                 ),
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: relatedCGWindowID,
                     title: "Chrome Fixture",
                     bounds: CGRect(x: 0, y: 74, width: 1_728, height: 165),
@@ -1330,7 +1330,7 @@ extension FlowTabPriorityCoverageTests {
                     storeType: 1,
                     spaceIDs: [7_120]
                 ),
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: unrelatedCGWindowID,
                     title: "Chrome Normal Tab",
                     bounds: CGRect(x: 384, y: 258, width: 960, height: 640),
@@ -1400,7 +1400,7 @@ extension FlowTabPriorityCoverageTests {
             XCTAssertEqual(pid, currentApp.processIdentifier)
             let targetIsVisible = focusedCGWindowIDs.last == sameSpaceCGWindowID
             return [
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: sameSpaceCGWindowID,
                     title: nil,
                     bounds: CGRect(x: 0, y: 37, width: 1_728, height: 44),
@@ -1409,7 +1409,7 @@ extension FlowTabPriorityCoverageTests {
                     storeType: 1,
                     spaceIDs: [7_128]
                 ),
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: otherSpaceCGWindowID,
                     title: nil,
                     bounds: CGRect(x: 0, y: 37, width: 1_728, height: 44),
@@ -1418,7 +1418,7 @@ extension FlowTabPriorityCoverageTests {
                     storeType: 1,
                     spaceIDs: [7_124]
                 ),
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: targetCGWindowID,
                     title: "Chrome Fullscreen Tab",
                     bounds: targetFrame,
@@ -1493,7 +1493,7 @@ extension FlowTabPriorityCoverageTests {
         activator.currentCGWindowsOverride = { pid in
             XCTAssertEqual(pid, currentApp.processIdentifier)
             return [
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: targetCGWindowID,
                     title: "Fullscreen Content",
                     bounds: targetFrame,
@@ -1570,7 +1570,7 @@ extension FlowTabPriorityCoverageTests {
                 visibilitySettled.fulfill()
             }
             return [
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: targetCGWindowID,
                     title: "CG Bridge Target",
                     bounds: targetFrame,
@@ -1642,7 +1642,7 @@ extension FlowTabPriorityCoverageTests {
         activator.currentCGWindowsOverride = { pid in
             XCTAssertEqual(pid, currentApp.processIdentifier)
             return [
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: targetCGWindowID,
                     title: "Shared Doc",
                     bounds: targetFrame,
@@ -1724,7 +1724,7 @@ extension FlowTabPriorityCoverageTests {
             let isVisible = didScanAXRecovery
             visibilityChecks.append(isVisible)
             return [
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: targetCGWindowID,
                     title: "Late Visible Target",
                     bounds: targetFrame,
@@ -1807,7 +1807,7 @@ extension FlowTabPriorityCoverageTests {
         activator.currentCGWindowsOverride = { pid in
             XCTAssertEqual(pid, currentApp.processIdentifier)
             return [
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: targetCGWindowID,
                     title: "Fullscreen Target",
                     bounds: targetFrame,

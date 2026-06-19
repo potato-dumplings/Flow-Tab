@@ -150,7 +150,7 @@ extension FlowTabPriorityCoverageTests {
 
     func testRuntimeWindowRecordOnlyExactMatchesUpdateStickyHistory() {
         let currentApp = NSRunningApplication.current
-        let cgWindow = RuntimeSnapshotProvider.CGWindowEntry(
+        let cgWindow = RuntimeCGWindowEntry(
             id: 24_501,
             title: "Fullscreen Candidate",
             bounds: CGRect(x: 40, y: 80, width: 960, height: 640),
@@ -545,7 +545,7 @@ extension FlowTabPriorityCoverageTests {
         let mergedEntries = provider.resolvedStableWindowEntries(
             axWindows: [],
             cgWindows: [
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: 243_747,
                     title: "Recovered Window",
                     bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
@@ -590,7 +590,7 @@ extension FlowTabPriorityCoverageTests {
             )
         ]
         let cgWindows = [
-            RuntimeSnapshotProvider.CGWindowEntry(
+            RuntimeCGWindowEntry(
                 id: 240_001,
                 title: "Doc A",
                 bounds: exactBounds,
@@ -599,7 +599,7 @@ extension FlowTabPriorityCoverageTests {
                 storeType: 1,
                 spaceIDs: [11_679]
             ),
-            RuntimeSnapshotProvider.CGWindowEntry(
+            RuntimeCGWindowEntry(
                 id: 243_747,
                 title: "Recovered Window",
                 bounds: recoveryBounds,
@@ -707,7 +707,7 @@ extension FlowTabPriorityCoverageTests {
         let mergedEntries = provider.resolvedStableWindowEntries(
             axWindows: [],
             cgWindows: [
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: 288_544,
                     title: "Google Chrome",
                     bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
@@ -716,7 +716,7 @@ extension FlowTabPriorityCoverageTests {
                     storeType: 1,
                     spaceIDs: [11_679]
                 ),
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: 258_323,
                     title: "Google Chrome",
                     bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
@@ -1274,7 +1274,7 @@ extension FlowTabPriorityCoverageTests {
         let appName = "Google Chrome"
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let cgWindows = [
-            RuntimeSnapshotProvider.CGWindowEntry(
+            RuntimeCGWindowEntry(
                 id: 243_747,
                 title: "Recovered Window",
                 bounds: fullscreenBounds,
@@ -1353,8 +1353,8 @@ extension FlowTabPriorityCoverageTests {
             }
         }
 
-        func cgWindow(for index: Int, isOnscreen: Bool) -> RuntimeSnapshotProvider.CGWindowEntry {
-            RuntimeSnapshotProvider.CGWindowEntry(
+        func cgWindow(for index: Int, isOnscreen: Bool) -> RuntimeCGWindowEntry {
+            RuntimeCGWindowEntry(
                 id: CGWindowID(240_000 + index),
                 title: title(for: index),
                 bounds: bounds(for: index),
@@ -1405,7 +1405,7 @@ extension FlowTabPriorityCoverageTests {
         let appName = "Google Chrome"
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let cgWindows = [
-            RuntimeSnapshotProvider.CGWindowEntry(
+            RuntimeCGWindowEntry(
                 id: 243_747,
                 title: "Recovered Window",
                 bounds: fullscreenBounds,
@@ -1462,7 +1462,7 @@ extension FlowTabPriorityCoverageTests {
         let appName = "Google Chrome"
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let cgWindows = [
-            RuntimeSnapshotProvider.CGWindowEntry(
+            RuntimeCGWindowEntry(
                 id: 243_747,
                 title: "Recovered Window",
                 bounds: fullscreenBounds,
@@ -1541,7 +1541,7 @@ extension FlowTabPriorityCoverageTests {
             )
         ]
         let firstCGWindows = [
-            RuntimeSnapshotProvider.CGWindowEntry(
+            RuntimeCGWindowEntry(
                 id: 240_001,
                 title: "Doc A",
                 bounds: fullscreenBounds,
@@ -1549,7 +1549,7 @@ extension FlowTabPriorityCoverageTests {
                 alpha: 1.0,
                 storeType: 1
             ),
-            RuntimeSnapshotProvider.CGWindowEntry(
+            RuntimeCGWindowEntry(
                 id: 240_002,
                 title: "Doc B",
                 bounds: fullscreenBounds,
@@ -1588,7 +1588,7 @@ extension FlowTabPriorityCoverageTests {
             )
         ]
         let secondCGWindows = [
-            RuntimeSnapshotProvider.CGWindowEntry(
+            RuntimeCGWindowEntry(
                 id: 240_001,
                 title: nil,
                 bounds: fullscreenBounds,
@@ -1596,7 +1596,7 @@ extension FlowTabPriorityCoverageTests {
                 alpha: 1.0,
                 storeType: 1
             ),
-            RuntimeSnapshotProvider.CGWindowEntry(
+            RuntimeCGWindowEntry(
                 id: 240_002,
                 title: nil,
                 bounds: fullscreenBounds,
@@ -2443,7 +2443,7 @@ extension FlowTabPriorityCoverageTests {
                 )
             ],
             cgWindows: cgWindowsForTesting.map {
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: $0.id,
                     title: $0.title,
                     bounds: $0.bounds,

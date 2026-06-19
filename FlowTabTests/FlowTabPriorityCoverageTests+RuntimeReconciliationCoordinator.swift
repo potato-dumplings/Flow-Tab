@@ -844,7 +844,7 @@ extension FlowTabPriorityCoverageTests {
             firstSeenAt: 10
         )
         record.refreshCGState(
-            from: RuntimeSnapshotProvider.CGWindowEntry(
+            from: RuntimeCGWindowEntry(
                 id: recordedWindowID,
                 title: "Recorded",
                 bounds: CGRect(x: 10, y: 10, width: 320, height: 240),
@@ -858,9 +858,9 @@ extension FlowTabPriorityCoverageTests {
         provider.windowMappingStateByPID[recordedPID] = RuntimeWindowMappingState(
             windowRecordsByCGWindowID: [recordedWindowID: record]
         )
-        let currentCGWindowsByPID: [pid_t: [RuntimeSnapshotProvider.CGWindowEntry]] = [
+        let currentCGWindowsByPID: [pid_t: [RuntimeCGWindowEntry]] = [
             currentPID: [
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: currentWindowID,
                     title: "Current",
                     bounds: CGRect(x: 20, y: 20, width: 640, height: 480),
@@ -869,7 +869,7 @@ extension FlowTabPriorityCoverageTests {
                     storeType: 1,
                     spaceIDs: [7_002]
                 ),
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: unrelatedWindowID,
                     title: "Unrelated",
                     bounds: CGRect(x: 30, y: 30, width: 640, height: 480),

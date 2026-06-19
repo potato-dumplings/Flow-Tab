@@ -96,7 +96,7 @@ extension FlowTabPriorityCoverageTests {
         let entries = provider.resolvedStableWindowEntries(
             axWindows: [],
             cgWindows: [
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: 240_003,
                     title: "Fullscreen Window",
                     bounds: fullscreenBounds,
@@ -145,7 +145,7 @@ extension FlowTabPriorityCoverageTests {
                 )
             ],
             cgWindows: [
-                RuntimeSnapshotProvider.CGWindowEntry(
+                RuntimeCGWindowEntry(
                     id: 240_004,
                     title: "Stale Space",
                     bounds: frame,
