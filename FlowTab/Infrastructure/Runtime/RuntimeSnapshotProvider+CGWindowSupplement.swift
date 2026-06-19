@@ -263,7 +263,7 @@ private func runtimeSnapshotAXWindowSummary(
 }
 
 private func runtimeSnapshotCGWindowSummary(
-    _ windows: [RuntimeSnapshotProvider.CGWindowEntry],
+    _ windows: [RuntimeCGWindowEntry],
     limit: Int = 16
 ) -> String {
     guard !windows.isEmpty else { return "empty" }

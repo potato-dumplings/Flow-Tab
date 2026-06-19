@@ -5,21 +5,21 @@ import Foundation
 struct RuntimeWindowMappingResolution {
     let exactMatchesByAXWindowID: [String: CGWindowID]
     let windowRecordsByCGWindowID: [CGWindowID: RuntimeWindowRecord]
-    let validCGWindows: [RuntimeSnapshotProvider.CGWindowEntry]
+    let validCGWindows: [RuntimeCGWindowEntry]
     let allowSpaceOneWithoutCurrentAXHandle: Bool
     let bindingDiagnostics: [WindowBindingDiagnostic]
 
-    var knownCGWindowsByID: [CGWindowID: RuntimeSnapshotProvider.CGWindowEntry] {
+    var knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry] {
         runtimeKnownCGWindowsByID(
             windowRecordsByCGWindowID: windowRecordsByCGWindowID,
             validCGWindows: validCGWindows
         )
     }
 
-    var windowLayerCGWindows: [RuntimeSnapshotProvider.CGWindowEntry] {
+    var windowLayerCGWindows: [RuntimeCGWindowEntry] {
         let knownCGWindowsByID = knownCGWindowsByID
         let validCGWindowIDs = Set(validCGWindows.map(\.id))
-        let synthesizedWindows: [RuntimeSnapshotProvider.CGWindowEntry] =
+        let synthesizedWindows: [RuntimeCGWindowEntry] =
             windowRecordsByCGWindowID.keys.sorted().compactMap { cgWindowID in
                 guard !validCGWindowIDs.contains(cgWindowID) else { return nil }
                 return knownCGWindowsByID[cgWindowID]
@@ -1090,7 +1090,7 @@ private let runtimeAuxiliaryOverlayContainmentTolerance: CGFloat = 8
 private func runtimeWindowEntryLooksLikeFullscreenHostArtifact(
     _ entry: RuntimeSnapshotProvider.WindowListEntry,
     activationSurfaces: [RuntimeSnapshotProvider.WindowListEntry],
-    knownCGWindowsByID: [CGWindowID: RuntimeSnapshotProvider.CGWindowEntry],
+    knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry],
     appName: String
 ) -> Bool {
     guard RuntimeWindowTopologyClassifier.hasOffDesktopSpace(spaceIDs: entry.spaceIDs) else { return false }
@@ -1122,7 +1122,7 @@ private func runtimeWindowEntryLooksLikeFullscreenHostArtifact(
 
 private func runtimeWindowEntryLooksLikeAXBackedFullscreenContentSurface(
     _ entry: RuntimeSnapshotProvider.WindowListEntry,
-    knownCGWindowsByID: [CGWindowID: RuntimeSnapshotProvider.CGWindowEntry],
+    knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry],
     appName: String
 ) -> Bool {
     guard entry.activationHandleID != nil || entry.axWindow != nil else { return false }
@@ -1136,7 +1136,7 @@ private func runtimeWindowEntryLooksLikeAXBackedFullscreenContentSurface(
 
 private func runtimeWindowEntryLooksLikeDesktopFullscreenSiblingSurface(
     _ entry: RuntimeSnapshotProvider.WindowListEntry,
-    knownCGWindowsByID: [CGWindowID: RuntimeSnapshotProvider.CGWindowEntry],
+    knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry],
     appName: String
 ) -> Bool {
     guard entry.isOnscreen else { return false }
@@ -1182,7 +1182,7 @@ private func runtimeWindowBoundsLookLikeFullscreenContentSurface(_ bounds: CGRec
 
 private func runtimeWindowEntryLooksLikeFullscreenSiblingArtifact(
     _ entry: RuntimeSnapshotProvider.WindowListEntry,
-    knownCGWindowsByID: [CGWindowID: RuntimeSnapshotProvider.CGWindowEntry],
+    knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry],
     appName: String,
     strongTitles: Set<String>
 ) -> Bool {
@@ -1205,7 +1205,7 @@ private func runtimeWindowEntryLooksLikeFullscreenSiblingArtifact(
 
 private func runtimeWindowEntryLooksLikeStrongUserWindow(
     _ entry: RuntimeSnapshotProvider.WindowListEntry,
-    knownCGWindowsByID: [CGWindowID: RuntimeSnapshotProvider.CGWindowEntry],
+    knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry],
     appName: String
 ) -> Bool {
     let bounds = runtimeWindowEntryBounds(entry, knownCGWindowsByID: knownCGWindowsByID)
@@ -1223,7 +1223,7 @@ private func runtimeWindowEntryLooksLikeStrongUserWindow(
 
 private func runtimeWindowEntryLooksLikeShallowFullscreenSibling(
     _ entry: RuntimeSnapshotProvider.WindowListEntry,
-    knownCGWindowsByID: [CGWindowID: RuntimeSnapshotProvider.CGWindowEntry]
+    knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry]
 ) -> Bool {
     guard let bounds = runtimeWindowEntryBounds(entry, knownCGWindowsByID: knownCGWindowsByID)?.standardized else {
         return false
@@ -1238,7 +1238,7 @@ private func runtimeWindowEntryLooksLikeShallowFullscreenSibling(
 private func runtimeWindowEntryLooksLikeContainedAuxiliaryOverlay(
     _ entry: RuntimeSnapshotProvider.WindowListEntry,
     primarySurfaces: [RuntimeSnapshotProvider.WindowListEntry],
-    knownCGWindowsByID: [CGWindowID: RuntimeSnapshotProvider.CGWindowEntry],
+    knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry],
     appName: String
 ) -> Bool {
     guard !runtimeWindowEntryLooksLikeStrongUserWindow(
@@ -1284,7 +1284,7 @@ private func runtimeWindowEntriesShareAnySpace(
 
 private func runtimeWindowEntryBounds(
     _ entry: RuntimeSnapshotProvider.WindowListEntry,
-    knownCGWindowsByID: [CGWindowID: RuntimeSnapshotProvider.CGWindowEntry]
+    knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry]
 ) -> CGRect? {
     if let cgWindowID = entry.cgWindowID,
         let cgBounds = knownCGWindowsByID[cgWindowID]?.bounds
@@ -1333,8 +1333,8 @@ private func runtimeNormalizedTitleKey(_ title: String?) -> String? {
 
 private func runtimeKnownCGWindowsByID(
     windowRecordsByCGWindowID: [CGWindowID: RuntimeWindowRecord],
-    validCGWindows: [RuntimeSnapshotProvider.CGWindowEntry]
-) -> [CGWindowID: RuntimeSnapshotProvider.CGWindowEntry] {
+    validCGWindows: [RuntimeCGWindowEntry]
+) -> [CGWindowID: RuntimeCGWindowEntry] {
     var knownCGWindowsByID = Dictionary(uniqueKeysWithValues: validCGWindows.map { ($0.id, $0) })
     for (cgWindowID, record) in windowRecordsByCGWindowID {
         guard knownCGWindowsByID[cgWindowID] == nil else { continue }
@@ -1387,7 +1387,7 @@ private func runtimeTitleLooksLikeAppNameFallback(_ title: String?, appName: Str
 
 private func runtimeSupplementalCGWindowTitle(
     appName: String,
-    cgWindow: RuntimeSnapshotProvider.CGWindowEntry
+    cgWindow: RuntimeCGWindowEntry
 ) -> String {
     normalizedRuntimeWindowTitle(cgWindow.title)
         ?? normalizedRuntimeWindowTitle(appName)
@@ -1409,7 +1409,7 @@ private func runtimeAXRecoveryAXWindowSummary(
 }
 
 private func runtimeAXRecoveryCGWindowSummary(
-    _ windows: [RuntimeSnapshotProvider.CGWindowEntry],
+    _ windows: [RuntimeCGWindowEntry],
     targetCGWindowID: CGWindowID?
 ) -> String {
     let sample = windows.prefix(12).map { window in
