@@ -48,7 +48,7 @@ enum RuntimeReconciliationState: String, Equatable {
 struct RuntimeReconciliationRetryPolicy: Equatable {
     let delays: [TimeInterval]
 
-    static let axEmptySnapshot = RuntimeReconciliationRetryPolicy(
+    static let transientEmptyCurrentAppWindowPayload = RuntimeReconciliationRetryPolicy(
         delays: [0.1, 0.3, 0.8]
     )
 
@@ -76,7 +76,7 @@ final class RuntimeReconciliationCoordinator {
     private var currentSpaceTopologySnapshot: RuntimeSpaceTopologySnapshot?
     private let retryPolicy: RuntimeReconciliationRetryPolicy
 
-    init(retryPolicy: RuntimeReconciliationRetryPolicy = .axEmptySnapshot) {
+    init(retryPolicy: RuntimeReconciliationRetryPolicy = .transientEmptyCurrentAppWindowPayload) {
         self.retryPolicy = retryPolicy
     }
 
@@ -193,7 +193,7 @@ final class RuntimeReconciliationCoordinator {
     }
 
     @discardableResult
-    func scheduleRetryAfterTransientEmptyAXSnapshot(
+    func scheduleRetryAfterTransientEmptyCurrentAppWindowPayload(
         id: UInt64,
         now: TimeInterval
     ) -> RuntimeReconciliationRequest? {

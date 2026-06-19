@@ -36,7 +36,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         case completed
         case completedWithFullRepairProjection(RuntimeFullRepairProjectionPayload)
         case completedWithRepairedCurrentAppWindowPayloads([RuntimeCurrentAppWindowPayload])
-        case transientEmptyAXSnapshot
+        case transientEmptyCurrentAppWindowPayload
 
         var repairedCurrentAppWindowPayloads: [RuntimeCurrentAppWindowPayload] {
             switch self {
@@ -44,7 +44,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 []
             case let .completedWithRepairedCurrentAppWindowPayloads(payloads):
                 payloads
-            case .transientEmptyAXSnapshot:
+            case .transientEmptyCurrentAppWindowPayload:
                 []
             }
         }
@@ -413,8 +413,8 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 result.repairedCurrentAppWindowPayloads.append(
                     contentsOf: outcome.repairedCurrentAppWindowPayloads
                 )
-            case .transientEmptyAXSnapshot:
-                _ = coordinator.scheduleRetryAfterTransientEmptyAXSnapshot(
+            case .transientEmptyCurrentAppWindowPayload:
+                _ = coordinator.scheduleRetryAfterTransientEmptyCurrentAppWindowPayload(
                     id: startedRequest.id,
                     now: now
                 )
@@ -435,7 +435,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 affectedCGWindowIDs: request.affectedCGWindowIDs
             )
             if result.isTransientEmptyCurrentAppWindowPayload {
-                return .transientEmptyAXSnapshot
+                return .transientEmptyCurrentAppWindowPayload
             }
             if let payload = result.currentAppWindowPayload {
                 return .completedWithRepairedCurrentAppWindowPayloads([payload])
@@ -458,7 +458,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                     affectedCGWindowIDs: target.affectedCGWindowIDs
                 )
                 if result.isTransientEmptyCurrentAppWindowPayload {
-                    return .transientEmptyAXSnapshot
+                    return .transientEmptyCurrentAppWindowPayload
                 }
                 if let payload = result.currentAppWindowPayload {
                     repairedCurrentAppWindowPayloads.append(payload)

@@ -454,7 +454,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(request?.state, .pending)
     }
 
-    func testRuntimeReconciliationCoordinatorCoalescesDirtyAppAndRetriesTransientEmptyAXSnapshots() throws {
+    func testRuntimeReconciliationCoordinatorCoalescesDirtyAppAndRetriesTransientEmptyCurrentAppWindowPayloads() throws {
         let coordinator = RuntimeReconciliationCoordinator(
             retryPolicy: RuntimeReconciliationRetryPolicy(delays: [0.1, 0.3])
         )
@@ -473,7 +473,7 @@ extension FlowTabPriorityCoverageTests {
         )
         let started = try XCTUnwrap(coordinator.startRequest(id: coalesced.id))
         let retry = try XCTUnwrap(
-            coordinator.scheduleRetryAfterTransientEmptyAXSnapshot(
+            coordinator.scheduleRetryAfterTransientEmptyCurrentAppWindowPayload(
                 id: started.id,
                 now: 11
             )
@@ -505,7 +505,7 @@ extension FlowTabPriorityCoverageTests {
         )
         let started = try XCTUnwrap(coordinator.startRequest(id: dirty.id))
 
-        let retry = coordinator.scheduleRetryAfterTransientEmptyAXSnapshot(
+        let retry = coordinator.scheduleRetryAfterTransientEmptyCurrentAppWindowPayload(
             id: started.id,
             now: 11
         )
@@ -531,7 +531,7 @@ extension FlowTabPriorityCoverageTests {
         )
         let started = try XCTUnwrap(coordinator.startRequest(id: dirty.id))
         let retry = try XCTUnwrap(
-            coordinator.scheduleRetryAfterTransientEmptyAXSnapshot(
+            coordinator.scheduleRetryAfterTransientEmptyCurrentAppWindowPayload(
                 id: started.id,
                 now: 10.5
             )
@@ -1339,16 +1339,16 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(mappingState.validCGWindowIDs, [focusedCGWindowID])
     }
 
-    func testRuntimeProjectionServiceSchedulesRetryWhenDrainSeesTransientEmptyAXSnapshot() throws {
+    func testRuntimeProjectionServiceSchedulesRetryWhenDrainSeesTransientEmptyCurrentAppWindowPayload() throws {
         let coordinator = RuntimeReconciliationCoordinator(
             retryPolicy: RuntimeReconciliationRetryPolicy(delays: [0.1])
         )
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
         let service = RuntimeProjectionService(
-            label: "FlowTabTests.RuntimeProjectionService.TransientAXRetry",
+            label: "FlowTabTests.RuntimeProjectionService.TransientCurrentAppPayloadRetry",
             snapshotProvider: provider,
             reconciliationExecutor: { _, _ in
-                .transientEmptyAXSnapshot
+                .transientEmptyCurrentAppWindowPayload
             }
         )
 
@@ -1484,7 +1484,7 @@ extension FlowTabPriorityCoverageTests {
         let waitingRetry = try XCTUnwrap(coordinator.startRequest(id: requests[0].id))
         let retryStart = Date.timeIntervalSinceReferenceDate
         let retry = try XCTUnwrap(
-            coordinator.scheduleRetryAfterTransientEmptyAXSnapshot(
+            coordinator.scheduleRetryAfterTransientEmptyCurrentAppWindowPayload(
                 id: waitingRetry.id,
                 now: retryStart
             )
@@ -1706,7 +1706,7 @@ extension FlowTabPriorityCoverageTests {
             readModelStore: store,
             reconciliationExecutor: { _, _ in
                 expectation.fulfill()
-                return .transientEmptyAXSnapshot
+                return .transientEmptyCurrentAppWindowPayload
             }
         )
 
@@ -1845,7 +1845,7 @@ extension FlowTabPriorityCoverageTests {
             readModelStore: store,
             reconciliationExecutor: { _, _ in
                 expectation.fulfill()
-                return .transientEmptyAXSnapshot
+                return .transientEmptyCurrentAppWindowPayload
             }
         )
 
@@ -1922,7 +1922,7 @@ extension FlowTabPriorityCoverageTests {
                 lock.unlock()
                 switch request.target {
                 case .app:
-                    return .transientEmptyAXSnapshot
+                    return .transientEmptyCurrentAppWindowPayload
                 case .fullRepair:
                     return .completedWithFullRepairProjection(
                         RuntimeFullRepairProjectionPayload(apps: [repairedApp], contextsByID: [:])
