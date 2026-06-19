@@ -16,8 +16,7 @@ struct RuntimeFullRepairProjectionPayload {
     ) {
         self.apps = apps
         self.contextsByID = contextsByID
-        self.appDirectoryEntries = appDirectoryEntries
-            ?? contextsByID.values.map { RuntimeAppDirectoryEntry(app: $0.runningApp) }
+        self.appDirectoryEntries = appDirectoryEntries ?? []
     }
 }
 

@@ -88,7 +88,11 @@ extension RuntimeProjectionRepairProvider {
                     ("totalMs", snapshotProvider.formatProjectionMilliseconds(runningAppsReadyMs - startMs))
                 ]
             )
-            return RuntimeFullRepairProjectionPayload(apps: [], contextsByID: [:])
+            return RuntimeFullRepairProjectionPayload(
+                apps: [],
+                contextsByID: [:],
+                appDirectoryEntries: appDirectoryEntries
+            )
         }
 
         RuntimeLog.debug(.projection, "runningApps=\(runningApps.count)")

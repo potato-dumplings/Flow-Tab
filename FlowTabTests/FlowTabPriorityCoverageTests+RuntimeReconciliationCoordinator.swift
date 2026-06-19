@@ -204,6 +204,42 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
+    func testRuntimeReadModelStoreDoesNotSynthesizeAppDirectoryFromSwitcherContexts() throws {
+        let store = RuntimeReadModelStore()
+        let app = try XCTUnwrap(searchScenarioApps().first)
+        let context = makeRuntimeAppContext(
+            appID: app.id,
+            runningApp: .current,
+            windows: app.windows
+        )
+
+        store.commitAppSwitcherProjection(
+            apps: [app],
+            contextsByID: [app.id: context],
+            generatedAt: 64
+        )
+
+        XCTAssertNil(store.readAppDirectoryProjection())
+        let appProjection = try XCTUnwrap(store.readAppSwitcherProjection())
+        XCTAssertEqual(appProjection.apps.map(\.id), [app.id])
+    }
+
+    func testRuntimeFullRepairProjectionPayloadDoesNotInferAppDirectoryFromContexts() throws {
+        let app = try XCTUnwrap(searchScenarioApps().first)
+        let context = makeRuntimeAppContext(
+            appID: app.id,
+            runningApp: .current,
+            windows: app.windows
+        )
+
+        let payload = RuntimeFullRepairProjectionPayload(
+            apps: [app],
+            contextsByID: [app.id: context]
+        )
+
+        XCTAssertTrue(payload.appDirectoryEntries.isEmpty)
+    }
+
     func testRuntimeReadModelStorePreservesRunningInstanceWhenSameBundleDifferentPIDTerminates() throws {
         let store = RuntimeReadModelStore()
         let apps = terminateScenarioApps()

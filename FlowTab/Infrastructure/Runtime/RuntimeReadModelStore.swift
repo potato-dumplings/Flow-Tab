@@ -231,7 +231,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     func commitAppSwitcherProjection(
         apps: [AppSwitchCandidate],
         contextsByID: [String: RuntimeAppContext],
-        appDirectoryEntries: [RuntimeAppDirectoryEntry] = [],
+        appDirectoryEntries: [RuntimeAppDirectoryEntry]? = nil,
         clearsDirtyState: Bool = true,
         generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
     ) {
@@ -247,12 +247,12 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             contextsByID: contextsByID,
             freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: !isDirtyLocked)
         )
-        replaceAppDirectoryProjectionLocked(
-            entries: appDirectoryEntries.isEmpty
-                ? contextsByID.values.map { RuntimeAppDirectoryEntry(app: $0.runningApp) }
-                : appDirectoryEntries,
-            generatedAt: generatedAt
-        )
+        if let appDirectoryEntries {
+            replaceAppDirectoryProjectionLocked(
+                entries: appDirectoryEntries,
+                generatedAt: generatedAt
+            )
+        }
         if clearsDirtyState {
             committedSearchIndex = buildSearchIndexLocked(
                 apps: apps,
