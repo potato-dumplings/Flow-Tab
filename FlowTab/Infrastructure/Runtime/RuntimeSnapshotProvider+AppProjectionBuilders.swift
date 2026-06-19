@@ -249,7 +249,11 @@ extension RuntimeSnapshotProvider {
         )
         let hideMinimizedAppsFromAppLayer =
             SwitcherBehaviorPreferencesStore.loadHideMinimizedAppsFromAppLayer()
-        if hideMinimizedAppsFromAppLayer && !windows.isEmpty && !windows.contains(where: { !$0.isMinimized }) {
+        if !RuntimeAppLayerProjectionFilter.shouldIncludeAppInAppLayer(
+            hasWindows: !windows.isEmpty,
+            hasVisibleWindow: windows.contains { !$0.isMinimized },
+            hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
+        ) {
             return nil
         }
 
@@ -336,7 +340,11 @@ extension RuntimeSnapshotProvider {
         let rowsReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let hideMinimizedAppsFromAppLayer =
             SwitcherBehaviorPreferencesStore.loadHideMinimizedAppsFromAppLayer()
-        if hideMinimizedAppsFromAppLayer && !windows.isEmpty && !windows.contains(where: { !$0.isMinimized }) {
+        if !RuntimeAppLayerProjectionFilter.shouldIncludeAppInAppLayer(
+            hasWindows: !windows.isEmpty,
+            hasVisibleWindow: windows.contains { !$0.isMinimized },
+            hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
+        ) {
             let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
             logProjectionTiming(
                 "focusedCurrentAppWindowPayload",
