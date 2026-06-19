@@ -3,39 +3,9 @@ import Foundation
 import FlowTabCore
 
 extension RuntimeSnapshotProvider {
-    struct FullRepairProjectionAssemblyApp {
-        let pid: pid_t
-        let bundleIdentifier: String?
-        let localizedName: String?
-        let launchDate: Date?
-    }
-
-    struct FullRepairProjectionAssemblyWindow {
-        let windowID: String
-        let title: String
-        let isMinimized: Bool
-        let cgWindowID: CGWindowID?
-        let spaceIDs: [Int]
-
-        init(
-            windowID: String,
-            title: String,
-            isMinimized: Bool,
-            cgWindowID: CGWindowID?,
-            spaceIDs: [Int] = []
-        ) {
-            self.windowID = windowID
-            self.title = title
-            self.isMinimized = isMinimized
-            self.cgWindowID = cgWindowID
-            self.spaceIDs = RuntimeWindowTopologyClassifier.normalizedSpaceIDs(spaceIDs)
-        }
-    }
-
-    struct FullRepairProjectionAssemblyRow {
-        let pid: pid_t
-        let candidate: AppSwitchCandidate
-    }
+    typealias FullRepairProjectionAssemblyApp = RuntimeFullRepairProjectionAssemblyApp
+    typealias FullRepairProjectionAssemblyWindow = RuntimeFullRepairProjectionAssemblyWindow
+    typealias FullRepairProjectionAssemblyRow = RuntimeFullRepairProjectionAssemblyRow
 
     func fullRepairProjectionPayload() -> RuntimeFullRepairProjectionPayload {
         fullRepairProjectionPayload(timingEvent: "fullRepairProjectionPayload")
