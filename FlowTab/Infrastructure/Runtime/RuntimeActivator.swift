@@ -514,7 +514,7 @@ final class RuntimeActivator {
             guard cgWindowID != targetCGWindowID else { return nil }
             guard
                 let cgWindow = currentWindows.first(where: { $0.id == cgWindowID }),
-                RuntimeSnapshotProvider.cgWindowPassesValidityConstraints(cgWindow)
+                RuntimeCGWindowFacts.passesValidityConstraints(cgWindow)
             else {
                 return nil
             }
@@ -768,7 +768,7 @@ final class RuntimeActivator {
         in app: NSRunningApplication
     ) {
         let visibleCGWindowIDs = currentWindows
-            .filter { $0.isOnscreen && RuntimeSnapshotProvider.cgWindowPassesValidityConstraints($0) }
+            .filter { $0.isOnscreen && RuntimeCGWindowFacts.passesValidityConstraints($0) }
             .map(\.id)
         let diagnostic = WindowBindingReadbackDiagnostic(
             appID: request.appID,
@@ -836,7 +836,7 @@ final class RuntimeActivator {
         return currentWindows.contains { window in
             window.id == targetCGWindowID
                 && window.isOnscreen
-                && RuntimeSnapshotProvider.cgWindowPassesValidityConstraints(window)
+                && RuntimeCGWindowFacts.passesValidityConstraints(window)
         }
     }
 

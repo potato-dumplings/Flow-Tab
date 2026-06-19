@@ -3,12 +3,6 @@ import ApplicationServices
 import Foundation
 
 extension RuntimeSnapshotProvider {
-    private static let minimumValidCGWindowWidth: CGFloat = 80
-    private static let minimumValidCGWindowHeight: CGFloat = 60
-    private static let minimumValidCGWindowArea: CGFloat = 20_000
-    private static let validCGWindowAlphaThreshold: Double = 0.001
-    private static let standardBufferedStoreType: Int = 1
-
     static func makeCGWindowID(pid: pid_t, cgWindowID: CGWindowID) -> String {
         "cg:\(pid):\(cgWindowID)"
     }
@@ -57,7 +51,7 @@ extension RuntimeSnapshotProvider {
         allCGWindows: [RuntimeCGWindowEntry]
     ) -> [RuntimeCGWindowEntry] {
         allCGWindows.filter { window in
-            !existingCGWindowIDs.contains(window.id) && Self.cgWindowPassesValidityConstraints(window)
+            !existingCGWindowIDs.contains(window.id) && RuntimeCGWindowFacts.passesValidityConstraints(window)
         }
     }
 
@@ -190,15 +184,6 @@ extension RuntimeSnapshotProvider {
                 lastConfirmationSource: $0.lastConfirmationSource
             )
         }
-    }
-
-    static func cgWindowPassesValidityConstraints(_ window: RuntimeCGWindowEntry) -> Bool {
-        guard window.alpha > validCGWindowAlphaThreshold else { return false }
-        guard window.storeType == standardBufferedStoreType else { return false }
-        guard let bounds = window.bounds?.standardized else { return false }
-        guard bounds.width >= minimumValidCGWindowWidth else { return false }
-        guard bounds.height >= minimumValidCGWindowHeight else { return false }
-        return bounds.width * bounds.height >= minimumValidCGWindowArea
     }
 
     private func resolvedTitleForSupplementalCGWindow(

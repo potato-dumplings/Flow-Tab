@@ -274,7 +274,7 @@ extension RuntimeSnapshotProvider {
         cgWindow: RuntimeCGWindowEntry,
         appName: String?
     ) -> Bool {
-        guard cgWindowPassesValidityConstraints(cgWindow) else { return false }
+        guard RuntimeCGWindowFacts.passesValidityConstraints(cgWindow) else { return false }
         guard
             let normalizedAXTitle = exactMatchingTitle(axWindow.sourceTitle ?? axWindow.title, appName: appName),
             let normalizedCGTitle = exactMatchingTitle(cgWindow.title, appName: appName),

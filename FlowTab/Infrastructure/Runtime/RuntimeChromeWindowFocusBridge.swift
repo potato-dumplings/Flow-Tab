@@ -492,7 +492,7 @@ struct RuntimeChromeWindowFocusBridge {
 
         let siblings = currentCGWindows
             .filter { window in
-                guard RuntimeSnapshotProvider.cgWindowPassesValidityConstraints(window) else {
+                guard RuntimeCGWindowFacts.passesValidityConstraints(window) else {
                     return false
                 }
                 guard let frame = window.bounds?.standardized else { return false }
