@@ -306,11 +306,15 @@ extension FlowTabTests {
         withLaunchArgumentsForTesting(["FlowTab", "--flowtab-ui-mock-runtime"]) {
             let provider = RuntimeSnapshotProvider()
 
+            let fullRepairPayload = provider.fullRepairProjectionPayload()
+            XCTAssertEqual(fullRepairPayload.apps.count, 6)
+            XCTAssertEqual(fullRepairPayload.contextsByID.count, 0)
+            XCTAssertEqual(fullRepairPayload.apps.first?.id, "com.flowtab.mock.mail")
+            XCTAssertEqual(fullRepairPayload.apps.first?.windows.count, 2)
+
             let snapshot = provider.snapshot()
-            XCTAssertEqual(snapshot.apps.count, 6)
-            XCTAssertEqual(snapshot.contextsByID.count, 0)
-            XCTAssertEqual(snapshot.apps.first?.id, "com.flowtab.mock.mail")
-            XCTAssertEqual(snapshot.apps.first?.windows.count, 2)
+            XCTAssertEqual(snapshot.apps.map(\.id), fullRepairPayload.apps.map(\.id))
+            XCTAssertEqual(snapshot.contextsByID.count, fullRepairPayload.contextsByID.count)
 
             let summaries = provider.homeSummaryProjections()
             XCTAssertEqual(summaries.count, 6)
@@ -332,6 +336,30 @@ extension FlowTabTests {
             XCTAssertEqual(appWindowRepairPayload?.context.appID, "com.flowtab.mock.mail")
             XCTAssertEqual(appWindowRepairPayload?.context.windowsByID.count, 2)
             XCTAssertNil(provider.appWindowRepairPayload(for: "com.flowtab.mock.missing"))
+        }
+    }
+
+    func testRuntimeProjectionServiceDefaultFullRepairCommitsProviderProjectionPayload() throws {
+        withLaunchArgumentsForTesting(["FlowTab", "--flowtab-ui-mock-runtime"]) {
+            let store = RuntimeReadModelStore()
+            let service = RuntimeProjectionService(
+                label: "FlowTabTests.RuntimeProjectionService.DefaultFullRepair",
+                snapshotProvider: RuntimeSnapshotProvider(),
+                readModelStore: store
+            )
+
+            service.requestAppSwitcherProjectionMaintenance(reason: .switcherSessionStarted)
+            service.waitForMaintenanceQueueForTesting()
+
+            guard let projection = store.readAppSwitcherProjection() else {
+                XCTFail("Expected default full repair executor to commit provider projection payload")
+                return
+            }
+            XCTAssertEqual(projection.apps.count, 6)
+            XCTAssertEqual(projection.apps.first?.id, "com.flowtab.mock.mail")
+            XCTAssertEqual(projection.apps.first?.windows.map(\.id), ["mock-mail-inbox", "mock-mail-draft"])
+            XCTAssertTrue(projection.freshness.isCompleteForScope)
+            XCTAssertEqual(store.diagnostics().dirtyAppIDs, [])
         }
     }
 

@@ -245,11 +245,23 @@ final class RuntimeSnapshotProvider {
     }
 
     func snapshot() -> RuntimeSnapshot {
+        let payload = fullRepairProjectionPayload(timingEvent: "provider")
+        return RuntimeSnapshot(
+            apps: payload.apps,
+            contextsByID: payload.contextsByID
+        )
+    }
+
+    func fullRepairProjectionPayload() -> RuntimeFullRepairProjectionPayload {
+        fullRepairProjectionPayload(timingEvent: "fullRepairProjectionPayload")
+    }
+
+    private func fullRepairProjectionPayload(timingEvent: String) -> RuntimeFullRepairProjectionPayload {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
         if let uiTestRuntimeDataset = Self.uiTestRuntimeDataset() {
             let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
             logSnapshotTiming(
-                "provider",
+                timingEvent,
                 fields: [
                     ("result", "uiTestDataset"),
                     ("apps", "\(uiTestRuntimeDataset.appSwitcherApps.count)"),
@@ -257,7 +269,7 @@ final class RuntimeSnapshotProvider {
                     ("totalMs", formatSnapshotMilliseconds(completeMs - startMs))
                 ]
             )
-            return RuntimeSnapshot(
+            return RuntimeFullRepairProjectionPayload(
                 apps: uiTestRuntimeDataset.appSwitcherApps,
                 contextsByID: uiTestRuntimeDataset.appSwitcherContextsByID
             )
@@ -268,7 +280,7 @@ final class RuntimeSnapshotProvider {
 
         guard !runningApps.isEmpty else {
             logSnapshotTiming(
-                "provider",
+                timingEvent,
                 fields: [
                     ("result", "empty"),
                     ("reason", "noRunningApps"),
@@ -276,7 +288,7 @@ final class RuntimeSnapshotProvider {
                     ("totalMs", formatSnapshotMilliseconds(runningAppsReadyMs - startMs))
                 ]
             )
-            return RuntimeSnapshot(apps: [], contextsByID: [:])
+            return RuntimeFullRepairProjectionPayload(apps: [], contextsByID: [:])
         }
 
         RuntimeLog.debug(.snapshot, "runningApps=\(runningApps.count)")
@@ -317,7 +329,7 @@ final class RuntimeSnapshotProvider {
         guard !appLayerCandidates.isEmpty else {
             let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
             logSnapshotTiming(
-                "provider",
+                timingEvent,
                 fields: [
                     ("result", "empty"),
                     ("reason", "noAppLayerCandidates"),
@@ -330,7 +342,7 @@ final class RuntimeSnapshotProvider {
                     ("totalMs", formatSnapshotMilliseconds(completeMs - startMs))
                 ]
             )
-            return RuntimeSnapshot(apps: [], contextsByID: [:])
+            return RuntimeFullRepairProjectionPayload(apps: [], contextsByID: [:])
         }
         let now = Date.timeIntervalSinceReferenceDate
 
@@ -426,7 +438,7 @@ final class RuntimeSnapshotProvider {
         let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
 
         logSnapshotTiming(
-            "provider",
+            timingEvent,
             fields: [
                 ("result", "ready"),
                 ("runningApps", "\(runningApps.count)"),
@@ -443,7 +455,7 @@ final class RuntimeSnapshotProvider {
             ]
         )
 
-        return RuntimeSnapshot(
+        return RuntimeFullRepairProjectionPayload(
             apps: rows.map(\.candidate),
             contextsByID: contextsByID
         )

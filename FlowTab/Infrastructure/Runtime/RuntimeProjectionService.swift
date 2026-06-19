@@ -31,26 +31,6 @@ protocol RuntimeProjectionServing: Sendable {
     func isLikelyTransientAXRebuild(for pid: pid_t) -> Bool
 }
 
-struct RuntimeFullRepairProjectionPayload {
-    let apps: [AppSwitchCandidate]
-    let contextsByID: [String: RuntimeAppContext]
-
-    init(
-        apps: [AppSwitchCandidate],
-        contextsByID: [String: RuntimeAppContext]
-    ) {
-        self.apps = apps
-        self.contextsByID = contextsByID
-    }
-
-    init(snapshot: RuntimeSnapshot) {
-        self.init(
-            apps: snapshot.apps,
-            contextsByID: snapshot.contextsByID
-        )
-    }
-}
-
 final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Sendable {
     enum ReconciliationExecutionOutcome {
         case completed
@@ -464,9 +444,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             }
             return .completed
         case .fullRepair:
-            return .completedWithFullRepairProjection(
-                RuntimeFullRepairProjectionPayload(snapshot: snapshotProvider.snapshot())
-            )
+            return .completedWithFullRepairProjection(snapshotProvider.fullRepairProjectionPayload())
         case .spaceTopology:
             let cgWindowsByPID = snapshotProvider.collectCGWindowsWithSpaceTopologyDiff(
                 options: [.excludeDesktopElements]

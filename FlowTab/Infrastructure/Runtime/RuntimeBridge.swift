@@ -13,6 +13,11 @@ struct RuntimeSnapshot {
     let contextsByID: [String: RuntimeAppContext]
 }
 
+struct RuntimeFullRepairProjectionPayload {
+    let apps: [AppSwitchCandidate]
+    let contextsByID: [String: RuntimeAppContext]
+}
+
 struct RuntimeAppContext {
     let appID: String
     let runningApp: NSRunningApplication
