@@ -8,12 +8,12 @@ extension RuntimeSnapshotProvider {
     }
 
     func appendOffSpaceCGWindows(
-        to entries: [WindowListEntry],
+        to entries: [RuntimeWindowListEntry],
         appName: String,
         pid: pid_t,
         allCGWindows: [RuntimeCGWindowEntry],
         matchedCGWindowIDs: Set<CGWindowID> = []
-    ) -> [WindowListEntry] {
+    ) -> [RuntimeWindowListEntry] {
         let unmatchedCGWindows = selectSupplementalOffSpaceCGWindows(
             existingCGWindowIDs: matchedCGWindowIDs,
             allCGWindows: allCGWindows
@@ -21,7 +21,7 @@ extension RuntimeSnapshotProvider {
         guard !unmatchedCGWindows.isEmpty else { return entries }
 
         let cgOnlyEntries = unmatchedCGWindows.map { cgWindow in
-            WindowListEntry(
+            RuntimeWindowListEntry(
                 windowID: Self.makeCGWindowID(pid: pid, cgWindowID: cgWindow.id),
                 title: resolvedTitleForSupplementalCGWindow(
                     appName: appName,
@@ -147,7 +147,7 @@ extension RuntimeSnapshotProvider {
         let provider = RuntimeSnapshotProvider()
         return provider.appendOffSpaceCGWindows(
             to: entries.map {
-                WindowListEntry(
+                RuntimeWindowListEntry(
                     windowID: $0.windowID,
                     title: $0.title,
                     isMinimized: $0.isMinimized,
@@ -221,7 +221,7 @@ extension RuntimeSnapshotProvider {
         appName: String,
         pid: pid_t,
         axWindowCount: Int,
-        entries: [WindowListEntry]
+        entries: [RuntimeWindowListEntry]
     ) {
         guard !entries.isEmpty else { return }
 
@@ -261,7 +261,7 @@ private func runtimeSnapshotCGWindowSummary(
 }
 
 private func runtimeSnapshotWindowEntrySummary(
-    _ entries: [RuntimeSnapshotProvider.WindowListEntry],
+    _ entries: [RuntimeWindowListEntry],
     limit: Int = 16
 ) -> String {
     guard !entries.isEmpty else { return "empty" }

@@ -100,7 +100,7 @@ struct RuntimeAppWindowProjectionSeed {
     }
 }
 
-extension RuntimeSnapshotProvider.WindowListEntry {
+extension RuntimeWindowListEntry {
     func projectionSeed(lastActiveAt: TimeInterval) -> RuntimeAppWindowProjectionSeed {
         RuntimeAppWindowProjectionSeed(
             windowID: windowID,

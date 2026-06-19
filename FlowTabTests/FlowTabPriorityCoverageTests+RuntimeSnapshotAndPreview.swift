@@ -15,7 +15,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(WindowBindingConfirmationSource.fullscreenContentFallbackBinding.bindingConfidence, .inferred)
         XCTAssertEqual(WindowBindingConfirmationSource.desktopSiblingBinding.bindingConfidence, .inferred)
 
-        let provisionalEntry = RuntimeSnapshotProvider.WindowListEntry(
+        let provisionalEntry = RuntimeWindowListEntry(
             windowID: "cg:42:101",
             title: "Draft",
             isMinimized: false,
@@ -23,7 +23,7 @@ extension FlowTabPriorityCoverageTests {
         )
         XCTAssertEqual(provisionalEntry.bindingConfidence, .provisional)
 
-        let stickyEntry = RuntimeSnapshotProvider.WindowListEntry(
+        let stickyEntry = RuntimeWindowListEntry(
             windowID: "cg:42:102",
             title: "Inbox",
             isMinimized: false,
@@ -78,7 +78,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(provisionalEntry.bindingDiagnostic.allowedActions.contains(.exposeInSwitcher))
         XCTAssertFalse(provisionalEntry.bindingDiagnostic.allowedActions.contains(.useForAXActivation))
 
-        let ambiguousEntry = RuntimeSnapshotProvider.WindowListEntry(
+        let ambiguousEntry = RuntimeWindowListEntry(
             windowID: "cg:42:104",
             title: "Ambiguous",
             isMinimized: false,
@@ -103,7 +103,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(ambiguousContext.bindingAllowedActions.contains(.capturePreview))
     }
 
-    func testRuntimeSnapshotProviderWindowListEntryProjectionSeedPreservesRuntimeEvidence() {
+    func testRuntimeWindowListEntryProjectionSeedPreservesRuntimeEvidence() {
         let spaceEvidence = RuntimeSpaceEvidence(
             cgWindowID: 204,
             spaceIDs: [3, 7],
@@ -111,7 +111,7 @@ extension FlowTabPriorityCoverageTests {
             displayID: 99,
             source: "unit"
         )
-        let entry = RuntimeSnapshotProvider.WindowListEntry(
+        let entry = RuntimeWindowListEntry(
             windowID: "cg:4242:204",
             title: "Runtime Evidence",
             isMinimized: true,
@@ -1700,7 +1700,7 @@ extension FlowTabPriorityCoverageTests {
         )
 
         let secondEntriesByCGWindowID = Dictionary(
-            uniqueKeysWithValues: secondEntries.compactMap { entry -> (CGWindowID, RuntimeSnapshotProvider.WindowListEntry)? in
+            uniqueKeysWithValues: secondEntries.compactMap { entry -> (CGWindowID, RuntimeWindowListEntry)? in
                 guard let cgWindowID = entry.cgWindowID else { return nil }
                 return (cgWindowID, entry)
             }

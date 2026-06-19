@@ -3,100 +3,100 @@ import ApplicationServices
 import Foundation
 import FlowTabCore
 
-final class RuntimeSnapshotProvider {
-    struct WindowListEntry {
-        let windowID: String
-        let title: String
-        let isMinimized: Bool
-        let ownerPID: pid_t
-        let cgWindowID: CGWindowID?
-        let activationHandleID: String?
-        let axWindow: AXUIElement?
-        let frame: CGRect?
-        let spaceIDs: [Int]
-        let isOnscreen: Bool
-        let allowsPublicAXRecovery: Bool
-        let hasStickyBinding: Bool
-        let lastConfirmationSource: WindowBindingConfirmationSource?
-        let bindingConfidenceOverride: WindowBindingConfidence?
-        let bindingCandidateCount: Int
-        let spaceEvidence: RuntimeSpaceEvidence?
+struct RuntimeWindowListEntry {
+    let windowID: String
+    let title: String
+    let isMinimized: Bool
+    let ownerPID: pid_t
+    let cgWindowID: CGWindowID?
+    let activationHandleID: String?
+    let axWindow: AXUIElement?
+    let frame: CGRect?
+    let spaceIDs: [Int]
+    let isOnscreen: Bool
+    let allowsPublicAXRecovery: Bool
+    let hasStickyBinding: Bool
+    let lastConfirmationSource: WindowBindingConfirmationSource?
+    let bindingConfidenceOverride: WindowBindingConfidence?
+    let bindingCandidateCount: Int
+    let spaceEvidence: RuntimeSpaceEvidence?
 
-        var bindingConfidence: WindowBindingConfidence {
-            if let bindingConfidenceOverride {
-                return bindingConfidenceOverride
-            }
-            if let lastConfirmationSource {
-                return lastConfirmationSource.bindingConfidence
-            }
-            if hasStickyBinding {
-                return .sticky
-            }
-            return .provisional
+    var bindingConfidence: WindowBindingConfidence {
+        if let bindingConfidenceOverride {
+            return bindingConfidenceOverride
         }
-
-        var bindingAllowedActions: Set<WindowBindingAction> {
-            bindingConfidence.allowedActions
+        if let lastConfirmationSource {
+            return lastConfirmationSource.bindingConfidence
         }
-
-        var bindingDiagnostic: WindowBindingDiagnostic {
-            WindowBindingDiagnostic(
-                stableWindowID: windowID,
-                axWindowID: activationHandleID,
-                cgWindowID: cgWindowID,
-                confidence: bindingConfidence,
-                source: lastConfirmationSource,
-                reason: nil,
-                candidateCount: bindingCandidateCount,
-                allowedActions: bindingAllowedActions
-            )
+        if hasStickyBinding {
+            return .sticky
         }
-
-        init(
-            windowID: String,
-            title: String,
-            isMinimized: Bool,
-            ownerPID: pid_t = 0,
-            cgWindowID: CGWindowID?,
-            activationHandleID: String? = nil,
-            axWindow: AXUIElement? = nil,
-            frame: CGRect? = nil,
-            spaceIDs: [Int] = [],
-            isOnscreen: Bool = false,
-            allowsPublicAXRecovery: Bool = false,
-            hasStickyBinding: Bool = false,
-            lastConfirmationSource: WindowBindingConfirmationSource? = nil,
-            bindingConfidenceOverride: WindowBindingConfidence? = nil,
-            bindingCandidateCount: Int? = nil,
-            spaceEvidence: RuntimeSpaceEvidence? = nil
-        ) {
-            self.windowID = windowID
-            self.title = title
-            self.isMinimized = isMinimized
-            self.ownerPID = ownerPID
-            self.cgWindowID = cgWindowID
-            self.activationHandleID = activationHandleID
-            self.axWindow = axWindow
-            self.frame = frame
-            let normalizedSpaceIDs = RuntimeWindowTopologyClassifier.normalizedSpaceIDs(spaceIDs)
-            self.spaceIDs = normalizedSpaceIDs
-            self.isOnscreen = isOnscreen
-            self.allowsPublicAXRecovery = allowsPublicAXRecovery
-            self.hasStickyBinding = hasStickyBinding
-            self.lastConfirmationSource = lastConfirmationSource
-            self.bindingConfidenceOverride = bindingConfidenceOverride
-            self.bindingCandidateCount = bindingCandidateCount ?? (cgWindowID == nil ? 0 : 1)
-            self.spaceEvidence = spaceEvidence ?? cgWindowID.map {
-                RuntimeWindowTopologyClassifier.spaceEvidence(
-                    cgWindowID: $0,
-                    spaceIDs: normalizedSpaceIDs,
-                    bounds: frame,
-                    source: "window-list-entry"
-                )
-            }
-        }
+        return .provisional
     }
 
+    var bindingAllowedActions: Set<WindowBindingAction> {
+        bindingConfidence.allowedActions
+    }
+
+    var bindingDiagnostic: WindowBindingDiagnostic {
+        WindowBindingDiagnostic(
+            stableWindowID: windowID,
+            axWindowID: activationHandleID,
+            cgWindowID: cgWindowID,
+            confidence: bindingConfidence,
+            source: lastConfirmationSource,
+            reason: nil,
+            candidateCount: bindingCandidateCount,
+            allowedActions: bindingAllowedActions
+        )
+    }
+
+    init(
+        windowID: String,
+        title: String,
+        isMinimized: Bool,
+        ownerPID: pid_t = 0,
+        cgWindowID: CGWindowID?,
+        activationHandleID: String? = nil,
+        axWindow: AXUIElement? = nil,
+        frame: CGRect? = nil,
+        spaceIDs: [Int] = [],
+        isOnscreen: Bool = false,
+        allowsPublicAXRecovery: Bool = false,
+        hasStickyBinding: Bool = false,
+        lastConfirmationSource: WindowBindingConfirmationSource? = nil,
+        bindingConfidenceOverride: WindowBindingConfidence? = nil,
+        bindingCandidateCount: Int? = nil,
+        spaceEvidence: RuntimeSpaceEvidence? = nil
+    ) {
+        self.windowID = windowID
+        self.title = title
+        self.isMinimized = isMinimized
+        self.ownerPID = ownerPID
+        self.cgWindowID = cgWindowID
+        self.activationHandleID = activationHandleID
+        self.axWindow = axWindow
+        self.frame = frame
+        let normalizedSpaceIDs = RuntimeWindowTopologyClassifier.normalizedSpaceIDs(spaceIDs)
+        self.spaceIDs = normalizedSpaceIDs
+        self.isOnscreen = isOnscreen
+        self.allowsPublicAXRecovery = allowsPublicAXRecovery
+        self.hasStickyBinding = hasStickyBinding
+        self.lastConfirmationSource = lastConfirmationSource
+        self.bindingConfidenceOverride = bindingConfidenceOverride
+        self.bindingCandidateCount = bindingCandidateCount ?? (cgWindowID == nil ? 0 : 1)
+        self.spaceEvidence = spaceEvidence ?? cgWindowID.map {
+            RuntimeWindowTopologyClassifier.spaceEvidence(
+                cgWindowID: $0,
+                spaceIDs: normalizedSpaceIDs,
+                bounds: frame,
+                source: "window-list-entry"
+            )
+        }
+    }
+}
+
+final class RuntimeSnapshotProvider {
     struct AXAppWindowCollection {
         let app: NSRunningApplication
         let appName: String
@@ -138,7 +138,7 @@ final class RuntimeSnapshotProvider {
         for runningApps: [NSRunningApplication],
         cgWindowsByPID: [pid_t: [RuntimeCGWindowEntry]],
         allCGWindowsByPID: [pid_t: [RuntimeCGWindowEntry]] = [:]
-    ) -> [pid_t: [WindowListEntry]] {
+    ) -> [pid_t: [RuntimeWindowListEntry]] {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
         guard AccessibilityPermissionChecker.isTrusted() else {
             RuntimeLog.warning(.ax, "not trusted; all app windows will be reported as 0")
@@ -158,7 +158,7 @@ final class RuntimeSnapshotProvider {
             cgWindowsByPID: cgWindowsByPID,
             allCGWindowsByPID: allCGWindowsByPID
         )
-        var windowsByPID: [pid_t: [WindowListEntry]] = [:]
+        var windowsByPID: [pid_t: [RuntimeWindowListEntry]] = [:]
         var totalRawWindows = 0
         var totalSwitchableWindows = 0
         var totalResolvedWindows = 0
@@ -454,7 +454,7 @@ final class RuntimeSnapshotProvider {
         pid: pid_t,
         appName: String,
         remoteScanCompleteness: RuntimeAXRemoteWindowResolver.RemoteScanCompleteness? = nil
-    ) -> [WindowListEntry] {
+    ) -> [RuntimeWindowListEntry] {
         resolvedStableWindowEntries(
             axWindows: axWindows,
             cgWindows: cgWindows,

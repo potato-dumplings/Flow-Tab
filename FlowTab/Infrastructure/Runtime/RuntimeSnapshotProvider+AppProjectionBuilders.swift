@@ -8,7 +8,7 @@ extension RuntimeSnapshotProvider {
     }
 
     private func collectWindowData(for runningApps: [NSRunningApplication]) -> (
-        windowsByPID: [pid_t: [WindowListEntry]],
+        windowsByPID: [pid_t: [RuntimeWindowListEntry]],
         rankByPID: [pid_t: Int]
     ) {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()

@@ -29,7 +29,7 @@ struct RuntimeWindowMappingResolution {
 }
 
 private func runtimeWindowEntryUsesDesktopSpace(
-    _ entry: RuntimeSnapshotProvider.WindowListEntry
+    _ entry: RuntimeWindowListEntry
 ) -> Bool {
     RuntimeWindowTopologyClassifier.isDesktopOnlySpaceWindow(spaceIDs: entry.spaceIDs)
 }
@@ -64,7 +64,7 @@ extension RuntimeSnapshotProvider {
         pid: pid_t,
         appName: String,
         remoteScanCompleteness: RuntimeAXRemoteWindowResolver.RemoteScanCompleteness? = nil
-    ) -> [WindowListEntry] {
+    ) -> [RuntimeWindowListEntry] {
         let mappingResolution = resolveStableWindowMapping(
             axWindows: axWindows,
             cgWindows: cgWindows,
@@ -86,7 +86,7 @@ extension RuntimeSnapshotProvider {
             ) else { return nil }
             return cgWindow.bounds
         }
-        let exactEntries = axWindows.compactMap { axEntry -> WindowListEntry? in
+        let exactEntries = axWindows.compactMap { axEntry -> RuntimeWindowListEntry? in
             guard
                 let cgWindowID = mappingResolution.exactMatchesByAXWindowID[axEntry.id],
                 let record = mappingResolution.windowRecordsByCGWindowID[cgWindowID]
@@ -126,7 +126,7 @@ extension RuntimeSnapshotProvider {
                 bounds: entryFrame,
                 source: "window-mapping-exact"
             )
-            return WindowListEntry(
+            return RuntimeWindowListEntry(
                 windowID: record.stableWindowID,
                 title: title,
                 isMinimized: axEntry.isMinimized,
@@ -145,7 +145,7 @@ extension RuntimeSnapshotProvider {
         }
 
         let exactCGWindowIDs = Set(exactEntries.compactMap(\.cgWindowID))
-        let stickyCGEntries = windowLayerCGWindows.compactMap { cgWindow -> WindowListEntry? in
+        let stickyCGEntries = windowLayerCGWindows.compactMap { cgWindow -> RuntimeWindowListEntry? in
             guard !exactCGWindowIDs.contains(cgWindow.id) else { return nil }
             guard
                 let record = mappingResolution.windowRecordsByCGWindowID[cgWindow.id],
@@ -176,7 +176,7 @@ extension RuntimeSnapshotProvider {
             ) else {
                 return nil
             }
-            return WindowListEntry(
+            return RuntimeWindowListEntry(
                 windowID: record.stableWindowID,
                 title: record.displayTitle
                     ?? runtimeSupplementalCGWindowTitle(appName: appName, cgWindow: cgWindow),
@@ -197,7 +197,7 @@ extension RuntimeSnapshotProvider {
 
         let stickyCGWindowIDs = Set(stickyCGEntries.compactMap(\.cgWindowID))
         var hiddenProvisionalCGOnlyCount = 0
-        let unmatchedCGEntries = windowLayerCGWindows.compactMap { cgWindow -> WindowListEntry? in
+        let unmatchedCGEntries = windowLayerCGWindows.compactMap { cgWindow -> RuntimeWindowListEntry? in
             guard !exactCGWindowIDs.contains(cgWindow.id) else { return nil }
             guard !stickyCGWindowIDs.contains(cgWindow.id) else { return nil }
             let record = mappingResolution.windowRecordsByCGWindowID[cgWindow.id]
@@ -229,7 +229,7 @@ extension RuntimeSnapshotProvider {
                 hiddenProvisionalCGOnlyCount += 1
                 return nil
             }
-            return WindowListEntry(
+            return RuntimeWindowListEntry(
                 windowID: record?.stableWindowID ?? Self.makeCGWindowID(pid: pid, cgWindowID: cgWindow.id),
                 title: record?.displayTitle
                     ?? runtimeSupplementalCGWindowTitle(appName: appName, cgWindow: cgWindow),
@@ -311,13 +311,13 @@ extension RuntimeSnapshotProvider {
     }
 
     private func filterFullscreenHostArtifactEntries(
-        _ entries: [WindowListEntry],
-        allEntries: [WindowListEntry],
+        _ entries: [RuntimeWindowListEntry],
+        allEntries: [RuntimeWindowListEntry],
         knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry],
         appName: String,
         hasFullscreenTopology: Bool,
         stage: String
-    ) -> [WindowListEntry] {
+    ) -> [RuntimeWindowListEntry] {
         guard hasFullscreenTopology, !entries.isEmpty else { return entries }
 
         let activationSurfaces = allEntries.filter {
@@ -353,13 +353,13 @@ extension RuntimeSnapshotProvider {
     }
 
     private func filterFullscreenSiblingArtifactEntries(
-        _ entries: [WindowListEntry],
-        allEntries: [WindowListEntry],
+        _ entries: [RuntimeWindowListEntry],
+        allEntries: [RuntimeWindowListEntry],
         knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry],
         appName: String,
         hasFullscreenTopology: Bool,
         stage: String
-    ) -> [WindowListEntry] {
+    ) -> [RuntimeWindowListEntry] {
         guard hasFullscreenTopology, !entries.isEmpty else { return entries }
 
         let strongTitles = Set(
@@ -400,11 +400,11 @@ extension RuntimeSnapshotProvider {
     }
 
     private func filterAuxiliaryOverlayEntries(
-        _ entries: [WindowListEntry],
+        _ entries: [RuntimeWindowListEntry],
         knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry],
         appName: String,
         stage: String
-    ) -> [WindowListEntry] {
+    ) -> [RuntimeWindowListEntry] {
         guard entries.count > 1 else { return entries }
 
         let primarySurfaces = entries.filter {
@@ -440,12 +440,12 @@ extension RuntimeSnapshotProvider {
     }
 
     private func orderWindowEntriesForPresentation(
-        _ entries: [WindowListEntry],
+        _ entries: [RuntimeWindowListEntry],
         prioritizesOnscreen: Bool = false,
         cgWindowOrderByID: [CGWindowID: Int] = [:],
         knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry] = [:],
         appName: String = ""
-    ) -> [WindowListEntry] {
+    ) -> [RuntimeWindowListEntry] {
         let hasRelatedFullscreenTopology = prioritizesOnscreen
             || knownCGWindowsByID.values.contains { cgWindow in
                 RuntimeWindowTopologyClassifier.hasOffDesktopSpace(spaceIDs: cgWindow.spaceIDs)
@@ -862,10 +862,10 @@ extension RuntimeSnapshotProvider {
     }
 
     private func suppressUnmatchedAXEntriesCoveredByStickySpace(
-        _ entries: [WindowListEntry],
+        _ entries: [RuntimeWindowListEntry],
         knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry],
         appName: String
-    ) -> [WindowListEntry] {
+    ) -> [RuntimeWindowListEntry] {
         let stickySpaceKeys = Set(entries.compactMap { entry -> String? in
             guard
                 entry.hasStickyBinding,
@@ -879,7 +879,7 @@ extension RuntimeSnapshotProvider {
             return normalizedSpaceIDs.map(String.init).joined(separator: ",")
         })
 
-        var deduplicatedEntries: [WindowListEntry] = []
+        var deduplicatedEntries: [RuntimeWindowListEntry] = []
         deduplicatedEntries.reserveCapacity(entries.count)
         var droppedCount = 0
 
@@ -1004,8 +1004,8 @@ private let runtimeAuxiliaryOverlayMaximumHeight: CGFloat = 180
 private let runtimeAuxiliaryOverlayContainmentTolerance: CGFloat = 8
 
 private func runtimeWindowEntryLooksLikeFullscreenHostArtifact(
-    _ entry: RuntimeSnapshotProvider.WindowListEntry,
-    activationSurfaces: [RuntimeSnapshotProvider.WindowListEntry],
+    _ entry: RuntimeWindowListEntry,
+    activationSurfaces: [RuntimeWindowListEntry],
     knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry],
     appName: String
 ) -> Bool {
@@ -1037,7 +1037,7 @@ private func runtimeWindowEntryLooksLikeFullscreenHostArtifact(
 }
 
 private func runtimeWindowEntryLooksLikeAXBackedFullscreenContentSurface(
-    _ entry: RuntimeSnapshotProvider.WindowListEntry,
+    _ entry: RuntimeWindowListEntry,
     knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry],
     appName: String
 ) -> Bool {
@@ -1051,7 +1051,7 @@ private func runtimeWindowEntryLooksLikeAXBackedFullscreenContentSurface(
 }
 
 private func runtimeWindowEntryLooksLikeDesktopFullscreenSiblingSurface(
-    _ entry: RuntimeSnapshotProvider.WindowListEntry,
+    _ entry: RuntimeWindowListEntry,
     knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry],
     appName: String
 ) -> Bool {
@@ -1097,7 +1097,7 @@ private func runtimeWindowBoundsLookLikeFullscreenContentSurface(_ bounds: CGRec
 }
 
 private func runtimeWindowEntryLooksLikeFullscreenSiblingArtifact(
-    _ entry: RuntimeSnapshotProvider.WindowListEntry,
+    _ entry: RuntimeWindowListEntry,
     knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry],
     appName: String,
     strongTitles: Set<String>
@@ -1120,7 +1120,7 @@ private func runtimeWindowEntryLooksLikeFullscreenSiblingArtifact(
 }
 
 private func runtimeWindowEntryLooksLikeStrongUserWindow(
-    _ entry: RuntimeSnapshotProvider.WindowListEntry,
+    _ entry: RuntimeWindowListEntry,
     knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry],
     appName: String
 ) -> Bool {
@@ -1138,7 +1138,7 @@ private func runtimeWindowEntryLooksLikeStrongUserWindow(
 }
 
 private func runtimeWindowEntryLooksLikeShallowFullscreenSibling(
-    _ entry: RuntimeSnapshotProvider.WindowListEntry,
+    _ entry: RuntimeWindowListEntry,
     knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry]
 ) -> Bool {
     guard let bounds = runtimeWindowEntryBounds(entry, knownCGWindowsByID: knownCGWindowsByID)?.standardized else {
@@ -1152,8 +1152,8 @@ private func runtimeWindowEntryLooksLikeShallowFullscreenSibling(
 }
 
 private func runtimeWindowEntryLooksLikeContainedAuxiliaryOverlay(
-    _ entry: RuntimeSnapshotProvider.WindowListEntry,
-    primarySurfaces: [RuntimeSnapshotProvider.WindowListEntry],
+    _ entry: RuntimeWindowListEntry,
+    primarySurfaces: [RuntimeWindowListEntry],
     knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry],
     appName: String
 ) -> Bool {
@@ -1189,8 +1189,8 @@ private func runtimeWindowEntryLooksLikeContainedAuxiliaryOverlay(
 }
 
 private func runtimeWindowEntriesShareAnySpace(
-    _ lhs: RuntimeSnapshotProvider.WindowListEntry,
-    _ rhs: RuntimeSnapshotProvider.WindowListEntry
+    _ lhs: RuntimeWindowListEntry,
+    _ rhs: RuntimeWindowListEntry
 ) -> Bool {
     let lhsSpaces = Set(RuntimeWindowTopologyClassifier.normalizedSpaceIDs(lhs.spaceIDs))
     let rhsSpaces = Set(RuntimeWindowTopologyClassifier.normalizedSpaceIDs(rhs.spaceIDs))
@@ -1199,7 +1199,7 @@ private func runtimeWindowEntriesShareAnySpace(
 }
 
 private func runtimeWindowEntryBounds(
-    _ entry: RuntimeSnapshotProvider.WindowListEntry,
+    _ entry: RuntimeWindowListEntry,
     knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry]
 ) -> CGRect? {
     if let cgWindowID = entry.cgWindowID,
