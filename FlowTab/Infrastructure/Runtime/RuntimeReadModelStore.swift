@@ -213,6 +213,13 @@ struct RuntimeReadModelDiagnostics: Equatable {
     let hasCommittedSearchIndex: Bool
     let hasStagingSearchIndex: Bool
     let currentAppWindowProjectionAppIDs: Set<String>
+
+    var hasDirtyState: Bool {
+        !dirtyAppIDs.isEmpty
+            || !dirtyPIDs.isEmpty
+            || !dirtyCGWindowIDs.isEmpty
+            || !pendingRepairScopes.isEmpty
+    }
 }
 
 final class RuntimeReadModelStore: @unchecked Sendable {

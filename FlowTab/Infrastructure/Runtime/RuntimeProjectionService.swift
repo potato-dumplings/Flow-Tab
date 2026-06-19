@@ -58,6 +58,11 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         var repairedCurrentAppWindowPayloads: [RuntimeCurrentAppWindowPayload] = []
     }
 
+    private struct FullRepairSnapshotCommitSummary {
+        var coldStartCommittedCount = 0
+        var degradedCommittedCount = 0
+    }
+
     typealias ReconciliationExecutor = (
         RuntimeReconciliationRequest,
         RuntimeSnapshotProvider
@@ -111,7 +116,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             let drainResult = drainReadyReconciliationRequestsWithResultLocked(
                 now: now
             )
-            commitFullRepairSnapshotsLocked(drainResult.fullRepairSnapshots)
+            let fullRepairCommitSummary = commitFullRepairSnapshotsLocked(drainResult.fullRepairSnapshots)
             commitRepairedCurrentAppWindowPayloadsLocked(drainResult.repairedCurrentAppWindowPayloads)
             RuntimeLog.debug(
                 .projection,
@@ -126,6 +131,8 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                     "startedRequests=\(drainResult.startedRequests.count)",
                     "completedRequests=\(drainResult.completedCount)",
                     "fullRepairSnapshots=\(drainResult.fullRepairSnapshots.count)",
+                    "fullRepairColdStartCommits=\(fullRepairCommitSummary.coldStartCommittedCount)",
+                    "fullRepairDegradedCommits=\(fullRepairCommitSummary.degradedCommittedCount)",
                     "repairedApps=\(drainResult.repairedCurrentAppWindowPayloads.count)"
                 ].joined(separator: " ")
             )
@@ -340,19 +347,32 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     @discardableResult
     private func drainReadyReconciliationRequestsLocked(now: TimeInterval) -> [RuntimeReconciliationRequest] {
         let result = drainReadyReconciliationRequestsWithResultLocked(now: now)
+        commitFullRepairSnapshotsLocked(result.fullRepairSnapshots)
         commitRepairedCurrentAppWindowPayloadsLocked(result.repairedCurrentAppWindowPayloads)
         return result.startedRequests
     }
 
+    @discardableResult
     private func commitFullRepairSnapshotsLocked(
         _ snapshots: [RuntimeSnapshot]
-    ) {
+    ) -> FullRepairSnapshotCommitSummary {
+        var summary = FullRepairSnapshotCommitSummary()
         for snapshot in snapshots {
+            let diagnostics = readModelStore.diagnostics()
+            let clearsDirtyState = !diagnostics.hasAppSwitcherProjection
+                && !diagnostics.hasDirtyState
             readModelStore.commitAppSwitcherProjection(
                 apps: snapshot.apps,
-                contextsByID: snapshot.contextsByID
+                contextsByID: snapshot.contextsByID,
+                clearsDirtyState: clearsDirtyState
             )
+            if clearsDirtyState {
+                summary.coldStartCommittedCount += 1
+            } else {
+                summary.degradedCommittedCount += 1
+            }
         }
+        return summary
     }
 
     private func commitRepairedCurrentAppWindowPayloadsLocked(

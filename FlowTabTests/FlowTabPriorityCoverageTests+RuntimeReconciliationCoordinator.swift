@@ -1832,6 +1832,100 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(store.diagnostics().hasStagingSearchIndex)
     }
 
+    func testRuntimeProjectionServiceFullRepairFallbackCommitsDegradedProjectionWithoutRefreshingSearch() throws {
+        let coordinator = RuntimeReconciliationCoordinator(
+            retryPolicy: RuntimeReconciliationRetryPolicy(delays: [])
+        )
+        let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
+        let store = RuntimeReadModelStore()
+        let committedApps = searchScenarioApps()
+        let repairedApp = AppSwitchCandidate(
+            id: "com.example.browser",
+            displayName: "Browser",
+            groupID: "web",
+            lastActiveAt: 320,
+            windows: [
+                WindowCandidate(
+                    id: "browser-full-repair",
+                    title: "Full Repair Runtime Docs",
+                    isMinimized: false,
+                    lastActiveAt: 320
+                )
+            ]
+        )
+        let pid = pid_t(42_106)
+        store.commitAppSwitcherProjection(
+            apps: committedApps,
+            contextsByID: [:],
+            generatedAt: 10
+        )
+        store.markAppWindowsDirty(
+            appID: repairedApp.id,
+            pid: pid,
+            pendingScope: "appWindows:\(repairedApp.id)"
+        )
+        store.stageSearchIndexApp(
+            repairedApp,
+            generatedAt: 20
+        )
+        coordinator.markAppDirty(
+            appID: repairedApp.id,
+            pid: pid,
+            reason: .axNotification,
+            now: 10
+        )
+        let lock = NSLock()
+        var executedRequests: [RuntimeReconciliationRequest] = []
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.FullRepairDegradedCommit",
+            snapshotProvider: provider,
+            readModelStore: store,
+            reconciliationExecutor: { request, _ in
+                lock.lock()
+                executedRequests.append(request)
+                lock.unlock()
+                switch request.target {
+                case .app:
+                    return .transientEmptyAXSnapshot
+                case .fullRepair:
+                    return .completedWithFullRepairSnapshot(
+                        RuntimeSnapshot(apps: [repairedApp], contextsByID: [:])
+                    )
+                case .spaceTopology:
+                    return .completed
+                }
+            }
+        )
+
+        service.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
+        service.waitForMaintenanceQueueForTesting()
+        XCTAssertEqual(executedRequests.map(\.target), [.app(pid)])
+
+        _ = service.drainReadyReconciliationRequestsSynchronouslyForTesting(
+            now: Date.timeIntervalSinceReferenceDate + 1
+        )
+
+        XCTAssertEqual(executedRequests.map(\.target), [.app(pid), .fullRepair])
+        let appSwitcherProjection = try XCTUnwrap(store.readAppSwitcherProjection())
+        XCTAssertEqual(appSwitcherProjection.apps.map(\.id), [repairedApp.id])
+        XCTAssertEqual(appSwitcherProjection.apps.first?.windows.map(\.id), ["browser-full-repair"])
+        XCTAssertFalse(appSwitcherProjection.freshness.isCompleteForScope)
+        let searchRead = store.readCommittedSearchIndexForSearch()
+        let searchProjection = try XCTUnwrap(searchRead.projection)
+        XCTAssertEqual(searchRead.readiness, .staleCommitted)
+        XCTAssertEqual(searchRead.resultState, .degradedStaleCommittedResult)
+        XCTAssertFalse(searchRead.committedIndexCoversCurrentGeneration)
+        XCTAssertEqual(
+            searchProjection.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),
+            ["browser-1"]
+        )
+        let diagnostics = store.diagnostics()
+        XCTAssertEqual(diagnostics.dirtyAppIDs, [repairedApp.id])
+        XCTAssertEqual(diagnostics.dirtyPIDs, [pid])
+        XCTAssertEqual(diagnostics.pendingRepairScopes, ["appWindows:\(repairedApp.id)"])
+        XCTAssertTrue(diagnostics.hasStagingSearchIndex)
+    }
+
     private func makeRuntimeCurrentAppWindowPayload(
         app: AppSwitchCandidate,
         pid: pid_t
