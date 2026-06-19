@@ -263,15 +263,17 @@ extension RuntimeSnapshotProvider {
 
         let now = Date.timeIntervalSinceReferenceDate
         return RuntimeCurrentAppWindowPayload(
-            appID: appID,
-            app: app,
-            appGroup: matchingApps,
-            rankByPID: rankByPID,
-            rankFallback: 10_000,
-            generatedAt: now,
-            windowSeeds: windows.enumerated().map { entryIndex, entry in
-                entry.projectionSeed(lastActiveAt: now - Double(entryIndex))
-            }
+            assemblyInput: RuntimeCurrentAppWindowProjectionAssemblyInput(
+                appID: appID,
+                app: app,
+                appGroup: matchingApps,
+                rankByPID: rankByPID,
+                rankFallback: 10_000,
+                generatedAt: now,
+                windowSeeds: windows.enumerated().map { entryIndex, entry in
+                    entry.projectionSeed(lastActiveAt: now - Double(entryIndex))
+                }
+            )
         )
     }
 
@@ -373,15 +375,17 @@ extension RuntimeSnapshotProvider {
 
         let now = Date.timeIntervalSinceReferenceDate
         let payload = RuntimeCurrentAppWindowPayload(
-            appID: appID,
-            app: app,
-            appGroup: focusedApps,
-            rankByPID: rankByPID,
-            rankFallback: 0,
-            generatedAt: now,
-            windowSeeds: windows.enumerated().map { entryIndex, entry in
-                entry.projectionSeed(lastActiveAt: now - Double(entryIndex))
-            }
+            assemblyInput: RuntimeCurrentAppWindowProjectionAssemblyInput(
+                appID: appID,
+                app: app,
+                appGroup: focusedApps,
+                rankByPID: rankByPID,
+                rankFallback: 0,
+                generatedAt: now,
+                windowSeeds: windows.enumerated().map { entryIndex, entry in
+                    entry.projectionSeed(lastActiveAt: now - Double(entryIndex))
+                }
+            )
         )
         let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
         logProjectionTiming(

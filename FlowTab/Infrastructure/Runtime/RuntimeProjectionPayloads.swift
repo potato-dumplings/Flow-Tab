@@ -244,28 +244,6 @@ struct RuntimeCurrentAppWindowPayload {
             windowSeeds: input.windowSeeds
         )
     }
-
-    init(
-        appID: String,
-        app: NSRunningApplication,
-        appGroup: [NSRunningApplication],
-        rankByPID: [pid_t: Int],
-        rankFallback: Int,
-        generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate,
-        windowSeeds: [RuntimeAppWindowProjectionSeed]
-    ) {
-        self.init(
-            assemblyInput: RuntimeCurrentAppWindowProjectionAssemblyInput(
-                appID: appID,
-                app: app,
-                appGroup: appGroup,
-                rankByPID: rankByPID,
-                rankFallback: rankFallback,
-                generatedAt: generatedAt,
-                windowSeeds: windowSeeds
-            )
-        )
-    }
 }
 
 enum RuntimeFullRepairProjectionAssembler {
