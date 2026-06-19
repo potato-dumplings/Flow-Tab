@@ -458,6 +458,14 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             dirtyPIDs.remove(pid)
             return
         }
+        let survivingDirectoryEntries = appDirectoryProjection?
+            .entries(forAppID: appID)
+            .filter { $0.pid != pid }
+            ?? []
+        if !survivingDirectoryEntries.isEmpty {
+            markAppInstanceTerminatedLocked(appID: appID, pid: pid)
+            return
+        }
 
         let hadAppSwitcherState = appSwitcherProjection?.apps.contains { $0.id == appID } == true
             || appSwitcherProjection?.contextsByID[appID] != nil
@@ -539,6 +547,11 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     }
 
     private func shouldRemoveTerminatedAppLocked(appID: String, pid: pid_t) -> Bool {
+        if let directoryEntries = appDirectoryProjection?.entries(forAppID: appID),
+           !directoryEntries.isEmpty {
+            return directoryEntries.contains { $0.pid == pid }
+        }
+
         var knownPIDs = Set<pid_t>()
         if let context = appSwitcherProjection?.contextsByID[appID] {
             knownPIDs.insert(context.runningApp.processIdentifier)
@@ -553,6 +566,75 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             knownPIDs.formUnion(directoryProjection.entries(forAppID: appID).map(\.pid))
         }
         return knownPIDs.isEmpty || knownPIDs.contains(pid)
+    }
+
+    private func markAppInstanceTerminatedLocked(appID: String, pid: pid_t) {
+        let generatedAt = Date.timeIntervalSinceReferenceDate
+        generation.appLifecycle &+= 1
+        markProjectionCommittedLocked()
+        dirtyAppIDs.insert(appID)
+        dirtyPIDs.remove(pid)
+        pendingRepairScopes.insert("appTerminated:\(appID)")
+
+        if let projection = appDirectoryProjection {
+            appDirectoryProjection = RuntimeAppDirectoryProjection(
+                entries: projection.entries.filter { $0.pid != pid },
+                freshness: freshnessLocked(
+                    generatedAt: generatedAt,
+                    isCompleteForScope: !isDirtyLocked
+                )
+            )
+        }
+        if let projection = appSwitcherProjection {
+            var contextsByID = projection.contextsByID
+            if contextsByID[appID]?.runningApp.processIdentifier == pid {
+                contextsByID.removeValue(forKey: appID)
+            }
+            appSwitcherProjection = RuntimeAppSwitcherProjection(
+                apps: projection.apps,
+                contextsByID: contextsByID,
+                freshness: freshnessLocked(
+                    generatedAt: generatedAt,
+                    isCompleteForScope: !isDirtyLocked
+                )
+            )
+        }
+        if let projection = currentAppWindowProjectionsByAppID[appID],
+           (
+            projection.currentAppWindowPayload.summary.pid == pid
+                || projection.currentAppWindowPayload.context.runningApp.processIdentifier == pid
+           ) {
+            currentAppWindowProjectionsByAppID.removeValue(forKey: appID)
+        }
+        if let projection = homeSummaryProjection {
+            homeSummaryProjection = RuntimeHomeSummaryProjection(
+                summaries: projection.summaries,
+                freshness: freshnessLocked(
+                    generatedAt: generatedAt,
+                    isCompleteForScope: !isDirtyLocked
+                )
+            )
+        }
+        if let projection = committedSearchIndex {
+            committedSearchIndex = RuntimeSearchIndexProjection(
+                appEntries: projection.appEntries,
+                windowEntries: projection.windowEntries,
+                freshness: freshnessLocked(
+                    generatedAt: generatedAt,
+                    isCompleteForScope: !isDirtyLocked
+                )
+            )
+        }
+        if let projection = stagingSearchIndex {
+            stagingSearchIndex = RuntimeSearchIndexProjection(
+                appEntries: projection.appEntries,
+                windowEntries: projection.windowEntries,
+                freshness: freshnessLocked(
+                    generatedAt: generatedAt,
+                    isCompleteForScope: false
+                )
+            )
+        }
     }
 
     func readAppSwitcherProjection() -> RuntimeAppSwitcherProjection? {
