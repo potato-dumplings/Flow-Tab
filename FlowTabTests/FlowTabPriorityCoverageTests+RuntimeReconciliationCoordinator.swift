@@ -334,18 +334,24 @@ extension FlowTabPriorityCoverageTests {
             )
         )
         XCTAssertEqual(staged.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID), ["browser-2"])
-        XCTAssertEqual(store.readCommittedSearchIndexForSearch().readiness, .staleCommitted)
+        var read = store.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(read.readiness, .staleCommitted)
+        XCTAssertEqual(read.resultState, .degradedStaleCommittedResult)
+        XCTAssertFalse(read.committedIndexCoversCurrentGeneration)
         XCTAssertEqual(
-            store.readCommittedSearchIndexForSearch().projection?.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),
+            read.projection?.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),
             ["browser-1"]
         )
 
         let committed = try XCTUnwrap(store.commitStagedSearchIndex(generatedAt: 21))
 
         XCTAssertTrue(committed.freshness.isCompleteForScope)
-        XCTAssertEqual(store.readCommittedSearchIndexForSearch().readiness, .currentGenerationCommitted)
+        read = store.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(read.readiness, .currentGenerationCommitted)
+        XCTAssertEqual(read.resultState, .verifiedCurrentGenerationCommittedResult)
+        XCTAssertTrue(read.committedIndexCoversCurrentGeneration)
         XCTAssertEqual(
-            store.readCommittedSearchIndexForSearch().projection?.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),
+            read.projection?.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),
             ["browser-2"]
         )
         let diagnostics = store.diagnostics()
@@ -1648,6 +1654,8 @@ extension FlowTabPriorityCoverageTests {
         let read = store.readCommittedSearchIndexForSearch()
         let projection = try XCTUnwrap(read.projection)
         XCTAssertEqual(read.readiness, .currentGenerationCommitted)
+        XCTAssertEqual(read.resultState, .verifiedCurrentGenerationCommittedResult)
+        XCTAssertTrue(read.committedIndexCoversCurrentGeneration)
         XCTAssertEqual(
             projection.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),
             ["browser-fresh"]
