@@ -141,7 +141,7 @@ extension FlowTabPriorityCoverageTests {
 
     func testRuntimeWindowRecordLifecycleKeepsRecoverableMissingEvidenceDuringGraceWindow() {
         let policy = RuntimeWindowRecordLifecyclePolicy(evidenceGraceInterval: 1.0)
-        let cgWindow = RuntimeSnapshotProvider.CGWindowEntry(
+        let cgWindow = RuntimeCGWindowEntry(
             id: 240_001,
             title: "Recovered Window",
             bounds: CGRect(x: 20, y: 30, width: 800, height: 600),
@@ -181,7 +181,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     func testRuntimeWindowRecordLifecycleClearsSuspectStateWhenCGEvidenceReturns() {
-        let cgWindow = RuntimeSnapshotProvider.CGWindowEntry(
+        let cgWindow = RuntimeCGWindowEntry(
             id: 243_747,
             title: "Recovered Window",
             bounds: CGRect(x: 0, y: 124, width: 1_728, height: 993),
@@ -213,7 +213,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     func testRuntimeWindowRecordClearsReconciliationNeedWhenCGEvidenceReturns() {
-        let cgWindow = RuntimeSnapshotProvider.CGWindowEntry(
+        let cgWindow = RuntimeCGWindowEntry(
             id: 243_748,
             title: "Topology Window",
             bounds: CGRect(x: 12, y: 124, width: 900, height: 700),

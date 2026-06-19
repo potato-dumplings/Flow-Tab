@@ -223,7 +223,7 @@ struct RuntimeWindowRecord {
     }
 
     mutating func refreshCGState(
-        from cgWindow: RuntimeSnapshotProvider.CGWindowEntry,
+        from cgWindow: RuntimeCGWindowEntry,
         observedAt: TimeInterval
     ) {
         if let cgTitle = normalizedRuntimeWindowTitle(cgWindow.title) {
@@ -322,7 +322,7 @@ struct RuntimeWindowRecord {
         resolvedTitle: String,
         confirmationSource: WindowBindingConfirmationSource,
         observedAt: TimeInterval,
-        matchedCGWindow: RuntimeSnapshotProvider.CGWindowEntry?
+        matchedCGWindow: RuntimeCGWindowEntry?
     ) {
         let previousSource = lastConfirmationSource
         let previousConfidence = bindingConfidence
@@ -364,12 +364,12 @@ struct RuntimeWindowRecord {
         }
     }
 
-    func synthesizedKnownCGWindowEntry() -> RuntimeSnapshotProvider.CGWindowEntry? {
+    func synthesizedKnownCGWindowEntry() -> RuntimeCGWindowEntry? {
         let spaceIDs = spaceRecovery?.spaceIDs ?? []
         guard lastKnownCGTitle != nil || lastKnownCGFrame != nil || !spaceIDs.isEmpty else {
             return nil
         }
-        return RuntimeSnapshotProvider.CGWindowEntry(
+        return RuntimeCGWindowEntry(
             id: cgWindowID,
             title: lastKnownCGTitle,
             bounds: lastKnownCGFrame,
