@@ -3,75 +3,6 @@ import Foundation
 import FlowTabCore
 
 extension RuntimeSnapshotProvider {
-    func homeSummaryProjections() -> [RuntimeHomeAppSummary] {
-        if let uiTestRuntimeDataset = Self.uiTestRuntimeDataset() {
-            return uiTestRuntimeDataset.summaries
-        }
-        let runningApps = filteredRunningApplications()
-        guard !runningApps.isEmpty else { return [] }
-
-        let windowData = collectWindowData(for: runningApps)
-        let appsGroupedByBaseID = groupedAppsByBaseID(runningApps)
-        let selectedApps = selectPrimaryApps(
-            from: runningApps,
-            windowsByPID: windowData.windowsByPID,
-            rankByPID: windowData.rankByPID
-        )
-        let mergedWindowsByPrimaryPID = Dictionary(uniqueKeysWithValues: selectedApps.map { app in
-            let appGroup = appsGroupedByBaseID[Self.baseAppID(for: app)] ?? [app]
-            return (
-                app.processIdentifier,
-                mergedWindowEntries(
-                    for: appGroup,
-                    windowsByPID: windowData.windowsByPID,
-                    rankByPID: windowData.rankByPID
-                )
-            )
-        })
-        let hideMinimizedAppsFromAppLayer =
-            SwitcherBehaviorPreferencesStore.loadHideMinimizedAppsFromAppLayer()
-        let appLayerCandidates = filterAppsForAppLayer(
-            selectedApps,
-            windowsByPID: mergedWindowsByPrimaryPID,
-            hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
-        )
-        guard !appLayerCandidates.isEmpty else { return [] }
-
-        var summaries: [RuntimeHomeAppSummary] = []
-        summaries.reserveCapacity(appLayerCandidates.count)
-        for (index, app) in appLayerCandidates.enumerated() {
-            let pid = app.processIdentifier
-            let appID = Self.baseAppID(for: app)
-            let appGroup = appsGroupedByBaseID[appID] ?? [app]
-            let displayName = app.localizedName ?? appID
-            let rank = preferredRankForAppGroup(
-                appGroup,
-                rankByPID: windowData.rankByPID,
-                fallback: 10_000 + index
-            )
-            summaries.append(
-                RuntimeHomeAppSummary(
-                    appID: appID,
-                    displayName: displayName,
-                    groupID: Self.groupID(for: app.bundleIdentifier, fallbackName: displayName),
-                    lastActiveAt: Self.stableLastActiveValue(forRank: rank),
-                    windowCount: mergedWindowsByPrimaryPID[pid]?.count ?? 0,
-                    pid: pid
-                )
-            )
-        }
-
-        summaries.sort { lhs, rhs in
-            if lhs.lastActiveAt == rhs.lastActiveAt {
-                return lhs.displayName.localizedCaseInsensitiveCompare(
-                    rhs.displayName
-                ) == .orderedAscending
-            }
-            return lhs.lastActiveAt > rhs.lastActiveAt
-        }
-        return summaries
-    }
-
     func appWindowRepairPayload(for appID: String) -> RuntimeAppWindowRepairPayload? {
         if let uiTestRuntimeDataset = Self.uiTestRuntimeDataset() {
             return uiTestRuntimeDataset.repairPayloadsByAppID[appID]
@@ -274,58 +205,6 @@ extension RuntimeSnapshotProvider {
                     spaceEvidence: entry.spaceEvidence
                 )
             }
-        )
-    }
-
-    func homeSummaryProjection(for appID: String) -> RuntimeHomeAppSummary? {
-        if let uiTestRuntimeDataset = Self.uiTestRuntimeDataset() {
-            return uiTestRuntimeDataset.summaries.first(where: { $0.appID == appID })
-        }
-        let runningApps = filteredRunningApplications()
-        let matchingApps = runningApps.filter { Self.baseAppID(for: $0) == appID }
-        guard !matchingApps.isEmpty else { return nil }
-
-        let rankByPID = collectAppRankByPID(for: runningApps)
-        let cgWindowsByPID = collectCGWindowsByPID()
-        let allCGWindowsByPID = collectCGWindowsByPID(options: [.optionAll, .excludeDesktopElements])
-        let windowsByPID = collectAXWindowData(
-            for: matchingApps,
-            cgWindowsByPID: cgWindowsByPID,
-            allCGWindowsByPID: allCGWindowsByPID
-        )
-        let mergedWindows = mergedWindowEntries(
-            for: matchingApps,
-            windowsByPID: windowsByPID,
-            rankByPID: rankByPID
-        )
-        let sortedApps = sortedAppsWithinGroup(
-            matchingApps,
-            windowsByPID: windowsByPID,
-            rankByPID: rankByPID
-        )
-        guard let app = sortedApps.first else { return nil }
-
-        if
-            SwitcherBehaviorPreferencesStore.loadHideMinimizedAppsFromAppLayer(),
-            !mergedWindows.isEmpty,
-            !mergedWindows.contains(where: { !$0.isMinimized })
-        {
-            return nil
-        }
-
-        let displayName = app.localizedName ?? appID
-        let rank = preferredRankForAppGroup(
-            matchingApps,
-            rankByPID: rankByPID,
-            fallback: 10_000
-        )
-        return RuntimeHomeAppSummary(
-            appID: appID,
-            displayName: displayName,
-            groupID: Self.groupID(for: app.bundleIdentifier, fallbackName: displayName),
-            lastActiveAt: Self.stableLastActiveValue(forRank: rank),
-            windowCount: mergedWindows.count,
-            pid: app.processIdentifier
         )
     }
 

@@ -328,12 +328,12 @@
 - `testRuntimeSnapshotProviderUsesProjectionPayloadForUITestMockDatasetWhenLaunchFlagEnabled`
   场景：UI test 启动参数要求使用 Mock Runtime 数据集。
   步骤：注入 `--flowtab-ui-mock-runtime` 后读取 `RuntimeSnapshotProvider.fullRepairProjectionPayload()`，并保留一次 legacy `snapshot()` 兼容包装断言。
-  验证：projection payload 中的应用数量、首尾应用、窗口数、首页摘要与上下文映射都与 Mock 数据集一致；`snapshot()` 只包装同一 payload。
+  验证：projection payload 中的应用数量、首尾应用、窗口数、repair payload summary 与上下文映射都与 Mock 数据集一致；`snapshot()` 只包装同一 payload。
 
 - `testRuntimeSnapshotProviderRealPathWithoutAccessibilityBuildsConsistentProjectionPayload`
   场景：真实运行路径下没有无障碍权限。
-  步骤：关闭无障碍权限、开启“在 Command-Tab 中显示”和“隐藏最小化应用”，再读取 full-repair projection payload 与首页摘要。
-  验证：projection payload 会只保留应用层信息、窗口数组为空、上下文数量与应用数量一致，首页摘要也同步为零窗口。
+  步骤：关闭无障碍权限、开启“在 Command-Tab 中显示”和“隐藏最小化应用”，再读取 full-repair projection payload 与 app-window repair payload。
+  验证：projection payload 会只保留应用层信息、窗口数组为空、上下文数量与应用数量一致，repair payload summary 也同步为零窗口。
 
 - `testRuntimeActivatorRequestsActivationForAppTargetWhenNotCurrent`
   场景：激活目标应用不是当前进程。

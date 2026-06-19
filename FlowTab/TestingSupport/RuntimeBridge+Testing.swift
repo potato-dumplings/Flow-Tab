@@ -70,7 +70,6 @@ extension RuntimeSnapshotProvider {
     struct UITestRuntimeDataset {
         let appSwitcherApps: [AppSwitchCandidate]
         let appSwitcherContextsByID: [String: RuntimeAppContext]
-        let summaries: [RuntimeHomeAppSummary]
         let repairPayloadsByAppID: [String: RuntimeAppWindowRepairPayload]
     }
 
@@ -470,7 +469,6 @@ extension RuntimeSnapshotProvider {
         return UITestRuntimeDataset(
             appSwitcherApps: candidates,
             appSwitcherContextsByID: FlowTabTestLaunchOptions.enablesMockHotkeyEffects ? contextsByAppID : [:],
-            summaries: summaries,
             repairPayloadsByAppID: repairPayloadsByAppID
         )
     }
