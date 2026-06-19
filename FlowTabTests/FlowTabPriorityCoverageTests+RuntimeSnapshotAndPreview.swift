@@ -2071,7 +2071,7 @@ extension FlowTabPriorityCoverageTests {
             .init(id: "ax:100:0", index: 0, title: "Document", bounds: CGRect(x: 10, y: 10, width: 600, height: 420)),
             .init(id: "ax:100:1", index: 1, title: "Document", bounds: CGRect(x: 640, y: 10, width: 600, height: 420))
         ]
-        let cgWindows: [RuntimeSnapshotProvider.CGWindowEntryForTesting] = [
+        let cgWindows: [RuntimeCGWindowEntry] = [
             .init(
                 id: 22,
                 title: "Document",
@@ -2098,7 +2098,7 @@ extension FlowTabPriorityCoverageTests {
             .init(id: "ax:200:2", index: 2, bounds: CGRect(x: 100, y: 100, width: 800, height: 500)),
             .init(id: "ax:200:0", index: 0, bounds: nil)
         ]
-        let cgWindows: [RuntimeSnapshotProvider.CGWindowEntryForTesting] = [
+        let cgWindows: [RuntimeCGWindowEntry] = [
             .init(id: 1, title: nil, bounds: CGRect(x: 100, y: 100, width: 800, height: 500)),
             .init(id: 2, title: nil, bounds: CGRect(x: 100, y: 100, width: 800, height: 500)),
             .init(id: 3, title: nil, bounds: CGRect(x: 100, y: 100, width: 800, height: 500)),
@@ -2124,7 +2124,7 @@ extension FlowTabPriorityCoverageTests {
                 bounds: CGRect(x: 100, y: 100, width: 800, height: 500)
             )
         ]
-        let cgWindows: [RuntimeSnapshotProvider.CGWindowEntryForTesting] = [
+        let cgWindows: [RuntimeCGWindowEntry] = [
             .init(
                 id: 31,
                 title: "Document",
@@ -2165,7 +2165,7 @@ extension FlowTabPriorityCoverageTests {
             .init(id: "ax:310:0", index: 0, title: "Document", bounds: bounds, isFocused: true),
             .init(id: "ax:310:1", index: 1, title: "Document", bounds: bounds)
         ]
-        let cgWindows: [RuntimeSnapshotProvider.CGWindowEntryForTesting] = [
+        let cgWindows: [RuntimeCGWindowEntry] = [
             .init(id: 311, title: "Document", bounds: bounds, isOnscreen: true),
             .init(id: 312, title: "Document", bounds: bounds, isOnscreen: true)
         ]
@@ -2189,7 +2189,7 @@ extension FlowTabPriorityCoverageTests {
         let axWindows: [RuntimeSnapshotProvider.AXWindowEntryForTesting] = [
             .init(id: "ax:320:0", index: 0, title: "Document", bounds: bounds, isMinimized: true)
         ]
-        let cgWindows: [RuntimeSnapshotProvider.CGWindowEntryForTesting] = [
+        let cgWindows: [RuntimeCGWindowEntry] = [
             .init(id: 321, title: "Document", bounds: bounds, isOnscreen: true),
             .init(id: 322, title: "Document", bounds: bounds, isOnscreen: false)
         ]
@@ -2218,7 +2218,7 @@ extension FlowTabPriorityCoverageTests {
                 bridgedCGWindowID: 202
             )
         ]
-        let cgWindows: [RuntimeSnapshotProvider.CGWindowEntryForTesting] = [
+        let cgWindows: [RuntimeCGWindowEntry] = [
             .init(id: 101, title: "百度一下，你就知道", bounds: fullscreenBounds),
             .init(id: 202, title: "百度一下，你就知道", bounds: fullscreenBounds)
         ]
@@ -2265,7 +2265,7 @@ extension FlowTabPriorityCoverageTests {
                 bounds: fullscreenBounds
             )
         ]
-        let cgWindows: [RuntimeSnapshotProvider.CGWindowEntryForTesting] = [
+        let cgWindows: [RuntimeCGWindowEntry] = [
             .init(
                 id: 401,
                 title: nil,
@@ -2460,7 +2460,7 @@ extension FlowTabPriorityCoverageTests {
                 bounds: fullscreenBounds
             )
         ]
-        let cgWindows: [RuntimeSnapshotProvider.CGWindowEntryForTesting] = [
+        let cgWindows: [RuntimeCGWindowEntry] = [
             .init(
                 id: 243_679,
                 title: "Google 搜索 - Google Chrome - test3",
@@ -2504,7 +2504,7 @@ extension FlowTabPriorityCoverageTests {
             )
         ]
         let cgWindowsForTesting = [
-            RuntimeSnapshotProvider.CGWindowEntryForTesting(
+            RuntimeCGWindowEntry(
                 id: 440_001,
                 title: "Focused Doc",
                 bounds: bounds,

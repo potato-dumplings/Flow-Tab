@@ -14,9 +14,9 @@ struct RuntimeCGWindowEntry {
         id: CGWindowID,
         title: String?,
         bounds: CGRect?,
-        isOnscreen: Bool,
-        alpha: Double,
-        storeType: Int,
+        isOnscreen: Bool = true,
+        alpha: Double = 1.0,
+        storeType: Int = 1,
         spaceIDs: [Int] = []
     ) {
         self.id = id

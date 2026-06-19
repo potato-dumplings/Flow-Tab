@@ -57,28 +57,18 @@ extension RuntimeSnapshotProvider {
 
     static func validCGWindowIDsForTesting(
         existingCGWindowIDs: Set<CGWindowID>,
-        allCGWindows: [CGWindowEntryForTesting]
+        allCGWindows: [RuntimeCGWindowEntry]
     ) -> [CGWindowID] {
         let provider = RuntimeSnapshotProvider()
         return provider.selectSupplementalOffSpaceCGWindows(
             existingCGWindowIDs: existingCGWindowIDs,
-            allCGWindows: allCGWindows.map {
-                RuntimeCGWindowEntry(
-                    id: $0.id,
-                    title: $0.title,
-                    bounds: $0.bounds,
-                    isOnscreen: $0.isOnscreen,
-                    alpha: $0.alpha,
-                    storeType: $0.storeType,
-                    spaceIDs: $0.spaceIDs
-                )
-            }
+            allCGWindows: allCGWindows
         ).map(\.id)
     }
 
     static func supplementalCGWindowIDsForTesting(
         existingCGWindowIDs: Set<CGWindowID>,
-        allCGWindows: [CGWindowEntryForTesting]
+        allCGWindows: [RuntimeCGWindowEntry]
     ) -> [CGWindowID] {
         validCGWindowIDsForTesting(
             existingCGWindowIDs: existingCGWindowIDs,
@@ -88,21 +78,13 @@ extension RuntimeSnapshotProvider {
 
     static func supplementalCGWindowTitleForTesting(
         appName: String,
-        cgWindow: CGWindowEntryForTesting,
+        cgWindow: RuntimeCGWindowEntry,
         cachedAXTitlesByCGWindowID: [CGWindowID: String] = [:]
     ) -> String {
         _ = cachedAXTitlesByCGWindowID
         return RuntimeSnapshotProvider().resolvedTitleForSupplementalCGWindow(
             appName: appName,
-            cgWindow: RuntimeCGWindowEntry(
-                id: cgWindow.id,
-                title: cgWindow.title,
-                bounds: cgWindow.bounds,
-                isOnscreen: cgWindow.isOnscreen,
-                alpha: cgWindow.alpha,
-                storeType: cgWindow.storeType,
-                spaceIDs: cgWindow.spaceIDs
-            )
+            cgWindow: cgWindow
         )
     }
 
@@ -141,7 +123,7 @@ extension RuntimeSnapshotProvider {
         entries: [SupplementalMergeEntryForTesting],
         appName: String,
         pid: pid_t,
-        allCGWindows: [CGWindowEntryForTesting],
+        allCGWindows: [RuntimeCGWindowEntry],
         matchedCGWindowIDs: Set<CGWindowID> = []
     ) -> [SupplementalMergeEntryForTesting] {
         let provider = RuntimeSnapshotProvider()
@@ -160,17 +142,7 @@ extension RuntimeSnapshotProvider {
             },
             appName: appName,
             pid: pid,
-            allCGWindows: allCGWindows.map {
-                RuntimeCGWindowEntry(
-                    id: $0.id,
-                    title: $0.title,
-                    bounds: $0.bounds,
-                    isOnscreen: $0.isOnscreen,
-                    alpha: $0.alpha,
-                    storeType: $0.storeType,
-                    spaceIDs: $0.spaceIDs
-                )
-            },
+            allCGWindows: allCGWindows,
             matchedCGWindowIDs: matchedCGWindowIDs
         ).map {
             SupplementalMergeEntryForTesting(

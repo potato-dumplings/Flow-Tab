@@ -757,34 +757,6 @@ final class RuntimeSnapshotProvider {
         )
     }
 
-    struct CGWindowEntryForTesting {
-        let id: CGWindowID
-        let title: String?
-        let bounds: CGRect?
-        let isOnscreen: Bool
-        let alpha: Double
-        let storeType: Int
-        let spaceIDs: [Int]
-
-        init(
-            id: CGWindowID,
-            title: String?,
-            bounds: CGRect?,
-            isOnscreen: Bool = true,
-            alpha: Double = 1.0,
-            storeType: Int = 1,
-            spaceIDs: [Int] = []
-        ) {
-            self.id = id
-            self.title = title
-            self.bounds = bounds
-            self.isOnscreen = isOnscreen
-            self.alpha = alpha
-            self.storeType = storeType
-            self.spaceIDs = spaceIDs
-        }
-    }
-
     struct AXWindowEntryForTesting {
         let id: String
         let index: Int
@@ -818,7 +790,7 @@ final class RuntimeSnapshotProvider {
 
     static func resolveCGWindowAssignmentsForTesting(
         axWindows: [AXWindowEntryForTesting],
-        cgWindows: [CGWindowEntryForTesting],
+        cgWindows: [RuntimeCGWindowEntry],
         previousMatches: [String: CGWindowID] = [:],
         previousAXWindowIDs: Set<String> = [],
         previousCGWindowIDs: Set<CGWindowID> = [],
@@ -855,17 +827,7 @@ final class RuntimeSnapshotProvider {
         }
         return provider.resolveStableWindowMapping(
             axWindows: axEntries,
-            cgWindows: cgWindows.map {
-                RuntimeCGWindowEntry(
-                    id: $0.id,
-                    title: $0.title,
-                    bounds: $0.bounds,
-                    isOnscreen: $0.isOnscreen,
-                    alpha: $0.alpha,
-                    storeType: $0.storeType,
-                    spaceIDs: $0.spaceIDs
-                )
-            },
+            cgWindows: cgWindows,
             pid: pid,
             appName: appName
         ).exactMatchesByAXWindowID
@@ -873,7 +835,7 @@ final class RuntimeSnapshotProvider {
 
     static func resolveCGWindowAssignmentDiagnosticsForTesting(
         axWindows: [AXWindowEntryForTesting],
-        cgWindows: [CGWindowEntryForTesting],
+        cgWindows: [RuntimeCGWindowEntry],
         previousMatches: [String: CGWindowID] = [:],
         previousAXWindowIDs: Set<String> = [],
         previousCGWindowIDs: Set<CGWindowID> = [],
@@ -910,39 +872,19 @@ final class RuntimeSnapshotProvider {
         }
         return provider.resolveStableWindowMapping(
             axWindows: axEntries,
-            cgWindows: cgWindows.map {
-                RuntimeCGWindowEntry(
-                    id: $0.id,
-                    title: $0.title,
-                    bounds: $0.bounds,
-                    isOnscreen: $0.isOnscreen,
-                    alpha: $0.alpha,
-                    storeType: $0.storeType,
-                    spaceIDs: $0.spaceIDs
-                )
-            },
+            cgWindows: cgWindows,
             pid: pid,
             appName: appName
         ).bindingDiagnostics
     }
 
     static func shouldIncludeRemoteAXWindowsForTesting(
-        allCGWindows: [CGWindowEntryForTesting],
+        allCGWindows: [RuntimeCGWindowEntry],
         publicSwitchableWindowCount: Int,
         publicFetchSucceeded: Bool = true
     ) -> Bool {
         RuntimeSnapshotProvider().shouldIncludeRemoteAXWindows(
-            allCGWindows: allCGWindows.map {
-                RuntimeCGWindowEntry(
-                    id: $0.id,
-                    title: $0.title,
-                    bounds: $0.bounds,
-                    isOnscreen: $0.isOnscreen,
-                    alpha: $0.alpha,
-                    storeType: $0.storeType,
-                    spaceIDs: $0.spaceIDs
-                )
-            },
+            allCGWindows: allCGWindows,
             publicSwitchableWindowCount: publicSwitchableWindowCount,
             publicFetchSucceeded: publicFetchSucceeded
         )
@@ -950,7 +892,7 @@ final class RuntimeSnapshotProvider {
 
     static func resolveWindowEntriesForTesting(
         axWindows: [AXWindowEntryForTesting],
-        cgWindows: [CGWindowEntryForTesting],
+        cgWindows: [RuntimeCGWindowEntry],
         previousMatches: [String: CGWindowID] = [:],
         previousAXWindowIDs: Set<String> = [],
         previousCGWindowIDs: Set<CGWindowID> = [],
@@ -987,17 +929,7 @@ final class RuntimeSnapshotProvider {
         }
         return provider.resolvedWindowEntries(
             axWindows: axEntries,
-            cgWindows: cgWindows.map {
-                RuntimeCGWindowEntry(
-                    id: $0.id,
-                    title: $0.title,
-                    bounds: $0.bounds,
-                    isOnscreen: $0.isOnscreen,
-                    alpha: $0.alpha,
-                    storeType: $0.storeType,
-                    spaceIDs: $0.spaceIDs
-                )
-            },
+            cgWindows: cgWindows,
             pid: pid,
             appName: appName
         ).map {
