@@ -90,7 +90,9 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     private var appSwitcherMaintenanceRequests: [RuntimeProjectionMaintenanceReason] = []
     private var searchIndexFreshnessBarrierRequests: [RuntimeProjectionMaintenanceReason] = []
     private var spaceTopologyChangeSignals = 0
-    private var appLaunchSignals: [(appID: String, pid: pid_t)] = []
+    private var appLaunchSignals: [
+        (appID: String, pid: pid_t, appDirectoryEntry: RuntimeAppDirectoryEntry?)
+    ] = []
     private var appWindowChangeSignals: [(appID: String, pid: pid_t)] = []
     private var selectedCurrentAppWindowChangeSignals: [(appID: String, pid: pid_t)] = []
     private var appTerminationSignals: [(appID: String, pid: pid_t)] = []
@@ -206,7 +208,9 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         return spaceTopologyChangeSignals
     }
 
-    func appLaunchSignalsRecorded() -> [(appID: String, pid: pid_t)] {
+    func appLaunchSignalsRecorded() -> [
+        (appID: String, pid: pid_t, appDirectoryEntry: RuntimeAppDirectoryEntry?)
+    ] {
         lock.lock()
         defer { lock.unlock() }
         return appLaunchSignals
@@ -319,9 +323,13 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         lock.unlock()
     }
 
-    func signalAppLaunched(appID: String, pid: pid_t) {
+    func signalAppLaunched(
+        appID: String,
+        pid: pid_t,
+        appDirectoryEntry: RuntimeAppDirectoryEntry?
+    ) {
         lock.lock()
-        appLaunchSignals.append((appID, pid))
+        appLaunchSignals.append((appID, pid, appDirectoryEntry))
         lock.unlock()
     }
 

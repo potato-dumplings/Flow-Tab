@@ -398,7 +398,13 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         return committedSearchIndex
     }
 
-    func markAppLifecycleDirty(appID: String, pid: pid_t, pendingScope: String) {
+    func markAppLifecycleDirty(
+        appID: String,
+        pid: pid_t,
+        pendingScope: String,
+        appDirectoryEntry: RuntimeAppDirectoryEntry? = nil,
+        generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
+    ) {
         lock.lock()
         defer { lock.unlock() }
 
@@ -406,6 +412,12 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         dirtyAppIDs.insert(appID)
         dirtyPIDs.insert(pid)
         pendingRepairScopes.insert(pendingScope)
+        if let appDirectoryEntry {
+            upsertAppDirectoryProjectionLocked(
+                entries: [appDirectoryEntry],
+                generatedAt: generatedAt
+            )
+        }
     }
 
     func markAppWindowsDirty(appID: String, pid: pid_t, pendingScope: String) {

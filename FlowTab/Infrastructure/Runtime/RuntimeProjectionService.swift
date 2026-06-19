@@ -21,7 +21,11 @@ protocol RuntimeProjectionServing: Sendable {
     func requestAppSwitcherProjectionMaintenance(reason: RuntimeProjectionMaintenanceReason)
     func requestSearchIndexFreshnessBarrier(reason: RuntimeProjectionMaintenanceReason)
     func signalSpaceTopologyChanged()
-    func signalAppLaunched(appID: String, pid: pid_t)
+    func signalAppLaunched(
+        appID: String,
+        pid: pid_t,
+        appDirectoryEntry: RuntimeAppDirectoryEntry?
+    )
     func signalAppWindowsChanged(appID: String, pid: pid_t)
     func signalSelectedCurrentAppWindowsChanged(appID: String, pid: pid_t)
     func signalAXWindowDestroyed(appID: String, pid: pid_t, axWindowID: String)
@@ -274,13 +278,19 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         }
     }
 
-    func signalAppLaunched(appID: String, pid: pid_t) {
+    func signalAppLaunched(
+        appID: String,
+        pid: pid_t,
+        appDirectoryEntry: RuntimeAppDirectoryEntry? = nil
+    ) {
         maintenanceQueue.async { [self] in
             let now = Date.timeIntervalSinceReferenceDate
             readModelStore.markAppLifecycleDirty(
                 appID: appID,
                 pid: pid,
-                pendingScope: "appLaunched:\(appID)"
+                pendingScope: "appLaunched:\(appID)",
+                appDirectoryEntry: appDirectoryEntry,
+                generatedAt: now
             )
             repairProvider.reconciliationCoordinator.markAppDirty(
                 appID: appID,

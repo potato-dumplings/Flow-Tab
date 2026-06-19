@@ -173,6 +173,37 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(store.readAppDirectoryProjection()?.entries.map(\.pid), [pid + 1])
     }
 
+    func testRuntimeReadModelStoreAppLaunchSignalUpsertsDirectoryEntryWithDirtyFreshness() throws {
+        let store = RuntimeReadModelStore()
+        let launchedEntry = RuntimeAppDirectoryEntry(
+            pid: 73_001,
+            appID: "com.example.launched",
+            bundleIdentifier: "com.example.launched",
+            localizedName: "Launched",
+            launchDate: nil
+        )
+
+        store.markAppLifecycleDirty(
+            appID: launchedEntry.appID,
+            pid: launchedEntry.pid,
+            pendingScope: "appLaunched:\(launchedEntry.appID)",
+            appDirectoryEntry: launchedEntry,
+            generatedAt: 52
+        )
+
+        let appDirectoryProjection = try XCTUnwrap(store.readAppDirectoryProjection())
+        XCTAssertEqual(appDirectoryProjection.entries, [launchedEntry])
+        XCTAssertEqual(appDirectoryProjection.freshness.generatedAt, 52)
+        XCTAssertFalse(appDirectoryProjection.freshness.isCompleteForScope)
+        XCTAssertEqual(appDirectoryProjection.freshness.sourceGeneration.appLifecycle, 1)
+        XCTAssertEqual(appDirectoryProjection.freshness.dirtyAppIDs, [launchedEntry.appID])
+        XCTAssertEqual(appDirectoryProjection.freshness.dirtyPIDs, [launchedEntry.pid])
+        XCTAssertEqual(
+            appDirectoryProjection.freshness.pendingRepairScopes,
+            ["appLaunched:\(launchedEntry.appID)"]
+        )
+    }
+
     func testRuntimeReadModelStorePreservesRunningInstanceWhenSameBundleDifferentPIDTerminates() throws {
         let store = RuntimeReadModelStore()
         let apps = terminateScenarioApps()
@@ -1117,11 +1148,20 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeProjectionServiceDrainsLaunchedAppThroughCoordinator() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
+        let store = RuntimeReadModelStore()
+        let launchedEntry = RuntimeAppDirectoryEntry(
+            pid: 18_407,
+            appID: "com.example.new",
+            bundleIdentifier: "com.example.new",
+            localizedName: "New",
+            launchDate: nil
+        )
         let lock = NSLock()
         var executedRequests: [RuntimeReconciliationRequest] = []
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.AppLaunchSignal",
             repairProvider: RuntimeProjectionRepairProvider(snapshotProvider: provider),
+            readModelStore: store,
             reconciliationExecutor: { request, _ in
                 lock.lock()
                 executedRequests.append(request)
@@ -1130,7 +1170,11 @@ extension FlowTabPriorityCoverageTests {
             }
         )
 
-        service.signalAppLaunched(appID: "com.example.new", pid: 18_407)
+        service.signalAppLaunched(
+            appID: "com.example.new",
+            pid: 18_407,
+            appDirectoryEntry: launchedEntry
+        )
         _ = service.drainReadyReconciliationRequestsSynchronouslyForTesting()
 
         let request = try XCTUnwrap(executedRequests.first)
@@ -1138,6 +1182,9 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(request.appID, "com.example.new")
         XCTAssertEqual(request.reasons, Set([.appLaunched]))
         XCTAssertEqual(request.state, .inFlight)
+        let appDirectoryProjection = try XCTUnwrap(store.readAppDirectoryProjection())
+        XCTAssertEqual(appDirectoryProjection.entries, [launchedEntry])
+        XCTAssertFalse(appDirectoryProjection.freshness.isCompleteForScope)
         XCTAssertTrue(coordinator.readyRequests(now: Date.timeIntervalSinceReferenceDate).isEmpty)
     }
 

@@ -157,6 +157,8 @@ extension FlowTabPriorityCoverageTests {
             return signals.count == 1
                 && signals.first?.appID == RuntimeAppIdentity.appID(for: workspaceApp)
                 && signals.first?.pid == workspaceApp.processIdentifier
+                && signals.first?.appDirectoryEntry?.appID == RuntimeAppIdentity.appID(for: workspaceApp)
+                && signals.first?.appDirectoryEntry?.pid == workspaceApp.processIdentifier
         }
 
         workspaceNotificationCenter.post(
