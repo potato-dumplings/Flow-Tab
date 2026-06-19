@@ -528,6 +528,31 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(coordinator.readyRequests(now: 12).isEmpty)
     }
 
+    func testRuntimeReconciliationCoordinatorSchedulesFullRepairFallbackWhenRetryPolicyExhausts() throws {
+        let coordinator = RuntimeReconciliationCoordinator(
+            retryPolicy: RuntimeReconciliationRetryPolicy(delays: [])
+        )
+        let dirty = coordinator.markAppDirty(
+            appID: "com.example.editor",
+            pid: 18_405,
+            reason: .axNotification,
+            now: 10
+        )
+        let started = try XCTUnwrap(coordinator.startRequest(id: dirty.id))
+
+        let retry = coordinator.scheduleRetryAfterTransientEmptyAXSnapshot(
+            id: started.id,
+            now: 11
+        )
+
+        XCTAssertNil(retry)
+        let readyRequests = coordinator.readyRequests(now: 11)
+        XCTAssertEqual(readyRequests.map(\.target), [.fullRepair])
+        XCTAssertEqual(readyRequests.first?.reasons, Set([.fullRepairFallback]))
+        XCTAssertEqual(readyRequests.first?.priority, .low)
+        XCTAssertFalse(readyRequests.contains { $0.id == dirty.id })
+    }
+
     func testRuntimeReconciliationCoordinatorPromotesPriorityAndBypassesRetryBackoff() throws {
         let coordinator = RuntimeReconciliationCoordinator(
             retryPolicy: RuntimeReconciliationRetryPolicy(delays: [5])
@@ -1733,6 +1758,78 @@ extension FlowTabPriorityCoverageTests {
         )
         XCTAssertTrue(store.diagnostics().hasStagingSearchIndex)
         XCTAssertTrue(coordinator.readyRequests(now: 10.49).isEmpty)
+    }
+
+    func testRuntimeProjectionServiceSearchFreshnessBarrierKeepsCommittedIndexStaleWhenRetryExhaustsToFullRepairFallback() throws {
+        let coordinator = RuntimeReconciliationCoordinator(
+            retryPolicy: RuntimeReconciliationRetryPolicy(delays: [])
+        )
+        let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
+        let store = RuntimeReadModelStore()
+        let committedApps = searchScenarioApps()
+        let repairedApp = AppSwitchCandidate(
+            id: "com.example.browser",
+            displayName: "Browser",
+            groupID: "web",
+            lastActiveAt: 320,
+            windows: [
+                WindowCandidate(
+                    id: "browser-exhausted",
+                    title: "Exhausted Runtime Docs",
+                    isMinimized: false,
+                    lastActiveAt: 320
+                )
+            ]
+        )
+        let pid = pid_t(42_105)
+        store.commitAppSwitcherProjection(
+            apps: committedApps,
+            contextsByID: [:],
+            generatedAt: 10
+        )
+        store.markAppWindowsDirty(
+            appID: repairedApp.id,
+            pid: pid,
+            pendingScope: "appWindows:\(repairedApp.id)"
+        )
+        store.stageSearchIndexApp(
+            repairedApp,
+            generatedAt: 20
+        )
+        coordinator.markAppDirty(
+            appID: repairedApp.id,
+            pid: pid,
+            reason: .axNotification,
+            now: 10
+        )
+        let expectation = expectation(description: "search freshness barrier exhausts scoped repair")
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.SearchFreshnessBarrierRetryExhausted",
+            snapshotProvider: provider,
+            readModelStore: store,
+            reconciliationExecutor: { _, _ in
+                expectation.fulfill()
+                return .transientEmptyAXSnapshot
+            }
+        )
+
+        service.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
+        wait(for: [expectation], timeout: 1)
+        service.waitForMaintenanceQueueForTesting()
+
+        let remainingRequests = coordinator.readyRequests(now: Date.timeIntervalSinceReferenceDate + 1)
+        XCTAssertEqual(remainingRequests.map(\.target), [.fullRepair])
+        XCTAssertEqual(remainingRequests.first?.reasons, Set([.fullRepairFallback]))
+        XCTAssertEqual(remainingRequests.first?.priority, .low)
+        let read = store.readCommittedSearchIndexForSearch()
+        let projection = try XCTUnwrap(read.projection)
+        XCTAssertEqual(read.readiness, .staleCommitted)
+        XCTAssertEqual(read.resultState, .degradedStaleCommittedResult)
+        XCTAssertEqual(
+            projection.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),
+            ["browser-1"]
+        )
+        XCTAssertTrue(store.diagnostics().hasStagingSearchIndex)
     }
 
     private func makeRuntimeCurrentAppWindowPayload(

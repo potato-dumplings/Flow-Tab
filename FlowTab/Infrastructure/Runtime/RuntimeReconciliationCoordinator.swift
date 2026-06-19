@@ -202,6 +202,9 @@ final class RuntimeReconciliationCoordinator {
         }
         guard let delay = retryPolicy.delay(forAttempt: request.attempt) else {
             requestsByTarget.removeValue(forKey: target)
+            if target != .fullRepair {
+                scheduleFullRepairFallback(now: now)
+            }
             return nil
         }
         request.attempt += 1
