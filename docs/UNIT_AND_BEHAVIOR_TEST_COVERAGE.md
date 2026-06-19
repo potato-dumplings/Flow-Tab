@@ -1027,12 +1027,12 @@
   步骤：先激活一个最小化窗口，再激活一个缺失窗口。
   验证：最小化窗口会强制带恢复标记聚焦；缺失窗口则只激活应用，不做窗口聚焦。
 
-- `testRuntimeSnapshotProviderAssemblySelectsPrimaryRowsAndFiltersMinimizedOnlyApps`
+- `testRuntimeSnapshotProviderFullRepairProjectionAssemblySelectsPrimaryRowsAndFiltersMinimizedOnlyApps`
   场景：同一 bundle 存在多个 PID、部分应用只有最小化窗口。
   步骤：构造多 PID 的 Mail/Chat/Notes 数据，开启“隐藏仅最小化应用”，并执行组装。
   验证：每个 bundle 只选主行，最小化-only 的应用被过滤，输出顺序按 rank 与时间排序。
 
-- `testRuntimeSnapshotProviderAssemblyIncludesMinimizedAppsWhenFilterDisabledAndUsesFallbackGroup`
+- `testRuntimeSnapshotProviderFullRepairProjectionAssemblyIncludesMinimizedAppsWhenFilterDisabledAndUsesFallbackGroup`
   场景：关闭最小化过滤，且应用没有 bundle ID。
   步骤：构造两个只有最小化窗口、无 bundle ID 的应用并执行组装。
   验证：两者都会保留，且分组 ID 会按回退名称首字母生成。

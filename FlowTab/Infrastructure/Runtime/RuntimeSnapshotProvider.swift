@@ -193,14 +193,14 @@ final class RuntimeSnapshotProvider {
         let totalMs: Double
     }
 
-    struct SnapshotAssemblyApp {
+    struct FullRepairProjectionAssemblyApp {
         let pid: pid_t
         let bundleIdentifier: String?
         let localizedName: String?
         let launchDate: Date?
     }
 
-    struct SnapshotAssemblyWindow {
+    struct FullRepairProjectionAssemblyWindow {
         let windowID: String
         let title: String
         let isMinimized: Bool
@@ -222,7 +222,7 @@ final class RuntimeSnapshotProvider {
         }
     }
 
-    struct SnapshotAssemblyRow {
+    struct FullRepairProjectionAssemblyRow {
         let pid: pid_t
         let candidate: AppSwitchCandidate
     }
@@ -461,18 +461,18 @@ final class RuntimeSnapshotProvider {
         )
     }
 
-    static func assembleSnapshotRowsForTesting(
-        apps: [SnapshotAssemblyApp],
-        windowsByPID: [pid_t: [SnapshotAssemblyWindow]],
+    static func assembleFullRepairProjectionRowsForTesting(
+        apps: [FullRepairProjectionAssemblyApp],
+        windowsByPID: [pid_t: [FullRepairProjectionAssemblyWindow]],
         rankByPID: [pid_t: Int],
         hideMinimizedAppsFromAppLayer: Bool,
         now: TimeInterval
-    ) -> [SnapshotAssemblyRow] {
-        func baseAppID(for app: SnapshotAssemblyApp) -> String {
+    ) -> [FullRepairProjectionAssemblyRow] {
+        func baseAppID(for app: FullRepairProjectionAssemblyApp) -> String {
             app.bundleIdentifier ?? "pid:\(app.pid)"
         }
 
-        func score(for app: SnapshotAssemblyApp) -> Int {
+        func score(for app: FullRepairProjectionAssemblyApp) -> Int {
             let windows = windowsByPID[app.pid] ?? []
             let hasWindowsScore = windows.isEmpty ? 0 : 1_000_000
             let windowCountScore = min(windows.count, 9_999) * 100
@@ -482,7 +482,7 @@ final class RuntimeSnapshotProvider {
         }
 
         let groupedApps = Dictionary(grouping: apps, by: baseAppID(for:))
-        var rows: [SnapshotAssemblyRow] = []
+        var rows: [FullRepairProjectionAssemblyRow] = []
         rows.reserveCapacity(groupedApps.count)
 
         for group in groupedApps.values {
@@ -524,7 +524,7 @@ final class RuntimeSnapshotProvider {
                     )
                 }
             )
-            rows.append(SnapshotAssemblyRow(pid: app.pid, candidate: candidate))
+            rows.append(FullRepairProjectionAssemblyRow(pid: app.pid, candidate: candidate))
         }
 
         rows.sort { lhs, rhs in

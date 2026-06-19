@@ -169,28 +169,28 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(record.lastExactConfirmedAt, 12)
     }
 
-    func testRuntimeSnapshotProviderAssemblySelectsPrimaryRowsAndFiltersMinimizedOnlyApps() {
-        let rows = RuntimeSnapshotProvider.assembleSnapshotRowsForTesting(
+    func testRuntimeSnapshotProviderFullRepairProjectionAssemblySelectsPrimaryRowsAndFiltersMinimizedOnlyApps() {
+        let rows = RuntimeSnapshotProvider.assembleFullRepairProjectionRowsForTesting(
             apps: [
-                RuntimeSnapshotProvider.SnapshotAssemblyApp(
+                RuntimeSnapshotProvider.FullRepairProjectionAssemblyApp(
                     pid: 10,
                     bundleIdentifier: "com.example.mail",
                     localizedName: "Mail",
                     launchDate: Date(timeIntervalSince1970: 100)
                 ),
-                RuntimeSnapshotProvider.SnapshotAssemblyApp(
+                RuntimeSnapshotProvider.FullRepairProjectionAssemblyApp(
                     pid: 11,
                     bundleIdentifier: "com.example.mail",
                     localizedName: "Mail",
                     launchDate: Date(timeIntervalSince1970: 200)
                 ),
-                RuntimeSnapshotProvider.SnapshotAssemblyApp(
+                RuntimeSnapshotProvider.FullRepairProjectionAssemblyApp(
                     pid: 20,
                     bundleIdentifier: "com.example.chat",
                     localizedName: "Chat",
                     launchDate: Date(timeIntervalSince1970: 150)
                 ),
-                RuntimeSnapshotProvider.SnapshotAssemblyApp(
+                RuntimeSnapshotProvider.FullRepairProjectionAssemblyApp(
                     pid: 30,
                     bundleIdentifier: "com.example.notes",
                     localizedName: "Notes",
@@ -199,7 +199,7 @@ extension FlowTabPriorityCoverageTests {
             ],
             windowsByPID: [
                 10: [
-                    RuntimeSnapshotProvider.SnapshotAssemblyWindow(
+                    RuntimeSnapshotProvider.FullRepairProjectionAssemblyWindow(
                         windowID: "mail-legacy",
                         title: "Inbox",
                         isMinimized: false,
@@ -207,13 +207,13 @@ extension FlowTabPriorityCoverageTests {
                     )
                 ],
                 11: [
-                    RuntimeSnapshotProvider.SnapshotAssemblyWindow(
+                    RuntimeSnapshotProvider.FullRepairProjectionAssemblyWindow(
                         windowID: "mail-1",
                         title: "Inbox",
                         isMinimized: false,
                         cgWindowID: 11
                     ),
-                    RuntimeSnapshotProvider.SnapshotAssemblyWindow(
+                    RuntimeSnapshotProvider.FullRepairProjectionAssemblyWindow(
                         windowID: "mail-2",
                         title: "Draft",
                         isMinimized: false,
@@ -221,7 +221,7 @@ extension FlowTabPriorityCoverageTests {
                     )
                 ],
                 20: [
-                    RuntimeSnapshotProvider.SnapshotAssemblyWindow(
+                    RuntimeSnapshotProvider.FullRepairProjectionAssemblyWindow(
                         windowID: "chat-1",
                         title: "Standup",
                         isMinimized: true,
@@ -1638,16 +1638,16 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(title, "百度一下，你就知道 - Google Chrome - test2")
     }
 
-    func testRuntimeSnapshotProviderAssemblyIncludesMinimizedAppsWhenFilterDisabledAndUsesFallbackGroup() {
-        let rows = RuntimeSnapshotProvider.assembleSnapshotRowsForTesting(
+    func testRuntimeSnapshotProviderFullRepairProjectionAssemblyIncludesMinimizedAppsWhenFilterDisabledAndUsesFallbackGroup() {
+        let rows = RuntimeSnapshotProvider.assembleFullRepairProjectionRowsForTesting(
             apps: [
-                RuntimeSnapshotProvider.SnapshotAssemblyApp(
+                RuntimeSnapshotProvider.FullRepairProjectionAssemblyApp(
                     pid: 41,
                     bundleIdentifier: nil,
                     localizedName: "Zulu",
                     launchDate: Date(timeIntervalSince1970: 100)
                 ),
-                RuntimeSnapshotProvider.SnapshotAssemblyApp(
+                RuntimeSnapshotProvider.FullRepairProjectionAssemblyApp(
                     pid: 42,
                     bundleIdentifier: nil,
                     localizedName: "Alpha",
@@ -1656,7 +1656,7 @@ extension FlowTabPriorityCoverageTests {
             ],
             windowsByPID: [
                 41: [
-                    RuntimeSnapshotProvider.SnapshotAssemblyWindow(
+                    RuntimeSnapshotProvider.FullRepairProjectionAssemblyWindow(
                         windowID: "z-1",
                         title: "Zulu Window",
                         isMinimized: true,
@@ -1664,7 +1664,7 @@ extension FlowTabPriorityCoverageTests {
                     )
                 ],
                 42: [
-                    RuntimeSnapshotProvider.SnapshotAssemblyWindow(
+                    RuntimeSnapshotProvider.FullRepairProjectionAssemblyWindow(
                         windowID: "a-1",
                         title: "Alpha Window",
                         isMinimized: true,
