@@ -767,6 +767,7 @@ Runtime infrastructure 负责：
 - `RuntimeSnapshotProvider+AppProjectionBuilders.swift` 内 full repair / current-app projection payload builder 的 timing 与 filtering diagnostics 现在写入 `RuntimeLogCategory.projection`；`RuntimeSnapshotProvider.swift` 底层 CG/AX/Space fact collection 才继续使用 snapshot diagnostic category。
 - `RuntimeAppWindowRepairPayload` 类型级 app-window repair 兼容 wrapper 已删除；provider 只把采样事实转换为 `RuntimeAppWindowProjectionSeed` 并产出 `RuntimeCurrentAppWindowPayload`，不再私有维护 candidate/context/summary projection assembly，也不再保留 repair-shaped current-app projection 上游。
 - app identity 规则现在直接由 `RuntimeAppIdentity.appID(for:)` 服务 AppDelegate lifecycle、Switcher focused-current-app projection、provider full repair grouping、reconciliation target 和 UI-test runtime projection seed；`RuntimeSnapshotProvider.baseAppID(for:)` 兼容 wrapper 已删除，provider 不再拥有 appID 派生入口。
+- `RuntimeProjectionService` 现在只持有 `RuntimeProjectionRepairProviding` 窄接口：service 可以调度 coordinator、读取 CG/Space fact diff、消费 current-app/full-repair projection payload、记录 verified focus/AX destroyed evidence，但不再以完整 `RuntimeSnapshotProvider` 作为自身依赖或 executor 类型边界。`RuntimeSnapshotProvider` 只是该 repair/fact provider 的默认实现，不能被 feature surface 当作 hot-path snapshot read seam 重新扩张。
 
 但当前实现仍有迁移对象：
 
@@ -890,6 +891,7 @@ Runtime infrastructure 负责：
 
 - full repair fallback 的 target / high-priority cancellation 已落到 scheduler；scoped repair retry exhausted 后会自动降级安排 low-priority full repair fallback，并且 dirty fallback commit 不会清 dirty 或刷新 committed Search。更广 backoff policy 与更细粒度 facts 拆分仍需扩展。
 - service 层 feature-facing full snapshot fallback 已从 `RuntimeProjectionService` 删除；full repair outcome 现在也只携带 `RuntimeFullRepairProjectionPayload`。full repair builder 已命名为 provider-side `fullRepairProjectionPayload()`，性质是 low-priority repair/diagnostic 或 cold-start 输入；provider-facing `RuntimeSnapshotProvider.snapshot()` wrapper 已删除，不是 Switcher/Home/Search hot-path read API，也不是 Search freshness barrier 的成功 oracle。
+- `RuntimeProjectionService` 的 provider 依赖已收窄为 `RuntimeProjectionRepairProviding`，default executor 只通过该 repair/fact-provider contract 消费 scoped repair、Space topology affected-target derivation 与 full repair projection payload。迁移期仍保留 `RuntimeSnapshotProvider` 名称作为底层 fact-source 实现，但 service/executor 边界不再拿完整 snapshot provider 类型。
 - Search committed/staging index 已在 Phase 4 推进；真实 committed/staging UI proof 与外部 pressure proof 仍需补齐。
 - 真实 UI/E2E 与多拓扑 pressure proof 本轮未新增；现有证明是 behavior + deterministic pressure。
 

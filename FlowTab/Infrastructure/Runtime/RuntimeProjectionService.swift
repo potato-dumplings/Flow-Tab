@@ -31,6 +31,36 @@ protocol RuntimeProjectionServing: Sendable {
     func isLikelyTransientAXRebuild(for pid: pid_t) -> Bool
 }
 
+protocol RuntimeProjectionRepairProviding: AnyObject {
+    var reconciliationCoordinator: RuntimeReconciliationCoordinator { get }
+
+    func collectCGWindowsWithSpaceTopologyDiff(
+        options: CGWindowListOption
+    ) -> RuntimeSnapshotProvider.CGWindowCollection
+    func appReconciliationTargets(
+        affectedCGWindowIDs: Set<CGWindowID>,
+        currentCGWindowsByPID: [pid_t: [RuntimeSnapshotProvider.CGWindowEntry]]
+    ) -> [RuntimeAffectedWindowReconciliationTarget]
+    func reconcileAppWindows(
+        processIdentifier pid: pid_t,
+        affectedCGWindowIDs: Set<CGWindowID>
+    ) -> RuntimeAppWindowReconciliationResult
+    func fullRepairProjectionPayload() -> RuntimeFullRepairProjectionPayload
+    func signalAXWindowDestroyed(
+        processIdentifier pid: pid_t,
+        axWindowID: String,
+        now: TimeInterval
+    ) -> CGWindowID?
+    func clearWindowMappingState(for pid: pid_t)
+    func recordWindowFocusVerification(
+        _ verification: RuntimeWindowFocusVerification,
+        now: TimeInterval
+    )
+    func isLikelyTransientAXRebuild(for pid: pid_t) -> Bool
+}
+
+extension RuntimeSnapshotProvider: RuntimeProjectionRepairProviding {}
+
 final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Sendable {
     enum ReconciliationExecutionOutcome {
         case completed
@@ -65,22 +95,22 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
 
     typealias ReconciliationExecutor = (
         RuntimeReconciliationRequest,
-        RuntimeSnapshotProvider
+        RuntimeProjectionRepairProviding
     ) -> ReconciliationExecutionOutcome
 
     private let maintenanceQueue: DispatchQueue
-    private let snapshotProvider: RuntimeSnapshotProvider
+    private let repairProvider: RuntimeProjectionRepairProviding
     private let readModelStore: RuntimeReadModelStore
     private let reconciliationExecutor: ReconciliationExecutor
 
     init(
         label: String = "FlowTab.RuntimeProjectionService",
-        snapshotProvider: RuntimeSnapshotProvider = RuntimeSnapshotProvider(),
+        repairProvider: RuntimeProjectionRepairProviding = RuntimeSnapshotProvider(),
         readModelStore: RuntimeReadModelStore = RuntimeReadModelStore(),
         reconciliationExecutor: @escaping ReconciliationExecutor = RuntimeProjectionService.defaultReconciliationExecutor
     ) {
         maintenanceQueue = DispatchQueue(label: label, qos: .utility)
-        self.snapshotProvider = snapshotProvider
+        self.repairProvider = repairProvider
         self.readModelStore = readModelStore
         self.reconciliationExecutor = reconciliationExecutor
     }
@@ -110,8 +140,8 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             let diagnostics = readModelStore.diagnostics()
             let now = Date.timeIntervalSinceReferenceDate
             if !diagnostics.hasAppSwitcherProjection
-                && !snapshotProvider.reconciliationCoordinator.hasPendingRequests() {
-                snapshotProvider.reconciliationCoordinator.scheduleFullRepairFallback(now: now)
+                && !repairProvider.reconciliationCoordinator.hasPendingRequests() {
+                repairProvider.reconciliationCoordinator.scheduleFullRepairFallback(now: now)
             }
             let drainResult = drainReadyReconciliationRequestsWithResultLocked(
                 now: now
@@ -145,7 +175,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         maintenanceQueue.async { [self] in
             let diagnostics = readModelStore.diagnostics()
             let now = Date.timeIntervalSinceReferenceDate
-            let promotedRequests = snapshotProvider.reconciliationCoordinator.promotePendingRequests(
+            let promotedRequests = repairProvider.reconciliationCoordinator.promotePendingRequests(
                 reason: .searchFreshnessBarrier,
                 now: now
             )
@@ -158,7 +188,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             let stagedSearchIndex = readModelStore.stageSearchIndexCurrentAppWindowPayloads(
                 drainResult.repairedCurrentAppWindowPayloads
             )
-            let hasPendingRequests = snapshotProvider.reconciliationCoordinator.hasPendingRequests()
+            let hasPendingRequests = repairProvider.reconciliationCoordinator.hasPendingRequests()
             let shouldCommitStagedSearchIndex = stagedSearchIndex != nil
                 && drainResult.deferredCount == 0
                 && !hasPendingRequests
@@ -190,7 +220,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
 
     func signalSpaceTopologyChanged() {
         maintenanceQueue.async { [self] in
-            let collection = snapshotProvider.collectCGWindowsWithSpaceTopologyDiff(
+            let collection = repairProvider.collectCGWindowsWithSpaceTopologyDiff(
                 options: [.excludeDesktopElements]
             )
             readModelStore.markSpaceTopologyDirty(
@@ -209,7 +239,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 pid: pid,
                 pendingScope: "appLaunched:\(appID)"
             )
-            snapshotProvider.reconciliationCoordinator.markAppDirty(
+            repairProvider.reconciliationCoordinator.markAppDirty(
                 appID: appID,
                 pid: pid,
                 reason: .appLaunched,
@@ -228,7 +258,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 pid: pid,
                 pendingScope: "appWindows:\(appID)"
             )
-            snapshotProvider.reconciliationCoordinator.markAppDirty(
+            repairProvider.reconciliationCoordinator.markAppDirty(
                 appID: appID,
                 pid: pid,
                 reason: .axNotification,
@@ -246,7 +276,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 pid: pid,
                 pendingScope: "selectedCurrentAppWindows:\(appID)"
             )
-            snapshotProvider.reconciliationCoordinator.markAppDirty(
+            repairProvider.reconciliationCoordinator.markAppDirty(
                 appID: appID,
                 pid: pid,
                 reason: .selectedCurrentAppWindows,
@@ -259,7 +289,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     func signalAXWindowDestroyed(appID: String, pid: pid_t, axWindowID: String) {
         maintenanceQueue.async { [self] in
             let now = Date.timeIntervalSinceReferenceDate
-            let affectedCGWindowID = snapshotProvider.signalAXWindowDestroyed(
+            let affectedCGWindowID = repairProvider.signalAXWindowDestroyed(
                 processIdentifier: pid,
                 axWindowID: axWindowID,
                 now: now
@@ -273,7 +303,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 .projection,
                 "runtimeAXDestroyed appID=\(appID) pid=\(pid) axWindowID=\(axWindowID) affectedCGWindowID=\(affectedCGWindowID.map(String.init) ?? "none")"
             )
-            snapshotProvider.reconciliationCoordinator.markAppDirty(
+            repairProvider.reconciliationCoordinator.markAppDirty(
                 appID: appID,
                 pid: pid,
                 reason: .axNotification,
@@ -287,8 +317,8 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     func signalAppTerminated(appID: String, pid: pid_t) {
         readModelStore.markAppTerminated(appID: appID, pid: pid)
         maintenanceQueue.async { [self] in
-            snapshotProvider.reconciliationCoordinator.cancelAppRequests(pid: pid)
-            snapshotProvider.clearWindowMappingState(for: pid)
+            repairProvider.reconciliationCoordinator.cancelAppRequests(pid: pid)
+            repairProvider.clearWindowMappingState(for: pid)
             AXLiveWindowRegistry.shared.remove(pid: pid)
             RuntimeLog.debug(.projection, "runtimeLifecycle appTerminated appID=\(appID) pid=\(pid)")
         }
@@ -297,13 +327,13 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     func signalWindowFocusVerified(_ verification: RuntimeWindowFocusVerification) {
         maintenanceQueue.async { [self] in
             let now = Date.timeIntervalSinceReferenceDate
-            snapshotProvider.recordWindowFocusVerification(verification, now: now)
+            repairProvider.recordWindowFocusVerification(verification, now: now)
             readModelStore.markWindowFocusVerified(
                 appID: verification.appID,
                 pid: verification.ownerPID,
                 affectedCGWindowIDs: Set([verification.targetCGWindowID, verification.focusedCGWindowID].compactMap { $0 })
             )
-            snapshotProvider.reconciliationCoordinator.markWindowFocusVerified(
+            repairProvider.reconciliationCoordinator.markWindowFocusVerified(
                 verification,
                 now: now
             )
@@ -329,7 +359,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
 
     func isLikelyTransientAXRebuild(for pid: pid_t) -> Bool {
         maintenanceQueue.sync {
-            snapshotProvider.isLikelyTransientAXRebuild(for: pid)
+            repairProvider.isLikelyTransientAXRebuild(for: pid)
         }
     }
 
@@ -390,7 +420,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         maxRequests: Int? = nil,
         includeFullRepair: Bool = true
     ) -> ReconciliationDrainResult {
-        let coordinator = snapshotProvider.reconciliationCoordinator
+        let coordinator = repairProvider.reconciliationCoordinator
         let readyRequests = coordinator.readyRequests(
             now: now,
             includeFullRepair: includeFullRepair
@@ -402,7 +432,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         for request in requests {
             guard let startedRequest = coordinator.startRequest(id: request.id) else { continue }
             result.startedRequests.append(startedRequest)
-            let outcome = reconciliationExecutor(startedRequest, snapshotProvider)
+            let outcome = reconciliationExecutor(startedRequest, repairProvider)
             switch outcome {
             case .completed, .completedWithFullRepairProjection, .completedWithRepairedCurrentAppWindowPayloads:
                 coordinator.completeRequest(id: startedRequest.id)
@@ -426,11 +456,11 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
 
     private static func defaultReconciliationExecutor(
         request: RuntimeReconciliationRequest,
-        snapshotProvider: RuntimeSnapshotProvider
+        repairProvider: RuntimeProjectionRepairProviding
     ) -> ReconciliationExecutionOutcome {
         switch request.target {
         case let .app(pid):
-            let result = snapshotProvider.reconcileAppWindows(
+            let result = repairProvider.reconcileAppWindows(
                 processIdentifier: pid,
                 affectedCGWindowIDs: request.affectedCGWindowIDs
             )
@@ -442,18 +472,18 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             }
             return .completed
         case .fullRepair:
-            return .completedWithFullRepairProjection(snapshotProvider.fullRepairProjectionPayload())
+            return .completedWithFullRepairProjection(repairProvider.fullRepairProjectionPayload())
         case .spaceTopology:
-            let cgWindowsByPID = snapshotProvider.collectCGWindowsWithSpaceTopologyDiff(
+            let cgWindowsByPID = repairProvider.collectCGWindowsWithSpaceTopologyDiff(
                 options: [.excludeDesktopElements]
             ).windowsByPID
-            let affectedTargets = snapshotProvider.appReconciliationTargets(
+            let affectedTargets = repairProvider.appReconciliationTargets(
                 affectedCGWindowIDs: request.affectedCGWindowIDs,
                 currentCGWindowsByPID: cgWindowsByPID
             )
             var repairedCurrentAppWindowPayloads: [RuntimeCurrentAppWindowPayload] = []
             for target in affectedTargets {
-                let result = snapshotProvider.reconcileAppWindows(
+                let result = repairProvider.reconcileAppWindows(
                     processIdentifier: target.pid,
                     affectedCGWindowIDs: target.affectedCGWindowIDs
                 )
