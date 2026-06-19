@@ -240,6 +240,81 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(payload.appDirectoryEntries.isEmpty)
     }
 
+    func testRuntimeReadModelStoreDerivesAppDirectoryProjectionFromPIDKeyedState() throws {
+        let store = RuntimeReadModelStore()
+        let apps = searchScenarioApps()
+        let app = try XCTUnwrap(apps.first)
+        let pid = NSRunningApplication.current.processIdentifier
+        let staleEntry = RuntimeAppDirectoryEntry(
+            pid: pid,
+            appID: app.id,
+            bundleIdentifier: "com.example.stale",
+            localizedName: "Stale Mail",
+            launchDate: nil
+        )
+        let repairedEntry = RuntimeAppDirectoryEntry(
+            pid: pid,
+            appID: app.id,
+            bundleIdentifier: "com.example.repaired",
+            localizedName: app.displayName,
+            launchDate: nil
+        )
+        let launchedEntry = RuntimeAppDirectoryEntry(
+            pid: pid + 1,
+            appID: "com.example.launched",
+            bundleIdentifier: "com.example.launched",
+            localizedName: "Launched",
+            launchDate: nil
+        )
+
+        XCTAssertNil(store.readAppDirectoryProjection())
+        XCTAssertFalse(store.diagnostics().hasAppDirectoryProjection)
+
+        store.commitAppSwitcherProjection(
+            apps: apps,
+            contextsByID: [
+                app.id: makeRuntimeAppContext(
+                    appID: app.id,
+                    runningApp: .current,
+                    windows: app.windows
+                )
+            ],
+            appDirectoryEntries: [staleEntry, repairedEntry],
+            generatedAt: 10
+        )
+
+        var projection = try XCTUnwrap(store.readAppDirectoryProjection())
+        XCTAssertEqual(projection.entries, [repairedEntry])
+        XCTAssertEqual(projection.freshness.generatedAt, 10)
+        XCTAssertEqual(store.diagnostics().appDirectoryEntryPIDs, [pid])
+
+        store.markAppLifecycleDirty(
+            appID: launchedEntry.appID,
+            pid: launchedEntry.pid,
+            pendingScope: "appLaunched:\(launchedEntry.appID)",
+            appDirectoryEntry: launchedEntry,
+            generatedAt: 11
+        )
+
+        projection = try XCTUnwrap(store.readAppDirectoryProjection())
+        XCTAssertEqual(Set(projection.entries.map(\.pid)), [pid, pid + 1])
+        XCTAssertEqual(projection.entries(forAppID: launchedEntry.appID), [launchedEntry])
+        XCTAssertEqual(projection.freshness.generatedAt, 11)
+        XCTAssertFalse(projection.freshness.isCompleteForScope)
+        XCTAssertEqual(projection.freshness.dirtyAppIDs, [launchedEntry.appID])
+
+        store.commitAppSwitcherProjection(
+            apps: apps,
+            contextsByID: [:],
+            generatedAt: 12
+        )
+
+        projection = try XCTUnwrap(store.readAppDirectoryProjection())
+        XCTAssertEqual(Set(projection.entries.map(\.pid)), [pid, pid + 1])
+        XCTAssertEqual(projection.freshness.generatedAt, 11)
+        XCTAssertTrue(projection.freshness.isCompleteForScope)
+    }
+
     func testRuntimeReadModelStorePreservesRunningInstanceWhenSameBundleDifferentPIDTerminates() throws {
         let store = RuntimeReadModelStore()
         let apps = terminateScenarioApps()

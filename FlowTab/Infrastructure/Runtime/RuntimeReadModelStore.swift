@@ -221,9 +221,10 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     private var dirtyPIDs: Set<pid_t> = []
     private var dirtyCGWindowIDs: Set<CGWindowID> = []
     private var pendingRepairScopes: Set<String> = []
+    private var appDirectoryEntriesByPID: [pid_t: RuntimeAppDirectoryEntry] = [:]
+    private var appDirectoryGeneratedAt: TimeInterval?
     private var appSwitcherProjection: RuntimeAppSwitcherProjection?
     private var homeSummaryProjection: RuntimeHomeSummaryProjection?
-    private var appDirectoryProjection: RuntimeAppDirectoryProjection?
     private var currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection] = [:]
     private var committedSearchIndex: RuntimeSearchIndexProjection?
     private var stagingSearchIndex: RuntimeSearchIndexProjection?
@@ -458,10 +459,8 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             dirtyPIDs.remove(pid)
             return
         }
-        let survivingDirectoryEntries = appDirectoryProjection?
-            .entries(forAppID: appID)
+        let survivingDirectoryEntries = appDirectoryEntriesLocked(forAppID: appID)
             .filter { $0.pid != pid }
-            ?? []
         if !survivingDirectoryEntries.isEmpty {
             markAppInstanceTerminatedLocked(appID: appID, pid: pid)
             return
@@ -495,17 +494,11 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         dirtyPIDs.remove(pid)
         pendingRepairScopes = pendingRepairScopes.filter { !$0.contains(appID) }
         currentAppWindowProjectionsByAppID.removeValue(forKey: appID)
-        if let projection = appDirectoryProjection {
-            let entries = projection.entries.filter { entry in
+        if appDirectoryGeneratedAt != nil {
+            appDirectoryEntriesByPID = appDirectoryEntriesByPID.filter { _, entry in
                 entry.appID != appID && entry.pid != pid
             }
-            appDirectoryProjection = RuntimeAppDirectoryProjection(
-                entries: entries,
-                freshness: freshnessLocked(
-                    generatedAt: generatedAt,
-                    isCompleteForScope: !isDirtyLocked
-                )
-            )
+            appDirectoryGeneratedAt = generatedAt
         }
         if let projection = appSwitcherProjection {
             appSwitcherProjection = RuntimeAppSwitcherProjection(
@@ -547,7 +540,8 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     }
 
     private func shouldRemoveTerminatedAppLocked(appID: String, pid: pid_t) -> Bool {
-        if let directoryEntries = appDirectoryProjection?.entries(forAppID: appID),
+        let directoryEntries = appDirectoryEntriesLocked(forAppID: appID)
+        if appDirectoryGeneratedAt != nil,
            !directoryEntries.isEmpty {
             return directoryEntries.contains { $0.pid == pid }
         }
@@ -562,9 +556,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         if let summary = homeSummaryProjection?.summary(for: appID) {
             knownPIDs.insert(summary.pid)
         }
-        if let directoryProjection = appDirectoryProjection {
-            knownPIDs.formUnion(directoryProjection.entries(forAppID: appID).map(\.pid))
-        }
+        knownPIDs.formUnion(directoryEntries.map(\.pid))
         return knownPIDs.isEmpty || knownPIDs.contains(pid)
     }
 
@@ -576,14 +568,9 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         dirtyPIDs.remove(pid)
         pendingRepairScopes.insert("appTerminated:\(appID)")
 
-        if let projection = appDirectoryProjection {
-            appDirectoryProjection = RuntimeAppDirectoryProjection(
-                entries: projection.entries.filter { $0.pid != pid },
-                freshness: freshnessLocked(
-                    generatedAt: generatedAt,
-                    isCompleteForScope: !isDirtyLocked
-                )
-            )
+        if appDirectoryGeneratedAt != nil {
+            appDirectoryEntriesByPID.removeValue(forKey: pid)
+            appDirectoryGeneratedAt = generatedAt
         }
         if let projection = appSwitcherProjection {
             var contextsByID = projection.contextsByID
@@ -665,12 +652,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
 
-        guard var projection = appDirectoryProjection else { return nil }
-        projection.freshness = freshnessLocked(
-            generatedAt: projection.freshness.generatedAt,
-            isCompleteForScope: !isDirtyLocked
-        )
-        return projection
+        return appDirectoryProjectionLocked()
     }
 
     func readCurrentAppWindowProjection(appID: String) -> RuntimeCurrentAppWindowProjection? {
@@ -723,11 +705,11 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             pendingRepairScopes: pendingRepairScopes,
             hasAppSwitcherProjection: appSwitcherProjection != nil,
             hasHomeSummaryProjection: homeSummaryProjection != nil,
-            hasAppDirectoryProjection: appDirectoryProjection != nil,
+            hasAppDirectoryProjection: appDirectoryGeneratedAt != nil,
             hasCommittedSearchIndex: committedSearchIndex != nil,
             hasStagingSearchIndex: stagingSearchIndex != nil,
             currentAppWindowProjectionAppIDs: Set(currentAppWindowProjectionsByAppID.keys),
-            appDirectoryEntryPIDs: Set(appDirectoryProjection?.entries.map(\.pid) ?? [])
+            appDirectoryEntryPIDs: Set(appDirectoryEntriesByPID.keys)
         )
     }
 
@@ -759,10 +741,10 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         entries: [RuntimeAppDirectoryEntry],
         generatedAt: TimeInterval
     ) {
-        appDirectoryProjection = RuntimeAppDirectoryProjection(
-            entries: sortedUniqueAppDirectoryEntriesLocked(entries),
-            freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: !isDirtyLocked)
+        appDirectoryEntriesByPID = Dictionary(
+            uniqueKeysWithValues: sortedUniqueAppDirectoryEntriesLocked(entries).map { ($0.pid, $0) }
         )
+        appDirectoryGeneratedAt = generatedAt
     }
 
     private func upsertAppDirectoryProjectionLocked(
@@ -771,17 +753,22 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     ) {
         guard !entries.isEmpty else { return }
 
-        var entriesByPID: [pid_t: RuntimeAppDirectoryEntry] = [:]
-        for entry in appDirectoryProjection?.entries ?? [] {
-            entriesByPID[entry.pid] = entry
-        }
         for entry in entries {
-            entriesByPID[entry.pid] = entry
+            appDirectoryEntriesByPID[entry.pid] = entry
         }
-        appDirectoryProjection = RuntimeAppDirectoryProjection(
-            entries: sortedUniqueAppDirectoryEntriesLocked(Array(entriesByPID.values)),
+        appDirectoryGeneratedAt = generatedAt
+    }
+
+    private func appDirectoryProjectionLocked() -> RuntimeAppDirectoryProjection? {
+        guard let generatedAt = appDirectoryGeneratedAt else { return nil }
+        return RuntimeAppDirectoryProjection(
+            entries: sortedUniqueAppDirectoryEntriesLocked(Array(appDirectoryEntriesByPID.values)),
             freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: !isDirtyLocked)
         )
+    }
+
+    private func appDirectoryEntriesLocked(forAppID appID: String) -> [RuntimeAppDirectoryEntry] {
+        appDirectoryEntriesByPID.values.filter { $0.appID == appID }
     }
 
     private func sortedUniqueAppDirectoryEntriesLocked(
