@@ -873,7 +873,7 @@ Runtime infrastructure 负责：
 
 - targeted unit/behavior 证明 hot read 不调用采样 provider。
 - pressure proof 记录 `Option+Tab` / `Control+Tab` 首帧不被后台 maintenance 阻塞。
-- `FlowTabPriorityCoverageTests.testLiveSwitcherModelStartsAppSessionFromRuntimeProjectionWithoutLightweightSampling` 证明 app switcher projection 存在时不会调用 lightweight snapshot 或 full snapshot bridge。
+- `FlowTabPriorityCoverageTests.testLiveSwitcherModelStartsAppSessionFromRuntimeProjectionWithoutLightweightSampling` 证明 app switcher projection 存在时读取 committed app-switcher projection，且在 maintenance disabled fixture 下不会发送 surface-local repair request。
 - `FlowTabPriorityCoverageTests.testLiveSwitcherModelSelectedAppWindowSnapshotUsesRuntimeProjectionWithoutHomeSampling` 证明 selected/current app window projection 存在时不会调用 Home snapshot bridge；`testLiveSwitcherModelSelectedAppWindowSnapshotSignalsRuntimeRepairWhenProjectionIsMissing` 证明 projection 缺失时即使旧 Home snapshot bridge 有污染数据也不会被读取，只会发送 shared runtime app-window dirty signal。
 - `FlowTabTests.testHomeWindowActivationControllerUsesRuntimeProjectionWithoutHomeSnapshotBridge` 证明 Home window activation 读取 runtime current-app window projection 后提交 activation target，且不会发送 app-window dirty signal；`testHomeWindowActivationControllerSignalsRuntimeRepairWhenProjectionIsMissing` 证明 projection 缺失时只读取 current-app/app-switcher/Home summary projection 边界以定位 pid，然后发送 shared runtime app-window dirty signal。
 - `FlowTabPriorityCoverageTests.testLiveSwitcherModelFocusedWindowSessionUsesRuntimeProjectionWithoutFocusedSampling` 证明 `Control+Tab` focused-current-app projection 存在时不会调用 focused snapshot bridge；`testLiveSwitcherModelFocusedWindowSessionSignalsRuntimeRepairWhenProjectionIsMissing` 证明 projection 缺失时即使旧 focused snapshot bridge 有污染数据也不会被读取，只会发送 shared runtime app-window dirty signal。
@@ -921,7 +921,7 @@ Runtime infrastructure 负责：
 
 验证：
 
-- `FlowTabPriorityCoverageTests.testLiveSwitcherModelStartSessionRequestsRuntimeMaintenanceWithoutSurfaceSampling` 证明 app switcher projection 存在时，`startSession` 只请求 runtime maintenance，且不调用 full/lightweight snapshot bridge。
+- `FlowTabPriorityCoverageTests.testLiveSwitcherModelStartSessionRequestsRuntimeMaintenanceWithoutSurfaceSampling` 证明 app switcher projection 存在时，`startSession` 读取 committed app-switcher projection 并只请求 shared runtime maintenance；`testLiveSwitcherModelStartsAppSessionFromRuntimeProjectionWithoutLightweightSampling` / `testLiveSwitcherModelRequestsMaintenanceWhenAppSwitcherProjectionIsMissing` / `testLiveSwitcherModelDoesNotExposeDirtyProjectionWindowsAsFreshWindowCycle` 也用 app-switcher projection read count 与 maintenance request 证明 projection-owned startup path，而不是 dead full/lightweight snapshot counters。
 - `FlowTabTests.testLiveSwitcherModelMaintenanceDiagnosticTracksGenerationReasonWithoutApply` 证明 maintenance diagnostic 记录 generation/reason，`applyGeneration=nil`，不会把后台结果 apply 回 surface session。
 - `FlowTabPriorityCoverageTests.testRuntimeReconciliationCoordinatorPromotesPriorityAndBypassesRetryBackoff` 证明 high-priority activation verified signal 可以提升已有 low-priority retry request，重置 attempt 并绕过 retry backoff。
 - `FlowTabPriorityCoverageTests.testRuntimeProjectionServiceMaintenanceRequestDrainsReadyRequestsBySchedulerPriority` 证明 runtime maintenance drain 按 shared coordinator priority 执行 high-priority request，再执行 low-priority request。

@@ -363,8 +363,10 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
 
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        assertAppSwitcherProjectionRead(
+            from: runtimeProjectionService,
+            maintenanceRequests: []
+        )
         XCTAssertEqual(model.session?.apps.map(\.id), apps.map(\.id))
         XCTAssertEqual(model.session?.apps.flatMap(\.windows).count, 0)
     }
@@ -377,11 +379,9 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(model.startSession(triggerDirection: .forward))
 
         XCTAssertNil(model.session)
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
-        XCTAssertEqual(
-            runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(),
-            [.switcherSessionStarted]
+        assertAppSwitcherProjectionRead(
+            from: runtimeProjectionService,
+            maintenanceRequests: [.switcherSessionStarted]
         )
     }
 
@@ -418,9 +418,10 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
 
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(), [.switcherSessionStarted])
+        assertAppSwitcherProjectionRead(
+            from: runtimeProjectionService,
+            maintenanceRequests: [.switcherSessionStarted]
+        )
         XCTAssertEqual(model.session?.apps.map(\.id), [appID])
         XCTAssertEqual(model.session?.selectedApp.windows.map(\.id), [])
 
@@ -1195,6 +1196,26 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(previewLayerFrame.midX, appLayerFrame.midX, accuracy: 0.5)
         XCTAssertEqual(appLayerFrame.midY, screenCenterY, accuracy: 0.5)
         XCTAssertEqual(previewLayerFrame.maxY, appLayerFrame.maxY, accuracy: 0.5)
+    }
+
+    private func assertAppSwitcherProjectionRead(
+        from runtimeProjectionService: RecordingRuntimeProjectionService,
+        maintenanceRequests: [RuntimeProjectionMaintenanceReason],
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertEqual(
+            runtimeProjectionService.appSwitcherProjectionReadCount(),
+            1,
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(
+            runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(),
+            maintenanceRequests,
+            file: file,
+            line: line
+        )
     }
 
 }
