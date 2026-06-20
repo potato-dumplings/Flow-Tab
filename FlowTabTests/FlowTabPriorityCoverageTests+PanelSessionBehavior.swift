@@ -1085,9 +1085,10 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
 
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(), [.switcherSessionStarted])
+        assertAppSwitcherProjectionRead(
+            from: runtimeProjectionService,
+            maintenanceRequests: [.switcherSessionStarted]
+        )
         XCTAssertEqual(model.lastRuntimeProjectionMaintenanceDiagnostic?.result, "maintenanceRequested")
         XCTAssertEqual(model.lastRuntimeProjectionMaintenanceDiagnostic?.applyGeneration, nil)
     }
