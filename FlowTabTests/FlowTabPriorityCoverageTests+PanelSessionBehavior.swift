@@ -599,7 +599,8 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
 
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 1)
+        XCTAssertTrue(runtimeProjectionService.selectedCurrentAppWindowChangeSignalsRecorded().isEmpty)
         XCTAssertEqual(model.session?.mode, .windowCycle(appID: appID))
         XCTAssertEqual(model.session?.selectedApp.windows.map(\.id), ["focused-projected-1", "focused-projected-2"])
     }
@@ -620,7 +621,7 @@ extension FlowTabPriorityCoverageTests {
             runtimeProjectionService.selectedCurrentAppWindowChangeSignalsRecorded().map(\.pid),
             [runningApp.processIdentifier]
         )
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 1)
         XCTAssertNil(model.session)
     }
 
