@@ -1153,17 +1153,18 @@ extension FlowTabTests {
         let summary = latencySummary(samples: samples)
         print(
             String(
-                format: "[ControlTabFocusedProjectionFastStartPressure] windows=%d, iterations=%d, p50=%.2fms, p95=%.2fms, max=%.2fms, snapshotCalls=%d",
+                format: "[ControlTabFocusedProjectionFastStartPressure] windows=%d, iterations=%d, p50=%.2fms, p95=%.2fms, max=%.2fms, currentAppProjectionReads=%d",
                 windowCount,
                 iterations,
                 summary.p50,
                 summary.p95,
                 summary.max,
-                runtimeProjectionService.snapshotRequestCount()
+                runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID)
             )
         )
 
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), iterations)
+        XCTAssertEqual(runtimeProjectionService.selectedCurrentAppWindowChangeSignalsRecorded().count, 0)
         XCTAssertLessThan(summary.p95, 100)
     }
 
