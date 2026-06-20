@@ -1027,8 +1027,11 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
         XCTAssertEqual(controller.modelForTesting.session?.selectedApp.windows.count, 0)
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertAppSwitcherProjectionRead(
+            from: runtimeProjectionService,
+            maintenanceRequests: [.switcherSessionStarted]
+        )
+        XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 0)
 
         controller.scheduleDelayedWindowLayerEntryForTesting()
 
@@ -1040,8 +1043,8 @@ extension FlowTabPriorityCoverageTests {
             controller.modelForTesting.session?.mode == .windowCycle(appID: appID)
         }
         XCTAssertTrue(didUseProjection)
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 1)
+        XCTAssertTrue(runtimeProjectionService.selectedCurrentAppWindowChangeSignalsRecorded().isEmpty)
         XCTAssertEqual(
             controller.modelForTesting.session?.mode,
             .windowCycle(appID: appID)
