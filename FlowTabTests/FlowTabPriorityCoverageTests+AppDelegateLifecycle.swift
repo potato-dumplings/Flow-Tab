@@ -836,8 +836,9 @@ extension FlowTabPriorityCoverageTests {
 
         mainRecord.monitor.onHotkeyPressed?(false)
         panelController.panelVisibilityOverride = true
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.appSwitcherProjectionReadCount(), 1)
+        XCTAssertEqual(runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(), [.switcherSessionStarted])
+        XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: currentAppID), 0)
         XCTAssertNotNil(panelController.modelForTesting.session)
         let initialSelectedAppID = panelController.modelForTesting.selectedApp?.id
 
@@ -871,8 +872,8 @@ extension FlowTabPriorityCoverageTests {
         panelController.ignoreHotkeyPressesUntil = 0
         inAppRecord.monitor.onHotkeyPressed?(false)
         panelController.panelVisibilityOverride = true
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: currentAppID), 1)
+        XCTAssertTrue(runtimeProjectionService.selectedCurrentAppWindowChangeSignalsRecorded().isEmpty)
         XCTAssertEqual(panelController.activeHotkeySessionKind, .inAppWindowSwitcher)
         XCTAssertEqual(panelController.modelForTesting.session?.mode, .windowCycle(appID: currentAppID))
         let initialSelectedWindowID = panelController.modelForTesting.session?.selectedWindow?.id
