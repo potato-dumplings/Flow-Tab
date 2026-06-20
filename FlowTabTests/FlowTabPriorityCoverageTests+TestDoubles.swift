@@ -86,6 +86,8 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     private let currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection]
     private var committedSearchIndexProjection: RuntimeSearchIndexProjection?
     private var appSwitcherProjectionReads = 0
+    private var currentAppWindowProjectionReadsByAppID: [String: Int] = [:]
+    private var committedSearchIndexReads = 0
     private var lightweightSnapshotRequests = 0
     private var appSwitcherMaintenanceRequests: [RuntimeProjectionMaintenanceReason] = []
     private var searchIndexFreshnessBarrierRequests: [RuntimeProjectionMaintenanceReason] = []
@@ -153,6 +155,18 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         lock.lock()
         defer { lock.unlock() }
         return appSwitcherProjectionReads
+    }
+
+    func currentAppWindowProjectionReadCount(appID: String) -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return currentAppWindowProjectionReadsByAppID[appID] ?? 0
+    }
+
+    func committedSearchIndexReadCount() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return committedSearchIndexReads
     }
 
     func installAppSwitcherProjection(
@@ -258,12 +272,16 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     }
 
     func readCurrentAppWindowProjection(appID: String) -> RuntimeCurrentAppWindowProjection? {
+        lock.lock()
+        currentAppWindowProjectionReadsByAppID[appID, default: 0] += 1
+        lock.unlock()
         return currentAppWindowProjectionsByAppID[appID]
     }
 
     func readCommittedSearchIndexForSearch() -> RuntimeSearchIndexRead {
         lock.lock()
         defer { lock.unlock() }
+        committedSearchIndexReads += 1
         guard let projection = committedSearchIndexProjection else {
             return RuntimeSearchIndexRead(projection: nil, readiness: .missingCommittedIndex)
         }

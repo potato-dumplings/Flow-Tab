@@ -48,8 +48,7 @@ extension FlowTabPriorityCoverageTests {
 
             XCTAssertTrue(model.startSession(triggerDirection: .forward))
             XCTAssertTrue(model.enterSearchMode())
-            XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-            XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+            assertCommittedSearchIndexRead(model, from: runtimeProjectionService)
             XCTAssertTrue(model.isSearchActive)
             XCTAssertEqual(model.searchScope, .app)
 
@@ -73,8 +72,7 @@ extension FlowTabPriorityCoverageTests {
 
             XCTAssertTrue(model.startSession(triggerDirection: .forward))
             XCTAssertTrue(model.enterSearchMode())
-            XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-            XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+            assertCommittedSearchIndexRead(model, from: runtimeProjectionService)
             XCTAssertTrue(model.isSearchActive)
             XCTAssertEqual(model.searchScope, .app)
             XCTAssertGreaterThanOrEqual(model.searchResultCount, 3)
@@ -103,8 +101,7 @@ extension FlowTabPriorityCoverageTests {
 
             XCTAssertTrue(model.startSession(triggerDirection: .forward))
             XCTAssertTrue(model.enterSearchMode())
-            XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-            XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+            assertCommittedSearchIndexRead(model, from: runtimeProjectionService)
             XCTAssertEqual(model.searchScope, .window)
             XCTAssertGreaterThanOrEqual(model.searchResultCount, 4)
 
@@ -154,8 +151,7 @@ extension FlowTabPriorityCoverageTests {
 
             XCTAssertTrue(model.startSession(triggerDirection: .forward))
             XCTAssertTrue(model.enterSearchMode())
-            XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-            XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+            assertCommittedSearchIndexRead(model, from: runtimeProjectionService)
             XCTAssertTrue(
                 model.searchCoordinator.replaceQueryWithoutRebuild(
                     "README",
@@ -192,8 +188,7 @@ extension FlowTabPriorityCoverageTests {
         )
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertAppSwitcherProjectionSessionRead(from: runtimeProjectionService)
         let initialSelectedAppID = controller.modelForTesting.selectedApp?.id
 
         controller.pointerSelectionGate.reset(currentLocation: .zero)
@@ -226,8 +221,7 @@ extension FlowTabPriorityCoverageTests {
         controller.modelForTesting.frontmostApplicationOverride = { currentApp }
 
         XCTAssertTrue(controller.beginInAppWindowHotkeySessionForTesting())
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertCurrentAppWindowProjectionRead(appID: appID, from: runtimeProjectionService)
         let initialSelectedWindowID = controller.modelForTesting.session?.selectedWindow?.id
         controller.pointerSelectionGate.reset(currentLocation: .zero)
 
@@ -299,8 +293,7 @@ extension FlowTabPriorityCoverageTests {
         }
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertAppSwitcherProjectionSessionRead(from: runtimeProjectionService)
         controller.pointerSelectionGate.reset(currentLocation: .zero)
 
         controller.commitSwitcherAppByPointerClick(appID: "com.example.browser")
@@ -337,8 +330,7 @@ extension FlowTabPriorityCoverageTests {
         }
 
         XCTAssertTrue(controller.beginInAppWindowHotkeySessionForTesting())
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertCurrentAppWindowProjectionRead(appID: appID, from: runtimeProjectionService)
         controller.pointerSelectionGate.reset(currentLocation: .zero)
 
         controller.commitSwitcherWindowByPointerClick(appID: appID, windowID: "front-2")
@@ -771,8 +763,7 @@ extension FlowTabPriorityCoverageTests {
         model.frontmostApplicationOverride = { currentApp }
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertCurrentAppWindowProjectionRead(appID: appID, from: runtimeProjectionService)
         XCTAssertEqual(model.overlayStyle, .windowOnly)
         XCTAssertTrue(model.isPreviewLayerMode)
         XCTAssertEqual(model.previewWindowCount, 2)
@@ -786,8 +777,7 @@ extension FlowTabPriorityCoverageTests {
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertAppSwitcherProjectionSessionRead(from: runtimeProjectionService)
         XCTAssertEqual(model.session?.mode, .appCycle)
         XCTAssertTrue(model.canAutoEnterWindowLayer)
         XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
@@ -912,8 +902,7 @@ extension FlowTabPriorityCoverageTests {
         controller.modelForTesting.isProcessRunningOverride = { _ in true }
 
         XCTAssertTrue(controller.modelForTesting.startSession(triggerDirection: .forward))
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertAppSwitcherProjectionSessionRead(from: runtimeProjectionService)
         let selectedAppID = controller.modelForTesting.selectedApp?.id
         let hotkeyConfiguration = SwitcherHotkeyPreferencesStore.load()
 
@@ -955,8 +944,7 @@ extension FlowTabPriorityCoverageTests {
                 min(sessionBeforeTermination.selectedAppIndex, remainingAppIDs.count - 1)
             ]
             XCTAssertFalse(controller.modelForTesting.isSearchActive)
-            XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-            XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+            assertAppSwitcherProjectionSessionRead(from: runtimeProjectionService)
 
             let layoutRefreshed = expectation(
                 description: "layout refreshed automatically after terminating frontmost app in app layer"
@@ -979,11 +967,95 @@ extension FlowTabPriorityCoverageTests {
             XCTAssertEqual(controller.modelForTesting.selectedApp?.id, expectedSelectedAppID)
             XCTAssertFalse(controller.modelForTesting.session?.apps.contains { $0.id == terminatedAppID } ?? true)
             XCTAssertEqual(runtimeProjectionService.appTerminationSignalsRecorded().map(\.appID), [terminatedAppID])
-            XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-            XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+            assertAppSwitcherProjectionSessionRead(from: runtimeProjectionService, minimumReadCount: 2)
             XCTAssertFalse(controller.modelForTesting.isSearchActive)
             controller.cancelSelectionForTesting()
         }
+    }
+
+    @MainActor
+    private func assertCommittedSearchIndexRead(
+        _ model: LiveSwitcherModel,
+        from runtimeProjectionService: RecordingRuntimeProjectionService,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertGreaterThanOrEqual(
+            runtimeProjectionService.committedSearchIndexReadCount(),
+            1,
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(
+            model.lastSearchIndexReadDiagnostic?.readiness,
+            .currentGenerationCommitted,
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(
+            model.lastSearchIndexReadDiagnostic?.resultState,
+            .verifiedCurrentGenerationCommittedResult,
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(
+            model.lastSearchIndexReadDiagnostic?.committedIndexCoversCurrentGeneration,
+            true,
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(
+            model.lastSearchIndexReadDiagnostic?.requestedFreshnessBarrier,
+            false,
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(
+            runtimeProjectionService.searchIndexFreshnessBarrierRequestsRecorded(),
+            [],
+            file: file,
+            line: line
+        )
+    }
+
+    private func assertAppSwitcherProjectionSessionRead(
+        from runtimeProjectionService: RecordingRuntimeProjectionService,
+        minimumReadCount: Int = 1,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertGreaterThanOrEqual(
+            runtimeProjectionService.appSwitcherProjectionReadCount(),
+            minimumReadCount,
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(
+            runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(),
+            [.switcherSessionStarted],
+            file: file,
+            line: line
+        )
+    }
+
+    private func assertCurrentAppWindowProjectionRead(
+        appID: String,
+        from runtimeProjectionService: RecordingRuntimeProjectionService,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertEqual(
+            runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID),
+            1,
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(
+            runtimeProjectionService.selectedCurrentAppWindowChangeSignalsRecorded().map(\.appID),
+            [],
+            file: file,
+            line: line
+        )
     }
 
 }
