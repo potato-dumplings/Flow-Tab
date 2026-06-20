@@ -130,6 +130,8 @@ extension FlowTabTests {
             capturedContextsByID[appID]?.windowsByID["projected-draft"]?.title,
             "Projected Draft"
         )
+        XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 1)
+        XCTAssertEqual(runtimeProjectionService.appWindowChangeSignalsRecorded().map(\.appID), [])
     }
 
     @MainActor
@@ -176,6 +178,9 @@ extension FlowTabTests {
         )
 
         XCTAssertNil(capturedTarget)
+        XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 1)
+        XCTAssertEqual(runtimeProjectionService.appSwitcherProjectionReadCount(), 1)
+        XCTAssertEqual(runtimeProjectionService.homeSummaryProjectionReadCount(), 1)
         XCTAssertEqual(runtimeProjectionService.appWindowChangeSignalsRecorded().map(\.appID), [appID])
         XCTAssertEqual(
             runtimeProjectionService.appWindowChangeSignalsRecorded().map(\.pid),
@@ -316,7 +321,9 @@ extension FlowTabTests {
             )?.candidate.windows.map(\.id),
             ["home-projected-1"]
         )
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.homeSummaryProjectionReadCount(), 3)
+        XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 1)
+        XCTAssertEqual(runtimeProjectionService.appSwitcherProjectionReadCount(), 0)
     }
 
     func testHomeInitialAppSummaryReaderDoesNotUseLightweightSnapshotFallback() {
@@ -351,7 +358,8 @@ extension FlowTabTests {
             HomeInitialAppSummaryReader.appSummaries(from: projectionService).map(\.appID),
             [appID]
         )
-        XCTAssertEqual(projectionService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(projectionService.homeSummaryProjectionReadCount(), 1)
+        XCTAssertEqual(projectionService.appSwitcherProjectionReadCount(), 1)
 
         let missingProjectionService = RecordingRuntimeProjectionService()
 
@@ -359,7 +367,9 @@ extension FlowTabTests {
             HomeInitialAppSummaryReader.appSummaries(from: missingProjectionService),
             []
         )
-        XCTAssertEqual(missingProjectionService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(missingProjectionService.homeSummaryProjectionReadCount(), 1)
+        XCTAssertEqual(missingProjectionService.appSwitcherProjectionReadCount(), 1)
+        XCTAssertEqual(missingProjectionService.appSwitcherMaintenanceRequestsRecorded(), [])
     }
 
     func testHomeRuntimeProjectionReaderDerivesHomeDataFromAppSwitcherProjectionWithoutSnapshotBridge() {
@@ -407,6 +417,9 @@ extension FlowTabTests {
             )?.candidate.windows.map(\.id),
             ["projection-window"]
         )
+        XCTAssertEqual(runtimeProjectionService.homeSummaryProjectionReadCount(), 2)
+        XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 1)
+        XCTAssertEqual(runtimeProjectionService.appSwitcherProjectionReadCount(), 3)
     }
 
     func testHomeRuntimeRefreshReaderSignalsRuntimeRepairWhenProjectionIsMissingWithoutHomeFallback() {

@@ -86,6 +86,7 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     private let currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection]
     private var committedSearchIndexProjection: RuntimeSearchIndexProjection?
     private var appSwitcherProjectionReads = 0
+    private var homeSummaryProjectionReads = 0
     private var currentAppWindowProjectionReadsByAppID: [String: Int] = [:]
     private var committedSearchIndexReads = 0
     private var lightweightSnapshotRequests = 0
@@ -155,6 +156,12 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         lock.lock()
         defer { lock.unlock() }
         return appSwitcherProjectionReads
+    }
+
+    func homeSummaryProjectionReadCount() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return homeSummaryProjectionReads
     }
 
     func currentAppWindowProjectionReadCount(appID: String) -> Int {
@@ -268,6 +275,9 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     }
 
     func readHomeSummaryProjection() -> RuntimeHomeSummaryProjection? {
+        lock.lock()
+        homeSummaryProjectionReads += 1
+        lock.unlock()
         return homeSummaryProjection
     }
 
