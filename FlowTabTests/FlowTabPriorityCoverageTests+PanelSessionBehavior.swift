@@ -785,14 +785,19 @@ extension FlowTabPriorityCoverageTests {
             return
         }
         XCTAssertEqual(controller.modelForTesting.selectedApp?.id, terminatedAppID)
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertAppSwitcherProjectionRead(
+            from: runtimeProjectionService,
+            maintenanceRequests: [.switcherSessionStarted]
+        )
 
         controller.handleWorkspaceApplicationTerminatedForTesting(appID: terminatedAppID, pid: 42_300)
 
         XCTAssertEqual(runtimeProjectionService.appTerminationSignalsRecorded().map(\.appID), [terminatedAppID])
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertAppSwitcherProjectionRead(
+            from: runtimeProjectionService,
+            readCount: 2,
+            maintenanceRequests: [.switcherSessionStarted]
+        )
         XCTAssertNotNil(controller.modelForTesting.session)
         XCTAssertFalse(controller.modelForTesting.session?.apps.contains { $0.id == terminatedAppID } ?? true)
 
@@ -820,8 +825,10 @@ extension FlowTabPriorityCoverageTests {
         controller.appIsActiveOverride = false
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertAppSwitcherProjectionRead(
+            from: runtimeProjectionService,
+            maintenanceRequests: [.switcherSessionStarted]
+        )
         let selectedAppID = controller.modelForTesting.selectedApp?.id
 
         controller.terminateSelectedApp()
@@ -1205,13 +1212,14 @@ extension FlowTabPriorityCoverageTests {
 
     private func assertAppSwitcherProjectionRead(
         from runtimeProjectionService: RecordingRuntimeProjectionService,
+        readCount: Int = 1,
         maintenanceRequests: [RuntimeProjectionMaintenanceReason],
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
         XCTAssertEqual(
             runtimeProjectionService.appSwitcherProjectionReadCount(),
-            1,
+            readCount,
             file: file,
             line: line
         )
