@@ -39,8 +39,10 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertEqual(controller.panelVisibilityRecoveryState, .idle)
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertInitialVisibilityProjectionRead(
+            from: runtimeProjectionService,
+            expectedReadCount: 1
+        )
 
         let initialGeneration = controller.beginInitialPresentationVisibilityTracking(
             trigger: "state_initial"
@@ -92,8 +94,10 @@ extension FlowTabPriorityCoverageTests {
         controller.appIsActiveOverride = false
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertInitialVisibilityProjectionRead(
+            from: runtimeProjectionService,
+            expectedReadCount: 1
+        )
 
         await controller.performPanelVisibilityRecoveryAttempt(
             trigger: "diagnostic_recovery",
@@ -158,8 +162,12 @@ extension FlowTabPriorityCoverageTests {
 
         for index in 0..<iterationCount {
             XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting(), "iteration \(index)")
-            XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0, "iteration \(index)")
-            XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0, "iteration \(index)")
+            assertInitialVisibilityProjectionRead(
+                from: runtimeProjectionService,
+                expectedReadCount: index + 1,
+                file: #filePath,
+                line: #line
+            )
             controller.panelVisibilityOverride = false
 
             let trigger = "\(triggerPrefix)_\(index)"
@@ -220,8 +228,10 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(didSettleRecoveryState)
 
         XCTAssertNil(controller.modelForTesting.session)
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertInitialVisibilityProjectionRead(
+            from: runtimeProjectionService,
+            expectedReadCount: iterationCount
+        )
         XCTAssertFalse(controller.hasActivePresentationSession)
         XCTAssertNil(controller.panelPresentationRecoveryTask)
         XCTAssertEqual(controller.initialPresentationVisibilityDeadline, 0, accuracy: 0.0001)
@@ -250,6 +260,26 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(
             staleExecutionLines.isEmpty,
             "stale recovery executions: \(staleExecutionLines.prefix(5).joined(separator: "\n"))"
+        )
+    }
+
+    private func assertInitialVisibilityProjectionRead(
+        from runtimeProjectionService: RecordingRuntimeProjectionService,
+        expectedReadCount: Int,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertEqual(
+            runtimeProjectionService.appSwitcherProjectionReadCount(),
+            expectedReadCount,
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(
+            runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(),
+            Array(repeating: .switcherSessionStarted, count: expectedReadCount),
+            file: file,
+            line: line
         )
     }
 }
