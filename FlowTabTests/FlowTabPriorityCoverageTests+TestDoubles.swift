@@ -139,10 +139,6 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         )
     }
 
-    func recordedHomeAppIDs() -> [String] {
-        []
-    }
-
     func snapshotRequestCount() -> Int {
         0
     }
@@ -180,14 +176,6 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
             contextsByID: contextsByID,
             freshness: freshness
         )
-    }
-
-    func homeSummariesRequestCount() -> Int {
-        0
-    }
-
-    func homeSummaryRequestCount() -> Int {
-        0
     }
 
     func appSwitcherMaintenanceRequestsRecorded() -> [RuntimeProjectionMaintenanceReason] {

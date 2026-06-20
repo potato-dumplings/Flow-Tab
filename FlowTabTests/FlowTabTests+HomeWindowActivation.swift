@@ -130,7 +130,6 @@ extension FlowTabTests {
             capturedContextsByID[appID]?.windowsByID["projected-draft"]?.title,
             "Projected Draft"
         )
-        XCTAssertEqual(runtimeProjectionService.recordedHomeAppIDs(), [])
     }
 
     @MainActor
@@ -177,7 +176,6 @@ extension FlowTabTests {
         )
 
         XCTAssertNil(capturedTarget)
-        XCTAssertEqual(runtimeProjectionService.recordedHomeAppIDs(), [])
         XCTAssertEqual(runtimeProjectionService.appWindowChangeSignalsRecorded().map(\.appID), [appID])
         XCTAssertEqual(
             runtimeProjectionService.appWindowChangeSignalsRecorded().map(\.pid),
@@ -319,9 +317,6 @@ extension FlowTabTests {
             ["home-projected-1"]
         )
         XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.homeSummariesRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.homeSummaryRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.recordedHomeAppIDs(), [])
     }
 
     func testHomeInitialAppSummaryReaderDoesNotUseLightweightSnapshotFallback() {
@@ -412,9 +407,6 @@ extension FlowTabTests {
             )?.candidate.windows.map(\.id),
             ["projection-window"]
         )
-        XCTAssertEqual(runtimeProjectionService.homeSummariesRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.homeSummaryRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.recordedHomeAppIDs(), [])
     }
 
     func testHomeRuntimeRefreshReaderSignalsRuntimeRepairWhenProjectionIsMissingWithoutHomeFallback() {
@@ -456,9 +448,6 @@ extension FlowTabTests {
             )?.candidate.windows.map(\.id),
             ["cached-window"]
         )
-        XCTAssertEqual(runtimeProjectionService.homeSummariesRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.homeSummaryRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.recordedHomeAppIDs(), [])
         XCTAssertEqual(runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(), [.homeProjectionMissing])
         XCTAssertEqual(runtimeProjectionService.appWindowChangeSignalsRecorded().map(\.appID), [appID, appID])
     }

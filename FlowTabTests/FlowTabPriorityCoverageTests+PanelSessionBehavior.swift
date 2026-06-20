@@ -495,7 +495,6 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertTrue(model.scheduleSelectedAppWindowProjectionIfNeeded(for: appID))
 
-        XCTAssertEqual(runtimeProjectionService.recordedHomeAppIDs(), [])
         XCTAssertEqual(model.session?.selectedApp.windows.map(\.id), ["projected-window-1", "projected-window-2"])
         XCTAssertEqual(model.runtimeContextsByID[appID]?.windowsByID["projected-window-1"]?.title, "Projected One")
     }
@@ -538,7 +537,6 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertTrue(model.scheduleSelectedAppWindowProjectionIfNeeded(for: appID))
 
-        XCTAssertEqual(runtimeProjectionService.recordedHomeAppIDs(), [])
         XCTAssertTrue(runtimeProjectionService.appWindowChangeSignalsRecorded().isEmpty)
         XCTAssertEqual(runtimeProjectionService.selectedCurrentAppWindowChangeSignalsRecorded().map(\.appID), [appID])
         XCTAssertEqual(
