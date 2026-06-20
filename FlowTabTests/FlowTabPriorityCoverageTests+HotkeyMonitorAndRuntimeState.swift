@@ -728,8 +728,10 @@ extension FlowTabPriorityCoverageTests {
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertAppSwitcherProjectionRead(
+            from: runtimeProjectionService,
+            expectedReadCount: 1
+        )
         XCTAssertEqual(model.selectedApp?.id, "com.example.code")
 
         let layoutRefreshed = expectation(description: "layout refreshed after app termination")
@@ -739,8 +741,10 @@ extension FlowTabPriorityCoverageTests {
 
         await fulfillment(of: [layoutRefreshed], timeout: 1.0)
         XCTAssertEqual(runtimeProjectionService.appTerminationSignalsRecorded().map(\.appID), ["com.example.code"])
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertAppSwitcherProjectionRead(
+            from: runtimeProjectionService,
+            expectedReadCount: 2
+        )
         XCTAssertEqual(model.appCount, 2)
         XCTAssertEqual(model.selectedApp?.id, "com.example.browser")
     }
@@ -807,17 +811,41 @@ extension FlowTabPriorityCoverageTests {
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertAppSwitcherProjectionRead(
+            from: runtimeProjectionService,
+            expectedReadCount: 1
+        )
         let selectedAppID = model.selectedApp?.id
 
         model.handleApplicationTerminated(appID: "com.example.unrelated", pid: 99_999)
 
         XCTAssertTrue(runtimeProjectionService.appTerminationSignalsRecorded().isEmpty)
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertAppSwitcherProjectionRead(
+            from: runtimeProjectionService,
+            expectedReadCount: 1
+        )
         XCTAssertEqual(model.appCount, initialApps.count)
         XCTAssertEqual(model.selectedApp?.id, selectedAppID)
+    }
+
+    private func assertAppSwitcherProjectionRead(
+        from runtimeProjectionService: RecordingRuntimeProjectionService,
+        expectedReadCount: Int,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertEqual(
+            runtimeProjectionService.appSwitcherProjectionReadCount(),
+            expectedReadCount,
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(
+            runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(),
+            [.switcherSessionStarted],
+            file: file,
+            line: line
+        )
     }
 
     func testOptionTabHotkeyMonitorSkipsHotkeyRegistrationWhenHandlerInstallFails() {
