@@ -647,6 +647,7 @@ extension FlowTabTests {
         XCTAssertNotEqual(diagnostic.resultState, .verifiedCurrentGenerationCommittedResult)
         XCTAssertFalse(diagnostic.committedIndexCoversCurrentGeneration)
         XCTAssertTrue(diagnostic.logMessage.contains("resultState=degradedStaleCommittedResult"))
+        XCTAssertTrue(diagnostic.logMessage.contains("source=committedRuntimeIndex"))
         XCTAssertTrue(diagnostic.logMessage.contains("committedIndexCoversCurrentGeneration=0"))
         XCTAssertFalse(diagnostic.logMessage.contains("resultState=verifiedCurrentGenerationCommittedResult"))
         XCTAssertFalse(diagnostic.logMessage.contains("resultState=latestCommittedResult"))
@@ -657,8 +658,6 @@ extension FlowTabTests {
             runtimeProjectionService.searchIndexFreshnessBarrierRequestsRecorded(),
             [.searchFreshnessBarrier]
         )
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
 
         XCTAssertTrue(
             model.searchCoordinator.replaceQueryWithoutRebuild(
@@ -844,9 +843,17 @@ extension FlowTabTests {
             .verifiedCurrentGenerationCommittedResult
         )
         XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.committedIndexCoversCurrentGeneration, true)
+        XCTAssertTrue(
+            model.lastSearchIndexReadDiagnostic?.logMessage.contains(
+                "source=committedRuntimeIndex"
+            ) ?? false
+        )
+        XCTAssertTrue(
+            model.lastSearchIndexReadDiagnostic?.logMessage.contains(
+                "resultState=verifiedCurrentGenerationCommittedResult"
+            ) ?? false
+        )
         XCTAssertEqual(runtimeProjectionService.searchIndexFreshnessBarrierRequestsRecorded(), [])
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
 
         let queries = benchmarkQueries()
         let rounds = 3
@@ -858,7 +865,7 @@ extension FlowTabTests {
 
         print(
             String(
-                format: "[CommittedSearchIndexPressure] dataset=%d apps / %d windows, rounds=%d, enter=%.2fms, query=%.2fms, queries=%d, throughput=%.2f qps, snapshotCalls=%d, lightweightCalls=%d, freshnessBarrierRequests=%d",
+                format: "[CommittedSearchIndexPressure] dataset=%d apps / %d windows, rounds=%d, enter=%.2fms, query=%.2fms, queries=%d, throughput=%.2f qps, resultState=%@, freshnessBarrierRequests=%d",
                 apps.count,
                 windowCount,
                 rounds,
@@ -866,15 +873,12 @@ extension FlowTabTests {
                 queryMs,
                 queryCount,
                 qps,
-                runtimeProjectionService.snapshotRequestCount(),
-                runtimeProjectionService.lightweightSnapshotRequestCount(),
+                model.lastSearchIndexReadDiagnostic?.resultState.rawValue ?? "nil",
                 runtimeProjectionService.searchIndexFreshnessBarrierRequestsRecorded().count
             )
         )
 
         XCTAssertFalse(searchResultIDs(query: "weixin", on: model.searchCoordinator).isEmpty)
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
         XCTAssertEqual(runtimeProjectionService.searchIndexFreshnessBarrierRequestsRecorded(), [])
     }
 
