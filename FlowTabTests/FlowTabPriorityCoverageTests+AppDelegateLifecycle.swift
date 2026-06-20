@@ -1165,8 +1165,12 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(didOpenSeededSwitcher)
 
         XCTAssertGreaterThanOrEqual(runtimeProjectionService.appSwitcherProjectionReadCount(), 3)
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertFalse(runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded().isEmpty)
+        XCTAssertTrue(
+            runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded()
+                .allSatisfy { $0 == .switcherSessionStarted }
+        )
+        XCTAssertEqual(runtimeProjectionService.committedSearchIndexReadCount(), 0)
         XCTAssertEqual(panelController.modelForTesting.appCount, multiAppSnapshot.count)
         XCTAssertEqual(
             panelController.modelForTesting.session?.apps.map(\.id),
@@ -1253,13 +1257,19 @@ extension FlowTabPriorityCoverageTests {
             pollIntervalNanoseconds: 25_000_000
         ) {
             hotkeyFactory.records.count == 2
+                && runtimeProjectionService.appSwitcherProjectionReadCount() >= 1
         }
         XCTAssertTrue(didFinishLaunchBootstrap)
 
         XCTAssertNil(panelController.modelForTesting.session)
         XCTAssertFalse(panelController.modelForTesting.isSearchActive)
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertGreaterThanOrEqual(runtimeProjectionService.appSwitcherProjectionReadCount(), 1)
+        XCTAssertFalse(runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded().isEmpty)
+        XCTAssertTrue(
+            runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded()
+                .allSatisfy { $0 == .switcherSessionStarted }
+        )
+        XCTAssertEqual(runtimeProjectionService.committedSearchIndexReadCount(), 0)
         XCTAssertEqual(hotkeyFactory.records.count, 2)
 
         let lines = await RuntimeDiagnostics.shared.readRecentLines(limit: 40, minimumLevel: .debug)
