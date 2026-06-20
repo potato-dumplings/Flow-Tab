@@ -5,6 +5,25 @@ import XCTest
 import FlowTabCore
 
 extension FlowTabPriorityCoverageTests {
+    private func assertPreviewProviderSessionStartedFromAppSwitcherProjection(
+        _ runtimeProjectionService: RecordingRuntimeProjectionService,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertEqual(
+            runtimeProjectionService.appSwitcherProjectionReadCount(),
+            1,
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(
+            runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(),
+            [.switcherSessionStarted],
+            file: file,
+            line: line
+        )
+    }
+
     func testWindowPreviewResolverUsesSpecialProviderBeforeGeneric() async {
         let specialProvider = FakeSpecialWindowPreviewProvider(
             supportedAppID: "com.apple.Terminal",
@@ -369,7 +388,6 @@ extension FlowTabPriorityCoverageTests {
             windows: windows
         )
         let (model, runtimeProjectionService) = makeAppSwitcherProjectionModel(app: app, context: context)
-        model.runtimeProjectionMaintenanceEnabled = false
         let specialProvider = FakeSpecialWindowPreviewProvider(
             supportedAppID: appID,
             result: .success(
@@ -389,8 +407,7 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertPreviewProviderSessionStartedFromAppSwitcherProjection(runtimeProjectionService)
 
         let published = expectation(description: "terminal preview provider published results")
         var cancellables: Set<AnyCancellable> = []
@@ -442,7 +459,6 @@ extension FlowTabPriorityCoverageTests {
             windows: windows
         )
         let (model, runtimeProjectionService) = makeAppSwitcherProjectionModel(app: app, context: context)
-        model.runtimeProjectionMaintenanceEnabled = false
         let specialProvider = FakeSpecialWindowPreviewProvider(
             supportedAppID: appID,
             result: .failure(.specialProviderUnavailable)
@@ -462,8 +478,7 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertPreviewProviderSessionStartedFromAppSwitcherProjection(runtimeProjectionService)
 
         let published = expectation(description: "terminal preview failure published")
         var cancellables: Set<AnyCancellable> = []
