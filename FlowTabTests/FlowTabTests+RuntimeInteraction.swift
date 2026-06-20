@@ -183,8 +183,7 @@ extension FlowTabTests {
 
         let result = model.terminateSelectedApp()
         XCTAssertEqual(result, .updatedSession)
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertRuntimeProjectionSessionRead(from: runtimeProjectionService)
         XCTAssertEqual(model.appCount, initialApps.count)
         XCTAssertTrue(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? false)
         XCTAssertEqual(model.terminatingAppID, terminatedAppID)
@@ -192,8 +191,7 @@ extension FlowTabTests {
         await fulfillment(of: [layoutRefreshed], timeout: 1.0)
         XCTAssertGreaterThanOrEqual(processCheckCount, 2)
         XCTAssertEqual(runtimeProjectionService.appTerminationSignalsRecorded().map(\.appID), [terminatedAppID])
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertRuntimeProjectionSessionRead(from: runtimeProjectionService, minimumReadCount: 2)
         XCTAssertEqual(model.appCount, appsAfterTermination.count)
         XCTAssertFalse(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? true)
         XCTAssertNil(model.terminatingAppID)
@@ -239,14 +237,12 @@ extension FlowTabTests {
 
         let result = model.terminateSelectedApp()
         XCTAssertEqual(result, .updatedSession)
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertRuntimeProjectionSessionRead(from: runtimeProjectionService)
 
         await fulfillment(of: [layoutRefreshed], timeout: 0.5)
         XCTAssertEqual(processCheckCount, 1)
         XCTAssertEqual(runtimeProjectionService.appTerminationSignalsRecorded().map(\.appID), [terminatedAppID])
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertRuntimeProjectionSessionRead(from: runtimeProjectionService, minimumReadCount: 2)
         XCTAssertEqual(model.appCount, appsAfterTermination.count)
         XCTAssertFalse(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? true)
         XCTAssertNil(model.terminatingAppID)
@@ -271,8 +267,7 @@ extension FlowTabTests {
             XCTFail("Expected an active session before termination refresh")
             return
         }
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertRuntimeProjectionSessionRead(from: runtimeProjectionService)
 
         let refreshedApps = initialApps.filter { $0.id != terminatedAppID }
 
@@ -282,8 +277,7 @@ extension FlowTabTests {
         XCTAssertTrue(model.handleApplicationTerminated(appID: terminatedAppID, pid: 42_012))
 
         await fulfillment(of: [layoutRefreshed], timeout: 1.0)
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertRuntimeProjectionSessionRead(from: runtimeProjectionService, minimumReadCount: 2)
         XCTAssertEqual(
             runtimeProjectionService.appTerminationSignalsRecorded().map(\.appID),
             [terminatedAppID]
@@ -293,6 +287,7 @@ extension FlowTabTests {
                 $0.appID == terminatedAppID
             } ?? true
         )
+        XCTAssertEqual(runtimeProjectionService.committedSearchIndexReadCount(), 1)
         XCTAssertEqual(model.appCount, refreshedApps.count)
         XCTAssertFalse(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? true)
     }
@@ -324,8 +319,7 @@ extension FlowTabTests {
 
         let result = model.terminateSelectedApp()
         XCTAssertEqual(result, .updatedSession)
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertRuntimeProjectionSessionRead(from: runtimeProjectionService)
         XCTAssertEqual(model.appCount, initialApps.count)
         XCTAssertTrue(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? false)
         XCTAssertEqual(model.terminatingAppID, terminatedAppID)
@@ -337,8 +331,7 @@ extension FlowTabTests {
         XCTAssertTrue(didReachTerminateTimeout)
         XCTAssertGreaterThan(processCheckCount, 0)
         XCTAssertTrue(runtimeProjectionService.appTerminationSignalsRecorded().isEmpty)
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertRuntimeProjectionSessionRead(from: runtimeProjectionService)
         XCTAssertEqual(model.appCount, initialApps.count)
         XCTAssertTrue(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? false)
         XCTAssertNil(model.terminatingAppID)
@@ -396,14 +389,12 @@ extension FlowTabTests {
         XCTAssertEqual(model.pendingTerminateRequest?.pid, activePID)
         XCTAssertEqual(model.pendingTerminateRequest?.generation, 1)
         XCTAssertEqual(model.terminatingAppID, terminatedAppID)
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertRuntimeProjectionSessionRead(from: runtimeProjectionService)
 
         XCTAssertTrue(model.handleApplicationTerminated(appID: terminatedAppID, pid: activePID + 1))
 
         XCTAssertEqual(runtimeProjectionService.appTerminationSignalsRecorded().map(\.appID), [terminatedAppID])
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertRuntimeProjectionSessionRead(from: runtimeProjectionService, minimumReadCount: 2)
         XCTAssertEqual(model.pendingTerminateRequest?.appID, terminatedAppID)
         XCTAssertEqual(model.pendingTerminateRequest?.pid, activePID)
         XCTAssertEqual(model.pendingTerminateRequest?.generation, 1)
@@ -445,8 +436,7 @@ extension FlowTabTests {
 
         let result = model.terminateSelectedApp()
         XCTAssertEqual(result, .updatedSession)
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertRuntimeProjectionSessionRead(from: runtimeProjectionService)
         XCTAssertEqual(model.appCount, initialApps.count)
         XCTAssertTrue(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? false)
 
@@ -457,8 +447,7 @@ extension FlowTabTests {
         XCTAssertGreaterThan(processCheckCount, 0)
         XCTAssertEqual(layoutRefreshCount, 0)
         XCTAssertTrue(runtimeProjectionService.appTerminationSignalsRecorded().isEmpty)
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertRuntimeProjectionSessionRead(from: runtimeProjectionService)
         XCTAssertNil(model.terminatingAppID)
 
         model.handleApplicationTerminated(appID: terminatedAppID, pid: 42_002)
@@ -466,11 +455,30 @@ extension FlowTabTests {
         await fulfillment(of: [deferredLayoutRefresh], timeout: 1.0)
         XCTAssertEqual(layoutRefreshCount, 1)
         XCTAssertEqual(runtimeProjectionService.appTerminationSignalsRecorded().map(\.appID), [terminatedAppID])
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertRuntimeProjectionSessionRead(from: runtimeProjectionService, minimumReadCount: 2)
         XCTAssertEqual(model.appCount, appsAfterTermination.count)
         XCTAssertFalse(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? true)
         model.cancelSelection()
+    }
+
+    private func assertRuntimeProjectionSessionRead(
+        from runtimeProjectionService: RecordingRuntimeProjectionService,
+        minimumReadCount: Int = 1,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertGreaterThanOrEqual(
+            runtimeProjectionService.appSwitcherProjectionReadCount(),
+            minimumReadCount,
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(
+            runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(),
+            [.switcherSessionStarted],
+            file: file,
+            line: line
+        )
     }
 
 }
