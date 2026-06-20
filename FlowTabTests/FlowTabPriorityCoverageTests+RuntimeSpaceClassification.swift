@@ -468,13 +468,13 @@ extension FlowTabPriorityCoverageTests {
         model.frontmostApplicationOverride = { currentApp }
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.appSwitcherProjectionReadCount(), 1)
+        XCTAssertEqual(runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(), [.switcherSessionStarted])
         let globalWindowIDs = model.session?.apps.first(where: { $0.id == appID })?.windows.map(\.id) ?? []
         model.cancelSelection()
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 1)
+        XCTAssertTrue(runtimeProjectionService.selectedCurrentAppWindowChangeSignalsRecorded().isEmpty)
         let focusedWindowIDs = model.session?.apps.first?.windows.map(\.id) ?? []
         let expectedWindowIDs: Set<String> = ["cg:\(pid):243747", "cg:\(pid):240101"]
 
