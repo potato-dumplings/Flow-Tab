@@ -633,7 +633,7 @@ extension RuntimeSnapshotProvider {
         )
         let publicMatches = publicAssignmentResult.matches
         bindingDiagnostics.append(contentsOf: publicAssignmentResult.bindingDiagnostics)
-        let publicMatchResolution = Self.resolveFullscreenContentRebindings(
+        let publicMatchResolution = RuntimeWindowTopologyBindingResolver.resolveFullscreenContentRebindings(
             matches: publicMatches,
             axWindows: unresolvedAXWindows,
             cgWindows: validCGWindows,
@@ -671,7 +671,7 @@ extension RuntimeSnapshotProvider {
             validCGWindowIDs: validCGWindowIDs,
             assignedCGWindowIDs: Set(exactMatchesByAXWindowID.values)
         )
-        let privateMatchResolution = Self.resolveFullscreenContentRebindings(
+        let privateMatchResolution = RuntimeWindowTopologyBindingResolver.resolveFullscreenContentRebindings(
             matches: privateExactBridgeMatches,
             axWindows: remainingAXWindows,
             cgWindows: validCGWindows,
@@ -704,7 +704,7 @@ extension RuntimeSnapshotProvider {
         let remainingAXWindowsForDesktopSibling = axWindows.filter {
             exactMatchesByAXWindowID[$0.id] == nil
         }
-        let desktopSiblingMatches = Self.resolveDesktopSiblingAXBindings(
+        let desktopSiblingMatches = RuntimeWindowTopologyBindingResolver.resolveDesktopSiblingAXBindings(
             axWindows: remainingAXWindowsForDesktopSibling,
             cgWindows: validCGWindows,
             assignedCGWindowIDs: Set(exactMatchesByAXWindowID.values),
@@ -725,7 +725,7 @@ extension RuntimeSnapshotProvider {
         let remainingAXWindowsForContentFallback = axWindows.filter {
             exactMatchesByAXWindowID[$0.id] == nil
         }
-        let fullscreenContentFallbackResult = Self.resolveFullscreenContentFallbackBindingsWithDiagnostics(
+        let fullscreenContentFallbackResult = RuntimeWindowTopologyBindingResolver.resolveFullscreenContentFallbackBindingsWithDiagnostics(
             axWindows: remainingAXWindowsForContentFallback,
             cgWindows: validCGWindows,
             assignedCGWindowIDs: Set(exactMatchesByAXWindowID.values),

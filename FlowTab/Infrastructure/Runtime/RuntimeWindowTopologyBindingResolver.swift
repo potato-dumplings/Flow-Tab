@@ -6,7 +6,7 @@ struct RuntimeWindowMatchResolution {
     var reboundMatches: [String: CGWindowID] = [:]
 }
 
-extension RuntimeSnapshotProvider {
+enum RuntimeWindowTopologyBindingResolver {
     static func resolveFullscreenContentRebindings(
         matches: [String: CGWindowID],
         axWindows: [RuntimeAXWindowEntry],
@@ -186,20 +186,6 @@ extension RuntimeSnapshotProvider {
         }
 
         return matches
-    }
-
-    static func resolveFullscreenContentFallbackBindings(
-        axWindows: [RuntimeAXWindowEntry],
-        cgWindows: [RuntimeCGWindowEntry],
-        assignedCGWindowIDs: Set<CGWindowID>,
-        appName: String
-    ) -> [String: CGWindowID] {
-        resolveFullscreenContentFallbackBindingsWithDiagnostics(
-            axWindows: axWindows,
-            cgWindows: cgWindows,
-            assignedCGWindowIDs: assignedCGWindowIDs,
-            appName: appName
-        ).matches
     }
 
     static func resolveFullscreenContentFallbackBindingsWithDiagnostics(

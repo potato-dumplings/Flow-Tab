@@ -172,7 +172,7 @@
 		F3C4D5E62FA2000100B0D737 /* RuntimeSnapshotProvider+WindowMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3C4D5E52FA2000100B0D737 /* RuntimeSnapshotProvider+WindowMapping.swift */; };
 		F3C4D5EA2FA2000100B0D737 /* RuntimeWindowAssignmentMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3C4D5E92FA2000100B0D737 /* RuntimeWindowAssignmentMatcher.swift */; };
 		F4D5E6F735AB000100B0D737 /* RuntimeCGSpaceInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4D5E6F835AB000100B0D737 /* RuntimeCGSpaceInspector.swift */; };
-		F6E7A8BE35AC000100B0D737 /* RuntimeSnapshotProvider+SpaceTopologyMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7A8BD35AC000100B0D737 /* RuntimeSnapshotProvider+SpaceTopologyMapping.swift */; };
+		F6E7A8BE35AC000100B0D737 /* RuntimeWindowTopologyBindingResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7A8BD35AC000100B0D737 /* RuntimeWindowTopologyBindingResolver.swift */; };
 		F6E7A8BC35AC000100B0D737 /* RuntimeWindowSpaceClassification.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7A8BB35AC000100B0D737 /* RuntimeWindowSpaceClassification.swift */; };
 		F6E7A8C035AC000100B0D737 /* RuntimeWindowRecencyTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7A8BF35AC000100B0D737 /* RuntimeWindowRecencyTracker.swift */; };
 		F6E7A8C235AC000100B0D737 /* RuntimeWindowFocusRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7A8C135AC000100B0D737 /* RuntimeWindowFocusRequest.swift */; };
@@ -394,7 +394,7 @@
 		F3C4D5E52FA2000100B0D737 /* RuntimeSnapshotProvider+WindowMapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RuntimeSnapshotProvider+WindowMapping.swift"; sourceTree = "<group>"; };
 		F3C4D5E92FA2000100B0D737 /* RuntimeWindowAssignmentMatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowAssignmentMatcher.swift; sourceTree = "<group>"; };
 		F4D5E6F835AB000100B0D737 /* RuntimeCGSpaceInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeCGSpaceInspector.swift; sourceTree = "<group>"; };
-		F6E7A8BD35AC000100B0D737 /* RuntimeSnapshotProvider+SpaceTopologyMapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RuntimeSnapshotProvider+SpaceTopologyMapping.swift"; sourceTree = "<group>"; };
+		F6E7A8BD35AC000100B0D737 /* RuntimeWindowTopologyBindingResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowTopologyBindingResolver.swift; sourceTree = "<group>"; };
 		F6E7A8BB35AC000100B0D737 /* RuntimeWindowSpaceClassification.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowSpaceClassification.swift; sourceTree = "<group>"; };
 		F7A8B9C135AD000100B0D737 /* RuntimeCGWindowFocusBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeCGWindowFocusBridge.swift; sourceTree = "<group>"; };
 		F8A9B0C235AE000100B0D737 /* RuntimeAXRemoteWindowResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeAXRemoteWindowResolver.swift; sourceTree = "<group>"; };
@@ -682,7 +682,7 @@
 				F2B3C4D52F8C000100B0D737 /* RuntimeSnapshotProvider+CGWindowSupplement.swift */,
 				F3C4D5E52FA2000100B0D737 /* RuntimeSnapshotProvider+WindowMapping.swift */,
 				F3C4D5E92FA2000100B0D737 /* RuntimeWindowAssignmentMatcher.swift */,
-				F6E7A8BD35AC000100B0D737 /* RuntimeSnapshotProvider+SpaceTopologyMapping.swift */,
+				F6E7A8BD35AC000100B0D737 /* RuntimeWindowTopologyBindingResolver.swift */,
 				F6E7B00935AC000100B0D737 /* RuntimeSnapshotProvider+Reconciliation.swift */,
 				F6E7A8B935AC000100B0D737 /* RuntimeWindowRecord.swift */,
 				F6E7A8BF35AC000100B0D737 /* RuntimeWindowRecencyTracker.swift */,
@@ -1093,7 +1093,7 @@
 				F2B3C4E52F8C000100B0D737 /* RuntimeSnapshotProvider+CGWindowSupplement.swift in Sources */,
 				F3C4D5E62FA2000100B0D737 /* RuntimeSnapshotProvider+WindowMapping.swift in Sources */,
 				F3C4D5EA2FA2000100B0D737 /* RuntimeWindowAssignmentMatcher.swift in Sources */,
-				F6E7A8BE35AC000100B0D737 /* RuntimeSnapshotProvider+SpaceTopologyMapping.swift in Sources */,
+				F6E7A8BE35AC000100B0D737 /* RuntimeWindowTopologyBindingResolver.swift in Sources */,
 				F6E7A8BA35AC000100B0D737 /* RuntimeWindowRecord.swift in Sources */,
 				F6E7A8C035AC000100B0D737 /* RuntimeWindowRecencyTracker.swift in Sources */,
 				F6E7A8C235AC000100B0D737 /* RuntimeWindowFocusRequest.swift in Sources */,
