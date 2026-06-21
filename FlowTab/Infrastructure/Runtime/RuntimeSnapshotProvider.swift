@@ -188,9 +188,9 @@ final class RuntimeSnapshotProvider {
         let appStartMs = RuntimePerformanceClock.monotonicMilliseconds()
         let appName = app.localizedName ?? app.bundleIdentifier ?? "pid:\(app.processIdentifier)"
         let cgWindows = cgWindowsByPID[app.processIdentifier] ?? []
-        let allCGWindows = markCurrentOnscreenCGWindows(
-            allCGWindowsByPID[app.processIdentifier] ?? cgWindows,
-            onscreenCGWindows: cgWindows
+        let allCGWindows = RuntimeCGWindowFacts.mergingCurrentOnscreenStatus(
+            allCGWindows: allCGWindowsByPID[app.processIdentifier] ?? cgWindows,
+            currentOnscreenCGWindows: cgWindows
         )
         let cgReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let publicWindowsFetchResult = AXWindowInspector.windowsFetchResult(
@@ -257,29 +257,6 @@ final class RuntimeSnapshotProvider {
             axInspectMs: axInspectReadyMs - finalFetchReadyMs,
             totalMs: axInspectReadyMs - appStartMs
         )
-    }
-
-    private func markCurrentOnscreenCGWindows(
-        _ allCGWindows: [RuntimeCGWindowEntry],
-        onscreenCGWindows: [RuntimeCGWindowEntry]
-    ) -> [RuntimeCGWindowEntry] {
-        let onscreenCGWindowIDs = Set(onscreenCGWindows.map(\.id))
-        guard !onscreenCGWindowIDs.isEmpty else { return allCGWindows }
-
-        return allCGWindows.map { window in
-            guard onscreenCGWindowIDs.contains(window.id), !window.isOnscreen else {
-                return window
-            }
-            return RuntimeCGWindowEntry(
-                id: window.id,
-                title: window.title,
-                bounds: window.bounds,
-                isOnscreen: true,
-                alpha: window.alpha,
-                storeType: window.storeType,
-                spaceIDs: window.spaceIDs
-            )
-        }
     }
 
     private func resolvedWindowEntries(

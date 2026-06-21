@@ -49,4 +49,27 @@ enum RuntimeCGWindowFacts {
         guard bounds.height >= minimumValidWindowHeight else { return false }
         return bounds.width * bounds.height >= minimumValidWindowArea
     }
+
+    static func mergingCurrentOnscreenStatus(
+        allCGWindows: [RuntimeCGWindowEntry],
+        currentOnscreenCGWindows: [RuntimeCGWindowEntry]
+    ) -> [RuntimeCGWindowEntry] {
+        let onscreenCGWindowIDs = Set(currentOnscreenCGWindows.map(\.id))
+        guard !onscreenCGWindowIDs.isEmpty else { return allCGWindows }
+
+        return allCGWindows.map { window in
+            guard onscreenCGWindowIDs.contains(window.id), !window.isOnscreen else {
+                return window
+            }
+            return RuntimeCGWindowEntry(
+                id: window.id,
+                title: window.title,
+                bounds: window.bounds,
+                isOnscreen: true,
+                alpha: window.alpha,
+                storeType: window.storeType,
+                spaceIDs: window.spaceIDs
+            )
+        }
+    }
 }

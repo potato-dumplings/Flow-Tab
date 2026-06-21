@@ -26,6 +26,62 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(RuntimeWindowTopologyClassifier.classify(spaceIDs: [1, 11_679]), .mixed)
     }
 
+    func testRuntimeCGWindowFactsMergeCurrentOnscreenStatusPreservesWindowFacts() {
+        let offscreenBounds = CGRect(x: 80, y: 120, width: 900, height: 700)
+        let unmatchedBounds = CGRect(x: 200, y: 220, width: 800, height: 640)
+        let allCGWindows = [
+            RuntimeCGWindowEntry(
+                id: 240_101,
+                title: "Current Onscreen",
+                bounds: offscreenBounds,
+                isOnscreen: false,
+                alpha: 0.75,
+                storeType: 2,
+                spaceIDs: [11_679]
+            ),
+            RuntimeCGWindowEntry(
+                id: 240_102,
+                title: "Still Offscreen",
+                bounds: unmatchedBounds,
+                isOnscreen: false,
+                alpha: 0.85,
+                storeType: 1,
+                spaceIDs: [11_680]
+            )
+        ]
+        let currentOnscreenCGWindows = [
+            RuntimeCGWindowEntry(
+                id: 240_101,
+                title: "Current Onscreen",
+                bounds: offscreenBounds,
+                isOnscreen: true,
+                alpha: 1.0,
+                storeType: 1,
+                spaceIDs: [1]
+            )
+        ]
+
+        let merged = RuntimeCGWindowFacts.mergingCurrentOnscreenStatus(
+            allCGWindows: allCGWindows,
+            currentOnscreenCGWindows: currentOnscreenCGWindows
+        )
+
+        XCTAssertEqual(merged.map(\.id), [240_101, 240_102])
+        XCTAssertEqual(merged[0].isOnscreen, true)
+        XCTAssertEqual(merged[0].alpha, 0.75)
+        XCTAssertEqual(merged[0].storeType, 2)
+        XCTAssertEqual(merged[0].spaceIDs, [11_679])
+        XCTAssertEqual(merged[1].isOnscreen, false)
+        XCTAssertEqual(merged[1].spaceIDs, [11_680])
+        XCTAssertEqual(
+            RuntimeCGWindowFacts.mergingCurrentOnscreenStatus(
+                allCGWindows: allCGWindows,
+                currentOnscreenCGWindows: []
+            ).map(\.isOnscreen),
+            [false, false]
+        )
+    }
+
     func testRuntimeWindowTopologyClassifierDetectsFullscreenContentAndDesktopWrapper() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
 
