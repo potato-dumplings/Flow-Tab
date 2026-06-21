@@ -98,3 +98,53 @@ struct RuntimeWindowListEntry {
         }
     }
 }
+
+enum RuntimeWindowListSupplementer {
+    static func appendOffSpaceCGWindows(
+        to entries: [RuntimeWindowListEntry],
+        appName: String,
+        pid: pid_t,
+        allCGWindows: [RuntimeCGWindowEntry],
+        matchedCGWindowIDs: Set<CGWindowID> = []
+    ) -> [RuntimeWindowListEntry] {
+        let unmatchedCGWindows = selectSupplementalOffSpaceCGWindows(
+            existingCGWindowIDs: matchedCGWindowIDs,
+            allCGWindows: allCGWindows
+        )
+        guard !unmatchedCGWindows.isEmpty else { return entries }
+
+        let cgOnlyEntries = unmatchedCGWindows.map { cgWindow in
+            RuntimeWindowListEntry(
+                windowID: RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindow.id),
+                title: RuntimeWindowTitleResolver.supplementalCGWindowTitle(
+                    appName: appName,
+                    cgWindow: cgWindow
+                ),
+                isMinimized: false,
+                ownerPID: pid,
+                cgWindowID: cgWindow.id,
+                axWindow: nil,
+                frame: cgWindow.bounds,
+                spaceIDs: cgWindow.spaceIDs,
+                isOnscreen: cgWindow.isOnscreen,
+                allowsPublicAXRecovery: true,
+                hasStickyBinding: false,
+                lastConfirmationSource: nil
+            )
+        }
+        RuntimeLog.debug(
+            .ax,
+            "\(appName) unmatched-cg windows=\(cgOnlyEntries.count)"
+        )
+        return entries + cgOnlyEntries
+    }
+
+    static func selectSupplementalOffSpaceCGWindows(
+        existingCGWindowIDs: Set<CGWindowID>,
+        allCGWindows: [RuntimeCGWindowEntry]
+    ) -> [RuntimeCGWindowEntry] {
+        allCGWindows.filter { window in
+            !existingCGWindowIDs.contains(window.id) && RuntimeCGWindowFacts.passesValidityConstraints(window)
+        }
+    }
+}

@@ -38,7 +38,7 @@ enum RuntimeWindowMappingTestSupport {
         existingCGWindowIDs: Set<CGWindowID>,
         allCGWindows: [RuntimeCGWindowEntry]
     ) -> [CGWindowID] {
-        RuntimeSnapshotProvider().selectSupplementalOffSpaceCGWindows(
+        RuntimeWindowListSupplementer.selectSupplementalOffSpaceCGWindows(
             existingCGWindowIDs: existingCGWindowIDs,
             allCGWindows: allCGWindows
         ).map(\.id)
@@ -73,8 +73,7 @@ enum RuntimeWindowMappingTestSupport {
         allCGWindows: [RuntimeCGWindowEntry],
         matchedCGWindowIDs: Set<CGWindowID> = []
     ) -> [ResolvedEntry] {
-        let provider = RuntimeSnapshotProvider()
-        return provider.appendOffSpaceCGWindows(
+        RuntimeWindowListSupplementer.appendOffSpaceCGWindows(
             to: entries.map {
                 RuntimeWindowListEntry(
                     windowID: $0.windowID,

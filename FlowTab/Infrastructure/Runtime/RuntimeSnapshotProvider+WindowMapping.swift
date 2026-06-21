@@ -522,7 +522,7 @@ extension RuntimeSnapshotProvider {
         appName: String,
         remoteScanCompleteness: RuntimeAXRemoteWindowResolver.RemoteScanCompleteness? = nil
     ) -> RuntimeWindowMappingResolution {
-        let validCGWindows = selectSupplementalOffSpaceCGWindows(
+        let validCGWindows = RuntimeWindowListSupplementer.selectSupplementalOffSpaceCGWindows(
             existingCGWindowIDs: [],
             allCGWindows: cgWindows
         )

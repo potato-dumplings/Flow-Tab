@@ -3,69 +3,6 @@ import ApplicationServices
 import Foundation
 
 extension RuntimeSnapshotProvider {
-    func appendOffSpaceCGWindows(
-        to entries: [RuntimeWindowListEntry],
-        appName: String,
-        pid: pid_t,
-        allCGWindows: [RuntimeCGWindowEntry],
-        matchedCGWindowIDs: Set<CGWindowID> = []
-    ) -> [RuntimeWindowListEntry] {
-        let unmatchedCGWindows = selectSupplementalOffSpaceCGWindows(
-            existingCGWindowIDs: matchedCGWindowIDs,
-            allCGWindows: allCGWindows
-        )
-        guard !unmatchedCGWindows.isEmpty else { return entries }
-
-        let cgOnlyEntries = unmatchedCGWindows.map { cgWindow in
-            RuntimeWindowListEntry(
-                windowID: RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindow.id),
-                title: resolvedTitleForSupplementalCGWindow(
-                    appName: appName,
-                    cgWindow: cgWindow
-                ),
-                isMinimized: false,
-                ownerPID: pid,
-                cgWindowID: cgWindow.id,
-                axWindow: nil,
-                frame: cgWindow.bounds,
-                spaceIDs: cgWindow.spaceIDs,
-                isOnscreen: cgWindow.isOnscreen,
-                allowsPublicAXRecovery: true,
-                hasStickyBinding: false,
-                lastConfirmationSource: nil
-            )
-        }
-        RuntimeLog.debug(
-            .ax,
-            "\(appName) unmatched-cg windows=\(cgOnlyEntries.count)"
-        )
-        return entries + cgOnlyEntries
-    }
-
-    func selectSupplementalOffSpaceCGWindows(
-        existingCGWindowIDs: Set<CGWindowID>,
-        allCGWindows: [RuntimeCGWindowEntry]
-    ) -> [RuntimeCGWindowEntry] {
-        allCGWindows.filter { window in
-            !existingCGWindowIDs.contains(window.id) && RuntimeCGWindowFacts.passesValidityConstraints(window)
-        }
-    }
-
-    private func resolvedTitleForSupplementalCGWindow(
-        appName: String,
-        cgWindow: RuntimeCGWindowEntry
-    ) -> String {
-        normalizedWindowTitle(cgWindow.title)
-            ?? normalizedWindowTitle(appName)
-            ?? appName
-    }
-
-    private func normalizedWindowTitle(_ title: String?) -> String? {
-        guard let title else { return nil }
-        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
-    }
-
     func logChromeLikeTopologySnapshot(
         appName: String,
         pid: pid_t,

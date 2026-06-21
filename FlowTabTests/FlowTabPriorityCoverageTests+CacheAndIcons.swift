@@ -79,7 +79,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(requestedAppIDs.filter { $0 == "com.example.missing" }.count, 1)
     }
 
-    func testRuntimeSnapshotProviderSupplementalCGWindowsIncludeLargeOnScreenWindowsWhenAXMissesThem() {
+    func testRuntimeWindowListSupplementerIncludesLargeOnScreenCGWindowsWhenAXMissesThem() {
         let mergedEntries = RuntimeWindowMappingTestSupport.appendOffSpaceCGWindows(
             entries: [
                 .init(

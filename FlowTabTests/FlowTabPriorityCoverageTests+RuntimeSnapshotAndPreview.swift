@@ -534,7 +534,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(validWindowIDs, [243747, 260000])
     }
 
-    func testRuntimeSnapshotProviderSupplementalCGWindowTitleUsesAppNameWhenCGTitleMissing() {
+    func testRuntimeWindowListSupplementerSupplementalCGWindowTitleUsesAppNameWhenCGTitleMissing() {
         let windowID: CGWindowID = 243747
         let cachedTitle = "百度一下，你就知道 - Google Chrome - test2"
         let appName = "Google Chrome"
@@ -564,7 +564,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(titleFromCG, "From CG")
     }
 
-    func testRuntimeSnapshotProviderSupplementalCGWindowTitleFallsBackToAppNameWhenUntitled() {
+    func testRuntimeWindowListSupplementerSupplementalCGWindowTitleFallsBackToAppNameWhenUntitled() {
         let title = RuntimeWindowMappingTestSupport.supplementalCGWindowTitle(
             appName: "Google Chrome",
             cgWindow: .init(
@@ -579,7 +579,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(title, "Google Chrome")
     }
 
-    func testRuntimeSnapshotProviderWindowListAppendsUnmatchedCGEntriesAfterExactMatches() {
+    func testRuntimeWindowListSupplementerAppendsUnmatchedCGEntriesAfterExactMatches() {
         let mergedEntries = RuntimeWindowMappingTestSupport.appendOffSpaceCGWindows(
             entries: [
                 .init(
