@@ -28,7 +28,7 @@ extension RuntimeProjectionRepairProvider {
             allCGWindowsByPID: allCGWindowsByPID
         )
         let axReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let rankByPID = snapshotProvider.collectAppRankByPID(for: runningApps)
+        let rankByPID = RuntimeAppRankProvider.collectAppRankByPID(for: runningApps)
         let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
         RuntimeProjectionDiagnostics.logTiming(
             "collectWindowData",
@@ -233,7 +233,7 @@ extension RuntimeProjectionRepairProvider {
         let matchingApps = runningApps.filter { RuntimeAppIdentity.appID(for: $0) == appID }
         guard !matchingApps.isEmpty else { return nil }
 
-        let rankByPID = snapshotProvider.collectAppRankByPID(for: runningApps)
+        let rankByPID = RuntimeAppRankProvider.collectAppRankByPID(for: runningApps)
         let cgWindowsByPID = snapshotProvider.collectCGWindowsWithSpaceTopologyDiff().windowsByPID
         let allCGWindowsByPID = snapshotProvider.collectCGWindowsWithSpaceTopologyDiff(
             options: [.optionAll, .excludeDesktopElements]
