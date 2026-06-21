@@ -24,7 +24,6 @@ final class RuntimeSnapshotProvider {
         let totalMs: Double
     }
 
-    private static let maxConcurrentAXAppCollections = 4
     private let cgWindowListProvider: RuntimeCGWindowListProviding
     private let spaceTopologyProvider: RuntimeSpaceTopologyProviding
     let reconciliationCoordinator: RuntimeReconciliationCoordinator
@@ -158,7 +157,7 @@ final class RuntimeSnapshotProvider {
                 ("rawAX", "\(totalRawWindows)"),
                 ("switchableAX", "\(totalSwitchableWindows)"),
                 ("resolved", "\(totalResolvedWindows)"),
-                ("concurrency", "\(Self.maxConcurrentAXAppCollections)"),
+                ("concurrency", "\(RuntimeAXAppCollectionCoordinator.maxConcurrentCollections)"),
                 ("totalMs", formatSnapshotMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))
             ]
         )
@@ -170,7 +169,7 @@ final class RuntimeSnapshotProvider {
         cgWindowsByPID: [pid_t: [RuntimeCGWindowEntry]],
         allCGWindowsByPID: [pid_t: [RuntimeCGWindowEntry]]
     ) -> [AXAppWindowCollection] {
-        Self.collectBoundedAXAppResults(count: runningApps.count) { [self] index in
+        RuntimeAXAppCollectionCoordinator.collect(count: runningApps.count) { [self] index in
             collectAXAppWindowCollection(
                 index: index,
                 app: runningApps[index],
@@ -258,39 +257,6 @@ final class RuntimeSnapshotProvider {
             axInspectMs: axInspectReadyMs - finalFetchReadyMs,
             totalMs: axInspectReadyMs - appStartMs
         )
-    }
-
-    private static func collectBoundedAXAppResults<Result>(
-        count: Int,
-        collect: @escaping (Int) -> Result
-    ) -> [Result] {
-        guard count > 1 else {
-            return (0..<count).map { collect($0) }
-        }
-
-        let group = DispatchGroup()
-        let resultLock = NSLock()
-        let concurrencyLimit = min(maxConcurrentAXAppCollections, count)
-        let concurrencyGate = DispatchSemaphore(value: concurrencyLimit)
-        var results = Array<Result?>(repeating: nil, count: count)
-
-        for index in 0..<count {
-            concurrencyGate.wait()
-            group.enter()
-            DispatchQueue.global(qos: .userInitiated).async {
-                defer {
-                    concurrencyGate.signal()
-                    group.leave()
-                }
-                let result = collect(index)
-                resultLock.lock()
-                results[index] = result
-                resultLock.unlock()
-            }
-        }
-
-        group.wait()
-        return results.compactMap { $0 }
     }
 
     private func markCurrentOnscreenCGWindows(
@@ -508,45 +474,6 @@ final class RuntimeSnapshotProvider {
             }
         }
         return rankByPID
-    }
-
-    struct BoundedAXAppCollectionPressureResultForTesting {
-        let orderedResults: [Int]
-        let elapsedMs: Double
-        let configuredConcurrency: Int
-        let maxInFlight: Int
-    }
-
-    static func boundedAXAppCollectionPressureForTesting(
-        taskCount: Int,
-        delayNanoseconds: UInt64
-    ) -> BoundedAXAppCollectionPressureResultForTesting {
-        let inFlightLock = NSLock()
-        var inFlight = 0
-        var maxInFlight = 0
-        let startNs = DispatchTime.now().uptimeNanoseconds
-
-        let orderedResults: [Int] = collectBoundedAXAppResults(count: taskCount) { index in
-            inFlightLock.lock()
-            inFlight += 1
-            maxInFlight = max(maxInFlight, inFlight)
-            inFlightLock.unlock()
-
-            Thread.sleep(forTimeInterval: Double(delayNanoseconds) / 1_000_000_000.0)
-
-            inFlightLock.lock()
-            inFlight -= 1
-            inFlightLock.unlock()
-            return index
-        }
-        let elapsedMs = Double(DispatchTime.now().uptimeNanoseconds - startNs) / 1_000_000.0
-
-        return BoundedAXAppCollectionPressureResultForTesting(
-            orderedResults: orderedResults,
-            elapsedMs: elapsedMs,
-            configuredConcurrency: min(maxConcurrentAXAppCollections, taskCount),
-            maxInFlight: maxInFlight
-        )
     }
 
 }

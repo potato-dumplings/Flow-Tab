@@ -3,11 +3,11 @@ import XCTest
 @testable import FlowTab
 
 extension FlowTabPriorityCoverageTests {
-    func testRuntimeSnapshotProviderAXAppCollectionPressureUsesBoundedConcurrencyAndKeepsOrder() {
+    func testRuntimeAXAppCollectionCoordinatorPressureUsesBoundedConcurrencyAndKeepsOrder() {
         let taskCount = 28
         let delayNanoseconds: UInt64 = 25_000_000
 
-        let result = RuntimeSnapshotProvider.boundedAXAppCollectionPressureForTesting(
+        let result = RuntimeAXAppCollectionCoordinator.pressureResultForTesting(
             taskCount: taskCount,
             delayNanoseconds: delayNanoseconds
         )
@@ -15,7 +15,7 @@ extension FlowTabPriorityCoverageTests {
 
         print(
             String(
-                format: "[RuntimeSnapshotAXCollectionPressure] tasks=%d configuredConcurrency=%d maxInFlight=%d elapsed=%.2fms serialExpected=%.2fms",
+                format: "[RuntimeAXAppCollectionPressure] tasks=%d configuredConcurrency=%d maxInFlight=%d elapsed=%.2fms serialExpected=%.2fms",
                 taskCount,
                 result.configuredConcurrency,
                 result.maxInFlight,
