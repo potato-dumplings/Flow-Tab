@@ -115,6 +115,12 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
         let windows = try XCTUnwrap(merged[18_405])
+        let flatMerged = RuntimeCGWindowFacts.mergingSpaceTopology(
+            windows: try XCTUnwrap(windowsByPID[18_405]),
+            spaceIDsByCGWindowID: [
+                240_101: [11_679, 11_681]
+            ]
+        )
 
         XCTAssertEqual(windows.map(\.id), [240_101, 240_102])
         XCTAssertEqual(windows[0].spaceIDs, [11_679, 11_681])
@@ -124,6 +130,8 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(windows[0].alpha, 0.72)
         XCTAssertEqual(windows[0].storeType, 2)
         XCTAssertEqual(windows[1].spaceIDs, [11_680])
+        XCTAssertEqual(flatMerged.map(\.spaceIDs), windows.map(\.spaceIDs))
+        XCTAssertEqual(flatMerged.map(\.id), windows.map(\.id))
         XCTAssertEqual(
             RuntimeCGWindowFacts.mergingSpaceTopology(
                 windowsByPID: windowsByPID,

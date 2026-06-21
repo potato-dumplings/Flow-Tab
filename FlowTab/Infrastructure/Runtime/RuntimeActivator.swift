@@ -1066,18 +1066,10 @@ final class RuntimeActivator {
             )
         }
         let spaceIDsByWindowID = RuntimeCGSpaceInspector.spaceIDsByWindowID(windowIDs)
-        guard !spaceIDsByWindowID.isEmpty else { return windows }
-        return windows.map { window in
-            RuntimeCGWindowEntry(
-                id: window.id,
-                title: window.title,
-                bounds: window.bounds,
-                isOnscreen: window.isOnscreen,
-                alpha: window.alpha,
-                storeType: window.storeType,
-                spaceIDs: spaceIDsByWindowID[window.id] ?? window.spaceIDs
-            )
-        }
+        return RuntimeCGWindowFacts.mergingSpaceTopology(
+            windows: windows,
+            spaceIDsByCGWindowID: spaceIDsByWindowID
+        )
     }
 
     private func axWindowFrame(for window: AXUIElement) -> CGRect? {

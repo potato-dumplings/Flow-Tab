@@ -82,18 +82,30 @@ enum RuntimeCGWindowFacts {
         return Dictionary(uniqueKeysWithValues: windowsByPID.map { pid, windows in
             (
                 pid,
-                windows.map { window in
-                    RuntimeCGWindowEntry(
-                        id: window.id,
-                        title: window.title,
-                        bounds: window.bounds,
-                        isOnscreen: window.isOnscreen,
-                        alpha: window.alpha,
-                        storeType: window.storeType,
-                        spaceIDs: spaceIDsByCGWindowID[window.id] ?? window.spaceIDs
-                    )
-                }
+                mergingSpaceTopology(
+                    windows: windows,
+                    spaceIDsByCGWindowID: spaceIDsByCGWindowID
+                )
             )
         })
+    }
+
+    static func mergingSpaceTopology(
+        windows: [RuntimeCGWindowEntry],
+        spaceIDsByCGWindowID: [CGWindowID: [Int]]
+    ) -> [RuntimeCGWindowEntry] {
+        guard !spaceIDsByCGWindowID.isEmpty else { return windows }
+
+        return windows.map { window in
+            RuntimeCGWindowEntry(
+                id: window.id,
+                title: window.title,
+                bounds: window.bounds,
+                isOnscreen: window.isOnscreen,
+                alpha: window.alpha,
+                storeType: window.storeType,
+                spaceIDs: spaceIDsByCGWindowID[window.id] ?? window.spaceIDs
+            )
+        }
     }
 }
