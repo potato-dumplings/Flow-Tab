@@ -332,66 +332,6 @@ final class RuntimeSnapshotProvider {
         )
     }
 
-    private func resolvedAXWindowTitle(
-        sourceTitle: String?,
-        matchedCGTitle: String?,
-        appName: String,
-        fallbackIndex: Int,
-        refreshedAXTitle: String?
-    ) -> String {
-        let normalizedSourceTitle = normalizedWindowTitle(sourceTitle)
-        let normalizedMatchedCGTitle = normalizedWindowTitle(matchedCGTitle)
-        let normalizedRefreshedAXTitle = normalizedWindowTitle(refreshedAXTitle)
-        let sourceLooksLikeAppNameFallback = isAppNameFallbackTitle(
-            normalizedSourceTitle,
-            appName: appName
-        )
-
-        if !sourceLooksLikeAppNameFallback,
-            let sourceTitle = normalizedSourceTitle
-        {
-            return sourceTitle
-        }
-
-        if let matchedCGTitle = normalizedMatchedCGTitle,
-            !isAppNameFallbackTitle(matchedCGTitle, appName: appName)
-        {
-            return matchedCGTitle
-        }
-
-        if let refreshedAXTitle = normalizedRefreshedAXTitle,
-            !isAppNameFallbackTitle(refreshedAXTitle, appName: appName)
-        {
-            RuntimeLog.info(.ax, "\(appName) untitled[\(fallbackIndex)] recovered-from-ax")
-            return refreshedAXTitle
-        }
-
-        if let matchedCGTitle = normalizedMatchedCGTitle {
-            return matchedCGTitle
-        }
-        if let refreshedAXTitle = normalizedRefreshedAXTitle {
-            return refreshedAXTitle
-        }
-        if let sourceTitle = normalizedSourceTitle {
-            return sourceTitle
-        }
-
-        RuntimeLog.info(.ax, "\(appName) untitled[\(fallbackIndex)] use app-name fallback")
-        return appName
-    }
-
-    private func normalizedWindowTitle(_ title: String?) -> String? {
-        guard let title else { return nil }
-        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
-    }
-
-    private func isAppNameFallbackTitle(_ title: String?, appName: String) -> Bool {
-        guard let normalizedTitle = normalizedWindowTitle(title) else { return false }
-        guard let normalizedAppName = normalizedWindowTitle(appName) else { return false }
-        return normalizedTitle.caseInsensitiveCompare(normalizedAppName) == .orderedSame
-    }
-
     func collectAXWindowStats(for runningApps: [NSRunningApplication]) -> [pid_t: RuntimeAppWindowStats] {
         guard AccessibilityPermissionChecker.isTrusted() else {
             RuntimeLog.warning(.ax, "not trusted; all app windows will be reported as 0")
@@ -568,22 +508,6 @@ final class RuntimeSnapshotProvider {
             }
         }
         return rankByPID
-    }
-
-    static func resolvedAXWindowTitleForTesting(
-        sourceTitle: String?,
-        matchedCGTitle: String?,
-        appName: String,
-        fallbackIndex: Int,
-        refreshedAXTitle: String? = nil
-    ) -> String {
-        RuntimeSnapshotProvider().resolvedAXWindowTitle(
-            sourceTitle: sourceTitle,
-            matchedCGTitle: matchedCGTitle,
-            appName: appName,
-            fallbackIndex: fallbackIndex,
-            refreshedAXTitle: refreshedAXTitle
-        )
     }
 
     struct BoundedAXAppCollectionPressureResultForTesting {

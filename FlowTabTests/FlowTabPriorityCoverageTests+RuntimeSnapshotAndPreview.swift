@@ -1815,8 +1815,8 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(secondEntriesByCGWindowID[240_002]?.title, "Doc B (Updated)")
     }
 
-    func testRuntimeSnapshotProviderAXWindowTitleFallsBackToAppNameWhenSourceTitleMissing() {
-        let fallbackTitle = RuntimeSnapshotProvider.resolvedAXWindowTitleForTesting(
+    func testRuntimeWindowTitleResolverStableTitleFallsBackToAppNameWhenSourceTitleMissing() {
+        let fallbackTitle = RuntimeWindowTitleResolver.stableWindowTitle(
             sourceTitle: nil,
             matchedCGTitle: nil,
             appName: "Google Chrome",
@@ -1824,7 +1824,7 @@ extension FlowTabPriorityCoverageTests {
         )
         XCTAssertEqual(fallbackTitle, "Google Chrome")
 
-        let explicitTitle = RuntimeSnapshotProvider.resolvedAXWindowTitleForTesting(
+        let explicitTitle = RuntimeWindowTitleResolver.stableWindowTitle(
             sourceTitle: "百度一下，你就知道",
             matchedCGTitle: "From CG",
             appName: "Google Chrome",
@@ -1833,8 +1833,8 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(explicitTitle, "百度一下，你就知道")
     }
 
-    func testRuntimeSnapshotProviderAXWindowTitleUsesMatchedCGTitleWhenAXTitleMissing() {
-        let title = RuntimeSnapshotProvider.resolvedAXWindowTitleForTesting(
+    func testRuntimeWindowTitleResolverStableTitleUsesMatchedCGTitleWhenAXTitleMissing() {
+        let title = RuntimeWindowTitleResolver.stableWindowTitle(
             sourceTitle: nil,
             matchedCGTitle: "百度一下，你就知道 - Google Chrome - test2",
             appName: "Google Chrome",
@@ -1843,8 +1843,8 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(title, "百度一下，你就知道 - Google Chrome - test2")
     }
 
-    func testRuntimeSnapshotProviderAXWindowTitleTreatsAppNameSourceAsFallbackWhenCGTitleExists() {
-        let title = RuntimeSnapshotProvider.resolvedAXWindowTitleForTesting(
+    func testRuntimeWindowTitleResolverStableTitleTreatsAppNameSourceAsFallbackWhenCGTitleExists() {
+        let title = RuntimeWindowTitleResolver.stableWindowTitle(
             sourceTitle: "Google Chrome",
             matchedCGTitle: "百度一下，你就知道 - Google Chrome - test2",
             appName: "Google Chrome",
@@ -1853,8 +1853,8 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(title, "百度一下，你就知道 - Google Chrome - test2")
     }
 
-    func testRuntimeSnapshotProviderAXWindowTitleTreatsAppNameSourceAsFallbackWhenRefreshedAXTitleExists() {
-        let title = RuntimeSnapshotProvider.resolvedAXWindowTitleForTesting(
+    func testRuntimeWindowTitleResolverStableTitleTreatsAppNameSourceAsFallbackWhenRefreshedAXTitleExists() {
+        let title = RuntimeWindowTitleResolver.stableWindowTitle(
             sourceTitle: "Google Chrome",
             matchedCGTitle: nil,
             appName: "Google Chrome",
@@ -1864,8 +1864,8 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(title, "百度一下，你就知道 - Google Chrome - test3")
     }
 
-    func testRuntimeSnapshotProviderAXWindowTitleUsesRefreshedAXTitleWhenPrimaryTitleMissing() {
-        let title = RuntimeSnapshotProvider.resolvedAXWindowTitleForTesting(
+    func testRuntimeWindowTitleResolverStableTitleUsesRefreshedAXTitleWhenPrimaryTitleMissing() {
+        let title = RuntimeWindowTitleResolver.stableWindowTitle(
             sourceTitle: nil,
             matchedCGTitle: nil,
             appName: "Google Chrome",

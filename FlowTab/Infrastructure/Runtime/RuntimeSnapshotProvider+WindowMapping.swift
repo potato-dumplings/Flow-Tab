@@ -94,7 +94,7 @@ extension RuntimeSnapshotProvider {
                 return nil
             }
             let matchedCGTitle = knownCGWindowsByID[cgWindowID]?.title ?? record.displayTitle
-            let sourceLooksLikeAppNameFallback = runtimeTitleLooksLikeAppNameFallback(
+            let sourceLooksLikeAppNameFallback = RuntimeWindowTitleResolver.titleLooksLikeAppNameFallback(
                 axEntry.sourceTitle,
                 appName: appName
             )
@@ -109,7 +109,7 @@ extension RuntimeSnapshotProvider {
             } else {
                 refreshedAXTitle = nil
             }
-            let title = resolveStableWindowTitle(
+            let title = RuntimeWindowTitleResolver.stableWindowTitle(
                 sourceTitle: axEntry.sourceTitle,
                 matchedCGTitle: matchedCGTitle,
                 appName: appName,
@@ -179,7 +179,7 @@ extension RuntimeSnapshotProvider {
             return RuntimeWindowListEntry(
                 windowID: record.stableWindowID,
                 title: record.displayTitle
-                    ?? runtimeSupplementalCGWindowTitle(appName: appName, cgWindow: cgWindow),
+                    ?? RuntimeWindowTitleResolver.supplementalCGWindowTitle(appName: appName, cgWindow: cgWindow),
                 isMinimized: record.isMinimized,
                 ownerPID: pid,
                 cgWindowID: cgWindow.id,
@@ -232,7 +232,7 @@ extension RuntimeSnapshotProvider {
             return RuntimeWindowListEntry(
                 windowID: record?.stableWindowID ?? Self.makeCGWindowID(pid: pid, cgWindowID: cgWindow.id),
                 title: record?.displayTitle
-                    ?? runtimeSupplementalCGWindowTitle(appName: appName, cgWindow: cgWindow),
+                    ?? RuntimeWindowTitleResolver.supplementalCGWindowTitle(appName: appName, cgWindow: cgWindow),
                 isMinimized: false,
                 ownerPID: pid,
                 cgWindowID: cgWindow.id,
@@ -596,7 +596,7 @@ extension RuntimeSnapshotProvider {
                     windowRecordsByCGWindowID[cgWindowID] = record
                     continue
                 }
-                let resolvedTitle = resolveStableWindowTitle(
+                let resolvedTitle = RuntimeWindowTitleResolver.stableWindowTitle(
                     sourceTitle: reusedAXWindow.sourceTitle,
                     matchedCGTitle: knownCGWindowsByID[cgWindowID]?.title ?? record.displayTitle,
                     appName: appName,
@@ -842,7 +842,7 @@ extension RuntimeSnapshotProvider {
                     stableWindowID: Self.makeCGWindowID(pid: pid, cgWindowID: cgWindowID),
                     firstSeenAt: observedAt
                 )
-            let resolvedTitle = resolveStableWindowTitle(
+            let resolvedTitle = RuntimeWindowTitleResolver.stableWindowTitle(
                 sourceTitle: axWindow.sourceTitle,
                 matchedCGTitle: knownCGWindowsByID[cgWindowID]?.title,
                 appName: appName,
@@ -1042,7 +1042,7 @@ private func runtimeWindowEntryLooksLikeAXBackedFullscreenContentSurface(
     appName: String
 ) -> Bool {
     guard entry.activationHandleID != nil || entry.axWindow != nil else { return false }
-    guard !runtimeTitleLooksLikeAppNameFallback(entry.title, appName: appName) else { return false }
+    guard !RuntimeWindowTitleResolver.titleLooksLikeAppNameFallback(entry.title, appName: appName) else { return false }
     return runtimeWindowEntryLooksLikeStrongUserWindow(
         entry,
         knownCGWindowsByID: knownCGWindowsByID,
@@ -1106,7 +1106,7 @@ private func runtimeWindowEntryLooksLikeFullscreenSiblingArtifact(
         return false
     }
 
-    if runtimeTitleLooksLikeAppNameFallback(entry.title, appName: appName) {
+    if RuntimeWindowTitleResolver.titleLooksLikeAppNameFallback(entry.title, appName: appName) {
         return true
     }
 
@@ -1129,7 +1129,7 @@ private func runtimeWindowEntryLooksLikeStrongUserWindow(
         return true
     }
 
-    guard !runtimeTitleLooksLikeAppNameFallback(entry.title, appName: appName) else {
+    guard !RuntimeWindowTitleResolver.titleLooksLikeAppNameFallback(entry.title, appName: appName) else {
         return false
     }
     guard let bounds = bounds?.standardized else { return false }
@@ -1215,8 +1215,8 @@ private func runtimeWindowTitlesCanRepresentSameFullscreenSurface(
     _ rhs: String?,
     appName: String
 ) -> Bool {
-    let leftLooksLikeAppFallback = runtimeTitleLooksLikeAppNameFallback(lhs, appName: appName)
-    let rightLooksLikeAppFallback = runtimeTitleLooksLikeAppNameFallback(rhs, appName: appName)
+    let leftLooksLikeAppFallback = RuntimeWindowTitleResolver.titleLooksLikeAppNameFallback(lhs, appName: appName)
+    let rightLooksLikeAppFallback = RuntimeWindowTitleResolver.titleLooksLikeAppNameFallback(rhs, appName: appName)
     let left = leftLooksLikeAppFallback ? nil : runtimeNormalizedTitleKey(lhs)
     let right = rightLooksLikeAppFallback ? nil : runtimeNormalizedTitleKey(rhs)
     switch (left, right) {
@@ -1287,71 +1287,4 @@ private func stickyBindingCanReuse(
     }
 
     return titleMatches && frameMatches
-}
-
-func normalizedRuntimeWindowTitle(_ title: String?) -> String? {
-    guard let title else { return nil }
-    let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-    return trimmed.isEmpty ? nil : trimmed
-}
-
-private func runtimeTitleLooksLikeAppNameFallback(_ title: String?, appName: String) -> Bool {
-    guard let normalizedTitle = normalizedRuntimeWindowTitle(title) else { return false }
-    guard let normalizedAppName = normalizedRuntimeWindowTitle(appName) else { return false }
-    return normalizedTitle.caseInsensitiveCompare(normalizedAppName) == .orderedSame
-}
-
-private func runtimeSupplementalCGWindowTitle(
-    appName: String,
-    cgWindow: RuntimeCGWindowEntry
-) -> String {
-    normalizedRuntimeWindowTitle(cgWindow.title)
-        ?? normalizedRuntimeWindowTitle(appName)
-        ?? appName
-}
-
-private func resolveStableWindowTitle(
-    sourceTitle: String?,
-    matchedCGTitle: String?,
-    appName: String,
-    fallbackIndex: Int,
-    refreshedAXTitle: String?
-) -> String {
-    let normalizedSourceTitle = normalizedRuntimeWindowTitle(sourceTitle)
-    let normalizedMatchedCGTitle = normalizedRuntimeWindowTitle(matchedCGTitle)
-    let normalizedRefreshedAXTitle = normalizedRuntimeWindowTitle(refreshedAXTitle)
-    let sourceLooksLikeAppNameFallback = runtimeTitleLooksLikeAppNameFallback(
-        normalizedSourceTitle,
-        appName: appName
-    )
-
-    if !sourceLooksLikeAppNameFallback, let normalizedSourceTitle {
-        return normalizedSourceTitle
-    }
-
-    if let normalizedMatchedCGTitle,
-        !runtimeTitleLooksLikeAppNameFallback(normalizedMatchedCGTitle, appName: appName)
-    {
-        return normalizedMatchedCGTitle
-    }
-
-    if let normalizedRefreshedAXTitle,
-        !runtimeTitleLooksLikeAppNameFallback(normalizedRefreshedAXTitle, appName: appName)
-    {
-        RuntimeLog.info(.ax, "\(appName) untitled[\(fallbackIndex)] recovered-from-ax")
-        return normalizedRefreshedAXTitle
-    }
-
-    if let normalizedMatchedCGTitle {
-        return normalizedMatchedCGTitle
-    }
-    if let normalizedRefreshedAXTitle {
-        return normalizedRefreshedAXTitle
-    }
-    if let normalizedSourceTitle {
-        return normalizedSourceTitle
-    }
-
-    RuntimeLog.info(.ax, "\(appName) untitled[\(fallbackIndex)] use app-name fallback")
-    return appName
 }

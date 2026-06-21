@@ -60,9 +60,10 @@ enum RuntimeWindowMappingTestSupport {
         cachedAXTitlesByCGWindowID: [CGWindowID: String] = [:]
     ) -> String {
         _ = cachedAXTitlesByCGWindowID
-        return normalizedRuntimeWindowTitle(cgWindow.title)
-            ?? normalizedRuntimeWindowTitle(appName)
-            ?? appName
+        return RuntimeWindowTitleResolver.supplementalCGWindowTitle(
+            appName: appName,
+            cgWindow: cgWindow
+        )
     }
 
     static func appendOffSpaceCGWindows(
