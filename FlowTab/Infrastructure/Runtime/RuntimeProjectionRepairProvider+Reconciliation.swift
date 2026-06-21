@@ -24,23 +24,12 @@ extension RuntimeProjectionRepairProvider {
         affectedCGWindowIDs: Set<CGWindowID>,
         currentCGWindowsByPID: [pid_t: [RuntimeCGWindowEntry]]
     ) -> [RuntimeAffectedWindowReconciliationTarget] {
-        guard !affectedCGWindowIDs.isEmpty else { return [] }
-
-        var affectedCGWindowIDsByPID: [pid_t: Set<CGWindowID>] = [:]
-        for (pid, cgWindows) in currentCGWindowsByPID {
-            let affected = Set(cgWindows.map(\.id)).intersection(affectedCGWindowIDs)
-            if !affected.isEmpty {
-                affectedCGWindowIDsByPID[pid, default: []].formUnion(affected)
-            }
-        }
-
-        for (pid, mappingState) in snapshotProvider.windowMappingStateByPID {
-            let affected = Set(mappingState.windowRecordsByCGWindowID.keys)
-                .intersection(affectedCGWindowIDs)
-            if !affected.isEmpty {
-                affectedCGWindowIDsByPID[pid, default: []].formUnion(affected)
-            }
-        }
+        let affectedCGWindowIDsByPID = RuntimeWindowMappingState.affectedCGWindowIDsByPID(
+            affectedCGWindowIDs: affectedCGWindowIDs,
+            currentCGWindowsByPID: currentCGWindowsByPID,
+            mappingStatesByPID: snapshotProvider.windowMappingStateByPID
+        )
+        guard !affectedCGWindowIDsByPID.isEmpty else { return [] }
 
         let appIDsByPID = Dictionary(
             uniqueKeysWithValues: RuntimeAppDirectoryFactSource.currentAppLayerRunningApplications(

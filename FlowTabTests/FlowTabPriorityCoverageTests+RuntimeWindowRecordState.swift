@@ -141,6 +141,60 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(state.lastAXWindowIDs.contains(axWindowID))
     }
 
+    func testRuntimeWindowMappingStateGroupsAffectedCGWindowIDsByPIDFromCurrentAndRecordedFacts() {
+        let currentPID = pid_t(18_405)
+        let recordedPID = pid_t(18_406)
+        let currentWindowID = CGWindowID(240_001)
+        let recordedWindowID = CGWindowID(240_002)
+        let unrelatedWindowID = CGWindowID(240_003)
+        let missingWindowID = CGWindowID(240_004)
+        let currentCGWindowsByPID: [pid_t: [RuntimeCGWindowEntry]] = [
+            currentPID: [
+                RuntimeCGWindowEntry(
+                    id: currentWindowID,
+                    title: "Current",
+                    bounds: CGRect(x: 10, y: 20, width: 640, height: 480),
+                    isOnscreen: true,
+                    alpha: 1.0,
+                    storeType: 1,
+                    spaceIDs: [1]
+                ),
+                RuntimeCGWindowEntry(
+                    id: unrelatedWindowID,
+                    title: "Unrelated",
+                    bounds: CGRect(x: 20, y: 30, width: 640, height: 480),
+                    isOnscreen: true,
+                    alpha: 1.0,
+                    storeType: 1,
+                    spaceIDs: [1]
+                )
+            ]
+        ]
+        let recordedState = RuntimeWindowMappingState(
+            windowRecordsByCGWindowID: [
+                recordedWindowID: RuntimeWindowRecord(
+                    cgWindowID: recordedWindowID,
+                    stableWindowID: "cg:\(recordedPID):\(recordedWindowID)",
+                    firstSeenAt: 10
+                )
+            ]
+        )
+
+        let affectedByPID = RuntimeWindowMappingState.affectedCGWindowIDsByPID(
+            affectedCGWindowIDs: [currentWindowID, recordedWindowID, missingWindowID],
+            currentCGWindowsByPID: currentCGWindowsByPID,
+            mappingStatesByPID: [recordedPID: recordedState]
+        )
+
+        XCTAssertEqual(
+            affectedByPID,
+            [
+                currentPID: [currentWindowID],
+                recordedPID: [recordedWindowID]
+            ]
+        )
+    }
+
     func testRuntimeWindowMappingStateReportsAffectedWindowRecordEvidence() {
         let pid = pid_t(18_405)
         let exactWindowID = CGWindowID(240_001)

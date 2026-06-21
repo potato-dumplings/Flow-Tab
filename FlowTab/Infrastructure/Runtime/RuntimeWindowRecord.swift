@@ -131,6 +131,32 @@ struct RuntimeWindowMappingState {
         windowRecordsByCGWindowID.isEmpty
     }
 
+    static func affectedCGWindowIDsByPID(
+        affectedCGWindowIDs: Set<CGWindowID>,
+        currentCGWindowsByPID: [pid_t: [RuntimeCGWindowEntry]],
+        mappingStatesByPID: [pid_t: RuntimeWindowMappingState]
+    ) -> [pid_t: Set<CGWindowID>] {
+        guard !affectedCGWindowIDs.isEmpty else { return [:] }
+
+        var affectedCGWindowIDsByPID: [pid_t: Set<CGWindowID>] = [:]
+        for (pid, cgWindows) in currentCGWindowsByPID {
+            let affected = Set(cgWindows.map(\.id)).intersection(affectedCGWindowIDs)
+            if !affected.isEmpty {
+                affectedCGWindowIDsByPID[pid, default: []].formUnion(affected)
+            }
+        }
+
+        for (pid, mappingState) in mappingStatesByPID {
+            let affected = mappingState.affectedWindowEvidence(
+                for: affectedCGWindowIDs
+            ).knownAffectedCGWindowIDs
+            if !affected.isEmpty {
+                affectedCGWindowIDsByPID[pid, default: []].formUnion(affected)
+            }
+        }
+        return affectedCGWindowIDsByPID
+    }
+
     @discardableResult
     mutating func clearDestroyedAXAttachment(
         axWindowID: String,
