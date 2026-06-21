@@ -181,6 +181,7 @@
 		F6E7B00A35AC000100B0D737 /* RuntimeSnapshotProvider+Reconciliation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7B00935AC000100B0D737 /* RuntimeSnapshotProvider+Reconciliation.swift */; };
 		F7A8B9C235AD000100B0D737 /* RuntimeCGWindowFocusBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7A8B9C135AD000100B0D737 /* RuntimeCGWindowFocusBridge.swift */; };
 		F8A9B0C335AE000100B0D737 /* RuntimeAXRemoteWindowResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A9B0C235AE000100B0D737 /* RuntimeAXRemoteWindowResolver.swift */; };
+		F8A9B0C535AE000100B0D737 /* RuntimeAXWindowAbsencePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A9B0C435AE000100B0D737 /* RuntimeAXWindowAbsencePolicy.swift */; };
 		F9C0D1E235AF000100B0D737 /* RuntimeChromeWindowFocusBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9C0D1E135AF000100B0D737 /* RuntimeChromeWindowFocusBridge.swift */; };
 		F50001012F90000100B0D737 /* FlowTabSpaceFixtureApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000022F90000100B0D737 /* FlowTabSpaceFixtureApp.swift */; };
 		F50001022F90000100B0D737 /* SpaceFixtureAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000032F90000100B0D737 /* SpaceFixtureAppDelegate.swift */; };
@@ -398,6 +399,7 @@
 		F6E7A8BB35AC000100B0D737 /* RuntimeWindowSpaceClassification.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowSpaceClassification.swift; sourceTree = "<group>"; };
 		F7A8B9C135AD000100B0D737 /* RuntimeCGWindowFocusBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeCGWindowFocusBridge.swift; sourceTree = "<group>"; };
 		F8A9B0C235AE000100B0D737 /* RuntimeAXRemoteWindowResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeAXRemoteWindowResolver.swift; sourceTree = "<group>"; };
+		F8A9B0C435AE000100B0D737 /* RuntimeAXWindowAbsencePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeAXWindowAbsencePolicy.swift; sourceTree = "<group>"; };
 		F9C0D1E135AF000100B0D737 /* RuntimeChromeWindowFocusBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeChromeWindowFocusBridge.swift; sourceTree = "<group>"; };
 		F50000012F90000100B0D737 /* FlowTabSpaceFixture.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FlowTabSpaceFixture.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		F50000022F90000100B0D737 /* FlowTabSpaceFixtureApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTabSpaceFixtureApp.swift; sourceTree = "<group>"; };
@@ -696,6 +698,7 @@
 				F6E7D00735C1000100B0D737 /* RuntimeWindowTitleResolver.swift */,
 				F6E7D00935C1000100B0D737 /* RuntimeAXAppCollectionCoordinator.swift */,
 				F6E7D00B35C1000100B0D737 /* RuntimeAppRankProvider.swift */,
+				F8A9B0C435AE000100B0D737 /* RuntimeAXWindowAbsencePolicy.swift */,
 				F6E7C01335C000100B0D737 /* RuntimeAXWindowRecovery.swift */,
 				F6E7C01535C000100B0D737 /* RuntimeAppDirectory.swift */,
 				F6E7A8BB35AC000100B0D737 /* RuntimeWindowSpaceClassification.swift */,
@@ -1102,6 +1105,7 @@
 				A1B2C43E2F73000100B0D737 /* AXLiveWindowRegistry.swift in Sources */,
 				A1B2C43F2F73000100B0D737 /* AXWindowInspector.swift in Sources */,
 				F8A9B0C335AE000100B0D737 /* RuntimeAXRemoteWindowResolver.swift in Sources */,
+				F8A9B0C535AE000100B0D737 /* RuntimeAXWindowAbsencePolicy.swift in Sources */,
 				A1B2C4402F73000100B0D737 /* RuntimeWindowPreviewProvider.swift in Sources */,
 				D2A0001235B9000100B0D737 /* WindowPreviewProviderResolver.swift in Sources */,
 				D2A0002235B9000100B0D737 /* TerminalWindowPreviewProvider.swift in Sources */,

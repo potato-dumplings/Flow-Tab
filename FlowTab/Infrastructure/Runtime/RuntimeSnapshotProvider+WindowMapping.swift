@@ -34,8 +34,6 @@ private func runtimeWindowEntryUsesDesktopSpace(
     RuntimeWindowTopologyClassifier.isDesktopOnlySpaceWindow(spaceIDs: entry.spaceIDs)
 }
 
-private let runtimeAXRebuildGraceMissingSnapshotLimit = 3
-
 struct RuntimeWindowAssignmentMatchResult {
     let matches: [String: CGWindowID]
     let bindingDiagnostics: [WindowBindingDiagnostic]
@@ -44,9 +42,10 @@ struct RuntimeWindowAssignmentMatchResult {
 extension RuntimeSnapshotProvider {
     func isLikelyTransientAXRebuild(for pid: pid_t) -> Bool {
         guard let state = windowMappingStateByPID[pid] else { return false }
-        guard state.hasObservedAXWindowHandle else { return false }
-        let missingSnapshots = state.consecutiveSnapshotsWithoutAXWindows
-        return missingSnapshots > 0 && missingSnapshots <= runtimeAXRebuildGraceMissingSnapshotLimit
+        return RuntimeAXWindowAbsencePolicy.isLikelyTransientRebuild(
+            hasObservedAXWindowHandle: state.hasObservedAXWindowHandle,
+            consecutiveMissingSnapshotCount: state.consecutiveSnapshotsWithoutAXWindows
+        )
     }
 
     func cleanupWindowMappingState(for runningApps: [NSRunningApplication]) {
@@ -531,23 +530,21 @@ extension RuntimeSnapshotProvider {
         let previousState = windowMappingStateByPID[pid] ?? RuntimeWindowMappingState()
         let observedAt = Date.timeIntervalSinceReferenceDate
         let hasAXWindowsInCurrentSnapshot = !axWindows.isEmpty
-        let axWindowAbsenceIsAuthoritative = Self.axWindowAbsenceIsAuthoritative(
+        let axWindowAbsenceIsAuthoritative = RuntimeAXWindowAbsencePolicy.isAbsenceAuthoritative(
             remoteScanCompleteness: remoteScanCompleteness
         )
         let hasObservedAXWindowHandle = previousState.hasObservedAXWindowHandle || hasAXWindowsInCurrentSnapshot
-        let consecutiveSnapshotsWithoutAXWindows: Int
-        if hasAXWindowsInCurrentSnapshot {
-            consecutiveSnapshotsWithoutAXWindows = 0
-        } else if axWindowAbsenceIsAuthoritative {
-            consecutiveSnapshotsWithoutAXWindows = previousState.consecutiveSnapshotsWithoutAXWindows + 1
-        } else {
-            consecutiveSnapshotsWithoutAXWindows = previousState.consecutiveSnapshotsWithoutAXWindows
-        }
-        let allowSpaceOneWithoutCurrentAXHandle = hasObservedAXWindowHandle
-            && !hasAXWindowsInCurrentSnapshot
-            && (
-                !axWindowAbsenceIsAuthoritative
-                    || consecutiveSnapshotsWithoutAXWindows <= runtimeAXRebuildGraceMissingSnapshotLimit
+        let consecutiveSnapshotsWithoutAXWindows = RuntimeAXWindowAbsencePolicy.consecutiveMissingSnapshotCount(
+            hasAXWindowsInCurrentSnapshot: hasAXWindowsInCurrentSnapshot,
+            previousMissingSnapshotCount: previousState.consecutiveSnapshotsWithoutAXWindows,
+            absenceIsAuthoritative: axWindowAbsenceIsAuthoritative
+        )
+        let allowSpaceOneWithoutCurrentAXHandle =
+            RuntimeAXWindowAbsencePolicy.allowsSpaceOneWithoutCurrentAXHandle(
+                hasObservedAXWindowHandle: hasObservedAXWindowHandle,
+                hasAXWindowsInCurrentSnapshot: hasAXWindowsInCurrentSnapshot,
+                absenceIsAuthoritative: axWindowAbsenceIsAuthoritative,
+                consecutiveMissingSnapshotCount: consecutiveSnapshotsWithoutAXWindows
             )
 
         var windowRecordsByCGWindowID = previousState.windowRecordsByCGWindowID
@@ -802,7 +799,7 @@ extension RuntimeSnapshotProvider {
             } else {
                 RuntimeLog.debug(
                     .axMatch,
-                    "\(appName) transient-ax-rebuild suspected; keeping space-1 windows missingAXSnapshots=\(consecutiveSnapshotsWithoutAXWindows)/\(runtimeAXRebuildGraceMissingSnapshotLimit)"
+                    "\(appName) transient-ax-rebuild suspected; keeping space-1 windows missingAXSnapshots=\(consecutiveSnapshotsWithoutAXWindows)/\(RuntimeAXWindowAbsencePolicy.transientRebuildGraceMissingSnapshotLimit)"
                 )
             }
         }
@@ -813,17 +810,6 @@ extension RuntimeSnapshotProvider {
             allowSpaceOneWithoutCurrentAXHandle: allowSpaceOneWithoutCurrentAXHandle,
             bindingDiagnostics: bindingDiagnostics
         )
-    }
-
-    private static func axWindowAbsenceIsAuthoritative(
-        remoteScanCompleteness: RuntimeAXRemoteWindowResolver.RemoteScanCompleteness?
-    ) -> Bool {
-        switch remoteScanCompleteness {
-        case nil, .some(.complete(_)):
-            true
-        case .some(.partialTimedOut(_, _)), .some(.unavailable):
-            false
-        }
     }
 
     private func applyExactMatches(
