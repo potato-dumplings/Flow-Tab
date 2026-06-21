@@ -10,7 +10,7 @@ struct RuntimeWindowMappingResolution {
     let bindingDiagnostics: [WindowBindingDiagnostic]
 
     var knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry] {
-        runtimeKnownCGWindowsByID(
+        RuntimeWindowRecord.knownCGWindowsByID(
             windowRecordsByCGWindowID: windowRecordsByCGWindowID,
             validCGWindows: validCGWindows
         )
@@ -358,7 +358,7 @@ extension RuntimeSnapshotProvider {
             windowRecordsByCGWindowID[cgWindowID] = record
         }
 
-        let knownCGWindowsByID = runtimeKnownCGWindowsByID(
+        let knownCGWindowsByID = RuntimeWindowRecord.knownCGWindowsByID(
             windowRecordsByCGWindowID: windowRecordsByCGWindowID,
             validCGWindows: validCGWindows
         )
@@ -707,7 +707,7 @@ extension RuntimeSnapshotProvider {
             let exactIDMatch = axWindows.first(where: {
                 $0.id == lastKnownAXWindowID && !assignedAXWindowIDs.contains($0.id)
             }),
-            stickyBindingCanReuse(record, axWindow: exactIDMatch)
+            record.canReuseStickyBinding(with: exactIDMatch)
         {
             return exactIDMatch
         }
@@ -723,46 +723,4 @@ extension RuntimeSnapshotProvider {
         }
     }
 
-}
-
-private func runtimeKnownCGWindowsByID(
-    windowRecordsByCGWindowID: [CGWindowID: RuntimeWindowRecord],
-    validCGWindows: [RuntimeCGWindowEntry]
-) -> [CGWindowID: RuntimeCGWindowEntry] {
-    var knownCGWindowsByID = Dictionary(uniqueKeysWithValues: validCGWindows.map { ($0.id, $0) })
-    for (cgWindowID, record) in windowRecordsByCGWindowID {
-        guard knownCGWindowsByID[cgWindowID] == nil else { continue }
-        guard let knownCGWindow = record.synthesizedKnownCGWindowEntry() else { continue }
-        knownCGWindowsByID[cgWindowID] = knownCGWindow
-    }
-    return knownCGWindowsByID
-}
-
-private func stickyBindingCanReuse(
-    _ record: RuntimeWindowRecord,
-    axWindow: RuntimeAXWindowEntry
-) -> Bool {
-    let normalizedBindingTitle = normalizedRuntimeWindowTitle(record.displayTitle)
-    let normalizedAXTitle = normalizedRuntimeWindowTitle(axWindow.sourceTitle ?? axWindow.title)
-    let titleMatches: Bool
-    switch (normalizedBindingTitle, normalizedAXTitle) {
-    case let (bindingTitle?, axTitle?):
-        titleMatches = bindingTitle.caseInsensitiveCompare(axTitle) == .orderedSame
-    case (nil, _):
-        titleMatches = true
-    default:
-        titleMatches = false
-    }
-
-    let frameMatches: Bool
-    switch (record.displayFrame, axWindow.frame) {
-    case let (bindingFrame?, axFrame?):
-        frameMatches = RuntimeWindowTopologyClassifier.framesApproximatelyMatch(axFrame, bindingFrame)
-    case (nil, _):
-        frameMatches = true
-    default:
-        frameMatches = false
-    }
-
-    return titleMatches && frameMatches
 }

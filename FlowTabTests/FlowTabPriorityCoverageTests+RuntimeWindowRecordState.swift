@@ -141,6 +141,96 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(state.lastAXWindowIDs.contains(axWindowID))
     }
 
+    func testRuntimeWindowRecordKnownCGWindowsCombinesLiveFactsWithSynthesizedRecordEvidence() {
+        let liveCGWindow = RuntimeCGWindowEntry(
+            id: 240_001,
+            title: "Live Title",
+            bounds: CGRect(x: 10, y: 20, width: 900, height: 700),
+            isOnscreen: true,
+            alpha: 1.0,
+            storeType: 1,
+            spaceIDs: [1]
+        )
+        var staleRecord = RuntimeWindowRecord(
+            cgWindowID: 240_002,
+            stableWindowID: "cg:18405:240002",
+            firstSeenAt: 10
+        )
+        staleRecord.lastKnownCGTitle = "Synthesized Title"
+        staleRecord.lastKnownCGFrame = CGRect(x: 0, y: 124, width: 1_728, height: 993)
+        staleRecord.spaceRecovery = RuntimeSpaceRecoveryState(
+            cgWindowID: 240_002,
+            spaceIDs: [11_682],
+            hasConfirmedActivationRoute: true,
+            lastValidatedAt: 10,
+            invalidatedAt: nil
+        )
+        var liveBackedRecord = RuntimeWindowRecord(
+            cgWindowID: liveCGWindow.id,
+            stableWindowID: "cg:18405:240001",
+            firstSeenAt: 10
+        )
+        liveBackedRecord.lastKnownCGTitle = "Old Title"
+
+        let knownCGWindowsByID = RuntimeWindowRecord.knownCGWindowsByID(
+            windowRecordsByCGWindowID: [
+                liveCGWindow.id: liveBackedRecord,
+                staleRecord.cgWindowID: staleRecord
+            ],
+            validCGWindows: [liveCGWindow]
+        )
+
+        XCTAssertEqual(knownCGWindowsByID[liveCGWindow.id]?.title, "Live Title")
+        XCTAssertEqual(knownCGWindowsByID[liveCGWindow.id]?.isOnscreen, true)
+        XCTAssertEqual(knownCGWindowsByID[staleRecord.cgWindowID]?.title, "Synthesized Title")
+        XCTAssertEqual(knownCGWindowsByID[staleRecord.cgWindowID]?.bounds, staleRecord.lastKnownCGFrame)
+        XCTAssertEqual(knownCGWindowsByID[staleRecord.cgWindowID]?.spaceIDs, [11_682])
+        XCTAssertEqual(knownCGWindowsByID[staleRecord.cgWindowID]?.isOnscreen, false)
+    }
+
+    func testRuntimeWindowRecordStickyBindingReuseRequiresCompatibleTitleAndFrame() {
+        let axElement = AXUIElementCreateApplication(NSRunningApplication.current.processIdentifier)
+        let matchingFrame = CGRect(x: 10, y: 20, width: 900, height: 700)
+        var record = RuntimeWindowRecord(
+            cgWindowID: 240_003,
+            stableWindowID: "cg:18405:240003",
+            firstSeenAt: 10
+        )
+        record.lastKnownDisplayTitle = "Reusable Window"
+        record.lastKnownCGFrame = matchingFrame
+        let matchingAXWindow = RuntimeAXWindowEntry(
+            index: 0,
+            id: "ax:18405:sticky",
+            title: "reusable window",
+            sourceTitle: "reusable window",
+            isMinimized: false,
+            window: axElement,
+            frame: matchingFrame.offsetBy(dx: 1, dy: -1)
+        )
+        let mismatchedTitleAXWindow = RuntimeAXWindowEntry(
+            index: 1,
+            id: "ax:18405:mismatch-title",
+            title: "Different Window",
+            sourceTitle: "Different Window",
+            isMinimized: false,
+            window: axElement,
+            frame: matchingFrame
+        )
+        let mismatchedFrameAXWindow = RuntimeAXWindowEntry(
+            index: 2,
+            id: "ax:18405:mismatch-frame",
+            title: "Reusable Window",
+            sourceTitle: "Reusable Window",
+            isMinimized: false,
+            window: axElement,
+            frame: CGRect(x: 400, y: 500, width: 900, height: 700)
+        )
+
+        XCTAssertTrue(record.canReuseStickyBinding(with: matchingAXWindow))
+        XCTAssertFalse(record.canReuseStickyBinding(with: mismatchedTitleAXWindow))
+        XCTAssertFalse(record.canReuseStickyBinding(with: mismatchedFrameAXWindow))
+    }
+
     func testRuntimeWindowRecordLifecycleKeepsRecoverableMissingEvidenceDuringGraceWindow() {
         let policy = RuntimeWindowRecordLifecyclePolicy(evidenceGraceInterval: 1.0)
         let cgWindow = RuntimeCGWindowEntry(

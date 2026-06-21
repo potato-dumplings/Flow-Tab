@@ -417,4 +417,43 @@ struct RuntimeWindowRecord {
             spaceIDs: spaceIDs
         )
     }
+
+    static func knownCGWindowsByID(
+        windowRecordsByCGWindowID: [CGWindowID: RuntimeWindowRecord],
+        validCGWindows: [RuntimeCGWindowEntry]
+    ) -> [CGWindowID: RuntimeCGWindowEntry] {
+        var knownCGWindowsByID = Dictionary(uniqueKeysWithValues: validCGWindows.map { ($0.id, $0) })
+        for (cgWindowID, record) in windowRecordsByCGWindowID {
+            guard knownCGWindowsByID[cgWindowID] == nil else { continue }
+            guard let knownCGWindow = record.synthesizedKnownCGWindowEntry() else { continue }
+            knownCGWindowsByID[cgWindowID] = knownCGWindow
+        }
+        return knownCGWindowsByID
+    }
+
+    func canReuseStickyBinding(with axWindow: RuntimeAXWindowEntry) -> Bool {
+        let normalizedBindingTitle = normalizedRuntimeWindowTitle(displayTitle)
+        let normalizedAXTitle = normalizedRuntimeWindowTitle(axWindow.sourceTitle ?? axWindow.title)
+        let titleMatches: Bool
+        switch (normalizedBindingTitle, normalizedAXTitle) {
+        case let (bindingTitle?, axTitle?):
+            titleMatches = bindingTitle.caseInsensitiveCompare(axTitle) == .orderedSame
+        case (nil, _):
+            titleMatches = true
+        default:
+            titleMatches = false
+        }
+
+        let frameMatches: Bool
+        switch (displayFrame, axWindow.frame) {
+        case let (bindingFrame?, axFrame?):
+            frameMatches = RuntimeWindowTopologyClassifier.framesApproximatelyMatch(axFrame, bindingFrame)
+        case (nil, _):
+            frameMatches = true
+        default:
+            frameMatches = false
+        }
+
+        return titleMatches && frameMatches
+    }
 }
