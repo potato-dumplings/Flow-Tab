@@ -33,9 +33,9 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(RuntimeLogCategory.projection.isVerboseOnlyBelowWarning)
     }
 
-    func testRuntimeSnapshotProviderProjectionTimingLineUsesProjectionBoundaryFields() {
+    func testRuntimeProjectionDiagnosticsTimingLineUsesProjectionBoundaryFields() {
         XCTAssertEqual(
-            RuntimeSnapshotProvider.projectionTimingLine(
+            RuntimeProjectionDiagnostics.timingLine(
                 "fullRepairProjectionPayload",
                 fields: [
                     ("result", "ready"),

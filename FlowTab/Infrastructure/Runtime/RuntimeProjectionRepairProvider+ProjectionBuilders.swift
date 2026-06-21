@@ -30,7 +30,7 @@ extension RuntimeProjectionRepairProvider {
         let axReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let rankByPID = snapshotProvider.collectAppRankByPID(for: runningApps)
         let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
-        snapshotProvider.logProjectionTiming(
+        RuntimeProjectionDiagnostics.logTiming(
             "collectWindowData",
             fields: [
                 ("apps", "\(runningApps.count)"),
@@ -38,13 +38,13 @@ extension RuntimeProjectionRepairProvider {
                 ("allCGWindows", "\(allCGWindowsByPID.values.reduce(0) { $0 + $1.count })"),
                 ("windowPIDs", "\(axWindowsByPID.count)"),
                 ("rankPIDs", "\(rankByPID.count)"),
-                ("cleanupMs", snapshotProvider.formatProjectionMilliseconds(cleanupReadyMs - startMs)),
-                ("registryPruneMs", snapshotProvider.formatProjectionMilliseconds(pruneReadyMs - cleanupReadyMs)),
-                ("onscreenCGMs", snapshotProvider.formatProjectionMilliseconds(onScreenCGReadyMs - pruneReadyMs)),
-                ("allCGMs", snapshotProvider.formatProjectionMilliseconds(allCGReadyMs - onScreenCGReadyMs)),
-                ("axMs", snapshotProvider.formatProjectionMilliseconds(axReadyMs - allCGReadyMs)),
-                ("rankMs", snapshotProvider.formatProjectionMilliseconds(completeMs - axReadyMs)),
-                ("totalMs", snapshotProvider.formatProjectionMilliseconds(completeMs - startMs))
+                ("cleanupMs", RuntimeProjectionDiagnostics.formatMilliseconds(cleanupReadyMs - startMs)),
+                ("registryPruneMs", RuntimeProjectionDiagnostics.formatMilliseconds(pruneReadyMs - cleanupReadyMs)),
+                ("onscreenCGMs", RuntimeProjectionDiagnostics.formatMilliseconds(onScreenCGReadyMs - pruneReadyMs)),
+                ("allCGMs", RuntimeProjectionDiagnostics.formatMilliseconds(allCGReadyMs - onScreenCGReadyMs)),
+                ("axMs", RuntimeProjectionDiagnostics.formatMilliseconds(axReadyMs - allCGReadyMs)),
+                ("rankMs", RuntimeProjectionDiagnostics.formatMilliseconds(completeMs - axReadyMs)),
+                ("totalMs", RuntimeProjectionDiagnostics.formatMilliseconds(completeMs - startMs))
             ]
         )
         // Keep a single source of truth for window counting and selection: AX window list.
@@ -58,13 +58,13 @@ extension RuntimeProjectionRepairProvider {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
         if let uiTestRuntimeDataset = FlowTabUITestRuntimeProjectionDataset.current() {
             let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
-            snapshotProvider.logProjectionTiming(
+            RuntimeProjectionDiagnostics.logTiming(
                 timingEvent,
                 fields: [
                     ("result", "uiTestDataset"),
                     ("apps", "\(uiTestRuntimeDataset.appSwitcherApps.count)"),
                     ("windows", "\(uiTestRuntimeDataset.appSwitcherApps.reduce(0) { $0 + $1.windows.count })"),
-                    ("totalMs", snapshotProvider.formatProjectionMilliseconds(completeMs - startMs))
+                    ("totalMs", RuntimeProjectionDiagnostics.formatMilliseconds(completeMs - startMs))
                 ]
             )
             return RuntimeFullRepairProjectionPayload(
@@ -79,13 +79,13 @@ extension RuntimeProjectionRepairProvider {
         let appDirectoryEntries = runningApps.map(RuntimeAppDirectoryEntry.init(app:))
 
         guard !runningApps.isEmpty else {
-            snapshotProvider.logProjectionTiming(
+            RuntimeProjectionDiagnostics.logTiming(
                 timingEvent,
                 fields: [
                     ("result", "empty"),
                     ("reason", "noRunningApps"),
-                    ("runningAppsMs", snapshotProvider.formatProjectionMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
-                    ("totalMs", snapshotProvider.formatProjectionMilliseconds(runningAppsReadyMs - startMs))
+                    ("runningAppsMs", RuntimeProjectionDiagnostics.formatMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
+                    ("totalMs", RuntimeProjectionDiagnostics.formatMilliseconds(runningAppsReadyMs - startMs))
                 ]
             )
             return RuntimeFullRepairProjectionPayload(
@@ -142,7 +142,7 @@ extension RuntimeProjectionRepairProvider {
 
         guard !appLayerCandidates.isEmpty else {
             let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
-            snapshotProvider.logProjectionTiming(
+            RuntimeProjectionDiagnostics.logTiming(
                 timingEvent,
                 fields: [
                     ("result", "empty"),
@@ -150,10 +150,10 @@ extension RuntimeProjectionRepairProvider {
                     ("runningApps", "\(runningApps.count)"),
                     ("selectedApps", "\(selectedApps.count)"),
                     ("windows", "\(windowData.windowsByPID.values.reduce(0) { $0 + $1.count })"),
-                    ("runningAppsMs", snapshotProvider.formatProjectionMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
-                    ("windowDataMs", snapshotProvider.formatProjectionMilliseconds(windowDataReadyMs - windowDataStartMs)),
-                    ("selectionMs", snapshotProvider.formatProjectionMilliseconds(selectionReadyMs - selectionStartMs)),
-                    ("totalMs", snapshotProvider.formatProjectionMilliseconds(completeMs - startMs))
+                    ("runningAppsMs", RuntimeProjectionDiagnostics.formatMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
+                    ("windowDataMs", RuntimeProjectionDiagnostics.formatMilliseconds(windowDataReadyMs - windowDataStartMs)),
+                    ("selectionMs", RuntimeProjectionDiagnostics.formatMilliseconds(selectionReadyMs - selectionStartMs)),
+                    ("totalMs", RuntimeProjectionDiagnostics.formatMilliseconds(completeMs - startMs))
                 ]
             )
             return RuntimeFullRepairProjectionPayload(
@@ -204,7 +204,7 @@ extension RuntimeProjectionRepairProvider {
         )
         let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
 
-        snapshotProvider.logProjectionTiming(
+        RuntimeProjectionDiagnostics.logTiming(
             timingEvent,
             fields: [
                 ("result", "ready"),
@@ -213,12 +213,12 @@ extension RuntimeProjectionRepairProvider {
                 ("appLayerCandidates", "\(appLayerCandidates.count)"),
                 ("windows", "\(payload.apps.reduce(0) { $0 + $1.windows.count })"),
                 ("contexts", "\(payload.contextsByID.count)"),
-                ("runningAppsMs", snapshotProvider.formatProjectionMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
-                ("windowDataMs", snapshotProvider.formatProjectionMilliseconds(windowDataReadyMs - windowDataStartMs)),
-                ("selectionMs", snapshotProvider.formatProjectionMilliseconds(selectionReadyMs - selectionStartMs)),
-                ("rowsMs", snapshotProvider.formatProjectionMilliseconds(rowsReadyMs - rowsStartMs)),
-                ("sortContextMs", snapshotProvider.formatProjectionMilliseconds(completeMs - rowsReadyMs)),
-                ("totalMs", snapshotProvider.formatProjectionMilliseconds(completeMs - startMs))
+                ("runningAppsMs", RuntimeProjectionDiagnostics.formatMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
+                ("windowDataMs", RuntimeProjectionDiagnostics.formatMilliseconds(windowDataReadyMs - windowDataStartMs)),
+                ("selectionMs", RuntimeProjectionDiagnostics.formatMilliseconds(selectionReadyMs - selectionStartMs)),
+                ("rowsMs", RuntimeProjectionDiagnostics.formatMilliseconds(rowsReadyMs - rowsStartMs)),
+                ("sortContextMs", RuntimeProjectionDiagnostics.formatMilliseconds(completeMs - rowsReadyMs)),
+                ("totalMs", RuntimeProjectionDiagnostics.formatMilliseconds(completeMs - startMs))
             ]
         )
 
@@ -294,13 +294,13 @@ extension RuntimeProjectionRepairProvider {
             let payload = uiTestRuntimeDataset.currentAppWindowPayloadsByAppID.values.first {
                 $0.summary.pid == pid
             }
-            snapshotProvider.logProjectionTiming(
+            RuntimeProjectionDiagnostics.logTiming(
                 "focusedCurrentAppWindowPayload",
                 fields: [
                     ("result", payload == nil ? "missingPID" : "uiTestDataset"),
                     ("pid", "\(pid)"),
                     ("windows", "\(payload?.candidate.windows.count ?? 0)"),
-                    ("totalMs", snapshotProvider.formatProjectionMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))
+                    ("totalMs", RuntimeProjectionDiagnostics.formatMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))
                 ]
             )
             return payload
@@ -312,14 +312,14 @@ extension RuntimeProjectionRepairProvider {
         guard let app = runningApps.first(where: { $0.processIdentifier == pid })
             ?? NSRunningApplication(processIdentifier: pid)
         else {
-            snapshotProvider.logProjectionTiming(
+            RuntimeProjectionDiagnostics.logTiming(
                 "focusedCurrentAppWindowPayload",
                 fields: [
                     ("result", "missingRunningApp"),
                     ("pid", "\(pid)"),
                     ("knownApps", "\(runningApps.count)"),
-                    ("runningAppsMs", snapshotProvider.formatProjectionMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
-                    ("totalMs", snapshotProvider.formatProjectionMilliseconds(runningAppsReadyMs - startMs))
+                    ("runningAppsMs", RuntimeProjectionDiagnostics.formatMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
+                    ("totalMs", RuntimeProjectionDiagnostics.formatMilliseconds(runningAppsReadyMs - startMs))
                 ]
             )
             return nil
@@ -363,7 +363,7 @@ extension RuntimeProjectionRepairProvider {
             hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
         ) {
             let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
-            snapshotProvider.logProjectionTiming(
+            RuntimeProjectionDiagnostics.logTiming(
                 "focusedCurrentAppWindowPayload",
                 fields: [
                     ("result", "minimizedOnly"),
@@ -372,13 +372,13 @@ extension RuntimeProjectionRepairProvider {
                     ("windows", "\(windows.count)"),
                     ("knownApps", "\(runningApps.count)"),
                     ("axApps", "\(focusedApps.count)"),
-                    ("runningAppsMs", snapshotProvider.formatProjectionMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
-                    ("cleanupMs", snapshotProvider.formatProjectionMilliseconds(cleanupReadyMs - runningAppsReadyMs)),
-                    ("onscreenCGMs", snapshotProvider.formatProjectionMilliseconds(onScreenCGReadyMs - cleanupReadyMs)),
-                    ("allCGMs", snapshotProvider.formatProjectionMilliseconds(allCGReadyMs - onScreenCGReadyMs)),
-                    ("axMs", snapshotProvider.formatProjectionMilliseconds(axReadyMs - allCGReadyMs)),
-                    ("rowsMs", snapshotProvider.formatProjectionMilliseconds(rowsReadyMs - axReadyMs)),
-                    ("totalMs", snapshotProvider.formatProjectionMilliseconds(completeMs - startMs))
+                    ("runningAppsMs", RuntimeProjectionDiagnostics.formatMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
+                    ("cleanupMs", RuntimeProjectionDiagnostics.formatMilliseconds(cleanupReadyMs - runningAppsReadyMs)),
+                    ("onscreenCGMs", RuntimeProjectionDiagnostics.formatMilliseconds(onScreenCGReadyMs - cleanupReadyMs)),
+                    ("allCGMs", RuntimeProjectionDiagnostics.formatMilliseconds(allCGReadyMs - onScreenCGReadyMs)),
+                    ("axMs", RuntimeProjectionDiagnostics.formatMilliseconds(axReadyMs - allCGReadyMs)),
+                    ("rowsMs", RuntimeProjectionDiagnostics.formatMilliseconds(rowsReadyMs - axReadyMs)),
+                    ("totalMs", RuntimeProjectionDiagnostics.formatMilliseconds(completeMs - startMs))
                 ]
             )
             return nil
@@ -399,7 +399,7 @@ extension RuntimeProjectionRepairProvider {
             )
         )
         let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
-        snapshotProvider.logProjectionTiming(
+        RuntimeProjectionDiagnostics.logTiming(
             "focusedCurrentAppWindowPayload",
             fields: [
                 ("result", payload.candidate.windows.isEmpty ? "empty" : "ready"),
@@ -408,13 +408,13 @@ extension RuntimeProjectionRepairProvider {
                 ("windows", "\(payload.candidate.windows.count)"),
                 ("knownApps", "\(runningApps.count)"),
                 ("axApps", "\(focusedApps.count)"),
-                ("runningAppsMs", snapshotProvider.formatProjectionMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
-                ("cleanupMs", snapshotProvider.formatProjectionMilliseconds(cleanupReadyMs - runningAppsReadyMs)),
-                ("onscreenCGMs", snapshotProvider.formatProjectionMilliseconds(onScreenCGReadyMs - cleanupReadyMs)),
-                ("allCGMs", snapshotProvider.formatProjectionMilliseconds(allCGReadyMs - onScreenCGReadyMs)),
-                ("axMs", snapshotProvider.formatProjectionMilliseconds(axReadyMs - allCGReadyMs)),
-                ("rowsMs", snapshotProvider.formatProjectionMilliseconds(rowsReadyMs - axReadyMs)),
-                ("totalMs", snapshotProvider.formatProjectionMilliseconds(completeMs - startMs))
+                ("runningAppsMs", RuntimeProjectionDiagnostics.formatMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
+                ("cleanupMs", RuntimeProjectionDiagnostics.formatMilliseconds(cleanupReadyMs - runningAppsReadyMs)),
+                ("onscreenCGMs", RuntimeProjectionDiagnostics.formatMilliseconds(onScreenCGReadyMs - cleanupReadyMs)),
+                ("allCGMs", RuntimeProjectionDiagnostics.formatMilliseconds(allCGReadyMs - onScreenCGReadyMs)),
+                ("axMs", RuntimeProjectionDiagnostics.formatMilliseconds(axReadyMs - allCGReadyMs)),
+                ("rowsMs", RuntimeProjectionDiagnostics.formatMilliseconds(rowsReadyMs - axReadyMs)),
+                ("totalMs", RuntimeProjectionDiagnostics.formatMilliseconds(completeMs - startMs))
             ]
         )
         return payload
