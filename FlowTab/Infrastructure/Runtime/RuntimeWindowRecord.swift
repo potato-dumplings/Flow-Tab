@@ -131,6 +131,19 @@ struct RuntimeWindowMappingState {
         windowRecordsByCGWindowID.isEmpty
     }
 
+    var isLikelyTransientAXRebuild: Bool {
+        RuntimeAXWindowAbsencePolicy.isLikelyTransientRebuild(
+            hasObservedAXWindowHandle: hasObservedAXWindowHandle,
+            consecutiveMissingSnapshotCount: consecutiveSnapshotsWithoutAXWindows
+        )
+    }
+
+    func isTransientEmptyCurrentAppWindowPayload(
+        currentAppWindowPayloadWasEmpty: Bool
+    ) -> Bool {
+        currentAppWindowPayloadWasEmpty && isLikelyTransientAXRebuild
+    }
+
     static func affectedCGWindowIDsByPID(
         affectedCGWindowIDs: Set<CGWindowID>,
         currentCGWindowsByPID: [pid_t: [RuntimeCGWindowEntry]],

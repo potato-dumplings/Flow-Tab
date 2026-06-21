@@ -195,6 +195,45 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
+    func testRuntimeWindowMappingStateClassifiesTransientEmptyCurrentAppPayload() {
+        let transientState = RuntimeWindowMappingState(
+            hasObservedAXWindowHandle: true,
+            consecutiveSnapshotsWithoutAXWindows: 1
+        )
+        let nonTransientMissingState = RuntimeWindowMappingState(
+            hasObservedAXWindowHandle: false,
+            consecutiveSnapshotsWithoutAXWindows: 1
+        )
+        let stableState = RuntimeWindowMappingState(
+            hasObservedAXWindowHandle: true,
+            consecutiveSnapshotsWithoutAXWindows: 0
+        )
+
+        XCTAssertTrue(transientState.isLikelyTransientAXRebuild)
+        XCTAssertTrue(
+            transientState.isTransientEmptyCurrentAppWindowPayload(
+                currentAppWindowPayloadWasEmpty: true
+            )
+        )
+        XCTAssertFalse(
+            transientState.isTransientEmptyCurrentAppWindowPayload(
+                currentAppWindowPayloadWasEmpty: false
+            )
+        )
+        XCTAssertFalse(nonTransientMissingState.isLikelyTransientAXRebuild)
+        XCTAssertFalse(
+            nonTransientMissingState.isTransientEmptyCurrentAppWindowPayload(
+                currentAppWindowPayloadWasEmpty: true
+            )
+        )
+        XCTAssertFalse(stableState.isLikelyTransientAXRebuild)
+        XCTAssertFalse(
+            stableState.isTransientEmptyCurrentAppWindowPayload(
+                currentAppWindowPayloadWasEmpty: true
+            )
+        )
+    }
+
     func testRuntimeWindowMappingStateReportsAffectedWindowRecordEvidence() {
         let pid = pid_t(18_405)
         let exactWindowID = CGWindowID(240_001)

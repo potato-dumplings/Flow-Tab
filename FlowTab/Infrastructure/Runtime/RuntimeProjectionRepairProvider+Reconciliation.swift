@@ -66,8 +66,10 @@ extension RuntimeProjectionRepairProvider {
             exactAffectedCGWindowIDs: affectedWindowEvidence.exactAffectedCGWindowIDs,
             currentAppWindowPayload: currentAppWindowPayload,
             currentAppWindowPayloadWasEmpty: currentAppWindowPayloadWasEmpty,
-            isTransientEmptyCurrentAppWindowPayload: currentAppWindowPayloadWasEmpty
-                && snapshotProvider.isLikelyTransientAXRebuild(for: pid)
+            isTransientEmptyCurrentAppWindowPayload: mappingState?
+                .isTransientEmptyCurrentAppWindowPayload(
+                    currentAppWindowPayloadWasEmpty: currentAppWindowPayloadWasEmpty
+                ) == true
         )
     }
 }
