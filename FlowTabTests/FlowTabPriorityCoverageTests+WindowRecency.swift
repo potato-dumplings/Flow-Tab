@@ -622,8 +622,7 @@ extension FlowTabPriorityCoverageTests {
         model.frontmostApplicationOverride = { currentApp }
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertAppSwitcherProjectionRead(from: runtimeProjectionService)
         XCTAssertEqual(model.selectedApp?.id, otherAppID)
 
         model.handle(.downArrow)
@@ -801,7 +800,7 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
 
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
+        assertCurrentAppWindowProjectionRead(from: runtimeProjectionService, appID: appID)
         XCTAssertEqual(
             model.session?.selectedApp.windows.map(\.id),
             ["fullscreen", "incognito", "normal"]
@@ -875,8 +874,7 @@ extension FlowTabPriorityCoverageTests {
         model.frontmostApplicationOverride = { currentApp }
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertAppSwitcherProjectionRead(from: runtimeProjectionService)
         XCTAssertEqual(model.session?.apps.first?.windows.map(\.id), ["fullscreen", "incognito", "normal"])
 
         model.windowRecencyTracker.recordVerifiedFocus(appID: appID, windowID: "normal", context: context)
@@ -894,8 +892,7 @@ extension FlowTabPriorityCoverageTests {
         )
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertAppSwitcherProjectionRead(from: runtimeProjectionService, readCount: 2)
         XCTAssertEqual(model.session?.apps.first?.windows.map(\.id), ["normal", "incognito", "fullscreen"])
     }
 
@@ -946,6 +943,46 @@ extension FlowTabPriorityCoverageTests {
             context: context
         )
         return apps.first?.windows.map(\.id)
+    }
+
+    private func assertAppSwitcherProjectionRead(
+        from runtimeProjectionService: RecordingRuntimeProjectionService,
+        readCount: Int = 1,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertEqual(
+            runtimeProjectionService.appSwitcherProjectionReadCount(),
+            readCount,
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(
+            runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(),
+            Array(repeating: .switcherSessionStarted, count: readCount),
+            file: file,
+            line: line
+        )
+    }
+
+    private func assertCurrentAppWindowProjectionRead(
+        from runtimeProjectionService: RecordingRuntimeProjectionService,
+        appID: String,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertEqual(
+            runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID),
+            1,
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(
+            runtimeProjectionService.appSwitcherProjectionReadCount(),
+            0,
+            file: file,
+            line: line
+        )
     }
 
     private func recencyAppliedApps(
