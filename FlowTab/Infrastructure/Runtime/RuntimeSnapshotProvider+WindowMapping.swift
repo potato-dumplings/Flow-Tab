@@ -230,7 +230,10 @@ extension RuntimeSnapshotProvider {
                 return nil
             }
             return RuntimeWindowListEntry(
-                windowID: record?.stableWindowID ?? Self.makeCGWindowID(pid: pid, cgWindowID: cgWindow.id),
+                windowID: record?.stableWindowID ?? RuntimeWindowListEntry.cgStableWindowID(
+                    pid: pid,
+                    cgWindowID: cgWindow.id
+                ),
                 title: record?.displayTitle
                     ?? RuntimeWindowTitleResolver.supplementalCGWindowTitle(appName: appName, cgWindow: cgWindow),
                 isMinimized: false,
@@ -553,7 +556,7 @@ extension RuntimeSnapshotProvider {
             var record = windowRecordsByCGWindowID[cgWindow.id]
                 ?? RuntimeWindowRecord(
                     cgWindowID: cgWindow.id,
-                    stableWindowID: Self.makeCGWindowID(pid: pid, cgWindowID: cgWindow.id),
+                    stableWindowID: RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindow.id),
                     firstSeenAt: observedAt
                 )
             record.refreshCGState(from: cgWindow, observedAt: observedAt)
@@ -839,7 +842,7 @@ extension RuntimeSnapshotProvider {
             var record = windowRecordsByCGWindowID[cgWindowID]
                 ?? RuntimeWindowRecord(
                     cgWindowID: cgWindowID,
-                    stableWindowID: Self.makeCGWindowID(pid: pid, cgWindowID: cgWindowID),
+                    stableWindowID: RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindowID),
                     firstSeenAt: observedAt
                 )
             let resolvedTitle = RuntimeWindowTitleResolver.stableWindowTitle(

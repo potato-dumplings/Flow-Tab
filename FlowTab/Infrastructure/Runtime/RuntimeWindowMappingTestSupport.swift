@@ -234,7 +234,7 @@ enum RuntimeWindowMappingTestSupport {
         let records = Dictionary(uniqueKeysWithValues: historicalCGWindowIDs.map { cgWindowID in
             var record = RuntimeWindowRecord(
                 cgWindowID: cgWindowID,
-                stableWindowID: RuntimeSnapshotProvider.makeCGWindowID(pid: pid, cgWindowID: cgWindowID),
+                stableWindowID: RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindowID),
                 firstSeenAt: seedTimestamp
             )
             if let previousAXWindowID = previousMatches.first(where: { $0.value == cgWindowID })?.key {

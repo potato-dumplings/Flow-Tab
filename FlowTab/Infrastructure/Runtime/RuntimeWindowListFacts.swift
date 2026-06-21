@@ -50,6 +50,10 @@ struct RuntimeWindowListEntry {
         )
     }
 
+    static func cgStableWindowID(pid: pid_t, cgWindowID: CGWindowID) -> String {
+        "cg:\(pid):\(cgWindowID)"
+    }
+
     init(
         windowID: String,
         title: String,

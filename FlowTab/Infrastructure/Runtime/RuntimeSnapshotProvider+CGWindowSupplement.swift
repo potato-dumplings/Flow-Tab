@@ -3,10 +3,6 @@ import ApplicationServices
 import Foundation
 
 extension RuntimeSnapshotProvider {
-    static func makeCGWindowID(pid: pid_t, cgWindowID: CGWindowID) -> String {
-        "cg:\(pid):\(cgWindowID)"
-    }
-
     func appendOffSpaceCGWindows(
         to entries: [RuntimeWindowListEntry],
         appName: String,
@@ -22,7 +18,7 @@ extension RuntimeSnapshotProvider {
 
         let cgOnlyEntries = unmatchedCGWindows.map { cgWindow in
             RuntimeWindowListEntry(
-                windowID: Self.makeCGWindowID(pid: pid, cgWindowID: cgWindow.id),
+                windowID: RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindow.id),
                 title: resolvedTitleForSupplementalCGWindow(
                     appName: appName,
                     cgWindow: cgWindow

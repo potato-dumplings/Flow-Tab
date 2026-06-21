@@ -72,7 +72,7 @@ extension RuntimeSnapshotProvider {
         var record = mappingState.windowRecordsByCGWindowID[focusedCGWindowID]
             ?? RuntimeWindowRecord(
                 cgWindowID: focusedCGWindowID,
-                stableWindowID: Self.makeCGWindowID(
+                stableWindowID: RuntimeWindowListEntry.cgStableWindowID(
                     pid: verification.ownerPID,
                     cgWindowID: focusedCGWindowID
                 ),
