@@ -382,29 +382,10 @@ final class RuntimeSnapshotProvider {
                 ("totalMs", formatSnapshotMilliseconds(spaceReadyMs - startMs))
             ]
         )
-        guard !spaceIDsByWindowID.isEmpty else {
-            return RuntimeCGWindowCollection(
-                windowsByPID: windowsByPID,
-                spaceTopologyDiff: spaceTopologyDiff
-            )
-        }
-
-        let enrichedWindowsByPID = Dictionary(uniqueKeysWithValues: windowsByPID.map { pid, windows in
-            (
-                pid,
-                windows.map { window in
-                    RuntimeCGWindowEntry(
-                        id: window.id,
-                        title: window.title,
-                        bounds: window.bounds,
-                        isOnscreen: window.isOnscreen,
-                        alpha: window.alpha,
-                        storeType: window.storeType,
-                        spaceIDs: spaceIDsByWindowID[window.id] ?? window.spaceIDs
-                    )
-                }
-            )
-        })
+        let enrichedWindowsByPID = RuntimeCGWindowFacts.mergingSpaceTopology(
+            windowsByPID: windowsByPID,
+            spaceIDsByCGWindowID: spaceIDsByWindowID
+        )
         return RuntimeCGWindowCollection(
             windowsByPID: enrichedWindowsByPID,
             spaceTopologyDiff: spaceTopologyDiff

@@ -82,6 +82,57 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
+    func testRuntimeCGWindowFactsMergeSpaceTopologyPreservesWindowFacts() throws {
+        let matchedBounds = CGRect(x: 40, y: 80, width: 1_000, height: 700)
+        let unmatchedBounds = CGRect(x: 140, y: 180, width: 900, height: 640)
+        let windowsByPID: [pid_t: [RuntimeCGWindowEntry]] = [
+            18_405: [
+                RuntimeCGWindowEntry(
+                    id: 240_101,
+                    title: "Matched Space",
+                    bounds: matchedBounds,
+                    isOnscreen: false,
+                    alpha: 0.72,
+                    storeType: 2,
+                    spaceIDs: [1]
+                ),
+                RuntimeCGWindowEntry(
+                    id: 240_102,
+                    title: "Unmatched Space",
+                    bounds: unmatchedBounds,
+                    isOnscreen: true,
+                    alpha: 0.91,
+                    storeType: 1,
+                    spaceIDs: [11_680]
+                )
+            ]
+        ]
+
+        let merged = RuntimeCGWindowFacts.mergingSpaceTopology(
+            windowsByPID: windowsByPID,
+            spaceIDsByCGWindowID: [
+                240_101: [11_679, 11_681]
+            ]
+        )
+        let windows = try XCTUnwrap(merged[18_405])
+
+        XCTAssertEqual(windows.map(\.id), [240_101, 240_102])
+        XCTAssertEqual(windows[0].spaceIDs, [11_679, 11_681])
+        XCTAssertEqual(windows[0].title, "Matched Space")
+        XCTAssertEqual(windows[0].bounds, matchedBounds)
+        XCTAssertEqual(windows[0].isOnscreen, false)
+        XCTAssertEqual(windows[0].alpha, 0.72)
+        XCTAssertEqual(windows[0].storeType, 2)
+        XCTAssertEqual(windows[1].spaceIDs, [11_680])
+        XCTAssertEqual(
+            RuntimeCGWindowFacts.mergingSpaceTopology(
+                windowsByPID: windowsByPID,
+                spaceIDsByCGWindowID: [:]
+            )[18_405]?.map(\.spaceIDs),
+            [[1], [11_680]]
+        )
+    }
+
     func testRuntimeWindowTopologyClassifierDetectsFullscreenContentAndDesktopWrapper() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
 
