@@ -159,6 +159,91 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
+    func testRuntimeWindowTopologyClassifierClassifiesActivationSurfaces() {
+        let targetFrame = CGRect(x: 0, y: 37, width: 1_728, height: 1_080)
+        let target = RuntimeCGWindowEntry(
+            id: 240_201,
+            title: "Fullscreen Target",
+            bounds: targetFrame,
+            storeType: 1,
+            spaceIDs: [7_128]
+        )
+        let relatedAXSurface = RuntimeCGWindowEntry(
+            id: 240_202,
+            title: nil,
+            bounds: CGRect(x: 0, y: 37, width: 1_728, height: 520),
+            storeType: 1,
+            spaceIDs: [7_128]
+        )
+        let sameSpaceSurface = RuntimeCGWindowEntry(
+            id: 240_203,
+            title: nil,
+            bounds: CGRect(x: 0, y: 37, width: 1_728, height: 44),
+            storeType: 1,
+            spaceIDs: [7_128]
+        )
+        let otherSpaceSurface = RuntimeCGWindowEntry(
+            id: 240_204,
+            title: nil,
+            bounds: CGRect(x: 0, y: 37, width: 1_728, height: 44),
+            storeType: 1,
+            spaceIDs: [7_124]
+        )
+        let nonBufferedSurface = RuntimeCGWindowEntry(
+            id: 240_205,
+            title: nil,
+            bounds: CGRect(x: 0, y: 37, width: 1_728, height: 44),
+            storeType: 2,
+            spaceIDs: [7_128]
+        )
+        let equalAreaLowerID = RuntimeCGWindowEntry(
+            id: 240_190,
+            title: nil,
+            bounds: CGRect(x: 0, y: 37, width: 1_728, height: 44),
+            storeType: 1,
+            spaceIDs: [7_128]
+        )
+
+        XCTAssertTrue(RuntimeWindowTopologyClassifier.isLikelyFullscreenActivationTarget(target))
+        XCTAssertFalse(
+            RuntimeWindowTopologyClassifier.isLikelyFullscreenActivationTarget(
+                RuntimeCGWindowEntry(
+                    id: 240_206,
+                    title: "Desktop",
+                    bounds: targetFrame,
+                    storeType: 1,
+                    spaceIDs: [1]
+                )
+            )
+        )
+        XCTAssertTrue(RuntimeWindowTopologyClassifier.sharesOffDesktopSpace(relatedAXSurface, with: target))
+        XCTAssertFalse(RuntimeWindowTopologyClassifier.sharesOffDesktopSpace(otherSpaceSurface, with: target))
+        XCTAssertTrue(
+            RuntimeWindowTopologyClassifier.isLikelyRelatedFullscreenAXSurface(
+                relatedAXSurface,
+                targetFrame: targetFrame
+            )
+        )
+        XCTAssertTrue(
+            RuntimeWindowTopologyClassifier.isLikelySameSpaceActivationSurface(
+                sameSpaceSurface,
+                targetFrame: targetFrame
+            )
+        )
+        XCTAssertFalse(
+            RuntimeWindowTopologyClassifier.isLikelySameSpaceActivationSurface(
+                nonBufferedSurface,
+                targetFrame: targetFrame
+            )
+        )
+        XCTAssertEqual(
+            [sameSpaceSurface, relatedAXSurface, equalAreaLowerID]
+                .sorted(by: RuntimeWindowTopologyClassifier.activationCandidateSort)
+                .map(\.id),
+            [relatedAXSurface.id, equalAreaLowerID.id, sameSpaceSurface.id]
+        )
+    }
+
     func testRuntimeWindowTopologyClassifierBuildsSpaceEvidenceConfidence() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
 

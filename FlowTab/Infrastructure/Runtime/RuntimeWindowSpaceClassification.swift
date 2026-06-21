@@ -161,6 +161,80 @@ enum RuntimeWindowTopologyClassifier {
         hasOffDesktopSpace(spaceIDs: spaceIDs) && isLikelyFullscreenContent(bounds: bounds)
     }
 
+    static func isLikelyFullscreenActivationTarget(_ window: RuntimeCGWindowEntry) -> Bool {
+        hasOffDesktopSpace(spaceIDs: window.spaceIDs)
+            && isLikelyFullscreenContent(bounds: window.bounds)
+    }
+
+    static func sharesOffDesktopSpace(
+        _ lhs: RuntimeCGWindowEntry,
+        with rhs: RuntimeCGWindowEntry
+    ) -> Bool {
+        let lhsSpaceIDs = Set(
+            normalizedSpaceIDs(lhs.spaceIDs).filter { $0 != desktopSpaceID }
+        )
+        guard !lhsSpaceIDs.isEmpty else { return false }
+        let rhsSpaceIDs = Set(
+            normalizedSpaceIDs(rhs.spaceIDs).filter { $0 != desktopSpaceID }
+        )
+        guard !rhsSpaceIDs.isEmpty else { return false }
+        return !lhsSpaceIDs.isDisjoint(with: rhsSpaceIDs)
+    }
+
+    static func isLikelyRelatedFullscreenAXSurface(
+        _ window: RuntimeCGWindowEntry,
+        targetFrame: CGRect?
+    ) -> Bool {
+        guard
+            let bounds = window.bounds?.standardized,
+            let targetFrame = targetFrame?.standardized,
+            isLikelyFullscreenContent(bounds: targetFrame)
+        else {
+            return false
+        }
+        guard bounds.width >= targetFrame.width * 0.7 else { return false }
+        guard bounds.height > 0, bounds.height <= targetFrame.height * 0.6 else { return false }
+        guard abs(bounds.minX - targetFrame.minX) <= 90 else { return false }
+        guard bounds.minY >= targetFrame.minY else { return false }
+        guard bounds.minY <= targetFrame.minY + targetFrame.height * 0.6 else { return false }
+        return true
+    }
+
+    static func isLikelySameSpaceActivationSurface(
+        _ window: RuntimeCGWindowEntry,
+        targetFrame: CGRect?
+    ) -> Bool {
+        guard window.storeType == 1 else { return false }
+        guard
+            let bounds = window.bounds?.standardized,
+            let targetFrame = targetFrame?.standardized,
+            isLikelyFullscreenContent(bounds: targetFrame)
+        else {
+            return false
+        }
+        guard !isLikelyFullscreenContent(bounds: bounds) else {
+            return false
+        }
+        guard bounds.width >= targetFrame.width * 0.5 else { return false }
+        guard bounds.height > 0, bounds.height <= targetFrame.height * 0.6 else { return false }
+        guard abs(bounds.minX - targetFrame.minX) <= 120 else { return false }
+        guard bounds.minY >= targetFrame.minY else { return false }
+        guard bounds.minY <= targetFrame.minY + targetFrame.height * 0.7 else { return false }
+        return true
+    }
+
+    static func activationCandidateSort(
+        _ lhs: RuntimeCGWindowEntry,
+        _ rhs: RuntimeCGWindowEntry
+    ) -> Bool {
+        let lhsArea = windowArea(lhs)
+        let rhsArea = windowArea(rhs)
+        if lhsArea != rhsArea {
+            return lhsArea > rhsArea
+        }
+        return lhs.id < rhs.id
+    }
+
     static func spaceEvidence(
         cgWindowID: CGWindowID,
         spaceIDs: [Int],
@@ -230,5 +304,10 @@ enum RuntimeWindowTopologyClassifier {
             && abs(left.minY - right.minY) <= policy.frameMatchOriginTolerance
             && abs(left.width - right.width) <= policy.frameMatchSizeTolerance
             && abs(left.height - right.height) <= policy.frameMatchSizeTolerance
+    }
+
+    private static func windowArea(_ window: RuntimeCGWindowEntry) -> CGFloat {
+        guard let bounds = window.bounds?.standardized else { return 0 }
+        return bounds.width * bounds.height
     }
 }

@@ -504,7 +504,7 @@ final class RuntimeActivator {
         let currentWindows = currentCGWindows(forPID: app.processIdentifier)
         guard
             let targetWindow = currentWindows.first(where: { $0.id == targetCGWindowID }),
-            runtimeCGWindowLooksLikeFullscreenActivationTarget(targetWindow)
+            RuntimeWindowTopologyClassifier.isLikelyFullscreenActivationTarget(targetWindow)
         else {
             return nil
         }
@@ -518,10 +518,10 @@ final class RuntimeActivator {
             else {
                 return nil
             }
-            guard runtimeCGWindowSharesOffDesktopSpace(cgWindow, with: targetWindow) else {
+            guard RuntimeWindowTopologyClassifier.sharesOffDesktopSpace(cgWindow, with: targetWindow) else {
                 return nil
             }
-            guard runtimeCGWindowLooksLikeRelatedFullscreenAXSurface(
+            guard RuntimeWindowTopologyClassifier.isLikelyRelatedFullscreenAXSurface(
                 cgWindow,
                 targetFrame: targetWindow.bounds ?? request.frame
             ) else {
@@ -572,17 +572,17 @@ final class RuntimeActivator {
         let currentWindows = currentCGWindows(forPID: app.processIdentifier)
         guard
             let targetWindow = currentWindows.first(where: { $0.id == targetCGWindowID }),
-            runtimeCGWindowLooksLikeFullscreenActivationTarget(targetWindow)
+            RuntimeWindowTopologyClassifier.isLikelyFullscreenActivationTarget(targetWindow)
         else {
             return nil
         }
 
         let candidates = currentWindows.filter { window in
             guard window.id != targetCGWindowID else { return false }
-            guard runtimeCGWindowSharesOffDesktopSpace(window, with: targetWindow) else {
+            guard RuntimeWindowTopologyClassifier.sharesOffDesktopSpace(window, with: targetWindow) else {
                 return false
             }
-            return runtimeCGWindowLooksLikeSameSpaceActivationSurface(
+            return RuntimeWindowTopologyClassifier.isLikelySameSpaceActivationSurface(
                 window,
                 targetFrame: targetWindow.bounds ?? request.frame
             )
@@ -593,7 +593,7 @@ final class RuntimeActivator {
         )
         guard !candidates.isEmpty else { return nil }
 
-        for candidate in candidates.sorted(by: runtimeCGSameSpaceActivationCandidateSort) {
+        for candidate in candidates.sorted(by: RuntimeWindowTopologyClassifier.activationCandidateSort) {
             guard focusCGWindow(candidate.id, in: app) else { continue }
             let windowsAfterFocus = currentCGWindows(forPID: app.processIdentifier)
             let isVisible = targetCGWindowIsVisible(
@@ -1165,87 +1165,4 @@ private func runtimeActivationLogValue(_ value: String) -> String {
         .replacingOccurrences(of: "\n", with: " ")
         .replacingOccurrences(of: "\r", with: " ")
         .trimmingCharacters(in: .whitespacesAndNewlines)
-}
-
-private func runtimeCGWindowLooksLikeFullscreenActivationTarget(
-    _ window: RuntimeCGWindowEntry
-) -> Bool {
-    RuntimeWindowTopologyClassifier.hasOffDesktopSpace(spaceIDs: window.spaceIDs)
-        && RuntimeWindowTopologyClassifier.isLikelyFullscreenContent(bounds: window.bounds)
-}
-
-private func runtimeCGWindowSharesOffDesktopSpace(
-    _ lhs: RuntimeCGWindowEntry,
-    with rhs: RuntimeCGWindowEntry
-) -> Bool {
-    let lhsSpaceIDs = Set(
-        RuntimeWindowTopologyClassifier.normalizedSpaceIDs(lhs.spaceIDs)
-            .filter { $0 != RuntimeWindowTopologyClassifier.desktopSpaceID }
-    )
-    guard !lhsSpaceIDs.isEmpty else { return false }
-    let rhsSpaceIDs = Set(
-        RuntimeWindowTopologyClassifier.normalizedSpaceIDs(rhs.spaceIDs)
-            .filter { $0 != RuntimeWindowTopologyClassifier.desktopSpaceID }
-    )
-    guard !rhsSpaceIDs.isEmpty else { return false }
-    return !lhsSpaceIDs.isDisjoint(with: rhsSpaceIDs)
-}
-
-private func runtimeCGWindowLooksLikeRelatedFullscreenAXSurface(
-    _ window: RuntimeCGWindowEntry,
-    targetFrame: CGRect?
-) -> Bool {
-    guard
-        let bounds = window.bounds?.standardized,
-        let targetFrame = targetFrame?.standardized,
-        RuntimeWindowTopologyClassifier.isLikelyFullscreenContent(bounds: targetFrame)
-    else {
-        return false
-    }
-    guard bounds.width >= targetFrame.width * 0.7 else { return false }
-    guard bounds.height > 0, bounds.height <= targetFrame.height * 0.6 else { return false }
-    guard abs(bounds.minX - targetFrame.minX) <= 90 else { return false }
-    guard bounds.minY >= targetFrame.minY else { return false }
-    guard bounds.minY <= targetFrame.minY + targetFrame.height * 0.6 else { return false }
-    return true
-}
-
-private func runtimeCGWindowLooksLikeSameSpaceActivationSurface(
-    _ window: RuntimeCGWindowEntry,
-    targetFrame: CGRect?
-) -> Bool {
-    guard window.storeType == 1 else { return false }
-    guard
-        let bounds = window.bounds?.standardized,
-        let targetFrame = targetFrame?.standardized,
-        RuntimeWindowTopologyClassifier.isLikelyFullscreenContent(bounds: targetFrame)
-    else {
-        return false
-    }
-    guard !RuntimeWindowTopologyClassifier.isLikelyFullscreenContent(bounds: bounds) else {
-        return false
-    }
-    guard bounds.width >= targetFrame.width * 0.5 else { return false }
-    guard bounds.height > 0, bounds.height <= targetFrame.height * 0.6 else { return false }
-    guard abs(bounds.minX - targetFrame.minX) <= 120 else { return false }
-    guard bounds.minY >= targetFrame.minY else { return false }
-    guard bounds.minY <= targetFrame.minY + targetFrame.height * 0.7 else { return false }
-    return true
-}
-
-private func runtimeCGSameSpaceActivationCandidateSort(
-    _ lhs: RuntimeCGWindowEntry,
-    _ rhs: RuntimeCGWindowEntry
-) -> Bool {
-    let lhsArea = runtimeCGWindowArea(lhs)
-    let rhsArea = runtimeCGWindowArea(rhs)
-    if lhsArea != rhsArea {
-        return lhsArea > rhsArea
-    }
-    return lhs.id < rhs.id
-}
-
-private func runtimeCGWindowArea(_ window: RuntimeCGWindowEntry) -> CGFloat {
-    guard let bounds = window.bounds?.standardized else { return 0 }
-    return bounds.width * bounds.height
 }
