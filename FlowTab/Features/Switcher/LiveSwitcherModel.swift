@@ -165,6 +165,16 @@ final class LiveSwitcherModel: ObservableObject {
         let pendingRepairScopeCount: Int
         let requestedFreshnessBarrier: Bool
 
+        var searchTraceFields: String {
+            [
+                "searchIndexReadiness=\(readiness.rawValue)",
+                "searchIndexResultState=\(resultState.rawValue)",
+                "searchIndexDegraded=\(resultState == .degradedStaleCommittedResult ? 1 : 0)",
+                "searchIndexCoversCurrentGeneration=\(committedIndexCoversCurrentGeneration ? 1 : 0)",
+                "searchFreshnessBarrierRequested=\(requestedFreshnessBarrier ? 1 : 0)"
+            ].joined(separator: " ")
+        }
+
         var logMessage: String {
             [
                 "searchIndexSource",

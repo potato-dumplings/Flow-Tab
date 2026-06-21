@@ -30,7 +30,15 @@ extension SwitcherPanelController {
         let now = ProcessInfo.processInfo.systemUptime
         let activeSpaceIgnoreMs = max(0, (ignoreActiveSpaceChangesUntil - now) * 1_000)
         let terminateProtectionMs = max(0, (terminateInterruptionProtectionUntil - now) * 1_000)
-        return "panelVisible=\(isPanelPresented ? 1 : 0) panelKey=\(panel.isKeyWindow ? 1 : 0) appActive=\(isAppCurrentlyActive ? 1 : 0) searchActive=\(model.isSearchActive ? 1 : 0) inputFocused=\(model.isSearchInputFocused ? 1 : 0) marked=\(model.hasMarkedSearchText ? 1 : 0) firstResponder=\(panelFirstResponderDebugName()) activeSpaceIgnoreMs=\(formatMilliseconds(activeSpaceIgnoreMs)) terminateProtectionMs=\(formatMilliseconds(terminateProtectionMs))"
+        let searchIndexTraceFields = model.lastSearchIndexReadDiagnostic?.searchTraceFields
+            ?? [
+                "searchIndexReadiness=none",
+                "searchIndexResultState=none",
+                "searchIndexDegraded=0",
+                "searchIndexCoversCurrentGeneration=0",
+                "searchFreshnessBarrierRequested=0"
+            ].joined(separator: " ")
+        return "panelVisible=\(isPanelPresented ? 1 : 0) panelKey=\(panel.isKeyWindow ? 1 : 0) appActive=\(isAppCurrentlyActive ? 1 : 0) searchActive=\(model.isSearchActive ? 1 : 0) inputFocused=\(model.isSearchInputFocused ? 1 : 0) marked=\(model.hasMarkedSearchText ? 1 : 0) firstResponder=\(panelFirstResponderDebugName()) activeSpaceIgnoreMs=\(formatMilliseconds(activeSpaceIgnoreMs)) terminateProtectionMs=\(formatMilliseconds(terminateProtectionMs)) \(searchIndexTraceFields)"
     }
 
     func beginIgnoringActiveSpaceChanges(trigger: String) {

@@ -657,6 +657,45 @@ extension FlowTabTests {
         XCTAssertFalse(diagnostic.logMessage.contains("resultState=freshResult"))
         XCTAssertFalse(diagnostic.logMessage.contains("resultState=completeResult"))
         XCTAssertFalse(diagnostic.logMessage.contains("complete="))
+        XCTAssertTrue(diagnostic.searchTraceFields.contains("searchIndexReadiness=staleCommitted"))
+        XCTAssertTrue(
+            diagnostic.searchTraceFields.contains(
+                "searchIndexResultState=degradedStaleCommittedResult"
+            )
+        )
+        XCTAssertTrue(diagnostic.searchTraceFields.contains("searchIndexDegraded=1"))
+        XCTAssertTrue(
+            diagnostic.searchTraceFields.contains("searchIndexCoversCurrentGeneration=0")
+        )
+        XCTAssertTrue(
+            diagnostic.searchTraceFields.contains("searchFreshnessBarrierRequested=1")
+        )
+        XCTAssertFalse(
+            diagnostic.searchTraceFields.contains(
+                "searchIndexResultState=verifiedCurrentGenerationCommittedResult"
+            )
+        )
+        XCTAssertFalse(diagnostic.searchTraceFields.contains("freshResult"))
+        XCTAssertFalse(diagnostic.searchTraceFields.contains("completeResult"))
+        XCTAssertFalse(diagnostic.searchTraceFields.contains("latestCommittedResult"))
+        let controller = SwitcherPanelController(model: model)
+        defer { controller.cancelSelectionForTesting() }
+        let searchTraceSummary = controller.searchTraceStateSummary()
+        XCTAssertTrue(searchTraceSummary.contains("searchIndexReadiness=staleCommitted"))
+        XCTAssertTrue(
+            searchTraceSummary.contains("searchIndexResultState=degradedStaleCommittedResult")
+        )
+        XCTAssertTrue(searchTraceSummary.contains("searchIndexDegraded=1"))
+        XCTAssertTrue(searchTraceSummary.contains("searchIndexCoversCurrentGeneration=0"))
+        XCTAssertTrue(searchTraceSummary.contains("searchFreshnessBarrierRequested=1"))
+        XCTAssertFalse(
+            searchTraceSummary.contains(
+                "searchIndexResultState=verifiedCurrentGenerationCommittedResult"
+            )
+        )
+        XCTAssertFalse(searchTraceSummary.contains("freshResult"))
+        XCTAssertFalse(searchTraceSummary.contains("completeResult"))
+        XCTAssertFalse(searchTraceSummary.contains("latestCommittedResult"))
         XCTAssertEqual(
             runtimeProjectionService.searchIndexFreshnessBarrierRequestsRecorded(),
             [.searchFreshnessBarrier]
