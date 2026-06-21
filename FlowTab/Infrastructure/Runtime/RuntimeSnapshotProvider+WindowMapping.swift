@@ -164,7 +164,7 @@ extension RuntimeSnapshotProvider {
                 bounds: entryFrame,
                 source: "window-mapping-sticky-cg"
             )
-            guard runtimeWindowCanBeExposedWithoutCurrentAXHandle(
+            guard RuntimeWindowTopologyClassifier.canExposeWithoutCurrentAXHandle(
                 spaceIDs: normalizedSpaceIDs,
                 isLikelyDesktopWrapper: RuntimeWindowTopologyClassifier.isLikelyDesktopWrapper(
                     bounds: cgWindow.bounds,
@@ -216,7 +216,7 @@ extension RuntimeSnapshotProvider {
                 bounds: entryFrame,
                 source: "window-mapping-provisional-cg"
             )
-            guard runtimeWindowCanBeExposedWithoutCurrentAXHandle(
+            guard RuntimeWindowTopologyClassifier.canExposeWithoutCurrentAXHandle(
                 spaceIDs: normalizedSpaceIDs,
                 isLikelyDesktopWrapper: RuntimeWindowTopologyClassifier.isLikelyDesktopWrapper(
                     bounds: cgWindow.bounds,

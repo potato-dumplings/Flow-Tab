@@ -204,6 +204,22 @@ enum RuntimeWindowTopologyClassifier {
         }
     }
 
+    static func canExposeWithoutCurrentAXHandle(
+        spaceIDs: [Int],
+        isLikelyDesktopWrapper: Bool,
+        hasFullscreenTopology: Bool,
+        allowSpaceOneWithoutCurrentAXHandle: Bool
+    ) -> Bool {
+        let normalizedSpaceIDs = normalizedSpaceIDs(spaceIDs)
+        guard !normalizedSpaceIDs.isEmpty else { return true }
+        guard !isDesktopOnlySpaceWindow(spaceIDs: normalizedSpaceIDs) else {
+            if isLikelyDesktopWrapper { return false }
+            if hasFullscreenTopology { return true }
+            return allowSpaceOneWithoutCurrentAXHandle
+        }
+        return true
+    }
+
     static func framesApproximatelyMatch(_ lhs: CGRect, _ rhs: CGRect) -> Bool {
         let left = lhs.standardized
         let right = rhs.standardized

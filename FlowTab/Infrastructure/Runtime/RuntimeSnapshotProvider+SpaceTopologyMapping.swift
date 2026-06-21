@@ -342,22 +342,6 @@ private func topologyFramesAreCompatible(_ axFrame: CGRect?, _ cgFrame: CGRect?)
     }
 }
 
-func runtimeWindowCanBeExposedWithoutCurrentAXHandle(
-    spaceIDs: [Int],
-    isLikelyDesktopWrapper: Bool,
-    hasFullscreenTopology: Bool,
-    allowSpaceOneWithoutCurrentAXHandle: Bool
-) -> Bool {
-    let normalizedSpaceIDs = RuntimeWindowTopologyClassifier.normalizedSpaceIDs(spaceIDs)
-    guard !normalizedSpaceIDs.isEmpty else { return true }
-    guard RuntimeWindowTopologyClassifier.isDesktopOnlySpaceWindow(spaceIDs: normalizedSpaceIDs) else {
-        return true
-    }
-    if isLikelyDesktopWrapper { return false }
-    if hasFullscreenTopology { return true }
-    return allowSpaceOneWithoutCurrentAXHandle
-}
-
 private func topologyTitlesAreCompatible(
     _ lhs: String?,
     _ rhs: String?,
