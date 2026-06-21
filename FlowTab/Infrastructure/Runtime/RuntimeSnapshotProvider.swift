@@ -203,7 +203,7 @@ final class RuntimeSnapshotProvider {
             AXWindowInspector.isSwitchable($0)
         }.count
         let publicSwitchableReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let shouldIncludeRemoteAXWindows = shouldIncludeRemoteAXWindows(
+        let shouldIncludeRemoteAXWindows = RuntimeAXRemoteWindowResolver.shouldIncludeRemoteWindows(
             allCGWindows: allCGWindows,
             publicSwitchableWindowCount: publicSwitchableWindowCount,
             publicFetchSucceeded: publicWindowsFetchResult.error == .success
@@ -291,45 +291,6 @@ final class RuntimeSnapshotProvider {
 
         group.wait()
         return results.compactMap { $0 }
-    }
-
-    private func shouldIncludeRemoteAXWindows(
-        allCGWindows: [RuntimeCGWindowEntry],
-        publicSwitchableWindowCount: Int,
-        publicFetchSucceeded: Bool
-    ) -> Bool {
-        let userFacingCGWindows = userFacingCGWindowsForRemoteAXDecision(allCGWindows)
-        guard userFacingCGWindows.contains(where: { window in
-            RuntimeWindowTopologyClassifier.hasOffDesktopSpace(spaceIDs: window.spaceIDs)
-                || !window.isOnscreen
-        }) else {
-            return false
-        }
-        guard publicFetchSucceeded else { return true }
-        return publicSwitchableWindowCount < userFacingCGWindows.count
-    }
-
-    private func userFacingCGWindowsForRemoteAXDecision(
-        _ allCGWindows: [RuntimeCGWindowEntry]
-    ) -> [RuntimeCGWindowEntry] {
-        let validCGWindows = selectSupplementalOffSpaceCGWindows(
-            existingCGWindowIDs: [],
-            allCGWindows: allCGWindows
-        )
-        let fullscreenContentBounds = validCGWindows.compactMap { window -> CGRect? in
-            guard RuntimeWindowTopologyClassifier.isLikelyOffDesktopFullscreenContent(
-                bounds: window.bounds,
-                spaceIDs: window.spaceIDs
-            ) else { return nil }
-            return window.bounds
-        }
-        return validCGWindows.filter { window in
-            !RuntimeWindowTopologyClassifier.isLikelyDesktopWrapper(
-                bounds: window.bounds,
-                spaceIDs: window.spaceIDs,
-                fullscreenContentBounds: fullscreenContentBounds
-            )
-        }
     }
 
     private func markCurrentOnscreenCGWindows(
@@ -661,18 +622,6 @@ final class RuntimeSnapshotProvider {
             elapsedMs: elapsedMs,
             configuredConcurrency: min(maxConcurrentAXAppCollections, taskCount),
             maxInFlight: maxInFlight
-        )
-    }
-
-    static func shouldIncludeRemoteAXWindowsForTesting(
-        allCGWindows: [RuntimeCGWindowEntry],
-        publicSwitchableWindowCount: Int,
-        publicFetchSucceeded: Bool = true
-    ) -> Bool {
-        RuntimeSnapshotProvider().shouldIncludeRemoteAXWindows(
-            allCGWindows: allCGWindows,
-            publicSwitchableWindowCount: publicSwitchableWindowCount,
-            publicFetchSucceeded: publicFetchSucceeded
         )
     }
 

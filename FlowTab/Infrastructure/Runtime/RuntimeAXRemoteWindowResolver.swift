@@ -104,6 +104,22 @@ enum RuntimeAXRemoteWindowResolver {
         "AXDialog"
     ]
 
+    static func shouldIncludeRemoteWindows(
+        allCGWindows: [RuntimeCGWindowEntry],
+        publicSwitchableWindowCount: Int,
+        publicFetchSucceeded: Bool
+    ) -> Bool {
+        let userFacingCGWindows = userFacingCGWindowsForRemoteScanDecision(allCGWindows)
+        guard userFacingCGWindows.contains(where: { window in
+            RuntimeWindowTopologyClassifier.hasOffDesktopSpace(spaceIDs: window.spaceIDs)
+                || !window.isOnscreen
+        }) else {
+            return false
+        }
+        guard publicFetchSucceeded else { return true }
+        return publicSwitchableWindowCount < userFacingCGWindows.count
+    }
+
     static func windows(forPID pid: pid_t) -> [AXUIElement] {
         windowScanResult(forPID: pid).windows
     }
@@ -301,6 +317,26 @@ enum RuntimeAXRemoteWindowResolver {
         return "ax:\(Unmanaged.passUnretained(window).toOpaque())"
     }
 
+    private static func userFacingCGWindowsForRemoteScanDecision(
+        _ allCGWindows: [RuntimeCGWindowEntry]
+    ) -> [RuntimeCGWindowEntry] {
+        let validCGWindows = allCGWindows.filter(RuntimeCGWindowFacts.passesValidityConstraints)
+        let fullscreenContentBounds = validCGWindows.compactMap { window -> CGRect? in
+            guard RuntimeWindowTopologyClassifier.isLikelyOffDesktopFullscreenContent(
+                bounds: window.bounds,
+                spaceIDs: window.spaceIDs
+            ) else { return nil }
+            return window.bounds
+        }
+        return validCGWindows.filter { window in
+            !RuntimeWindowTopologyClassifier.isLikelyDesktopWrapper(
+                bounds: window.bounds,
+                spaceIDs: window.spaceIDs,
+                fullscreenContentBounds: fullscreenContentBounds
+            )
+        }
+    }
+
     private static let createWithRemoteToken: CreateWithRemoteTokenFn? = {
         let candidateHandles = [
             UnsafeMutableRawPointer(bitPattern: -2),
@@ -359,6 +395,18 @@ enum RuntimeAXRemoteWindowResolverForTesting {
 
     static func scanPolicy(for useCase: ScanUseCase) -> ScanPolicy {
         RuntimeAXRemoteWindowResolver.scanPolicy(for: useCase)
+    }
+
+    static func shouldIncludeRemoteWindows(
+        allCGWindows: [RuntimeCGWindowEntry],
+        publicSwitchableWindowCount: Int,
+        publicFetchSucceeded: Bool = true
+    ) -> Bool {
+        RuntimeAXRemoteWindowResolver.shouldIncludeRemoteWindows(
+            allCGWindows: allCGWindows,
+            publicSwitchableWindowCount: publicSwitchableWindowCount,
+            publicFetchSucceeded: publicFetchSucceeded
+        )
     }
 
     static func remoteAXResolveResult(

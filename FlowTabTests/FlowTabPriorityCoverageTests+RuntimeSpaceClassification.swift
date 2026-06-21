@@ -164,11 +164,11 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(entries.first?.allowsPublicAXRecovery ?? true)
     }
 
-    func testRuntimeSnapshotProviderSkipsRemoteAXScanWhenPublicAXAlreadyCoversRealCGWindows() {
+    func testRuntimeAXRemoteWindowResolverSkipsRemoteScanWhenPublicAXAlreadyCoversRealCGWindows() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let desktopSiblingBounds = CGRect(x: 160, y: 140, width: 960, height: 680)
 
-        let shouldScanRemoteAX = RuntimeSnapshotProvider.shouldIncludeRemoteAXWindowsForTesting(
+        let shouldScanRemoteAX = RuntimeAXRemoteWindowResolverForTesting.shouldIncludeRemoteWindows(
             allCGWindows: [
                 .init(
                     id: 240_101,
@@ -198,11 +198,11 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(shouldScanRemoteAX)
     }
 
-    func testRuntimeSnapshotProviderUsesRemoteAXScanWhenPublicAXMissesRealCGWindow() {
+    func testRuntimeAXRemoteWindowResolverUsesRemoteScanWhenPublicAXMissesRealCGWindow() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let desktopSiblingBounds = CGRect(x: 160, y: 140, width: 960, height: 680)
 
-        let shouldScanRemoteAX = RuntimeSnapshotProvider.shouldIncludeRemoteAXWindowsForTesting(
+        let shouldScanRemoteAX = RuntimeAXRemoteWindowResolverForTesting.shouldIncludeRemoteWindows(
             allCGWindows: [
                 .init(
                     id: 240_101,
