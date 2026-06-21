@@ -456,4 +456,29 @@ struct RuntimeWindowRecord {
 
         return titleMatches && frameMatches
     }
+
+    func reusableStickyAXWindow(
+        from axWindows: [RuntimeAXWindowEntry],
+        assignedAXWindowIDs: Set<String>
+    ) -> RuntimeAXWindowEntry? {
+        if
+            let lastKnownAXWindowID = lastExactAXWindowID,
+            let exactIDMatch = axWindows.first(where: {
+                $0.id == lastKnownAXWindowID && !assignedAXWindowIDs.contains($0.id)
+            }),
+            canReuseStickyBinding(with: exactIDMatch)
+        {
+            return exactIDMatch
+        }
+
+        guard let previousAXWindow = lastExactAXWindow else { return nil }
+        return axWindows.first { axWindow in
+            guard !assignedAXWindowIDs.contains(axWindow.id) else { return false }
+            guard CFEqual(axWindow.window, previousAXWindow) else { return false }
+            // Title changes are expected for a stable AX window handle. Once the
+            // underlying AX element identity matches, prefer continuity and let
+            // the current snapshot refresh title/frame in binding state.
+            return true
+        }
+    }
 }

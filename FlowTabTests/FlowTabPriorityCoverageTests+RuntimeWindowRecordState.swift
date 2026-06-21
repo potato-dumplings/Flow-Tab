@@ -231,6 +231,93 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(record.canReuseStickyBinding(with: mismatchedFrameAXWindow))
     }
 
+    func testRuntimeWindowRecordReusableStickyAXWindowUsesCompatibleUnassignedExactID() {
+        let axElement = AXUIElementCreateApplication(NSRunningApplication.current.processIdentifier)
+        let matchingFrame = CGRect(x: 10, y: 20, width: 900, height: 700)
+        var record = RuntimeWindowRecord(
+            cgWindowID: 240_003,
+            stableWindowID: "cg:18405:240003",
+            firstSeenAt: 10
+        )
+        record.lastKnownDisplayTitle = "Reusable Window"
+        record.lastKnownCGFrame = matchingFrame
+        record.lastExactAXWindowID = "ax:18405:sticky"
+        let matchingAXWindow = RuntimeAXWindowEntry(
+            index: 0,
+            id: "ax:18405:sticky",
+            title: "reusable window",
+            sourceTitle: "reusable window",
+            isMinimized: false,
+            window: axElement,
+            frame: matchingFrame.offsetBy(dx: 1, dy: -1)
+        )
+        let mismatchedAXWindow = RuntimeAXWindowEntry(
+            index: 1,
+            id: "ax:18405:sticky",
+            title: "Different Window",
+            sourceTitle: "Different Window",
+            isMinimized: false,
+            window: axElement,
+            frame: matchingFrame
+        )
+
+        XCTAssertEqual(
+            record.reusableStickyAXWindow(
+                from: [matchingAXWindow],
+                assignedAXWindowIDs: []
+            )?.id,
+            matchingAXWindow.id
+        )
+        XCTAssertNil(
+            record.reusableStickyAXWindow(
+                from: [matchingAXWindow],
+                assignedAXWindowIDs: [matchingAXWindow.id]
+            )
+        )
+        XCTAssertNil(
+            record.reusableStickyAXWindow(
+                from: [mismatchedAXWindow],
+                assignedAXWindowIDs: []
+            )
+        )
+    }
+
+    func testRuntimeWindowRecordReusableStickyAXWindowUsesPreviousAXElementIdentity() {
+        let previousAXElement = AXUIElementCreateApplication(NSRunningApplication.current.processIdentifier)
+        var record = RuntimeWindowRecord(
+            cgWindowID: 240_003,
+            stableWindowID: "cg:18405:240003",
+            firstSeenAt: 10
+        )
+        record.lastKnownDisplayTitle = "Original Window"
+        record.lastKnownCGFrame = CGRect(x: 10, y: 20, width: 900, height: 700)
+        record.lastExactAXWindowID = "ax:18405:old"
+        record.lastExactAXWindow = previousAXElement
+        let renamedAXWindow = RuntimeAXWindowEntry(
+            index: 0,
+            id: "ax:18405:new",
+            title: "Renamed Window",
+            sourceTitle: "Renamed Window",
+            isMinimized: false,
+            window: previousAXElement,
+            frame: CGRect(x: 400, y: 500, width: 900, height: 700)
+        )
+
+        XCTAssertEqual(
+            record.reusableStickyAXWindow(
+                from: [renamedAXWindow],
+                assignedAXWindowIDs: []
+            )?.id,
+            renamedAXWindow.id
+        )
+        XCTAssertNil(
+            record.reusableStickyAXWindow(
+                from: [renamedAXWindow],
+                assignedAXWindowIDs: [renamedAXWindow.id]
+            )
+        )
+    }
+
     func testRuntimeWindowRecordLifecycleKeepsRecoverableMissingEvidenceDuringGraceWindow() {
         let policy = RuntimeWindowRecordLifecyclePolicy(evidenceGraceInterval: 1.0)
         let cgWindow = RuntimeCGWindowEntry(

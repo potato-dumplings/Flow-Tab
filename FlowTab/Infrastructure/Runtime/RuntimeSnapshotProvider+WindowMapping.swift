@@ -367,9 +367,8 @@ extension RuntimeSnapshotProvider {
 
         for cgWindowID in windowRecordsByCGWindowID.keys.sorted() {
             guard var record = windowRecordsByCGWindowID[cgWindowID] else { continue }
-            let reusedAXWindow = resolveStickyAXWindow(
-                for: record,
-                axWindows: axWindows,
+            let reusedAXWindow = record.reusableStickyAXWindow(
+                from: axWindows,
                 assignedAXWindowIDs: assignedAXWindowIDs
             )
 
@@ -639,32 +638,6 @@ extension RuntimeSnapshotProvider {
             )
             windowRecordsByCGWindowID[cgWindowID] = record
             exactMatchesByAXWindowID[axWindowID] = cgWindowID
-        }
-    }
-
-    private func resolveStickyAXWindow(
-        for record: RuntimeWindowRecord,
-        axWindows: [RuntimeAXWindowEntry],
-        assignedAXWindowIDs: Set<String>
-    ) -> RuntimeAXWindowEntry? {
-        if
-            let lastKnownAXWindowID = record.lastExactAXWindowID,
-            let exactIDMatch = axWindows.first(where: {
-                $0.id == lastKnownAXWindowID && !assignedAXWindowIDs.contains($0.id)
-            }),
-            record.canReuseStickyBinding(with: exactIDMatch)
-        {
-            return exactIDMatch
-        }
-
-        guard let previousAXWindow = record.lastExactAXWindow else { return nil }
-        return axWindows.first { axWindow in
-            guard !assignedAXWindowIDs.contains(axWindow.id) else { return false }
-            guard CFEqual(axWindow.window, previousAXWindow) else { return false }
-            // Title changes are expected for a stable AX window handle. Once the
-            // underlying AX element identity matches, prefer continuity and let
-            // the current snapshot refresh title/frame in binding state.
-            return true
         }
     }
 
