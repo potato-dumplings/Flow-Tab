@@ -2910,8 +2910,10 @@ extension FlowTabPriorityCoverageTests {
         }
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertFocusedPreviewCurrentAppProjectionRead(
+            from: runtimeProjectionService,
+            appID: appID
+        )
 
         let firstSnapshot = model.windowPreviewSnapshotForTesting()
         let secondSnapshot = model.windowPreviewSnapshotForTesting()
@@ -2968,8 +2970,10 @@ extension FlowTabPriorityCoverageTests {
         }
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertFocusedPreviewCurrentAppProjectionRead(
+            from: runtimeProjectionService,
+            appID: appID
+        )
         let initialSnapshot = model.windowPreviewSnapshotForTesting()
         XCTAssertEqual(captureCallCount, 1)
         XCTAssertTrue(initialSnapshot.first?.hasImage == true)
@@ -3058,8 +3062,10 @@ extension FlowTabPriorityCoverageTests {
         }
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertFocusedPreviewCurrentAppProjectionRead(
+            from: runtimeProjectionService,
+            appID: appID
+        )
         let initialSnapshot = model.windowPreviewSnapshotForTesting()
         XCTAssertEqual(initialSnapshot.count, 2)
         XCTAssertTrue(initialSnapshot.allSatisfy(\.hasImage))
@@ -3078,8 +3084,11 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertNil(model.session)
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertFocusedPreviewCurrentAppProjectionRead(
+            from: runtimeProjectionService,
+            appID: appID,
+            readCount: 2
+        )
         let restartedSnapshot = model.windowPreviewSnapshotForTesting()
         XCTAssertEqual(restartedSnapshot.count, 2)
         XCTAssertTrue(restartedSnapshot.allSatisfy { !$0.hasImage })
@@ -3121,8 +3130,10 @@ extension FlowTabPriorityCoverageTests {
         }
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertFocusedPreviewCurrentAppProjectionRead(
+            from: runtimeProjectionService,
+            appID: appID
+        )
 
         let firstSnapshot = model.windowPreviewSnapshotForTesting()
         XCTAssertEqual(firstSnapshot.count, 1)
@@ -3198,8 +3209,10 @@ extension FlowTabPriorityCoverageTests {
         }
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
-        XCTAssertEqual(runtimeProjectionService.snapshotRequestCount(), 0)
-        XCTAssertEqual(runtimeProjectionService.lightweightSnapshotRequestCount(), 0)
+        assertFocusedPreviewCurrentAppProjectionRead(
+            from: runtimeProjectionService,
+            appID: appID
+        )
 
         let snapshot = model.windowPreviewSnapshotForTesting()
 
@@ -3214,6 +3227,32 @@ extension FlowTabPriorityCoverageTests {
         }
         XCTAssertEqual(reason, .bindingActionDisallowed)
         XCTAssertNil(retryAfterGeneration)
+    }
+
+    private func assertFocusedPreviewCurrentAppProjectionRead(
+        from runtimeProjectionService: RecordingRuntimeProjectionService,
+        appID: String,
+        readCount: Int = 1,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        XCTAssertEqual(
+            runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID),
+            readCount,
+            file: file,
+            line: line
+        )
+        XCTAssertEqual(
+            runtimeProjectionService.appSwitcherProjectionReadCount(),
+            0,
+            file: file,
+            line: line
+        )
+        XCTAssertTrue(
+            runtimeProjectionService.selectedCurrentAppWindowChangeSignalsRecorded().isEmpty,
+            file: file,
+            line: line
+        )
     }
 
 }

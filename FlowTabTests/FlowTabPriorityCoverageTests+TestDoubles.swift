@@ -89,7 +89,6 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     private var homeSummaryProjectionReads = 0
     private var currentAppWindowProjectionReadsByAppID: [String: Int] = [:]
     private var committedSearchIndexReads = 0
-    private var lightweightSnapshotRequests = 0
     private var appSwitcherMaintenanceRequests: [RuntimeProjectionMaintenanceReason] = []
     private var searchIndexFreshnessBarrierRequests: [RuntimeProjectionMaintenanceReason] = []
     private var spaceTopologyChangeSignals = 0
@@ -140,16 +139,6 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
                 generatedAt: generatedAt
             )
         )
-    }
-
-    func snapshotRequestCount() -> Int {
-        0
-    }
-
-    func lightweightSnapshotRequestCount() -> Int {
-        lock.lock()
-        defer { lock.unlock() }
-        return lightweightSnapshotRequests
     }
 
     func appSwitcherProjectionReadCount() -> Int {
