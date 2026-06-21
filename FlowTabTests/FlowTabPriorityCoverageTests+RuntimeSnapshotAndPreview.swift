@@ -481,7 +481,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     func testRuntimeSnapshotProviderValidCGWindowsFilterSkipsInvalidEntries() {
-        let validWindowIDs = RuntimeSnapshotProvider.validCGWindowIDsForTesting(
+        let validWindowIDs = RuntimeWindowMappingTestSupport.validCGWindowIDs(
             existingCGWindowIDs: Set<CGWindowID>([240016]),
             allCGWindows: [
                 .init(
@@ -539,7 +539,7 @@ extension FlowTabPriorityCoverageTests {
         let cachedTitle = "百度一下，你就知道 - Google Chrome - test2"
         let appName = "Google Chrome"
 
-        let titleFromFallback = RuntimeSnapshotProvider.supplementalCGWindowTitleForTesting(
+        let titleFromFallback = RuntimeWindowMappingTestSupport.supplementalCGWindowTitle(
             appName: appName,
             cgWindow: .init(
                 id: windowID,
@@ -551,7 +551,7 @@ extension FlowTabPriorityCoverageTests {
         )
         XCTAssertEqual(titleFromFallback, appName)
 
-        let titleFromCG = RuntimeSnapshotProvider.supplementalCGWindowTitleForTesting(
+        let titleFromCG = RuntimeWindowMappingTestSupport.supplementalCGWindowTitle(
             appName: appName,
             cgWindow: .init(
                 id: windowID,
@@ -565,7 +565,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     func testRuntimeSnapshotProviderSupplementalCGWindowTitleFallsBackToAppNameWhenUntitled() {
-        let title = RuntimeSnapshotProvider.supplementalCGWindowTitleForTesting(
+        let title = RuntimeWindowMappingTestSupport.supplementalCGWindowTitle(
             appName: "Google Chrome",
             cgWindow: .init(
                 id: 243679,
@@ -580,7 +580,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     func testRuntimeSnapshotProviderWindowListAppendsUnmatchedCGEntriesAfterExactMatches() {
-        let mergedEntries = RuntimeSnapshotProvider.appendOffSpaceCGWindowsForTesting(
+        let mergedEntries = RuntimeWindowMappingTestSupport.appendOffSpaceCGWindows(
             entries: [
                 .init(
                     windowID: "cg:18405:240001",
@@ -636,7 +636,7 @@ extension FlowTabPriorityCoverageTests {
 
     func testRuntimeSnapshotProviderWindowListDoesNotExposeProvisionalCGOnlyEntriesWithoutRecoveryEvidence() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
-        let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+        let mergedEntries = RuntimeWindowMappingTestSupport.resolveWindowEntries(
             axWindows: [
                 .init(
                     id: "ax:18405:0",
@@ -680,7 +680,7 @@ extension FlowTabPriorityCoverageTests {
 
     func testRuntimeSnapshotProviderWindowListUsesPrivateExactBridgeWhenPublicSignalsRemainAmbiguous() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
-        let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+        let mergedEntries = RuntimeWindowMappingTestSupport.resolveWindowEntries(
             axWindows: [
                 .init(
                     id: "ax:18405:0",
@@ -838,7 +838,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     func testRuntimeSnapshotProviderWindowListHidesCGOnlyEntriesBoundToSpaceOneWithoutAXHandle() {
-        let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+        let mergedEntries = RuntimeWindowMappingTestSupport.resolveWindowEntries(
             axWindows: [],
             cgWindows: [
                 .init(
@@ -858,7 +858,7 @@ extension FlowTabPriorityCoverageTests {
 
     func testRuntimeSnapshotProviderWindowListKeepsExactEntriesBoundToSpaceOneWhenAXHandleIsPresent() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
-        let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+        let mergedEntries = RuntimeWindowMappingTestSupport.resolveWindowEntries(
             axWindows: [
                 .init(
                     id: "ax:18405:0",
@@ -921,7 +921,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     func testRuntimeSnapshotProviderWindowListSuppressesCGOnlyEntryCoveredByStickySpaceBinding() {
-        let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+        let mergedEntries = RuntimeWindowMappingTestSupport.resolveWindowEntries(
             axWindows: [],
             cgWindows: [
                 .init(
@@ -952,7 +952,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     func testRuntimeSnapshotProviderWindowListKeepsUnmatchedAXEntriesWhenSpaceBindingDiffers() {
-        let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+        let mergedEntries = RuntimeWindowMappingTestSupport.resolveWindowEntries(
             axWindows: [],
             cgWindows: [
                 .init(
@@ -978,7 +978,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     func testRuntimeSnapshotProviderWindowListKeepsStickyCGEntriesWhenCurrentAXHandleIsMissing() {
-        let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+        let mergedEntries = RuntimeWindowMappingTestSupport.resolveWindowEntries(
             axWindows: [],
             cgWindows: [
                 .init(
@@ -1009,7 +1009,7 @@ extension FlowTabPriorityCoverageTests {
         let fullscreenContentFrame = CGRect(x: 0, y: 158, width: 1_728, height: 959)
         let fullscreenBandFrame = CGRect(x: 0, y: 74, width: 1_728, height: 165)
 
-        let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+        let mergedEntries = RuntimeWindowMappingTestSupport.resolveWindowEntries(
             axWindows: [
                 .init(
                     id: "ax:chrome:normal",
@@ -1176,7 +1176,7 @@ extension FlowTabPriorityCoverageTests {
         let incognitoFrame = CGRect(x: 492, y: 354, width: 960, height: 640)
         let fullscreenFrame = CGRect(x: 0, y: 37, width: 1_728, height: 1_080)
 
-        let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+        let mergedEntries = RuntimeWindowMappingTestSupport.resolveWindowEntries(
             axWindows: [
                 .init(
                     id: "ax:chrome:normal",
@@ -1242,7 +1242,7 @@ extension FlowTabPriorityCoverageTests {
         let incognitoFrame = CGRect(x: 492, y: 354, width: 960, height: 640)
         let fullscreenContentFrame = CGRect(x: 0, y: 195, width: 1_728, height: 922)
 
-        let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+        let mergedEntries = RuntimeWindowMappingTestSupport.resolveWindowEntries(
             axWindows: [
                 .init(
                     id: "ax:chrome:normal",
@@ -1331,7 +1331,7 @@ extension FlowTabPriorityCoverageTests {
         let fullscreenHostFrame = CGRect(x: 0, y: 37, width: 1_728, height: 1_080)
         let fullscreenContentFrame = CGRect(x: 0, y: 195, width: 1_728, height: 922)
 
-        let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+        let mergedEntries = RuntimeWindowMappingTestSupport.resolveWindowEntries(
             axWindows: [
                 .init(
                     id: "ax:chrome:normal",
@@ -1417,7 +1417,7 @@ extension FlowTabPriorityCoverageTests {
         let browserFrame = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let findOverlayFrame = CGRect(x: 1_140, y: 110, width: 403, height: 84)
 
-        let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+        let mergedEntries = RuntimeWindowMappingTestSupport.resolveWindowEntries(
             axWindows: [
                 .init(
                     id: "ax:chrome:browser",
@@ -2192,7 +2192,7 @@ extension FlowTabPriorityCoverageTests {
             )
         ]
 
-        let assignments = RuntimeSnapshotProvider.resolveCGWindowAssignmentsForTesting(
+        let assignments = RuntimeWindowMappingTestSupport.resolveCGWindowAssignments(
             axWindows: axWindows,
             cgWindows: cgWindows
         )
@@ -2214,7 +2214,7 @@ extension FlowTabPriorityCoverageTests {
             .init(id: 5, title: nil, bounds: CGRect(x: 100, y: 100, width: 800, height: 500))
         ]
 
-        let assignments = RuntimeSnapshotProvider.resolveCGWindowAssignmentsForTesting(
+        let assignments = RuntimeWindowMappingTestSupport.resolveCGWindowAssignments(
             axWindows: axWindows,
             cgWindows: cgWindows
         )
@@ -2245,11 +2245,11 @@ extension FlowTabPriorityCoverageTests {
             )
         ]
 
-        let assignments = RuntimeSnapshotProvider.resolveCGWindowAssignmentsForTesting(
+        let assignments = RuntimeWindowMappingTestSupport.resolveCGWindowAssignments(
             axWindows: axWindows,
             cgWindows: cgWindows
         )
-        let diagnostics = RuntimeSnapshotProvider.resolveCGWindowAssignmentDiagnosticsForTesting(
+        let diagnostics = RuntimeWindowMappingTestSupport.resolveCGWindowAssignmentDiagnostics(
             axWindows: axWindows,
             cgWindows: cgWindows
         )
@@ -2278,11 +2278,11 @@ extension FlowTabPriorityCoverageTests {
             .init(id: 312, title: "Document", bounds: bounds, isOnscreen: true)
         ]
 
-        let assignments = RuntimeSnapshotProvider.resolveCGWindowAssignmentsForTesting(
+        let assignments = RuntimeWindowMappingTestSupport.resolveCGWindowAssignments(
             axWindows: axWindows,
             cgWindows: cgWindows
         )
-        let diagnostics = RuntimeSnapshotProvider.resolveCGWindowAssignmentDiagnosticsForTesting(
+        let diagnostics = RuntimeWindowMappingTestSupport.resolveCGWindowAssignmentDiagnostics(
             axWindows: axWindows,
             cgWindows: cgWindows
         )
@@ -2302,11 +2302,11 @@ extension FlowTabPriorityCoverageTests {
             .init(id: 322, title: "Document", bounds: bounds, isOnscreen: false)
         ]
 
-        let assignments = RuntimeSnapshotProvider.resolveCGWindowAssignmentsForTesting(
+        let assignments = RuntimeWindowMappingTestSupport.resolveCGWindowAssignments(
             axWindows: axWindows,
             cgWindows: cgWindows
         )
-        let diagnostics = RuntimeSnapshotProvider.resolveCGWindowAssignmentDiagnosticsForTesting(
+        let diagnostics = RuntimeWindowMappingTestSupport.resolveCGWindowAssignmentDiagnostics(
             axWindows: axWindows,
             cgWindows: cgWindows
         )
@@ -2330,7 +2330,7 @@ extension FlowTabPriorityCoverageTests {
             .init(id: 202, title: "百度一下，你就知道", bounds: fullscreenBounds)
         ]
 
-        let assignments = RuntimeSnapshotProvider.resolveCGWindowAssignmentsForTesting(
+        let assignments = RuntimeWindowMappingTestSupport.resolveCGWindowAssignments(
             axWindows: axWindows,
             cgWindows: cgWindows,
             exactBridgeMatches: ["ax:100:0": 202],
@@ -2340,7 +2340,7 @@ extension FlowTabPriorityCoverageTests {
             pid: 100,
             appName: "Google Chrome"
         )
-        let diagnostics = RuntimeSnapshotProvider.resolveCGWindowAssignmentDiagnosticsForTesting(
+        let diagnostics = RuntimeWindowMappingTestSupport.resolveCGWindowAssignmentDiagnostics(
             axWindows: axWindows,
             cgWindows: cgWindows,
             exactBridgeMatches: ["ax:100:0": 202],
@@ -2391,13 +2391,13 @@ extension FlowTabPriorityCoverageTests {
             )
         ]
 
-        let assignments = RuntimeSnapshotProvider.resolveCGWindowAssignmentsForTesting(
+        let assignments = RuntimeWindowMappingTestSupport.resolveCGWindowAssignments(
             axWindows: axWindows,
             cgWindows: cgWindows,
             pid: 400,
             appName: "Google Chrome"
         )
-        let diagnostics = RuntimeSnapshotProvider.resolveCGWindowAssignmentDiagnosticsForTesting(
+        let diagnostics = RuntimeWindowMappingTestSupport.resolveCGWindowAssignmentDiagnostics(
             axWindows: axWindows,
             cgWindows: cgWindows,
             pid: 400,
@@ -2420,7 +2420,7 @@ extension FlowTabPriorityCoverageTests {
 
     func testRuntimeSnapshotProviderResolveCGWindowAssignmentsBindsSingleNewUnmatchedPairFromDelta() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
-        let assignments = RuntimeSnapshotProvider.resolveCGWindowAssignmentsForTesting(
+        let assignments = RuntimeWindowMappingTestSupport.resolveCGWindowAssignments(
             axWindows: [
                 .init(id: "ax:100:0", index: 0, title: "百度一下，你就知道", bounds: fullscreenBounds),
                 .init(id: "ax:100:1", index: 1, title: "百度一下，你就知道", bounds: fullscreenBounds),
@@ -2452,7 +2452,7 @@ extension FlowTabPriorityCoverageTests {
 
     func testRuntimeSnapshotProviderResolveCGWindowAssignmentsDoesNotGuessAcrossInitialAmbiguousSnapshot() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
-        let assignments = RuntimeSnapshotProvider.resolveCGWindowAssignmentsForTesting(
+        let assignments = RuntimeWindowMappingTestSupport.resolveCGWindowAssignments(
             axWindows: [
                 .init(id: "ax:100:0", index: 0, title: "百度一下，你就知道 - Google Chrome - test3", bounds: fullscreenBounds),
                 .init(id: "ax:100:1", index: 1, title: "百度一下，你就知道 - Google Chrome - test2", bounds: fullscreenBounds),
@@ -2478,7 +2478,7 @@ extension FlowTabPriorityCoverageTests {
 
     func testRuntimeSnapshotProviderResolveCGWindowAssignmentsUsesPrivateExactBridgeWhenPublicSignalsRemainAmbiguous() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
-        let assignments = RuntimeSnapshotProvider.resolveCGWindowAssignmentsForTesting(
+        let assignments = RuntimeWindowMappingTestSupport.resolveCGWindowAssignments(
             axWindows: [
                 .init(
                     id: "ax:100:0",
@@ -2520,7 +2520,7 @@ extension FlowTabPriorityCoverageTests {
 
     func testRuntimeSnapshotProviderResolveCGWindowAssignmentsKeepsHistoricalBindingsWhenSnapshotBecomesAmbiguous() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
-        let assignments = RuntimeSnapshotProvider.resolveCGWindowAssignmentsForTesting(
+        let assignments = RuntimeWindowMappingTestSupport.resolveCGWindowAssignments(
             axWindows: [
                 .init(id: "ax:100:0", index: 0, title: "百度一下，你就知道", bounds: fullscreenBounds),
                 .init(id: "ax:100:1", index: 1, title: "百度一下，你就知道", bounds: fullscreenBounds),
@@ -2589,7 +2589,7 @@ extension FlowTabPriorityCoverageTests {
             )
         ]
 
-        let assignments = RuntimeSnapshotProvider.resolveCGWindowAssignmentsForTesting(
+        let assignments = RuntimeWindowMappingTestSupport.resolveCGWindowAssignments(
             axWindows: axWindows,
             cgWindows: cgWindows
         )
@@ -2626,7 +2626,7 @@ extension FlowTabPriorityCoverageTests {
             )
         ]
 
-        let mergedEntries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+        let mergedEntries = RuntimeWindowMappingTestSupport.resolveWindowEntries(
             axWindows: axWindows,
             cgWindows: cgWindowsForTesting,
             pid: pid

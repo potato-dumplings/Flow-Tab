@@ -235,7 +235,7 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeSnapshotProviderRebindsFullscreenWrapperAXMatchToOffDesktopContent() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
 
-        let entries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+        let entries = RuntimeWindowMappingTestSupport.resolveWindowEntries(
             axWindows: [
                 .init(
                     id: "ax:18405:0",
@@ -273,7 +273,7 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeSnapshotProviderBindsAXOnlyFullscreenWrapperToOffDesktopContent() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
 
-        let entries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+        let entries = RuntimeWindowMappingTestSupport.resolveWindowEntries(
             axWindows: [
                 .init(
                     id: "ax:18405:0",
@@ -313,7 +313,7 @@ extension FlowTabPriorityCoverageTests {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let desktopSiblingBounds = CGRect(x: 160, y: 140, width: 960, height: 680)
 
-        let entries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+        let entries = RuntimeWindowMappingTestSupport.resolveWindowEntries(
             axWindows: [
                 .init(
                     id: "ax:18405:0",
@@ -377,7 +377,7 @@ extension FlowTabPriorityCoverageTests {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let desktopSiblingBounds = CGRect(x: 160, y: 140, width: 960, height: 680)
         let pid = currentApp.processIdentifier
-        let entries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+        let entries = RuntimeWindowMappingTestSupport.resolveWindowEntries(
             axWindows: [
                 .init(id: "ax:\(pid):0", index: 0, title: nil, bounds: fullscreenBounds)
             ],
@@ -490,7 +490,7 @@ extension FlowTabPriorityCoverageTests {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let desktopSiblingBounds = CGRect(x: 160, y: 140, width: 960, height: 680)
 
-        let entries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+        let entries = RuntimeWindowMappingTestSupport.resolveWindowEntries(
             axWindows: [
                 .init(
                     id: "ax:18405:0",
@@ -534,7 +534,7 @@ extension FlowTabPriorityCoverageTests {
         )
 
         let entriesByCGWindowID = Dictionary(
-            uniqueKeysWithValues: entries.compactMap { entry -> (CGWindowID, RuntimeSnapshotProvider.SupplementalMergeEntryForTesting)? in
+            uniqueKeysWithValues: entries.compactMap { entry -> (CGWindowID, RuntimeWindowMappingTestSupport.ResolvedEntry)? in
                 guard let cgWindowID = entry.cgWindowID else { return nil }
                 return (cgWindowID, entry)
             }
@@ -551,7 +551,7 @@ extension FlowTabPriorityCoverageTests {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let desktopSiblingBounds = CGRect(x: 160, y: 140, width: 960, height: 680)
 
-        let entries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+        let entries = RuntimeWindowMappingTestSupport.resolveWindowEntries(
             axWindows: [
                 .init(
                     id: "ax:18405:0",
@@ -608,7 +608,7 @@ extension FlowTabPriorityCoverageTests {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let desktopSiblingBounds = CGRect(x: 160, y: 140, width: 960, height: 680)
 
-        let entries = RuntimeSnapshotProvider.resolveWindowEntriesForTesting(
+        let entries = RuntimeWindowMappingTestSupport.resolveWindowEntries(
             axWindows: [
                 .init(
                     id: "ax:18405:0",

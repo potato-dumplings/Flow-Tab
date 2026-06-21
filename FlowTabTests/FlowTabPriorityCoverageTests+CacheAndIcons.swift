@@ -80,7 +80,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     func testRuntimeSnapshotProviderSupplementalCGWindowsIncludeLargeOnScreenWindowsWhenAXMissesThem() {
-        let mergedEntries = RuntimeSnapshotProvider.appendOffSpaceCGWindowsForTesting(
+        let mergedEntries = RuntimeWindowMappingTestSupport.appendOffSpaceCGWindows(
             entries: [
                 .init(
                     windowID: "ax:18405:0",
