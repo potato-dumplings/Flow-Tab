@@ -1,22 +1,6 @@
 import AppKit
 import Foundation
 
-struct RuntimeAffectedWindowReconciliationTarget: Equatable {
-    let pid: pid_t
-    let appID: String
-    let affectedCGWindowIDs: Set<CGWindowID>
-}
-
-struct RuntimeAppWindowReconciliationResult {
-    let pid: pid_t
-    let affectedCGWindowIDs: Set<CGWindowID>
-    let knownAffectedCGWindowIDs: Set<CGWindowID>
-    let exactAffectedCGWindowIDs: Set<CGWindowID>
-    let currentAppWindowPayload: RuntimeCurrentAppWindowPayload?
-    let currentAppWindowPayloadWasEmpty: Bool
-    let isTransientEmptyCurrentAppWindowPayload: Bool
-}
-
 extension RuntimeSnapshotProvider {
     @discardableResult
     func recordSpaceTopologySnapshot(
