@@ -77,6 +77,16 @@ struct RuntimeWindowRecordDerivedIndexes: Equatable {
     }
 }
 
+struct RuntimeWindowRecordAffectedEvidence: Equatable {
+    let knownAffectedCGWindowIDs: Set<CGWindowID>
+    let exactAffectedCGWindowIDs: Set<CGWindowID>
+
+    static let empty = RuntimeWindowRecordAffectedEvidence(
+        knownAffectedCGWindowIDs: [],
+        exactAffectedCGWindowIDs: []
+    )
+}
+
 struct RuntimeWindowMappingState {
     var windowRecordsByCGWindowID: [CGWindowID: RuntimeWindowRecord]
     private var derivedIndexes: RuntimeWindowRecordDerivedIndexes
@@ -144,6 +154,21 @@ struct RuntimeWindowMappingState {
             lastAXWindowIDs: lastAXWindowIDs
         )
         return cgWindowID
+    }
+
+    func affectedWindowEvidence(
+        for affectedCGWindowIDs: Set<CGWindowID>
+    ) -> RuntimeWindowRecordAffectedEvidence {
+        let knownAffectedCGWindowIDs = affectedCGWindowIDs.intersection(
+            windowRecordsByCGWindowID.keys
+        )
+        let exactAffectedCGWindowIDs = knownAffectedCGWindowIDs.filter { cgWindowID in
+            windowRecordsByCGWindowID[cgWindowID]?.bindingConfidence == .exact
+        }
+        return RuntimeWindowRecordAffectedEvidence(
+            knownAffectedCGWindowIDs: knownAffectedCGWindowIDs,
+            exactAffectedCGWindowIDs: exactAffectedCGWindowIDs
+        )
     }
 }
 

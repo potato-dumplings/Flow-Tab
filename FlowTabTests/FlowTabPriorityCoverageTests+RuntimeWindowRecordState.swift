@@ -141,6 +141,37 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(state.lastAXWindowIDs.contains(axWindowID))
     }
 
+    func testRuntimeWindowMappingStateReportsAffectedWindowRecordEvidence() {
+        let pid = pid_t(18_405)
+        let exactWindowID = CGWindowID(240_001)
+        let provisionalWindowID = CGWindowID(240_002)
+        let missingWindowID = CGWindowID(240_003)
+        var exactRecord = RuntimeWindowRecord(
+            cgWindowID: exactWindowID,
+            stableWindowID: "cg:\(pid):\(exactWindowID)",
+            firstSeenAt: 10
+        )
+        exactRecord.lastConfirmationSource = .publicExactMatch
+        let provisionalRecord = RuntimeWindowRecord(
+            cgWindowID: provisionalWindowID,
+            stableWindowID: "cg:\(pid):\(provisionalWindowID)",
+            firstSeenAt: 10
+        )
+        let state = RuntimeWindowMappingState(
+            windowRecordsByCGWindowID: [
+                exactWindowID: exactRecord,
+                provisionalWindowID: provisionalRecord
+            ]
+        )
+
+        let evidence = state.affectedWindowEvidence(
+            for: [exactWindowID, provisionalWindowID, missingWindowID]
+        )
+
+        XCTAssertEqual(evidence.knownAffectedCGWindowIDs, [exactWindowID, provisionalWindowID])
+        XCTAssertEqual(evidence.exactAffectedCGWindowIDs, [exactWindowID])
+    }
+
     func testRuntimeWindowRecordKnownCGWindowsCombinesLiveFactsWithSynthesizedRecordEvidence() {
         let liveCGWindow = RuntimeCGWindowEntry(
             id: 240_001,

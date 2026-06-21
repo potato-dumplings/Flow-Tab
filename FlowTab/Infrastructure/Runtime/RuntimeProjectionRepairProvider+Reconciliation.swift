@@ -67,17 +67,14 @@ extension RuntimeProjectionRepairProvider {
         let currentAppWindowPayload = focusedCurrentAppWindowPayload(processIdentifier: pid)
         let currentAppWindowPayloadWasEmpty = currentAppWindowPayload?.candidate.windows.isEmpty == true
         let mappingState = snapshotProvider.windowMappingStateByPID[pid]
-        let knownAffectedCGWindowIDs = mappingState.map {
-            affectedCGWindowIDs.intersection($0.windowRecordsByCGWindowID.keys)
-        } ?? []
-        let exactAffectedCGWindowIDs = knownAffectedCGWindowIDs.filter { cgWindowID in
-            mappingState?.windowRecordsByCGWindowID[cgWindowID]?.bindingConfidence == .exact
-        }
+        let affectedWindowEvidence = mappingState?.affectedWindowEvidence(
+            for: affectedCGWindowIDs
+        ) ?? .empty
         return RuntimeAppWindowReconciliationResult(
             pid: pid,
             affectedCGWindowIDs: affectedCGWindowIDs,
-            knownAffectedCGWindowIDs: knownAffectedCGWindowIDs,
-            exactAffectedCGWindowIDs: exactAffectedCGWindowIDs,
+            knownAffectedCGWindowIDs: affectedWindowEvidence.knownAffectedCGWindowIDs,
+            exactAffectedCGWindowIDs: affectedWindowEvidence.exactAffectedCGWindowIDs,
             currentAppWindowPayload: currentAppWindowPayload,
             currentAppWindowPayloadWasEmpty: currentAppWindowPayloadWasEmpty,
             isTransientEmptyCurrentAppWindowPayload: currentAppWindowPayloadWasEmpty
