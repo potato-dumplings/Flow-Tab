@@ -585,7 +585,7 @@ extension RuntimeSnapshotProvider {
             )
 
             if let reusedAXWindow {
-                if let diagnostic = Self.stickyBindingConflictDiagnostic(
+                if let diagnostic = RuntimeAXWindowRecovery.stickyBindingConflictDiagnostic(
                     record: record,
                     reusedAXWindow: reusedAXWindow,
                     validCGWindowIDs: validCGWindowIDs
@@ -666,7 +666,7 @@ extension RuntimeSnapshotProvider {
         let remainingAXWindows = axWindows.filter {
             exactMatchesByAXWindowID[$0.id] == nil
         }
-        let privateExactBridgeMatches = Self.resolvePrivateExactBridgeMatches(
+        let privateExactBridgeMatches = RuntimeAXWindowRecovery.resolvePrivateExactBridgeMatches(
             axWindows: remainingAXWindows,
             validCGWindowIDs: validCGWindowIDs,
             assignedCGWindowIDs: Set(exactMatchesByAXWindowID.values)
@@ -943,55 +943,6 @@ extension RuntimeSnapshotProvider {
             // the current snapshot refresh title/frame in binding state.
             return true
         }
-    }
-
-    private static func stickyBindingConflictDiagnostic(
-        record: RuntimeWindowRecord,
-        reusedAXWindow: RuntimeAXWindowEntry,
-        validCGWindowIDs: Set<CGWindowID>
-    ) -> WindowBindingDiagnostic? {
-        guard let exactCGWindowID = AXWindowInspector.cgWindowID(for: reusedAXWindow.window) else {
-            return nil
-        }
-        guard validCGWindowIDs.contains(exactCGWindowID) else {
-            return nil
-        }
-        guard exactCGWindowID != record.cgWindowID else {
-            return nil
-        }
-        return WindowBindingDiagnostic(
-            stableWindowID: record.stableWindowID,
-            axWindowID: reusedAXWindow.id,
-            cgWindowID: exactCGWindowID,
-            confidence: .ambiguous,
-            source: .privateExactBridge,
-            reason: .privateExactBridgeConflictsWithStickyBinding,
-            candidateCount: 2,
-            allowedActions: WindowBindingConfidence.ambiguous.allowedActions
-        )
-    }
-
-    private static func resolvePrivateExactBridgeMatches(
-        axWindows: [RuntimeAXWindowEntry],
-        validCGWindowIDs: Set<CGWindowID>,
-        assignedCGWindowIDs: Set<CGWindowID>
-    ) -> [String: CGWindowID] {
-        guard !axWindows.isEmpty, !validCGWindowIDs.isEmpty else { return [:] }
-
-        var candidateAXWindowIDsByCGWindowID: [CGWindowID: [String]] = [:]
-        for axWindow in axWindows {
-            guard let cgWindowID = AXWindowInspector.cgWindowID(for: axWindow.window) else { continue }
-            guard validCGWindowIDs.contains(cgWindowID) else { continue }
-            guard !assignedCGWindowIDs.contains(cgWindowID) else { continue }
-            candidateAXWindowIDsByCGWindowID[cgWindowID, default: []].append(axWindow.id)
-        }
-
-        var matches: [String: CGWindowID] = [:]
-        for (cgWindowID, axWindowIDs) in candidateAXWindowIDsByCGWindowID {
-            guard axWindowIDs.count == 1, let axWindowID = axWindowIDs.first else { continue }
-            matches[axWindowID] = cgWindowID
-        }
-        return matches
     }
 
 }
