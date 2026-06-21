@@ -414,10 +414,6 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         lock.unlock()
     }
 
-    func isLikelyTransientAXRebuild(for pid: pid_t) -> Bool {
-        false
-    }
-
     private static func committedSearchIndexProjection(
         for apps: [AppSwitchCandidate],
         generatedAt: TimeInterval

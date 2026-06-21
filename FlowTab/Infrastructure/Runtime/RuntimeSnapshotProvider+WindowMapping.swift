@@ -34,10 +34,6 @@ struct RuntimeWindowAssignmentMatchResult {
 }
 
 extension RuntimeSnapshotProvider {
-    func isLikelyTransientAXRebuild(for pid: pid_t) -> Bool {
-        windowMappingStateByPID[pid]?.isLikelyTransientAXRebuild == true
-    }
-
     func cleanupWindowMappingState(for runningApps: [NSRunningApplication]) {
         let runningPIDs = Set(runningApps.map(\.processIdentifier))
         windowMappingStateByPID = windowMappingStateByPID.filter { runningPIDs.contains($0.key) }

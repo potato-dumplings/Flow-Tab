@@ -32,7 +32,6 @@ protocol RuntimeProjectionServing: Sendable {
     func signalAppTerminated(appID: String, pid: pid_t)
     func signalWindowFocusVerified(_ verification: RuntimeWindowFocusVerification)
     func signalWindowFocusVerified(appID: String, pid: pid_t)
-    func isLikelyTransientAXRebuild(for pid: pid_t) -> Bool
 }
 
 protocol RuntimeProjectionRepairProviding: AnyObject {
@@ -60,7 +59,6 @@ protocol RuntimeProjectionRepairProviding: AnyObject {
         _ verification: RuntimeWindowFocusVerification,
         now: TimeInterval
     )
-    func isLikelyTransientAXRebuild(for pid: pid_t) -> Bool
 }
 
 final class RuntimeProjectionRepairProvider: RuntimeProjectionRepairProviding {
@@ -101,10 +99,6 @@ final class RuntimeProjectionRepairProvider: RuntimeProjectionRepairProviding {
         now: TimeInterval
     ) {
         snapshotProvider.recordWindowFocusVerification(verification, now: now)
-    }
-
-    func isLikelyTransientAXRebuild(for pid: pid_t) -> Bool {
-        snapshotProvider.isLikelyTransientAXRebuild(for: pid)
     }
 }
 
@@ -408,12 +402,6 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 allowedActions: []
             )
         )
-    }
-
-    func isLikelyTransientAXRebuild(for pid: pid_t) -> Bool {
-        maintenanceQueue.sync {
-            repairProvider.isLikelyTransientAXRebuild(for: pid)
-        }
     }
 
     @discardableResult

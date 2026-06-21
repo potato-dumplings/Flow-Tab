@@ -72,6 +72,29 @@ enum HomeRuntimeProjectionReader {
         )
     }
 
+    static func shouldWaitForNoSwitchableWindowProjection(
+        appID: String,
+        pid: pid_t,
+        from service: any RuntimeProjectionServing
+    ) -> Bool {
+        guard pid > 0 else { return false }
+        if let projection = service.readCurrentAppWindowProjection(appID: appID),
+           projection.currentAppWindowPayload.summary.pid == pid
+            || projection.currentAppWindowPayload.context.runningApp.processIdentifier == pid
+        {
+            return !projection.freshness.isCompleteForScope
+        }
+        if let projection = service.readHomeSummaryProjection(),
+           projection.summary(for: appID)?.pid == pid {
+            return !projection.freshness.isCompleteForScope
+        }
+        if let projection = service.readAppSwitcherProjection(),
+           projection.contextsByID[appID]?.runningApp.processIdentifier == pid {
+            return !projection.freshness.isCompleteForScope
+        }
+        return false
+    }
+
     private static func homeSummary(
         for app: AppSwitchCandidate,
         context: RuntimeAppContext?

@@ -411,7 +411,11 @@ struct HomeLandingView: View {
     private func noSwitchableWindowsSubtitle(for app: RuntimeHomeAppSummary) -> String {
         if
             accessibilityTrusted,
-            runtimeProjectionService.isLikelyTransientAXRebuild(for: app.pid)
+            HomeRuntimeProjectionReader.shouldWaitForNoSwitchableWindowProjection(
+                appID: app.appID,
+                pid: app.pid,
+                from: runtimeProjectionService
+            )
         {
             return AppStrings.text(.homeWaitCacheUpdate, language: appLanguage)
         }
