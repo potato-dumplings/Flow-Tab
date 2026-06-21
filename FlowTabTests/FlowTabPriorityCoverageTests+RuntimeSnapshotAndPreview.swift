@@ -920,6 +920,52 @@ extension FlowTabPriorityCoverageTests {
         })
     }
 
+    func testRuntimeWindowListDeduplicatorSuppressesUnmatchedEntryCoveredByStickySpace() {
+        let stickyEntry = RuntimeWindowListEntry(
+            windowID: "cg:18405:288544",
+            title: "Sticky Window",
+            isMinimized: false,
+            ownerPID: 18_405,
+            cgWindowID: 288_544,
+            spaceIDs: [11_679],
+            hasStickyBinding: true,
+            lastConfirmationSource: .stickyBinding
+        )
+        let weakEntry = RuntimeWindowListEntry(
+            windowID: "cg:18405:258323",
+            title: "Weak Candidate",
+            isMinimized: false,
+            ownerPID: 18_405,
+            cgWindowID: 258_323,
+            spaceIDs: [11_679],
+            hasStickyBinding: false
+        )
+        let differentSpaceEntry = RuntimeWindowListEntry(
+            windowID: "cg:18405:258324",
+            title: "Different Space Candidate",
+            isMinimized: false,
+            ownerPID: 18_405,
+            cgWindowID: 258_324,
+            spaceIDs: [11_680],
+            hasStickyBinding: false
+        )
+        let knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry] = [
+            288_544: .init(id: 288_544, title: "Sticky Window", bounds: nil, isOnscreen: false, spaceIDs: [11_679]),
+            258_323: .init(id: 258_323, title: "Weak Candidate", bounds: nil, isOnscreen: false, spaceIDs: [11_679]),
+            258_324: .init(id: 258_324, title: "Different Space Candidate", bounds: nil, isOnscreen: false, spaceIDs: [11_680])
+        ]
+
+        let deduplicatedEntries = RuntimeWindowListDeduplicator.suppressUnmatchedEntriesCoveredByStickySpace(
+            [stickyEntry, weakEntry, differentSpaceEntry],
+            knownCGWindowsByID: knownCGWindowsByID,
+            appName: "Google Chrome"
+        )
+
+        XCTAssertEqual(deduplicatedEntries.map(\.windowID), ["cg:18405:288544", "cg:18405:258324"])
+        XCTAssertTrue(deduplicatedEntries.first?.hasStickyBinding == true)
+        XCTAssertEqual(deduplicatedEntries.last?.spaceIDs, [11_680])
+    }
+
     func testRuntimeSnapshotProviderWindowListSuppressesCGOnlyEntryCoveredByStickySpaceBinding() {
         let mergedEntries = RuntimeWindowMappingTestSupport.resolveWindowEntries(
             axWindows: [],
