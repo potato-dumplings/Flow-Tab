@@ -30,6 +30,40 @@ enum RuntimeAppLayerProjectionFilter {
     }
 }
 
+enum RuntimeAppDirectoryFactSource {
+    static func currentAppLayerRunningApplications(
+        includeCurrentProcessInAppLayer: Bool,
+        workspace: NSWorkspace = .shared,
+        currentPID: pid_t = ProcessInfo.processInfo.processIdentifier
+    ) -> [NSRunningApplication] {
+        appLayerRunningApplications(
+            from: workspace.runningApplications,
+            currentPID: currentPID,
+            includeCurrentProcessInAppLayer: includeCurrentProcessInAppLayer
+        )
+    }
+
+    static func appLayerRunningApplications(
+        from runningApplications: [NSRunningApplication],
+        currentPID: pid_t,
+        includeCurrentProcessInAppLayer: Bool
+    ) -> [NSRunningApplication] {
+        runningApplications.filter {
+            RuntimeAppLayerProjectionFilter.shouldIncludeRunningApplication(
+                activationPolicy: $0.activationPolicy,
+                isTerminated: $0.isTerminated,
+                pid: $0.processIdentifier,
+                currentPID: currentPID,
+                includeCurrentProcessInAppLayer: includeCurrentProcessInAppLayer
+            )
+        }
+    }
+
+    static func entries(from runningApplications: [NSRunningApplication]) -> [RuntimeAppDirectoryEntry] {
+        runningApplications.map(RuntimeAppDirectoryEntry.init(app:))
+    }
+}
+
 struct RuntimeAppDirectoryEntry: Equatable {
     let pid: pid_t
     let appID: String

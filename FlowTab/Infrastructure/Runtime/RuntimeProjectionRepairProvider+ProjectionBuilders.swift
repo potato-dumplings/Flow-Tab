@@ -74,9 +74,11 @@ extension RuntimeProjectionRepairProvider {
             )
         }
         let runningAppsStartMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let runningApps = filteredRunningApplications()
+        let runningApps = RuntimeAppDirectoryFactSource.currentAppLayerRunningApplications(
+            includeCurrentProcessInAppLayer: AppVisibilityPreferencesStore.loadShowInCommandTab()
+        )
         let runningAppsReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let appDirectoryEntries = runningApps.map(RuntimeAppDirectoryEntry.init(app:))
+        let appDirectoryEntries = RuntimeAppDirectoryFactSource.entries(from: runningApps)
 
         guard !runningApps.isEmpty else {
             RuntimeProjectionDiagnostics.logTiming(
@@ -229,7 +231,9 @@ extension RuntimeProjectionRepairProvider {
         if let uiTestRuntimeDataset = FlowTabUITestRuntimeProjectionDataset.current() {
             return uiTestRuntimeDataset.currentAppWindowPayloadsByAppID[appID]
         }
-        let runningApps = filteredRunningApplications()
+        let runningApps = RuntimeAppDirectoryFactSource.currentAppLayerRunningApplications(
+            includeCurrentProcessInAppLayer: AppVisibilityPreferencesStore.loadShowInCommandTab()
+        )
         let matchingApps = runningApps.filter { RuntimeAppIdentity.appID(for: $0) == appID }
         guard !matchingApps.isEmpty else { return nil }
 
@@ -307,7 +311,9 @@ extension RuntimeProjectionRepairProvider {
         }
 
         let runningAppsStartMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let runningApps = filteredRunningApplications()
+        let runningApps = RuntimeAppDirectoryFactSource.currentAppLayerRunningApplications(
+            includeCurrentProcessInAppLayer: AppVisibilityPreferencesStore.loadShowInCommandTab()
+        )
         let runningAppsReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         guard let app = runningApps.first(where: { $0.processIdentifier == pid })
             ?? NSRunningApplication(processIdentifier: pid)
@@ -418,20 +424,6 @@ extension RuntimeProjectionRepairProvider {
             ]
         )
         return payload
-    }
-
-    func filteredRunningApplications() -> [NSRunningApplication] {
-        let currentPID = ProcessInfo.processInfo.processIdentifier
-        let includeCurrentProcessInAppLayer = AppVisibilityPreferencesStore.loadShowInCommandTab()
-        return NSWorkspace.shared.runningApplications.filter {
-            RuntimeAppLayerProjectionFilter.shouldIncludeRunningApplication(
-                activationPolicy: $0.activationPolicy,
-                isTerminated: $0.isTerminated,
-                pid: $0.processIdentifier,
-                currentPID: currentPID,
-                includeCurrentProcessInAppLayer: includeCurrentProcessInAppLayer
-            )
-        }
     }
 
 }

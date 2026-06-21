@@ -43,7 +43,9 @@ extension RuntimeProjectionRepairProvider {
         }
 
         let appIDsByPID = Dictionary(
-            uniqueKeysWithValues: filteredRunningApplications().map { app in
+            uniqueKeysWithValues: RuntimeAppDirectoryFactSource.currentAppLayerRunningApplications(
+                includeCurrentProcessInAppLayer: AppVisibilityPreferencesStore.loadShowInCommandTab()
+            ).map { app in
                 (app.processIdentifier, RuntimeAppIdentity.appID(for: app))
             }
         )

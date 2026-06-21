@@ -266,6 +266,57 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(RuntimeAppDirectory.stableLastActiveValue(forRank: 3), -3)
         XCTAssertEqual(RuntimeAppDirectory.stableLastActiveValue(forRank: -2), 0)
     }
+
+    func testRuntimeAppDirectoryFactSourceFiltersAppLayerRunningApplications() {
+        let visibleApp = FakeRunningApplication(
+            pid: 20,
+            bundleIdentifier: "com.example.visible",
+            localizedName: "Visible",
+            bundlePath: "/Applications/Visible.app"
+        )
+        let accessoryApp = FakeRunningApplication(
+            pid: 30,
+            bundleIdentifier: "com.example.accessory",
+            localizedName: "Accessory",
+            bundlePath: "/Applications/Accessory.app",
+            activationPolicy: .accessory
+        )
+        let terminatedApp = FakeRunningApplication(
+            pid: 40,
+            bundleIdentifier: "com.example.terminated",
+            localizedName: "Terminated",
+            bundlePath: "/Applications/Terminated.app",
+            isTerminated: true
+        )
+        let currentProcessApp = FakeRunningApplication(
+            pid: 50,
+            bundleIdentifier: "com.example.current",
+            localizedName: "Current",
+            bundlePath: "/Applications/Current.app"
+        )
+        let runningApps = [visibleApp, accessoryApp, terminatedApp, currentProcessApp]
+
+        XCTAssertEqual(
+            RuntimeAppDirectoryFactSource.appLayerRunningApplications(
+                from: runningApps,
+                currentPID: currentProcessApp.processIdentifier,
+                includeCurrentProcessInAppLayer: false
+            ).map(\.processIdentifier),
+            [visibleApp.processIdentifier]
+        )
+        XCTAssertEqual(
+            RuntimeAppDirectoryFactSource.appLayerRunningApplications(
+                from: runningApps,
+                currentPID: currentProcessApp.processIdentifier,
+                includeCurrentProcessInAppLayer: true
+            ).map(\.processIdentifier),
+            [visibleApp.processIdentifier, currentProcessApp.processIdentifier]
+        )
+        XCTAssertEqual(
+            RuntimeAppDirectoryFactSource.entries(from: [visibleApp]).map(\.appID),
+            ["com.example.visible"]
+        )
+    }
 }
 
 private final class FakeRunningApplication: NSRunningApplication {
@@ -273,17 +324,23 @@ private final class FakeRunningApplication: NSRunningApplication {
     private let fakeBundleIdentifier: String
     private let fakeLocalizedName: String
     private let fakeBundleURL: URL
+    private let fakeActivationPolicy: NSApplication.ActivationPolicy
+    private let fakeIsTerminated: Bool
 
     init(
         pid: pid_t,
         bundleIdentifier: String,
         localizedName: String,
-        bundlePath: String
+        bundlePath: String,
+        activationPolicy: NSApplication.ActivationPolicy = .regular,
+        isTerminated: Bool = false
     ) {
         fakePID = pid
         fakeBundleIdentifier = bundleIdentifier
         fakeLocalizedName = localizedName
         fakeBundleURL = URL(fileURLWithPath: bundlePath)
+        fakeActivationPolicy = activationPolicy
+        fakeIsTerminated = isTerminated
         super.init()
     }
 
@@ -292,11 +349,11 @@ private final class FakeRunningApplication: NSRunningApplication {
     }
 
     override var activationPolicy: NSApplication.ActivationPolicy {
-        .regular
+        fakeActivationPolicy
     }
 
     override var isTerminated: Bool {
-        false
+        fakeIsTerminated
     }
 
     override var bundleIdentifier: String? {
