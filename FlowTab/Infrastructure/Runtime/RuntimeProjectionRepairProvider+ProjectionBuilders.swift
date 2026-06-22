@@ -27,11 +27,9 @@ extension RuntimeProjectionRepairProvider {
             )
         }
         let runningAppsStartMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let runningApps = RuntimeAppDirectoryFactSource.currentAppLayerRunningApplications(
-            includeCurrentProcessInAppLayer: AppVisibilityPreferencesStore.loadShowInCommandTab()
-        )
+        let runningAppFacts = repairFactSource.collectRepairRunningAppFacts()
+        let runningApps = runningAppFacts.runningApps
         let runningAppsReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let appDirectoryEntries = RuntimeAppDirectoryFactSource.entries(from: runningApps)
 
         guard !runningApps.isEmpty else {
             RuntimeProjectionDiagnostics.logTiming(
@@ -46,7 +44,7 @@ extension RuntimeProjectionRepairProvider {
             return RuntimeFullRepairProjectionPayload(
                 apps: [],
                 contextsByID: [:],
-                appDirectoryEntries: appDirectoryEntries
+                appDirectoryEntries: runningAppFacts.appDirectoryEntries
             )
         }
 
@@ -114,7 +112,7 @@ extension RuntimeProjectionRepairProvider {
             return RuntimeFullRepairProjectionPayload(
                 apps: [],
                 contextsByID: [:],
-                appDirectoryEntries: appDirectoryEntries
+                appDirectoryEntries: runningAppFacts.appDirectoryEntries
             )
         }
         let now = Date.timeIntervalSinceReferenceDate
@@ -152,7 +150,7 @@ extension RuntimeProjectionRepairProvider {
         let rowsReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let payload = RuntimeFullRepairProjectionAssembler.payload(
             fromCurrentAppWindowProjectionInputs: currentAppProjectionInputs,
-            appDirectoryEntries: appDirectoryEntries,
+            appDirectoryEntries: runningAppFacts.appDirectoryEntries,
             duplicateContextHandler: { appID in
                 RuntimeLog.debug(.projection, "duplicate appID fallback overwrite=\(appID)")
             }
@@ -184,9 +182,7 @@ extension RuntimeProjectionRepairProvider {
         if let uiTestRuntimeDataset = FlowTabUITestRuntimeProjectionDataset.current() {
             return uiTestRuntimeDataset.currentAppWindowPayloadsByAppID[appID]
         }
-        let runningApps = RuntimeAppDirectoryFactSource.currentAppLayerRunningApplications(
-            includeCurrentProcessInAppLayer: AppVisibilityPreferencesStore.loadShowInCommandTab()
-        )
+        let runningApps = repairFactSource.collectRepairRunningAppFacts().runningApps
         let matchingApps = runningApps.filter { RuntimeAppIdentity.appID(for: $0) == appID }
         guard !matchingApps.isEmpty else { return nil }
 
@@ -258,9 +254,7 @@ extension RuntimeProjectionRepairProvider {
         }
 
         let runningAppsStartMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let runningApps = RuntimeAppDirectoryFactSource.currentAppLayerRunningApplications(
-            includeCurrentProcessInAppLayer: AppVisibilityPreferencesStore.loadShowInCommandTab()
-        )
+        let runningApps = repairFactSource.collectRepairRunningAppFacts().runningApps
         let runningAppsReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         guard let app = runningApps.first(where: { $0.processIdentifier == pid })
             ?? NSRunningApplication(processIdentifier: pid)

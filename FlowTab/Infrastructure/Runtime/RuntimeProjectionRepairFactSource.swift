@@ -1,6 +1,11 @@
 import AppKit
 import Foundation
 
+struct RuntimeRepairRunningAppFacts {
+    let runningApps: [NSRunningApplication]
+    let appDirectoryEntries: [RuntimeAppDirectoryEntry]
+}
+
 struct RuntimeFullRepairWindowFacts {
     let windowsByPID: [pid_t: [RuntimeWindowListEntry]]
     let rankByPID: [pid_t: Int]
@@ -26,6 +31,16 @@ struct RuntimeFocusedCurrentAppWindowFacts {
 
 struct RuntimeProjectionRepairFactSource {
     let snapshotProvider: RuntimeSnapshotProvider
+
+    func collectRepairRunningAppFacts() -> RuntimeRepairRunningAppFacts {
+        let runningApps = RuntimeAppDirectoryFactSource.currentAppLayerRunningApplications(
+            includeCurrentProcessInAppLayer: AppVisibilityPreferencesStore.loadShowInCommandTab()
+        )
+        return RuntimeRepairRunningAppFacts(
+            runningApps: runningApps,
+            appDirectoryEntries: RuntimeAppDirectoryFactSource.entries(from: runningApps)
+        )
+    }
 
     func collectFullRepairWindowFacts(for runningApps: [NSRunningApplication]) -> RuntimeFullRepairWindowFacts {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
