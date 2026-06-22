@@ -1242,6 +1242,42 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
+    func testRuntimeProjectionRepairProviderReconcilesSpaceTopologyThroughAffectedTargets() {
+        let recordedPID = pid_t(1_840_501_409)
+        let currentPID = pid_t(1_840_501_410)
+        let recordedWindowID = CGWindowID(240_001)
+        let currentWindowID = CGWindowID(240_002)
+        let staleWindowID = CGWindowID(240_003)
+        let provider = RuntimeSnapshotProvider(
+            cgWindowListProvider: FixedRuntimeCGWindowListProvider(
+                rawWindowInfo: [
+                    makeRawCGWindowInfo(
+                        pid: currentPID,
+                        windowID: currentWindowID,
+                        title: "Current Topology Window"
+                    )
+                ]
+            )
+        )
+        let repairProvider = RuntimeProjectionRepairProvider(snapshotProvider: provider)
+        provider.windowMappingStateByPID[recordedPID] = RuntimeWindowMappingState(
+            windowRecordsByCGWindowID: [
+                recordedWindowID: RuntimeWindowRecord(
+                    cgWindowID: recordedWindowID,
+                    stableWindowID: "cg:\(recordedPID):\(recordedWindowID)",
+                    firstSeenAt: 1
+                )
+            ]
+        )
+
+        let results = repairProvider.reconcileSpaceTopology(
+            affectedCGWindowIDs: [recordedWindowID, currentWindowID, staleWindowID]
+        )
+
+        XCTAssertEqual(results.map(\.pid), [recordedPID, currentPID])
+        XCTAssertEqual(results.map(\.affectedCGWindowIDs), [[recordedWindowID], [currentWindowID]])
+    }
+
     func testRuntimeProjectionRepairProviderReconcilesAppWindowsWithAffectedCGWindowScope() {
         let provider = RuntimeSnapshotProvider()
         let repairProvider = RuntimeProjectionRepairProvider(snapshotProvider: provider)

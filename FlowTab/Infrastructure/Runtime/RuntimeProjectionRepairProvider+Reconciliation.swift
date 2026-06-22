@@ -20,6 +20,13 @@ struct RuntimeAppWindowReconciliationResult {
 }
 
 extension RuntimeProjectionRepairProvider {
+    func recordSpaceTopologyChanged(now: TimeInterval) -> Set<CGWindowID> {
+        snapshotProvider.collectCGWindowsWithSpaceTopologyDiff(
+            options: [.excludeDesktopElements],
+            now: now
+        ).spaceTopologyDiff?.affectedCGWindowIDs ?? []
+    }
+
     func appReconciliationTargets(
         affectedCGWindowIDs: Set<CGWindowID>,
         currentCGWindowsByPID: [pid_t: [RuntimeCGWindowEntry]]
@@ -71,5 +78,23 @@ extension RuntimeProjectionRepairProvider {
                     currentAppWindowPayloadWasEmpty: currentAppWindowPayloadWasEmpty
                 ) == true
         )
+    }
+
+    func reconcileSpaceTopology(
+        affectedCGWindowIDs: Set<CGWindowID>
+    ) -> [RuntimeAppWindowReconciliationResult] {
+        let cgWindowsByPID = snapshotProvider.collectCGWindowsWithSpaceTopologyDiff(
+            options: [.excludeDesktopElements]
+        ).windowsByPID
+        let affectedTargets = appReconciliationTargets(
+            affectedCGWindowIDs: affectedCGWindowIDs,
+            currentCGWindowsByPID: cgWindowsByPID
+        )
+        return affectedTargets.map { target in
+            reconcileAppWindows(
+                processIdentifier: target.pid,
+                affectedCGWindowIDs: target.affectedCGWindowIDs
+            )
+        }
     }
 }

@@ -305,7 +305,8 @@ final class RuntimeSnapshotProvider {
     }
 
     func collectCGWindowsWithSpaceTopologyDiff(
-        options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
+        options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements],
+        now: TimeInterval = ProcessInfo.processInfo.systemUptime
     ) -> RuntimeCGWindowCollection {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
         guard
@@ -356,7 +357,7 @@ final class RuntimeSnapshotProvider {
         }
         let parseReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let spaceTopologySnapshot = spaceTopologyProvider.snapshot(for: windowIDs)
-        let spaceTopologyDiff = recordSpaceTopologySnapshot(spaceTopologySnapshot)
+        let spaceTopologyDiff = recordSpaceTopologySnapshot(spaceTopologySnapshot, now: now)
         let spaceIDsByWindowID = Dictionary(
             uniqueKeysWithValues: spaceTopologySnapshot.spaceIDsByCGWindowID.map { windowID, spaceIDs in
                 (windowID, Array(spaceIDs).sorted())

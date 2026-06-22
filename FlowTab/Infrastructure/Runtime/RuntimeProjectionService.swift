@@ -37,18 +37,15 @@ protocol RuntimeProjectionServing: Sendable {
 protocol RuntimeProjectionRepairProviding: AnyObject {
     var reconciliationCoordinator: RuntimeReconciliationCoordinator { get }
 
-    func collectCGWindowsWithSpaceTopologyDiff(
-        options: CGWindowListOption
-    ) -> RuntimeCGWindowCollection
-    func appReconciliationTargets(
-        affectedCGWindowIDs: Set<CGWindowID>,
-        currentCGWindowsByPID: [pid_t: [RuntimeCGWindowEntry]]
-    ) -> [RuntimeAffectedWindowReconciliationTarget]
     func reconcileAppWindows(
         processIdentifier pid: pid_t,
         affectedCGWindowIDs: Set<CGWindowID>
     ) -> RuntimeAppWindowReconciliationResult
+    func reconcileSpaceTopology(
+        affectedCGWindowIDs: Set<CGWindowID>
+    ) -> [RuntimeAppWindowReconciliationResult]
     func fullRepairProjectionPayload() -> RuntimeFullRepairProjectionPayload
+    func recordSpaceTopologyChanged(now: TimeInterval) -> Set<CGWindowID>
     func signalAXWindowDestroyed(
         processIdentifier pid: pid_t,
         axWindowID: String,
@@ -70,12 +67,6 @@ final class RuntimeProjectionRepairProvider: RuntimeProjectionRepairProviding {
 
     var reconciliationCoordinator: RuntimeReconciliationCoordinator {
         snapshotProvider.reconciliationCoordinator
-    }
-
-    func collectCGWindowsWithSpaceTopologyDiff(
-        options: CGWindowListOption
-    ) -> RuntimeCGWindowCollection {
-        snapshotProvider.collectCGWindowsWithSpaceTopologyDiff(options: options)
     }
 
     func signalAXWindowDestroyed(
@@ -263,14 +254,13 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
 
     func signalSpaceTopologyChanged() {
         maintenanceQueue.async { [self] in
-            let collection = repairProvider.collectCGWindowsWithSpaceTopologyDiff(
-                options: [.excludeDesktopElements]
-            )
+            let now = Date.timeIntervalSinceReferenceDate
+            let affectedCGWindowIDs = repairProvider.recordSpaceTopologyChanged(now: now)
             readModelStore.markSpaceTopologyDirty(
-                affectedCGWindowIDs: collection.spaceTopologyDiff?.affectedCGWindowIDs ?? [],
+                affectedCGWindowIDs: affectedCGWindowIDs,
                 pendingScope: "spaceTopology"
             )
-            drainReadyReconciliationRequestsLocked(now: Date.timeIntervalSinceReferenceDate)
+            drainReadyReconciliationRequestsLocked(now: now)
         }
     }
 
@@ -516,19 +506,11 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         case .fullRepair:
             return .completedWithFullRepairProjection(repairProvider.fullRepairProjectionPayload())
         case .spaceTopology:
-            let cgWindowsByPID = repairProvider.collectCGWindowsWithSpaceTopologyDiff(
-                options: [.excludeDesktopElements]
-            ).windowsByPID
-            let affectedTargets = repairProvider.appReconciliationTargets(
-                affectedCGWindowIDs: request.affectedCGWindowIDs,
-                currentCGWindowsByPID: cgWindowsByPID
+            let results = repairProvider.reconcileSpaceTopology(
+                affectedCGWindowIDs: request.affectedCGWindowIDs
             )
             var repairedCurrentAppWindowPayloads: [RuntimeCurrentAppWindowPayload] = []
-            for target in affectedTargets {
-                let result = repairProvider.reconcileAppWindows(
-                    processIdentifier: target.pid,
-                    affectedCGWindowIDs: target.affectedCGWindowIDs
-                )
+            for result in results {
                 if result.isTransientEmptyCurrentAppWindowPayload {
                     return .transientEmptyCurrentAppWindowPayload
                 }
