@@ -1,11 +1,9 @@
-import AppKit
 import CoreGraphics
 import Foundation
 import FlowTabCore
 
-struct RuntimeAffectedWindowReconciliationTarget: Equatable {
+private struct RuntimeAffectedWindowReconciliationTarget: Equatable {
     let pid: pid_t
-    let appID: String
     let affectedCGWindowIDs: Set<CGWindowID>
 }
 
@@ -27,7 +25,7 @@ extension RuntimeProjectionRepairProvider {
         ).spaceTopologyDiff?.affectedCGWindowIDs ?? []
     }
 
-    func appReconciliationTargets(
+    private func appReconciliationTargets(
         affectedCGWindowIDs: Set<CGWindowID>,
         currentCGWindowsByPID: [pid_t: [RuntimeCGWindowEntry]]
     ) -> [RuntimeAffectedWindowReconciliationTarget] {
@@ -38,19 +36,9 @@ extension RuntimeProjectionRepairProvider {
         )
         guard !affectedCGWindowIDsByPID.isEmpty else { return [] }
 
-        let appIDsByPID = Dictionary(
-            uniqueKeysWithValues: RuntimeAppDirectoryFactSource.currentAppLayerRunningApplications(
-                includeCurrentProcessInAppLayer: AppVisibilityPreferencesStore.loadShowInCommandTab()
-            ).map { app in
-                (app.processIdentifier, RuntimeAppIdentity.appID(for: app))
-            }
-        )
         return affectedCGWindowIDsByPID.keys.sorted().map { pid in
             RuntimeAffectedWindowReconciliationTarget(
                 pid: pid,
-                appID: appIDsByPID[pid]
-                    ?? NSRunningApplication(processIdentifier: pid).map(RuntimeAppIdentity.appID(for:))
-                    ?? "pid:\(pid)",
                 affectedCGWindowIDs: affectedCGWindowIDsByPID[pid] ?? []
             )
         }
