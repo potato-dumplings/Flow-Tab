@@ -55,7 +55,7 @@ protocol RuntimeProjectionRepairProviding: AnyObject {
     func recordWindowFocusVerification(
         _ verification: RuntimeWindowFocusVerification,
         now: TimeInterval
-    )
+    ) -> Set<CGWindowID>
 }
 
 final class RuntimeProjectionRepairProvider: RuntimeProjectionRepairProviding {
@@ -90,8 +90,10 @@ final class RuntimeProjectionRepairProvider: RuntimeProjectionRepairProviding {
     func recordWindowFocusVerification(
         _ verification: RuntimeWindowFocusVerification,
         now: TimeInterval
-    ) {
+    ) -> Set<CGWindowID> {
         snapshotProvider.recordWindowFocusVerification(verification, now: now)
+        reconciliationCoordinator.markWindowFocusVerified(verification, now: now)
+        return verification.affectedCGWindowIDs
     }
 }
 
@@ -364,15 +366,11 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     func signalWindowFocusVerified(_ verification: RuntimeWindowFocusVerification) {
         maintenanceQueue.async { [self] in
             let now = Date.timeIntervalSinceReferenceDate
-            repairProvider.recordWindowFocusVerification(verification, now: now)
+            let affectedCGWindowIDs = repairProvider.recordWindowFocusVerification(verification, now: now)
             readModelStore.markWindowFocusVerified(
                 appID: verification.appID,
                 pid: verification.ownerPID,
-                affectedCGWindowIDs: Set([verification.targetCGWindowID, verification.focusedCGWindowID].compactMap { $0 })
-            )
-            repairProvider.reconciliationCoordinator.markWindowFocusVerified(
-                verification,
-                now: now
+                affectedCGWindowIDs: affectedCGWindowIDs
             )
             drainReadyReconciliationRequestsLocked(now: now)
         }
