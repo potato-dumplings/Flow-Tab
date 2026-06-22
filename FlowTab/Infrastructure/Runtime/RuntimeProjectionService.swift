@@ -37,7 +37,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     private let maintenanceQueue: DispatchQueue
     private let repairProvider: RuntimeProjectionRepairProviding
     private let readModelStore: RuntimeReadModelStore
-    private let reconciliationExecutor: RuntimeProjectionReconciliationExecutor
+    private let reconciliationDrainer: RuntimeProjectionReconciliationDrainer
 
     init(
         label: String = "FlowTab.RuntimeProjectionService",
@@ -49,7 +49,10 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         maintenanceQueue = DispatchQueue(label: label, qos: .utility)
         self.repairProvider = repairProvider
         self.readModelStore = readModelStore
-        self.reconciliationExecutor = reconciliationExecutor
+        reconciliationDrainer = RuntimeProjectionReconciliationDrainer(
+            repairProvider: repairProvider,
+            reconciliationExecutor: reconciliationExecutor
+        )
     }
 
     func readAppSwitcherProjection() -> RuntimeAppSwitcherProjection? {
@@ -80,7 +83,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 && !repairProvider.hasPendingReconciliationRequests() {
                 repairProvider.scheduleFullRepairFallback(now: now)
             }
-            let drainResult = drainReadyReconciliationRequestsWithResultLocked(
+            let drainResult = reconciliationDrainer.drainReadyRequests(
                 now: now
             )
             let fullRepairCommitSummary = commitFullRepairProjectionPayloadsLocked(
@@ -113,7 +116,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             let diagnostics = readModelStore.diagnostics()
             let now = Date.timeIntervalSinceReferenceDate
             let promotedRequests = repairProvider.promoteSearchFreshnessBarrierRequests(now: now)
-            let drainResult = drainReadyReconciliationRequestsWithResultLocked(
+            let drainResult = reconciliationDrainer.drainReadyRequests(
                 now: now,
                 maxRequests: runtimeSearchFreshnessBarrierMaxReadyRepairs,
                 includeFullRepair: false
@@ -284,7 +287,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
 
     @discardableResult
     private func drainReadyReconciliationRequestsLocked(now: TimeInterval) -> [RuntimeReconciliationRequest] {
-        let result = drainReadyReconciliationRequestsWithResultLocked(now: now)
+        let result = reconciliationDrainer.drainReadyRequests(now: now)
         commitFullRepairProjectionPayloadsLocked(result.fullRepairProjectionPayloads)
         commitRepairedCurrentAppWindowPayloadsLocked(result.repairedCurrentAppWindowPayloads)
         return result.startedRequests
@@ -320,46 +323,6 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         for payload in payloads {
             readModelStore.commitCurrentAppWindowProjection(payload)
         }
-    }
-
-    private func drainReadyReconciliationRequestsWithResultLocked(
-        now: TimeInterval,
-        maxRequests: Int? = nil,
-        includeFullRepair: Bool = true
-    ) -> RuntimeProjectionReconciliationDrainResult {
-        let readyRequests = repairProvider.readyReconciliationRequests(
-            now: now,
-            includeFullRepair: includeFullRepair
-        )
-        let requests = maxRequests.map { Array(readyRequests.prefix($0)) } ?? readyRequests
-        var result = RuntimeProjectionReconciliationDrainResult()
-        result.startedRequests.reserveCapacity(requests.count)
-
-        for request in requests {
-            guard let startedRequest = repairProvider.startReconciliationRequest(id: request.id) else {
-                continue
-            }
-            result.startedRequests.append(startedRequest)
-            let outcome = reconciliationExecutor(startedRequest, repairProvider)
-            switch outcome {
-            case .completed, .completedWithFullRepairProjection, .completedWithRepairedCurrentAppWindowPayloads:
-                repairProvider.completeReconciliationRequest(id: startedRequest.id)
-                result.completedCount += 1
-                if case let .completedWithFullRepairProjection(payload) = outcome {
-                    result.fullRepairProjectionPayloads.append(payload)
-                }
-                result.repairedCurrentAppWindowPayloads.append(
-                    contentsOf: outcome.repairedCurrentAppWindowPayloads
-                )
-            case .transientEmptyCurrentAppWindowPayload:
-                repairProvider.deferReconciliationRequestAfterTransientEmptyCurrentAppWindowPayload(
-                    id: startedRequest.id,
-                    now: now
-                )
-                result.deferredCount += 1
-            }
-        }
-        return result
     }
 
 }
