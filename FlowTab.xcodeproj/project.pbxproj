@@ -46,6 +46,7 @@
 		A1B2C43A2F73000100B0D737 /* SystemAppMRUTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4312F73000100B0D737 /* SystemAppMRUTracker.swift */; };
 		A1B2C43B2F73000100B0D737 /* RuntimeSnapshotProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4322F73000100B0D737 /* RuntimeSnapshotProvider.swift */; };
 		F6E7E00235C2000100B0D737 /* RuntimeProjectionRepairProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7E00135C2000100B0D737 /* RuntimeProjectionRepairProvider.swift */; };
+		F6E7E20235C4000100B0D737 /* RuntimeSearchIndexReadModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7E20135C4000100B0D737 /* RuntimeSearchIndexReadModel.swift */; };
 		A1B2C43C2F73000100B0D737 /* RuntimeProjectionRepairProvider+ProjectionBuilders.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4332F73000100B0D737 /* RuntimeProjectionRepairProvider+ProjectionBuilders.swift */; };
 		F6E7D00435C1000100B0D737 /* RuntimeWindowListFacts.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7D00335C1000100B0D737 /* RuntimeWindowListFacts.swift */; };
 		F6E7D00635C1000100B0D737 /* RuntimeWindowMappingTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7D00535C1000100B0D737 /* RuntimeWindowMappingTestSupport.swift */; };
@@ -282,6 +283,7 @@
 		F6E7B00B35AC000100B0D737 /* RuntimeProjectionRepairProvider+Reconciliation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RuntimeProjectionRepairProvider+Reconciliation.swift"; sourceTree = "<group>"; };
 		F6E7D00135C1000100B0D737 /* RuntimeProjectionDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionDiagnostics.swift; sourceTree = "<group>"; };
 		F6E7E10135C3000100B0D737 /* RuntimeProjectionMaintenance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionMaintenance.swift; sourceTree = "<group>"; };
+		F6E7E20135C4000100B0D737 /* RuntimeSearchIndexReadModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeSearchIndexReadModel.swift; sourceTree = "<group>"; };
 		D10000022FF500100B0D737 /* RuntimeProjectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionService.swift; sourceTree = "<group>"; };
 		B26000012FE000100B0D737 /* RuntimePerformanceClock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimePerformanceClock.swift; sourceTree = "<group>"; };
 		B26000022FE000100B0D737 /* RuntimeSnapshotProvider+Diagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RuntimeSnapshotProvider+Diagnostics.swift"; sourceTree = "<group>"; };
@@ -701,6 +703,7 @@
 				F6E7A8C135AC000100B0D737 /* RuntimeWindowFocusRequest.swift */,
 				F6E7B00535AC000100B0D737 /* RuntimeReconciliationCoordinator.swift */,
 				F6E7C00135C000100B0D737 /* RuntimeReadModelStore.swift */,
+				F6E7E20135C4000100B0D737 /* RuntimeSearchIndexReadModel.swift */,
 				F6E7C00F35C000100B0D737 /* RuntimeCGWindowFacts.swift */,
 				F6E7C01135C000100B0D737 /* RuntimeProjectionPayloads.swift */,
 				F6E7D00335C1000100B0D737 /* RuntimeWindowListFacts.swift */,
@@ -1102,6 +1105,7 @@
 				B26010022FE000100B0D737 /* RuntimeSnapshotProvider+Diagnostics.swift in Sources */,
 				F6E7B00635AC000100B0D737 /* RuntimeReconciliationCoordinator.swift in Sources */,
 				F6E7C00235C000100B0D737 /* RuntimeReadModelStore.swift in Sources */,
+				F6E7E20235C4000100B0D737 /* RuntimeSearchIndexReadModel.swift in Sources */,
 				F6E7C01035C000100B0D737 /* RuntimeCGWindowFacts.swift in Sources */,
 				F6E7C01235C000100B0D737 /* RuntimeProjectionPayloads.swift in Sources */,
 				F6E7C01435C000100B0D737 /* RuntimeAXWindowRecovery.swift in Sources */,
