@@ -18,6 +18,42 @@ struct RuntimeAppWindowReconciliationResult {
 }
 
 extension RuntimeProjectionRepairProvider {
+    func signalAXWindowDestroyed(
+        appID: String,
+        processIdentifier pid: pid_t,
+        axWindowID: String,
+        now: TimeInterval
+    ) -> CGWindowID? {
+        let affectedCGWindowID = snapshotProvider.signalAXWindowDestroyed(
+            processIdentifier: pid,
+            axWindowID: axWindowID,
+            now: now
+        )
+        snapshotProvider.reconciliationCoordinator.markAppDirty(
+            appID: appID,
+            pid: pid,
+            reason: .axNotification,
+            affectedCGWindowIDs: affectedCGWindowID.map { Set([$0]) } ?? [],
+            now: now
+        )
+        return affectedCGWindowID
+    }
+
+    func recordAppTerminated(processIdentifier pid: pid_t) {
+        snapshotProvider.reconciliationCoordinator.cancelAppRequests(pid: pid)
+        snapshotProvider.removeWindowMappingState(forTerminatedPID: pid)
+        AXLiveWindowRegistry.shared.remove(pid: pid)
+    }
+
+    func recordWindowFocusVerification(
+        _ verification: RuntimeWindowFocusVerification,
+        now: TimeInterval
+    ) -> Set<CGWindowID> {
+        snapshotProvider.recordWindowFocusVerification(verification, now: now)
+        snapshotProvider.reconciliationCoordinator.markWindowFocusVerified(verification, now: now)
+        return verification.affectedCGWindowIDs
+    }
+
     func hasPendingReconciliationRequests() -> Bool {
         snapshotProvider.reconciliationCoordinator.hasPendingRequests()
     }
