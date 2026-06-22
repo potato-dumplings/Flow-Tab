@@ -6,10 +6,15 @@ struct RuntimeFullRepairWindowFacts {
     let rankByPID: [pid_t: Int]
 }
 
-struct RuntimeFullRepairFactSource {
+struct RuntimeCurrentAppWindowFacts {
+    let windowsByPID: [pid_t: [RuntimeWindowListEntry]]
+    let rankByPID: [pid_t: Int]
+}
+
+struct RuntimeProjectionRepairFactSource {
     let snapshotProvider: RuntimeSnapshotProvider
 
-    func collectWindowFacts(for runningApps: [NSRunningApplication]) -> RuntimeFullRepairWindowFacts {
+    func collectFullRepairWindowFacts(for runningApps: [NSRunningApplication]) -> RuntimeFullRepairWindowFacts {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
         snapshotProvider.cleanupWindowMappingState(for: runningApps)
         let cleanupReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
@@ -49,6 +54,26 @@ struct RuntimeFullRepairFactSource {
         // Keep a single source of truth for window counting and selection: AX window list.
         return RuntimeFullRepairWindowFacts(
             windowsByPID: axWindowsByPID,
+            rankByPID: rankByPID
+        )
+    }
+
+    func collectCurrentAppWindowFacts(
+        for matchingApps: [NSRunningApplication],
+        in runningApps: [NSRunningApplication]
+    ) -> RuntimeCurrentAppWindowFacts {
+        let rankByPID = RuntimeAppRankProvider.collectAppRankByPID(for: runningApps)
+        let cgWindowsByPID = snapshotProvider.collectCGWindowsWithSpaceTopologyDiff().windowsByPID
+        let allCGWindowsByPID = snapshotProvider.collectCGWindowsWithSpaceTopologyDiff(
+            options: [.optionAll, .excludeDesktopElements]
+        ).windowsByPID
+        let windowsByPID = snapshotProvider.collectAXWindowData(
+            for: matchingApps,
+            cgWindowsByPID: cgWindowsByPID,
+            allCGWindowsByPID: allCGWindowsByPID
+        )
+        return RuntimeCurrentAppWindowFacts(
+            windowsByPID: windowsByPID,
             rankByPID: rankByPID
         )
     }

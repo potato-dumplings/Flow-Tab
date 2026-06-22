@@ -52,7 +52,7 @@ extension RuntimeProjectionRepairProvider {
 
         RuntimeLog.debug(.projection, "runningApps=\(runningApps.count)")
         let windowDataStartMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let windowData = fullRepairFactSource.collectWindowFacts(for: runningApps)
+        let windowData = repairFactSource.collectFullRepairWindowFacts(for: runningApps)
         let windowDataReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let selectionStartMs = windowDataReadyMs
         let appDirectory = RuntimeAppDirectory(apps: runningApps)
@@ -190,34 +190,28 @@ extension RuntimeProjectionRepairProvider {
         let matchingApps = runningApps.filter { RuntimeAppIdentity.appID(for: $0) == appID }
         guard !matchingApps.isEmpty else { return nil }
 
-        let rankByPID = RuntimeAppRankProvider.collectAppRankByPID(for: runningApps)
-        let cgWindowsByPID = snapshotProvider.collectCGWindowsWithSpaceTopologyDiff().windowsByPID
-        let allCGWindowsByPID = snapshotProvider.collectCGWindowsWithSpaceTopologyDiff(
-            options: [.optionAll, .excludeDesktopElements]
-        ).windowsByPID
-        let windowsByPID = snapshotProvider.collectAXWindowData(
+        let windowFacts = repairFactSource.collectCurrentAppWindowFacts(
             for: matchingApps,
-            cgWindowsByPID: cgWindowsByPID,
-            allCGWindowsByPID: allCGWindowsByPID
+            in: runningApps
         )
         let appDirectory = RuntimeAppDirectory(apps: matchingApps)
         let windowStatsByPID = RuntimeAppDirectory.windowStats(
             for: matchingApps,
-            windowsByPID: windowsByPID,
+            windowsByPID: windowFacts.windowsByPID,
             isVisibleWindow: { !$0.isMinimized }
         )
         let sortedApps = appDirectory.sortedAppsWithinGroup(
             matchingApps,
             windowStatsByPID: windowStatsByPID,
-            rankByPID: rankByPID
+            rankByPID: windowFacts.rankByPID
         )
         guard let app = sortedApps.first else { return nil }
 
         let windows = appDirectory.mergedWindows(
             for: sortedApps,
-            windowsByPID: windowsByPID,
+            windowsByPID: windowFacts.windowsByPID,
             windowStatsByPID: windowStatsByPID,
-            rankByPID: rankByPID
+            rankByPID: windowFacts.rankByPID
         )
         let hideMinimizedAppsFromAppLayer =
             SwitcherBehaviorPreferencesStore.loadHideMinimizedAppsFromAppLayer()
@@ -235,7 +229,7 @@ extension RuntimeProjectionRepairProvider {
                 appID: appID,
                 app: app,
                 appGroup: matchingApps,
-                rankByPID: rankByPID,
+                rankByPID: windowFacts.rankByPID,
                 rankFallback: 10_000,
                 generatedAt: now,
                 windowSeeds: windows.enumerated().map { entryIndex, entry in
