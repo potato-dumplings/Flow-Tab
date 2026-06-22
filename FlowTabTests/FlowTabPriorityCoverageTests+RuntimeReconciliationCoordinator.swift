@@ -1513,6 +1513,9 @@ extension FlowTabPriorityCoverageTests {
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
         let pid = pid_t(18_405)
         let cgWindowID = CGWindowID(240_001)
+        let liveAXWindow = AXUIElementCreateApplication(pid)
+        AXLiveWindowRegistry.shared.refreshSnapshot(forPID: pid, windows: [liveAXWindow])
+        defer { AXLiveWindowRegistry.shared.remove(pid: pid) }
         provider.windowMappingStateByPID[pid] = RuntimeWindowMappingState(
             windowRecordsByCGWindowID: [
                 cgWindowID: RuntimeWindowRecord(
@@ -1533,10 +1536,12 @@ extension FlowTabPriorityCoverageTests {
             repairProvider: RuntimeProjectionRepairProvider(snapshotProvider: provider)
         )
 
+        XCTAssertFalse(AXLiveWindowRegistry.shared.windows(forPID: pid).isEmpty)
         service.signalAppTerminated(appID: "com.example.terminated", pid: pid)
         _ = service.drainReadyReconciliationRequestsSynchronouslyForTesting(now: 11)
 
         XCTAssertNil(provider.windowMappingStateByPID[pid])
+        XCTAssertTrue(AXLiveWindowRegistry.shared.windows(forPID: pid).isEmpty)
         XCTAssertFalse(coordinator.readyRequests(now: 11).contains { $0.id == request.id })
     }
 

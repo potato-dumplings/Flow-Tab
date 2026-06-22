@@ -54,7 +54,7 @@ protocol RuntimeProjectionRepairProviding: AnyObject {
         axWindowID: String,
         now: TimeInterval
     ) -> CGWindowID?
-    func clearWindowMappingState(for pid: pid_t)
+    func recordAppTerminated(processIdentifier pid: pid_t)
     func recordWindowFocusVerification(
         _ verification: RuntimeWindowFocusVerification,
         now: TimeInterval
@@ -90,8 +90,10 @@ final class RuntimeProjectionRepairProvider: RuntimeProjectionRepairProviding {
         )
     }
 
-    func clearWindowMappingState(for pid: pid_t) {
-        snapshotProvider.clearWindowMappingState(for: pid)
+    func recordAppTerminated(processIdentifier pid: pid_t) {
+        reconciliationCoordinator.cancelAppRequests(pid: pid)
+        snapshotProvider.removeWindowMappingState(forTerminatedPID: pid)
+        AXLiveWindowRegistry.shared.remove(pid: pid)
     }
 
     func recordWindowFocusVerification(
@@ -364,9 +366,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     func signalAppTerminated(appID: String, pid: pid_t) {
         readModelStore.markAppTerminated(appID: appID, pid: pid)
         maintenanceQueue.async { [self] in
-            repairProvider.reconciliationCoordinator.cancelAppRequests(pid: pid)
-            repairProvider.clearWindowMappingState(for: pid)
-            AXLiveWindowRegistry.shared.remove(pid: pid)
+            repairProvider.recordAppTerminated(processIdentifier: pid)
             RuntimeLog.debug(.projection, "runtimeLifecycle appTerminated appID=\(appID) pid=\(pid)")
         }
     }

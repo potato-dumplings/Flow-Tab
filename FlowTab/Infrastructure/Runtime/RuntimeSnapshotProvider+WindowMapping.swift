@@ -39,7 +39,7 @@ extension RuntimeSnapshotProvider {
         windowMappingStateByPID = windowMappingStateByPID.filter { runningPIDs.contains($0.key) }
     }
 
-    func clearWindowMappingState(for pid: pid_t) {
+    func removeWindowMappingState(forTerminatedPID pid: pid_t) {
         windowMappingStateByPID.removeValue(forKey: pid)
     }
 
