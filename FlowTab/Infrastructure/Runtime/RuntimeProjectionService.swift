@@ -47,6 +47,7 @@ protocol RuntimeProjectionRepairProviding: AnyObject {
     func fullRepairProjectionPayload() -> RuntimeFullRepairProjectionPayload
     func recordSpaceTopologyChanged(now: TimeInterval) -> Set<CGWindowID>
     func signalAXWindowDestroyed(
+        appID: String,
         processIdentifier pid: pid_t,
         axWindowID: String,
         now: TimeInterval
@@ -70,15 +71,24 @@ final class RuntimeProjectionRepairProvider: RuntimeProjectionRepairProviding {
     }
 
     func signalAXWindowDestroyed(
+        appID: String,
         processIdentifier pid: pid_t,
         axWindowID: String,
         now: TimeInterval
     ) -> CGWindowID? {
-        snapshotProvider.signalAXWindowDestroyed(
+        let affectedCGWindowID = snapshotProvider.signalAXWindowDestroyed(
             processIdentifier: pid,
             axWindowID: axWindowID,
             now: now
         )
+        reconciliationCoordinator.markAppDirty(
+            appID: appID,
+            pid: pid,
+            reason: .axNotification,
+            affectedCGWindowIDs: affectedCGWindowID.map { Set([$0]) } ?? [],
+            now: now
+        )
+        return affectedCGWindowID
     }
 
     func recordAppTerminated(processIdentifier pid: pid_t) {
@@ -331,6 +341,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         maintenanceQueue.async { [self] in
             let now = Date.timeIntervalSinceReferenceDate
             let affectedCGWindowID = repairProvider.signalAXWindowDestroyed(
+                appID: appID,
                 processIdentifier: pid,
                 axWindowID: axWindowID,
                 now: now
@@ -343,13 +354,6 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             RuntimeLog.debug(
                 .projection,
                 "runtimeAXDestroyed appID=\(appID) pid=\(pid) axWindowID=\(axWindowID) affectedCGWindowID=\(affectedCGWindowID.map(String.init) ?? "none")"
-            )
-            repairProvider.reconciliationCoordinator.markAppDirty(
-                appID: appID,
-                pid: pid,
-                reason: .axNotification,
-                affectedCGWindowIDs: affectedCGWindowID.map { Set([$0]) } ?? [],
-                now: now
             )
             drainReadyReconciliationRequestsLocked(now: now)
         }
