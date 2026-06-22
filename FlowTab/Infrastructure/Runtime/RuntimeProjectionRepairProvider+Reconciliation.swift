@@ -33,18 +33,29 @@ extension RuntimeProjectionRepairProvider {
         snapshotProvider.reconciliationCoordinator.promotePendingRequests(reason: reason, now: now)
     }
 
-    func markAppDirty(
-        appID: String,
-        pid: pid_t,
-        reason: RuntimeReconciliationReason,
-        affectedCGWindowIDs: Set<CGWindowID>,
-        now: TimeInterval
-    ) {
+    func recordAppLaunched(appID: String, pid: pid_t, now: TimeInterval) {
         snapshotProvider.reconciliationCoordinator.markAppDirty(
             appID: appID,
             pid: pid,
-            reason: reason,
-            affectedCGWindowIDs: affectedCGWindowIDs,
+            reason: .appLaunched,
+            now: now
+        )
+    }
+
+    func recordAppWindowsChanged(appID: String, pid: pid_t, now: TimeInterval) {
+        snapshotProvider.reconciliationCoordinator.markAppDirty(
+            appID: appID,
+            pid: pid,
+            reason: .axNotification,
+            now: now
+        )
+    }
+
+    func recordSelectedCurrentAppWindowsChanged(appID: String, pid: pid_t, now: TimeInterval) {
+        snapshotProvider.reconciliationCoordinator.markAppDirty(
+            appID: appID,
+            pid: pid,
+            reason: .selectedCurrentAppWindows,
             now: now
         )
     }

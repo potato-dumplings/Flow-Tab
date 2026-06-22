@@ -55,19 +55,15 @@ protocol RuntimeProjectionRepairProviding: AnyObject {
         _ verification: RuntimeWindowFocusVerification,
         now: TimeInterval
     ) -> Set<CGWindowID>
+    func recordAppLaunched(appID: String, pid: pid_t, now: TimeInterval)
+    func recordAppWindowsChanged(appID: String, pid: pid_t, now: TimeInterval)
+    func recordSelectedCurrentAppWindowsChanged(appID: String, pid: pid_t, now: TimeInterval)
     func hasPendingReconciliationRequests() -> Bool
     func scheduleFullRepairFallback(now: TimeInterval)
     func promotePendingReconciliationRequests(
         reason: RuntimeReconciliationReason,
         now: TimeInterval
     ) -> [RuntimeReconciliationRequest]
-    func markAppDirty(
-        appID: String,
-        pid: pid_t,
-        reason: RuntimeReconciliationReason,
-        affectedCGWindowIDs: Set<CGWindowID>,
-        now: TimeInterval
-    )
     func readyReconciliationRequests(
         now: TimeInterval,
         includeFullRepair: Bool
@@ -311,13 +307,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 appDirectoryEntry: appDirectoryEntry,
                 generatedAt: now
             )
-            repairProvider.markAppDirty(
-                appID: appID,
-                pid: pid,
-                reason: .appLaunched,
-                affectedCGWindowIDs: [],
-                now: now
-            )
+            repairProvider.recordAppLaunched(appID: appID, pid: pid, now: now)
             RuntimeLog.debug(.projection, "runtimeLifecycle appLaunched appID=\(appID) pid=\(pid)")
             drainReadyReconciliationRequestsLocked(now: now)
         }
@@ -331,13 +321,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 pid: pid,
                 pendingScope: "appWindows:\(appID)"
             )
-            repairProvider.markAppDirty(
-                appID: appID,
-                pid: pid,
-                reason: .axNotification,
-                affectedCGWindowIDs: [],
-                now: now
-            )
+            repairProvider.recordAppWindowsChanged(appID: appID, pid: pid, now: now)
             drainReadyReconciliationRequestsLocked(now: now)
         }
     }
@@ -350,13 +334,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 pid: pid,
                 pendingScope: "selectedCurrentAppWindows:\(appID)"
             )
-            repairProvider.markAppDirty(
-                appID: appID,
-                pid: pid,
-                reason: .selectedCurrentAppWindows,
-                affectedCGWindowIDs: [],
-                now: now
-            )
+            repairProvider.recordSelectedCurrentAppWindowsChanged(appID: appID, pid: pid, now: now)
             drainReadyReconciliationRequestsLocked(now: now)
         }
     }
