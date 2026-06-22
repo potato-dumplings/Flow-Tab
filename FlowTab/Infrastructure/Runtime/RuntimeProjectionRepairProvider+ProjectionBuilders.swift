@@ -9,22 +9,18 @@ extension RuntimeProjectionRepairProvider {
 
     private func fullRepairProjectionPayload(timingEvent: String) -> RuntimeFullRepairProjectionPayload {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
-        if let uiTestRuntimeDataset = FlowTabUITestRuntimeProjectionDataset.current() {
+        if let uiTestProjectionFacts = repairFactSource.collectUITestProjectionDatasetFacts() {
             let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
             RuntimeProjectionDiagnostics.logTiming(
                 timingEvent,
                 fields: [
                     ("result", "uiTestDataset"),
-                    ("apps", "\(uiTestRuntimeDataset.appSwitcherApps.count)"),
-                    ("windows", "\(uiTestRuntimeDataset.appSwitcherApps.reduce(0) { $0 + $1.windows.count })"),
+                    ("apps", "\(uiTestProjectionFacts.appCount)"),
+                    ("windows", "\(uiTestProjectionFacts.windowCount)"),
                     ("totalMs", RuntimeProjectionDiagnostics.formatMilliseconds(completeMs - startMs))
                 ]
             )
-            return RuntimeFullRepairProjectionPayload(
-                apps: uiTestRuntimeDataset.appSwitcherApps,
-                contextsByID: uiTestRuntimeDataset.appSwitcherContextsByID,
-                appDirectoryEntries: uiTestRuntimeDataset.appDirectoryEntries
-            )
+            return uiTestProjectionFacts.fullRepairProjectionPayload
         }
         let runningAppsStartMs = RuntimePerformanceClock.monotonicMilliseconds()
         let runningAppFacts = repairFactSource.collectFullRepairRunningAppFacts()
@@ -151,8 +147,8 @@ extension RuntimeProjectionRepairProvider {
     }
 
     func currentAppWindowPayload(for appID: String) -> RuntimeCurrentAppWindowPayload? {
-        if let uiTestRuntimeDataset = FlowTabUITestRuntimeProjectionDataset.current() {
-            return uiTestRuntimeDataset.currentAppWindowPayloadsByAppID[appID]
+        if let uiTestProjectionFacts = repairFactSource.collectUITestProjectionDatasetFacts() {
+            return uiTestProjectionFacts.currentAppWindowPayload(for: appID)
         }
         let runningApps = repairFactSource.collectRepairRunningApps().runningApps
         let matchingApps = runningApps.filter { RuntimeAppIdentity.appID(for: $0) == appID }
@@ -188,10 +184,8 @@ extension RuntimeProjectionRepairProvider {
 
     func focusedCurrentAppWindowPayload(processIdentifier pid: pid_t) -> RuntimeCurrentAppWindowPayload? {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
-        if let uiTestRuntimeDataset = FlowTabUITestRuntimeProjectionDataset.current() {
-            let payload = uiTestRuntimeDataset.currentAppWindowPayloadsByAppID.values.first {
-                $0.summary.pid == pid
-            }
+        if let uiTestProjectionFacts = repairFactSource.collectUITestProjectionDatasetFacts() {
+            let payload = uiTestProjectionFacts.focusedCurrentAppWindowPayload(processIdentifier: pid)
             RuntimeProjectionDiagnostics.logTiming(
                 "focusedCurrentAppWindowPayload",
                 fields: [

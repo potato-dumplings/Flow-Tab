@@ -51,8 +51,43 @@ struct RuntimeRepairAppLayerPolicyFacts {
     let hideMinimizedAppsFromAppLayer: Bool
 }
 
+struct RuntimeUITestProjectionDatasetFacts {
+    let fullRepairProjectionPayload: RuntimeFullRepairProjectionPayload
+    let currentAppWindowPayloadsByAppID: [String: RuntimeCurrentAppWindowPayload]
+
+    var appCount: Int {
+        fullRepairProjectionPayload.apps.count
+    }
+
+    var windowCount: Int {
+        fullRepairProjectionPayload.apps.reduce(0) { $0 + $1.windows.count }
+    }
+
+    func currentAppWindowPayload(for appID: String) -> RuntimeCurrentAppWindowPayload? {
+        currentAppWindowPayloadsByAppID[appID]
+    }
+
+    func focusedCurrentAppWindowPayload(processIdentifier pid: pid_t) -> RuntimeCurrentAppWindowPayload? {
+        currentAppWindowPayloadsByAppID.values.first {
+            $0.summary.pid == pid
+        }
+    }
+}
+
 struct RuntimeProjectionRepairFactSource {
     let snapshotProvider: RuntimeSnapshotProvider
+
+    func collectUITestProjectionDatasetFacts() -> RuntimeUITestProjectionDatasetFacts? {
+        guard let dataset = FlowTabUITestRuntimeProjectionDataset.current() else { return nil }
+        return RuntimeUITestProjectionDatasetFacts(
+            fullRepairProjectionPayload: RuntimeFullRepairProjectionPayload(
+                apps: dataset.appSwitcherApps,
+                contextsByID: dataset.appSwitcherContextsByID,
+                appDirectoryEntries: dataset.appDirectoryEntries
+            ),
+            currentAppWindowPayloadsByAppID: dataset.currentAppWindowPayloadsByAppID
+        )
+    }
 
     func collectRepairRunningApps() -> RuntimeRepairRunningApps {
         let runningApps = RuntimeAppDirectoryFactSource.currentAppLayerRunningApplications(
