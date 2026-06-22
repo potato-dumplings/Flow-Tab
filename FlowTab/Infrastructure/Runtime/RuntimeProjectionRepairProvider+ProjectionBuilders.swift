@@ -77,7 +77,7 @@ extension RuntimeProjectionRepairProvider {
             )
         })
         let hideMinimizedAppsFromAppLayer =
-            SwitcherBehaviorPreferencesStore.loadHideMinimizedAppsFromAppLayer()
+            repairFactSource.collectRepairAppLayerPolicyFacts().hideMinimizedAppsFromAppLayer
         let appLayerWindowStatsByPID = RuntimeAppDirectory.windowStats(
             for: selectedApps,
             windowsByPID: mergedWindowsByPrimaryPID,
@@ -210,7 +210,7 @@ extension RuntimeProjectionRepairProvider {
             rankByPID: windowFacts.rankByPID
         )
         let hideMinimizedAppsFromAppLayer =
-            SwitcherBehaviorPreferencesStore.loadHideMinimizedAppsFromAppLayer()
+            repairFactSource.collectRepairAppLayerPolicyFacts().hideMinimizedAppsFromAppLayer
         if !RuntimeAppLayerProjectionFilter.shouldIncludeAppInAppLayer(
             hasWindows: !windows.isEmpty,
             hasVisibleWindow: windows.contains { !$0.isMinimized },
@@ -293,7 +293,7 @@ extension RuntimeProjectionRepairProvider {
         )
         let rowsReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let hideMinimizedAppsFromAppLayer =
-            SwitcherBehaviorPreferencesStore.loadHideMinimizedAppsFromAppLayer()
+            repairFactSource.collectRepairAppLayerPolicyFacts().hideMinimizedAppsFromAppLayer
         if !RuntimeAppLayerProjectionFilter.shouldIncludeAppInAppLayer(
             hasWindows: !windows.isEmpty,
             hasVisibleWindow: windows.contains { !$0.isMinimized },

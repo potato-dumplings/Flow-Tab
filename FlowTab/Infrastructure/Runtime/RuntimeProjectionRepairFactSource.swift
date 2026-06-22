@@ -33,6 +33,10 @@ struct RuntimeFocusedCurrentAppWindowFacts {
     let timings: RuntimeFocusedCurrentAppWindowFactTimings
 }
 
+struct RuntimeRepairAppLayerPolicyFacts {
+    let hideMinimizedAppsFromAppLayer: Bool
+}
+
 struct RuntimeProjectionRepairFactSource {
     let snapshotProvider: RuntimeSnapshotProvider
 
@@ -48,6 +52,12 @@ struct RuntimeProjectionRepairFactSource {
         return RuntimeFullRepairRunningAppFacts(
             runningApps: runningApps,
             appDirectoryEntries: RuntimeAppDirectoryFactSource.entries(from: runningApps)
+        )
+    }
+
+    func collectRepairAppLayerPolicyFacts() -> RuntimeRepairAppLayerPolicyFacts {
+        RuntimeRepairAppLayerPolicyFacts(
+            hideMinimizedAppsFromAppLayer: SwitcherBehaviorPreferencesStore.loadHideMinimizedAppsFromAppLayer()
         )
     }
 
