@@ -34,52 +34,17 @@ protocol RuntimeProjectionServing: Sendable {
 }
 
 final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Sendable {
-    enum ReconciliationExecutionOutcome {
-        case completed
-        case completedWithFullRepairProjection(RuntimeFullRepairProjectionPayload)
-        case completedWithRepairedCurrentAppWindowPayloads([RuntimeCurrentAppWindowPayload])
-        case transientEmptyCurrentAppWindowPayload
-
-        var repairedCurrentAppWindowPayloads: [RuntimeCurrentAppWindowPayload] {
-            switch self {
-            case .completed, .completedWithFullRepairProjection:
-                []
-            case let .completedWithRepairedCurrentAppWindowPayloads(payloads):
-                payloads
-            case .transientEmptyCurrentAppWindowPayload:
-                []
-            }
-        }
-    }
-
-    private struct ReconciliationDrainResult {
-        var startedRequests: [RuntimeReconciliationRequest] = []
-        var completedCount = 0
-        var deferredCount = 0
-        var fullRepairProjectionPayloads: [RuntimeFullRepairProjectionPayload] = []
-        var repairedCurrentAppWindowPayloads: [RuntimeCurrentAppWindowPayload] = []
-    }
-
-    private struct FullRepairProjectionCommitSummary {
-        var coldStartCommittedCount = 0
-        var degradedCommittedCount = 0
-    }
-
-    typealias ReconciliationExecutor = (
-        RuntimeReconciliationRequest,
-        RuntimeProjectionRepairProviding
-    ) -> ReconciliationExecutionOutcome
-
     private let maintenanceQueue: DispatchQueue
     private let repairProvider: RuntimeProjectionRepairProviding
     private let readModelStore: RuntimeReadModelStore
-    private let reconciliationExecutor: ReconciliationExecutor
+    private let reconciliationExecutor: RuntimeProjectionReconciliationExecutor
 
     init(
         label: String = "FlowTab.RuntimeProjectionService",
         repairProvider: RuntimeProjectionRepairProviding = RuntimeProjectionRepairProvider(),
         readModelStore: RuntimeReadModelStore = RuntimeReadModelStore(),
-        reconciliationExecutor: @escaping ReconciliationExecutor = RuntimeProjectionService.defaultReconciliationExecutor
+        reconciliationExecutor: @escaping RuntimeProjectionReconciliationExecutor =
+            runtimeProjectionDefaultReconciliationExecutor
     ) {
         maintenanceQueue = DispatchQueue(label: label, qos: .utility)
         self.repairProvider = repairProvider
@@ -328,8 +293,8 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     @discardableResult
     private func commitFullRepairProjectionPayloadsLocked(
         _ payloads: [RuntimeFullRepairProjectionPayload]
-    ) -> FullRepairProjectionCommitSummary {
-        var summary = FullRepairProjectionCommitSummary()
+    ) -> RuntimeFullRepairProjectionCommitSummary {
+        var summary = RuntimeFullRepairProjectionCommitSummary()
         for payload in payloads {
             let diagnostics = readModelStore.diagnostics()
             let clearsDirtyState = !diagnostics.hasAppSwitcherProjection
@@ -361,13 +326,13 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         now: TimeInterval,
         maxRequests: Int? = nil,
         includeFullRepair: Bool = true
-    ) -> ReconciliationDrainResult {
+    ) -> RuntimeProjectionReconciliationDrainResult {
         let readyRequests = repairProvider.readyReconciliationRequests(
             now: now,
             includeFullRepair: includeFullRepair
         )
         let requests = maxRequests.map { Array(readyRequests.prefix($0)) } ?? readyRequests
-        var result = ReconciliationDrainResult()
+        var result = RuntimeProjectionReconciliationDrainResult()
         result.startedRequests.reserveCapacity(requests.count)
 
         for request in requests {
@@ -397,44 +362,4 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         return result
     }
 
-    private static func defaultReconciliationExecutor(
-        request: RuntimeReconciliationRequest,
-        repairProvider: RuntimeProjectionRepairProviding
-    ) -> ReconciliationExecutionOutcome {
-        switch request.target {
-        case let .app(pid):
-            let result = repairProvider.reconcileAppWindows(
-                processIdentifier: pid,
-                affectedCGWindowIDs: request.affectedCGWindowIDs
-            )
-            if result.isTransientEmptyCurrentAppWindowPayload {
-                return .transientEmptyCurrentAppWindowPayload
-            }
-            if let payload = result.currentAppWindowPayload {
-                return .completedWithRepairedCurrentAppWindowPayloads([payload])
-            }
-            return .completed
-        case .fullRepair:
-            return .completedWithFullRepairProjection(repairProvider.fullRepairProjectionPayload())
-        case .spaceTopology:
-            let results = repairProvider.reconcileSpaceTopology(
-                affectedCGWindowIDs: request.affectedCGWindowIDs
-            )
-            var repairedCurrentAppWindowPayloads: [RuntimeCurrentAppWindowPayload] = []
-            for result in results {
-                if result.isTransientEmptyCurrentAppWindowPayload {
-                    return .transientEmptyCurrentAppWindowPayload
-                }
-                if let payload = result.currentAppWindowPayload {
-                    repairedCurrentAppWindowPayloads.append(payload)
-                }
-            }
-            if !repairedCurrentAppWindowPayloads.isEmpty {
-                return .completedWithRepairedCurrentAppWindowPayloads(
-                    repairedCurrentAppWindowPayloads
-                )
-            }
-            return .completed
-        }
-    }
 }

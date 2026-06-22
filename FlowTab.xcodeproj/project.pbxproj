@@ -54,6 +54,7 @@
 		F6E7D00C35C1000100B0D737 /* RuntimeAppRankProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7D00B35C1000100B0D737 /* RuntimeAppRankProvider.swift */; };
 		F6E7B00C35AC000100B0D737 /* RuntimeProjectionRepairProvider+Reconciliation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7B00B35AC000100B0D737 /* RuntimeProjectionRepairProvider+Reconciliation.swift */; };
 		F6E7D00235C1000100B0D737 /* RuntimeProjectionDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7D00135C1000100B0D737 /* RuntimeProjectionDiagnostics.swift */; };
+		F6E7E10235C3000100B0D737 /* RuntimeProjectionMaintenance.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7E10135C3000100B0D737 /* RuntimeProjectionMaintenance.swift */; };
 		D10000012FF500100B0D737 /* RuntimeProjectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000022FF500100B0D737 /* RuntimeProjectionService.swift */; };
 		B26010012FE000100B0D737 /* RuntimePerformanceClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26000012FE000100B0D737 /* RuntimePerformanceClock.swift */; };
 		B26010022FE000100B0D737 /* RuntimeSnapshotProvider+Diagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26000022FE000100B0D737 /* RuntimeSnapshotProvider+Diagnostics.swift */; };
@@ -280,6 +281,7 @@
 		A1B2C4332F73000100B0D737 /* RuntimeProjectionRepairProvider+ProjectionBuilders.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RuntimeProjectionRepairProvider+ProjectionBuilders.swift"; sourceTree = "<group>"; };
 		F6E7B00B35AC000100B0D737 /* RuntimeProjectionRepairProvider+Reconciliation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RuntimeProjectionRepairProvider+Reconciliation.swift"; sourceTree = "<group>"; };
 		F6E7D00135C1000100B0D737 /* RuntimeProjectionDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionDiagnostics.swift; sourceTree = "<group>"; };
+		F6E7E10135C3000100B0D737 /* RuntimeProjectionMaintenance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionMaintenance.swift; sourceTree = "<group>"; };
 		D10000022FF500100B0D737 /* RuntimeProjectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionService.swift; sourceTree = "<group>"; };
 		B26000012FE000100B0D737 /* RuntimePerformanceClock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimePerformanceClock.swift; sourceTree = "<group>"; };
 		B26000022FE000100B0D737 /* RuntimeSnapshotProvider+Diagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RuntimeSnapshotProvider+Diagnostics.swift"; sourceTree = "<group>"; };
@@ -686,6 +688,7 @@
 				A1B2C4332F73000100B0D737 /* RuntimeProjectionRepairProvider+ProjectionBuilders.swift */,
 				F6E7B00B35AC000100B0D737 /* RuntimeProjectionRepairProvider+Reconciliation.swift */,
 				F6E7D00135C1000100B0D737 /* RuntimeProjectionDiagnostics.swift */,
+				F6E7E10135C3000100B0D737 /* RuntimeProjectionMaintenance.swift */,
 				D10000022FF500100B0D737 /* RuntimeProjectionService.swift */,
 				B26000022FE000100B0D737 /* RuntimeSnapshotProvider+Diagnostics.swift */,
 				F2B3C4D52F8C000100B0D737 /* RuntimeSnapshotProvider+CGWindowSupplement.swift */,
@@ -1094,6 +1097,7 @@
 				F6E7D00C35C1000100B0D737 /* RuntimeAppRankProvider.swift in Sources */,
 				F6E7B00C35AC000100B0D737 /* RuntimeProjectionRepairProvider+Reconciliation.swift in Sources */,
 				F6E7D00235C1000100B0D737 /* RuntimeProjectionDiagnostics.swift in Sources */,
+				F6E7E10235C3000100B0D737 /* RuntimeProjectionMaintenance.swift in Sources */,
 				D10000012FF500100B0D737 /* RuntimeProjectionService.swift in Sources */,
 				B26010022FE000100B0D737 /* RuntimeSnapshotProvider+Diagnostics.swift in Sources */,
 				F6E7B00635AC000100B0D737 /* RuntimeReconciliationCoordinator.swift in Sources */,

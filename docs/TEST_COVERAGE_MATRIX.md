@@ -1,6 +1,6 @@
 # Test Coverage Matrix
 
-Updated: 2026-06-21
+Updated: 2026-06-22
 
 ## Purpose
 
@@ -242,6 +242,7 @@ No high-value cross-layer gaps are currently tracked here.
 - 2026-06-18 Phase 5: Switcher hidden-app filtering now logs as a projection payload diagnostic instead of using the snapshot category; Search stale committed reads remain degraded/stale committed results until a freshness barrier commits a new generation.
 - 2026-06-17 Phase 5: `RuntimeLogCategory.projection` is now a first-class verbose runtime log category. Switcher projection diagnostics use the typed category, and `RuntimeProjectionService` maintenance/lifecycle/destroyed-window diagnostics moved from `.snapshot` to `.projection`; provider snapshot diagnostics remain legitimate snapshot-category logs for lower-level fact collection.
 - 2026-06-22 Phase 5: `RuntimeProjectionRepairProviding` protocol ownership moved out of `RuntimeProjectionService.swift` into `RuntimeProjectionRepairProvider.swift`, colocating the repair-provider API with the concrete facade. Required coverage: `testRuntimeProjectionRepairProviderUsesProjectionPayloadForUITestMockDatasetWhenLaunchFlagEnabled` and `testRuntimeProjectionServiceOwnsReadModelStoreForProjectionReadsAndDirtySignals` run through `run-flowtabtests-local.sh`, proving provider API/class target membership and default service wiring still compile and behave. Optional/not adding: no new UI/E2E or pressure proof in this loop because this is a file-boundary ownership cleanup. Search remains degraded/stale committed until a bounded freshness barrier successfully commits a new generation; barrier-requested or repair-in-progress behavior must not be called fresh, complete, latest, or current-generation committed.
+- 2026-06-22 Phase 5: projection reconciliation maintenance execution types moved out of `RuntimeProjectionService.swift` into `RuntimeProjectionMaintenance.swift`, so service consumes a maintenance execution boundary instead of owning outcome/drain/executor type definitions. Required coverage: `testRuntimeProjectionServiceOwnsReadModelStoreForProjectionReadsAndDirtySignals` and `testRuntimeProjectionServiceSearchFreshnessBarrierPromotesAndBoundsReadyRepairs` passed through `run-flowtabtests-local.sh`, proving app-target membership, store ownership, and bounded Search barrier drain behavior still compile and behave. Optional/not adding: no new UI/E2E or pressure proof because this is a mechanical maintenance-boundary extraction with no changed surface behavior or hot-path cost; committed/staging Search UI proof and broader topology proof remain gaps.
 
 ## Maintenance Rules
 
