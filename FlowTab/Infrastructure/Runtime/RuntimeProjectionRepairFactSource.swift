@@ -11,6 +11,19 @@ struct RuntimeCurrentAppWindowFacts {
     let rankByPID: [pid_t: Int]
 }
 
+struct RuntimeFocusedCurrentAppWindowFactTimings {
+    let cleanupMs: Double
+    let onScreenCGMs: Double
+    let allCGMs: Double
+    let axMs: Double
+}
+
+struct RuntimeFocusedCurrentAppWindowFacts {
+    let windowsByPID: [pid_t: [RuntimeWindowListEntry]]
+    let rankByPID: [pid_t: Int]
+    let timings: RuntimeFocusedCurrentAppWindowFactTimings
+}
+
 struct RuntimeProjectionRepairFactSource {
     let snapshotProvider: RuntimeSnapshotProvider
 
@@ -75,6 +88,39 @@ struct RuntimeProjectionRepairFactSource {
         return RuntimeCurrentAppWindowFacts(
             windowsByPID: windowsByPID,
             rankByPID: rankByPID
+        )
+    }
+
+    func collectFocusedCurrentAppWindowFacts(
+        for app: NSRunningApplication,
+        in runningApps: [NSRunningApplication],
+        processIdentifier pid: pid_t
+    ) -> RuntimeFocusedCurrentAppWindowFacts {
+        let startMs = RuntimePerformanceClock.monotonicMilliseconds()
+        snapshotProvider.cleanupWindowMappingState(for: runningApps)
+        AXLiveWindowRegistry.shared.prune(to: runningApps)
+        let cleanupReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let cgWindowsByPID = snapshotProvider.collectCGWindowsWithSpaceTopologyDiff().windowsByPID
+        let onScreenCGReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let allCGWindowsByPID = snapshotProvider.collectCGWindowsWithSpaceTopologyDiff(
+            options: [.optionAll, .excludeDesktopElements]
+        ).windowsByPID
+        let allCGReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let windowsByPID = snapshotProvider.collectAXWindowData(
+            for: [app],
+            cgWindowsByPID: cgWindowsByPID,
+            allCGWindowsByPID: allCGWindowsByPID
+        )
+        let axReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+        return RuntimeFocusedCurrentAppWindowFacts(
+            windowsByPID: windowsByPID,
+            rankByPID: [pid: 0],
+            timings: RuntimeFocusedCurrentAppWindowFactTimings(
+                cleanupMs: cleanupReadyMs - startMs,
+                onScreenCGMs: onScreenCGReadyMs - cleanupReadyMs,
+                allCGMs: allCGReadyMs - onScreenCGReadyMs,
+                axMs: axReadyMs - allCGReadyMs
+            )
         )
     }
 }

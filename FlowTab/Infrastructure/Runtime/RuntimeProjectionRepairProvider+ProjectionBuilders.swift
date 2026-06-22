@@ -278,34 +278,24 @@ extension RuntimeProjectionRepairProvider {
             return nil
         }
 
-        snapshotProvider.cleanupWindowMappingState(for: runningApps)
-        AXLiveWindowRegistry.shared.prune(to: runningApps)
-        let cleanupReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let cgWindowsByPID = snapshotProvider.collectCGWindowsWithSpaceTopologyDiff().windowsByPID
-        let onScreenCGReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let allCGWindowsByPID = snapshotProvider.collectCGWindowsWithSpaceTopologyDiff(
-            options: [.optionAll, .excludeDesktopElements]
-        ).windowsByPID
-        let allCGReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let focusedApps = [app]
-        let windowsByPID = snapshotProvider.collectAXWindowData(
-            for: focusedApps,
-            cgWindowsByPID: cgWindowsByPID,
-            allCGWindowsByPID: allCGWindowsByPID
+        let windowFacts = repairFactSource.collectFocusedCurrentAppWindowFacts(
+            for: app,
+            in: runningApps,
+            processIdentifier: pid
         )
-        let axReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let rankByPID = [pid: 0]
+        let rowsStartMs = RuntimePerformanceClock.monotonicMilliseconds()
         let appID = RuntimeAppIdentity.appID(for: app)
         let windowStatsByPID = RuntimeAppDirectory.windowStats(
             for: focusedApps,
-            windowsByPID: windowsByPID,
+            windowsByPID: windowFacts.windowsByPID,
             isVisibleWindow: { !$0.isMinimized }
         )
         let windows = RuntimeAppDirectory(apps: focusedApps).mergedWindows(
             for: focusedApps,
-            windowsByPID: windowsByPID,
+            windowsByPID: windowFacts.windowsByPID,
             windowStatsByPID: windowStatsByPID,
-            rankByPID: rankByPID
+            rankByPID: windowFacts.rankByPID
         )
         let rowsReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let hideMinimizedAppsFromAppLayer =
@@ -326,11 +316,11 @@ extension RuntimeProjectionRepairProvider {
                     ("knownApps", "\(runningApps.count)"),
                     ("axApps", "\(focusedApps.count)"),
                     ("runningAppsMs", RuntimeProjectionDiagnostics.formatMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
-                    ("cleanupMs", RuntimeProjectionDiagnostics.formatMilliseconds(cleanupReadyMs - runningAppsReadyMs)),
-                    ("onscreenCGMs", RuntimeProjectionDiagnostics.formatMilliseconds(onScreenCGReadyMs - cleanupReadyMs)),
-                    ("allCGMs", RuntimeProjectionDiagnostics.formatMilliseconds(allCGReadyMs - onScreenCGReadyMs)),
-                    ("axMs", RuntimeProjectionDiagnostics.formatMilliseconds(axReadyMs - allCGReadyMs)),
-                    ("rowsMs", RuntimeProjectionDiagnostics.formatMilliseconds(rowsReadyMs - axReadyMs)),
+                    ("cleanupMs", RuntimeProjectionDiagnostics.formatMilliseconds(windowFacts.timings.cleanupMs)),
+                    ("onscreenCGMs", RuntimeProjectionDiagnostics.formatMilliseconds(windowFacts.timings.onScreenCGMs)),
+                    ("allCGMs", RuntimeProjectionDiagnostics.formatMilliseconds(windowFacts.timings.allCGMs)),
+                    ("axMs", RuntimeProjectionDiagnostics.formatMilliseconds(windowFacts.timings.axMs)),
+                    ("rowsMs", RuntimeProjectionDiagnostics.formatMilliseconds(rowsReadyMs - rowsStartMs)),
                     ("totalMs", RuntimeProjectionDiagnostics.formatMilliseconds(completeMs - startMs))
                 ]
             )
@@ -343,7 +333,7 @@ extension RuntimeProjectionRepairProvider {
                 appID: appID,
                 app: app,
                 appGroup: focusedApps,
-                rankByPID: rankByPID,
+                rankByPID: windowFacts.rankByPID,
                 rankFallback: 0,
                 generatedAt: now,
                 windowSeeds: windows.enumerated().map { entryIndex, entry in
@@ -362,11 +352,11 @@ extension RuntimeProjectionRepairProvider {
                 ("knownApps", "\(runningApps.count)"),
                 ("axApps", "\(focusedApps.count)"),
                 ("runningAppsMs", RuntimeProjectionDiagnostics.formatMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
-                ("cleanupMs", RuntimeProjectionDiagnostics.formatMilliseconds(cleanupReadyMs - runningAppsReadyMs)),
-                ("onscreenCGMs", RuntimeProjectionDiagnostics.formatMilliseconds(onScreenCGReadyMs - cleanupReadyMs)),
-                ("allCGMs", RuntimeProjectionDiagnostics.formatMilliseconds(allCGReadyMs - onScreenCGReadyMs)),
-                ("axMs", RuntimeProjectionDiagnostics.formatMilliseconds(axReadyMs - allCGReadyMs)),
-                ("rowsMs", RuntimeProjectionDiagnostics.formatMilliseconds(rowsReadyMs - axReadyMs)),
+                ("cleanupMs", RuntimeProjectionDiagnostics.formatMilliseconds(windowFacts.timings.cleanupMs)),
+                ("onscreenCGMs", RuntimeProjectionDiagnostics.formatMilliseconds(windowFacts.timings.onScreenCGMs)),
+                ("allCGMs", RuntimeProjectionDiagnostics.formatMilliseconds(windowFacts.timings.allCGMs)),
+                ("axMs", RuntimeProjectionDiagnostics.formatMilliseconds(windowFacts.timings.axMs)),
+                ("rowsMs", RuntimeProjectionDiagnostics.formatMilliseconds(rowsReadyMs - rowsStartMs)),
                 ("totalMs", RuntimeProjectionDiagnostics.formatMilliseconds(completeMs - startMs))
             ]
         )
