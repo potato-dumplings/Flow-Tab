@@ -73,14 +73,6 @@ protocol RuntimeProjectionRepairProviding: AnyObject {
     )
 }
 
-final class RuntimeProjectionRepairProvider: RuntimeProjectionRepairProviding {
-    let snapshotProvider: RuntimeSnapshotProvider
-
-    init(snapshotProvider: RuntimeSnapshotProvider = RuntimeSnapshotProvider()) {
-        self.snapshotProvider = snapshotProvider
-    }
-}
-
 final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Sendable {
     enum ReconciliationExecutionOutcome {
         case completed
