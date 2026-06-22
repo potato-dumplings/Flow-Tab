@@ -48,7 +48,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(appProjection.freshness.isCompleteForScope)
         XCTAssertEqual(appProjection.freshness.sourceGeneration.projection, 1)
         let searchRead = store.readCommittedSearchIndexForSearch()
-        XCTAssertEqual(searchRead.readiness, .currentGenerationCommitted)
+        XCTAssertEqual(searchRead.readiness, .verifiedCurrentGenerationCommitted)
         let searchProjection = try XCTUnwrap(searchRead.projection)
         XCTAssertEqual(searchProjection.appEntries.map(\.appID), apps.map(\.id))
         XCTAssertEqual(
@@ -159,7 +159,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(appSwitcherProjection.freshness.isCompleteForScope)
         XCTAssertEqual(appSwitcherProjection.apps.map(\.id), apps.map(\.id))
         let searchRead = store.readCommittedSearchIndexForSearch()
-        XCTAssertEqual(searchRead.readiness, .currentGenerationCommitted)
+        XCTAssertEqual(searchRead.readiness, .verifiedCurrentGenerationCommitted)
         XCTAssertEqual(searchRead.resultState, .verifiedCurrentGenerationCommittedResult)
         XCTAssertTrue(searchRead.committedIndexCoversCurrentGeneration)
         let searchProjection = try XCTUnwrap(searchRead.projection)
@@ -274,7 +274,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(appProjection.freshness.sourceGeneration.projection, 2)
 
         let searchRead = store.readCommittedSearchIndexForSearch()
-        XCTAssertEqual(searchRead.readiness, .currentGenerationCommitted)
+        XCTAssertEqual(searchRead.readiness, .verifiedCurrentGenerationCommitted)
         XCTAssertFalse(searchRead.projection?.appEntries.contains { $0.appID == terminatedApp.id } ?? true)
         XCTAssertFalse(searchRead.projection?.windowEntries.contains { $0.appID == terminatedApp.id } ?? true)
         XCTAssertEqual(
@@ -680,7 +680,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(committed.freshness.generatedAt, 21)
         XCTAssertTrue(committed.freshness.isCompleteForScope)
         read = store.readCommittedSearchIndexForSearch()
-        XCTAssertEqual(read.readiness, .currentGenerationCommitted)
+        XCTAssertEqual(read.readiness, .verifiedCurrentGenerationCommitted)
         XCTAssertEqual(read.resultState, .verifiedCurrentGenerationCommittedResult)
         XCTAssertTrue(read.committedIndexCoversCurrentGeneration)
         XCTAssertEqual(
@@ -719,7 +719,7 @@ extension FlowTabPriorityCoverageTests {
         )
 
         var read = store.readCommittedSearchIndexForSearch()
-        XCTAssertEqual(read.readiness, .currentGenerationCommitted)
+        XCTAssertEqual(read.readiness, .verifiedCurrentGenerationCommitted)
         XCTAssertEqual(read.resultState, .verifiedCurrentGenerationCommittedResult)
         XCTAssertTrue(read.committedIndexCoversCurrentGeneration)
         XCTAssertEqual(read.projection?.appEntries.map(\.appID), committedApps.map(\.id))
@@ -792,7 +792,7 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(committed.freshness.isCompleteForScope)
         read = store.readCommittedSearchIndexForSearch()
-        XCTAssertEqual(read.readiness, .currentGenerationCommitted)
+        XCTAssertEqual(read.readiness, .verifiedCurrentGenerationCommitted)
         XCTAssertEqual(read.resultState, .verifiedCurrentGenerationCommittedResult)
         XCTAssertTrue(read.committedIndexCoversCurrentGeneration)
         XCTAssertEqual(
@@ -2113,7 +2113,7 @@ extension FlowTabPriorityCoverageTests {
 
         let read = store.readCommittedSearchIndexForSearch()
         let projection = try XCTUnwrap(read.projection)
-        XCTAssertEqual(read.readiness, .currentGenerationCommitted)
+        XCTAssertEqual(read.readiness, .verifiedCurrentGenerationCommitted)
         XCTAssertEqual(read.resultState, .verifiedCurrentGenerationCommittedResult)
         XCTAssertTrue(read.committedIndexCoversCurrentGeneration)
         XCTAssertEqual(

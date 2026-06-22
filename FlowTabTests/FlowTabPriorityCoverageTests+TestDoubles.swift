@@ -286,7 +286,9 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         }
         return RuntimeSearchIndexRead(
             projection: projection,
-            readiness: projection.freshness.isCompleteForScope ? .currentGenerationCommitted : .staleCommitted
+            readiness: projection.freshness.isCompleteForScope
+                ? .verifiedCurrentGenerationCommitted
+                : .staleCommitted
         )
     }
 

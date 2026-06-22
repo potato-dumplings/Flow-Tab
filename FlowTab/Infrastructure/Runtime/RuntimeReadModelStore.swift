@@ -503,7 +503,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         return RuntimeSearchIndexRead(
             projection: projection,
             readiness: projection.freshness.isCompleteForScope
-                ? .currentGenerationCommitted
+                ? .verifiedCurrentGenerationCommitted
                 : .staleCommitted
         )
     }

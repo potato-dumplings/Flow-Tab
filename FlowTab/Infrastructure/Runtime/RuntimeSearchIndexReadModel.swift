@@ -44,7 +44,7 @@ struct RuntimeSearchIndexProjection: Equatable, Sendable {
 }
 
 enum RuntimeSearchIndexReadiness: String, Equatable, Sendable {
-    case currentGenerationCommitted
+    case verifiedCurrentGenerationCommitted
     case staleCommitted
     case missingCommittedIndex
 }
@@ -67,7 +67,7 @@ struct RuntimeSearchIndexRead: Equatable, Sendable {
         self.projection = projection
         self.readiness = readiness
         switch readiness {
-        case .currentGenerationCommitted:
+        case .verifiedCurrentGenerationCommitted:
             resultState = .verifiedCurrentGenerationCommittedResult
         case .staleCommitted:
             resultState = .degradedStaleCommittedResult
@@ -85,6 +85,6 @@ struct RuntimeSearchIndexRead: Equatable, Sendable {
     }
 
     var committedIndexCoversCurrentGeneration: Bool {
-        readiness == .currentGenerationCommitted
+        readiness == .verifiedCurrentGenerationCommitted
     }
 }

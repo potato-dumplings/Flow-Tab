@@ -845,7 +845,7 @@ extension FlowTabTests {
     }
 
     @MainActor
-    func testLiveSwitcherModelSearchPressureReadsCurrentGenerationCommittedIndexWithoutSampling() {
+    func testLiveSwitcherModelSearchPressureReadsVerifiedCurrentGenerationCommittedIndexWithoutSampling() {
         let defaults = UserDefaults.standard
         let previousSearchEnabled = defaults.object(forKey: AppPreferenceKeys.searchEnabled)
         let previousSearchDefaultScope = defaults.object(forKey: AppPreferenceKeys.searchDefaultScope)
@@ -876,7 +876,7 @@ extension FlowTabTests {
         XCTAssertTrue(model.enterSearchMode())
         let enterMs = nanosToMilliseconds(DispatchTime.now().uptimeNanoseconds - enterStart)
 
-        XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.readiness, .currentGenerationCommitted)
+        XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.readiness, .verifiedCurrentGenerationCommitted)
         XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.appCount, apps.count)
         XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.windowCount, windowCount)
         XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.requestedFreshnessBarrier, false)
