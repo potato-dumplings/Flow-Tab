@@ -15,6 +15,13 @@ struct RuntimeFullRepairWindowFacts {
     let rankByPID: [pid_t: Int]
 }
 
+struct RuntimeFullRepairAppSelectionFacts {
+    let appsGroupedByAppID: [String: [NSRunningApplication]]
+    let selectedApps: [NSRunningApplication]
+    let mergedWindowsByPrimaryPID: [pid_t: [RuntimeWindowListEntry]]
+    let appLayerCandidates: [NSRunningApplication]
+}
+
 struct RuntimeCurrentAppWindowFacts {
     let windowsByPID: [pid_t: [RuntimeWindowListEntry]]
     let rankByPID: [pid_t: Int]
@@ -102,6 +109,51 @@ struct RuntimeProjectionRepairFactSource {
         return RuntimeFullRepairWindowFacts(
             windowsByPID: axWindowsByPID,
             rankByPID: rankByPID
+        )
+    }
+
+    func collectFullRepairAppSelectionFacts(
+        for runningApps: [NSRunningApplication],
+        windowFacts: RuntimeFullRepairWindowFacts,
+        policyFacts: RuntimeRepairAppLayerPolicyFacts
+    ) -> RuntimeFullRepairAppSelectionFacts {
+        let appDirectory = RuntimeAppDirectory(apps: runningApps)
+        let appsGroupedByAppID = appDirectory.groupedAppsByAppID()
+        let windowStatsByPID = RuntimeAppDirectory.windowStats(
+            for: runningApps,
+            windowsByPID: windowFacts.windowsByPID,
+            isVisibleWindow: { !$0.isMinimized }
+        )
+        let selectedApps = appDirectory.selectPrimaryApps(
+            windowStatsByPID: windowStatsByPID,
+            rankByPID: windowFacts.rankByPID
+        )
+        let mergedWindowsByPrimaryPID = Dictionary(uniqueKeysWithValues: selectedApps.map { app in
+            let appGroup = appsGroupedByAppID[RuntimeAppIdentity.appID(for: app)] ?? [app]
+            return (
+                app.processIdentifier,
+                appDirectory.mergedWindows(
+                    for: appGroup,
+                    windowsByPID: windowFacts.windowsByPID,
+                    windowStatsByPID: windowStatsByPID,
+                    rankByPID: windowFacts.rankByPID
+                )
+            )
+        })
+        let appLayerWindowStatsByPID = RuntimeAppDirectory.windowStats(
+            for: selectedApps,
+            windowsByPID: mergedWindowsByPrimaryPID,
+            isVisibleWindow: { !$0.isMinimized }
+        )
+        let appLayerCandidates = RuntimeAppDirectory(apps: selectedApps).filterAppLayerCandidates(
+            windowStatsByPID: appLayerWindowStatsByPID,
+            hideMinimizedAppsFromAppLayer: policyFacts.hideMinimizedAppsFromAppLayer
+        )
+        return RuntimeFullRepairAppSelectionFacts(
+            appsGroupedByAppID: appsGroupedByAppID,
+            selectedApps: selectedApps,
+            mergedWindowsByPrimaryPID: mergedWindowsByPrimaryPID,
+            appLayerCandidates: appLayerCandidates
         )
     }
 

@@ -53,47 +53,19 @@ extension RuntimeProjectionRepairProvider {
         let windowData = repairFactSource.collectFullRepairWindowFacts(for: runningApps)
         let windowDataReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let selectionStartMs = windowDataReadyMs
-        let appDirectory = RuntimeAppDirectory(apps: runningApps)
-        let appsGroupedByBaseID = appDirectory.groupedAppsByAppID()
-        let windowStatsByPID = RuntimeAppDirectory.windowStats(
+        let policyFacts = repairFactSource.collectRepairAppLayerPolicyFacts()
+        let selectionFacts = repairFactSource.collectFullRepairAppSelectionFacts(
             for: runningApps,
-            windowsByPID: windowData.windowsByPID,
-            isVisibleWindow: { !$0.isMinimized }
-        )
-        let selectedApps = appDirectory.selectPrimaryApps(
-            windowStatsByPID: windowStatsByPID,
-            rankByPID: windowData.rankByPID
-        )
-        let mergedWindowsByPrimaryPID = Dictionary(uniqueKeysWithValues: selectedApps.map { app in
-            let appGroup = appsGroupedByBaseID[RuntimeAppIdentity.appID(for: app)] ?? [app]
-            return (
-                app.processIdentifier,
-                appDirectory.mergedWindows(
-                    for: appGroup,
-                    windowsByPID: windowData.windowsByPID,
-                    windowStatsByPID: windowStatsByPID,
-                    rankByPID: windowData.rankByPID
-                )
-            )
-        })
-        let hideMinimizedAppsFromAppLayer =
-            repairFactSource.collectRepairAppLayerPolicyFacts().hideMinimizedAppsFromAppLayer
-        let appLayerWindowStatsByPID = RuntimeAppDirectory.windowStats(
-            for: selectedApps,
-            windowsByPID: mergedWindowsByPrimaryPID,
-            isVisibleWindow: { !$0.isMinimized }
-        )
-        let appLayerCandidates = RuntimeAppDirectory(apps: selectedApps).filterAppLayerCandidates(
-            windowStatsByPID: appLayerWindowStatsByPID,
-            hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
+            windowFacts: windowData,
+            policyFacts: policyFacts
         )
         let selectionReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         RuntimeLog.debug(
             .projection,
-            "selectedApps=\(selectedApps.count) appLayerCandidates=\(appLayerCandidates.count) hideMinimized=\(hideMinimizedAppsFromAppLayer)"
+            "selectedApps=\(selectionFacts.selectedApps.count) appLayerCandidates=\(selectionFacts.appLayerCandidates.count) hideMinimized=\(policyFacts.hideMinimizedAppsFromAppLayer)"
         )
 
-        guard !appLayerCandidates.isEmpty else {
+        guard !selectionFacts.appLayerCandidates.isEmpty else {
             let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
             RuntimeProjectionDiagnostics.logTiming(
                 timingEvent,
@@ -101,7 +73,7 @@ extension RuntimeProjectionRepairProvider {
                     ("result", "empty"),
                     ("reason", "noAppLayerCandidates"),
                     ("runningApps", "\(runningApps.count)"),
-                    ("selectedApps", "\(selectedApps.count)"),
+                    ("selectedApps", "\(selectionFacts.selectedApps.count)"),
                     ("windows", "\(windowData.windowsByPID.values.reduce(0) { $0 + $1.count })"),
                     ("runningAppsMs", RuntimeProjectionDiagnostics.formatMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
                     ("windowDataMs", RuntimeProjectionDiagnostics.formatMilliseconds(windowDataReadyMs - windowDataStartMs)),
@@ -118,17 +90,17 @@ extension RuntimeProjectionRepairProvider {
         let now = Date.timeIntervalSinceReferenceDate
 
         var currentAppProjectionInputs: [RuntimeCurrentAppWindowProjectionAssemblyInput] = []
-        currentAppProjectionInputs.reserveCapacity(appLayerCandidates.count)
+        currentAppProjectionInputs.reserveCapacity(selectionFacts.appLayerCandidates.count)
 
         let rowsStartMs = RuntimePerformanceClock.monotonicMilliseconds()
-        for (index, app) in appLayerCandidates.enumerated() {
+        for (index, app) in selectionFacts.appLayerCandidates.enumerated() {
             let pid = app.processIdentifier
             let baseAppID = RuntimeAppIdentity.appID(for: app)
-            let appGroup = appsGroupedByBaseID[baseAppID] ?? [app]
+            let appGroup = selectionFacts.appsGroupedByAppID[baseAppID] ?? [app]
             let appID = baseAppID
             let displayName = app.localizedName ?? baseAppID
 
-            let windows = mergedWindowsByPrimaryPID[pid] ?? []
+            let windows = selectionFacts.mergedWindowsByPrimaryPID[pid] ?? []
             RuntimeLog.debug(
                 .projection,
                 "\(displayName) pid=\(pid) appID=\(appID) windows=\(windows.count)"
@@ -162,8 +134,8 @@ extension RuntimeProjectionRepairProvider {
             fields: [
                 ("result", "ready"),
                 ("runningApps", "\(runningApps.count)"),
-                ("selectedApps", "\(selectedApps.count)"),
-                ("appLayerCandidates", "\(appLayerCandidates.count)"),
+                ("selectedApps", "\(selectionFacts.selectedApps.count)"),
+                ("appLayerCandidates", "\(selectionFacts.appLayerCandidates.count)"),
                 ("windows", "\(payload.apps.reduce(0) { $0 + $1.windows.count })"),
                 ("contexts", "\(payload.contextsByID.count)"),
                 ("runningAppsMs", RuntimeProjectionDiagnostics.formatMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
