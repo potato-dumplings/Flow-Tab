@@ -1,0 +1,129 @@
+import CoreGraphics
+import Foundation
+import FlowTabCore
+
+struct RuntimeReadModelGeneration: Equatable {
+    var appLifecycle: UInt64 = 0
+    var cg: UInt64 = 0
+    var space: UInt64 = 0
+    var axDirty: UInt64 = 0
+    var projection: UInt64 = 0
+}
+
+struct RuntimeProjectionFreshness: Equatable {
+    let generatedAt: TimeInterval
+    let sourceGeneration: RuntimeReadModelGeneration
+    let dirtyAppIDs: Set<String>
+    let dirtyPIDs: Set<pid_t>
+    let dirtyCGWindowIDs: Set<CGWindowID>
+    let pendingRepairScopes: Set<String>
+    let isCompleteForScope: Bool
+
+    var isDirty: Bool {
+        !dirtyAppIDs.isEmpty
+            || !dirtyPIDs.isEmpty
+            || !dirtyCGWindowIDs.isEmpty
+            || !pendingRepairScopes.isEmpty
+    }
+}
+
+struct RuntimeAppSwitcherProjection {
+    let apps: [AppSwitchCandidate]
+    let contextsByID: [String: RuntimeAppContext]
+    var freshness: RuntimeProjectionFreshness
+
+    var appCycleApps: [AppSwitchCandidate] {
+        guard !freshness.isCompleteForScope else { return apps }
+        let suppressesAllWindowLists = !freshness.dirtyCGWindowIDs.isEmpty
+            || (!freshness.pendingRepairScopes.isEmpty && freshness.dirtyAppIDs.isEmpty)
+        return apps.map { app -> AppSwitchCandidate in
+            guard suppressesAllWindowLists || freshness.dirtyAppIDs.contains(app.id) else {
+                return app
+            }
+            var app = app
+            app.windows = []
+            return app
+        }
+    }
+}
+
+struct RuntimeHomeSummaryProjection {
+    let summaries: [RuntimeHomeAppSummary]
+    var freshness: RuntimeProjectionFreshness
+
+    func summary(for appID: String) -> RuntimeHomeAppSummary? {
+        summaries.first { $0.appID == appID }
+    }
+}
+
+struct RuntimeHomeAppDetailProjection {
+    let summary: RuntimeHomeAppSummary
+    let candidate: AppSwitchCandidate
+    let context: RuntimeAppContext
+
+    init(summary: RuntimeHomeAppSummary, candidate: AppSwitchCandidate, context: RuntimeAppContext) {
+        self.summary = summary
+        self.candidate = candidate
+        self.context = context
+    }
+
+    init(currentAppWindowPayload payload: RuntimeCurrentAppWindowPayload) {
+        self.init(
+            summary: payload.summary,
+            candidate: payload.candidate,
+            context: payload.context
+        )
+    }
+}
+
+struct RuntimeAppDirectoryProjection {
+    let entries: [RuntimeAppDirectoryEntry]
+    var freshness: RuntimeProjectionFreshness
+
+    func entries(forAppID appID: String) -> [RuntimeAppDirectoryEntry] {
+        entries.filter { $0.appID == appID }
+    }
+}
+
+struct RuntimeCurrentAppWindowProjection {
+    let appID: String
+    let currentAppWindowPayload: RuntimeCurrentAppWindowPayload
+    var freshness: RuntimeProjectionFreshness
+
+    init(
+        appID: String,
+        currentAppWindowPayload: RuntimeCurrentAppWindowPayload,
+        freshness: RuntimeProjectionFreshness
+    ) {
+        self.appID = appID
+        self.currentAppWindowPayload = currentAppWindowPayload
+        self.freshness = freshness
+    }
+}
+
+struct RuntimeReadModelDiagnostics: Equatable {
+    let generation: RuntimeReadModelGeneration
+    let dirtyAppIDs: Set<String>
+    let dirtyPIDs: Set<pid_t>
+    let dirtyCGWindowIDs: Set<CGWindowID>
+    let pendingRepairScopes: Set<String>
+    let hasAppSwitcherProjection: Bool
+    let hasHomeSummaryProjection: Bool
+    let hasAppDirectoryProjection: Bool
+    let hasCommittedSearchIndex: Bool
+    let hasStagingSearchIndex: Bool
+    let currentAppWindowProjectionAppIDs: Set<String>
+    let appDirectoryEntryPIDs: Set<pid_t>
+
+    var hasDirtyState: Bool {
+        !dirtyAppIDs.isEmpty
+            || !dirtyPIDs.isEmpty
+            || !dirtyCGWindowIDs.isEmpty
+            || !pendingRepairScopes.isEmpty
+    }
+}
+
+struct RuntimeFullRepairProjectionCommitSummary {
+    var coldStartCommittedCount = 0
+    var degradedCommittedCount = 0
+}
