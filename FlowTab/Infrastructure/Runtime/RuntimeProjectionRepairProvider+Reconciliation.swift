@@ -18,6 +18,65 @@ struct RuntimeAppWindowReconciliationResult {
 }
 
 extension RuntimeProjectionRepairProvider {
+    func hasPendingReconciliationRequests() -> Bool {
+        snapshotProvider.reconciliationCoordinator.hasPendingRequests()
+    }
+
+    func scheduleFullRepairFallback(now: TimeInterval) {
+        snapshotProvider.reconciliationCoordinator.scheduleFullRepairFallback(now: now)
+    }
+
+    func promotePendingReconciliationRequests(
+        reason: RuntimeReconciliationReason,
+        now: TimeInterval
+    ) -> [RuntimeReconciliationRequest] {
+        snapshotProvider.reconciliationCoordinator.promotePendingRequests(reason: reason, now: now)
+    }
+
+    func markAppDirty(
+        appID: String,
+        pid: pid_t,
+        reason: RuntimeReconciliationReason,
+        affectedCGWindowIDs: Set<CGWindowID>,
+        now: TimeInterval
+    ) {
+        snapshotProvider.reconciliationCoordinator.markAppDirty(
+            appID: appID,
+            pid: pid,
+            reason: reason,
+            affectedCGWindowIDs: affectedCGWindowIDs,
+            now: now
+        )
+    }
+
+    func readyReconciliationRequests(
+        now: TimeInterval,
+        includeFullRepair: Bool
+    ) -> [RuntimeReconciliationRequest] {
+        snapshotProvider.reconciliationCoordinator.readyRequests(
+            now: now,
+            includeFullRepair: includeFullRepair
+        )
+    }
+
+    func startReconciliationRequest(id: UInt64) -> RuntimeReconciliationRequest? {
+        snapshotProvider.reconciliationCoordinator.startRequest(id: id)
+    }
+
+    func completeReconciliationRequest(id: UInt64) {
+        snapshotProvider.reconciliationCoordinator.completeRequest(id: id)
+    }
+
+    func deferReconciliationRequestAfterTransientEmptyCurrentAppWindowPayload(
+        id: UInt64,
+        now: TimeInterval
+    ) {
+        snapshotProvider.reconciliationCoordinator.scheduleRetryAfterTransientEmptyCurrentAppWindowPayload(
+            id: id,
+            now: now
+        )
+    }
+
     func recordSpaceTopologyChanged(now: TimeInterval) -> Set<CGWindowID> {
         snapshotProvider.collectCGWindowsWithSpaceTopologyDiff(
             options: [.excludeDesktopElements],
