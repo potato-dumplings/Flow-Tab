@@ -27,7 +27,7 @@ extension RuntimeProjectionRepairProvider {
             )
         }
         let runningAppsStartMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let runningAppFacts = repairFactSource.collectRepairRunningAppFacts()
+        let runningAppFacts = repairFactSource.collectFullRepairRunningAppFacts()
         let runningApps = runningAppFacts.runningApps
         let runningAppsReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
 
@@ -182,7 +182,7 @@ extension RuntimeProjectionRepairProvider {
         if let uiTestRuntimeDataset = FlowTabUITestRuntimeProjectionDataset.current() {
             return uiTestRuntimeDataset.currentAppWindowPayloadsByAppID[appID]
         }
-        let runningApps = repairFactSource.collectRepairRunningAppFacts().runningApps
+        let runningApps = repairFactSource.collectRepairRunningApps().runningApps
         let matchingApps = runningApps.filter { RuntimeAppIdentity.appID(for: $0) == appID }
         guard !matchingApps.isEmpty else { return nil }
 
@@ -254,7 +254,7 @@ extension RuntimeProjectionRepairProvider {
         }
 
         let runningAppsStartMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let runningApps = repairFactSource.collectRepairRunningAppFacts().runningApps
+        let runningApps = repairFactSource.collectRepairRunningApps().runningApps
         let runningAppsReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         guard let app = runningApps.first(where: { $0.processIdentifier == pid })
             ?? NSRunningApplication(processIdentifier: pid)

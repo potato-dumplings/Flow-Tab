@@ -1,7 +1,11 @@
 import AppKit
 import Foundation
 
-struct RuntimeRepairRunningAppFacts {
+struct RuntimeRepairRunningApps {
+    let runningApps: [NSRunningApplication]
+}
+
+struct RuntimeFullRepairRunningAppFacts {
     let runningApps: [NSRunningApplication]
     let appDirectoryEntries: [RuntimeAppDirectoryEntry]
 }
@@ -32,11 +36,16 @@ struct RuntimeFocusedCurrentAppWindowFacts {
 struct RuntimeProjectionRepairFactSource {
     let snapshotProvider: RuntimeSnapshotProvider
 
-    func collectRepairRunningAppFacts() -> RuntimeRepairRunningAppFacts {
+    func collectRepairRunningApps() -> RuntimeRepairRunningApps {
         let runningApps = RuntimeAppDirectoryFactSource.currentAppLayerRunningApplications(
             includeCurrentProcessInAppLayer: AppVisibilityPreferencesStore.loadShowInCommandTab()
         )
-        return RuntimeRepairRunningAppFacts(
+        return RuntimeRepairRunningApps(runningApps: runningApps)
+    }
+
+    func collectFullRepairRunningAppFacts() -> RuntimeFullRepairRunningAppFacts {
+        let runningApps = collectRepairRunningApps().runningApps
+        return RuntimeFullRepairRunningAppFacts(
             runningApps: runningApps,
             appDirectoryEntries: RuntimeAppDirectoryFactSource.entries(from: runningApps)
         )
