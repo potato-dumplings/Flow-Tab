@@ -42,8 +42,10 @@ protocol RuntimeProjectionRepairProviding: AnyObject {
 
 final class RuntimeProjectionRepairProvider: RuntimeProjectionRepairProviding {
     let snapshotProvider: RuntimeSnapshotProvider
+    let fullRepairFactSource: RuntimeFullRepairFactSource
 
     init(snapshotProvider: RuntimeSnapshotProvider = RuntimeSnapshotProvider()) {
         self.snapshotProvider = snapshotProvider
+        self.fullRepairFactSource = RuntimeFullRepairFactSource(snapshotProvider: snapshotProvider)
     }
 }

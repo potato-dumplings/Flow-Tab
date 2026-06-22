@@ -7,53 +7,6 @@ extension RuntimeProjectionRepairProvider {
         fullRepairProjectionPayload(timingEvent: "fullRepairProjectionPayload")
     }
 
-    private func collectWindowData(for runningApps: [NSRunningApplication]) -> (
-        windowsByPID: [pid_t: [RuntimeWindowListEntry]],
-        rankByPID: [pid_t: Int]
-    ) {
-        let startMs = RuntimePerformanceClock.monotonicMilliseconds()
-        snapshotProvider.cleanupWindowMappingState(for: runningApps)
-        let cleanupReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        AXLiveWindowRegistry.shared.prune(to: runningApps)
-        let pruneReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let onScreenCGWindowsByPID = snapshotProvider.collectCGWindowsWithSpaceTopologyDiff().windowsByPID
-        let onScreenCGReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let allCGWindowsByPID = snapshotProvider.collectCGWindowsWithSpaceTopologyDiff(
-            options: [.optionAll, .excludeDesktopElements]
-        ).windowsByPID
-        let allCGReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let axWindowsByPID = snapshotProvider.collectAXWindowData(
-            for: runningApps,
-            cgWindowsByPID: onScreenCGWindowsByPID,
-            allCGWindowsByPID: allCGWindowsByPID
-        )
-        let axReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let rankByPID = RuntimeAppRankProvider.collectAppRankByPID(for: runningApps)
-        let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
-        RuntimeProjectionDiagnostics.logTiming(
-            "collectWindowData",
-            fields: [
-                ("apps", "\(runningApps.count)"),
-                ("onscreenCGWindows", "\(onScreenCGWindowsByPID.values.reduce(0) { $0 + $1.count })"),
-                ("allCGWindows", "\(allCGWindowsByPID.values.reduce(0) { $0 + $1.count })"),
-                ("windowPIDs", "\(axWindowsByPID.count)"),
-                ("rankPIDs", "\(rankByPID.count)"),
-                ("cleanupMs", RuntimeProjectionDiagnostics.formatMilliseconds(cleanupReadyMs - startMs)),
-                ("registryPruneMs", RuntimeProjectionDiagnostics.formatMilliseconds(pruneReadyMs - cleanupReadyMs)),
-                ("onscreenCGMs", RuntimeProjectionDiagnostics.formatMilliseconds(onScreenCGReadyMs - pruneReadyMs)),
-                ("allCGMs", RuntimeProjectionDiagnostics.formatMilliseconds(allCGReadyMs - onScreenCGReadyMs)),
-                ("axMs", RuntimeProjectionDiagnostics.formatMilliseconds(axReadyMs - allCGReadyMs)),
-                ("rankMs", RuntimeProjectionDiagnostics.formatMilliseconds(completeMs - axReadyMs)),
-                ("totalMs", RuntimeProjectionDiagnostics.formatMilliseconds(completeMs - startMs))
-            ]
-        )
-        // Keep a single source of truth for window counting and selection: AX window list.
-        return (
-            windowsByPID: axWindowsByPID,
-            rankByPID: rankByPID
-        )
-    }
-
     private func fullRepairProjectionPayload(timingEvent: String) -> RuntimeFullRepairProjectionPayload {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
         if let uiTestRuntimeDataset = FlowTabUITestRuntimeProjectionDataset.current() {
@@ -99,7 +52,7 @@ extension RuntimeProjectionRepairProvider {
 
         RuntimeLog.debug(.projection, "runningApps=\(runningApps.count)")
         let windowDataStartMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let windowData = collectWindowData(for: runningApps)
+        let windowData = fullRepairFactSource.collectWindowFacts(for: runningApps)
         let windowDataReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let selectionStartMs = windowDataReadyMs
         let appDirectory = RuntimeAppDirectory(apps: runningApps)
