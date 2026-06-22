@@ -2,14 +2,6 @@ import Foundation
 import FlowTabCore
 
 let sharedRuntimeProjectionService = RuntimeProjectionService()
-let runtimeSearchFreshnessBarrierMaxReadyRepairs = 4
-
-enum RuntimeProjectionMaintenanceReason: String, Sendable {
-    case switcherSessionStarted
-    case appLifecycleRefresh
-    case homeProjectionMissing
-    case searchFreshnessBarrier
-}
 
 protocol RuntimeProjectionServing: Sendable {
     func readAppSwitcherProjection() -> RuntimeAppSwitcherProjection?
