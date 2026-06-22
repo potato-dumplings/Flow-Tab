@@ -26,11 +26,11 @@ extension RuntimeProjectionRepairProvider {
         snapshotProvider.reconciliationCoordinator.scheduleFullRepairFallback(now: now)
     }
 
-    func promotePendingReconciliationRequests(
-        reason: RuntimeReconciliationReason,
-        now: TimeInterval
-    ) -> [RuntimeReconciliationRequest] {
-        snapshotProvider.reconciliationCoordinator.promotePendingRequests(reason: reason, now: now)
+    func promoteSearchFreshnessBarrierRequests(now: TimeInterval) -> [RuntimeReconciliationRequest] {
+        snapshotProvider.reconciliationCoordinator.promotePendingRequests(
+            reason: .searchFreshnessBarrier,
+            now: now
+        )
     }
 
     func recordAppLaunched(appID: String, pid: pid_t, now: TimeInterval) {

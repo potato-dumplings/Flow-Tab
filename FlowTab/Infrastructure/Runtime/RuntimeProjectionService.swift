@@ -60,10 +60,7 @@ protocol RuntimeProjectionRepairProviding: AnyObject {
     func recordSelectedCurrentAppWindowsChanged(appID: String, pid: pid_t, now: TimeInterval)
     func hasPendingReconciliationRequests() -> Bool
     func scheduleFullRepairFallback(now: TimeInterval)
-    func promotePendingReconciliationRequests(
-        reason: RuntimeReconciliationReason,
-        now: TimeInterval
-    ) -> [RuntimeReconciliationRequest]
+    func promoteSearchFreshnessBarrierRequests(now: TimeInterval) -> [RuntimeReconciliationRequest]
     func readyReconciliationRequests(
         now: TimeInterval,
         includeFullRepair: Bool
@@ -238,10 +235,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         maintenanceQueue.async { [self] in
             let diagnostics = readModelStore.diagnostics()
             let now = Date.timeIntervalSinceReferenceDate
-            let promotedRequests = repairProvider.promotePendingReconciliationRequests(
-                reason: .searchFreshnessBarrier,
-                now: now
-            )
+            let promotedRequests = repairProvider.promoteSearchFreshnessBarrierRequests(now: now)
             let drainResult = drainReadyReconciliationRequestsWithResultLocked(
                 now: now,
                 maxRequests: runtimeSearchFreshnessBarrierMaxReadyRepairs,
