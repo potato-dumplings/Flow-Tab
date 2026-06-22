@@ -40,6 +40,13 @@ struct RuntimeFocusedCurrentAppWindowFacts {
     let timings: RuntimeFocusedCurrentAppWindowFactTimings
 }
 
+struct RuntimeAppWindowSelectionFacts {
+    let app: NSRunningApplication
+    let appGroup: [NSRunningApplication]
+    let windows: [RuntimeWindowListEntry]
+    let isIncludedInAppLayer: Bool
+}
+
 struct RuntimeRepairAppLayerPolicyFacts {
     let hideMinimizedAppsFromAppLayer: Bool
 }
@@ -177,6 +184,42 @@ struct RuntimeProjectionRepairFactSource {
         )
     }
 
+    func collectCurrentAppSelectionFacts(
+        for matchingApps: [NSRunningApplication],
+        windowFacts: RuntimeCurrentAppWindowFacts,
+        policyFacts: RuntimeRepairAppLayerPolicyFacts
+    ) -> RuntimeAppWindowSelectionFacts? {
+        let appDirectory = RuntimeAppDirectory(apps: matchingApps)
+        let windowStatsByPID = RuntimeAppDirectory.windowStats(
+            for: matchingApps,
+            windowsByPID: windowFacts.windowsByPID,
+            isVisibleWindow: { !$0.isMinimized }
+        )
+        let sortedApps = appDirectory.sortedAppsWithinGroup(
+            matchingApps,
+            windowStatsByPID: windowStatsByPID,
+            rankByPID: windowFacts.rankByPID
+        )
+        guard let app = sortedApps.first else { return nil }
+
+        let windows = appDirectory.mergedWindows(
+            for: sortedApps,
+            windowsByPID: windowFacts.windowsByPID,
+            windowStatsByPID: windowStatsByPID,
+            rankByPID: windowFacts.rankByPID
+        )
+        return RuntimeAppWindowSelectionFacts(
+            app: app,
+            appGroup: matchingApps,
+            windows: windows,
+            isIncludedInAppLayer: RuntimeAppLayerProjectionFilter.shouldIncludeAppInAppLayer(
+                hasWindows: !windows.isEmpty,
+                hasVisibleWindow: windows.contains { !$0.isMinimized },
+                hideMinimizedAppsFromAppLayer: policyFacts.hideMinimizedAppsFromAppLayer
+            )
+        )
+    }
+
     func collectFocusedCurrentAppWindowFacts(
         for app: NSRunningApplication,
         in runningApps: [NSRunningApplication],
@@ -206,6 +249,35 @@ struct RuntimeProjectionRepairFactSource {
                 onScreenCGMs: onScreenCGReadyMs - cleanupReadyMs,
                 allCGMs: allCGReadyMs - onScreenCGReadyMs,
                 axMs: axReadyMs - allCGReadyMs
+            )
+        )
+    }
+
+    func collectFocusedCurrentAppSelectionFacts(
+        for app: NSRunningApplication,
+        windowFacts: RuntimeFocusedCurrentAppWindowFacts,
+        policyFacts: RuntimeRepairAppLayerPolicyFacts
+    ) -> RuntimeAppWindowSelectionFacts {
+        let focusedApps = [app]
+        let windowStatsByPID = RuntimeAppDirectory.windowStats(
+            for: focusedApps,
+            windowsByPID: windowFacts.windowsByPID,
+            isVisibleWindow: { !$0.isMinimized }
+        )
+        let windows = RuntimeAppDirectory(apps: focusedApps).mergedWindows(
+            for: focusedApps,
+            windowsByPID: windowFacts.windowsByPID,
+            windowStatsByPID: windowStatsByPID,
+            rankByPID: windowFacts.rankByPID
+        )
+        return RuntimeAppWindowSelectionFacts(
+            app: app,
+            appGroup: focusedApps,
+            windows: windows,
+            isIncludedInAppLayer: RuntimeAppLayerProjectionFilter.shouldIncludeAppInAppLayer(
+                hasWindows: !windows.isEmpty,
+                hasVisibleWindow: windows.contains { !$0.isMinimized },
+                hideMinimizedAppsFromAppLayer: policyFacts.hideMinimizedAppsFromAppLayer
             )
         )
     }
