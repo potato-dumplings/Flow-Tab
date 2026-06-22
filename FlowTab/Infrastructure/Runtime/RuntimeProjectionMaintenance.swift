@@ -35,11 +35,6 @@ struct RuntimeProjectionReconciliationDrainResult {
     var repairedCurrentAppWindowPayloads: [RuntimeCurrentAppWindowPayload] = []
 }
 
-struct RuntimeFullRepairProjectionCommitSummary {
-    var coldStartCommittedCount = 0
-    var degradedCommittedCount = 0
-}
-
 typealias RuntimeProjectionReconciliationExecutor = (
     RuntimeReconciliationRequest,
     RuntimeProjectionRepairProviding

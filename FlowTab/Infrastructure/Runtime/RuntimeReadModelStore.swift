@@ -214,6 +214,11 @@ struct RuntimeReadModelDiagnostics: Equatable {
     }
 }
 
+struct RuntimeFullRepairProjectionCommitSummary {
+    var coldStartCommittedCount = 0
+    var degradedCommittedCount = 0
+}
+
 final class RuntimeReadModelStore: @unchecked Sendable {
     private let lock = NSLock()
     private var generation = RuntimeReadModelGeneration()
@@ -261,6 +266,42 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             )
             stagingSearchIndex = nil
         }
+    }
+
+    @discardableResult
+    func commitFullRepairProjectionPayload(
+        _ payload: RuntimeFullRepairProjectionPayload,
+        generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
+    ) -> RuntimeFullRepairProjectionCommitSummary {
+        lock.lock()
+        defer { lock.unlock() }
+
+        let clearsDirtyState = appSwitcherProjection == nil && !isDirtyLocked
+        markProjectionCommittedLocked()
+        if clearsDirtyState {
+            clearDirtyStateLocked()
+        }
+        appSwitcherProjection = RuntimeAppSwitcherProjection(
+            apps: payload.apps,
+            contextsByID: payload.contextsByID,
+            freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: !isDirtyLocked)
+        )
+        replaceAppDirectoryStateLocked(
+            entries: payload.appDirectoryEntries,
+            generatedAt: generatedAt
+        )
+        if clearsDirtyState {
+            committedSearchIndex = buildSearchIndexLocked(
+                apps: payload.apps,
+                generatedAt: generatedAt,
+                isCompleteForScope: true
+            )
+            stagingSearchIndex = nil
+        }
+        return RuntimeFullRepairProjectionCommitSummary(
+            coldStartCommittedCount: clearsDirtyState ? 1 : 0,
+            degradedCommittedCount: clearsDirtyState ? 0 : 1
+        )
     }
 
     func commitHomeSummaries(

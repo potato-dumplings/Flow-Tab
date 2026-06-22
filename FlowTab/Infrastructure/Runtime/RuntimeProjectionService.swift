@@ -291,20 +291,9 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     ) -> RuntimeFullRepairProjectionCommitSummary {
         var summary = RuntimeFullRepairProjectionCommitSummary()
         for payload in payloads {
-            let diagnostics = readModelStore.diagnostics()
-            let clearsDirtyState = !diagnostics.hasAppSwitcherProjection
-                && !diagnostics.hasDirtyState
-            readModelStore.commitAppSwitcherProjection(
-                apps: payload.apps,
-                contextsByID: payload.contextsByID,
-                appDirectoryEntries: payload.appDirectoryEntries,
-                clearsDirtyState: clearsDirtyState
-            )
-            if clearsDirtyState {
-                summary.coldStartCommittedCount += 1
-            } else {
-                summary.degradedCommittedCount += 1
-            }
+            let payloadSummary = readModelStore.commitFullRepairProjectionPayload(payload)
+            summary.coldStartCommittedCount += payloadSummary.coldStartCommittedCount
+            summary.degradedCommittedCount += payloadSummary.degradedCommittedCount
         }
         return summary
     }

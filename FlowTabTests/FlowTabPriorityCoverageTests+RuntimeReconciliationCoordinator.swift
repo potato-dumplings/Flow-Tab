@@ -127,6 +127,115 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(appDirectoryProjection.entries(forAppID: app.id).map(\.pid), [pid])
     }
 
+    func testRuntimeReadModelStoreFullRepairColdStartCommitsCurrentSearchIndex() throws {
+        let store = RuntimeReadModelStore()
+        let apps = searchScenarioApps()
+        let app = try XCTUnwrap(apps.first)
+        let pid = pid_t(42_201)
+        let entry = RuntimeAppDirectoryEntry(
+            pid: pid,
+            appID: app.id,
+            bundleIdentifier: "com.example.cold-start",
+            localizedName: app.displayName,
+            launchDate: nil
+        )
+
+        let summary = store.commitFullRepairProjectionPayload(
+            RuntimeFullRepairProjectionPayload(
+                apps: apps,
+                contextsByID: [app.id: makeRuntimeAppContext(
+                    appID: app.id,
+                    runningApp: .current,
+                    windows: app.windows
+                )],
+                appDirectoryEntries: [entry]
+            ),
+            generatedAt: 30
+        )
+
+        XCTAssertEqual(summary.coldStartCommittedCount, 1)
+        XCTAssertEqual(summary.degradedCommittedCount, 0)
+        let appSwitcherProjection = try XCTUnwrap(store.readAppSwitcherProjection())
+        XCTAssertTrue(appSwitcherProjection.freshness.isCompleteForScope)
+        XCTAssertEqual(appSwitcherProjection.apps.map(\.id), apps.map(\.id))
+        let searchRead = store.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(searchRead.readiness, .currentGenerationCommitted)
+        XCTAssertEqual(searchRead.resultState, .verifiedCurrentGenerationCommittedResult)
+        XCTAssertTrue(searchRead.committedIndexCoversCurrentGeneration)
+        let searchProjection = try XCTUnwrap(searchRead.projection)
+        XCTAssertEqual(searchProjection.windowEntries.map(\.windowID), apps.flatMap(\.windows).map(\.id))
+        let directoryProjection = try XCTUnwrap(store.readAppDirectoryProjection())
+        XCTAssertEqual(directoryProjection.entries, [entry])
+        XCTAssertTrue(directoryProjection.freshness.isCompleteForScope)
+    }
+
+    func testRuntimeReadModelStoreDirtyFullRepairCommitsDegradedProjectionAndKeepsSearchStale() throws {
+        let store = RuntimeReadModelStore()
+        let committedApps = searchScenarioApps()
+        let committedApp = try XCTUnwrap(committedApps.first)
+        let pid = pid_t(42_202)
+        let repairedApp = AppSwitchCandidate(
+            id: committedApp.id,
+            displayName: committedApp.displayName,
+            groupID: committedApp.groupID,
+            lastActiveAt: 720,
+            windows: [
+                WindowCandidate(
+                    id: "full-repair-rebuilt-window",
+                    title: "Full Repair Rebuilt Window",
+                    isMinimized: false,
+                    lastActiveAt: 720
+                )
+            ]
+        )
+
+        store.commitAppSwitcherProjection(
+            apps: committedApps,
+            contextsByID: [:],
+            appDirectoryEntries: nil,
+            generatedAt: 10
+        )
+        store.markAppWindowsDirty(
+            appID: repairedApp.id,
+            pid: pid,
+            pendingScope: "appWindows:\(repairedApp.id)"
+        )
+        store.stageSearchIndexApp(repairedApp, generatedAt: 20)
+
+        let summary = store.commitFullRepairProjectionPayload(
+            RuntimeFullRepairProjectionPayload(
+                apps: [repairedApp],
+                contextsByID: [:],
+                appDirectoryEntries: []
+            ),
+            generatedAt: 30
+        )
+
+        XCTAssertEqual(summary.coldStartCommittedCount, 0)
+        XCTAssertEqual(summary.degradedCommittedCount, 1)
+        let appSwitcherProjection = try XCTUnwrap(store.readAppSwitcherProjection())
+        XCTAssertEqual(appSwitcherProjection.apps.map(\.id), [repairedApp.id])
+        XCTAssertEqual(appSwitcherProjection.apps.first?.windows.map(\.id), ["full-repair-rebuilt-window"])
+        XCTAssertFalse(appSwitcherProjection.freshness.isCompleteForScope)
+        let searchRead = store.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(searchRead.readiness, .staleCommitted)
+        XCTAssertEqual(searchRead.resultState, .degradedStaleCommittedResult)
+        XCTAssertFalse(searchRead.committedIndexCoversCurrentGeneration)
+        let searchProjection = try XCTUnwrap(searchRead.projection)
+        XCTAssertEqual(
+            searchProjection.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),
+            committedApp.windows.map(\.id)
+        )
+        XCTAssertFalse(
+            searchProjection.windowEntries.contains { $0.windowID == "full-repair-rebuilt-window" }
+        )
+        let diagnostics = store.diagnostics()
+        XCTAssertEqual(diagnostics.dirtyAppIDs, [repairedApp.id])
+        XCTAssertEqual(diagnostics.dirtyPIDs, [pid])
+        XCTAssertEqual(diagnostics.pendingRepairScopes, ["appWindows:\(repairedApp.id)"])
+        XCTAssertTrue(diagnostics.hasStagingSearchIndex)
+    }
+
     func testRuntimeReadModelStoreRemovesTerminatedAppFromCommittedProjectionsAndSearch() throws {
         let store = RuntimeReadModelStore()
         let apps = searchScenarioApps()
