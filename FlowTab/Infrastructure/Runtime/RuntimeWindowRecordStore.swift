@@ -16,6 +16,14 @@ final class RuntimeWindowRecordStore {
         mappingStatesByPID[pid] = state
     }
 
+    func commitState(_ state: RuntimeWindowMappingState, for pid: pid_t) {
+        if state.isEmpty {
+            removeState(for: pid)
+        } else {
+            setState(state, for: pid)
+        }
+    }
+
     func removeState(for pid: pid_t) {
         mappingStatesByPID.removeValue(forKey: pid)
     }

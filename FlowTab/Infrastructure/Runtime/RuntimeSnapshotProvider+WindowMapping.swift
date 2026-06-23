@@ -458,11 +458,7 @@ extension RuntimeSnapshotProvider {
         )
         let nextState = mappingState
         windowRecordsByCGWindowID = nextState.windowRecordsByCGWindowID
-        if nextState.isEmpty {
-            windowRecordStore.removeState(for: pid)
-        } else {
-            windowRecordStore.setState(nextState, for: pid)
-        }
+        windowRecordStore.commitState(nextState, for: pid)
 
         let unmatchedAXCount = max(0, axWindows.count - exactMatchesByAXWindowID.count)
         let unmatchedCGCount = max(0, validCGWindows.count - Set(exactMatchesByAXWindowID.values).count)
