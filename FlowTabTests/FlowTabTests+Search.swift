@@ -617,7 +617,7 @@ extension FlowTabTests {
             pid: 42_300,
             pendingScope: "appWindows:\(committedSearchApp.id)"
         )
-        let staleSearchProjection = store.readCommittedSearchIndexForSearch().projection
+        let staleSearchRead = store.readCommittedSearchIndexForSearch()
         let runtimeProjectionService = RecordingRuntimeProjectionService(
             appSwitcherProjection: RuntimeAppSwitcherProjection(
                 apps: [sessionApp],
@@ -632,7 +632,7 @@ extension FlowTabTests {
                     isCompleteForScope: true
                 )
             ),
-            committedSearchIndexProjection: staleSearchProjection
+            committedSearchIndexRead: staleSearchRead
         )
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
 

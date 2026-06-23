@@ -84,7 +84,7 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     private var appSwitcherProjection: RuntimeAppSwitcherProjection?
     private let homeSummaryProjection: RuntimeHomeSummaryProjection?
     private let currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection]
-    private var committedSearchIndexProjection: RuntimeSearchIndexProjection?
+    private var committedSearchIndexRead: RuntimeSearchIndexRead?
     private var appSwitcherProjectionReads = 0
     private var homeSummaryProjectionReads = 0
     private var currentAppWindowProjectionReadsByAppID: [String: Int] = [:]
@@ -105,12 +105,12 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         appSwitcherProjection: RuntimeAppSwitcherProjection? = nil,
         homeSummaryProjection: RuntimeHomeSummaryProjection? = nil,
         currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection] = [:],
-        committedSearchIndexProjection: RuntimeSearchIndexProjection? = nil
+        committedSearchIndexRead: RuntimeSearchIndexRead? = nil
     ) {
         self.appSwitcherProjection = appSwitcherProjection
         self.homeSummaryProjection = homeSummaryProjection
         self.currentAppWindowProjectionsByAppID = currentAppWindowProjectionsByAppID
-        self.committedSearchIndexProjection = committedSearchIndexProjection
+        self.committedSearchIndexRead = committedSearchIndexRead
     }
 
     convenience init(
@@ -134,9 +134,12 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
                 contextsByID: contextsByID,
                 freshness: freshness
             ),
-            committedSearchIndexProjection: Self.committedSearchIndexProjection(
-                for: committedSearchApps ?? apps,
-                generatedAt: generatedAt
+            committedSearchIndexRead: RuntimeSearchIndexRead(
+                projection: Self.committedSearchIndexProjection(
+                    for: committedSearchApps ?? apps,
+                    generatedAt: generatedAt
+                ),
+                readiness: .verifiedCurrentGenerationCommitted
             )
         )
     }
@@ -249,9 +252,12 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         generatedAt: TimeInterval = 10
     ) {
         lock.lock()
-        committedSearchIndexProjection = Self.committedSearchIndexProjection(
-            for: apps,
-            generatedAt: generatedAt
+        committedSearchIndexRead = RuntimeSearchIndexRead(
+            projection: Self.committedSearchIndexProjection(
+                for: apps,
+                generatedAt: generatedAt
+            ),
+            readiness: .verifiedCurrentGenerationCommitted
         )
         lock.unlock()
     }
@@ -281,20 +287,15 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         lock.lock()
         defer { lock.unlock() }
         committedSearchIndexReads += 1
-        guard let projection = committedSearchIndexProjection else {
+        guard let committedSearchIndexRead else {
             return RuntimeSearchIndexRead(projection: nil, readiness: .missingCommittedIndex)
         }
-        return RuntimeSearchIndexRead(
-            projection: projection,
-            readiness: projection.freshness.isCompleteForScope
-                ? .verifiedCurrentGenerationCommitted
-                : .staleCommitted
-        )
+        return committedSearchIndexRead
     }
 
     func runtimeReadModelDiagnostics() -> RuntimeReadModelDiagnostics {
         lock.lock()
-        let hasCommittedSearchIndex = committedSearchIndexProjection != nil
+        let hasCommittedSearchIndex = committedSearchIndexRead?.projection != nil
         lock.unlock()
         return RuntimeReadModelDiagnostics(
             generation: RuntimeReadModelGeneration(),
@@ -370,10 +371,14 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
                 freshness: projection.freshness
             )
         }
-        if let projection = committedSearchIndexProjection {
-            committedSearchIndexProjection = projection.removingApp(
-                appID,
-                freshness: projection.freshness
+        if let searchIndexRead = committedSearchIndexRead,
+           let projection = searchIndexRead.projection {
+            committedSearchIndexRead = RuntimeSearchIndexRead(
+                projection: projection.removingApp(
+                    appID,
+                    freshness: projection.freshness
+                ),
+                readiness: searchIndexRead.readiness
             )
         }
         lock.unlock()
