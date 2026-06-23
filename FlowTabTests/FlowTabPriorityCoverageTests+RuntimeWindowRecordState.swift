@@ -198,15 +198,15 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeWindowMappingStateClassifiesTransientEmptyCurrentAppPayload() {
         let transientState = RuntimeWindowMappingState(
             hasObservedAXWindowHandle: true,
-            consecutiveSnapshotsWithoutAXWindows: 1
+            consecutiveAXCollectionMisses: 1
         )
         let nonTransientMissingState = RuntimeWindowMappingState(
             hasObservedAXWindowHandle: false,
-            consecutiveSnapshotsWithoutAXWindows: 1
+            consecutiveAXCollectionMisses: 1
         )
         let stableState = RuntimeWindowMappingState(
             hasObservedAXWindowHandle: true,
-            consecutiveSnapshotsWithoutAXWindows: 0
+            consecutiveAXCollectionMisses: 0
         )
 
         XCTAssertTrue(transientState.isLikelyTransientAXRebuild)

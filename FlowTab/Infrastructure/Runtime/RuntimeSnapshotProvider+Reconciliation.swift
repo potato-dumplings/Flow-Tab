@@ -97,7 +97,7 @@ extension RuntimeSnapshotProvider {
             validCGWindowIDs: mappingState.validCGWindowIDs.union([focusedCGWindowID]),
             lastAXWindowIDs: lastAXWindowIDs,
             hasObservedAXWindowHandle: true,
-            consecutiveSnapshotsWithoutAXWindows: 0
+            consecutiveAXCollectionMisses: 0
         )
     }
 

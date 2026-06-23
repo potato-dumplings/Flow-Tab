@@ -113,7 +113,7 @@ struct RuntimeWindowMappingState {
     var windowRecordsByCGWindowID: [CGWindowID: RuntimeWindowRecord]
     private var derivedIndexes: RuntimeWindowRecordDerivedIndexes
     var hasObservedAXWindowHandle: Bool
-    var consecutiveSnapshotsWithoutAXWindows: Int
+    var consecutiveAXCollectionMisses: Int
 
     init(
         windowRecordsByCGWindowID: [CGWindowID: RuntimeWindowRecord] = [:],
@@ -121,7 +121,7 @@ struct RuntimeWindowMappingState {
         validCGWindowIDs: Set<CGWindowID> = [],
         lastAXWindowIDs: Set<String> = [],
         hasObservedAXWindowHandle: Bool = false,
-        consecutiveSnapshotsWithoutAXWindows: Int = 0
+        consecutiveAXCollectionMisses: Int = 0
     ) {
         self.windowRecordsByCGWindowID = windowRecordsByCGWindowID
         derivedIndexes = RuntimeWindowRecordDerivedIndexes(
@@ -130,7 +130,7 @@ struct RuntimeWindowMappingState {
             lastAXWindowIDs: lastAXWindowIDs
         )
         self.hasObservedAXWindowHandle = hasObservedAXWindowHandle
-        self.consecutiveSnapshotsWithoutAXWindows = consecutiveSnapshotsWithoutAXWindows
+        self.consecutiveAXCollectionMisses = consecutiveAXCollectionMisses
     }
 
     var currentAXToCG: [String: CGWindowID] {
@@ -156,7 +156,7 @@ struct RuntimeWindowMappingState {
     var isLikelyTransientAXRebuild: Bool {
         RuntimeAXWindowAbsencePolicy.isLikelyTransientRebuild(
             hasObservedAXWindowHandle: hasObservedAXWindowHandle,
-            consecutiveMissingSnapshotCount: consecutiveSnapshotsWithoutAXWindows
+            consecutiveAXCollectionMissCount: consecutiveAXCollectionMisses
         )
     }
 

@@ -1,7 +1,7 @@
 import Foundation
 
 enum RuntimeAXWindowAbsencePolicy {
-    static let transientRebuildGraceMissingSnapshotLimit = 3
+    static let transientRebuildGraceAXCollectionMissLimit = 3
 
     static func isAbsenceAuthoritative(
         remoteScanCompleteness: RuntimeAXRemoteWindowResolver.RemoteScanCompleteness?
@@ -14,40 +14,40 @@ enum RuntimeAXWindowAbsencePolicy {
         }
     }
 
-    static func consecutiveMissingSnapshotCount(
-        hasAXWindowsInCurrentSnapshot: Bool,
-        previousMissingSnapshotCount: Int,
+    static func consecutiveAXCollectionMissCount(
+        hasAXWindowsInCurrentCollection: Bool,
+        previousAXCollectionMissCount: Int,
         absenceIsAuthoritative: Bool
     ) -> Int {
-        if hasAXWindowsInCurrentSnapshot {
+        if hasAXWindowsInCurrentCollection {
             return 0
         }
         if absenceIsAuthoritative {
-            return previousMissingSnapshotCount + 1
+            return previousAXCollectionMissCount + 1
         }
-        return previousMissingSnapshotCount
+        return previousAXCollectionMissCount
     }
 
     static func allowsSpaceOneWithoutCurrentAXHandle(
         hasObservedAXWindowHandle: Bool,
-        hasAXWindowsInCurrentSnapshot: Bool,
+        hasAXWindowsInCurrentCollection: Bool,
         absenceIsAuthoritative: Bool,
-        consecutiveMissingSnapshotCount: Int
+        consecutiveAXCollectionMissCount: Int
     ) -> Bool {
         hasObservedAXWindowHandle
-            && !hasAXWindowsInCurrentSnapshot
+            && !hasAXWindowsInCurrentCollection
             && (
                 !absenceIsAuthoritative
-                    || consecutiveMissingSnapshotCount <= transientRebuildGraceMissingSnapshotLimit
+                    || consecutiveAXCollectionMissCount <= transientRebuildGraceAXCollectionMissLimit
             )
     }
 
     static func isLikelyTransientRebuild(
         hasObservedAXWindowHandle: Bool,
-        consecutiveMissingSnapshotCount: Int
+        consecutiveAXCollectionMissCount: Int
     ) -> Bool {
         guard hasObservedAXWindowHandle else { return false }
-        return consecutiveMissingSnapshotCount > 0
-            && consecutiveMissingSnapshotCount <= transientRebuildGraceMissingSnapshotLimit
+        return consecutiveAXCollectionMissCount > 0
+            && consecutiveAXCollectionMissCount <= transientRebuildGraceAXCollectionMissLimit
     }
 }

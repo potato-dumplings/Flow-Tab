@@ -288,22 +288,22 @@ extension RuntimeSnapshotProvider {
         let currentAXWindowsByID = Dictionary(uniqueKeysWithValues: axWindows.map { ($0.id, $0) })
         let previousState = windowMappingStateByPID[pid] ?? RuntimeWindowMappingState()
         let observedAt = Date.timeIntervalSinceReferenceDate
-        let hasAXWindowsInCurrentSnapshot = !axWindows.isEmpty
+        let hasAXWindowsInCurrentCollection = !axWindows.isEmpty
         let axWindowAbsenceIsAuthoritative = RuntimeAXWindowAbsencePolicy.isAbsenceAuthoritative(
             remoteScanCompleteness: remoteScanCompleteness
         )
-        let hasObservedAXWindowHandle = previousState.hasObservedAXWindowHandle || hasAXWindowsInCurrentSnapshot
-        let consecutiveSnapshotsWithoutAXWindows = RuntimeAXWindowAbsencePolicy.consecutiveMissingSnapshotCount(
-            hasAXWindowsInCurrentSnapshot: hasAXWindowsInCurrentSnapshot,
-            previousMissingSnapshotCount: previousState.consecutiveSnapshotsWithoutAXWindows,
+        let hasObservedAXWindowHandle = previousState.hasObservedAXWindowHandle || hasAXWindowsInCurrentCollection
+        let consecutiveAXCollectionMisses = RuntimeAXWindowAbsencePolicy.consecutiveAXCollectionMissCount(
+            hasAXWindowsInCurrentCollection: hasAXWindowsInCurrentCollection,
+            previousAXCollectionMissCount: previousState.consecutiveAXCollectionMisses,
             absenceIsAuthoritative: axWindowAbsenceIsAuthoritative
         )
         let allowSpaceOneWithoutCurrentAXHandle =
             RuntimeAXWindowAbsencePolicy.allowsSpaceOneWithoutCurrentAXHandle(
                 hasObservedAXWindowHandle: hasObservedAXWindowHandle,
-                hasAXWindowsInCurrentSnapshot: hasAXWindowsInCurrentSnapshot,
+                hasAXWindowsInCurrentCollection: hasAXWindowsInCurrentCollection,
                 absenceIsAuthoritative: axWindowAbsenceIsAuthoritative,
-                consecutiveMissingSnapshotCount: consecutiveSnapshotsWithoutAXWindows
+                consecutiveAXCollectionMissCount: consecutiveAXCollectionMisses
             )
 
         var windowRecordsByCGWindowID = previousState.windowRecordsByCGWindowID
@@ -520,7 +520,7 @@ extension RuntimeSnapshotProvider {
         }
         let currentAXToCG = exactMatchesByAXWindowID
         let lastAXWindowIDs: Set<String>
-        if hasAXWindowsInCurrentSnapshot {
+        if hasAXWindowsInCurrentCollection {
             lastAXWindowIDs = Set(axWindows.map(\.id))
         } else if axWindowAbsenceIsAuthoritative {
             lastAXWindowIDs = []
@@ -533,7 +533,7 @@ extension RuntimeSnapshotProvider {
             validCGWindowIDs: validCGWindowIDs,
             lastAXWindowIDs: lastAXWindowIDs,
             hasObservedAXWindowHandle: hasObservedAXWindowHandle,
-            consecutiveSnapshotsWithoutAXWindows: consecutiveSnapshotsWithoutAXWindows
+            consecutiveAXCollectionMisses: consecutiveAXCollectionMisses
         )
         if nextState.isEmpty {
             windowMappingStateByPID.removeValue(forKey: pid)
@@ -557,7 +557,7 @@ extension RuntimeSnapshotProvider {
             } else {
                 RuntimeLog.debug(
                     .axMatch,
-                    "\(appName) transient-ax-rebuild suspected; keeping space-1 windows missingAXSnapshots=\(consecutiveSnapshotsWithoutAXWindows)/\(RuntimeAXWindowAbsencePolicy.transientRebuildGraceMissingSnapshotLimit)"
+                    "\(appName) transient-ax-rebuild suspected; keeping space-1 windows axCollectionMisses=\(consecutiveAXCollectionMisses)/\(RuntimeAXWindowAbsencePolicy.transientRebuildGraceAXCollectionMissLimit)"
                 )
             }
         }
