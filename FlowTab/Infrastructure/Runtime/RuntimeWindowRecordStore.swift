@@ -53,6 +53,31 @@ final class RuntimeWindowRecordStore {
         )
     }
 
+    func recordWindowFocusVerification(
+        _ verification: RuntimeWindowFocusVerification,
+        now: TimeInterval
+    ) {
+        RuntimeWindowRecordEvidence.recordWindowFocusVerification(
+            verification,
+            now: now,
+            mappingStatesByPID: &mappingStatesByPID
+        )
+    }
+
+    @discardableResult
+    func clearDestroyedAXAttachment(
+        processIdentifier pid: pid_t,
+        axWindowID: String,
+        now: TimeInterval
+    ) -> CGWindowID? {
+        RuntimeWindowRecordEvidence.clearDestroyedAXAttachment(
+            processIdentifier: pid,
+            axWindowID: axWindowID,
+            now: now,
+            mappingStatesByPID: &mappingStatesByPID
+        )
+    }
+
     func cleanup(keepingRunningApps runningApps: [NSRunningApplication]) {
         let runningPIDs = Set(runningApps.map(\.processIdentifier))
         mappingStatesByPID = mappingStatesByPID.filter { runningPIDs.contains($0.key) }

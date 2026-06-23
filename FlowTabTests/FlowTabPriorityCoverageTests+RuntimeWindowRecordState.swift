@@ -98,7 +98,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(state.lastAXWindowIDs, Set(["ax:18405:0", "ax:18405:1"]))
     }
 
-    func testRuntimeWindowMappingStateClearsDestroyedAXAttachmentWithoutDeletingWindowRecord() {
+    func testRuntimeWindowRecordStoreClearsDestroyedAXAttachmentWithoutDeletingWindowRecord() {
         let pid = pid_t(18_405)
         let axWindowID = "ax:18405:0"
         let cgWindowID = CGWindowID(240_001)
@@ -116,18 +116,24 @@ extension FlowTabPriorityCoverageTests {
         )
         record.lastExactAXWindowID = axWindowID
         record.lastConfirmationSource = .publicExactMatch
-        var state = RuntimeWindowMappingState(
-            windowRecordsByCGWindowID: [cgWindowID: record],
-            currentAXToCG: [axWindowID: cgWindowID],
-            validCGWindowIDs: [cgWindowID],
-            lastAXWindowIDs: [axWindowID]
+        let store = RuntimeWindowRecordStore(
+            mappingStatesByPID: [
+                pid: RuntimeWindowMappingState(
+                    windowRecordsByCGWindowID: [cgWindowID: record],
+                    currentAXToCG: [axWindowID: cgWindowID],
+                    validCGWindowIDs: [cgWindowID],
+                    lastAXWindowIDs: [axWindowID]
+                )
+            ]
         )
 
-        let affectedCGWindowID = state.clearDestroyedAXAttachment(
+        let affectedCGWindowID = store.clearDestroyedAXAttachment(
+            processIdentifier: pid,
             axWindowID: axWindowID,
-            observedAt: 11
+            now: 11
         )
-        let downgradedRecord = state.windowRecordsByCGWindowID[cgWindowID]
+        let state = store.mappingStatesByPID[pid]
+        let downgradedRecord = state?.windowRecordsByCGWindowID[cgWindowID]
 
         XCTAssertEqual(affectedCGWindowID, cgWindowID)
         XCTAssertNil(downgradedRecord?.currentAXAttachment)
@@ -136,9 +142,9 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(downgradedRecord?.bindingConfidence, .sticky)
         XCTAssertTrue(downgradedRecord?.needsReconciliation == true)
         XCTAssertEqual(downgradedRecord?.lastReconciliationMarkedAt, 11)
-        XCTAssertNil(state.currentAXToCG[axWindowID])
-        XCTAssertNil(state.currentCGToAX[cgWindowID])
-        XCTAssertFalse(state.lastAXWindowIDs.contains(axWindowID))
+        XCTAssertNil(state?.currentAXToCG[axWindowID])
+        XCTAssertNil(state?.currentCGToAX[cgWindowID])
+        XCTAssertFalse(state?.lastAXWindowIDs.contains(axWindowID) == true)
     }
 
     func testRuntimeWindowRecordStoreGroupsAffectedCGWindowIDsByPIDFromCurrentAndRecordedFacts() {

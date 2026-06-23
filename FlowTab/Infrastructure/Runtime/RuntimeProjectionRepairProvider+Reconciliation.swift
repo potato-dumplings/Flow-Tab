@@ -9,11 +9,10 @@ extension RuntimeProjectionRepairProvider {
         axWindowID: String,
         now: TimeInterval
     ) -> CGWindowID? {
-        let affectedCGWindowID = RuntimeWindowRecordEvidence.clearDestroyedAXAttachment(
+        let affectedCGWindowID = runtimeFactProvider.windowRecordStore.clearDestroyedAXAttachment(
             processIdentifier: pid,
             axWindowID: axWindowID,
-            now: now,
-            mappingStatesByPID: &runtimeFactProvider.windowRecordStore.mappingStatesByPID
+            now: now
         )
         runtimeFactProvider.reconciliationCoordinator.markAppDirty(
             appID: appID,
@@ -35,10 +34,9 @@ extension RuntimeProjectionRepairProvider {
         _ verification: RuntimeWindowFocusVerification,
         now: TimeInterval
     ) -> Set<CGWindowID> {
-        RuntimeWindowRecordEvidence.recordWindowFocusVerification(
+        runtimeFactProvider.windowRecordStore.recordWindowFocusVerification(
             verification,
-            now: now,
-            mappingStatesByPID: &runtimeFactProvider.windowRecordStore.mappingStatesByPID
+            now: now
         )
         runtimeFactProvider.reconciliationCoordinator.markWindowFocusVerified(verification, now: now)
         return verification.affectedCGWindowIDs
