@@ -196,7 +196,7 @@ enum RuntimeWindowMappingTestSupport {
         pid: pid_t
     ) -> RuntimeSnapshotProvider {
         let provider = RuntimeSnapshotProvider()
-        provider.windowMappingStateByPID[pid] = windowMappingState(
+        provider.windowRecordStore.mappingStatesByPID[pid] = windowMappingState(
             previousMatches: previousMatches,
             previousAXWindowIDs: previousAXWindowIDs,
             previousCGWindowIDs: previousCGWindowIDs,

@@ -1370,13 +1370,13 @@ extension FlowTabPriorityCoverageTests {
             previous,
             now: 1,
             reconciliationCoordinator: coordinator,
-            mappingStatesByPID: &provider.windowMappingStateByPID
+            mappingStatesByPID: &provider.windowRecordStore.mappingStatesByPID
         )
         let diff = RuntimeWindowRecordEvidence.recordSpaceTopologySnapshot(
             current,
             now: 2,
             reconciliationCoordinator: coordinator,
-            mappingStatesByPID: &provider.windowMappingStateByPID
+            mappingStatesByPID: &provider.windowRecordStore.mappingStatesByPID
         )
         let request = coordinator.readyRequests(now: 2).first
 
@@ -1446,9 +1446,9 @@ extension FlowTabPriorityCoverageTests {
             previous,
             now: 1,
             reconciliationCoordinator: coordinator,
-            mappingStatesByPID: &provider.windowMappingStateByPID
+            mappingStatesByPID: &provider.windowRecordStore.mappingStatesByPID
         )
-        provider.windowMappingStateByPID[pid] = RuntimeWindowMappingState(
+        provider.windowRecordStore.mappingStatesByPID[pid] = RuntimeWindowMappingState(
             windowRecordsByCGWindowID: [
                 removedSpaceWindowID: removedSpaceRecord,
                 addedSpaceWindowID: addedSpaceRecord,
@@ -1459,9 +1459,9 @@ extension FlowTabPriorityCoverageTests {
             current,
             now: 2,
             reconciliationCoordinator: coordinator,
-            mappingStatesByPID: &provider.windowMappingStateByPID
+            mappingStatesByPID: &provider.windowRecordStore.mappingStatesByPID
         )
-        let records = provider.windowMappingStateByPID[pid]?.windowRecordsByCGWindowID
+        let records = provider.windowRecordStore.mappingStatesByPID[pid]?.windowRecordsByCGWindowID
 
         XCTAssertEqual(diff.removedSpaceIDs, [10])
         XCTAssertEqual(diff.addedSpaceIDs, [11])
@@ -1554,7 +1554,7 @@ extension FlowTabPriorityCoverageTests {
             )
         )
         let repairProvider = RuntimeProjectionRepairProvider(runtimeFactProvider: provider)
-        provider.windowMappingStateByPID[recordedPID] = RuntimeWindowMappingState(
+        provider.windowRecordStore.mappingStatesByPID[recordedPID] = RuntimeWindowMappingState(
             windowRecordsByCGWindowID: [
                 recordedWindowID: RuntimeWindowRecord(
                     cgWindowID: recordedWindowID,
@@ -1605,7 +1605,7 @@ extension FlowTabPriorityCoverageTests {
             stableWindowID: "cg:\(pid):\(provisionalWindowID)",
             firstSeenAt: 10
         )
-        provider.windowMappingStateByPID[pid] = RuntimeWindowMappingState(
+        provider.windowRecordStore.mappingStatesByPID[pid] = RuntimeWindowMappingState(
             windowRecordsByCGWindowID: [
                 exactWindowID: exactRecord,
                 provisionalWindowID: provisionalRecord
@@ -1696,7 +1696,7 @@ extension FlowTabPriorityCoverageTests {
         )
         record.lastExactAXWindowID = axWindowID
         record.lastConfirmationSource = .publicExactMatch
-        provider.windowMappingStateByPID[pid] = RuntimeWindowMappingState(
+        provider.windowRecordStore.mappingStatesByPID[pid] = RuntimeWindowMappingState(
             windowRecordsByCGWindowID: [cgWindowID: record],
             currentAXToCG: [axWindowID: cgWindowID],
             validCGWindowIDs: [cgWindowID],
@@ -1723,7 +1723,7 @@ extension FlowTabPriorityCoverageTests {
         _ = service.drainReadyReconciliationRequestsSynchronouslyForTesting()
 
         let request = try XCTUnwrap(executedRequests.first)
-        let downgradedRecord = provider.windowMappingStateByPID[pid]?
+        let downgradedRecord = provider.windowRecordStore.mappingStatesByPID[pid]?
             .windowRecordsByCGWindowID[cgWindowID]
         XCTAssertEqual(request.target, .app(pid))
         XCTAssertEqual(request.appID, "com.example.editor")
@@ -1846,7 +1846,7 @@ extension FlowTabPriorityCoverageTests {
         let liveAXWindow = AXUIElementCreateApplication(pid)
         AXLiveWindowRegistry.shared.replaceWindows(forPID: pid, with: [liveAXWindow])
         defer { AXLiveWindowRegistry.shared.remove(pid: pid) }
-        provider.windowMappingStateByPID[pid] = RuntimeWindowMappingState(
+        provider.windowRecordStore.mappingStatesByPID[pid] = RuntimeWindowMappingState(
             windowRecordsByCGWindowID: [
                 cgWindowID: RuntimeWindowRecord(
                     cgWindowID: cgWindowID,
@@ -1870,7 +1870,7 @@ extension FlowTabPriorityCoverageTests {
         service.signalAppTerminated(appID: "com.example.terminated", pid: pid)
         _ = service.drainReadyReconciliationRequestsSynchronouslyForTesting(now: 11)
 
-        XCTAssertNil(provider.windowMappingStateByPID[pid])
+        XCTAssertNil(provider.windowRecordStore.mappingStatesByPID[pid])
         XCTAssertTrue(AXLiveWindowRegistry.shared.windows(forPID: pid).isEmpty)
         XCTAssertFalse(coordinator.readyRequests(now: 11).contains { $0.id == request.id })
     }
@@ -1882,7 +1882,7 @@ extension FlowTabPriorityCoverageTests {
         let focusedCGWindowID = CGWindowID(240_001)
         let focusedAXWindow = AXUIElementCreateApplication(pid)
         let focusedAXWindowID = AXWindowInspectorForTesting.makeWindowID(pid: pid, index: 0)
-        provider.windowMappingStateByPID[pid] = RuntimeWindowMappingState(
+        provider.windowRecordStore.mappingStatesByPID[pid] = RuntimeWindowMappingState(
             windowRecordsByCGWindowID: [
                 focusedCGWindowID: RuntimeWindowRecord(
                     cgWindowID: focusedCGWindowID,
@@ -1928,11 +1928,11 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(request.reasons, Set([.activationVerified]))
         XCTAssertEqual(request.affectedCGWindowIDs, Set<CGWindowID>([focusedCGWindowID]))
         XCTAssertEqual(request.state, .inFlight)
-        let record = try XCTUnwrap(provider.windowMappingStateByPID[pid]?.windowRecordsByCGWindowID[focusedCGWindowID])
+        let record = try XCTUnwrap(provider.windowRecordStore.mappingStatesByPID[pid]?.windowRecordsByCGWindowID[focusedCGWindowID])
         XCTAssertEqual(record.bindingConfidence, .exact)
         XCTAssertEqual(record.lastConfirmationSource, .verifiedFocusReadback)
         XCTAssertEqual(record.lastExactAXWindowID, focusedAXWindowID)
-        XCTAssertEqual(provider.windowMappingStateByPID[pid]?.currentAXToCG[focusedAXWindowID], focusedCGWindowID)
+        XCTAssertEqual(provider.windowRecordStore.mappingStatesByPID[pid]?.currentAXToCG[focusedAXWindowID], focusedCGWindowID)
         XCTAssertTrue(coordinator.readyRequests(now: Date.timeIntervalSinceReferenceDate).isEmpty)
     }
 
@@ -1976,7 +1976,7 @@ extension FlowTabPriorityCoverageTests {
         let request = try XCTUnwrap(executedRequests.first)
         XCTAssertEqual(request.target, .app(pid))
         XCTAssertEqual(request.affectedCGWindowIDs, Set<CGWindowID>([focusedCGWindowID]))
-        let mappingState = try XCTUnwrap(provider.windowMappingStateByPID[pid])
+        let mappingState = try XCTUnwrap(provider.windowRecordStore.mappingStatesByPID[pid])
         let record = try XCTUnwrap(mappingState.windowRecordsByCGWindowID[focusedCGWindowID])
         XCTAssertEqual(record.bindingConfidence, .exact)
         XCTAssertEqual(record.lastConfirmationSource, .verifiedFocusReadback)
@@ -2028,7 +2028,7 @@ extension FlowTabPriorityCoverageTests {
         let request = try XCTUnwrap(executedRequests.first)
         XCTAssertEqual(request.target, .app(pid))
         XCTAssertEqual(request.affectedCGWindowIDs, Set<CGWindowID>([focusedCGWindowID]))
-        let mappingState = try XCTUnwrap(provider.windowMappingStateByPID[pid])
+        let mappingState = try XCTUnwrap(provider.windowRecordStore.mappingStatesByPID[pid])
         let record = try XCTUnwrap(mappingState.windowRecordsByCGWindowID[focusedCGWindowID])
         XCTAssertEqual(record.bindingConfidence, .exact)
         XCTAssertEqual(record.lastConfirmationSource, .verifiedFocusReadback)

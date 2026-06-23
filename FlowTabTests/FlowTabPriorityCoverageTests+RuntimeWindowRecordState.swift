@@ -592,7 +592,7 @@ extension FlowTabPriorityCoverageTests {
             invalidatedAt: now - 2
         )
         staleRecord.suspectDeletedAt = now - 2
-        provider.windowMappingStateByPID[pid] = RuntimeWindowMappingState(
+        provider.windowRecordStore.mappingStatesByPID[pid] = RuntimeWindowMappingState(
             windowRecordsByCGWindowID: [250_000: staleRecord]
         )
 
@@ -604,7 +604,7 @@ extension FlowTabPriorityCoverageTests {
         )
 
         XCTAssertTrue(resolution.windowRecordsByCGWindowID.isEmpty)
-        XCTAssertNil(provider.windowMappingStateByPID[pid])
+        XCTAssertNil(provider.windowRecordStore.mappingStatesByPID[pid])
     }
 
     func testRuntimeSnapshotProviderWindowLayerExposesInGraceStickyRecordWithoutCurrentCGEvidence() {
@@ -629,7 +629,7 @@ extension FlowTabPriorityCoverageTests {
             invalidatedAt: now
         )
         record.suspectDeletedAt = now
-        provider.windowMappingStateByPID[pid] = RuntimeWindowMappingState(
+        provider.windowRecordStore.mappingStatesByPID[pid] = RuntimeWindowMappingState(
             windowRecordsByCGWindowID: [250_001: record]
         )
 
@@ -668,7 +668,7 @@ extension FlowTabPriorityCoverageTests {
             invalidatedAt: now
         )
         record.suspectDeletedAt = now
-        provider.windowMappingStateByPID[pid] = RuntimeWindowMappingState(
+        provider.windowRecordStore.mappingStatesByPID[pid] = RuntimeWindowMappingState(
             windowRecordsByCGWindowID: [250_002: record]
         )
 

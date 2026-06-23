@@ -11,11 +11,6 @@ final class RuntimeSnapshotProvider {
     let windowRecordStore: RuntimeWindowRecordStore
     let reconciliationCoordinator: RuntimeReconciliationCoordinator
 
-    var windowMappingStateByPID: [pid_t: RuntimeWindowMappingState] {
-        get { windowRecordStore.mappingStatesByPID }
-        set { windowRecordStore.mappingStatesByPID = newValue }
-    }
-
     init(
         cgWindowListProvider: RuntimeCGWindowListProviding = RuntimeSystemCGWindowListProvider(),
         spaceTopologyProvider: RuntimeSpaceTopologyProviding = RuntimeSystemSpaceTopologyProvider(),
