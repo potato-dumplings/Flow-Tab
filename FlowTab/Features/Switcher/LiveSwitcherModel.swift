@@ -277,6 +277,7 @@ final class LiveSwitcherModel: ObservableObject {
     var runtimeProjectionMaintenanceEnabled = true
     var selectedAppWindowProjectionGeneration: UInt64 = 0
     var selectedAppWindowProjectionPendingAppID: String?
+    var pendingManualWindowLayerEntryAppID: String?
     var lastProjectionInvalidationRecord: ProjectionInvalidationRecord?
     var lastRuntimeProjectionMaintenanceDiagnostic: RuntimeProjectionMaintenanceDiagnostic?
     var lastSearchIndexReadDiagnostic: SearchIndexReadDiagnostic?
@@ -755,6 +756,7 @@ final class LiveSwitcherModel: ObservableObject {
         let currentAppID = session.selectedApp.id
         if currentAppID != previousAppID {
             autoEnterSuppressedAppID = nil
+            pendingManualWindowLayerEntryAppID = nil
         }
 
         if
@@ -771,6 +773,19 @@ final class LiveSwitcherModel: ObservableObject {
             keyInput == .downArrow
         {
             autoEnterSuppressedAppID = nil
+            pendingManualWindowLayerEntryAppID = nil
+        } else if
+            case .appCycle = previousMode,
+            case .appCycle = session.mode,
+            keyInput == .downArrow,
+            currentAppID == previousAppID,
+            session.selectedApp.windows.isEmpty
+        {
+            pendingManualWindowLayerEntryAppID = currentAppID
+            RuntimeLog.debug(
+                .projection,
+                "manualWindowLayerEntry result=pending appID=\(currentAppID)"
+            )
         }
         self.session = session
     }
@@ -783,6 +798,7 @@ final class LiveSwitcherModel: ObservableObject {
         guard session.selectApp(withID: appID) else { return false }
         if session.selectedApp.id != previousAppID {
             autoEnterSuppressedAppID = nil
+            pendingManualWindowLayerEntryAppID = nil
         }
         self.session = session
         return true
@@ -796,6 +812,7 @@ final class LiveSwitcherModel: ObservableObject {
         guard session.selectWindow(appID: appID, windowID: windowID) else { return false }
         if session.selectedApp.id != previousAppID {
             autoEnterSuppressedAppID = nil
+            pendingManualWindowLayerEntryAppID = nil
         }
         self.session = session
         return true
@@ -883,6 +900,7 @@ final class LiveSwitcherModel: ObservableObject {
         runtimeContextsByID = [:]
         clearPreviewSnapshotState()
         autoEnterSuppressedAppID = nil
+        pendingManualWindowLayerEntryAppID = nil
         titleBarStyleInferenceEnabled = false
     }
 

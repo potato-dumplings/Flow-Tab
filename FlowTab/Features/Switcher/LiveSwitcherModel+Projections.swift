@@ -291,6 +291,13 @@ extension LiveSwitcherModel {
             } else {
                 _ = rebuiltSession.enterWindowCycle(allowSingleWindow: false)
             }
+        } else if pendingManualWindowLayerEntryAppID == appID {
+            let enteredWindowLayer = rebuiltSession.enterWindowCycle(allowSingleWindow: false)
+            RuntimeLog.debug(
+                .projection,
+                "manualWindowLayerEntry result=\(enteredWindowLayer ? "entered" : "notReady") appID=\(appID) windows=\(rebuiltSession.selectedApp.windows.count)"
+            )
+            pendingManualWindowLayerEntryAppID = nil
         }
 
         session = rebuiltSession
@@ -311,6 +318,7 @@ extension LiveSwitcherModel {
     ) {
         selectedAppWindowProjectionGeneration &+= 1
         selectedAppWindowProjectionPendingAppID = nil
+        pendingManualWindowLayerEntryAppID = nil
         recordProjectionInvalidation(
             reason: reason,
             scope: .selectedAppWindowProjection,

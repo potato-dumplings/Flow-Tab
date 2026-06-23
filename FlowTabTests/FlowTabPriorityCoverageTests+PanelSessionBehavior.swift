@@ -501,6 +501,80 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testLiveSwitcherModelReplaysManualWindowLayerEntryAfterSelectedAppProjectionApplies() {
+        let appID = "com.example.projected-window-layer-entry"
+        let runningApp = NSRunningApplication.current
+        let appOnlyCandidate = AppSwitchCandidate(
+            id: appID,
+            displayName: "Projected Window Layer Entry",
+            groupID: "projected-window-layer-entry",
+            lastActiveAt: 100,
+            windows: []
+        )
+        let windows = [
+            WindowCandidate(id: "projected-entry-1", title: "Projected Entry One", isMinimized: false, lastActiveAt: 20),
+            WindowCandidate(id: "projected-entry-2", title: "Projected Entry Two", isMinimized: false, lastActiveAt: 10)
+        ]
+        let windowCandidate = AppSwitchCandidate(
+            id: appID,
+            displayName: "Projected Window Layer Entry",
+            groupID: "projected-window-layer-entry",
+            lastActiveAt: 100,
+            windows: windows
+        )
+        let context = makeRuntimeAppContext(appID: appID, runningApp: runningApp, windows: windows)
+        let selectedCurrentAppWindowPayload = RuntimeCurrentAppWindowPayload(
+            summary: RuntimeHomeAppSummary(
+                appID: appID,
+                displayName: "Projected Window Layer Entry",
+                groupID: "projected-window-layer-entry",
+                lastActiveAt: 100,
+                windowCount: windows.count,
+                pid: runningApp.processIdentifier
+            ),
+            candidate: windowCandidate,
+            context: context,
+            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: runningApp)]
+        )
+        let freshness = RuntimeProjectionFreshness(
+            generatedAt: 12,
+            sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+            dirtyAppIDs: [],
+            dirtyPIDs: [],
+            dirtyCGWindowIDs: [],
+            pendingRepairScopes: [],
+            isCompleteForScope: true
+        )
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
+            appSwitcherProjection: RuntimeAppSwitcherProjection(
+                apps: [appOnlyCandidate],
+                contextsByID: [appID: context],
+                freshness: freshness
+            ),
+            currentAppWindowProjectionsByAppID: [
+                appID: RuntimeCurrentAppWindowProjection(
+                    appID: appID,
+                    currentAppWindowPayload: selectedCurrentAppWindowPayload,
+                    freshness: freshness
+                )
+            ]
+        )
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
+        model.runtimeProjectionMaintenanceEnabled = false
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        model.handle(.downArrow)
+        XCTAssertEqual(model.session?.mode, .appCycle)
+
+        XCTAssertTrue(model.scheduleSelectedAppWindowProjectionIfNeeded(for: appID))
+
+        XCTAssertEqual(model.session?.mode, .windowCycle(appID: appID))
+        XCTAssertEqual(model.session?.selectedApp.windows.map(\.id), ["projected-entry-1", "projected-entry-2"])
+        XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 1)
+        XCTAssertTrue(runtimeProjectionService.selectedCurrentAppWindowChangeSignalsRecorded().isEmpty)
+    }
+
+    @MainActor
     func testLiveSwitcherModelSelectedAppWindowProjectionSignalsRuntimeRepairWhenProjectionIsMissing() {
         let appID = "com.example.missing-window-projection"
         let runningApp = NSRunningApplication.current
