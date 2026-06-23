@@ -1,6 +1,16 @@
 import CoreGraphics
 import Foundation
 
+struct RuntimeAppWindowReconciliationResult {
+    let pid: pid_t
+    let affectedCGWindowIDs: Set<CGWindowID>
+    let knownAffectedCGWindowIDs: Set<CGWindowID>
+    let exactAffectedCGWindowIDs: Set<CGWindowID>
+    let currentAppWindowPayload: RuntimeCurrentAppWindowPayload?
+    let currentAppWindowPayloadWasEmpty: Bool
+    let isTransientEmptyCurrentAppWindowPayload: Bool
+}
+
 protocol RuntimeProjectionRepairProviding: AnyObject {
     func reconcileAppWindows(
         processIdentifier pid: pid_t,

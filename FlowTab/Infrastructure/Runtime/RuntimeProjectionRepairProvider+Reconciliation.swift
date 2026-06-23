@@ -2,16 +2,6 @@ import CoreGraphics
 import Foundation
 import FlowTabCore
 
-struct RuntimeAppWindowReconciliationResult {
-    let pid: pid_t
-    let affectedCGWindowIDs: Set<CGWindowID>
-    let knownAffectedCGWindowIDs: Set<CGWindowID>
-    let exactAffectedCGWindowIDs: Set<CGWindowID>
-    let currentAppWindowPayload: RuntimeCurrentAppWindowPayload?
-    let currentAppWindowPayloadWasEmpty: Bool
-    let isTransientEmptyCurrentAppWindowPayload: Bool
-}
-
 extension RuntimeProjectionRepairProvider {
     func signalAXWindowDestroyed(
         appID: String,
