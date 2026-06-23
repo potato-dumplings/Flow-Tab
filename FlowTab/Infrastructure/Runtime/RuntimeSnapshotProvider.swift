@@ -3,6 +3,8 @@ import ApplicationServices
 import Foundation
 import FlowTabCore
 
+private typealias FactDiagnostics = RuntimeFactCollectionDiagnostics
+
 final class RuntimeSnapshotProvider {
     private let cgWindowListProvider: RuntimeCGWindowListProviding
     private let spaceTopologyProvider: RuntimeSpaceTopologyProviding
@@ -28,12 +30,12 @@ final class RuntimeSnapshotProvider {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
         guard AccessibilityPermissionChecker.isTrusted() else {
             RuntimeLog.warning(.ax, "not trusted; all app windows will be reported as 0")
-            logRuntimeFactTiming(
+            FactDiagnostics.logTiming(
                 "collectAXWindowData",
                 fields: [
                     ("result", "notTrusted"),
                     ("apps", "\(runningApps.count)"),
-                    ("totalMs", formatRuntimeFactMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))
+                    ("totalMs", FactDiagnostics.formatMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))
                 ]
             )
             return [:]
@@ -90,12 +92,12 @@ final class RuntimeSnapshotProvider {
             totalRawWindows += windows.count
             totalSwitchableWindows += axEntries.count
             totalResolvedWindows += resolvedEntries.count
-            logRuntimeFactTiming(
+            FactDiagnostics.logTiming(
                 "collectAXApp",
                 fields: [
-                    ("appID", logAppIdentifier(app)),
+                    ("appID", FactDiagnostics.logAppIdentifier(app)),
                     ("pid", "\(app.processIdentifier)"),
-                    ("name", logAppName(appName)),
+                    ("name", FactDiagnostics.logAppName(appName)),
                     ("cgOnscreen", "\(collection.cgWindows.count)"),
                     ("cgAll", "\(collection.allCGWindows.count)"),
                     ("rawAX", "\(windows.count)"),
@@ -106,16 +108,16 @@ final class RuntimeSnapshotProvider {
                     ("includeRemote", collection.shouldIncludeRemoteAXWindows ? "1" : "0"),
                     ("publicError", "\(publicWindowsFetchResult.error.rawValue)"),
                     ("finalError", "\(windowsFetchResult.error.rawValue)"),
-                    ("cgPrepMs", formatRuntimeFactMilliseconds(collection.cgPrepMs)),
-                    ("publicFetchMs", formatRuntimeFactMilliseconds(collection.publicFetchMs)),
-                    ("publicSwitchableMs", formatRuntimeFactMilliseconds(collection.publicSwitchableMs)),
-                    ("remoteDecisionMs", formatRuntimeFactMilliseconds(collection.remoteDecisionMs)),
-                    ("finalFetchMs", formatRuntimeFactMilliseconds(collection.finalFetchMs)),
-                    ("registryMs", formatRuntimeFactMilliseconds(registryReadyMs - registryStartMs)),
-                    ("axInspectMs", formatRuntimeFactMilliseconds(collection.axInspectMs)),
-                    ("topologyLogMs", formatRuntimeFactMilliseconds(topologyLogReadyMs - registryReadyMs)),
-                    ("resolveMs", formatRuntimeFactMilliseconds(resolveReadyMs - topologyLogReadyMs)),
-                    ("totalMs", formatRuntimeFactMilliseconds(collection.totalMs + resolveReadyMs - registryStartMs))
+                    ("cgPrepMs", FactDiagnostics.formatMilliseconds(collection.cgPrepMs)),
+                    ("publicFetchMs", FactDiagnostics.formatMilliseconds(collection.publicFetchMs)),
+                    ("publicSwitchableMs", FactDiagnostics.formatMilliseconds(collection.publicSwitchableMs)),
+                    ("remoteDecisionMs", FactDiagnostics.formatMilliseconds(collection.remoteDecisionMs)),
+                    ("finalFetchMs", FactDiagnostics.formatMilliseconds(collection.finalFetchMs)),
+                    ("registryMs", FactDiagnostics.formatMilliseconds(registryReadyMs - registryStartMs)),
+                    ("axInspectMs", FactDiagnostics.formatMilliseconds(collection.axInspectMs)),
+                    ("topologyLogMs", FactDiagnostics.formatMilliseconds(topologyLogReadyMs - registryReadyMs)),
+                    ("resolveMs", FactDiagnostics.formatMilliseconds(resolveReadyMs - topologyLogReadyMs)),
+                    ("totalMs", FactDiagnostics.formatMilliseconds(collection.totalMs + resolveReadyMs - registryStartMs))
                 ]
             )
             guard !resolvedEntries.isEmpty else { continue }
@@ -128,7 +130,7 @@ final class RuntimeSnapshotProvider {
             )
             windowsByPID[app.processIdentifier] = resolvedEntries
         }
-        logRuntimeFactTiming(
+        FactDiagnostics.logTiming(
             "collectAXWindowData",
             fields: [
                 ("result", "ready"),
@@ -138,7 +140,7 @@ final class RuntimeSnapshotProvider {
                 ("switchableAX", "\(totalSwitchableWindows)"),
                 ("resolved", "\(totalResolvedWindows)"),
                 ("concurrency", "\(RuntimeAXAppCollectionCoordinator.maxConcurrentCollections)"),
-                ("totalMs", formatRuntimeFactMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))
+                ("totalMs", FactDiagnostics.formatMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))
             ]
         )
         return windowsByPID
@@ -266,12 +268,12 @@ final class RuntimeSnapshotProvider {
                 relativeToWindow: kCGNullWindowID
             )
         else {
-            logRuntimeFactTiming(
+            FactDiagnostics.logTiming(
                 "collectCGWindows",
                 fields: [
                     ("result", "copyFailed"),
                     ("scope", options.contains(.optionOnScreenOnly) ? "onscreen" : "all"),
-                    ("totalMs", formatRuntimeFactMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))
+                    ("totalMs", FactDiagnostics.formatMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))
                 ]
             )
             return RuntimeCGWindowCollection(windowsByPID: [:], spaceTopologyDiff: nil)
@@ -317,7 +319,7 @@ final class RuntimeSnapshotProvider {
         let spaceReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let scope = options.contains(.optionOnScreenOnly) ? "onscreen" : "all"
         let signatureLogFields = spaceTopologyDiff.signatureLogFields
-        logRuntimeFactTiming(
+        FactDiagnostics.logTiming(
             "collectCGWindows",
             fields: [
                 ("result", "ready"),
@@ -328,10 +330,10 @@ final class RuntimeSnapshotProvider {
                 ("spaceIDs", "\(spaceIDsByWindowID.count)"),
                 ("affected", "\(spaceTopologyDiff.affectedCGWindowIDs.count)")
             ] + signatureLogFields + [
-                ("copyMs", formatRuntimeFactMilliseconds(copyReadyMs - startMs)),
-                ("parseMs", formatRuntimeFactMilliseconds(parseReadyMs - copyReadyMs)),
-                ("spaceMs", formatRuntimeFactMilliseconds(spaceReadyMs - parseReadyMs)),
-                ("totalMs", formatRuntimeFactMilliseconds(spaceReadyMs - startMs))
+                ("copyMs", FactDiagnostics.formatMilliseconds(copyReadyMs - startMs)),
+                ("parseMs", FactDiagnostics.formatMilliseconds(parseReadyMs - copyReadyMs)),
+                ("spaceMs", FactDiagnostics.formatMilliseconds(spaceReadyMs - parseReadyMs)),
+                ("totalMs", FactDiagnostics.formatMilliseconds(spaceReadyMs - startMs))
             ]
         )
         let enrichedWindowsByPID = RuntimeCGWindowFacts.mergingSpaceTopology(
