@@ -386,7 +386,7 @@ extension RuntimeSnapshotProvider {
             assignedCGWindowIDs: Set(exactMatchesByAXWindowID.values),
             appName: appName
         )
-        applyExactMatches(
+        RuntimeWindowRecord.applyExactMatches(
             publicMatchResolution.directMatches,
             source: .publicExactMatch,
             pid: pid,
@@ -397,7 +397,7 @@ extension RuntimeSnapshotProvider {
             windowRecordsByCGWindowID: &windowRecordsByCGWindowID,
             exactMatchesByAXWindowID: &exactMatchesByAXWindowID
         )
-        applyExactMatches(
+        RuntimeWindowRecord.applyExactMatches(
             publicMatchResolution.reboundMatches,
             source: .fullscreenContentRebinding,
             pid: pid,
@@ -424,7 +424,7 @@ extension RuntimeSnapshotProvider {
             assignedCGWindowIDs: Set(exactMatchesByAXWindowID.values),
             appName: appName
         )
-        applyExactMatches(
+        RuntimeWindowRecord.applyExactMatches(
             privateMatchResolution.directMatches,
             source: .privateExactBridge,
             pid: pid,
@@ -435,7 +435,7 @@ extension RuntimeSnapshotProvider {
             windowRecordsByCGWindowID: &windowRecordsByCGWindowID,
             exactMatchesByAXWindowID: &exactMatchesByAXWindowID
         )
-        applyExactMatches(
+        RuntimeWindowRecord.applyExactMatches(
             privateMatchResolution.reboundMatches,
             source: .fullscreenContentRebinding,
             pid: pid,
@@ -456,7 +456,7 @@ extension RuntimeSnapshotProvider {
             assignedCGWindowIDs: Set(exactMatchesByAXWindowID.values),
             appName: appName
         )
-        applyExactMatches(
+        RuntimeWindowRecord.applyExactMatches(
             desktopSiblingMatches,
             source: .desktopSiblingBinding,
             pid: pid,
@@ -478,7 +478,7 @@ extension RuntimeSnapshotProvider {
             appName: appName
         )
         bindingDiagnostics.append(contentsOf: fullscreenContentFallbackResult.bindingDiagnostics)
-        applyExactMatches(
+        RuntimeWindowRecord.applyExactMatches(
             fullscreenContentFallbackResult.matches,
             source: .fullscreenContentFallbackBinding,
             pid: pid,
@@ -559,44 +559,6 @@ extension RuntimeSnapshotProvider {
             allowSpaceOneWithoutCurrentAXHandle: allowSpaceOneWithoutCurrentAXHandle,
             bindingDiagnostics: bindingDiagnostics
         )
-    }
-
-    private func applyExactMatches(
-        _ matches: [String: CGWindowID],
-        source: WindowBindingConfirmationSource,
-        pid: pid_t,
-        currentAXWindowsByID: [String: RuntimeAXWindowEntry],
-        knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry],
-        appName: String,
-        observedAt: TimeInterval,
-        windowRecordsByCGWindowID: inout [CGWindowID: RuntimeWindowRecord],
-        exactMatchesByAXWindowID: inout [String: CGWindowID]
-    ) {
-        for (axWindowID, cgWindowID) in matches {
-            guard let axWindow = currentAXWindowsByID[axWindowID] else { continue }
-            var record = windowRecordsByCGWindowID[cgWindowID]
-                ?? RuntimeWindowRecord(
-                    cgWindowID: cgWindowID,
-                    stableWindowID: RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindowID),
-                    firstSeenAt: observedAt
-                )
-            let resolvedTitle = RuntimeWindowTitleResolver.stableWindowTitle(
-                sourceTitle: axWindow.sourceTitle,
-                matchedCGTitle: knownCGWindowsByID[cgWindowID]?.title,
-                appName: appName,
-                fallbackIndex: axWindow.index,
-                refreshedAXTitle: nil
-            )
-            record.applyExactMatch(
-                axWindow: axWindow,
-                resolvedTitle: resolvedTitle,
-                confirmationSource: source,
-                observedAt: observedAt,
-                matchedCGWindow: knownCGWindowsByID[cgWindowID]
-            )
-            windowRecordsByCGWindowID[cgWindowID] = record
-            exactMatchesByAXWindowID[axWindowID] = cgWindowID
-        }
     }
 
 }

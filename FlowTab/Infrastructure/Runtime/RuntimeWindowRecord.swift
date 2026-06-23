@@ -534,6 +534,44 @@ struct RuntimeWindowRecord {
         return validCGWindows + synthesizedWindows
     }
 
+    static func applyExactMatches(
+        _ matches: [String: CGWindowID],
+        source: WindowBindingConfirmationSource,
+        pid: pid_t,
+        currentAXWindowsByID: [String: RuntimeAXWindowEntry],
+        knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry],
+        appName: String,
+        observedAt: TimeInterval,
+        windowRecordsByCGWindowID: inout [CGWindowID: RuntimeWindowRecord],
+        exactMatchesByAXWindowID: inout [String: CGWindowID]
+    ) {
+        for (axWindowID, cgWindowID) in matches {
+            guard let axWindow = currentAXWindowsByID[axWindowID] else { continue }
+            var record = windowRecordsByCGWindowID[cgWindowID]
+                ?? RuntimeWindowRecord(
+                    cgWindowID: cgWindowID,
+                    stableWindowID: RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindowID),
+                    firstSeenAt: observedAt
+                )
+            let resolvedTitle = RuntimeWindowTitleResolver.stableWindowTitle(
+                sourceTitle: axWindow.sourceTitle,
+                matchedCGTitle: knownCGWindowsByID[cgWindowID]?.title,
+                appName: appName,
+                fallbackIndex: axWindow.index,
+                refreshedAXTitle: nil
+            )
+            record.applyExactMatch(
+                axWindow: axWindow,
+                resolvedTitle: resolvedTitle,
+                confirmationSource: source,
+                observedAt: observedAt,
+                matchedCGWindow: knownCGWindowsByID[cgWindowID]
+            )
+            windowRecordsByCGWindowID[cgWindowID] = record
+            exactMatchesByAXWindowID[axWindowID] = cgWindowID
+        }
+    }
+
     func canReuseStickyBinding(with axWindow: RuntimeAXWindowEntry) -> Bool {
         let normalizedBindingTitle = normalizedRuntimeWindowTitle(displayTitle)
         let normalizedAXTitle = normalizedRuntimeWindowTitle(axWindow.sourceTitle ?? axWindow.title)
