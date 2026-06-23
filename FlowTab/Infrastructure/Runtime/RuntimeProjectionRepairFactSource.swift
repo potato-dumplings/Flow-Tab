@@ -2,6 +2,21 @@ import AppKit
 import CoreGraphics
 import Foundation
 
+protocol RuntimeProjectionRepairFactProviding: AnyObject {
+    func collectAXWindowData(
+        for runningApps: [NSRunningApplication],
+        cgWindowsByPID: [pid_t: [RuntimeCGWindowEntry]],
+        allCGWindowsByPID: [pid_t: [RuntimeCGWindowEntry]]
+    ) -> [pid_t: [RuntimeWindowListEntry]]
+
+    func collectCGWindowsWithSpaceTopologyDiff(
+        options: CGWindowListOption,
+        now: TimeInterval
+    ) -> RuntimeCGWindowCollection
+}
+
+extension RuntimeSnapshotProvider: RuntimeProjectionRepairFactProviding {}
+
 struct RuntimeRepairRunningApps {
     let runningApps: [NSRunningApplication]
 }
@@ -129,11 +144,11 @@ extension RuntimeFullRepairAppSelectionFacts {
 }
 
 struct RuntimeProjectionRepairFactSource {
-    private let runtimeFactProvider: RuntimeSnapshotProvider
+    private let runtimeFactProvider: any RuntimeProjectionRepairFactProviding
     private let windowRecordStore: RuntimeWindowRecordStore
 
     init(
-        runtimeFactProvider: RuntimeSnapshotProvider,
+        runtimeFactProvider: any RuntimeProjectionRepairFactProviding,
         windowRecordStore: RuntimeWindowRecordStore
     ) {
         self.runtimeFactProvider = runtimeFactProvider
@@ -188,7 +203,8 @@ struct RuntimeProjectionRepairFactSource {
         affectedCGWindowIDs: Set<CGWindowID>
     ) -> [RuntimeSpaceTopologyReconciliationTarget] {
         let cgWindowsByPID = runtimeFactProvider.collectCGWindowsWithSpaceTopologyDiff(
-            options: [.excludeDesktopElements]
+            options: [.excludeDesktopElements],
+            now: ProcessInfo.processInfo.systemUptime
         ).windowsByPID
         let affectedCGWindowIDsByPID = windowRecordStore.affectedCGWindowIDsByPID(
             affectedCGWindowIDs: affectedCGWindowIDs,
@@ -210,10 +226,14 @@ struct RuntimeProjectionRepairFactSource {
         let cleanupReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         AXLiveWindowRegistry.shared.prune(to: runningApps)
         let pruneReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let onScreenCGWindowsByPID = runtimeFactProvider.collectCGWindowsWithSpaceTopologyDiff().windowsByPID
+        let onScreenCGWindowsByPID = runtimeFactProvider.collectCGWindowsWithSpaceTopologyDiff(
+            options: [.optionOnScreenOnly, .excludeDesktopElements],
+            now: ProcessInfo.processInfo.systemUptime
+        ).windowsByPID
         let onScreenCGReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let allCGWindowsByPID = runtimeFactProvider.collectCGWindowsWithSpaceTopologyDiff(
-            options: [.optionAll, .excludeDesktopElements]
+            options: [.optionAll, .excludeDesktopElements],
+            now: ProcessInfo.processInfo.systemUptime
         ).windowsByPID
         let allCGReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let axWindowsByPID = runtimeFactProvider.collectAXWindowData(
@@ -298,9 +318,13 @@ struct RuntimeProjectionRepairFactSource {
         in runningApps: [NSRunningApplication]
     ) -> RuntimeCurrentAppWindowFacts {
         let rankByPID = RuntimeAppRankProvider.collectAppRankByPID(for: runningApps)
-        let cgWindowsByPID = runtimeFactProvider.collectCGWindowsWithSpaceTopologyDiff().windowsByPID
+        let cgWindowsByPID = runtimeFactProvider.collectCGWindowsWithSpaceTopologyDiff(
+            options: [.optionOnScreenOnly, .excludeDesktopElements],
+            now: ProcessInfo.processInfo.systemUptime
+        ).windowsByPID
         let allCGWindowsByPID = runtimeFactProvider.collectCGWindowsWithSpaceTopologyDiff(
-            options: [.optionAll, .excludeDesktopElements]
+            options: [.optionAll, .excludeDesktopElements],
+            now: ProcessInfo.processInfo.systemUptime
         ).windowsByPID
         let windowsByPID = runtimeFactProvider.collectAXWindowData(
             for: matchingApps,
@@ -358,10 +382,14 @@ struct RuntimeProjectionRepairFactSource {
         windowRecordStore.cleanup(keepingRunningApps: runningApps)
         AXLiveWindowRegistry.shared.prune(to: runningApps)
         let cleanupReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let cgWindowsByPID = runtimeFactProvider.collectCGWindowsWithSpaceTopologyDiff().windowsByPID
+        let cgWindowsByPID = runtimeFactProvider.collectCGWindowsWithSpaceTopologyDiff(
+            options: [.optionOnScreenOnly, .excludeDesktopElements],
+            now: ProcessInfo.processInfo.systemUptime
+        ).windowsByPID
         let onScreenCGReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let allCGWindowsByPID = runtimeFactProvider.collectCGWindowsWithSpaceTopologyDiff(
-            options: [.optionAll, .excludeDesktopElements]
+            options: [.optionAll, .excludeDesktopElements],
+            now: ProcessInfo.processInfo.systemUptime
         ).windowsByPID
         let allCGReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let windowsByPID = runtimeFactProvider.collectAXWindowData(

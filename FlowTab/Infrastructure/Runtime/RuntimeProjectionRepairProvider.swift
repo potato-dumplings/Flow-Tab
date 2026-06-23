@@ -4,7 +4,7 @@ import Foundation
 import FlowTabCore
 
 final class RuntimeProjectionRepairProvider: RuntimeProjectionRepairProviding {
-    private let runtimeFactProvider: RuntimeSnapshotProvider
+    private let runtimeFactProvider: any RuntimeProjectionRepairFactProviding
     private let windowRecordStore: RuntimeWindowRecordStore
     private let reconciliationCoordinator: RuntimeReconciliationCoordinator
     private let repairFactSource: RuntimeProjectionRepairFactSource
