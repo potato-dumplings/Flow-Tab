@@ -51,7 +51,6 @@ extension FlowTabUITests {
             preservesDesktopAfterFullscreen: false,
             prelaunchesFlowTabBeforeFixture: true,
             beforeFlowTabLaunch: { _ in
-                runtimeLogSnapshot = self.makeRuntimeLogFileSnapshot()
                 self.logWorkflowSpaceObservation("\(traceLabel).beforeFlowTabLaunch", app: targetApp)
                 if allowsNoisyCGSiblings {
                     XCTAssertTrue(

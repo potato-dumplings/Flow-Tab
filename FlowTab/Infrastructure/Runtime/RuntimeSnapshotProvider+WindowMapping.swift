@@ -257,9 +257,15 @@ extension RuntimeSnapshotProvider {
             appName: appName,
             stage: "presentation"
         )
+        let duplicateFilteredPresentationEntries = RuntimeWindowPresentationFilter.filterDuplicateFullscreenContentEntries(
+            overlayFilteredPresentationEntries,
+            knownCGWindowsByID: knownCGWindowsByID,
+            appName: appName,
+            stage: "presentation-final"
+        )
 
         return RuntimeWindowPresentationFilter.orderWindowEntriesForPresentation(
-            overlayFilteredPresentationEntries,
+            duplicateFilteredPresentationEntries,
             prioritizesOnscreen: !fullscreenContentBounds.isEmpty,
             cgWindowOrderByID: cgWindowOrderByID,
             knownCGWindowsByID: knownCGWindowsByID,
