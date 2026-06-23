@@ -24,11 +24,6 @@ struct RuntimeWindowMappingResolution {
     }
 }
 
-struct RuntimeWindowAssignmentMatchResult {
-    let matches: [String: CGWindowID]
-    let bindingDiagnostics: [WindowBindingDiagnostic]
-}
-
 extension RuntimeSnapshotProvider {
     func cleanupWindowMappingState(for runningApps: [NSRunningApplication]) {
         let runningPIDs = Set(runningApps.map(\.processIdentifier))

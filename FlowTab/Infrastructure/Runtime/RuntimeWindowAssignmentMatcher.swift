@@ -1,6 +1,11 @@
 import CoreGraphics
 import Foundation
 
+struct RuntimeWindowAssignmentMatchResult {
+    let matches: [String: CGWindowID]
+    let bindingDiagnostics: [WindowBindingDiagnostic]
+}
+
 enum RuntimeWindowAssignmentMatcher {
     static func matchCGWindowAssignments(
         axWindows: [RuntimeAXWindowEntry],
