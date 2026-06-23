@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 
 final class RuntimeWindowRecordStore {
-    var mappingStatesByPID: [pid_t: RuntimeWindowMappingState]
+    private var mappingStatesByPID: [pid_t: RuntimeWindowMappingState]
 
     init(mappingStatesByPID: [pid_t: RuntimeWindowMappingState] = [:]) {
         self.mappingStatesByPID = mappingStatesByPID

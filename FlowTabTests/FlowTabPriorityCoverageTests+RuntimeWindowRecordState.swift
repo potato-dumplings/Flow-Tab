@@ -132,7 +132,7 @@ extension FlowTabPriorityCoverageTests {
             axWindowID: axWindowID,
             now: 11
         )
-        let state = store.mappingStatesByPID[pid]
+        let state = store.state(for: pid)
         let downgradedRecord = state?.windowRecordsByCGWindowID[cgWindowID]
 
         XCTAssertEqual(affectedCGWindowID, cgWindowID)
@@ -598,8 +598,11 @@ extension FlowTabPriorityCoverageTests {
             invalidatedAt: now - 2
         )
         staleRecord.suspectDeletedAt = now - 2
-        provider.windowRecordStore.mappingStatesByPID[pid] = RuntimeWindowMappingState(
-            windowRecordsByCGWindowID: [250_000: staleRecord]
+        provider.windowRecordStore.setState(
+            RuntimeWindowMappingState(
+                windowRecordsByCGWindowID: [250_000: staleRecord]
+            ),
+            for: pid
         )
 
         let resolution = provider.resolveStableWindowMapping(
@@ -610,7 +613,7 @@ extension FlowTabPriorityCoverageTests {
         )
 
         XCTAssertTrue(resolution.windowRecordsByCGWindowID.isEmpty)
-        XCTAssertNil(provider.windowRecordStore.mappingStatesByPID[pid])
+        XCTAssertNil(provider.windowRecordStore.state(for: pid))
     }
 
     func testRuntimeSnapshotProviderWindowLayerExposesInGraceStickyRecordWithoutCurrentCGEvidence() {
@@ -635,8 +638,11 @@ extension FlowTabPriorityCoverageTests {
             invalidatedAt: now
         )
         record.suspectDeletedAt = now
-        provider.windowRecordStore.mappingStatesByPID[pid] = RuntimeWindowMappingState(
-            windowRecordsByCGWindowID: [250_001: record]
+        provider.windowRecordStore.setState(
+            RuntimeWindowMappingState(
+                windowRecordsByCGWindowID: [250_001: record]
+            ),
+            for: pid
         )
 
         let entries = provider.resolvedStableWindowEntries(
@@ -674,8 +680,11 @@ extension FlowTabPriorityCoverageTests {
             invalidatedAt: now
         )
         record.suspectDeletedAt = now
-        provider.windowRecordStore.mappingStatesByPID[pid] = RuntimeWindowMappingState(
-            windowRecordsByCGWindowID: [250_002: record]
+        provider.windowRecordStore.setState(
+            RuntimeWindowMappingState(
+                windowRecordsByCGWindowID: [250_002: record]
+            ),
+            for: pid
         )
 
         let entries = provider.resolvedStableWindowEntries(

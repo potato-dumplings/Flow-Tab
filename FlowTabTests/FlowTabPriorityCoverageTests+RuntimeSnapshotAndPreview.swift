@@ -803,7 +803,7 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertEqual(entries.map(\.windowID), ["cg:18405:240001", "cg:18405:243747"])
 
-        let state = try XCTUnwrap(provider.windowRecordStore.mappingStatesByPID[pid])
+        let state = try XCTUnwrap(provider.windowRecordStore.state(for: pid))
         XCTAssertEqual(state.currentAXToCG["ax:18405:0"], 240_001)
         XCTAssertEqual(state.currentCGToAX[240_001], "ax:18405:0")
         XCTAssertEqual(state.validCGWindowIDs, Set<CGWindowID>([240_001, 243_747]))
@@ -1691,7 +1691,7 @@ extension FlowTabPriorityCoverageTests {
         )
         XCTAssertEqual(initialEntries.map(\.windowID), ["cg:18405:243747"])
         XCTAssertEqual(initialEntries.first?.lastConfirmationSource, .publicExactMatch)
-        XCTAssertFalse(provider.windowRecordStore.mappingStatesByPID[pid]?.isLikelyTransientAXRebuild == true)
+        XCTAssertFalse(provider.windowRecordStore.state(for: pid)?.isLikelyTransientAXRebuild == true)
 
         let transientMissingAXEntries = provider.resolvedStableWindowEntries(
             axWindows: [],
@@ -1703,7 +1703,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(transientMissingAXEntries.map(\.windowID), ["cg:18405:243747"])
         XCTAssertTrue(transientMissingAXEntries.first?.hasStickyBinding == true)
         XCTAssertNotNil(transientMissingAXEntries.first?.lastConfirmationSource)
-        XCTAssertTrue(provider.windowRecordStore.mappingStatesByPID[pid]?.isLikelyTransientAXRebuild == true)
+        XCTAssertTrue(provider.windowRecordStore.state(for: pid)?.isLikelyTransientAXRebuild == true)
     }
 
     func testRuntimeSnapshotProviderWindowListKeepsMultipleStickySpaceOneEntriesWhenAXReturnsSubsetFromFullscreenSpace() {
@@ -1820,7 +1820,7 @@ extension FlowTabPriorityCoverageTests {
             pid: pid,
             appName: appName
         )
-        XCTAssertFalse(provider.windowRecordStore.mappingStatesByPID[pid]?.isLikelyTransientAXRebuild == true)
+        XCTAssertFalse(provider.windowRecordStore.state(for: pid)?.isLikelyTransientAXRebuild == true)
 
         for _ in 0..<3 {
             let retryEntries = provider.resolvedStableWindowEntries(
@@ -1830,7 +1830,7 @@ extension FlowTabPriorityCoverageTests {
                 appName: appName
             )
             XCTAssertEqual(retryEntries.map(\.windowID), ["cg:18405:243747"])
-            XCTAssertTrue(provider.windowRecordStore.mappingStatesByPID[pid]?.isLikelyTransientAXRebuild == true)
+            XCTAssertTrue(provider.windowRecordStore.state(for: pid)?.isLikelyTransientAXRebuild == true)
         }
 
         let exhaustedEntries = provider.resolvedStableWindowEntries(
@@ -1840,7 +1840,7 @@ extension FlowTabPriorityCoverageTests {
             appName: appName
         )
         XCTAssertTrue(exhaustedEntries.isEmpty)
-        XCTAssertFalse(provider.windowRecordStore.mappingStatesByPID[pid]?.isLikelyTransientAXRebuild == true)
+        XCTAssertFalse(provider.windowRecordStore.state(for: pid)?.isLikelyTransientAXRebuild == true)
     }
 
     func testRuntimeSnapshotProviderPartialRemoteAXScanDoesNotConsumeMissingAXGrace() {
@@ -1887,7 +1887,7 @@ extension FlowTabPriorityCoverageTests {
                 remoteScanCompleteness: .partialTimedOut(scanned: 24, maximum: 1_000)
             )
             XCTAssertEqual(partialEntries.map(\.windowID), ["cg:18405:243747"])
-            XCTAssertFalse(provider.windowRecordStore.mappingStatesByPID[pid]?.isLikelyTransientAXRebuild == true)
+            XCTAssertFalse(provider.windowRecordStore.state(for: pid)?.isLikelyTransientAXRebuild == true)
         }
 
         let firstAuthoritativeMissingEntries = provider.resolvedStableWindowEntries(
@@ -1898,7 +1898,7 @@ extension FlowTabPriorityCoverageTests {
             remoteScanCompleteness: .complete(scanned: 1_000)
         )
         XCTAssertEqual(firstAuthoritativeMissingEntries.map(\.windowID), ["cg:18405:243747"])
-        XCTAssertTrue(provider.windowRecordStore.mappingStatesByPID[pid]?.isLikelyTransientAXRebuild == true)
+        XCTAssertTrue(provider.windowRecordStore.state(for: pid)?.isLikelyTransientAXRebuild == true)
     }
 
     func testRuntimeSnapshotProviderWindowListKeepsStickyMatchesWhenAXTitlesChange() {
@@ -2858,7 +2858,7 @@ extension FlowTabPriorityCoverageTests {
             appName: "FlowTab Test"
         )
 
-        let record = try XCTUnwrap(provider.windowRecordStore.mappingStatesByPID[pid]?.windowRecordsByCGWindowID[440_001])
+        let record = try XCTUnwrap(provider.windowRecordStore.state(for: pid)?.windowRecordsByCGWindowID[440_001])
         XCTAssertEqual(
             record.currentAXAttachment?.state,
             RuntimeAXWindowState(
