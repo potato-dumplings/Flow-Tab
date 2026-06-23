@@ -2,6 +2,26 @@ import AppKit
 import ApplicationServices
 import FlowTabCore
 
+struct RuntimeAXAppWindowCollection {
+    let app: NSRunningApplication
+    let appName: String
+    let cgWindows: [RuntimeCGWindowEntry]
+    let allCGWindows: [RuntimeCGWindowEntry]
+    let publicWindowsFetchResult: AXWindowInspector.WindowsFetchResult
+    let publicSwitchableWindowCount: Int
+    let shouldIncludeRemoteAXWindows: Bool
+    let windowsFetchResult: AXWindowInspector.WindowsFetchResult
+    let windows: [AXUIElement]
+    let axEntries: [RuntimeAXWindowEntry]
+    let cgPrepMs: Double
+    let publicFetchMs: Double
+    let publicSwitchableMs: Double
+    let remoteDecisionMs: Double
+    let finalFetchMs: Double
+    let axInspectMs: Double
+    let totalMs: Double
+}
+
 struct RuntimeWindowListEntry {
     let windowID: String
     let title: String

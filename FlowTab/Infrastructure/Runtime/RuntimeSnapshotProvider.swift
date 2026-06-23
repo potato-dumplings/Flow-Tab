@@ -4,26 +4,6 @@ import Foundation
 import FlowTabCore
 
 final class RuntimeSnapshotProvider {
-    struct AXAppWindowCollection {
-        let app: NSRunningApplication
-        let appName: String
-        let cgWindows: [RuntimeCGWindowEntry]
-        let allCGWindows: [RuntimeCGWindowEntry]
-        let publicWindowsFetchResult: AXWindowInspector.WindowsFetchResult
-        let publicSwitchableWindowCount: Int
-        let shouldIncludeRemoteAXWindows: Bool
-        let windowsFetchResult: AXWindowInspector.WindowsFetchResult
-        let windows: [AXUIElement]
-        let axEntries: [RuntimeAXWindowEntry]
-        let cgPrepMs: Double
-        let publicFetchMs: Double
-        let publicSwitchableMs: Double
-        let remoteDecisionMs: Double
-        let finalFetchMs: Double
-        let axInspectMs: Double
-        let totalMs: Double
-    }
-
     private let cgWindowListProvider: RuntimeCGWindowListProviding
     private let spaceTopologyProvider: RuntimeSpaceTopologyProviding
     let reconciliationCoordinator: RuntimeReconciliationCoordinator
@@ -168,7 +148,7 @@ final class RuntimeSnapshotProvider {
         for runningApps: [NSRunningApplication],
         cgWindowsByPID: [pid_t: [RuntimeCGWindowEntry]],
         allCGWindowsByPID: [pid_t: [RuntimeCGWindowEntry]]
-    ) -> [AXAppWindowCollection] {
+    ) -> [RuntimeAXAppWindowCollection] {
         RuntimeAXAppCollectionCoordinator.collect(count: runningApps.count) { [self] index in
             collectAXAppWindowCollection(
                 index: index,
@@ -184,7 +164,7 @@ final class RuntimeSnapshotProvider {
         app: NSRunningApplication,
         cgWindowsByPID: [pid_t: [RuntimeCGWindowEntry]],
         allCGWindowsByPID: [pid_t: [RuntimeCGWindowEntry]]
-    ) -> AXAppWindowCollection {
+    ) -> RuntimeAXAppWindowCollection {
         let appStartMs = RuntimePerformanceClock.monotonicMilliseconds()
         let appName = app.localizedName ?? app.bundleIdentifier ?? "pid:\(app.processIdentifier)"
         let cgWindows = cgWindowsByPID[app.processIdentifier] ?? []
@@ -238,7 +218,7 @@ final class RuntimeSnapshotProvider {
         }
         let axInspectReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
 
-        return AXAppWindowCollection(
+        return RuntimeAXAppWindowCollection(
             app: app,
             appName: appName,
             cgWindows: cgWindows,
