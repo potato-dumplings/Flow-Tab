@@ -582,7 +582,8 @@ extension FlowTabPriorityCoverageTests {
     }
 
     func testRuntimeSnapshotProviderDropsWindowRecordAfterLifecycleGraceExpires() {
-        let provider = RuntimeSnapshotProvider()
+        let windowRecordStore = RuntimeWindowRecordStore()
+        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore)
         let pid: pid_t = 18_405
         let now = Date.timeIntervalSinceReferenceDate
         var staleRecord = RuntimeWindowRecord(
@@ -598,14 +599,14 @@ extension FlowTabPriorityCoverageTests {
             invalidatedAt: now - 2
         )
         staleRecord.suspectDeletedAt = now - 2
-        provider.windowRecordStore.setState(
+        windowRecordStore.setState(
             RuntimeWindowMappingState(
                 windowRecordsByCGWindowID: [250_000: staleRecord]
             ),
             for: pid
         )
 
-        let resolution = provider.windowRecordStore.resolveStableWindowMapping(
+        let resolution = windowRecordStore.resolveStableWindowMapping(
             axWindows: [],
             cgWindows: [],
             pid: pid,
@@ -613,11 +614,12 @@ extension FlowTabPriorityCoverageTests {
         )
 
         XCTAssertTrue(resolution.windowRecordsByCGWindowID.isEmpty)
-        XCTAssertNil(provider.windowRecordStore.state(for: pid))
+        XCTAssertNil(windowRecordStore.state(for: pid))
     }
 
     func testRuntimeSnapshotProviderWindowLayerExposesInGraceStickyRecordWithoutCurrentCGEvidence() {
-        let provider = RuntimeSnapshotProvider()
+        let windowRecordStore = RuntimeWindowRecordStore()
+        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore)
         let pid: pid_t = 18_405
         let now = Date.timeIntervalSinceReferenceDate
         var record = RuntimeWindowRecord(
@@ -638,7 +640,7 @@ extension FlowTabPriorityCoverageTests {
             invalidatedAt: now
         )
         record.suspectDeletedAt = now
-        provider.windowRecordStore.setState(
+        windowRecordStore.setState(
             RuntimeWindowMappingState(
                 windowRecordsByCGWindowID: [250_001: record]
             ),
@@ -646,7 +648,7 @@ extension FlowTabPriorityCoverageTests {
         )
 
         let entries = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
-            windowRecordStore: provider.windowRecordStore,
+            windowRecordStore: windowRecordStore,
             axWindows: [],
             cgWindows: [],
             pid: pid,
@@ -662,7 +664,8 @@ extension FlowTabPriorityCoverageTests {
     }
 
     func testRuntimeSnapshotProviderWindowLayerExposesInGraceSpaceBackedRecordWithoutStickyBinding() {
-        let provider = RuntimeSnapshotProvider()
+        let windowRecordStore = RuntimeWindowRecordStore()
+        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore)
         let pid: pid_t = 18_405
         let now = Date.timeIntervalSinceReferenceDate
         var record = RuntimeWindowRecord(
@@ -681,7 +684,7 @@ extension FlowTabPriorityCoverageTests {
             invalidatedAt: now
         )
         record.suspectDeletedAt = now
-        provider.windowRecordStore.setState(
+        windowRecordStore.setState(
             RuntimeWindowMappingState(
                 windowRecordsByCGWindowID: [250_002: record]
             ),
@@ -689,7 +692,7 @@ extension FlowTabPriorityCoverageTests {
         )
 
         let entries = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
-            windowRecordStore: provider.windowRecordStore,
+            windowRecordStore: windowRecordStore,
             axWindows: [],
             cgWindows: [],
             pid: pid,

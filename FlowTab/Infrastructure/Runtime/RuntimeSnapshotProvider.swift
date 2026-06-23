@@ -8,8 +8,8 @@ private typealias FactDiagnostics = RuntimeFactCollectionDiagnostics
 final class RuntimeSnapshotProvider {
     private let cgWindowListProvider: RuntimeCGWindowListProviding
     private let spaceTopologyProvider: RuntimeSpaceTopologyProviding
-    let windowRecordStore: RuntimeWindowRecordStore
-    let reconciliationCoordinator: RuntimeReconciliationCoordinator
+    private let windowRecordStore: RuntimeWindowRecordStore
+    private let reconciliationCoordinator: RuntimeReconciliationCoordinator
 
     init(
         cgWindowListProvider: RuntimeCGWindowListProviding = RuntimeSystemCGWindowListProvider(),

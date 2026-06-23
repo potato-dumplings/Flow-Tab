@@ -54,11 +54,29 @@ protocol RuntimeProjectionRepairProviding: AnyObject {
 
 final class RuntimeProjectionRepairProvider: RuntimeProjectionRepairProviding {
     private let runtimeFactProvider: RuntimeSnapshotProvider
+    private let windowRecordStore: RuntimeWindowRecordStore
+    private let reconciliationCoordinator: RuntimeReconciliationCoordinator
     private let repairFactSource: RuntimeProjectionRepairFactSource
 
-    init(runtimeFactProvider: RuntimeSnapshotProvider = RuntimeSnapshotProvider()) {
+    init(
+        cgWindowListProvider: RuntimeCGWindowListProviding = RuntimeSystemCGWindowListProvider(),
+        spaceTopologyProvider: RuntimeSpaceTopologyProviding = RuntimeSystemSpaceTopologyProvider(),
+        windowRecordStore: RuntimeWindowRecordStore = RuntimeWindowRecordStore(),
+        reconciliationCoordinator: RuntimeReconciliationCoordinator = RuntimeReconciliationCoordinator()
+    ) {
+        self.windowRecordStore = windowRecordStore
+        self.reconciliationCoordinator = reconciliationCoordinator
+        let runtimeFactProvider = RuntimeSnapshotProvider(
+            cgWindowListProvider: cgWindowListProvider,
+            spaceTopologyProvider: spaceTopologyProvider,
+            windowRecordStore: windowRecordStore,
+            reconciliationCoordinator: reconciliationCoordinator
+        )
         self.runtimeFactProvider = runtimeFactProvider
-        self.repairFactSource = RuntimeProjectionRepairFactSource(runtimeFactProvider: runtimeFactProvider)
+        self.repairFactSource = RuntimeProjectionRepairFactSource(
+            runtimeFactProvider: runtimeFactProvider,
+            windowRecordStore: windowRecordStore
+        )
     }
 }
 
@@ -329,12 +347,12 @@ extension RuntimeProjectionRepairProvider {
         axWindowID: String,
         now: TimeInterval
     ) -> CGWindowID? {
-        let affectedCGWindowID = runtimeFactProvider.windowRecordStore.clearDestroyedAXAttachment(
+        let affectedCGWindowID = windowRecordStore.clearDestroyedAXAttachment(
             processIdentifier: pid,
             axWindowID: axWindowID,
             now: now
         )
-        runtimeFactProvider.reconciliationCoordinator.markAppDirty(
+        reconciliationCoordinator.markAppDirty(
             appID: appID,
             pid: pid,
             reason: .axNotification,
@@ -345,8 +363,8 @@ extension RuntimeProjectionRepairProvider {
     }
 
     func recordAppTerminated(processIdentifier pid: pid_t) {
-        runtimeFactProvider.reconciliationCoordinator.cancelAppRequests(pid: pid)
-        runtimeFactProvider.windowRecordStore.removeState(for: pid)
+        reconciliationCoordinator.cancelAppRequests(pid: pid)
+        windowRecordStore.removeState(for: pid)
         AXLiveWindowRegistry.shared.remove(pid: pid)
     }
 
@@ -354,31 +372,31 @@ extension RuntimeProjectionRepairProvider {
         _ verification: RuntimeWindowFocusVerification,
         now: TimeInterval
     ) -> Set<CGWindowID> {
-        runtimeFactProvider.windowRecordStore.recordWindowFocusVerification(
+        windowRecordStore.recordWindowFocusVerification(
             verification,
             now: now
         )
-        runtimeFactProvider.reconciliationCoordinator.markWindowFocusVerified(verification, now: now)
+        reconciliationCoordinator.markWindowFocusVerified(verification, now: now)
         return verification.affectedCGWindowIDs
     }
 
     func hasPendingReconciliationRequests() -> Bool {
-        runtimeFactProvider.reconciliationCoordinator.hasPendingRequests()
+        reconciliationCoordinator.hasPendingRequests()
     }
 
     func scheduleFullRepairFallback(now: TimeInterval) {
-        runtimeFactProvider.reconciliationCoordinator.scheduleFullRepairFallback(now: now)
+        reconciliationCoordinator.scheduleFullRepairFallback(now: now)
     }
 
     func promoteSearchFreshnessBarrierRequests(now: TimeInterval) -> [RuntimeReconciliationRequest] {
-        runtimeFactProvider.reconciliationCoordinator.promotePendingRequests(
+        reconciliationCoordinator.promotePendingRequests(
             reason: .searchFreshnessBarrier,
             now: now
         )
     }
 
     func recordAppLaunched(appID: String, pid: pid_t, now: TimeInterval) {
-        runtimeFactProvider.reconciliationCoordinator.markAppDirty(
+        reconciliationCoordinator.markAppDirty(
             appID: appID,
             pid: pid,
             reason: .appLaunched,
@@ -387,7 +405,7 @@ extension RuntimeProjectionRepairProvider {
     }
 
     func recordAppWindowsChanged(appID: String, pid: pid_t, now: TimeInterval) {
-        runtimeFactProvider.reconciliationCoordinator.markAppDirty(
+        reconciliationCoordinator.markAppDirty(
             appID: appID,
             pid: pid,
             reason: .axNotification,
@@ -396,7 +414,7 @@ extension RuntimeProjectionRepairProvider {
     }
 
     func recordSelectedCurrentAppWindowsChanged(appID: String, pid: pid_t, now: TimeInterval) {
-        runtimeFactProvider.reconciliationCoordinator.markAppDirty(
+        reconciliationCoordinator.markAppDirty(
             appID: appID,
             pid: pid,
             reason: .selectedCurrentAppWindows,
@@ -408,25 +426,25 @@ extension RuntimeProjectionRepairProvider {
         now: TimeInterval,
         includeFullRepair: Bool
     ) -> [RuntimeReconciliationRequest] {
-        runtimeFactProvider.reconciliationCoordinator.readyRequests(
+        reconciliationCoordinator.readyRequests(
             now: now,
             includeFullRepair: includeFullRepair
         )
     }
 
     func startReconciliationRequest(id: UInt64) -> RuntimeReconciliationRequest? {
-        runtimeFactProvider.reconciliationCoordinator.startRequest(id: id)
+        reconciliationCoordinator.startRequest(id: id)
     }
 
     func completeReconciliationRequest(id: UInt64) {
-        runtimeFactProvider.reconciliationCoordinator.completeRequest(id: id)
+        reconciliationCoordinator.completeRequest(id: id)
     }
 
     func deferReconciliationRequestAfterTransientEmptyCurrentAppWindowPayload(
         id: UInt64,
         now: TimeInterval
     ) {
-        runtimeFactProvider.reconciliationCoordinator.scheduleRetryAfterTransientEmptyCurrentAppWindowPayload(
+        reconciliationCoordinator.scheduleRetryAfterTransientEmptyCurrentAppWindowPayload(
             id: id,
             now: now
         )
@@ -442,7 +460,7 @@ extension RuntimeProjectionRepairProvider {
     ) -> RuntimeAppWindowReconciliationResult {
         let currentAppWindowPayload = focusedCurrentAppWindowPayload(processIdentifier: pid)
         let currentAppWindowPayloadWasEmpty = currentAppWindowPayload?.candidate.windows.isEmpty == true
-        let mappingState = runtimeFactProvider.windowRecordStore.state(for: pid)
+        let mappingState = windowRecordStore.state(for: pid)
         let affectedWindowEvidence = mappingState?.affectedWindowEvidence(
             for: affectedCGWindowIDs
         ) ?? .empty

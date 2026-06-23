@@ -87,9 +87,14 @@ struct RuntimeUITestProjectionDatasetFacts {
 
 struct RuntimeProjectionRepairFactSource {
     private let runtimeFactProvider: RuntimeSnapshotProvider
+    private let windowRecordStore: RuntimeWindowRecordStore
 
-    init(runtimeFactProvider: RuntimeSnapshotProvider) {
+    init(
+        runtimeFactProvider: RuntimeSnapshotProvider,
+        windowRecordStore: RuntimeWindowRecordStore
+    ) {
         self.runtimeFactProvider = runtimeFactProvider
+        self.windowRecordStore = windowRecordStore
     }
 
     func collectUITestProjectionDatasetFacts() -> RuntimeUITestProjectionDatasetFacts? {
@@ -142,7 +147,7 @@ struct RuntimeProjectionRepairFactSource {
         let cgWindowsByPID = runtimeFactProvider.collectCGWindowsWithSpaceTopologyDiff(
             options: [.excludeDesktopElements]
         ).windowsByPID
-        let affectedCGWindowIDsByPID = runtimeFactProvider.windowRecordStore.affectedCGWindowIDsByPID(
+        let affectedCGWindowIDsByPID = windowRecordStore.affectedCGWindowIDsByPID(
             affectedCGWindowIDs: affectedCGWindowIDs,
             currentCGWindowsByPID: cgWindowsByPID
         )
@@ -158,7 +163,7 @@ struct RuntimeProjectionRepairFactSource {
 
     func collectFullRepairWindowFacts(for runningApps: [NSRunningApplication]) -> RuntimeFullRepairWindowFacts {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
-        runtimeFactProvider.windowRecordStore.cleanup(keepingRunningApps: runningApps)
+        windowRecordStore.cleanup(keepingRunningApps: runningApps)
         let cleanupReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         AXLiveWindowRegistry.shared.prune(to: runningApps)
         let pruneReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
@@ -307,7 +312,7 @@ struct RuntimeProjectionRepairFactSource {
         processIdentifier pid: pid_t
     ) -> RuntimeFocusedCurrentAppWindowFacts {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
-        runtimeFactProvider.windowRecordStore.cleanup(keepingRunningApps: runningApps)
+        windowRecordStore.cleanup(keepingRunningApps: runningApps)
         AXLiveWindowRegistry.shared.prune(to: runningApps)
         let cleanupReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let cgWindowsByPID = runtimeFactProvider.collectCGWindowsWithSpaceTopologyDiff().windowsByPID

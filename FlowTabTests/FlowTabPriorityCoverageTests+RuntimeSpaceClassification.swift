@@ -291,10 +291,11 @@ extension FlowTabPriorityCoverageTests {
 
     func testRuntimeSnapshotProviderWindowEntriesCarrySpaceEvidence() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
-        let provider = RuntimeSnapshotProvider()
+        let windowRecordStore = RuntimeWindowRecordStore()
+        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore)
 
         let entries = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
-            windowRecordStore: provider.windowRecordStore,
+            windowRecordStore: windowRecordStore,
             axWindows: [],
             cgWindows: [
                 RuntimeCGWindowEntry(
@@ -330,11 +331,12 @@ extension FlowTabPriorityCoverageTests {
     }
 
     func testRuntimeSnapshotProviderStaleSpaceEvidenceDisablesPublicAXRecovery() {
-        let provider = RuntimeSnapshotProvider()
+        let windowRecordStore = RuntimeWindowRecordStore()
+        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore)
         let pid: pid_t = 18_405
         let frame = CGRect(x: 100, y: 100, width: 900, height: 620)
         let entries = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
-            windowRecordStore: provider.windowRecordStore,
+            windowRecordStore: windowRecordStore,
             axWindows: [
                 RuntimeAXWindowEntry(
                     index: 0,
