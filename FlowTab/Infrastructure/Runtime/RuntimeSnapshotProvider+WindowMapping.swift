@@ -283,38 +283,26 @@ extension RuntimeSnapshotProvider {
         let axWindowAbsenceIsAuthoritative = RuntimeAXWindowAbsencePolicy.isAbsenceAuthoritative(
             remoteScanCompleteness: remoteScanCompleteness
         )
-        let hasObservedAXWindowHandle = previousState.hasObservedAXWindowHandle || hasAXWindowsInCurrentCollection
-        let consecutiveAXCollectionMisses = RuntimeAXWindowAbsencePolicy.consecutiveAXCollectionMissCount(
+        var mappingState = previousState
+        mappingState.recordAXCollectionPresence(
             hasAXWindowsInCurrentCollection: hasAXWindowsInCurrentCollection,
-            previousAXCollectionMissCount: previousState.consecutiveAXCollectionMisses,
             absenceIsAuthoritative: axWindowAbsenceIsAuthoritative
         )
         let allowSpaceOneWithoutCurrentAXHandle =
             RuntimeAXWindowAbsencePolicy.allowsSpaceOneWithoutCurrentAXHandle(
-                hasObservedAXWindowHandle: hasObservedAXWindowHandle,
+                hasObservedAXWindowHandle: mappingState.hasObservedAXWindowHandle,
                 hasAXWindowsInCurrentCollection: hasAXWindowsInCurrentCollection,
                 absenceIsAuthoritative: axWindowAbsenceIsAuthoritative,
-                consecutiveAXCollectionMissCount: consecutiveAXCollectionMisses
+                consecutiveAXCollectionMissCount: mappingState.consecutiveAXCollectionMisses
             )
 
-        var windowRecordsByCGWindowID = previousState.windowRecordsByCGWindowID
+        mappingState.refreshCGWindowRecords(
+            validCGWindows: validCGWindows,
+            pid: pid,
+            observedAt: observedAt
+        )
+        var windowRecordsByCGWindowID = mappingState.windowRecordsByCGWindowID
         var bindingDiagnostics: [WindowBindingDiagnostic] = []
-        for cgWindow in validCGWindows {
-            var record = windowRecordsByCGWindowID[cgWindow.id]
-                ?? RuntimeWindowRecord(
-                    cgWindowID: cgWindow.id,
-                    stableWindowID: RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindow.id),
-                    firstSeenAt: observedAt
-                )
-            record.refreshCGState(from: cgWindow, observedAt: observedAt)
-            record.updateFallbackDisplayStateIfNeeded()
-            windowRecordsByCGWindowID[cgWindow.id] = record
-        }
-        for cgWindowID in windowRecordsByCGWindowID.keys.sorted() {
-            guard var record = windowRecordsByCGWindowID[cgWindowID] else { continue }
-            record.clearCurrentAXAttachment()
-            windowRecordsByCGWindowID[cgWindowID] = record
-        }
 
         let knownCGWindowsByID = RuntimeWindowRecord.knownCGWindowsByID(
             windowRecordsByCGWindowID: windowRecordsByCGWindowID,
@@ -490,42 +478,22 @@ extension RuntimeSnapshotProvider {
             exactMatchesByAXWindowID: &exactMatchesByAXWindowID
         )
 
-        for cgWindowID in windowRecordsByCGWindowID.keys.sorted() {
-            guard var record = windowRecordsByCGWindowID[cgWindowID] else { continue }
-            record.updateFallbackDisplayStateIfNeeded()
-            windowRecordsByCGWindowID[cgWindowID] = record
-        }
-
-        for cgWindowID in windowRecordsByCGWindowID.keys.sorted() {
-            guard var record = windowRecordsByCGWindowID[cgWindowID] else { continue }
-            let lifecycleDecision = record.reconcileLifecycle(
-                validCGWindowIDs: validCGWindowIDs,
-                observedAt: observedAt
-            )
-            switch lifecycleDecision {
-            case .keep:
-                windowRecordsByCGWindowID[cgWindowID] = record
-            case .delete:
-                windowRecordsByCGWindowID.removeValue(forKey: cgWindowID)
-            }
-        }
+        mappingState.windowRecordsByCGWindowID = windowRecordsByCGWindowID
+        mappingState.updateFallbackDisplayStateForRecords()
+        mappingState.reconcileWindowRecordLifecycle(
+            validCGWindowIDs: validCGWindowIDs,
+            observedAt: observedAt
+        )
         let currentAXToCG = exactMatchesByAXWindowID
-        let lastAXWindowIDs: Set<String>
-        if hasAXWindowsInCurrentCollection {
-            lastAXWindowIDs = Set(axWindows.map(\.id))
-        } else if axWindowAbsenceIsAuthoritative {
-            lastAXWindowIDs = []
-        } else {
-            lastAXWindowIDs = previousState.lastAXWindowIDs
-        }
-        let nextState = RuntimeWindowMappingState(
-            windowRecordsByCGWindowID: windowRecordsByCGWindowID,
+        mappingState.commitDerivedIndexes(
             currentAXToCG: currentAXToCG,
             validCGWindowIDs: validCGWindowIDs,
-            lastAXWindowIDs: lastAXWindowIDs,
-            hasObservedAXWindowHandle: hasObservedAXWindowHandle,
-            consecutiveAXCollectionMisses: consecutiveAXCollectionMisses
+            axWindows: axWindows,
+            hasAXWindowsInCurrentCollection: hasAXWindowsInCurrentCollection,
+            absenceIsAuthoritative: axWindowAbsenceIsAuthoritative
         )
+        let nextState = mappingState
+        windowRecordsByCGWindowID = nextState.windowRecordsByCGWindowID
         if nextState.isEmpty {
             windowRecordStore.removeState(for: pid)
         } else {
@@ -548,7 +516,7 @@ extension RuntimeSnapshotProvider {
             } else {
                 RuntimeLog.debug(
                     .axMatch,
-                    "\(appName) transient-ax-rebuild suspected; keeping space-1 windows axCollectionMisses=\(consecutiveAXCollectionMisses)/\(RuntimeAXWindowAbsencePolicy.transientRebuildGraceAXCollectionMissLimit)"
+                    "\(appName) transient-ax-rebuild suspected; keeping space-1 windows axCollectionMisses=\(nextState.consecutiveAXCollectionMisses)/\(RuntimeAXWindowAbsencePolicy.transientRebuildGraceAXCollectionMissLimit)"
                 )
             }
         }

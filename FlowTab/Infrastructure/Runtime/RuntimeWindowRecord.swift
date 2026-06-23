@@ -166,6 +166,86 @@ struct RuntimeWindowMappingState {
         currentAppWindowPayloadWasEmpty && isLikelyTransientAXRebuild
     }
 
+    mutating func recordAXCollectionPresence(
+        hasAXWindowsInCurrentCollection: Bool,
+        absenceIsAuthoritative: Bool
+    ) {
+        hasObservedAXWindowHandle = hasObservedAXWindowHandle || hasAXWindowsInCurrentCollection
+        consecutiveAXCollectionMisses = RuntimeAXWindowAbsencePolicy.consecutiveAXCollectionMissCount(
+            hasAXWindowsInCurrentCollection: hasAXWindowsInCurrentCollection,
+            previousAXCollectionMissCount: consecutiveAXCollectionMisses,
+            absenceIsAuthoritative: absenceIsAuthoritative
+        )
+    }
+
+    mutating func refreshCGWindowRecords(
+        validCGWindows: [RuntimeCGWindowEntry],
+        pid: pid_t,
+        observedAt: TimeInterval
+    ) {
+        for cgWindow in validCGWindows {
+            var record = windowRecordsByCGWindowID[cgWindow.id]
+                ?? RuntimeWindowRecord(
+                    cgWindowID: cgWindow.id,
+                    stableWindowID: RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindow.id),
+                    firstSeenAt: observedAt
+                )
+            record.refreshCGState(from: cgWindow, observedAt: observedAt)
+            record.updateFallbackDisplayStateIfNeeded()
+            windowRecordsByCGWindowID[cgWindow.id] = record
+        }
+        for cgWindowID in windowRecordsByCGWindowID.keys.sorted() {
+            windowRecordsByCGWindowID[cgWindowID]?.clearCurrentAXAttachment()
+        }
+    }
+
+    mutating func updateFallbackDisplayStateForRecords() {
+        for cgWindowID in windowRecordsByCGWindowID.keys.sorted() {
+            windowRecordsByCGWindowID[cgWindowID]?.updateFallbackDisplayStateIfNeeded()
+        }
+    }
+
+    mutating func reconcileWindowRecordLifecycle(
+        validCGWindowIDs: Set<CGWindowID>,
+        observedAt: TimeInterval
+    ) {
+        for cgWindowID in windowRecordsByCGWindowID.keys.sorted() {
+            guard var record = windowRecordsByCGWindowID[cgWindowID] else { continue }
+            let lifecycleDecision = record.reconcileLifecycle(
+                validCGWindowIDs: validCGWindowIDs,
+                observedAt: observedAt
+            )
+            switch lifecycleDecision {
+            case .keep:
+                windowRecordsByCGWindowID[cgWindowID] = record
+            case .delete:
+                windowRecordsByCGWindowID.removeValue(forKey: cgWindowID)
+            }
+        }
+    }
+
+    mutating func commitDerivedIndexes(
+        currentAXToCG: [String: CGWindowID],
+        validCGWindowIDs: Set<CGWindowID>,
+        axWindows: [RuntimeAXWindowEntry],
+        hasAXWindowsInCurrentCollection: Bool,
+        absenceIsAuthoritative: Bool
+    ) {
+        let lastAXWindowIDs: Set<String>
+        if hasAXWindowsInCurrentCollection {
+            lastAXWindowIDs = Set(axWindows.map(\.id))
+        } else if absenceIsAuthoritative {
+            lastAXWindowIDs = []
+        } else {
+            lastAXWindowIDs = derivedIndexes.lastAXWindowIDs
+        }
+        derivedIndexes = RuntimeWindowRecordDerivedIndexes(
+            currentAXToCG: currentAXToCG,
+            validCGWindowIDs: validCGWindowIDs,
+            lastAXWindowIDs: lastAXWindowIDs
+        )
+    }
+
     static func affectedCGWindowIDsByPID(
         affectedCGWindowIDs: Set<CGWindowID>,
         currentCGWindowsByPID: [pid_t: [RuntimeCGWindowEntry]],
