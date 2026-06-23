@@ -4,7 +4,6 @@ import Foundation
 import FlowTabCore
 
 final class RuntimeProjectionRepairProvider: RuntimeProjectionRepairProviding {
-    private let runtimeFactProvider: any RuntimeProjectionRepairFactProviding
     private let windowRecordStore: RuntimeWindowRecordStore
     private let reconciliationCoordinator: RuntimeReconciliationCoordinator
     private let repairFactSource: RuntimeProjectionRepairFactSource
@@ -23,7 +22,6 @@ final class RuntimeProjectionRepairProvider: RuntimeProjectionRepairProviding {
             windowRecordStore: windowRecordStore,
             reconciliationCoordinator: reconciliationCoordinator
         )
-        self.runtimeFactProvider = runtimeFactProvider
         self.repairFactSource = RuntimeProjectionRepairFactSource(
             runtimeFactProvider: runtimeFactProvider,
             windowRecordStore: windowRecordStore
