@@ -349,7 +349,8 @@ extension FlowTabPriorityCoverageTests {
                         )
                     ]
                 )
-            ]
+            ],
+            appDirectoryEntries: []
         )
 
         XCTAssertEqual(payload.apps.map(\.id), ["com.example.current"])
@@ -439,7 +440,8 @@ extension FlowTabPriorityCoverageTests {
                     windowSeeds: [],
                     appDirectoryEntries: []
                 )
-            ]
+            ],
+            appDirectoryEntries: []
         )
 
         XCTAssertEqual(payload.apps.map(\.id), ["com.example.beta", "com.example.alpha"])
@@ -1965,7 +1967,8 @@ extension FlowTabPriorityCoverageTests {
                     ],
                     appDirectoryEntries: []
                 )
-            ]
+            ],
+            appDirectoryEntries: []
         )
 
         XCTAssertEqual(payload.apps.map(\.id), ["pid:42", "pid:41"])
