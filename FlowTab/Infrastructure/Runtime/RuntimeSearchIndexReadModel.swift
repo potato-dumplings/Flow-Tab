@@ -88,3 +88,16 @@ struct RuntimeSearchIndexRead: Equatable, Sendable {
         readiness == .verifiedCurrentGenerationCommitted
     }
 }
+
+struct RuntimeSearchFreshnessBarrierCommitResult: Equatable, Sendable {
+    let stagedSearchIndex: RuntimeSearchIndexProjection?
+    let committedSearchIndex: RuntimeSearchIndexProjection?
+
+    var stagedNewPayload: Bool {
+        stagedSearchIndex != nil
+    }
+
+    var committedNewGeneration: Bool {
+        committedSearchIndex != nil
+    }
+}

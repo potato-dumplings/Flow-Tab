@@ -158,6 +158,13 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
 
+        return stageSearchIndexAppLocked(app, generatedAt: generatedAt)
+    }
+
+    private func stageSearchIndexAppLocked(
+        _ app: AppSwitchCandidate,
+        generatedAt: TimeInterval
+    ) -> RuntimeSearchIndexProjection? {
         guard let base = stagingSearchIndex ?? committedSearchIndex else { return nil }
         let appEntry = buildSearchAppIndexEntryLocked(app: app)
         let windowEntries = buildSearchWindowIndexEntriesLocked(
@@ -188,11 +195,24 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         _ payloads: [RuntimeCurrentAppWindowPayload],
         generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
     ) -> RuntimeSearchIndexProjection? {
+        lock.lock()
+        defer { lock.unlock() }
+
+        return stageSearchIndexCurrentAppWindowPayloadsLocked(
+            payloads,
+            generatedAt: generatedAt
+        )
+    }
+
+    private func stageSearchIndexCurrentAppWindowPayloadsLocked(
+        _ payloads: [RuntimeCurrentAppWindowPayload],
+        generatedAt: TimeInterval
+    ) -> RuntimeSearchIndexProjection? {
         guard !payloads.isEmpty else { return nil }
 
         var stagedProjection: RuntimeSearchIndexProjection?
         for payload in payloads {
-            stagedProjection = stageSearchIndexApp(
+            stagedProjection = stageSearchIndexAppLocked(
                 payload.candidate,
                 generatedAt: generatedAt
             )
@@ -208,6 +228,16 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
 
+        return commitStagedSearchIndexLocked(
+            clearsDirtyState: clearsDirtyState,
+            generatedAt: generatedAt
+        )
+    }
+
+    private func commitStagedSearchIndexLocked(
+        clearsDirtyState: Bool,
+        generatedAt: TimeInterval
+    ) -> RuntimeSearchIndexProjection? {
         guard let staged = stagingSearchIndex else { return nil }
         markProjectionCommittedLocked()
         if clearsDirtyState {
@@ -220,6 +250,32 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         )
         stagingSearchIndex = nil
         return committedSearchIndex
+    }
+
+    @discardableResult
+    func commitSearchFreshnessBarrierPayloads(
+        _ payloads: [RuntimeCurrentAppWindowPayload],
+        deferredRequestCount: Int,
+        hasPendingRequests: Bool,
+        generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
+    ) -> RuntimeSearchFreshnessBarrierCommitResult {
+        lock.lock()
+        defer { lock.unlock() }
+
+        let stagedSearchIndex = stageSearchIndexCurrentAppWindowPayloadsLocked(
+            payloads,
+            generatedAt: generatedAt
+        )
+        let canCommit = stagedSearchIndex != nil
+            && deferredRequestCount == 0
+            && !hasPendingRequests
+        let committedSearchIndex = canCommit
+            ? commitStagedSearchIndexLocked(clearsDirtyState: true, generatedAt: generatedAt)
+            : nil
+        return RuntimeSearchFreshnessBarrierCommitResult(
+            stagedSearchIndex: stagedSearchIndex,
+            committedSearchIndex: committedSearchIndex
+        )
     }
 
     func markAppLifecycleDirty(

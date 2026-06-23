@@ -114,16 +114,13 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 includeFullRepair: false
             )
             commitRepairedCurrentAppWindowPayloadsLocked(drainResult.repairedCurrentAppWindowPayloads)
-            let stagedSearchIndex = readModelStore.stageSearchIndexCurrentAppWindowPayloads(
-                drainResult.repairedCurrentAppWindowPayloads
-            )
             let hasPendingRequests = repairProvider.hasPendingReconciliationRequests()
-            let shouldCommitStagedSearchIndex = stagedSearchIndex != nil
-                && drainResult.deferredCount == 0
-                && !hasPendingRequests
-            let committedSearchIndex = shouldCommitStagedSearchIndex
-                ? readModelStore.commitStagedSearchIndex()
-                : nil
+            let searchCommitResult = readModelStore.commitSearchFreshnessBarrierPayloads(
+                drainResult.repairedCurrentAppWindowPayloads,
+                deferredRequestCount: drainResult.deferredCount,
+                hasPendingRequests: hasPendingRequests,
+                generatedAt: now
+            )
             RuntimeLog.debug(
                 .projection,
                 [
@@ -141,7 +138,8 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                     "deferredRequests=\(drainResult.deferredCount)",
                     "pendingRequests=\(hasPendingRequests ? 1 : 0)",
                     "repairedSearchApps=\(drainResult.repairedCurrentAppWindowPayloads.count)",
-                    "committedSearchIndex=\(committedSearchIndex == nil ? 0 : 1)"
+                    "stagedSearchIndex=\(searchCommitResult.stagedNewPayload ? 1 : 0)",
+                    "committedSearchIndex=\(searchCommitResult.committedNewGeneration ? 1 : 0)"
                 ].joined(separator: " ")
             )
         }
