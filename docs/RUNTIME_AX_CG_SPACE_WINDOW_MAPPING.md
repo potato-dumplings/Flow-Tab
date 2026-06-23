@@ -55,7 +55,7 @@
 关键约束：
 
 - `RuntimeReadModelStore` 是长期状态核心。
-- `RuntimeSnapshotProvider` 是采集、reconciliation 和投影构建边界，不是所有 surface 的状态机中心。
+- `RuntimeSnapshotProvider` 只是底层 CG/AX/Space fact source、WindowRecord mapping/evidence bridge 与 repair/fallback 兼容入口；projection 构建与提交边界属于 `RuntimeProjectionRepairProvider` / fact source / `RuntimeReadModelStore`，不能回流成 surface hot-path read seam。
 - feature surface 只发 dirty signal 或读 projection，不自己扩张 topology reconciliation 状态机。
 - projection 可丢弃、可重建、可带 freshness metadata；它不是长期真相。
 
@@ -788,6 +788,7 @@ Runtime infrastructure 负责：
 - `RuntimeActivator` 的 activation readback、target visibility、CG-only / same-Space route helpers 和 test override seam 现在也直接使用 top-level `RuntimeCGWindowEntry`；activation 成功证明仍来自 selected `CGWindowID` / focused AX/CG readback，而不是 provider-nested snapshot fact 命名。
 - `RuntimeChromeWindowFocusBridge` 的 Chrome candidate selection / target-ordinal tie-break helpers 现在也直接接收 top-level `RuntimeCGWindowEntry`；Chrome-style activation 辅助路径不再把 current CG fact 输入表达成 `RuntimeSnapshotProvider` namespace。
 - `RuntimeProjectionService` 现在只持有 `RuntimeProjectionRepairProviding` 窄接口：service 只能通过 repair-provider methods 调度 pending/full-repair/search-barrier/ready-request lifecycle，app launch / app windows / selected-current-app dirty signals 与 Search freshness-barrier promotion 都只调用 semantic repair-provider methods，不再传 raw `RuntimeReconciliationReason`；service 只消费 repair-provider/fact-source 返回的 affected evidence 与 current-app/full-repair projection payload，并提交 verified focus/AX destroyed evidence；protocol 不再暴露 concrete `RuntimeReconciliationCoordinator`。默认 service wiring 进入 runtime-owned `RuntimeProjectionRepairProvider` facade；该 repair-provider protocol 与 concrete facade 已共同独立到 `RuntimeProjectionRepairProvider.swift`，组合底层 `RuntimeSnapshotProvider` fact source，`RuntimeProjectionService.swift` 只保留 feature-facing `RuntimeProjectionServing`、read-model store ownership、maintenance drain 与 commit/freshness policy。AX destroyed、app termination 与 verified-focus repair-provider implementations 已集中在 `RuntimeProjectionRepairProvider+Reconciliation.swift`，不再留在 service 文件中直接承载 coordinator mutation。`RuntimeSnapshotProvider` 本身不再直接 conform service repair protocol。CG fact payload 也已抽为 top-level `RuntimeCGWindowEntry` / `RuntimeCGWindowCollection` 并由 `RuntimeCGWindowFacts.swift` 承载，provider internals 与 tests 也直接使用 top-level CG fact 类型；`RuntimeSnapshotProvider` 只能作为底层 fact-source/repair bridge 存在，不能被 feature surface 当作 hot-path snapshot read seam 重新扩张。
+- AX live registry 批量写入现在命名为 `AXLiveWindowRegistry.replaceWindows(forPID:with:)`，表达长期 live registry 对某 PID 当前 AX window handles 的原子替换，而不是“刷新 snapshot”。底层 provider 采样后仍可写入该 registry 作为 AX/CG readback 与 destroyed routing evidence；这不新增 surface-local state、scheduler 或 Search 行为。Search freshness contract 不变：freshness barrier 未成功提交新 generation 时当前 Search 行为只能暴露为 degraded/stale committed result 与 dirty/freshness metadata，不能命名为 fresh、complete、latest 或 current-generation committed。
 
 但当前实现仍有迁移对象：
 

@@ -57,9 +57,9 @@ final class RuntimeSnapshotProvider {
             let windowsFetchResult = collection.windowsFetchResult
             let axEntries = collection.axEntries
             let registryStartMs = RuntimePerformanceClock.monotonicMilliseconds()
-            AXLiveWindowRegistry.shared.refreshSnapshot(
+            AXLiveWindowRegistry.shared.replaceWindows(
                 forPID: app.processIdentifier,
-                windows: windows
+                with: windows
             )
             let registryReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
             RuntimeLog.debug(

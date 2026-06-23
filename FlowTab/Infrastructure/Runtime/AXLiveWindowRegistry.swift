@@ -23,7 +23,7 @@ final class AXLiveWindowRegistry {
         lock.unlock()
     }
 
-    func refreshSnapshot(forPID pid: pid_t, windows: [AXUIElement]) {
+    func replaceWindows(forPID pid: pid_t, with windows: [AXUIElement]) {
         let windowsByID = makeWindowMap(pid: pid, windows: windows)
         lock.lock()
         windowsByPID[pid] = windowsByID

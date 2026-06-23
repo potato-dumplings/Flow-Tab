@@ -1807,7 +1807,7 @@ extension FlowTabPriorityCoverageTests {
         let pid = pid_t(18_405)
         let cgWindowID = CGWindowID(240_001)
         let liveAXWindow = AXUIElementCreateApplication(pid)
-        AXLiveWindowRegistry.shared.refreshSnapshot(forPID: pid, windows: [liveAXWindow])
+        AXLiveWindowRegistry.shared.replaceWindows(forPID: pid, with: [liveAXWindow])
         defer { AXLiveWindowRegistry.shared.remove(pid: pid) }
         provider.windowMappingStateByPID[pid] = RuntimeWindowMappingState(
             windowRecordsByCGWindowID: [
@@ -1855,7 +1855,7 @@ extension FlowTabPriorityCoverageTests {
             ],
             validCGWindowIDs: [focusedCGWindowID]
         )
-        AXLiveWindowRegistry.shared.refreshSnapshot(forPID: pid, windows: [focusedAXWindow])
+        AXLiveWindowRegistry.shared.replaceWindows(forPID: pid, with: [focusedAXWindow])
         defer { AXLiveWindowRegistry.shared.remove(pid: pid) }
         let lock = NSLock()
         var executedRequests: [RuntimeReconciliationRequest] = []
@@ -1906,7 +1906,7 @@ extension FlowTabPriorityCoverageTests {
         let focusedCGWindowID = CGWindowID(240_101)
         let focusedAXWindow = AXUIElementCreateApplication(pid)
         let focusedAXWindowID = AXWindowInspectorForTesting.makeWindowID(pid: pid, index: 0)
-        AXLiveWindowRegistry.shared.refreshSnapshot(forPID: pid, windows: [focusedAXWindow])
+        AXLiveWindowRegistry.shared.replaceWindows(forPID: pid, with: [focusedAXWindow])
         defer { AXLiveWindowRegistry.shared.remove(pid: pid) }
         let lock = NSLock()
         var executedRequests: [RuntimeReconciliationRequest] = []

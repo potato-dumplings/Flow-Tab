@@ -12,7 +12,7 @@ extension FlowTabPriorityCoverageTests {
         let knownWindow = AXUIElementCreateApplication(pid)
         let unrelatedWindow = AXUIElementCreateApplication(pid + 1)
         let knownWindowID = AXWindowInspectorForTesting.makeWindowID(pid: pid, index: 0)
-        AXLiveWindowRegistry.shared.refreshSnapshot(forPID: pid, windows: [knownWindow])
+        AXLiveWindowRegistry.shared.replaceWindows(forPID: pid, with: [knownWindow])
         defer { AXLiveWindowRegistry.shared.remove(pid: pid) }
 
         let monitor = RuntimeAXWindowChangeMonitor()
