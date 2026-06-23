@@ -275,35 +275,6 @@ final class RuntimeSnapshotProvider {
         )
     }
 
-    func collectAXWindowStats(for runningApps: [NSRunningApplication]) -> [pid_t: RuntimeAppWindowStats] {
-        guard AccessibilityPermissionChecker.isTrusted() else {
-            RuntimeLog.warning(.ax, "not trusted; all app windows will be reported as 0")
-            return [:]
-        }
-
-        var statsByPID: [pid_t: RuntimeAppWindowStats] = [:]
-        for app in runningApps {
-            let windows = AXWindowInspector.windows(for: app)
-            guard !windows.isEmpty else { continue }
-
-            var count = 0
-            var hasVisibleWindow = false
-            for window in windows {
-                guard AXWindowInspector.isSwitchable(window) else { continue }
-                count += 1
-                if !AXWindowInspector.isMinimized(window) {
-                    hasVisibleWindow = true
-                }
-            }
-            guard count > 0 else { continue }
-            statsByPID[app.processIdentifier] = RuntimeAppWindowStats(
-                windowCount: count,
-                hasVisibleWindow: hasVisibleWindow
-            )
-        }
-        return statsByPID
-    }
-
     func collectCGWindowsWithSpaceTopologyDiff(
         options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements],
         now: TimeInterval = ProcessInfo.processInfo.systemUptime
