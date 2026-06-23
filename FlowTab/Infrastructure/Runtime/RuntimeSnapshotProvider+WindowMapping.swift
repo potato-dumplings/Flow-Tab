@@ -4,12 +4,11 @@ import Foundation
 
 extension RuntimeSnapshotProvider {
     func cleanupWindowMappingState(for runningApps: [NSRunningApplication]) {
-        let runningPIDs = Set(runningApps.map(\.processIdentifier))
-        windowMappingStateByPID = windowMappingStateByPID.filter { runningPIDs.contains($0.key) }
+        windowRecordStore.cleanup(keepingRunningApps: runningApps)
     }
 
     func removeWindowMappingState(forTerminatedPID pid: pid_t) {
-        windowMappingStateByPID.removeValue(forKey: pid)
+        windowRecordStore.removeState(for: pid)
     }
 
     func resolvedStableWindowEntries(
@@ -286,7 +285,7 @@ extension RuntimeSnapshotProvider {
         )
         let validCGWindowIDs = Set(validCGWindows.map(\.id))
         let currentAXWindowsByID = Dictionary(uniqueKeysWithValues: axWindows.map { ($0.id, $0) })
-        let previousState = windowMappingStateByPID[pid] ?? RuntimeWindowMappingState()
+        let previousState = windowRecordStore.state(for: pid) ?? RuntimeWindowMappingState()
         let observedAt = Date.timeIntervalSinceReferenceDate
         let hasAXWindowsInCurrentCollection = !axWindows.isEmpty
         let axWindowAbsenceIsAuthoritative = RuntimeAXWindowAbsencePolicy.isAbsenceAuthoritative(
@@ -536,9 +535,9 @@ extension RuntimeSnapshotProvider {
             consecutiveAXCollectionMisses: consecutiveAXCollectionMisses
         )
         if nextState.isEmpty {
-            windowMappingStateByPID.removeValue(forKey: pid)
+            windowRecordStore.removeState(for: pid)
         } else {
-            windowMappingStateByPID[pid] = nextState
+            windowRecordStore.setState(nextState, for: pid)
         }
 
         let unmatchedAXCount = max(0, axWindows.count - exactMatchesByAXWindowID.count)

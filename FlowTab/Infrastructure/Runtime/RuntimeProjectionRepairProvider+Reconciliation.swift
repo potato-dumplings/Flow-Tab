@@ -13,7 +13,7 @@ extension RuntimeProjectionRepairProvider {
             processIdentifier: pid,
             axWindowID: axWindowID,
             now: now,
-            mappingStatesByPID: &runtimeFactProvider.windowMappingStateByPID
+            mappingStatesByPID: &runtimeFactProvider.windowRecordStore.mappingStatesByPID
         )
         runtimeFactProvider.reconciliationCoordinator.markAppDirty(
             appID: appID,
@@ -38,7 +38,7 @@ extension RuntimeProjectionRepairProvider {
         RuntimeWindowRecordEvidence.recordWindowFocusVerification(
             verification,
             now: now,
-            mappingStatesByPID: &runtimeFactProvider.windowMappingStateByPID
+            mappingStatesByPID: &runtimeFactProvider.windowRecordStore.mappingStatesByPID
         )
         runtimeFactProvider.reconciliationCoordinator.markWindowFocusVerified(verification, now: now)
         return verification.affectedCGWindowIDs
@@ -124,7 +124,7 @@ extension RuntimeProjectionRepairProvider {
     ) -> RuntimeAppWindowReconciliationResult {
         let currentAppWindowPayload = focusedCurrentAppWindowPayload(processIdentifier: pid)
         let currentAppWindowPayloadWasEmpty = currentAppWindowPayload?.candidate.windows.isEmpty == true
-        let mappingState = runtimeFactProvider.windowMappingStateByPID[pid]
+        let mappingState = runtimeFactProvider.windowRecordStore.state(for: pid)
         let affectedWindowEvidence = mappingState?.affectedWindowEvidence(
             for: affectedCGWindowIDs
         ) ?? .empty

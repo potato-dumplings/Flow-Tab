@@ -8,17 +8,23 @@ private typealias FactDiagnostics = RuntimeFactCollectionDiagnostics
 final class RuntimeSnapshotProvider {
     private let cgWindowListProvider: RuntimeCGWindowListProviding
     private let spaceTopologyProvider: RuntimeSpaceTopologyProviding
+    let windowRecordStore: RuntimeWindowRecordStore
     let reconciliationCoordinator: RuntimeReconciliationCoordinator
 
-    var windowMappingStateByPID: [pid_t: RuntimeWindowMappingState] = [:]
+    var windowMappingStateByPID: [pid_t: RuntimeWindowMappingState] {
+        get { windowRecordStore.mappingStatesByPID }
+        set { windowRecordStore.mappingStatesByPID = newValue }
+    }
 
     init(
         cgWindowListProvider: RuntimeCGWindowListProviding = RuntimeSystemCGWindowListProvider(),
         spaceTopologyProvider: RuntimeSpaceTopologyProviding = RuntimeSystemSpaceTopologyProvider(),
+        windowRecordStore: RuntimeWindowRecordStore = RuntimeWindowRecordStore(),
         reconciliationCoordinator: RuntimeReconciliationCoordinator = RuntimeReconciliationCoordinator()
     ) {
         self.cgWindowListProvider = cgWindowListProvider
         self.spaceTopologyProvider = spaceTopologyProvider
+        self.windowRecordStore = windowRecordStore
         self.reconciliationCoordinator = reconciliationCoordinator
     }
 
@@ -314,7 +320,7 @@ final class RuntimeSnapshotProvider {
             spaceTopologySnapshot,
             now: now,
             reconciliationCoordinator: reconciliationCoordinator,
-            mappingStatesByPID: &windowMappingStateByPID
+            mappingStatesByPID: &windowRecordStore.mappingStatesByPID
         )
         let spaceIDsByWindowID = Dictionary(
             uniqueKeysWithValues: spaceTopologySnapshot.spaceIDsByCGWindowID.map { windowID, spaceIDs in

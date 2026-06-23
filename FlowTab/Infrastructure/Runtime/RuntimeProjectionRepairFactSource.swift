@@ -141,7 +141,7 @@ struct RuntimeProjectionRepairFactSource {
         let affectedCGWindowIDsByPID = RuntimeWindowMappingState.affectedCGWindowIDsByPID(
             affectedCGWindowIDs: affectedCGWindowIDs,
             currentCGWindowsByPID: cgWindowsByPID,
-            mappingStatesByPID: runtimeFactProvider.windowMappingStateByPID
+            mappingStatesByPID: runtimeFactProvider.windowRecordStore.mappingStatesByPID
         )
         guard !affectedCGWindowIDsByPID.isEmpty else { return [] }
 
