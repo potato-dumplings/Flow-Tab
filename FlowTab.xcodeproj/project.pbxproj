@@ -60,6 +60,7 @@
 		F6E7D00235C1000100B0D737 /* RuntimeProjectionDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7D00135C1000100B0D737 /* RuntimeProjectionDiagnostics.swift */; };
 		F6E7E10235C3000100B0D737 /* RuntimeProjectionMaintenance.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7E10135C3000100B0D737 /* RuntimeProjectionMaintenance.swift */; };
 		D10000012FF500100B0D737 /* RuntimeProjectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000022FF500100B0D737 /* RuntimeProjectionService.swift */; };
+		D10000032FF500200B0D737 /* RuntimeProjectionServing.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000042FF500200B0D737 /* RuntimeProjectionServing.swift */; };
 		B26010012FE000100B0D737 /* RuntimePerformanceClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26000012FE000100B0D737 /* RuntimePerformanceClock.swift */; };
 		B26010022FE000100B0D737 /* RuntimeFactCollectionDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26000022FE000100B0D737 /* RuntimeFactCollectionDiagnostics.swift */; };
 		A1B2C43D2F73000100B0D737 /* RuntimeActivator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4342F73000100B0D737 /* RuntimeActivator.swift */; };
@@ -289,6 +290,7 @@
 		F6E7E20135C4000100B0D737 /* RuntimeSearchIndexReadModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeSearchIndexReadModel.swift; sourceTree = "<group>"; };
 		F6E7E30135C4000200B0D737 /* RuntimeProjectionReadModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionReadModels.swift; sourceTree = "<group>"; };
 		D10000022FF500100B0D737 /* RuntimeProjectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionService.swift; sourceTree = "<group>"; };
+		D10000042FF500200B0D737 /* RuntimeProjectionServing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionServing.swift; sourceTree = "<group>"; };
 		B26000012FE000100B0D737 /* RuntimePerformanceClock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimePerformanceClock.swift; sourceTree = "<group>"; };
 		B26000022FE000100B0D737 /* RuntimeFactCollectionDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeFactCollectionDiagnostics.swift; sourceTree = "<group>"; };
 		A1B2C4342F73000100B0D737 /* RuntimeActivator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeActivator.swift; sourceTree = "<group>"; };
@@ -698,6 +700,7 @@
 				F6E7D00135C1000100B0D737 /* RuntimeProjectionDiagnostics.swift */,
 				F6E7E10135C3000100B0D737 /* RuntimeProjectionMaintenance.swift */,
 				D10000022FF500100B0D737 /* RuntimeProjectionService.swift */,
+				D10000042FF500200B0D737 /* RuntimeProjectionServing.swift */,
 				B26000022FE000100B0D737 /* RuntimeFactCollectionDiagnostics.swift */,
 				F2B3C4D52F8C000100B0D737 /* RuntimeWindowListDiagnostics.swift */,
 				F3C4D5E52FA2000100B0D737 /* RuntimeWindowMappingPresentationAssembler.swift */,
@@ -1113,6 +1116,7 @@
 				F6E7D00235C1000100B0D737 /* RuntimeProjectionDiagnostics.swift in Sources */,
 				F6E7E10235C3000100B0D737 /* RuntimeProjectionMaintenance.swift in Sources */,
 				D10000012FF500100B0D737 /* RuntimeProjectionService.swift in Sources */,
+				D10000032FF500200B0D737 /* RuntimeProjectionServing.swift in Sources */,
 				B26010022FE000100B0D737 /* RuntimeFactCollectionDiagnostics.swift in Sources */,
 				F6E7B00635AC000100B0D737 /* RuntimeReconciliationCoordinator.swift in Sources */,
 				F6E7C00235C000100B0D737 /* RuntimeReadModelStore.swift in Sources */,
