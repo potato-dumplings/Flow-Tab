@@ -3,14 +3,6 @@ import ApplicationServices
 import Foundation
 
 extension RuntimeSnapshotProvider {
-    func cleanupWindowMappingState(for runningApps: [NSRunningApplication]) {
-        windowRecordStore.cleanup(keepingRunningApps: runningApps)
-    }
-
-    func removeWindowMappingState(forTerminatedPID pid: pid_t) {
-        windowRecordStore.removeState(for: pid)
-    }
-
     func resolvedStableWindowEntries(
         axWindows: [RuntimeAXWindowEntry],
         cgWindows: [RuntimeCGWindowEntry],

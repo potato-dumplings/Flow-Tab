@@ -27,7 +27,7 @@ extension RuntimeProjectionRepairProvider {
 
     func recordAppTerminated(processIdentifier pid: pid_t) {
         runtimeFactProvider.reconciliationCoordinator.cancelAppRequests(pid: pid)
-        runtimeFactProvider.removeWindowMappingState(forTerminatedPID: pid)
+        runtimeFactProvider.windowRecordStore.removeState(for: pid)
         AXLiveWindowRegistry.shared.remove(pid: pid)
     }
 
