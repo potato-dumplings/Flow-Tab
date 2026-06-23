@@ -256,31 +256,37 @@ extension FlowTabPriorityCoverageTests {
     }
 
     func testSystemAppMRUTrackerHelpersCoverNotificationRemovalAndPruningPaths() {
-        let tracker = SystemAppMRUTracker.shared
-        tracker.resetStateForTesting()
-        defer { tracker.resetStateForTesting() }
+        let tracker = SystemAppMRUTracker()
 
-        tracker.recordActivationForTesting(pid: 4_001)
-        tracker.recordActivationForTesting(pid: 4_002)
-        tracker.recordActivationForTesting(pid: 4_001)
-        XCTAssertEqual(tracker.trackedMRUOrderForTesting(runningPIDs: [4_001, 4_002]), [4_001, 4_002])
+        tracker.recordActivation(of: 4_001)
+        tracker.recordActivation(of: 4_002)
+        tracker.recordActivation(of: 4_001)
+        XCTAssertEqual(tracker.trackedMRUOrder(for: [4_001, 4_002]), [4_001, 4_002])
 
-        tracker.removeForTesting(pid: 4_002)
-        XCTAssertEqual(tracker.trackedMRUOrderForTesting(runningPIDs: [4_001, 4_002]), [4_001])
+        tracker.remove(pid: 4_002)
+        XCTAssertEqual(tracker.trackedMRUOrder(for: [4_001, 4_002]), [4_001])
 
-        tracker.handleApplicationNotificationForTesting(app: nil, removeOnly: true)
-        XCTAssertEqual(tracker.trackedMRUOrderForTesting(runningPIDs: [4_001]), [4_001])
+        tracker.handleApplicationNotification(
+            Notification(name: NSWorkspace.didTerminateApplicationNotification),
+            removeOnly: true
+        )
+        XCTAssertEqual(tracker.trackedMRUOrder(for: [4_001]), [4_001])
 
-        tracker.handleApplicationNotificationForTesting(app: .current, removeOnly: false)
-        XCTAssertEqual(
-            tracker.trackedMRUOrderForTesting(
-                runningPIDs: [4_001, ProcessInfo.processInfo.processIdentifier]
+        tracker.handleApplicationNotification(
+            Notification(
+                name: NSWorkspace.didActivateApplicationNotification,
+                object: nil,
+                userInfo: [NSWorkspace.applicationUserInfoKey: NSRunningApplication.current]
             ),
+            removeOnly: false
+        )
+        XCTAssertEqual(
+            tracker.trackedMRUOrder(for: [4_001, ProcessInfo.processInfo.processIdentifier]),
             [4_001]
         )
 
-        tracker.recordActivationForTesting(pid: 4_999)
-        XCTAssertEqual(tracker.trackedMRUOrderForTesting(runningPIDs: [4_001]), [4_001])
+        tracker.recordActivation(of: 4_999)
+        XCTAssertEqual(tracker.trackedMRUOrder(for: [4_001]), [4_001])
     }
 
     func testSystemAppMRUTrackerRankingFallsBackWhenCurrentPIDLaunchRankIsMissing() {
@@ -307,9 +313,7 @@ extension FlowTabPriorityCoverageTests {
             throw XCTSkip("No secondary running app is available for observer notification coverage.")
         }
 
-        let tracker = SystemAppMRUTracker.shared
-        tracker.resetStateForTesting()
-        defer { tracker.resetStateForTesting() }
+        let tracker = SystemAppMRUTracker()
 
         tracker.startIfNeeded()
         let notificationCenter = NSWorkspace.shared.notificationCenter
@@ -320,7 +324,7 @@ extension FlowTabPriorityCoverageTests {
             userInfo: [NSWorkspace.applicationUserInfoKey: otherApp]
         )
         XCTAssertEqual(
-            tracker.trackedMRUOrderForTesting(runningPIDs: [otherApp.processIdentifier]),
+            tracker.trackedMRUOrder(for: [otherApp.processIdentifier]),
             [otherApp.processIdentifier]
         )
 
@@ -330,7 +334,7 @@ extension FlowTabPriorityCoverageTests {
             userInfo: [NSWorkspace.applicationUserInfoKey: otherApp]
         )
         XCTAssertEqual(
-            tracker.trackedMRUOrderForTesting(runningPIDs: [otherApp.processIdentifier]),
+            tracker.trackedMRUOrder(for: [otherApp.processIdentifier]),
             []
         )
     }

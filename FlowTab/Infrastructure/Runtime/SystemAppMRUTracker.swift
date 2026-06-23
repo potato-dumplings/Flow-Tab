@@ -9,7 +9,11 @@ final class SystemAppMRUTracker {
     private var observers: [NSObjectProtocol] = []
     private var mruPIDs: [pid_t] = []
 
-    private init() {}
+    init() {}
+
+    deinit {
+        stopObserving()
+    }
 
     func startIfNeeded() {
         if Thread.isMainThread {
@@ -120,7 +124,7 @@ final class SystemAppMRUTracker {
         }
     }
 
-    private func handleApplicationNotification(_ notification: Notification, removeOnly: Bool) {
+    func handleApplicationNotification(_ notification: Notification, removeOnly: Bool) {
         guard
             let app = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
         else {
@@ -133,7 +137,7 @@ final class SystemAppMRUTracker {
         recordActivation(of: app.processIdentifier)
     }
 
-    private func recordActivation(of pid: pid_t) {
+    func recordActivation(of pid: pid_t) {
         guard pid != ProcessInfo.processInfo.processIdentifier else { return }
         lock.lock()
         defer { lock.unlock() }
@@ -141,13 +145,13 @@ final class SystemAppMRUTracker {
         mruPIDs.insert(pid, at: 0)
     }
 
-    private func remove(pid: pid_t) {
+    func remove(pid: pid_t) {
         lock.lock()
         defer { lock.unlock() }
         mruPIDs.removeAll { $0 == pid }
     }
 
-    private func trackedMRUOrder(for runningPIDs: Set<pid_t>) -> [pid_t] {
+    func trackedMRUOrder(for runningPIDs: Set<pid_t>) -> [pid_t] {
         lock.lock()
         defer { lock.unlock() }
         mruPIDs.removeAll { !runningPIDs.contains($0) }
@@ -184,7 +188,7 @@ final class SystemAppMRUTracker {
         return rankByPID
     }
 
-    func resetStateForTesting() {
+    private func stopObserving() {
         lock.lock()
         hasStarted = false
         mruPIDs.removeAll()
@@ -196,32 +200,5 @@ final class SystemAppMRUTracker {
         for observer in existingObservers {
             workspaceNotificationCenter.removeObserver(observer)
         }
-    }
-
-    func recordActivationForTesting(pid: pid_t) {
-        recordActivation(of: pid)
-    }
-
-    func removeForTesting(pid: pid_t) {
-        remove(pid: pid)
-    }
-
-    func trackedMRUOrderForTesting(runningPIDs: [pid_t]) -> [pid_t] {
-        trackedMRUOrder(for: Set(runningPIDs))
-    }
-
-    func handleApplicationNotificationForTesting(
-        app: NSRunningApplication?,
-        removeOnly: Bool
-    ) {
-        let name =
-            removeOnly
-            ? NSWorkspace.didTerminateApplicationNotification
-            : NSWorkspace.didActivateApplicationNotification
-        let userInfo: [AnyHashable: Any]? = app.map {
-            [NSWorkspace.applicationUserInfoKey: $0]
-        }
-        let notification = Notification(name: name, object: nil, userInfo: userInfo)
-        handleApplicationNotification(notification, removeOnly: removeOnly)
     }
 }
