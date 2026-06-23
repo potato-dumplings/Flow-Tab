@@ -2,15 +2,15 @@ import AppKit
 import Foundation
 
 extension RuntimeSnapshotProvider {
-    func logSnapshotTiming(_ event: String, fields: [(String, String)]) {
-        RuntimeLog.debug(.snapshot, Self.snapshotTimingLine(event, fields: fields))
+    func logRuntimeFactTiming(_ event: String, fields: [(String, String)]) {
+        RuntimeLog.debug(.snapshot, Self.runtimeFactTimingLine(event, fields: fields))
     }
 
-    static func snapshotTimingLine(_ event: String, fields: [(String, String)]) -> String {
+    static func runtimeFactTimingLine(_ event: String, fields: [(String, String)]) -> String {
         ([event] + fields.map { "\($0.0)=\($0.1)" }).joined(separator: " ")
     }
 
-    func formatSnapshotMilliseconds(_ value: Double) -> String {
+    func formatRuntimeFactMilliseconds(_ value: Double) -> String {
         RuntimePerformanceClock.formatMilliseconds(value)
     }
 
