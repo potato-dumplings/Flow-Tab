@@ -103,7 +103,7 @@ enum RuntimeWindowMappingTestSupport {
         pid: pid_t = 100,
         appName: String = "FlowTab Test"
     ) -> [String: CGWindowID] {
-        let provider = mappingProvider(
+        let windowRecordStore = mappingStore(
             previousMatches: previousMatches,
             previousAXWindowIDs: previousAXWindowIDs,
             previousCGWindowIDs: previousCGWindowIDs,
@@ -117,7 +117,7 @@ enum RuntimeWindowMappingTestSupport {
         defer {
             AXWindowInspector.cgWindowIDOverrideForTesting = previousExactBridgeOverride
         }
-        return provider.windowRecordStore.resolveStableWindowMapping(
+        return windowRecordStore.resolveStableWindowMapping(
             axWindows: axWindows,
             cgWindows: cgWindows,
             pid: pid,
@@ -135,7 +135,7 @@ enum RuntimeWindowMappingTestSupport {
         pid: pid_t = 100,
         appName: String = "FlowTab Test"
     ) -> [WindowBindingDiagnostic] {
-        let provider = mappingProvider(
+        let windowRecordStore = mappingStore(
             previousMatches: previousMatches,
             previousAXWindowIDs: previousAXWindowIDs,
             previousCGWindowIDs: previousCGWindowIDs,
@@ -149,7 +149,7 @@ enum RuntimeWindowMappingTestSupport {
         defer {
             AXWindowInspector.cgWindowIDOverrideForTesting = previousExactBridgeOverride
         }
-        return provider.windowRecordStore.resolveStableWindowMapping(
+        return windowRecordStore.resolveStableWindowMapping(
             axWindows: axWindows,
             cgWindows: cgWindows,
             pid: pid,
@@ -167,7 +167,7 @@ enum RuntimeWindowMappingTestSupport {
         pid: pid_t = 100,
         appName: String = "FlowTab Test"
     ) -> [ResolvedEntry] {
-        let provider = mappingProvider(
+        let windowRecordStore = mappingStore(
             previousMatches: previousMatches,
             previousAXWindowIDs: previousAXWindowIDs,
             previousCGWindowIDs: previousCGWindowIDs,
@@ -181,7 +181,8 @@ enum RuntimeWindowMappingTestSupport {
         defer {
             AXWindowInspector.cgWindowIDOverrideForTesting = previousExactBridgeOverride
         }
-        return provider.resolvedStableWindowEntries(
+        return RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
+            windowRecordStore: windowRecordStore,
             axWindows: axWindows,
             cgWindows: cgWindows,
             pid: pid,
@@ -189,14 +190,14 @@ enum RuntimeWindowMappingTestSupport {
         ).map(Self.resolvedEntry)
     }
 
-    private static func mappingProvider(
+    private static func mappingStore(
         previousMatches: [String: CGWindowID],
         previousAXWindowIDs: Set<String>,
         previousCGWindowIDs: Set<CGWindowID>,
         pid: pid_t
-    ) -> RuntimeSnapshotProvider {
-        let provider = RuntimeSnapshotProvider()
-        provider.windowRecordStore.setState(
+    ) -> RuntimeWindowRecordStore {
+        let windowRecordStore = RuntimeWindowRecordStore()
+        windowRecordStore.setState(
             windowMappingState(
                 previousMatches: previousMatches,
                 previousAXWindowIDs: previousAXWindowIDs,
@@ -205,7 +206,7 @@ enum RuntimeWindowMappingTestSupport {
             ),
             for: pid
         )
-        return provider
+        return windowRecordStore
     }
 
     private static func exactBridgeOverride(

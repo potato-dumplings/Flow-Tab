@@ -293,7 +293,8 @@ extension FlowTabPriorityCoverageTests {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let provider = RuntimeSnapshotProvider()
 
-        let entries = provider.resolvedStableWindowEntries(
+        let entries = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
+            windowRecordStore: provider.windowRecordStore,
             axWindows: [],
             cgWindows: [
                 RuntimeCGWindowEntry(
@@ -332,7 +333,8 @@ extension FlowTabPriorityCoverageTests {
         let provider = RuntimeSnapshotProvider()
         let pid: pid_t = 18_405
         let frame = CGRect(x: 100, y: 100, width: 900, height: 620)
-        let entries = provider.resolvedStableWindowEntries(
+        let entries = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
+            windowRecordStore: provider.windowRecordStore,
             axWindows: [
                 RuntimeAXWindowEntry(
                     index: 0,

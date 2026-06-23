@@ -726,7 +726,8 @@ extension FlowTabPriorityCoverageTests {
 
     func testRuntimeSnapshotProviderWindowListKeepsSpaceBackedEntriesAfterAXDisappearsWithoutStickyBinding() throws {
         let provider = RuntimeSnapshotProvider()
-        let mergedEntries = provider.resolvedStableWindowEntries(
+        let mergedEntries = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
+            windowRecordStore: provider.windowRecordStore,
             axWindows: [],
             cgWindows: [
                 RuntimeCGWindowEntry(
@@ -794,7 +795,8 @@ extension FlowTabPriorityCoverageTests {
             )
         ]
 
-        let entries = provider.resolvedStableWindowEntries(
+        let entries = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
+            windowRecordStore: provider.windowRecordStore,
             axWindows: axWindows,
             cgWindows: cgWindows,
             pid: pid,
@@ -888,7 +890,8 @@ extension FlowTabPriorityCoverageTests {
 
     func testRuntimeSnapshotProviderWindowListKeepsDistinctCGOnlyEntriesSharingSameSpaceBinding() {
         let provider = RuntimeSnapshotProvider()
-        let mergedEntries = provider.resolvedStableWindowEntries(
+        let mergedEntries = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
+            windowRecordStore: provider.windowRecordStore,
             axWindows: [],
             cgWindows: [
                 RuntimeCGWindowEntry(
@@ -1318,7 +1321,8 @@ extension FlowTabPriorityCoverageTests {
         let fullscreenHostFrame = CGRect(x: 0, y: 37, width: 1_728, height: 1_080)
         let fullscreenContentFrame = CGRect(x: 0, y: 195, width: 1_728, height: 922)
 
-        _ = provider.resolvedStableWindowEntries(
+        _ = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
+            windowRecordStore: provider.windowRecordStore,
             axWindows: [
                 .init(id: "ax:chrome:normal", index: 0, title: "Chrome Normal Tab", bounds: normalFrame),
                 .init(id: "ax:chrome:incognito", index: 1, title: "Chrome Incognito Tab", bounds: incognitoFrame)
@@ -1333,7 +1337,8 @@ extension FlowTabPriorityCoverageTests {
             appName: appName
         )
 
-        let mergedEntries = provider.resolvedStableWindowEntries(
+        let mergedEntries = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
+            windowRecordStore: provider.windowRecordStore,
             axWindows: [
                 .init(id: "ax:chrome:normal", index: 0, title: "Chrome Normal Tab", bounds: normalFrame),
                 .init(id: "ax:chrome:incognito", index: 1, title: "Chrome Incognito Tab", bounds: incognitoFrame)
@@ -1683,7 +1688,8 @@ extension FlowTabPriorityCoverageTests {
             )
         ]
 
-        let initialEntries = provider.resolvedStableWindowEntries(
+        let initialEntries = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
+            windowRecordStore: provider.windowRecordStore,
             axWindows: initialAXWindows,
             cgWindows: cgWindows,
             pid: pid,
@@ -1693,7 +1699,8 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(initialEntries.first?.lastConfirmationSource, .publicExactMatch)
         XCTAssertFalse(provider.windowRecordStore.state(for: pid)?.isLikelyTransientAXRebuild == true)
 
-        let transientMissingAXEntries = provider.resolvedStableWindowEntries(
+        let transientMissingAXEntries = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
+            windowRecordStore: provider.windowRecordStore,
             axWindows: [],
             cgWindows: cgWindows,
             pid: pid,
@@ -1764,7 +1771,8 @@ extension FlowTabPriorityCoverageTests {
             )
         }
 
-        let initialEntries = provider.resolvedStableWindowEntries(
+        let initialEntries = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
+            windowRecordStore: provider.windowRecordStore,
             axWindows: (0..<20).map(axWindow),
             cgWindows: (0..<20).map { cgWindow(for: $0, isOnscreen: true) },
             pid: pid,
@@ -1772,7 +1780,8 @@ extension FlowTabPriorityCoverageTests {
         )
         XCTAssertEqual(initialEntries.count, 20)
 
-        let fullscreenSpaceEntries = provider.resolvedStableWindowEntries(
+        let fullscreenSpaceEntries = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
+            windowRecordStore: provider.windowRecordStore,
             axWindows: [17, 18, 19].map(axWindow),
             cgWindows: (0..<20).map { cgWindow(for: $0, isOnscreen: false) },
             pid: pid,
@@ -1814,7 +1823,8 @@ extension FlowTabPriorityCoverageTests {
             )
         ]
 
-        _ = provider.resolvedStableWindowEntries(
+        _ = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
+            windowRecordStore: provider.windowRecordStore,
             axWindows: initialAXWindows,
             cgWindows: cgWindows,
             pid: pid,
@@ -1823,7 +1833,8 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(provider.windowRecordStore.state(for: pid)?.isLikelyTransientAXRebuild == true)
 
         for _ in 0..<3 {
-            let retryEntries = provider.resolvedStableWindowEntries(
+            let retryEntries = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
+            windowRecordStore: provider.windowRecordStore,
                 axWindows: [],
                 cgWindows: cgWindows,
                 pid: pid,
@@ -1833,7 +1844,8 @@ extension FlowTabPriorityCoverageTests {
             XCTAssertTrue(provider.windowRecordStore.state(for: pid)?.isLikelyTransientAXRebuild == true)
         }
 
-        let exhaustedEntries = provider.resolvedStableWindowEntries(
+        let exhaustedEntries = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
+            windowRecordStore: provider.windowRecordStore,
             axWindows: [],
             cgWindows: cgWindows,
             pid: pid,
@@ -1871,7 +1883,8 @@ extension FlowTabPriorityCoverageTests {
             )
         ]
 
-        _ = provider.resolvedStableWindowEntries(
+        _ = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
+            windowRecordStore: provider.windowRecordStore,
             axWindows: initialAXWindows,
             cgWindows: cgWindows,
             pid: pid,
@@ -1879,7 +1892,8 @@ extension FlowTabPriorityCoverageTests {
         )
 
         for _ in 0..<5 {
-            let partialEntries = provider.resolvedStableWindowEntries(
+            let partialEntries = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
+            windowRecordStore: provider.windowRecordStore,
                 axWindows: [],
                 cgWindows: cgWindows,
                 pid: pid,
@@ -1890,7 +1904,8 @@ extension FlowTabPriorityCoverageTests {
             XCTAssertFalse(provider.windowRecordStore.state(for: pid)?.isLikelyTransientAXRebuild == true)
         }
 
-        let firstAuthoritativeMissingEntries = provider.resolvedStableWindowEntries(
+        let firstAuthoritativeMissingEntries = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
+            windowRecordStore: provider.windowRecordStore,
             axWindows: [],
             cgWindows: cgWindows,
             pid: pid,
@@ -1946,7 +1961,8 @@ extension FlowTabPriorityCoverageTests {
             )
         ]
 
-        let firstEntries = provider.resolvedStableWindowEntries(
+        let firstEntries = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
+            windowRecordStore: provider.windowRecordStore,
             axWindows: firstAXWindows,
             cgWindows: firstCGWindows,
             pid: pid,
@@ -1993,7 +2009,8 @@ extension FlowTabPriorityCoverageTests {
             )
         ]
 
-        let secondEntries = provider.resolvedStableWindowEntries(
+        let secondEntries = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
+            windowRecordStore: provider.windowRecordStore,
             axWindows: secondAXWindows,
             cgWindows: secondCGWindows,
             pid: pid,
@@ -2829,7 +2846,8 @@ extension FlowTabPriorityCoverageTests {
         )
         XCTAssertEqual(mergedEntries.first?.isMinimized, true)
 
-        _ = provider.resolvedStableWindowEntries(
+        _ = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
+            windowRecordStore: provider.windowRecordStore,
             axWindows: [
                 RuntimeAXWindowEntry(
                     index: 0,

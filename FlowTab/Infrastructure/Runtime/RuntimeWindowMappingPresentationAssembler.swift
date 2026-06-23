@@ -2,8 +2,9 @@ import AppKit
 import ApplicationServices
 import Foundation
 
-extension RuntimeSnapshotProvider {
-    func resolvedStableWindowEntries(
+enum RuntimeWindowMappingPresentationAssembler {
+    static func resolvedStableWindowEntries(
+        windowRecordStore: RuntimeWindowRecordStore,
         axWindows: [RuntimeAXWindowEntry],
         cgWindows: [RuntimeCGWindowEntry],
         pid: pid_t,

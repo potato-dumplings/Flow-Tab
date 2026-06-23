@@ -645,7 +645,8 @@ extension FlowTabPriorityCoverageTests {
             for: pid
         )
 
-        let entries = provider.resolvedStableWindowEntries(
+        let entries = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
+            windowRecordStore: provider.windowRecordStore,
             axWindows: [],
             cgWindows: [],
             pid: pid,
@@ -687,7 +688,8 @@ extension FlowTabPriorityCoverageTests {
             for: pid
         )
 
-        let entries = provider.resolvedStableWindowEntries(
+        let entries = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
+            windowRecordStore: provider.windowRecordStore,
             axWindows: [],
             cgWindows: [],
             pid: pid,

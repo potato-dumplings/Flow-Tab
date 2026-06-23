@@ -249,7 +249,8 @@ final class RuntimeSnapshotProvider {
         appName: String,
         remoteScanCompleteness: RuntimeAXRemoteWindowResolver.RemoteScanCompleteness? = nil
     ) -> [RuntimeWindowListEntry] {
-        resolvedStableWindowEntries(
+        RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
+            windowRecordStore: windowRecordStore,
             axWindows: axWindows,
             cgWindows: cgWindows,
             pid: pid,
