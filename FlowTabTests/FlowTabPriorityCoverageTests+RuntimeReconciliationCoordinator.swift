@@ -1036,6 +1036,63 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(diagnostics.hasStagingSearchIndex)
     }
 
+    func testRuntimeReadModelStoreTreatsUncommittedSearchStagingAsDegradedWhenDirtyClears() throws {
+        let store = RuntimeReadModelStore()
+        let committedApps = searchScenarioApps()
+        let repairedApp = AppSwitchCandidate(
+            id: "com.example.browser",
+            displayName: "Browser",
+            groupID: "web",
+            lastActiveAt: 320,
+            windows: [
+                WindowCandidate(
+                    id: "browser-staged-not-committed",
+                    title: "Staged Runtime Docs",
+                    isMinimized: false,
+                    lastActiveAt: 320
+                )
+            ]
+        )
+        let pid = pid_t(42_109)
+        let payload = makeRuntimeCurrentAppWindowPayload(app: repairedApp, pid: pid)
+        store.commitAppSwitcherProjection(
+            apps: committedApps,
+            contextsByID: [:],
+            appDirectoryEntries: nil,
+            generatedAt: 10
+        )
+        store.markAppWindowsDirty(
+            appID: repairedApp.id,
+            pid: pid,
+            pendingScope: "appWindows:\(repairedApp.id)"
+        )
+        store.commitCurrentAppWindowProjection(payload, generatedAt: 20)
+
+        let result = store.commitSearchFreshnessBarrierPayloads(
+            [payload],
+            deferredRequestCount: 1,
+            hasPendingRequests: false,
+            generatedAt: 21
+        )
+
+        XCTAssertTrue(result.stagedNewPayload)
+        XCTAssertFalse(result.committedNewGeneration)
+        let read = store.readCommittedSearchIndexForSearch()
+        let projection = try XCTUnwrap(read.projection)
+        XCTAssertEqual(read.readiness, .staleCommitted)
+        XCTAssertEqual(read.resultState, .degradedStaleCommittedResult)
+        XCTAssertFalse(read.committedIndexCoversCurrentGeneration)
+        XCTAssertFalse(read.freshness?.isCompleteForScope ?? true)
+        XCTAssertEqual(
+            projection.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),
+            ["browser-1"]
+        )
+        let diagnostics = store.diagnostics()
+        XCTAssertTrue(diagnostics.dirtyAppIDs.isEmpty)
+        XCTAssertTrue(diagnostics.pendingRepairScopes.isEmpty)
+        XCTAssertTrue(diagnostics.hasStagingSearchIndex)
+    }
+
     func testRuntimeReconciliationCoordinatorMarksSpaceTopologyAffectedWindows() {
         let coordinator = RuntimeReconciliationCoordinator()
         let previous = RuntimeSpaceTopologySnapshot(

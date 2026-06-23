@@ -501,7 +501,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         }
         projection.freshness = freshnessLocked(
             generatedAt: projection.freshness.generatedAt,
-            isCompleteForScope: !isDirtyLocked
+            isCompleteForScope: !isDirtyLocked && stagingSearchIndex == nil
         )
         return RuntimeSearchIndexRead(
             projection: projection,
