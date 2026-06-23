@@ -3,13 +3,6 @@ import Foundation
 enum RuntimeAXAppCollectionCoordinator {
     static let maxConcurrentCollections = 4
 
-    struct PressureResultForTesting {
-        let orderedResults: [Int]
-        let elapsedMs: Double
-        let configuredConcurrency: Int
-        let maxInFlight: Int
-    }
-
     static func collect<Result>(
         count: Int,
         collect: @escaping (Int) -> Result
@@ -41,37 +34,5 @@ enum RuntimeAXAppCollectionCoordinator {
 
         group.wait()
         return results.compactMap { $0 }
-    }
-
-    static func pressureResultForTesting(
-        taskCount: Int,
-        delayNanoseconds: UInt64
-    ) -> PressureResultForTesting {
-        let inFlightLock = NSLock()
-        var inFlight = 0
-        var maxInFlight = 0
-        let startNs = DispatchTime.now().uptimeNanoseconds
-
-        let orderedResults: [Int] = collect(count: taskCount) { index in
-            inFlightLock.lock()
-            inFlight += 1
-            maxInFlight = max(maxInFlight, inFlight)
-            inFlightLock.unlock()
-
-            Thread.sleep(forTimeInterval: Double(delayNanoseconds) / 1_000_000_000.0)
-
-            inFlightLock.lock()
-            inFlight -= 1
-            inFlightLock.unlock()
-            return index
-        }
-        let elapsedMs = Double(DispatchTime.now().uptimeNanoseconds - startNs) / 1_000_000.0
-
-        return PressureResultForTesting(
-            orderedResults: orderedResults,
-            elapsedMs: elapsedMs,
-            configuredConcurrency: min(maxConcurrentCollections, taskCount),
-            maxInFlight: maxInFlight
-        )
     }
 }
