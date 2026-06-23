@@ -102,7 +102,7 @@ final class RuntimeWindowRecencyTracker: @unchecked Sendable {
     private let semanticFallbackMaxGenerationAge: UInt64
     private let lock = NSLock()
     private var recordsByAppID: [String: [Record]] = [:]
-    private var snapshotGeneration: UInt64 = 0
+    private var projectionEvaluationGeneration: UInt64 = 0
 
     init(
         clock: @escaping () -> TimeInterval = { Date.timeIntervalSinceReferenceDate },
@@ -144,7 +144,7 @@ final class RuntimeWindowRecencyTracker: @unchecked Sendable {
             normalizedTitle: normalizedRuntimeWindowTitle(title),
             frame: frame?.standardized,
             timestamp: timestamp,
-            generation: snapshotGeneration
+            generation: projectionEvaluationGeneration
         )
         defer { lock.unlock() }
         upsert(record)
@@ -210,7 +210,7 @@ final class RuntimeWindowRecencyTracker: @unchecked Sendable {
         _ apps: [AppSwitchCandidate],
         contextsByID: [String: RuntimeAppContext]
     ) -> [AppSwitchCandidate] {
-        let evaluation = beginSnapshotEvaluation()
+        let evaluation = beginProjectionEvaluation()
         return apps.map { app in
             guard let context = contextsByID[app.id] else {
                 return app
@@ -245,18 +245,18 @@ final class RuntimeWindowRecencyTracker: @unchecked Sendable {
     func removeAll() {
         lock.lock()
         recordsByAppID.removeAll()
-        snapshotGeneration = 0
+        projectionEvaluationGeneration = 0
         lock.unlock()
     }
 
-    private func beginSnapshotEvaluation() -> (
+    private func beginProjectionEvaluation() -> (
         recordsByAppID: [String: [Record]],
         generation: UInt64
     ) {
         lock.lock()
         defer { lock.unlock() }
-        snapshotGeneration &+= 1
-        return (recordsByAppID, snapshotGeneration)
+        projectionEvaluationGeneration &+= 1
+        return (recordsByAppID, projectionEvaluationGeneration)
     }
 
     private func upsert(_ record: Record) {
@@ -556,7 +556,7 @@ final class RuntimeWindowRecencyTracker: @unchecked Sendable {
                 recordGeneration: record.generation,
                 evaluationGeneration: evaluationGeneration,
                 generationAge: record.generationAge(at: evaluationGeneration),
-                action: "ignore_record_for_this_snapshot",
+                action: "ignore_record_for_this_projection_evaluation",
                 reason: reason
             ).logMessage
         )

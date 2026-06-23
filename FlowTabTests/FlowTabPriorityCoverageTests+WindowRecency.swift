@@ -179,7 +179,7 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
-    func testRuntimeWindowRecencyTrackerMatchesRecordedCGWindowAcrossSnapshotOrder() {
+    func testRuntimeWindowRecencyTrackerMatchesRecordedCGWindowAcrossProjectionOrder() {
         var now: TimeInterval = 500
         let tracker = RuntimeWindowRecencyTracker(clock: { now })
         let currentApp = NSRunningApplication.current
@@ -319,7 +319,7 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
-    func testRuntimeWindowRecencyTrackerExpiresSemanticFallbackAcrossSnapshotGenerations() {
+    func testRuntimeWindowRecencyTrackerExpiresSemanticFallbackAcrossProjectionEvaluations() {
         var now: TimeInterval = 100
         let tracker = RuntimeWindowRecencyTracker(
             clock: { now },
