@@ -67,7 +67,7 @@ final class RuntimeSnapshotProvider {
                 "\(appName) rawWindows=\(windows.count) \(windowsFetchResult.logDetails)"
             )
 
-            logChromeLikeTopologySnapshot(
+            logChromeLikeTopologyFacts(
                 appName: appName,
                 pid: app.processIdentifier,
                 publicWindowsFetchResult: publicWindowsFetchResult,
