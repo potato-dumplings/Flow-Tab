@@ -150,10 +150,10 @@ extension FlowTabUITests {
         since snapshot: [String: UInt64]
     ) {
         waitForRuntimeLogFiles(
-            matching: #"Chrome Fixture filtered-fullscreen-(sibling|host)-artifacts stage=(pre-dedupe|presentation) dropped=[1-9][0-9]*"#,
+            matching: #"Chrome Fixture filtered-fullscreen-((sibling|host)-artifacts stage=(pre-dedupe|presentation)|duplicate-surfaces stage=presentation-final) dropped=[1-9][0-9]*"#,
             since: snapshot,
             timeout: 8,
-            description: "Noisy Chrome Fixture filtered CG-only/fullscreen artifact source"
+            description: "Noisy Chrome Fixture filtered CG-only/fullscreen artifact or duplicate surface source"
         )
     }
 
