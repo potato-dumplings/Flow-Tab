@@ -605,7 +605,7 @@ extension FlowTabPriorityCoverageTests {
             for: pid
         )
 
-        let resolution = provider.resolveStableWindowMapping(
+        let resolution = provider.windowRecordStore.resolveStableWindowMapping(
             axWindows: [],
             cgWindows: [],
             pid: pid,

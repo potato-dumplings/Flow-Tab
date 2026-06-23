@@ -117,7 +117,7 @@ enum RuntimeWindowMappingTestSupport {
         defer {
             AXWindowInspector.cgWindowIDOverrideForTesting = previousExactBridgeOverride
         }
-        return provider.resolveStableWindowMapping(
+        return provider.windowRecordStore.resolveStableWindowMapping(
             axWindows: axWindows,
             cgWindows: cgWindows,
             pid: pid,
@@ -149,7 +149,7 @@ enum RuntimeWindowMappingTestSupport {
         defer {
             AXWindowInspector.cgWindowIDOverrideForTesting = previousExactBridgeOverride
         }
-        return provider.resolveStableWindowMapping(
+        return provider.windowRecordStore.resolveStableWindowMapping(
             axWindows: axWindows,
             cgWindows: cgWindows,
             pid: pid,
