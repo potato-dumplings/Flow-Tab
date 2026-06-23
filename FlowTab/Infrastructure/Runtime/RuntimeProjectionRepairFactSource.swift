@@ -86,7 +86,11 @@ struct RuntimeUITestProjectionDatasetFacts {
 }
 
 struct RuntimeProjectionRepairFactSource {
-    let runtimeFactProvider: RuntimeSnapshotProvider
+    private let runtimeFactProvider: RuntimeSnapshotProvider
+
+    init(runtimeFactProvider: RuntimeSnapshotProvider) {
+        self.runtimeFactProvider = runtimeFactProvider
+    }
 
     func collectUITestProjectionDatasetFacts() -> RuntimeUITestProjectionDatasetFacts? {
         guard let dataset = FlowTabUITestRuntimeProjectionDataset.current() else { return nil }
