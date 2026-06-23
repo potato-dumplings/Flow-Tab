@@ -196,6 +196,49 @@ struct RuntimeCurrentAppWindowProjectionAssemblyInput {
     }
 }
 
+extension RuntimeAppWindowSelectionFacts {
+    func currentAppProjectionAssemblyInput(
+        appID: String? = nil,
+        rankByPID: [pid_t: Int],
+        rankFallback: Int,
+        generatedAt: TimeInterval
+    ) -> RuntimeCurrentAppWindowProjectionAssemblyInput {
+        RuntimeCurrentAppWindowProjectionAssemblyInput(
+            appID: appID ?? RuntimeAppIdentity.appID(for: app),
+            app: app,
+            appGroup: appGroup,
+            rankByPID: rankByPID,
+            rankFallback: rankFallback,
+            generatedAt: generatedAt,
+            windowSeeds: windows.enumerated().map { entryIndex, entry in
+                entry.projectionSeed(lastActiveAt: generatedAt - Double(entryIndex))
+            }
+        )
+    }
+}
+
+extension RuntimeFullRepairAppSelectionFacts {
+    func currentAppProjectionAssemblyInputs(
+        rankByPID: [pid_t: Int],
+        generatedAt: TimeInterval
+    ) -> [RuntimeCurrentAppWindowProjectionAssemblyInput] {
+        appLayerCandidates.enumerated().map { index, app in
+            let appID = RuntimeAppIdentity.appID(for: app)
+            return RuntimeAppWindowSelectionFacts(
+                app: app,
+                appGroup: appsGroupedByAppID[appID] ?? [app],
+                windows: mergedWindowsByPrimaryPID[app.processIdentifier] ?? [],
+                isIncludedInAppLayer: true
+            ).currentAppProjectionAssemblyInput(
+                appID: appID,
+                rankByPID: rankByPID,
+                rankFallback: 10_000 + index,
+                generatedAt: generatedAt
+            )
+        }
+    }
+}
+
 struct RuntimeCurrentAppWindowPayload {
     let summary: RuntimeHomeAppSummary
     let candidate: AppSwitchCandidate

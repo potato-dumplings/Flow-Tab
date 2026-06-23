@@ -85,35 +85,16 @@ extension RuntimeProjectionRepairProvider {
         }
         let now = Date.timeIntervalSinceReferenceDate
 
-        var currentAppProjectionInputs: [RuntimeCurrentAppWindowProjectionAssemblyInput] = []
-        currentAppProjectionInputs.reserveCapacity(selectionFacts.appLayerCandidates.count)
-
         let rowsStartMs = RuntimePerformanceClock.monotonicMilliseconds()
-        for (index, app) in selectionFacts.appLayerCandidates.enumerated() {
-            let pid = app.processIdentifier
-            let baseAppID = RuntimeAppIdentity.appID(for: app)
-            let appGroup = selectionFacts.appsGroupedByAppID[baseAppID] ?? [app]
-            let appID = baseAppID
-            let displayName = app.localizedName ?? baseAppID
-
-            let windows = selectionFacts.mergedWindowsByPrimaryPID[pid] ?? []
+        let currentAppProjectionInputs = selectionFacts.currentAppProjectionAssemblyInputs(
+            rankByPID: windowData.rankByPID,
+            generatedAt: now
+        )
+        for input in currentAppProjectionInputs {
             RuntimeLog.debug(
                 .projection,
-                "\(displayName) pid=\(pid) appID=\(appID) windows=\(windows.count)"
+                "\(input.displayName) pid=\(input.pid) appID=\(input.appID) windows=\(input.windowSeeds.count)"
             )
-
-            let input = RuntimeCurrentAppWindowProjectionAssemblyInput(
-                appID: appID,
-                app: app,
-                appGroup: appGroup,
-                rankByPID: windowData.rankByPID,
-                rankFallback: 10_000 + index,
-                generatedAt: now,
-                windowSeeds: windows.enumerated().map { entryIndex, entry in
-                    entry.projectionSeed(lastActiveAt: now - Double(entryIndex))
-                }
-            )
-            currentAppProjectionInputs.append(input)
         }
         let rowsReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let payload = RuntimeFullRepairProjectionAssembler.payload(
@@ -168,16 +149,11 @@ extension RuntimeProjectionRepairProvider {
 
         let now = Date.timeIntervalSinceReferenceDate
         return RuntimeCurrentAppWindowPayload(
-            assemblyInput: RuntimeCurrentAppWindowProjectionAssemblyInput(
+            assemblyInput: selectionFacts.currentAppProjectionAssemblyInput(
                 appID: appID,
-                app: selectionFacts.app,
-                appGroup: selectionFacts.appGroup,
                 rankByPID: windowFacts.rankByPID,
                 rankFallback: 10_000,
-                generatedAt: now,
-                windowSeeds: selectionFacts.windows.enumerated().map { entryIndex, entry in
-                    entry.projectionSeed(lastActiveAt: now - Double(entryIndex))
-                }
+                generatedAt: now
             )
         )
     }
@@ -256,16 +232,11 @@ extension RuntimeProjectionRepairProvider {
 
         let now = Date.timeIntervalSinceReferenceDate
         let payload = RuntimeCurrentAppWindowPayload(
-            assemblyInput: RuntimeCurrentAppWindowProjectionAssemblyInput(
+            assemblyInput: selectionFacts.currentAppProjectionAssemblyInput(
                 appID: appID,
-                app: selectionFacts.app,
-                appGroup: selectionFacts.appGroup,
                 rankByPID: windowFacts.rankByPID,
                 rankFallback: 0,
-                generatedAt: now,
-                windowSeeds: selectionFacts.windows.enumerated().map { entryIndex, entry in
-                    entry.projectionSeed(lastActiveAt: now - Double(entryIndex))
-                }
+                generatedAt: now
             )
         )
         let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
