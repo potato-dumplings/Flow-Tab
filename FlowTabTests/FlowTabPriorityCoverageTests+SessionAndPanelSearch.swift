@@ -988,13 +988,13 @@ extension FlowTabPriorityCoverageTests {
         )
         XCTAssertEqual(
             model.lastSearchIndexReadDiagnostic?.readiness,
-            .verifiedCurrentGenerationCommitted,
+            .committedGenerationValidated,
             file: file,
             line: line
         )
         XCTAssertEqual(
             model.lastSearchIndexReadDiagnostic?.resultState,
-            .verifiedCurrentGenerationCommittedResult,
+            .committedGenerationResult,
             file: file,
             line: line
         )

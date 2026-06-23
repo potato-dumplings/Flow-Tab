@@ -140,7 +140,7 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
                     for: committedSearchApps ?? apps,
                     generatedAt: generatedAt
                 ),
-                readiness: .verifiedCurrentGenerationCommitted
+                readiness: .committedGenerationValidated
             )
         )
     }
@@ -258,7 +258,7 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
                 for: apps,
                 generatedAt: generatedAt
             ),
-            readiness: .verifiedCurrentGenerationCommitted
+            readiness: .committedGenerationValidated
         )
         lock.unlock()
     }

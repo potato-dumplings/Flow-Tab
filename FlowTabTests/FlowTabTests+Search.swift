@@ -642,22 +642,22 @@ extension FlowTabTests {
             XCTFail("missing search index read diagnostic")
             return
         }
-        XCTAssertEqual(diagnostic.readiness, .staleCommitted)
+        XCTAssertEqual(diagnostic.readiness, .degradedStaleCommitted)
         XCTAssertEqual(diagnostic.resultState, .degradedStaleCommittedResult)
-        XCTAssertNotEqual(diagnostic.resultState, .verifiedCurrentGenerationCommittedResult)
+        XCTAssertNotEqual(diagnostic.resultState, .committedGenerationResult)
         XCTAssertFalse(diagnostic.committedIndexCoversCurrentGeneration)
         XCTAssertTrue(diagnostic.logMessage.contains("resultState=degradedStaleCommittedResult"))
         XCTAssertTrue(diagnostic.logMessage.contains("source=committedRuntimeIndex"))
-        XCTAssertTrue(diagnostic.logMessage.contains("readiness=staleCommitted"))
+        XCTAssertTrue(diagnostic.logMessage.contains("readiness=degradedStaleCommitted"))
         XCTAssertTrue(diagnostic.logMessage.contains("degraded=1"))
         XCTAssertTrue(diagnostic.logMessage.contains("committedIndexCoversCurrentGeneration=0"))
         XCTAssertTrue(diagnostic.logMessage.contains("freshnessBarrierRequested=1"))
-        XCTAssertFalse(diagnostic.logMessage.contains("resultState=verifiedCurrentGenerationCommittedResult"))
+        XCTAssertFalse(diagnostic.logMessage.contains("resultState=committedGenerationResult"))
         XCTAssertFalse(diagnostic.logMessage.contains("resultState=latestCommittedResult"))
         XCTAssertFalse(diagnostic.logMessage.contains("resultState=freshResult"))
         XCTAssertFalse(diagnostic.logMessage.contains("resultState=completeResult"))
         XCTAssertFalse(diagnostic.logMessage.contains("complete="))
-        XCTAssertTrue(diagnostic.searchTraceFields.contains("searchIndexReadiness=staleCommitted"))
+        XCTAssertTrue(diagnostic.searchTraceFields.contains("searchIndexReadiness=degradedStaleCommitted"))
         XCTAssertTrue(
             diagnostic.searchTraceFields.contains(
                 "searchIndexResultState=degradedStaleCommittedResult"
@@ -672,7 +672,7 @@ extension FlowTabTests {
         )
         XCTAssertFalse(
             diagnostic.searchTraceFields.contains(
-                "searchIndexResultState=verifiedCurrentGenerationCommittedResult"
+                "searchIndexResultState=committedGenerationResult"
             )
         )
         XCTAssertFalse(diagnostic.searchTraceFields.contains("freshResult"))
@@ -681,7 +681,7 @@ extension FlowTabTests {
         let controller = SwitcherPanelController(model: model)
         defer { controller.cancelSelectionForTesting() }
         let searchTraceSummary = controller.searchTraceStateSummary()
-        XCTAssertTrue(searchTraceSummary.contains("searchIndexReadiness=staleCommitted"))
+        XCTAssertTrue(searchTraceSummary.contains("searchIndexReadiness=degradedStaleCommitted"))
         XCTAssertTrue(
             searchTraceSummary.contains("searchIndexResultState=degradedStaleCommittedResult")
         )
@@ -690,7 +690,7 @@ extension FlowTabTests {
         XCTAssertTrue(searchTraceSummary.contains("searchFreshnessBarrierRequested=1"))
         XCTAssertFalse(
             searchTraceSummary.contains(
-                "searchIndexResultState=verifiedCurrentGenerationCommittedResult"
+                "searchIndexResultState=committedGenerationResult"
             )
         )
         XCTAssertFalse(searchTraceSummary.contains("freshResult"))
@@ -845,7 +845,7 @@ extension FlowTabTests {
     }
 
     @MainActor
-    func testLiveSwitcherModelSearchPressureReadsVerifiedCurrentGenerationCommittedIndexWithoutSampling() {
+    func testLiveSwitcherModelSearchPressureReadsCommittedGenerationValidatedIndexWithoutSampling() {
         let defaults = UserDefaults.standard
         let previousSearchEnabled = defaults.object(forKey: AppPreferenceKeys.searchEnabled)
         let previousSearchDefaultScope = defaults.object(forKey: AppPreferenceKeys.searchDefaultScope)
@@ -876,13 +876,13 @@ extension FlowTabTests {
         XCTAssertTrue(model.enterSearchMode())
         let enterMs = nanosToMilliseconds(DispatchTime.now().uptimeNanoseconds - enterStart)
 
-        XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.readiness, .verifiedCurrentGenerationCommitted)
+        XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.readiness, .committedGenerationValidated)
         XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.appCount, apps.count)
         XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.windowCount, windowCount)
         XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.requestedFreshnessBarrier, false)
         XCTAssertEqual(
             model.lastSearchIndexReadDiagnostic?.resultState,
-            .verifiedCurrentGenerationCommittedResult
+            .committedGenerationResult
         )
         XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.committedIndexCoversCurrentGeneration, true)
         XCTAssertTrue(
@@ -892,7 +892,7 @@ extension FlowTabTests {
         )
         XCTAssertTrue(
             model.lastSearchIndexReadDiagnostic?.logMessage.contains(
-                "resultState=verifiedCurrentGenerationCommittedResult"
+                "resultState=committedGenerationResult"
             ) ?? false
         )
         XCTAssertEqual(runtimeProjectionService.searchIndexFreshnessBarrierRequestsRecorded(), [])
