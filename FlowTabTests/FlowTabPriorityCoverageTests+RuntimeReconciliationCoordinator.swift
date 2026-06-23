@@ -1366,17 +1366,15 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
 
-        _ = RuntimeWindowRecordEvidence.recordSpaceTopologySnapshot(
+        _ = provider.windowRecordStore.recordSpaceTopologySnapshot(
             previous,
             now: 1,
-            reconciliationCoordinator: coordinator,
-            mappingStatesByPID: &provider.windowRecordStore.mappingStatesByPID
+            reconciliationCoordinator: coordinator
         )
-        let diff = RuntimeWindowRecordEvidence.recordSpaceTopologySnapshot(
+        let diff = provider.windowRecordStore.recordSpaceTopologySnapshot(
             current,
             now: 2,
-            reconciliationCoordinator: coordinator,
-            mappingStatesByPID: &provider.windowRecordStore.mappingStatesByPID
+            reconciliationCoordinator: coordinator
         )
         let request = coordinator.readyRequests(now: 2).first
 
@@ -1442,11 +1440,10 @@ extension FlowTabPriorityCoverageTests {
             firstSeenAt: 1
         )
 
-        _ = RuntimeWindowRecordEvidence.recordSpaceTopologySnapshot(
+        _ = provider.windowRecordStore.recordSpaceTopologySnapshot(
             previous,
             now: 1,
-            reconciliationCoordinator: coordinator,
-            mappingStatesByPID: &provider.windowRecordStore.mappingStatesByPID
+            reconciliationCoordinator: coordinator
         )
         provider.windowRecordStore.mappingStatesByPID[pid] = RuntimeWindowMappingState(
             windowRecordsByCGWindowID: [
@@ -1455,11 +1452,10 @@ extension FlowTabPriorityCoverageTests {
                 unaffectedWindowID: unaffectedRecord
             ]
         )
-        let diff = RuntimeWindowRecordEvidence.recordSpaceTopologySnapshot(
+        let diff = provider.windowRecordStore.recordSpaceTopologySnapshot(
             current,
             now: 2,
-            reconciliationCoordinator: coordinator,
-            mappingStatesByPID: &provider.windowRecordStore.mappingStatesByPID
+            reconciliationCoordinator: coordinator
         )
         let records = provider.windowRecordStore.mappingStatesByPID[pid]?.windowRecordsByCGWindowID
 

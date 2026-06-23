@@ -28,6 +28,31 @@ final class RuntimeWindowRecordStore {
         mappingStatesByPID.removeValue(forKey: pid)
     }
 
+    @discardableResult
+    func recordSpaceTopologySnapshot(
+        _ snapshot: RuntimeSpaceTopologySnapshot,
+        now: TimeInterval = ProcessInfo.processInfo.systemUptime,
+        reconciliationCoordinator: RuntimeReconciliationCoordinator
+    ) -> RuntimeSpaceTopologyDiff {
+        RuntimeWindowRecordEvidence.recordSpaceTopologySnapshot(
+            snapshot,
+            now: now,
+            reconciliationCoordinator: reconciliationCoordinator,
+            mappingStatesByPID: &mappingStatesByPID
+        )
+    }
+
+    func affectedCGWindowIDsByPID(
+        affectedCGWindowIDs: Set<CGWindowID>,
+        currentCGWindowsByPID: [pid_t: [RuntimeCGWindowEntry]]
+    ) -> [pid_t: Set<CGWindowID>] {
+        RuntimeWindowMappingState.affectedCGWindowIDsByPID(
+            affectedCGWindowIDs: affectedCGWindowIDs,
+            currentCGWindowsByPID: currentCGWindowsByPID,
+            mappingStatesByPID: mappingStatesByPID
+        )
+    }
+
     func cleanup(keepingRunningApps runningApps: [NSRunningApplication]) {
         let runningPIDs = Set(runningApps.map(\.processIdentifier))
         mappingStatesByPID = mappingStatesByPID.filter { runningPIDs.contains($0.key) }

@@ -141,7 +141,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(state.lastAXWindowIDs.contains(axWindowID))
     }
 
-    func testRuntimeWindowMappingStateGroupsAffectedCGWindowIDsByPIDFromCurrentAndRecordedFacts() {
+    func testRuntimeWindowRecordStoreGroupsAffectedCGWindowIDsByPIDFromCurrentAndRecordedFacts() {
         let currentPID = pid_t(18_405)
         let recordedPID = pid_t(18_406)
         let currentWindowID = CGWindowID(240_001)
@@ -180,10 +180,10 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
 
-        let affectedByPID = RuntimeWindowMappingState.affectedCGWindowIDsByPID(
+        let store = RuntimeWindowRecordStore(mappingStatesByPID: [recordedPID: recordedState])
+        let affectedByPID = store.affectedCGWindowIDsByPID(
             affectedCGWindowIDs: [currentWindowID, recordedWindowID, missingWindowID],
-            currentCGWindowsByPID: currentCGWindowsByPID,
-            mappingStatesByPID: [recordedPID: recordedState]
+            currentCGWindowsByPID: currentCGWindowsByPID
         )
 
         XCTAssertEqual(

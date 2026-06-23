@@ -311,11 +311,10 @@ final class RuntimeSnapshotProvider {
         }
         let parseReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let spaceTopologySnapshot = spaceTopologyProvider.snapshot(for: windowIDs)
-        let spaceTopologyDiff = RuntimeWindowRecordEvidence.recordSpaceTopologySnapshot(
+        let spaceTopologyDiff = windowRecordStore.recordSpaceTopologySnapshot(
             spaceTopologySnapshot,
             now: now,
-            reconciliationCoordinator: reconciliationCoordinator,
-            mappingStatesByPID: &windowRecordStore.mappingStatesByPID
+            reconciliationCoordinator: reconciliationCoordinator
         )
         let spaceIDsByWindowID = Dictionary(
             uniqueKeysWithValues: spaceTopologySnapshot.spaceIDsByCGWindowID.map { windowID, spaceIDs in

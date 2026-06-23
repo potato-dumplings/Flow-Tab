@@ -138,10 +138,9 @@ struct RuntimeProjectionRepairFactSource {
         let cgWindowsByPID = runtimeFactProvider.collectCGWindowsWithSpaceTopologyDiff(
             options: [.excludeDesktopElements]
         ).windowsByPID
-        let affectedCGWindowIDsByPID = RuntimeWindowMappingState.affectedCGWindowIDsByPID(
+        let affectedCGWindowIDsByPID = runtimeFactProvider.windowRecordStore.affectedCGWindowIDsByPID(
             affectedCGWindowIDs: affectedCGWindowIDs,
-            currentCGWindowsByPID: cgWindowsByPID,
-            mappingStatesByPID: runtimeFactProvider.windowRecordStore.mappingStatesByPID
+            currentCGWindowsByPID: cgWindowsByPID
         )
         guard !affectedCGWindowIDsByPID.isEmpty else { return [] }
 
