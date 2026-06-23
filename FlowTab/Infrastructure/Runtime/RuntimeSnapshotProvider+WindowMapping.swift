@@ -2,28 +2,6 @@ import AppKit
 import ApplicationServices
 import Foundation
 
-struct RuntimeWindowMappingResolution {
-    let exactMatchesByAXWindowID: [String: CGWindowID]
-    let windowRecordsByCGWindowID: [CGWindowID: RuntimeWindowRecord]
-    let validCGWindows: [RuntimeCGWindowEntry]
-    let allowSpaceOneWithoutCurrentAXHandle: Bool
-    let bindingDiagnostics: [WindowBindingDiagnostic]
-
-    var knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry] {
-        RuntimeWindowRecord.knownCGWindowsByID(
-            windowRecordsByCGWindowID: windowRecordsByCGWindowID,
-            validCGWindows: validCGWindows
-        )
-    }
-
-    var windowLayerCGWindows: [RuntimeCGWindowEntry] {
-        RuntimeWindowRecord.windowLayerCGWindows(
-            windowRecordsByCGWindowID: windowRecordsByCGWindowID,
-            validCGWindows: validCGWindows
-        )
-    }
-}
-
 extension RuntimeSnapshotProvider {
     func cleanupWindowMappingState(for runningApps: [NSRunningApplication]) {
         let runningPIDs = Set(runningApps.map(\.processIdentifier))

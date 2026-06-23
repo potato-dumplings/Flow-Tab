@@ -87,6 +87,28 @@ struct RuntimeWindowRecordAffectedEvidence: Equatable {
     )
 }
 
+struct RuntimeWindowMappingResolution {
+    let exactMatchesByAXWindowID: [String: CGWindowID]
+    let windowRecordsByCGWindowID: [CGWindowID: RuntimeWindowRecord]
+    let validCGWindows: [RuntimeCGWindowEntry]
+    let allowSpaceOneWithoutCurrentAXHandle: Bool
+    let bindingDiagnostics: [WindowBindingDiagnostic]
+
+    var knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry] {
+        RuntimeWindowRecord.knownCGWindowsByID(
+            windowRecordsByCGWindowID: windowRecordsByCGWindowID,
+            validCGWindows: validCGWindows
+        )
+    }
+
+    var windowLayerCGWindows: [RuntimeCGWindowEntry] {
+        RuntimeWindowRecord.windowLayerCGWindows(
+            windowRecordsByCGWindowID: windowRecordsByCGWindowID,
+            validCGWindows: validCGWindows
+        )
+    }
+}
+
 struct RuntimeWindowMappingState {
     var windowRecordsByCGWindowID: [CGWindowID: RuntimeWindowRecord]
     private var derivedIndexes: RuntimeWindowRecordDerivedIndexes
