@@ -713,7 +713,6 @@
 				F6E7C00F35C000100B0D737 /* RuntimeCGWindowFacts.swift */,
 				F6E7C01135C000100B0D737 /* RuntimeProjectionPayloads.swift */,
 				F6E7D00335C1000100B0D737 /* RuntimeWindowListFacts.swift */,
-				F6E7D00535C1000100B0D737 /* RuntimeWindowMappingTestSupport.swift */,
 				F6E7D00735C1000100B0D737 /* RuntimeWindowTitleResolver.swift */,
 				F6E7D00935C1000100B0D737 /* RuntimeAXAppCollectionCoordinator.swift */,
 				F6E7D00B35C1000100B0D737 /* RuntimeAppRankProvider.swift */,
@@ -752,6 +751,7 @@
 				D1A1B1C12A00000100B0D737 /* FlowTabUITestBootstrapper.swift */,
 				D1A1B1C22A00000100B0D737 /* NSView+FlowTabTesting.swift */,
 				D1A1B1C32A00000100B0D737 /* RuntimeBridge+Testing.swift */,
+				F6E7D00535C1000100B0D737 /* RuntimeWindowMappingTestSupport.swift */,
 			);
 			path = TestingSupport;
 			sourceTree = "<group>";
