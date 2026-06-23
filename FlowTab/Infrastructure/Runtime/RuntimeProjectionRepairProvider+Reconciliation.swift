@@ -2,11 +2,6 @@ import CoreGraphics
 import Foundation
 import FlowTabCore
 
-private struct RuntimeAffectedWindowReconciliationTarget: Equatable {
-    let pid: pid_t
-    let affectedCGWindowIDs: Set<CGWindowID>
-}
-
 struct RuntimeAppWindowReconciliationResult {
     let pid: pid_t
     let affectedCGWindowIDs: Set<CGWindowID>
@@ -125,29 +120,7 @@ extension RuntimeProjectionRepairProvider {
     }
 
     func recordSpaceTopologyChanged(now: TimeInterval) -> Set<CGWindowID> {
-        snapshotProvider.collectCGWindowsWithSpaceTopologyDiff(
-            options: [.excludeDesktopElements],
-            now: now
-        ).spaceTopologyDiff?.affectedCGWindowIDs ?? []
-    }
-
-    private func appReconciliationTargets(
-        affectedCGWindowIDs: Set<CGWindowID>,
-        currentCGWindowsByPID: [pid_t: [RuntimeCGWindowEntry]]
-    ) -> [RuntimeAffectedWindowReconciliationTarget] {
-        let affectedCGWindowIDsByPID = RuntimeWindowMappingState.affectedCGWindowIDsByPID(
-            affectedCGWindowIDs: affectedCGWindowIDs,
-            currentCGWindowsByPID: currentCGWindowsByPID,
-            mappingStatesByPID: snapshotProvider.windowMappingStateByPID
-        )
-        guard !affectedCGWindowIDsByPID.isEmpty else { return [] }
-
-        return affectedCGWindowIDsByPID.keys.sorted().map { pid in
-            RuntimeAffectedWindowReconciliationTarget(
-                pid: pid,
-                affectedCGWindowIDs: affectedCGWindowIDsByPID[pid] ?? []
-            )
-        }
+        repairFactSource.collectSpaceTopologySignalFacts(now: now).affectedCGWindowIDs
     }
 
     func reconcileAppWindows(
@@ -177,12 +150,8 @@ extension RuntimeProjectionRepairProvider {
     func reconcileSpaceTopology(
         affectedCGWindowIDs: Set<CGWindowID>
     ) -> [RuntimeAppWindowReconciliationResult] {
-        let cgWindowsByPID = snapshotProvider.collectCGWindowsWithSpaceTopologyDiff(
-            options: [.excludeDesktopElements]
-        ).windowsByPID
-        let affectedTargets = appReconciliationTargets(
-            affectedCGWindowIDs: affectedCGWindowIDs,
-            currentCGWindowsByPID: cgWindowsByPID
+        let affectedTargets = repairFactSource.collectSpaceTopologyReconciliationTargets(
+            affectedCGWindowIDs: affectedCGWindowIDs
         )
         return affectedTargets.map { target in
             reconcileAppWindows(

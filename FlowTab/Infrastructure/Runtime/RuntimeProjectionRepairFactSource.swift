@@ -1,4 +1,5 @@
 import AppKit
+import CoreGraphics
 import Foundation
 
 struct RuntimeRepairRunningApps {
@@ -49,6 +50,15 @@ struct RuntimeAppWindowSelectionFacts {
 
 struct RuntimeRepairAppLayerPolicyFacts {
     let hideMinimizedAppsFromAppLayer: Bool
+}
+
+struct RuntimeSpaceTopologySignalFacts {
+    let affectedCGWindowIDs: Set<CGWindowID>
+}
+
+struct RuntimeSpaceTopologyReconciliationTarget: Equatable {
+    let pid: pid_t
+    let affectedCGWindowIDs: Set<CGWindowID>
 }
 
 struct RuntimeUITestProjectionDatasetFacts {
@@ -108,6 +118,36 @@ struct RuntimeProjectionRepairFactSource {
         RuntimeRepairAppLayerPolicyFacts(
             hideMinimizedAppsFromAppLayer: SwitcherBehaviorPreferencesStore.loadHideMinimizedAppsFromAppLayer()
         )
+    }
+
+    func collectSpaceTopologySignalFacts(now: TimeInterval) -> RuntimeSpaceTopologySignalFacts {
+        RuntimeSpaceTopologySignalFacts(
+            affectedCGWindowIDs: snapshotProvider.collectCGWindowsWithSpaceTopologyDiff(
+                options: [.excludeDesktopElements],
+                now: now
+            ).spaceTopologyDiff?.affectedCGWindowIDs ?? []
+        )
+    }
+
+    func collectSpaceTopologyReconciliationTargets(
+        affectedCGWindowIDs: Set<CGWindowID>
+    ) -> [RuntimeSpaceTopologyReconciliationTarget] {
+        let cgWindowsByPID = snapshotProvider.collectCGWindowsWithSpaceTopologyDiff(
+            options: [.excludeDesktopElements]
+        ).windowsByPID
+        let affectedCGWindowIDsByPID = RuntimeWindowMappingState.affectedCGWindowIDsByPID(
+            affectedCGWindowIDs: affectedCGWindowIDs,
+            currentCGWindowsByPID: cgWindowsByPID,
+            mappingStatesByPID: snapshotProvider.windowMappingStateByPID
+        )
+        guard !affectedCGWindowIDsByPID.isEmpty else { return [] }
+
+        return affectedCGWindowIDsByPID.keys.sorted().map { pid in
+            RuntimeSpaceTopologyReconciliationTarget(
+                pid: pid,
+                affectedCGWindowIDs: affectedCGWindowIDsByPID[pid] ?? []
+            )
+        }
     }
 
     func collectFullRepairWindowFacts(for runningApps: [NSRunningApplication]) -> RuntimeFullRepairWindowFacts {
