@@ -17,14 +17,10 @@ struct RuntimeWindowMappingResolution {
     }
 
     var windowLayerCGWindows: [RuntimeCGWindowEntry] {
-        let knownCGWindowsByID = knownCGWindowsByID
-        let validCGWindowIDs = Set(validCGWindows.map(\.id))
-        let synthesizedWindows: [RuntimeCGWindowEntry] =
-            windowRecordsByCGWindowID.keys.sorted().compactMap { cgWindowID in
-                guard !validCGWindowIDs.contains(cgWindowID) else { return nil }
-                return knownCGWindowsByID[cgWindowID]
-            }
-        return validCGWindows + synthesizedWindows
+        RuntimeWindowRecord.windowLayerCGWindows(
+            windowRecordsByCGWindowID: windowRecordsByCGWindowID,
+            validCGWindows: validCGWindows
+        )
     }
 }
 

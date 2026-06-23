@@ -310,6 +310,16 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(knownCGWindowsByID[staleRecord.cgWindowID]?.bounds, staleRecord.lastKnownCGFrame)
         XCTAssertEqual(knownCGWindowsByID[staleRecord.cgWindowID]?.spaceIDs, [11_682])
         XCTAssertEqual(knownCGWindowsByID[staleRecord.cgWindowID]?.isOnscreen, false)
+
+        let windowLayerCGWindows = RuntimeWindowRecord.windowLayerCGWindows(
+            windowRecordsByCGWindowID: [
+                liveCGWindow.id: liveBackedRecord,
+                staleRecord.cgWindowID: staleRecord
+            ],
+            validCGWindows: [liveCGWindow]
+        )
+        XCTAssertEqual(windowLayerCGWindows.map(\.id), [liveCGWindow.id, staleRecord.cgWindowID])
+        XCTAssertEqual(windowLayerCGWindows.map(\.isOnscreen), [true, false])
     }
 
     func testRuntimeWindowRecordStickyBindingReuseRequiresCompatibleTitleAndFrame() {

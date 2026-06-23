@@ -495,6 +495,23 @@ struct RuntimeWindowRecord {
         return knownCGWindowsByID
     }
 
+    static func windowLayerCGWindows(
+        windowRecordsByCGWindowID: [CGWindowID: RuntimeWindowRecord],
+        validCGWindows: [RuntimeCGWindowEntry]
+    ) -> [RuntimeCGWindowEntry] {
+        let knownCGWindowsByID = knownCGWindowsByID(
+            windowRecordsByCGWindowID: windowRecordsByCGWindowID,
+            validCGWindows: validCGWindows
+        )
+        let validCGWindowIDs = Set(validCGWindows.map(\.id))
+        let synthesizedWindows: [RuntimeCGWindowEntry] =
+            windowRecordsByCGWindowID.keys.sorted().compactMap { cgWindowID in
+                guard !validCGWindowIDs.contains(cgWindowID) else { return nil }
+                return knownCGWindowsByID[cgWindowID]
+            }
+        return validCGWindows + synthesizedWindows
+    }
+
     func canReuseStickyBinding(with axWindow: RuntimeAXWindowEntry) -> Bool {
         let normalizedBindingTitle = normalizedRuntimeWindowTitle(displayTitle)
         let normalizedAXTitle = normalizedRuntimeWindowTitle(axWindow.sourceTitle ?? axWindow.title)
