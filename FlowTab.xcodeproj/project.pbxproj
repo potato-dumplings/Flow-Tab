@@ -174,7 +174,7 @@
 		E1F100022B00000100B0D737 /* RuntimeLogsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F100122B00000100B0D737 /* RuntimeLogsSection.swift */; };
 		E1F100032B00000100B0D737 /* AppDelegate+Testing.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F100132B00000100B0D737 /* AppDelegate+Testing.swift */; };
 		F7B8C9D235B8000100B0D737 /* LaunchAtLoginController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7B8C9D135B8000100B0D737 /* LaunchAtLoginController.swift */; };
-		F2B3C4E52F8C000100B0D737 /* RuntimeSnapshotProvider+CGWindowSupplement.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2B3C4D52F8C000100B0D737 /* RuntimeSnapshotProvider+CGWindowSupplement.swift */; };
+		F2B3C4E52F8C000100B0D737 /* RuntimeWindowListDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = F2B3C4D52F8C000100B0D737 /* RuntimeWindowListDiagnostics.swift */; };
 		F3C4D5E62FA2000100B0D737 /* RuntimeSnapshotProvider+WindowMapping.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3C4D5E52FA2000100B0D737 /* RuntimeSnapshotProvider+WindowMapping.swift */; };
 		F3C4D5EA2FA2000100B0D737 /* RuntimeWindowAssignmentMatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3C4D5E92FA2000100B0D737 /* RuntimeWindowAssignmentMatcher.swift */; };
 		F4D5E6F735AB000100B0D737 /* RuntimeCGSpaceInspector.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4D5E6F835AB000100B0D737 /* RuntimeCGSpaceInspector.swift */; };
@@ -404,7 +404,7 @@
 		E1F100122B00000100B0D737 /* RuntimeLogsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeLogsSection.swift; sourceTree = "<group>"; };
 		E1F100132B00000100B0D737 /* AppDelegate+Testing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppDelegate+Testing.swift"; sourceTree = "<group>"; };
 		F7B8C9D135B8000100B0D737 /* LaunchAtLoginController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginController.swift; sourceTree = "<group>"; };
-		F2B3C4D52F8C000100B0D737 /* RuntimeSnapshotProvider+CGWindowSupplement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RuntimeSnapshotProvider+CGWindowSupplement.swift"; sourceTree = "<group>"; };
+		F2B3C4D52F8C000100B0D737 /* RuntimeWindowListDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowListDiagnostics.swift; sourceTree = "<group>"; };
 		F3C4D5E52FA2000100B0D737 /* RuntimeSnapshotProvider+WindowMapping.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RuntimeSnapshotProvider+WindowMapping.swift"; sourceTree = "<group>"; };
 		F3C4D5E92FA2000100B0D737 /* RuntimeWindowAssignmentMatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowAssignmentMatcher.swift; sourceTree = "<group>"; };
 		F4D5E6F835AB000100B0D737 /* RuntimeCGSpaceInspector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeCGSpaceInspector.swift; sourceTree = "<group>"; };
@@ -700,7 +700,7 @@
 				F6E7E10135C3000100B0D737 /* RuntimeProjectionMaintenance.swift */,
 				D10000022FF500100B0D737 /* RuntimeProjectionService.swift */,
 				B26000022FE000100B0D737 /* RuntimeFactCollectionDiagnostics.swift */,
-				F2B3C4D52F8C000100B0D737 /* RuntimeSnapshotProvider+CGWindowSupplement.swift */,
+				F2B3C4D52F8C000100B0D737 /* RuntimeWindowListDiagnostics.swift */,
 				F3C4D5E52FA2000100B0D737 /* RuntimeSnapshotProvider+WindowMapping.swift */,
 				F3C4D5E92FA2000100B0D737 /* RuntimeWindowAssignmentMatcher.swift */,
 				F6E7A8BD35AC000100B0D737 /* RuntimeWindowTopologyBindingResolver.swift */,
@@ -1123,7 +1123,7 @@
 				F6E7C01435C000100B0D737 /* RuntimeAXWindowRecovery.swift in Sources */,
 				F6E7C01635C000100B0D737 /* RuntimeAppDirectory.swift in Sources */,
 				F6E7B00A35AC000100B0D737 /* RuntimeSnapshotProvider+Reconciliation.swift in Sources */,
-				F2B3C4E52F8C000100B0D737 /* RuntimeSnapshotProvider+CGWindowSupplement.swift in Sources */,
+				F2B3C4E52F8C000100B0D737 /* RuntimeWindowListDiagnostics.swift in Sources */,
 				F3C4D5E62FA2000100B0D737 /* RuntimeSnapshotProvider+WindowMapping.swift in Sources */,
 				F3C4D5EA2FA2000100B0D737 /* RuntimeWindowAssignmentMatcher.swift in Sources */,
 				F6E7A8BE35AC000100B0D737 /* RuntimeWindowTopologyBindingResolver.swift in Sources */,

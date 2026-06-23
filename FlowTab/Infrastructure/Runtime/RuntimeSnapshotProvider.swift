@@ -69,7 +69,7 @@ final class RuntimeSnapshotProvider {
                 "\(appName) rawWindows=\(windows.count) \(windowsFetchResult.logDetails)"
             )
 
-            logChromeLikeTopologyFacts(
+            RuntimeWindowListDiagnostics.logChromeLikeTopologyFacts(
                 appName: appName,
                 pid: app.processIdentifier,
                 publicWindowsFetchResult: publicWindowsFetchResult,
@@ -122,7 +122,7 @@ final class RuntimeSnapshotProvider {
             )
             guard !resolvedEntries.isEmpty else { continue }
             RuntimeLog.debug(.ax, "\(appName) switchableWindows=\(resolvedEntries.count)")
-            logResolvedWindowEntrySummary(
+            RuntimeWindowListDiagnostics.logResolvedWindowEntrySummary(
                 appName: appName,
                 pid: app.processIdentifier,
                 axWindowCount: axEntries.count,
