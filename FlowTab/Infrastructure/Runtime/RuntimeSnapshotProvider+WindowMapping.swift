@@ -308,53 +308,17 @@ extension RuntimeSnapshotProvider {
             windowRecordsByCGWindowID: windowRecordsByCGWindowID,
             validCGWindows: validCGWindows
         )
-        var exactMatchesByAXWindowID: [String: CGWindowID] = [:]
-        var assignedAXWindowIDs: Set<String> = []
-
-        for cgWindowID in windowRecordsByCGWindowID.keys.sorted() {
-            guard var record = windowRecordsByCGWindowID[cgWindowID] else { continue }
-            let reusedAXWindow = record.reusableStickyAXWindow(
-                from: axWindows,
-                assignedAXWindowIDs: assignedAXWindowIDs
-            )
-
-            if let reusedAXWindow {
-                if let diagnostic = RuntimeAXWindowRecovery.stickyBindingConflictDiagnostic(
-                    record: record,
-                    reusedAXWindow: reusedAXWindow,
-                    validCGWindowIDs: validCGWindowIDs
-                ) {
-                    bindingDiagnostics.append(diagnostic)
-                    RuntimeLog.debug(
-                        .axMatch,
-                        "binding-assignment conflict reason=\(diagnostic.reason?.rawValue ?? "unknown") ax=\(reusedAXWindow.id) stickyCG=\(cgWindowID) exactCG=\(diagnostic.cgWindowID.map(String.init) ?? "nil") allowedActions=\(diagnostic.allowedActions.map(\.rawValue).sorted().joined(separator: ","))"
-                    )
-                    record.updateFallbackDisplayStateIfNeeded()
-                    windowRecordsByCGWindowID[cgWindowID] = record
-                    continue
-                }
-                let resolvedTitle = RuntimeWindowTitleResolver.stableWindowTitle(
-                    sourceTitle: reusedAXWindow.sourceTitle,
-                    matchedCGTitle: knownCGWindowsByID[cgWindowID]?.title ?? record.displayTitle,
-                    appName: appName,
-                    fallbackIndex: reusedAXWindow.index,
-                    refreshedAXTitle: nil
-                )
-                record.applyExactMatch(
-                    axWindow: reusedAXWindow,
-                    resolvedTitle: resolvedTitle,
-                    confirmationSource: .stickyBinding,
-                    observedAt: observedAt,
-                    matchedCGWindow: knownCGWindowsByID[cgWindowID]
-                )
-                exactMatchesByAXWindowID[reusedAXWindow.id] = cgWindowID
-                assignedAXWindowIDs.insert(reusedAXWindow.id)
-            } else {
-                record.updateFallbackDisplayStateIfNeeded()
-            }
-
-            windowRecordsByCGWindowID[cgWindowID] = record
-        }
+        let stickyBindingResolution = mappingState.applyReusableStickyBindings(
+            axWindows: axWindows,
+            validCGWindowIDs: validCGWindowIDs,
+            knownCGWindowsByID: knownCGWindowsByID,
+            appName: appName,
+            observedAt: observedAt
+        )
+        windowRecordsByCGWindowID = mappingState.windowRecordsByCGWindowID
+        var exactMatchesByAXWindowID = stickyBindingResolution.exactMatchesByAXWindowID
+        let assignedAXWindowIDs = stickyBindingResolution.assignedAXWindowIDs
+        bindingDiagnostics.append(contentsOf: stickyBindingResolution.bindingDiagnostics)
 
         let unresolvedAXWindows = axWindows.filter { !assignedAXWindowIDs.contains($0.id) }
         let unresolvedCGWindows = validCGWindows.filter { cgWindow in
