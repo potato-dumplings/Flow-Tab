@@ -603,7 +603,7 @@ extension FlowTabPriorityCoverageTests {
         )
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.PartialAppTermination",
-            repairProvider: RuntimeProjectionRepairProvider(snapshotProvider: provider),
+            repairProvider: RuntimeProjectionRepairProvider(runtimeFactProvider: provider),
             readModelStore: store
         )
 
@@ -639,7 +639,7 @@ extension FlowTabPriorityCoverageTests {
         )
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.ReadModelStore",
-            repairProvider: RuntimeProjectionRepairProvider(snapshotProvider: provider),
+            repairProvider: RuntimeProjectionRepairProvider(runtimeFactProvider: provider),
             readModelStore: readModelStore,
             reconciliationExecutor: { _, _ in .completed }
         )
@@ -1474,7 +1474,7 @@ extension FlowTabPriorityCoverageTests {
         let readModelStore = RuntimeReadModelStore()
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.SpaceTopologySignal",
-            repairProvider: RuntimeProjectionRepairProvider(snapshotProvider: provider),
+            repairProvider: RuntimeProjectionRepairProvider(runtimeFactProvider: provider),
             readModelStore: readModelStore,
             reconciliationExecutor: { request, _ in
                 lock.lock()
@@ -1516,7 +1516,7 @@ extension FlowTabPriorityCoverageTests {
                 ]
             )
         )
-        let repairProvider = RuntimeProjectionRepairProvider(snapshotProvider: provider)
+        let repairProvider = RuntimeProjectionRepairProvider(runtimeFactProvider: provider)
         provider.windowMappingStateByPID[recordedPID] = RuntimeWindowMappingState(
             windowRecordsByCGWindowID: [
                 recordedWindowID: RuntimeWindowRecord(
@@ -1537,7 +1537,7 @@ extension FlowTabPriorityCoverageTests {
 
     func testRuntimeProjectionRepairProviderReconcilesAppWindowsWithAffectedCGWindowScope() {
         let provider = RuntimeSnapshotProvider()
-        let repairProvider = RuntimeProjectionRepairProvider(snapshotProvider: provider)
+        let repairProvider = RuntimeProjectionRepairProvider(runtimeFactProvider: provider)
         let currentPID = NSRunningApplication.current.processIdentifier
         let affectedCGWindowIDs: Set<CGWindowID> = [240_001, 240_002]
 
@@ -1552,7 +1552,7 @@ extension FlowTabPriorityCoverageTests {
 
     func testRuntimeProjectionRepairProviderReconciliationResultReportsAffectedWindowRecordEvidence() {
         let provider = RuntimeSnapshotProvider()
-        let repairProvider = RuntimeProjectionRepairProvider(snapshotProvider: provider)
+        let repairProvider = RuntimeProjectionRepairProvider(runtimeFactProvider: provider)
         let pid = pid_t(1_840_501_407)
         let exactWindowID = CGWindowID(240_001)
         let provisionalWindowID = CGWindowID(240_002)
@@ -1593,7 +1593,7 @@ extension FlowTabPriorityCoverageTests {
         var executedRequests: [RuntimeReconciliationRequest] = []
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.AppWindowSignal",
-            repairProvider: RuntimeProjectionRepairProvider(snapshotProvider: provider),
+            repairProvider: RuntimeProjectionRepairProvider(runtimeFactProvider: provider),
             reconciliationExecutor: { request, _ in
                 lock.lock()
                 executedRequests.append(request)
@@ -1619,7 +1619,7 @@ extension FlowTabPriorityCoverageTests {
         var executedRequests: [RuntimeReconciliationRequest] = []
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.SelectedCurrentAppWindowSignal",
-            repairProvider: RuntimeProjectionRepairProvider(snapshotProvider: provider),
+            repairProvider: RuntimeProjectionRepairProvider(runtimeFactProvider: provider),
             reconciliationExecutor: { request, _ in
                 lock.lock()
                 executedRequests.append(request)
@@ -1669,7 +1669,7 @@ extension FlowTabPriorityCoverageTests {
         var executedRequests: [RuntimeReconciliationRequest] = []
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.AXDestroyed",
-            repairProvider: RuntimeProjectionRepairProvider(snapshotProvider: provider),
+            repairProvider: RuntimeProjectionRepairProvider(runtimeFactProvider: provider),
             reconciliationExecutor: { request, _ in
                 lock.lock()
                 executedRequests.append(request)
@@ -1713,7 +1713,7 @@ extension FlowTabPriorityCoverageTests {
         var executedRequests: [RuntimeReconciliationRequest] = []
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.AppLaunchSignal",
-            repairProvider: RuntimeProjectionRepairProvider(snapshotProvider: provider),
+            repairProvider: RuntimeProjectionRepairProvider(runtimeFactProvider: provider),
             readModelStore: store,
             reconciliationExecutor: { request, _ in
                 lock.lock()
@@ -1775,7 +1775,7 @@ extension FlowTabPriorityCoverageTests {
         )
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.AppLaunchRepairCommit",
-            repairProvider: RuntimeProjectionRepairProvider(snapshotProvider: provider),
+            repairProvider: RuntimeProjectionRepairProvider(runtimeFactProvider: provider),
             readModelStore: store,
             reconciliationExecutor: { _, _ in
                 .completedWithRepairedCurrentAppWindowPayloads([
@@ -1826,7 +1826,7 @@ extension FlowTabPriorityCoverageTests {
         )
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.AppTerminated",
-            repairProvider: RuntimeProjectionRepairProvider(snapshotProvider: provider)
+            repairProvider: RuntimeProjectionRepairProvider(runtimeFactProvider: provider)
         )
 
         XCTAssertFalse(AXLiveWindowRegistry.shared.windows(forPID: pid).isEmpty)
@@ -1861,7 +1861,7 @@ extension FlowTabPriorityCoverageTests {
         var executedRequests: [RuntimeReconciliationRequest] = []
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.VerifiedFocusSignal",
-            repairProvider: RuntimeProjectionRepairProvider(snapshotProvider: provider),
+            repairProvider: RuntimeProjectionRepairProvider(runtimeFactProvider: provider),
             reconciliationExecutor: { request, _ in
                 lock.lock()
                 executedRequests.append(request)
@@ -1912,7 +1912,7 @@ extension FlowTabPriorityCoverageTests {
         var executedRequests: [RuntimeReconciliationRequest] = []
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.VerifiedFocusSeed",
-            repairProvider: RuntimeProjectionRepairProvider(snapshotProvider: provider),
+            repairProvider: RuntimeProjectionRepairProvider(runtimeFactProvider: provider),
             reconciliationExecutor: { request, _ in
                 lock.lock()
                 executedRequests.append(request)
@@ -1964,7 +1964,7 @@ extension FlowTabPriorityCoverageTests {
         var executedRequests: [RuntimeReconciliationRequest] = []
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.VerifiedFocusFallbackAXID",
-            repairProvider: RuntimeProjectionRepairProvider(snapshotProvider: provider),
+            repairProvider: RuntimeProjectionRepairProvider(runtimeFactProvider: provider),
             reconciliationExecutor: { request, _ in
                 lock.lock()
                 executedRequests.append(request)
@@ -2008,7 +2008,7 @@ extension FlowTabPriorityCoverageTests {
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.TransientCurrentAppPayloadRetry",
-            repairProvider: RuntimeProjectionRepairProvider(snapshotProvider: provider),
+            repairProvider: RuntimeProjectionRepairProvider(runtimeFactProvider: provider),
             reconciliationExecutor: { _, _ in
                 .transientEmptyCurrentAppWindowPayload
             }
@@ -2053,7 +2053,7 @@ extension FlowTabPriorityCoverageTests {
         expectation.expectedFulfillmentCount = 2
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.MaintenancePriority",
-            repairProvider: RuntimeProjectionRepairProvider(snapshotProvider: provider),
+            repairProvider: RuntimeProjectionRepairProvider(runtimeFactProvider: provider),
             reconciliationExecutor: { request, _ in
                 lock.lock()
                 executedRequests.append(request)
@@ -2103,7 +2103,7 @@ extension FlowTabPriorityCoverageTests {
         let expectation = expectation(description: "runtime maintenance executes full repair fallback")
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.FullRepairFallback",
-            repairProvider: RuntimeProjectionRepairProvider(snapshotProvider: provider),
+            repairProvider: RuntimeProjectionRepairProvider(runtimeFactProvider: provider),
             readModelStore: store,
             reconciliationExecutor: { request, _ in
                 lock.lock()
@@ -2185,7 +2185,7 @@ extension FlowTabPriorityCoverageTests {
         expectation.expectedFulfillmentCount = runtimeSearchFreshnessBarrierMaxReadyRepairs
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.SearchFreshnessBarrier",
-            repairProvider: RuntimeProjectionRepairProvider(snapshotProvider: provider),
+            repairProvider: RuntimeProjectionRepairProvider(runtimeFactProvider: provider),
             readModelStore: store,
             reconciliationExecutor: { request, _ in
                 lock.lock()
@@ -2252,7 +2252,7 @@ extension FlowTabPriorityCoverageTests {
         let expectation = expectation(description: "search barrier drains scoped repair only")
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.SearchBarrierSkipsFullRepair",
-            repairProvider: RuntimeProjectionRepairProvider(snapshotProvider: provider),
+            repairProvider: RuntimeProjectionRepairProvider(runtimeFactProvider: provider),
             readModelStore: store,
             reconciliationExecutor: { request, _ in
                 lock.lock()
@@ -2318,7 +2318,7 @@ extension FlowTabPriorityCoverageTests {
         let expectation = expectation(description: "search freshness barrier commits repaired index")
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.SearchFreshnessBarrierCommit",
-            repairProvider: RuntimeProjectionRepairProvider(snapshotProvider: provider),
+            repairProvider: RuntimeProjectionRepairProvider(runtimeFactProvider: provider),
             readModelStore: store,
             reconciliationExecutor: { _, _ in
                 expectation.fulfill()
@@ -2395,7 +2395,7 @@ extension FlowTabPriorityCoverageTests {
         let expectation = expectation(description: "search freshness barrier defers repair")
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.SearchFreshnessBarrierDeferred",
-            repairProvider: RuntimeProjectionRepairProvider(snapshotProvider: provider),
+            repairProvider: RuntimeProjectionRepairProvider(runtimeFactProvider: provider),
             readModelStore: store,
             reconciliationExecutor: { _, _ in
                 expectation.fulfill()
@@ -2469,7 +2469,7 @@ extension FlowTabPriorityCoverageTests {
         let expectation = expectation(description: "search freshness barrier completes without repair payload")
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.SearchFreshnessBarrierStaleStaging",
-            repairProvider: RuntimeProjectionRepairProvider(snapshotProvider: provider),
+            repairProvider: RuntimeProjectionRepairProvider(runtimeFactProvider: provider),
             readModelStore: store,
             reconciliationExecutor: { _, _ in
                 expectation.fulfill()
@@ -2545,7 +2545,7 @@ extension FlowTabPriorityCoverageTests {
         let expectation = expectation(description: "search freshness barrier exhausts scoped repair")
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.SearchFreshnessBarrierRetryExhausted",
-            repairProvider: RuntimeProjectionRepairProvider(snapshotProvider: provider),
+            repairProvider: RuntimeProjectionRepairProvider(runtimeFactProvider: provider),
             readModelStore: store,
             reconciliationExecutor: { _, _ in
                 expectation.fulfill()
@@ -2621,7 +2621,7 @@ extension FlowTabPriorityCoverageTests {
         var executedRequests: [RuntimeReconciliationRequest] = []
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.FullRepairDegradedCommit",
-            repairProvider: RuntimeProjectionRepairProvider(snapshotProvider: provider),
+            repairProvider: RuntimeProjectionRepairProvider(runtimeFactProvider: provider),
             readModelStore: store,
             reconciliationExecutor: { request, _ in
                 lock.lock()

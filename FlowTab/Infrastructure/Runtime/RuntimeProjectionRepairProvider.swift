@@ -51,11 +51,11 @@ protocol RuntimeProjectionRepairProviding: AnyObject {
 }
 
 final class RuntimeProjectionRepairProvider: RuntimeProjectionRepairProviding {
-    let snapshotProvider: RuntimeSnapshotProvider
+    let runtimeFactProvider: RuntimeSnapshotProvider
     let repairFactSource: RuntimeProjectionRepairFactSource
 
-    init(snapshotProvider: RuntimeSnapshotProvider = RuntimeSnapshotProvider()) {
-        self.snapshotProvider = snapshotProvider
-        self.repairFactSource = RuntimeProjectionRepairFactSource(snapshotProvider: snapshotProvider)
+    init(runtimeFactProvider: RuntimeSnapshotProvider = RuntimeSnapshotProvider()) {
+        self.runtimeFactProvider = runtimeFactProvider
+        self.repairFactSource = RuntimeProjectionRepairFactSource(runtimeFactProvider: runtimeFactProvider)
     }
 }
