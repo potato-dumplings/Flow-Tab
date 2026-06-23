@@ -136,31 +136,6 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         upsertAppSwitcherProjectionLocked(payload, generatedAt: generatedAt)
     }
 
-    func stageSearchIndexApps(
-        _ apps: [AppSwitchCandidate],
-        generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
-    ) {
-        lock.lock()
-        defer { lock.unlock() }
-
-        stagingSearchIndex = buildSearchIndexLocked(
-            apps: apps,
-            generatedAt: generatedAt,
-            isCompleteForScope: false
-        )
-    }
-
-    @discardableResult
-    func stageSearchIndexApp(
-        _ app: AppSwitchCandidate,
-        generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
-    ) -> RuntimeSearchIndexProjection? {
-        lock.lock()
-        defer { lock.unlock() }
-
-        return stageSearchIndexAppLocked(app, generatedAt: generatedAt)
-    }
-
     private func stageSearchIndexAppLocked(
         _ app: AppSwitchCandidate,
         generatedAt: TimeInterval
@@ -188,20 +163,6 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             )
         )
         return stagingSearchIndex
-    }
-
-    @discardableResult
-    func stageSearchIndexCurrentAppWindowPayloads(
-        _ payloads: [RuntimeCurrentAppWindowPayload],
-        generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
-    ) -> RuntimeSearchIndexProjection? {
-        lock.lock()
-        defer { lock.unlock() }
-
-        return stageSearchIndexCurrentAppWindowPayloadsLocked(
-            payloads,
-            generatedAt: generatedAt
-        )
     }
 
     private func stageSearchIndexCurrentAppWindowPayloadsLocked(
