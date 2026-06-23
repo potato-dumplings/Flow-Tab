@@ -658,7 +658,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(service.readAppSwitcherProjection()?.freshness.isCompleteForScope ?? true)
     }
 
-    func testRuntimeReadModelStoreKeepsStagingSearchIndexHiddenUntilCommit() throws {
+    func testRuntimeReadModelStoreKeepsStagingSearchIndexHiddenWithoutBarrierPayload() throws {
         let store = RuntimeReadModelStore()
         let apps = searchScenarioApps()
 
@@ -673,23 +673,22 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(diagnostics.hasCommittedSearchIndex)
         XCTAssertTrue(diagnostics.hasStagingSearchIndex)
 
-        let committed = try XCTUnwrap(
-            store.commitStagedSearchIndex(generatedAt: 21)
+        let commitResult = store.commitSearchFreshnessBarrierPayloads(
+            [],
+            deferredRequestCount: 0,
+            hasPendingRequests: false,
+            generatedAt: 21
         )
 
-        XCTAssertEqual(committed.freshness.generatedAt, 21)
-        XCTAssertTrue(committed.freshness.isCompleteForScope)
+        XCTAssertFalse(commitResult.stagedNewPayload)
+        XCTAssertFalse(commitResult.committedNewGeneration)
         read = store.readCommittedSearchIndexForSearch()
-        XCTAssertEqual(read.readiness, .verifiedCurrentGenerationCommitted)
-        XCTAssertEqual(read.resultState, .verifiedCurrentGenerationCommittedResult)
-        XCTAssertTrue(read.committedIndexCoversCurrentGeneration)
-        XCTAssertEqual(
-            read.projection?.windowEntries.map(\.windowID),
-            apps.flatMap(\.windows).map(\.id)
-        )
+        XCTAssertEqual(read.readiness, .missingCommittedIndex)
+        XCTAssertEqual(read.resultState, .missingCommittedIndex)
+        XCTAssertNil(read.projection)
         diagnostics = store.diagnostics()
-        XCTAssertTrue(diagnostics.hasCommittedSearchIndex)
-        XCTAssertFalse(diagnostics.hasStagingSearchIndex)
+        XCTAssertFalse(diagnostics.hasCommittedSearchIndex)
+        XCTAssertTrue(diagnostics.hasStagingSearchIndex)
     }
 
     func testRuntimeReadModelStoreSearchReadinessTracksDirtyMetadataWithoutReadingStaging() throws {
@@ -766,9 +765,10 @@ extension FlowTabPriorityCoverageTests {
             appDirectoryEntries: nil,
             generatedAt: 10
         )
+        let pid = pid_t(42_101)
         store.markAppWindowsDirty(
             appID: repairedApp.id,
-            pid: 42_101,
+            pid: pid,
             pendingScope: "appWindows:\(repairedApp.id)"
         )
 
@@ -788,8 +788,14 @@ extension FlowTabPriorityCoverageTests {
             ["browser-1"]
         )
 
-        let committed = try XCTUnwrap(store.commitStagedSearchIndex(generatedAt: 21))
+        let commitResult = store.commitSearchFreshnessBarrierPayloads(
+            [makeRuntimeCurrentAppWindowPayload(app: repairedApp, pid: pid)],
+            deferredRequestCount: 0,
+            hasPendingRequests: false,
+            generatedAt: 21
+        )
 
+        let committed = try XCTUnwrap(commitResult.committedSearchIndex)
         XCTAssertTrue(committed.freshness.isCompleteForScope)
         read = store.readCommittedSearchIndexForSearch()
         XCTAssertEqual(read.readiness, .verifiedCurrentGenerationCommitted)
@@ -862,8 +868,14 @@ extension FlowTabPriorityCoverageTests {
             ["browser-1"]
         )
 
-        let committed = try XCTUnwrap(store.commitStagedSearchIndex(generatedAt: 21))
+        let commitResult = store.commitSearchFreshnessBarrierPayloads(
+            [payload],
+            deferredRequestCount: 0,
+            hasPendingRequests: false,
+            generatedAt: 21
+        )
 
+        let committed = try XCTUnwrap(commitResult.committedSearchIndex)
         XCTAssertTrue(committed.freshness.isCompleteForScope)
         XCTAssertEqual(
             store.readCommittedSearchIndexForSearch().projection?.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),

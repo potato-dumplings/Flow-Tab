@@ -220,20 +220,6 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         return stagedProjection
     }
 
-    @discardableResult
-    func commitStagedSearchIndex(
-        clearsDirtyState: Bool = true,
-        generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
-    ) -> RuntimeSearchIndexProjection? {
-        lock.lock()
-        defer { lock.unlock() }
-
-        return commitStagedSearchIndexLocked(
-            clearsDirtyState: clearsDirtyState,
-            generatedAt: generatedAt
-        )
-    }
-
     private func commitStagedSearchIndexLocked(
         clearsDirtyState: Bool,
         generatedAt: TimeInterval
