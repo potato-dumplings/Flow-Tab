@@ -125,6 +125,20 @@ extension FlowTabPriorityCoverageTests {
         appDirectoryProjection = try XCTUnwrap(store.readAppDirectoryProjection())
         XCTAssertTrue(appDirectoryProjection.freshness.isCompleteForScope)
         XCTAssertEqual(appDirectoryProjection.entries(forAppID: app.id).map(\.pid), [pid])
+
+        store.markSpaceTopologyDirty(
+            affectedCGWindowIDs: [CGWindowID(240_777)],
+            signatureSummary: "d=1,current=7,spaces=1,windows=1,fullscreen=0",
+            pendingScope: "spaceTopology"
+        )
+        let staleSearchRead = store.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(staleSearchRead.readiness, .staleCommitted)
+        XCTAssertEqual(staleSearchRead.resultState, .degradedStaleCommittedResult)
+        XCTAssertEqual(
+            staleSearchRead.freshness?.spaceTopologySignatureSummary,
+            "d=1,current=7,spaces=1,windows=1,fullscreen=0"
+        )
+        XCTAssertEqual(staleSearchRead.freshness?.sourceGeneration.space, 1)
     }
 
     func testRuntimeReadModelStoreFullRepairColdStartCommitsCurrentSearchIndex() throws {
@@ -1494,8 +1508,11 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(request.state, .inFlight)
         let diagnostics = readModelStore.diagnostics()
         XCTAssertEqual(diagnostics.dirtyCGWindowIDs, [affectedWindowID])
+        XCTAssertEqual(diagnostics.spaceTopologySignatureSummary, "d=1,current=7,spaces=1,windows=1,fullscreen=0")
         XCTAssertEqual(diagnostics.generation.space, 1)
         XCTAssertEqual(diagnostics.pendingRepairScopes, ["spaceTopology"])
+        let searchRead = readModelStore.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(searchRead.readiness, .missingCommittedIndex)
         XCTAssertTrue(coordinator.readyRequests(now: Date.timeIntervalSinceReferenceDate).isEmpty)
     }
 

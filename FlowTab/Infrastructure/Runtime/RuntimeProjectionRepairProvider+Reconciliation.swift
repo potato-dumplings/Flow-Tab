@@ -109,8 +109,8 @@ extension RuntimeProjectionRepairProvider {
         )
     }
 
-    func recordSpaceTopologyChanged(now: TimeInterval) -> Set<CGWindowID> {
-        repairFactSource.collectSpaceTopologySignalFacts(now: now).affectedCGWindowIDs
+    func recordSpaceTopologyChanged(now: TimeInterval) -> RuntimeSpaceTopologySignalFacts {
+        repairFactSource.collectSpaceTopologySignalFacts(now: now)
     }
 
     func reconcileAppWindows(

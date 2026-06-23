@@ -54,6 +54,7 @@ struct RuntimeRepairAppLayerPolicyFacts {
 
 struct RuntimeSpaceTopologySignalFacts {
     let affectedCGWindowIDs: Set<CGWindowID>
+    let signatureSummary: String?
 }
 
 struct RuntimeSpaceTopologyReconciliationTarget: Equatable {
@@ -121,11 +122,13 @@ struct RuntimeProjectionRepairFactSource {
     }
 
     func collectSpaceTopologySignalFacts(now: TimeInterval) -> RuntimeSpaceTopologySignalFacts {
-        RuntimeSpaceTopologySignalFacts(
-            affectedCGWindowIDs: runtimeFactProvider.collectCGWindowsWithSpaceTopologyDiff(
-                options: [.excludeDesktopElements],
-                now: now
-            ).spaceTopologyDiff?.affectedCGWindowIDs ?? []
+        let collection = runtimeFactProvider.collectCGWindowsWithSpaceTopologyDiff(
+            options: [.excludeDesktopElements],
+            now: now
+        )
+        return RuntimeSpaceTopologySignalFacts(
+            affectedCGWindowIDs: collection.spaceTopologyDiff?.affectedCGWindowIDs ?? [],
+            signatureSummary: collection.spaceTopologyDiff?.currentSignature.diagnosticSummary
         )
     }
 

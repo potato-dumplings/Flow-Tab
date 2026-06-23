@@ -20,7 +20,7 @@ protocol RuntimeProjectionRepairProviding: AnyObject {
         affectedCGWindowIDs: Set<CGWindowID>
     ) -> [RuntimeAppWindowReconciliationResult]
     func fullRepairProjectionPayload() -> RuntimeFullRepairProjectionPayload
-    func recordSpaceTopologyChanged(now: TimeInterval) -> Set<CGWindowID>
+    func recordSpaceTopologyChanged(now: TimeInterval) -> RuntimeSpaceTopologySignalFacts
     func signalAXWindowDestroyed(
         appID: String,
         processIdentifier pid: pid_t,

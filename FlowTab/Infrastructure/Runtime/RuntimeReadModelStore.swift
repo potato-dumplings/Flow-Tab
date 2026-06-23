@@ -8,6 +8,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     private var dirtyAppIDs: Set<String> = []
     private var dirtyPIDs: Set<pid_t> = []
     private var dirtyCGWindowIDs: Set<CGWindowID> = []
+    private var spaceTopologySignatureSummary: String?
     private var pendingRepairScopes: Set<String> = []
     private var appDirectoryState = RuntimeAppDirectoryState()
     private var appSwitcherProjection: RuntimeAppSwitcherProjection?
@@ -257,12 +258,17 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         pendingRepairScopes.insert(pendingScope)
     }
 
-    func markSpaceTopologyDirty(affectedCGWindowIDs: Set<CGWindowID>, pendingScope: String) {
+    func markSpaceTopologyDirty(
+        affectedCGWindowIDs: Set<CGWindowID>,
+        signatureSummary: String?,
+        pendingScope: String
+    ) {
         lock.lock()
         defer { lock.unlock() }
 
         generation.space &+= 1
         dirtyCGWindowIDs.formUnion(affectedCGWindowIDs)
+        spaceTopologySignatureSummary = signatureSummary
         pendingRepairScopes.insert(pendingScope)
     }
 
@@ -520,6 +526,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             dirtyAppIDs: dirtyAppIDs,
             dirtyPIDs: dirtyPIDs,
             dirtyCGWindowIDs: dirtyCGWindowIDs,
+            spaceTopologySignatureSummary: spaceTopologySignatureSummary,
             pendingRepairScopes: pendingRepairScopes,
             hasAppSwitcherProjection: appSwitcherProjection != nil,
             hasHomeSummaryProjection: homeSummaryProjection != nil,
@@ -546,6 +553,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         dirtyAppIDs.removeAll()
         dirtyPIDs.removeAll()
         dirtyCGWindowIDs.removeAll()
+        spaceTopologySignatureSummary = nil
         pendingRepairScopes.removeAll()
     }
 
@@ -658,6 +666,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             dirtyAppIDs: dirtyAppIDs,
             dirtyPIDs: dirtyPIDs,
             dirtyCGWindowIDs: dirtyCGWindowIDs,
+            spaceTopologySignatureSummary: spaceTopologySignatureSummary,
             pendingRepairScopes: pendingRepairScopes,
             isCompleteForScope: isCompleteForScope
         )

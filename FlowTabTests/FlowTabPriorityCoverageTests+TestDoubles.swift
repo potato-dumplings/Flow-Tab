@@ -125,6 +125,7 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
             dirtyAppIDs: [],
             dirtyPIDs: [],
             dirtyCGWindowIDs: [],
+            spaceTopologySignatureSummary: nil,
             pendingRepairScopes: [],
             isCompleteForScope: true
         )
@@ -302,6 +303,7 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
             dirtyAppIDs: [],
             dirtyPIDs: [],
             dirtyCGWindowIDs: [],
+            spaceTopologySignatureSummary: nil,
             pendingRepairScopes: [],
             hasAppSwitcherProjection: false,
             hasHomeSummaryProjection: false,

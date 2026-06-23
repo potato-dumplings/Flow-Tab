@@ -16,8 +16,29 @@ struct RuntimeProjectionFreshness: Equatable {
     let dirtyAppIDs: Set<String>
     let dirtyPIDs: Set<pid_t>
     let dirtyCGWindowIDs: Set<CGWindowID>
+    let spaceTopologySignatureSummary: String?
     let pendingRepairScopes: Set<String>
     let isCompleteForScope: Bool
+
+    init(
+        generatedAt: TimeInterval,
+        sourceGeneration: RuntimeReadModelGeneration,
+        dirtyAppIDs: Set<String>,
+        dirtyPIDs: Set<pid_t>,
+        dirtyCGWindowIDs: Set<CGWindowID>,
+        spaceTopologySignatureSummary: String? = nil,
+        pendingRepairScopes: Set<String>,
+        isCompleteForScope: Bool
+    ) {
+        self.generatedAt = generatedAt
+        self.sourceGeneration = sourceGeneration
+        self.dirtyAppIDs = dirtyAppIDs
+        self.dirtyPIDs = dirtyPIDs
+        self.dirtyCGWindowIDs = dirtyCGWindowIDs
+        self.spaceTopologySignatureSummary = spaceTopologySignatureSummary
+        self.pendingRepairScopes = pendingRepairScopes
+        self.isCompleteForScope = isCompleteForScope
+    }
 
     var isDirty: Bool {
         !dirtyAppIDs.isEmpty
@@ -106,6 +127,7 @@ struct RuntimeReadModelDiagnostics: Equatable {
     let dirtyAppIDs: Set<String>
     let dirtyPIDs: Set<pid_t>
     let dirtyCGWindowIDs: Set<CGWindowID>
+    let spaceTopologySignatureSummary: String?
     let pendingRepairScopes: Set<String>
     let hasAppSwitcherProjection: Bool
     let hasHomeSummaryProjection: Bool

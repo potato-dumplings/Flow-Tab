@@ -148,9 +148,10 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     func signalSpaceTopologyChanged() {
         maintenanceQueue.async { [self] in
             let now = Date.timeIntervalSinceReferenceDate
-            let affectedCGWindowIDs = repairProvider.recordSpaceTopologyChanged(now: now)
+            let signalFacts = repairProvider.recordSpaceTopologyChanged(now: now)
             readModelStore.markSpaceTopologyDirty(
-                affectedCGWindowIDs: affectedCGWindowIDs,
+                affectedCGWindowIDs: signalFacts.affectedCGWindowIDs,
+                signatureSummary: signalFacts.signatureSummary,
                 pendingScope: "spaceTopology"
             )
             drainReadyReconciliationRequestsLocked(now: now)
