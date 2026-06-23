@@ -146,7 +146,7 @@ enum RuntimeAXRemoteWindowResolver {
             return WindowScanResult(windows: [], completeness: .unavailable)
         }
 
-        var token = makeRemoteToken(pid: pid, elementID: 0)
+        var token = remoteToken(pid: pid, elementID: 0)
         var windows: [AXUIElement] = []
         let startedAt = Date.timeIntervalSinceReferenceDate
         for elementID in AXUIElementID(0)..<policy.maximumElementID {
@@ -208,7 +208,7 @@ enum RuntimeAXRemoteWindowResolver {
         return merged
     }
 
-    private static func makeRemoteToken(pid: pid_t, elementID: AXUIElementID) -> Data {
+    static func remoteToken(pid: pid_t, elementID: AXUIElementID) -> Data {
         var token = Data(count: RemoteTokenLayout.byteCount)
         let zero = Int32(0)
         let marker = RemoteTokenLayout.marker
@@ -238,7 +238,7 @@ enum RuntimeAXRemoteWindowResolver {
         return WindowScanResult(windows: windows, completeness: completeness)
     }
 
-    fileprivate static func scanCompleteness(
+    static func scanCompleteness(
         scannedCount: Int,
         timedOut: Bool,
         policy: RuntimeAXRemoteScanPolicy = defaultScanPolicy
@@ -249,17 +249,13 @@ enum RuntimeAXRemoteWindowResolver {
         return .complete(scanned: scannedCount)
     }
 
-    fileprivate static func scanPolicy(
+    static func scanPolicy(
         for useCase: RuntimeAXRemoteScanUseCase
     ) -> RuntimeAXRemoteScanPolicy {
         RuntimeAXRemoteScanPolicy.policy(for: useCase)
     }
 
-    fileprivate static func remoteTokenForTesting(pid: pid_t, elementID: AXUIElementID) -> Data {
-        makeRemoteToken(pid: pid, elementID: elementID)
-    }
-
-    fileprivate static func remoteAXResolveResult(
+    static func remoteAXResolveResult(
         element: AXUIElement?,
         elementID: AXUIElementID,
         expectedPID: pid_t? = nil
@@ -286,7 +282,7 @@ enum RuntimeAXRemoteWindowResolver {
         )
     }
 
-    fileprivate static func resolveFailureReason(
+    static func resolveFailureReason(
         forSubrole subrole: String?
     ) -> RemoteAXResolveFailureReason? {
         guard let subrole else { return .missingSubrole }
@@ -356,84 +352,4 @@ enum RuntimeAXRemoteWindowResolver {
         }
         return nil
     }()
-}
-
-enum RuntimeAXRemoteWindowResolverForTesting {
-    typealias ScanPolicy = RuntimeAXRemoteWindowResolver.RuntimeAXRemoteScanPolicy
-    typealias ScanUseCase = RuntimeAXRemoteWindowResolver.RuntimeAXRemoteScanUseCase
-    typealias ResolveFailureReason = RuntimeAXRemoteWindowResolver.RemoteAXResolveFailureReason
-    typealias ResolveResult = RuntimeAXRemoteWindowResolver.RemoteAXResolveResult
-
-    static func remoteToken(pid: pid_t, elementID: UInt64) -> Data {
-        RuntimeAXRemoteWindowResolver.remoteTokenForTesting(
-            pid: pid,
-            elementID: elementID
-        )
-    }
-
-    static func scanCompleteness(
-        scannedCount: Int,
-        timedOut: Bool
-    ) -> RuntimeAXRemoteWindowResolver.RemoteScanCompleteness {
-        RuntimeAXRemoteWindowResolver.scanCompleteness(
-            scannedCount: scannedCount,
-            timedOut: timedOut
-        )
-    }
-
-    static func scanCompleteness(
-        scannedCount: Int,
-        timedOut: Bool,
-        policy: ScanPolicy
-    ) -> RuntimeAXRemoteWindowResolver.RemoteScanCompleteness {
-        RuntimeAXRemoteWindowResolver.scanCompleteness(
-            scannedCount: scannedCount,
-            timedOut: timedOut,
-            policy: policy
-        )
-    }
-
-    static func scanPolicy(for useCase: ScanUseCase) -> ScanPolicy {
-        RuntimeAXRemoteWindowResolver.scanPolicy(for: useCase)
-    }
-
-    static func shouldIncludeRemoteWindows(
-        allCGWindows: [RuntimeCGWindowEntry],
-        publicSwitchableWindowCount: Int,
-        publicFetchSucceeded: Bool = true
-    ) -> Bool {
-        RuntimeAXRemoteWindowResolver.shouldIncludeRemoteWindows(
-            allCGWindows: allCGWindows,
-            publicSwitchableWindowCount: publicSwitchableWindowCount,
-            publicFetchSucceeded: publicFetchSucceeded
-        )
-    }
-
-    static func remoteAXResolveResult(
-        element: AXUIElement?,
-        elementID: UInt64,
-        expectedPID: pid_t? = nil
-    ) -> ResolveResult {
-        RuntimeAXRemoteWindowResolver.remoteAXResolveResult(
-            element: element,
-            elementID: elementID,
-            expectedPID: expectedPID
-        )
-    }
-
-    static func resolveFailureReason(
-        forSubrole subrole: String?
-    ) -> ResolveFailureReason? {
-        RuntimeAXRemoteWindowResolver.resolveFailureReason(forSubrole: subrole)
-    }
-
-    static func mergedWindows(
-        publicWindows: [AXUIElement],
-        remoteWindows: [AXUIElement]
-    ) -> [AXUIElement] {
-        RuntimeAXRemoteWindowResolver.mergedWindows(
-            publicWindows: publicWindows,
-            remoteWindows: remoteWindows
-        )
-    }
 }
