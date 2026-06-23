@@ -1,53 +1,33 @@
-import AppKit
+import ApplicationServices
 import Foundation
 
-extension RuntimeSnapshotProvider {
+enum RuntimeWindowRecordEvidence {
     @discardableResult
-    func recordSpaceTopologySnapshot(
+    static func recordSpaceTopologySnapshot(
         _ snapshot: RuntimeSpaceTopologySnapshot,
-        now: TimeInterval = ProcessInfo.processInfo.systemUptime
+        now: TimeInterval = ProcessInfo.processInfo.systemUptime,
+        reconciliationCoordinator: RuntimeReconciliationCoordinator,
+        mappingStatesByPID: inout [pid_t: RuntimeWindowMappingState]
     ) -> RuntimeSpaceTopologyDiff {
         let diff = reconciliationCoordinator.applySpaceTopologySnapshot(snapshot, now: now)
-        markWindowRecordsForSpaceTopologyReconciliation(diff, now: now)
+        markWindowRecordsForSpaceTopologyReconciliation(
+            diff,
+            now: now,
+            mappingStatesByPID: &mappingStatesByPID
+        )
         return diff
     }
 
-    private func markWindowRecordsForSpaceTopologyReconciliation(
-        _ diff: RuntimeSpaceTopologyDiff,
-        now: TimeInterval
-    ) {
-        guard !diff.affectedCGWindowIDs.isEmpty else { return }
-
-        for pid in windowMappingStateByPID.keys.sorted() {
-            guard var mappingState = windowMappingStateByPID[pid] else { continue }
-            var updated = false
-            for cgWindowID in diff.affectedCGWindowIDs.sorted() {
-                guard var record = mappingState.windowRecordsByCGWindowID[cgWindowID] else {
-                    continue
-                }
-                record.markNeedsReconciliation(observedAt: now)
-                if let recovery = record.spaceRecovery,
-                   !Set(recovery.spaceIDs).isDisjoint(with: diff.removedSpaceIDs) {
-                    record.invalidateSpaceRecovery(observedAt: now)
-                }
-                mappingState.windowRecordsByCGWindowID[cgWindowID] = record
-                updated = true
-            }
-            if updated {
-                windowMappingStateByPID[pid] = mappingState
-            }
-        }
-    }
-
-    func recordWindowFocusVerification(
+    static func recordWindowFocusVerification(
         _ verification: RuntimeWindowFocusVerification,
-        now: TimeInterval
+        now: TimeInterval,
+        mappingStatesByPID: inout [pid_t: RuntimeWindowMappingState]
     ) {
         guard let focusedAXWindow = verification.focusedAXWindow,
               let focusedCGWindowID = verification.focusedCGWindowID else {
             return
         }
-        var mappingState = windowMappingStateByPID[verification.ownerPID] ?? RuntimeWindowMappingState()
+        var mappingState = mappingStatesByPID[verification.ownerPID] ?? RuntimeWindowMappingState()
 
         let axWindowID = focusedAXWindowID(
             for: focusedAXWindow,
@@ -59,7 +39,10 @@ extension RuntimeSnapshotProvider {
         let focusedTitle = AXWindowInspector.title(for: focusedAXWindow)
 
         let focusedAXEntry = RuntimeAXWindowEntry(
-            index: AXWindowInspector.windowIndex(from: axWindowID, expectedPID: verification.ownerPID) ?? 0,
+            index: AXWindowInspector.windowIndex(
+                from: axWindowID,
+                expectedPID: verification.ownerPID
+            ) ?? 0,
             id: axWindowID,
             title: focusedTitle ?? verification.title,
             sourceTitle: focusedTitle,
@@ -91,7 +74,7 @@ extension RuntimeSnapshotProvider {
         currentAXToCG[axWindowID] = focusedCGWindowID
         var lastAXWindowIDs = mappingState.lastAXWindowIDs
         lastAXWindowIDs.insert(axWindowID)
-        windowMappingStateByPID[verification.ownerPID] = RuntimeWindowMappingState(
+        mappingStatesByPID[verification.ownerPID] = RuntimeWindowMappingState(
             windowRecordsByCGWindowID: mappingState.windowRecordsByCGWindowID,
             currentAXToCG: currentAXToCG,
             validCGWindowIDs: mappingState.validCGWindowIDs.union([focusedCGWindowID]),
@@ -101,7 +84,52 @@ extension RuntimeSnapshotProvider {
         )
     }
 
-    private func focusedAXWindowID(
+    @discardableResult
+    static func clearDestroyedAXAttachment(
+        processIdentifier pid: pid_t,
+        axWindowID: String,
+        now: TimeInterval,
+        mappingStatesByPID: inout [pid_t: RuntimeWindowMappingState]
+    ) -> CGWindowID? {
+        guard var mappingState = mappingStatesByPID[pid] else { return nil }
+        let affectedCGWindowID = mappingState.clearDestroyedAXAttachment(
+            axWindowID: axWindowID,
+            observedAt: now
+        )
+        guard affectedCGWindowID != nil else { return nil }
+        mappingStatesByPID[pid] = mappingState
+        return affectedCGWindowID
+    }
+
+    private static func markWindowRecordsForSpaceTopologyReconciliation(
+        _ diff: RuntimeSpaceTopologyDiff,
+        now: TimeInterval,
+        mappingStatesByPID: inout [pid_t: RuntimeWindowMappingState]
+    ) {
+        guard !diff.affectedCGWindowIDs.isEmpty else { return }
+
+        for pid in mappingStatesByPID.keys.sorted() {
+            guard var mappingState = mappingStatesByPID[pid] else { continue }
+            var updated = false
+            for cgWindowID in diff.affectedCGWindowIDs.sorted() {
+                guard var record = mappingState.windowRecordsByCGWindowID[cgWindowID] else {
+                    continue
+                }
+                record.markNeedsReconciliation(observedAt: now)
+                if let recovery = record.spaceRecovery,
+                   !Set(recovery.spaceIDs).isDisjoint(with: diff.removedSpaceIDs) {
+                    record.invalidateSpaceRecovery(observedAt: now)
+                }
+                mappingState.windowRecordsByCGWindowID[cgWindowID] = record
+                updated = true
+            }
+            if updated {
+                mappingStatesByPID[pid] = mappingState
+            }
+        }
+    }
+
+    private static func focusedAXWindowID(
         for focusedAXWindow: AXUIElement,
         focusedCGWindowID: CGWindowID,
         pid: pid_t,
@@ -131,21 +159,5 @@ extension RuntimeSnapshotProvider {
                 pid: pid,
                 cgWindowID: focusedCGWindowID
             )
-    }
-
-    @discardableResult
-    func signalAXWindowDestroyed(
-        processIdentifier pid: pid_t,
-        axWindowID: String,
-        now: TimeInterval
-    ) -> CGWindowID? {
-        guard var mappingState = windowMappingStateByPID[pid] else { return nil }
-        let affectedCGWindowID = mappingState.clearDestroyedAXAttachment(
-            axWindowID: axWindowID,
-            observedAt: now
-        )
-        guard affectedCGWindowID != nil else { return nil }
-        windowMappingStateByPID[pid] = mappingState
-        return affectedCGWindowID
     }
 }

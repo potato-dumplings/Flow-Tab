@@ -1344,7 +1344,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(remainingRequests.contains { $0.target == .spaceTopology })
     }
 
-    func testRuntimeSnapshotProviderRecordsSpaceTopologyThroughCoordinator() {
+    func testRuntimeWindowRecordEvidenceRecordsSpaceTopologyThroughCoordinator() {
         let coordinator = RuntimeReconciliationCoordinator()
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
         let previous = RuntimeSpaceTopologySnapshot(
@@ -1366,8 +1366,18 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
 
-        _ = provider.recordSpaceTopologySnapshot(previous, now: 1)
-        let diff = provider.recordSpaceTopologySnapshot(current, now: 2)
+        _ = RuntimeWindowRecordEvidence.recordSpaceTopologySnapshot(
+            previous,
+            now: 1,
+            reconciliationCoordinator: coordinator,
+            mappingStatesByPID: &provider.windowMappingStateByPID
+        )
+        let diff = RuntimeWindowRecordEvidence.recordSpaceTopologySnapshot(
+            current,
+            now: 2,
+            reconciliationCoordinator: coordinator,
+            mappingStatesByPID: &provider.windowMappingStateByPID
+        )
         let request = coordinator.readyRequests(now: 2).first
 
         XCTAssertEqual(diff.affectedCGWindowIDs, Set<CGWindowID>([240_001, 240_002, 240_003]))
@@ -1379,7 +1389,7 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
-    func testRuntimeSnapshotProviderMarksAffectedWindowRecordsForSpaceTopologyReconciliation() {
+    func testRuntimeWindowRecordEvidenceMarksAffectedWindowRecordsForSpaceTopologyReconciliation() {
         let coordinator = RuntimeReconciliationCoordinator()
         let provider = RuntimeSnapshotProvider(reconciliationCoordinator: coordinator)
         let pid = pid_t(18_405)
@@ -1432,7 +1442,12 @@ extension FlowTabPriorityCoverageTests {
             firstSeenAt: 1
         )
 
-        _ = provider.recordSpaceTopologySnapshot(previous, now: 1)
+        _ = RuntimeWindowRecordEvidence.recordSpaceTopologySnapshot(
+            previous,
+            now: 1,
+            reconciliationCoordinator: coordinator,
+            mappingStatesByPID: &provider.windowMappingStateByPID
+        )
         provider.windowMappingStateByPID[pid] = RuntimeWindowMappingState(
             windowRecordsByCGWindowID: [
                 removedSpaceWindowID: removedSpaceRecord,
@@ -1440,7 +1455,12 @@ extension FlowTabPriorityCoverageTests {
                 unaffectedWindowID: unaffectedRecord
             ]
         )
-        let diff = provider.recordSpaceTopologySnapshot(current, now: 2)
+        let diff = RuntimeWindowRecordEvidence.recordSpaceTopologySnapshot(
+            current,
+            now: 2,
+            reconciliationCoordinator: coordinator,
+            mappingStatesByPID: &provider.windowMappingStateByPID
+        )
         let records = provider.windowMappingStateByPID[pid]?.windowRecordsByCGWindowID
 
         XCTAssertEqual(diff.removedSpaceIDs, [10])
