@@ -5,7 +5,7 @@ import FlowTabCore
 
 private typealias FactDiagnostics = RuntimeFactCollectionDiagnostics
 
-final class RuntimeSnapshotProvider {
+final class RuntimeSystemRepairFactProvider {
     private let cgWindowListProvider: RuntimeCGWindowListProviding
     private let spaceTopologyProvider: RuntimeSpaceTopologyProviding
     private let windowRecordStore: RuntimeWindowRecordStore

@@ -482,7 +482,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(mergedStats.hasVisibleWindow)
     }
 
-    func testRuntimeSnapshotProviderValidCGWindowsFilterSkipsInvalidEntries() {
+    func testRuntimeSystemRepairFactProviderValidCGWindowsFilterSkipsInvalidEntries() {
         let validWindowIDs = RuntimeWindowMappingTestSupport.validCGWindowIDs(
             existingCGWindowIDs: Set<CGWindowID>([240016]),
             allCGWindows: [
@@ -636,7 +636,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(mergedEntries[3].title, "Google Chrome")
     }
 
-    func testRuntimeSnapshotProviderWindowListDoesNotExposeProvisionalCGOnlyEntriesWithoutRecoveryEvidence() {
+    func testRuntimeSystemRepairFactProviderWindowListDoesNotExposeProvisionalCGOnlyEntriesWithoutRecoveryEvidence() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let mergedEntries = RuntimeWindowMappingTestSupport.resolveWindowEntries(
             axWindows: [
@@ -680,7 +680,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(mergedEntries.first?.lastConfirmationSource, .publicExactMatch)
     }
 
-    func testRuntimeSnapshotProviderWindowListUsesPrivateExactBridgeWhenPublicSignalsRemainAmbiguous() {
+    func testRuntimeSystemRepairFactProviderWindowListUsesPrivateExactBridgeWhenPublicSignalsRemainAmbiguous() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let mergedEntries = RuntimeWindowMappingTestSupport.resolveWindowEntries(
             axWindows: [
@@ -724,9 +724,9 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(mergedEntries.allSatisfy { $0.lastConfirmationSource == .privateExactBridge })
     }
 
-    func testRuntimeSnapshotProviderWindowListKeepsSpaceBackedEntriesAfterAXDisappearsWithoutStickyBinding() throws {
+    func testRuntimeSystemRepairFactProviderWindowListKeepsSpaceBackedEntriesAfterAXDisappearsWithoutStickyBinding() throws {
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore)
         let mergedEntries = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
             windowRecordStore: windowRecordStore,
             axWindows: [],
@@ -755,9 +755,9 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(entry.bindingAllowedActions.contains(.useForCGActivationFallback))
     }
 
-    func testRuntimeSnapshotProviderStoresCGFirstWindowRecordsAsSingleSourceOfTruth() throws {
+    func testRuntimeSystemRepairFactProviderStoresCGFirstWindowRecordsAsSingleSourceOfTruth() throws {
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore)
         let pid: pid_t = 18_405
         let appName = "Google Chrome"
         let exactBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
@@ -843,7 +843,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertNil(recoveryRecord.lastConfirmationSource)
     }
 
-    func testRuntimeSnapshotProviderWindowListHidesCGOnlyEntriesBoundToSpaceOneWithoutAXHandle() {
+    func testRuntimeSystemRepairFactProviderWindowListHidesCGOnlyEntriesBoundToSpaceOneWithoutAXHandle() {
         let mergedEntries = RuntimeWindowMappingTestSupport.resolveWindowEntries(
             axWindows: [],
             cgWindows: [
@@ -862,7 +862,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(mergedEntries.isEmpty)
     }
 
-    func testRuntimeSnapshotProviderWindowListKeepsExactEntriesBoundToSpaceOneWhenAXHandleIsPresent() {
+    func testRuntimeSystemRepairFactProviderWindowListKeepsExactEntriesBoundToSpaceOneWhenAXHandleIsPresent() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let mergedEntries = RuntimeWindowMappingTestSupport.resolveWindowEntries(
             axWindows: [
@@ -890,9 +890,9 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(mergedEntries.first?.lastConfirmationSource, .publicExactMatch)
     }
 
-    func testRuntimeSnapshotProviderWindowListKeepsDistinctCGOnlyEntriesSharingSameSpaceBinding() {
+    func testRuntimeSystemRepairFactProviderWindowListKeepsDistinctCGOnlyEntriesSharingSameSpaceBinding() {
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore)
         let mergedEntries = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
             windowRecordStore: windowRecordStore,
             axWindows: [],
@@ -974,7 +974,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(deduplicatedEntries.last?.spaceIDs, [11_680])
     }
 
-    func testRuntimeSnapshotProviderWindowListSuppressesCGOnlyEntryCoveredByStickySpaceBinding() {
+    func testRuntimeSystemRepairFactProviderWindowListSuppressesCGOnlyEntryCoveredByStickySpaceBinding() {
         let mergedEntries = RuntimeWindowMappingTestSupport.resolveWindowEntries(
             axWindows: [],
             cgWindows: [
@@ -1005,7 +1005,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(mergedEntries.first?.lastConfirmationSource, .stickyBinding)
     }
 
-    func testRuntimeSnapshotProviderWindowListKeepsUnmatchedAXEntriesWhenSpaceBindingDiffers() {
+    func testRuntimeSystemRepairFactProviderWindowListKeepsUnmatchedAXEntriesWhenSpaceBindingDiffers() {
         let mergedEntries = RuntimeWindowMappingTestSupport.resolveWindowEntries(
             axWindows: [],
             cgWindows: [
@@ -1031,7 +1031,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(mergedEntries.map(\.windowID), ["cg:18405:288544", "cg:18405:258323"])
     }
 
-    func testRuntimeSnapshotProviderWindowListKeepsStickyCGEntriesWhenCurrentAXHandleIsMissing() {
+    func testRuntimeSystemRepairFactProviderWindowListKeepsStickyCGEntriesWhenCurrentAXHandleIsMissing() {
         let mergedEntries = RuntimeWindowMappingTestSupport.resolveWindowEntries(
             axWindows: [],
             cgWindows: [
@@ -1055,7 +1055,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(mergedEntries.first?.lastConfirmationSource, .stickyBinding)
     }
 
-    func testRuntimeSnapshotProviderWindowListFiltersFullscreenSiblingArtifactsAroundNoisyWindows() {
+    func testRuntimeSystemRepairFactProviderWindowListFiltersFullscreenSiblingArtifactsAroundNoisyWindows() {
         let appName = "Chrome Fixture"
         let normalFrame = CGRect(x: 384, y: 258, width: 960, height: 640)
         let incognitoFrame = CGRect(x: 492, y: 354, width: 960, height: 640)
@@ -1224,7 +1224,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(mergedEntries.contains { $0.title == appName })
     }
 
-    func testRuntimeSnapshotProviderWindowListFiltersDuplicateFullscreenGeometryHosts() {
+    func testRuntimeSystemRepairFactProviderWindowListFiltersDuplicateFullscreenGeometryHosts() {
         let appName = "Chrome Fixture"
         let normalFrame = CGRect(x: 384, y: 258, width: 960, height: 640)
         let incognitoFrame = CGRect(x: 492, y: 354, width: 960, height: 640)
@@ -1313,9 +1313,9 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
-    func testRuntimeSnapshotProviderWindowListFiltersFullscreenHostAfterDesktopCGIDMovesToFullscreenSpace() {
+    func testRuntimeSystemRepairFactProviderWindowListFiltersFullscreenHostAfterDesktopCGIDMovesToFullscreenSpace() {
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore)
         let appName = "Chrome Fixture"
         let pid: pid_t = 85_301
         let normalFrame = CGRect(x: 384, y: 258, width: 960, height: 640)
@@ -1374,7 +1374,7 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
-    func testRuntimeSnapshotProviderWindowListOrdersOnscreenWindowsByCGZOrderInFullscreenTopology() {
+    func testRuntimeSystemRepairFactProviderWindowListOrdersOnscreenWindowsByCGZOrderInFullscreenTopology() {
         let appName = "Chrome Fixture"
         let normalFrame = CGRect(x: 384, y: 258, width: 960, height: 640)
         let incognitoFrame = CGRect(x: 492, y: 354, width: 960, height: 640)
@@ -1440,7 +1440,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(mergedEntries.first?.title, "Chrome Incognito Tab")
     }
 
-    func testRuntimeSnapshotProviderWindowListKeepsDesktopWindowsBeforeOffscreenFullscreenFallback() {
+    func testRuntimeSystemRepairFactProviderWindowListKeepsDesktopWindowsBeforeOffscreenFullscreenFallback() {
         let appName = "Chrome Fixture"
         let normalFrame = CGRect(x: 384, y: 258, width: 960, height: 640)
         let incognitoFrame = CGRect(x: 492, y: 354, width: 960, height: 640)
@@ -1528,7 +1528,7 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
-    func testRuntimeSnapshotProviderWindowListKeepsDesktopFullscreenSiblingsBehindNormalSurfaces() {
+    func testRuntimeSystemRepairFactProviderWindowListKeepsDesktopFullscreenSiblingsBehindNormalSurfaces() {
         let appName = "Chrome Fixture"
         let normalFrame = CGRect(x: 384, y: 258, width: 960, height: 640)
         let incognitoFrame = CGRect(x: 492, y: 354, width: 960, height: 640)
@@ -1616,7 +1616,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(mergedEntries.first?.title, "Chrome Normal Tab")
     }
 
-    func testRuntimeSnapshotProviderWindowListFiltersChromeFindOverlayAXWindow() {
+    func testRuntimeSystemRepairFactProviderWindowListFiltersChromeFindOverlayAXWindow() {
         let appName = "Google Chrome"
         let browserFrame = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let findOverlayFrame = CGRect(x: 1_140, y: 110, width: 403, height: 84)
@@ -1664,9 +1664,9 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(mergedEntries.first?.title, "Docs - Google Chrome - Profile")
     }
 
-    func testRuntimeSnapshotProviderWindowListKeepsStickyCGEntriesBoundToSpaceOneDuringTransientAXRebuild() {
+    func testRuntimeSystemRepairFactProviderWindowListKeepsStickyCGEntriesBoundToSpaceOneDuringTransientAXRebuild() {
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore)
         let pid: pid_t = 18_405
         let appName = "Google Chrome"
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
@@ -1718,9 +1718,9 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(windowRecordStore.state(for: pid)?.isLikelyTransientAXRebuild == true)
     }
 
-    func testRuntimeSnapshotProviderWindowListKeepsMultipleStickySpaceOneEntriesWhenAXReturnsSubsetFromFullscreenSpace() {
+    func testRuntimeSystemRepairFactProviderWindowListKeepsMultipleStickySpaceOneEntriesWhenAXReturnsSubsetFromFullscreenSpace() {
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore)
         let pid: pid_t = 18_405
         let appName = "Google Chrome"
         let desktopBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
@@ -1801,9 +1801,9 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
-    func testRuntimeSnapshotProviderWindowListHidesStickyCGEntriesBoundToSpaceOneAfterAXRebuildGraceRetriesExhausted() {
+    func testRuntimeSystemRepairFactProviderWindowListHidesStickyCGEntriesBoundToSpaceOneAfterAXRebuildGraceRetriesExhausted() {
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore)
         let pid: pid_t = 18_405
         let appName = "Google Chrome"
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
@@ -1862,9 +1862,9 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(windowRecordStore.state(for: pid)?.isLikelyTransientAXRebuild == true)
     }
 
-    func testRuntimeSnapshotProviderPartialRemoteAXScanDoesNotConsumeMissingAXGrace() {
+    func testRuntimeSystemRepairFactProviderPartialRemoteAXScanDoesNotConsumeMissingAXGrace() {
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore)
         let pid: pid_t = 18_405
         let appName = "Google Chrome"
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
@@ -1924,9 +1924,9 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(windowRecordStore.state(for: pid)?.isLikelyTransientAXRebuild == true)
     }
 
-    func testRuntimeSnapshotProviderWindowListKeepsStickyMatchesWhenAXTitlesChange() {
+    func testRuntimeSystemRepairFactProviderWindowListKeepsStickyMatchesWhenAXTitlesChange() {
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore)
         let pid: pid_t = 18405
         let appName = "Google Chrome"
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
@@ -2396,7 +2396,7 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
-    func testRuntimeSnapshotProviderResolveCGWindowAssignmentsUsesGeometryWithDuplicateTitles() {
+    func testRuntimeSystemRepairFactProviderResolveCGWindowAssignmentsUsesGeometryWithDuplicateTitles() {
         let axWindows: [RuntimeAXWindowEntry] = [
             .init(id: "ax:100:0", index: 0, title: "Document", bounds: CGRect(x: 10, y: 10, width: 600, height: 420)),
             .init(id: "ax:100:1", index: 1, title: "Document", bounds: CGRect(x: 640, y: 10, width: 600, height: 420))
@@ -2423,7 +2423,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(assignments["ax:100:1"], 22)
     }
 
-    func testRuntimeSnapshotProviderResolveCGWindowAssignmentsRequiresTitleHitAndSkipsAmbiguousMatches() {
+    func testRuntimeSystemRepairFactProviderResolveCGWindowAssignmentsRequiresTitleHitAndSkipsAmbiguousMatches() {
         let axWindows: [RuntimeAXWindowEntry] = [
             .init(id: "ax:200:2", index: 2, bounds: CGRect(x: 100, y: 100, width: 800, height: 500)),
             .init(id: "ax:200:0", index: 0, bounds: nil)
@@ -2445,7 +2445,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertNil(assignments["ax:200:0"], "Windows without a title hit should remain unbound")
     }
 
-    func testRuntimeSnapshotProviderResolveCGWindowAssignmentsReportsAmbiguousDiagnostics() {
+    func testRuntimeSystemRepairFactProviderResolveCGWindowAssignmentsReportsAmbiguousDiagnostics() {
         let axWindows: [RuntimeAXWindowEntry] = [
             .init(
                 id: "ax:300:0",
@@ -2489,7 +2489,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(diagnostics.first?.isQuarantined == true)
     }
 
-    func testRuntimeSnapshotProviderResolveCGWindowAssignmentsUsesFocusedAXStateAsPublicTieBreaker() {
+    func testRuntimeSystemRepairFactProviderResolveCGWindowAssignmentsUsesFocusedAXStateAsPublicTieBreaker() {
         let bounds = CGRect(x: 100, y: 100, width: 800, height: 500)
         let axWindows: [RuntimeAXWindowEntry] = [
             .init(id: "ax:310:0", index: 0, title: "Document", bounds: bounds, isFocused: true),
@@ -2514,7 +2514,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(diagnostics.isEmpty)
     }
 
-    func testRuntimeSnapshotProviderResolveCGWindowAssignmentsUsesMinimizedAXStateAsPublicTieBreaker() {
+    func testRuntimeSystemRepairFactProviderResolveCGWindowAssignmentsUsesMinimizedAXStateAsPublicTieBreaker() {
         let bounds = CGRect(x: 100, y: 100, width: 800, height: 500)
         let axWindows: [RuntimeAXWindowEntry] = [
             .init(id: "ax:320:0", index: 0, title: "Document", bounds: bounds, isMinimized: true)
@@ -2537,7 +2537,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(diagnostics.isEmpty)
     }
 
-    func testRuntimeSnapshotProviderPrivateExactBridgeConflictWithStickyBindingReportsDiagnosticAndUsesExactTarget() {
+    func testRuntimeSystemRepairFactProviderPrivateExactBridgeConflictWithStickyBindingReportsDiagnosticAndUsesExactTarget() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let axWindows: [RuntimeAXWindowEntry] = [
             .init(
@@ -2587,7 +2587,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(conflictDiagnostic?.isQuarantined == true)
     }
 
-    func testRuntimeSnapshotProviderReportsAmbiguousFullscreenTopologyFallbackDiagnostics() {
+    func testRuntimeSystemRepairFactProviderReportsAmbiguousFullscreenTopologyFallbackDiagnostics() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let axWindows: [RuntimeAXWindowEntry] = [
             .init(
@@ -2640,7 +2640,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(topologyDiagnostic?.isQuarantined == true)
     }
 
-    func testRuntimeSnapshotProviderResolveCGWindowAssignmentsBindsSingleNewUnmatchedPairFromDelta() {
+    func testRuntimeSystemRepairFactProviderResolveCGWindowAssignmentsBindsSingleNewUnmatchedPairFromDelta() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let assignments = RuntimeWindowMappingTestSupport.resolveCGWindowAssignments(
             axWindows: [
@@ -2672,7 +2672,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(assignments["ax:100:3"], 251_969)
     }
 
-    func testRuntimeSnapshotProviderResolveCGWindowAssignmentsDoesNotGuessAcrossInitialAmbiguousSnapshot() {
+    func testRuntimeSystemRepairFactProviderResolveCGWindowAssignmentsDoesNotGuessAcrossInitialAmbiguousSnapshot() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let assignments = RuntimeWindowMappingTestSupport.resolveCGWindowAssignments(
             axWindows: [
@@ -2698,7 +2698,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(assignments.isEmpty)
     }
 
-    func testRuntimeSnapshotProviderResolveCGWindowAssignmentsUsesPrivateExactBridgeWhenPublicSignalsRemainAmbiguous() {
+    func testRuntimeSystemRepairFactProviderResolveCGWindowAssignmentsUsesPrivateExactBridgeWhenPublicSignalsRemainAmbiguous() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let assignments = RuntimeWindowMappingTestSupport.resolveCGWindowAssignments(
             axWindows: [
@@ -2740,7 +2740,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(assignments["ax:100:2"], 240_029)
     }
 
-    func testRuntimeSnapshotProviderResolveCGWindowAssignmentsKeepsHistoricalBindingsWhenSnapshotBecomesAmbiguous() {
+    func testRuntimeSystemRepairFactProviderResolveCGWindowAssignmentsKeepsHistoricalBindingsWhenSnapshotBecomesAmbiguous() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let assignments = RuntimeWindowMappingTestSupport.resolveCGWindowAssignments(
             axWindows: [
@@ -2771,7 +2771,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertNil(assignments["ax:100:3"])
     }
 
-    func testRuntimeSnapshotProviderResolveCGWindowAssignmentsUsesExactTitlesToBreakFullscreenGeometryTies() {
+    func testRuntimeSystemRepairFactProviderResolveCGWindowAssignmentsUsesExactTitlesToBreakFullscreenGeometryTies() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let axWindows: [RuntimeAXWindowEntry] = [
             .init(
@@ -2821,9 +2821,9 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(assignments["ax:100:2"], 240_029)
     }
 
-    func testRuntimeSnapshotProviderTestingAXEntriesCarryPublicWindowState() throws {
+    func testRuntimeSystemRepairFactProviderTestingAXEntriesCarryPublicWindowState() throws {
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore)
         let pid: pid_t = 22_001
         let bounds = CGRect(x: 20, y: 40, width: 900, height: 700)
         let axWindows = [

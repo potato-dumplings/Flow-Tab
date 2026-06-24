@@ -289,10 +289,10 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(stale.allowsPublicAXRecovery)
     }
 
-    func testRuntimeSnapshotProviderWindowEntriesCarrySpaceEvidence() {
+    func testRuntimeSystemRepairFactProviderWindowEntriesCarrySpaceEvidence() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore)
 
         let entries = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
             windowRecordStore: windowRecordStore,
@@ -330,9 +330,9 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(context.spaceEvidence?.confidence, .inferredFromFullscreenGeometry)
     }
 
-    func testRuntimeSnapshotProviderStaleSpaceEvidenceDisablesPublicAXRecovery() {
+    func testRuntimeSystemRepairFactProviderStaleSpaceEvidenceDisablesPublicAXRecovery() {
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore)
         let pid: pid_t = 18_405
         let frame = CGRect(x: 100, y: 100, width: 900, height: 620)
         let entries = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
@@ -436,7 +436,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(shouldScanRemoteAX)
     }
 
-    func testRuntimeSnapshotProviderRebindsFullscreenWrapperAXMatchToOffDesktopContent() {
+    func testRuntimeSystemRepairFactProviderRebindsFullscreenWrapperAXMatchToOffDesktopContent() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
 
         let entries = RuntimeWindowMappingTestSupport.resolveWindowEntries(
@@ -474,7 +474,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(entries.first?.lastConfirmationSource, .fullscreenContentRebinding)
     }
 
-    func testRuntimeSnapshotProviderBindsAXOnlyFullscreenWrapperToOffDesktopContent() {
+    func testRuntimeSystemRepairFactProviderBindsAXOnlyFullscreenWrapperToOffDesktopContent() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
 
         let entries = RuntimeWindowMappingTestSupport.resolveWindowEntries(
@@ -513,7 +513,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(entries.first?.lastConfirmationSource, .fullscreenContentFallbackBinding)
     }
 
-    func testRuntimeSnapshotProviderKeepsDesktopSiblingWhenAXOnlySeesFullscreenWrapper() {
+    func testRuntimeSystemRepairFactProviderKeepsDesktopSiblingWhenAXOnlySeesFullscreenWrapper() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let desktopSiblingBounds = CGRect(x: 160, y: 140, width: 960, height: 680)
 
@@ -690,7 +690,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(model.session?.mode, .windowCycle(appID: appID))
     }
 
-    func testRuntimeSnapshotProviderBindsDesktopSiblingAXHandleWhenFullscreenWrapperCGAlsoExists() {
+    func testRuntimeSystemRepairFactProviderBindsDesktopSiblingAXHandleWhenFullscreenWrapperCGAlsoExists() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let desktopSiblingBounds = CGRect(x: 160, y: 140, width: 960, height: 680)
 
@@ -751,7 +751,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(entriesByCGWindowID[240_101]?.spaceIDs, [1])
     }
 
-    func testRuntimeSnapshotProviderBindsRemoteAXWindowToOffDesktopCGContent() {
+    func testRuntimeSystemRepairFactProviderBindsRemoteAXWindowToOffDesktopCGContent() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let desktopSiblingBounds = CGRect(x: 160, y: 140, width: 960, height: 680)
 
@@ -808,7 +808,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(entries.map(\.lastConfirmationSource), [.publicExactMatch, .privateExactBridge])
     }
 
-    func testRuntimeSnapshotProviderOrdersVisibleFullscreenSiblingBeforeHiddenDesktopSibling() {
+    func testRuntimeSystemRepairFactProviderOrdersVisibleFullscreenSiblingBeforeHiddenDesktopSibling() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let desktopSiblingBounds = CGRect(x: 160, y: 140, width: 960, height: 680)
 

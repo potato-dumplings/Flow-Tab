@@ -15,4 +15,4 @@ protocol RuntimeProjectionRepairFactProviding: AnyObject {
     ) -> RuntimeCGWindowCollection
 }
 
-extension RuntimeSnapshotProvider: RuntimeProjectionRepairFactProviding {}
+extension RuntimeSystemRepairFactProvider: RuntimeProjectionRepairFactProviding {}

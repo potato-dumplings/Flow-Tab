@@ -16,7 +16,7 @@ final class RuntimeProjectionRepairProvider: RuntimeProjectionRepairProviding {
     ) {
         self.windowRecordStore = windowRecordStore
         self.reconciliationCoordinator = reconciliationCoordinator
-        let runtimeFactProvider = RuntimeSnapshotProvider(
+        let runtimeFactProvider = RuntimeSystemRepairFactProvider(
             cgWindowListProvider: cgWindowListProvider,
             spaceTopologyProvider: spaceTopologyProvider,
             windowRecordStore: windowRecordStore,

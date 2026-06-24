@@ -585,7 +585,7 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeProjectionServicePrunesTerminatedPIDButKeepsSameAppDirectoryInstance() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
         let store = RuntimeReadModelStore()
         let app = try XCTUnwrap(terminateScenarioApps().first)
         let activePID = NSRunningApplication.current.processIdentifier
@@ -637,7 +637,7 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeProjectionServiceOwnsReadModelStoreForProjectionReadsAndDirtySignals() {
         let coordinator = RuntimeReconciliationCoordinator()
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
         let seededApp = AppSwitchCandidate(
             id: "com.example.seeded",
             displayName: "Seeded",
@@ -1349,7 +1349,7 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeWindowRecordEvidenceRecordsSpaceTopologyThroughCoordinator() {
         let coordinator = RuntimeReconciliationCoordinator()
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
         let previous = RuntimeSpaceTopologySnapshot(
             spacesByID: [
                 10: RuntimeSpaceTopologySpace(id: 10, displayID: 1, isCurrent: true)
@@ -1393,7 +1393,7 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeWindowRecordEvidenceMarksAffectedWindowRecordsForSpaceTopologyReconciliation() {
         let coordinator = RuntimeReconciliationCoordinator()
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
         let pid = pid_t(18_405)
         let removedSpaceWindowID = CGWindowID(240_001)
         let addedSpaceWindowID = CGWindowID(240_002)
@@ -1637,7 +1637,7 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeProjectionServiceDrainsAppWindowChangesThroughCoordinator() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
         let lock = NSLock()
         var executedRequests: [RuntimeReconciliationRequest] = []
         let service = RuntimeProjectionService(
@@ -1664,7 +1664,7 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeProjectionServiceDrainsSelectedCurrentAppWindowChangesAtHighPriority() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
         let lock = NSLock()
         var executedRequests: [RuntimeReconciliationRequest] = []
         let service = RuntimeProjectionService(
@@ -1692,7 +1692,7 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeProjectionServiceSignalsDestroyedAXWindowThroughCoordinator() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
         let pid = pid_t(18_405)
         let axWindowID = "ax:18405:0"
         let cgWindowID = CGWindowID(240_001)
@@ -1755,7 +1755,7 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeProjectionServiceDrainsLaunchedAppThroughCoordinator() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
         let store = RuntimeReadModelStore()
         let launchedEntry = RuntimeAppDirectoryEntry(
             pid: 18_407,
@@ -1799,7 +1799,7 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeProjectionServiceCommitsLaunchedAppRepairIntoAppSwitcherProjection() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
         let store = RuntimeReadModelStore()
         let existingApp = AppSwitchCandidate(
             id: "com.example.existing",
@@ -1860,7 +1860,7 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeProjectionServiceClearsTerminatedAppRuntimeState() {
         let coordinator = RuntimeReconciliationCoordinator()
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
         let pid = pid_t(18_405)
         let cgWindowID = CGWindowID(240_001)
         let liveAXWindow = AXUIElementCreateApplication(pid)
@@ -1901,7 +1901,7 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeProjectionServiceDrainsVerifiedFocusThroughCoordinator() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
         let pid = pid_t(18_405)
         let focusedCGWindowID = CGWindowID(240_001)
         let focusedAXWindow = AXUIElementCreateApplication(pid)
@@ -1966,7 +1966,7 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeProjectionServiceSeedsVerifiedFocusRecordWithoutPriorMappingState() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
         let pid = pid_t(18_406)
         let focusedCGWindowID = CGWindowID(240_101)
         let focusedAXWindow = AXUIElementCreateApplication(pid)
@@ -2016,7 +2016,7 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeProjectionServiceSeedsVerifiedFocusRecordWhenFocusedAXWindowIsNotInRegistry() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
         let pid = pid_t(18_407)
         let focusedCGWindowID = CGWindowID(240_201)
         let focusedAXWindow = AXUIElementCreateApplication(pid)
@@ -2072,7 +2072,7 @@ extension FlowTabPriorityCoverageTests {
             retryPolicy: RuntimeReconciliationRetryPolicy(delays: [0.1])
         )
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.TransientCurrentAppPayloadRetry",
             repairProvider: RuntimeProjectionRepairProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator),
@@ -2102,7 +2102,7 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeProjectionServiceMaintenanceRequestDrainsReadyRequestsBySchedulerPriority() {
         let coordinator = RuntimeReconciliationCoordinator()
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
         let lowPriority = coordinator.markAppDirty(
             appID: "com.example.low",
             pid: 18_405,
@@ -2142,7 +2142,7 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeProjectionServiceMaintenanceSchedulesLowPriorityFullRepairWhenProjectionMissing() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
         let store = RuntimeReadModelStore()
         let repairedApp = AppSwitchCandidate(
             id: "com.example.full-repair",
@@ -2210,7 +2210,7 @@ extension FlowTabPriorityCoverageTests {
             retryPolicy: RuntimeReconciliationRetryPolicy(delays: [60])
         )
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
         let store = RuntimeReadModelStore()
         let committedApps = searchScenarioApps()
         store.commitAppSwitcherProjection(
@@ -2295,7 +2295,7 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeProjectionServiceSearchFreshnessBarrierDoesNotPromoteOrDrainFullRepairFallback() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
         let store = RuntimeReadModelStore()
         let committedApps = searchScenarioApps()
         let dirtyApp = try XCTUnwrap(committedApps.first)
@@ -2352,7 +2352,7 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeProjectionServiceSearchFreshnessBarrierCommitsRepairedSearchGeneration() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
         let store = RuntimeReadModelStore()
         let committedApps = searchScenarioApps()
         let repairedApp = AppSwitchCandidate(
@@ -2424,7 +2424,7 @@ extension FlowTabPriorityCoverageTests {
             retryPolicy: RuntimeReconciliationRetryPolicy(delays: [0.5])
         )
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
         let store = RuntimeReadModelStore()
         let committedApps = searchScenarioApps()
         let repairedApp = AppSwitchCandidate(
@@ -2499,7 +2499,7 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeProjectionServiceSearchFreshnessBarrierDoesNotCommitStaleStagingWithoutRepairPayload() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
         let store = RuntimeReadModelStore()
         let committedApps = searchScenarioApps()
         let stagedApp = AppSwitchCandidate(
@@ -2576,7 +2576,7 @@ extension FlowTabPriorityCoverageTests {
             retryPolicy: RuntimeReconciliationRetryPolicy(delays: [])
         )
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
         let store = RuntimeReadModelStore()
         let committedApps = searchScenarioApps()
         let repairedApp = AppSwitchCandidate(
@@ -2652,7 +2652,7 @@ extension FlowTabPriorityCoverageTests {
             retryPolicy: RuntimeReconciliationRetryPolicy(delays: [])
         )
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
         let store = RuntimeReadModelStore()
         let committedApps = searchScenarioApps()
         let repairedApp = AppSwitchCandidate(

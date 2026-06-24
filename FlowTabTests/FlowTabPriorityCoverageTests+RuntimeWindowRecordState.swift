@@ -581,9 +581,9 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(record.lastReconciliationMarkedAt, 21)
     }
 
-    func testRuntimeSnapshotProviderDropsWindowRecordAfterLifecycleGraceExpires() {
+    func testRuntimeSystemRepairFactProviderDropsWindowRecordAfterLifecycleGraceExpires() {
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore)
         let pid: pid_t = 18_405
         let now = Date.timeIntervalSinceReferenceDate
         var staleRecord = RuntimeWindowRecord(
@@ -617,9 +617,9 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertNil(windowRecordStore.state(for: pid))
     }
 
-    func testRuntimeSnapshotProviderWindowLayerExposesInGraceStickyRecordWithoutCurrentCGEvidence() {
+    func testRuntimeSystemRepairFactProviderWindowLayerExposesInGraceStickyRecordWithoutCurrentCGEvidence() {
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore)
         let pid: pid_t = 18_405
         let now = Date.timeIntervalSinceReferenceDate
         var record = RuntimeWindowRecord(
@@ -663,9 +663,9 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertNil(entries.first?.activationHandleID)
     }
 
-    func testRuntimeSnapshotProviderWindowLayerExposesInGraceSpaceBackedRecordWithoutStickyBinding() {
+    func testRuntimeSystemRepairFactProviderWindowLayerExposesInGraceSpaceBackedRecordWithoutStickyBinding() {
         let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSnapshotProvider(windowRecordStore: windowRecordStore)
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore)
         let pid: pid_t = 18_405
         let now = Date.timeIntervalSinceReferenceDate
         var record = RuntimeWindowRecord(
