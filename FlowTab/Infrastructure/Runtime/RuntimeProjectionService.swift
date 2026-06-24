@@ -53,6 +53,9 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         maintenanceQueue.async { [self] in
             let diagnostics = readModelStore.diagnostics()
             let now = Date.timeIntervalSinceReferenceDate
+            let mainTableProjectionCommitted = commitMainTableAppSwitcherProjectionLocked(
+                generatedAt: now
+            )
             if !diagnostics.hasAppSwitcherProjection
                 && !repairProvider.hasPendingReconciliationRequests() {
                 repairProvider.scheduleFullRepairFallback(now: now)
@@ -79,6 +82,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                     "fullRepairProjectionPayloads=\(drainResult.fullRepairProjectionPayloads.count)",
                     "fullRepairColdStartCommits=\(fullRepairCommitSummary.coldStartCommittedCount)",
                     "fullRepairDegradedCommits=\(fullRepairCommitSummary.degradedCommittedCount)",
+                    "mainTableProjectionCommitted=\(mainTableProjectionCommitted ? 1 : 0)",
                     "repairedApps=\(drainResult.repairedCurrentAppWindowPayloads.count)"
                 ].joined(separator: " ")
             )
@@ -292,6 +296,23 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             summary.degradedCommittedCount += payloadSummary.degradedCommittedCount
         }
         return summary
+    }
+
+    @discardableResult
+    private func commitMainTableAppSwitcherProjectionLocked(
+        generatedAt: TimeInterval
+    ) -> Bool {
+        guard
+            let appDirectoryEntries = readModelStore.readAppDirectoryProjection()?.entries,
+            let payload = repairProvider.fullAppSwitcherProjectionPayloadFromMainTables(
+                appDirectoryEntries: appDirectoryEntries,
+                generatedAt: generatedAt
+            )
+        else {
+            return false
+        }
+        readModelStore.commitFullRepairProjectionPayload(payload, generatedAt: generatedAt)
+        return true
     }
 
     private func commitRepairedCurrentAppWindowPayloadsLocked(

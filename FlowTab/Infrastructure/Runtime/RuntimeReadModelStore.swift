@@ -36,6 +36,10 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             contextsByID: contextsByID,
             freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: !isDirtyLocked)
         )
+        homeSummaryProjection = RuntimeHomeSummaryProjection(
+            summaries: homeSummariesLocked(for: apps, contextsByID: contextsByID),
+            freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: !isDirtyLocked)
+        )
         if let appDirectoryEntries {
             replaceAppDirectoryStateLocked(
                 entries: appDirectoryEntries,
@@ -68,6 +72,10 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         appSwitcherProjection = RuntimeAppSwitcherProjection(
             apps: payload.apps,
             contextsByID: payload.contextsByID,
+            freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: !isDirtyLocked)
+        )
+        homeSummaryProjection = RuntimeHomeSummaryProjection(
+            summaries: homeSummariesLocked(for: payload.apps, contextsByID: payload.contextsByID),
             freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: !isDirtyLocked)
         )
         replaceAppDirectoryStateLocked(
@@ -743,6 +751,18 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             windowCount: app.windows.count,
             pid: context?.runningApp.processIdentifier ?? 0
         )
+    }
+
+    private func homeSummariesLocked(
+        for apps: [AppSwitchCandidate],
+        contextsByID: [String: RuntimeAppContext]
+    ) -> [RuntimeHomeAppSummary] {
+        apps.map { app in
+            homeSummaryLocked(
+                for: app,
+                context: contextsByID[app.id]
+            )
+        }
     }
 
     private func freshnessLocked(

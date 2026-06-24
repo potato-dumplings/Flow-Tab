@@ -25,6 +25,10 @@ protocol RuntimeProjectionRepairProviding: AnyObject {
         appDirectoryEntries: [RuntimeAppDirectoryEntry],
         generatedAt: TimeInterval
     ) -> RuntimeCurrentAppWindowPayload?
+    func fullAppSwitcherProjectionPayloadFromMainTables(
+        appDirectoryEntries: [RuntimeAppDirectoryEntry],
+        generatedAt: TimeInterval
+    ) -> RuntimeFullRepairProjectionPayload?
     func fullRepairProjectionPayload() -> RuntimeFullRepairProjectionPayload
     func recordSpaceTopologyChanged(now: TimeInterval) -> RuntimeSpaceTopologySignalFacts
     func signalAXWindowDestroyed(
