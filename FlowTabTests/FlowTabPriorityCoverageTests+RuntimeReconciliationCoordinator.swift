@@ -141,7 +141,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(staleSearchRead.freshness?.sourceGeneration.space, 1)
     }
 
-    func testRuntimeReadModelStoreFullRepairColdStartDoesNotCommitSearchIndex() throws {
+    func testRuntimeReadModelStoreMainTableAppSwitcherColdStartDoesNotCommitSearchIndex() throws {
         let store = RuntimeReadModelStore()
         let apps = searchScenarioApps()
         let app = try XCTUnwrap(apps.first)
@@ -154,7 +154,8 @@ extension FlowTabPriorityCoverageTests {
             launchDate: nil
         )
 
-        let summary = store.commitFullRepairProjectionPayload(
+        store.commitFullRepairAppDirectoryEvidence([entry], generatedAt: 29)
+        let summary = store.commitMainTableAppSwitcherProjectionPayload(
             RuntimeFullRepairProjectionPayload(
                 apps: apps,
                 contextsByID: [app.id: makeRuntimeAppContext(
@@ -182,7 +183,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(directoryProjection.freshness.isCompleteForScope)
     }
 
-    func testRuntimeReadModelStoreDirtyFullRepairCommitsDegradedProjectionAndKeepsSearchStale() throws {
+    func testRuntimeReadModelStoreDirtyMainTableAppSwitcherCommitKeepsSearchStale() throws {
         let store = RuntimeReadModelStore()
         let committedApps = searchScenarioApps()
         let committedApp = try XCTUnwrap(committedApps.first)
@@ -220,7 +221,7 @@ extension FlowTabPriorityCoverageTests {
             generatedAt: 20
         )
 
-        let summary = store.commitFullRepairProjectionPayload(
+        let summary = store.commitMainTableAppSwitcherProjectionPayload(
             RuntimeFullRepairProjectionPayload(
                 apps: [repairedApp],
                 contextsByID: [:],

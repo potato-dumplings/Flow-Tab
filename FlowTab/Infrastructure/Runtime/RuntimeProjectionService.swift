@@ -63,7 +63,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             let drainResult = reconciliationDrainer.drainReadyRequests(
                 now: now
             )
-            let fullRepairCommitSummary = commitFullRepairProjectionPayloadsLocked(
+            let fullRepairProjectionCommitSummary = commitFullRepairEvidencePayloadsLocked(
                 drainResult.fullRepairProjectionPayloads,
                 generatedAt: now
             )
@@ -84,8 +84,8 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                     "startedRequests=\(drainResult.startedRequests.count)",
                     "completedRequests=\(drainResult.completedCount)",
                     "fullRepairProjectionPayloads=\(drainResult.fullRepairProjectionPayloads.count)",
-                    "fullRepairColdStartCommits=\(fullRepairCommitSummary.coldStartCommittedCount)",
-                    "fullRepairDegradedCommits=\(fullRepairCommitSummary.degradedCommittedCount)",
+                    "fullRepairColdStartCommits=\(fullRepairProjectionCommitSummary.coldStartCommittedCount)",
+                    "fullRepairDegradedCommits=\(fullRepairProjectionCommitSummary.degradedCommittedCount)",
                     "mainTableProjectionCommitted=\(mainTableProjectionCommitted ? 1 : 0)",
                     "currentAppRepairEvidence=\(drainResult.currentAppRepairEvidence.count)"
                 ].joined(separator: " ")
@@ -292,7 +292,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     @discardableResult
     private func drainReadyReconciliationRequestsLocked(now: TimeInterval) -> [RuntimeReconciliationRequest] {
         let result = reconciliationDrainer.drainReadyRequests(now: now)
-        commitFullRepairProjectionPayloadsLocked(
+        commitFullRepairEvidencePayloadsLocked(
             result.fullRepairProjectionPayloads,
             generatedAt: now
         )
@@ -304,11 +304,11 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     }
 
     @discardableResult
-    private func commitFullRepairProjectionPayloadsLocked(
+    private func commitFullRepairEvidencePayloadsLocked(
         _ payloads: [RuntimeFullRepairProjectionPayload],
         generatedAt: TimeInterval
-    ) -> RuntimeFullRepairProjectionCommitSummary {
-        var summary = RuntimeFullRepairProjectionCommitSummary()
+    ) -> RuntimeAppSwitcherProjectionCommitSummary {
+        var summary = RuntimeAppSwitcherProjectionCommitSummary()
         for payload in payloads {
             let diagnostics = readModelStore.diagnostics()
             readModelStore.commitFullRepairAppDirectoryEvidence(
@@ -340,7 +340,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         else {
             return false
         }
-        readModelStore.commitFullRepairProjectionPayload(payload, generatedAt: generatedAt)
+        readModelStore.commitMainTableAppSwitcherProjectionPayload(payload, generatedAt: generatedAt)
         return true
     }
 

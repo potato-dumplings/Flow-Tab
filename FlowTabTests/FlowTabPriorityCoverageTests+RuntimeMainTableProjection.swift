@@ -282,7 +282,7 @@ extension FlowTabPriorityCoverageTests {
             pid: pid,
             pendingScope: "appWindows:\(repairedApp.id)"
         )
-        store.commitFullRepairProjectionPayload(
+        store.commitMainTableAppSwitcherProjectionPayload(
             RuntimeFullRepairProjectionPayload(
                 apps: [repairedApp],
                 contextsByID: [:],

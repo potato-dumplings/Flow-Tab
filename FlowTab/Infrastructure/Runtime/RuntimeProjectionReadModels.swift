@@ -145,7 +145,7 @@ struct RuntimeReadModelDiagnostics: Equatable {
     }
 }
 
-struct RuntimeFullRepairProjectionCommitSummary {
+struct RuntimeAppSwitcherProjectionCommitSummary {
     var coldStartCommittedCount = 0
     var degradedCommittedCount = 0
 }

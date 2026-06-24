@@ -57,10 +57,10 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     }
 
     @discardableResult
-    func commitFullRepairProjectionPayload(
+    func commitMainTableAppSwitcherProjectionPayload(
         _ payload: RuntimeFullRepairProjectionPayload,
         generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
-    ) -> RuntimeFullRepairProjectionCommitSummary {
+    ) -> RuntimeAppSwitcherProjectionCommitSummary {
         lock.lock()
         defer { lock.unlock() }
 
@@ -78,11 +78,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             summaries: homeSummariesLocked(for: payload.apps, contextsByID: payload.contextsByID),
             freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: !isDirtyLocked)
         )
-        replaceAppDirectoryStateLocked(
-            entries: payload.appDirectoryEntries,
-            generatedAt: generatedAt
-        )
-        return RuntimeFullRepairProjectionCommitSummary(
+        return RuntimeAppSwitcherProjectionCommitSummary(
             coldStartCommittedCount: clearsDirtyState ? 1 : 0,
             degradedCommittedCount: clearsDirtyState ? 0 : 1
         )
