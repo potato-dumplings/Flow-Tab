@@ -82,17 +82,22 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             entries: payload.appDirectoryEntries,
             generatedAt: generatedAt
         )
-        if clearsDirtyState {
-            committedSearchIndex = buildSearchIndexLocked(
-                apps: payload.apps,
-                generatedAt: generatedAt,
-                isCompleteForScope: true
-            )
-            stagingSearchIndex = nil
-        }
         return RuntimeFullRepairProjectionCommitSummary(
             coldStartCommittedCount: clearsDirtyState ? 1 : 0,
             degradedCommittedCount: clearsDirtyState ? 0 : 1
+        )
+    }
+
+    func commitFullRepairAppDirectoryEvidence(
+        _ entries: [RuntimeAppDirectoryEntry],
+        generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
+    ) {
+        lock.lock()
+        defer { lock.unlock() }
+
+        replaceAppDirectoryStateLocked(
+            entries: entries,
+            generatedAt: generatedAt
         )
     }
 

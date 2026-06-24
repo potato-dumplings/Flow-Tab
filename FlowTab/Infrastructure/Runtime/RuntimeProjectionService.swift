@@ -64,7 +64,8 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 now: now
             )
             let fullRepairCommitSummary = commitFullRepairProjectionPayloadsLocked(
-                drainResult.fullRepairProjectionPayloads
+                drainResult.fullRepairProjectionPayloads,
+                generatedAt: now
             )
             commitRepairedCurrentAppWindowPayloadsLocked(drainResult.repairedCurrentAppWindowPayloads)
             RuntimeLog.debug(
@@ -285,20 +286,34 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     @discardableResult
     private func drainReadyReconciliationRequestsLocked(now: TimeInterval) -> [RuntimeReconciliationRequest] {
         let result = reconciliationDrainer.drainReadyRequests(now: now)
-        commitFullRepairProjectionPayloadsLocked(result.fullRepairProjectionPayloads)
+        commitFullRepairProjectionPayloadsLocked(
+            result.fullRepairProjectionPayloads,
+            generatedAt: now
+        )
         commitRepairedCurrentAppWindowPayloadsLocked(result.repairedCurrentAppWindowPayloads)
         return result.startedRequests
     }
 
     @discardableResult
     private func commitFullRepairProjectionPayloadsLocked(
-        _ payloads: [RuntimeFullRepairProjectionPayload]
+        _ payloads: [RuntimeFullRepairProjectionPayload],
+        generatedAt: TimeInterval
     ) -> RuntimeFullRepairProjectionCommitSummary {
         var summary = RuntimeFullRepairProjectionCommitSummary()
         for payload in payloads {
-            let payloadSummary = readModelStore.commitFullRepairProjectionPayload(payload)
-            summary.coldStartCommittedCount += payloadSummary.coldStartCommittedCount
-            summary.degradedCommittedCount += payloadSummary.degradedCommittedCount
+            let diagnostics = readModelStore.diagnostics()
+            readModelStore.commitFullRepairAppDirectoryEvidence(
+                payload.appDirectoryEntries,
+                generatedAt: generatedAt
+            )
+            guard commitMainTableAppSwitcherProjectionLocked(generatedAt: generatedAt) else {
+                continue
+            }
+            if diagnostics.hasAppSwitcherProjection || diagnostics.hasDirtyState {
+                summary.degradedCommittedCount += 1
+            } else {
+                summary.coldStartCommittedCount += 1
+            }
         }
         return summary
     }

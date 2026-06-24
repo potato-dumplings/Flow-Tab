@@ -141,7 +141,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(staleSearchRead.freshness?.sourceGeneration.space, 1)
     }
 
-    func testRuntimeReadModelStoreFullRepairColdStartCommitsCurrentSearchIndex() throws {
+    func testRuntimeReadModelStoreFullRepairColdStartDoesNotCommitSearchIndex() throws {
         let store = RuntimeReadModelStore()
         let apps = searchScenarioApps()
         let app = try XCTUnwrap(apps.first)
@@ -173,11 +173,10 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(appSwitcherProjection.freshness.isCompleteForScope)
         XCTAssertEqual(appSwitcherProjection.apps.map(\.id), apps.map(\.id))
         let searchRead = store.readCommittedSearchIndexForSearch()
-        XCTAssertEqual(searchRead.readiness, .committedGenerationValidated)
-        XCTAssertEqual(searchRead.resultState, .committedGenerationResult)
-        XCTAssertTrue(searchRead.committedIndexCoversCurrentGeneration)
-        let searchProjection = try XCTUnwrap(searchRead.projection)
-        XCTAssertEqual(searchProjection.windowEntries.map(\.windowID), apps.flatMap(\.windows).map(\.id))
+        XCTAssertEqual(searchRead.readiness, .missingCommittedIndex)
+        XCTAssertEqual(searchRead.resultState, .missingCommittedIndex)
+        XCTAssertFalse(searchRead.committedIndexCoversCurrentGeneration)
+        XCTAssertNil(searchRead.projection)
         let directoryProjection = try XCTUnwrap(store.readAppDirectoryProjection())
         XCTAssertEqual(directoryProjection.entries, [entry])
         XCTAssertTrue(directoryProjection.freshness.isCompleteForScope)
@@ -2704,31 +2703,80 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(store.diagnostics().hasStagingSearchIndex)
     }
 
-    func testRuntimeProjectionServiceFullRepairFallbackCommitsDegradedProjectionWithoutRefreshingSearch() throws {
+    func testRuntimeProjectionServiceFullRepairFallbackCommitsMainTableProjectionWithoutRefreshingSearch() throws {
         let coordinator = RuntimeReconciliationCoordinator(
             retryPolicy: RuntimeReconciliationRetryPolicy(delays: [])
         )
-        let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let pid = runningApp.processIdentifier
+        let displayName = runningApp.localizedName ?? appID
+        let cgWindowID = CGWindowID(240_906)
+        let axWindowID = "ax:\(pid):full-repair-main-table"
+        var mainTableRecord = RuntimeWindowRecord(
+            cgWindowID: cgWindowID,
+            stableWindowID: RuntimeWindowListEntry.cgStableWindowID(
+                pid: pid,
+                cgWindowID: cgWindowID
+            ),
+            firstSeenAt: 10
+        )
+        mainTableRecord.currentAXAttachment = RuntimeCurrentAXAttachment(
+            axWindowID: axWindowID,
+            axWindow: AXUIElementCreateApplication(pid),
+            title: "Full Repair Main Table Projection",
+            frame: CGRect(x: 40, y: 50, width: 900, height: 700),
+            state: RuntimeAXWindowState(isMinimized: false, isFocused: true, isMain: true)
+        )
+        mainTableRecord.lastKnownCGTitle = "Full Repair Main Table Projection"
+        mainTableRecord.lastKnownCGFrame = CGRect(x: 40, y: 50, width: 900, height: 700)
+        mainTableRecord.lastConfirmationSource = .verifiedFocusReadback
+        mainTableRecord.lastExactConfirmedAt = 12
+        let windowRecordStore = RuntimeWindowRecordStore(
+            mappingStatesByPID: [
+                pid: RuntimeWindowMappingState(
+                    windowRecordsByCGWindowID: [cgWindowID: mainTableRecord],
+                    currentAXToCG: [axWindowID: cgWindowID],
+                    validCGWindowIDs: [cgWindowID],
+                    lastAXWindowIDs: [axWindowID],
+                    hasObservedAXWindowHandle: true
+                )
+            ]
+        )
         let store = RuntimeReadModelStore()
-        let committedApps = searchScenarioApps()
+        let committedApp = AppSwitchCandidate(
+            id: appID,
+            displayName: displayName,
+            groupID: RuntimeAppIdentity.groupID(
+                for: runningApp.bundleIdentifier,
+                fallbackName: displayName
+            ),
+            lastActiveAt: 300,
+            windows: [
+                WindowCandidate(
+                    id: "committed-before-full-repair",
+                    title: "Committed Before Full Repair",
+                    isMinimized: false,
+                    lastActiveAt: 300
+                )
+            ]
+        )
         let repairedApp = AppSwitchCandidate(
-            id: "com.example.browser",
-            displayName: "Browser",
-            groupID: "web",
+            id: appID,
+            displayName: displayName,
+            groupID: committedApp.groupID,
             lastActiveAt: 320,
             windows: [
                 WindowCandidate(
-                    id: "browser-full-repair",
-                    title: "Full Repair Runtime Docs",
+                    id: "sampled-full-repair",
+                    title: "Sampled Full Repair Runtime Docs",
                     isMinimized: false,
                     lastActiveAt: 320
                 )
             ]
         )
-        let pid = pid_t(42_106)
         store.commitAppSwitcherProjection(
-            apps: committedApps,
+            apps: [committedApp],
             contextsByID: [:],
             appDirectoryEntries: nil,
             generatedAt: 10
@@ -2767,8 +2815,14 @@ extension FlowTabPriorityCoverageTests {
                     return .completedWithFullRepairProjection(
                         RuntimeFullRepairProjectionPayload(
                             apps: [repairedApp],
-                            contextsByID: [:],
-                            appDirectoryEntries: []
+                            contextsByID: [
+                                appID: self.makeRuntimeAppContext(
+                                    appID: appID,
+                                    runningApp: runningApp,
+                                    windows: repairedApp.windows
+                                )
+                            ],
+                            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: runningApp)]
                         )
                     )
                 case .spaceTopology:
@@ -2788,7 +2842,10 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(executedRequests.map(\.target), [.app(pid), .fullRepair])
         let appSwitcherProjection = try XCTUnwrap(store.readAppSwitcherProjection())
         XCTAssertEqual(appSwitcherProjection.apps.map(\.id), [repairedApp.id])
-        XCTAssertEqual(appSwitcherProjection.apps.first?.windows.map(\.id), ["browser-full-repair"])
+        XCTAssertEqual(appSwitcherProjection.apps.first?.windows.map(\.id), [
+            RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindowID)
+        ])
+        XCTAssertFalse(appSwitcherProjection.apps.first?.windows.map(\.id).contains("sampled-full-repair") == true)
         XCTAssertFalse(appSwitcherProjection.freshness.isCompleteForScope)
         let searchRead = store.readCommittedSearchIndexForSearch()
         let searchProjection = try XCTUnwrap(searchRead.projection)
@@ -2797,7 +2854,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(searchRead.committedIndexCoversCurrentGeneration)
         XCTAssertEqual(
             searchProjection.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),
-            ["browser-1"]
+            ["committed-before-full-repair"]
         )
         let diagnostics = store.diagnostics()
         XCTAssertEqual(diagnostics.dirtyAppIDs, [repairedApp.id])
