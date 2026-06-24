@@ -99,24 +99,17 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 maxRequests: runtimeSearchFreshnessBarrierMaxReadyRepairs,
                 includeFullRepair: false
             )
-            commitRepairedCurrentAppWindowPayloadsLocked(drainResult.repairedCurrentAppWindowPayloads)
             let mainTableProjectionCommitted = commitMainTableAppSwitcherProjectionLocked(
                 generatedAt: now
             )
+            commitRepairedCurrentAppWindowPayloadsLocked(drainResult.repairedCurrentAppWindowPayloads)
             let hasPendingRequests = repairProvider.hasPendingReconciliationRequests()
-            let searchCommitResult = readModelStore.commitSearchFreshnessBarrierPayloads(
-                drainResult.repairedCurrentAppWindowPayloads,
+            let projectionCacheSearchCommit = readModelStore.commitSearchFreshnessBarrierFromProjectionCache(
                 deferredRequestCount: drainResult.deferredCount,
                 hasPendingRequests: hasPendingRequests,
                 generatedAt: now
             )
-            let projectionCacheSearchCommit = searchCommitResult.committedNewGeneration
-                ? nil
-                : readModelStore.commitSearchFreshnessBarrierFromProjectionCache(
-                    deferredRequestCount: drainResult.deferredCount,
-                    hasPendingRequests: hasPendingRequests,
-                    generatedAt: now
-                )
+            let postCommitDiagnostics = readModelStore.diagnostics()
             RuntimeLog.debug(
                 .projection,
                 [
@@ -135,8 +128,8 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                     "pendingRequests=\(hasPendingRequests ? 1 : 0)",
                     "repairedSearchApps=\(drainResult.repairedCurrentAppWindowPayloads.count)",
                     "mainTableProjectionCommitted=\(mainTableProjectionCommitted ? 1 : 0)",
-                    "stagedSearchIndex=\(searchCommitResult.stagedNewPayload ? 1 : 0)",
-                    "committedSearchIndex=\((searchCommitResult.committedNewGeneration || projectionCacheSearchCommit != nil) ? 1 : 0)",
+                    "stagedSearchIndex=\(postCommitDiagnostics.hasStagingSearchIndex ? 1 : 0)",
+                    "committedSearchIndex=\(projectionCacheSearchCommit != nil ? 1 : 0)",
                     "projectionCacheSearchCommit=\(projectionCacheSearchCommit != nil ? 1 : 0)"
                 ].joined(separator: " ")
             )

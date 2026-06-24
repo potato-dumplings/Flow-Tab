@@ -2404,6 +2404,20 @@ extension FlowTabPriorityCoverageTests {
                 )
             ]
         )
+        let staleStagingApp = AppSwitchCandidate(
+            id: "com.example.staging-only",
+            displayName: "Staging Only",
+            groupID: "staging",
+            lastActiveAt: 300,
+            windows: [
+                WindowCandidate(
+                    id: "staging-only-window",
+                    title: "Staging Only Runtime Docs",
+                    isMinimized: false,
+                    lastActiveAt: 300
+                )
+            ]
+        )
         let pid = pid_t(42_102)
         store.commitAppSwitcherProjection(
             apps: committedApps,
@@ -2415,6 +2429,12 @@ extension FlowTabPriorityCoverageTests {
             appID: repairedApp.id,
             pid: pid,
             pendingScope: "appWindows:\(repairedApp.id)"
+        )
+        store.commitSearchFreshnessBarrierPayloads(
+            [makeRuntimeCurrentAppWindowPayload(app: staleStagingApp, pid: pid)],
+            deferredRequestCount: 1,
+            hasPendingRequests: false,
+            generatedAt: 20
         )
         coordinator.markAppDirty(
             appID: repairedApp.id,
@@ -2449,6 +2469,8 @@ extension FlowTabPriorityCoverageTests {
             projection.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),
             ["browser-fresh"]
         )
+        XCTAssertFalse(projection.appEntries.map(\.appID).contains(staleStagingApp.id))
+        XCTAssertFalse(projection.windowEntries.map(\.appID).contains(staleStagingApp.id))
         let diagnostics = store.diagnostics()
         XCTAssertTrue(diagnostics.dirtyAppIDs.isEmpty)
         XCTAssertFalse(diagnostics.hasStagingSearchIndex)
