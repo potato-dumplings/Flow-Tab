@@ -108,6 +108,10 @@ struct RuntimeAppDirectoryState: Equatable {
         Set(entriesByPID.keys)
     }
 
+    var entries: [RuntimeAppDirectoryEntry] {
+        Self.sortedUniqueEntries(Array(entriesByPID.values))
+    }
+
     mutating func replace(
         entries: [RuntimeAppDirectoryEntry],
         generatedAt: TimeInterval
@@ -154,7 +158,7 @@ struct RuntimeAppDirectoryState: Equatable {
     }
 
     func entries(forAppID appID: String) -> [RuntimeAppDirectoryEntry] {
-        Self.sortedUniqueEntries(Array(entriesByPID.values)).filter { $0.appID == appID }
+        entries.filter { $0.appID == appID }
     }
 
     func projection(
@@ -162,7 +166,7 @@ struct RuntimeAppDirectoryState: Equatable {
     ) -> RuntimeAppDirectoryProjection? {
         guard let generatedAt else { return nil }
         return RuntimeAppDirectoryProjection(
-            entries: Self.sortedUniqueEntries(Array(entriesByPID.values)),
+            entries: entries,
             freshness: freshness(generatedAt)
         )
     }

@@ -342,6 +342,20 @@ extension FlowTabPriorityCoverageTests {
             appDirectoryProjection.freshness.pendingRepairScopes,
             ["appLaunched:\(launchedEntry.appID)"]
         )
+        let appSwitcherProjection = try XCTUnwrap(store.readAppSwitcherProjection())
+        XCTAssertEqual(appSwitcherProjection.apps.map(\.id), [launchedEntry.appID])
+        XCTAssertEqual(appSwitcherProjection.apps.first?.displayName, launchedEntry.localizedName)
+        XCTAssertTrue(appSwitcherProjection.apps.first?.windows.isEmpty == true)
+        XCTAssertTrue(appSwitcherProjection.contextsByID.isEmpty)
+        XCTAssertEqual(appSwitcherProjection.freshness.generatedAt, 52)
+        XCTAssertFalse(appSwitcherProjection.freshness.isCompleteForScope)
+        XCTAssertEqual(appSwitcherProjection.freshness.sourceGeneration.appLifecycle, 1)
+        XCTAssertEqual(
+            appSwitcherProjection.freshness.pendingRepairScopes,
+            ["appLaunched:\(launchedEntry.appID)"]
+        )
+        XCTAssertTrue(store.diagnostics().hasAppSwitcherProjection)
+        XCTAssertEqual(store.readCommittedSearchIndexForSearch().readiness, .missingCommittedIndex)
     }
 
     func testRuntimeReadModelStoreDoesNotSynthesizeAppDirectoryFromSwitcherContexts() throws {

@@ -452,7 +452,9 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
 
-        guard var projection = appSwitcherProjection else { return nil }
+        guard var projection = appSwitcherProjection ?? appSwitcherProjectionFromAppDirectoryLocked() else {
+            return nil
+        }
         projection.freshness = freshnessLocked(
             generatedAt: projection.freshness.generatedAt,
             isCompleteForScope: !isDirtyLocked
@@ -528,7 +530,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             dirtyCGWindowIDs: dirtyCGWindowIDs,
             spaceTopologySignatureSummary: spaceTopologySignatureSummary,
             pendingRepairScopes: pendingRepairScopes,
-            hasAppSwitcherProjection: appSwitcherProjection != nil,
+            hasAppSwitcherProjection: appSwitcherProjection != nil || appDirectoryState.isInitialized,
             hasHomeSummaryProjection: homeSummaryProjection != nil,
             hasAppDirectoryProjection: appDirectoryState.isInitialized,
             hasCommittedSearchIndex: committedSearchIndex != nil,
@@ -585,6 +587,34 @@ final class RuntimeReadModelStore: @unchecked Sendable {
 
     private func appDirectoryEntriesLocked(forAppID appID: String) -> [RuntimeAppDirectoryEntry] {
         appDirectoryState.entries(forAppID: appID)
+    }
+
+    private func appSwitcherProjectionFromAppDirectoryLocked() -> RuntimeAppSwitcherProjection? {
+        guard let generatedAt = appDirectoryState.generatedAt else { return nil }
+
+        let selectedEntries = RuntimeAppDirectory.selectPrimaryEntries(
+            from: appDirectoryState.entries,
+            windowStatsByPID: [:],
+            rankByPID: [:]
+        )
+        let apps = selectedEntries.enumerated().map { index, entry in
+            let displayName = entry.localizedName ?? entry.bundleIdentifier ?? entry.appID
+            return AppSwitchCandidate(
+                id: entry.appID,
+                displayName: displayName,
+                groupID: RuntimeAppIdentity.groupID(
+                    for: entry.bundleIdentifier,
+                    fallbackName: displayName
+                ),
+                lastActiveAt: RuntimeAppDirectory.stableLastActiveValue(forRank: index),
+                windows: []
+            )
+        }
+        return RuntimeAppSwitcherProjection(
+            apps: apps,
+            contextsByID: [:],
+            freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: !isDirtyLocked)
+        )
     }
 
     private func upsertAppSwitcherProjectionLocked(
