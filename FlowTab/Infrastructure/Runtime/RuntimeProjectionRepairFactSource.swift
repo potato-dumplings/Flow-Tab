@@ -74,10 +74,6 @@ struct RuntimeUITestProjectionDatasetFacts {
         fullRepairProjectionPayload.apps.reduce(0) { $0 + $1.windows.count }
     }
 
-    func currentAppWindowPayload(for appID: String) -> RuntimeCurrentAppWindowPayload? {
-        currentAppWindowPayloadsByAppID[appID]
-    }
-
     func focusedCurrentAppRepairEvidence(processIdentifier pid: pid_t) -> RuntimeCurrentAppRepairEvidence? {
         currentAppWindowPayloadsByAppID.values.first {
             $0.summary.pid == pid

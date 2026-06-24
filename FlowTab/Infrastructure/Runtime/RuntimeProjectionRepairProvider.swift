@@ -293,37 +293,6 @@ extension RuntimeProjectionRepairProvider {
         return payload
     }
 
-    func currentAppWindowPayload(for appID: String) -> RuntimeCurrentAppWindowPayload? {
-        if let uiTestProjectionFacts = repairFactSource.collectUITestProjectionDatasetFacts() {
-            return uiTestProjectionFacts.currentAppWindowPayload(for: appID)
-        }
-        let runningApps = repairFactSource.collectRepairRunningApps().runningApps
-        let matchingApps = runningApps.filter { RuntimeAppIdentity.appID(for: $0) == appID }
-        guard !matchingApps.isEmpty else { return nil }
-
-        let windowFacts = repairFactSource.collectCurrentAppWindowFacts(
-            for: matchingApps,
-            in: runningApps
-        )
-        let policyFacts = repairFactSource.collectRepairAppLayerPolicyFacts()
-        guard let selectionFacts = repairFactSource.collectCurrentAppSelectionFacts(
-            for: matchingApps,
-            windowFacts: windowFacts,
-            policyFacts: policyFacts
-        ) else { return nil }
-        guard selectionFacts.isIncludedInAppLayer else { return nil }
-
-        let now = Date.timeIntervalSinceReferenceDate
-        return RuntimeCurrentAppWindowPayload(
-            assemblyInput: selectionFacts.currentAppProjectionAssemblyInput(
-                appID: appID,
-                rankByPID: windowFacts.rankByPID,
-                rankFallback: 10_000,
-                generatedAt: now
-            )
-        )
-    }
-
     private func focusedCurrentAppRepairEvidence(
         processIdentifier pid: pid_t
     ) -> RuntimeFocusedCurrentAppRepairEvidence {
