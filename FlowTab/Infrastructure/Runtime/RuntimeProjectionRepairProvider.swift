@@ -29,6 +29,11 @@ final class RuntimeProjectionRepairProvider: RuntimeProjectionRepairProviding {
     }
 }
 
+private struct RuntimeFocusedCurrentAppRepairEvidence {
+    let repairEvidence: RuntimeCurrentAppRepairEvidence?
+    let currentAppWindowPayloadWasEmpty: Bool
+}
+
 extension RuntimeProjectionRepairProvider {
     func fullAppSwitcherProjectionPayloadFromMainTables(
         appDirectoryEntries: [RuntimeAppDirectoryEntry],
@@ -319,20 +324,25 @@ extension RuntimeProjectionRepairProvider {
         )
     }
 
-    func focusedCurrentAppWindowPayload(processIdentifier pid: pid_t) -> RuntimeCurrentAppWindowPayload? {
+    private func focusedCurrentAppRepairEvidence(
+        processIdentifier pid: pid_t
+    ) -> RuntimeFocusedCurrentAppRepairEvidence {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
         if let uiTestProjectionFacts = repairFactSource.collectUITestProjectionDatasetFacts() {
-            let payload = uiTestProjectionFacts.focusedCurrentAppWindowPayload(processIdentifier: pid)
+            let repairEvidence = uiTestProjectionFacts.focusedCurrentAppRepairEvidence(processIdentifier: pid)
             RuntimeProjectionDiagnostics.logTiming(
-                "focusedCurrentAppWindowPayload",
+                "focusedCurrentAppRepairEvidence",
                 fields: [
-                    ("result", payload == nil ? "missingPID" : "uiTestDataset"),
+                    ("result", repairEvidence == nil ? "missingPID" : "uiTestDataset"),
                     ("pid", "\(pid)"),
-                    ("windows", "\(payload?.candidate.windows.count ?? 0)"),
+                    ("empty", "\(repairEvidence?.currentAppWindowPayloadWasEmpty == true ? 1 : 0)"),
                     ("totalMs", RuntimeProjectionDiagnostics.formatMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))
                 ]
             )
-            return payload
+            return RuntimeFocusedCurrentAppRepairEvidence(
+                repairEvidence: repairEvidence,
+                currentAppWindowPayloadWasEmpty: repairEvidence?.currentAppWindowPayloadWasEmpty == true
+            )
         }
 
         let runningAppsStartMs = RuntimePerformanceClock.monotonicMilliseconds()
@@ -342,7 +352,7 @@ extension RuntimeProjectionRepairProvider {
             ?? NSRunningApplication(processIdentifier: pid)
         else {
             RuntimeProjectionDiagnostics.logTiming(
-                "focusedCurrentAppWindowPayload",
+                "focusedCurrentAppRepairEvidence",
                 fields: [
                     ("result", "missingRunningApp"),
                     ("pid", "\(pid)"),
@@ -351,7 +361,10 @@ extension RuntimeProjectionRepairProvider {
                     ("totalMs", RuntimeProjectionDiagnostics.formatMilliseconds(runningAppsReadyMs - startMs))
                 ]
             )
-            return nil
+            return RuntimeFocusedCurrentAppRepairEvidence(
+                repairEvidence: nil,
+                currentAppWindowPayloadWasEmpty: false
+            )
         }
 
         let windowFacts = repairFactSource.collectFocusedCurrentAppWindowFacts(
@@ -371,7 +384,7 @@ extension RuntimeProjectionRepairProvider {
         if !selectionFacts.isIncludedInAppLayer {
             let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
             RuntimeProjectionDiagnostics.logTiming(
-                "focusedCurrentAppWindowPayload",
+                "focusedCurrentAppRepairEvidence",
                 fields: [
                     ("result", "minimizedOnly"),
                     ("appID", appID),
@@ -388,26 +401,27 @@ extension RuntimeProjectionRepairProvider {
                     ("totalMs", RuntimeProjectionDiagnostics.formatMilliseconds(completeMs - startMs))
                 ]
             )
-            return nil
+            return RuntimeFocusedCurrentAppRepairEvidence(
+                repairEvidence: nil,
+                currentAppWindowPayloadWasEmpty: false
+            )
         }
 
-        let now = Date.timeIntervalSinceReferenceDate
-        let payload = RuntimeCurrentAppWindowPayload(
-            assemblyInput: selectionFacts.currentAppProjectionAssemblyInput(
-                appID: appID,
-                rankByPID: windowFacts.rankByPID,
-                rankFallback: 0,
-                generatedAt: now
-            )
+        let currentAppWindowPayloadWasEmpty = selectionFacts.windows.isEmpty
+        let repairEvidence = RuntimeCurrentAppRepairEvidence(
+            appID: appID,
+            pid: selectionFacts.app.processIdentifier,
+            appDirectoryEntries: selectionFacts.appGroup.map(RuntimeAppDirectoryEntry.init(app:)),
+            currentAppWindowPayloadWasEmpty: currentAppWindowPayloadWasEmpty
         )
         let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
         RuntimeProjectionDiagnostics.logTiming(
-            "focusedCurrentAppWindowPayload",
+            "focusedCurrentAppRepairEvidence",
             fields: [
-                ("result", payload.candidate.windows.isEmpty ? "empty" : "ready"),
+                ("result", currentAppWindowPayloadWasEmpty ? "empty" : "ready"),
                 ("appID", appID),
                 ("pid", "\(pid)"),
-                ("windows", "\(payload.candidate.windows.count)"),
+                ("windows", "\(selectionFacts.windows.count)"),
                 ("knownApps", "\(runningApps.count)"),
                 ("axApps", "\(selectionFacts.appGroup.count)"),
                 ("runningAppsMs", RuntimeProjectionDiagnostics.formatMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
@@ -419,7 +433,10 @@ extension RuntimeProjectionRepairProvider {
                 ("totalMs", RuntimeProjectionDiagnostics.formatMilliseconds(completeMs - startMs))
             ]
         )
-        return payload
+        return RuntimeFocusedCurrentAppRepairEvidence(
+            repairEvidence: repairEvidence,
+            currentAppWindowPayloadWasEmpty: currentAppWindowPayloadWasEmpty
+        )
     }
 }
 
@@ -541,29 +558,20 @@ extension RuntimeProjectionRepairProvider {
         processIdentifier pid: pid_t,
         affectedCGWindowIDs: Set<CGWindowID>
     ) -> RuntimeAppWindowReconciliationResult {
-        let currentAppWindowPayload = focusedCurrentAppWindowPayload(processIdentifier: pid)
-        let currentAppWindowPayloadWasEmpty = currentAppWindowPayload?.candidate.windows.isEmpty == true
+        let focusedRepairEvidence = focusedCurrentAppRepairEvidence(processIdentifier: pid)
         let mappingState = windowRecordStore.state(for: pid)
         let affectedWindowEvidence = mappingState?.affectedWindowEvidence(
             for: affectedCGWindowIDs
         ) ?? .empty
-        let currentAppRepairEvidence = currentAppWindowPayload.map { payload in
-            RuntimeCurrentAppRepairEvidence(
-                appID: payload.summary.appID,
-                pid: payload.summary.pid,
-                appDirectoryEntries: payload.appDirectoryEntries,
-                currentAppWindowPayloadWasEmpty: currentAppWindowPayloadWasEmpty
-            )
-        }
         return RuntimeAppWindowReconciliationResult(
             pid: pid,
             affectedCGWindowIDs: affectedCGWindowIDs,
             knownAffectedCGWindowIDs: affectedWindowEvidence.knownAffectedCGWindowIDs,
             exactAffectedCGWindowIDs: affectedWindowEvidence.exactAffectedCGWindowIDs,
-            currentAppRepairEvidence: currentAppRepairEvidence,
+            currentAppRepairEvidence: focusedRepairEvidence.repairEvidence,
             isTransientEmptyCurrentAppWindowPayload: mappingState?
                 .isTransientEmptyCurrentAppWindowPayload(
-                    currentAppWindowPayloadWasEmpty: currentAppWindowPayloadWasEmpty
+                    currentAppWindowPayloadWasEmpty: focusedRepairEvidence.currentAppWindowPayloadWasEmpty
                 ) == true
         )
     }

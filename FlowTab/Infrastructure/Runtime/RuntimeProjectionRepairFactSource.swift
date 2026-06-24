@@ -78,9 +78,16 @@ struct RuntimeUITestProjectionDatasetFacts {
         currentAppWindowPayloadsByAppID[appID]
     }
 
-    func focusedCurrentAppWindowPayload(processIdentifier pid: pid_t) -> RuntimeCurrentAppWindowPayload? {
+    func focusedCurrentAppRepairEvidence(processIdentifier pid: pid_t) -> RuntimeCurrentAppRepairEvidence? {
         currentAppWindowPayloadsByAppID.values.first {
             $0.summary.pid == pid
+        }.map { payload in
+            RuntimeCurrentAppRepairEvidence(
+                appID: payload.summary.appID,
+                pid: payload.summary.pid,
+                appDirectoryEntries: payload.appDirectoryEntries,
+                currentAppWindowPayloadWasEmpty: payload.candidate.windows.isEmpty
+            )
         }
     }
 }
