@@ -591,13 +591,24 @@ final class RuntimeReadModelStore: @unchecked Sendable {
                 readiness: .missingCommittedIndex
             )
         }
-        projection.freshness = freshnessLocked(
+        let committedSourceGeneration = projection.freshness.sourceGeneration
+        let coversCurrentGeneration = committedSourceGeneration == generation
+        let isCommittedGenerationValidated = coversCurrentGeneration
+            && !isDirtyLocked
+            && stagingSearchIndex == nil
+        projection.freshness = RuntimeProjectionFreshness(
             generatedAt: projection.freshness.generatedAt,
-            isCompleteForScope: !isDirtyLocked && stagingSearchIndex == nil
+            sourceGeneration: committedSourceGeneration,
+            dirtyAppIDs: dirtyAppIDs,
+            dirtyPIDs: dirtyPIDs,
+            dirtyCGWindowIDs: dirtyCGWindowIDs,
+            spaceTopologySignatureSummary: spaceTopologySignatureSummary,
+            pendingRepairScopes: pendingRepairScopes,
+            isCompleteForScope: isCommittedGenerationValidated
         )
         return RuntimeSearchIndexRead(
             projection: projection,
-            readiness: projection.freshness.isCompleteForScope
+            readiness: isCommittedGenerationValidated
                 ? .committedGenerationValidated
                 : .degradedStaleCommitted
         )

@@ -889,6 +889,66 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(diagnostics.hasStagingSearchIndex)
     }
 
+    func testRuntimeReadModelStoreKeepsCommittedSearchStaleWhenProjectionCommitClearsDirtyWithoutSearchGeneration() throws {
+        let store = RuntimeReadModelStore()
+        let committedApps = searchScenarioApps()
+        let repairedApp = AppSwitchCandidate(
+            id: "com.example.browser",
+            displayName: "Browser",
+            groupID: "web",
+            lastActiveAt: 330,
+            windows: [
+                WindowCandidate(
+                    id: "browser-projection-repair-only",
+                    title: "Projection Repair Only",
+                    isMinimized: false,
+                    lastActiveAt: 330
+                )
+            ]
+        )
+        let pid = pid_t(42_102)
+        store.commitAppSwitcherProjection(
+            apps: committedApps,
+            contextsByID: [:],
+            appDirectoryEntries: nil,
+            generatedAt: 10
+        )
+        let initialRead = store.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(initialRead.readiness, .committedGenerationValidated)
+        let initialSearchGeneration = try XCTUnwrap(initialRead.freshness?.sourceGeneration)
+
+        store.markAppWindowsDirty(
+            appID: repairedApp.id,
+            pid: pid,
+            pendingScope: "appWindows:\(repairedApp.id)"
+        )
+        store.commitCurrentAppWindowProjection(
+            makeRuntimeCurrentAppWindowPayload(app: repairedApp, pid: pid),
+            generatedAt: 20
+        )
+
+        let read = store.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(read.readiness, .degradedStaleCommitted)
+        XCTAssertEqual(read.resultState, .degradedStaleCommittedResult)
+        XCTAssertFalse(read.committedIndexCoversCurrentGeneration)
+        XCTAssertFalse(read.freshness?.isCompleteForScope ?? true)
+        XCTAssertEqual(read.freshness?.sourceGeneration, initialSearchGeneration)
+        XCTAssertEqual(read.freshness?.dirtyAppIDs, [])
+        XCTAssertEqual(read.freshness?.dirtyPIDs, [])
+        XCTAssertEqual(read.freshness?.pendingRepairScopes, [])
+        XCTAssertEqual(
+            read.projection?.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),
+            ["browser-1"]
+        )
+        XCTAssertFalse(
+            read.projection?.windowEntries
+                .filter { $0.appID == repairedApp.id }
+                .map(\.windowID)
+                .contains("browser-projection-repair-only") ?? true
+        )
+        XCTAssertNotEqual(read.freshness?.sourceGeneration, store.diagnostics().generation)
+    }
+
     func testRuntimeReadModelStoreStagesSearchRepairFromCurrentAppProjectionPayload() throws {
         let store = RuntimeReadModelStore()
         let committedApps = searchScenarioApps()
