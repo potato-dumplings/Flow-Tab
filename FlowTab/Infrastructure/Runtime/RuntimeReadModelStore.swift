@@ -466,7 +466,9 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
 
-        guard var projection = homeSummaryProjection else { return nil }
+        guard var projection = homeSummaryProjection ?? homeSummaryProjectionFromAppDirectoryLocked() else {
+            return nil
+        }
         projection.freshness = freshnessLocked(
             generatedAt: projection.freshness.generatedAt,
             isCompleteForScope: !isDirtyLocked
@@ -531,7 +533,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             spaceTopologySignatureSummary: spaceTopologySignatureSummary,
             pendingRepairScopes: pendingRepairScopes,
             hasAppSwitcherProjection: appSwitcherProjection != nil || appDirectoryState.isInitialized,
-            hasHomeSummaryProjection: homeSummaryProjection != nil,
+            hasHomeSummaryProjection: homeSummaryProjection != nil || appDirectoryState.isInitialized,
             hasAppDirectoryProjection: appDirectoryState.isInitialized,
             hasCommittedSearchIndex: committedSearchIndex != nil,
             hasStagingSearchIndex: stagingSearchIndex != nil,
@@ -613,6 +615,34 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         return RuntimeAppSwitcherProjection(
             apps: apps,
             contextsByID: [:],
+            freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: !isDirtyLocked)
+        )
+    }
+
+    private func homeSummaryProjectionFromAppDirectoryLocked() -> RuntimeHomeSummaryProjection? {
+        guard let generatedAt = appDirectoryState.generatedAt else { return nil }
+
+        let selectedEntries = RuntimeAppDirectory.selectPrimaryEntries(
+            from: appDirectoryState.entries,
+            windowStatsByPID: [:],
+            rankByPID: [:]
+        )
+        let summaries = selectedEntries.enumerated().map { index, entry in
+            let displayName = entry.localizedName ?? entry.bundleIdentifier ?? entry.appID
+            return RuntimeHomeAppSummary(
+                appID: entry.appID,
+                displayName: displayName,
+                groupID: RuntimeAppIdentity.groupID(
+                    for: entry.bundleIdentifier,
+                    fallbackName: displayName
+                ),
+                lastActiveAt: RuntimeAppDirectory.stableLastActiveValue(forRank: index),
+                windowCount: 0,
+                pid: entry.pid
+            )
+        }
+        return RuntimeHomeSummaryProjection(
+            summaries: summaries,
             freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: !isDirtyLocked)
         )
     }
