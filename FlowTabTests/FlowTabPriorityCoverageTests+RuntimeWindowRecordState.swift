@@ -147,6 +147,82 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(state?.lastAXWindowIDs.contains(axWindowID) == true)
     }
 
+    func testRuntimeProjectionRepairFactSourceBuildsCurrentAppWindowFactsFromWindowRecordStore() {
+        let app = NSRunningApplication.current
+        let pid = app.processIdentifier
+        let axWindowID = "ax:\(pid):main"
+        let cgWindowID = CGWindowID(240_101)
+        var record = RuntimeWindowRecord(
+            cgWindowID: cgWindowID,
+            stableWindowID: RuntimeWindowListEntry.cgStableWindowID(
+                pid: pid,
+                cgWindowID: cgWindowID
+            ),
+            firstSeenAt: 10
+        )
+        record.currentAXAttachment = RuntimeCurrentAXAttachment(
+            axWindowID: axWindowID,
+            axWindow: AXUIElementCreateApplication(pid),
+            title: "WindowRecord Projection",
+            frame: CGRect(x: 20, y: 30, width: 800, height: 600),
+            state: RuntimeAXWindowState(isMinimized: false, isFocused: true, isMain: true)
+        )
+        record.lastKnownCGTitle = "CG Projection"
+        record.lastKnownCGFrame = CGRect(x: 20, y: 30, width: 800, height: 600)
+        record.lastConfirmationSource = .verifiedFocusReadback
+        record.lastExactConfirmedAt = 12
+        record.spaceRecovery = RuntimeSpaceRecoveryState(
+            cgWindowID: cgWindowID,
+            spaceIDs: [3, 1],
+            hasConfirmedActivationRoute: true,
+            lastValidatedAt: 12,
+            invalidatedAt: nil
+        )
+        let windowRecordStore = RuntimeWindowRecordStore(
+            mappingStatesByPID: [
+                pid: RuntimeWindowMappingState(
+                    windowRecordsByCGWindowID: [cgWindowID: record],
+                    currentAXToCG: [axWindowID: cgWindowID],
+                    validCGWindowIDs: [cgWindowID],
+                    lastAXWindowIDs: [axWindowID],
+                    hasObservedAXWindowHandle: true
+                )
+            ]
+        )
+        let sampledEntry = RuntimeWindowListEntry(
+            windowID: "sampled-payload-window",
+            title: "Sampled Payload Window",
+            isMinimized: false,
+            ownerPID: pid,
+            cgWindowID: 999_999
+        )
+        let provider = RuntimeWindowRecordProjectionFakeFactProvider(
+            sampledWindowsByPID: [pid: [sampledEntry]]
+        )
+        let factSource = RuntimeProjectionRepairFactSource(
+            runtimeFactProvider: provider,
+            windowRecordStore: windowRecordStore
+        )
+
+        let facts = factSource.collectCurrentAppWindowFacts(
+            for: [app],
+            in: [app]
+        )
+
+        XCTAssertEqual(provider.collectAXWindowDataCallCount, 1)
+        XCTAssertEqual(facts.windowsByPID[pid]?.map(\.windowID), [
+            RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindowID)
+        ])
+        XCTAssertEqual(facts.windowsByPID[pid]?.map(\.title), ["WindowRecord Projection"])
+        let projectedEntry = facts.windowsByPID[pid]?.first
+        XCTAssertEqual(projectedEntry?.cgWindowID, cgWindowID)
+        XCTAssertEqual(projectedEntry?.activationHandleID, axWindowID)
+        XCTAssertEqual(projectedEntry?.spaceIDs, [1, 3])
+        XCTAssertEqual(projectedEntry?.lastConfirmationSource, .verifiedFocusReadback)
+        XCTAssertEqual(projectedEntry?.bindingConfidence, .exact)
+        XCTAssertNotEqual(projectedEntry?.windowID, sampledEntry.windowID)
+    }
+
     func testRuntimeWindowRecordStoreGroupsAffectedCGWindowIDsByPIDFromCurrentAndRecordedFacts() {
         let currentPID = pid_t(18_405)
         let recordedPID = pid_t(18_406)
@@ -705,5 +781,33 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(entries.first?.spaceIDs, [11_683])
         XCTAssertTrue(entries.first?.hasStickyBinding == false)
         XCTAssertNil(entries.first?.activationHandleID)
+    }
+}
+
+private final class RuntimeWindowRecordProjectionFakeFactProvider: RuntimeProjectionRepairFactProviding {
+    private let sampledWindowsByPID: [pid_t: [RuntimeWindowListEntry]]
+    private(set) var collectAXWindowDataCallCount = 0
+
+    init(sampledWindowsByPID: [pid_t: [RuntimeWindowListEntry]]) {
+        self.sampledWindowsByPID = sampledWindowsByPID
+    }
+
+    func collectAXWindowData(
+        for runningApps: [NSRunningApplication],
+        cgWindowsByPID: [pid_t: [RuntimeCGWindowEntry]],
+        allCGWindowsByPID: [pid_t: [RuntimeCGWindowEntry]]
+    ) -> [pid_t: [RuntimeWindowListEntry]] {
+        collectAXWindowDataCallCount += 1
+        return sampledWindowsByPID
+    }
+
+    func collectCGWindowsWithSpaceTopologyDiff(
+        options: CGWindowListOption,
+        now: TimeInterval
+    ) -> RuntimeCGWindowCollection {
+        RuntimeCGWindowCollection(
+            windowsByPID: [:],
+            spaceTopologyDiff: nil
+        )
     }
 }

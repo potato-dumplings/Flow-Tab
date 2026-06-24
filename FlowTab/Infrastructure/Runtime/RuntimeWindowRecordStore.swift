@@ -29,6 +29,16 @@ final class RuntimeWindowRecordStore {
         mappingStatesByPID.removeValue(forKey: pid)
     }
 
+    func projectedWindowEntries(
+        processIdentifier pid: pid_t,
+        appName: String
+    ) -> [RuntimeWindowListEntry] {
+        state(for: pid)?.projectedWindowEntries(
+            processIdentifier: pid,
+            appName: appName
+        ) ?? []
+    }
+
     @discardableResult
     func recordSpaceTopologySnapshot(
         _ snapshot: RuntimeSpaceTopologySnapshot,
@@ -306,6 +316,82 @@ final class RuntimeWindowRecordStore {
             validCGWindows: validCGWindows,
             allowSpaceOneWithoutCurrentAXHandle: allowSpaceOneWithoutCurrentAXHandle,
             bindingDiagnostics: bindingDiagnostics
+        )
+    }
+}
+
+private extension RuntimeWindowMappingState {
+    func projectedWindowEntries(
+        processIdentifier pid: pid_t,
+        appName: String
+    ) -> [RuntimeWindowListEntry] {
+        windowRecordsByCGWindowID.values
+            .sorted { lhs, rhs in
+                if lhs.isFocused != rhs.isFocused {
+                    return lhs.isFocused
+                }
+                if lhs.isMain != rhs.isMain {
+                    return lhs.isMain
+                }
+                if lhs.lastExactConfirmedAt != rhs.lastExactConfirmedAt {
+                    return (lhs.lastExactConfirmedAt ?? 0) > (rhs.lastExactConfirmedAt ?? 0)
+                }
+                if lhs.lastSeenAt != rhs.lastSeenAt {
+                    return lhs.lastSeenAt > rhs.lastSeenAt
+                }
+                return lhs.cgWindowID < rhs.cgWindowID
+            }
+            .compactMap { record in
+                record.projectedWindowEntry(processIdentifier: pid, appName: appName)
+            }
+    }
+}
+
+private extension RuntimeWindowRecord {
+    func projectedWindowEntry(
+        processIdentifier pid: pid_t,
+        appName: String
+    ) -> RuntimeWindowListEntry? {
+        let synthesizedCGWindow = synthesizedKnownCGWindowEntry()
+        let title = displayTitle
+            ?? synthesizedCGWindow.map {
+                RuntimeWindowTitleResolver.supplementalCGWindowTitle(
+                    appName: appName,
+                    cgWindow: $0
+                )
+            }
+        guard let title else { return nil }
+
+        let rawSpaceIDs = spaceRecovery?.spaceIDs ?? synthesizedCGWindow?.spaceIDs ?? []
+        let normalizedSpaceIDs = RuntimeWindowTopologyClassifier.normalizedSpaceIDs(rawSpaceIDs)
+        let frame = displayFrame ?? synthesizedCGWindow?.bounds
+        let spaceEvidence = RuntimeWindowTopologyClassifier.spaceEvidence(
+            cgWindowID: cgWindowID,
+            spaceIDs: normalizedSpaceIDs,
+            bounds: frame,
+            source: "window-record-projection"
+        )
+        let exposesWithoutCurrentAX = currentAXAttachment != nil
+            || hasStickyBinding
+            || spaceRecovery?.hasConfirmedActivationRoute == true
+        guard exposesWithoutCurrentAX else { return nil }
+
+        return RuntimeWindowListEntry(
+            windowID: stableWindowID,
+            title: title,
+            isMinimized: isMinimized,
+            ownerPID: pid,
+            cgWindowID: cgWindowID,
+            activationHandleID: currentAXWindowID,
+            axWindow: currentAXAttachment?.axWindow,
+            frame: frame,
+            spaceIDs: normalizedSpaceIDs,
+            isOnscreen: false,
+            allowsPublicAXRecovery: spaceEvidence.allowsPublicAXRecovery,
+            hasStickyBinding: hasStickyBinding,
+            lastConfirmationSource: lastConfirmationSource,
+            bindingConfidenceOverride: hasStickyBinding ? nil : .inferred,
+            spaceEvidence: spaceEvidence
         )
     }
 }

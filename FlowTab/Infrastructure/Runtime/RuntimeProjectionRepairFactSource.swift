@@ -221,12 +221,13 @@ struct RuntimeProjectionRepairFactSource {
             now: ProcessInfo.processInfo.systemUptime
         ).windowsByPID
         let allCGReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let axWindowsByPID = runtimeFactProvider.collectAXWindowData(
+        let sampledWindowsByPID = runtimeFactProvider.collectAXWindowData(
             for: runningApps,
             cgWindowsByPID: onScreenCGWindowsByPID,
             allCGWindowsByPID: allCGWindowsByPID
         )
         let axReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let windowsByPID = projectedWindowEntriesByPID(for: runningApps)
         let rankByPID = RuntimeAppRankProvider.collectAppRankByPID(for: runningApps)
         let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
         RuntimeProjectionDiagnostics.logTiming(
@@ -235,7 +236,8 @@ struct RuntimeProjectionRepairFactSource {
                 ("apps", "\(runningApps.count)"),
                 ("onscreenCGWindows", "\(onScreenCGWindowsByPID.values.reduce(0) { $0 + $1.count })"),
                 ("allCGWindows", "\(allCGWindowsByPID.values.reduce(0) { $0 + $1.count })"),
-                ("windowPIDs", "\(axWindowsByPID.count)"),
+                ("sampledWindowPIDs", "\(sampledWindowsByPID.count)"),
+                ("projectedWindowPIDs", "\(windowsByPID.count)"),
                 ("rankPIDs", "\(rankByPID.count)"),
                 ("cleanupMs", RuntimeProjectionDiagnostics.formatMilliseconds(cleanupReadyMs - startMs)),
                 ("registryPruneMs", RuntimeProjectionDiagnostics.formatMilliseconds(pruneReadyMs - cleanupReadyMs)),
@@ -246,9 +248,9 @@ struct RuntimeProjectionRepairFactSource {
                 ("totalMs", RuntimeProjectionDiagnostics.formatMilliseconds(completeMs - startMs))
             ]
         )
-        // Keep a single source of truth for window counting and selection: AX window list.
+        // Sampling updates WindowRecord; projection selection reads the long-lived record table.
         return RuntimeFullRepairWindowFacts(
-            windowsByPID: axWindowsByPID,
+            windowsByPID: windowsByPID,
             rankByPID: rankByPID
         )
     }
@@ -311,11 +313,12 @@ struct RuntimeProjectionRepairFactSource {
             options: [.optionAll, .excludeDesktopElements],
             now: ProcessInfo.processInfo.systemUptime
         ).windowsByPID
-        let windowsByPID = runtimeFactProvider.collectAXWindowData(
+        _ = runtimeFactProvider.collectAXWindowData(
             for: matchingApps,
             cgWindowsByPID: cgWindowsByPID,
             allCGWindowsByPID: allCGWindowsByPID
         )
+        let windowsByPID = projectedWindowEntriesByPID(for: matchingApps)
         return RuntimeCurrentAppWindowFacts(
             windowsByPID: windowsByPID,
             rankByPID: rankByPID
@@ -377,12 +380,13 @@ struct RuntimeProjectionRepairFactSource {
             now: ProcessInfo.processInfo.systemUptime
         ).windowsByPID
         let allCGReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let windowsByPID = runtimeFactProvider.collectAXWindowData(
+        _ = runtimeFactProvider.collectAXWindowData(
             for: [app],
             cgWindowsByPID: cgWindowsByPID,
             allCGWindowsByPID: allCGWindowsByPID
         )
         let axReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let windowsByPID = projectedWindowEntriesByPID(for: [app])
         return RuntimeFocusedCurrentAppWindowFacts(
             windowsByPID: windowsByPID,
             rankByPID: [pid: 0],
@@ -392,6 +396,22 @@ struct RuntimeProjectionRepairFactSource {
                 allCGMs: allCGReadyMs - onScreenCGReadyMs,
                 axMs: axReadyMs - allCGReadyMs
             )
+        )
+    }
+
+    private func projectedWindowEntriesByPID(
+        for runningApps: [NSRunningApplication]
+    ) -> [pid_t: [RuntimeWindowListEntry]] {
+        Dictionary(
+            uniqueKeysWithValues: runningApps.compactMap { app in
+                let appName = app.localizedName ?? app.bundleIdentifier ?? "pid:\(app.processIdentifier)"
+                let entries = windowRecordStore.projectedWindowEntries(
+                    processIdentifier: app.processIdentifier,
+                    appName: appName
+                )
+                guard !entries.isEmpty else { return nil }
+                return (app.processIdentifier, entries)
+            }
         )
     }
 
