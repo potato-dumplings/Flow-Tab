@@ -1,6 +1,37 @@
 import CoreGraphics
 import Foundation
 
+struct RuntimeCurrentAppRepairEvidence: Equatable, Sendable {
+    let appID: String
+    let pid: pid_t
+    let appDirectoryEntries: [RuntimeAppDirectoryEntry]
+    let currentAppWindowPayloadWasEmpty: Bool
+
+    init(
+        appID: String,
+        pid: pid_t,
+        appDirectoryEntries: [RuntimeAppDirectoryEntry],
+        currentAppWindowPayloadWasEmpty: Bool
+    ) {
+        self.appID = appID
+        self.pid = pid
+        self.appDirectoryEntries = appDirectoryEntries
+        self.currentAppWindowPayloadWasEmpty = currentAppWindowPayloadWasEmpty
+    }
+
+    init(
+        currentAppWindowPayload payload: RuntimeCurrentAppWindowPayload,
+        currentAppWindowPayloadWasEmpty: Bool
+    ) {
+        self.init(
+            appID: payload.summary.appID,
+            pid: payload.summary.pid,
+            appDirectoryEntries: payload.appDirectoryEntries,
+            currentAppWindowPayloadWasEmpty: currentAppWindowPayloadWasEmpty
+        )
+    }
+}
+
 struct RuntimeAppWindowReconciliationResult {
     let pid: pid_t
     let affectedCGWindowIDs: Set<CGWindowID>
@@ -9,6 +40,14 @@ struct RuntimeAppWindowReconciliationResult {
     let currentAppWindowPayload: RuntimeCurrentAppWindowPayload?
     let currentAppWindowPayloadWasEmpty: Bool
     let isTransientEmptyCurrentAppWindowPayload: Bool
+
+    var currentAppRepairEvidence: RuntimeCurrentAppRepairEvidence? {
+        guard let currentAppWindowPayload else { return nil }
+        return RuntimeCurrentAppRepairEvidence(
+            currentAppWindowPayload: currentAppWindowPayload,
+            currentAppWindowPayloadWasEmpty: currentAppWindowPayloadWasEmpty
+        )
+    }
 }
 
 protocol RuntimeProjectionRepairProviding: AnyObject {

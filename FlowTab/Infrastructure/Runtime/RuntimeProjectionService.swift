@@ -67,8 +67,8 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 drainResult.fullRepairProjectionPayloads,
                 generatedAt: now
             )
-            commitRepairedCurrentAppWindowPayloadsLocked(
-                drainResult.repairedCurrentAppWindowPayloads,
+            commitCurrentAppRepairEvidenceLocked(
+                drainResult.currentAppRepairEvidence,
                 generatedAt: now
             )
             RuntimeLog.debug(
@@ -87,7 +87,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                     "fullRepairColdStartCommits=\(fullRepairCommitSummary.coldStartCommittedCount)",
                     "fullRepairDegradedCommits=\(fullRepairCommitSummary.degradedCommittedCount)",
                     "mainTableProjectionCommitted=\(mainTableProjectionCommitted ? 1 : 0)",
-                    "repairedApps=\(drainResult.repairedCurrentAppWindowPayloads.count)"
+                    "currentAppRepairEvidence=\(drainResult.currentAppRepairEvidence.count)"
                 ].joined(separator: " ")
             )
         }
@@ -106,8 +106,8 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             let mainTableProjectionCommitted = commitMainTableAppSwitcherProjectionLocked(
                 generatedAt: now
             )
-            commitRepairedCurrentAppWindowPayloadsLocked(
-                drainResult.repairedCurrentAppWindowPayloads,
+            commitCurrentAppRepairEvidenceLocked(
+                drainResult.currentAppRepairEvidence,
                 generatedAt: now
             )
             let hasPendingRequests = repairProvider.hasPendingReconciliationRequests()
@@ -133,7 +133,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                     "completedRequests=\(drainResult.completedCount)",
                     "deferredRequests=\(drainResult.deferredCount)",
                     "pendingRequests=\(hasPendingRequests ? 1 : 0)",
-                    "repairedSearchApps=\(drainResult.repairedCurrentAppWindowPayloads.count)",
+                    "currentAppRepairEvidence=\(drainResult.currentAppRepairEvidence.count)",
                     "mainTableProjectionCommitted=\(mainTableProjectionCommitted ? 1 : 0)",
                     "stagedSearchIndex=\(postCommitDiagnostics.hasStagingSearchIndex ? 1 : 0)",
                     "committedSearchIndex=\(projectionCacheSearchCommit != nil ? 1 : 0)",
@@ -296,8 +296,8 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             result.fullRepairProjectionPayloads,
             generatedAt: now
         )
-        commitRepairedCurrentAppWindowPayloadsLocked(
-            result.repairedCurrentAppWindowPayloads,
+        commitCurrentAppRepairEvidenceLocked(
+            result.currentAppRepairEvidence,
             generatedAt: now
         )
         return result.startedRequests
@@ -344,21 +344,21 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         return true
     }
 
-    private func commitRepairedCurrentAppWindowPayloadsLocked(
-        _ payloads: [RuntimeCurrentAppWindowPayload],
+    private func commitCurrentAppRepairEvidenceLocked(
+        _ repairEvidence: [RuntimeCurrentAppRepairEvidence],
         generatedAt: TimeInterval
     ) {
-        for payload in payloads {
+        for evidence in repairEvidence {
             readModelStore.commitCurrentAppRepairAppDirectoryEvidence(
-                payload.appDirectoryEntries,
+                evidence.appDirectoryEntries,
                 generatedAt: generatedAt
             )
             let appDirectoryEntries = readModelStore
                 .readAppDirectoryProjection()?
-                .entries(forAppID: payload.summary.appID) ?? payload.appDirectoryEntries
+                .entries(forAppID: evidence.appID) ?? evidence.appDirectoryEntries
             guard let mainTablePayload = repairProvider.currentAppWindowPayloadFromMainTables(
-                appID: payload.summary.appID,
-                pid: payload.summary.pid,
+                appID: evidence.appID,
+                pid: evidence.pid,
                 appDirectoryEntries: appDirectoryEntries,
                 generatedAt: generatedAt
             ) else {

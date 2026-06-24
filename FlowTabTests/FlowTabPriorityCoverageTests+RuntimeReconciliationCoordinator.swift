@@ -1892,7 +1892,42 @@ extension FlowTabPriorityCoverageTests {
 
     func testRuntimeProjectionServiceCommitsLaunchedAppRepairIntoAppSwitcherProjection() throws {
         let coordinator = RuntimeReconciliationCoordinator()
-        let windowRecordStore = RuntimeWindowRecordStore()
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let pid = runningApp.processIdentifier
+        let displayName = runningApp.localizedName ?? appID
+        let cgWindowID = CGWindowID(241_203)
+        let axWindowID = "ax:\(pid):app-launch-main-table"
+        var mainTableRecord = RuntimeWindowRecord(
+            cgWindowID: cgWindowID,
+            stableWindowID: RuntimeWindowListEntry.cgStableWindowID(
+                pid: pid,
+                cgWindowID: cgWindowID
+            ),
+            firstSeenAt: 10
+        )
+        mainTableRecord.currentAXAttachment = RuntimeCurrentAXAttachment(
+            axWindowID: axWindowID,
+            axWindow: AXUIElementCreateApplication(pid),
+            title: "New Window",
+            frame: CGRect(x: 120, y: 140, width: 700, height: 500),
+            state: RuntimeAXWindowState(isMinimized: false, isFocused: true, isMain: true)
+        )
+        mainTableRecord.lastKnownCGTitle = "New Window"
+        mainTableRecord.lastKnownCGFrame = CGRect(x: 120, y: 140, width: 700, height: 500)
+        mainTableRecord.lastConfirmationSource = .verifiedFocusReadback
+        mainTableRecord.lastExactConfirmedAt = 12
+        let windowRecordStore = RuntimeWindowRecordStore(
+            mappingStatesByPID: [
+                pid: RuntimeWindowMappingState(
+                    windowRecordsByCGWindowID: [cgWindowID: mainTableRecord],
+                    currentAXToCG: [axWindowID: cgWindowID],
+                    validCGWindowIDs: [cgWindowID],
+                    lastAXWindowIDs: [axWindowID],
+                    hasObservedAXWindowHandle: true
+                )
+            ]
+        )
         let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
         let store = RuntimeReadModelStore()
         let existingApp = AppSwitchCandidate(
@@ -1903,20 +1938,23 @@ extension FlowTabPriorityCoverageTests {
             windows: []
         )
         let repairedApp = AppSwitchCandidate(
-            id: "com.example.new",
-            displayName: "New",
-            groupID: "example",
+            id: appID,
+            displayName: displayName,
+            groupID: RuntimeAppIdentity.groupID(
+                for: runningApp.bundleIdentifier,
+                fallbackName: displayName
+            ),
             lastActiveAt: 300,
             windows: [
                 WindowCandidate(
                     id: "new-window",
-                    title: "New Window",
+                    title: "Payload Contamination",
                     isMinimized: false,
                     lastActiveAt: 300
                 )
             ]
         )
-        let pid = pid_t(18_407)
+        let appDirectoryEntry = RuntimeAppDirectoryEntry(app: runningApp)
         store.commitAppSwitcherProjection(
             apps: [existingApp],
             contextsByID: [:],
@@ -1928,25 +1966,55 @@ extension FlowTabPriorityCoverageTests {
             repairProvider: RuntimeProjectionRepairProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator),
             readModelStore: store,
             reconciliationExecutor: { _, _ in
-                .completedWithRepairedCurrentAppWindowPayloads([
-                    self.makeRuntimeCurrentAppWindowPayload(app: repairedApp, pid: pid)
+                .completedWithCurrentAppRepairEvidence([
+                    RuntimeCurrentAppRepairEvidence(
+                        currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
+                            summary: RuntimeHomeAppSummary(
+                                appID: repairedApp.id,
+                                displayName: repairedApp.displayName,
+                                groupID: repairedApp.groupID,
+                                lastActiveAt: repairedApp.lastActiveAt,
+                                windowCount: repairedApp.windows.count,
+                                pid: pid
+                            ),
+                            candidate: repairedApp,
+                            context: self.makeRuntimeAppContext(
+                                appID: repairedApp.id,
+                                runningApp: .current,
+                                windows: repairedApp.windows
+                            ),
+                            appDirectoryEntries: [appDirectoryEntry]
+                        ),
+                        currentAppWindowPayloadWasEmpty: false
+                    )
                 ])
             }
         )
 
-        service.signalAppLaunched(appID: repairedApp.id, pid: pid)
-        _ = service.drainReadyReconciliationRequestsSynchronouslyForTesting(now: 11)
+        service.signalAppLaunched(
+            appID: repairedApp.id,
+            pid: pid,
+            appDirectoryEntry: appDirectoryEntry
+        )
+        service.waitForMaintenanceQueueForTesting()
 
         let projection = try XCTUnwrap(store.readAppSwitcherProjection())
-        XCTAssertEqual(projection.apps.map(\.id), [repairedApp.id, existingApp.id])
+        XCTAssertEqual(Set(projection.apps.map(\.id)), [repairedApp.id, existingApp.id])
         XCTAssertEqual(
             projection.apps.first(where: { $0.id == repairedApp.id })?.windows.map(\.id),
-            ["new-window"]
+            [RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindowID)]
+        )
+        XCTAssertFalse(
+            projection.apps
+                .first(where: { $0.id == repairedApp.id })?
+                .windows
+                .map(\.title)
+                .contains("Payload Contamination") ?? true
         )
         XCTAssertNotNil(projection.contextsByID[repairedApp.id])
         XCTAssertTrue(projection.freshness.isCompleteForScope)
         let homeProjection = try XCTUnwrap(store.readHomeSummaryProjection())
-        XCTAssertEqual(homeProjection.summaries.map(\.appID), [repairedApp.id, existingApp.id])
+        XCTAssertEqual(Set(homeProjection.summaries.map(\.appID)), [repairedApp.id, existingApp.id])
         XCTAssertEqual(homeProjection.summary(for: repairedApp.id)?.windowCount, 1)
         XCTAssertTrue(homeProjection.freshness.isCompleteForScope)
     }
@@ -2557,8 +2625,14 @@ extension FlowTabPriorityCoverageTests {
             readModelStore: store,
             reconciliationExecutor: { _, _ in
                 expectation.fulfill()
-                return .completedWithRepairedCurrentAppWindowPayloads([
-                    self.makeRuntimeCurrentAppWindowPayload(app: repairedApp, pid: pid)
+                return .completedWithCurrentAppRepairEvidence([
+                    RuntimeCurrentAppRepairEvidence(
+                        currentAppWindowPayload: self.makeRuntimeCurrentAppWindowPayload(
+                            app: repairedApp,
+                            pid: pid
+                        ),
+                        currentAppWindowPayloadWasEmpty: false
+                    )
                 ])
             }
         )

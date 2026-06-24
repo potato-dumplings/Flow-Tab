@@ -3,15 +3,15 @@ import Foundation
 enum RuntimeProjectionReconciliationExecutionOutcome {
     case completed
     case completedWithFullRepairProjection(RuntimeFullRepairProjectionPayload)
-    case completedWithRepairedCurrentAppWindowPayloads([RuntimeCurrentAppWindowPayload])
+    case completedWithCurrentAppRepairEvidence([RuntimeCurrentAppRepairEvidence])
     case transientEmptyCurrentAppWindowPayload
 
-    var repairedCurrentAppWindowPayloads: [RuntimeCurrentAppWindowPayload] {
+    var currentAppRepairEvidence: [RuntimeCurrentAppRepairEvidence] {
         switch self {
         case .completed, .completedWithFullRepairProjection:
             []
-        case let .completedWithRepairedCurrentAppWindowPayloads(payloads):
-            payloads
+        case let .completedWithCurrentAppRepairEvidence(evidence):
+            evidence
         case .transientEmptyCurrentAppWindowPayload:
             []
         }
@@ -23,7 +23,7 @@ struct RuntimeProjectionReconciliationDrainResult {
     var completedCount = 0
     var deferredCount = 0
     var fullRepairProjectionPayloads: [RuntimeFullRepairProjectionPayload] = []
-    var repairedCurrentAppWindowPayloads: [RuntimeCurrentAppWindowPayload] = []
+    var currentAppRepairEvidence: [RuntimeCurrentAppRepairEvidence] = []
 }
 
 typealias RuntimeProjectionReconciliationExecutor = (
@@ -55,14 +55,14 @@ struct RuntimeProjectionReconciliationDrainer {
             result.startedRequests.append(startedRequest)
             let outcome = reconciliationExecutor(startedRequest, repairProvider)
             switch outcome {
-            case .completed, .completedWithFullRepairProjection, .completedWithRepairedCurrentAppWindowPayloads:
+            case .completed, .completedWithFullRepairProjection, .completedWithCurrentAppRepairEvidence:
                 repairProvider.completeReconciliationRequest(id: startedRequest.id)
                 result.completedCount += 1
                 if case let .completedWithFullRepairProjection(payload) = outcome {
                     result.fullRepairProjectionPayloads.append(payload)
                 }
-                result.repairedCurrentAppWindowPayloads.append(
-                    contentsOf: outcome.repairedCurrentAppWindowPayloads
+                result.currentAppRepairEvidence.append(
+                    contentsOf: outcome.currentAppRepairEvidence
                 )
             case .transientEmptyCurrentAppWindowPayload:
                 repairProvider.deferReconciliationRequestAfterTransientEmptyCurrentAppWindowPayload(
@@ -89,8 +89,8 @@ func runtimeProjectionDefaultReconciliationExecutor(
         if result.isTransientEmptyCurrentAppWindowPayload {
             return .transientEmptyCurrentAppWindowPayload
         }
-        if let payload = result.currentAppWindowPayload {
-            return .completedWithRepairedCurrentAppWindowPayloads([payload])
+        if let evidence = result.currentAppRepairEvidence {
+            return .completedWithCurrentAppRepairEvidence([evidence])
         }
         return .completed
     case .fullRepair:
@@ -99,18 +99,18 @@ func runtimeProjectionDefaultReconciliationExecutor(
         let results = repairProvider.reconcileSpaceTopology(
             affectedCGWindowIDs: request.affectedCGWindowIDs
         )
-        var repairedCurrentAppWindowPayloads: [RuntimeCurrentAppWindowPayload] = []
+        var currentAppRepairEvidence: [RuntimeCurrentAppRepairEvidence] = []
         for result in results {
             if result.isTransientEmptyCurrentAppWindowPayload {
                 return .transientEmptyCurrentAppWindowPayload
             }
-            if let payload = result.currentAppWindowPayload {
-                repairedCurrentAppWindowPayloads.append(payload)
+            if let evidence = result.currentAppRepairEvidence {
+                currentAppRepairEvidence.append(evidence)
             }
         }
-        if !repairedCurrentAppWindowPayloads.isEmpty {
-            return .completedWithRepairedCurrentAppWindowPayloads(
-                repairedCurrentAppWindowPayloads
+        if !currentAppRepairEvidence.isEmpty {
+            return .completedWithCurrentAppRepairEvidence(
+                currentAppRepairEvidence
             )
         }
         return .completed
