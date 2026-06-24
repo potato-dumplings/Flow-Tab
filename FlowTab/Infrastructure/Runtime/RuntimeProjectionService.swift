@@ -177,6 +177,21 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 pid: pid,
                 pendingScope: "selectedCurrentAppWindows:\(appID)"
             )
+            let appDirectoryEntries = readModelStore
+                .readAppDirectoryProjection()?
+                .entries(forAppID: appID) ?? []
+            if let payload = repairProvider.currentAppWindowPayloadFromMainTables(
+                appID: appID,
+                pid: pid,
+                appDirectoryEntries: appDirectoryEntries,
+                generatedAt: now
+            ) {
+                readModelStore.commitCurrentAppWindowProjection(
+                    payload,
+                    clearsDirtyState: false,
+                    generatedAt: now
+                )
+            }
             repairProvider.recordSelectedCurrentAppWindowsChanged(appID: appID, pid: pid, now: now)
             drainReadyReconciliationRequestsLocked(now: now)
         }

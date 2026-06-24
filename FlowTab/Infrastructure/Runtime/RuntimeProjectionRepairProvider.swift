@@ -30,6 +30,52 @@ final class RuntimeProjectionRepairProvider: RuntimeProjectionRepairProviding {
 }
 
 extension RuntimeProjectionRepairProvider {
+    func currentAppWindowPayloadFromMainTables(
+        appID: String,
+        pid: pid_t,
+        appDirectoryEntries: [RuntimeAppDirectoryEntry],
+        generatedAt: TimeInterval
+    ) -> RuntimeCurrentAppWindowPayload? {
+        guard let runningApp = NSRunningApplication(processIdentifier: pid) else { return nil }
+
+        var directoryEntries = appDirectoryEntries.filter { $0.appID == appID }
+        let selectedEntry: RuntimeAppDirectoryEntry
+        if let matchingEntry = directoryEntries.first(where: { $0.pid == pid }) {
+            selectedEntry = matchingEntry
+        } else {
+            selectedEntry = RuntimeAppDirectoryEntry(app: runningApp)
+            directoryEntries.append(selectedEntry)
+        }
+        let displayName = selectedEntry.localizedName
+            ?? runningApp.localizedName
+            ?? selectedEntry.bundleIdentifier
+            ?? appID
+        let windowEntries = windowRecordStore.projectedWindowEntries(
+            processIdentifier: pid,
+            appName: displayName
+        )
+        guard !windowEntries.isEmpty else { return nil }
+
+        return RuntimeCurrentAppWindowPayload(
+            assemblyInput: RuntimeCurrentAppWindowProjectionAssemblyInput(
+                appID: appID,
+                displayName: displayName,
+                groupID: RuntimeAppIdentity.groupID(
+                    for: selectedEntry.bundleIdentifier ?? runningApp.bundleIdentifier,
+                    fallbackName: displayName
+                ),
+                summaryLastActiveAt: RuntimeAppDirectory.stableLastActiveValue(forRank: 0),
+                candidateLastActiveAt: generatedAt,
+                pid: selectedEntry.pid,
+                runningApp: runningApp,
+                windowSeeds: windowEntries.enumerated().map { index, entry in
+                    entry.projectionSeed(lastActiveAt: generatedAt - Double(index))
+                },
+                appDirectoryEntries: directoryEntries
+            )
+        )
+    }
+
     func fullRepairProjectionPayload() -> RuntimeFullRepairProjectionPayload {
         fullRepairProjectionPayload(timingEvent: "fullRepairProjectionPayload")
     }

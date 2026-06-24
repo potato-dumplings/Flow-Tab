@@ -117,17 +117,23 @@ final class RuntimeReadModelStore: @unchecked Sendable {
 
     func commitCurrentAppWindowProjection(
         _ payload: RuntimeCurrentAppWindowPayload,
+        clearsDirtyState: Bool = true,
         generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
     ) {
         lock.lock()
         defer { lock.unlock() }
 
         markProjectionCommittedLocked()
-        clearDirtyStateForAppLocked(appID: payload.summary.appID, pid: payload.summary.pid)
+        if clearsDirtyState {
+            clearDirtyStateForAppLocked(appID: payload.summary.appID, pid: payload.summary.pid)
+        }
         currentAppWindowProjectionsByAppID[payload.summary.appID] = RuntimeCurrentAppWindowProjection(
             appID: payload.summary.appID,
             currentAppWindowPayload: payload,
-            freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: true)
+            freshness: freshnessLocked(
+                generatedAt: generatedAt,
+                isCompleteForScope: clearsDirtyState
+            )
         )
         upsertAppDirectoryStateLocked(
             entries: payload.appDirectoryEntries,
