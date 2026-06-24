@@ -14,7 +14,7 @@ enum RuntimeWindowListDiagnostics {
         cgWindows: [RuntimeCGWindowEntry]
     ) {
         RuntimeLog.debug(
-            .snapshot,
+            .runtimeFacts,
             "chrome-topology app=\(logValue(appName)) pid=\(pid) publicSwitchableAX=\(publicSwitchableWindowCount) publicFetch=[\(publicWindowsFetchResult.logDetails)] includeRemoteAX=\(includeRemoteAXWindows ? 1 : 0) finalFetch=[\(finalWindowsFetchResult.logDetails)] ax=[\(axWindowSummary(axWindows))] cg=[\(cgWindowSummary(cgWindows))]"
         )
     }
@@ -30,7 +30,7 @@ enum RuntimeWindowListDiagnostics {
         let cgOnlyCount = entries.filter { $0.activationHandleID == nil && $0.axWindow == nil }.count
         let stickyCount = entries.filter(\.hasStickyBinding).count
         RuntimeLog.debug(
-            .snapshot,
+            .runtimeFacts,
             "window-entries app=\(logValue(appName)) pid=\(pid) ax=\(axWindowCount) entries=\(entries.count) cgOnly=\(cgOnlyCount) sticky=\(stickyCount) detail=[\(entrySummary(entries))]"
         )
     }

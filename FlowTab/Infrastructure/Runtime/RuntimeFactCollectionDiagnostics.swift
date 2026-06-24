@@ -3,7 +3,7 @@ import Foundation
 
 enum RuntimeFactCollectionDiagnostics {
     static func logTiming(_ event: String, fields: [(String, String)]) {
-        RuntimeLog.debug(.snapshot, timingLine(event, fields: fields))
+        RuntimeLog.debug(.runtimeFacts, timingLine(event, fields: fields))
     }
 
     static func timingLine(_ event: String, fields: [(String, String)]) -> String {
