@@ -547,13 +547,20 @@ extension RuntimeProjectionRepairProvider {
         let affectedWindowEvidence = mappingState?.affectedWindowEvidence(
             for: affectedCGWindowIDs
         ) ?? .empty
+        let currentAppRepairEvidence = currentAppWindowPayload.map { payload in
+            RuntimeCurrentAppRepairEvidence(
+                appID: payload.summary.appID,
+                pid: payload.summary.pid,
+                appDirectoryEntries: payload.appDirectoryEntries,
+                currentAppWindowPayloadWasEmpty: currentAppWindowPayloadWasEmpty
+            )
+        }
         return RuntimeAppWindowReconciliationResult(
             pid: pid,
             affectedCGWindowIDs: affectedCGWindowIDs,
             knownAffectedCGWindowIDs: affectedWindowEvidence.knownAffectedCGWindowIDs,
             exactAffectedCGWindowIDs: affectedWindowEvidence.exactAffectedCGWindowIDs,
-            currentAppWindowPayload: currentAppWindowPayload,
-            currentAppWindowPayloadWasEmpty: currentAppWindowPayloadWasEmpty,
+            currentAppRepairEvidence: currentAppRepairEvidence,
             isTransientEmptyCurrentAppWindowPayload: mappingState?
                 .isTransientEmptyCurrentAppWindowPayload(
                     currentAppWindowPayloadWasEmpty: currentAppWindowPayloadWasEmpty

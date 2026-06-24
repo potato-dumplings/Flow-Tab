@@ -1968,23 +1968,9 @@ extension FlowTabPriorityCoverageTests {
             reconciliationExecutor: { _, _ in
                 .completedWithCurrentAppRepairEvidence([
                     RuntimeCurrentAppRepairEvidence(
-                        currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
-                            summary: RuntimeHomeAppSummary(
-                                appID: repairedApp.id,
-                                displayName: repairedApp.displayName,
-                                groupID: repairedApp.groupID,
-                                lastActiveAt: repairedApp.lastActiveAt,
-                                windowCount: repairedApp.windows.count,
-                                pid: pid
-                            ),
-                            candidate: repairedApp,
-                            context: self.makeRuntimeAppContext(
-                                appID: repairedApp.id,
-                                runningApp: .current,
-                                windows: repairedApp.windows
-                            ),
-                            appDirectoryEntries: [appDirectoryEntry]
-                        ),
+                        appID: repairedApp.id,
+                        pid: pid,
+                        appDirectoryEntries: [appDirectoryEntry],
                         currentAppWindowPayloadWasEmpty: false
                     )
                 ])
@@ -2517,6 +2503,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = RuntimeAppIdentity.appID(for: runningApp)
         let pid = runningApp.processIdentifier
         let displayName = runningApp.localizedName ?? appID
+        let appDirectoryEntry = RuntimeAppDirectoryEntry(app: runningApp)
         let cgWindowID = CGWindowID(241_102)
         let axWindowID = "ax:\(pid):search-barrier-main-table"
         var mainTableRecord = RuntimeWindowRecord(
@@ -2627,10 +2614,9 @@ extension FlowTabPriorityCoverageTests {
                 expectation.fulfill()
                 return .completedWithCurrentAppRepairEvidence([
                     RuntimeCurrentAppRepairEvidence(
-                        currentAppWindowPayload: self.makeRuntimeCurrentAppWindowPayload(
-                            app: repairedApp,
-                            pid: pid
-                        ),
+                        appID: repairedApp.id,
+                        pid: pid,
+                        appDirectoryEntries: [appDirectoryEntry],
                         currentAppWindowPayloadWasEmpty: false
                     )
                 ])

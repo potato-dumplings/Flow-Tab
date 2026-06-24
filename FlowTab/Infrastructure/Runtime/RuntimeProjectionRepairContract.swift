@@ -19,17 +19,6 @@ struct RuntimeCurrentAppRepairEvidence: Equatable, Sendable {
         self.currentAppWindowPayloadWasEmpty = currentAppWindowPayloadWasEmpty
     }
 
-    init(
-        currentAppWindowPayload payload: RuntimeCurrentAppWindowPayload,
-        currentAppWindowPayloadWasEmpty: Bool
-    ) {
-        self.init(
-            appID: payload.summary.appID,
-            pid: payload.summary.pid,
-            appDirectoryEntries: payload.appDirectoryEntries,
-            currentAppWindowPayloadWasEmpty: currentAppWindowPayloadWasEmpty
-        )
-    }
 }
 
 struct RuntimeAppWindowReconciliationResult {
@@ -37,17 +26,8 @@ struct RuntimeAppWindowReconciliationResult {
     let affectedCGWindowIDs: Set<CGWindowID>
     let knownAffectedCGWindowIDs: Set<CGWindowID>
     let exactAffectedCGWindowIDs: Set<CGWindowID>
-    let currentAppWindowPayload: RuntimeCurrentAppWindowPayload?
-    let currentAppWindowPayloadWasEmpty: Bool
+    let currentAppRepairEvidence: RuntimeCurrentAppRepairEvidence?
     let isTransientEmptyCurrentAppWindowPayload: Bool
-
-    var currentAppRepairEvidence: RuntimeCurrentAppRepairEvidence? {
-        guard let currentAppWindowPayload else { return nil }
-        return RuntimeCurrentAppRepairEvidence(
-            currentAppWindowPayload: currentAppWindowPayload,
-            currentAppWindowPayloadWasEmpty: currentAppWindowPayloadWasEmpty
-        )
-    }
 }
 
 protocol RuntimeProjectionRepairProviding: AnyObject {
