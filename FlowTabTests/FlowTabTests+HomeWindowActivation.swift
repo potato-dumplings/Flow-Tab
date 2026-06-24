@@ -130,7 +130,8 @@ extension FlowTabTests {
             capturedContextsByID[appID]?.windowsByID["projected-draft"]?.title,
             "Projected Draft"
         )
-        XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 1)
+        XCTAssertEqual(runtimeProjectionService.homeDetailProjectionReadCount(appID: appID), 1)
+        XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 0)
         XCTAssertEqual(runtimeProjectionService.appWindowChangeSignalsRecorded().map(\.appID), [])
     }
 
@@ -178,8 +179,9 @@ extension FlowTabTests {
         )
 
         XCTAssertNil(capturedTarget)
-        XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 1)
-        XCTAssertEqual(runtimeProjectionService.appSwitcherProjectionReadCount(), 1)
+        XCTAssertEqual(runtimeProjectionService.homeDetailProjectionReadCount(appID: appID), 1)
+        XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 0)
+        XCTAssertEqual(runtimeProjectionService.appSwitcherProjectionReadCount(), 0)
         XCTAssertEqual(runtimeProjectionService.homeSummaryProjectionReadCount(), 1)
         XCTAssertEqual(runtimeProjectionService.appWindowChangeSignalsRecorded().map(\.appID), [appID])
         XCTAssertEqual(
@@ -322,7 +324,8 @@ extension FlowTabTests {
             ["home-projected-1"]
         )
         XCTAssertEqual(runtimeProjectionService.homeSummaryProjectionReadCount(), 3)
-        XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 1)
+        XCTAssertEqual(runtimeProjectionService.homeDetailProjectionReadCount(appID: appID), 1)
+        XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 0)
         XCTAssertEqual(runtimeProjectionService.appSwitcherProjectionReadCount(), 0)
     }
 
@@ -482,8 +485,9 @@ extension FlowTabTests {
             ["projection-window"]
         )
         XCTAssertEqual(runtimeProjectionService.homeSummaryProjectionReadCount(), 2)
-        XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 1)
-        XCTAssertEqual(runtimeProjectionService.appSwitcherProjectionReadCount(), 3)
+        XCTAssertEqual(runtimeProjectionService.homeDetailProjectionReadCount(appID: appID), 1)
+        XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 0)
+        XCTAssertEqual(runtimeProjectionService.appSwitcherProjectionReadCount(), 2)
     }
 
     func testHomeRuntimeRefreshReaderSignalsRuntimeRepairWhenProjectionIsMissingWithoutHomeFallback() {

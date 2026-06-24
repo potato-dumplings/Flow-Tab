@@ -3,6 +3,7 @@ import Foundation
 protocol RuntimeProjectionServing: Sendable {
     func readAppSwitcherProjection() -> RuntimeAppSwitcherProjection?
     func readHomeSummaryProjection() -> RuntimeHomeSummaryProjection?
+    func readHomeAppDetailProjection(appID: String) -> RuntimeHomeAppDetailProjection?
     func readCurrentAppWindowProjection(appID: String) -> RuntimeCurrentAppWindowProjection?
     func readCommittedSearchIndexForSearch() -> RuntimeSearchIndexRead
     func runtimeReadModelDiagnostics() -> RuntimeReadModelDiagnostics

@@ -33,6 +33,10 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         readModelStore.readHomeSummaryProjection()
     }
 
+    func readHomeAppDetailProjection(appID: String) -> RuntimeHomeAppDetailProjection? {
+        readModelStore.readHomeAppDetailProjection(appID: appID)
+    }
+
     func readCurrentAppWindowProjection(appID: String) -> RuntimeCurrentAppWindowProjection? {
         readModelStore.readCurrentAppWindowProjection(appID: appID)
     }

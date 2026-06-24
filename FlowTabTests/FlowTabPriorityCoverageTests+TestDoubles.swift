@@ -83,10 +83,12 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     private let lock = NSLock()
     private var appSwitcherProjection: RuntimeAppSwitcherProjection?
     private let homeSummaryProjection: RuntimeHomeSummaryProjection?
+    private let homeDetailProjectionsByAppID: [String: RuntimeHomeAppDetailProjection]
     private let currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection]
     private var committedSearchIndexRead: RuntimeSearchIndexRead?
     private var appSwitcherProjectionReads = 0
     private var homeSummaryProjectionReads = 0
+    private var homeDetailProjectionReadsByAppID: [String: Int] = [:]
     private var currentAppWindowProjectionReadsByAppID: [String: Int] = [:]
     private var committedSearchIndexReads = 0
     private var appSwitcherMaintenanceRequests: [RuntimeProjectionMaintenanceReason] = []
@@ -104,11 +106,17 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     init(
         appSwitcherProjection: RuntimeAppSwitcherProjection? = nil,
         homeSummaryProjection: RuntimeHomeSummaryProjection? = nil,
+        homeDetailProjectionsByAppID: [String: RuntimeHomeAppDetailProjection]? = nil,
         currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection] = [:],
         committedSearchIndexRead: RuntimeSearchIndexRead? = nil
     ) {
         self.appSwitcherProjection = appSwitcherProjection
         self.homeSummaryProjection = homeSummaryProjection
+        self.homeDetailProjectionsByAppID = homeDetailProjectionsByAppID
+            ?? Self.homeDetailProjections(
+                appSwitcherProjection: appSwitcherProjection,
+                currentAppWindowProjectionsByAppID: currentAppWindowProjectionsByAppID
+            )
         self.currentAppWindowProjectionsByAppID = currentAppWindowProjectionsByAppID
         self.committedSearchIndexRead = committedSearchIndexRead
     }
@@ -155,6 +163,12 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         lock.lock()
         defer { lock.unlock() }
         return homeSummaryProjectionReads
+    }
+
+    func homeDetailProjectionReadCount(appID: String) -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return homeDetailProjectionReadsByAppID[appID] ?? 0
     }
 
     func currentAppWindowProjectionReadCount(appID: String) -> Int {
@@ -275,6 +289,13 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         homeSummaryProjectionReads += 1
         lock.unlock()
         return homeSummaryProjection
+    }
+
+    func readHomeAppDetailProjection(appID: String) -> RuntimeHomeAppDetailProjection? {
+        lock.lock()
+        homeDetailProjectionReadsByAppID[appID, default: 0] += 1
+        lock.unlock()
+        return homeDetailProjectionsByAppID[appID]
     }
 
     func readCurrentAppWindowProjection(appID: String) -> RuntimeCurrentAppWindowProjection? {
@@ -435,6 +456,39 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
             generatedAt: generatedAt
         )
         return store.readCommittedSearchIndexForSearch().projection!
+    }
+
+    private static func homeDetailProjections(
+        appSwitcherProjection: RuntimeAppSwitcherProjection?,
+        currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection]
+    ) -> [String: RuntimeHomeAppDetailProjection] {
+        var projections = Dictionary(
+            uniqueKeysWithValues: currentAppWindowProjectionsByAppID.map { appID, projection in
+                (
+                    appID,
+                    RuntimeHomeAppDetailProjection(
+                        currentAppWindowPayload: projection.currentAppWindowPayload
+                    )
+                )
+            }
+        )
+        guard let appSwitcherProjection else { return projections }
+        for app in appSwitcherProjection.apps where projections[app.id] == nil {
+            guard let context = appSwitcherProjection.contextsByID[app.id] else { continue }
+            projections[app.id] = RuntimeHomeAppDetailProjection(
+                summary: RuntimeHomeAppSummary(
+                    appID: app.id,
+                    displayName: app.displayName,
+                    groupID: app.groupID,
+                    lastActiveAt: app.lastActiveAt,
+                    windowCount: app.windows.count,
+                    pid: context.runningApp.processIdentifier
+                ),
+                candidate: app,
+                context: context
+            )
+        }
+        return projections
     }
 }
 

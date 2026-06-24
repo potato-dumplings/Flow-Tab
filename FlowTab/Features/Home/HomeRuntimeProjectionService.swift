@@ -53,23 +53,7 @@ enum HomeRuntimeProjectionReader {
         for appID: String,
         from service: any RuntimeProjectionServing
     ) -> RuntimeHomeAppDetailProjection? {
-        if let projection = service.readCurrentAppWindowProjection(appID: appID) {
-            return RuntimeHomeAppDetailProjection(
-                currentAppWindowPayload: projection.currentAppWindowPayload
-            )
-        }
-        guard
-            let appProjection = service.readAppSwitcherProjection(),
-            let app = appProjection.apps.first(where: { $0.id == appID }),
-            let context = appProjection.contextsByID[appID]
-        else {
-            return nil
-        }
-        return RuntimeHomeAppDetailProjection(
-            summary: homeSummary(for: app, context: context),
-            candidate: app,
-            context: context
-        )
+        service.readHomeAppDetailProjection(appID: appID)
     }
 
     static func shouldWaitForNoSwitchableWindowProjection(

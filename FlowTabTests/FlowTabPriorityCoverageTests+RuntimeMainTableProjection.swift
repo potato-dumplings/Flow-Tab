@@ -101,6 +101,68 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(searchRead.projection?.windowEntries.filter { $0.appID == appID }.map(\.windowID), [])
     }
 
+    func testRuntimeReadModelStoreOwnsHomeDetailProjectionFromCurrentAppCache() throws {
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let window = WindowCandidate(
+            id: "main-table-home-detail-window",
+            title: "Main Table Home Detail",
+            isMinimized: false,
+            lastActiveAt: 500
+        )
+        let candidate = AppSwitchCandidate(
+            id: appID,
+            displayName: runningApp.localizedName ?? appID,
+            groupID: RuntimeAppIdentity.groupID(
+                for: runningApp.bundleIdentifier,
+                fallbackName: runningApp.localizedName ?? appID
+            ),
+            lastActiveAt: 500,
+            windows: [window]
+        )
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: runningApp,
+            windowsByID: [
+                window.id: RuntimeWindowContext(
+                    id: window.id,
+                    title: window.title,
+                    isMinimized: window.isMinimized,
+                    ownerPID: runningApp.processIdentifier,
+                    cgWindowID: 240_701,
+                    spaceIDs: [5]
+                )
+            ]
+        )
+        let summary = RuntimeHomeAppSummary(
+            appID: appID,
+            displayName: candidate.displayName,
+            groupID: candidate.groupID,
+            lastActiveAt: candidate.lastActiveAt,
+            windowCount: candidate.windows.count,
+            pid: runningApp.processIdentifier
+        )
+        let payload = RuntimeCurrentAppWindowPayload(
+            summary: summary,
+            candidate: candidate,
+            context: context,
+            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: runningApp)]
+        )
+        let store = RuntimeReadModelStore()
+
+        store.commitCurrentAppWindowProjection(payload, generatedAt: 42)
+
+        let homeDetailProjection = try XCTUnwrap(
+            store.readHomeAppDetailProjection(appID: appID)
+        )
+        XCTAssertEqual(homeDetailProjection.summary, summary)
+        XCTAssertEqual(homeDetailProjection.candidate.windows.map(\.id), [window.id])
+        XCTAssertEqual(
+            homeDetailProjection.context.windowsByID[window.id]?.cgWindowID,
+            240_701
+        )
+    }
+
     private func makeMainTableProjectionWindowRecord(
         pid: pid_t,
         cgWindowID: CGWindowID,
