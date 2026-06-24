@@ -240,6 +240,33 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         )
     }
 
+    @discardableResult
+    func commitSearchFreshnessBarrierFromProjectionCache(
+        deferredRequestCount: Int,
+        hasPendingRequests: Bool,
+        generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
+    ) -> RuntimeSearchIndexProjection? {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard deferredRequestCount == 0,
+              !hasPendingRequests,
+              let projection = appSwitcherProjection,
+              projection.freshness.sourceGeneration == generation
+        else {
+            return nil
+        }
+        markProjectionCommittedLocked()
+        clearDirtyStateLocked()
+        committedSearchIndex = buildSearchIndexLocked(
+            apps: projection.apps,
+            generatedAt: generatedAt,
+            isCompleteForScope: true
+        )
+        stagingSearchIndex = nil
+        return committedSearchIndex
+    }
+
     func markAppLifecycleDirty(
         appID: String,
         pid: pid_t,

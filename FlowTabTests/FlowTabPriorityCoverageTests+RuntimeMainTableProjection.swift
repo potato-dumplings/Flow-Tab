@@ -141,6 +141,180 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(searchRead.projection?.windowEntries.filter { $0.appID == appID }.map(\.windowID), [])
     }
 
+    func testRuntimeProjectionServiceCommitsSearchIndexFromMainTableProjectionOnlyAfterBarrier() throws {
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let pid = runningApp.processIdentifier
+        let displayName = runningApp.localizedName ?? appID
+        let appDirectoryEntry = RuntimeAppDirectoryEntry(app: runningApp)
+        let committedApp = AppSwitchCandidate(
+            id: appID,
+            displayName: displayName,
+            groupID: RuntimeAppIdentity.groupID(
+                for: runningApp.bundleIdentifier,
+                fallbackName: displayName
+            ),
+            lastActiveAt: 100,
+            windows: []
+        )
+        let readModelStore = RuntimeReadModelStore()
+        readModelStore.commitAppSwitcherProjection(
+            apps: [committedApp],
+            contextsByID: [:],
+            appDirectoryEntries: [appDirectoryEntry],
+            generatedAt: 10
+        )
+        readModelStore.markAppWindowsDirty(
+            appID: appID,
+            pid: pid,
+            pendingScope: "appWindows:\(appID)"
+        )
+        let cgWindowID = CGWindowID(240_803)
+        let axWindowID = "ax:\(pid):main-table-search"
+        let windowRecordStore = RuntimeWindowRecordStore(
+            mappingStatesByPID: [
+                pid: RuntimeWindowMappingState(
+                    windowRecordsByCGWindowID: [
+                        cgWindowID: makeMainTableProjectionWindowRecord(
+                            pid: pid,
+                            cgWindowID: cgWindowID,
+                            axWindowID: axWindowID
+                        )
+                    ],
+                    currentAXToCG: [axWindowID: cgWindowID],
+                    validCGWindowIDs: [cgWindowID],
+                    lastAXWindowIDs: [axWindowID],
+                    hasObservedAXWindowHandle: true
+                )
+            ]
+        )
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.MainTableSearchProjection",
+            repairProvider: RuntimeProjectionRepairProvider(
+                windowRecordStore: windowRecordStore,
+                reconciliationCoordinator: RuntimeReconciliationCoordinator()
+            ),
+            readModelStore: readModelStore
+        )
+
+        service.requestAppSwitcherProjectionMaintenance(reason: .switcherSessionStarted)
+        service.waitForMaintenanceQueueForTesting()
+
+        var searchRead = readModelStore.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(searchRead.readiness, .degradedStaleCommitted)
+        XCTAssertEqual(searchRead.resultState, .degradedStaleCommittedResult)
+        XCTAssertEqual(searchRead.projection?.windowEntries.filter { $0.appID == appID }.map(\.windowID), [])
+
+        service.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
+        service.waitForMaintenanceQueueForTesting()
+
+        searchRead = readModelStore.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(searchRead.readiness, .committedGenerationValidated)
+        XCTAssertEqual(searchRead.resultState, .committedGenerationResult)
+        XCTAssertEqual(searchRead.projection?.windowEntries.filter { $0.appID == appID }.map(\.windowID), [
+            RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindowID)
+        ])
+        XCTAssertTrue(readModelStore.diagnostics().dirtyAppIDs.isEmpty)
+        XCTAssertFalse(readModelStore.diagnostics().hasStagingSearchIndex)
+    }
+
+    func testRuntimeReadModelStoreDoesNotCommitSearchFromStaleProjectionCache() throws {
+        let store = RuntimeReadModelStore()
+        let committedApps = searchScenarioApps()
+        let repairedApp = try XCTUnwrap(committedApps.first)
+        let pid = pid_t(42_120)
+        store.commitAppSwitcherProjection(
+            apps: committedApps,
+            contextsByID: [:],
+            appDirectoryEntries: nil,
+            generatedAt: 10
+        )
+        store.markAppWindowsDirty(
+            appID: repairedApp.id,
+            pid: pid,
+            pendingScope: "appWindows:\(repairedApp.id)"
+        )
+
+        let committed = store.commitSearchFreshnessBarrierFromProjectionCache(
+            deferredRequestCount: 0,
+            hasPendingRequests: false,
+            generatedAt: 20
+        )
+
+        XCTAssertNil(committed)
+        let read = store.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(read.readiness, .degradedStaleCommitted)
+        XCTAssertEqual(read.resultState, .degradedStaleCommittedResult)
+        XCTAssertFalse(read.committedIndexCoversCurrentGeneration)
+        XCTAssertEqual(
+            read.projection?.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),
+            repairedApp.windows.map(\.id)
+        )
+        XCTAssertEqual(store.diagnostics().dirtyAppIDs, [repairedApp.id])
+    }
+
+    func testRuntimeReadModelStoreCommitsSearchFromCurrentProjectionCacheAfterBarrierValidation() throws {
+        let store = RuntimeReadModelStore()
+        let committedApps = searchScenarioApps()
+        let repairedApp = AppSwitchCandidate(
+            id: "com.example.browser",
+            displayName: "Browser",
+            groupID: "web",
+            lastActiveAt: 340,
+            windows: [
+                WindowCandidate(
+                    id: "browser-main-table-search",
+                    title: "Main Table Runtime Docs",
+                    isMinimized: false,
+                    lastActiveAt: 340
+                )
+            ]
+        )
+        let pid = pid_t(42_121)
+        store.commitAppSwitcherProjection(
+            apps: committedApps,
+            contextsByID: [:],
+            appDirectoryEntries: nil,
+            generatedAt: 10
+        )
+        store.markAppWindowsDirty(
+            appID: repairedApp.id,
+            pid: pid,
+            pendingScope: "appWindows:\(repairedApp.id)"
+        )
+        store.commitFullRepairProjectionPayload(
+            RuntimeFullRepairProjectionPayload(
+                apps: [repairedApp],
+                contextsByID: [:],
+                appDirectoryEntries: []
+            ),
+            generatedAt: 20
+        )
+
+        var read = store.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(read.readiness, .degradedStaleCommitted)
+        XCTAssertEqual(read.resultState, .degradedStaleCommittedResult)
+
+        let committed = try XCTUnwrap(
+            store.commitSearchFreshnessBarrierFromProjectionCache(
+                deferredRequestCount: 0,
+                hasPendingRequests: false,
+                generatedAt: 21
+            )
+        )
+
+        XCTAssertTrue(committed.freshness.isCompleteForScope)
+        read = store.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(read.readiness, .committedGenerationValidated)
+        XCTAssertEqual(read.resultState, .committedGenerationResult)
+        XCTAssertEqual(
+            read.projection?.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),
+            ["browser-main-table-search"]
+        )
+        XCTAssertTrue(store.diagnostics().dirtyAppIDs.isEmpty)
+        XCTAssertFalse(store.diagnostics().hasStagingSearchIndex)
+    }
+
     func testRuntimeProjectionServiceCommitsSelectedCurrentAppProjectionFromMainTablesAsStale() throws {
         let runningApp = NSRunningApplication.current
         let appID = RuntimeAppIdentity.appID(for: runningApp)

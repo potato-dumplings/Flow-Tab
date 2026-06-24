@@ -100,6 +100,9 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 includeFullRepair: false
             )
             commitRepairedCurrentAppWindowPayloadsLocked(drainResult.repairedCurrentAppWindowPayloads)
+            let mainTableProjectionCommitted = commitMainTableAppSwitcherProjectionLocked(
+                generatedAt: now
+            )
             let hasPendingRequests = repairProvider.hasPendingReconciliationRequests()
             let searchCommitResult = readModelStore.commitSearchFreshnessBarrierPayloads(
                 drainResult.repairedCurrentAppWindowPayloads,
@@ -107,6 +110,13 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 hasPendingRequests: hasPendingRequests,
                 generatedAt: now
             )
+            let projectionCacheSearchCommit = searchCommitResult.committedNewGeneration
+                ? nil
+                : readModelStore.commitSearchFreshnessBarrierFromProjectionCache(
+                    deferredRequestCount: drainResult.deferredCount,
+                    hasPendingRequests: hasPendingRequests,
+                    generatedAt: now
+                )
             RuntimeLog.debug(
                 .projection,
                 [
@@ -124,8 +134,10 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                     "deferredRequests=\(drainResult.deferredCount)",
                     "pendingRequests=\(hasPendingRequests ? 1 : 0)",
                     "repairedSearchApps=\(drainResult.repairedCurrentAppWindowPayloads.count)",
+                    "mainTableProjectionCommitted=\(mainTableProjectionCommitted ? 1 : 0)",
                     "stagedSearchIndex=\(searchCommitResult.stagedNewPayload ? 1 : 0)",
-                    "committedSearchIndex=\(searchCommitResult.committedNewGeneration ? 1 : 0)"
+                    "committedSearchIndex=\((searchCommitResult.committedNewGeneration || projectionCacheSearchCommit != nil) ? 1 : 0)",
+                    "projectionCacheSearchCommit=\(projectionCacheSearchCommit != nil ? 1 : 0)"
                 ].joined(separator: " ")
             )
         }
