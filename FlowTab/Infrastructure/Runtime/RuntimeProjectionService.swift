@@ -67,7 +67,10 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 drainResult.fullRepairProjectionPayloads,
                 generatedAt: now
             )
-            commitRepairedCurrentAppWindowPayloadsLocked(drainResult.repairedCurrentAppWindowPayloads)
+            commitRepairedCurrentAppWindowPayloadsLocked(
+                drainResult.repairedCurrentAppWindowPayloads,
+                generatedAt: now
+            )
             RuntimeLog.debug(
                 .projection,
                 [
@@ -103,7 +106,10 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             let mainTableProjectionCommitted = commitMainTableAppSwitcherProjectionLocked(
                 generatedAt: now
             )
-            commitRepairedCurrentAppWindowPayloadsLocked(drainResult.repairedCurrentAppWindowPayloads)
+            commitRepairedCurrentAppWindowPayloadsLocked(
+                drainResult.repairedCurrentAppWindowPayloads,
+                generatedAt: now
+            )
             let hasPendingRequests = repairProvider.hasPendingReconciliationRequests()
             let projectionCacheSearchCommit = readModelStore.commitSearchFreshnessBarrierFromProjectionCache(
                 deferredRequestCount: drainResult.deferredCount,
@@ -290,7 +296,10 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             result.fullRepairProjectionPayloads,
             generatedAt: now
         )
-        commitRepairedCurrentAppWindowPayloadsLocked(result.repairedCurrentAppWindowPayloads)
+        commitRepairedCurrentAppWindowPayloadsLocked(
+            result.repairedCurrentAppWindowPayloads,
+            generatedAt: now
+        )
         return result.startedRequests
     }
 
@@ -336,10 +345,29 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     }
 
     private func commitRepairedCurrentAppWindowPayloadsLocked(
-        _ payloads: [RuntimeCurrentAppWindowPayload]
+        _ payloads: [RuntimeCurrentAppWindowPayload],
+        generatedAt: TimeInterval
     ) {
         for payload in payloads {
-            readModelStore.commitCurrentAppWindowProjection(payload)
+            readModelStore.commitCurrentAppRepairAppDirectoryEvidence(
+                payload.appDirectoryEntries,
+                generatedAt: generatedAt
+            )
+            let appDirectoryEntries = readModelStore
+                .readAppDirectoryProjection()?
+                .entries(forAppID: payload.summary.appID) ?? payload.appDirectoryEntries
+            guard let mainTablePayload = repairProvider.currentAppWindowPayloadFromMainTables(
+                appID: payload.summary.appID,
+                pid: payload.summary.pid,
+                appDirectoryEntries: appDirectoryEntries,
+                generatedAt: generatedAt
+            ) else {
+                continue
+            }
+            readModelStore.commitCurrentAppWindowProjection(
+                mainTablePayload,
+                generatedAt: generatedAt
+            )
         }
     }
 

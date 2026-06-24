@@ -2385,19 +2385,69 @@ extension FlowTabPriorityCoverageTests {
 
     func testRuntimeProjectionServiceSearchFreshnessBarrierCommitsRepairedSearchGeneration() throws {
         let coordinator = RuntimeReconciliationCoordinator()
-        let windowRecordStore = RuntimeWindowRecordStore()
-        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let pid = runningApp.processIdentifier
+        let displayName = runningApp.localizedName ?? appID
+        let cgWindowID = CGWindowID(241_102)
+        let axWindowID = "ax:\(pid):search-barrier-main-table"
+        var mainTableRecord = RuntimeWindowRecord(
+            cgWindowID: cgWindowID,
+            stableWindowID: RuntimeWindowListEntry.cgStableWindowID(
+                pid: pid,
+                cgWindowID: cgWindowID
+            ),
+            firstSeenAt: 10
+        )
+        mainTableRecord.currentAXAttachment = RuntimeCurrentAXAttachment(
+            axWindowID: axWindowID,
+            axWindow: AXUIElementCreateApplication(pid),
+            title: "Fresh Runtime Docs",
+            frame: CGRect(x: 40, y: 50, width: 900, height: 700),
+            state: RuntimeAXWindowState(isMinimized: false, isFocused: true, isMain: true)
+        )
+        mainTableRecord.lastKnownCGTitle = "Fresh Runtime Docs"
+        mainTableRecord.lastKnownCGFrame = CGRect(x: 40, y: 50, width: 900, height: 700)
+        mainTableRecord.lastConfirmationSource = .verifiedFocusReadback
+        mainTableRecord.lastExactConfirmedAt = 12
+        let windowRecordStore = RuntimeWindowRecordStore(
+            mappingStatesByPID: [
+                pid: RuntimeWindowMappingState(
+                    windowRecordsByCGWindowID: [cgWindowID: mainTableRecord],
+                    currentAXToCG: [axWindowID: cgWindowID],
+                    validCGWindowIDs: [cgWindowID],
+                    lastAXWindowIDs: [axWindowID],
+                    hasObservedAXWindowHandle: true
+                )
+            ]
+        )
         let store = RuntimeReadModelStore()
-        let committedApps = searchScenarioApps()
+        let committedApp = AppSwitchCandidate(
+            id: appID,
+            displayName: displayName,
+            groupID: RuntimeAppIdentity.groupID(
+                for: runningApp.bundleIdentifier,
+                fallbackName: displayName
+            ),
+            lastActiveAt: 300,
+            windows: [
+                WindowCandidate(
+                    id: "browser-1",
+                    title: "Committed Browser Window",
+                    isMinimized: false,
+                    lastActiveAt: 300
+                )
+            ]
+        )
         let repairedApp = AppSwitchCandidate(
-            id: "com.example.browser",
-            displayName: "Browser",
-            groupID: "web",
+            id: appID,
+            displayName: displayName,
+            groupID: committedApp.groupID,
             lastActiveAt: 320,
             windows: [
                 WindowCandidate(
-                    id: "browser-fresh",
-                    title: "Fresh Runtime Docs",
+                    id: "repair-payload-contamination",
+                    title: "Repair Payload Runtime Docs",
                     isMinimized: false,
                     lastActiveAt: 320
                 )
@@ -2417,9 +2467,8 @@ extension FlowTabPriorityCoverageTests {
                 )
             ]
         )
-        let pid = pid_t(42_102)
         store.commitAppSwitcherProjection(
-            apps: committedApps,
+            apps: [committedApp],
             contextsByID: [:],
             appDirectoryEntries: nil,
             generatedAt: 10
@@ -2466,8 +2515,9 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(read.committedIndexCoversCurrentGeneration)
         XCTAssertEqual(
             projection.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),
-            ["browser-fresh"]
+            [RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindowID)]
         )
+        XCTAssertFalse(projection.windowEntries.map(\.windowID).contains("repair-payload-contamination"))
         XCTAssertFalse(projection.appEntries.map(\.appID).contains(staleStagingApp.id))
         XCTAssertFalse(projection.windowEntries.map(\.appID).contains(staleStagingApp.id))
         let diagnostics = store.diagnostics()

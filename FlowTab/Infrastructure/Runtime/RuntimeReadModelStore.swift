@@ -101,6 +101,19 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         )
     }
 
+    func commitCurrentAppRepairAppDirectoryEvidence(
+        _ entries: [RuntimeAppDirectoryEntry],
+        generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
+    ) {
+        lock.lock()
+        defer { lock.unlock() }
+
+        upsertAppDirectoryStateLocked(
+            entries: entries,
+            generatedAt: generatedAt
+        )
+    }
+
     func commitHomeSummaries(
         _ summaries: [RuntimeHomeAppSummary],
         generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
