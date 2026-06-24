@@ -13,12 +13,12 @@
 
 ## 分类规则
 
-`RuntimeLogCategory` 里标记为 verbose-only 的分类，在关闭 verbose diagnostics 时会压制 `debug/info`，但仍保留 `warning/error`。这适用于 `Activation`、`AX`、`AXMatch`、`HotKey`、`InputTrace`、`Preview`、`Search*`、`Session`、`Snapshot`、`SwitcherLayout` 等容易在热路径中刷屏的分类。
+`RuntimeLogCategory` 里标记为 verbose-only 的分类，在关闭 verbose diagnostics 时会压制 `debug/info`，但仍保留 `warning/error`。这适用于 `Activation`、`AX`、`AXMatch`、`HotKey`、`InputTrace`、`Preview`、`RuntimeFacts`、`Search*`、`Session`、`SwitcherLayout` 等容易在热路径中刷屏的分类。
 
 `Permission`、`App`、`UITest` 不按 noisy 分类压制。权限缺失通常用 `warning`，偏好或应用状态生效通常用 `info`。
 
 ## 放置原则
 
 - 可复用生产日志入口放在 `FlowTab/Infrastructure/Runtime/RuntimeLogging.swift`。
-- 运行时拓扑、权限、activation、preview、snapshot 等诊断日志应留在 runtime infrastructure 或对应的 feature coordinator，不要散落到纯 UI 渲染代码。
+- 运行时拓扑、权限、activation、preview、projection 与 fact collection 等诊断日志应留在 runtime infrastructure 或对应的 feature coordinator，不要散落到纯 UI 渲染代码。
 - 临时排障日志必须在交付前移除；需要长期保留的日志应按本页级别重新判断。

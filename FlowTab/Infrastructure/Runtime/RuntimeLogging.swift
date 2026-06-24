@@ -68,7 +68,6 @@ enum RuntimeLogCategory: String, CaseIterable, Identifiable {
     case searchModel = "SearchModel"
     case searchTrace = "SearchTrace"
     case session = "Session"
-    case snapshot = "Snapshot"
     case switcherLayout = "SwitcherLayout"
     case uiTest = "UITest"
 
@@ -93,7 +92,6 @@ enum RuntimeLogCategory: String, CaseIterable, Identifiable {
              .searchModel,
              .searchTrace,
              .session,
-             .snapshot,
              .switcherLayout:
             return true
         case .app,
