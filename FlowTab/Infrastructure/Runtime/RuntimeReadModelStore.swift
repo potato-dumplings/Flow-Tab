@@ -103,10 +103,6 @@ final class RuntimeReadModelStore: @unchecked Sendable {
                 isCompleteForScope: clearsDirtyState
             )
         )
-        upsertAppDirectoryStateLocked(
-            entries: payload.appDirectoryEntries,
-            generatedAt: generatedAt
-        )
         upsertHomeSummaryProjectionLocked(payload.summary, generatedAt: generatedAt)
         upsertAppSwitcherProjectionLocked(payload, generatedAt: generatedAt)
     }

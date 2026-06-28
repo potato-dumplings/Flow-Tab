@@ -1455,6 +1455,7 @@ extension FlowTabPriorityCoverageTests {
 
         store.commitCurrentAppWindowProjection(payload, generatedAt: 42)
 
+        XCTAssertNil(store.readAppDirectoryProjection())
         let homeDetailProjection = try XCTUnwrap(
             store.readHomeAppDetailProjection(appID: appID)
         )
