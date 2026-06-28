@@ -151,53 +151,6 @@ final class SwitcherSearchCoordinator {
     static let shortQueryThreshold: Int = 2
     static let queryDebounceNanoseconds: UInt64 = 10_000_000
 
-    // Search happens on every key press, so we pre-normalize source text once per session.
-    func rebuildIndex(with apps: [AppSwitchCandidate]) {
-        cancelPendingRebuild()
-        appEntries = apps.map { app in
-            let searchIndex = Self.buildSearchIndex(for: app.displayName, identifier: app.id)
-            return AppEntry(
-                appID: app.id,
-                appDisplayName: app.displayName,
-                searchIndex: searchIndex
-            )
-        }
-        let appSearchIndexes = Dictionary(uniqueKeysWithValues: appEntries.map { ($0.appID, $0.searchIndex) })
-
-        var windows: [WindowEntry] = []
-        windows.reserveCapacity(apps.reduce(0) { partial, app in
-            partial + app.windows.count
-        })
-
-        for app in apps {
-            let appSearchIndex = appSearchIndexes[app.id]
-                ?? Self.buildSearchIndex(for: app.displayName, identifier: app.id)
-            for window in app.windows {
-                let title = window.title.trimmingCharacters(in: .whitespacesAndNewlines)
-                windows.append(
-                    WindowEntry(
-                        appID: app.id,
-                        appDisplayName: app.displayName,
-                        windowID: window.id,
-                        windowTitle: title,
-                        windowSearchIndex: Self.buildSearchIndex(for: title),
-                        appSearchIndex: appSearchIndex
-                    )
-                )
-            }
-        }
-        windowEntries = windows
-        appInvertedIndex = Self.buildScopeInvertedIndex(from: appEntries.map(\.searchIndex))
-        windowInvertedIndex = Self.buildScopeInvertedIndex(
-            from: windowEntries.map { window in
-                window.windowSearchIndex.mergingCoarseTerms(with: window.appSearchIndex)
-            }
-        )
-        appMatchCache = nil
-        windowMatchCache = nil
-        state = .inactive
-    }
-
     func rebuildIndex(with projection: RuntimeSearchIndexProjection) {
         cancelPendingRebuild()
         appEntries = projection.appEntries.map { app in
@@ -223,6 +176,17 @@ final class SwitcherSearchCoordinator {
                 window.windowSearchIndex.mergingCoarseTerms(with: window.appSearchIndex)
             }
         )
+        appMatchCache = nil
+        windowMatchCache = nil
+        state = .inactive
+    }
+
+    func resetIndex() {
+        cancelPendingRebuild()
+        appEntries = []
+        windowEntries = []
+        appInvertedIndex = ScopeInvertedIndex(termPostings: [:], bigramPostings: [:])
+        windowInvertedIndex = ScopeInvertedIndex(termPostings: [:], bigramPostings: [:])
         appMatchCache = nil
         windowMatchCache = nil
         state = .inactive

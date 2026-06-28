@@ -890,7 +890,7 @@ final class LiveSwitcherModel: ObservableObject {
         pendingTerminateRequest = nil
         terminatingAppID = nil
         overlayStyle = .appAndWindow
-        searchCoordinator.rebuildIndex(with: [])
+        searchCoordinator.resetIndex()
         publishSearchStateIfNeeded()
         resetRuntimeState()
     }

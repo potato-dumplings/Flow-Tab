@@ -60,7 +60,7 @@ extension FlowTabTests {
 
     func testSearchMatchesAppByPartialName() {
         let coordinator = SwitcherSearchCoordinator()
-        coordinator.rebuildIndex(with: searchSampleApps())
+        coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
         XCTAssertTrue(coordinator.appendQueryText("fari"))
@@ -70,7 +70,7 @@ extension FlowTabTests {
 
     func testSearchDebouncedRebuildIgnoresStaleGeneration() {
         let coordinator = SwitcherSearchCoordinator()
-        coordinator.rebuildIndex(with: searchSampleApps())
+        coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
         XCTAssertTrue(coordinator.appendQueryText("fari"))
@@ -90,7 +90,7 @@ extension FlowTabTests {
 
     func testSearchMatchesCamelCaseAppBySegmentedWords() {
         let coordinator = SwitcherSearchCoordinator()
-        coordinator.rebuildIndex(with: searchSampleApps())
+        coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
         XCTAssertTrue(coordinator.appendQueryText("flow search"))
@@ -100,7 +100,7 @@ extension FlowTabTests {
 
     func testSearchQuerySupportsMiddleInsertionViaCursorMovement() {
         let coordinator = SwitcherSearchCoordinator()
-        coordinator.rebuildIndex(with: searchSampleApps())
+        coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
         XCTAssertTrue(coordinator.appendQueryTextWithoutRebuild("abcd"))
@@ -113,7 +113,7 @@ extension FlowTabTests {
 
     func testSearchDeleteBackwardRespectsCursorPosition() {
         let coordinator = SwitcherSearchCoordinator()
-        coordinator.rebuildIndex(with: searchSampleApps())
+        coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
         XCTAssertTrue(coordinator.appendQueryTextWithoutRebuild("abced"))
@@ -126,7 +126,7 @@ extension FlowTabTests {
 
     func testSearchAppendWhileResultsFocusedUsesQueryTail() {
         let coordinator = SwitcherSearchCoordinator()
-        coordinator.rebuildIndex(with: searchSampleApps())
+        coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
         XCTAssertTrue(coordinator.appendQueryTextWithoutRebuild("abcd"))
@@ -140,7 +140,7 @@ extension FlowTabTests {
 
     func testSearchDeleteWhileResultsFocusedUsesQueryTail() {
         let coordinator = SwitcherSearchCoordinator()
-        coordinator.rebuildIndex(with: searchSampleApps())
+        coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
         XCTAssertTrue(coordinator.appendQueryTextWithoutRebuild("abcd"))
@@ -154,7 +154,7 @@ extension FlowTabTests {
 
     func testSearchSelectionWrapsFromLastResultBackToFirstResult() {
         let coordinator = SwitcherSearchCoordinator()
-        coordinator.rebuildIndex(with: searchSampleApps())
+        coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
         XCTAssertTrue(coordinator.focusResults())
 
@@ -169,7 +169,7 @@ extension FlowTabTests {
 
     func testSearchSelectResultByIDMovesFocusToResults() {
         let coordinator = SwitcherSearchCoordinator()
-        coordinator.rebuildIndex(with: searchSampleApps())
+        coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
         XCTAssertTrue(coordinator.selectResult(withID: "app:com.flowtab.search"))
@@ -180,7 +180,7 @@ extension FlowTabTests {
 
     func testSearchReplaceQueryWithoutRebuildUpdatesQueryAndCursor() {
         let coordinator = SwitcherSearchCoordinator()
-        coordinator.rebuildIndex(with: searchSampleApps())
+        coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
         XCTAssertTrue(coordinator.replaceQueryWithoutRebuild("微信", cursorPosition: 1))
@@ -191,7 +191,7 @@ extension FlowTabTests {
 
     func testSearchMatchesChineseAppByPinyinInitialsAndFullSpelling() {
         let coordinator = SwitcherSearchCoordinator()
-        coordinator.rebuildIndex(with: searchSampleApps())
+        coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
         XCTAssertTrue(coordinator.appendQueryText("wx"))
@@ -206,7 +206,7 @@ extension FlowTabTests {
 
     func testSearchMatchesChineseCompoundAppBySegmentedQueryWithoutSpaces() {
         let coordinator = SwitcherSearchCoordinator()
-        coordinator.rebuildIndex(with: searchSampleApps())
+        coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
         XCTAssertTrue(coordinator.appendQueryText("文件助手"))
@@ -216,7 +216,7 @@ extension FlowTabTests {
 
     func testSearchMatchesEnglishAbbreviation() {
         let coordinator = SwitcherSearchCoordinator()
-        coordinator.rebuildIndex(with: searchSampleApps())
+        coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
         XCTAssertTrue(coordinator.appendQueryText("vsc"))
@@ -226,7 +226,7 @@ extension FlowTabTests {
 
     func testSearchMatchesEnglishCodeLikeSubsequence() {
         let coordinator = SwitcherSearchCoordinator()
-        coordinator.rebuildIndex(with: searchSampleApps())
+        coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
         XCTAssertTrue(coordinator.appendQueryText("vce"))
@@ -236,7 +236,7 @@ extension FlowTabTests {
 
     func testSearchMatchesByBundleIDButNotGenericComPrefix() {
         let coordinator = SwitcherSearchCoordinator()
-        coordinator.rebuildIndex(with: searchSampleApps())
+        coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
         XCTAssertTrue(coordinator.appendQueryText("wechat"))
@@ -251,7 +251,7 @@ extension FlowTabTests {
 
     func testSearchLocksChineseTestAppByPinyinInitials() {
         let coordinator = SwitcherSearchCoordinator()
-        coordinator.rebuildIndex(with: searchSampleApps())
+        coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
         XCTAssertTrue(coordinator.appendQueryText("c"))
@@ -265,7 +265,7 @@ extension FlowTabTests {
 
     func testSearchLocksChineseTestAppByBundleIDPrefixes() {
         let coordinator = SwitcherSearchCoordinator()
-        coordinator.rebuildIndex(with: searchSampleApps())
+        coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
         let expectedKind = SwitcherSearchResultKind.app(appID: "com.xxx.test")
@@ -286,7 +286,7 @@ extension FlowTabTests {
 
     func testSearchQueryCsMatchesBothCSGOAndChineseTestApp() {
         let coordinator = SwitcherSearchCoordinator()
-        coordinator.rebuildIndex(with: searchSampleAppsForSharedCSQuery())
+        coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleAppsForSharedCSQuery()))
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
         XCTAssertTrue(coordinator.appendQueryText("c"))
@@ -301,7 +301,7 @@ extension FlowTabTests {
 
     func testSearchRecoversResultsWhenIncrementalCandidateCacheMisses() {
         let coordinator = SwitcherSearchCoordinator()
-        coordinator.rebuildIndex(with: searchCacheMissSampleApps())
+        coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchCacheMissSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
         XCTAssertTrue(coordinator.appendQueryText("t"))
@@ -318,7 +318,7 @@ extension FlowTabTests {
 
     func testWindowSearchCanMatchByAppNamePinyinInitials() {
         let coordinator = SwitcherSearchCoordinator()
-        coordinator.rebuildIndex(with: searchSampleApps())
+        coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .window))
 
         XCTAssertTrue(coordinator.appendQueryText("wx"))
@@ -328,7 +328,7 @@ extension FlowTabTests {
 
     func testSearchCanMatchChinesePinyinInitialPrefixBeyondExactInitials() {
         let coordinator = SwitcherSearchCoordinator()
-        coordinator.rebuildIndex(with: searchSampleApps())
+        coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
         XCTAssertTrue(coordinator.appendQueryText("wjc"))
@@ -363,7 +363,7 @@ extension FlowTabTests {
 
     func testWindowSearchMatchesCamelCaseTitleBySegmentedWords() {
         let coordinator = SwitcherSearchCoordinator()
-        coordinator.rebuildIndex(with: searchSampleApps())
+        coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .window))
 
         XCTAssertTrue(coordinator.appendQueryText("search coordinator"))
@@ -777,13 +777,13 @@ extension FlowTabTests {
 
         let buildNanos = measureNanos {
             let coordinator = SwitcherSearchCoordinator()
-            coordinator.rebuildIndex(with: apps)
+            coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: apps))
             _ = coordinator.activate(defaultScope: .window)
         }
 
         let rounds = 3
         let queryCoordinator = SwitcherSearchCoordinator()
-        queryCoordinator.rebuildIndex(with: apps)
+        queryCoordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: apps))
         _ = queryCoordinator.activate(defaultScope: .window)
         let queryNanos = measureNanos {
             runBaselineQueries(queries, on: queryCoordinator, rounds: rounds)
@@ -817,11 +817,11 @@ extension FlowTabTests {
 
         let buildNanos = measureNanos {
             let coordinator = SwitcherSearchCoordinator()
-            coordinator.rebuildIndex(with: apps)
+            coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: apps))
         }
 
         let queryCoordinator = SwitcherSearchCoordinator()
-        queryCoordinator.rebuildIndex(with: apps)
+        queryCoordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: apps))
         _ = queryCoordinator.activate(defaultScope: .window)
         let queryNanos = measureNanos {
             runBaselineQueries(queries, on: queryCoordinator, rounds: rounds)
@@ -936,11 +936,11 @@ extension FlowTabTests {
 
         let buildNanos = measureNanos {
             let coordinator = SwitcherSearchCoordinator()
-            coordinator.rebuildIndex(with: apps)
+            coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: apps))
         }
 
         let queryCoordinator = SwitcherSearchCoordinator()
-        queryCoordinator.rebuildIndex(with: apps)
+        queryCoordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: apps))
         _ = queryCoordinator.activate(defaultScope: .window)
         let queryNanos = measureNanos {
             runBaselineQueries(queries, on: queryCoordinator, rounds: rounds)
@@ -975,7 +975,7 @@ extension FlowTabTests {
         let rounds = 3
 
         let coordinator = SwitcherSearchCoordinator()
-        coordinator.rebuildIndex(with: apps)
+        coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: apps))
         _ = coordinator.activate(defaultScope: .window)
 
         for workload in workloads {

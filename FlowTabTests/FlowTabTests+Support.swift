@@ -398,11 +398,53 @@ extension FlowTabTests {
         scope: SwitcherSearchScope
     ) -> [String] {
         let coordinator = SwitcherSearchCoordinator()
-        coordinator.rebuildIndex(with: apps)
+        coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: apps))
         _ = coordinator.activate(defaultScope: scope)
         _ = coordinator.appendQueryText(query)
         drainPendingSearchRebuild(on: coordinator)
         return coordinator.state.results.prefix(10).map(\.id)
+    }
+    func runtimeSearchIndexProjection(
+        from apps: [AppSwitchCandidate],
+        generatedAt: TimeInterval = 1,
+        sourceGeneration: RuntimeReadModelGeneration = RuntimeReadModelGeneration(projection: 1)
+    ) -> RuntimeSearchIndexProjection {
+        let appEntries = apps.map { app in
+            RuntimeSearchAppIndexEntry(
+                appID: app.id,
+                appDisplayName: app.displayName,
+                searchIndex: SearchTextMatcher.buildIndex(for: app.displayName, identifier: app.id)
+            )
+        }
+        let appSearchIndexes = Dictionary(uniqueKeysWithValues: appEntries.map { ($0.appID, $0.searchIndex) })
+        let windowEntries = apps.flatMap { app -> [RuntimeSearchWindowIndexEntry] in
+            let appSearchIndex = appSearchIndexes[app.id]
+                ?? SearchTextMatcher.buildIndex(for: app.displayName, identifier: app.id)
+            return app.windows.map { window in
+                let title = window.title.trimmingCharacters(in: .whitespacesAndNewlines)
+                return RuntimeSearchWindowIndexEntry(
+                    appID: app.id,
+                    appDisplayName: app.displayName,
+                    windowID: window.id,
+                    windowTitle: title,
+                    windowSearchIndex: SearchTextMatcher.buildIndex(for: title),
+                    appSearchIndex: appSearchIndex
+                )
+            }
+        }
+        return RuntimeSearchIndexProjection(
+            appEntries: appEntries,
+            windowEntries: windowEntries,
+            freshness: RuntimeProjectionFreshness(
+                generatedAt: generatedAt,
+                sourceGeneration: sourceGeneration,
+                dirtyAppIDs: [],
+                dirtyPIDs: [],
+                dirtyCGWindowIDs: [],
+                pendingRepairScopes: [],
+                isCompleteForScope: true
+            )
+        )
     }
     func searchResultIDs(
         query: String,
