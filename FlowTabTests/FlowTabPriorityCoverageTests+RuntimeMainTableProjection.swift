@@ -5,6 +5,22 @@ import XCTest
 import FlowTabCore
 
 extension FlowTabPriorityCoverageTests {
+    @discardableResult
+    private func commitMainTableSearchFreshnessBarrierForTesting(
+        _ store: RuntimeReadModelStore,
+        generatedAt: TimeInterval,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> RuntimeSearchIndexProjection? {
+        let committed = store.commitSearchFreshnessBarrierFromProjectionCache(
+            deferredRequestCount: 0,
+            hasPendingRequests: false,
+            generatedAt: generatedAt
+        )
+        XCTAssertNotNil(committed, file: file, line: line)
+        return committed
+    }
+
     func testRuntimeProjectionRepairProviderBuildsAppSwitcherPayloadFromMainTables() throws {
         let runningApp = NSRunningApplication.current
         let appID = RuntimeAppIdentity.appID(for: runningApp)
@@ -81,6 +97,7 @@ extension FlowTabPriorityCoverageTests {
             appDirectoryEntries: [appDirectoryEntry],
             generatedAt: 10
         )
+        commitMainTableSearchFreshnessBarrierForTesting(readModelStore, generatedAt: 11)
         readModelStore.markAppWindowsDirty(
             appID: appID,
             pid: pid,
@@ -163,6 +180,7 @@ extension FlowTabPriorityCoverageTests {
             appDirectoryEntries: [appDirectoryEntry],
             generatedAt: 10
         )
+        commitMainTableSearchFreshnessBarrierForTesting(readModelStore, generatedAt: 11)
         readModelStore.markAppWindowsDirty(
             appID: appID,
             pid: pid,
@@ -227,6 +245,7 @@ extension FlowTabPriorityCoverageTests {
             appDirectoryEntries: nil,
             generatedAt: 10
         )
+        commitMainTableSearchFreshnessBarrierForTesting(store, generatedAt: 11)
         store.markAppWindowsDirty(
             appID: repairedApp.id,
             pid: pid,
@@ -275,6 +294,7 @@ extension FlowTabPriorityCoverageTests {
             appDirectoryEntries: nil,
             generatedAt: 10
         )
+        commitMainTableSearchFreshnessBarrierForTesting(store, generatedAt: 11)
         store.markAppWindowsDirty(
             appID: repairedApp.id,
             pid: pid,
@@ -334,6 +354,7 @@ extension FlowTabPriorityCoverageTests {
             appDirectoryEntries: [appDirectoryEntry],
             generatedAt: 10
         )
+        commitMainTableSearchFreshnessBarrierForTesting(readModelStore, generatedAt: 11)
         let cgWindowID = CGWindowID(240_601)
         let axWindowID = "ax:\(pid):main-table"
         let windowRecordStore = RuntimeWindowRecordStore(

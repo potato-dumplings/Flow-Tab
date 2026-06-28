@@ -454,6 +454,11 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
             appDirectoryEntries: nil,
             generatedAt: generatedAt
         )
+        store.commitSearchFreshnessBarrierFromProjectionCache(
+            deferredRequestCount: 0,
+            hasPendingRequests: false,
+            generatedAt: generatedAt
+        )
         return store.readCommittedSearchIndexForSearch().projection!
     }
 

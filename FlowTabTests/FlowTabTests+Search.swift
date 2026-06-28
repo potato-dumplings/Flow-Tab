@@ -612,6 +612,11 @@ extension FlowTabTests {
             appDirectoryEntries: nil,
             generatedAt: 10
         )
+        store.commitSearchFreshnessBarrierFromProjectionCache(
+            deferredRequestCount: 0,
+            hasPendingRequests: false,
+            generatedAt: 11
+        )
         store.markAppWindowsDirty(
             appID: committedSearchApp.id,
             pid: 42_300,

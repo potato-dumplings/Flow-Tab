@@ -45,13 +45,6 @@ final class RuntimeReadModelStore: @unchecked Sendable {
                 generatedAt: generatedAt
             )
         }
-        if clearsDirtyState {
-            committedSearchIndex = buildSearchIndexLocked(
-                apps: apps,
-                generatedAt: generatedAt,
-                isCompleteForScope: true
-            )
-        }
     }
 
     @discardableResult
@@ -309,9 +302,10 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         if let projection = committedSearchIndex {
             committedSearchIndex = projection.removingApp(
                 appID,
-                freshness: freshnessLocked(
+                freshness: staleCommittedSearchFreshnessLocked(
+                    previous: projection.freshness,
                     generatedAt: generatedAt,
-                    isCompleteForScope: !isDirtyLocked
+                    isCompleteForScope: false
                 )
             )
         }
@@ -381,9 +375,10 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             committedSearchIndex = RuntimeSearchIndexProjection(
                 appEntries: projection.appEntries,
                 windowEntries: projection.windowEntries,
-                freshness: freshnessLocked(
+                freshness: staleCommittedSearchFreshnessLocked(
+                    previous: projection.freshness,
                     generatedAt: generatedAt,
-                    isCompleteForScope: !isDirtyLocked
+                    isCompleteForScope: false
                 )
             )
         }
@@ -708,6 +703,23 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         RuntimeProjectionFreshness(
             generatedAt: generatedAt,
             sourceGeneration: generation,
+            dirtyAppIDs: dirtyAppIDs,
+            dirtyPIDs: dirtyPIDs,
+            dirtyCGWindowIDs: dirtyCGWindowIDs,
+            spaceTopologySignatureSummary: spaceTopologySignatureSummary,
+            pendingRepairScopes: pendingRepairScopes,
+            isCompleteForScope: isCompleteForScope
+        )
+    }
+
+    private func staleCommittedSearchFreshnessLocked(
+        previous: RuntimeProjectionFreshness,
+        generatedAt: TimeInterval,
+        isCompleteForScope: Bool
+    ) -> RuntimeProjectionFreshness {
+        RuntimeProjectionFreshness(
+            generatedAt: generatedAt,
+            sourceGeneration: previous.sourceGeneration,
             dirtyAppIDs: dirtyAppIDs,
             dirtyPIDs: dirtyPIDs,
             dirtyCGWindowIDs: dirtyCGWindowIDs,
