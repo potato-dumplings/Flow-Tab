@@ -39,14 +39,14 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeProjectionDiagnosticsTimingLineUsesProjectionBoundaryFields() {
         XCTAssertEqual(
             RuntimeProjectionDiagnostics.timingLine(
-                "fullRepairProjectionPayload",
+                "fullRepairEvidence",
                 fields: [
                     ("result", "ready"),
                     ("apps", "3"),
                     ("totalMs", "1.25")
                 ]
             ),
-            "fullRepairProjectionPayload result=ready apps=3 totalMs=1.25"
+            "fullRepairEvidence result=ready apps=3 totalMs=1.25"
         )
     }
 

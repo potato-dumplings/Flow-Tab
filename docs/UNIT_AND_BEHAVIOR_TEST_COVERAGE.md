@@ -325,20 +325,20 @@
 
 来源：`FlowTabTests/FlowTabTests.swift`
 
-- `testRuntimeProjectionRepairProviderUsesProjectionPayloadForUITestMockDatasetWhenLaunchFlagEnabled`
+- `testUITestMockDatasetBuildsExplicitFullRepairProjectionPayloadWhenLaunchFlagEnabled`
   场景：UI test 启动参数要求使用 Mock Runtime 数据集。
-  步骤：注入 `--flowtab-ui-mock-runtime` 后读取 `RuntimeProjectionRepairProvider.fullRepairProjectionPayload()` 和 current-app projection payload。
-  验证：projection payload 中的应用数量、首尾应用、窗口数、current-app summary 与上下文映射都与 Mock projection dataset 一致，不经过 legacy `snapshot()` 包装。
+  步骤：注入 `--flowtab-ui-mock-runtime` 后从 `FlowTabUITestRuntimeProjectionDataset` 显式构造 TestingSupport full-repair fixture payload，并读取 current-app projection payload seed。
+  验证：fixture payload 中的应用数量、首尾应用、窗口数、current-app summary 与上下文映射都与 Mock projection dataset 一致，不经过 legacy `snapshot()` 或 provider-facing `fullRepairProjectionPayload()` 包装。
 
 - `testAppInventoryServiceReadsUITestRuntimeProjectionDataset`
   场景：Settings app inventory 在 UI test mock runtime 下需要显示 projection seed 中的 mock apps。
   步骤：注入 `--flowtab-ui-mock-runtime` 后读取 `AppInventoryService.installedApps()`。
   验证：Mock Mail、Mock Browser 和文件传输助手来自 `FlowTabUITestRuntimeProjectionDataset`，保持 running/bundle/path metadata 稳定，不通过 provider-owned dataset API。
 
-- `testRuntimeProjectionRepairProviderRealPathWithoutAccessibilityBuildsConsistentProjectionPayload`
+- `testRuntimeProjectionRepairProviderRealPathWithoutAccessibilityBuildsMainTableProjectionPayload`
   场景：真实运行路径下没有无障碍权限。
-  步骤：关闭无障碍权限、开启“在 Command-Tab 中显示”和“隐藏最小化应用”，再读取 full-repair projection payload 与 app-window repair payload。
-  验证：projection payload 会只保留应用层信息、窗口数组为空、上下文数量与应用数量一致，repair payload summary 也同步为零窗口。
+  步骤：关闭无障碍权限、开启“在 Command-Tab 中显示”和“隐藏最小化应用”，先读取 `fullRepairEvidence()`，再经主表 app-switcher projection builder 生成 projection payload。
+  验证：full repair 只提交 app-directory evidence；后续 projection payload 来自 app directory + WindowRecord 主表，不来自 provider-facing full-repair projection facade。
 
 - `testRuntimeActivatorRequestsActivationForAppTargetWhenNotCurrent`
   场景：激活目标应用不是当前进程。

@@ -58,6 +58,7 @@
 		F6E7D00C35C1000100B0D737 /* RuntimeAppRankProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7D00B35C1000100B0D737 /* RuntimeAppRankProvider.swift */; };
 		F6E7D00E35C1000100B0D737 /* RuntimeAXRemoteWindowResolverTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7D00D35C1000100B0D737 /* RuntimeAXRemoteWindowResolverTestSupport.swift */; };
 		F6E7D01035C1000100B0D737 /* AXWindowInspectorTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7D00F35C1000100B0D737 /* AXWindowInspectorTestSupport.swift */; };
+		F6E7D01235C1000100B0D737 /* RuntimeFullRepairProjectionTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7D01135C1000100B0D737 /* RuntimeFullRepairProjectionTestSupport.swift */; };
 		F6E7D00235C1000100B0D737 /* RuntimeProjectionDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7D00135C1000100B0D737 /* RuntimeProjectionDiagnostics.swift */; };
 		F6E7E10235C3000100B0D737 /* RuntimeProjectionReconciliationDrainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7E10135C3000100B0D737 /* RuntimeProjectionReconciliationDrainer.swift */; };
 		D10000052FF500300B0D737 /* RuntimeProjectionMaintenancePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000062FF500300B0D737 /* RuntimeProjectionMaintenancePolicy.swift */; };
@@ -455,6 +456,7 @@
 		F6E7D00B35C1000100B0D737 /* RuntimeAppRankProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeAppRankProvider.swift; sourceTree = "<group>"; };
 		F6E7D00D35C1000100B0D737 /* RuntimeAXRemoteWindowResolverTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeAXRemoteWindowResolverTestSupport.swift; sourceTree = "<group>"; };
 		F6E7D00F35C1000100B0D737 /* AXWindowInspectorTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AXWindowInspectorTestSupport.swift; sourceTree = "<group>"; };
+		F6E7D01135C1000100B0D737 /* RuntimeFullRepairProjectionTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeFullRepairProjectionTestSupport.swift; sourceTree = "<group>"; };
 		F6E7C01335C000100B0D737 /* RuntimeAXWindowRecovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeAXWindowRecovery.swift; sourceTree = "<group>"; };
 		F6E7C01535C000100B0D737 /* RuntimeAppDirectory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeAppDirectory.swift; sourceTree = "<group>"; };
 		F6E7B00735AC000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeReconciliationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+RuntimeReconciliationCoordinator.swift"; sourceTree = "<group>"; };
@@ -766,6 +768,7 @@
 				D1A1B1C32A00000100B0D737 /* RuntimeBridge+Testing.swift */,
 				F6E7D00F35C1000100B0D737 /* AXWindowInspectorTestSupport.swift */,
 				F6E7D00D35C1000100B0D737 /* RuntimeAXRemoteWindowResolverTestSupport.swift */,
+				F6E7D01135C1000100B0D737 /* RuntimeFullRepairProjectionTestSupport.swift */,
 				F6E7D00535C1000100B0D737 /* RuntimeWindowMappingTestSupport.swift */,
 			);
 			path = TestingSupport;
@@ -1123,6 +1126,7 @@
 				F6E7D00C35C1000100B0D737 /* RuntimeAppRankProvider.swift in Sources */,
 				F6E7D00E35C1000100B0D737 /* RuntimeAXRemoteWindowResolverTestSupport.swift in Sources */,
 				F6E7D01035C1000100B0D737 /* AXWindowInspectorTestSupport.swift in Sources */,
+				F6E7D01235C1000100B0D737 /* RuntimeFullRepairProjectionTestSupport.swift in Sources */,
 				F6E7D00235C1000100B0D737 /* RuntimeProjectionDiagnostics.swift in Sources */,
 				F6E7E10235C3000100B0D737 /* RuntimeProjectionReconciliationDrainer.swift in Sources */,
 				D10000052FF500300B0D737 /* RuntimeProjectionMaintenancePolicy.swift in Sources */,
