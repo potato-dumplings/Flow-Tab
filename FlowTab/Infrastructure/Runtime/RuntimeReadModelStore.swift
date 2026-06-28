@@ -493,22 +493,9 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
 
-        if let projection = currentAppWindowProjectionsByAppID[appID] {
-            return RuntimeHomeAppDetailProjection(
-                currentAppWindowPayload: projection.currentAppWindowPayload
-            )
-        }
-        guard
-            let appProjection = appSwitcherProjection ?? appSwitcherProjectionFromAppDirectoryLocked(),
-            let app = appProjection.apps.first(where: { $0.id == appID }),
-            let context = appProjection.contextsByID[appID]
-        else {
-            return nil
-        }
+        guard let projection = currentAppWindowProjectionsByAppID[appID] else { return nil }
         return RuntimeHomeAppDetailProjection(
-            summary: homeSummaryLocked(for: app, context: context),
-            candidate: app,
-            context: context
+            currentAppWindowPayload: projection.currentAppWindowPayload
         )
     }
 

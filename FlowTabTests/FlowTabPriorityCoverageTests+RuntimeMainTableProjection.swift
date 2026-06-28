@@ -201,8 +201,7 @@ extension FlowTabPriorityCoverageTests {
         let homeProjection = try XCTUnwrap(readModelStore.readHomeSummaryProjection())
         XCTAssertEqual(homeProjection.summary(for: appID)?.windowCount, 1)
         XCTAssertFalse(homeProjection.freshness.isCompleteForScope)
-        let detailProjection = try XCTUnwrap(readModelStore.readHomeAppDetailProjection(appID: appID))
-        XCTAssertEqual(detailProjection.candidate.windows.map(\.id), app.windows.map(\.id))
+        XCTAssertNil(readModelStore.readHomeAppDetailProjection(appID: appID))
 
         let searchRead = readModelStore.readCommittedSearchIndexForSearch()
         XCTAssertEqual(searchRead.readiness, .degradedStaleCommitted)
@@ -1465,6 +1464,53 @@ extension FlowTabPriorityCoverageTests {
             homeDetailProjection.context.windowsByID[window.id]?.cgWindowID,
             240_701
         )
+    }
+
+    func testRuntimeReadModelStoreDoesNotDeriveHomeDetailFromAppSwitcherProjection() throws {
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let window = WindowCandidate(
+            id: "app-switcher-only-home-detail-window",
+            title: "App Switcher Only Home Detail",
+            isMinimized: false,
+            lastActiveAt: 500
+        )
+        let candidate = AppSwitchCandidate(
+            id: appID,
+            displayName: runningApp.localizedName ?? appID,
+            groupID: RuntimeAppIdentity.groupID(
+                for: runningApp.bundleIdentifier,
+                fallbackName: runningApp.localizedName ?? appID
+            ),
+            lastActiveAt: 500,
+            windows: [window]
+        )
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: runningApp,
+            windowsByID: [
+                window.id: RuntimeWindowContext(
+                    id: window.id,
+                    title: window.title,
+                    isMinimized: window.isMinimized,
+                    ownerPID: runningApp.processIdentifier,
+                    cgWindowID: 240_702,
+                    spaceIDs: [5]
+                )
+            ]
+        )
+        let store = RuntimeReadModelStore()
+
+        store.commitAppSwitcherProjection(
+            apps: [candidate],
+            contextsByID: [appID: context],
+            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: runningApp)],
+            generatedAt: 42
+        )
+
+        XCTAssertNotNil(store.readAppSwitcherProjection()?.contextsByID[appID])
+        XCTAssertNotNil(store.readHomeSummaryProjection()?.summary(for: appID))
+        XCTAssertNil(store.readHomeAppDetailProjection(appID: appID))
     }
 
     private func makeMainTableProjectionWindowRecord(
