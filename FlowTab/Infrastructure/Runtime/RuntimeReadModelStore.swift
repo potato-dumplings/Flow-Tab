@@ -190,78 +190,6 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         pendingRepairScopes.insert("activationVerified:\(appID)")
     }
 
-    func markAppTerminated(appID: String, pid: pid_t) {
-        lock.lock()
-        defer { lock.unlock() }
-
-        guard shouldRemoveTerminatedAppLocked(appID: appID, pid: pid) else {
-            dirtyPIDs.remove(pid)
-            return
-        }
-        let survivingDirectoryEntries = appDirectoryEntriesLocked(forAppID: appID)
-            .filter { $0.pid != pid }
-        if !survivingDirectoryEntries.isEmpty {
-            markAppInstanceTerminatedLocked(appID: appID, pid: pid)
-            return
-        }
-
-        let hadAppSwitcherState = appSwitcherProjection?.apps.contains { $0.id == appID } == true
-            || appSwitcherProjection?.contextsByID[appID] != nil
-        let hadHomeState = homeSummaryProjection?.summaries.contains { $0.appID == appID } == true
-        let hadCurrentAppState = currentAppWindowProjectionsByAppID[appID] != nil
-        let hadCommittedSearchState = committedSearchIndex?.appEntries.contains { $0.appID == appID } == true
-            || committedSearchIndex?.windowEntries.contains { $0.appID == appID } == true
-        let hadDirtyState = dirtyAppIDs.contains(appID)
-            || dirtyPIDs.contains(pid)
-            || pendingRepairScopes.contains { $0.contains(appID) }
-        guard hadAppSwitcherState
-            || hadHomeState
-            || hadCurrentAppState
-            || hadCommittedSearchState
-            || hadDirtyState
-        else {
-            return
-        }
-
-        let generatedAt = Date.timeIntervalSinceReferenceDate
-        generation.appLifecycle &+= 1
-        markProjectionCommittedLocked()
-        dirtyAppIDs.remove(appID)
-        dirtyPIDs.remove(pid)
-        pendingRepairScopes = pendingRepairScopes.filter { !$0.contains(appID) }
-        currentAppWindowProjectionsByAppID.removeValue(forKey: appID)
-        appDirectoryState.remove(appID: appID, pid: pid, generatedAt: generatedAt)
-        if let projection = appSwitcherProjection {
-            appSwitcherProjection = RuntimeAppSwitcherProjection(
-                apps: projection.apps.filter { $0.id != appID },
-                contextsByID: projection.contextsByID.filter { $0.key != appID },
-                freshness: freshnessLocked(
-                    generatedAt: generatedAt,
-                    isCompleteForScope: !isDirtyLocked
-                )
-            )
-        }
-        if let summaries = homeSummaryProjection?.summaries.filter({ $0.appID != appID }) {
-            homeSummaryProjection = RuntimeHomeSummaryProjection(
-                summaries: summaries,
-                freshness: freshnessLocked(
-                    generatedAt: generatedAt,
-                    isCompleteForScope: !isDirtyLocked
-                )
-            )
-        }
-        if let projection = committedSearchIndex {
-            committedSearchIndex = projection.removingApp(
-                appID,
-                freshness: staleCommittedSearchFreshnessLocked(
-                    previous: projection.freshness,
-                    generatedAt: generatedAt,
-                    isCompleteForScope: false
-                )
-            )
-        }
-    }
-
     func markAppTerminatedForMainTableProjection(appID: String, pid: pid_t) {
         lock.lock()
         defer { lock.unlock() }
@@ -337,58 +265,6 @@ final class RuntimeReadModelStore: @unchecked Sendable {
                 || projection.currentAppWindowPayload.context.runningApp.processIdentifier == pid
            ) {
             currentAppWindowProjectionsByAppID.removeValue(forKey: appID)
-        }
-    }
-
-    private func markAppInstanceTerminatedLocked(appID: String, pid: pid_t) {
-        let generatedAt = Date.timeIntervalSinceReferenceDate
-        generation.appLifecycle &+= 1
-        markProjectionCommittedLocked()
-        dirtyAppIDs.insert(appID)
-        dirtyPIDs.remove(pid)
-        pendingRepairScopes.insert("appTerminated:\(appID)")
-
-        appDirectoryState.remove(pid: pid, generatedAt: generatedAt)
-        if let projection = appSwitcherProjection {
-            var contextsByID = projection.contextsByID
-            if contextsByID[appID]?.runningApp.processIdentifier == pid {
-                contextsByID.removeValue(forKey: appID)
-            }
-            appSwitcherProjection = RuntimeAppSwitcherProjection(
-                apps: projection.apps,
-                contextsByID: contextsByID,
-                freshness: freshnessLocked(
-                    generatedAt: generatedAt,
-                    isCompleteForScope: !isDirtyLocked
-                )
-            )
-        }
-        if let projection = currentAppWindowProjectionsByAppID[appID],
-           (
-            projection.currentAppWindowPayload.summary.pid == pid
-                || projection.currentAppWindowPayload.context.runningApp.processIdentifier == pid
-           ) {
-            currentAppWindowProjectionsByAppID.removeValue(forKey: appID)
-        }
-        if let projection = homeSummaryProjection {
-            homeSummaryProjection = RuntimeHomeSummaryProjection(
-                summaries: projection.summaries,
-                freshness: freshnessLocked(
-                    generatedAt: generatedAt,
-                    isCompleteForScope: !isDirtyLocked
-                )
-            )
-        }
-        if let projection = committedSearchIndex {
-            committedSearchIndex = RuntimeSearchIndexProjection(
-                appEntries: projection.appEntries,
-                windowEntries: projection.windowEntries,
-                freshness: staleCommittedSearchFreshnessLocked(
-                    previous: projection.freshness,
-                    generatedAt: generatedAt,
-                    isCompleteForScope: false
-                )
-            )
         }
     }
 
@@ -698,23 +574,6 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         RuntimeProjectionFreshness(
             generatedAt: generatedAt,
             sourceGeneration: generation,
-            dirtyAppIDs: dirtyAppIDs,
-            dirtyPIDs: dirtyPIDs,
-            dirtyCGWindowIDs: dirtyCGWindowIDs,
-            spaceTopologySignatureSummary: spaceTopologySignatureSummary,
-            pendingRepairScopes: pendingRepairScopes,
-            isCompleteForScope: isCompleteForScope
-        )
-    }
-
-    private func staleCommittedSearchFreshnessLocked(
-        previous: RuntimeProjectionFreshness,
-        generatedAt: TimeInterval,
-        isCompleteForScope: Bool
-    ) -> RuntimeProjectionFreshness {
-        RuntimeProjectionFreshness(
-            generatedAt: generatedAt,
-            sourceGeneration: previous.sourceGeneration,
             dirtyAppIDs: dirtyAppIDs,
             dirtyPIDs: dirtyPIDs,
             dirtyCGWindowIDs: dirtyCGWindowIDs,
