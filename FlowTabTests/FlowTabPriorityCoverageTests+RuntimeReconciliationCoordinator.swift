@@ -156,14 +156,13 @@ extension FlowTabPriorityCoverageTests {
 
         store.commitFullRepairAppDirectoryEvidence([entry], generatedAt: 29)
         let summary = store.commitMainTableAppSwitcherProjectionPayload(
-            RuntimeFullRepairProjectionPayload(
+            RuntimeAppSwitcherProjectionPayload(
                 apps: apps,
                 contextsByID: [app.id: makeRuntimeAppContext(
                     appID: app.id,
                     runningApp: .current,
                     windows: app.windows
-                )],
-                appDirectoryEntries: [entry]
+                )]
             ),
             generatedAt: 30
         )
@@ -222,10 +221,9 @@ extension FlowTabPriorityCoverageTests {
         )
 
         let summary = store.commitMainTableAppSwitcherProjectionPayload(
-            RuntimeFullRepairProjectionPayload(
+            RuntimeAppSwitcherProjectionPayload(
                 apps: [repairedApp],
-                contextsByID: [:],
-                appDirectoryEntries: []
+                contextsByID: [:]
             ),
             generatedAt: 30
         )

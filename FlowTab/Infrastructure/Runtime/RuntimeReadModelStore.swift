@@ -58,7 +58,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
 
     @discardableResult
     func commitMainTableAppSwitcherProjectionPayload(
-        _ payload: RuntimeFullRepairProjectionPayload,
+        _ payload: RuntimeAppSwitcherProjectionPayload,
         generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
     ) -> RuntimeAppSwitcherProjectionCommitSummary {
         lock.lock()

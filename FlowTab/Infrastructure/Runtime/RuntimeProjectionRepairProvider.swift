@@ -35,10 +35,10 @@ private struct RuntimeFocusedCurrentAppRepairEvidence {
 }
 
 extension RuntimeProjectionRepairProvider {
-    func fullAppSwitcherProjectionPayloadFromMainTables(
+    func appSwitcherProjectionPayloadFromMainTables(
         appDirectoryEntries: [RuntimeAppDirectoryEntry],
         generatedAt: TimeInterval
-    ) -> RuntimeFullRepairProjectionPayload? {
+    ) -> RuntimeAppSwitcherProjectionPayload? {
         guard !appDirectoryEntries.isEmpty else { return nil }
 
         var windowsByPID: [pid_t: [RuntimeWindowListEntry]] = [:]
@@ -108,14 +108,13 @@ extension RuntimeProjectionRepairProvider {
             return (candidate: candidate, context: context)
         }
 
-        return RuntimeFullRepairProjectionPayload(
+        return RuntimeAppSwitcherProjectionPayload(
             apps: rows.map(\.candidate),
             contextsByID: Dictionary(
                 uniqueKeysWithValues: rows.compactMap { row in
                     row.context.map { ($0.appID, $0) }
                 }
-            ),
-            appDirectoryEntries: appDirectoryEntries
+            )
         )
     }
 

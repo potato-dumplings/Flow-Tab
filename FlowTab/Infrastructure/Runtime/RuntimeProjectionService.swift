@@ -333,7 +333,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     ) -> Bool {
         guard
             let appDirectoryEntries = readModelStore.readAppDirectoryProjection()?.entries,
-            let payload = repairProvider.fullAppSwitcherProjectionPayloadFromMainTables(
+            let payload = repairProvider.appSwitcherProjectionPayloadFromMainTables(
                 appDirectoryEntries: appDirectoryEntries,
                 generatedAt: generatedAt
             )

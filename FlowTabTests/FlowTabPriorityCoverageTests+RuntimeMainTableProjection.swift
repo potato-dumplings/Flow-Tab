@@ -35,7 +35,7 @@ extension FlowTabPriorityCoverageTests {
         let appDirectoryEntry = RuntimeAppDirectoryEntry(app: runningApp)
 
         let payload = try XCTUnwrap(
-            provider.fullAppSwitcherProjectionPayloadFromMainTables(
+            provider.appSwitcherProjectionPayloadFromMainTables(
                 appDirectoryEntries: [appDirectoryEntry],
                 generatedAt: 80
             )
@@ -56,7 +56,6 @@ extension FlowTabPriorityCoverageTests {
             payload.contextsByID[appID]?.windowsByID[projectedWindowID]?.spaceIDs,
             [5]
         )
-        XCTAssertEqual(payload.appDirectoryEntries, [appDirectoryEntry])
     }
 
     func testRuntimeProjectionServiceCommitsAppSwitcherProjectionFromMainTablesAsStale() throws {
@@ -283,10 +282,9 @@ extension FlowTabPriorityCoverageTests {
             pendingScope: "appWindows:\(repairedApp.id)"
         )
         store.commitMainTableAppSwitcherProjectionPayload(
-            RuntimeFullRepairProjectionPayload(
+            RuntimeAppSwitcherProjectionPayload(
                 apps: [repairedApp],
-                contextsByID: [:],
-                appDirectoryEntries: []
+                contextsByID: [:]
             ),
             generatedAt: 20
         )

@@ -4,6 +4,19 @@ import CoreGraphics
 import Foundation
 import FlowTabCore
 
+struct RuntimeAppSwitcherProjectionPayload {
+    let apps: [AppSwitchCandidate]
+    let contextsByID: [String: RuntimeAppContext]
+
+    init(
+        apps: [AppSwitchCandidate],
+        contextsByID: [String: RuntimeAppContext]
+    ) {
+        self.apps = apps
+        self.contextsByID = contextsByID
+    }
+}
+
 struct RuntimeFullRepairProjectionPayload {
     let apps: [AppSwitchCandidate]
     let contextsByID: [String: RuntimeAppContext]
