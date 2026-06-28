@@ -3,7 +3,7 @@ import CoreGraphics
 import Foundation
 import FlowTabCore
 
-final class RuntimeProjectionRepairProvider: RuntimeProjectionRepairProviding {
+final class RuntimeProjectionRepairProvider: RuntimeProjectionRepairProviding, RuntimeMainTableProjectionBuilding {
     private let windowRecordStore: RuntimeWindowRecordStore
     private let reconciliationCoordinator: RuntimeReconciliationCoordinator
     private let repairFactSource: RuntimeProjectionRepairFactSource

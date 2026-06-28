@@ -6,18 +6,23 @@ let sharedRuntimeProjectionService = RuntimeProjectionService()
 final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Sendable {
     private let maintenanceQueue: DispatchQueue
     private let repairProvider: RuntimeProjectionRepairProviding
+    private let mainTableProjectionBuilder: RuntimeMainTableProjectionBuilding
     private let readModelStore: RuntimeReadModelStore
     private let reconciliationDrainer: RuntimeProjectionReconciliationDrainer
 
     init(
         label: String = "FlowTab.RuntimeProjectionService",
         repairProvider: RuntimeProjectionRepairProviding = RuntimeProjectionRepairProvider(),
+        mainTableProjectionBuilder: RuntimeMainTableProjectionBuilding? = nil,
         readModelStore: RuntimeReadModelStore = RuntimeReadModelStore(),
         reconciliationExecutor: @escaping RuntimeProjectionReconciliationExecutor =
             runtimeProjectionDefaultReconciliationExecutor
     ) {
         maintenanceQueue = DispatchQueue(label: label, qos: .utility)
         self.repairProvider = repairProvider
+        self.mainTableProjectionBuilder = mainTableProjectionBuilder
+            ?? (repairProvider as? RuntimeMainTableProjectionBuilding)
+            ?? RuntimeUnavailableMainTableProjectionBuilder()
         self.readModelStore = readModelStore
         reconciliationDrainer = RuntimeProjectionReconciliationDrainer(
             repairProvider: repairProvider,
@@ -198,7 +203,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             let appDirectoryEntries = readModelStore
                 .readAppDirectoryProjection()?
                 .entries(forAppID: appID) ?? []
-            if let payload = repairProvider.currentAppWindowPayloadFromMainTables(
+            if let payload = mainTableProjectionBuilder.currentAppWindowPayloadFromMainTables(
                 appID: appID,
                 pid: pid,
                 appDirectoryEntries: appDirectoryEntries,
@@ -331,7 +336,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     ) -> Bool {
         guard
             let appDirectoryEntries = readModelStore.readAppDirectoryProjection()?.entries,
-            let payload = repairProvider.appSwitcherProjectionPayloadFromMainTables(
+            let payload = mainTableProjectionBuilder.appSwitcherProjectionPayloadFromMainTables(
                 appDirectoryEntries: appDirectoryEntries,
                 generatedAt: generatedAt
             )
@@ -354,7 +359,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             let appDirectoryEntries = readModelStore
                 .readAppDirectoryProjection()?
                 .entries(forAppID: evidence.appID) ?? evidence.appDirectoryEntries
-            guard let mainTablePayload = repairProvider.currentAppWindowPayloadFromMainTables(
+            guard let mainTablePayload = mainTableProjectionBuilder.currentAppWindowPayloadFromMainTables(
                 appID: evidence.appID,
                 pid: evidence.pid,
                 appDirectoryEntries: appDirectoryEntries,

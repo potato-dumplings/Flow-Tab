@@ -526,8 +526,9 @@ extension FlowTabTests {
 
         withLaunchArgumentsForTesting(["FlowTab"]) {
             let repairProvider = RuntimeProjectionRepairProvider()
+            let projectionBuilder: RuntimeMainTableProjectionBuilding = repairProvider
             let repairEvidence = repairProvider.fullRepairEvidence()
-            let projectionPayload = repairProvider.appSwitcherProjectionPayloadFromMainTables(
+            let projectionPayload = projectionBuilder.appSwitcherProjectionPayloadFromMainTables(
                 appDirectoryEntries: repairEvidence.appDirectoryEntries,
                 generatedAt: Date.timeIntervalSinceReferenceDate
             )

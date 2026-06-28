@@ -21,7 +21,7 @@ extension FlowTabPriorityCoverageTests {
         return committed
     }
 
-    func testRuntimeProjectionRepairProviderBuildsAppSwitcherPayloadFromMainTables() throws {
+    func testRuntimeMainTableProjectionBuilderBuildsAppSwitcherPayloadFromMainTables() throws {
         let runningApp = NSRunningApplication.current
         let appID = RuntimeAppIdentity.appID(for: runningApp)
         let pid = runningApp.processIdentifier
@@ -44,14 +44,14 @@ extension FlowTabPriorityCoverageTests {
                 )
             ]
         )
-        let provider = RuntimeProjectionRepairProvider(
+        let builder: RuntimeMainTableProjectionBuilding = RuntimeProjectionRepairProvider(
             windowRecordStore: windowRecordStore,
             reconciliationCoordinator: RuntimeReconciliationCoordinator()
         )
         let appDirectoryEntry = RuntimeAppDirectoryEntry(app: runningApp)
 
         let payload = try XCTUnwrap(
-            provider.appSwitcherProjectionPayloadFromMainTables(
+            builder.appSwitcherProjectionPayloadFromMainTables(
                 appDirectoryEntries: [appDirectoryEntry],
                 generatedAt: 80
             )
