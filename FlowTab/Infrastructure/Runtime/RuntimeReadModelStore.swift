@@ -16,37 +16,6 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     private var currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection] = [:]
     private var committedSearchIndex: RuntimeSearchIndexProjection?
 
-    func commitAppSwitcherProjection(
-        apps: [AppSwitchCandidate],
-        contextsByID: [String: RuntimeAppContext],
-        appDirectoryEntries: [RuntimeAppDirectoryEntry]?,
-        clearsDirtyState: Bool = true,
-        generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
-    ) {
-        lock.lock()
-        defer { lock.unlock() }
-
-        markProjectionCommittedLocked()
-        if clearsDirtyState {
-            clearDirtyStateLocked()
-        }
-        appSwitcherProjection = RuntimeAppSwitcherProjection(
-            apps: apps,
-            contextsByID: contextsByID,
-            freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: !isDirtyLocked)
-        )
-        homeSummaryProjection = RuntimeHomeSummaryProjection(
-            summaries: homeSummariesLocked(for: apps, contextsByID: contextsByID),
-            freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: !isDirtyLocked)
-        )
-        if let appDirectoryEntries {
-            replaceAppDirectoryStateLocked(
-                entries: appDirectoryEntries,
-                generatedAt: generatedAt
-            )
-        }
-    }
-
     @discardableResult
     func commitMainTableAppSwitcherProjectionPayload(
         _ payload: RuntimeAppSwitcherProjectionPayload,

@@ -141,7 +141,7 @@ extension FlowTabPriorityCoverageTests {
             windows: []
         )
         let readModelStore = RuntimeReadModelStore()
-        readModelStore.commitAppSwitcherProjection(
+        readModelStore.seedAppSwitcherProjectionForTesting(
             apps: [committedApp],
             contextsByID: [:],
             appDirectoryEntries: [appDirectoryEntry],
@@ -232,7 +232,7 @@ extension FlowTabPriorityCoverageTests {
             windows: [legacyWindow]
         )
         let readModelStore = RuntimeReadModelStore()
-        readModelStore.commitAppSwitcherProjection(
+        readModelStore.seedAppSwitcherProjectionForTesting(
             apps: [committedApp],
             contextsByID: [:],
             appDirectoryEntries: nil,
@@ -341,7 +341,7 @@ extension FlowTabPriorityCoverageTests {
             windows: [legacyWindow]
         )
         let readModelStore = RuntimeReadModelStore()
-        readModelStore.commitAppSwitcherProjection(
+        readModelStore.seedAppSwitcherProjectionForTesting(
             apps: [committedApp],
             contextsByID: [:],
             appDirectoryEntries: [appDirectoryEntry],
@@ -470,7 +470,7 @@ extension FlowTabPriorityCoverageTests {
             windows: []
         )
         let readModelStore = RuntimeReadModelStore()
-        readModelStore.commitAppSwitcherProjection(
+        readModelStore.seedAppSwitcherProjectionForTesting(
             apps: [committedApp],
             contextsByID: [:],
             appDirectoryEntries: [appDirectoryEntry],
@@ -589,7 +589,7 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
         let readModelStore = RuntimeReadModelStore()
-        readModelStore.commitAppSwitcherProjection(
+        readModelStore.seedAppSwitcherProjectionForTesting(
             apps: [survivingApp, terminatedApp],
             contextsByID: [:],
             appDirectoryEntries: [
@@ -691,7 +691,7 @@ extension FlowTabPriorityCoverageTests {
             windows: [legacyWindow]
         )
         let readModelStore = RuntimeReadModelStore()
-        readModelStore.commitAppSwitcherProjection(
+        readModelStore.seedAppSwitcherProjectionForTesting(
             apps: [committedApp],
             contextsByID: [:],
             appDirectoryEntries: [appDirectoryEntry],
@@ -810,7 +810,7 @@ extension FlowTabPriorityCoverageTests {
             windows: [legacyWindow]
         )
         let readModelStore = RuntimeReadModelStore()
-        readModelStore.commitAppSwitcherProjection(
+        readModelStore.seedAppSwitcherProjectionForTesting(
             apps: [committedApp],
             contextsByID: [:],
             appDirectoryEntries: [appDirectoryEntry],
@@ -932,7 +932,7 @@ extension FlowTabPriorityCoverageTests {
             windows: []
         )
         let readModelStore = RuntimeReadModelStore()
-        readModelStore.commitAppSwitcherProjection(
+        readModelStore.seedAppSwitcherProjectionForTesting(
             apps: [committedApp],
             contextsByID: [:],
             appDirectoryEntries: [appDirectoryEntry],
@@ -1000,7 +1000,7 @@ extension FlowTabPriorityCoverageTests {
         let committedApps = searchScenarioApps()
         let repairedApp = try XCTUnwrap(committedApps.first)
         let pid = pid_t(42_120)
-        store.commitAppSwitcherProjection(
+        store.seedAppSwitcherProjectionForTesting(
             apps: committedApps,
             contextsByID: [:],
             appDirectoryEntries: nil,
@@ -1049,7 +1049,7 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
         let pid = pid_t(42_121)
-        store.commitAppSwitcherProjection(
+        store.seedAppSwitcherProjectionForTesting(
             apps: committedApps,
             contextsByID: [:],
             appDirectoryEntries: nil,
@@ -1109,7 +1109,7 @@ extension FlowTabPriorityCoverageTests {
             windows: []
         )
         let readModelStore = RuntimeReadModelStore()
-        readModelStore.commitAppSwitcherProjection(
+        readModelStore.seedAppSwitcherProjectionForTesting(
             apps: [committedApp],
             contextsByID: [:],
             appDirectoryEntries: [appDirectoryEntry],
@@ -1209,7 +1209,7 @@ extension FlowTabPriorityCoverageTests {
             windows: []
         )
         let readModelStore = RuntimeReadModelStore()
-        readModelStore.commitAppSwitcherProjection(
+        readModelStore.seedAppSwitcherProjectionForTesting(
             apps: [committedApp],
             contextsByID: [:],
             appDirectoryEntries: [appDirectoryEntry],
@@ -1315,7 +1315,7 @@ extension FlowTabPriorityCoverageTests {
             windows: [legacyWindow]
         )
         let readModelStore = RuntimeReadModelStore()
-        readModelStore.commitAppSwitcherProjection(
+        readModelStore.seedAppSwitcherProjectionForTesting(
             apps: [committedApp],
             contextsByID: [:],
             appDirectoryEntries: nil,
@@ -1501,7 +1501,7 @@ extension FlowTabPriorityCoverageTests {
         )
         let store = RuntimeReadModelStore()
 
-        store.commitAppSwitcherProjection(
+        store.seedAppSwitcherProjectionForTesting(
             apps: [candidate],
             contextsByID: [appID: context],
             appDirectoryEntries: [RuntimeAppDirectoryEntry(app: runningApp)],

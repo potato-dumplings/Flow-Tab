@@ -606,7 +606,7 @@ extension FlowTabTests {
             ]
         )
         let store = RuntimeReadModelStore()
-        store.commitAppSwitcherProjection(
+        store.seedAppSwitcherProjectionForTesting(
             apps: [committedSearchApp],
             contextsByID: [:],
             appDirectoryEntries: nil,

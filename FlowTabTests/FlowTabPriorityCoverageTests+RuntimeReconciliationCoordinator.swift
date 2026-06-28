@@ -47,7 +47,7 @@ extension FlowTabPriorityCoverageTests {
             launchDate: nil
         )
 
-        store.commitAppSwitcherProjection(
+        store.seedAppSwitcherProjectionForTesting(
             apps: apps,
             contextsByID: [app.id: makeRuntimeAppContext(
                 appID: app.id,
@@ -213,7 +213,7 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
 
-        store.commitAppSwitcherProjection(
+        store.seedAppSwitcherProjectionForTesting(
             apps: committedApps,
             contextsByID: [:],
             appDirectoryEntries: nil,
@@ -279,7 +279,7 @@ extension FlowTabPriorityCoverageTests {
             launchDate: nil
         )
 
-        store.commitAppSwitcherProjection(
+        store.seedAppSwitcherProjectionForTesting(
             apps: apps,
             contextsByID: [:],
             appDirectoryEntries: [terminatedDirectoryEntry, remainingDirectoryEntry],
@@ -394,7 +394,7 @@ extension FlowTabPriorityCoverageTests {
             windows: app.windows
         )
 
-        store.commitAppSwitcherProjection(
+        store.seedAppSwitcherProjectionForTesting(
             apps: [app],
             contextsByID: [app.id: context],
             appDirectoryEntries: nil,
@@ -507,7 +507,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertNil(store.readAppDirectoryProjection())
         XCTAssertFalse(store.diagnostics().hasAppDirectoryProjection)
 
-        store.commitAppSwitcherProjection(
+        store.seedAppSwitcherProjectionForTesting(
             apps: apps,
             contextsByID: [
                 app.id: makeRuntimeAppContext(
@@ -540,7 +540,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(projection.freshness.isCompleteForScope)
         XCTAssertEqual(projection.freshness.dirtyAppIDs, [launchedEntry.appID])
 
-        store.commitAppSwitcherProjection(
+        store.seedAppSwitcherProjectionForTesting(
             apps: apps,
             contextsByID: [:],
             appDirectoryEntries: nil,
@@ -579,7 +579,7 @@ extension FlowTabPriorityCoverageTests {
             launchDate: nil
         )
 
-        store.commitAppSwitcherProjection(
+        store.seedAppSwitcherProjectionForTesting(
             apps: apps,
             contextsByID: [activeApp.id: context],
             appDirectoryEntries: [activeDirectoryEntry, secondaryDirectoryEntry],
@@ -649,7 +649,7 @@ extension FlowTabPriorityCoverageTests {
             localizedName: activeEntry.localizedName,
             launchDate: nil
         )
-        store.commitAppSwitcherProjection(
+        store.seedAppSwitcherProjectionForTesting(
             apps: [app],
             contextsByID: [
                 app.id: makeRuntimeAppContext(
@@ -692,11 +692,10 @@ extension FlowTabPriorityCoverageTests {
             windows: []
         )
         let readModelStore = RuntimeReadModelStore()
-        readModelStore.commitAppSwitcherProjection(
+        readModelStore.seedAppSwitcherProjectionForTesting(
             apps: [seededApp],
             contextsByID: [:],
             appDirectoryEntries: nil,
-            clearsDirtyState: false,
             generatedAt: 1
         )
         let service = RuntimeProjectionService(
@@ -728,7 +727,7 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeReadModelStoreSearchReadinessTracksDirtyMetadataFromCommittedIndexOnly() throws {
         let store = RuntimeReadModelStore()
         let committedApps = searchScenarioApps()
-        store.commitAppSwitcherProjection(
+        store.seedAppSwitcherProjectionForTesting(
             apps: committedApps,
             contextsByID: [:],
             appDirectoryEntries: nil,
@@ -777,7 +776,7 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
         let pid = pid_t(42_102)
-        store.commitAppSwitcherProjection(
+        store.seedAppSwitcherProjectionForTesting(
             apps: committedApps,
             contextsByID: [:],
             appDirectoryEntries: nil,
@@ -839,7 +838,7 @@ extension FlowTabPriorityCoverageTests {
         )
         let pid = pid_t(42_109)
         let payload = makeRuntimeCurrentAppWindowPayload(app: repairedApp, pid: pid)
-        store.commitAppSwitcherProjection(
+        store.seedAppSwitcherProjectionForTesting(
             apps: committedApps,
             contextsByID: [:],
             appDirectoryEntries: nil,
@@ -1620,7 +1619,7 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
         let appDirectoryEntry = RuntimeAppDirectoryEntry(app: runningApp)
-        store.commitAppSwitcherProjection(
+        store.seedAppSwitcherProjectionForTesting(
             apps: [existingApp],
             contextsByID: [:],
             appDirectoryEntries: nil,
@@ -2030,7 +2029,7 @@ extension FlowTabPriorityCoverageTests {
         let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
         let store = RuntimeReadModelStore()
         let committedApps = searchScenarioApps()
-        store.commitAppSwitcherProjection(
+        store.seedAppSwitcherProjectionForTesting(
             apps: committedApps,
             contextsByID: [:],
             appDirectoryEntries: nil,
@@ -2117,7 +2116,7 @@ extension FlowTabPriorityCoverageTests {
         let committedApps = searchScenarioApps()
         let dirtyApp = try XCTUnwrap(committedApps.first)
         let pid = pid_t(42_104)
-        store.commitAppSwitcherProjection(
+        store.seedAppSwitcherProjectionForTesting(
             apps: committedApps,
             contextsByID: [:],
             appDirectoryEntries: nil,
@@ -2238,7 +2237,7 @@ extension FlowTabPriorityCoverageTests {
                 )
             ]
         )
-        store.commitAppSwitcherProjection(
+        store.seedAppSwitcherProjectionForTesting(
             apps: [committedApp],
             contextsByID: [:],
             appDirectoryEntries: nil,
@@ -2319,7 +2318,7 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
         let pid = pid_t(42_103)
-        store.commitAppSwitcherProjection(
+        store.seedAppSwitcherProjectionForTesting(
             apps: committedApps,
             contextsByID: [:],
             appDirectoryEntries: nil,
@@ -2388,7 +2387,7 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
         let pid = pid_t(42_107)
-        store.commitAppSwitcherProjection(
+        store.seedAppSwitcherProjectionForTesting(
             apps: committedApps,
             contextsByID: [:],
             appDirectoryEntries: nil,
@@ -2459,7 +2458,7 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
         let pid = pid_t(42_105)
-        store.commitAppSwitcherProjection(
+        store.seedAppSwitcherProjectionForTesting(
             apps: committedApps,
             contextsByID: [:],
             appDirectoryEntries: nil,
@@ -2578,7 +2577,7 @@ extension FlowTabPriorityCoverageTests {
                 )
             ]
         )
-        store.commitAppSwitcherProjection(
+        store.seedAppSwitcherProjectionForTesting(
             apps: [committedApp],
             contextsByID: [:],
             appDirectoryEntries: nil,

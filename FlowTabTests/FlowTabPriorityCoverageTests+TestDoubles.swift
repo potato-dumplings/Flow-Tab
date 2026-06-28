@@ -447,7 +447,7 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         generatedAt: TimeInterval
     ) -> RuntimeSearchIndexProjection {
         let store = RuntimeReadModelStore()
-        store.commitAppSwitcherProjection(
+        store.seedAppSwitcherProjectionForTesting(
             apps: apps,
             contextsByID: [:],
             appDirectoryEntries: nil,

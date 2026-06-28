@@ -5,6 +5,26 @@ import XCTest
 @testable import FlowTab
 import FlowTabCore
 
+extension RuntimeReadModelStore {
+    func seedAppSwitcherProjectionForTesting(
+        apps: [AppSwitchCandidate],
+        contextsByID: [String: RuntimeAppContext],
+        appDirectoryEntries: [RuntimeAppDirectoryEntry]?,
+        generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
+    ) {
+        if let appDirectoryEntries {
+            commitFullRepairAppDirectoryEvidence(appDirectoryEntries, generatedAt: generatedAt)
+        }
+        commitMainTableAppSwitcherProjectionPayload(
+            RuntimeAppSwitcherProjectionPayload(
+                apps: apps,
+                contextsByID: contextsByID
+            ),
+            generatedAt: generatedAt
+        )
+    }
+}
+
 extension FlowTabPriorityCoverageTests {
     func commitScenarioApps() -> [AppSwitchCandidate] {
         [
