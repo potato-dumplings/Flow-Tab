@@ -63,32 +63,25 @@ struct RuntimeSpaceTopologyReconciliationTarget: Equatable {
 }
 
 struct RuntimeUITestProjectionDatasetFacts {
-    let fullRepairProjectionPayload: RuntimeFullRepairProjectionPayload
-    let currentAppWindowPayloadsByAppID: [String: RuntimeCurrentAppWindowPayload]
+    let appDirectoryEntries: [RuntimeAppDirectoryEntry]
+    let appCount: Int
+    let windowCount: Int
+    private let focusedRepairEvidenceByPID: [pid_t: RuntimeCurrentAppRepairEvidence]
 
-    var appCount: Int {
-        fullRepairProjectionPayload.apps.count
-    }
-
-    var windowCount: Int {
-        fullRepairProjectionPayload.apps.reduce(0) { $0 + $1.windows.count }
-    }
-
-    var appDirectoryEntries: [RuntimeAppDirectoryEntry] {
-        fullRepairProjectionPayload.appDirectoryEntries
+    init(
+        appDirectoryEntries: [RuntimeAppDirectoryEntry],
+        appCount: Int,
+        windowCount: Int,
+        focusedRepairEvidenceByPID: [pid_t: RuntimeCurrentAppRepairEvidence]
+    ) {
+        self.appDirectoryEntries = appDirectoryEntries
+        self.appCount = appCount
+        self.windowCount = windowCount
+        self.focusedRepairEvidenceByPID = focusedRepairEvidenceByPID
     }
 
     func focusedCurrentAppRepairEvidence(processIdentifier pid: pid_t) -> RuntimeCurrentAppRepairEvidence? {
-        currentAppWindowPayloadsByAppID.values.first {
-            $0.summary.pid == pid
-        }.map { payload in
-            RuntimeCurrentAppRepairEvidence(
-                appID: payload.summary.appID,
-                pid: payload.summary.pid,
-                appDirectoryEntries: payload.appDirectoryEntries,
-                currentAppWindowPayloadWasEmpty: payload.candidate.windows.isEmpty
-            )
-        }
+        focusedRepairEvidenceByPID[pid]
     }
 }
 
@@ -149,13 +142,25 @@ struct RuntimeProjectionRepairFactSource {
 
     func collectUITestProjectionDatasetFacts() -> RuntimeUITestProjectionDatasetFacts? {
         guard let dataset = FlowTabUITestRuntimeProjectionDataset.current() else { return nil }
+        let focusedRepairEvidenceByPID = Dictionary(
+            dataset.currentAppWindowPayloadsByAppID.values.map { payload in
+                (
+                    payload.summary.pid,
+                    RuntimeCurrentAppRepairEvidence(
+                        appID: payload.summary.appID,
+                        pid: payload.summary.pid,
+                        appDirectoryEntries: payload.appDirectoryEntries,
+                        currentAppWindowPayloadWasEmpty: payload.candidate.windows.isEmpty
+                    )
+                )
+            },
+            uniquingKeysWith: { existing, _ in existing }
+        )
         return RuntimeUITestProjectionDatasetFacts(
-            fullRepairProjectionPayload: RuntimeFullRepairProjectionPayload(
-                apps: dataset.appSwitcherApps,
-                contextsByID: dataset.appSwitcherContextsByID,
-                appDirectoryEntries: dataset.appDirectoryEntries
-            ),
-            currentAppWindowPayloadsByAppID: dataset.currentAppWindowPayloadsByAppID
+            appDirectoryEntries: dataset.appDirectoryEntries,
+            appCount: dataset.appSwitcherApps.count,
+            windowCount: dataset.appSwitcherApps.reduce(0) { $0 + $1.windows.count },
+            focusedRepairEvidenceByPID: focusedRepairEvidenceByPID
         )
     }
 
