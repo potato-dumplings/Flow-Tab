@@ -258,7 +258,13 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     func signalAppTerminated(appID: String, pid: pid_t) {
         readModelStore.markAppTerminated(appID: appID, pid: pid)
         maintenanceQueue.async { [self] in
+            let now = Date.timeIntervalSinceReferenceDate
             repairProvider.recordAppTerminated(processIdentifier: pid)
+            commitMainTableAppSwitcherProjectionLocked(
+                generatedAt: now,
+                requiresExistingProjectionCoverage: true,
+                permittedMissingAppIDs: [appID]
+            )
             RuntimeLog.debug(.projection, "runtimeLifecycle appTerminated appID=\(appID) pid=\(pid)")
         }
     }
@@ -349,7 +355,8 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     @discardableResult
     private func commitMainTableAppSwitcherProjectionLocked(
         generatedAt: TimeInterval,
-        requiresExistingProjectionCoverage: Bool
+        requiresExistingProjectionCoverage: Bool,
+        permittedMissingAppIDs: Set<String> = []
     ) -> Bool {
         guard
             let appDirectoryEntries = readModelStore.readAppDirectoryProjection()?.entries,
@@ -363,7 +370,9 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         if requiresExistingProjectionCoverage,
            let existingProjection = readModelStore.readAppSwitcherProjection() {
             let payloadAppIDs = Set(payload.apps.map(\.id))
-            guard Set(existingProjection.apps.map(\.id)).isSubset(of: payloadAppIDs) else {
+            let requiredExistingAppIDs = Set(existingProjection.apps.map(\.id))
+                .subtracting(permittedMissingAppIDs)
+            guard requiredExistingAppIDs.isSubset(of: payloadAppIDs) else {
                 return false
             }
         }
