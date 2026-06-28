@@ -178,6 +178,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 signatureSummary: signalFacts.signatureSummary,
                 pendingScope: "spaceTopology"
             )
+            commitAppDirectoryProviderEvidenceLocked(generatedAt: now)
             commitMainTableAppSwitcherProjectionLocked(
                 generatedAt: now,
                 requiresExistingProjectionCoverage: true
@@ -200,6 +201,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 appDirectoryEntry: appDirectoryEntry,
                 generatedAt: now
             )
+            commitAppDirectoryProviderEvidenceLocked(generatedAt: now)
             commitMainTableAppSwitcherProjectionLocked(
                 generatedAt: now,
                 requiresExistingProjectionCoverage: true
@@ -218,6 +220,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 pid: pid,
                 pendingScope: "appWindows:\(appID)"
             )
+            commitAppDirectoryProviderEvidenceLocked(generatedAt: now)
             commitMainTableCurrentAppProjectionLocked(
                 appID: appID,
                 pid: pid,
@@ -237,6 +240,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 pid: pid,
                 pendingScope: "selectedCurrentAppWindows:\(appID)"
             )
+            commitAppDirectoryProviderEvidenceLocked(generatedAt: now)
             commitMainTableCurrentAppProjectionLocked(
                 appID: appID,
                 pid: pid,
@@ -262,6 +266,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 pid: pid,
                 pendingScope: "axWindowDestroyed:\(appID)"
             )
+            commitAppDirectoryProviderEvidenceLocked(generatedAt: now)
             commitMainTableCurrentAppProjectionLocked(
                 appID: appID,
                 pid: pid,
@@ -281,6 +286,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         maintenanceQueue.async { [self] in
             let now = Date.timeIntervalSinceReferenceDate
             repairProvider.recordAppTerminated(processIdentifier: pid)
+            commitAppDirectoryProviderEvidenceLocked(generatedAt: now)
             commitMainTableAppSwitcherProjectionLocked(
                 generatedAt: now,
                 requiresExistingProjectionCoverage: true,
@@ -299,6 +305,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 pid: verification.ownerPID,
                 affectedCGWindowIDs: affectedCGWindowIDs
             )
+            commitAppDirectoryProviderEvidenceLocked(generatedAt: now)
             commitMainTableCurrentAppProjectionLocked(
                 appID: verification.appID,
                 pid: verification.ownerPID,
