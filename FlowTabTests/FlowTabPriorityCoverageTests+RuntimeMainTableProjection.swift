@@ -538,6 +538,134 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
+    func testRuntimeProjectionServiceCommitsVerifiedFocusProjectionFromMainTablesAsStale() throws {
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let pid = runningApp.processIdentifier
+        let displayName = runningApp.localizedName ?? appID
+        let appDirectoryEntry = RuntimeAppDirectoryEntry(app: runningApp)
+        let legacyWindow = WindowCandidate(
+            id: "legacy-verified-focus-window",
+            title: "Legacy Verified Focus Window",
+            isMinimized: false,
+            lastActiveAt: 100
+        )
+        let committedApp = AppSwitchCandidate(
+            id: appID,
+            displayName: displayName,
+            groupID: RuntimeAppIdentity.groupID(
+                for: runningApp.bundleIdentifier,
+                fallbackName: displayName
+            ),
+            lastActiveAt: 100,
+            windows: [legacyWindow]
+        )
+        let readModelStore = RuntimeReadModelStore()
+        readModelStore.commitAppSwitcherProjection(
+            apps: [committedApp],
+            contextsByID: [:],
+            appDirectoryEntries: [appDirectoryEntry],
+            generatedAt: 10
+        )
+        commitMainTableSearchFreshnessBarrierForTesting(readModelStore, generatedAt: 11)
+        let focusedCGWindowID = CGWindowID(240_809)
+        let focusedAXWindow = AXUIElementCreateApplication(pid)
+        let focusedAXWindowID = AXWindowInspectorForTesting.makeWindowID(pid: pid, index: 0)
+        let focusedReadbackTitle = AXWindowInspector.title(for: focusedAXWindow)
+            ?? "Verified Focus Main Table"
+        AXLiveWindowRegistry.shared.replaceWindows(forPID: pid, with: [focusedAXWindow])
+        defer { AXLiveWindowRegistry.shared.remove(pid: pid) }
+        let windowRecordStore = RuntimeWindowRecordStore()
+        let requestLock = NSLock()
+        var startedRequests: [RuntimeReconciliationRequest] = []
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.MainTableVerifiedFocusProjection",
+            repairProvider: RuntimeProjectionRepairProvider(
+                windowRecordStore: windowRecordStore,
+                reconciliationCoordinator: RuntimeReconciliationCoordinator()
+            ),
+            mainTableProjectionBuilder: RuntimeMainTableProjectionBuilder(
+                windowRecordStore: windowRecordStore
+            ),
+            readModelStore: readModelStore,
+            reconciliationExecutor: { request, _ in
+                requestLock.lock()
+                startedRequests.append(request)
+                requestLock.unlock()
+                return .completed
+            }
+        )
+
+        service.signalWindowFocusVerified(
+            RuntimeWindowFocusVerification(
+                appID: appID,
+                windowID: RuntimeWindowListEntry.cgStableWindowID(
+                    pid: pid,
+                    cgWindowID: focusedCGWindowID
+                ),
+                ownerPID: pid,
+                targetCGWindowID: focusedCGWindowID,
+                focusedCGWindowID: focusedCGWindowID,
+                focusedAXWindow: focusedAXWindow,
+                title: "Verified Focus Main Table",
+                frame: CGRect(x: 25, y: 35, width: 640, height: 480),
+                allowedActions: WindowBindingConfidence.exact.allowedActions
+            )
+        )
+        service.waitForMaintenanceQueueForTesting()
+
+        let projection = try XCTUnwrap(readModelStore.readCurrentAppWindowProjection(appID: appID))
+        XCTAssertEqual(projection.currentAppWindowPayload.candidate.windows.map(\.id), [
+            RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: focusedCGWindowID)
+        ])
+        XCTAssertEqual(projection.currentAppWindowPayload.candidate.windows.map(\.title), [
+            focusedReadbackTitle
+        ])
+        let projectedWindowID = try XCTUnwrap(
+            projection.currentAppWindowPayload.candidate.windows.first?.id
+        )
+        let contextWindow = try XCTUnwrap(
+            projection.currentAppWindowPayload.context.windowsByID[projectedWindowID]
+        )
+        XCTAssertEqual(contextWindow.cgWindowID, focusedCGWindowID)
+        XCTAssertEqual(contextWindow.activationHandleID, focusedAXWindowID)
+        XCTAssertTrue(contextWindow.axWindow.map { CFEqual($0, focusedAXWindow) } == true)
+        XCTAssertEqual(contextWindow.lastConfirmationSource, .verifiedFocusReadback)
+        XCTAssertFalse(projection.freshness.isCompleteForScope)
+        XCTAssertEqual(projection.freshness.dirtyAppIDs, [appID])
+        XCTAssertEqual(projection.freshness.dirtyPIDs, [pid])
+        XCTAssertEqual(projection.freshness.dirtyCGWindowIDs, [focusedCGWindowID])
+        XCTAssertTrue(projection.freshness.pendingRepairScopes.contains("activationVerified:\(appID)"))
+
+        let homeDetailProjection = try XCTUnwrap(
+            readModelStore.readHomeAppDetailProjection(appID: appID)
+        )
+        XCTAssertEqual(homeDetailProjection.candidate.windows.map(\.id), [
+            RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: focusedCGWindowID)
+        ])
+        XCTAssertEqual(
+            homeDetailProjection.context.windowsByID[projectedWindowID]?.lastConfirmationSource,
+            .verifiedFocusReadback
+        )
+        let record = try XCTUnwrap(
+            windowRecordStore.state(for: pid)?
+                .windowRecordsByCGWindowID[focusedCGWindowID]
+        )
+        XCTAssertEqual(record.lastConfirmationSource, .verifiedFocusReadback)
+        XCTAssertEqual(record.currentAXWindowID, focusedAXWindowID)
+        requestLock.lock()
+        let startedTargets = startedRequests.map(\.target)
+        requestLock.unlock()
+        XCTAssertEqual(startedTargets, [.app(pid)])
+        let searchRead = readModelStore.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(searchRead.readiness, .degradedStaleCommitted)
+        XCTAssertEqual(searchRead.resultState, .degradedStaleCommittedResult)
+        XCTAssertEqual(
+            searchRead.projection?.windowEntries.filter { $0.appID == appID }.map(\.windowID),
+            [legacyWindow.id]
+        )
+    }
+
     func testRuntimeProjectionServiceCommitsSearchIndexFromMainTableProjectionOnlyAfterBarrier() throws {
         let runningApp = NSRunningApplication.current
         let appID = RuntimeAppIdentity.appID(for: runningApp)

@@ -284,6 +284,12 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 pid: verification.ownerPID,
                 affectedCGWindowIDs: affectedCGWindowIDs
             )
+            commitMainTableCurrentAppProjectionLocked(
+                appID: verification.appID,
+                pid: verification.ownerPID,
+                clearsDirtyState: false,
+                generatedAt: now
+            )
             drainReadyReconciliationRequestsLocked(now: now)
         }
     }
