@@ -15,7 +15,6 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     private var homeSummaryProjection: RuntimeHomeSummaryProjection?
     private var currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection] = [:]
     private var committedSearchIndex: RuntimeSearchIndexProjection?
-    private var stagingSearchIndex: RuntimeSearchIndexProjection?
 
     func commitAppSwitcherProjection(
         apps: [AppSwitchCandidate],
@@ -52,7 +51,6 @@ final class RuntimeReadModelStore: @unchecked Sendable {
                 generatedAt: generatedAt,
                 isCompleteForScope: true
             )
-            stagingSearchIndex = nil
         }
     }
 
@@ -165,95 +163,6 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         upsertAppSwitcherProjectionLocked(payload, generatedAt: generatedAt)
     }
 
-    private func stageSearchIndexAppLocked(
-        _ app: AppSwitchCandidate,
-        generatedAt: TimeInterval
-    ) -> RuntimeSearchIndexProjection? {
-        guard let base = stagingSearchIndex ?? committedSearchIndex else { return nil }
-        let appEntry = buildSearchAppIndexEntryLocked(app: app)
-        let windowEntries = buildSearchWindowIndexEntriesLocked(
-            app: app,
-            appSearchIndex: appEntry.searchIndex
-        )
-        var appEntries = base.appEntries
-        if let index = appEntries.firstIndex(where: { $0.appID == app.id }) {
-            appEntries[index] = appEntry
-        } else {
-            appEntries.append(appEntry)
-        }
-        let mergedWindowEntries = base.windowEntries.filter { $0.appID != app.id }
-            + windowEntries
-        stagingSearchIndex = RuntimeSearchIndexProjection(
-            appEntries: appEntries,
-            windowEntries: mergedWindowEntries,
-            freshness: freshnessLocked(
-                generatedAt: generatedAt,
-                isCompleteForScope: false
-            )
-        )
-        return stagingSearchIndex
-    }
-
-    private func stageSearchIndexCurrentAppWindowPayloadsLocked(
-        _ payloads: [RuntimeCurrentAppWindowPayload],
-        generatedAt: TimeInterval
-    ) -> RuntimeSearchIndexProjection? {
-        guard !payloads.isEmpty else { return nil }
-
-        var stagedProjection: RuntimeSearchIndexProjection?
-        for payload in payloads {
-            stagedProjection = stageSearchIndexAppLocked(
-                payload.candidate,
-                generatedAt: generatedAt
-            )
-        }
-        return stagedProjection
-    }
-
-    private func commitStagedSearchIndexLocked(
-        clearsDirtyState: Bool,
-        generatedAt: TimeInterval
-    ) -> RuntimeSearchIndexProjection? {
-        guard let staged = stagingSearchIndex else { return nil }
-        markProjectionCommittedLocked()
-        if clearsDirtyState {
-            clearDirtyStateLocked()
-        }
-        committedSearchIndex = RuntimeSearchIndexProjection(
-            appEntries: staged.appEntries,
-            windowEntries: staged.windowEntries,
-            freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: !isDirtyLocked)
-        )
-        stagingSearchIndex = nil
-        return committedSearchIndex
-    }
-
-    @discardableResult
-    func commitSearchFreshnessBarrierPayloads(
-        _ payloads: [RuntimeCurrentAppWindowPayload],
-        deferredRequestCount: Int,
-        hasPendingRequests: Bool,
-        generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
-    ) -> RuntimeSearchFreshnessBarrierCommitResult {
-        lock.lock()
-        defer { lock.unlock() }
-
-        let stagedSearchIndex = stageSearchIndexCurrentAppWindowPayloadsLocked(
-            payloads,
-            generatedAt: generatedAt
-        )
-        let canCommit = stagedSearchIndex != nil
-            && deferredRequestCount == 0
-            && !hasPendingRequests
-        let committedSearchIndex = canCommit
-            ? commitStagedSearchIndexLocked(clearsDirtyState: true, generatedAt: generatedAt)
-            : nil
-        return RuntimeSearchFreshnessBarrierCommitResult(
-            stagedSearchIndex: stagedSearchIndex,
-            committedSearchIndex: committedSearchIndex
-        )
-    }
-
     @discardableResult
     func commitSearchFreshnessBarrierFromProjectionCache(
         deferredRequestCount: Int,
@@ -277,7 +186,6 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             generatedAt: generatedAt,
             isCompleteForScope: true
         )
-        stagingSearchIndex = nil
         return committedSearchIndex
     }
 
@@ -359,8 +267,6 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         let hadCurrentAppState = currentAppWindowProjectionsByAppID[appID] != nil
         let hadCommittedSearchState = committedSearchIndex?.appEntries.contains { $0.appID == appID } == true
             || committedSearchIndex?.windowEntries.contains { $0.appID == appID } == true
-        let hadStagingSearchState = stagingSearchIndex?.appEntries.contains { $0.appID == appID } == true
-            || stagingSearchIndex?.windowEntries.contains { $0.appID == appID } == true
         let hadDirtyState = dirtyAppIDs.contains(appID)
             || dirtyPIDs.contains(pid)
             || pendingRepairScopes.contains { $0.contains(appID) }
@@ -368,7 +274,6 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             || hadHomeState
             || hadCurrentAppState
             || hadCommittedSearchState
-            || hadStagingSearchState
             || hadDirtyState
         else {
             return
@@ -407,15 +312,6 @@ final class RuntimeReadModelStore: @unchecked Sendable {
                 freshness: freshnessLocked(
                     generatedAt: generatedAt,
                     isCompleteForScope: !isDirtyLocked
-                )
-            )
-        }
-        if let projection = stagingSearchIndex {
-            stagingSearchIndex = projection.removingApp(
-                appID,
-                freshness: freshnessLocked(
-                    generatedAt: generatedAt,
-                    isCompleteForScope: false
                 )
             )
         }
@@ -488,16 +384,6 @@ final class RuntimeReadModelStore: @unchecked Sendable {
                 freshness: freshnessLocked(
                     generatedAt: generatedAt,
                     isCompleteForScope: !isDirtyLocked
-                )
-            )
-        }
-        if let projection = stagingSearchIndex {
-            stagingSearchIndex = RuntimeSearchIndexProjection(
-                appEntries: projection.appEntries,
-                windowEntries: projection.windowEntries,
-                freshness: freshnessLocked(
-                    generatedAt: generatedAt,
-                    isCompleteForScope: false
                 )
             )
         }
@@ -591,7 +477,6 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         let coversCurrentGeneration = committedSourceGeneration == generation
         let isCommittedGenerationValidated = coversCurrentGeneration
             && !isDirtyLocked
-            && stagingSearchIndex == nil
         projection.freshness = RuntimeProjectionFreshness(
             generatedAt: projection.freshness.generatedAt,
             sourceGeneration: committedSourceGeneration,
@@ -625,7 +510,6 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             hasHomeSummaryProjection: homeSummaryProjection != nil || appDirectoryState.isInitialized,
             hasAppDirectoryProjection: appDirectoryState.isInitialized,
             hasCommittedSearchIndex: committedSearchIndex != nil,
-            hasStagingSearchIndex: stagingSearchIndex != nil,
             currentAppWindowProjectionAppIDs: Set(currentAppWindowProjectionsByAppID.keys),
             appDirectoryEntryPIDs: appDirectoryState.entryPIDs
         )

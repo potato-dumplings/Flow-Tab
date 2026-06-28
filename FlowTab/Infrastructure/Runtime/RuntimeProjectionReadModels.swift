@@ -133,7 +133,6 @@ struct RuntimeReadModelDiagnostics: Equatable {
     let hasHomeSummaryProjection: Bool
     let hasAppDirectoryProjection: Bool
     let hasCommittedSearchIndex: Bool
-    let hasStagingSearchIndex: Bool
     let currentAppWindowProjectionAppIDs: Set<String>
     let appDirectoryEntryPIDs: Set<pid_t>
 

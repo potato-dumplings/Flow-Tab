@@ -116,7 +116,6 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 hasPendingRequests: hasPendingRequests,
                 generatedAt: now
             )
-            let postCommitDiagnostics = readModelStore.diagnostics()
             RuntimeLog.debug(
                 .projection,
                 [
@@ -135,7 +134,6 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                     "pendingRequests=\(hasPendingRequests ? 1 : 0)",
                     "currentAppRepairEvidence=\(drainResult.currentAppRepairEvidence.count)",
                     "mainTableProjectionCommitted=\(mainTableProjectionCommitted ? 1 : 0)",
-                    "stagedSearchIndex=\(postCommitDiagnostics.hasStagingSearchIndex ? 1 : 0)",
                     "committedSearchIndex=\(projectionCacheSearchCommit != nil ? 1 : 0)",
                     "projectionCacheSearchCommit=\(projectionCacheSearchCommit != nil ? 1 : 0)"
                 ].joined(separator: " ")

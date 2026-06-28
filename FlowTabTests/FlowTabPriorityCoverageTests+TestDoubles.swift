@@ -330,7 +330,6 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
             hasHomeSummaryProjection: false,
             hasAppDirectoryProjection: false,
             hasCommittedSearchIndex: hasCommittedSearchIndex,
-            hasStagingSearchIndex: false,
             currentAppWindowProjectionAppIDs: [],
             appDirectoryEntryPIDs: []
         )

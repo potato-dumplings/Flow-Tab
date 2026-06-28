@@ -214,7 +214,6 @@ extension FlowTabPriorityCoverageTests {
             RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindowID)
         ])
         XCTAssertTrue(readModelStore.diagnostics().dirtyAppIDs.isEmpty)
-        XCTAssertFalse(readModelStore.diagnostics().hasStagingSearchIndex)
     }
 
     func testRuntimeReadModelStoreDoesNotCommitSearchFromStaleProjectionCache() throws {
@@ -310,7 +309,6 @@ extension FlowTabPriorityCoverageTests {
             ["browser-main-table-search"]
         )
         XCTAssertTrue(store.diagnostics().dirtyAppIDs.isEmpty)
-        XCTAssertFalse(store.diagnostics().hasStagingSearchIndex)
     }
 
     func testRuntimeProjectionServiceCommitsSelectedCurrentAppProjectionFromMainTablesAsStale() throws {
