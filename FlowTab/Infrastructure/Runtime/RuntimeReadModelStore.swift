@@ -103,8 +103,6 @@ final class RuntimeReadModelStore: @unchecked Sendable {
                 isCompleteForScope: clearsDirtyState
             )
         )
-        upsertHomeSummaryProjectionLocked(payload.summary, generatedAt: generatedAt)
-        upsertAppSwitcherProjectionLocked(payload, generatedAt: generatedAt)
     }
 
     @discardableResult
@@ -481,61 +479,6 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             )
         }
         return RuntimeHomeSummaryProjection(
-            summaries: summaries,
-            freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: !isDirtyLocked)
-        )
-    }
-
-    private func upsertAppSwitcherProjectionLocked(
-        _ payload: RuntimeCurrentAppWindowPayload,
-        generatedAt: TimeInterval
-    ) {
-        var apps = appSwitcherProjection?.apps ?? []
-        if let index = apps.firstIndex(where: { $0.id == payload.candidate.id }) {
-            apps[index] = payload.candidate
-        } else {
-            apps.append(payload.candidate)
-        }
-        apps.sort { lhs, rhs in
-            if lhs.lastActiveAt == rhs.lastActiveAt {
-                return lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName) == .orderedAscending
-            }
-            return lhs.lastActiveAt > rhs.lastActiveAt
-        }
-
-        var contextsByID = appSwitcherProjection?.contextsByID ?? [:]
-        contextsByID[payload.context.appID] = payload.context
-        appSwitcherProjection = RuntimeAppSwitcherProjection(
-            apps: apps,
-            contextsByID: contextsByID,
-            freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: !isDirtyLocked)
-        )
-    }
-
-    private func upsertHomeSummaryProjectionLocked(
-        _ summary: RuntimeHomeAppSummary,
-        generatedAt: TimeInterval
-    ) {
-        var summaries = homeSummaryProjection?.summaries
-            ?? appSwitcherProjection?.apps.map { app in
-                homeSummaryLocked(
-                    for: app,
-                    context: appSwitcherProjection?.contextsByID[app.id]
-                )
-            }
-            ?? []
-        if let index = summaries.firstIndex(where: { $0.appID == summary.appID }) {
-            summaries[index] = summary
-        } else {
-            summaries.append(summary)
-        }
-        summaries.sort { lhs, rhs in
-            if lhs.lastActiveAt == rhs.lastActiveAt {
-                return lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName) == .orderedAscending
-            }
-            return lhs.lastActiveAt > rhs.lastActiveAt
-        }
-        homeSummaryProjection = RuntimeHomeSummaryProjection(
             summaries: summaries,
             freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: !isDirtyLocked)
         )
