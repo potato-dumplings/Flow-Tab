@@ -302,18 +302,32 @@ extension FlowTabTests {
         }
     }
 
-    func testRuntimeProjectionRepairProviderUsesProjectionPayloadForUITestMockDatasetWhenLaunchFlagEnabled() {
-        withLaunchArgumentsForTesting(["FlowTab", "--flowtab-ui-mock-runtime"]) {
-            let repairProvider = RuntimeProjectionRepairProvider()
-            let uiTestDataset = FlowTabUITestRuntimeProjectionDataset.current()
+    private func uiTestFullRepairProjectionPayload(
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) -> RuntimeFullRepairProjectionPayload? {
+        guard let dataset = FlowTabUITestRuntimeProjectionDataset.current() else {
+            XCTFail("Expected UI test runtime projection dataset", file: file, line: line)
+            return nil
+        }
+        return RuntimeFullRepairProjectionPayload(
+            apps: dataset.appSwitcherApps,
+            contextsByID: dataset.appSwitcherContextsByID,
+            appDirectoryEntries: dataset.appDirectoryEntries
+        )
+    }
 
-            let fullRepairPayload = repairProvider.fullRepairProjectionPayload()
-            XCTAssertEqual(fullRepairPayload.apps.count, 6)
-            XCTAssertEqual(fullRepairPayload.contextsByID.count, 0)
-            XCTAssertEqual(fullRepairPayload.apps.first?.id, "com.flowtab.mock.mail")
-            XCTAssertEqual(fullRepairPayload.apps.first?.windows.count, 2)
-            XCTAssertEqual(fullRepairPayload.appDirectoryEntries.count, 6)
-            XCTAssertEqual(fullRepairPayload.appDirectoryEntries.first?.appID, "com.flowtab.mock.mail")
+    func testUITestMockDatasetBuildsExplicitFullRepairProjectionPayloadWhenLaunchFlagEnabled() {
+        withLaunchArgumentsForTesting(["FlowTab", "--flowtab-ui-mock-runtime"]) {
+            let uiTestDataset = FlowTabUITestRuntimeProjectionDataset.current()
+            let fullRepairPayload = uiTestFullRepairProjectionPayload()
+
+            XCTAssertEqual(fullRepairPayload?.apps.count, 6)
+            XCTAssertEqual(fullRepairPayload?.contextsByID.count, 0)
+            XCTAssertEqual(fullRepairPayload?.apps.first?.id, "com.flowtab.mock.mail")
+            XCTAssertEqual(fullRepairPayload?.apps.first?.windows.count, 2)
+            XCTAssertEqual(fullRepairPayload?.appDirectoryEntries.count, 6)
+            XCTAssertEqual(fullRepairPayload?.appDirectoryEntries.first?.appID, "com.flowtab.mock.mail")
 
             let currentAppWindowPayload = uiTestDataset?.currentAppWindowPayloadsByAppID["com.flowtab.mock.mail"]
             XCTAssertNotNil(currentAppWindowPayload)
@@ -333,7 +347,7 @@ extension FlowTabTests {
             let browserPayload = uiTestDataset?.currentAppWindowPayloadsByAppID["com.flowtab.mock.browser"]
             XCTAssertEqual(browserPayload?.summary.displayName, "Mock Browser")
             XCTAssertEqual(browserPayload?.summary.windowCount, 1)
-            XCTAssertEqual(fullRepairPayload.apps.last?.id, "com.flowtab.mock.file-transfer-assistant")
+            XCTAssertEqual(fullRepairPayload?.apps.last?.id, "com.flowtab.mock.file-transfer-assistant")
             XCTAssertNil(uiTestDataset?.currentAppWindowPayloadsByAppID["com.flowtab.mock.missing"])
         }
     }
@@ -411,14 +425,13 @@ extension FlowTabTests {
                 "single-app-five-windows"
             ]
         ) {
-            let repairProvider = RuntimeProjectionRepairProvider()
             let uiTestDataset = FlowTabUITestRuntimeProjectionDataset.current()
+            let fullRepairPayload = uiTestFullRepairProjectionPayload()
 
-            let fullRepairPayload = repairProvider.fullRepairProjectionPayload()
-            XCTAssertEqual(fullRepairPayload.apps.count, 1)
-            XCTAssertEqual(fullRepairPayload.apps.first?.id, "com.flowtab.mock.browser")
-            XCTAssertEqual(fullRepairPayload.apps.first?.windows.count, 5)
-            XCTAssertEqual(fullRepairPayload.apps.first?.windows.map(\.id), expectedWindowIDs)
+            XCTAssertEqual(fullRepairPayload?.apps.count, 1)
+            XCTAssertEqual(fullRepairPayload?.apps.first?.id, "com.flowtab.mock.browser")
+            XCTAssertEqual(fullRepairPayload?.apps.first?.windows.count, 5)
+            XCTAssertEqual(fullRepairPayload?.apps.first?.windows.map(\.id), expectedWindowIDs)
 
             let currentAppWindowPayload = uiTestDataset?.currentAppWindowPayloadsByAppID["com.flowtab.mock.browser"]
             XCTAssertNotNil(currentAppWindowPayload)
@@ -446,14 +459,13 @@ extension FlowTabTests {
                 "single-app-five-windows-cg-offspace"
             ]
         ) {
-            let repairProvider = RuntimeProjectionRepairProvider()
             let uiTestDataset = FlowTabUITestRuntimeProjectionDataset.current()
+            let fullRepairPayload = uiTestFullRepairProjectionPayload()
 
-            let fullRepairPayload = repairProvider.fullRepairProjectionPayload()
-            XCTAssertEqual(fullRepairPayload.apps.count, 1)
-            XCTAssertEqual(fullRepairPayload.apps.first?.id, "com.flowtab.mock.browser")
-            XCTAssertEqual(fullRepairPayload.apps.first?.windows.count, 5)
-            XCTAssertEqual(fullRepairPayload.apps.first?.windows.map(\.id), expectedWindowIDs)
+            XCTAssertEqual(fullRepairPayload?.apps.count, 1)
+            XCTAssertEqual(fullRepairPayload?.apps.first?.id, "com.flowtab.mock.browser")
+            XCTAssertEqual(fullRepairPayload?.apps.first?.windows.count, 5)
+            XCTAssertEqual(fullRepairPayload?.apps.first?.windows.map(\.id), expectedWindowIDs)
 
             let currentAppWindowPayload = uiTestDataset?.currentAppWindowPayloadsByAppID["com.flowtab.mock.browser"]
             XCTAssertNotNil(currentAppWindowPayload)
@@ -473,12 +485,11 @@ extension FlowTabTests {
                 "single-app-five-windows-cg-offspace-titled"
             ]
         ) {
-            let repairProvider = RuntimeProjectionRepairProvider()
             let uiTestDataset = FlowTabUITestRuntimeProjectionDataset.current()
-            let fullRepairPayload = repairProvider.fullRepairProjectionPayload()
-            XCTAssertEqual(fullRepairPayload.apps.count, 1)
+            let fullRepairPayload = uiTestFullRepairProjectionPayload()
+            XCTAssertEqual(fullRepairPayload?.apps.count, 1)
             XCTAssertEqual(
-                fullRepairPayload.apps.first?.windows.map(\.title),
+                fullRepairPayload?.apps.first?.windows.map(\.title),
                 ["Normal 1", "Normal 2", "Fullscreen 3", "Fullscreen 4", "Fullscreen 5"]
             )
 
@@ -490,7 +501,7 @@ extension FlowTabTests {
         }
     }
 
-    func testRuntimeProjectionRepairProviderRealPathWithoutAccessibilityBuildsConsistentProjectionPayload() {
+    func testRuntimeProjectionRepairProviderRealPathWithoutAccessibilityBuildsMainTableProjectionPayload() {
         let previousAXTrusted = AccessibilityPermissionChecker.isTrustedOverrideForTesting
         let userDefaults = UserDefaults.standard
         let previousShowInCommandTab = userDefaults.object(forKey: AppPreferenceKeys.showInCommandTab)
@@ -515,12 +526,17 @@ extension FlowTabTests {
 
         withLaunchArgumentsForTesting(["FlowTab"]) {
             let repairProvider = RuntimeProjectionRepairProvider()
-            let fullRepairPayload = repairProvider.fullRepairProjectionPayload()
+            let repairEvidence = repairProvider.fullRepairEvidence()
+            let projectionPayload = repairProvider.appSwitcherProjectionPayloadFromMainTables(
+                appDirectoryEntries: repairEvidence.appDirectoryEntries,
+                generatedAt: Date.timeIntervalSinceReferenceDate
+            )
 
-            XCTAssertFalse(fullRepairPayload.apps.isEmpty)
-            XCTAssertEqual(fullRepairPayload.contextsByID.count, fullRepairPayload.apps.count)
-            XCTAssertTrue(fullRepairPayload.apps.allSatisfy { $0.windows.isEmpty })
-            XCTAssertTrue(fullRepairPayload.contextsByID.values.allSatisfy { $0.windowsByID.isEmpty })
+            XCTAssertFalse(repairEvidence.appDirectoryEntries.isEmpty)
+            XCTAssertFalse(projectionPayload?.apps.isEmpty ?? true)
+            XCTAssertEqual(projectionPayload?.contextsByID.count, projectionPayload?.apps.count)
+            XCTAssertTrue(projectionPayload?.apps.allSatisfy { $0.windows.isEmpty } == true)
+            XCTAssertTrue(projectionPayload?.contextsByID.values.allSatisfy { $0.windowsByID.isEmpty } == true)
         }
     }
 
