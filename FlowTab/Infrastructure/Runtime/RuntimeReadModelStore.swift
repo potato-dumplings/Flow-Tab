@@ -114,33 +114,6 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         )
     }
 
-    func commitHomeSummaries(
-        _ summaries: [RuntimeHomeAppSummary],
-        generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
-    ) {
-        lock.lock()
-        defer { lock.unlock() }
-
-        markProjectionCommittedLocked()
-        clearDirtyStateLocked()
-        homeSummaryProjection = RuntimeHomeSummaryProjection(
-            summaries: summaries,
-            freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: true)
-        )
-    }
-
-    func commitHomeSummary(
-        _ summary: RuntimeHomeAppSummary,
-        generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
-    ) {
-        lock.lock()
-        defer { lock.unlock() }
-
-        markProjectionCommittedLocked()
-        clearDirtyStateForAppLocked(appID: summary.appID, pid: summary.pid)
-        upsertHomeSummaryProjectionLocked(summary, generatedAt: generatedAt)
-    }
-
     func commitCurrentAppWindowProjection(
         _ payload: RuntimeCurrentAppWindowPayload,
         clearsDirtyState: Bool = true,
