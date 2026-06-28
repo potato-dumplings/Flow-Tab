@@ -197,6 +197,12 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 pid: pid,
                 pendingScope: "appWindows:\(appID)"
             )
+            commitMainTableCurrentAppProjectionLocked(
+                appID: appID,
+                pid: pid,
+                clearsDirtyState: false,
+                generatedAt: now
+            )
             repairProvider.recordAppWindowsChanged(appID: appID, pid: pid, now: now)
             drainReadyReconciliationRequestsLocked(now: now)
         }
@@ -210,21 +216,12 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 pid: pid,
                 pendingScope: "selectedCurrentAppWindows:\(appID)"
             )
-            let appDirectoryEntries = readModelStore
-                .readAppDirectoryProjection()?
-                .entries(forAppID: appID) ?? []
-            if let payload = mainTableProjectionBuilder.currentAppWindowPayloadFromMainTables(
+            commitMainTableCurrentAppProjectionLocked(
                 appID: appID,
                 pid: pid,
-                appDirectoryEntries: appDirectoryEntries,
+                clearsDirtyState: false,
                 generatedAt: now
-            ) {
-                readModelStore.commitCurrentAppWindowProjection(
-                    payload,
-                    clearsDirtyState: false,
-                    generatedAt: now
-                )
-            }
+            )
             repairProvider.recordSelectedCurrentAppWindowsChanged(appID: appID, pid: pid, now: now)
             drainReadyReconciliationRequestsLocked(now: now)
         }
@@ -366,22 +363,39 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 evidence.appDirectoryEntries,
                 generatedAt: generatedAt
             )
-            let appDirectoryEntries = readModelStore
-                .readAppDirectoryProjection()?
-                .entries(forAppID: evidence.appID) ?? evidence.appDirectoryEntries
-            guard let mainTablePayload = mainTableProjectionBuilder.currentAppWindowPayloadFromMainTables(
+            commitMainTableCurrentAppProjectionLocked(
                 appID: evidence.appID,
                 pid: evidence.pid,
-                appDirectoryEntries: appDirectoryEntries,
-                generatedAt: generatedAt
-            ) else {
-                continue
-            }
-            readModelStore.commitCurrentAppWindowProjection(
-                mainTablePayload,
+                clearsDirtyState: true,
                 generatedAt: generatedAt
             )
         }
+    }
+
+    @discardableResult
+    private func commitMainTableCurrentAppProjectionLocked(
+        appID: String,
+        pid: pid_t,
+        clearsDirtyState: Bool,
+        generatedAt: TimeInterval
+    ) -> Bool {
+        let appDirectoryEntries = readModelStore
+            .readAppDirectoryProjection()?
+            .entries(forAppID: appID) ?? []
+        guard let mainTablePayload = mainTableProjectionBuilder.currentAppWindowPayloadFromMainTables(
+            appID: appID,
+            pid: pid,
+            appDirectoryEntries: appDirectoryEntries,
+            generatedAt: generatedAt
+        ) else {
+            return false
+        }
+        readModelStore.commitCurrentAppWindowProjection(
+            mainTablePayload,
+            clearsDirtyState: clearsDirtyState,
+            generatedAt: generatedAt
+        )
+        return true
     }
 
 }

@@ -487,6 +487,106 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(searchRead.projection?.windowEntries.filter { $0.appID == appID }.map(\.windowID), [])
     }
 
+    func testRuntimeProjectionServiceCommitsAppWindowDirtyProjectionForHomeDetailFromMainTablesAsStale() throws {
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let pid = runningApp.processIdentifier
+        let displayName = runningApp.localizedName ?? appID
+        let appDirectoryEntry = RuntimeAppDirectoryEntry(app: runningApp)
+        let committedApp = AppSwitchCandidate(
+            id: appID,
+            displayName: displayName,
+            groupID: RuntimeAppIdentity.groupID(
+                for: runningApp.bundleIdentifier,
+                fallbackName: displayName
+            ),
+            lastActiveAt: 100,
+            windows: []
+        )
+        let readModelStore = RuntimeReadModelStore()
+        readModelStore.commitAppSwitcherProjection(
+            apps: [committedApp],
+            contextsByID: [:],
+            appDirectoryEntries: [appDirectoryEntry],
+            generatedAt: 10
+        )
+        commitMainTableSearchFreshnessBarrierForTesting(readModelStore, generatedAt: 11)
+        let cgWindowID = CGWindowID(240_805)
+        let axWindowID = "ax:\(pid):main-table-home-detail"
+        let windowRecordStore = RuntimeWindowRecordStore(
+            mappingStatesByPID: [
+                pid: RuntimeWindowMappingState(
+                    windowRecordsByCGWindowID: [
+                        cgWindowID: makeMainTableProjectionWindowRecord(
+                            pid: pid,
+                            cgWindowID: cgWindowID,
+                            axWindowID: axWindowID
+                        )
+                    ],
+                    currentAXToCG: [axWindowID: cgWindowID],
+                    validCGWindowIDs: [cgWindowID],
+                    lastAXWindowIDs: [axWindowID],
+                    hasObservedAXWindowHandle: true
+                )
+            ]
+        )
+        let coordinator = RuntimeReconciliationCoordinator()
+        let requestLock = NSLock()
+        var startedRequests: [RuntimeReconciliationRequest] = []
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.MainTableHomeDetailProjection",
+            repairProvider: RuntimeProjectionRepairProvider(
+                windowRecordStore: windowRecordStore,
+                reconciliationCoordinator: coordinator
+            ),
+            mainTableProjectionBuilder: RuntimeMainTableProjectionBuilder(
+                windowRecordStore: windowRecordStore
+            ),
+            readModelStore: readModelStore,
+            reconciliationExecutor: { request, _ in
+                requestLock.lock()
+                startedRequests.append(request)
+                requestLock.unlock()
+                return .completed
+            }
+        )
+
+        service.signalAppWindowsChanged(appID: appID, pid: pid)
+        service.waitForMaintenanceQueueForTesting()
+
+        let projection = try XCTUnwrap(readModelStore.readCurrentAppWindowProjection(appID: appID))
+        XCTAssertEqual(projection.currentAppWindowPayload.summary.appID, appID)
+        XCTAssertEqual(projection.currentAppWindowPayload.summary.pid, pid)
+        XCTAssertEqual(projection.currentAppWindowPayload.candidate.windows.map(\.id), [
+            RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindowID)
+        ])
+        XCTAssertFalse(projection.freshness.isCompleteForScope)
+        XCTAssertEqual(projection.freshness.dirtyAppIDs, [appID])
+        XCTAssertTrue(projection.freshness.pendingRepairScopes.contains("appWindows:\(appID)"))
+
+        let homeDetailProjection = try XCTUnwrap(
+            readModelStore.readHomeAppDetailProjection(appID: appID)
+        )
+        XCTAssertEqual(homeDetailProjection.summary.windowCount, 1)
+        XCTAssertEqual(homeDetailProjection.candidate.windows.map(\.id), [
+            RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindowID)
+        ])
+        let projectedWindowID = try XCTUnwrap(homeDetailProjection.candidate.windows.first?.id)
+        XCTAssertEqual(
+            homeDetailProjection.context.windowsByID[projectedWindowID]?.cgWindowID,
+            cgWindowID
+        )
+
+        requestLock.lock()
+        let startedTargets = startedRequests.map(\.target)
+        requestLock.unlock()
+        XCTAssertEqual(startedTargets, [.app(pid)])
+        let searchRead = readModelStore.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(searchRead.readiness, .degradedStaleCommitted)
+        XCTAssertEqual(searchRead.resultState, .degradedStaleCommittedResult)
+        XCTAssertEqual(searchRead.projection?.windowEntries.filter { $0.appID == appID }.map(\.windowID), [])
+    }
+
     func testRuntimeReadModelStoreOwnsHomeDetailProjectionFromCurrentAppCache() throws {
         let runningApp = NSRunningApplication.current
         let appID = RuntimeAppIdentity.appID(for: runningApp)
