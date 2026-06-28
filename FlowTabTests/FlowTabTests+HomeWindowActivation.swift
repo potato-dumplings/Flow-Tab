@@ -399,6 +399,13 @@ extension FlowTabTests {
                 freshness: cleanFreshness
             )
         )
+        let appSwitcherOnlyService = RecordingRuntimeProjectionService(
+            appSwitcherProjection: RuntimeAppSwitcherProjection(
+                apps: [detailProjection.candidate],
+                contextsByID: [appID: detailProjection.context],
+                freshness: staleFreshness
+            )
+        )
 
         XCTAssertTrue(
             HomeRuntimeProjectionReader.shouldWaitForNoSwitchableWindowProjection(
@@ -414,10 +421,20 @@ extension FlowTabTests {
                 from: cleanHomeSummaryService
             )
         )
+        XCTAssertFalse(
+            HomeRuntimeProjectionReader.shouldWaitForNoSwitchableWindowProjection(
+                appID: appID,
+                pid: detailProjection.summary.pid,
+                from: appSwitcherOnlyService
+            )
+        )
         XCTAssertEqual(staleCurrentAppService.currentAppWindowProjectionReadCount(appID: appID), 1)
         XCTAssertEqual(staleCurrentAppService.homeSummaryProjectionReadCount(), 0)
         XCTAssertEqual(cleanHomeSummaryService.currentAppWindowProjectionReadCount(appID: appID), 1)
         XCTAssertEqual(cleanHomeSummaryService.homeSummaryProjectionReadCount(), 1)
+        XCTAssertEqual(appSwitcherOnlyService.currentAppWindowProjectionReadCount(appID: appID), 1)
+        XCTAssertEqual(appSwitcherOnlyService.homeSummaryProjectionReadCount(), 1)
+        XCTAssertEqual(appSwitcherOnlyService.appSwitcherProjectionReadCount(), 0)
     }
 
     func testHomeInitialAppSummaryReaderDoesNotUseLightweightSnapshotFallback() {

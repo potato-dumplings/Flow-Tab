@@ -42,10 +42,6 @@ enum HomeRuntimeProjectionReader {
            projection.summary(for: appID)?.pid == pid {
             return !projection.freshness.isCompleteForScope
         }
-        if let projection = service.readAppSwitcherProjection(),
-           projection.contextsByID[appID]?.runningApp.processIdentifier == pid {
-            return !projection.freshness.isCompleteForScope
-        }
         return false
     }
 }
