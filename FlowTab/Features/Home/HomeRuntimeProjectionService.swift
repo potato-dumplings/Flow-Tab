@@ -5,48 +5,18 @@ let homeRuntimeProjectionService = sharedRuntimeProjectionService
 
 enum HomeRuntimeProjectionReader {
     static func appSummaries(from service: any RuntimeProjectionServing) -> [RuntimeHomeAppSummary]? {
-        if let homeProjection = service.readHomeSummaryProjection() {
-            return homeProjection.summaries
-        }
-        guard let appProjection = service.readAppSwitcherProjection() else { return nil }
-        return appProjection.apps.map { app in
-            homeSummary(
-                for: app,
-                context: appProjection.contextsByID[app.id]
-            )
-        }
+        service.readHomeSummaryProjection()?.summaries
     }
 
     static func initialAppSummaries(from service: any RuntimeProjectionServing) -> [RuntimeHomeAppSummary]? {
-        if let homeProjection = service.readHomeSummaryProjection() {
-            return homeProjection.summaries
-        }
-        guard let appProjection = service.readAppSwitcherProjection() else { return nil }
-        return appProjection.apps.map { app in
-            homeSummary(
-                for: app,
-                context: appProjection.contextsByID[app.id]
-            )
-        }
+        service.readHomeSummaryProjection()?.summaries
     }
 
     static func appSummary(
         for appID: String,
         from service: any RuntimeProjectionServing
     ) -> RuntimeHomeAppSummary? {
-        if let summary = service.readHomeSummaryProjection()?.summary(for: appID) {
-            return summary
-        }
-        guard
-            let appProjection = service.readAppSwitcherProjection(),
-            let app = appProjection.apps.first(where: { $0.id == appID })
-        else {
-            return nil
-        }
-        return homeSummary(
-            for: app,
-            context: appProjection.contextsByID[appID]
-        )
+        service.readHomeSummaryProjection()?.summary(for: appID)
     }
 
     static func appDetailProjection(
@@ -77,20 +47,6 @@ enum HomeRuntimeProjectionReader {
             return !projection.freshness.isCompleteForScope
         }
         return false
-    }
-
-    private static func homeSummary(
-        for app: AppSwitchCandidate,
-        context: RuntimeAppContext?
-    ) -> RuntimeHomeAppSummary {
-        RuntimeHomeAppSummary(
-            appID: app.id,
-            displayName: app.displayName,
-            groupID: app.groupID,
-            lastActiveAt: app.lastActiveAt,
-            windowCount: app.windows.count,
-            pid: context?.runningApp.processIdentifier ?? 0
-        )
     }
 }
 

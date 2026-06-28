@@ -114,7 +114,6 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         self.homeSummaryProjection = homeSummaryProjection
         self.homeDetailProjectionsByAppID = homeDetailProjectionsByAppID
             ?? Self.homeDetailProjections(
-                appSwitcherProjection: appSwitcherProjection,
                 currentAppWindowProjectionsByAppID: currentAppWindowProjectionsByAppID
             )
         self.currentAppWindowProjectionsByAppID = currentAppWindowProjectionsByAppID
@@ -463,10 +462,9 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     }
 
     private static func homeDetailProjections(
-        appSwitcherProjection: RuntimeAppSwitcherProjection?,
         currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection]
     ) -> [String: RuntimeHomeAppDetailProjection] {
-        var projections = Dictionary(
+        Dictionary(
             uniqueKeysWithValues: currentAppWindowProjectionsByAppID.map { appID, projection in
                 (
                     appID,
@@ -476,23 +474,6 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
                 )
             }
         )
-        guard let appSwitcherProjection else { return projections }
-        for app in appSwitcherProjection.apps where projections[app.id] == nil {
-            guard let context = appSwitcherProjection.contextsByID[app.id] else { continue }
-            projections[app.id] = RuntimeHomeAppDetailProjection(
-                summary: RuntimeHomeAppSummary(
-                    appID: app.id,
-                    displayName: app.displayName,
-                    groupID: app.groupID,
-                    lastActiveAt: app.lastActiveAt,
-                    windowCount: app.windows.count,
-                    pid: context.runningApp.processIdentifier
-                ),
-                candidate: app,
-                context: context
-            )
-        }
-        return projections
     }
 }
 

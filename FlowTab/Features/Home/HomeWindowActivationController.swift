@@ -71,7 +71,6 @@ final class HomeWindowActivationController {
 
     private func signalActivationProjectionMissing(appID: String) {
         let pid = HomeRuntimeProjectionReader.appSummary(for: appID, from: runtimeProjectionService)?.pid
-            ?? runtimeProjectionService.readAppSwitcherProjection()?.contextsByID[appID]?.runningApp.processIdentifier
         guard let pid, pid != 0 else { return }
         runtimeProjectionService.signalAppWindowsChanged(appID: appID, pid: pid)
     }
