@@ -88,6 +88,19 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         )
     }
 
+    func commitAppDirectoryProviderEvidence(
+        _ entries: [RuntimeAppDirectoryEntry],
+        generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
+    ) {
+        lock.lock()
+        defer { lock.unlock() }
+
+        replaceAppDirectoryStateLocked(
+            entries: entries,
+            generatedAt: generatedAt
+        )
+    }
+
     func commitCurrentAppRepairAppDirectoryEvidence(
         _ entries: [RuntimeAppDirectoryEntry],
         generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate

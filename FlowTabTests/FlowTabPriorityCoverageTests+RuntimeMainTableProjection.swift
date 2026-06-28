@@ -210,6 +210,115 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(searchRead.projection?.windowEntries.filter { $0.appID == appID }.map(\.windowID), [])
     }
 
+    func testRuntimeProjectionServiceCommitsAppDirectoryProviderProjectionFromMainTablesWithoutFullRepair() throws {
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let pid = runningApp.processIdentifier
+        let displayName = runningApp.localizedName ?? appID
+        let appDirectoryEntry = RuntimeAppDirectoryEntry(app: runningApp)
+        let legacyWindow = WindowCandidate(
+            id: "legacy-provider-window",
+            title: "Legacy Provider Window",
+            isMinimized: false,
+            lastActiveAt: 100
+        )
+        let committedApp = AppSwitchCandidate(
+            id: appID,
+            displayName: displayName,
+            groupID: RuntimeAppIdentity.groupID(
+                for: runningApp.bundleIdentifier,
+                fallbackName: displayName
+            ),
+            lastActiveAt: 100,
+            windows: [legacyWindow]
+        )
+        let readModelStore = RuntimeReadModelStore()
+        readModelStore.commitAppSwitcherProjection(
+            apps: [committedApp],
+            contextsByID: [:],
+            appDirectoryEntries: nil,
+            generatedAt: 10
+        )
+        commitMainTableSearchFreshnessBarrierForTesting(readModelStore, generatedAt: 11)
+        readModelStore.markAppWindowsDirty(
+            appID: appID,
+            pid: pid,
+            pendingScope: "appWindows:\(appID)"
+        )
+        let cgWindowID = CGWindowID(240_811)
+        let axWindowID = "ax:\(pid):main-table-app-directory-provider"
+        let windowRecordStore = RuntimeWindowRecordStore(
+            mappingStatesByPID: [
+                pid: RuntimeWindowMappingState(
+                    windowRecordsByCGWindowID: [
+                        cgWindowID: makeMainTableProjectionWindowRecord(
+                            pid: pid,
+                            cgWindowID: cgWindowID,
+                            axWindowID: axWindowID
+                        )
+                    ],
+                    currentAXToCG: [axWindowID: cgWindowID],
+                    validCGWindowIDs: [cgWindowID],
+                    lastAXWindowIDs: [axWindowID],
+                    hasObservedAXWindowHandle: true
+                )
+            ]
+        )
+        let requestLock = NSLock()
+        var startedRequests: [RuntimeReconciliationRequest] = []
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.AppDirectoryProviderProjection",
+            repairProvider: RuntimeProjectionRepairProvider(
+                windowRecordStore: windowRecordStore,
+                reconciliationCoordinator: RuntimeReconciliationCoordinator()
+            ),
+            mainTableProjectionBuilder: RuntimeMainTableProjectionBuilder(
+                windowRecordStore: windowRecordStore
+            ),
+            appDirectoryProvider: FixedRuntimeAppDirectoryProvider(entries: [appDirectoryEntry]),
+            readModelStore: readModelStore,
+            reconciliationExecutor: { request, _ in
+                requestLock.lock()
+                startedRequests.append(request)
+                requestLock.unlock()
+                return .completed
+            }
+        )
+
+        service.requestAppSwitcherProjectionMaintenance(reason: .switcherSessionStarted)
+        service.waitForMaintenanceQueueForTesting()
+
+        let appDirectoryProjection = try XCTUnwrap(readModelStore.readAppDirectoryProjection())
+        XCTAssertEqual(appDirectoryProjection.entries, [appDirectoryEntry])
+        let appProjection = try XCTUnwrap(readModelStore.readAppSwitcherProjection())
+        let app = try XCTUnwrap(appProjection.apps.first(where: { $0.id == appID }))
+        XCTAssertEqual(app.windows.map(\.id), [
+            RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindowID)
+        ])
+        XCTAssertEqual(app.windows.map(\.title), ["Main Table Projection"])
+        XCTAssertFalse(app.windows.contains { $0.id == legacyWindow.id })
+        XCTAssertFalse(appProjection.freshness.isCompleteForScope)
+        XCTAssertEqual(appProjection.freshness.dirtyAppIDs, [appID])
+        XCTAssertEqual(appProjection.freshness.dirtyPIDs, [pid])
+        XCTAssertTrue(appProjection.freshness.pendingRepairScopes.contains("appWindows:\(appID)"))
+
+        let homeProjection = try XCTUnwrap(readModelStore.readHomeSummaryProjection())
+        XCTAssertEqual(homeProjection.summary(for: appID)?.windowCount, 1)
+        XCTAssertFalse(homeProjection.freshness.isCompleteForScope)
+        requestLock.lock()
+        let startedTargets = startedRequests.map(\.target)
+        requestLock.unlock()
+        XCTAssertEqual(startedTargets, [])
+
+        let searchRead = readModelStore.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(searchRead.readiness, .degradedStaleCommitted)
+        XCTAssertEqual(searchRead.resultState, .degradedStaleCommittedResult)
+        XCTAssertEqual(
+            searchRead.projection?.windowEntries.filter { $0.appID == appID }.map(\.windowID),
+            [legacyWindow.id]
+        )
+    }
+
     func testRuntimeProjectionServiceCommitsSpaceTopologyProjectionFromMainTablesAsStale() throws {
         let runningApp = NSRunningApplication.current
         let appID = RuntimeAppIdentity.appID(for: runningApp)
@@ -1278,5 +1387,17 @@ extension FlowTabPriorityCoverageTests {
             invalidatedAt: nil
         )
         return record
+    }
+
+    private final class FixedRuntimeAppDirectoryProvider: RuntimeAppDirectoryProviding {
+        private let entries: [RuntimeAppDirectoryEntry]
+
+        init(entries: [RuntimeAppDirectoryEntry]) {
+            self.entries = entries
+        }
+
+        func appDirectoryEntriesForRuntimeMaintenance() -> [RuntimeAppDirectoryEntry] {
+            entries
+        }
     }
 }

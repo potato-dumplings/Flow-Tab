@@ -8,12 +8,14 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     private let repairProvider: RuntimeProjectionRepairProviding
     private let mainTableProjectionBuilder: RuntimeMainTableProjectionBuilding
     private let readModelStore: RuntimeReadModelStore
+    private let appDirectoryProvider: RuntimeAppDirectoryProviding?
     private let reconciliationDrainer: RuntimeProjectionReconciliationDrainer
 
     init(
         label: String = "FlowTab.RuntimeProjectionService",
         repairProvider: RuntimeProjectionRepairProviding? = nil,
         mainTableProjectionBuilder: RuntimeMainTableProjectionBuilding? = nil,
+        appDirectoryProvider: RuntimeAppDirectoryProviding? = nil,
         readModelStore: RuntimeReadModelStore = RuntimeReadModelStore(),
         reconciliationExecutor: @escaping RuntimeProjectionReconciliationExecutor =
             runtimeProjectionDefaultReconciliationExecutor
@@ -32,6 +34,11 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             )
             self.mainTableProjectionBuilder = mainTableProjectionBuilder
                 ?? RuntimeMainTableProjectionBuilder(windowRecordStore: windowRecordStore)
+        }
+        if let appDirectoryProvider {
+            self.appDirectoryProvider = appDirectoryProvider
+        } else {
+            self.appDirectoryProvider = repairProvider == nil ? RuntimeWorkspaceAppDirectoryProvider() : nil
         }
         self.readModelStore = readModelStore
         reconciliationDrainer = RuntimeProjectionReconciliationDrainer(
@@ -66,12 +73,13 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
 
     func requestAppSwitcherProjectionMaintenance(reason: RuntimeProjectionMaintenanceReason) {
         maintenanceQueue.async { [self] in
-            let diagnostics = readModelStore.diagnostics()
             let now = Date.timeIntervalSinceReferenceDate
+            let appDirectoryProviderEvidenceCount = commitAppDirectoryProviderEvidenceLocked(generatedAt: now)
             let mainTableProjectionCommitted = commitMainTableAppSwitcherProjectionLocked(
                 generatedAt: now,
                 requiresExistingProjectionCoverage: true
             )
+            let diagnostics = readModelStore.diagnostics()
             if !diagnostics.hasAppSwitcherProjection
                 && !repairProvider.hasPendingReconciliationRequests() {
                 repairProvider.scheduleFullRepairFallback(now: now)
@@ -97,6 +105,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                     "dirtyPIDs=\(diagnostics.dirtyPIDs.count)",
                     "dirtyCGWindowIDs=\(diagnostics.dirtyCGWindowIDs.count)",
                     "pendingScopes=\(diagnostics.pendingRepairScopes.count)",
+                    "appDirectoryProviderEvidence=\(appDirectoryProviderEvidenceCount)",
                     "startedRequests=\(drainResult.startedRequests.count)",
                     "completedRequests=\(drainResult.completedCount)",
                     "fullRepairEvidence=\(drainResult.fullRepairEvidence.count)",
@@ -111,8 +120,8 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
 
     func requestSearchIndexFreshnessBarrier(reason: RuntimeProjectionMaintenanceReason) {
         maintenanceQueue.async { [self] in
-            let diagnostics = readModelStore.diagnostics()
             let now = Date.timeIntervalSinceReferenceDate
+            let appDirectoryProviderEvidenceCount = commitAppDirectoryProviderEvidenceLocked(generatedAt: now)
             let promotedRequests = repairProvider.promoteSearchFreshnessBarrierRequests(now: now)
             let drainResult = reconciliationDrainer.drainReadyRequests(
                 now: now,
@@ -128,6 +137,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 generatedAt: now
             )
             let hasPendingRequests = repairProvider.hasPendingReconciliationRequests()
+            let diagnostics = readModelStore.diagnostics()
             let projectionCacheSearchCommit = readModelStore.commitSearchFreshnessBarrierFromProjectionCache(
                 deferredRequestCount: drainResult.deferredCount,
                 hasPendingRequests: hasPendingRequests,
@@ -143,6 +153,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                     "dirtyPIDs=\(diagnostics.dirtyPIDs.count)",
                     "dirtyCGWindowIDs=\(diagnostics.dirtyCGWindowIDs.count)",
                     "pendingScopes=\(diagnostics.pendingRepairScopes.count)",
+                    "appDirectoryProviderEvidence=\(appDirectoryProviderEvidenceCount)",
                     "promotedRequests=\(promotedRequests.count)",
                     "startedRequests=\(drainResult.startedRequests.count)",
                     "maxReadyRepairs=\(runtimeSearchFreshnessBarrierMaxReadyRepairs)",
@@ -394,6 +405,15 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         }
         readModelStore.commitMainTableAppSwitcherProjectionPayload(payload, generatedAt: generatedAt)
         return true
+    }
+
+    @discardableResult
+    private func commitAppDirectoryProviderEvidenceLocked(generatedAt: TimeInterval) -> Int {
+        guard let entries = appDirectoryProvider?.appDirectoryEntriesForRuntimeMaintenance() else {
+            return 0
+        }
+        readModelStore.commitAppDirectoryProviderEvidence(entries, generatedAt: generatedAt)
+        return entries.count
     }
 
     private func commitCurrentAppRepairEvidenceLocked(

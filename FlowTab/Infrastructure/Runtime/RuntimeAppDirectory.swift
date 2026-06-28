@@ -64,6 +64,19 @@ enum RuntimeAppDirectoryFactSource {
     }
 }
 
+protocol RuntimeAppDirectoryProviding: AnyObject {
+    func appDirectoryEntriesForRuntimeMaintenance() -> [RuntimeAppDirectoryEntry]
+}
+
+final class RuntimeWorkspaceAppDirectoryProvider: RuntimeAppDirectoryProviding {
+    func appDirectoryEntriesForRuntimeMaintenance() -> [RuntimeAppDirectoryEntry] {
+        let runningApps = RuntimeAppDirectoryFactSource.currentAppLayerRunningApplications(
+            includeCurrentProcessInAppLayer: AppVisibilityPreferencesStore.loadShowInCommandTab()
+        )
+        return RuntimeAppDirectoryFactSource.entries(from: runningApps)
+    }
+}
+
 struct RuntimeAppDirectoryEntry: Equatable {
     let pid: pid_t
     let appID: String
