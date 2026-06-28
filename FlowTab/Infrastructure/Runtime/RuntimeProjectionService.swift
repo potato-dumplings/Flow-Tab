@@ -247,6 +247,12 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 pid: pid,
                 pendingScope: "axWindowDestroyed:\(appID)"
             )
+            commitMainTableCurrentAppProjectionLocked(
+                appID: appID,
+                pid: pid,
+                clearsDirtyState: false,
+                generatedAt: now
+            )
             RuntimeLog.debug(
                 .projection,
                 "runtimeAXDestroyed appID=\(appID) pid=\(pid) axWindowID=\(axWindowID) affectedCGWindowID=\(affectedCGWindowID.map(String.init) ?? "none")"
