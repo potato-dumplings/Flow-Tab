@@ -210,6 +210,102 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(searchRead.projection?.windowEntries.filter { $0.appID == appID }.map(\.windowID), [])
     }
 
+    func testRuntimeProjectionServiceCommitsLaunchedAppProjectionFromMainTablesAsStale() throws {
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let pid = runningApp.processIdentifier
+        let displayName = runningApp.localizedName ?? appID
+        let appDirectoryEntry = RuntimeAppDirectoryEntry(app: runningApp)
+        let committedApp = AppSwitchCandidate(
+            id: appID,
+            displayName: displayName,
+            groupID: RuntimeAppIdentity.groupID(
+                for: runningApp.bundleIdentifier,
+                fallbackName: displayName
+            ),
+            lastActiveAt: 100,
+            windows: []
+        )
+        let readModelStore = RuntimeReadModelStore()
+        readModelStore.commitAppSwitcherProjection(
+            apps: [committedApp],
+            contextsByID: [:],
+            appDirectoryEntries: [appDirectoryEntry],
+            generatedAt: 10
+        )
+        commitMainTableSearchFreshnessBarrierForTesting(readModelStore, generatedAt: 11)
+        let cgWindowID = CGWindowID(240_806)
+        let axWindowID = "ax:\(pid):main-table-launch"
+        let windowRecordStore = RuntimeWindowRecordStore(
+            mappingStatesByPID: [
+                pid: RuntimeWindowMappingState(
+                    windowRecordsByCGWindowID: [
+                        cgWindowID: makeMainTableProjectionWindowRecord(
+                            pid: pid,
+                            cgWindowID: cgWindowID,
+                            axWindowID: axWindowID
+                        )
+                    ],
+                    currentAXToCG: [axWindowID: cgWindowID],
+                    validCGWindowIDs: [cgWindowID],
+                    lastAXWindowIDs: [axWindowID],
+                    hasObservedAXWindowHandle: true
+                )
+            ]
+        )
+        let coordinator = RuntimeReconciliationCoordinator()
+        let requestLock = NSLock()
+        var startedRequests: [RuntimeReconciliationRequest] = []
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.MainTableAppLaunchProjection",
+            repairProvider: RuntimeProjectionRepairProvider(
+                windowRecordStore: windowRecordStore,
+                reconciliationCoordinator: coordinator
+            ),
+            mainTableProjectionBuilder: RuntimeMainTableProjectionBuilder(
+                windowRecordStore: windowRecordStore
+            ),
+            readModelStore: readModelStore,
+            reconciliationExecutor: { request, _ in
+                requestLock.lock()
+                startedRequests.append(request)
+                requestLock.unlock()
+                return .completed
+            }
+        )
+
+        service.signalAppLaunched(
+            appID: appID,
+            pid: pid,
+            appDirectoryEntry: appDirectoryEntry
+        )
+        service.waitForMaintenanceQueueForTesting()
+
+        let appProjection = try XCTUnwrap(readModelStore.readAppSwitcherProjection())
+        let app = try XCTUnwrap(appProjection.apps.first(where: { $0.id == appID }))
+        XCTAssertEqual(app.windows.map(\.id), [
+            RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindowID)
+        ])
+        XCTAssertEqual(app.windows.map(\.title), ["Main Table Projection"])
+        XCTAssertFalse(appProjection.freshness.isCompleteForScope)
+        XCTAssertEqual(appProjection.freshness.dirtyAppIDs, [appID])
+        XCTAssertEqual(appProjection.freshness.dirtyPIDs, [pid])
+        XCTAssertTrue(appProjection.freshness.pendingRepairScopes.contains("appLaunched:\(appID)"))
+
+        let homeProjection = try XCTUnwrap(readModelStore.readHomeSummaryProjection())
+        XCTAssertEqual(homeProjection.summary(for: appID)?.windowCount, 1)
+        XCTAssertFalse(homeProjection.freshness.isCompleteForScope)
+
+        requestLock.lock()
+        let startedTargets = startedRequests.map(\.target)
+        requestLock.unlock()
+        XCTAssertEqual(startedTargets, [.app(pid)])
+        let searchRead = readModelStore.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(searchRead.readiness, .degradedStaleCommitted)
+        XCTAssertEqual(searchRead.resultState, .degradedStaleCommittedResult)
+        XCTAssertEqual(searchRead.projection?.windowEntries.filter { $0.appID == appID }.map(\.windowID), [])
+    }
+
     func testRuntimeProjectionServiceCommitsSearchIndexFromMainTableProjectionOnlyAfterBarrier() throws {
         let runningApp = NSRunningApplication.current
         let appID = RuntimeAppIdentity.appID(for: runningApp)

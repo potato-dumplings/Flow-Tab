@@ -69,7 +69,8 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             let diagnostics = readModelStore.diagnostics()
             let now = Date.timeIntervalSinceReferenceDate
             let mainTableProjectionCommitted = commitMainTableAppSwitcherProjectionLocked(
-                generatedAt: now
+                generatedAt: now,
+                requiresExistingProjectionCoverage: true
             )
             if !diagnostics.hasAppSwitcherProjection
                 && !repairProvider.hasPendingReconciliationRequests() {
@@ -119,7 +120,8 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 includeFullRepair: false
             )
             let mainTableProjectionCommitted = commitMainTableAppSwitcherProjectionLocked(
-                generatedAt: now
+                generatedAt: now,
+                requiresExistingProjectionCoverage: true
             )
             commitCurrentAppRepairEvidenceLocked(
                 drainResult.currentAppRepairEvidence,
@@ -182,6 +184,10 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 pendingScope: "appLaunched:\(appID)",
                 appDirectoryEntry: appDirectoryEntry,
                 generatedAt: now
+            )
+            commitMainTableAppSwitcherProjectionLocked(
+                generatedAt: now,
+                requiresExistingProjectionCoverage: true
             )
             repairProvider.recordAppLaunched(appID: appID, pid: pid, now: now)
             RuntimeLog.debug(.projection, "runtimeLifecycle appLaunched appID=\(appID) pid=\(pid)")
@@ -325,7 +331,10 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 evidence.appDirectoryEntries,
                 generatedAt: generatedAt
             )
-            guard commitMainTableAppSwitcherProjectionLocked(generatedAt: generatedAt) else {
+            guard commitMainTableAppSwitcherProjectionLocked(
+                generatedAt: generatedAt,
+                requiresExistingProjectionCoverage: false
+            ) else {
                 continue
             }
             if diagnostics.hasAppSwitcherProjection || diagnostics.hasDirtyState {
@@ -339,7 +348,8 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
 
     @discardableResult
     private func commitMainTableAppSwitcherProjectionLocked(
-        generatedAt: TimeInterval
+        generatedAt: TimeInterval,
+        requiresExistingProjectionCoverage: Bool
     ) -> Bool {
         guard
             let appDirectoryEntries = readModelStore.readAppDirectoryProjection()?.entries,
@@ -349,6 +359,13 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             )
         else {
             return false
+        }
+        if requiresExistingProjectionCoverage,
+           let existingProjection = readModelStore.readAppSwitcherProjection() {
+            let payloadAppIDs = Set(payload.apps.map(\.id))
+            guard Set(existingProjection.apps.map(\.id)).isSubset(of: payloadAppIDs) else {
+                return false
+            }
         }
         readModelStore.commitMainTableAppSwitcherProjectionPayload(payload, generatedAt: generatedAt)
         return true
