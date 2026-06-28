@@ -311,6 +311,34 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         }
     }
 
+    func markAppTerminatedForMainTableProjection(appID: String, pid: pid_t) {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard shouldRemoveTerminatedAppLocked(appID: appID, pid: pid) else {
+            dirtyPIDs.remove(pid)
+            return
+        }
+        let survivingDirectoryEntries = appDirectoryEntriesLocked(forAppID: appID)
+            .filter { $0.pid != pid }
+        if !survivingDirectoryEntries.isEmpty {
+            markAppInstanceTerminatedForMainTableProjectionLocked(appID: appID, pid: pid)
+            return
+        }
+
+        guard hasTerminatedAppStateLocked(appID: appID, pid: pid) else {
+            return
+        }
+
+        let generatedAt = Date.timeIntervalSinceReferenceDate
+        generation.appLifecycle &+= 1
+        dirtyAppIDs.remove(appID)
+        dirtyPIDs.remove(pid)
+        pendingRepairScopes = pendingRepairScopes.filter { !$0.contains(appID) }
+        currentAppWindowProjectionsByAppID.removeValue(forKey: appID)
+        appDirectoryState.remove(appID: appID, pid: pid, generatedAt: generatedAt)
+    }
+
     private func shouldRemoveTerminatedAppLocked(appID: String, pid: pid_t) -> Bool {
         let directoryEntries = appDirectoryEntriesLocked(forAppID: appID)
         if appDirectoryState.isInitialized,
@@ -330,6 +358,35 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         }
         knownPIDs.formUnion(directoryEntries.map(\.pid))
         return knownPIDs.isEmpty || knownPIDs.contains(pid)
+    }
+
+    private func hasTerminatedAppStateLocked(appID: String, pid: pid_t) -> Bool {
+        appSwitcherProjection?.apps.contains { $0.id == appID } == true
+            || appSwitcherProjection?.contextsByID[appID] != nil
+            || homeSummaryProjection?.summaries.contains { $0.appID == appID } == true
+            || currentAppWindowProjectionsByAppID[appID] != nil
+            || committedSearchIndex?.appEntries.contains { $0.appID == appID } == true
+            || committedSearchIndex?.windowEntries.contains { $0.appID == appID } == true
+            || dirtyAppIDs.contains(appID)
+            || dirtyPIDs.contains(pid)
+            || pendingRepairScopes.contains { $0.contains(appID) }
+            || appDirectoryEntriesLocked(forAppID: appID).contains { $0.pid == pid }
+    }
+
+    private func markAppInstanceTerminatedForMainTableProjectionLocked(appID: String, pid: pid_t) {
+        let generatedAt = Date.timeIntervalSinceReferenceDate
+        generation.appLifecycle &+= 1
+        dirtyAppIDs.insert(appID)
+        dirtyPIDs.remove(pid)
+        pendingRepairScopes.insert("appTerminated:\(appID)")
+        appDirectoryState.remove(pid: pid, generatedAt: generatedAt)
+        if let projection = currentAppWindowProjectionsByAppID[appID],
+           (
+            projection.currentAppWindowPayload.summary.pid == pid
+                || projection.currentAppWindowPayload.context.runningApp.processIdentifier == pid
+           ) {
+            currentAppWindowProjectionsByAppID.removeValue(forKey: appID)
+        }
     }
 
     private func markAppInstanceTerminatedLocked(appID: String, pid: pid_t) {

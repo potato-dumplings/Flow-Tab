@@ -551,7 +551,13 @@ extension FlowTabPriorityCoverageTests {
             searchRead.projection?.windowEntries.filter { $0.appID == appID }.map(\.windowID),
             [legacyWindow.id]
         )
-        XCTAssertFalse(searchRead.projection?.appEntries.contains { $0.appID == terminatedAppID } ?? true)
+        XCTAssertTrue(searchRead.projection?.appEntries.contains { $0.appID == terminatedAppID } ?? false)
+        XCTAssertEqual(
+            searchRead.projection?.windowEntries
+                .filter { $0.appID == terminatedAppID }
+                .map(\.windowTitle),
+            ["Terminated Cache Window"]
+        )
     }
 
     func testRuntimeProjectionServiceCommitsAXDestroyedProjectionFromMainTablesAsStale() throws {
