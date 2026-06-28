@@ -167,6 +167,10 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 signatureSummary: signalFacts.signatureSummary,
                 pendingScope: "spaceTopology"
             )
+            commitMainTableAppSwitcherProjectionLocked(
+                generatedAt: now,
+                requiresExistingProjectionCoverage: true
+            )
             drainReadyReconciliationRequestsLocked(now: now)
         }
     }

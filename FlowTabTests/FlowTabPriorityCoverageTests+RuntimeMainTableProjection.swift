@@ -210,6 +210,141 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(searchRead.projection?.windowEntries.filter { $0.appID == appID }.map(\.windowID), [])
     }
 
+    func testRuntimeProjectionServiceCommitsSpaceTopologyProjectionFromMainTablesAsStale() throws {
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let pid = runningApp.processIdentifier
+        let displayName = runningApp.localizedName ?? appID
+        let appDirectoryEntry = RuntimeAppDirectoryEntry(app: runningApp)
+        let legacyWindow = WindowCandidate(
+            id: "legacy-space-topology-window",
+            title: "Legacy Space Topology Window",
+            isMinimized: false,
+            lastActiveAt: 100
+        )
+        let committedApp = AppSwitchCandidate(
+            id: appID,
+            displayName: displayName,
+            groupID: RuntimeAppIdentity.groupID(
+                for: runningApp.bundleIdentifier,
+                fallbackName: displayName
+            ),
+            lastActiveAt: 100,
+            windows: [legacyWindow]
+        )
+        let readModelStore = RuntimeReadModelStore()
+        readModelStore.commitAppSwitcherProjection(
+            apps: [committedApp],
+            contextsByID: [:],
+            appDirectoryEntries: [appDirectoryEntry],
+            generatedAt: 10
+        )
+        commitMainTableSearchFreshnessBarrierForTesting(readModelStore, generatedAt: 11)
+        let cgWindowID = CGWindowID(240_810)
+        let axWindowID = "ax:\(pid):main-table-space-topology"
+        let windowRecordStore = RuntimeWindowRecordStore(
+            mappingStatesByPID: [
+                pid: RuntimeWindowMappingState(
+                    windowRecordsByCGWindowID: [
+                        cgWindowID: makeMainTableProjectionWindowRecord(
+                            pid: pid,
+                            cgWindowID: cgWindowID,
+                            axWindowID: axWindowID
+                        )
+                    ],
+                    currentAXToCG: [axWindowID: cgWindowID],
+                    validCGWindowIDs: [cgWindowID],
+                    lastAXWindowIDs: [axWindowID],
+                    hasObservedAXWindowHandle: true
+                )
+            ]
+        )
+        let requestLock = NSLock()
+        var startedRequests: [RuntimeReconciliationRequest] = []
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.MainTableSpaceTopologyProjection",
+            repairProvider: RuntimeProjectionRepairProvider(
+                cgWindowListProvider: FixedRuntimeCGWindowListProvider(
+                    rawWindowInfo: [
+                        makeRawCGWindowInfo(
+                            pid: pid,
+                            windowID: cgWindowID,
+                            title: "Sampled Space Topology Window"
+                        )
+                    ]
+                ),
+                spaceTopologyProvider: FixedRuntimeSpaceTopologyProvider(
+                    snapshot: RuntimeSpaceTopologySnapshot(
+                        spacesByID: [
+                            7: RuntimeSpaceTopologySpace(id: 7, displayID: 1, isCurrent: true)
+                        ],
+                        windowIDsBySpaceID: [
+                            7: [cgWindowID]
+                        ],
+                        spaceIDsByCGWindowID: [
+                            cgWindowID: [7]
+                        ]
+                    )
+                ),
+                windowRecordStore: windowRecordStore,
+                reconciliationCoordinator: RuntimeReconciliationCoordinator()
+            ),
+            mainTableProjectionBuilder: RuntimeMainTableProjectionBuilder(
+                windowRecordStore: windowRecordStore
+            ),
+            readModelStore: readModelStore,
+            reconciliationExecutor: { request, _ in
+                requestLock.lock()
+                startedRequests.append(request)
+                requestLock.unlock()
+                return .completed
+            }
+        )
+
+        service.signalSpaceTopologyChanged()
+        service.waitForMaintenanceQueueForTesting()
+
+        let appProjection = try XCTUnwrap(readModelStore.readAppSwitcherProjection())
+        let app = try XCTUnwrap(appProjection.apps.first(where: { $0.id == appID }))
+        XCTAssertEqual(app.windows.map(\.id), [
+            RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindowID)
+        ])
+        XCTAssertEqual(app.windows.map(\.title), ["Main Table Projection"])
+        let projectedWindowID = try XCTUnwrap(app.windows.first?.id)
+        let contextWindow = try XCTUnwrap(
+            appProjection.contextsByID[appID]?.windowsByID[projectedWindowID]
+        )
+        XCTAssertEqual(contextWindow.cgWindowID, cgWindowID)
+        XCTAssertEqual(contextWindow.spaceIDs, [5])
+        XCTAssertFalse(appProjection.freshness.isCompleteForScope)
+        XCTAssertEqual(appProjection.freshness.dirtyCGWindowIDs, [cgWindowID])
+        XCTAssertEqual(
+            appProjection.freshness.spaceTopologySignatureSummary,
+            "d=1,current=7,spaces=1,windows=1,fullscreen=0"
+        )
+        XCTAssertTrue(appProjection.freshness.pendingRepairScopes.contains("spaceTopology"))
+
+        let homeProjection = try XCTUnwrap(readModelStore.readHomeSummaryProjection())
+        XCTAssertEqual(homeProjection.summary(for: appID)?.windowCount, 1)
+        XCTAssertFalse(homeProjection.freshness.isCompleteForScope)
+        let record = try XCTUnwrap(
+            windowRecordStore.state(for: pid)?
+                .windowRecordsByCGWindowID[cgWindowID]
+        )
+        XCTAssertTrue(record.needsReconciliation)
+        requestLock.lock()
+        let startedTargets = startedRequests.map(\.target)
+        requestLock.unlock()
+        XCTAssertEqual(startedTargets, [.spaceTopology])
+        let searchRead = readModelStore.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(searchRead.readiness, .degradedStaleCommitted)
+        XCTAssertEqual(searchRead.resultState, .degradedStaleCommittedResult)
+        XCTAssertEqual(
+            searchRead.projection?.windowEntries.filter { $0.appID == appID }.map(\.windowID),
+            [legacyWindow.id]
+        )
+    }
+
     func testRuntimeProjectionServiceCommitsLaunchedAppProjectionFromMainTablesAsStale() throws {
         let runningApp = NSRunningApplication.current
         let appID = RuntimeAppIdentity.appID(for: runningApp)
