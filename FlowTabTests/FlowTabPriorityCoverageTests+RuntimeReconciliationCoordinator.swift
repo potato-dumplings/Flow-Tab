@@ -2326,10 +2326,8 @@ extension FlowTabPriorityCoverageTests {
                 executedRequests.append(request)
                 lock.unlock()
                 expectation.fulfill()
-                return .completedWithFullRepairProjection(
-                    RuntimeFullRepairProjectionPayload(
-                        apps: [repairedApp],
-                        contextsByID: [:],
+                return .completedWithFullRepairEvidence(
+                    RuntimeFullRepairEvidence(
                         appDirectoryEntries: appDirectoryEntries
                     )
                 )
@@ -2344,7 +2342,10 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(executedRequests.map(\.priority), [.low])
         XCTAssertEqual(executedRequests.first?.reasons, Set([.fullRepairFallback]))
         let projection = try XCTUnwrap(store.readAppSwitcherProjection())
-        XCTAssertEqual(projection.apps.map(\.id), [repairedApp.id])
+        XCTAssertEqual(
+            projection.apps.map(\.id),
+            [repairedApp.id, "com.example.full-repair-helper"]
+        )
         XCTAssertTrue(projection.freshness.isCompleteForScope)
         let appDirectoryProjection = try XCTUnwrap(store.readAppDirectoryProjection())
         XCTAssertEqual(appDirectoryProjection.entries, appDirectoryEntries)
@@ -2981,16 +2982,8 @@ extension FlowTabPriorityCoverageTests {
                 case .app:
                     return .transientEmptyCurrentAppWindowPayload
                 case .fullRepair:
-                    return .completedWithFullRepairProjection(
-                        RuntimeFullRepairProjectionPayload(
-                            apps: [repairedApp],
-                            contextsByID: [
-                                appID: self.makeRuntimeAppContext(
-                                    appID: appID,
-                                    runningApp: runningApp,
-                                    windows: repairedApp.windows
-                                )
-                            ],
+                    return .completedWithFullRepairEvidence(
+                        RuntimeFullRepairEvidence(
                             appDirectoryEntries: [RuntimeAppDirectoryEntry(app: runningApp)]
                         )
                     )

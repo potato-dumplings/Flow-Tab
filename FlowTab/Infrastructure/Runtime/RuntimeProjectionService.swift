@@ -63,8 +63,8 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             let drainResult = reconciliationDrainer.drainReadyRequests(
                 now: now
             )
-            let fullRepairProjectionCommitSummary = commitFullRepairEvidencePayloadsLocked(
-                drainResult.fullRepairProjectionPayloads,
+            let fullRepairProjectionCommitSummary = commitFullRepairEvidenceLocked(
+                drainResult.fullRepairEvidence,
                 generatedAt: now
             )
             commitCurrentAppRepairEvidenceLocked(
@@ -83,7 +83,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                     "pendingScopes=\(diagnostics.pendingRepairScopes.count)",
                     "startedRequests=\(drainResult.startedRequests.count)",
                     "completedRequests=\(drainResult.completedCount)",
-                    "fullRepairProjectionPayloads=\(drainResult.fullRepairProjectionPayloads.count)",
+                    "fullRepairEvidence=\(drainResult.fullRepairEvidence.count)",
                     "fullRepairColdStartCommits=\(fullRepairProjectionCommitSummary.coldStartCommittedCount)",
                     "fullRepairDegradedCommits=\(fullRepairProjectionCommitSummary.degradedCommittedCount)",
                     "mainTableProjectionCommitted=\(mainTableProjectionCommitted ? 1 : 0)",
@@ -292,8 +292,8 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     @discardableResult
     private func drainReadyReconciliationRequestsLocked(now: TimeInterval) -> [RuntimeReconciliationRequest] {
         let result = reconciliationDrainer.drainReadyRequests(now: now)
-        commitFullRepairEvidencePayloadsLocked(
-            result.fullRepairProjectionPayloads,
+        commitFullRepairEvidenceLocked(
+            result.fullRepairEvidence,
             generatedAt: now
         )
         commitCurrentAppRepairEvidenceLocked(
@@ -304,15 +304,15 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     }
 
     @discardableResult
-    private func commitFullRepairEvidencePayloadsLocked(
-        _ payloads: [RuntimeFullRepairProjectionPayload],
+    private func commitFullRepairEvidenceLocked(
+        _ evidenceBatch: [RuntimeFullRepairEvidence],
         generatedAt: TimeInterval
     ) -> RuntimeAppSwitcherProjectionCommitSummary {
         var summary = RuntimeAppSwitcherProjectionCommitSummary()
-        for payload in payloads {
+        for evidence in evidenceBatch {
             let diagnostics = readModelStore.diagnostics()
             readModelStore.commitFullRepairAppDirectoryEvidence(
-                payload.appDirectoryEntries,
+                evidence.appDirectoryEntries,
                 generatedAt: generatedAt
             )
             guard commitMainTableAppSwitcherProjectionLocked(generatedAt: generatedAt) else {

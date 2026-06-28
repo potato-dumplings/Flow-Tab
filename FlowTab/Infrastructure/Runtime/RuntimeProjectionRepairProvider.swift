@@ -168,6 +168,67 @@ extension RuntimeProjectionRepairProvider {
         entry.localizedName ?? entry.bundleIdentifier ?? entry.appID
     }
 
+    func fullRepairEvidence() -> RuntimeFullRepairEvidence {
+        fullRepairEvidence(timingEvent: "fullRepairEvidence")
+    }
+
+    private func fullRepairEvidence(timingEvent: String) -> RuntimeFullRepairEvidence {
+        let startMs = RuntimePerformanceClock.monotonicMilliseconds()
+        if let uiTestProjectionFacts = repairFactSource.collectUITestProjectionDatasetFacts() {
+            let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
+            RuntimeProjectionDiagnostics.logTiming(
+                timingEvent,
+                fields: [
+                    ("result", "uiTestDataset"),
+                    ("apps", "\(uiTestProjectionFacts.appCount)"),
+                    ("windows", "\(uiTestProjectionFacts.windowCount)"),
+                    ("totalMs", RuntimeProjectionDiagnostics.formatMilliseconds(completeMs - startMs))
+                ]
+            )
+            return RuntimeFullRepairEvidence(
+                appDirectoryEntries: uiTestProjectionFacts.appDirectoryEntries
+            )
+        }
+
+        let runningAppsStartMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let runningAppFacts = repairFactSource.collectFullRepairRunningAppFacts()
+        let runningApps = runningAppFacts.runningApps
+        let runningAppsReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+        guard !runningApps.isEmpty else {
+            RuntimeProjectionDiagnostics.logTiming(
+                timingEvent,
+                fields: [
+                    ("result", "empty"),
+                    ("reason", "noRunningApps"),
+                    ("runningAppsMs", RuntimeProjectionDiagnostics.formatMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
+                    ("totalMs", RuntimeProjectionDiagnostics.formatMilliseconds(runningAppsReadyMs - startMs))
+                ]
+            )
+            return RuntimeFullRepairEvidence(
+                appDirectoryEntries: runningAppFacts.appDirectoryEntries
+            )
+        }
+
+        let windowDataStartMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let windowData = repairFactSource.collectFullRepairWindowFacts(for: runningApps)
+        let windowDataReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
+        RuntimeProjectionDiagnostics.logTiming(
+            timingEvent,
+            fields: [
+                ("result", "ready"),
+                ("runningApps", "\(runningApps.count)"),
+                ("projectedWindowPIDs", "\(windowData.windowsByPID.count)"),
+                ("runningAppsMs", RuntimeProjectionDiagnostics.formatMilliseconds(runningAppsReadyMs - runningAppsStartMs)),
+                ("windowDataMs", RuntimeProjectionDiagnostics.formatMilliseconds(windowDataReadyMs - windowDataStartMs)),
+                ("totalMs", RuntimeProjectionDiagnostics.formatMilliseconds(completeMs - startMs))
+            ]
+        )
+        return RuntimeFullRepairEvidence(
+            appDirectoryEntries: runningAppFacts.appDirectoryEntries
+        )
+    }
+
     func fullRepairProjectionPayload() -> RuntimeFullRepairProjectionPayload {
         fullRepairProjectionPayload(timingEvent: "fullRepairProjectionPayload")
     }

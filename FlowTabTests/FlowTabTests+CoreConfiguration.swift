@@ -353,7 +353,7 @@ extension FlowTabTests {
         }
     }
 
-    func testRuntimeProjectionServiceDefaultFullRepairCommitsProviderProjectionPayload() throws {
+    func testRuntimeProjectionServiceDefaultFullRepairCommitsEvidenceThroughMainTableProjection() throws {
         withLaunchArgumentsForTesting(["FlowTab", "--flowtab-ui-mock-runtime"]) {
             let store = RuntimeReadModelStore()
             let service = RuntimeProjectionService(
@@ -365,7 +365,7 @@ extension FlowTabTests {
             service.waitForMaintenanceQueueForTesting()
 
             guard let projection = store.readAppSwitcherProjection() else {
-                XCTFail("Expected default full repair executor to commit provider projection payload")
+                XCTFail("Expected default full repair executor to commit evidence through main-table projection")
                 return
             }
             XCTAssertEqual(projection.apps.count, 6)

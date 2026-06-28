@@ -21,6 +21,10 @@ struct RuntimeCurrentAppRepairEvidence: Equatable, Sendable {
 
 }
 
+struct RuntimeFullRepairEvidence: Equatable, Sendable {
+    let appDirectoryEntries: [RuntimeAppDirectoryEntry]
+}
+
 struct RuntimeAppWindowReconciliationResult {
     let pid: pid_t
     let affectedCGWindowIDs: Set<CGWindowID>
@@ -48,7 +52,7 @@ protocol RuntimeProjectionRepairProviding: AnyObject {
         appDirectoryEntries: [RuntimeAppDirectoryEntry],
         generatedAt: TimeInterval
     ) -> RuntimeAppSwitcherProjectionPayload?
-    func fullRepairProjectionPayload() -> RuntimeFullRepairProjectionPayload
+    func fullRepairEvidence() -> RuntimeFullRepairEvidence
     func recordSpaceTopologyChanged(now: TimeInterval) -> RuntimeSpaceTopologySignalFacts
     func signalAXWindowDestroyed(
         appID: String,

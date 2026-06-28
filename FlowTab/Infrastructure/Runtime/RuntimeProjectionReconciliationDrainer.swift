@@ -2,13 +2,13 @@ import Foundation
 
 enum RuntimeProjectionReconciliationExecutionOutcome {
     case completed
-    case completedWithFullRepairProjection(RuntimeFullRepairProjectionPayload)
+    case completedWithFullRepairEvidence(RuntimeFullRepairEvidence)
     case completedWithCurrentAppRepairEvidence([RuntimeCurrentAppRepairEvidence])
     case transientEmptyCurrentAppWindowPayload
 
     var currentAppRepairEvidence: [RuntimeCurrentAppRepairEvidence] {
         switch self {
-        case .completed, .completedWithFullRepairProjection:
+        case .completed, .completedWithFullRepairEvidence:
             []
         case let .completedWithCurrentAppRepairEvidence(evidence):
             evidence
@@ -22,7 +22,7 @@ struct RuntimeProjectionReconciliationDrainResult {
     var startedRequests: [RuntimeReconciliationRequest] = []
     var completedCount = 0
     var deferredCount = 0
-    var fullRepairProjectionPayloads: [RuntimeFullRepairProjectionPayload] = []
+    var fullRepairEvidence: [RuntimeFullRepairEvidence] = []
     var currentAppRepairEvidence: [RuntimeCurrentAppRepairEvidence] = []
 }
 
@@ -55,11 +55,11 @@ struct RuntimeProjectionReconciliationDrainer {
             result.startedRequests.append(startedRequest)
             let outcome = reconciliationExecutor(startedRequest, repairProvider)
             switch outcome {
-            case .completed, .completedWithFullRepairProjection, .completedWithCurrentAppRepairEvidence:
+            case .completed, .completedWithFullRepairEvidence, .completedWithCurrentAppRepairEvidence:
                 repairProvider.completeReconciliationRequest(id: startedRequest.id)
                 result.completedCount += 1
-                if case let .completedWithFullRepairProjection(payload) = outcome {
-                    result.fullRepairProjectionPayloads.append(payload)
+                if case let .completedWithFullRepairEvidence(evidence) = outcome {
+                    result.fullRepairEvidence.append(evidence)
                 }
                 result.currentAppRepairEvidence.append(
                     contentsOf: outcome.currentAppRepairEvidence
@@ -94,7 +94,7 @@ func runtimeProjectionDefaultReconciliationExecutor(
         }
         return .completed
     case .fullRepair:
-        return .completedWithFullRepairProjection(repairProvider.fullRepairProjectionPayload())
+        return .completedWithFullRepairEvidence(repairProvider.fullRepairEvidence())
     case .spaceTopology:
         let results = repairProvider.reconcileSpaceTopology(
             affectedCGWindowIDs: request.affectedCGWindowIDs
