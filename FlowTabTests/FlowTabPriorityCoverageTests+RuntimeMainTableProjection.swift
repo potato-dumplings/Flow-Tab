@@ -44,9 +44,8 @@ extension FlowTabPriorityCoverageTests {
                 )
             ]
         )
-        let builder: RuntimeMainTableProjectionBuilding = RuntimeProjectionRepairProvider(
-            windowRecordStore: windowRecordStore,
-            reconciliationCoordinator: RuntimeReconciliationCoordinator()
+        let builder: RuntimeMainTableProjectionBuilding = RuntimeMainTableProjectionBuilder(
+            windowRecordStore: windowRecordStore
         )
         let appDirectoryEntry = RuntimeAppDirectoryEntry(app: runningApp)
 
@@ -127,6 +126,9 @@ extension FlowTabPriorityCoverageTests {
             repairProvider: RuntimeProjectionRepairProvider(
                 windowRecordStore: windowRecordStore,
                 reconciliationCoordinator: RuntimeReconciliationCoordinator()
+            ),
+            mainTableProjectionBuilder: RuntimeMainTableProjectionBuilder(
+                windowRecordStore: windowRecordStore
             ),
             readModelStore: readModelStore
         )
@@ -210,6 +212,9 @@ extension FlowTabPriorityCoverageTests {
             repairProvider: RuntimeProjectionRepairProvider(
                 windowRecordStore: windowRecordStore,
                 reconciliationCoordinator: RuntimeReconciliationCoordinator()
+            ),
+            mainTableProjectionBuilder: RuntimeMainTableProjectionBuilder(
+                windowRecordStore: windowRecordStore
             ),
             readModelStore: readModelStore
         )
@@ -382,6 +387,9 @@ extension FlowTabPriorityCoverageTests {
             repairProvider: RuntimeProjectionRepairProvider(
                 windowRecordStore: windowRecordStore,
                 reconciliationCoordinator: coordinator
+            ),
+            mainTableProjectionBuilder: RuntimeMainTableProjectionBuilder(
+                windowRecordStore: windowRecordStore
             ),
             readModelStore: readModelStore,
             reconciliationExecutor: { request, _ in

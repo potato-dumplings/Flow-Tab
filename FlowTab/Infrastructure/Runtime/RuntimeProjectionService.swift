@@ -12,20 +12,30 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
 
     init(
         label: String = "FlowTab.RuntimeProjectionService",
-        repairProvider: RuntimeProjectionRepairProviding = RuntimeProjectionRepairProvider(),
+        repairProvider: RuntimeProjectionRepairProviding? = nil,
         mainTableProjectionBuilder: RuntimeMainTableProjectionBuilding? = nil,
         readModelStore: RuntimeReadModelStore = RuntimeReadModelStore(),
         reconciliationExecutor: @escaping RuntimeProjectionReconciliationExecutor =
             runtimeProjectionDefaultReconciliationExecutor
     ) {
         maintenanceQueue = DispatchQueue(label: label, qos: .utility)
-        self.repairProvider = repairProvider
-        self.mainTableProjectionBuilder = mainTableProjectionBuilder
-            ?? (repairProvider as? RuntimeMainTableProjectionBuilding)
-            ?? RuntimeUnavailableMainTableProjectionBuilder()
+        if let repairProvider {
+            self.repairProvider = repairProvider
+            self.mainTableProjectionBuilder = mainTableProjectionBuilder
+                ?? RuntimeUnavailableMainTableProjectionBuilder()
+        } else {
+            let windowRecordStore = RuntimeWindowRecordStore()
+            let reconciliationCoordinator = RuntimeReconciliationCoordinator()
+            self.repairProvider = RuntimeProjectionRepairProvider(
+                windowRecordStore: windowRecordStore,
+                reconciliationCoordinator: reconciliationCoordinator
+            )
+            self.mainTableProjectionBuilder = mainTableProjectionBuilder
+                ?? RuntimeMainTableProjectionBuilder(windowRecordStore: windowRecordStore)
+        }
         self.readModelStore = readModelStore
         reconciliationDrainer = RuntimeProjectionReconciliationDrainer(
-            repairProvider: repairProvider,
+            repairProvider: self.repairProvider,
             reconciliationExecutor: reconciliationExecutor
         )
     }

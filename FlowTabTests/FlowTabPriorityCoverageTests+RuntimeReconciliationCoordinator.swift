@@ -1629,6 +1629,9 @@ extension FlowTabPriorityCoverageTests {
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.AppLaunchRepairCommit",
             repairProvider: RuntimeProjectionRepairProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator),
+            mainTableProjectionBuilder: RuntimeMainTableProjectionBuilder(
+                windowRecordStore: windowRecordStore
+            ),
             readModelStore: store,
             reconciliationExecutor: { _, _ in
                 .completedWithCurrentAppRepairEvidence([
@@ -2257,6 +2260,9 @@ extension FlowTabPriorityCoverageTests {
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.SearchFreshnessBarrierCommit",
             repairProvider: RuntimeProjectionRepairProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator),
+            mainTableProjectionBuilder: RuntimeMainTableProjectionBuilder(
+                windowRecordStore: windowRecordStore
+            ),
             readModelStore: store,
             reconciliationExecutor: { _, _ in
                 expectation.fulfill()
@@ -2595,6 +2601,9 @@ extension FlowTabPriorityCoverageTests {
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.FullRepairDegradedCommit",
             repairProvider: RuntimeProjectionRepairProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator),
+            mainTableProjectionBuilder: RuntimeMainTableProjectionBuilder(
+                windowRecordStore: windowRecordStore
+            ),
             readModelStore: store,
             reconciliationExecutor: { request, _ in
                 lock.lock()

@@ -525,8 +525,11 @@ extension FlowTabTests {
         userDefaults.set(true, forKey: AppPreferenceKeys.hideMinimizedAppsFromAppLayer)
 
         withLaunchArgumentsForTesting(["FlowTab"]) {
-            let repairProvider = RuntimeProjectionRepairProvider()
-            let projectionBuilder: RuntimeMainTableProjectionBuilding = repairProvider
+            let windowRecordStore = RuntimeWindowRecordStore()
+            let repairProvider = RuntimeProjectionRepairProvider(windowRecordStore: windowRecordStore)
+            let projectionBuilder = RuntimeMainTableProjectionBuilder(
+                windowRecordStore: windowRecordStore
+            )
             let repairEvidence = repairProvider.fullRepairEvidence()
             let projectionPayload = projectionBuilder.appSwitcherProjectionPayloadFromMainTables(
                 appDirectoryEntries: repairEvidence.appDirectoryEntries,
