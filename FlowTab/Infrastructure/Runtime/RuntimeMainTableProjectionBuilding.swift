@@ -29,16 +29,13 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
         appDirectoryEntries: [RuntimeAppDirectoryEntry],
         generatedAt: TimeInterval
     ) -> RuntimeCurrentAppWindowPayload? {
-        guard let runningApp = NSRunningApplication(processIdentifier: pid) else { return nil }
-
-        var directoryEntries = appDirectoryEntries.filter { $0.appID == appID }
-        let selectedEntry: RuntimeAppDirectoryEntry
-        if let matchingEntry = directoryEntries.first(where: { $0.pid == pid }) {
-            selectedEntry = matchingEntry
-        } else {
-            selectedEntry = RuntimeAppDirectoryEntry(app: runningApp)
-            directoryEntries.append(selectedEntry)
+        guard
+            let runningApp = NSRunningApplication(processIdentifier: pid),
+            let selectedEntry = appDirectoryEntries.first(where: { $0.appID == appID && $0.pid == pid })
+        else {
+            return nil
         }
+        let directoryEntries = appDirectoryEntries.filter { $0.appID == appID }
         let displayName = selectedEntry.localizedName
             ?? runningApp.localizedName
             ?? selectedEntry.bundleIdentifier

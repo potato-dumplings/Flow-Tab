@@ -73,6 +73,57 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
+    func testRuntimeMainTableProjectionBuilderRequiresAppDirectoryEntryForCurrentAppPayload() throws {
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let pid = runningApp.processIdentifier
+        let cgWindowID = CGWindowID(240_804)
+        let axWindowID = "ax:\(pid):main-table-current-app-directory-required"
+        let windowRecordStore = RuntimeWindowRecordStore(
+            mappingStatesByPID: [
+                pid: RuntimeWindowMappingState(
+                    windowRecordsByCGWindowID: [
+                        cgWindowID: makeMainTableProjectionWindowRecord(
+                            pid: pid,
+                            cgWindowID: cgWindowID,
+                            axWindowID: axWindowID
+                        )
+                    ],
+                    currentAXToCG: [axWindowID: cgWindowID],
+                    validCGWindowIDs: [cgWindowID],
+                    lastAXWindowIDs: [axWindowID],
+                    hasObservedAXWindowHandle: true
+                )
+            ]
+        )
+        let builder: RuntimeMainTableProjectionBuilding = RuntimeMainTableProjectionBuilder(
+            windowRecordStore: windowRecordStore
+        )
+
+        XCTAssertNil(
+            builder.currentAppWindowPayloadFromMainTables(
+                appID: appID,
+                pid: pid,
+                appDirectoryEntries: [],
+                generatedAt: 81
+            )
+        )
+
+        let payload = try XCTUnwrap(
+            builder.currentAppWindowPayloadFromMainTables(
+                appID: appID,
+                pid: pid,
+                appDirectoryEntries: [RuntimeAppDirectoryEntry(app: runningApp)],
+                generatedAt: 82
+            )
+        )
+        XCTAssertEqual(payload.summary.appID, appID)
+        XCTAssertEqual(payload.summary.pid, pid)
+        XCTAssertEqual(payload.candidate.windows.map(\.id), [
+            RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindowID)
+        ])
+    }
+
     func testRuntimeProjectionServiceCommitsAppSwitcherProjectionFromMainTablesAsStale() throws {
         let runningApp = NSRunningApplication.current
         let appID = RuntimeAppIdentity.appID(for: runningApp)
