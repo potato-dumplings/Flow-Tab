@@ -7,6 +7,7 @@ protocol RuntimeProjectionServing: Sendable {
     func readCurrentAppWindowProjection(appID: String) -> RuntimeCurrentAppWindowProjection?
     func readFocusedCurrentAppWindowProjection() -> RuntimeFocusedCurrentAppWindowProjectionRead?
     func readActivationTargetProjection() -> RuntimeActivationTargetProjection?
+    func readSpaceTopologyProjection() -> RuntimeSpaceTopologyProjection?
     func readCommittedSearchIndexForSearch() -> RuntimeSearchIndexRead
     func runtimeReadModelDiagnostics() -> RuntimeReadModelDiagnostics
     func requestAppSwitcherProjectionMaintenance(reason: RuntimeProjectionMaintenanceReason)

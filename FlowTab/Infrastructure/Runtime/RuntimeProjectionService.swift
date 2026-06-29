@@ -72,6 +72,10 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         readModelStore.readActivationTargetProjection()
     }
 
+    func readSpaceTopologyProjection() -> RuntimeSpaceTopologyProjection? {
+        readModelStore.readSpaceTopologyProjection()
+    }
+
     func readCommittedSearchIndexForSearch() -> RuntimeSearchIndexRead {
         readModelStore.readCommittedSearchIndexForSearch()
     }

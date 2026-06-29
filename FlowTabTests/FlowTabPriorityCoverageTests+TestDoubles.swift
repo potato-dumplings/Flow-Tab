@@ -87,6 +87,7 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     private let currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection]
     private let focusedCurrentAppWindowProjectionRead: RuntimeFocusedCurrentAppWindowProjectionRead?
     private let activationTargetProjection: RuntimeActivationTargetProjection?
+    private let spaceTopologyProjection: RuntimeSpaceTopologyProjection?
     private var committedSearchIndexRead: RuntimeSearchIndexRead?
     private var appSwitcherProjectionReads = 0
     private var homeSummaryProjectionReads = 0
@@ -113,6 +114,7 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection] = [:],
         focusedCurrentAppWindowProjectionRead: RuntimeFocusedCurrentAppWindowProjectionRead? = nil,
         activationTargetProjection: RuntimeActivationTargetProjection? = nil,
+        spaceTopologyProjection: RuntimeSpaceTopologyProjection? = nil,
         committedSearchIndexRead: RuntimeSearchIndexRead? = nil
     ) {
         self.appSwitcherProjection = appSwitcherProjection
@@ -135,6 +137,7 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
             self.focusedCurrentAppWindowProjectionRead = nil
         }
         self.activationTargetProjection = activationTargetProjection
+        self.spaceTopologyProjection = spaceTopologyProjection
         self.committedSearchIndexRead = committedSearchIndexRead
     }
 
@@ -347,6 +350,10 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
 
     func readActivationTargetProjection() -> RuntimeActivationTargetProjection? {
         activationTargetProjection
+    }
+
+    func readSpaceTopologyProjection() -> RuntimeSpaceTopologyProjection? {
+        spaceTopologyProjection
     }
 
     func readCommittedSearchIndexForSearch() -> RuntimeSearchIndexRead {
