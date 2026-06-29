@@ -55,13 +55,12 @@ struct SwitcherSearchIndexStatus: Equatable, Sendable {
         )
     }
 
-    init(projection: RuntimeSearchIndexProjection) {
-        let isComplete = projection.freshness.isCompleteForScope
+    init(projection _: RuntimeSearchIndexProjection) {
         self.init(
-            readiness: isComplete ? .committedGenerationValidated : .degradedStaleCommitted,
-            resultState: isComplete ? .committedGenerationResult : .degradedStaleCommittedResult,
-            committedIndexCoversCurrentGeneration: isComplete,
-            requestedFreshnessBarrier: !isComplete
+            readiness: .degradedStaleCommitted,
+            resultState: .degradedStaleCommittedResult,
+            committedIndexCoversCurrentGeneration: false,
+            requestedFreshnessBarrier: true
         )
     }
 

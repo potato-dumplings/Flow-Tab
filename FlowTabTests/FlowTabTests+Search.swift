@@ -88,6 +88,21 @@ extension FlowTabTests {
         XCTAssertEqual(coordinator.state.results.map(\.primaryText), ["Safari"])
     }
 
+    func testSearchProjectionOnlyRebuildDefaultsToDegradedStaleCommittedStatus() {
+        let coordinator = SwitcherSearchCoordinator()
+        let projection = runtimeSearchIndexProjection(from: searchSampleApps())
+        XCTAssertTrue(projection.freshness.isCompleteForScope)
+
+        coordinator.rebuildIndex(with: projection)
+        XCTAssertTrue(coordinator.activate(defaultScope: .app))
+
+        XCTAssertEqual(coordinator.state.indexStatus?.readiness, .degradedStaleCommitted)
+        XCTAssertEqual(coordinator.state.indexStatus?.resultState, .degradedStaleCommittedResult)
+        XCTAssertEqual(coordinator.state.indexStatus?.committedIndexCoversCurrentGeneration, false)
+        XCTAssertEqual(coordinator.state.indexStatus?.requestedFreshnessBarrier, true)
+        XCTAssertNotEqual(coordinator.state.indexStatus?.resultState, .committedGenerationResult)
+    }
+
     func testSearchMatchesCamelCaseAppBySegmentedWords() {
         let coordinator = SwitcherSearchCoordinator()
         coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
