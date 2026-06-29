@@ -366,6 +366,68 @@ enum RuntimeWindowPresentationFilter {
         return orderedEntries
     }
 
+    static func filteredAndOrderedEntriesForPresentation(
+        _ entries: [RuntimeWindowListEntry],
+        allEntriesForHostArtifacts: [RuntimeWindowListEntry]? = nil,
+        knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry],
+        appName: String,
+        hasFullscreenTopology: Bool,
+        cgWindowOrderByID: [CGWindowID: Int],
+        stage: String,
+        finalStage: String
+    ) -> [RuntimeWindowListEntry] {
+        let hostFilteredEntries = filterFullscreenHostArtifactEntries(
+            entries,
+            allEntries: allEntriesForHostArtifacts ?? entries,
+            knownCGWindowsByID: knownCGWindowsByID,
+            appName: appName,
+            hasFullscreenTopology: hasFullscreenTopology,
+            stage: stage
+        )
+        let siblingFilteredEntries = filterFullscreenSiblingArtifactEntries(
+            hostFilteredEntries,
+            allEntries: hostFilteredEntries,
+            knownCGWindowsByID: knownCGWindowsByID,
+            appName: appName,
+            hasFullscreenTopology: hasFullscreenTopology,
+            stage: stage
+        )
+        let overlayFilteredEntries = filterAuxiliaryOverlayEntries(
+            siblingFilteredEntries,
+            knownCGWindowsByID: knownCGWindowsByID,
+            appName: appName,
+            stage: stage
+        )
+        let activationCoveredEntries = filterCGOnlyEntriesCoveredByActivationEntries(
+            overlayFilteredEntries,
+            knownCGWindowsByID: knownCGWindowsByID,
+            appName: appName,
+            hasFullscreenTopology: hasFullscreenTopology,
+            stage: stage
+        )
+        let duplicateFilteredEntries = filterDuplicateFullscreenContentEntries(
+            activationCoveredEntries,
+            knownCGWindowsByID: knownCGWindowsByID,
+            appName: appName,
+            stage: finalStage
+        )
+        let titleFilteredEntries = filterRepeatedFullscreenPresentationTitles(
+            duplicateFilteredEntries,
+            knownCGWindowsByID: knownCGWindowsByID,
+            appName: appName,
+            hasFullscreenTopology: hasFullscreenTopology,
+            stage: finalStage
+        )
+
+        return orderWindowEntriesForPresentation(
+            titleFilteredEntries,
+            prioritizesOnscreen: hasFullscreenTopology,
+            cgWindowOrderByID: cgWindowOrderByID,
+            knownCGWindowsByID: knownCGWindowsByID,
+            appName: appName
+        )
+    }
+
     private static func entryUsesDesktopSpace(_ entry: RuntimeWindowListEntry) -> Bool {
         RuntimeWindowTopologyClassifier.isDesktopOnlySpaceWindow(spaceIDs: entry.spaceIDs)
     }

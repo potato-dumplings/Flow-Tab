@@ -190,6 +190,44 @@ enum RuntimeWindowMappingTestSupport {
         ).map(Self.resolvedEntry)
     }
 
+    static func resolveWindowEntriesAndProjectedEntries(
+        axWindows: [RuntimeAXWindowEntry],
+        cgWindows: [RuntimeCGWindowEntry],
+        exactBridgeMatches: [String: CGWindowID] = [:],
+        previousMatches: [String: CGWindowID] = [:],
+        previousAXWindowIDs: Set<String> = [],
+        previousCGWindowIDs: Set<CGWindowID> = [],
+        pid: pid_t = 100,
+        appName: String = "FlowTab Test"
+    ) -> (resolvedEntries: [ResolvedEntry], projectedEntries: [ResolvedEntry]) {
+        let windowRecordStore = mappingStore(
+            previousMatches: previousMatches,
+            previousAXWindowIDs: previousAXWindowIDs,
+            previousCGWindowIDs: previousCGWindowIDs,
+            pid: pid
+        )
+        let previousExactBridgeOverride = AXWindowInspector.cgWindowIDOverrideForTesting
+        AXWindowInspector.cgWindowIDOverrideForTesting = exactBridgeOverride(
+            axEntries: axWindows,
+            requestedWindowIDsByAXWindowID: exactBridgeMatches
+        )
+        defer {
+            AXWindowInspector.cgWindowIDOverrideForTesting = previousExactBridgeOverride
+        }
+        let resolvedEntries = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
+            windowRecordStore: windowRecordStore,
+            axWindows: axWindows,
+            cgWindows: cgWindows,
+            pid: pid,
+            appName: appName
+        ).map(Self.resolvedEntry)
+        let projectedEntries = windowRecordStore.projectedWindowEntries(
+            processIdentifier: pid,
+            appName: appName
+        ).map(Self.resolvedEntry)
+        return (resolvedEntries, projectedEntries)
+    }
+
     private static func mappingStore(
         previousMatches: [String: CGWindowID],
         previousAXWindowIDs: Set<String>,

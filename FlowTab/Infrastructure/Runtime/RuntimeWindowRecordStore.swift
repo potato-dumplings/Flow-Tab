@@ -329,7 +329,7 @@ private extension RuntimeWindowMappingState {
         processIdentifier pid: pid_t,
         appName: String
     ) -> [RuntimeWindowListEntry] {
-        windowRecordsByCGWindowID.values
+        let rawEntries = windowRecordsByCGWindowID.values
             .sorted { lhs, rhs in
                 if lhs.isFocused != rhs.isFocused {
                     return lhs.isFocused
@@ -348,6 +348,34 @@ private extension RuntimeWindowMappingState {
             .compactMap { record in
                 record.projectedWindowEntry(processIdentifier: pid, appName: appName)
             }
+        guard rawEntries.count > 1 else { return rawEntries }
+
+        let knownCGWindowsByID = RuntimeWindowRecord.knownCGWindowsByID(
+            windowRecordsByCGWindowID: windowRecordsByCGWindowID,
+            validCGWindows: []
+        )
+        let hasFullscreenTopology = knownCGWindowsByID.values.contains {
+            RuntimeWindowTopologyClassifier.isLikelyOffDesktopFullscreenContent(
+                bounds: $0.bounds,
+                spaceIDs: $0.spaceIDs
+            )
+        }
+        let cgWindowOrderByID = Dictionary(
+            uniqueKeysWithValues: rawEntries.enumerated().compactMap { index, entry in
+                entry.cgWindowID.map { ($0, index) }
+            }
+        )
+
+        return RuntimeWindowPresentationFilter.filteredAndOrderedEntriesForPresentation(
+            rawEntries,
+            allEntriesForHostArtifacts: rawEntries,
+            knownCGWindowsByID: knownCGWindowsByID,
+            appName: appName,
+            hasFullscreenTopology: hasFullscreenTopology,
+            cgWindowOrderByID: cgWindowOrderByID,
+            stage: "window-record-projection",
+            finalStage: "window-record-projection-final"
+        )
     }
 }
 

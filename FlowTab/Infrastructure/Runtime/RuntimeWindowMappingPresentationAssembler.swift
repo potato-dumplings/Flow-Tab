@@ -227,55 +227,15 @@ enum RuntimeWindowMappingPresentationAssembler {
             appName: appName
         )
 
-        let hostFilteredPresentationEntries = RuntimeWindowPresentationFilter.filterFullscreenHostArtifactEntries(
+        return RuntimeWindowPresentationFilter.filteredAndOrderedEntriesForPresentation(
             exactEntries + deduplicatedUnmatchedAXEntries,
-            allEntries: exactEntries + rawUnmatchedAXEntries,
+            allEntriesForHostArtifacts: exactEntries + rawUnmatchedAXEntries,
             knownCGWindowsByID: knownCGWindowsByID,
             appName: appName,
             hasFullscreenTopology: !fullscreenContentBounds.isEmpty,
-            stage: "presentation"
-        )
-        let presentationEntries = RuntimeWindowPresentationFilter.filterFullscreenSiblingArtifactEntries(
-            hostFilteredPresentationEntries,
-            allEntries: hostFilteredPresentationEntries,
-            knownCGWindowsByID: knownCGWindowsByID,
-            appName: appName,
-            hasFullscreenTopology: !fullscreenContentBounds.isEmpty,
-            stage: "presentation"
-        )
-        let overlayFilteredPresentationEntries = RuntimeWindowPresentationFilter.filterAuxiliaryOverlayEntries(
-            presentationEntries,
-            knownCGWindowsByID: knownCGWindowsByID,
-            appName: appName,
-            stage: "presentation"
-        )
-        let activationCoveredPresentationEntries = RuntimeWindowPresentationFilter.filterCGOnlyEntriesCoveredByActivationEntries(
-            overlayFilteredPresentationEntries,
-            knownCGWindowsByID: knownCGWindowsByID,
-            appName: appName,
-            hasFullscreenTopology: !fullscreenContentBounds.isEmpty,
-            stage: "presentation"
-        )
-        let duplicateFilteredPresentationEntries = RuntimeWindowPresentationFilter.filterDuplicateFullscreenContentEntries(
-            activationCoveredPresentationEntries,
-            knownCGWindowsByID: knownCGWindowsByID,
-            appName: appName,
-            stage: "presentation-final"
-        )
-        let titleFilteredPresentationEntries = RuntimeWindowPresentationFilter.filterRepeatedFullscreenPresentationTitles(
-            duplicateFilteredPresentationEntries,
-            knownCGWindowsByID: knownCGWindowsByID,
-            appName: appName,
-            hasFullscreenTopology: !fullscreenContentBounds.isEmpty,
-            stage: "presentation-final"
-        )
-
-        return RuntimeWindowPresentationFilter.orderWindowEntriesForPresentation(
-            titleFilteredPresentationEntries,
-            prioritizesOnscreen: !fullscreenContentBounds.isEmpty,
             cgWindowOrderByID: cgWindowOrderByID,
-            knownCGWindowsByID: knownCGWindowsByID,
-            appName: appName
+            stage: "presentation",
+            finalStage: "presentation-final"
         )
     }
 }

@@ -1063,7 +1063,7 @@ extension FlowTabPriorityCoverageTests {
         let fullscreenContentFrame = CGRect(x: 0, y: 158, width: 1_728, height: 959)
         let fullscreenBandFrame = CGRect(x: 0, y: 74, width: 1_728, height: 165)
 
-        let mergedEntries = RuntimeWindowMappingTestSupport.resolveWindowEntries(
+        let result = RuntimeWindowMappingTestSupport.resolveWindowEntriesAndProjectedEntries(
             axWindows: [
                 .init(
                     id: "ax:chrome:normal",
@@ -1202,6 +1202,7 @@ extension FlowTabPriorityCoverageTests {
             pid: 20_596,
             appName: appName
         )
+        let mergedEntries = result.resolvedEntries
 
         XCTAssertEqual(
             mergedEntries.map(\.title),
@@ -1222,6 +1223,15 @@ extension FlowTabPriorityCoverageTests {
             }
         )
         XCTAssertFalse(mergedEntries.contains { $0.title == appName })
+        XCTAssertEqual(
+            Set(result.projectedEntries.map(\.title)),
+            Set(mergedEntries.map(\.title)),
+            "WindowRecord main-table projection must preserve noisy fullscreen artifact filtering."
+        )
+        XCTAssertEqual(
+            Set(result.projectedEntries.compactMap(\.cgWindowID)),
+            Set(mergedEntries.compactMap(\.cgWindowID))
+        )
     }
 
     func testRuntimeSystemRepairFactProviderWindowListFiltersCGOnlyNoisySiblingsCoveredByActivationEntries() {
