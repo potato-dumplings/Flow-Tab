@@ -39,6 +39,10 @@ final class RuntimeWindowRecordStore {
         ) ?? []
     }
 
+    func hasWindowProjectionCoverage(processIdentifier pid: pid_t) -> Bool {
+        state(for: pid)?.hasRecordedWindowCollection == true
+    }
+
     @discardableResult
     func recordSpaceTopologySnapshot(
         _ snapshot: RuntimeSpaceTopologySnapshot,

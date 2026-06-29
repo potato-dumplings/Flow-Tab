@@ -118,6 +118,7 @@ struct RuntimeWindowMappingResolution {
 struct RuntimeWindowMappingState {
     var windowRecordsByCGWindowID: [CGWindowID: RuntimeWindowRecord]
     private var derivedIndexes: RuntimeWindowRecordDerivedIndexes
+    var hasRecordedWindowCollection: Bool
     var hasObservedAXWindowHandle: Bool
     var consecutiveAXCollectionMisses: Int
 
@@ -126,6 +127,7 @@ struct RuntimeWindowMappingState {
         currentAXToCG: [String: CGWindowID] = [:],
         validCGWindowIDs: Set<CGWindowID> = [],
         lastAXWindowIDs: Set<String> = [],
+        hasRecordedWindowCollection: Bool? = nil,
         hasObservedAXWindowHandle: Bool = false,
         consecutiveAXCollectionMisses: Int = 0
     ) {
@@ -135,6 +137,8 @@ struct RuntimeWindowMappingState {
             validCGWindowIDs: validCGWindowIDs,
             lastAXWindowIDs: lastAXWindowIDs
         )
+        self.hasRecordedWindowCollection = hasRecordedWindowCollection
+            ?? !windowRecordsByCGWindowID.isEmpty
         self.hasObservedAXWindowHandle = hasObservedAXWindowHandle
         self.consecutiveAXCollectionMisses = consecutiveAXCollectionMisses
     }
@@ -156,7 +160,7 @@ struct RuntimeWindowMappingState {
     }
 
     var isEmpty: Bool {
-        windowRecordsByCGWindowID.isEmpty
+        windowRecordsByCGWindowID.isEmpty && !hasRecordedWindowCollection
     }
 
     var isLikelyTransientAXRebuild: Bool {
@@ -176,6 +180,9 @@ struct RuntimeWindowMappingState {
         hasAXWindowsInCurrentCollection: Bool,
         absenceIsAuthoritative: Bool
     ) {
+        hasRecordedWindowCollection = hasRecordedWindowCollection
+            || hasAXWindowsInCurrentCollection
+            || absenceIsAuthoritative
         hasObservedAXWindowHandle = hasObservedAXWindowHandle || hasAXWindowsInCurrentCollection
         consecutiveAXCollectionMisses = RuntimeAXWindowAbsencePolicy.consecutiveAXCollectionMissCount(
             hasAXWindowsInCurrentCollection: hasAXWindowsInCurrentCollection,

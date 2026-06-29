@@ -79,11 +79,15 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
         guard !appDirectoryEntries.isEmpty else { return nil }
 
         var windowsByPID: [pid_t: [RuntimeWindowListEntry]] = [:]
+        var windowCoverageByPID: [pid_t: Bool] = [:]
         for entry in appDirectoryEntries {
             let displayName = Self.displayName(for: entry)
             windowsByPID[entry.pid] = windowRecordStore.projectedWindowEntries(
                 processIdentifier: entry.pid,
                 appName: displayName
+            )
+            windowCoverageByPID[entry.pid] = windowRecordStore.hasWindowProjectionCoverage(
+                processIdentifier: entry.pid
             )
         }
         let windowStatsByPID = RuntimeAppDirectory.windowStats(
@@ -164,7 +168,15 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
                     )
                 )
             }
-            return (candidate: candidate, homeSummary: homeSummary, context: context)
+            let hasCoveredAppGroupWindowState = appGroup.allSatisfy {
+                windowCoverageByPID[$0.pid] == true
+            }
+            return (
+                candidate: candidate,
+                homeSummary: homeSummary,
+                context: context,
+                hasCoveredAppGroupWindowState: hasCoveredAppGroupWindowState
+            )
         }
 
         return RuntimeAppSwitcherProjectionPayload(
@@ -177,7 +189,7 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
             homeSummaries: rows.map(\.homeSummary),
             hasCompleteWindowCoverage: rows.allSatisfy { row in
                 guard let context = row.context,
-                      !row.candidate.windows.isEmpty
+                      row.hasCoveredAppGroupWindowState
                 else { return false }
                 return context.windowsByID.count == row.candidate.windows.count
             }

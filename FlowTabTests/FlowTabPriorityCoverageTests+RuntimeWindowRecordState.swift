@@ -657,7 +657,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(record.lastReconciliationMarkedAt, 21)
     }
 
-    func testRuntimeSystemRepairFactProviderDropsWindowRecordAfterLifecycleGraceExpires() {
+    func testRuntimeSystemRepairFactProviderDropsWindowRecordAfterLifecycleGraceExpires() throws {
         let windowRecordStore = RuntimeWindowRecordStore()
         let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore)
         let pid: pid_t = 18_405
@@ -690,7 +690,9 @@ extension FlowTabPriorityCoverageTests {
         )
 
         XCTAssertTrue(resolution.windowRecordsByCGWindowID.isEmpty)
-        XCTAssertNil(windowRecordStore.state(for: pid))
+        let retainedCoverageState = try XCTUnwrap(windowRecordStore.state(for: pid))
+        XCTAssertTrue(retainedCoverageState.windowRecordsByCGWindowID.isEmpty)
+        XCTAssertTrue(retainedCoverageState.hasRecordedWindowCollection)
     }
 
     func testRuntimeSystemRepairFactProviderWindowLayerExposesInGraceStickyRecordWithoutCurrentCGEvidence() {
