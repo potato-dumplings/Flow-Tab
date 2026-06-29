@@ -10,10 +10,14 @@ HOME_ROOT="${BUILD_ROOT}/home"
 MODULE_CACHE_ROOT="${BUILD_ROOT}/module-cache"
 PACKAGE_CACHE_PATH="${BUILD_ROOT}/source-packages"
 USER_HOME="${HOME}"
+ORIGINAL_HOME="${HOME}"
+ORIGINAL_CFFIXED_USER_HOME="${CFFIXED_USER_HOME:-${HOME}}"
 DEFAULT_UI_TEST_APP_PATH="${USER_HOME}/Applications/Flow Tab UITest.app"
+LOCAL_SIGNING_CONFIG_PATH="${ROOT_DIR}/xcconfigs/LocalSigning.xcconfig"
 SPACE_FIXTURE_BUILD_SCRIPT="${ROOT_DIR}/scripts/testing/build-space-fixture-workflow.sh"
 SPACE_FIXTURE_BASELINE_WORKFLOW="${ROOT_DIR}/docs/fixtures/space-fixture-home-multi-app-workflow.json"
 SPACE_FIXTURE_BASELINE_RESOLVED_PATH="${ROOT_DIR}/.build-local/space-fixture-workflow/variants/resolved-workflow.json"
+UI_TEST_RUNNER_PATH="${DERIVED_DATA_PATH}/Build/Products/Debug/FlowTabUITests-Runner.app"
 
 ACTION="test"
 ACTION_SET=false
@@ -22,6 +26,9 @@ HAS_CODE_SIGNING_OVERRIDE=false
 USE_STABLE_UI_TEST_APP=true
 PREPARE_SPACE_FIXTURES=true
 UI_TEST_APP_PATH="${FLOWTAB_UI_TEST_APP_PATH:-${DEFAULT_UI_TEST_APP_PATH}}"
+DEVELOPMENT_TEAM="${FLOWTAB_DEVELOPMENT_TEAM:-}"
+CODE_SIGN_IDENTITY="${FLOWTAB_CODE_SIGN_IDENTITY:-}"
+RESOLVED_CODE_SIGN_IDENTITY=""
 declare -a EXTRA_ARGS=()
 
 expand_path() {
@@ -51,6 +58,122 @@ Examples:
   ./scripts/testing/run-ui-tests-local.sh build-for-testing
   ./scripts/testing/run-ui-tests-local.sh test-without-building -only-testing:FlowTabUITests
 EOF
+}
+
+local_signing_config_value() {
+  local key="$1"
+
+  if [[ ! -f "${LOCAL_SIGNING_CONFIG_PATH}" ]]; then
+    return 0
+  fi
+
+  awk -v key="${key}" '
+    /^[[:space:]]*(#|\/\/)/ {
+      next
+    }
+    $0 ~ "^[[:space:]]*" key "[[:space:]]*=" {
+      value = $0
+      sub(/^[^=]*=/, "", value)
+      sub(/[[:space:]]*\/\/.*$/, "", value)
+      sub(/[[:space:]]+$/, "", value)
+      sub(/^[[:space:]]+/, "", value)
+      if (value != "" && value != "YOUR_TEAM_ID") {
+        print value
+      }
+      exit
+    }
+  ' "${LOCAL_SIGNING_CONFIG_PATH}"
+}
+
+resolve_code_sign_identity() {
+  local requested="$1"
+  local team="$2"
+  local identities
+  local line
+  local identity
+
+  identities="$(
+    HOME="${ORIGINAL_HOME}" \
+    CFFIXED_USER_HOME="${ORIGINAL_CFFIXED_USER_HOME}" \
+    security find-identity -v -p codesigning 2>/dev/null || true
+  )"
+
+  while IFS= read -r line; do
+    identity="${line#*\"}"
+    identity="${identity%\"*}"
+
+    if [[ "${identity}" == "${line}" ]]; then
+      continue
+    fi
+
+    if [[ -n "${team}" && "${identity}" != *"(${team})" ]]; then
+      continue
+    fi
+
+    if [[ -n "${requested}" && "${requested}" != "Apple Development" && "${identity}" != "${requested}" ]]; then
+      continue
+    fi
+
+    if [[ -z "${requested}" && "${identity}" != Apple\ Development:* ]]; then
+      continue
+    fi
+
+    if [[ "${requested}" == "Apple Development" && "${identity}" != Apple\ Development:* ]]; then
+      continue
+    fi
+
+    printf '%s' "${identity}"
+    return 0
+  done <<< "${identities}"
+
+  return 1
+}
+
+resolve_runner_signing_identity() {
+  if [[ -n "${RESOLVED_CODE_SIGN_IDENTITY}" ]]; then
+    return 0
+  fi
+
+  if [[ -z "${DEVELOPMENT_TEAM}" ]]; then
+    DEVELOPMENT_TEAM="$(local_signing_config_value "FLOWTAB_DEVELOPMENT_TEAM")"
+  fi
+
+  if [[ -z "${CODE_SIGN_IDENTITY}" ]]; then
+    CODE_SIGN_IDENTITY="$(local_signing_config_value "FLOWTAB_CODE_SIGN_IDENTITY")"
+  fi
+
+  if [[ -z "${CODE_SIGN_IDENTITY}" ]]; then
+    CODE_SIGN_IDENTITY="Apple Development"
+  fi
+
+  if RESOLVED_CODE_SIGN_IDENTITY="$(resolve_code_sign_identity "${CODE_SIGN_IDENTITY}" "${DEVELOPMENT_TEAM}")"; then
+    echo "UI test runner signing identity: ${RESOLVED_CODE_SIGN_IDENTITY}"
+    return 0
+  fi
+
+  echo "Could not resolve a local codesigning identity for FlowTabUITests-Runner.app." >&2
+  echo "Requested identity: ${CODE_SIGN_IDENTITY}" >&2
+  if [[ -n "${DEVELOPMENT_TEAM}" ]]; then
+    echo "Requested team: ${DEVELOPMENT_TEAM}" >&2
+  else
+    echo "No FLOWTAB_DEVELOPMENT_TEAM was exported and ${LOCAL_SIGNING_CONFIG_PATH} did not provide one." >&2
+  fi
+  echo "Configure xcconfigs/LocalSigning.xcconfig or FLOWTAB_DEVELOPMENT_TEAM, then rerun UI tests." >&2
+  return 1
+}
+
+sign_ui_test_runner() {
+  if [[ ! -d "${UI_TEST_RUNNER_PATH}" ]]; then
+    echo "UI test runner not found: ${UI_TEST_RUNNER_PATH}" >&2
+    return 1
+  fi
+
+  resolve_runner_signing_identity
+  echo "Signing UI test runner: ${UI_TEST_RUNNER_PATH}"
+  HOME="${ORIGINAL_HOME}" \
+  CFFIXED_USER_HOME="${ORIGINAL_CFFIXED_USER_HOME}" \
+    /usr/bin/codesign --force --deep --sign "${RESOLVED_CODE_SIGN_IDENTITY}" "${UI_TEST_RUNNER_PATH}"
+  /usr/bin/codesign --verify --deep --strict --verbose=2 "${UI_TEST_RUNNER_PATH}"
 }
 
 ensure_space_fixture_variants() {
@@ -251,37 +374,67 @@ if [[ "${ACTION}" != "build-for-testing" && "${PREPARE_SPACE_FIXTURES}" == true 
   ensure_space_fixture_variants
 fi
 
-XCODEBUILD_CMD=(
-  xcodebuild
-  -project "${ROOT_DIR}/FlowTab.xcodeproj"
-  -scheme FlowTab
-  -destination "platform=macOS"
-  -derivedDataPath "${DERIVED_DATA_PATH}"
-  -clonedSourcePackagesDirPath "${PACKAGE_CACHE_PATH}"
-)
+build_xcodebuild_cmd() {
+  local action="$1"
+  local include_result_bundle="$2"
 
-if [[ "${ACTION}" == "test" || "${ACTION}" == "test-without-building" ]]; then
-  XCODEBUILD_CMD+=(-resultBundlePath "${RESULT_BUNDLE_PATH}")
-fi
+  XCODEBUILD_CMD=(
+    xcodebuild
+    -project "${ROOT_DIR}/FlowTab.xcodeproj"
+    -scheme FlowTab
+    -destination "platform=macOS"
+    -derivedDataPath "${DERIVED_DATA_PATH}"
+    -clonedSourcePackagesDirPath "${PACKAGE_CACHE_PATH}"
+  )
 
-# Local UI test builds do not need signed build products, and disabling signing
-# avoids coupling test execution to whichever Xcode account happens to be configured.
-if [[ "${HAS_CODE_SIGNING_OVERRIDE}" == false ]]; then
-  XCODEBUILD_CMD+=("CODE_SIGNING_ALLOWED=NO")
-fi
+  if [[ "${include_result_bundle}" == true ]]; then
+    XCODEBUILD_CMD+=(-resultBundlePath "${RESULT_BUNDLE_PATH}")
+  fi
 
-XCODEBUILD_CMD+=("${ACTION}")
-if ((${#EXTRA_ARGS[@]} > 0)); then
-  XCODEBUILD_CMD+=("${EXTRA_ARGS[@]}")
-fi
+  # Local UI test builds do not use Xcode automatic signing. The wrapper signs
+  # the generated XCTest runner after build-for-testing with the local identity.
+  if [[ "${HAS_CODE_SIGNING_OVERRIDE}" == false ]]; then
+    XCODEBUILD_CMD+=("CODE_SIGNING_ALLOWED=NO")
+  fi
 
-if ! "${XCODEBUILD_CMD[@]}"; then
-  echo >&2
-  echo "UI test run failed." >&2
-  echo "If the error still points at sandboxed temporary files or restricted caches," >&2
-  echo "treat it as an environment blocker and rerun with elevated permissions or outside the sandbox." >&2
-  exit 1
-fi
+  XCODEBUILD_CMD+=("${action}")
+}
+
+run_xcodebuild() {
+  local action="$1"
+  local include_result_bundle="$2"
+  shift 2
+  local action_args=("$@")
+
+  build_xcodebuild_cmd "${action}" "${include_result_bundle}"
+  if ((${#action_args[@]} > 0)); then
+    XCODEBUILD_CMD+=("${action_args[@]}")
+  fi
+
+  if ! "${XCODEBUILD_CMD[@]}"; then
+    echo >&2
+    echo "UI test run failed." >&2
+    echo "If the error still points at sandboxed temporary files, restricted caches, keychain access, signing, or automation permissions," >&2
+    echo "treat it as an environment blocker and rerun with elevated permissions or outside the sandbox." >&2
+    exit 1
+  fi
+}
+
+case "${ACTION}" in
+  test)
+    run_xcodebuild "build-for-testing" false
+    sign_ui_test_runner
+    run_xcodebuild "test-without-building" true "${EXTRA_ARGS[@]}"
+    ;;
+  build-for-testing)
+    run_xcodebuild "build-for-testing" false "${EXTRA_ARGS[@]}"
+    sign_ui_test_runner
+    ;;
+  test-without-building)
+    sign_ui_test_runner
+    run_xcodebuild "test-without-building" true "${EXTRA_ARGS[@]}"
+    ;;
+esac
 
 if [[ -d "${RESULT_BUNDLE_PATH}" ]]; then
   echo "Result bundle: ${RESULT_BUNDLE_PATH}"
