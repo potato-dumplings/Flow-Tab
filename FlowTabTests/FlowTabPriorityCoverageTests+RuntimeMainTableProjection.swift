@@ -588,6 +588,49 @@ extension FlowTabPriorityCoverageTests {
         ])
     }
 
+    func testRuntimeMainTableProjectionBuilderBuildsZeroWindowCurrentAppPayloadOnlyWithCoverage() throws {
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let pid = runningApp.processIdentifier
+        let appDirectoryEntry = RuntimeAppDirectoryEntry(app: runningApp)
+        let windowRecordStore = RuntimeWindowRecordStore()
+        let builder: RuntimeMainTableProjectionBuilding = RuntimeMainTableProjectionBuilder(
+            windowRecordStore: windowRecordStore
+        )
+
+        XCTAssertNil(
+            builder.currentAppWindowPayloadFromMainTables(
+                appID: appID,
+                pid: pid,
+                appDirectoryEntries: [appDirectoryEntry],
+                generatedAt: 91
+            )
+        )
+
+        _ = windowRecordStore.resolveStableWindowMapping(
+            axWindows: [],
+            cgWindows: [],
+            pid: pid,
+            appName: runningApp.localizedName ?? appID,
+            remoteScanCompleteness: .complete(scanned: 0)
+        )
+
+        let payload = try XCTUnwrap(
+            builder.currentAppWindowPayloadFromMainTables(
+                appID: appID,
+                pid: pid,
+                appDirectoryEntries: [appDirectoryEntry],
+                generatedAt: 92
+            )
+        )
+        XCTAssertEqual(payload.summary.appID, appID)
+        XCTAssertEqual(payload.summary.pid, pid)
+        XCTAssertEqual(payload.summary.windowCount, 0)
+        XCTAssertTrue(payload.candidate.windows.isEmpty)
+        XCTAssertTrue(payload.context.windowsByID.isEmpty)
+        XCTAssertEqual(payload.appDirectoryEntries, [appDirectoryEntry])
+    }
+
     func testRuntimeProjectionServiceCommitsAppSwitcherProjectionFromMainTablesAsStale() throws {
         let runningApp = NSRunningApplication.current
         let appID = RuntimeAppIdentity.appID(for: runningApp)
@@ -2043,6 +2086,100 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(searchRead.readiness, .degradedStaleCommitted)
         XCTAssertEqual(searchRead.resultState, .degradedStaleCommittedResult)
         XCTAssertEqual(searchRead.projection?.windowEntries.filter { $0.appID == appID }.map(\.windowID), [])
+    }
+
+    func testRuntimeProjectionServiceCommitsZeroWindowCurrentAppHomeDetailFromMainTablesAsStale() throws {
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let pid = runningApp.processIdentifier
+        let displayName = runningApp.localizedName ?? appID
+        let appDirectoryEntry = RuntimeAppDirectoryEntry(app: runningApp)
+        let legacyWindow = WindowCandidate(
+            id: "legacy-zero-window-current-app",
+            title: "Legacy Zero Window Current App",
+            isMinimized: false,
+            lastActiveAt: 100
+        )
+        let committedApp = AppSwitchCandidate(
+            id: appID,
+            displayName: displayName,
+            groupID: RuntimeAppIdentity.groupID(
+                for: runningApp.bundleIdentifier,
+                fallbackName: displayName
+            ),
+            lastActiveAt: 100,
+            windows: [legacyWindow]
+        )
+        let readModelStore = RuntimeReadModelStore()
+        readModelStore.seedAppSwitcherProjectionForTesting(
+            apps: [committedApp],
+            contextsByID: [:],
+            appDirectoryEntries: [appDirectoryEntry],
+            generatedAt: 10
+        )
+        commitMainTableSearchFreshnessBarrierForTesting(readModelStore, generatedAt: 11)
+        let windowRecordStore = RuntimeWindowRecordStore()
+        _ = windowRecordStore.resolveStableWindowMapping(
+            axWindows: [],
+            cgWindows: [],
+            pid: pid,
+            appName: displayName,
+            remoteScanCompleteness: .complete(scanned: 0)
+        )
+        XCTAssertTrue(windowRecordStore.hasWindowProjectionCoverage(processIdentifier: pid))
+        let requestLock = NSLock()
+        var startedRequests: [RuntimeReconciliationRequest] = []
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.ZeroWindowCurrentAppHomeDetail",
+            repairProvider: RuntimeProjectionRepairProvider(
+                windowRecordStore: windowRecordStore,
+                reconciliationCoordinator: RuntimeReconciliationCoordinator()
+            ),
+            mainTableProjectionBuilder: RuntimeMainTableProjectionBuilder(
+                windowRecordStore: windowRecordStore
+            ),
+            readModelStore: readModelStore,
+            reconciliationExecutor: { request, _ in
+                requestLock.lock()
+                startedRequests.append(request)
+                requestLock.unlock()
+                return .completed
+            }
+        )
+
+        service.signalAppWindowsChanged(appID: appID, pid: pid)
+        service.waitForMaintenanceQueueForTesting()
+
+        let projection = try XCTUnwrap(readModelStore.readCurrentAppWindowProjection(appID: appID))
+        XCTAssertEqual(projection.currentAppWindowPayload.summary.appID, appID)
+        XCTAssertEqual(projection.currentAppWindowPayload.summary.pid, pid)
+        XCTAssertEqual(projection.currentAppWindowPayload.summary.windowCount, 0)
+        XCTAssertTrue(projection.currentAppWindowPayload.candidate.windows.isEmpty)
+        XCTAssertTrue(projection.currentAppWindowPayload.context.windowsByID.isEmpty)
+        XCTAssertFalse(projection.freshness.isCompleteForScope)
+        XCTAssertEqual(projection.freshness.dirtyAppIDs, [appID])
+        XCTAssertEqual(projection.freshness.dirtyPIDs, [pid])
+        XCTAssertTrue(projection.freshness.pendingRepairScopes.contains("appWindows:\(appID)"))
+
+        let homeDetailProjection = try XCTUnwrap(
+            readModelStore.readHomeAppDetailProjection(appID: appID)
+        )
+        XCTAssertEqual(homeDetailProjection.summary.windowCount, 0)
+        XCTAssertTrue(homeDetailProjection.candidate.windows.isEmpty)
+        XCTAssertTrue(homeDetailProjection.context.windowsByID.isEmpty)
+        XCTAssertFalse(homeDetailProjection.freshness.isCompleteForScope)
+
+        requestLock.lock()
+        let startedTargets = startedRequests.map(\.target)
+        requestLock.unlock()
+        XCTAssertEqual(startedTargets, [.app(pid)])
+        let searchRead = readModelStore.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(searchRead.readiness, .degradedStaleCommitted)
+        XCTAssertEqual(searchRead.resultState, .degradedStaleCommittedResult)
+        XCTAssertEqual(
+            searchRead.projection?.windowEntries.filter { $0.appID == appID }.map(\.windowID),
+            [legacyWindow.id]
+        )
     }
 
     func testRuntimeProjectionServiceCommitsCurrentAppProjectionFromAppDirectoryProviderEvidence() throws {

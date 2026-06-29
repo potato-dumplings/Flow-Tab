@@ -50,7 +50,9 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
             processIdentifier: pid,
             appName: displayName
         )
-        guard !windowEntries.isEmpty else { return nil }
+        guard !windowEntries.isEmpty
+            || windowRecordStore.hasWindowProjectionCoverage(processIdentifier: pid)
+        else { return nil }
 
         return RuntimeCurrentAppWindowPayload(
             assemblyInput: RuntimeCurrentAppWindowProjectionAssemblyInput(
