@@ -409,6 +409,10 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             pendingRepairScopes: pendingRepairScopes,
             hasAppSwitcherProjection: appSwitcherProjection != nil || appDirectoryState.isInitialized,
             hasHomeSummaryProjection: homeSummaryProjection != nil || appDirectoryState.isInitialized,
+            hasCompleteAppSwitcherProjection: appSwitcherProjection?.freshness.isCompleteForScope == true
+                && !isDirtyLocked,
+            hasCompleteHomeSummaryProjection: homeSummaryProjection?.freshness.isCompleteForScope == true
+                && !isDirtyLocked,
             hasAppDirectoryProjection: appDirectoryState.isInitialized,
             hasCommittedSearchIndex: committedSearchIndex != nil,
             currentAppWindowProjectionAppIDs: Set(currentAppWindowProjectionsByAppID.keys),

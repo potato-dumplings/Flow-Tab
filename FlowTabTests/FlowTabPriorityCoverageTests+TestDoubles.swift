@@ -327,6 +327,8 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
             pendingRepairScopes: [],
             hasAppSwitcherProjection: false,
             hasHomeSummaryProjection: false,
+            hasCompleteAppSwitcherProjection: false,
+            hasCompleteHomeSummaryProjection: false,
             hasAppDirectoryProjection: false,
             hasCommittedSearchIndex: hasCommittedSearchIndex,
             currentAppWindowProjectionAppIDs: [],

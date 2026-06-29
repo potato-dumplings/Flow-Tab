@@ -142,6 +142,8 @@ struct RuntimeReadModelDiagnostics: Equatable {
     let pendingRepairScopes: Set<String>
     let hasAppSwitcherProjection: Bool
     let hasHomeSummaryProjection: Bool
+    let hasCompleteAppSwitcherProjection: Bool
+    let hasCompleteHomeSummaryProjection: Bool
     let hasAppDirectoryProjection: Bool
     let hasCommittedSearchIndex: Bool
     let currentAppWindowProjectionAppIDs: Set<String>

@@ -373,7 +373,9 @@ extension FlowTabPriorityCoverageTests {
             appSwitcherProjection.freshness.pendingRepairScopes,
             ["appLaunched:\(launchedEntry.appID)"]
         )
-        XCTAssertTrue(store.diagnostics().hasAppSwitcherProjection)
+        let appSwitcherDiagnostics = store.diagnostics()
+        XCTAssertTrue(appSwitcherDiagnostics.hasAppSwitcherProjection)
+        XCTAssertFalse(appSwitcherDiagnostics.hasCompleteAppSwitcherProjection)
         let homeProjection = try XCTUnwrap(store.readHomeSummaryProjection())
         XCTAssertEqual(homeProjection.summaries.map(\.appID), [launchedEntry.appID])
         let homeSummary = try XCTUnwrap(homeProjection.summary(for: launchedEntry.appID))
@@ -394,7 +396,9 @@ extension FlowTabPriorityCoverageTests {
             homeProjection.freshness.pendingRepairScopes,
             ["appLaunched:\(launchedEntry.appID)"]
         )
-        XCTAssertTrue(store.diagnostics().hasHomeSummaryProjection)
+        let homeSummaryDiagnostics = store.diagnostics()
+        XCTAssertTrue(homeSummaryDiagnostics.hasHomeSummaryProjection)
+        XCTAssertFalse(homeSummaryDiagnostics.hasCompleteHomeSummaryProjection)
         XCTAssertEqual(store.readCommittedSearchIndexForSearch().readiness, .missingCommittedIndex)
     }
 

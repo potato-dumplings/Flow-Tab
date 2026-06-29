@@ -80,7 +80,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 requiresExistingProjectionCoverage: true
             )
             let diagnostics = readModelStore.diagnostics()
-            if !diagnostics.hasAppSwitcherProjection
+            if !diagnostics.hasCompleteAppSwitcherProjection
                 && !repairProvider.hasPendingReconciliationRequests() {
                 repairProvider.scheduleFullRepairFallback(now: now)
             }

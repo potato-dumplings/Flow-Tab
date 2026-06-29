@@ -440,7 +440,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(searchRead.projection?.windowEntries.filter { $0.appID == appID }.map(\.windowID), [])
     }
 
-    func testRuntimeProjectionServiceCommitsAppDirectoryProviderProjectionFromMainTablesWithoutFullRepair() throws {
+    func testRuntimeProjectionServiceCommitsAppDirectoryProviderProjectionFromMainTablesAsStaleWithFullRepairFallback() throws {
         let runningApp = NSRunningApplication.current
         let appID = RuntimeAppIdentity.appID(for: runningApp)
         let pid = runningApp.processIdentifier
@@ -538,9 +538,11 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(homeProjection.summary(for: appID)?.windowCount, 1)
         XCTAssertFalse(homeProjection.freshness.isCompleteForScope)
         requestLock.lock()
-        let startedTargets = startedRequests.map(\.target)
+        let startedRequestsAfterAppSwitcherMaintenance = startedRequests
         requestLock.unlock()
-        XCTAssertEqual(startedTargets, [])
+        XCTAssertEqual(startedRequestsAfterAppSwitcherMaintenance.map(\.target), [.fullRepair])
+        XCTAssertEqual(startedRequestsAfterAppSwitcherMaintenance.map(\.priority), [.low])
+        XCTAssertEqual(startedRequestsAfterAppSwitcherMaintenance.first?.reasons, Set([.fullRepairFallback]))
 
         let searchRead = readModelStore.readCommittedSearchIndexForSearch()
         XCTAssertEqual(searchRead.readiness, .degradedStaleCommitted)
@@ -599,9 +601,11 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(homeProjection.freshness.sourceGeneration.projection, 0)
 
         requestLock.lock()
-        let startedTargets = startedRequests.map(\.target)
+        let startedRequestsAfterAppSwitcherMaintenance = startedRequests
         requestLock.unlock()
-        XCTAssertEqual(startedTargets, [])
+        XCTAssertEqual(startedRequestsAfterAppSwitcherMaintenance.map(\.target), [.fullRepair])
+        XCTAssertEqual(startedRequestsAfterAppSwitcherMaintenance.map(\.priority), [.low])
+        XCTAssertEqual(startedRequestsAfterAppSwitcherMaintenance.first?.reasons, Set([.fullRepairFallback]))
         XCTAssertEqual(
             readModelStore.readCommittedSearchIndexForSearch().readiness,
             .missingCommittedIndex
@@ -614,6 +618,8 @@ extension FlowTabPriorityCoverageTests {
         let appDirectoryEntry = RuntimeAppDirectoryEntry(app: runningApp)
         let windowRecordStore = RuntimeWindowRecordStore()
         let readModelStore = RuntimeReadModelStore()
+        let requestLock = NSLock()
+        var startedRequests: [RuntimeReconciliationRequest] = []
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.AppDirectoryOnlyMainTableProjection",
             repairProvider: RuntimeProjectionRepairProvider(
@@ -625,7 +631,12 @@ extension FlowTabPriorityCoverageTests {
             ),
             appDirectoryProvider: FixedRuntimeAppDirectoryProvider(entries: [appDirectoryEntry]),
             readModelStore: readModelStore,
-            reconciliationExecutor: { _, _ in .completed }
+            reconciliationExecutor: { request, _ in
+                requestLock.lock()
+                startedRequests.append(request)
+                requestLock.unlock()
+                return .completed
+            }
         )
 
         service.requestAppSwitcherProjectionMaintenance(reason: .switcherSessionStarted)
@@ -648,6 +659,12 @@ extension FlowTabPriorityCoverageTests {
             readModelStore.readCommittedSearchIndexForSearch().readiness,
             .missingCommittedIndex
         )
+        requestLock.lock()
+        let startedRequestsAfterAppSwitcherMaintenance = startedRequests
+        requestLock.unlock()
+        XCTAssertEqual(startedRequestsAfterAppSwitcherMaintenance.map(\.target), [.fullRepair])
+        XCTAssertEqual(startedRequestsAfterAppSwitcherMaintenance.map(\.priority), [.low])
+        XCTAssertEqual(startedRequestsAfterAppSwitcherMaintenance.first?.reasons, Set([.fullRepairFallback]))
 
         service.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
         service.waitForMaintenanceQueueForTesting()
