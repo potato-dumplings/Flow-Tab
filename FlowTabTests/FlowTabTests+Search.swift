@@ -620,6 +620,85 @@ extension FlowTabTests {
             [.window(appID: "com.example.committed", windowID: "committed-docs")]
         )
         XCTAssertEqual(model.searchWindowItems().map(\.appName), ["Committed Browser"])
+
+        let contaminatingSessionApp = AppSwitchCandidate(
+            id: "com.example.window-only",
+            displayName: "Session Contaminant",
+            groupID: "session",
+            lastActiveAt: 120,
+            windows: [
+                WindowCandidate(
+                    id: "session-docs",
+                    title: "Session Docs",
+                    isMinimized: false,
+                    lastActiveAt: 120
+                )
+            ]
+        )
+        let committedWindowSource = AppSwitchCandidate(
+            id: contaminatingSessionApp.id,
+            displayName: "Committed Window Source",
+            groupID: "committed",
+            lastActiveAt: 90,
+            windows: [
+                WindowCandidate(
+                    id: "committed-only-docs",
+                    title: "Committed Only Docs",
+                    isMinimized: false,
+                    lastActiveAt: 90
+                )
+            ]
+        )
+        let contaminatedModel = LiveSwitcherModel(
+            runtimeProjectionService: RecordingRuntimeProjectionService(
+                appSwitcherProjection: RuntimeAppSwitcherProjection(
+                    apps: [contaminatingSessionApp],
+                    contextsByID: [:],
+                    freshness: RuntimeProjectionFreshness(
+                        generatedAt: 20,
+                        sourceGeneration: RuntimeReadModelGeneration(projection: 2),
+                        dirtyAppIDs: [],
+                        dirtyPIDs: [],
+                        dirtyCGWindowIDs: [],
+                        pendingRepairScopes: [],
+                        isCompleteForScope: true
+                    )
+                ),
+                committedSearchIndexRead: RuntimeSearchIndexRead(
+                    projection: runtimeSearchIndexProjection(
+                        from: [committedWindowSource],
+                        generatedAt: 20,
+                        sourceGeneration: RuntimeReadModelGeneration(projection: 2)
+                    ),
+                    readiness: .degradedStaleCommitted
+                )
+            )
+        )
+
+        XCTAssertTrue(contaminatedModel.startSession(triggerDirection: .forward))
+        XCTAssertTrue(contaminatedModel.enterSearchMode())
+        contaminatedModel.committedSearchAppsByID = [:]
+        XCTAssertTrue(contaminatedModel.toggleSearchScope())
+        XCTAssertTrue(
+            contaminatedModel.searchCoordinator.replaceQueryWithoutRebuild(
+                "only docs",
+                cursorPosition: 9
+            )
+        )
+        contaminatedModel.searchCoordinator.rebuildResults(resetSelection: true)
+        contaminatedModel.publishSearchStateIfNeeded()
+
+        XCTAssertEqual(
+            contaminatedModel.searchViewState.results.map(\.kind),
+            [.window(appID: contaminatingSessionApp.id, windowID: "committed-only-docs")]
+        )
+        XCTAssertEqual(
+            contaminatedModel.searchWindowItems().map(\.appName),
+            ["Committed Window Source"]
+        )
+        XCTAssertFalse(
+            contaminatedModel.searchWindowItems().map(\.appName).contains("Session Contaminant")
+        )
     }
 
     @MainActor
