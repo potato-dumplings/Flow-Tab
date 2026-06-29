@@ -204,13 +204,13 @@ extension LiveSwitcherModel {
                     "selectedAppWindowProjection result=degradedStaleCommitted appID=\(targetAppID) windows=\(projection.currentAppWindowPayload.candidate.windows.count)"
                 )
                 completeSelectedAppWindowProjection(
-                    projection.currentAppWindowPayload,
+                    nil,
                     appID: targetAppID,
                     generation: generation,
                     startMs: startMs,
                     projectionReadMs: projectionReadMs
                 )
-                return true
+                return false
             }
         }
 
@@ -240,15 +240,8 @@ extension LiveSwitcherModel {
         guard
             let projection = runtimeProjectionService.readCurrentAppWindowProjection(appID: targetAppID),
             projection.freshness.isCompleteForScope
-                || !projection.currentAppWindowPayload.candidate.windows.isEmpty
         else {
             return false
-        }
-        if !projection.freshness.isCompleteForScope {
-            RuntimeLog.debug(
-                .projection,
-                "selectedAppWindowProjection result=degradedStaleCommitted appID=\(targetAppID) windows=\(projection.currentAppWindowPayload.candidate.windows.count)"
-            )
         }
 
         selectedAppWindowProjectionGeneration &+= 1
