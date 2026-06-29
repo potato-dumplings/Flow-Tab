@@ -28,6 +28,48 @@ struct SwitcherSearchResult: Identifiable, Equatable, Sendable {
     let secondaryText: String?
 }
 
+struct SwitcherSearchIndexStatus: Equatable, Sendable {
+    let readiness: RuntimeSearchIndexReadiness
+    let resultState: RuntimeSearchIndexResultState
+    let committedIndexCoversCurrentGeneration: Bool
+    let requestedFreshnessBarrier: Bool
+
+    init(
+        readiness: RuntimeSearchIndexReadiness,
+        resultState: RuntimeSearchIndexResultState,
+        committedIndexCoversCurrentGeneration: Bool,
+        requestedFreshnessBarrier: Bool
+    ) {
+        self.readiness = readiness
+        self.resultState = resultState
+        self.committedIndexCoversCurrentGeneration = committedIndexCoversCurrentGeneration
+        self.requestedFreshnessBarrier = requestedFreshnessBarrier
+    }
+
+    init(read: RuntimeSearchIndexRead) {
+        self.init(
+            readiness: read.readiness,
+            resultState: read.resultState,
+            committedIndexCoversCurrentGeneration: read.committedIndexCoversCurrentGeneration,
+            requestedFreshnessBarrier: read.shouldRequestFreshnessBarrier
+        )
+    }
+
+    init(projection: RuntimeSearchIndexProjection) {
+        let isComplete = projection.freshness.isCompleteForScope
+        self.init(
+            readiness: isComplete ? .committedGenerationValidated : .degradedStaleCommitted,
+            resultState: isComplete ? .committedGenerationResult : .degradedStaleCommittedResult,
+            committedIndexCoversCurrentGeneration: isComplete,
+            requestedFreshnessBarrier: !isComplete
+        )
+    }
+
+    var isDegraded: Bool {
+        resultState == .degradedStaleCommittedResult
+    }
+}
+
 struct SwitcherSearchViewState: Equatable, Sendable {
     var isActive: Bool
     var isInputFocused: Bool
@@ -36,6 +78,7 @@ struct SwitcherSearchViewState: Equatable, Sendable {
     var queryCursorPosition: Int
     var results: [SwitcherSearchResult]
     var selectedResultIndex: Int
+    var indexStatus: SwitcherSearchIndexStatus?
 
     static let inactive = SwitcherSearchViewState(
         isActive: false,
@@ -44,7 +87,8 @@ struct SwitcherSearchViewState: Equatable, Sendable {
         query: "",
         queryCursorPosition: 0,
         results: [],
-        selectedResultIndex: 0
+        selectedResultIndex: 0,
+        indexStatus: nil
     )
 
     var selectedResult: SwitcherSearchResult? {
@@ -151,7 +195,10 @@ final class SwitcherSearchCoordinator {
     static let shortQueryThreshold: Int = 2
     static let queryDebounceNanoseconds: UInt64 = 10_000_000
 
-    func rebuildIndex(with projection: RuntimeSearchIndexProjection) {
+    func rebuildIndex(
+        with projection: RuntimeSearchIndexProjection,
+        indexStatus: SwitcherSearchIndexStatus? = nil
+    ) {
         cancelPendingRebuild()
         appEntries = projection.appEntries.map { app in
             AppEntry(
@@ -179,6 +226,7 @@ final class SwitcherSearchCoordinator {
         appMatchCache = nil
         windowMatchCache = nil
         state = .inactive
+        state.indexStatus = indexStatus ?? SwitcherSearchIndexStatus(projection: projection)
     }
 
     func resetIndex() {

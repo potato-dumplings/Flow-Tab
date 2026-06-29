@@ -651,6 +651,12 @@ extension FlowTabTests {
         XCTAssertEqual(diagnostic.resultState, .degradedStaleCommittedResult)
         XCTAssertNotEqual(diagnostic.resultState, .committedGenerationResult)
         XCTAssertFalse(diagnostic.committedIndexCoversCurrentGeneration)
+        XCTAssertEqual(model.searchViewState.indexStatus?.readiness, .degradedStaleCommitted)
+        XCTAssertEqual(model.searchViewState.indexStatus?.resultState, .degradedStaleCommittedResult)
+        XCTAssertEqual(model.searchViewState.indexStatus?.isDegraded, true)
+        XCTAssertEqual(model.searchViewState.indexStatus?.committedIndexCoversCurrentGeneration, false)
+        XCTAssertEqual(model.searchViewState.indexStatus?.requestedFreshnessBarrier, true)
+        XCTAssertNotEqual(model.searchViewState.indexStatus?.resultState, .committedGenerationResult)
         XCTAssertTrue(diagnostic.logMessage.contains("resultState=degradedStaleCommittedResult"))
         XCTAssertTrue(diagnostic.logMessage.contains("source=committedRuntimeIndex"))
         XCTAssertTrue(diagnostic.logMessage.contains("readiness=degradedStaleCommitted"))
@@ -719,6 +725,7 @@ extension FlowTabTests {
             model.searchViewState.results.map(\.kind),
             [.window(appID: "com.example.committed", windowID: "committed-stale-docs")]
         )
+        XCTAssertEqual(model.searchViewState.indexStatus?.resultState, .degradedStaleCommittedResult)
     }
 
     @MainActor
@@ -776,6 +783,7 @@ extension FlowTabTests {
             [.searchFreshnessBarrier]
         )
         XCTAssertEqual(model.searchViewState.results, [])
+        XCTAssertNil(model.searchViewState.indexStatus)
     }
 
     func testSearchPerformanceWindowScope() {
@@ -897,6 +905,11 @@ extension FlowTabTests {
             .committedGenerationResult
         )
         XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.committedIndexCoversCurrentGeneration, true)
+        XCTAssertEqual(model.searchViewState.indexStatus?.readiness, .committedGenerationValidated)
+        XCTAssertEqual(model.searchViewState.indexStatus?.resultState, .committedGenerationResult)
+        XCTAssertEqual(model.searchViewState.indexStatus?.isDegraded, false)
+        XCTAssertEqual(model.searchViewState.indexStatus?.committedIndexCoversCurrentGeneration, true)
+        XCTAssertEqual(model.searchViewState.indexStatus?.requestedFreshnessBarrier, false)
         XCTAssertTrue(
             model.lastSearchIndexReadDiagnostic?.logMessage.contains(
                 "source=committedRuntimeIndex"

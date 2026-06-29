@@ -71,21 +71,22 @@ extension LiveSwitcherModel {
         let searchProjection = projection.filteringApps(
             using: AppVisibilityPreferencesStore.visibilityFilter()
         )
+        let indexStatus = SwitcherSearchIndexStatus(read: read)
         let diagnostic = SearchIndexReadDiagnostic(
             reason: reason,
-            readiness: read.readiness,
-            resultState: read.resultState,
+            readiness: indexStatus.readiness,
+            resultState: indexStatus.resultState,
             appCount: searchProjection.appEntries.count,
             windowCount: searchProjection.windowEntries.count,
-            committedIndexCoversCurrentGeneration: read.committedIndexCoversCurrentGeneration,
+            committedIndexCoversCurrentGeneration: indexStatus.committedIndexCoversCurrentGeneration,
             dirtyAppCount: projection.freshness.dirtyAppIDs.count,
             dirtyPIDCount: projection.freshness.dirtyPIDs.count,
             dirtyCGWindowIDCount: projection.freshness.dirtyCGWindowIDs.count,
             pendingRepairScopeCount: projection.freshness.pendingRepairScopes.count,
-            requestedFreshnessBarrier: read.shouldRequestFreshnessBarrier
+            requestedFreshnessBarrier: indexStatus.requestedFreshnessBarrier
         )
         lastSearchIndexReadDiagnostic = diagnostic
-        searchCoordinator.rebuildIndex(with: searchProjection)
+        searchCoordinator.rebuildIndex(with: searchProjection, indexStatus: indexStatus)
         RuntimeLog.debug(.searchModel, diagnostic.logMessage)
         return true
     }
