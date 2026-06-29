@@ -167,6 +167,8 @@ extension FlowTabPriorityCoverageTests {
         )
 
         store.commitFullRepairAppDirectoryEvidence([entry], generatedAt: 29)
+        let directoryGeneration = store.diagnostics().generation
+        XCTAssertEqual(directoryGeneration.appLifecycle, 1)
         let summary = store.commitMainTableAppSwitcherProjectionPayload(
             RuntimeAppSwitcherProjectionPayload(
                 apps: apps,
@@ -183,6 +185,8 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(summary.degradedCommittedCount, 0)
         let appSwitcherProjection = try XCTUnwrap(store.readAppSwitcherProjection())
         XCTAssertTrue(appSwitcherProjection.freshness.isCompleteForScope)
+        XCTAssertEqual(appSwitcherProjection.freshness.sourceGeneration.appLifecycle, 1)
+        XCTAssertEqual(appSwitcherProjection.freshness.sourceGeneration.projection, 1)
         XCTAssertEqual(appSwitcherProjection.apps.map(\.id), apps.map(\.id))
         let searchRead = store.readCommittedSearchIndexForSearch()
         XCTAssertEqual(searchRead.readiness, .missingCommittedIndex)
@@ -192,6 +196,9 @@ extension FlowTabPriorityCoverageTests {
         let directoryProjection = try XCTUnwrap(store.readAppDirectoryProjection())
         XCTAssertEqual(directoryProjection.entries, [entry])
         XCTAssertTrue(directoryProjection.freshness.isCompleteForScope)
+        XCTAssertEqual(directoryProjection.freshness.sourceGeneration.appLifecycle, 1)
+        store.commitFullRepairAppDirectoryEvidence([entry], generatedAt: 31)
+        XCTAssertEqual(store.diagnostics().generation, RuntimeReadModelGeneration(appLifecycle: 1, projection: 1))
     }
 
     func testRuntimeReadModelStoreDirtyMainTableAppSwitcherCommitKeepsSearchStale() throws {
@@ -294,7 +301,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(appProjection.apps.map(\.id), apps.map(\.id))
         XCTAssertTrue(appProjection.apps.contains { $0.id == terminatedApp.id })
         XCTAssertTrue(appProjection.freshness.isCompleteForScope)
-        XCTAssertEqual(appProjection.freshness.sourceGeneration.appLifecycle, 1)
+        XCTAssertEqual(appProjection.freshness.sourceGeneration.appLifecycle, 2)
         XCTAssertEqual(appProjection.freshness.sourceGeneration.projection, 2)
 
         let searchRead = store.readCommittedSearchIndexForSearch()
@@ -315,7 +322,7 @@ extension FlowTabPriorityCoverageTests {
 
         let duplicateSignalProjection = try XCTUnwrap(store.readAppSwitcherProjection())
         XCTAssertEqual(duplicateSignalProjection.apps.map(\.id), apps.map(\.id))
-        XCTAssertEqual(duplicateSignalProjection.freshness.sourceGeneration.appLifecycle, 1)
+        XCTAssertEqual(duplicateSignalProjection.freshness.sourceGeneration.appLifecycle, 2)
         XCTAssertEqual(duplicateSignalProjection.freshness.sourceGeneration.projection, 2)
         XCTAssertEqual(store.readAppDirectoryProjection()?.entries.map(\.pid), [pid + 1])
     }
@@ -600,7 +607,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(appProjection.freshness.isCompleteForScope)
         XCTAssertEqual(appProjection.freshness.dirtyAppIDs, [activeApp.id])
         XCTAssertEqual(appProjection.freshness.pendingRepairScopes, ["appTerminated:\(activeApp.id)"])
-        XCTAssertEqual(appProjection.freshness.sourceGeneration.appLifecycle, 1)
+        XCTAssertEqual(appProjection.freshness.sourceGeneration.appLifecycle, 2)
         XCTAssertEqual(appProjection.freshness.sourceGeneration.projection, 2)
         var searchRead = store.readCommittedSearchIndexForSearch()
         XCTAssertEqual(searchRead.readiness, .degradedStaleCommitted)
@@ -609,7 +616,7 @@ extension FlowTabPriorityCoverageTests {
         store.markAppTerminatedForMainTableProjection(appID: activeApp.id, pid: secondaryPID)
 
         appProjection = try XCTUnwrap(store.readAppSwitcherProjection())
-        XCTAssertEqual(appProjection.freshness.sourceGeneration.appLifecycle, 1)
+        XCTAssertEqual(appProjection.freshness.sourceGeneration.appLifecycle, 2)
         XCTAssertEqual(appProjection.freshness.sourceGeneration.projection, 2)
         XCTAssertEqual(store.readAppDirectoryProjection()?.entries.map(\.pid), [activePID])
 
@@ -619,7 +626,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(appProjection.apps.contains { $0.id == activeApp.id })
         XCTAssertNotNil(appProjection.contextsByID[activeApp.id])
         XCTAssertTrue(store.readAppDirectoryProjection()?.entries.isEmpty == true)
-        XCTAssertEqual(appProjection.freshness.sourceGeneration.appLifecycle, 2)
+        XCTAssertEqual(appProjection.freshness.sourceGeneration.appLifecycle, 3)
         XCTAssertEqual(appProjection.freshness.sourceGeneration.projection, 2)
         searchRead = store.readCommittedSearchIndexForSearch()
         XCTAssertEqual(searchRead.readiness, .degradedStaleCommitted)

@@ -289,6 +289,7 @@ extension FlowTabPriorityCoverageTests {
 
         let appDirectoryProjection = try XCTUnwrap(readModelStore.readAppDirectoryProjection())
         XCTAssertEqual(appDirectoryProjection.entries, [appDirectoryEntry])
+        XCTAssertEqual(appDirectoryProjection.freshness.sourceGeneration.appLifecycle, 1)
         let appProjection = try XCTUnwrap(readModelStore.readAppSwitcherProjection())
         let app = try XCTUnwrap(appProjection.apps.first(where: { $0.id == appID }))
         XCTAssertEqual(app.windows.map(\.id), [
@@ -297,6 +298,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(app.windows.map(\.title), ["Main Table Projection"])
         XCTAssertFalse(app.windows.contains { $0.id == legacyWindow.id })
         XCTAssertFalse(appProjection.freshness.isCompleteForScope)
+        XCTAssertEqual(appProjection.freshness.sourceGeneration.appLifecycle, 1)
         XCTAssertEqual(appProjection.freshness.dirtyAppIDs, [appID])
         XCTAssertEqual(appProjection.freshness.dirtyPIDs, [pid])
         XCTAssertTrue(appProjection.freshness.pendingRepairScopes.contains("appWindows:\(appID)"))

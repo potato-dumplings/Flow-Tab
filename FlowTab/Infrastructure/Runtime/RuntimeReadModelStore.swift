@@ -51,10 +51,12 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
 
-        replaceAppDirectoryStateLocked(
+        if replaceAppDirectoryStateLocked(
             entries: entries,
             generatedAt: generatedAt
-        )
+        ) {
+            generation.appLifecycle &+= 1
+        }
     }
 
     func commitAppDirectoryProviderEvidence(
@@ -64,10 +66,12 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
 
-        replaceAppDirectoryStateLocked(
+        if replaceAppDirectoryStateLocked(
             entries: entries,
             generatedAt: generatedAt
-        )
+        ) {
+            generation.appLifecycle &+= 1
+        }
     }
 
     func commitCurrentAppRepairAppDirectoryEvidence(
@@ -77,10 +81,12 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
 
-        upsertAppDirectoryStateLocked(
+        if upsertAppDirectoryStateLocked(
             entries: entries,
             generatedAt: generatedAt
-        )
+        ) {
+            generation.appLifecycle &+= 1
+        }
     }
 
     func commitCurrentAppWindowProjection(
@@ -404,18 +410,25 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         pendingRepairScopes = pendingRepairScopes.filter { !$0.contains(appID) }
     }
 
+    @discardableResult
     private func replaceAppDirectoryStateLocked(
         entries: [RuntimeAppDirectoryEntry],
         generatedAt: TimeInterval
-    ) {
+    ) -> Bool {
+        let wasInitialized = appDirectoryState.isInitialized
+        let previousEntries = appDirectoryState.entries
         appDirectoryState.replace(entries: entries, generatedAt: generatedAt)
+        return !wasInitialized || previousEntries != appDirectoryState.entries
     }
 
+    @discardableResult
     private func upsertAppDirectoryStateLocked(
         entries: [RuntimeAppDirectoryEntry],
         generatedAt: TimeInterval
-    ) {
+    ) -> Bool {
+        let previousEntries = appDirectoryState.entries
         appDirectoryState.upsert(entries: entries, generatedAt: generatedAt)
+        return previousEntries != appDirectoryState.entries
     }
 
     private func appDirectoryProjectionLocked() -> RuntimeAppDirectoryProjection? {

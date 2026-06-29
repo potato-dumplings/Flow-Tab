@@ -128,13 +128,13 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 maxRequests: runtimeSearchFreshnessBarrierMaxReadyRepairs,
                 includeFullRepair: false
             )
-            let mainTableProjectionCommitted = commitMainTableAppSwitcherProjectionLocked(
-                generatedAt: now,
-                requiresExistingProjectionCoverage: true
-            )
             commitCurrentAppRepairEvidenceLocked(
                 drainResult.currentAppRepairEvidence,
                 generatedAt: now
+            )
+            let mainTableProjectionCommitted = commitMainTableAppSwitcherProjectionLocked(
+                generatedAt: now,
+                requiresExistingProjectionCoverage: true
             )
             let hasPendingRequests = repairProvider.hasPendingReconciliationRequests()
             let diagnostics = readModelStore.diagnostics()
