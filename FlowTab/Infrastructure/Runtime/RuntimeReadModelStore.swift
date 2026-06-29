@@ -282,8 +282,6 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             || appSwitcherProjection?.contextsByID[appID] != nil
             || homeSummaryProjection?.summaries.contains { $0.appID == appID } == true
             || currentAppWindowProjectionsByAppID[appID] != nil
-            || committedSearchIndex?.appEntries.contains { $0.appID == appID } == true
-            || committedSearchIndex?.windowEntries.contains { $0.appID == appID } == true
             || dirtyAppIDs.contains(appID)
             || dirtyPIDs.contains(pid)
             || pendingRepairScopes.contains { $0.contains(appID) }
