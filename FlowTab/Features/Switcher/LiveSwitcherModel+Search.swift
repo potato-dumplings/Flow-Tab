@@ -43,6 +43,7 @@ extension LiveSwitcherModel {
     func rebuildSearchIndexFromCommittedProjection(reason: String) -> Bool {
         let read = runtimeProjectionService.readCommittedSearchIndexForSearch()
         guard let projection = read.projection else {
+            committedSearchAppsByID = [:]
             if read.shouldRequestFreshnessBarrier {
                 runtimeProjectionService.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
             }
@@ -71,6 +72,7 @@ extension LiveSwitcherModel {
         let searchProjection = projection.filteringApps(
             using: AppVisibilityPreferencesStore.visibilityFilter()
         )
+        committedSearchAppsByID = Self.committedSearchAppsByID(from: searchProjection)
         let indexStatus = SwitcherSearchIndexStatus(read: read)
         let diagnostic = SearchIndexReadDiagnostic(
             reason: reason,
@@ -89,6 +91,29 @@ extension LiveSwitcherModel {
         searchCoordinator.rebuildIndex(with: searchProjection, indexStatus: indexStatus)
         RuntimeLog.debug(.searchModel, diagnostic.logMessage)
         return true
+    }
+
+    private static func committedSearchAppsByID(
+        from projection: RuntimeSearchIndexProjection
+    ) -> [String: AppSwitchCandidate] {
+        Dictionary(
+            projection.appEntries.enumerated().map { index, entry in
+                (
+                    entry.appID,
+                    AppSwitchCandidate(
+                        id: entry.appID,
+                        displayName: entry.appDisplayName,
+                        groupID: RuntimeAppIdentity.groupID(
+                            for: entry.appID,
+                            fallbackName: entry.appDisplayName
+                        ),
+                        lastActiveAt: RuntimeAppDirectory.stableLastActiveValue(forRank: index),
+                        windows: []
+                    )
+                )
+            },
+            uniquingKeysWith: { first, _ in first }
+        )
     }
 
     @discardableResult

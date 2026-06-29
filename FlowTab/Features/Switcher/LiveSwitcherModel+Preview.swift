@@ -887,7 +887,9 @@ extension LiveSwitcherModel {
         let showsSelection = !searchViewState.isInputFocused
         return searchViewState.results.enumerated().compactMap { index, result in
             guard case .app(let appID) = result.kind else { return nil }
-            guard let app = sessionAppsByID[appID] else { return nil }
+            guard let app = committedSearchAppsByID[appID] ?? sessionAppsByID[appID] else {
+                return nil
+            }
             return SearchAppResultItem(
                 id: result.id,
                 app: app,
@@ -905,7 +907,7 @@ extension LiveSwitcherModel {
         var missingIconAppIDs: Set<String> = []
         return searchViewState.results.enumerated().compactMap { index, result in
             guard case .window(let appID, _) = result.kind else { return nil }
-            let app = sessionAppsByID[appID]
+            let app = committedSearchAppsByID[appID] ?? sessionAppsByID[appID]
             let appName = app?.displayName ?? result.secondaryText ?? ""
             let resolvedIcon: NSImage?
             if let cached = iconByAppID[appID] {

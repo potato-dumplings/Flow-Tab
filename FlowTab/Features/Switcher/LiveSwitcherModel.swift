@@ -251,6 +251,7 @@ final class LiveSwitcherModel: ObservableObject {
     var terminateRefreshTimeoutNs: UInt64 = 1_800_000_000
 
     var sessionAppsByID: [String: AppSwitchCandidate] = [:]
+    var committedSearchAppsByID: [String: AppSwitchCandidate] = [:]
     var runtimeContextsByID: [String: RuntimeAppContext] = [:]
     var rememberedWindowIDByAppID: [String: String] = [:]
     var previewCaptureAttemptedKeys: Set<String> = []
@@ -890,6 +891,7 @@ final class LiveSwitcherModel: ObservableObject {
         terminatingAppID = nil
         overlayStyle = .appAndWindow
         searchCoordinator.resetIndex()
+        committedSearchAppsByID = [:]
         publishSearchStateIfNeeded()
         resetRuntimeState()
     }

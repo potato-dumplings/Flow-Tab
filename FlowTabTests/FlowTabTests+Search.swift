@@ -548,7 +548,7 @@ extension FlowTabTests {
         }
 
         defaults.set(true, forKey: AppPreferenceKeys.searchEnabled)
-        defaults.set(SwitcherSearchScope.window.rawValue, forKey: AppPreferenceKeys.searchDefaultScope)
+        defaults.set(SwitcherSearchScope.app.rawValue, forKey: AppPreferenceKeys.searchDefaultScope)
 
         let sessionOnlyApp = AppSwitchCandidate(
             id: "com.example.session-only",
@@ -581,6 +581,31 @@ extension FlowTabTests {
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertEqual(model.session?.apps.map(\.id), ["com.example.session-only"])
         XCTAssertTrue(model.enterSearchMode())
+        XCTAssertEqual(model.searchScope, .app)
+        XCTAssertTrue(
+            model.searchCoordinator.replaceQueryWithoutRebuild(
+                "Committed",
+                cursorPosition: 9
+            )
+        )
+        model.searchCoordinator.rebuildResults(resetSelection: true)
+        model.publishSearchStateIfNeeded()
+
+        XCTAssertEqual(
+            model.searchViewState.results.map(\.kind),
+            [.app(appID: "com.example.committed")]
+        )
+        XCTAssertEqual(
+            model.searchAppItems().map { $0.app.id },
+            ["com.example.committed"]
+        )
+        XCTAssertEqual(
+            model.searchAppItems().map { $0.app.displayName },
+            ["Committed Browser"]
+        )
+
+        XCTAssertTrue(model.toggleSearchScope())
+        XCTAssertEqual(model.searchScope, .window)
         XCTAssertTrue(
             model.searchCoordinator.replaceQueryWithoutRebuild(
                 "docs",
@@ -594,6 +619,7 @@ extension FlowTabTests {
             model.searchViewState.results.map(\.kind),
             [.window(appID: "com.example.committed", windowID: "committed-docs")]
         )
+        XCTAssertEqual(model.searchWindowItems().map(\.appName), ["Committed Browser"])
     }
 
     @MainActor
