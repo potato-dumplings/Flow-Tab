@@ -228,6 +228,72 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(appDirectoryProjection.freshness.sourceGeneration.appLifecycle, 2)
     }
 
+    func testRuntimeReadModelStoreCurrentAppRepairEvidencePreservesExistingActivationRank() throws {
+        let frontPID: pid_t = 260_921
+        let alphaPID: pid_t = 260_922
+        let rankedFrontEntry = RuntimeAppDirectoryEntry(
+            pid: frontPID,
+            appID: "com.example.front",
+            bundleIdentifier: "com.example.front",
+            localizedName: "Front",
+            launchDate: nil,
+            activationRank: 0
+        )
+        let rankedAlphaEntry = RuntimeAppDirectoryEntry(
+            pid: alphaPID,
+            appID: "com.example.alpha",
+            bundleIdentifier: "com.example.alpha",
+            localizedName: "Alpha",
+            launchDate: nil,
+            activationRank: 1
+        )
+        let unrankedFrontRepairEntry = RuntimeAppDirectoryEntry(
+            pid: frontPID,
+            appID: "com.example.front",
+            bundleIdentifier: "com.example.front",
+            localizedName: "Front",
+            launchDate: nil
+        )
+        let store = RuntimeReadModelStore()
+
+        store.commitAppDirectoryProviderEvidence([rankedAlphaEntry, rankedFrontEntry], generatedAt: 10)
+        store.commitCurrentAppRepairAppDirectoryEvidence([unrankedFrontRepairEntry], generatedAt: 11)
+
+        var appDirectoryProjection = try XCTUnwrap(store.readAppDirectoryProjection())
+        XCTAssertEqual(appDirectoryProjection.freshness.sourceGeneration.appLifecycle, 1)
+        XCTAssertEqual(
+            appDirectoryProjection.entries(forAppID: "com.example.front").first?.activationRank,
+            0
+        )
+        var appProjection = try XCTUnwrap(store.readAppSwitcherProjection())
+        XCTAssertEqual(appProjection.apps.map(\.id), ["com.example.front", "com.example.alpha"])
+        XCTAssertEqual(appProjection.apps.map(\.lastActiveAt), [0, -1])
+
+        let demotedFrontRepairEntry = RuntimeAppDirectoryEntry(
+            pid: frontPID,
+            appID: "com.example.front",
+            bundleIdentifier: "com.example.front",
+            localizedName: "Front",
+            launchDate: nil,
+            activationRank: 2
+        )
+
+        store.commitCurrentAppRepairAppDirectoryEvidence([demotedFrontRepairEntry], generatedAt: 12)
+
+        appDirectoryProjection = try XCTUnwrap(store.readAppDirectoryProjection())
+        XCTAssertEqual(appDirectoryProjection.freshness.sourceGeneration.appLifecycle, 2)
+        XCTAssertEqual(
+            appDirectoryProjection.entries(forAppID: "com.example.front").first?.activationRank,
+            2
+        )
+        appProjection = try XCTUnwrap(store.readAppSwitcherProjection())
+        XCTAssertEqual(appProjection.apps.map(\.id), ["com.example.alpha", "com.example.front"])
+        XCTAssertEqual(
+            store.readCommittedSearchIndexForSearch().readiness,
+            .missingCommittedIndex
+        )
+    }
+
     func testRuntimeMainTableProjectionBuilderRequiresAppDirectoryEntryForCurrentAppPayload() throws {
         let runningApp = NSRunningApplication.current
         let appID = RuntimeAppIdentity.appID(for: runningApp)

@@ -70,6 +70,13 @@ enum RuntimeAppDirectoryFactSource {
             )
         }
     }
+
+    static func entries(
+        from runningApplications: [NSRunningApplication],
+        preservingRankFrom rankByPID: [pid_t: Int]
+    ) -> [RuntimeAppDirectoryEntry] {
+        entries(from: runningApplications, rankByPID: rankByPID)
+    }
 }
 
 protocol RuntimeAppDirectoryProviding: AnyObject {
@@ -120,6 +127,22 @@ struct RuntimeAppDirectoryEntry: Equatable {
             activationRank: activationRank
         )
     }
+
+    func preservingActivationRank(from existing: RuntimeAppDirectoryEntry?) -> RuntimeAppDirectoryEntry {
+        guard activationRank == nil,
+              let existingRank = existing?.activationRank
+        else {
+            return self
+        }
+        return RuntimeAppDirectoryEntry(
+            pid: pid,
+            appID: appID,
+            bundleIdentifier: bundleIdentifier,
+            localizedName: localizedName,
+            launchDate: launchDate,
+            activationRank: existingRank
+        )
+    }
 }
 
 struct RuntimeAppDirectoryState: Equatable {
@@ -155,7 +178,7 @@ struct RuntimeAppDirectoryState: Equatable {
         guard !entries.isEmpty else { return }
 
         for entry in entries {
-            entriesByPID[entry.pid] = entry
+            entriesByPID[entry.pid] = entry.preservingActivationRank(from: entriesByPID[entry.pid])
         }
         self.generatedAt = generatedAt
     }
