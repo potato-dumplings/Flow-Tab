@@ -415,16 +415,23 @@ extension SwitcherPanelController {
         trigger: String,
         behaviorMode: SwitcherPanelWindowConfiguration.PresentationBehaviorMode = .allSpaces
     ) {
-        let inspection = FrontmostWindowInspector.inspect()
-        let requiresFallbackElevation = inspection.failureReason != nil
         let resolvedLevel = SwitcherPanelWindowConfiguration.presentationLevel(
-            frontmostWindowIsFullScreen: inspection.fullScreenDetected,
-            requiresFallbackElevation: requiresFallbackElevation
+            frontmostWindowIsFullScreen: runtimeProjectionHasCurrentSpaceFullscreen()
         )
         panel.collectionBehavior = SwitcherPanelWindowConfiguration.presentationCollectionBehavior(
             mode: behaviorMode
         )
         panel.level = resolvedLevel
+    }
+
+    private func runtimeProjectionHasCurrentSpaceFullscreen() -> Bool {
+        guard let projection = model.runtimeProjectionService.readSpaceTopologyProjection() else {
+            model.runtimeProjectionService.signalSpaceTopologyChanged()
+            return false
+        }
+        guard projection.freshness.isCompleteForScope else { return false }
+        let displayID = (activePresentationScreen ?? resolveActivePresentationScreen())?.flowTabDisplayID
+        return projection.signature.hasFullscreenWindowOnCurrentSpace(displayID: displayID)
     }
 
     func centerPanelOnActiveScreen(preferredScreen: NSScreen? = nil) {
@@ -797,5 +804,13 @@ extension SwitcherPanelController {
             columns: count,
             rows: 1
         )
+    }
+}
+
+private extension NSScreen {
+    var flowTabDisplayID: CGDirectDisplayID? {
+        let key = NSDeviceDescriptionKey("NSScreenNumber")
+        guard let number = deviceDescription[key] as? NSNumber else { return nil }
+        return CGDirectDisplayID(number.uint32Value)
     }
 }

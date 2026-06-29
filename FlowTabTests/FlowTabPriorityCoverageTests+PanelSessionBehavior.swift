@@ -959,6 +959,40 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testSwitcherPanelPresentationReadsRuntimeSpaceTopologyProjectionForFullscreenLevel() {
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
+            appSwitcherApps: searchScenarioApps(),
+            spaceTopologyProjection: makeCompleteCurrentSpaceFullscreenProjectionForTesting()
+        )
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
+        let controller = SwitcherPanelController(model: model)
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+
+        XCTAssertGreaterThan(
+            controller.panel.level.rawValue,
+            SwitcherPanelWindowConfiguration.level.rawValue
+        )
+        XCTAssertEqual(runtimeProjectionService.spaceTopologyProjectionReadCount(), 1)
+        XCTAssertEqual(runtimeProjectionService.spaceTopologyChangeSignalCount(), 0)
+        controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
+    func testSwitcherPanelPresentationSignalsRuntimeWhenSpaceTopologyProjectionIsMissing() {
+        let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: searchScenarioApps())
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
+        let controller = SwitcherPanelController(model: model)
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+
+        XCTAssertEqual(controller.panel.level, SwitcherPanelWindowConfiguration.level)
+        XCTAssertEqual(runtimeProjectionService.spaceTopologyProjectionReadCount(), 1)
+        XCTAssertEqual(runtimeProjectionService.spaceTopologyChangeSignalCount(), 1)
+        controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
     func testSwitcherPanelControllerActiveSpaceChangeCancelsSessionAfterModifierRelease() async {
         let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: searchScenarioApps())
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
@@ -1421,6 +1455,53 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(previewLayerFrame.midX, appLayerFrame.midX, accuracy: 0.5)
         XCTAssertEqual(appLayerFrame.midY, screenCenterY, accuracy: 0.5)
         XCTAssertEqual(previewLayerFrame.maxY, appLayerFrame.maxY, accuracy: 0.5)
+    }
+
+    private func makeCompleteCurrentSpaceFullscreenProjectionForTesting() -> RuntimeSpaceTopologyProjection {
+        let displays = NSScreen.screens.compactMap { screen -> RuntimeDisplaySpaceSignature? in
+            let key = NSDeviceDescriptionKey("NSScreenNumber")
+            guard let number = screen.deviceDescription[key] as? NSNumber else { return nil }
+            let displayID = CGDirectDisplayID(number.uint32Value)
+            return RuntimeDisplaySpaceSignature(
+                displayID: displayID,
+                currentSpaceID: 7,
+                spaceIDs: [7],
+                windowIDsBySpaceID: [
+                    7: [240_001]
+                ],
+                fullscreenWindowIDBySpaceID: [
+                    7: 240_001
+                ]
+            )
+        }
+        let fallbackDisplays = displays.isEmpty
+            ? [
+                RuntimeDisplaySpaceSignature(
+                    displayID: nil,
+                    currentSpaceID: 7,
+                    spaceIDs: [7],
+                    windowIDsBySpaceID: [
+                        7: [240_001]
+                    ],
+                    fullscreenWindowIDBySpaceID: [
+                        7: 240_001
+                    ]
+                )
+            ]
+            : displays
+        return RuntimeSpaceTopologyProjection(
+            signature: RuntimeSpaceTopologySignature(displays: fallbackDisplays),
+            affectedCGWindowIDs: [],
+            freshness: RuntimeProjectionFreshness(
+                generatedAt: 10,
+                sourceGeneration: RuntimeReadModelGeneration(space: 1),
+                dirtyAppIDs: [],
+                dirtyPIDs: [],
+                dirtyCGWindowIDs: [],
+                pendingRepairScopes: [],
+                isCompleteForScope: true
+            )
+        )
     }
 
     private func assertAppSwitcherProjectionRead(

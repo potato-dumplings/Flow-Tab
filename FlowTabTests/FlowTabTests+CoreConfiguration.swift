@@ -826,17 +826,45 @@ extension FlowTabTests {
         XCTAssertGreaterThan(fullScreenLevel.rawValue, normalLevel.rawValue)
     }
 
-    func testSwitcherPanelWindowConfigurationElevatesLevelWhenFullscreenDetectionFallsBack() {
-        let fallbackLevel = SwitcherPanelWindowConfiguration.presentationLevel(
-            frontmostWindowIsFullScreen: false,
-            requiresFallbackElevation: true
+    func testRuntimeSpaceTopologySignatureDetectsCurrentSpaceFullscreenByDisplay() {
+        let signature = RuntimeSpaceTopologySignature(displays: [
+            RuntimeDisplaySpaceSignature(
+                displayID: 1,
+                currentSpaceID: 7,
+                spaceIDs: [7, 8],
+                windowIDsBySpaceID: [
+                    7: [240_001],
+                    8: [240_002]
+                ],
+                fullscreenWindowIDBySpaceID: [
+                    8: 240_002
+                ]
+            ),
+            RuntimeDisplaySpaceSignature(
+                displayID: 2,
+                currentSpaceID: 11,
+                spaceIDs: [11],
+                windowIDsBySpaceID: [
+                    11: [250_001]
+                ],
+                fullscreenWindowIDBySpaceID: [
+                    11: 250_001
+                ]
+            )
+        ])
+
+        XCTAssertFalse(signature.hasFullscreenWindowOnCurrentSpace(displayID: 1))
+        XCTAssertTrue(signature.hasFullscreenWindowOnCurrentSpace(displayID: 2))
+        XCTAssertTrue(signature.hasFullscreenWindowOnCurrentSpace(displayID: nil))
+        XCTAssertFalse(signature.hasFullscreenWindowOnCurrentSpace(displayID: 3))
+    }
+
+    func testSwitcherPanelWindowConfigurationDoesNotElevateWithoutFullscreenProjectionProof() {
+        let normalLevel = SwitcherPanelWindowConfiguration.presentationLevel(
+            frontmostWindowIsFullScreen: false
         )
 
-        XCTAssertEqual(SwitcherPanelWindowConfiguration.level, .statusBar)
-        XCTAssertGreaterThan(
-            fallbackLevel.rawValue,
-            SwitcherPanelWindowConfiguration.level.rawValue
-        )
+        XCTAssertEqual(normalLevel, .statusBar)
     }
 
     func testSwitcherPanelWindowConfigurationAddsMoveToActiveSpaceOnlyForRecovery() {

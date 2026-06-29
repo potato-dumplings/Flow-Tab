@@ -94,6 +94,7 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     private var homeDetailProjectionReadsByAppID: [String: Int] = [:]
     private var currentAppWindowProjectionReadsByAppID: [String: Int] = [:]
     private var focusedCurrentAppWindowProjectionReads = 0
+    private var spaceTopologyProjectionReads = 0
     private var committedSearchIndexReads = 0
     private var appSwitcherMaintenanceRequests: [RuntimeProjectionMaintenanceReason] = []
     private var searchIndexFreshnessBarrierRequests: [RuntimeProjectionMaintenanceReason] = []
@@ -146,6 +147,7 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         contextsByID: [String: RuntimeAppContext] = [:],
         committedSearchApps: [AppSwitchCandidate]? = nil,
         committedSearchReadiness: RuntimeSearchIndexReadiness = .degradedStaleCommitted,
+        spaceTopologyProjection: RuntimeSpaceTopologyProjection? = nil,
         generatedAt: TimeInterval = 10
     ) {
         let freshness = RuntimeProjectionFreshness(
@@ -164,6 +166,7 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
                 contextsByID: contextsByID,
                 freshness: freshness
             ),
+            spaceTopologyProjection: spaceTopologyProjection,
             committedSearchIndexRead: RuntimeSearchIndexRead(
                 projection: committedSearchReadiness == .missingCommittedIndex
                     ? nil
@@ -205,6 +208,12 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         lock.lock()
         defer { lock.unlock() }
         return focusedCurrentAppWindowProjectionReads
+    }
+
+    func spaceTopologyProjectionReadCount() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return spaceTopologyProjectionReads
     }
 
     func committedSearchIndexReadCount() -> Int {
@@ -353,7 +362,10 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     }
 
     func readSpaceTopologyProjection() -> RuntimeSpaceTopologyProjection? {
-        spaceTopologyProjection
+        lock.lock()
+        defer { lock.unlock() }
+        spaceTopologyProjectionReads += 1
+        return spaceTopologyProjection
     }
 
     func readCommittedSearchIndexForSearch() -> RuntimeSearchIndexRead {

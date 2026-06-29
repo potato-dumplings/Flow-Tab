@@ -96,6 +96,16 @@ struct RuntimeSpaceTopologySignature: Equatable, Sendable {
         }).count
     }
 
+    func hasFullscreenWindowOnCurrentSpace(displayID: CGDirectDisplayID?) -> Bool {
+        let displaySignatures = displayID.map { id in
+            displays.filter { $0.displayID == id }
+        } ?? displays
+        return displaySignatures.contains { display in
+            guard let currentSpaceID = display.currentSpaceID else { return false }
+            return display.fullscreenWindowIDBySpaceID[currentSpaceID] != nil
+        }
+    }
+
     var diagnosticSummary: String {
         guard !displays.isEmpty else { return "none" }
         return displays.map { display in
