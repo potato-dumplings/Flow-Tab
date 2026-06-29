@@ -106,7 +106,11 @@ extension FlowTabPriorityCoverageTests {
             appDirectoryEntries: [initialDirectoryEntry]
         )
 
-        store.commitCurrentAppWindowProjection(payload, generatedAt: generatedAt + 1)
+        store.commitCurrentAppWindowProjection(
+            payload,
+            clearsDirtyState: true,
+            generatedAt: generatedAt + 1
+        )
 
         let currentAppProjection = try XCTUnwrap(
             store.readCurrentAppWindowProjection(appID: app.id)
@@ -862,6 +866,7 @@ extension FlowTabPriorityCoverageTests {
         )
         store.commitCurrentAppWindowProjection(
             makeRuntimeCurrentAppWindowPayload(app: repairedApp, pid: pid),
+            clearsDirtyState: true,
             generatedAt: 20
         )
 
@@ -1041,7 +1046,11 @@ extension FlowTabPriorityCoverageTests {
             pid: pid,
             pendingScope: "appWindows:\(repairedApp.id)"
         )
-        store.commitCurrentAppWindowProjection(payload, generatedAt: 20)
+        store.commitCurrentAppWindowProjection(
+            payload,
+            clearsDirtyState: true,
+            generatedAt: 20
+        )
 
         let read = store.readCommittedSearchIndexForSearch()
         let projection = try XCTUnwrap(read.projection)

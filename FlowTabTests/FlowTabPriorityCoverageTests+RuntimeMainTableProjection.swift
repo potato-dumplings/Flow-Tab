@@ -2135,7 +2135,22 @@ extension FlowTabPriorityCoverageTests {
         )
         let store = RuntimeReadModelStore()
 
-        store.commitCurrentAppWindowProjection(payload, generatedAt: 42)
+        store.commitCurrentAppWindowProjection(payload, generatedAt: 41)
+
+        let defaultHomeDetailProjection = try XCTUnwrap(
+            store.readHomeAppDetailProjection(appID: appID)
+        )
+        XCTAssertEqual(defaultHomeDetailProjection.summary, summary)
+        XCTAssertEqual(defaultHomeDetailProjection.candidate.windows.map(\.id), [window.id])
+        XCTAssertFalse(defaultHomeDetailProjection.freshness.isCompleteForScope)
+        XCTAssertTrue(defaultHomeDetailProjection.freshness.dirtyAppIDs.isEmpty)
+        XCTAssertTrue(defaultHomeDetailProjection.freshness.pendingRepairScopes.isEmpty)
+
+        store.commitCurrentAppWindowProjection(
+            payload,
+            clearsDirtyState: true,
+            generatedAt: 42
+        )
 
         XCTAssertNil(store.readAppDirectoryProjection())
         XCTAssertNil(store.readAppSwitcherProjection())
@@ -2226,7 +2241,11 @@ extension FlowTabPriorityCoverageTests {
             ),
             RuntimeAppDirectoryEntry(app: runningApp, activationRank: 0)
         ], generatedAt: 40)
-        store.commitCurrentAppWindowProjection(payload, generatedAt: 42)
+        store.commitCurrentAppWindowProjection(
+            payload,
+            clearsDirtyState: true,
+            generatedAt: 42
+        )
 
         let focusedRead = try XCTUnwrap(store.readFocusedCurrentAppWindowProjection())
         XCTAssertEqual(focusedRead.appID, appID)

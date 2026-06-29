@@ -109,7 +109,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
 
     func commitCurrentAppWindowProjection(
         _ payload: RuntimeCurrentAppWindowPayload,
-        clearsDirtyState: Bool = true,
+        clearsDirtyState: Bool = false,
         generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
     ) {
         lock.lock()
