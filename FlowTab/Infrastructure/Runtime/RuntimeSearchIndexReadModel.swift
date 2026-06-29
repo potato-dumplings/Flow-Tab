@@ -1,8 +1,11 @@
+import Foundation
 import FlowTabCore
 
 struct RuntimeSearchAppIndexEntry: Equatable, Sendable {
     let appID: String
     let appDisplayName: String
+    let appGroupID: String
+    let appLastActiveAt: TimeInterval
     let searchIndex: SearchTextMatcher.Index
 }
 
@@ -11,6 +14,8 @@ struct RuntimeSearchWindowIndexEntry: Equatable, Sendable {
     let appDisplayName: String
     let windowID: String
     let windowTitle: String
+    let windowIsMinimized: Bool
+    let windowLastActiveAt: TimeInterval
     let windowSearchIndex: SearchTextMatcher.Index
     let appSearchIndex: SearchTextMatcher.Index
 }

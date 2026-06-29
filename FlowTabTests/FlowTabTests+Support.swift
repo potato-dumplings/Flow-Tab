@@ -413,6 +413,8 @@ extension FlowTabTests {
             RuntimeSearchAppIndexEntry(
                 appID: app.id,
                 appDisplayName: app.displayName,
+                appGroupID: app.groupID,
+                appLastActiveAt: app.lastActiveAt,
                 searchIndex: SearchTextMatcher.buildIndex(for: app.displayName, identifier: app.id)
             )
         }
@@ -427,6 +429,8 @@ extension FlowTabTests {
                     appDisplayName: app.displayName,
                     windowID: window.id,
                     windowTitle: title,
+                    windowIsMinimized: window.isMinimized,
+                    windowLastActiveAt: window.lastActiveAt,
                     windowSearchIndex: SearchTextMatcher.buildIndex(for: title),
                     appSearchIndex: appSearchIndex
                 )

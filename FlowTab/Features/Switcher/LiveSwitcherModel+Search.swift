@@ -96,19 +96,27 @@ extension LiveSwitcherModel {
     private static func committedSearchAppsByID(
         from projection: RuntimeSearchIndexProjection
     ) -> [String: AppSwitchCandidate] {
-        Dictionary(
-            projection.appEntries.enumerated().map { index, entry in
+        let windowsByAppID = Dictionary(grouping: projection.windowEntries, by: \.appID)
+            .mapValues { entries in
+                entries.map { entry in
+                    WindowCandidate(
+                        id: entry.windowID,
+                        title: entry.windowTitle,
+                        isMinimized: entry.windowIsMinimized,
+                        lastActiveAt: entry.windowLastActiveAt
+                    )
+                }
+            }
+        return Dictionary(
+            projection.appEntries.map { entry in
                 (
                     entry.appID,
                     AppSwitchCandidate(
                         id: entry.appID,
                         displayName: entry.appDisplayName,
-                        groupID: RuntimeAppIdentity.groupID(
-                            for: entry.appID,
-                            fallbackName: entry.appDisplayName
-                        ),
-                        lastActiveAt: RuntimeAppDirectory.stableLastActiveValue(forRank: index),
-                        windows: []
+                        groupID: entry.appGroupID,
+                        lastActiveAt: entry.appLastActiveAt,
+                        windows: windowsByAppID[entry.appID] ?? []
                     )
                 )
             },
@@ -228,9 +236,30 @@ extension LiveSwitcherModel {
 
         switch selected.kind {
         case .app(let appID):
-            guard session.selectApp(withID: appID) else { return false }
+            if !session.selectApp(withID: appID) {
+                guard let committedApp = committedSearchAppsByID[appID] else { return false }
+                session = Self.sessionByApplyingCommittedSearchTarget(
+                    committedApp,
+                    to: session
+                )
+                guard session.selectApp(withID: appID) else { return false }
+            }
         case .window(let appID, let windowID):
-            guard session.selectWindow(appID: appID, windowID: windowID) else { return false }
+            if !session.selectWindow(appID: appID, windowID: windowID) {
+                guard
+                    let committedApp = committedSearchAppsByID[appID],
+                    committedApp.windows.contains(where: { $0.id == windowID })
+                else {
+                    return false
+                }
+                session = Self.sessionByApplyingCommittedSearchTarget(
+                    committedApp,
+                    to: session
+                )
+                guard session.selectWindow(appID: appID, windowID: windowID) else {
+                    return false
+                }
+            }
         }
 
         autoEnterSuppressedAppID = nil
@@ -239,6 +268,24 @@ extension LiveSwitcherModel {
         _ = searchCoordinator.exit()
         publishSearchStateIfNeeded()
         return true
+    }
+
+    private static func sessionByApplyingCommittedSearchTarget(
+        _ committedApp: AppSwitchCandidate,
+        to session: SwitcherSession
+    ) -> SwitcherSession {
+        var apps = session.apps
+        if let index = apps.firstIndex(where: { $0.id == committedApp.id }) {
+            apps[index] = committedApp
+        } else {
+            apps.append(committedApp)
+        }
+        return SwitcherSession(
+            apps: apps,
+            preferences: session.preferences,
+            triggerDirection: .forward,
+            rememberedWindowIDByAppID: session.rememberedWindowIDByAppID
+        )
     }
 
     func flushCurrentSearchComputationForCommit() {

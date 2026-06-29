@@ -623,6 +623,96 @@ extension FlowTabTests {
     }
 
     @MainActor
+    func testLiveSwitcherModelSearchAppliesCommittedIndexTargetWhenSessionDoesNotContainResult() {
+        let defaults = UserDefaults.standard
+        let previousSearchEnabled = defaults.object(forKey: AppPreferenceKeys.searchEnabled)
+        let previousSearchDefaultScope = defaults.object(forKey: AppPreferenceKeys.searchDefaultScope)
+        defer {
+            restoreUserDefaultsValue(
+                previousSearchEnabled,
+                forKey: AppPreferenceKeys.searchEnabled,
+                userDefaults: defaults
+            )
+            restoreUserDefaultsValue(
+                previousSearchDefaultScope,
+                forKey: AppPreferenceKeys.searchDefaultScope,
+                userDefaults: defaults
+            )
+        }
+
+        defaults.set(true, forKey: AppPreferenceKeys.searchEnabled)
+        defaults.set(SwitcherSearchScope.window.rawValue, forKey: AppPreferenceKeys.searchDefaultScope)
+
+        let sessionOnlyApp = AppSwitchCandidate(
+            id: "com.example.session-only",
+            displayName: "Session Only",
+            groupID: "session",
+            lastActiveAt: 100,
+            windows: []
+        )
+        let committedSearchApp = AppSwitchCandidate(
+            id: "com.example.committed",
+            displayName: "Committed Browser",
+            groupID: "committed",
+            lastActiveAt: 90,
+            windows: [
+                WindowCandidate(
+                    id: "committed-docs",
+                    title: "Runtime Committed Docs",
+                    isMinimized: false,
+                    lastActiveAt: 90
+                )
+            ]
+        )
+        let model = LiveSwitcherModel(
+            runtimeProjectionService: RecordingRuntimeProjectionService(
+                appSwitcherApps: [sessionOnlyApp],
+                committedSearchApps: [committedSearchApp]
+            )
+        )
+        var activationTarget: ActivationTarget?
+        model.activationOverride = { target, _ in
+            activationTarget = target
+        }
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        XCTAssertEqual(model.session?.apps.map(\.id), ["com.example.session-only"])
+        XCTAssertTrue(model.enterSearchMode())
+        XCTAssertEqual(model.searchScope, .window)
+        XCTAssertTrue(
+            model.searchCoordinator.replaceQueryWithoutRebuild(
+                "docs",
+                cursorPosition: 4
+            )
+        )
+        model.searchCoordinator.rebuildResults(resetSelection: true)
+        model.publishSearchStateIfNeeded()
+        XCTAssertEqual(
+            model.searchViewState.results.map(\.kind),
+            [.window(appID: "com.example.committed", windowID: "committed-docs")]
+        )
+
+        XCTAssertTrue(model.applySelectedSearchResultToSession())
+        XCTAssertFalse(model.isSearchActive)
+        XCTAssertEqual(
+            model.session?.apps.map(\.id),
+            ["com.example.session-only", "com.example.committed"]
+        )
+        XCTAssertEqual(model.selectedApp?.id, "com.example.committed")
+        XCTAssertEqual(model.session?.selectedWindow?.id, "committed-docs")
+
+        model.commitSelection()
+        XCTAssertEqual(
+            activationTarget,
+            .window(
+                appID: "com.example.committed",
+                windowID: "committed-docs",
+                restoreIfMinimized: false
+            )
+        )
+    }
+
+    @MainActor
     func testLiveSwitcherModelSearchReportsDegradedStaleCommittedIndexUntilFreshnessBarrierCommits() {
         let defaults = UserDefaults.standard
         let previousSearchEnabled = defaults.object(forKey: AppPreferenceKeys.searchEnabled)

@@ -728,6 +728,8 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         RuntimeSearchAppIndexEntry(
             appID: app.id,
             appDisplayName: app.displayName,
+            appGroupID: app.groupID,
+            appLastActiveAt: app.lastActiveAt,
             searchIndex: SearchTextMatcher.buildIndex(for: app.displayName, identifier: app.id)
         )
     }
@@ -742,6 +744,8 @@ final class RuntimeReadModelStore: @unchecked Sendable {
                 appDisplayName: app.displayName,
                 windowID: window.id,
                 windowTitle: window.title.trimmingCharacters(in: .whitespacesAndNewlines),
+                windowIsMinimized: window.isMinimized,
+                windowLastActiveAt: window.lastActiveAt,
                 windowSearchIndex: SearchTextMatcher.buildIndex(for: window.title),
                 appSearchIndex: appSearchIndex
             )
