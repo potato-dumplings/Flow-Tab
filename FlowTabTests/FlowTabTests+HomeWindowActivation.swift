@@ -304,11 +304,11 @@ extension FlowTabTests {
         let freshness = RuntimeProjectionFreshness(
             generatedAt: 20,
             sourceGeneration: RuntimeReadModelGeneration(projection: 1),
-            dirtyAppIDs: [],
-            dirtyPIDs: [],
+            dirtyAppIDs: [appID],
+            dirtyPIDs: [detailProjection.summary.pid],
             dirtyCGWindowIDs: [],
-            pendingRepairScopes: [],
-            isCompleteForScope: true
+            pendingRepairScopes: ["homeSummary:\(appID)"],
+            isCompleteForScope: false
         )
         let runtimeProjectionService = RecordingRuntimeProjectionService(
             homeSummaryProjection: RuntimeHomeSummaryProjection(
@@ -331,6 +331,15 @@ extension FlowTabTests {
             ]
         )
 
+        let summaryRead = HomeRuntimeProjectionReader.appSummaryProjection(from: runtimeProjectionService)
+        XCTAssertEqual(summaryRead?.summaries.map(\.appID), [appID])
+        XCTAssertEqual(summaryRead?.freshness, freshness)
+        XCTAssertEqual(summaryRead?.isProjectionBacked, true)
+        XCTAssertEqual(summaryRead?.freshness?.isCompleteForScope, false)
+        let initialRead = HomeRuntimeProjectionReader.initialAppSummaryProjection(from: runtimeProjectionService)
+        XCTAssertEqual(initialRead?.summaries.map(\.appID), [appID])
+        XCTAssertEqual(initialRead?.freshness, freshness)
+        XCTAssertEqual(initialRead?.isProjectionBacked, true)
         XCTAssertEqual(
             HomeRuntimeProjectionReader.appSummaries(from: runtimeProjectionService)?.map(\.appID),
             [appID]
@@ -350,7 +359,7 @@ extension FlowTabTests {
             )?.candidate.windows.map(\.id),
             ["home-projected-1"]
         )
-        XCTAssertEqual(runtimeProjectionService.homeSummaryProjectionReadCount(), 3)
+        XCTAssertEqual(runtimeProjectionService.homeSummaryProjectionReadCount(), 5)
         XCTAssertEqual(runtimeProjectionService.homeDetailProjectionReadCount(appID: appID), 1)
         XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 0)
         XCTAssertEqual(runtimeProjectionService.appSwitcherProjectionReadCount(), 0)
@@ -461,20 +470,28 @@ extension FlowTabTests {
             )
         )
 
+        let initialProjectionRead = HomeInitialAppSummaryReader.appSummaryProjection(from: projectionService)
+        XCTAssertEqual(initialProjectionRead.summaries.map(\.appID), [appID])
+        XCTAssertEqual(initialProjectionRead.freshness, freshness)
+        XCTAssertEqual(initialProjectionRead.isProjectionBacked, true)
         XCTAssertEqual(
             HomeInitialAppSummaryReader.appSummaries(from: projectionService).map(\.appID),
             [appID]
         )
-        XCTAssertEqual(projectionService.homeSummaryProjectionReadCount(), 1)
+        XCTAssertEqual(projectionService.homeSummaryProjectionReadCount(), 2)
         XCTAssertEqual(projectionService.appSwitcherProjectionReadCount(), 0)
 
         let missingProjectionService = RecordingRuntimeProjectionService()
 
+        let missingRead = HomeInitialAppSummaryReader.appSummaryProjection(from: missingProjectionService)
+        XCTAssertEqual(missingRead.summaries, [])
+        XCTAssertNil(missingRead.freshness)
+        XCTAssertEqual(missingRead.isProjectionBacked, false)
         XCTAssertEqual(
             HomeInitialAppSummaryReader.appSummaries(from: missingProjectionService),
             []
         )
-        XCTAssertEqual(missingProjectionService.homeSummaryProjectionReadCount(), 1)
+        XCTAssertEqual(missingProjectionService.homeSummaryProjectionReadCount(), 2)
         XCTAssertEqual(missingProjectionService.appSwitcherProjectionReadCount(), 0)
         XCTAssertEqual(missingProjectionService.appSwitcherMaintenanceRequestsRecorded(), [])
     }
@@ -545,6 +562,13 @@ extension FlowTabTests {
         )
         let runtimeProjectionService = RecordingRuntimeProjectionService()
 
+        let summaryRead = HomeRuntimeRefreshReader.appSummaryProjection(
+            from: runtimeProjectionService,
+            current: [cachedDetailProjection.summary]
+        )
+        XCTAssertEqual(summaryRead.summaries.map(\.appID), [appID])
+        XCTAssertNil(summaryRead.freshness)
+        XCTAssertEqual(summaryRead.isProjectionBacked, false)
         XCTAssertEqual(
             HomeRuntimeRefreshReader.appSummaries(
                 from: runtimeProjectionService,
@@ -569,7 +593,10 @@ extension FlowTabTests {
             )?.candidate.windows.map(\.id),
             ["cached-window"]
         )
-        XCTAssertEqual(runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(), [.homeProjectionMissing])
+        XCTAssertEqual(
+            runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(),
+            [.homeProjectionMissing, .homeProjectionMissing]
+        )
         XCTAssertEqual(runtimeProjectionService.appWindowChangeSignalsRecorded().map(\.appID), [appID, appID])
     }
 

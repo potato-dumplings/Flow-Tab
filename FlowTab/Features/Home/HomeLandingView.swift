@@ -41,6 +41,7 @@ struct HomeLandingView: View {
     @State private var hiddenAppIDs = AppVisibilityPreferencesStore.loadHiddenAppIDs()
     @State private var windowsByAppID: [String: [WindowCandidate]] = [:]
     @State private var homeDetailProjectionsByAppID: [String: RuntimeHomeAppDetailProjection] = [:]
+    @State private var homeSummaryProjectionFreshness: RuntimeProjectionFreshness?
     @State private var loadingWindowCountAppIDs: Set<String> = []
     @State private var selectedAppID: String?
     @State private var appSummariesRefreshTask: Task<Void, Never>?
@@ -591,10 +592,12 @@ struct HomeLandingView: View {
 
     private func refreshInitialAppSummaryProjection() async {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let summaries = initialHomeAppSummaryProjections()
+        let projectionRead = initialHomeAppSummaryProjection()
+        let summaries = projectionRead.summaries
         guard !Task.isCancelled, appSummaries.isEmpty else { return }
         guard !summaries.isEmpty else { return }
 
+        homeSummaryProjectionFreshness = projectionRead.freshness
         appSummaries = summaries
         loadingWindowCountAppIDs = accessibilityTrusted ? Set(summaries.map(\.appID)) : []
         syncSelectedApp()
@@ -609,16 +612,18 @@ struct HomeLandingView: View {
         }
         RuntimeLog.debug(
             .projection,
-            "homeInitialProjectionRead result=ready apps=\(summaries.count) selected=\(currentSelectedAppID ?? "nil") loadingCounts=\(loadingWindowCountAppIDs.count) accessibilityTrusted=\(accessibilityTrusted) totalMs=\(formatHomeMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))"
+            "homeInitialProjectionRead result=ready source=\(projectionRead.isProjectionBacked ? "runtimeProjection" : "currentFallback") freshnessComplete=\(projectionRead.freshness?.isCompleteForScope == true ? 1 : 0) apps=\(summaries.count) selected=\(currentSelectedAppID ?? "nil") loadingCounts=\(loadingWindowCountAppIDs.count) accessibilityTrusted=\(accessibilityTrusted) totalMs=\(formatHomeMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))"
         )
     }
 
     private func refreshAppSummaries(reason: String) async {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
         RuntimeLog.debug(.projection, "homeRefreshAppSummaryProjection begin reason=\(reason)")
-        let summaries = await readHomeAppSummaryProjections()
+        let projectionRead = await readHomeAppSummaryProjection()
+        let summaries = projectionRead.summaries
         guard !Task.isCancelled else { return }
 
+        homeSummaryProjectionFreshness = projectionRead.freshness
         appSummaries = summaries
         loadingWindowCountAppIDs.removeAll()
         let validAppIDs = Set(summaries.map(\.appID))
@@ -639,7 +644,7 @@ struct HomeLandingView: View {
         }
         RuntimeLog.debug(
             .projection,
-            "homeRefreshAppSummaryProjection result=ready reason=\(reason) apps=\(summaries.count) totalMs=\(formatHomeMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))"
+            "homeRefreshAppSummaryProjection result=ready reason=\(reason) source=\(projectionRead.isProjectionBacked ? "runtimeProjection" : "currentFallback") freshnessComplete=\(projectionRead.freshness?.isCompleteForScope == true ? 1 : 0) apps=\(summaries.count) totalMs=\(formatHomeMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))"
         )
     }
 
@@ -763,8 +768,8 @@ struct HomeLandingView: View {
         )
     }
 
-    private func readHomeAppSummaryProjections() async -> [RuntimeHomeAppSummary] {
-        HomeRuntimeRefreshReader.appSummaries(
+    private func readHomeAppSummaryProjection() async -> HomeAppSummaryProjectionRead {
+        HomeRuntimeRefreshReader.appSummaryProjection(
             from: runtimeProjectionService,
             current: appSummaries
         )
@@ -775,8 +780,8 @@ struct HomeLandingView: View {
         setupWindowMonitorIfNeeded()
     }
 
-    private func initialHomeAppSummaryProjections() -> [RuntimeHomeAppSummary] {
-        HomeInitialAppSummaryReader.appSummaries(from: runtimeProjectionService)
+    private func initialHomeAppSummaryProjection() -> HomeAppSummaryProjectionRead {
+        HomeInitialAppSummaryReader.appSummaryProjection(from: runtimeProjectionService)
     }
 
     private func formatHomeMilliseconds(_ value: Double) -> String {

@@ -3,13 +3,45 @@ import FlowTabCore
 
 let homeRuntimeProjectionService = sharedRuntimeProjectionService
 
+struct HomeAppSummaryProjectionRead: Equatable {
+    let summaries: [RuntimeHomeAppSummary]
+    let freshness: RuntimeProjectionFreshness?
+    let isProjectionBacked: Bool
+
+    init(
+        summaries: [RuntimeHomeAppSummary],
+        freshness: RuntimeProjectionFreshness?,
+        isProjectionBacked: Bool
+    ) {
+        self.summaries = summaries
+        self.freshness = freshness
+        self.isProjectionBacked = isProjectionBacked
+    }
+
+    init(projection: RuntimeHomeSummaryProjection) {
+        self.init(
+            summaries: projection.summaries,
+            freshness: projection.freshness,
+            isProjectionBacked: true
+        )
+    }
+}
+
 enum HomeRuntimeProjectionReader {
+    static func appSummaryProjection(from service: any RuntimeProjectionServing) -> HomeAppSummaryProjectionRead? {
+        service.readHomeSummaryProjection().map(HomeAppSummaryProjectionRead.init(projection:))
+    }
+
     static func appSummaries(from service: any RuntimeProjectionServing) -> [RuntimeHomeAppSummary]? {
-        service.readHomeSummaryProjection()?.summaries
+        appSummaryProjection(from: service)?.summaries
+    }
+
+    static func initialAppSummaryProjection(from service: any RuntimeProjectionServing) -> HomeAppSummaryProjectionRead? {
+        service.readHomeSummaryProjection().map(HomeAppSummaryProjectionRead.init(projection:))
     }
 
     static func initialAppSummaries(from service: any RuntimeProjectionServing) -> [RuntimeHomeAppSummary]? {
-        service.readHomeSummaryProjection()?.summaries
+        initialAppSummaryProjection(from: service)?.summaries
     }
 
     static func appSummary(
@@ -47,15 +79,26 @@ enum HomeRuntimeProjectionReader {
 }
 
 enum HomeRuntimeRefreshReader {
+    static func appSummaryProjection(
+        from service: any RuntimeProjectionServing,
+        current summaries: [RuntimeHomeAppSummary]
+    ) -> HomeAppSummaryProjectionRead {
+        guard let projectionRead = HomeRuntimeProjectionReader.appSummaryProjection(from: service) else {
+            service.requestAppSwitcherProjectionMaintenance(reason: .homeProjectionMissing)
+            return HomeAppSummaryProjectionRead(
+                summaries: summaries,
+                freshness: nil,
+                isProjectionBacked: false
+            )
+        }
+        return projectionRead
+    }
+
     static func appSummaries(
         from service: any RuntimeProjectionServing,
         current summaries: [RuntimeHomeAppSummary]
     ) -> [RuntimeHomeAppSummary] {
-        guard let projectionSummaries = HomeRuntimeProjectionReader.appSummaries(from: service) else {
-            service.requestAppSwitcherProjectionMaintenance(reason: .homeProjectionMissing)
-            return summaries
-        }
-        return projectionSummaries
+        appSummaryProjection(from: service, current: summaries).summaries
     }
 
     static func appSummary(
@@ -111,7 +154,16 @@ enum HomeRuntimeProjectionRefreshPolicy {
 }
 
 enum HomeInitialAppSummaryReader {
+    static func appSummaryProjection(from service: any RuntimeProjectionServing) -> HomeAppSummaryProjectionRead {
+        HomeRuntimeProjectionReader.initialAppSummaryProjection(from: service)
+            ?? HomeAppSummaryProjectionRead(
+                summaries: [],
+                freshness: nil,
+                isProjectionBacked: false
+            )
+    }
+
     static func appSummaries(from service: any RuntimeProjectionServing) -> [RuntimeHomeAppSummary] {
-        HomeRuntimeProjectionReader.initialAppSummaries(from: service) ?? []
+        appSummaryProjection(from: service).summaries
     }
 }
