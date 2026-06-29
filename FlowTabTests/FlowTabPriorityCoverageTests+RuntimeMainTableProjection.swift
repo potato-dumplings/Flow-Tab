@@ -114,7 +114,8 @@ extension FlowTabPriorityCoverageTests {
             localizedName: runningApp.localizedName ?? appID,
             bundleURL: parentBundleURL,
             launchDate: runningApp.launchDate,
-            activationRank: 0
+            activationRank: 0,
+            runningApplication: runningApp
         )
         let helperEntry = RuntimeAppDirectoryEntry(
             pid: helperPID,
@@ -1666,8 +1667,11 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeReadModelStoreCommitsSearchFromCurrentProjectionCacheAfterBarrierValidation() throws {
         let store = RuntimeReadModelStore()
         let committedApps = searchScenarioApps()
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let pid = runningApp.processIdentifier
         let repairedApp = AppSwitchCandidate(
-            id: "com.example.browser",
+            id: appID,
             displayName: "Browser",
             groupID: "web",
             lastActiveAt: 340,
@@ -1680,7 +1684,20 @@ extension FlowTabPriorityCoverageTests {
                 )
             ]
         )
-        let pid = pid_t(42_121)
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: runningApp,
+            windowsByID: [
+                "browser-main-table-search": RuntimeWindowContext(
+                    id: "browser-main-table-search",
+                    title: "Main Table Runtime Docs",
+                    isMinimized: false,
+                    ownerPID: pid,
+                    cgWindowID: 240_621,
+                    spaceIDs: [5]
+                )
+            ]
+        )
         store.seedAppSwitcherProjectionForTesting(
             apps: committedApps,
             contextsByID: [:],
@@ -1696,8 +1713,10 @@ extension FlowTabPriorityCoverageTests {
         store.commitMainTableAppSwitcherProjectionPayload(
             RuntimeAppSwitcherProjectionPayload(
                 apps: [repairedApp],
-                contextsByID: [:]
+                contextsByID: [appID: context]
             ),
+            clearsDirtyForAppID: appID,
+            clearsDirtyForPID: pid,
             generatedAt: 20
         )
 
@@ -1718,7 +1737,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(read.readiness, .committedGenerationValidated)
         XCTAssertEqual(read.resultState, .committedGenerationResult)
         XCTAssertEqual(
-            read.projection?.windowEntries.filter { $0.appID == repairedApp.id }.map(\.windowID),
+            read.projection?.windowEntries.filter { $0.appID == appID }.map(\.windowID),
             ["browser-main-table-search"]
         )
         XCTAssertTrue(store.diagnostics().dirtyAppIDs.isEmpty)

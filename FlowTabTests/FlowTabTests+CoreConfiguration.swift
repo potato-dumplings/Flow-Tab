@@ -389,7 +389,7 @@ extension FlowTabTests {
             let appDirectoryEntries = store.readAppDirectoryProjection()?.entries
             XCTAssertEqual(appDirectoryEntries?.count, 6)
             XCTAssertTrue(appDirectoryEntries?.contains { $0.appID == "com.flowtab.mock.mail" } == true)
-            XCTAssertTrue(projection.freshness.isCompleteForScope)
+            XCTAssertFalse(projection.freshness.isCompleteForScope)
             XCTAssertEqual(store.diagnostics().dirtyAppIDs, [])
         }
     }

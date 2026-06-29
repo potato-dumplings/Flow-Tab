@@ -1097,7 +1097,10 @@ extension FlowTabPriorityCoverageTests {
             timeoutNanoseconds: 1_000_000_000,
             pollIntervalNanoseconds: 10_000_000
         ) {
-            occlusionController.lastPanelVisibilityRecoveryDiagnostic?.after.userVisible == true
+            if case .visibleConfirmed = occlusionController.panelVisibilityRecoveryState {
+                return true
+            }
+            return false
         }
         XCTAssertTrue(didRecoverVisibility)
         XCTAssertNotNil(occlusionController.modelForTesting.session)

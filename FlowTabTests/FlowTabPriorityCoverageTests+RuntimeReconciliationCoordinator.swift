@@ -1830,11 +1830,11 @@ extension FlowTabPriorityCoverageTests {
                 .contains("Payload Contamination") ?? true
         )
         XCTAssertNotNil(projection.contextsByID[repairedApp.id])
-        XCTAssertTrue(projection.freshness.isCompleteForScope)
+        XCTAssertFalse(projection.freshness.isCompleteForScope)
         let homeProjection = try XCTUnwrap(store.readHomeSummaryProjection())
         XCTAssertEqual(Set(homeProjection.summaries.map(\.appID)), [repairedApp.id, existingApp.id])
         XCTAssertEqual(homeProjection.summary(for: repairedApp.id)?.windowCount, 1)
-        XCTAssertTrue(homeProjection.freshness.isCompleteForScope)
+        XCTAssertFalse(homeProjection.freshness.isCompleteForScope)
     }
 
     func testRuntimeProjectionServiceClearsTerminatedAppRuntimeState() {
@@ -2179,7 +2179,7 @@ extension FlowTabPriorityCoverageTests {
             projection.apps.map(\.id),
             [repairedApp.id, "com.example.full-repair-helper"]
         )
-        XCTAssertTrue(projection.freshness.isCompleteForScope)
+        XCTAssertFalse(projection.freshness.isCompleteForScope)
         let appDirectoryProjection = try XCTUnwrap(store.readAppDirectoryProjection())
         XCTAssertEqual(appDirectoryProjection.entries, appDirectoryEntries)
         XCTAssertTrue(appDirectoryProjection.freshness.isCompleteForScope)
