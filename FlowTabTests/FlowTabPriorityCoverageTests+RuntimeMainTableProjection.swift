@@ -843,22 +843,14 @@ extension FlowTabPriorityCoverageTests {
         )
         XCTAssertEqual(contextWindow.cgWindowID, cgWindowID)
         XCTAssertEqual(contextWindow.spaceIDs, [5])
-        XCTAssertFalse(appProjection.freshness.isCompleteForScope)
-        XCTAssertEqual(appProjection.freshness.dirtyCGWindowIDs, [cgWindowID])
-        XCTAssertEqual(
-            appProjection.freshness.spaceTopologySignatureSummary,
-            "d=1,current=7,spaces=1,windows=1,fullscreen=0"
-        )
-        XCTAssertTrue(appProjection.freshness.pendingRepairScopes.contains("spaceTopology"))
+        XCTAssertTrue(appProjection.freshness.isCompleteForScope)
+        XCTAssertTrue(appProjection.freshness.dirtyCGWindowIDs.isEmpty)
+        XCTAssertNil(appProjection.freshness.spaceTopologySignatureSummary)
+        XCTAssertFalse(appProjection.freshness.pendingRepairScopes.contains("spaceTopology"))
 
         let homeProjection = try XCTUnwrap(readModelStore.readHomeSummaryProjection())
         XCTAssertEqual(homeProjection.summary(for: appID)?.windowCount, 1)
-        XCTAssertFalse(homeProjection.freshness.isCompleteForScope)
-        let record = try XCTUnwrap(
-            windowRecordStore.state(for: pid)?
-                .windowRecordsByCGWindowID[cgWindowID]
-        )
-        XCTAssertTrue(record.needsReconciliation)
+        XCTAssertTrue(homeProjection.freshness.isCompleteForScope)
         requestLock.lock()
         let startedTargets = startedRequests.map(\.target)
         requestLock.unlock()
@@ -866,9 +858,24 @@ extension FlowTabPriorityCoverageTests {
         let searchRead = readModelStore.readCommittedSearchIndexForSearch()
         XCTAssertEqual(searchRead.readiness, .degradedStaleCommitted)
         XCTAssertEqual(searchRead.resultState, .degradedStaleCommittedResult)
+        XCTAssertFalse(searchRead.committedIndexCoversCurrentGeneration)
+        XCTAssertEqual(searchRead.freshness?.dirtyCGWindowIDs, [])
+        XCTAssertEqual(searchRead.freshness?.pendingRepairScopes, [])
         XCTAssertEqual(
             searchRead.projection?.windowEntries.filter { $0.appID == appID }.map(\.windowID),
             [legacyWindow.id]
+        )
+
+        service.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
+        service.waitForMaintenanceQueueForTesting()
+
+        let freshSearchRead = readModelStore.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(freshSearchRead.readiness, .committedGenerationValidated)
+        XCTAssertEqual(freshSearchRead.resultState, .committedGenerationResult)
+        XCTAssertTrue(freshSearchRead.committedIndexCoversCurrentGeneration)
+        XCTAssertEqual(
+            freshSearchRead.projection?.windowEntries.filter { $0.appID == appID }.map(\.windowID),
+            [projectedWindowID]
         )
     }
 

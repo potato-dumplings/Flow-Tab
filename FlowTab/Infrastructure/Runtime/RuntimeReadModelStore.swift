@@ -24,6 +24,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         _ payload: RuntimeAppSwitcherProjectionPayload,
         clearsDirtyForAppID: String? = nil,
         clearsDirtyForPID: pid_t? = nil,
+        clearsDirtyCGWindowIDs: Set<CGWindowID> = [],
         generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
     ) -> RuntimeAppSwitcherProjectionCommitSummary {
         lock.lock()
@@ -39,6 +40,11 @@ final class RuntimeReadModelStore: @unchecked Sendable {
                 dirtyPIDs.remove(clearsDirtyForPID)
             }
         }
+        clearDirtyStateForCoveredCGWindowsLocked(
+            clearsDirtyCGWindowIDs,
+            coveredCGWindowIDs: payload.coveredCGWindowIDs,
+            hasCompleteWindowCoverage: payload.hasCompleteWindowCoverage
+        )
         let isCompleteForScope = !isDirtyLocked && payload.hasCompleteWindowCoverage
         appSwitcherProjection = RuntimeAppSwitcherProjection(
             apps: payload.apps,
@@ -357,9 +363,10 @@ final class RuntimeReadModelStore: @unchecked Sendable {
                 dirtyAppIDs: dirtyAppIDs,
                 dirtyPIDs: dirtyPIDs,
                 dirtyCGWindowIDs: dirtyCGWindowIDs,
-                spaceTopologySignatureSummary: signature.diagnosticSummary,
+                spaceTopologySignatureSummary: spaceTopologySignatureSummary,
                 pendingRepairScopes: pendingRepairScopes,
-                isCompleteForScope: false
+                isCompleteForScope: dirtyCGWindowIDs.isEmpty
+                    && !pendingRepairScopes.contains("spaceTopology")
             )
         )
     }
@@ -488,6 +495,22 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     private func clearDirtyStateForAppLocked(appID: String) {
         dirtyAppIDs.remove(appID)
         pendingRepairScopes = pendingRepairScopes.filter { !$0.contains(appID) }
+    }
+
+    private func clearDirtyStateForCoveredCGWindowsLocked(
+        _ requestedCGWindowIDs: Set<CGWindowID>,
+        coveredCGWindowIDs: Set<CGWindowID>,
+        hasCompleteWindowCoverage: Bool
+    ) {
+        guard hasCompleteWindowCoverage, !requestedCGWindowIDs.isEmpty else { return }
+        let reconciledCGWindowIDs = requestedCGWindowIDs.intersection(coveredCGWindowIDs)
+        guard !reconciledCGWindowIDs.isEmpty else { return }
+
+        dirtyCGWindowIDs.subtract(reconciledCGWindowIDs)
+        if dirtyCGWindowIDs.isEmpty {
+            pendingRepairScopes.remove("spaceTopology")
+            spaceTopologySignatureSummary = nil
+        }
     }
 
     @discardableResult

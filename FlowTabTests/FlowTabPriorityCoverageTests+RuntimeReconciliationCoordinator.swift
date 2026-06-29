@@ -848,6 +848,121 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertNotEqual(read.freshness?.sourceGeneration, store.diagnostics().generation)
     }
 
+    func testRuntimeReadModelStoreClearsSpaceDirtyOnlyAfterCoveredMainTableProjectionCommitWithoutRefreshingSearch() throws {
+        let store = RuntimeReadModelStore()
+        let committedApp = try XCTUnwrap(searchScenarioApps().first)
+        let cgWindowID = CGWindowID(240_888)
+        let pid = NSRunningApplication.current.processIdentifier
+        let window = WindowCandidate(
+            id: "covered-space-window",
+            title: "Covered Space Window",
+            isMinimized: false,
+            lastActiveAt: 44
+        )
+        let coveredApp = AppSwitchCandidate(
+            id: committedApp.id,
+            displayName: committedApp.displayName,
+            groupID: committedApp.groupID,
+            lastActiveAt: 44,
+            windows: [window]
+        )
+        let coveredContext = RuntimeAppContext(
+            appID: committedApp.id,
+            runningApp: .current,
+            windowsByID: [
+                window.id: RuntimeWindowContext(
+                    id: window.id,
+                    title: window.title,
+                    isMinimized: window.isMinimized,
+                    ownerPID: pid,
+                    cgWindowID: cgWindowID,
+                    spaceIDs: [7]
+                )
+            ]
+        )
+        let topologySignature = RuntimeSpaceTopologySnapshot(
+            spacesByID: [
+                7: RuntimeSpaceTopologySpace(id: 7, displayID: 1, isCurrent: true)
+            ],
+            windowIDsBySpaceID: [
+                7: [cgWindowID]
+            ],
+            spaceIDsByCGWindowID: [
+                cgWindowID: [7]
+            ]
+        ).signature
+
+        store.seedAppSwitcherProjectionForTesting(
+            apps: [committedApp],
+            contextsByID: [:],
+            appDirectoryEntries: nil,
+            generatedAt: 10
+        )
+        commitSearchFreshnessBarrierForTesting(store, generatedAt: 11)
+        let committedSearchGeneration = try XCTUnwrap(
+            store.readCommittedSearchIndexForSearch().freshness?.sourceGeneration
+        )
+
+        store.markSpaceTopologyDirty(
+            affectedCGWindowIDs: [cgWindowID],
+            signature: topologySignature,
+            signatureSummary: topologySignature.diagnosticSummary,
+            pendingScope: "spaceTopology",
+            generatedAt: 20
+        )
+        var staleSearchRead = store.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(staleSearchRead.readiness, .degradedStaleCommitted)
+        XCTAssertEqual(staleSearchRead.resultState, .degradedStaleCommittedResult)
+        XCTAssertEqual(staleSearchRead.freshness?.dirtyCGWindowIDs, [cgWindowID])
+        XCTAssertEqual(staleSearchRead.freshness?.pendingRepairScopes, ["spaceTopology"])
+
+        store.commitMainTableAppSwitcherProjectionPayload(
+            RuntimeAppSwitcherProjectionPayload(
+                apps: [coveredApp],
+                contextsByID: [coveredApp.id: coveredContext],
+                hasCompleteWindowCoverage: false
+            ),
+            clearsDirtyCGWindowIDs: [cgWindowID],
+            generatedAt: 21
+        )
+        XCTAssertEqual(store.diagnostics().dirtyCGWindowIDs, [cgWindowID])
+        XCTAssertEqual(store.diagnostics().pendingRepairScopes, ["spaceTopology"])
+
+        store.commitMainTableAppSwitcherProjectionPayload(
+            RuntimeAppSwitcherProjectionPayload(
+                apps: [coveredApp],
+                contextsByID: [coveredApp.id: coveredContext],
+                hasCompleteWindowCoverage: true
+            ),
+            clearsDirtyCGWindowIDs: [cgWindowID],
+            generatedAt: 22
+        )
+
+        let diagnostics = store.diagnostics()
+        XCTAssertTrue(diagnostics.dirtyCGWindowIDs.isEmpty)
+        XCTAssertTrue(diagnostics.pendingRepairScopes.isEmpty)
+        XCTAssertNil(diagnostics.spaceTopologySignatureSummary)
+        let appProjection = try XCTUnwrap(store.readAppSwitcherProjection())
+        XCTAssertTrue(appProjection.freshness.isCompleteForScope)
+        let topologyProjection = try XCTUnwrap(store.readSpaceTopologyProjection())
+        XCTAssertTrue(topologyProjection.freshness.isCompleteForScope)
+        XCTAssertEqual(topologyProjection.affectedCGWindowIDs, [cgWindowID])
+        staleSearchRead = store.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(staleSearchRead.readiness, .degradedStaleCommitted)
+        XCTAssertEqual(staleSearchRead.resultState, .degradedStaleCommittedResult)
+        XCTAssertFalse(staleSearchRead.committedIndexCoversCurrentGeneration)
+        XCTAssertEqual(staleSearchRead.freshness?.sourceGeneration, committedSearchGeneration)
+        XCTAssertEqual(staleSearchRead.freshness?.dirtyCGWindowIDs, [])
+        XCTAssertEqual(staleSearchRead.freshness?.pendingRepairScopes, [])
+        XCTAssertFalse(staleSearchRead.readiness.rawValue.localizedCaseInsensitiveContains("fresh"))
+        XCTAssertFalse(staleSearchRead.readiness.rawValue.localizedCaseInsensitiveContains("complete"))
+        XCTAssertFalse(staleSearchRead.readiness.rawValue.localizedCaseInsensitiveContains("latest"))
+        XCTAssertFalse(staleSearchRead.resultState.rawValue.localizedCaseInsensitiveContains("fresh"))
+        XCTAssertFalse(staleSearchRead.resultState.rawValue.localizedCaseInsensitiveContains("complete"))
+        XCTAssertFalse(staleSearchRead.resultState.rawValue.localizedCaseInsensitiveContains("latest"))
+        XCTAssertNotEqual(staleSearchRead.freshness?.sourceGeneration, store.diagnostics().generation)
+    }
+
     func testRuntimeReadModelStoreTreatsSearchAsDegradedWhenProjectionGenerationAdvancesWithoutBarrierCommit() throws {
         let store = RuntimeReadModelStore()
         let committedApps = searchScenarioApps()

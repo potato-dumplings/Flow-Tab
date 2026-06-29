@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import FlowTabCore
 
@@ -75,7 +76,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         maintenanceQueue.async { [self] in
             let now = Date.timeIntervalSinceReferenceDate
             let appDirectoryProviderEvidenceCount = commitAppDirectoryProviderEvidenceLocked(generatedAt: now)
-            let mainTableProjectionCommitted = commitMainTableAppSwitcherProjectionLocked(
+            var mainTableProjectionCommitted = commitMainTableAppSwitcherProjectionLocked(
                 generatedAt: now,
                 requiresExistingProjectionCoverage: true
             )
@@ -95,6 +96,13 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 drainResult.currentAppRepairEvidence,
                 generatedAt: now
             )
+            if !drainResult.completedSpaceTopologyAffectedCGWindowIDs.isEmpty {
+                mainTableProjectionCommitted = commitMainTableAppSwitcherProjectionLocked(
+                    generatedAt: now,
+                    requiresExistingProjectionCoverage: true,
+                    clearsDirtyCGWindowIDs: drainResult.completedSpaceTopologyAffectedCGWindowIDs
+                ) || mainTableProjectionCommitted
+            }
             RuntimeLog.debug(
                 .projection,
                 [
@@ -134,7 +142,8 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             )
             let mainTableProjectionCommitted = commitMainTableAppSwitcherProjectionLocked(
                 generatedAt: now,
-                requiresExistingProjectionCoverage: true
+                requiresExistingProjectionCoverage: true,
+                clearsDirtyCGWindowIDs: drainResult.completedSpaceTopologyAffectedCGWindowIDs
             )
             let hasPendingRequests = repairProvider.hasPendingReconciliationRequests()
             let diagnostics = readModelStore.diagnostics()
@@ -185,7 +194,14 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 generatedAt: now,
                 requiresExistingProjectionCoverage: true
             )
-            drainReadyReconciliationRequestsLocked(now: now)
+            let drainResult = drainReadyReconciliationRequestResultLocked(now: now)
+            if !drainResult.completedSpaceTopologyAffectedCGWindowIDs.isEmpty {
+                commitMainTableAppSwitcherProjectionLocked(
+                    generatedAt: now,
+                    requiresExistingProjectionCoverage: true,
+                    clearsDirtyCGWindowIDs: drainResult.completedSpaceTopologyAffectedCGWindowIDs
+                )
+            }
         }
     }
 
@@ -351,6 +367,13 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
 
     @discardableResult
     private func drainReadyReconciliationRequestsLocked(now: TimeInterval) -> [RuntimeReconciliationRequest] {
+        drainReadyReconciliationRequestResultLocked(now: now).startedRequests
+    }
+
+    @discardableResult
+    private func drainReadyReconciliationRequestResultLocked(
+        now: TimeInterval
+    ) -> RuntimeProjectionReconciliationDrainResult {
         let result = reconciliationDrainer.drainReadyRequests(now: now)
         commitFullRepairEvidenceLocked(
             result.fullRepairEvidence,
@@ -360,7 +383,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             result.currentAppRepairEvidence,
             generatedAt: now
         )
-        return result.startedRequests
+        return result
     }
 
     @discardableResult
@@ -396,7 +419,8 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         requiresExistingProjectionCoverage: Bool,
         permittedMissingAppIDs: Set<String> = [],
         clearsDirtyForAppID: String? = nil,
-        clearsDirtyForPID: pid_t? = nil
+        clearsDirtyForPID: pid_t? = nil,
+        clearsDirtyCGWindowIDs: Set<CGWindowID> = []
     ) -> Bool {
         guard
             let appDirectoryEntries = readModelStore.readAppDirectoryProjection()?.entries,
@@ -420,6 +444,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             payload,
             clearsDirtyForAppID: clearsDirtyForAppID,
             clearsDirtyForPID: clearsDirtyForPID,
+            clearsDirtyCGWindowIDs: clearsDirtyCGWindowIDs,
             generatedAt: generatedAt
         )
         return true
