@@ -101,6 +101,24 @@ extension FlowTabTests {
         XCTAssertEqual(coordinator.state.indexStatus?.committedIndexCoversCurrentGeneration, false)
         XCTAssertEqual(coordinator.state.indexStatus?.requestedFreshnessBarrier, true)
         XCTAssertNotEqual(coordinator.state.indexStatus?.resultState, .committedGenerationResult)
+        XCTAssertFalse(
+            coordinator.state.indexStatus?.readiness.rawValue.localizedCaseInsensitiveContains("fresh") ?? true
+        )
+        XCTAssertFalse(
+            coordinator.state.indexStatus?.readiness.rawValue.localizedCaseInsensitiveContains("complete") ?? true
+        )
+        XCTAssertFalse(
+            coordinator.state.indexStatus?.readiness.rawValue.localizedCaseInsensitiveContains("latest") ?? true
+        )
+        XCTAssertFalse(
+            coordinator.state.indexStatus?.resultState.rawValue.localizedCaseInsensitiveContains("fresh") ?? true
+        )
+        XCTAssertFalse(
+            coordinator.state.indexStatus?.resultState.rawValue.localizedCaseInsensitiveContains("complete") ?? true
+        )
+        XCTAssertFalse(
+            coordinator.state.indexStatus?.resultState.rawValue.localizedCaseInsensitiveContains("latest") ?? true
+        )
     }
 
     func testSearchMatchesCamelCaseAppBySegmentedWords() {

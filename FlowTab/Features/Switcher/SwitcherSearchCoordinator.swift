@@ -55,7 +55,7 @@ struct SwitcherSearchIndexStatus: Equatable, Sendable {
         )
     }
 
-    init(projection _: RuntimeSearchIndexProjection) {
+    init(degradedProjectionFallback _: RuntimeSearchIndexProjection) {
         self.init(
             readiness: .degradedStaleCommitted,
             resultState: .degradedStaleCommittedResult,
@@ -225,7 +225,9 @@ final class SwitcherSearchCoordinator {
         appMatchCache = nil
         windowMatchCache = nil
         state = .inactive
-        state.indexStatus = indexStatus ?? SwitcherSearchIndexStatus(projection: projection)
+        state.indexStatus = indexStatus ?? SwitcherSearchIndexStatus(
+            degradedProjectionFallback: projection
+        )
     }
 
     func resetIndex() {
