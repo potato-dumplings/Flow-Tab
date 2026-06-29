@@ -5,6 +5,7 @@ protocol RuntimeProjectionServing: Sendable {
     func readHomeSummaryProjection() -> RuntimeHomeSummaryProjection?
     func readHomeAppDetailProjection(appID: String) -> RuntimeHomeAppDetailProjection?
     func readCurrentAppWindowProjection(appID: String) -> RuntimeCurrentAppWindowProjection?
+    func readFocusedCurrentAppWindowProjection() -> RuntimeFocusedCurrentAppWindowProjectionRead?
     func readCommittedSearchIndexForSearch() -> RuntimeSearchIndexRead
     func runtimeReadModelDiagnostics() -> RuntimeReadModelDiagnostics
     func requestAppSwitcherProjectionMaintenance(reason: RuntimeProjectionMaintenanceReason)
@@ -17,6 +18,7 @@ protocol RuntimeProjectionServing: Sendable {
     )
     func signalAppWindowsChanged(appID: String, pid: pid_t)
     func signalSelectedCurrentAppWindowsChanged(appID: String, pid: pid_t)
+    func signalFocusedCurrentAppWindowsChanged()
     func signalAXWindowDestroyed(appID: String, pid: pid_t, axWindowID: String)
     func signalAppTerminated(appID: String, pid: pid_t)
     func signalWindowFocusVerified(_ verification: RuntimeWindowFocusVerification)

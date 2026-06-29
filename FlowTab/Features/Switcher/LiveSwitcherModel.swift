@@ -407,20 +407,21 @@ final class LiveSwitcherModel: ObservableObject {
         clearTerminateSelectedAppAnimation()
         overlayStyle = .windowOnly
         titleBarStyleInferenceEnabled = true
-        guard let frontmostApp = resolveFrontmostApplication() else {
+        guard let focusedRead = runtimeProjectionService.readFocusedCurrentAppWindowProjection() else {
+            runtimeProjectionService.signalFocusedCurrentAppWindowsChanged()
             logStartFocusedWindowSessionNoFrontmost(startMs: startMs)
             resetSessionState()
             return false
         }
         let frontmostReadyMs = Self.monotonicMilliseconds()
 
-        let frontmostAppID = RuntimeAppIdentity.appID(for: frontmostApp)
+        let frontmostAppID = focusedRead.appID
         let projectionReadMs: Double
         let recencyAppliedMs: Double
         var resolvedAppCandidate: AppSwitchCandidate?
         var resolvedContext: RuntimeAppContext?
 
-        if let projection = runtimeProjectionService.readCurrentAppWindowProjection(appID: frontmostAppID),
+        if let projection = focusedRead.projection,
            projection.freshness.isCompleteForScope {
             projectionReadMs = Self.monotonicMilliseconds()
             let payload = currentAppWindowPayloadWithWindowRecencyApplied(
@@ -431,10 +432,7 @@ final class LiveSwitcherModel: ObservableObject {
             resolvedContext = payload.context
         } else {
             projectionReadMs = Self.monotonicMilliseconds()
-            runtimeProjectionService.signalSelectedCurrentAppWindowsChanged(
-                appID: frontmostAppID,
-                pid: frontmostApp.processIdentifier
-            )
+            runtimeProjectionService.signalFocusedCurrentAppWindowsChanged()
             recencyAppliedMs = Self.monotonicMilliseconds()
         }
 

@@ -387,15 +387,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
 
-        guard var projection = currentAppWindowProjectionsByAppID[appID] else { return nil }
-        let isScopeDirty = dirtyAppIDs.contains(appID)
-            || dirtyPIDs.contains(projection.currentAppWindowPayload.summary.pid)
-            || !dirtyCGWindowIDs.isEmpty
-            || !pendingRepairScopes.isEmpty
-        projection.freshness = freshnessLocked(
-            generatedAt: projection.freshness.generatedAt,
-            isCompleteForScope: projection.freshness.isCompleteForScope && !isScopeDirty
-        )
+        guard let projection = currentAppWindowProjectionLocked(appID: appID) else { return nil }
         return RuntimeHomeAppDetailProjection(
             currentAppWindowPayload: projection.currentAppWindowPayload,
             freshness: projection.freshness
@@ -406,6 +398,25 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
 
+        return currentAppWindowProjectionLocked(appID: appID)
+    }
+
+    func readFocusedCurrentAppWindowProjection() -> RuntimeFocusedCurrentAppWindowProjectionRead? {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard let focusedEntry = focusedCurrentAppDirectoryEntryLocked() else { return nil }
+        let projection = currentAppWindowProjectionLocked(appID: focusedEntry.appID).flatMap { projection in
+            projection.currentAppWindowPayload.summary.pid == focusedEntry.pid ? projection : nil
+        }
+        return RuntimeFocusedCurrentAppWindowProjectionRead(
+            appID: focusedEntry.appID,
+            pid: focusedEntry.pid,
+            projection: projection
+        )
+    }
+
+    private func currentAppWindowProjectionLocked(appID: String) -> RuntimeCurrentAppWindowProjection? {
         guard var projection = currentAppWindowProjectionsByAppID[appID] else { return nil }
         let isScopeDirty = dirtyAppIDs.contains(appID)
             || dirtyPIDs.contains(projection.currentAppWindowPayload.summary.pid)
@@ -416,6 +427,22 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             isCompleteForScope: projection.freshness.isCompleteForScope && !isScopeDirty
         )
         return projection
+    }
+
+    private func focusedCurrentAppDirectoryEntryLocked() -> RuntimeAppDirectoryEntry? {
+        appDirectoryState.entries
+            .compactMap { entry -> (entry: RuntimeAppDirectoryEntry, rank: Int)? in
+                guard let rank = entry.activationRank else { return nil }
+                return (entry, rank)
+            }
+            .sorted { lhs, rhs in
+                if lhs.rank != rhs.rank {
+                    return lhs.rank < rhs.rank
+                }
+                return lhs.entry.pid < rhs.entry.pid
+            }
+            .first?
+            .entry
     }
 
     func readCommittedSearchIndexForSearch() -> RuntimeSearchIndexRead {

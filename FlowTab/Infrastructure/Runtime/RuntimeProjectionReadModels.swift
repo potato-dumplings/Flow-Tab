@@ -139,6 +139,12 @@ struct RuntimeCurrentAppWindowProjection {
     }
 }
 
+struct RuntimeFocusedCurrentAppWindowProjectionRead {
+    let appID: String
+    let pid: pid_t
+    let projection: RuntimeCurrentAppWindowProjection?
+}
+
 struct RuntimeReadModelDiagnostics: Equatable {
     let generation: RuntimeReadModelGeneration
     let dirtyAppIDs: Set<String>

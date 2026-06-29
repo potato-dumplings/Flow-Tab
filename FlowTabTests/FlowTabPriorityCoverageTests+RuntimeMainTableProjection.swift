@@ -2117,6 +2117,77 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(staleHomeDetailProjection.freshness.pendingRepairScopes.contains("appWindows:\(appID)"))
     }
 
+    func testRuntimeReadModelStoreReadsFocusedCurrentAppProjectionFromAppDirectoryRank() throws {
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let window = WindowCandidate(
+            id: "focused-main-table-window",
+            title: "Focused Main Table Window",
+            isMinimized: false,
+            lastActiveAt: 500
+        )
+        let candidate = AppSwitchCandidate(
+            id: appID,
+            displayName: runningApp.localizedName ?? appID,
+            groupID: RuntimeAppIdentity.groupID(
+                for: runningApp.bundleIdentifier,
+                fallbackName: runningApp.localizedName ?? appID
+            ),
+            lastActiveAt: 500,
+            windows: [window]
+        )
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: runningApp,
+            windowsByID: [
+                window.id: RuntimeWindowContext(
+                    id: window.id,
+                    title: window.title,
+                    isMinimized: window.isMinimized,
+                    ownerPID: runningApp.processIdentifier,
+                    cgWindowID: 240_711,
+                    spaceIDs: [5]
+                )
+            ]
+        )
+        let summary = RuntimeHomeAppSummary(
+            appID: appID,
+            displayName: candidate.displayName,
+            groupID: candidate.groupID,
+            lastActiveAt: candidate.lastActiveAt,
+            windowCount: candidate.windows.count,
+            pid: runningApp.processIdentifier
+        )
+        let payload = RuntimeCurrentAppWindowPayload(
+            summary: summary,
+            candidate: candidate,
+            context: context,
+            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: runningApp, activationRank: 0)]
+        )
+        let store = RuntimeReadModelStore()
+        store.commitFullRepairAppDirectoryEvidence([
+            RuntimeAppDirectoryEntry(
+                pid: 1_000_002,
+                appID: "com.example.background",
+                bundleIdentifier: "com.example.background",
+                localizedName: "Background",
+                launchDate: nil,
+                activationRank: 1
+            ),
+            RuntimeAppDirectoryEntry(app: runningApp, activationRank: 0)
+        ], generatedAt: 40)
+        store.commitCurrentAppWindowProjection(payload, generatedAt: 42)
+
+        let focusedRead = try XCTUnwrap(store.readFocusedCurrentAppWindowProjection())
+        XCTAssertEqual(focusedRead.appID, appID)
+        XCTAssertEqual(focusedRead.pid, runningApp.processIdentifier)
+        XCTAssertEqual(
+            focusedRead.projection?.currentAppWindowPayload.candidate.windows.map(\.id),
+            [window.id]
+        )
+        XCTAssertTrue(focusedRead.projection?.freshness.isCompleteForScope == true)
+    }
+
     func testRuntimeReadModelStorePreservesStaleCurrentAppProjectionAfterOtherMainTableCommitClearsDirty() throws {
         let runningApp = NSRunningApplication.current
         let appID = RuntimeAppIdentity.appID(for: runningApp)

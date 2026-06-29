@@ -85,11 +85,13 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     private let homeSummaryProjection: RuntimeHomeSummaryProjection?
     private let homeDetailProjectionsByAppID: [String: RuntimeHomeAppDetailProjection]
     private let currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection]
+    private let focusedCurrentAppWindowProjectionRead: RuntimeFocusedCurrentAppWindowProjectionRead?
     private var committedSearchIndexRead: RuntimeSearchIndexRead?
     private var appSwitcherProjectionReads = 0
     private var homeSummaryProjectionReads = 0
     private var homeDetailProjectionReadsByAppID: [String: Int] = [:]
     private var currentAppWindowProjectionReadsByAppID: [String: Int] = [:]
+    private var focusedCurrentAppWindowProjectionReads = 0
     private var committedSearchIndexReads = 0
     private var appSwitcherMaintenanceRequests: [RuntimeProjectionMaintenanceReason] = []
     private var searchIndexFreshnessBarrierRequests: [RuntimeProjectionMaintenanceReason] = []
@@ -108,6 +110,7 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         homeSummaryProjection: RuntimeHomeSummaryProjection? = nil,
         homeDetailProjectionsByAppID: [String: RuntimeHomeAppDetailProjection]? = nil,
         currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection] = [:],
+        focusedCurrentAppWindowProjectionRead: RuntimeFocusedCurrentAppWindowProjectionRead? = nil,
         committedSearchIndexRead: RuntimeSearchIndexRead? = nil
     ) {
         self.appSwitcherProjection = appSwitcherProjection
@@ -117,6 +120,18 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
                 currentAppWindowProjectionsByAppID: currentAppWindowProjectionsByAppID
             )
         self.currentAppWindowProjectionsByAppID = currentAppWindowProjectionsByAppID
+        if let focusedCurrentAppWindowProjectionRead {
+            self.focusedCurrentAppWindowProjectionRead = focusedCurrentAppWindowProjectionRead
+        } else if currentAppWindowProjectionsByAppID.count == 1,
+                  let projection = currentAppWindowProjectionsByAppID.values.first {
+            self.focusedCurrentAppWindowProjectionRead = RuntimeFocusedCurrentAppWindowProjectionRead(
+                appID: projection.appID,
+                pid: projection.currentAppWindowPayload.summary.pid,
+                projection: projection
+            )
+        } else {
+            self.focusedCurrentAppWindowProjectionRead = nil
+        }
         self.committedSearchIndexRead = committedSearchIndexRead
     }
 
@@ -174,6 +189,12 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         lock.lock()
         defer { lock.unlock() }
         return currentAppWindowProjectionReadsByAppID[appID] ?? 0
+    }
+
+    func focusedCurrentAppWindowProjectionReadCount() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return focusedCurrentAppWindowProjectionReads
     }
 
     func committedSearchIndexReadCount() -> Int {
@@ -304,6 +325,19 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         return currentAppWindowProjectionsByAppID[appID]
     }
 
+    func readFocusedCurrentAppWindowProjection() -> RuntimeFocusedCurrentAppWindowProjectionRead? {
+        lock.lock()
+        focusedCurrentAppWindowProjectionReads += 1
+        if let focusedCurrentAppWindowProjectionRead {
+            currentAppWindowProjectionReadsByAppID[
+                focusedCurrentAppWindowProjectionRead.appID,
+                default: 0
+            ] += 1
+        }
+        lock.unlock()
+        return focusedCurrentAppWindowProjectionRead
+    }
+
     func readCommittedSearchIndexForSearch() -> RuntimeSearchIndexRead {
         lock.lock()
         defer { lock.unlock() }
@@ -378,6 +412,17 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     func signalSelectedCurrentAppWindowsChanged(appID: String, pid: pid_t) {
         lock.lock()
         selectedCurrentAppWindowChangeSignals.append((appID, pid))
+        lock.unlock()
+    }
+
+    func signalFocusedCurrentAppWindowsChanged() {
+        lock.lock()
+        if let focusedCurrentAppWindowProjectionRead {
+            selectedCurrentAppWindowChangeSignals.append((
+                focusedCurrentAppWindowProjectionRead.appID,
+                focusedCurrentAppWindowProjectionRead.pid
+            ))
+        }
         lock.unlock()
     }
 

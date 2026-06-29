@@ -64,6 +64,10 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         readModelStore.readCurrentAppWindowProjection(appID: appID)
     }
 
+    func readFocusedCurrentAppWindowProjection() -> RuntimeFocusedCurrentAppWindowProjectionRead? {
+        readModelStore.readFocusedCurrentAppWindowProjection()
+    }
+
     func readCommittedSearchIndexForSearch() -> RuntimeSearchIndexRead {
         readModelStore.readCommittedSearchIndexForSearch()
     }
@@ -266,6 +270,42 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 generatedAt: now
             )
             repairProvider.recordSelectedCurrentAppWindowsChanged(appID: appID, pid: pid, now: now)
+            drainReadyReconciliationRequestsLocked(now: now)
+        }
+    }
+
+    func signalFocusedCurrentAppWindowsChanged() {
+        maintenanceQueue.async { [self] in
+            var focusedRead = readModelStore.readFocusedCurrentAppWindowProjection()
+            let now = Date.timeIntervalSinceReferenceDate
+            if focusedRead == nil {
+                commitAppDirectoryProviderEvidenceLocked(generatedAt: now)
+                focusedRead = readModelStore.readFocusedCurrentAppWindowProjection()
+            }
+            guard let focusedRead else {
+                RuntimeLog.debug(
+                    .projection,
+                    "selectedAppWindowProjection result=missingFocusedAppDirectoryEntry"
+                )
+                return
+            }
+            readModelStore.markAppWindowsDirty(
+                appID: focusedRead.appID,
+                pid: focusedRead.pid,
+                pendingScope: "selectedCurrentAppWindows:\(focusedRead.appID)"
+            )
+            commitAppDirectoryProviderEvidenceLocked(generatedAt: now)
+            commitMainTableCurrentAppProjectionLocked(
+                appID: focusedRead.appID,
+                pid: focusedRead.pid,
+                clearsDirtyState: false,
+                generatedAt: now
+            )
+            repairProvider.recordSelectedCurrentAppWindowsChanged(
+                appID: focusedRead.appID,
+                pid: focusedRead.pid,
+                now: now
+            )
             drainReadyReconciliationRequestsLocked(now: now)
         }
     }

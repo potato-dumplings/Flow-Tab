@@ -757,6 +757,7 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
 
+        XCTAssertEqual(runtimeProjectionService.focusedCurrentAppWindowProjectionReadCount(), 1)
         XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 1)
         XCTAssertTrue(runtimeProjectionService.selectedCurrentAppWindowChangeSignalsRecorded().isEmpty)
         XCTAssertEqual(model.session?.mode, .windowCycle(appID: appID))
@@ -767,7 +768,13 @@ extension FlowTabPriorityCoverageTests {
     func testLiveSwitcherModelFocusedWindowSessionSignalsRuntimeRepairWhenProjectionIsMissing() {
         let runningApp = NSRunningApplication.current
         let appID = runningApp.bundleIdentifier ?? "pid:\(runningApp.processIdentifier)"
-        let runtimeProjectionService = RecordingRuntimeProjectionService()
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
+            focusedCurrentAppWindowProjectionRead: RuntimeFocusedCurrentAppWindowProjectionRead(
+                appID: appID,
+                pid: runningApp.processIdentifier,
+                projection: nil
+            )
+        )
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
         model.frontmostApplicationOverride = { runningApp }
 
@@ -779,6 +786,7 @@ extension FlowTabPriorityCoverageTests {
             runtimeProjectionService.selectedCurrentAppWindowChangeSignalsRecorded().map(\.pid),
             [runningApp.processIdentifier]
         )
+        XCTAssertEqual(runtimeProjectionService.focusedCurrentAppWindowProjectionReadCount(), 1)
         XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 1)
         XCTAssertNil(model.session)
     }
@@ -834,6 +842,7 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertFalse(model.startFocusedAppWindowSession(triggerDirection: .forward))
 
+        XCTAssertEqual(runtimeProjectionService.focusedCurrentAppWindowProjectionReadCount(), 1)
         XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 1)
         XCTAssertEqual(runtimeProjectionService.selectedCurrentAppWindowChangeSignalsRecorded().map(\.appID), [appID])
         XCTAssertEqual(
