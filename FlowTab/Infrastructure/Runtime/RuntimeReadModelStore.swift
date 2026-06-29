@@ -444,12 +444,17 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     private func appSwitcherProjectionFromAppDirectoryLocked() -> RuntimeAppSwitcherProjection? {
         guard let generatedAt = appDirectoryState.generatedAt else { return nil }
 
+        let rankByPID = RuntimeAppDirectory.activationRankByPID(from: appDirectoryState.entries)
         let selectedEntries = RuntimeAppDirectory.selectPrimaryEntries(
             from: appDirectoryState.entries,
             windowStatsByPID: [:],
-            rankByPID: [:]
+            rankByPID: rankByPID
         )
-        let apps = selectedEntries.enumerated().map { index, entry in
+        let apps = Self.sortedAppDirectoryEntriesForProjection(
+            selectedEntries,
+            rankByPID: rankByPID
+        ).enumerated().map { index, entry in
+            let rank = rankByPID[entry.pid] ?? index
             let displayName = entry.localizedName ?? entry.bundleIdentifier ?? entry.appID
             return AppSwitchCandidate(
                 id: entry.appID,
@@ -458,7 +463,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
                     for: entry.bundleIdentifier,
                     fallbackName: displayName
                 ),
-                lastActiveAt: RuntimeAppDirectory.stableLastActiveValue(forRank: index),
+                lastActiveAt: RuntimeAppDirectory.stableLastActiveValue(forRank: rank),
                 windows: []
             )
         }
@@ -472,12 +477,17 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     private func homeSummaryProjectionFromAppDirectoryLocked() -> RuntimeHomeSummaryProjection? {
         guard let generatedAt = appDirectoryState.generatedAt else { return nil }
 
+        let rankByPID = RuntimeAppDirectory.activationRankByPID(from: appDirectoryState.entries)
         let selectedEntries = RuntimeAppDirectory.selectPrimaryEntries(
             from: appDirectoryState.entries,
             windowStatsByPID: [:],
-            rankByPID: [:]
+            rankByPID: rankByPID
         )
-        let summaries = selectedEntries.enumerated().map { index, entry in
+        let summaries = Self.sortedAppDirectoryEntriesForProjection(
+            selectedEntries,
+            rankByPID: rankByPID
+        ).enumerated().map { index, entry in
+            let rank = rankByPID[entry.pid] ?? index
             let displayName = entry.localizedName ?? entry.bundleIdentifier ?? entry.appID
             return RuntimeHomeAppSummary(
                 appID: entry.appID,
@@ -486,7 +496,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
                     for: entry.bundleIdentifier,
                     fallbackName: displayName
                 ),
-                lastActiveAt: RuntimeAppDirectory.stableLastActiveValue(forRank: index),
+                lastActiveAt: RuntimeAppDirectory.stableLastActiveValue(forRank: rank),
                 windowCount: 0,
                 pid: entry.pid
             )
@@ -520,6 +530,26 @@ final class RuntimeReadModelStore: @unchecked Sendable {
                 for: app,
                 context: contextsByID[app.id]
             )
+        }
+    }
+
+    private static func sortedAppDirectoryEntriesForProjection(
+        _ entries: [RuntimeAppDirectoryEntry],
+        rankByPID: [pid_t: Int]
+    ) -> [RuntimeAppDirectoryEntry] {
+        entries.sorted { lhs, rhs in
+            let lhsRank = rankByPID[lhs.pid] ?? Int.max
+            let rhsRank = rankByPID[rhs.pid] ?? Int.max
+            if lhsRank != rhsRank {
+                return lhsRank < rhsRank
+            }
+
+            let lhsDisplayName = lhs.localizedName ?? lhs.bundleIdentifier ?? lhs.appID
+            let rhsDisplayName = rhs.localizedName ?? rhs.bundleIdentifier ?? rhs.appID
+            if lhsDisplayName == rhsDisplayName {
+                return lhs.appID < rhs.appID
+            }
+            return lhsDisplayName.localizedCaseInsensitiveCompare(rhsDisplayName) == .orderedAscending
         }
     }
 

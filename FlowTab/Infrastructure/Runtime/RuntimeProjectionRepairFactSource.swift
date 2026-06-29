@@ -173,9 +173,13 @@ struct RuntimeProjectionRepairFactSource {
 
     func collectFullRepairRunningAppFacts() -> RuntimeFullRepairRunningAppFacts {
         let runningApps = collectRepairRunningApps().runningApps
+        let rankByPID = RuntimeAppRankProvider.collectAppRankByPID(for: runningApps)
         return RuntimeFullRepairRunningAppFacts(
             runningApps: runningApps,
-            appDirectoryEntries: RuntimeAppDirectoryFactSource.entries(from: runningApps)
+            appDirectoryEntries: RuntimeAppDirectoryFactSource.entries(
+                from: runningApps,
+                rankByPID: rankByPID
+            )
         )
     }
 

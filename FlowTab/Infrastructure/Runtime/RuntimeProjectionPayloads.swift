@@ -188,7 +188,7 @@ struct RuntimeCurrentAppWindowProjectionAssemblyInput {
             pid: app.processIdentifier,
             runningApp: app,
             windowSeeds: windowSeeds,
-            appDirectoryEntries: appGroup.map(RuntimeAppDirectoryEntry.init(app:))
+            appDirectoryEntries: appGroup.map { RuntimeAppDirectoryEntry(app: $0) }
         )
     }
 }

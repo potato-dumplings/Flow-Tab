@@ -183,7 +183,7 @@ extension RuntimeProjectionRepairProvider {
         let repairEvidence = RuntimeCurrentAppRepairEvidence(
             appID: appID,
             pid: selectionFacts.app.processIdentifier,
-            appDirectoryEntries: selectionFacts.appGroup.map(RuntimeAppDirectoryEntry.init(app:)),
+            appDirectoryEntries: selectionFacts.appGroup.map { RuntimeAppDirectoryEntry(app: $0) },
             currentAppWindowPayloadWasEmpty: currentAppWindowPayloadWasEmpty
         )
         let completeMs = RuntimePerformanceClock.monotonicMilliseconds()

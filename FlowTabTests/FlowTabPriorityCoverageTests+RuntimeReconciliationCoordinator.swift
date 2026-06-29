@@ -558,7 +558,8 @@ extension FlowTabPriorityCoverageTests {
         projection = try XCTUnwrap(store.readAppDirectoryProjection())
         XCTAssertEqual(Set(projection.entries.map(\.pid)), [pid, pid + 1])
         XCTAssertEqual(projection.freshness.generatedAt, 11)
-        XCTAssertTrue(projection.freshness.isCompleteForScope)
+        XCTAssertFalse(projection.freshness.isCompleteForScope)
+        XCTAssertEqual(projection.freshness.dirtyAppIDs, [launchedEntry.appID])
     }
 
     func testRuntimeReadModelStorePreservesRunningInstanceWhenSameBundleDifferentPIDTerminates() throws {
@@ -1626,11 +1627,18 @@ extension FlowTabPriorityCoverageTests {
                 )
             ]
         )
+        let existingDirectoryEntry = RuntimeAppDirectoryEntry(
+            pid: 260_701,
+            appID: existingApp.id,
+            bundleIdentifier: existingApp.id,
+            localizedName: existingApp.displayName,
+            launchDate: nil
+        )
         let appDirectoryEntry = RuntimeAppDirectoryEntry(app: runningApp)
         store.seedAppSwitcherProjectionForTesting(
             apps: [existingApp],
             contextsByID: [:],
-            appDirectoryEntries: nil,
+            appDirectoryEntries: [existingDirectoryEntry],
             generatedAt: 10
         )
         let service = RuntimeProjectionService(

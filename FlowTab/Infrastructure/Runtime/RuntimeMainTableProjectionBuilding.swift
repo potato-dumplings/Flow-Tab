@@ -40,6 +40,12 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
             ?? runningApp.localizedName
             ?? selectedEntry.bundleIdentifier
             ?? appID
+        let rankByPID = RuntimeAppDirectory.activationRankByPID(from: appDirectoryEntries)
+        let summaryRank = RuntimeAppDirectory.preferredRank(
+            for: directoryEntries,
+            rankByPID: rankByPID,
+            fallback: 0
+        )
         let windowEntries = windowRecordStore.projectedWindowEntries(
             processIdentifier: pid,
             appName: displayName
@@ -54,8 +60,8 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
                     for: selectedEntry.bundleIdentifier ?? runningApp.bundleIdentifier,
                     fallbackName: displayName
                 ),
-                summaryLastActiveAt: RuntimeAppDirectory.stableLastActiveValue(forRank: 0),
-                candidateLastActiveAt: generatedAt,
+                summaryLastActiveAt: RuntimeAppDirectory.stableLastActiveValue(forRank: summaryRank),
+                candidateLastActiveAt: generatedAt - Double(summaryRank),
                 pid: selectedEntry.pid,
                 runningApp: runningApp,
                 windowSeeds: windowEntries.enumerated().map { index, entry in
@@ -85,13 +91,20 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
             windowsByPID: windowsByPID,
             isVisibleWindow: { !$0.isMinimized }
         )
+        let rankByPID = RuntimeAppDirectory.activationRankByPID(from: appDirectoryEntries)
         let entriesByAppID = RuntimeAppDirectory.groupedEntriesByAppID(appDirectoryEntries)
         let selectedEntries = RuntimeAppDirectory.selectPrimaryEntries(
             from: appDirectoryEntries,
             windowStatsByPID: windowStatsByPID,
-            rankByPID: [:]
+            rankByPID: rankByPID
         )
         let sortedEntries = selectedEntries.sorted { lhs, rhs in
+            let lhsRank = rankByPID[lhs.pid] ?? Int.max
+            let rhsRank = rankByPID[rhs.pid] ?? Int.max
+            if lhsRank != rhsRank {
+                return lhsRank < rhsRank
+            }
+
             let lhsDisplayName = Self.displayName(for: lhs)
             let rhsDisplayName = Self.displayName(for: rhs)
             if lhsDisplayName == rhsDisplayName {
@@ -105,7 +118,7 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
             let appGroup = RuntimeAppDirectory.sortedEntriesWithinGroup(
                 entriesByAppID[entry.appID] ?? [entry],
                 windowStatsByPID: windowStatsByPID,
-                rankByPID: [:]
+                rankByPID: rankByPID
             )
             let windowSeeds = appGroup
                 .flatMap { windowsByPID[$0.pid] ?? [] }
@@ -122,7 +135,7 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
                     for: entry.bundleIdentifier,
                     fallbackName: displayName
                 ),
-                lastActiveAt: generatedAt - Double(index),
+                lastActiveAt: RuntimeAppDirectory.stableLastActiveValue(forRank: rankByPID[entry.pid] ?? index),
                 windows: windowSeeds.map(\.candidate)
             )
             let context = NSRunningApplication(processIdentifier: entry.pid).map { runningApp in

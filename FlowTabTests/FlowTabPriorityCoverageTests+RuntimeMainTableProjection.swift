@@ -73,6 +73,161 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
+    func testRuntimeMainTableProjectionBuilderUsesAppDirectoryActivationRank() throws {
+        let frontPID: pid_t = 260_901
+        let backgroundPID: pid_t = 260_902
+        let alphaPID: pid_t = 260_903
+        let frontCGWindowID = CGWindowID(240_901)
+        let backgroundCGWindowID = CGWindowID(240_902)
+        let alphaCGWindowID = CGWindowID(240_903)
+        let windowRecordStore = RuntimeWindowRecordStore(
+            mappingStatesByPID: [
+                frontPID: RuntimeWindowMappingState(
+                    windowRecordsByCGWindowID: [
+                        frontCGWindowID: makeMainTableProjectionWindowRecord(
+                            pid: frontPID,
+                            cgWindowID: frontCGWindowID,
+                            axWindowID: "ax:\(frontPID):front-rank"
+                        )
+                    ],
+                    currentAXToCG: ["ax:\(frontPID):front-rank": frontCGWindowID],
+                    validCGWindowIDs: [frontCGWindowID],
+                    lastAXWindowIDs: ["ax:\(frontPID):front-rank"],
+                    hasObservedAXWindowHandle: true
+                ),
+                backgroundPID: RuntimeWindowMappingState(
+                    windowRecordsByCGWindowID: [
+                        backgroundCGWindowID: makeMainTableProjectionWindowRecord(
+                            pid: backgroundPID,
+                            cgWindowID: backgroundCGWindowID,
+                            axWindowID: "ax:\(backgroundPID):background-rank"
+                        )
+                    ],
+                    currentAXToCG: ["ax:\(backgroundPID):background-rank": backgroundCGWindowID],
+                    validCGWindowIDs: [backgroundCGWindowID],
+                    lastAXWindowIDs: ["ax:\(backgroundPID):background-rank"],
+                    hasObservedAXWindowHandle: true
+                ),
+                alphaPID: RuntimeWindowMappingState(
+                    windowRecordsByCGWindowID: [
+                        alphaCGWindowID: makeMainTableProjectionWindowRecord(
+                            pid: alphaPID,
+                            cgWindowID: alphaCGWindowID,
+                            axWindowID: "ax:\(alphaPID):alpha-rank"
+                        )
+                    ],
+                    currentAXToCG: ["ax:\(alphaPID):alpha-rank": alphaCGWindowID],
+                    validCGWindowIDs: [alphaCGWindowID],
+                    lastAXWindowIDs: ["ax:\(alphaPID):alpha-rank"],
+                    hasObservedAXWindowHandle: true
+                )
+            ]
+        )
+        let builder = RuntimeMainTableProjectionBuilder(windowRecordStore: windowRecordStore)
+
+        let payload = try XCTUnwrap(
+            builder.appSwitcherProjectionPayloadFromMainTables(
+                appDirectoryEntries: [
+                    RuntimeAppDirectoryEntry(
+                        pid: alphaPID,
+                        appID: "com.example.alpha",
+                        bundleIdentifier: "com.example.alpha",
+                        localizedName: "Alpha",
+                        launchDate: nil,
+                        activationRank: 1
+                    ),
+                    RuntimeAppDirectoryEntry(
+                        pid: backgroundPID,
+                        appID: "com.example.dupe",
+                        bundleIdentifier: "com.example.dupe",
+                        localizedName: "Dupe",
+                        launchDate: nil,
+                        activationRank: 5
+                    ),
+                    RuntimeAppDirectoryEntry(
+                        pid: frontPID,
+                        appID: "com.example.dupe",
+                        bundleIdentifier: "com.example.dupe",
+                        localizedName: "Dupe",
+                        launchDate: nil,
+                        activationRank: 0
+                    )
+                ],
+                generatedAt: 90
+            )
+        )
+
+        XCTAssertEqual(payload.apps.map(\.id), ["com.example.dupe", "com.example.alpha"])
+        XCTAssertEqual(payload.apps.first?.lastActiveAt, 0)
+        XCTAssertEqual(payload.apps.last?.lastActiveAt, -1)
+        XCTAssertEqual(payload.apps.first?.windows.map(\.id), [
+            RuntimeWindowListEntry.cgStableWindowID(pid: frontPID, cgWindowID: frontCGWindowID),
+            RuntimeWindowListEntry.cgStableWindowID(pid: backgroundPID, cgWindowID: backgroundCGWindowID)
+        ])
+    }
+
+    func testRuntimeReadModelStoreAppDirectoryProjectionUsesActivationRankEvidence() throws {
+        let alphaPID: pid_t = 260_911
+        let frontPID: pid_t = 260_912
+        let alphaEntry = RuntimeAppDirectoryEntry(
+            pid: alphaPID,
+            appID: "com.example.alpha",
+            bundleIdentifier: "com.example.alpha",
+            localizedName: "Alpha",
+            launchDate: nil,
+            activationRank: 1
+        )
+        let frontEntry = RuntimeAppDirectoryEntry(
+            pid: frontPID,
+            appID: "com.example.front",
+            bundleIdentifier: "com.example.front",
+            localizedName: "Front",
+            launchDate: nil,
+            activationRank: 0
+        )
+        let store = RuntimeReadModelStore()
+
+        store.commitAppDirectoryProviderEvidence([alphaEntry, frontEntry], generatedAt: 10)
+
+        var appProjection = try XCTUnwrap(store.readAppSwitcherProjection())
+        XCTAssertEqual(appProjection.apps.map(\.id), ["com.example.front", "com.example.alpha"])
+        XCTAssertEqual(appProjection.apps.map(\.lastActiveAt), [0, -1])
+        var appDirectoryProjection = try XCTUnwrap(store.readAppDirectoryProjection())
+        XCTAssertEqual(appDirectoryProjection.freshness.sourceGeneration.appLifecycle, 1)
+        XCTAssertEqual(
+            store.readCommittedSearchIndexForSearch().readiness,
+            .missingCommittedIndex
+        )
+
+        store.commitAppDirectoryProviderEvidence([alphaEntry, frontEntry], generatedAt: 11)
+        appDirectoryProjection = try XCTUnwrap(store.readAppDirectoryProjection())
+        XCTAssertEqual(appDirectoryProjection.freshness.sourceGeneration.appLifecycle, 1)
+
+        let promotedAlphaEntry = RuntimeAppDirectoryEntry(
+            pid: alphaPID,
+            appID: "com.example.alpha",
+            bundleIdentifier: "com.example.alpha",
+            localizedName: "Alpha",
+            launchDate: nil,
+            activationRank: 0
+        )
+        let demotedFrontEntry = RuntimeAppDirectoryEntry(
+            pid: frontPID,
+            appID: "com.example.front",
+            bundleIdentifier: "com.example.front",
+            localizedName: "Front",
+            launchDate: nil,
+            activationRank: 1
+        )
+
+        store.commitAppDirectoryProviderEvidence([promotedAlphaEntry, demotedFrontEntry], generatedAt: 12)
+
+        appProjection = try XCTUnwrap(store.readAppSwitcherProjection())
+        XCTAssertEqual(appProjection.apps.map(\.id), ["com.example.alpha", "com.example.front"])
+        appDirectoryProjection = try XCTUnwrap(store.readAppDirectoryProjection())
+        XCTAssertEqual(appDirectoryProjection.freshness.sourceGeneration.appLifecycle, 2)
+    }
+
     func testRuntimeMainTableProjectionBuilderRequiresAppDirectoryEntryForCurrentAppPayload() throws {
         let runningApp = NSRunningApplication.current
         let appID = RuntimeAppIdentity.appID(for: runningApp)

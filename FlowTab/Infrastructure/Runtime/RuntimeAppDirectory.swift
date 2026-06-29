@@ -59,8 +59,16 @@ enum RuntimeAppDirectoryFactSource {
         }
     }
 
-    static func entries(from runningApplications: [NSRunningApplication]) -> [RuntimeAppDirectoryEntry] {
-        runningApplications.map(RuntimeAppDirectoryEntry.init(app:))
+    static func entries(
+        from runningApplications: [NSRunningApplication],
+        rankByPID: [pid_t: Int] = [:]
+    ) -> [RuntimeAppDirectoryEntry] {
+        runningApplications.map { app in
+            RuntimeAppDirectoryEntry(
+                app: app,
+                activationRank: rankByPID[app.processIdentifier]
+            )
+        }
     }
 }
 
@@ -73,7 +81,8 @@ final class RuntimeWorkspaceAppDirectoryProvider: RuntimeAppDirectoryProviding {
         let runningApps = RuntimeAppDirectoryFactSource.currentAppLayerRunningApplications(
             includeCurrentProcessInAppLayer: AppVisibilityPreferencesStore.loadShowInCommandTab()
         )
-        return RuntimeAppDirectoryFactSource.entries(from: runningApps)
+        let rankByPID = RuntimeAppRankProvider.collectAppRankByPID(for: runningApps)
+        return RuntimeAppDirectoryFactSource.entries(from: runningApps, rankByPID: rankByPID)
     }
 }
 
@@ -83,28 +92,32 @@ struct RuntimeAppDirectoryEntry: Equatable {
     let bundleIdentifier: String?
     let localizedName: String?
     let launchDate: Date?
+    let activationRank: Int?
 
     init(
         pid: pid_t,
         appID: String,
         bundleIdentifier: String?,
         localizedName: String?,
-        launchDate: Date?
+        launchDate: Date?,
+        activationRank: Int? = nil
     ) {
         self.pid = pid
         self.appID = appID
         self.bundleIdentifier = bundleIdentifier
         self.localizedName = localizedName
         self.launchDate = launchDate
+        self.activationRank = activationRank
     }
 
-    init(app: NSRunningApplication) {
+    init(app: NSRunningApplication, activationRank: Int? = nil) {
         self.init(
             pid: app.processIdentifier,
             appID: RuntimeAppIdentity.appID(for: app),
             bundleIdentifier: app.bundleIdentifier,
             localizedName: app.localizedName,
-            launchDate: app.launchDate
+            launchDate: app.launchDate,
+            activationRank: activationRank
         )
     }
 }
@@ -220,6 +233,17 @@ struct RuntimeAppDirectory {
         Dictionary(grouping: entries, by: \.appID)
     }
 
+    static func activationRankByPID(
+        from entries: [RuntimeAppDirectoryEntry]
+    ) -> [pid_t: Int] {
+        var rankByPID: [pid_t: Int] = [:]
+        for entry in entries {
+            guard let activationRank = entry.activationRank else { continue }
+            rankByPID[entry.pid] = activationRank
+        }
+        return rankByPID
+    }
+
     func selectPrimaryApps(
         windowStatsByPID: [pid_t: RuntimeAppWindowStats],
         rankByPID: [pid_t: Int]
@@ -228,7 +252,7 @@ struct RuntimeAppDirectory {
             (app.processIdentifier, app)
         })
         let selectedEntries = Self.selectPrimaryEntries(
-            from: apps.map(RuntimeAppDirectoryEntry.init(app:)),
+            from: apps.map { RuntimeAppDirectoryEntry(app: $0) },
             windowStatsByPID: windowStatsByPID,
             rankByPID: rankByPID
         ) { appID, primaryPID, droppedPIDs in
@@ -299,7 +323,7 @@ struct RuntimeAppDirectory {
             (app.processIdentifier, app)
         })
         return Self.sortedEntriesWithinGroup(
-            group.map(RuntimeAppDirectoryEntry.init(app:)),
+            group.map { RuntimeAppDirectoryEntry(app: $0) },
             windowStatsByPID: windowStatsByPID,
             rankByPID: rankByPID
         ).compactMap { entry in
@@ -339,7 +363,7 @@ struct RuntimeAppDirectory {
         fallback: Int
     ) -> Int {
         Self.preferredRank(
-            for: group.map(RuntimeAppDirectoryEntry.init(app:)),
+            for: group.map { RuntimeAppDirectoryEntry(app: $0) },
             rankByPID: rankByPID,
             fallback: fallback
         )
@@ -419,7 +443,7 @@ struct RuntimeAppDirectory {
         isVisibleWindow: (Window) -> Bool
     ) -> [pid_t: RuntimeAppWindowStats] {
         windowStats(
-            for: apps.map(RuntimeAppDirectoryEntry.init(app:)),
+            for: apps.map { RuntimeAppDirectoryEntry(app: $0) },
             windowsByPID: windowsByPID,
             isVisibleWindow: isVisibleWindow
         )
