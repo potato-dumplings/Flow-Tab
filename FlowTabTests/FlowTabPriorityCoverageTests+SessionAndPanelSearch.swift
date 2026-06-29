@@ -42,7 +42,8 @@ extension FlowTabPriorityCoverageTests {
     func testLiveSwitcherModelCancelSelectionResetsSessionAndSearchState() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
             let runtimeProjectionService = RecordingRuntimeProjectionService(
-                appSwitcherApps: self.searchScenarioApps()
+                appSwitcherApps: self.searchScenarioApps(),
+                committedSearchReadiness: .committedGenerationValidated
             )
             let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
 
@@ -66,7 +67,8 @@ extension FlowTabPriorityCoverageTests {
     func testLiveSwitcherModelEnterSearchModeAndApplySelectedAppResult() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
             let runtimeProjectionService = RecordingRuntimeProjectionService(
-                appSwitcherApps: self.searchScenarioApps()
+                appSwitcherApps: self.searchScenarioApps(),
+                committedSearchReadiness: .committedGenerationValidated
             )
             let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
 
@@ -95,7 +97,8 @@ extension FlowTabPriorityCoverageTests {
     func testLiveSwitcherModelApplySelectedWindowSearchResultEntersWindowCycle() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .window) {
             let runtimeProjectionService = RecordingRuntimeProjectionService(
-                appSwitcherApps: self.searchScenarioApps()
+                appSwitcherApps: self.searchScenarioApps(),
+                committedSearchReadiness: .committedGenerationValidated
             )
             let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
 
@@ -138,7 +141,8 @@ extension FlowTabPriorityCoverageTests {
             )
             let runtimeProjectionService = RecordingRuntimeProjectionService(
                 appSwitcherApps: apps,
-                contextsByID: contextsByID
+                contextsByID: contextsByID,
+                committedSearchReadiness: .committedGenerationValidated
             )
             let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
 

@@ -878,6 +878,49 @@ extension FlowTabTests {
     }
 
     @MainActor
+    func testLiveSwitcherModelSearchDefaultCommittedFixtureIsDegradedUntilBarrierValidation() {
+        let defaults = UserDefaults.standard
+        let previousSearchEnabled = defaults.object(forKey: AppPreferenceKeys.searchEnabled)
+        let previousSearchDefaultScope = defaults.object(forKey: AppPreferenceKeys.searchDefaultScope)
+        defer {
+            restoreUserDefaultsValue(
+                previousSearchEnabled,
+                forKey: AppPreferenceKeys.searchEnabled,
+                userDefaults: defaults
+            )
+            restoreUserDefaultsValue(
+                previousSearchDefaultScope,
+                forKey: AppPreferenceKeys.searchDefaultScope,
+                userDefaults: defaults
+            )
+        }
+
+        defaults.set(true, forKey: AppPreferenceKeys.searchEnabled)
+        defaults.set(SwitcherSearchScope.app.rawValue, forKey: AppPreferenceKeys.searchDefaultScope)
+
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
+            appSwitcherApps: terminateScenarioApps()
+        )
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        XCTAssertTrue(model.enterSearchMode())
+
+        XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.readiness, .degradedStaleCommitted)
+        XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.resultState, .degradedStaleCommittedResult)
+        XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.committedIndexCoversCurrentGeneration, false)
+        XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.requestedFreshnessBarrier, true)
+        XCTAssertEqual(model.searchViewState.indexStatus?.readiness, .degradedStaleCommitted)
+        XCTAssertEqual(model.searchViewState.indexStatus?.resultState, .degradedStaleCommittedResult)
+        XCTAssertEqual(model.searchViewState.indexStatus?.committedIndexCoversCurrentGeneration, false)
+        XCTAssertEqual(model.searchViewState.indexStatus?.requestedFreshnessBarrier, true)
+        XCTAssertEqual(
+            runtimeProjectionService.searchIndexFreshnessBarrierRequestsRecorded(),
+            [.searchFreshnessBarrier]
+        )
+    }
+
+    @MainActor
     func testLiveSwitcherModelSearchDoesNotFallbackToSessionAppsWithoutCommittedIndex() {
         let defaults = UserDefaults.standard
         let previousSearchEnabled = defaults.object(forKey: AppPreferenceKeys.searchEnabled)
@@ -1036,7 +1079,10 @@ extension FlowTabTests {
 
         let apps = makeBenchmarkApps(appCount: 400, windowsPerApp: 25)
         let windowCount = apps.reduce(0) { $0 + $1.windows.count }
-        let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: apps)
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
+            appSwitcherApps: apps,
+            committedSearchReadiness: .committedGenerationValidated
+        )
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))

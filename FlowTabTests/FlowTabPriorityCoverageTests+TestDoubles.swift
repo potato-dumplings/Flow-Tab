@@ -142,6 +142,7 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         appSwitcherApps apps: [AppSwitchCandidate],
         contextsByID: [String: RuntimeAppContext] = [:],
         committedSearchApps: [AppSwitchCandidate]? = nil,
+        committedSearchReadiness: RuntimeSearchIndexReadiness = .degradedStaleCommitted,
         generatedAt: TimeInterval = 10
     ) {
         let freshness = RuntimeProjectionFreshness(
@@ -161,11 +162,14 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
                 freshness: freshness
             ),
             committedSearchIndexRead: RuntimeSearchIndexRead(
-                projection: Self.committedSearchIndexProjection(
-                    for: committedSearchApps ?? apps,
-                    generatedAt: generatedAt
-                ),
-                readiness: .committedGenerationValidated
+                projection: committedSearchReadiness == .missingCommittedIndex
+                    ? nil
+                    : Self.committedSearchIndexProjection(
+                        for: committedSearchApps ?? apps,
+                        generatedAt: generatedAt,
+                        isCompleteForScope: committedSearchReadiness == .committedGenerationValidated
+                    ),
+                readiness: committedSearchReadiness
             )
         )
     }
@@ -504,7 +508,8 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
 
     private static func committedSearchIndexProjection(
         for apps: [AppSwitchCandidate],
-        generatedAt: TimeInterval
+        generatedAt: TimeInterval,
+        isCompleteForScope: Bool = true
     ) -> RuntimeSearchIndexProjection {
         let store = RuntimeReadModelStore()
         store.seedAppSwitcherProjectionForTesting(
@@ -518,7 +523,18 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
             hasPendingRequests: false,
             generatedAt: generatedAt
         )
-        return store.readCommittedSearchIndexForSearch().projection!
+        var projection = store.readCommittedSearchIndexForSearch().projection!
+        projection.freshness = RuntimeProjectionFreshness(
+            generatedAt: projection.freshness.generatedAt,
+            sourceGeneration: projection.freshness.sourceGeneration,
+            dirtyAppIDs: projection.freshness.dirtyAppIDs,
+            dirtyPIDs: projection.freshness.dirtyPIDs,
+            dirtyCGWindowIDs: projection.freshness.dirtyCGWindowIDs,
+            spaceTopologySignatureSummary: projection.freshness.spaceTopologySignatureSummary,
+            pendingRepairScopes: projection.freshness.pendingRepairScopes,
+            isCompleteForScope: isCompleteForScope
+        )
+        return projection
     }
 
     private static func homeDetailProjections(
