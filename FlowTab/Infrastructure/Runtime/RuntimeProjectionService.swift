@@ -432,7 +432,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             return false
         }
         if requiresExistingProjectionCoverage,
-           let existingProjection = readModelStore.readAppSwitcherProjection() {
+           let existingProjection = readModelStore.readCommittedAppSwitcherProjectionCacheForMaintenance() {
             let payloadAppIDs = Set(payload.apps.map(\.id))
             let requiredExistingAppIDs = Set(existingProjection.apps.map(\.id))
                 .subtracting(permittedMissingAppIDs)

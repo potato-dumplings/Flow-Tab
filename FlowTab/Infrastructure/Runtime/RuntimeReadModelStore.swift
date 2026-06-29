@@ -317,6 +317,18 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         return projection
     }
 
+    func readCommittedAppSwitcherProjectionCacheForMaintenance() -> RuntimeAppSwitcherProjection? {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard var projection = appSwitcherProjection else { return nil }
+        projection.freshness = freshnessLocked(
+            generatedAt: projection.freshness.generatedAt,
+            isCompleteForScope: projection.freshness.isCompleteForScope && !isDirtyLocked
+        )
+        return projection
+    }
+
     func readHomeSummaryProjection() -> RuntimeHomeSummaryProjection? {
         lock.lock()
         defer { lock.unlock() }

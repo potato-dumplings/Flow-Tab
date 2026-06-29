@@ -73,6 +73,95 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
+    func testRuntimeProjectionServiceFiltersNestedZeroWindowDirectoryEntriesBeforeMainTableProjection() throws {
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let pid = runningApp.processIdentifier
+        let helperPID: pid_t = 260_812
+        let parentBundleURL = URL(fileURLWithPath: "/Applications/FlowTabParent.app")
+        let helperBundleURL = parentBundleURL
+            .appendingPathComponent("Contents")
+            .appendingPathComponent("Helpers")
+            .appendingPathComponent("FlowTabNestedHelper.app")
+        let parentEntry = RuntimeAppDirectoryEntry(
+            pid: pid,
+            appID: appID,
+            bundleIdentifier: runningApp.bundleIdentifier,
+            localizedName: runningApp.localizedName ?? appID,
+            bundleURL: parentBundleURL,
+            launchDate: runningApp.launchDate,
+            activationRank: 0
+        )
+        let helperEntry = RuntimeAppDirectoryEntry(
+            pid: helperPID,
+            appID: "com.flowtab.tests.nested-helper",
+            bundleIdentifier: "com.flowtab.tests.nested-helper",
+            localizedName: "Nested Helper",
+            bundleURL: helperBundleURL,
+            launchDate: nil,
+            activationRank: 1
+        )
+        let cgWindowID = CGWindowID(240_812)
+        let axWindowID = "ax:\(pid):main-table-filtered-parent"
+        let windowRecordStore = RuntimeWindowRecordStore(
+            mappingStatesByPID: [
+                pid: RuntimeWindowMappingState(
+                    windowRecordsByCGWindowID: [
+                        cgWindowID: makeMainTableProjectionWindowRecord(
+                            pid: pid,
+                            cgWindowID: cgWindowID,
+                            axWindowID: axWindowID
+                        )
+                    ],
+                    currentAXToCG: [axWindowID: cgWindowID],
+                    validCGWindowIDs: [cgWindowID],
+                    lastAXWindowIDs: [axWindowID],
+                    hasObservedAXWindowHandle: true
+                )
+            ]
+        )
+        let readModelStore = RuntimeReadModelStore()
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.MainTableFiltersNestedDirectoryEntries",
+            repairProvider: RuntimeProjectionRepairProvider(
+                windowRecordStore: windowRecordStore,
+                reconciliationCoordinator: RuntimeReconciliationCoordinator()
+            ),
+            mainTableProjectionBuilder: RuntimeMainTableProjectionBuilder(
+                windowRecordStore: windowRecordStore
+            ),
+            appDirectoryProvider: FixedRuntimeAppDirectoryProvider(entries: [parentEntry, helperEntry]),
+            readModelStore: readModelStore
+        )
+
+        service.requestAppSwitcherProjectionMaintenance(reason: .switcherSessionStarted)
+        service.waitForMaintenanceQueueForTesting()
+
+        let appDirectoryProjection = try XCTUnwrap(readModelStore.readAppDirectoryProjection())
+        XCTAssertEqual(
+            Set(appDirectoryProjection.entries.map(\.appID)),
+            Set([appID, "com.flowtab.tests.nested-helper"])
+        )
+        let appProjection = try XCTUnwrap(readModelStore.readAppSwitcherProjection())
+        XCTAssertEqual(appProjection.apps.map(\.id), [appID])
+        XCTAssertEqual(appProjection.contextsByID.keys.sorted(), [appID])
+        XCTAssertEqual(appProjection.apps.first?.windows.map(\.id), [
+            RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindowID)
+        ])
+        XCTAssertTrue(appProjection.freshness.isCompleteForScope)
+        XCTAssertEqual(readModelStore.readCommittedSearchIndexForSearch().readiness, .missingCommittedIndex)
+
+        service.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
+        service.waitForMaintenanceQueueForTesting()
+
+        let searchRead = readModelStore.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(searchRead.readiness, .committedGenerationValidated)
+        XCTAssertEqual(searchRead.resultState, .committedGenerationResult)
+        XCTAssertEqual(searchRead.projection?.appEntries.map(\.appID), [appID])
+        XCTAssertEqual(searchRead.projection?.windowEntries.map(\.appID), [appID])
+        XCTAssertTrue(searchRead.committedIndexCoversCurrentGeneration)
+    }
+
     func testRuntimeMainTableProjectionBuilderUsesAppDirectoryActivationRank() throws {
         let frontPID: pid_t = 260_901
         let backgroundPID: pid_t = 260_902
@@ -241,11 +330,13 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeReadModelStoreCurrentAppRepairEvidencePreservesExistingActivationRank() throws {
         let frontPID: pid_t = 260_921
         let alphaPID: pid_t = 260_922
+        let frontBundleURL = URL(fileURLWithPath: "/Applications/Front.app")
         let rankedFrontEntry = RuntimeAppDirectoryEntry(
             pid: frontPID,
             appID: "com.example.front",
             bundleIdentifier: "com.example.front",
             localizedName: "Front",
+            bundleURL: frontBundleURL,
             launchDate: nil,
             activationRank: 0
         )
@@ -275,6 +366,10 @@ extension FlowTabPriorityCoverageTests {
             appDirectoryProjection.entries(forAppID: "com.example.front").first?.activationRank,
             0
         )
+        XCTAssertEqual(
+            appDirectoryProjection.entries(forAppID: "com.example.front").first?.bundleURL,
+            frontBundleURL
+        )
         var appProjection = try XCTUnwrap(store.readAppSwitcherProjection())
         XCTAssertEqual(appProjection.apps.map(\.id), ["com.example.front", "com.example.alpha"])
         XCTAssertEqual(appProjection.apps.map(\.lastActiveAt), [0, -1])
@@ -295,6 +390,10 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(
             appDirectoryProjection.entries(forAppID: "com.example.front").first?.activationRank,
             2
+        )
+        XCTAssertEqual(
+            appDirectoryProjection.entries(forAppID: "com.example.front").first?.bundleURL,
+            frontBundleURL
         )
         appProjection = try XCTUnwrap(store.readAppSwitcherProjection())
         XCTAssertEqual(appProjection.apps.map(\.id), ["com.example.alpha", "com.example.front"])

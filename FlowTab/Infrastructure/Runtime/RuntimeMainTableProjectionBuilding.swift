@@ -98,7 +98,12 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
             windowStatsByPID: windowStatsByPID,
             rankByPID: rankByPID
         )
-        let sortedEntries = selectedEntries.sorted { lhs, rhs in
+        let appLayerEntries = RuntimeAppDirectory.filterAppLayerEntries(
+            selectedEntries,
+            windowStatsByPID: windowStatsByPID,
+            hideMinimizedAppsFromAppLayer: SwitcherBehaviorPreferencesStore.loadHideMinimizedAppsFromAppLayer()
+        )
+        let sortedEntries = appLayerEntries.sorted { lhs, rhs in
             let lhsRank = rankByPID[lhs.pid] ?? Int.max
             let rhsRank = rankByPID[rhs.pid] ?? Int.max
             if lhsRank != rhsRank {

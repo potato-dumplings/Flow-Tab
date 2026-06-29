@@ -98,6 +98,7 @@ struct RuntimeAppDirectoryEntry: Equatable {
     let appID: String
     let bundleIdentifier: String?
     let localizedName: String?
+    let bundleURL: URL?
     let launchDate: Date?
     let activationRank: Int?
 
@@ -106,6 +107,7 @@ struct RuntimeAppDirectoryEntry: Equatable {
         appID: String,
         bundleIdentifier: String?,
         localizedName: String?,
+        bundleURL: URL? = nil,
         launchDate: Date?,
         activationRank: Int? = nil
     ) {
@@ -113,6 +115,7 @@ struct RuntimeAppDirectoryEntry: Equatable {
         self.appID = appID
         self.bundleIdentifier = bundleIdentifier
         self.localizedName = localizedName
+        self.bundleURL = bundleURL
         self.launchDate = launchDate
         self.activationRank = activationRank
     }
@@ -123,24 +126,24 @@ struct RuntimeAppDirectoryEntry: Equatable {
             appID: RuntimeAppIdentity.appID(for: app),
             bundleIdentifier: app.bundleIdentifier,
             localizedName: app.localizedName,
+            bundleURL: app.bundleURL,
             launchDate: app.launchDate,
             activationRank: activationRank
         )
     }
 
-    func preservingActivationRank(from existing: RuntimeAppDirectoryEntry?) -> RuntimeAppDirectoryEntry {
-        guard activationRank == nil,
-              let existingRank = existing?.activationRank
-        else {
-            return self
-        }
+    func preservingMissingRuntimeFacts(from existing: RuntimeAppDirectoryEntry?) -> RuntimeAppDirectoryEntry {
+        let preservedRank = activationRank ?? existing?.activationRank
+        let preservedBundleURL = bundleURL ?? existing?.bundleURL
+        guard preservedRank != activationRank || preservedBundleURL != bundleURL else { return self }
         return RuntimeAppDirectoryEntry(
             pid: pid,
             appID: appID,
             bundleIdentifier: bundleIdentifier,
             localizedName: localizedName,
+            bundleURL: preservedBundleURL,
             launchDate: launchDate,
-            activationRank: existingRank
+            activationRank: preservedRank
         )
     }
 }
@@ -182,7 +185,7 @@ struct RuntimeAppDirectoryState: Equatable {
         guard !entries.isEmpty else { return }
 
         for entry in entries {
-            entriesByPID[entry.pid] = entry.preservingActivationRank(from: entriesByPID[entry.pid])
+            entriesByPID[entry.pid] = entry.preservingMissingRuntimeFacts(from: entriesByPID[entry.pid])
         }
         self.generatedAt = generatedAt
         hasCompleteAppLayerCoverage = hasCompleteAppLayerCoverage || completesAppLayerCoverage
@@ -431,6 +434,32 @@ struct RuntimeAppDirectory {
                 return false
             }
             return true
+        }
+    }
+
+    static func filterAppLayerEntries(
+        _ entries: [RuntimeAppDirectoryEntry],
+        windowStatsByPID: [pid_t: RuntimeAppWindowStats],
+        hideMinimizedAppsFromAppLayer: Bool
+    ) -> [RuntimeAppDirectoryEntry] {
+        let candidateAppBundlePaths = Set(entries.compactMap { entry in
+            standardizedAppBundlePath(for: entry.bundleURL)
+        })
+        return entries.filter { entry in
+            let stats = windowStatsByPID[entry.pid]
+                ?? RuntimeAppWindowStats(windowCount: 0, hasVisibleWindow: false)
+            guard !shouldHideZeroWindowNestedApp(
+                hasWindows: stats.windowCount > 0,
+                bundleURL: entry.bundleURL,
+                candidateAppBundlePaths: candidateAppBundlePaths
+            ) else {
+                return false
+            }
+            return RuntimeAppLayerProjectionFilter.shouldIncludeAppInAppLayer(
+                hasWindows: stats.windowCount > 0,
+                hasVisibleWindow: stats.hasVisibleWindow,
+                hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
+            )
         }
     }
 
