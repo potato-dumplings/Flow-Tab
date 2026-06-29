@@ -248,7 +248,9 @@ struct RuntimeCurrentAppWindowPayload {
                 groupID: groupID,
                 lastActiveAt: summaryLastActiveAt,
                 windowCount: windowSeeds.count,
-                pid: pid
+                pid: pid,
+                bundleIdentifier: runningApp.bundleIdentifier,
+                bundleURL: runningApp.bundleURL
             ),
             candidate: AppSwitchCandidate(
                 id: appID,

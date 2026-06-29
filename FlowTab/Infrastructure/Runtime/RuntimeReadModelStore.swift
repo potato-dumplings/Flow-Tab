@@ -616,7 +616,9 @@ final class RuntimeReadModelStore: @unchecked Sendable {
                 ),
                 lastActiveAt: RuntimeAppDirectory.stableLastActiveValue(forRank: rank),
                 windowCount: 0,
-                pid: entry.pid
+                pid: entry.pid,
+                bundleIdentifier: entry.bundleIdentifier,
+                bundleURL: entry.bundleURL
             )
         }
         return RuntimeHomeSummaryProjection(
@@ -635,7 +637,9 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             groupID: app.groupID,
             lastActiveAt: app.lastActiveAt,
             windowCount: app.windows.count,
-            pid: context?.runningApp.processIdentifier ?? 0
+            pid: context?.runningApp.processIdentifier ?? 0,
+            bundleIdentifier: context?.runningApp.bundleIdentifier,
+            bundleURL: context?.runningApp.bundleURL
         )
     }
 

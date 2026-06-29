@@ -277,6 +277,7 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeReadModelStoreAppDirectoryProjectionUsesActivationRankEvidence() throws {
         let alphaPID: pid_t = 260_911
         let frontPID: pid_t = 260_912
+        let frontBundleURL = URL(fileURLWithPath: "/Applications/Front.app")
         let alphaEntry = RuntimeAppDirectoryEntry(
             pid: alphaPID,
             appID: "com.example.alpha",
@@ -290,6 +291,7 @@ extension FlowTabPriorityCoverageTests {
             appID: "com.example.front",
             bundleIdentifier: "com.example.front",
             localizedName: "Front",
+            bundleURL: frontBundleURL,
             launchDate: nil,
             activationRank: 0
         )
@@ -306,6 +308,8 @@ extension FlowTabPriorityCoverageTests {
         let homeProjection = try XCTUnwrap(store.readHomeSummaryProjection())
         XCTAssertEqual(homeProjection.summaries.map(\.appID), ["com.example.front", "com.example.alpha"])
         XCTAssertEqual(homeProjection.summaries.map(\.windowCount), [0, 0])
+        XCTAssertEqual(homeProjection.summary(for: "com.example.front")?.bundleIdentifier, "com.example.front")
+        XCTAssertEqual(homeProjection.summary(for: "com.example.front")?.bundleURL, frontBundleURL)
         XCTAssertFalse(homeProjection.freshness.isCompleteForScope)
         XCTAssertEqual(homeProjection.freshness.sourceGeneration.appLifecycle, 1)
         var appDirectoryProjection = try XCTUnwrap(store.readAppDirectoryProjection())
@@ -571,6 +575,8 @@ extension FlowTabPriorityCoverageTests {
         )
         XCTAssertEqual(payload.summary.appID, appID)
         XCTAssertEqual(payload.summary.pid, pid)
+        XCTAssertEqual(payload.summary.bundleIdentifier, runningApp.bundleIdentifier)
+        XCTAssertEqual(payload.summary.bundleURL, runningApp.bundleURL)
         XCTAssertEqual(payload.candidate.windows.map(\.id), [
             RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindowID)
         ])
@@ -665,6 +671,8 @@ extension FlowTabPriorityCoverageTests {
 
         let homeProjection = try XCTUnwrap(readModelStore.readHomeSummaryProjection())
         XCTAssertEqual(homeProjection.summary(for: appID)?.windowCount, 1)
+        XCTAssertEqual(homeProjection.summary(for: appID)?.bundleIdentifier, runningApp.bundleIdentifier)
+        XCTAssertEqual(homeProjection.summary(for: appID)?.bundleURL, runningApp.bundleURL)
         XCTAssertFalse(homeProjection.freshness.isCompleteForScope)
         XCTAssertNil(readModelStore.readHomeAppDetailProjection(appID: appID))
 

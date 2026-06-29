@@ -229,6 +229,28 @@ struct RuntimeHomeAppSummary: Equatable, Identifiable {
     let lastActiveAt: TimeInterval
     let windowCount: Int
     let pid: pid_t
+    let bundleIdentifier: String?
+    let bundleURL: URL?
+
+    init(
+        appID: String,
+        displayName: String,
+        groupID: String,
+        lastActiveAt: TimeInterval,
+        windowCount: Int,
+        pid: pid_t,
+        bundleIdentifier: String? = nil,
+        bundleURL: URL? = nil
+    ) {
+        self.appID = appID
+        self.displayName = displayName
+        self.groupID = groupID
+        self.lastActiveAt = lastActiveAt
+        self.windowCount = windowCount
+        self.pid = pid
+        self.bundleIdentifier = bundleIdentifier
+        self.bundleURL = bundleURL
+    }
 
     var id: String { appID }
 }

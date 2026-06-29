@@ -12,12 +12,19 @@ enum HomeAppIconProvider {
         }
 
         let resolvedIcon =
-            NSRunningApplication(processIdentifier: app.pid)?.icon
-            ?? NSWorkspace.shared.urlForApplication(withBundleIdentifier: app.appID)
-                .map { NSWorkspace.shared.icon(forFile: $0.path) }
+            app.bundleURL.map { NSWorkspace.shared.icon(forFile: $0.path) }
+            ?? applicationBundleURL(for: app).map { NSWorkspace.shared.icon(forFile: $0.path) }
             ?? NSWorkspace.shared.icon(for: .applicationBundle)
         cache[app.appID] = resolvedIcon
         return resolvedIcon
+    }
+
+    private static func applicationBundleURL(for app: RuntimeHomeAppSummary) -> URL? {
+        if let bundleIdentifier = app.bundleIdentifier,
+           let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) {
+            return url
+        }
+        return NSWorkspace.shared.urlForApplication(withBundleIdentifier: app.appID)
     }
 }
 
