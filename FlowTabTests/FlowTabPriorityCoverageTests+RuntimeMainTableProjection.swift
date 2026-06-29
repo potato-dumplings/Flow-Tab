@@ -2007,7 +2007,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(searchRead.projection?.windowEntries.filter { $0.appID == appID }.map(\.windowID), [])
     }
 
-    func testRuntimeProjectionServiceCommitsCurrentAppDirectRepairPayloadAsCompleteProjection() throws {
+    func testRuntimeProjectionServiceDoesNotCommitCurrentAppRepairWithoutMainTableCoverage() throws {
         let runningApp = NSRunningApplication.current
         let appID = RuntimeAppIdentity.appID(for: runningApp)
         let pid = runningApp.processIdentifier
@@ -2016,47 +2016,7 @@ extension FlowTabPriorityCoverageTests {
             for: runningApp.bundleIdentifier,
             fallbackName: displayName
         )
-        let windowID = "direct-repair-window"
-        let cgWindowID = CGWindowID(240_613)
-        let window = WindowCandidate(
-            id: windowID,
-            title: "Direct Repair Window",
-            isMinimized: false,
-            lastActiveAt: 120
-        )
         let appDirectoryEntry = RuntimeAppDirectoryEntry(app: runningApp)
-        let payload = RuntimeCurrentAppWindowPayload(
-            summary: RuntimeHomeAppSummary(
-                appID: appID,
-                displayName: displayName,
-                groupID: groupID,
-                lastActiveAt: 120,
-                windowCount: 1,
-                pid: pid
-            ),
-            candidate: AppSwitchCandidate(
-                id: appID,
-                displayName: displayName,
-                groupID: groupID,
-                lastActiveAt: 120,
-                windows: [window]
-            ),
-            context: RuntimeAppContext(
-                appID: appID,
-                runningApp: runningApp,
-                windowsByID: [
-                    windowID: RuntimeWindowContext(
-                        id: windowID,
-                        title: window.title,
-                        isMinimized: false,
-                        ownerPID: pid,
-                        cgWindowID: cgWindowID,
-                        spaceIDs: [5]
-                    )
-                ]
-            ),
-            appDirectoryEntries: [appDirectoryEntry]
-        )
         let readModelStore = RuntimeReadModelStore()
         readModelStore.seedAppSwitcherProjectionForTesting(
             apps: [
@@ -2073,7 +2033,7 @@ extension FlowTabPriorityCoverageTests {
             generatedAt: 10
         )
         let service = RuntimeProjectionService(
-            label: "FlowTabTests.RuntimeProjectionService.DirectCurrentAppRepairPayload",
+            label: "FlowTabTests.RuntimeProjectionService.CurrentAppRepairEvidenceOnly",
             repairProvider: RuntimeProjectionRepairProvider(
                 windowRecordStore: RuntimeWindowRecordStore(),
                 reconciliationCoordinator: RuntimeReconciliationCoordinator()
@@ -2088,7 +2048,6 @@ extension FlowTabPriorityCoverageTests {
                         appID: appID,
                         pid: pid,
                         appDirectoryEntries: [appDirectoryEntry],
-                        currentAppWindowPayload: payload,
                         currentAppWindowPayloadWasEmpty: false
                     )
                 ])
@@ -2098,16 +2057,13 @@ extension FlowTabPriorityCoverageTests {
         service.signalSelectedCurrentAppWindowsChanged(appID: appID, pid: pid)
         service.waitForMaintenanceQueueForTesting()
 
-        let projection = try XCTUnwrap(readModelStore.readCurrentAppWindowProjection(appID: appID))
-        XCTAssertTrue(projection.freshness.isCompleteForScope)
-        XCTAssertTrue(projection.freshness.dirtyAppIDs.isEmpty)
-        XCTAssertTrue(projection.freshness.dirtyPIDs.isEmpty)
-        XCTAssertTrue(projection.freshness.pendingRepairScopes.isEmpty)
-        XCTAssertEqual(projection.currentAppWindowPayload.candidate.windows.map(\.id), [windowID])
-        XCTAssertEqual(
-            projection.currentAppWindowPayload.context.windowsByID[windowID]?.cgWindowID,
-            cgWindowID
-        )
+        XCTAssertNil(readModelStore.readCurrentAppWindowProjection(appID: appID))
+        let diagnostics = readModelStore.diagnostics()
+        XCTAssertEqual(diagnostics.dirtyAppIDs, [appID])
+        XCTAssertEqual(diagnostics.dirtyPIDs, [pid])
+        XCTAssertTrue(diagnostics.pendingRepairScopes.contains("selectedCurrentAppWindows:\(appID)"))
+        let appDirectoryProjection = try XCTUnwrap(readModelStore.readAppDirectoryProjection())
+        XCTAssertEqual(appDirectoryProjection.entries, [appDirectoryEntry])
     }
 
     func testRuntimeProjectionServiceCommitsAppWindowDirtyProjectionForHomeDetailFromMainTablesAsStale() throws {

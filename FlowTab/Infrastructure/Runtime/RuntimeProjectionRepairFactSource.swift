@@ -151,7 +151,6 @@ struct RuntimeProjectionRepairFactSource {
                         appID: payload.summary.appID,
                         pid: payload.summary.pid,
                         appDirectoryEntries: payload.appDirectoryEntries,
-                        currentAppWindowPayload: payload,
                         currentAppWindowPayloadWasEmpty: payload.candidate.windows.isEmpty
                     )
                 )
@@ -332,13 +331,14 @@ struct RuntimeProjectionRepairFactSource {
             options: [.optionAll, .excludeDesktopElements],
             now: ProcessInfo.processInfo.systemUptime
         ).windowsByPID
-        let sampledWindowsByPID = runtimeFactProvider.collectAXWindowData(
+        _ = runtimeFactProvider.collectAXWindowData(
             for: matchingApps,
             cgWindowsByPID: cgWindowsByPID,
             allCGWindowsByPID: allCGWindowsByPID
         )
+        let windowsByPID = projectedWindowEntriesByPID(for: matchingApps)
         return RuntimeCurrentAppWindowFacts(
-            windowsByPID: sampledWindowsByPID,
+            windowsByPID: windowsByPID,
             rankByPID: rankByPID
         )
     }

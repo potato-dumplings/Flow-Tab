@@ -147,7 +147,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(state?.lastAXWindowIDs.contains(axWindowID) == true)
     }
 
-    func testRuntimeProjectionRepairFactSourceBuildsCurrentAppWindowFactsFromSampledProjection() {
+    func testRuntimeProjectionRepairFactSourceBuildsCurrentAppWindowFactsFromWindowRecordStore() {
         let app = NSRunningApplication.current
         let pid = app.processIdentifier
         let axWindowID = "ax:\(pid):main"
@@ -210,12 +210,14 @@ extension FlowTabPriorityCoverageTests {
         )
 
         XCTAssertEqual(provider.collectAXWindowDataCallCount, 1)
-        XCTAssertEqual(facts.windowsByPID[pid]?.map(\.windowID), [sampledEntry.windowID])
-        XCTAssertEqual(facts.windowsByPID[pid]?.map(\.title), [sampledEntry.title])
+        XCTAssertEqual(
+            facts.windowsByPID[pid]?.map(\.windowID),
+            [RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindowID)]
+        )
+        XCTAssertEqual(facts.windowsByPID[pid]?.map(\.title), ["WindowRecord Projection"])
         let projectedEntry = facts.windowsByPID[pid]?.first
-        XCTAssertEqual(projectedEntry?.cgWindowID, sampledEntry.cgWindowID)
-        XCTAssertNil(projectedEntry?.activationHandleID)
-        XCTAssertNotEqual(projectedEntry?.windowID, RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindowID))
+        XCTAssertEqual(projectedEntry?.cgWindowID, cgWindowID)
+        XCTAssertEqual(projectedEntry?.activationHandleID, axWindowID)
     }
 
     func testRuntimeWindowRecordStoreGroupsAffectedCGWindowIDsByPIDFromCurrentAndRecordedFacts() {
