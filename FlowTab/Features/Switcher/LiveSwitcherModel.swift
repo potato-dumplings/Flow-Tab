@@ -420,7 +420,8 @@ final class LiveSwitcherModel: ObservableObject {
         var resolvedAppCandidate: AppSwitchCandidate?
         var resolvedContext: RuntimeAppContext?
 
-        if let projection = runtimeProjectionService.readCurrentAppWindowProjection(appID: frontmostAppID) {
+        if let projection = runtimeProjectionService.readCurrentAppWindowProjection(appID: frontmostAppID),
+           projection.freshness.isCompleteForScope {
             projectionReadMs = Self.monotonicMilliseconds()
             let payload = currentAppWindowPayloadWithWindowRecencyApplied(
                 projection.currentAppWindowPayload

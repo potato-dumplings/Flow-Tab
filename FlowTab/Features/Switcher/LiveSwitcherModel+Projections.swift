@@ -183,7 +183,8 @@ extension LiveSwitcherModel {
             "selectedAppWindowProjection result=scheduled appID=\(targetAppID)"
         )
 
-        if let projection = runtimeService.readCurrentAppWindowProjection(appID: targetAppID) {
+        if let projection = runtimeService.readCurrentAppWindowProjection(appID: targetAppID),
+           projection.freshness.isCompleteForScope {
             completeSelectedAppWindowProjection(
                 projection.currentAppWindowPayload,
                 appID: targetAppID,
