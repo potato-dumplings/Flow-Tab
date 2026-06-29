@@ -382,7 +382,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             || !pendingRepairScopes.isEmpty
         projection.freshness = freshnessLocked(
             generatedAt: projection.freshness.generatedAt,
-            isCompleteForScope: !isScopeDirty
+            isCompleteForScope: projection.freshness.isCompleteForScope && !isScopeDirty
         )
         return RuntimeHomeAppDetailProjection(
             currentAppWindowPayload: projection.currentAppWindowPayload,
@@ -401,7 +401,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             || !pendingRepairScopes.isEmpty
         projection.freshness = freshnessLocked(
             generatedAt: projection.freshness.generatedAt,
-            isCompleteForScope: !isScopeDirty
+            isCompleteForScope: projection.freshness.isCompleteForScope && !isScopeDirty
         )
         return projection
     }

@@ -1911,6 +1911,109 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(staleHomeDetailProjection.freshness.pendingRepairScopes.contains("appWindows:\(appID)"))
     }
 
+    func testRuntimeReadModelStorePreservesStaleCurrentAppProjectionAfterOtherMainTableCommitClearsDirty() throws {
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let pid = runningApp.processIdentifier
+        let window = WindowCandidate(
+            id: "stale-current-app-projection-window",
+            title: "Stale Current App Projection",
+            isMinimized: false,
+            lastActiveAt: 510
+        )
+        let candidate = AppSwitchCandidate(
+            id: appID,
+            displayName: runningApp.localizedName ?? appID,
+            groupID: RuntimeAppIdentity.groupID(
+                for: runningApp.bundleIdentifier,
+                fallbackName: runningApp.localizedName ?? appID
+            ),
+            lastActiveAt: 510,
+            windows: [window]
+        )
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: runningApp,
+            windowsByID: [
+                window.id: RuntimeWindowContext(
+                    id: window.id,
+                    title: window.title,
+                    isMinimized: window.isMinimized,
+                    ownerPID: pid,
+                    cgWindowID: 240_703,
+                    spaceIDs: [5]
+                )
+            ]
+        )
+        let summary = RuntimeHomeAppSummary(
+            appID: appID,
+            displayName: candidate.displayName,
+            groupID: candidate.groupID,
+            lastActiveAt: candidate.lastActiveAt,
+            windowCount: candidate.windows.count,
+            pid: pid
+        )
+        let payload = RuntimeCurrentAppWindowPayload(
+            summary: summary,
+            candidate: candidate,
+            context: context,
+            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: runningApp)]
+        )
+        let store = RuntimeReadModelStore()
+        store.seedAppSwitcherProjectionForTesting(
+            apps: [candidate],
+            contextsByID: [appID: context],
+            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: runningApp)],
+            generatedAt: 40
+        )
+        commitMainTableSearchFreshnessBarrierForTesting(store, generatedAt: 41)
+
+        store.markAppWindowsDirty(
+            appID: appID,
+            pid: pid,
+            pendingScope: "appWindows:\(appID)"
+        )
+        store.commitCurrentAppWindowProjection(
+            payload,
+            clearsDirtyState: false,
+            generatedAt: 42
+        )
+
+        var currentProjection = try XCTUnwrap(store.readCurrentAppWindowProjection(appID: appID))
+        XCTAssertFalse(currentProjection.freshness.isCompleteForScope)
+        var homeDetailProjection = try XCTUnwrap(store.readHomeAppDetailProjection(appID: appID))
+        XCTAssertFalse(homeDetailProjection.freshness.isCompleteForScope)
+        XCTAssertEqual(homeDetailProjection.freshness.dirtyAppIDs, [appID])
+        XCTAssertEqual(homeDetailProjection.freshness.pendingRepairScopes, ["appWindows:\(appID)"])
+
+        store.commitMainTableAppSwitcherProjectionPayload(
+            RuntimeAppSwitcherProjectionPayload(
+                apps: [candidate],
+                contextsByID: [appID: context]
+            ),
+            clearsDirtyForAppID: appID,
+            clearsDirtyForPID: pid,
+            generatedAt: 43
+        )
+
+        XCTAssertTrue(store.diagnostics().dirtyAppIDs.isEmpty)
+        XCTAssertTrue(store.diagnostics().dirtyPIDs.isEmpty)
+        XCTAssertTrue(store.diagnostics().pendingRepairScopes.isEmpty)
+        XCTAssertTrue(store.readAppSwitcherProjection()?.freshness.isCompleteForScope ?? false)
+        currentProjection = try XCTUnwrap(store.readCurrentAppWindowProjection(appID: appID))
+        XCTAssertFalse(currentProjection.freshness.isCompleteForScope)
+        XCTAssertEqual(currentProjection.freshness.dirtyAppIDs, [])
+        XCTAssertEqual(currentProjection.freshness.pendingRepairScopes, [])
+        homeDetailProjection = try XCTUnwrap(store.readHomeAppDetailProjection(appID: appID))
+        XCTAssertFalse(homeDetailProjection.freshness.isCompleteForScope)
+        XCTAssertEqual(homeDetailProjection.freshness.dirtyAppIDs, [])
+        XCTAssertEqual(homeDetailProjection.freshness.pendingRepairScopes, [])
+        let searchRead = store.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(searchRead.readiness, .degradedStaleCommitted)
+        XCTAssertEqual(searchRead.resultState, .degradedStaleCommittedResult)
+        XCTAssertFalse(searchRead.committedIndexCoversCurrentGeneration)
+    }
+
     func testRuntimeReadModelStoreDoesNotDeriveHomeDetailFromAppSwitcherProjection() throws {
         let runningApp = NSRunningApplication.current
         let appID = RuntimeAppIdentity.appID(for: runningApp)
