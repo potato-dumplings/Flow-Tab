@@ -6,6 +6,7 @@ protocol RuntimeProjectionServing: Sendable {
     func readHomeAppDetailProjection(appID: String) -> RuntimeHomeAppDetailProjection?
     func readCurrentAppWindowProjection(appID: String) -> RuntimeCurrentAppWindowProjection?
     func readFocusedCurrentAppWindowProjection() -> RuntimeFocusedCurrentAppWindowProjectionRead?
+    func readActivationTargetProjection() -> RuntimeActivationTargetProjection?
     func readCommittedSearchIndexForSearch() -> RuntimeSearchIndexRead
     func runtimeReadModelDiagnostics() -> RuntimeReadModelDiagnostics
     func requestAppSwitcherProjectionMaintenance(reason: RuntimeProjectionMaintenanceReason)

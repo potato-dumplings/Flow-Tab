@@ -1478,6 +1478,36 @@ extension FlowTabPriorityCoverageTests {
         )
         service.waitForMaintenanceQueueForTesting()
 
+        let activationProjection = try XCTUnwrap(readModelStore.readActivationTargetProjection())
+        XCTAssertEqual(activationProjection.appID, appID)
+        XCTAssertEqual(
+            activationProjection.windowID,
+            RuntimeWindowListEntry.cgStableWindowID(
+                pid: pid,
+                cgWindowID: focusedCGWindowID
+            )
+        )
+        XCTAssertEqual(activationProjection.ownerPID, pid)
+        XCTAssertEqual(activationProjection.targetCGWindowID, focusedCGWindowID)
+        XCTAssertEqual(activationProjection.focusedCGWindowID, focusedCGWindowID)
+        XCTAssertEqual(activationProjection.affectedCGWindowIDs, [focusedCGWindowID])
+        XCTAssertEqual(activationProjection.title, "Verified Focus Main Table")
+        XCTAssertEqual(
+            activationProjection.allowedActions,
+            WindowBindingConfidence.exact.allowedActions
+        )
+        XCTAssertFalse(activationProjection.freshness.isCompleteForScope)
+        XCTAssertEqual(activationProjection.freshness.dirtyAppIDs, [appID])
+        XCTAssertEqual(activationProjection.freshness.dirtyPIDs, [pid])
+        XCTAssertEqual(activationProjection.freshness.dirtyCGWindowIDs, [focusedCGWindowID])
+        XCTAssertTrue(
+            activationProjection.freshness.pendingRepairScopes.contains(
+                "activationVerified:\(appID)"
+            )
+        )
+        XCTAssertEqual(service.readActivationTargetProjection(), activationProjection)
+        XCTAssertEqual(readModelStore.diagnostics().hasActivationTargetProjection, true)
+
         let projection = try XCTUnwrap(readModelStore.readCurrentAppWindowProjection(appID: appID))
         XCTAssertEqual(projection.currentAppWindowPayload.candidate.windows.map(\.id), [
             RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: focusedCGWindowID)

@@ -123,6 +123,36 @@ struct RuntimeSpaceTopologyProjection {
     var freshness: RuntimeProjectionFreshness
 }
 
+struct RuntimeActivationTargetProjection: Equatable {
+    let appID: String
+    let windowID: String
+    let ownerPID: pid_t
+    let targetCGWindowID: CGWindowID?
+    let focusedCGWindowID: CGWindowID?
+    let affectedCGWindowIDs: Set<CGWindowID>
+    let title: String
+    let frame: CGRect?
+    let allowedActions: Set<WindowBindingAction>
+    var freshness: RuntimeProjectionFreshness
+
+    init(
+        verification: RuntimeWindowFocusVerification,
+        affectedCGWindowIDs: Set<CGWindowID>,
+        freshness: RuntimeProjectionFreshness
+    ) {
+        appID = verification.appID
+        windowID = verification.windowID
+        ownerPID = verification.ownerPID
+        targetCGWindowID = verification.targetCGWindowID
+        focusedCGWindowID = verification.focusedCGWindowID
+        self.affectedCGWindowIDs = affectedCGWindowIDs
+        title = verification.title
+        frame = verification.frame
+        allowedActions = verification.allowedActions
+        self.freshness = freshness
+    }
+}
+
 struct RuntimeCurrentAppWindowProjection {
     let appID: String
     let currentAppWindowPayload: RuntimeCurrentAppWindowPayload
@@ -162,6 +192,7 @@ struct RuntimeReadModelDiagnostics: Equatable {
     let spaceTopologyTrackedSpaceCount: Int
     let spaceTopologyTrackedWindowCount: Int
     let spaceTopologyFullscreenWindowCount: Int
+    let hasActivationTargetProjection: Bool
     let hasCommittedSearchIndex: Bool
     let currentAppWindowProjectionAppIDs: Set<String>
     let appDirectoryEntryPIDs: Set<pid_t>

@@ -86,6 +86,7 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     private let homeDetailProjectionsByAppID: [String: RuntimeHomeAppDetailProjection]
     private let currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection]
     private let focusedCurrentAppWindowProjectionRead: RuntimeFocusedCurrentAppWindowProjectionRead?
+    private let activationTargetProjection: RuntimeActivationTargetProjection?
     private var committedSearchIndexRead: RuntimeSearchIndexRead?
     private var appSwitcherProjectionReads = 0
     private var homeSummaryProjectionReads = 0
@@ -111,6 +112,7 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         homeDetailProjectionsByAppID: [String: RuntimeHomeAppDetailProjection]? = nil,
         currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection] = [:],
         focusedCurrentAppWindowProjectionRead: RuntimeFocusedCurrentAppWindowProjectionRead? = nil,
+        activationTargetProjection: RuntimeActivationTargetProjection? = nil,
         committedSearchIndexRead: RuntimeSearchIndexRead? = nil
     ) {
         self.appSwitcherProjection = appSwitcherProjection
@@ -132,6 +134,7 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         } else {
             self.focusedCurrentAppWindowProjectionRead = nil
         }
+        self.activationTargetProjection = activationTargetProjection
         self.committedSearchIndexRead = committedSearchIndexRead
     }
 
@@ -338,6 +341,10 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         return focusedCurrentAppWindowProjectionRead
     }
 
+    func readActivationTargetProjection() -> RuntimeActivationTargetProjection? {
+        activationTargetProjection
+    }
+
     func readCommittedSearchIndexForSearch() -> RuntimeSearchIndexRead {
         lock.lock()
         defer { lock.unlock() }
@@ -369,6 +376,7 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
             spaceTopologyTrackedSpaceCount: 0,
             spaceTopologyTrackedWindowCount: 0,
             spaceTopologyFullscreenWindowCount: 0,
+            hasActivationTargetProjection: activationTargetProjection != nil,
             hasCommittedSearchIndex: hasCommittedSearchIndex,
             currentAppWindowProjectionAppIDs: [],
             appDirectoryEntryPIDs: []

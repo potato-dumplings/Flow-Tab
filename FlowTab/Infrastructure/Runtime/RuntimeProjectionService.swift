@@ -68,6 +68,10 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         readModelStore.readFocusedCurrentAppWindowProjection()
     }
 
+    func readActivationTargetProjection() -> RuntimeActivationTargetProjection? {
+        readModelStore.readActivationTargetProjection()
+    }
+
     func readCommittedSearchIndexForSearch() -> RuntimeSearchIndexRead {
         readModelStore.readCommittedSearchIndexForSearch()
     }
@@ -361,9 +365,9 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             let now = Date.timeIntervalSinceReferenceDate
             let affectedCGWindowIDs = repairProvider.recordWindowFocusVerification(verification, now: now)
             readModelStore.markWindowFocusVerified(
-                appID: verification.appID,
-                pid: verification.ownerPID,
-                affectedCGWindowIDs: affectedCGWindowIDs
+                verification,
+                affectedCGWindowIDs: affectedCGWindowIDs,
+                generatedAt: now
             )
             commitAppDirectoryProviderEvidenceLocked(generatedAt: now)
             commitMainTableCurrentAppProjectionLocked(

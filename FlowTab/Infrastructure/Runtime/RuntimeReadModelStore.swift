@@ -14,6 +14,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     private var spaceTopologySignature: RuntimeSpaceTopologySignature?
     private var spaceTopologyAffectedCGWindowIDs: Set<CGWindowID> = []
     private var spaceTopologyGeneratedAt: TimeInterval?
+    private var activationTargetProjection: RuntimeActivationTargetProjection?
     private var appSwitcherProjection: RuntimeAppSwitcherProjection?
     private var homeSummaryProjection: RuntimeHomeSummaryProjection?
     private var currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection] = [:]
@@ -208,15 +209,24 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         pendingRepairScopes.insert(pendingScope)
     }
 
-    func markWindowFocusVerified(appID: String, pid: pid_t, affectedCGWindowIDs: Set<CGWindowID>) {
+    func markWindowFocusVerified(
+        _ verification: RuntimeWindowFocusVerification,
+        affectedCGWindowIDs: Set<CGWindowID>,
+        generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
+    ) {
         lock.lock()
         defer { lock.unlock() }
 
         generation.axDirty &+= 1
-        dirtyAppIDs.insert(appID)
-        dirtyPIDs.insert(pid)
+        dirtyAppIDs.insert(verification.appID)
+        dirtyPIDs.insert(verification.ownerPID)
         dirtyCGWindowIDs.formUnion(affectedCGWindowIDs)
-        pendingRepairScopes.insert("activationVerified:\(appID)")
+        pendingRepairScopes.insert("activationVerified:\(verification.appID)")
+        activationTargetProjection = RuntimeActivationTargetProjection(
+            verification: verification,
+            affectedCGWindowIDs: affectedCGWindowIDs,
+            freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: false)
+        )
     }
 
     func markAppTerminatedForMainTableProjection(appID: String, pid: pid_t) {
@@ -383,6 +393,18 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         )
     }
 
+    func readActivationTargetProjection() -> RuntimeActivationTargetProjection? {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard var projection = activationTargetProjection else { return nil }
+        projection.freshness = freshnessLocked(
+            generatedAt: projection.freshness.generatedAt,
+            isCompleteForScope: false
+        )
+        return projection
+    }
+
     func readHomeAppDetailProjection(appID: String) -> RuntimeHomeAppDetailProjection? {
         lock.lock()
         defer { lock.unlock() }
@@ -501,6 +523,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             spaceTopologyTrackedSpaceCount: spaceTopologySignature?.trackedSpaceCount ?? 0,
             spaceTopologyTrackedWindowCount: spaceTopologySignature?.trackedWindowCount ?? 0,
             spaceTopologyFullscreenWindowCount: spaceTopologySignature?.fullscreenWindowCount ?? 0,
+            hasActivationTargetProjection: activationTargetProjection != nil,
             hasCommittedSearchIndex: committedSearchIndex != nil,
             currentAppWindowProjectionAppIDs: Set(currentAppWindowProjectionsByAppID.keys),
             appDirectoryEntryPIDs: appDirectoryState.entryPIDs
