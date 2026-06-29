@@ -65,6 +65,11 @@ extension FlowTabPriorityCoverageTests {
             )
         )
         XCTAssertEqual(degradedPayload.apps.map(\.id), [appID])
+        XCTAssertEqual(degradedPayload.homeSummaries.map(\.appID), [appID])
+        XCTAssertEqual(degradedPayload.homeSummaries.first?.pid, pid)
+        XCTAssertEqual(degradedPayload.homeSummaries.first?.bundleIdentifier, runningApp.bundleIdentifier)
+        XCTAssertEqual(degradedPayload.homeSummaries.first?.bundleURL, runningApp.bundleURL)
+        XCTAssertEqual(degradedPayload.homeSummaries.first?.windowCount, 1)
         XCTAssertTrue(degradedPayload.contextsByID.isEmpty)
         XCTAssertFalse(degradedPayload.hasCompleteWindowCoverage)
 
@@ -895,6 +900,9 @@ extension FlowTabPriorityCoverageTests {
 
         let homeProjection = try XCTUnwrap(readModelStore.readHomeSummaryProjection())
         XCTAssertEqual(homeProjection.summary(for: appID)?.windowCount, 0)
+        XCTAssertEqual(homeProjection.summary(for: appID)?.pid, runningApp.processIdentifier)
+        XCTAssertEqual(homeProjection.summary(for: appID)?.bundleIdentifier, runningApp.bundleIdentifier)
+        XCTAssertEqual(homeProjection.summary(for: appID)?.bundleURL, runningApp.bundleURL)
         XCTAssertEqual(homeProjection.freshness.sourceGeneration.projection, 1)
         XCTAssertFalse(homeProjection.freshness.isCompleteForScope)
         XCTAssertEqual(

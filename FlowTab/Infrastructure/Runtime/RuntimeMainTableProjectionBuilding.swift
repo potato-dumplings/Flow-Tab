@@ -143,6 +143,16 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
                 lastActiveAt: RuntimeAppDirectory.stableLastActiveValue(forRank: rankByPID[entry.pid] ?? index),
                 windows: windowSeeds.map(\.candidate)
             )
+            let homeSummary = RuntimeHomeAppSummary(
+                appID: entry.appID,
+                displayName: displayName,
+                groupID: candidate.groupID,
+                lastActiveAt: candidate.lastActiveAt,
+                windowCount: candidate.windows.count,
+                pid: entry.pid,
+                bundleIdentifier: entry.bundleIdentifier,
+                bundleURL: entry.bundleURL
+            )
             let context = entry.runningApplication.map { runningApp in
                 RuntimeAppContext(
                     appID: entry.appID,
@@ -154,7 +164,7 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
                     )
                 )
             }
-            return (candidate: candidate, context: context)
+            return (candidate: candidate, homeSummary: homeSummary, context: context)
         }
 
         return RuntimeAppSwitcherProjectionPayload(
@@ -164,6 +174,7 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
                     row.context.map { ($0.appID, $0) }
                 }
             ),
+            homeSummaries: rows.map(\.homeSummary),
             hasCompleteWindowCoverage: rows.allSatisfy { row in
                 guard let context = row.context,
                       !row.candidate.windows.isEmpty

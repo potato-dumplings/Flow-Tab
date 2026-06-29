@@ -7,23 +7,48 @@ import FlowTabCore
 struct RuntimeAppSwitcherProjectionPayload {
     let apps: [AppSwitchCandidate]
     let contextsByID: [String: RuntimeAppContext]
+    let homeSummaries: [RuntimeHomeAppSummary]
     let hasCompleteWindowCoverage: Bool
     let coveredCGWindowIDs: Set<CGWindowID>
 
     init(
         apps: [AppSwitchCandidate],
         contextsByID: [String: RuntimeAppContext],
+        homeSummaries: [RuntimeHomeAppSummary]? = nil,
         hasCompleteWindowCoverage: Bool = true,
         coveredCGWindowIDs: Set<CGWindowID>? = nil
     ) {
         self.apps = apps
         self.contextsByID = contextsByID
+        self.homeSummaries = homeSummaries ?? Self.homeSummaries(
+            for: apps,
+            contextsByID: contextsByID
+        )
         self.hasCompleteWindowCoverage = hasCompleteWindowCoverage
         self.coveredCGWindowIDs = coveredCGWindowIDs ?? Set(
             contextsByID.values.flatMap { context in
                 context.windowsByID.values.compactMap(\.cgWindowID)
             }
         )
+    }
+
+    private static func homeSummaries(
+        for apps: [AppSwitchCandidate],
+        contextsByID: [String: RuntimeAppContext]
+    ) -> [RuntimeHomeAppSummary] {
+        apps.map { app in
+            let context = contextsByID[app.id]
+            return RuntimeHomeAppSummary(
+                appID: app.id,
+                displayName: app.displayName,
+                groupID: app.groupID,
+                lastActiveAt: app.lastActiveAt,
+                windowCount: app.windows.count,
+                pid: context?.runningApp.processIdentifier ?? 0,
+                bundleIdentifier: context?.runningApp.bundleIdentifier,
+                bundleURL: context?.runningApp.bundleURL
+            )
+        }
     }
 }
 

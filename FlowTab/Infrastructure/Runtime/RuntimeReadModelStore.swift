@@ -52,7 +52,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: isCompleteForScope)
         )
         homeSummaryProjection = RuntimeHomeSummaryProjection(
-            summaries: homeSummariesLocked(for: payload.apps, contextsByID: payload.contextsByID),
+            summaries: payload.homeSummaries,
             freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: isCompleteForScope)
         )
         return RuntimeAppSwitcherProjectionCommitSummary(
@@ -625,34 +625,6 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             summaries: summaries,
             freshness: appDirectoryDerivedProjectionFreshnessLocked(generatedAt: generatedAt)
         )
-    }
-
-    private func homeSummaryLocked(
-        for app: AppSwitchCandidate,
-        context: RuntimeAppContext?
-    ) -> RuntimeHomeAppSummary {
-        RuntimeHomeAppSummary(
-            appID: app.id,
-            displayName: app.displayName,
-            groupID: app.groupID,
-            lastActiveAt: app.lastActiveAt,
-            windowCount: app.windows.count,
-            pid: context?.runningApp.processIdentifier ?? 0,
-            bundleIdentifier: context?.runningApp.bundleIdentifier,
-            bundleURL: context?.runningApp.bundleURL
-        )
-    }
-
-    private func homeSummariesLocked(
-        for apps: [AppSwitchCandidate],
-        contextsByID: [String: RuntimeAppContext]
-    ) -> [RuntimeHomeAppSummary] {
-        apps.map { app in
-            homeSummaryLocked(
-                for: app,
-                context: contextsByID[app.id]
-            )
-        }
     }
 
     private static func sortedAppDirectoryEntriesForProjection(
