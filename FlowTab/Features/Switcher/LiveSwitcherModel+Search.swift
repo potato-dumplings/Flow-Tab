@@ -43,6 +43,9 @@ extension LiveSwitcherModel {
     func rebuildSearchIndexFromCommittedProjection(reason: String) -> Bool {
         let read = runtimeProjectionService.readCommittedSearchIndexForSearch()
         guard let projection = read.projection else {
+            if read.shouldRequestFreshnessBarrier {
+                runtimeProjectionService.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
+            }
             lastSearchIndexReadDiagnostic = SearchIndexReadDiagnostic(
                 reason: reason,
                 readiness: read.readiness,
@@ -54,9 +57,12 @@ extension LiveSwitcherModel {
                 dirtyPIDCount: 0,
                 dirtyCGWindowIDCount: 0,
                 pendingRepairScopeCount: 0,
-                requestedFreshnessBarrier: false
+                requestedFreshnessBarrier: read.shouldRequestFreshnessBarrier
             )
-            RuntimeLog.debug(.searchModel, "searchIndexSource reason=\(reason) source=none")
+            RuntimeLog.debug(
+                .searchModel,
+                "searchIndexSource reason=\(reason) source=none readiness=\(read.readiness.rawValue) resultState=\(read.resultState.rawValue) freshnessBarrierRequested=\(read.shouldRequestFreshnessBarrier ? 1 : 0)"
+            )
             return false
         }
         if read.shouldRequestFreshnessBarrier {

@@ -748,27 +748,34 @@ extension FlowTabTests {
                 )
             ]
         )
-        let model = LiveSwitcherModel(
-            runtimeProjectionService: RecordingRuntimeProjectionService(
-                appSwitcherProjection: RuntimeAppSwitcherProjection(
-                    apps: [searchableSessionApp],
-                    contextsByID: [:],
-                    freshness: RuntimeProjectionFreshness(
-                        generatedAt: 10,
-                        sourceGeneration: RuntimeReadModelGeneration(projection: 1),
-                        dirtyAppIDs: [],
-                        dirtyPIDs: [],
-                        dirtyCGWindowIDs: [],
-                        pendingRepairScopes: [],
-                        isCompleteForScope: true
-                    )
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
+            appSwitcherProjection: RuntimeAppSwitcherProjection(
+                apps: [searchableSessionApp],
+                contextsByID: [:],
+                freshness: RuntimeProjectionFreshness(
+                    generatedAt: 10,
+                    sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+                    dirtyAppIDs: [],
+                    dirtyPIDs: [],
+                    dirtyCGWindowIDs: [],
+                    pendingRepairScopes: [],
+                    isCompleteForScope: true
                 )
             )
         )
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertFalse(model.enterSearchMode())
         XCTAssertFalse(model.isSearchActive)
+        XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.readiness, .missingCommittedIndex)
+        XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.resultState, .missingCommittedIndex)
+        XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.requestedFreshnessBarrier, true)
+        XCTAssertEqual(
+            runtimeProjectionService.searchIndexFreshnessBarrierRequestsRecorded(),
+            [.searchFreshnessBarrier]
+        )
+        XCTAssertEqual(model.searchViewState.results, [])
     }
 
     func testSearchPerformanceWindowScope() {

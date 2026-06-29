@@ -81,7 +81,7 @@ struct RuntimeSearchIndexRead: Equatable, Sendable {
     }
 
     var shouldRequestFreshnessBarrier: Bool {
-        readiness == .degradedStaleCommitted
+        readiness != .committedGenerationValidated
     }
 
     var committedIndexCoversCurrentGeneration: Bool {
