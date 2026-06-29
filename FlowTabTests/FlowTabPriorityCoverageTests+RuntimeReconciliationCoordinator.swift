@@ -300,7 +300,9 @@ extension FlowTabPriorityCoverageTests {
         let appProjection = try XCTUnwrap(store.readAppSwitcherProjection())
         XCTAssertEqual(appProjection.apps.map(\.id), apps.map(\.id))
         XCTAssertTrue(appProjection.apps.contains { $0.id == terminatedApp.id })
-        XCTAssertTrue(appProjection.freshness.isCompleteForScope)
+        XCTAssertFalse(appProjection.freshness.isCompleteForScope)
+        XCTAssertEqual(appProjection.freshness.dirtyAppIDs, [terminatedApp.id])
+        XCTAssertEqual(appProjection.freshness.pendingRepairScopes, ["appTerminated:\(terminatedApp.id)"])
         XCTAssertEqual(appProjection.freshness.sourceGeneration.appLifecycle, 2)
         XCTAssertEqual(appProjection.freshness.sourceGeneration.projection, 2)
 
@@ -324,6 +326,9 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(duplicateSignalProjection.apps.map(\.id), apps.map(\.id))
         XCTAssertEqual(duplicateSignalProjection.freshness.sourceGeneration.appLifecycle, 2)
         XCTAssertEqual(duplicateSignalProjection.freshness.sourceGeneration.projection, 2)
+        XCTAssertFalse(duplicateSignalProjection.freshness.isCompleteForScope)
+        XCTAssertEqual(duplicateSignalProjection.freshness.dirtyAppIDs, [terminatedApp.id])
+        XCTAssertEqual(duplicateSignalProjection.freshness.pendingRepairScopes, ["appTerminated:\(terminatedApp.id)"])
         XCTAssertEqual(store.readAppDirectoryProjection()?.entries.map(\.pid), [pid + 1])
     }
 
@@ -627,6 +632,9 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(appProjection.apps.contains { $0.id == activeApp.id })
         XCTAssertNotNil(appProjection.contextsByID[activeApp.id])
         XCTAssertTrue(store.readAppDirectoryProjection()?.entries.isEmpty == true)
+        XCTAssertFalse(appProjection.freshness.isCompleteForScope)
+        XCTAssertEqual(appProjection.freshness.dirtyAppIDs, [activeApp.id])
+        XCTAssertEqual(appProjection.freshness.pendingRepairScopes, ["appTerminated:\(activeApp.id)"])
         XCTAssertEqual(appProjection.freshness.sourceGeneration.appLifecycle, 3)
         XCTAssertEqual(appProjection.freshness.sourceGeneration.projection, 2)
         searchRead = store.readCommittedSearchIndexForSearch()

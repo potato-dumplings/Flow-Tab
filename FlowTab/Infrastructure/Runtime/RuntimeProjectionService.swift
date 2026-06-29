@@ -290,7 +290,9 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             commitMainTableAppSwitcherProjectionLocked(
                 generatedAt: now,
                 requiresExistingProjectionCoverage: true,
-                permittedMissingAppIDs: [appID]
+                permittedMissingAppIDs: [appID],
+                clearsDirtyForAppID: appID,
+                clearsDirtyForPID: pid
             )
             RuntimeLog.debug(.projection, "runtimeLifecycle appTerminated appID=\(appID) pid=\(pid)")
         }
@@ -390,7 +392,9 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     private func commitMainTableAppSwitcherProjectionLocked(
         generatedAt: TimeInterval,
         requiresExistingProjectionCoverage: Bool,
-        permittedMissingAppIDs: Set<String> = []
+        permittedMissingAppIDs: Set<String> = [],
+        clearsDirtyForAppID: String? = nil,
+        clearsDirtyForPID: pid_t? = nil
     ) -> Bool {
         guard
             let appDirectoryEntries = readModelStore.readAppDirectoryProjection()?.entries,
@@ -410,7 +414,12 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 return false
             }
         }
-        readModelStore.commitMainTableAppSwitcherProjectionPayload(payload, generatedAt: generatedAt)
+        readModelStore.commitMainTableAppSwitcherProjectionPayload(
+            payload,
+            clearsDirtyForAppID: clearsDirtyForAppID,
+            clearsDirtyForPID: clearsDirtyForPID,
+            generatedAt: generatedAt
+        )
         return true
     }
 

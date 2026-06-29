@@ -19,6 +19,8 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     @discardableResult
     func commitMainTableAppSwitcherProjectionPayload(
         _ payload: RuntimeAppSwitcherProjectionPayload,
+        clearsDirtyForAppID: String? = nil,
+        clearsDirtyForPID: pid_t? = nil,
         generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
     ) -> RuntimeAppSwitcherProjectionCommitSummary {
         lock.lock()
@@ -28,6 +30,11 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         markProjectionCommittedLocked()
         if clearsDirtyState {
             clearDirtyStateLocked()
+        } else if let clearsDirtyForAppID {
+            clearDirtyStateForAppLocked(appID: clearsDirtyForAppID)
+            if let clearsDirtyForPID {
+                dirtyPIDs.remove(clearsDirtyForPID)
+            }
         }
         appSwitcherProjection = RuntimeAppSwitcherProjection(
             apps: payload.apps,
@@ -215,17 +222,16 @@ final class RuntimeReadModelStore: @unchecked Sendable {
 
         let generatedAt = Date.timeIntervalSinceReferenceDate
         generation.appLifecycle &+= 1
-        dirtyAppIDs.remove(appID)
+        dirtyAppIDs.insert(appID)
         dirtyPIDs.remove(pid)
-        pendingRepairScopes = pendingRepairScopes.filter { !$0.contains(appID) }
+        pendingRepairScopes.insert("appTerminated:\(appID)")
         currentAppWindowProjectionsByAppID.removeValue(forKey: appID)
         appDirectoryState.remove(appID: appID, pid: pid, generatedAt: generatedAt)
     }
 
     private func shouldRemoveTerminatedAppLocked(appID: String, pid: pid_t) -> Bool {
         let directoryEntries = appDirectoryEntriesLocked(forAppID: appID)
-        if appDirectoryState.isInitialized,
-           !directoryEntries.isEmpty {
+        if appDirectoryState.isInitialized {
             return directoryEntries.contains { $0.pid == pid }
         }
 
@@ -414,8 +420,12 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     }
 
     private func clearDirtyStateForAppLocked(appID: String, pid: pid_t) {
-        dirtyAppIDs.remove(appID)
+        clearDirtyStateForAppLocked(appID: appID)
         dirtyPIDs.remove(pid)
+    }
+
+    private func clearDirtyStateForAppLocked(appID: String) {
+        dirtyAppIDs.remove(appID)
         pendingRepairScopes = pendingRepairScopes.filter { !$0.contains(appID) }
     }
 
