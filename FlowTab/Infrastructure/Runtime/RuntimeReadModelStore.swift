@@ -311,9 +311,18 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
 
-        guard let projection = currentAppWindowProjectionsByAppID[appID] else { return nil }
+        guard var projection = currentAppWindowProjectionsByAppID[appID] else { return nil }
+        let isScopeDirty = dirtyAppIDs.contains(appID)
+            || dirtyPIDs.contains(projection.currentAppWindowPayload.summary.pid)
+            || !dirtyCGWindowIDs.isEmpty
+            || !pendingRepairScopes.isEmpty
+        projection.freshness = freshnessLocked(
+            generatedAt: projection.freshness.generatedAt,
+            isCompleteForScope: !isScopeDirty
+        )
         return RuntimeHomeAppDetailProjection(
-            currentAppWindowPayload: projection.currentAppWindowPayload
+            currentAppWindowPayload: projection.currentAppWindowPayload,
+            freshness: projection.freshness
         )
     }
 

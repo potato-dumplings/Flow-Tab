@@ -469,7 +469,8 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
                 (
                     appID,
                     RuntimeHomeAppDetailProjection(
-                        currentAppWindowPayload: projection.currentAppWindowPayload
+                        currentAppWindowPayload: projection.currentAppWindowPayload,
+                        freshness: projection.freshness
                     )
                 )
             }

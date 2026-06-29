@@ -81,18 +81,29 @@ struct RuntimeHomeAppDetailProjection {
     let summary: RuntimeHomeAppSummary
     let candidate: AppSwitchCandidate
     let context: RuntimeAppContext
+    var freshness: RuntimeProjectionFreshness
 
-    init(summary: RuntimeHomeAppSummary, candidate: AppSwitchCandidate, context: RuntimeAppContext) {
+    init(
+        summary: RuntimeHomeAppSummary,
+        candidate: AppSwitchCandidate,
+        context: RuntimeAppContext,
+        freshness: RuntimeProjectionFreshness
+    ) {
         self.summary = summary
         self.candidate = candidate
         self.context = context
+        self.freshness = freshness
     }
 
-    init(currentAppWindowPayload payload: RuntimeCurrentAppWindowPayload) {
+    init(
+        currentAppWindowPayload payload: RuntimeCurrentAppWindowPayload,
+        freshness: RuntimeProjectionFreshness
+    ) {
         self.init(
             summary: payload.summary,
             candidate: payload.candidate,
-            context: payload.context
+            context: payload.context,
+            freshness: freshness
         )
     }
 }

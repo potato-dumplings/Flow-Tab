@@ -1690,6 +1690,22 @@ extension FlowTabPriorityCoverageTests {
             homeDetailProjection.context.windowsByID[window.id]?.cgWindowID,
             240_701
         )
+        XCTAssertTrue(homeDetailProjection.freshness.isCompleteForScope)
+
+        store.markAppWindowsDirty(
+            appID: appID,
+            pid: runningApp.processIdentifier,
+            pendingScope: "appWindows:\(appID)"
+        )
+
+        let staleHomeDetailProjection = try XCTUnwrap(
+            store.readHomeAppDetailProjection(appID: appID)
+        )
+        XCTAssertEqual(staleHomeDetailProjection.summary, summary)
+        XCTAssertFalse(staleHomeDetailProjection.freshness.isCompleteForScope)
+        XCTAssertEqual(staleHomeDetailProjection.freshness.dirtyAppIDs, [appID])
+        XCTAssertEqual(staleHomeDetailProjection.freshness.dirtyPIDs, [runningApp.processIdentifier])
+        XCTAssertTrue(staleHomeDetailProjection.freshness.pendingRepairScopes.contains("appWindows:\(appID)"))
     }
 
     func testRuntimeReadModelStoreDoesNotDeriveHomeDetailFromAppSwitcherProjection() throws {

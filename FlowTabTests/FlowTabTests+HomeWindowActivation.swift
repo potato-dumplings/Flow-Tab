@@ -714,7 +714,21 @@ extension FlowTabTests {
             windowCount: windows.count,
             pid: runningApp.processIdentifier
         )
-        return RuntimeHomeAppDetailProjection(summary: summary, candidate: candidate, context: context)
+        let freshness = RuntimeProjectionFreshness(
+            generatedAt: 300,
+            sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+            dirtyAppIDs: [],
+            dirtyPIDs: [],
+            dirtyCGWindowIDs: [],
+            pendingRepairScopes: [],
+            isCompleteForScope: true
+        )
+        return RuntimeHomeAppDetailProjection(
+            summary: summary,
+            candidate: candidate,
+            context: context,
+            freshness: freshness
+        )
     }
 
     private func makeHomeAppSummary(
