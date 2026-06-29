@@ -414,6 +414,8 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             hasCompleteHomeSummaryProjection: homeSummaryProjection?.freshness.isCompleteForScope == true
                 && !isDirtyLocked,
             hasAppDirectoryProjection: appDirectoryState.isInitialized,
+            hasCompleteAppDirectoryProjection: appDirectoryState.hasCompleteAppLayerCoverage
+                && !isDirtyLocked,
             hasCommittedSearchIndex: committedSearchIndex != nil,
             currentAppWindowProjectionAppIDs: Set(currentAppWindowProjectionsByAppID.keys),
             appDirectoryEntryPIDs: appDirectoryState.entryPIDs
@@ -472,7 +474,10 @@ final class RuntimeReadModelStore: @unchecked Sendable {
 
     private func appDirectoryProjectionLocked() -> RuntimeAppDirectoryProjection? {
         appDirectoryState.projection { generatedAt in
-            freshnessLocked(generatedAt: generatedAt, isCompleteForScope: !isDirtyLocked)
+            freshnessLocked(
+                generatedAt: generatedAt,
+                isCompleteForScope: appDirectoryState.hasCompleteAppLayerCoverage && !isDirtyLocked
+            )
         }
     }
 

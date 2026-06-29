@@ -145,6 +145,7 @@ struct RuntimeReadModelDiagnostics: Equatable {
     let hasCompleteAppSwitcherProjection: Bool
     let hasCompleteHomeSummaryProjection: Bool
     let hasAppDirectoryProjection: Bool
+    let hasCompleteAppDirectoryProjection: Bool
     let hasCommittedSearchIndex: Bool
     let currentAppWindowProjectionAppIDs: Set<String>
     let appDirectoryEntryPIDs: Set<pid_t>

@@ -304,6 +304,68 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
+    func testRuntimeReadModelStoreKeepsScopedAppDirectoryEvidencePartialUntilCompleteCoverage() throws {
+        let scopedEntry = RuntimeAppDirectoryEntry(
+            pid: 260_931,
+            appID: "com.example.scoped",
+            bundleIdentifier: "com.example.scoped",
+            localizedName: "Scoped",
+            launchDate: nil,
+            activationRank: 0
+        )
+        let providerEntry = RuntimeAppDirectoryEntry(
+            pid: 260_932,
+            appID: "com.example.provider",
+            bundleIdentifier: "com.example.provider",
+            localizedName: "Provider",
+            launchDate: nil,
+            activationRank: 1
+        )
+        let updatedScopedEntry = RuntimeAppDirectoryEntry(
+            pid: scopedEntry.pid,
+            appID: scopedEntry.appID,
+            bundleIdentifier: scopedEntry.bundleIdentifier,
+            localizedName: "Scoped Updated",
+            launchDate: nil,
+            activationRank: 0
+        )
+        let store = RuntimeReadModelStore()
+
+        store.commitCurrentAppRepairAppDirectoryEvidence([scopedEntry], generatedAt: 10)
+
+        var appDirectoryProjection = try XCTUnwrap(store.readAppDirectoryProjection())
+        XCTAssertEqual(appDirectoryProjection.entries, [scopedEntry])
+        XCTAssertEqual(appDirectoryProjection.freshness.sourceGeneration.appLifecycle, 1)
+        XCTAssertFalse(appDirectoryProjection.freshness.isCompleteForScope)
+        XCTAssertTrue(store.diagnostics().hasAppDirectoryProjection)
+        XCTAssertFalse(store.diagnostics().hasCompleteAppDirectoryProjection)
+        let appProjection = try XCTUnwrap(store.readAppSwitcherProjection())
+        XCTAssertEqual(appProjection.apps.map(\.id), [scopedEntry.appID])
+        XCTAssertFalse(appProjection.freshness.isCompleteForScope)
+        XCTAssertEqual(store.readCommittedSearchIndexForSearch().readiness, .missingCommittedIndex)
+
+        store.commitCurrentAppRepairAppDirectoryEvidence([scopedEntry], generatedAt: 11)
+        appDirectoryProjection = try XCTUnwrap(store.readAppDirectoryProjection())
+        XCTAssertEqual(appDirectoryProjection.freshness.sourceGeneration.appLifecycle, 1)
+        XCTAssertFalse(appDirectoryProjection.freshness.isCompleteForScope)
+
+        store.commitAppDirectoryProviderEvidence([scopedEntry, providerEntry], generatedAt: 12)
+
+        appDirectoryProjection = try XCTUnwrap(store.readAppDirectoryProjection())
+        XCTAssertEqual(appDirectoryProjection.entries, [providerEntry, scopedEntry])
+        XCTAssertEqual(appDirectoryProjection.freshness.sourceGeneration.appLifecycle, 2)
+        XCTAssertTrue(appDirectoryProjection.freshness.isCompleteForScope)
+        XCTAssertTrue(store.diagnostics().hasCompleteAppDirectoryProjection)
+
+        store.commitCurrentAppRepairAppDirectoryEvidence([updatedScopedEntry], generatedAt: 13)
+
+        appDirectoryProjection = try XCTUnwrap(store.readAppDirectoryProjection())
+        XCTAssertEqual(appDirectoryProjection.entries, [providerEntry, updatedScopedEntry])
+        XCTAssertEqual(appDirectoryProjection.freshness.sourceGeneration.appLifecycle, 3)
+        XCTAssertTrue(appDirectoryProjection.freshness.isCompleteForScope)
+        XCTAssertTrue(store.diagnostics().hasCompleteAppDirectoryProjection)
+    }
+
     func testRuntimeMainTableProjectionBuilderRequiresAppDirectoryEntryForCurrentAppPayload() throws {
         let runningApp = NSRunningApplication.current
         let appID = RuntimeAppIdentity.appID(for: runningApp)

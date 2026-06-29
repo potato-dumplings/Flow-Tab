@@ -148,6 +148,7 @@ struct RuntimeAppDirectoryEntry: Equatable {
 struct RuntimeAppDirectoryState: Equatable {
     private var entriesByPID: [pid_t: RuntimeAppDirectoryEntry] = [:]
     private(set) var generatedAt: TimeInterval?
+    private(set) var hasCompleteAppLayerCoverage = false
 
     var isInitialized: Bool {
         generatedAt != nil
@@ -163,17 +164,20 @@ struct RuntimeAppDirectoryState: Equatable {
 
     mutating func replace(
         entries: [RuntimeAppDirectoryEntry],
-        generatedAt: TimeInterval
+        generatedAt: TimeInterval,
+        hasCompleteAppLayerCoverage: Bool = true
     ) {
         entriesByPID = Dictionary(
             uniqueKeysWithValues: Self.sortedUniqueEntries(entries).map { ($0.pid, $0) }
         )
         self.generatedAt = generatedAt
+        self.hasCompleteAppLayerCoverage = hasCompleteAppLayerCoverage
     }
 
     mutating func upsert(
         entries: [RuntimeAppDirectoryEntry],
-        generatedAt: TimeInterval
+        generatedAt: TimeInterval,
+        completesAppLayerCoverage: Bool = false
     ) {
         guard !entries.isEmpty else { return }
 
@@ -181,6 +185,7 @@ struct RuntimeAppDirectoryState: Equatable {
             entriesByPID[entry.pid] = entry.preservingActivationRank(from: entriesByPID[entry.pid])
         }
         self.generatedAt = generatedAt
+        hasCompleteAppLayerCoverage = hasCompleteAppLayerCoverage || completesAppLayerCoverage
     }
 
     mutating func remove(
