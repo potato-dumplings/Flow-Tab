@@ -72,6 +72,15 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(degradedPayload.homeSummaries.first?.windowCount, 1)
         XCTAssertTrue(degradedPayload.contextsByID.isEmpty)
         XCTAssertFalse(degradedPayload.hasCompleteWindowCoverage)
+        let degradedSearchPayload = try XCTUnwrap(
+            builder.searchIndexPayloadFromMainTables(
+                appDirectoryEntries: [entryWithoutActivationHandle],
+                generatedAt: 79
+            )
+        )
+        XCTAssertEqual(degradedSearchPayload.appEntries.map(\.appID), [appID])
+        XCTAssertEqual(degradedSearchPayload.windowEntries.map(\.appID), [appID])
+        XCTAssertFalse(degradedSearchPayload.hasCompleteWindowCoverage)
 
         let payload = try XCTUnwrap(
             builder.appSwitcherProjectionPayloadFromMainTables(
@@ -95,6 +104,18 @@ extension FlowTabPriorityCoverageTests {
             payload.contextsByID[appID]?.windowsByID[projectedWindowID]?.spaceIDs,
             [5]
         )
+        XCTAssertTrue(payload.hasCompleteWindowCoverage)
+        let searchPayload = try XCTUnwrap(
+            builder.searchIndexPayloadFromMainTables(
+                appDirectoryEntries: [appDirectoryEntry],
+                generatedAt: 80
+            )
+        )
+        XCTAssertEqual(searchPayload.appEntries.map(\.appID), [appID])
+        XCTAssertEqual(searchPayload.windowEntries.map(\.windowID), [
+            RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindowID)
+        ])
+        XCTAssertTrue(searchPayload.hasCompleteWindowCoverage)
     }
 
     func testRuntimeProjectionServiceFiltersNestedZeroWindowDirectoryEntriesBeforeMainTableProjection() throws {
@@ -1827,7 +1848,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(store.diagnostics().dirtyAppIDs, [repairedApp.id])
     }
 
-    func testRuntimeReadModelStoreCommitsSearchFromCurrentProjectionCacheAfterBarrierValidation() throws {
+    func testRuntimeReadModelStoreCommitsSearchFromMainTablePayloadAfterBarrierValidation() throws {
         let store = RuntimeReadModelStore()
         let committedApps = searchScenarioApps()
         let runningApp = NSRunningApplication.current
@@ -1888,8 +1909,37 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(read.readiness, .degradedStaleCommitted)
         XCTAssertEqual(read.resultState, .degradedStaleCommittedResult)
 
+        let appSearchIndex = SearchTextMatcher.buildIndex(
+            for: repairedApp.displayName,
+            identifier: appID
+        )
+        let searchPayload = RuntimeSearchIndexPayload(
+            appEntries: [
+                RuntimeSearchAppIndexEntry(
+                    appID: appID,
+                    appDisplayName: repairedApp.displayName,
+                    appGroupID: repairedApp.groupID,
+                    appLastActiveAt: repairedApp.lastActiveAt,
+                    searchIndex: appSearchIndex
+                )
+            ],
+            windowEntries: [
+                RuntimeSearchWindowIndexEntry(
+                    appID: appID,
+                    appDisplayName: repairedApp.displayName,
+                    windowID: "main-table-search-payload-window",
+                    windowTitle: "Main Table Search Payload",
+                    windowIsMinimized: false,
+                    windowLastActiveAt: 341,
+                    windowSearchIndex: SearchTextMatcher.buildIndex(for: "Main Table Search Payload"),
+                    appSearchIndex: appSearchIndex
+                )
+            ],
+            hasCompleteWindowCoverage: true
+        )
         let committed = try XCTUnwrap(
-            store.commitSearchFreshnessBarrierFromProjectionCache(
+            store.commitSearchFreshnessBarrierFromMainTablePayload(
+                searchPayload,
                 deferredRequestCount: 0,
                 hasPendingRequests: false,
                 generatedAt: 21
@@ -1902,7 +1952,10 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(read.resultState, .committedGenerationResult)
         XCTAssertEqual(
             read.projection?.windowEntries.filter { $0.appID == appID }.map(\.windowID),
-            ["browser-main-table-search"]
+            ["main-table-search-payload-window"]
+        )
+        XCTAssertFalse(
+            read.projection?.windowEntries.map(\.windowID).contains("browser-main-table-search") ?? true
         )
         XCTAssertTrue(store.diagnostics().dirtyAppIDs.isEmpty)
     }

@@ -14,6 +14,11 @@ protocol RuntimeMainTableProjectionBuilding: AnyObject {
         appDirectoryEntries: [RuntimeAppDirectoryEntry],
         generatedAt: TimeInterval
     ) -> RuntimeAppSwitcherProjectionPayload?
+
+    func searchIndexPayloadFromMainTables(
+        appDirectoryEntries: [RuntimeAppDirectoryEntry],
+        generatedAt: TimeInterval
+    ) -> RuntimeSearchIndexPayload?
 }
 
 final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuilding {
@@ -198,6 +203,49 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
         )
     }
 
+    func searchIndexPayloadFromMainTables(
+        appDirectoryEntries: [RuntimeAppDirectoryEntry],
+        generatedAt: TimeInterval
+    ) -> RuntimeSearchIndexPayload? {
+        guard let appSwitcherPayload = appSwitcherProjectionPayloadFromMainTables(
+            appDirectoryEntries: appDirectoryEntries,
+            generatedAt: generatedAt
+        ) else {
+            return nil
+        }
+        let appEntries = appSwitcherPayload.apps.map { app in
+            RuntimeSearchAppIndexEntry(
+                appID: app.id,
+                appDisplayName: app.displayName,
+                appGroupID: app.groupID,
+                appLastActiveAt: app.lastActiveAt,
+                searchIndex: SearchTextMatcher.buildIndex(for: app.displayName, identifier: app.id)
+            )
+        }
+        let appSearchIndexes = Dictionary(uniqueKeysWithValues: appEntries.map { ($0.appID, $0.searchIndex) })
+        let windowEntries = appSwitcherPayload.apps.flatMap { app -> [RuntimeSearchWindowIndexEntry] in
+            let appSearchIndex = appSearchIndexes[app.id]
+                ?? SearchTextMatcher.buildIndex(for: app.displayName, identifier: app.id)
+            return app.windows.map { window in
+                RuntimeSearchWindowIndexEntry(
+                    appID: app.id,
+                    appDisplayName: app.displayName,
+                    windowID: window.id,
+                    windowTitle: window.title.trimmingCharacters(in: .whitespacesAndNewlines),
+                    windowIsMinimized: window.isMinimized,
+                    windowLastActiveAt: window.lastActiveAt,
+                    windowSearchIndex: SearchTextMatcher.buildIndex(for: window.title),
+                    appSearchIndex: appSearchIndex
+                )
+            }
+        }
+        return RuntimeSearchIndexPayload(
+            appEntries: appEntries,
+            windowEntries: windowEntries,
+            hasCompleteWindowCoverage: appSwitcherPayload.hasCompleteWindowCoverage
+        )
+    }
+
     private static func displayName(for entry: RuntimeAppDirectoryEntry) -> String {
         entry.localizedName ?? entry.bundleIdentifier ?? entry.appID
     }
@@ -217,6 +265,13 @@ final class RuntimeUnavailableMainTableProjectionBuilder: RuntimeMainTableProjec
         appDirectoryEntries: [RuntimeAppDirectoryEntry],
         generatedAt: TimeInterval
     ) -> RuntimeAppSwitcherProjectionPayload? {
+        nil
+    }
+
+    func searchIndexPayloadFromMainTables(
+        appDirectoryEntries: [RuntimeAppDirectoryEntry],
+        generatedAt: TimeInterval
+    ) -> RuntimeSearchIndexPayload? {
         nil
     }
 }

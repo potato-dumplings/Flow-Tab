@@ -158,6 +158,33 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         return committedSearchIndex
     }
 
+    @discardableResult
+    func commitSearchFreshnessBarrierFromMainTablePayload(
+        _ payload: RuntimeSearchIndexPayload,
+        deferredRequestCount: Int,
+        hasPendingRequests: Bool,
+        generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
+    ) -> RuntimeSearchIndexProjection? {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard deferredRequestCount == 0,
+              !hasPendingRequests,
+              payload.hasCompleteWindowCoverage,
+              !isDirtyLocked
+        else {
+            return nil
+        }
+        markProjectionCommittedLocked()
+        clearDirtyStateLocked()
+        committedSearchIndex = RuntimeSearchIndexProjection(
+            appEntries: payload.appEntries,
+            windowEntries: payload.windowEntries,
+            freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: true)
+        )
+        return committedSearchIndex
+    }
+
     func markAppLifecycleDirty(
         appID: String,
         pid: pid_t,

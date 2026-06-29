@@ -2431,6 +2431,38 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(read.committedIndexCoversCurrentGeneration)
     }
 
+    func testRuntimeProjectionServiceSearchFreshnessBarrierDoesNotCommitFromProjectionCacheWithoutMainTablePayload() throws {
+        let coordinator = RuntimeReconciliationCoordinator()
+        let windowRecordStore = RuntimeWindowRecordStore()
+        let store = RuntimeReadModelStore()
+        let cachedApps = searchScenarioApps()
+        store.seedAppSwitcherProjectionForTesting(
+            apps: cachedApps,
+            contextsByID: [:],
+            appDirectoryEntries: nil,
+            hasCompleteWindowCoverage: true,
+            generatedAt: 10
+        )
+        XCTAssertEqual(store.readCommittedSearchIndexForSearch().readiness, .missingCommittedIndex)
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.SearchBarrierNoMainTablePayload",
+            repairProvider: RuntimeProjectionRepairProvider(
+                windowRecordStore: windowRecordStore,
+                reconciliationCoordinator: coordinator
+            ),
+            mainTableProjectionBuilder: RuntimeUnavailableMainTableProjectionBuilder(),
+            readModelStore: store
+        )
+
+        service.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
+        service.waitForMaintenanceQueueForTesting()
+
+        let read = store.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(read.readiness, .missingCommittedIndex)
+        XCTAssertEqual(read.resultState, .missingCommittedIndex)
+        XCTAssertNil(read.projection)
+    }
+
     func testRuntimeProjectionServiceSearchFreshnessBarrierCommitsRepairedSearchGeneration() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let runningApp = NSRunningApplication.current

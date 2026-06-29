@@ -161,7 +161,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             )
             let hasPendingRequests = repairProvider.hasPendingReconciliationRequests()
             let diagnostics = readModelStore.diagnostics()
-            let projectionCacheSearchCommit = readModelStore.commitSearchFreshnessBarrierFromProjectionCache(
+            let mainTableSearchCommit = commitSearchIndexFromMainTablesLocked(
                 deferredRequestCount: drainResult.deferredCount,
                 hasPendingRequests: hasPendingRequests,
                 generatedAt: now
@@ -185,8 +185,8 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                     "pendingRequests=\(hasPendingRequests ? 1 : 0)",
                     "currentAppRepairEvidence=\(drainResult.currentAppRepairEvidence.count)",
                     "mainTableProjectionCommitted=\(mainTableProjectionCommitted ? 1 : 0)",
-                    "committedSearchIndex=\(projectionCacheSearchCommit != nil ? 1 : 0)",
-                    "projectionCacheSearchCommit=\(projectionCacheSearchCommit != nil ? 1 : 0)"
+                    "committedSearchIndex=\(mainTableSearchCommit != nil ? 1 : 0)",
+                    "mainTableSearchCommit=\(mainTableSearchCommit != nil ? 1 : 0)"
                 ].joined(separator: " ")
             )
         }
@@ -551,6 +551,29 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             generatedAt: generatedAt
         )
         return true
+    }
+
+    @discardableResult
+    private func commitSearchIndexFromMainTablesLocked(
+        deferredRequestCount: Int,
+        hasPendingRequests: Bool,
+        generatedAt: TimeInterval
+    ) -> RuntimeSearchIndexProjection? {
+        guard
+            let appDirectoryEntries = readModelStore.readAppDirectoryProjection()?.entries,
+            let payload = mainTableProjectionBuilder.searchIndexPayloadFromMainTables(
+                appDirectoryEntries: appDirectoryEntries,
+                generatedAt: generatedAt
+            )
+        else {
+            return nil
+        }
+        return readModelStore.commitSearchFreshnessBarrierFromMainTablePayload(
+            payload,
+            deferredRequestCount: deferredRequestCount,
+            hasPendingRequests: hasPendingRequests,
+            generatedAt: generatedAt
+        )
     }
 
     private func performMaintenanceSynchronously(_ work: () -> Void) {

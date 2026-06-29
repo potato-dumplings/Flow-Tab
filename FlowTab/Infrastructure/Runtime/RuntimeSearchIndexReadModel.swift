@@ -48,6 +48,12 @@ struct RuntimeSearchIndexProjection: Equatable, Sendable {
     }
 }
 
+struct RuntimeSearchIndexPayload: Equatable, Sendable {
+    let appEntries: [RuntimeSearchAppIndexEntry]
+    let windowEntries: [RuntimeSearchWindowIndexEntry]
+    let hasCompleteWindowCoverage: Bool
+}
+
 enum RuntimeSearchIndexReadiness: String, Equatable, Sendable {
     case committedGenerationValidated
     case degradedStaleCommitted
