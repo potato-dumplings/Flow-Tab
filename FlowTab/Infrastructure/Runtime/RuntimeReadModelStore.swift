@@ -36,18 +36,19 @@ final class RuntimeReadModelStore: @unchecked Sendable {
                 dirtyPIDs.remove(clearsDirtyForPID)
             }
         }
+        let isCompleteForScope = !isDirtyLocked && payload.hasCompleteWindowCoverage
         appSwitcherProjection = RuntimeAppSwitcherProjection(
             apps: payload.apps,
             contextsByID: payload.contextsByID,
-            freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: !isDirtyLocked)
+            freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: isCompleteForScope)
         )
         homeSummaryProjection = RuntimeHomeSummaryProjection(
             summaries: homeSummariesLocked(for: payload.apps, contextsByID: payload.contextsByID),
-            freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: !isDirtyLocked)
+            freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: isCompleteForScope)
         )
         return RuntimeAppSwitcherProjectionCommitSummary(
-            coldStartCommittedCount: clearsDirtyState ? 1 : 0,
-            degradedCommittedCount: clearsDirtyState ? 0 : 1
+            coldStartCommittedCount: clearsDirtyState && isCompleteForScope ? 1 : 0,
+            degradedCommittedCount: clearsDirtyState && isCompleteForScope ? 0 : 1
         )
     }
 
@@ -130,6 +131,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         guard deferredRequestCount == 0,
               !hasPendingRequests,
               let projection = appSwitcherProjection,
+              projection.freshness.isCompleteForScope,
               projection.freshness.sourceGeneration == generation
         else {
             return nil
@@ -285,7 +287,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         if var projection = appSwitcherProjection {
             projection.freshness = freshnessLocked(
                 generatedAt: projection.freshness.generatedAt,
-                isCompleteForScope: !isDirtyLocked
+                isCompleteForScope: projection.freshness.isCompleteForScope && !isDirtyLocked
             )
             return projection
         }
@@ -306,7 +308,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         if var projection = homeSummaryProjection {
             projection.freshness = freshnessLocked(
                 generatedAt: projection.freshness.generatedAt,
-                isCompleteForScope: !isDirtyLocked
+                isCompleteForScope: projection.freshness.isCompleteForScope && !isDirtyLocked
             )
             return projection
         }

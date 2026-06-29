@@ -158,7 +158,13 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
                 uniqueKeysWithValues: rows.compactMap { row in
                     row.context.map { ($0.appID, $0) }
                 }
-            )
+            ),
+            hasCompleteWindowCoverage: rows.allSatisfy { row in
+                guard let context = row.context,
+                      !row.candidate.windows.isEmpty
+                else { return false }
+                return context.windowsByID.count == row.candidate.windows.count
+            }
         )
     }
 

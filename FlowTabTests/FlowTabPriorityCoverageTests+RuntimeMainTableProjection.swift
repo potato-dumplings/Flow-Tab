@@ -608,6 +608,56 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
+    func testRuntimeProjectionServiceKeepsAppDirectoryOnlyMainTableProjectionIncompleteForSearch() throws {
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let appDirectoryEntry = RuntimeAppDirectoryEntry(app: runningApp)
+        let windowRecordStore = RuntimeWindowRecordStore()
+        let readModelStore = RuntimeReadModelStore()
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.AppDirectoryOnlyMainTableProjection",
+            repairProvider: RuntimeProjectionRepairProvider(
+                windowRecordStore: windowRecordStore,
+                reconciliationCoordinator: RuntimeReconciliationCoordinator()
+            ),
+            mainTableProjectionBuilder: RuntimeMainTableProjectionBuilder(
+                windowRecordStore: windowRecordStore
+            ),
+            appDirectoryProvider: FixedRuntimeAppDirectoryProvider(entries: [appDirectoryEntry]),
+            readModelStore: readModelStore,
+            reconciliationExecutor: { _, _ in .completed }
+        )
+
+        service.requestAppSwitcherProjectionMaintenance(reason: .switcherSessionStarted)
+        service.waitForMaintenanceQueueForTesting()
+
+        let appProjection = try XCTUnwrap(readModelStore.readAppSwitcherProjection())
+        XCTAssertEqual(appProjection.apps.map(\.id), [appID])
+        XCTAssertTrue(appProjection.apps.first?.windows.isEmpty == true)
+        XCTAssertNotNil(appProjection.contextsByID[appID])
+        XCTAssertTrue(appProjection.contextsByID[appID]?.windowsByID.isEmpty == true)
+        XCTAssertEqual(appProjection.freshness.sourceGeneration.appLifecycle, 1)
+        XCTAssertEqual(appProjection.freshness.sourceGeneration.projection, 1)
+        XCTAssertFalse(appProjection.freshness.isCompleteForScope)
+
+        let homeProjection = try XCTUnwrap(readModelStore.readHomeSummaryProjection())
+        XCTAssertEqual(homeProjection.summary(for: appID)?.windowCount, 0)
+        XCTAssertEqual(homeProjection.freshness.sourceGeneration.projection, 1)
+        XCTAssertFalse(homeProjection.freshness.isCompleteForScope)
+        XCTAssertEqual(
+            readModelStore.readCommittedSearchIndexForSearch().readiness,
+            .missingCommittedIndex
+        )
+
+        service.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
+        service.waitForMaintenanceQueueForTesting()
+
+        let searchRead = readModelStore.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(searchRead.readiness, .missingCommittedIndex)
+        XCTAssertEqual(searchRead.resultState, .missingCommittedIndex)
+        XCTAssertNil(searchRead.projection)
+    }
+
     func testRuntimeProjectionServiceCommitsSpaceTopologyProjectionFromMainTablesAsStale() throws {
         let runningApp = NSRunningApplication.current
         let appID = RuntimeAppIdentity.appID(for: runningApp)

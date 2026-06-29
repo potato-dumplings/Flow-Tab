@@ -541,6 +541,7 @@ extension FlowTabTests {
             XCTAssertEqual(projectionPayload?.contextsByID.count, projectionPayload?.apps.count)
             XCTAssertTrue(projectionPayload?.apps.allSatisfy { $0.windows.isEmpty } == true)
             XCTAssertTrue(projectionPayload?.contextsByID.values.allSatisfy { $0.windowsByID.isEmpty } == true)
+            XCTAssertFalse(projectionPayload?.hasCompleteWindowCoverage ?? true)
         }
     }
 

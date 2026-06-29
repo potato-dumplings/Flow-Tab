@@ -7,13 +7,16 @@ import FlowTabCore
 struct RuntimeAppSwitcherProjectionPayload {
     let apps: [AppSwitchCandidate]
     let contextsByID: [String: RuntimeAppContext]
+    let hasCompleteWindowCoverage: Bool
 
     init(
         apps: [AppSwitchCandidate],
-        contextsByID: [String: RuntimeAppContext]
+        contextsByID: [String: RuntimeAppContext],
+        hasCompleteWindowCoverage: Bool = true
     ) {
         self.apps = apps
         self.contextsByID = contextsByID
+        self.hasCompleteWindowCoverage = hasCompleteWindowCoverage
     }
 }
 
