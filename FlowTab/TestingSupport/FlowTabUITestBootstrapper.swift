@@ -123,13 +123,13 @@ enum FlowTabUITestBootstrapper {
 
         guard FlowTabTestLaunchOptions.enablesMockHotkeyEffects else { return }
 
-        panelController.modelForTesting.terminateRequestOverride = { appID in
+        panelController.modelForTesting.terminateRequestOverride = { [weak panelController] appID in
             let pid = FlowTabUITestMockRuntimeEffects.recordTerminateRequest(appID: appID)
             RuntimeLog.info("UITest", "mock terminate request appID=\(appID) pid=\(pid)")
+            Task { @MainActor [weak panelController] in
+                panelController?.handleWorkspaceApplicationTerminatedForTesting(appID: appID, pid: pid)
+            }
             return (sent: true, pid: pid)
-        }
-        panelController.modelForTesting.isProcessRunningOverride = { pid in
-            FlowTabUITestMockRuntimeEffects.isProcessRunning(pid: pid)
         }
     }
 

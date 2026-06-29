@@ -898,7 +898,6 @@ extension FlowTabPriorityCoverageTests {
         controller.modelForTesting.terminateRequestOverride = { _ in
             (sent: true, pid: 42_100)
         }
-        controller.modelForTesting.isProcessRunningOverride = { _ in true }
 
         XCTAssertTrue(controller.modelForTesting.startSession(triggerDirection: .forward))
         assertAppSwitcherProjectionSessionRead(from: runtimeProjectionService)
@@ -913,13 +912,27 @@ extension FlowTabPriorityCoverageTests {
         )
 
         XCTAssertTrue(handled)
+        let didEnterTerminateFlow = await waitUntil(
+            "quit shortcut enters terminate flow",
+            timeoutNanoseconds: 1_000_000_000,
+            pollIntervalNanoseconds: 10_000_000
+        ) {
+            controller.modelForTesting.pendingTerminateRequest?.appID == selectedAppID
+        }
+        XCTAssertTrue(didEnterTerminateFlow)
         XCTAssertEqual(controller.modelForTesting.terminatingAppID, selectedAppID)
+        XCTAssertEqual(controller.modelForTesting.pendingTerminateRequest?.appID, selectedAppID)
+        XCTAssertTrue(runtimeProjectionService.appTerminationSignalsRecorded().isEmpty)
+        assertAppSwitcherProjectionSessionRead(
+            from: runtimeProjectionService,
+            maintenanceRequests: [.switcherSessionStarted, .appLifecycleRefresh]
+        )
         XCTAssertNotNil(controller.modelForTesting.session)
         controller.modelForTesting.cancelSelection()
     }
 
     @MainActor
-    func testSwitcherPanelControllerQuitFrontmostAppInAppLayerKeepsSessionAfterAutomaticTerminationRefresh() async {
+    func testSwitcherPanelControllerQuitFrontmostAppInAppLayerKeepsSessionAfterWorkspaceTerminationRefresh() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
             let initialApps = self.terminateScenarioApps()
             let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: initialApps)
@@ -929,12 +942,10 @@ extension FlowTabPriorityCoverageTests {
             controller.modelForTesting.terminateRequestOverride = { _ in
                 (sent: true, pid: 42_100)
             }
-            // Use polling path to drive a fully automatic refresh after quit shortcut.
-            controller.modelForTesting.isProcessRunningOverride = { _ in false }
 
             XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
             guard let sessionBeforeTermination = controller.modelForTesting.session else {
-                XCTFail("Expected an active session before automatic terminate refresh")
+                XCTFail("Expected an active session before workspace terminate refresh")
                 return
             }
             let terminatedAppID = sessionBeforeTermination.selectedApp.id
@@ -958,6 +969,23 @@ extension FlowTabPriorityCoverageTests {
                 )
             )
             XCTAssertTrue(handled)
+            let didEnterTerminateFlow = await waitUntil(
+                "quit shortcut enters terminate flow before workspace notification",
+                timeoutNanoseconds: 1_000_000_000,
+                pollIntervalNanoseconds: 10_000_000
+            ) {
+                controller.modelForTesting.pendingTerminateRequest?.appID == terminatedAppID
+            }
+            XCTAssertTrue(didEnterTerminateFlow)
+            assertAppSwitcherProjectionSessionRead(
+                from: runtimeProjectionService,
+                maintenanceRequests: [.switcherSessionStarted, .appLifecycleRefresh]
+            )
+            XCTAssertEqual(controller.modelForTesting.appCount, initialApps.count)
+            XCTAssertTrue(controller.modelForTesting.session?.apps.contains { $0.id == terminatedAppID } ?? false)
+            XCTAssertTrue(runtimeProjectionService.appTerminationSignalsRecorded().isEmpty)
+
+            controller.handleWorkspaceApplicationTerminatedForTesting(appID: terminatedAppID, pid: 42_100)
 
             await fulfillment(of: [layoutRefreshed], timeout: 1.0)
 
@@ -966,7 +994,11 @@ extension FlowTabPriorityCoverageTests {
             XCTAssertEqual(controller.modelForTesting.selectedApp?.id, expectedSelectedAppID)
             XCTAssertFalse(controller.modelForTesting.session?.apps.contains { $0.id == terminatedAppID } ?? true)
             XCTAssertEqual(runtimeProjectionService.appTerminationSignalsRecorded().map(\.appID), [terminatedAppID])
-            assertAppSwitcherProjectionSessionRead(from: runtimeProjectionService, minimumReadCount: 2)
+            assertAppSwitcherProjectionSessionRead(
+                from: runtimeProjectionService,
+                minimumReadCount: 2,
+                maintenanceRequests: [.switcherSessionStarted, .appLifecycleRefresh]
+            )
             XCTAssertFalse(controller.modelForTesting.isSearchActive)
             controller.cancelSelectionForTesting()
         }
@@ -1020,6 +1052,7 @@ extension FlowTabPriorityCoverageTests {
     private func assertAppSwitcherProjectionSessionRead(
         from runtimeProjectionService: RecordingRuntimeProjectionService,
         minimumReadCount: Int = 1,
+        maintenanceRequests: [RuntimeProjectionMaintenanceReason] = [.switcherSessionStarted],
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
@@ -1031,7 +1064,7 @@ extension FlowTabPriorityCoverageTests {
         )
         XCTAssertEqual(
             runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(),
-            [.switcherSessionStarted],
+            maintenanceRequests,
             file: file,
             line: line
         )

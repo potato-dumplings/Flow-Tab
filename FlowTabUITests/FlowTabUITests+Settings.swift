@@ -544,24 +544,31 @@ extension FlowTabUITests {
             launchFlowTabUITestApplication(app)
             XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
 
+            let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
+            XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
             let browserTile = element(in: app, identifier: Identifier.switcherAppMockBrowser)
             XCTAssertTrue(browserTile.waitForExistence(timeout: 8))
+            let selectedAppID = switcherPanelDiagnosticsValue(diagnosticsSummary, key: "selected")
+            XCTAssertFalse(selectedAppID.isEmpty)
+            let selectedTile = element(
+                in: app,
+                identifier: "flowtab.switcher.app.\(selectedAppID.flowTabUITestAccessibilityIdentifierComponent)"
+            )
+            XCTAssertTrue(selectedTile.waitForExistence(timeout: 8))
 
             let logSnapshot = makeRuntimeLogFileSnapshot()
             typeHotkey(in: app, key: item.triggerKey, modifier: "option")
             waitForRuntimeLogFiles(
                 containing: [
-                    "mock terminate request appID=com.flowtab.mock.browser",
-                    "terminate request app=Mock Browser appID=com.flowtab.mock.browser sent=true"
-                ],
-                containingOneOf: [
-                    "terminate post-refresh reason=initial_process_check appID=com.flowtab.mock.browser",
-                    "terminate post-refresh reason=poll appID=com.flowtab.mock.browser"
+                    "mock terminate request appID=\(selectedAppID)",
+                    "terminate request app=",
+                    "appID=\(selectedAppID) sent=true",
+                    "terminate post-refresh reason=workspace_notification appID=\(selectedAppID)"
                 ],
                 since: logSnapshot,
                 timeout: 10
             )
-            XCTAssertTrue(waitForNonExistence(browserTile, timeout: 6))
+            XCTAssertTrue(waitForNonExistence(selectedTile, timeout: 6))
             app.terminate()
         }
     }

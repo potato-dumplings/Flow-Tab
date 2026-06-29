@@ -4,44 +4,6 @@ import CoreGraphics
 import SwiftUI
 import FlowTabCore
 
-struct TerminateRefreshPollingDiagnostic: Equatable {
-    enum Action: String, Equatable {
-        case refresh
-        case timeout
-        case canceled
-    }
-
-    enum ProcessState: String, Equatable {
-        case running
-        case exited
-        case unknown
-    }
-
-    let appID: String
-    let pid: pid_t
-    let appInstanceGeneration: UInt64
-    let attempt: Int
-    let maxAttempts: Int
-    let elapsedMs: Double
-    let finalProcessState: ProcessState
-    let reason: String
-    let action: Action
-
-    var logMessage: String {
-        [
-            "terminate poll",
-            "action=\(action.rawValue)",
-            "reason=\(reason)",
-            "appID=\(appID)",
-            "pid=\(pid)",
-            "appInstanceGeneration=\(appInstanceGeneration)",
-            "attempt=\(attempt)/\(maxAttempts)",
-            "elapsedMs=\(String(format: "%.3f", elapsedMs))",
-            "finalProcessState=\(finalProcessState.rawValue)"
-        ].joined(separator: " ")
-    }
-}
-
 @MainActor
 final class LiveSwitcherModel: ObservableObject {
     enum TerminateSelectedAppResult {
@@ -233,7 +195,6 @@ final class LiveSwitcherModel: ObservableObject {
     var onSearchResultScrollRequestForTesting: ((String) -> Void)?
     var activationOverride: ((ActivationTarget, [String: RuntimeAppContext]) -> Void)?
     var terminateRequestOverride: ((String) -> (sent: Bool, pid: pid_t))?
-    var isProcessRunningOverride: ((pid_t) -> Bool)?
     var previewCaptureOverride: ((
         CGWindowID?,
         pid_t,
@@ -246,8 +207,6 @@ final class LiveSwitcherModel: ObservableObject {
     var previewCaptureBatchOutcomeOverride: ((
         [RuntimeWindowPreviewProvider.CaptureRequest]
     ) -> [RuntimeWindowPreviewProvider.CaptureOutcome])?
-    var terminateRefreshPollIntervalNs: UInt64 = 60_000_000
-    var terminateRefreshTimeoutNs: UInt64 = 1_800_000_000
 
     var sessionAppsByID: [String: AppSwitchCandidate] = [:]
     var committedSearchAppsByID: [String: AppSwitchCandidate] = [:]
@@ -269,9 +228,7 @@ final class LiveSwitcherModel: ObservableObject {
     var titleBarStyleInferenceEnabled = false
     var searchInputHasMarkedText = false
     var pendingSearchComputationTask: Task<Void, Never>?
-    var pendingTerminateRefreshTask: Task<Void, Never>?
     var pendingTerminateRequest: PendingTerminateRequest?
-    var lastTerminateRefreshPollingDiagnostic: TerminateRefreshPollingDiagnostic?
     var terminateAppInstanceGeneration: UInt64 = 0
     var runtimeProjectionMaintenanceGeneration: UInt64 = 0
     var runtimeProjectionMaintenanceEnabled = true
@@ -387,7 +344,6 @@ final class LiveSwitcherModel: ObservableObject {
     }
 
     func startSession(triggerDirection: CycleDirection) -> Bool {
-        cancelPendingTerminateRefresh()
         invalidateSelectedAppWindowProjection(reason: .startSession)
         clearTerminateSelectedAppAnimation()
         overlayStyle = .appAndWindow
@@ -402,7 +358,6 @@ final class LiveSwitcherModel: ObservableObject {
 
     func startFocusedAppWindowSession(triggerDirection: CycleDirection) -> Bool {
         let startMs = Self.monotonicMilliseconds()
-        cancelPendingTerminateRefresh()
         invalidateSelectedAppWindowProjection(reason: .startFocusedWindowSession)
         clearTerminateSelectedAppAnimation()
         overlayStyle = .windowOnly
@@ -525,147 +480,8 @@ final class LiveSwitcherModel: ObservableObject {
         )
         pendingTerminateRequest = request
         terminatingAppID = selectedApp.id
-        schedulePostTerminateRefresh(for: request)
+        runtimeProjectionService.requestAppSwitcherProjectionMaintenance(reason: .appLifecycleRefresh)
         return .updatedSession
-    }
-
-    func schedulePostTerminateRefresh(for request: PendingTerminateRequest) {
-        cancelPendingTerminateRefresh()
-        let maxAttempts = max(1, Int(terminateRefreshTimeoutNs / terminateRefreshPollIntervalNs))
-        let startMs = Self.monotonicMilliseconds()
-        pendingTerminateRefreshTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            guard self.session != nil, self.pendingTerminateRequest == request else {
-                self.recordTerminateRefreshPollingDiagnostic(
-                    request: request,
-                    attempt: 0,
-                    maxAttempts: maxAttempts,
-                    startMs: startMs,
-                    finalProcessState: .unknown,
-                    reason: "request_stale",
-                    action: .canceled
-                )
-                self.pendingTerminateRefreshTask = nil
-                return
-            }
-            if !self.isProcessRunning(request.pid) {
-                self.recordTerminateRefreshPollingDiagnostic(
-                    request: request,
-                    attempt: 0,
-                    maxAttempts: maxAttempts,
-                    startMs: startMs,
-                    finalProcessState: .exited,
-                    reason: "initial_process_check",
-                    action: .refresh
-                )
-                self.refreshSessionAfterTerminatedApplication(
-                    appID: request.appID,
-                    pid: request.pid,
-                    reason: "initial_process_check"
-                )
-                self.pendingTerminateRefreshTask = nil
-                return
-            }
-
-            for attempt in 1...maxAttempts {
-                try? await Task.sleep(nanoseconds: self.terminateRefreshPollIntervalNs)
-                guard !Task.isCancelled else { return }
-                guard self.session != nil else { break }
-                guard self.pendingTerminateRequest == request else { break }
-
-                guard !self.isProcessRunning(request.pid) else { continue }
-                self.recordTerminateRefreshPollingDiagnostic(
-                    request: request,
-                    attempt: attempt,
-                    maxAttempts: maxAttempts,
-                    startMs: startMs,
-                    finalProcessState: .exited,
-                    reason: "poll",
-                    action: .refresh
-                )
-                self.refreshSessionAfterTerminatedApplication(
-                    appID: request.appID,
-                    pid: request.pid,
-                    reason: "poll"
-                )
-                self.pendingTerminateRefreshTask = nil
-                return
-            }
-
-            guard self.pendingTerminateRequest == request else {
-                self.recordTerminateRefreshPollingDiagnostic(
-                    request: request,
-                    attempt: maxAttempts,
-                    maxAttempts: maxAttempts,
-                    startMs: startMs,
-                    finalProcessState: .unknown,
-                    reason: "request_changed",
-                    action: .canceled
-                )
-                self.pendingTerminateRefreshTask = nil
-                return
-            }
-            if !self.isProcessRunning(request.pid) {
-                self.recordTerminateRefreshPollingDiagnostic(
-                    request: request,
-                    attempt: maxAttempts,
-                    maxAttempts: maxAttempts,
-                    startMs: startMs,
-                    finalProcessState: .exited,
-                    reason: "poll_timeout_final_check",
-                    action: .refresh
-                )
-                self.refreshSessionAfterTerminatedApplication(
-                    appID: request.appID,
-                    pid: request.pid,
-                    reason: "poll_timeout_final_check"
-                )
-                self.pendingTerminateRefreshTask = nil
-                return
-            }
-            self.recordTerminateRefreshPollingDiagnostic(
-                request: request,
-                attempt: maxAttempts,
-                maxAttempts: maxAttempts,
-                startMs: startMs,
-                finalProcessState: .running,
-                reason: "timeout",
-                action: .timeout
-            )
-            self.pendingTerminateRequest = nil
-            if self.terminatingAppID == request.appID {
-                self.terminatingAppID = nil
-            }
-            self.pendingTerminateRefreshTask = nil
-        }
-    }
-
-    func recordTerminateRefreshPollingDiagnostic(
-        request: PendingTerminateRequest,
-        attempt: Int,
-        maxAttempts: Int,
-        startMs: Double,
-        finalProcessState: TerminateRefreshPollingDiagnostic.ProcessState,
-        reason: String,
-        action: TerminateRefreshPollingDiagnostic.Action
-    ) {
-        let diagnostic = TerminateRefreshPollingDiagnostic(
-            appID: request.appID,
-            pid: request.pid,
-            appInstanceGeneration: request.generation,
-            attempt: attempt,
-            maxAttempts: maxAttempts,
-            elapsedMs: max(0, Self.monotonicMilliseconds() - startMs),
-            finalProcessState: finalProcessState,
-            reason: reason,
-            action: action
-        )
-        lastTerminateRefreshPollingDiagnostic = diagnostic
-        if action == .timeout {
-            RuntimeLog.error(.session, diagnostic.logMessage)
-        } else {
-            RuntimeLog.info(.session, diagnostic.logMessage)
-        }
     }
 
     func restoreSearchStateAfterProjectionRefreshIfNeeded(
@@ -856,7 +672,6 @@ final class LiveSwitcherModel: ObservableObject {
         let target = session.commitSelection()
         rememberedWindowIDByAppID = session.rememberedWindowIDByAppID
         invalidateRuntimeProjectionMaintenanceRequest(reason: .commitSelection)
-        cancelPendingTerminateRefresh()
         clearTerminateSelectedAppAnimation()
         cancelPendingSearchComputation()
         self.session = nil
@@ -883,7 +698,6 @@ final class LiveSwitcherModel: ObservableObject {
 
     func resetSessionState() {
         invalidateRuntimeProjectionMaintenanceRequest(reason: .resetSession)
-        cancelPendingTerminateRefresh()
         cancelPendingSearchComputation()
         session = nil
         pendingTerminateRequest = nil
@@ -908,11 +722,6 @@ final class LiveSwitcherModel: ObservableObject {
         pendingSearchComputationTask?.cancel()
         pendingSearchComputationTask = nil
         searchComputationRevision &+= 1
-    }
-
-    func cancelPendingTerminateRefresh() {
-        pendingTerminateRefreshTask?.cancel()
-        pendingTerminateRefreshTask = nil
     }
 
     func appSwitcherPayloadWithWindowRecencyApplied(
@@ -942,13 +751,6 @@ final class LiveSwitcherModel: ObservableObject {
             sent: context.runningApp.terminate(),
             pid: context.runningApp.processIdentifier
         )
-    }
-
-    func isProcessRunning(_ pid: pid_t) -> Bool {
-        if let isProcessRunningOverride {
-            return isProcessRunningOverride(pid)
-        }
-        return NSRunningApplication(processIdentifier: pid) != nil
     }
 
 }

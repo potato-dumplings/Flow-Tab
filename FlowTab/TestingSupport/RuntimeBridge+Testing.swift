@@ -6,14 +6,12 @@ enum FlowTabUITestMockRuntimeEffects {
     private static let lock = NSLock()
     private static var terminatedAppIDs: Set<String> = []
     private static var pidByAppID: [String: pid_t] = [:]
-    private static var appIDByPID: [pid_t: String] = [:]
     private static var nextPID: pid_t = 72_000
 
     static func reset() {
         lock.lock()
         terminatedAppIDs = []
         pidByAppID = [:]
-        appIDByPID = [:]
         nextPID = 72_000
         lock.unlock()
     }
@@ -29,7 +27,6 @@ enum FlowTabUITestMockRuntimeEffects {
         let pid = nextPID
         nextPID += 1
         pidByAppID[appID] = pid
-        appIDByPID[pid] = appID
         return pid
     }
 
@@ -44,18 +41,9 @@ enum FlowTabUITestMockRuntimeEffects {
             pid = nextPID
             nextPID += 1
             pidByAppID[appID] = pid
-            appIDByPID[pid] = appID
         }
         terminatedAppIDs.insert(appID)
         return pid
-    }
-
-    static func isProcessRunning(pid: pid_t) -> Bool {
-        lock.lock()
-        defer { lock.unlock() }
-
-        guard let appID = appIDByPID[pid] else { return true }
-        return !terminatedAppIDs.contains(appID)
     }
 
     static func isTerminated(appID: String) -> Bool {

@@ -6,6 +6,7 @@ let sharedRuntimeProjectionService = RuntimeProjectionService()
 
 final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Sendable {
     private let maintenanceQueue: DispatchQueue
+    private let maintenanceQueueSpecificKey = DispatchSpecificKey<Void>()
     private let repairProvider: RuntimeProjectionRepairProviding
     private let mainTableProjectionBuilder: RuntimeMainTableProjectionBuilding
     private let readModelStore: RuntimeReadModelStore
@@ -22,6 +23,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             runtimeProjectionDefaultReconciliationExecutor
     ) {
         maintenanceQueue = DispatchQueue(label: label, qos: .utility)
+        maintenanceQueue.setSpecific(key: maintenanceQueueSpecificKey, value: ())
         if let repairProvider {
             self.repairProvider = repairProvider
             self.mainTableProjectionBuilder = mainTableProjectionBuilder
@@ -348,7 +350,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     }
 
     func signalAppTerminated(appID: String, pid: pid_t) {
-        maintenanceQueue.async { [self] in
+        performMaintenanceSynchronously { [self] in
             let now = Date.timeIntervalSinceReferenceDate
             readModelStore.markAppTerminatedForMainTableProjection(appID: appID, pid: pid)
             repairProvider.recordAppTerminated(processIdentifier: pid)
@@ -549,6 +551,14 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             generatedAt: generatedAt
         )
         return true
+    }
+
+    private func performMaintenanceSynchronously(_ work: () -> Void) {
+        if DispatchQueue.getSpecific(key: maintenanceQueueSpecificKey) != nil {
+            work()
+            return
+        }
+        maintenanceQueue.sync(execute: work)
     }
 
 }

@@ -1142,7 +1142,6 @@ extension FlowTabPriorityCoverageTests {
         controller.modelForTesting.terminateRequestOverride = { _ in
             (sent: true, pid: 42_301)
         }
-        controller.modelForTesting.isProcessRunningOverride = { _ in true }
         controller.globalPrimaryModifierPressedOverride = false
         controller.globalMainKeyPressedOverride = false
         controller.appIsActiveOverride = false
@@ -1166,6 +1165,11 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(didEnterTerminateProtection)
 
         XCTAssertEqual(controller.modelForTesting.terminatingAppID, selectedAppID)
+        XCTAssertEqual(
+            runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(),
+            [.switcherSessionStarted, .appLifecycleRefresh]
+        )
+        XCTAssertTrue(runtimeProjectionService.appTerminationSignalsRecorded().isEmpty)
         controller.handlePanelDidResignKeyForTesting()
 
         XCTAssertNotNil(controller.modelForTesting.session)

@@ -155,7 +155,7 @@ extension FlowTabTests {
     }
 
     @MainActor
-    func testTerminateSelectedAppBehaviorKeepsAppUntilProcessActuallyExits() async {
+    func testTerminateSelectedAppBehaviorKeepsAppUntilWorkspaceTerminationArrives() async {
         let initialApps = terminateScenarioApps()
         let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: initialApps)
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
@@ -168,48 +168,42 @@ extension FlowTabTests {
 
         let appsAfterTermination = initialApps.filter { $0.id != terminatedAppID }
 
-        model.terminateRequestOverride = { _ in (sent: true, pid: 42_000) }
-        model.terminateRefreshPollIntervalNs = 2_000_000
-        model.terminateRefreshTimeoutNs = 100_000_000
-
-        var processCheckCount = 0
-        model.isProcessRunningOverride = { _ in
-            processCheckCount += 1
-            return processCheckCount < 2
-        }
+        let terminatedPID = pid_t(42_000)
+        model.terminateRequestOverride = { _ in (sent: true, pid: terminatedPID) }
 
         let layoutRefreshed = expectation(description: "post terminate layout refreshed")
         model.onSessionLayoutChanged = { layoutRefreshed.fulfill() }
 
         let result = model.terminateSelectedApp()
         XCTAssertEqual(result, .updatedSession)
-        assertRuntimeProjectionSessionRead(from: runtimeProjectionService)
+        assertRuntimeProjectionSessionRead(
+            from: runtimeProjectionService,
+            maintenanceRequests: [.switcherSessionStarted, .appLifecycleRefresh]
+        )
         XCTAssertEqual(model.appCount, initialApps.count)
         XCTAssertTrue(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? false)
         XCTAssertEqual(model.terminatingAppID, terminatedAppID)
+        XCTAssertEqual(model.pendingTerminateRequest?.appID, terminatedAppID)
+        XCTAssertEqual(model.pendingTerminateRequest?.pid, terminatedPID)
+        XCTAssertTrue(runtimeProjectionService.appTerminationSignalsRecorded().isEmpty)
 
+        XCTAssertTrue(model.handleApplicationTerminated(appID: terminatedAppID, pid: terminatedPID))
         await fulfillment(of: [layoutRefreshed], timeout: 1.0)
-        XCTAssertGreaterThanOrEqual(processCheckCount, 2)
         XCTAssertEqual(runtimeProjectionService.appTerminationSignalsRecorded().map(\.appID), [terminatedAppID])
-        assertRuntimeProjectionSessionRead(from: runtimeProjectionService, minimumReadCount: 2)
+        assertRuntimeProjectionSessionRead(
+            from: runtimeProjectionService,
+            minimumReadCount: 2,
+            maintenanceRequests: [.switcherSessionStarted, .appLifecycleRefresh]
+        )
         XCTAssertEqual(model.appCount, appsAfterTermination.count)
         XCTAssertFalse(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? true)
         XCTAssertNil(model.terminatingAppID)
-        XCTAssertEqual(model.lastTerminateRefreshPollingDiagnostic?.appID, terminatedAppID)
-        XCTAssertEqual(model.lastTerminateRefreshPollingDiagnostic?.pid, 42_000)
-        XCTAssertEqual(model.lastTerminateRefreshPollingDiagnostic?.appInstanceGeneration, 1)
-        XCTAssertEqual(model.lastTerminateRefreshPollingDiagnostic?.attempt, 1)
-        XCTAssertEqual(model.lastTerminateRefreshPollingDiagnostic?.finalProcessState, .exited)
-        XCTAssertEqual(model.lastTerminateRefreshPollingDiagnostic?.reason, "poll")
-        XCTAssertEqual(model.lastTerminateRefreshPollingDiagnostic?.action, .refresh)
-        XCTAssertTrue(
-            model.lastTerminateRefreshPollingDiagnostic?.logMessage.contains("finalProcessState=exited") ?? false
-        )
+        XCTAssertNil(model.pendingTerminateRequest)
         model.cancelSelection()
     }
 
     @MainActor
-    func testTerminateSelectedAppBehaviorRefreshesWithoutPollingDelayWhenProcessAlreadyExited() async {
+    func testTerminateSelectedAppBehaviorDoesNotTreatSentQuitRequestAsTerminationFact() async {
         let initialApps = terminateScenarioApps()
         let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: initialApps)
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
@@ -220,39 +214,19 @@ extension FlowTabTests {
             return
         }
 
-        let appsAfterTermination = initialApps.filter { $0.id != terminatedAppID }
-
         model.terminateRequestOverride = { _ in (sent: true, pid: 42_010) }
-        model.terminateRefreshPollIntervalNs = 5_000_000_000
-        model.terminateRefreshTimeoutNs = 5_000_000_000
-
-        var processCheckCount = 0
-        model.isProcessRunningOverride = { _ in
-            processCheckCount += 1
-            return false
-        }
-
-        let layoutRefreshed = expectation(description: "post terminate layout refreshed without polling delay")
-        model.onSessionLayoutChanged = { layoutRefreshed.fulfill() }
 
         let result = model.terminateSelectedApp()
         XCTAssertEqual(result, .updatedSession)
-        assertRuntimeProjectionSessionRead(from: runtimeProjectionService)
-
-        await fulfillment(of: [layoutRefreshed], timeout: 0.5)
-        XCTAssertEqual(processCheckCount, 1)
-        XCTAssertEqual(runtimeProjectionService.appTerminationSignalsRecorded().map(\.appID), [terminatedAppID])
-        assertRuntimeProjectionSessionRead(from: runtimeProjectionService, minimumReadCount: 2)
-        XCTAssertEqual(model.appCount, appsAfterTermination.count)
-        XCTAssertFalse(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? true)
-        XCTAssertNil(model.terminatingAppID)
-        XCTAssertEqual(model.lastTerminateRefreshPollingDiagnostic?.appID, terminatedAppID)
-        XCTAssertEqual(model.lastTerminateRefreshPollingDiagnostic?.pid, 42_010)
-        XCTAssertEqual(model.lastTerminateRefreshPollingDiagnostic?.appInstanceGeneration, 1)
-        XCTAssertEqual(model.lastTerminateRefreshPollingDiagnostic?.attempt, 0)
-        XCTAssertEqual(model.lastTerminateRefreshPollingDiagnostic?.finalProcessState, .exited)
-        XCTAssertEqual(model.lastTerminateRefreshPollingDiagnostic?.reason, "initial_process_check")
-        XCTAssertEqual(model.lastTerminateRefreshPollingDiagnostic?.action, .refresh)
+        assertRuntimeProjectionSessionRead(
+            from: runtimeProjectionService,
+            maintenanceRequests: [.switcherSessionStarted, .appLifecycleRefresh]
+        )
+        XCTAssertTrue(runtimeProjectionService.appTerminationSignalsRecorded().isEmpty)
+        XCTAssertEqual(model.appCount, initialApps.count)
+        XCTAssertTrue(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? false)
+        XCTAssertEqual(model.terminatingAppID, terminatedAppID)
+        XCTAssertEqual(model.pendingTerminateRequest?.appID, terminatedAppID)
         model.cancelSelection()
     }
 
@@ -293,7 +267,7 @@ extension FlowTabTests {
     }
 
     @MainActor
-    func testTerminateSelectedAppUnitStopsPollingAfterTimeoutWhenAppStillRunning() async {
+    func testTerminateSelectedAppUnitKeepsPendingRequestWithoutSurfaceTimeout() async {
         let initialApps = terminateScenarioApps()
         let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: initialApps)
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
@@ -305,13 +279,6 @@ extension FlowTabTests {
         }
 
         model.terminateRequestOverride = { _ in (sent: true, pid: 42_001) }
-        model.terminateRefreshPollIntervalNs = 2_000_000
-        model.terminateRefreshTimeoutNs = 12_000_000
-        var processCheckCount = 0
-        model.isProcessRunningOverride = { _ in
-            processCheckCount += 1
-            return true
-        }
 
         let noDeferredLayoutRefresh = expectation(description: "no deferred layout refresh")
         noDeferredLayoutRefresh.isInverted = true
@@ -319,33 +286,24 @@ extension FlowTabTests {
 
         let result = model.terminateSelectedApp()
         XCTAssertEqual(result, .updatedSession)
-        assertRuntimeProjectionSessionRead(from: runtimeProjectionService)
+        assertRuntimeProjectionSessionRead(
+            from: runtimeProjectionService,
+            maintenanceRequests: [.switcherSessionStarted, .appLifecycleRefresh]
+        )
         XCTAssertEqual(model.appCount, initialApps.count)
         XCTAssertTrue(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? false)
         XCTAssertEqual(model.terminatingAppID, terminatedAppID)
 
-        let didReachTerminateTimeout = await waitUntil("terminate polling reaches timeout") {
-            model.lastTerminateRefreshPollingDiagnostic?.action == .timeout
-        }
         await fulfillment(of: [noDeferredLayoutRefresh], timeout: 0.01)
-        XCTAssertTrue(didReachTerminateTimeout)
-        XCTAssertGreaterThan(processCheckCount, 0)
         XCTAssertTrue(runtimeProjectionService.appTerminationSignalsRecorded().isEmpty)
-        assertRuntimeProjectionSessionRead(from: runtimeProjectionService)
+        assertRuntimeProjectionSessionRead(
+            from: runtimeProjectionService,
+            maintenanceRequests: [.switcherSessionStarted, .appLifecycleRefresh]
+        )
         XCTAssertEqual(model.appCount, initialApps.count)
         XCTAssertTrue(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? false)
-        XCTAssertNil(model.terminatingAppID)
-        XCTAssertEqual(model.lastTerminateRefreshPollingDiagnostic?.appID, terminatedAppID)
-        XCTAssertEqual(model.lastTerminateRefreshPollingDiagnostic?.pid, 42_001)
-        XCTAssertEqual(model.lastTerminateRefreshPollingDiagnostic?.appInstanceGeneration, 1)
-        XCTAssertEqual(model.lastTerminateRefreshPollingDiagnostic?.attempt, 6)
-        XCTAssertEqual(model.lastTerminateRefreshPollingDiagnostic?.maxAttempts, 6)
-        XCTAssertEqual(model.lastTerminateRefreshPollingDiagnostic?.finalProcessState, .running)
-        XCTAssertEqual(model.lastTerminateRefreshPollingDiagnostic?.reason, "timeout")
-        XCTAssertEqual(model.lastTerminateRefreshPollingDiagnostic?.action, .timeout)
-        XCTAssertTrue(
-            model.lastTerminateRefreshPollingDiagnostic?.logMessage.contains("attempt=6/6") ?? false
-        )
+        XCTAssertEqual(model.terminatingAppID, terminatedAppID)
+        XCTAssertEqual(model.pendingTerminateRequest?.appID, terminatedAppID)
         model.cancelSelection()
     }
 
@@ -379,9 +337,6 @@ extension FlowTabTests {
         }
 
         model.terminateRequestOverride = { _ in (sent: true, pid: activePID) }
-        model.terminateRefreshPollIntervalNs = 1_000_000_000
-        model.terminateRefreshTimeoutNs = 1_000_000_000
-        model.isProcessRunningOverride = { _ in true }
 
         let result = model.terminateSelectedApp()
         XCTAssertEqual(result, .updatedSession)
@@ -389,12 +344,19 @@ extension FlowTabTests {
         XCTAssertEqual(model.pendingTerminateRequest?.pid, activePID)
         XCTAssertEqual(model.pendingTerminateRequest?.generation, 1)
         XCTAssertEqual(model.terminatingAppID, terminatedAppID)
-        assertRuntimeProjectionSessionRead(from: runtimeProjectionService)
+        assertRuntimeProjectionSessionRead(
+            from: runtimeProjectionService,
+            maintenanceRequests: [.switcherSessionStarted, .appLifecycleRefresh]
+        )
 
         XCTAssertTrue(model.handleApplicationTerminated(appID: terminatedAppID, pid: activePID + 1))
 
         XCTAssertEqual(runtimeProjectionService.appTerminationSignalsRecorded().map(\.appID), [terminatedAppID])
-        assertRuntimeProjectionSessionRead(from: runtimeProjectionService, minimumReadCount: 2)
+        assertRuntimeProjectionSessionRead(
+            from: runtimeProjectionService,
+            minimumReadCount: 2,
+            maintenanceRequests: [.switcherSessionStarted, .appLifecycleRefresh]
+        )
         XCTAssertEqual(model.pendingTerminateRequest?.appID, terminatedAppID)
         XCTAssertEqual(model.pendingTerminateRequest?.pid, activePID)
         XCTAssertEqual(model.pendingTerminateRequest?.generation, 1)
@@ -404,7 +366,7 @@ extension FlowTabTests {
     }
 
     @MainActor
-    func testTerminateSelectedAppUnitRefreshesOnWorkspaceTerminateAfterPollingTimeout() async {
+    func testTerminateSelectedAppUnitRefreshesOnWorkspaceTerminateAfterPendingRequest() async {
         let initialApps = terminateScenarioApps()
         let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: initialApps)
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
@@ -418,14 +380,6 @@ extension FlowTabTests {
         let appsAfterTermination = initialApps.filter { $0.id != terminatedAppID }
 
         model.terminateRequestOverride = { _ in (sent: true, pid: 42_002) }
-        model.terminateRefreshPollIntervalNs = 2_000_000
-        model.terminateRefreshTimeoutNs = 12_000_000
-
-        var processCheckCount = 0
-        model.isProcessRunningOverride = { _ in
-            processCheckCount += 1
-            return true
-        }
 
         let deferredLayoutRefresh = expectation(description: "deferred layout refresh")
         var layoutRefreshCount = 0
@@ -436,26 +390,32 @@ extension FlowTabTests {
 
         let result = model.terminateSelectedApp()
         XCTAssertEqual(result, .updatedSession)
-        assertRuntimeProjectionSessionRead(from: runtimeProjectionService)
+        assertRuntimeProjectionSessionRead(
+            from: runtimeProjectionService,
+            maintenanceRequests: [.switcherSessionStarted, .appLifecycleRefresh]
+        )
         XCTAssertEqual(model.appCount, initialApps.count)
         XCTAssertTrue(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? false)
 
-        let didReachTerminateTimeout = await waitUntil("terminate polling reaches timeout before workspace notification") {
-            model.lastTerminateRefreshPollingDiagnostic?.action == .timeout
-        }
-        XCTAssertTrue(didReachTerminateTimeout)
-        XCTAssertGreaterThan(processCheckCount, 0)
+        await Task.yield()
         XCTAssertEqual(layoutRefreshCount, 0)
         XCTAssertTrue(runtimeProjectionService.appTerminationSignalsRecorded().isEmpty)
-        assertRuntimeProjectionSessionRead(from: runtimeProjectionService)
-        XCTAssertNil(model.terminatingAppID)
+        assertRuntimeProjectionSessionRead(
+            from: runtimeProjectionService,
+            maintenanceRequests: [.switcherSessionStarted, .appLifecycleRefresh]
+        )
+        XCTAssertEqual(model.terminatingAppID, terminatedAppID)
 
         model.handleApplicationTerminated(appID: terminatedAppID, pid: 42_002)
 
         await fulfillment(of: [deferredLayoutRefresh], timeout: 1.0)
         XCTAssertEqual(layoutRefreshCount, 1)
         XCTAssertEqual(runtimeProjectionService.appTerminationSignalsRecorded().map(\.appID), [terminatedAppID])
-        assertRuntimeProjectionSessionRead(from: runtimeProjectionService, minimumReadCount: 2)
+        assertRuntimeProjectionSessionRead(
+            from: runtimeProjectionService,
+            minimumReadCount: 2,
+            maintenanceRequests: [.switcherSessionStarted, .appLifecycleRefresh]
+        )
         XCTAssertEqual(model.appCount, appsAfterTermination.count)
         XCTAssertFalse(model.session?.apps.contains(where: { $0.id == terminatedAppID }) ?? true)
         model.cancelSelection()
@@ -464,6 +424,7 @@ extension FlowTabTests {
     private func assertRuntimeProjectionSessionRead(
         from runtimeProjectionService: RecordingRuntimeProjectionService,
         minimumReadCount: Int = 1,
+        maintenanceRequests: [RuntimeProjectionMaintenanceReason] = [.switcherSessionStarted],
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
@@ -475,7 +436,7 @@ extension FlowTabTests {
         )
         XCTAssertEqual(
             runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(),
-            [.switcherSessionStarted],
+            maintenanceRequests,
             file: file,
             line: line
         )
