@@ -398,14 +398,15 @@ struct RuntimeProjectionRepairFactSource {
             now: ProcessInfo.processInfo.systemUptime
         ).windowsByPID
         let allCGReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let sampledWindowsByPID = runtimeFactProvider.collectAXWindowData(
+        _ = runtimeFactProvider.collectAXWindowData(
             for: [app],
             cgWindowsByPID: cgWindowsByPID,
             allCGWindowsByPID: allCGWindowsByPID
         )
         let axReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let windowsByPID = projectedWindowEntriesByPID(for: [app])
         return RuntimeFocusedCurrentAppWindowFacts(
-            windowsByPID: sampledWindowsByPID,
+            windowsByPID: windowsByPID,
             rankByPID: [pid: 0],
             timings: RuntimeFocusedCurrentAppWindowFactTimings(
                 cleanupMs: cleanupReadyMs - startMs,

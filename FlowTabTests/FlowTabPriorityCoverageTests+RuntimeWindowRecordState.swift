@@ -148,76 +148,60 @@ extension FlowTabPriorityCoverageTests {
     }
 
     func testRuntimeProjectionRepairFactSourceBuildsCurrentAppWindowFactsFromWindowRecordStore() {
-        let app = NSRunningApplication.current
-        let pid = app.processIdentifier
-        let axWindowID = "ax:\(pid):main"
-        let cgWindowID = CGWindowID(240_101)
-        var record = RuntimeWindowRecord(
-            cgWindowID: cgWindowID,
-            stableWindowID: RuntimeWindowListEntry.cgStableWindowID(
-                pid: pid,
-                cgWindowID: cgWindowID
-            ),
-            firstSeenAt: 10
-        )
-        record.currentAXAttachment = RuntimeCurrentAXAttachment(
-            axWindowID: axWindowID,
-            axWindow: AXUIElementCreateApplication(pid),
+        let fixture = makeRuntimeWindowRecordProjectionFactSourceFixture(
+            axWindowIDSuffix: "main",
+            cgWindowID: 240_101,
             title: "WindowRecord Projection",
-            frame: CGRect(x: 20, y: 30, width: 800, height: 600),
-            state: RuntimeAXWindowState(isMinimized: false, isFocused: true, isMain: true)
-        )
-        record.lastKnownCGTitle = "CG Projection"
-        record.lastKnownCGFrame = CGRect(x: 20, y: 30, width: 800, height: 600)
-        record.lastConfirmationSource = .verifiedFocusReadback
-        record.lastExactConfirmedAt = 12
-        record.spaceRecovery = RuntimeSpaceRecoveryState(
-            cgWindowID: cgWindowID,
-            spaceIDs: [3, 1],
-            hasConfirmedActivationRoute: true,
-            lastValidatedAt: 12,
-            invalidatedAt: nil
-        )
-        let windowRecordStore = RuntimeWindowRecordStore(
-            mappingStatesByPID: [
-                pid: RuntimeWindowMappingState(
-                    windowRecordsByCGWindowID: [cgWindowID: record],
-                    currentAXToCG: [axWindowID: cgWindowID],
-                    validCGWindowIDs: [cgWindowID],
-                    lastAXWindowIDs: [axWindowID],
-                    hasObservedAXWindowHandle: true
-                )
-            ]
-        )
-        let sampledEntry = RuntimeWindowListEntry(
-            windowID: "sampled-payload-window",
-            title: "Sampled Payload Window",
-            isMinimized: false,
-            ownerPID: pid,
-            cgWindowID: 999_999
-        )
-        let provider = RuntimeWindowRecordProjectionFakeFactProvider(
-            sampledWindowsByPID: [pid: [sampledEntry]]
-        )
-        let factSource = RuntimeProjectionRepairFactSource(
-            runtimeFactProvider: provider,
-            windowRecordStore: windowRecordStore
+            sampledWindowID: "sampled-payload-window",
+            sampledTitle: "Sampled Payload Window",
+            sampledCGWindowID: 999_999,
+            spaceIDs: [3, 1]
         )
 
-        let facts = factSource.collectCurrentAppWindowFacts(
-            for: [app],
-            in: [app]
+        let facts = fixture.factSource.collectCurrentAppWindowFacts(
+            for: [fixture.app],
+            in: [fixture.app]
         )
 
-        XCTAssertEqual(provider.collectAXWindowDataCallCount, 1)
+        XCTAssertEqual(fixture.provider.collectAXWindowDataCallCount, 1)
         XCTAssertEqual(
-            facts.windowsByPID[pid]?.map(\.windowID),
-            [RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindowID)]
+            facts.windowsByPID[fixture.pid]?.map(\.windowID),
+            [fixture.stableWindowID]
         )
-        XCTAssertEqual(facts.windowsByPID[pid]?.map(\.title), ["WindowRecord Projection"])
-        let projectedEntry = facts.windowsByPID[pid]?.first
-        XCTAssertEqual(projectedEntry?.cgWindowID, cgWindowID)
-        XCTAssertEqual(projectedEntry?.activationHandleID, axWindowID)
+        XCTAssertEqual(facts.windowsByPID[fixture.pid]?.map(\.title), ["WindowRecord Projection"])
+        let projectedEntry = facts.windowsByPID[fixture.pid]?.first
+        XCTAssertEqual(projectedEntry?.cgWindowID, fixture.cgWindowID)
+        XCTAssertEqual(projectedEntry?.activationHandleID, fixture.axWindowID)
+    }
+
+    func testRuntimeProjectionRepairFactSourceBuildsFocusedCurrentAppWindowFactsFromWindowRecordStore() {
+        let fixture = makeRuntimeWindowRecordProjectionFactSourceFixture(
+            axWindowIDSuffix: "focused",
+            cgWindowID: 240_102,
+            title: "Focused WindowRecord Projection",
+            sampledWindowID: "focused-sampled-payload-window",
+            sampledTitle: "Focused Sampled Payload Window",
+            sampledCGWindowID: 999_998
+        )
+
+        let facts = fixture.factSource.collectFocusedCurrentAppWindowFacts(
+            for: fixture.app,
+            in: [fixture.app],
+            processIdentifier: fixture.pid
+        )
+
+        XCTAssertEqual(fixture.provider.collectAXWindowDataCallCount, 1)
+        XCTAssertEqual(
+            facts.windowsByPID[fixture.pid]?.map(\.windowID),
+            [fixture.stableWindowID]
+        )
+        XCTAssertFalse(
+            facts.windowsByPID[fixture.pid]?.map(\.windowID).contains("focused-sampled-payload-window") ?? true
+        )
+        XCTAssertEqual(facts.windowsByPID[fixture.pid]?.map(\.title), ["Focused WindowRecord Projection"])
+        let projectedEntry = facts.windowsByPID[fixture.pid]?.first
+        XCTAssertEqual(projectedEntry?.cgWindowID, fixture.cgWindowID)
+        XCTAssertEqual(projectedEntry?.activationHandleID, fixture.axWindowID)
     }
 
     func testRuntimeWindowRecordStoreGroupsAffectedCGWindowIDsByPIDFromCurrentAndRecordedFacts() {
@@ -781,6 +765,93 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(entries.first?.hasStickyBinding == false)
         XCTAssertNil(entries.first?.activationHandleID)
     }
+}
+
+private struct RuntimeWindowRecordProjectionFactSourceFixture {
+    let app: NSRunningApplication
+    let pid: pid_t
+    let axWindowID: String
+    let cgWindowID: CGWindowID
+    let provider: RuntimeWindowRecordProjectionFakeFactProvider
+    let factSource: RuntimeProjectionRepairFactSource
+
+    var stableWindowID: String {
+        RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindowID)
+    }
+}
+
+private func makeRuntimeWindowRecordProjectionFactSourceFixture(
+    axWindowIDSuffix: String,
+    cgWindowID: CGWindowID,
+    title: String,
+    sampledWindowID: String,
+    sampledTitle: String,
+    sampledCGWindowID: CGWindowID,
+    spaceIDs: [Int] = []
+) -> RuntimeWindowRecordProjectionFactSourceFixture {
+    let app = NSRunningApplication.current
+    let pid = app.processIdentifier
+    let axWindowID = "ax:\(pid):\(axWindowIDSuffix)"
+    var record = RuntimeWindowRecord(
+        cgWindowID: cgWindowID,
+        stableWindowID: RuntimeWindowListEntry.cgStableWindowID(
+            pid: pid,
+            cgWindowID: cgWindowID
+        ),
+        firstSeenAt: 10
+    )
+    record.currentAXAttachment = RuntimeCurrentAXAttachment(
+        axWindowID: axWindowID,
+        axWindow: AXUIElementCreateApplication(pid),
+        title: title,
+        frame: CGRect(x: 20, y: 30, width: 800, height: 600),
+        state: RuntimeAXWindowState(isMinimized: false, isFocused: true, isMain: true)
+    )
+    record.lastKnownCGTitle = "CG \(title)"
+    record.lastKnownCGFrame = CGRect(x: 20, y: 30, width: 800, height: 600)
+    record.lastConfirmationSource = .verifiedFocusReadback
+    record.lastExactConfirmedAt = 12
+    if !spaceIDs.isEmpty {
+        record.spaceRecovery = RuntimeSpaceRecoveryState(
+            cgWindowID: cgWindowID,
+            spaceIDs: spaceIDs,
+            hasConfirmedActivationRoute: true,
+            lastValidatedAt: 12,
+            invalidatedAt: nil
+        )
+    }
+    let windowRecordStore = RuntimeWindowRecordStore(
+        mappingStatesByPID: [
+            pid: RuntimeWindowMappingState(
+                windowRecordsByCGWindowID: [cgWindowID: record],
+                currentAXToCG: [axWindowID: cgWindowID],
+                validCGWindowIDs: [cgWindowID],
+                lastAXWindowIDs: [axWindowID],
+                hasObservedAXWindowHandle: true
+            )
+        ]
+    )
+    let sampledEntry = RuntimeWindowListEntry(
+        windowID: sampledWindowID,
+        title: sampledTitle,
+        isMinimized: false,
+        ownerPID: pid,
+        cgWindowID: sampledCGWindowID
+    )
+    let provider = RuntimeWindowRecordProjectionFakeFactProvider(
+        sampledWindowsByPID: [pid: [sampledEntry]]
+    )
+    return RuntimeWindowRecordProjectionFactSourceFixture(
+        app: app,
+        pid: pid,
+        axWindowID: axWindowID,
+        cgWindowID: cgWindowID,
+        provider: provider,
+        factSource: RuntimeProjectionRepairFactSource(
+            runtimeFactProvider: provider,
+            windowRecordStore: windowRecordStore
+        )
+    )
 }
 
 private final class RuntimeWindowRecordProjectionFakeFactProvider: RuntimeProjectionRepairFactProviding {
