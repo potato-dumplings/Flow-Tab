@@ -192,6 +192,7 @@ final class SwitcherPanelController {
         panelVisibilityRecoveryPolicy.initialPresentationGraceWindow
     }
     let activeSpaceMigrationActivationSuppressionWindow: TimeInterval = 0.5
+    let manualWindowLayerProjectionApplyDelay: TimeInterval = 0.35
     var interruptionPresentationRecoveryAttemptDelaysNs: [UInt64] {
         panelVisibilityRecoveryPolicy.interruptionAttemptDelaysNanoseconds
     }

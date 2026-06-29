@@ -180,13 +180,23 @@ extension RuntimeProjectionRepairProvider {
         }
 
         let currentAppWindowPayloadWasEmpty = selectionFacts.windows.isEmpty
+        let appDirectoryEntries = RuntimeAppDirectoryFactSource.entries(
+            from: selectionFacts.appGroup,
+            preservingRankFrom: windowFacts.rankByPID
+        )
+        let currentAppWindowPayload = RuntimeCurrentAppWindowPayload(
+            assemblyInput: selectionFacts.currentAppProjectionAssemblyInput(
+                appID: appID,
+                rankByPID: windowFacts.rankByPID,
+                rankFallback: 0,
+                generatedAt: Date.timeIntervalSinceReferenceDate
+            )
+        )
         let repairEvidence = RuntimeCurrentAppRepairEvidence(
             appID: appID,
             pid: selectionFacts.app.processIdentifier,
-            appDirectoryEntries: RuntimeAppDirectoryFactSource.entries(
-                from: selectionFacts.appGroup,
-                preservingRankFrom: windowFacts.rankByPID
-            ),
+            appDirectoryEntries: appDirectoryEntries,
+            currentAppWindowPayload: currentAppWindowPayload,
             currentAppWindowPayloadWasEmpty: currentAppWindowPayloadWasEmpty
         )
         let completeMs = RuntimePerformanceClock.monotonicMilliseconds()

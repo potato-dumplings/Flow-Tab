@@ -187,6 +187,25 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(searchRead.committedIndexCoversCurrentGeneration)
     }
 
+    func testRuntimeReadModelStoreAppDirectoryFallbackCarriesZeroWindowAppContext() throws {
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let pid = runningApp.processIdentifier
+        let store = RuntimeReadModelStore()
+
+        store.commitAppDirectoryProviderEvidence(
+            [RuntimeAppDirectoryEntry(app: runningApp)],
+            generatedAt: 10
+        )
+
+        let projection = try XCTUnwrap(store.readAppSwitcherProjection())
+        XCTAssertEqual(projection.apps.map(\.id), [appID])
+        XCTAssertEqual(projection.apps.first?.windows, [])
+        let context = try XCTUnwrap(projection.contextsByID[appID])
+        XCTAssertEqual(context.runningApp.processIdentifier, pid)
+        XCTAssertTrue(context.windowsByID.isEmpty)
+    }
+
     func testRuntimeMainTableProjectionBuilderUsesAppDirectoryActivationRank() throws {
         let frontPID: pid_t = 260_901
         let backgroundPID: pid_t = 260_902
@@ -1988,6 +2007,109 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(searchRead.projection?.windowEntries.filter { $0.appID == appID }.map(\.windowID), [])
     }
 
+    func testRuntimeProjectionServiceCommitsCurrentAppDirectRepairPayloadAsCompleteProjection() throws {
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let pid = runningApp.processIdentifier
+        let displayName = runningApp.localizedName ?? appID
+        let groupID = RuntimeAppIdentity.groupID(
+            for: runningApp.bundleIdentifier,
+            fallbackName: displayName
+        )
+        let windowID = "direct-repair-window"
+        let cgWindowID = CGWindowID(240_613)
+        let window = WindowCandidate(
+            id: windowID,
+            title: "Direct Repair Window",
+            isMinimized: false,
+            lastActiveAt: 120
+        )
+        let appDirectoryEntry = RuntimeAppDirectoryEntry(app: runningApp)
+        let payload = RuntimeCurrentAppWindowPayload(
+            summary: RuntimeHomeAppSummary(
+                appID: appID,
+                displayName: displayName,
+                groupID: groupID,
+                lastActiveAt: 120,
+                windowCount: 1,
+                pid: pid
+            ),
+            candidate: AppSwitchCandidate(
+                id: appID,
+                displayName: displayName,
+                groupID: groupID,
+                lastActiveAt: 120,
+                windows: [window]
+            ),
+            context: RuntimeAppContext(
+                appID: appID,
+                runningApp: runningApp,
+                windowsByID: [
+                    windowID: RuntimeWindowContext(
+                        id: windowID,
+                        title: window.title,
+                        isMinimized: false,
+                        ownerPID: pid,
+                        cgWindowID: cgWindowID,
+                        spaceIDs: [5]
+                    )
+                ]
+            ),
+            appDirectoryEntries: [appDirectoryEntry]
+        )
+        let readModelStore = RuntimeReadModelStore()
+        readModelStore.seedAppSwitcherProjectionForTesting(
+            apps: [
+                AppSwitchCandidate(
+                    id: appID,
+                    displayName: displayName,
+                    groupID: groupID,
+                    lastActiveAt: 100,
+                    windows: []
+                )
+            ],
+            contextsByID: [:],
+            appDirectoryEntries: [appDirectoryEntry],
+            generatedAt: 10
+        )
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.DirectCurrentAppRepairPayload",
+            repairProvider: RuntimeProjectionRepairProvider(
+                windowRecordStore: RuntimeWindowRecordStore(),
+                reconciliationCoordinator: RuntimeReconciliationCoordinator()
+            ),
+            mainTableProjectionBuilder: RuntimeMainTableProjectionBuilder(
+                windowRecordStore: RuntimeWindowRecordStore()
+            ),
+            readModelStore: readModelStore,
+            reconciliationExecutor: { _, _ in
+                .completedWithCurrentAppRepairEvidence([
+                    RuntimeCurrentAppRepairEvidence(
+                        appID: appID,
+                        pid: pid,
+                        appDirectoryEntries: [appDirectoryEntry],
+                        currentAppWindowPayload: payload,
+                        currentAppWindowPayloadWasEmpty: false
+                    )
+                ])
+            }
+        )
+
+        service.signalSelectedCurrentAppWindowsChanged(appID: appID, pid: pid)
+        service.waitForMaintenanceQueueForTesting()
+
+        let projection = try XCTUnwrap(readModelStore.readCurrentAppWindowProjection(appID: appID))
+        XCTAssertTrue(projection.freshness.isCompleteForScope)
+        XCTAssertTrue(projection.freshness.dirtyAppIDs.isEmpty)
+        XCTAssertTrue(projection.freshness.dirtyPIDs.isEmpty)
+        XCTAssertTrue(projection.freshness.pendingRepairScopes.isEmpty)
+        XCTAssertEqual(projection.currentAppWindowPayload.candidate.windows.map(\.id), [windowID])
+        XCTAssertEqual(
+            projection.currentAppWindowPayload.context.windowsByID[windowID]?.cgWindowID,
+            cgWindowID
+        )
+    }
+
     func testRuntimeProjectionServiceCommitsAppWindowDirtyProjectionForHomeDetailFromMainTablesAsStale() throws {
         let runningApp = NSRunningApplication.current
         let appID = RuntimeAppIdentity.appID(for: runningApp)
@@ -2388,6 +2510,373 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(staleHomeDetailProjection.freshness.dirtyAppIDs, [appID])
         XCTAssertEqual(staleHomeDetailProjection.freshness.dirtyPIDs, [runningApp.processIdentifier])
         XCTAssertTrue(staleHomeDetailProjection.freshness.pendingRepairScopes.contains("appWindows:\(appID)"))
+    }
+
+    func testRuntimeReadModelStoreCurrentAppProjectionFreshnessIgnoresUnrelatedTopologyDirtyState() throws {
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let pid = runningApp.processIdentifier
+        let window = WindowCandidate(
+            id: "current-app-unrelated-topology-window",
+            title: "Current App Unrelated Topology",
+            isMinimized: false,
+            lastActiveAt: 520
+        )
+        let candidate = AppSwitchCandidate(
+            id: appID,
+            displayName: runningApp.localizedName ?? appID,
+            groupID: RuntimeAppIdentity.groupID(
+                for: runningApp.bundleIdentifier,
+                fallbackName: runningApp.localizedName ?? appID
+            ),
+            lastActiveAt: 520,
+            windows: [window]
+        )
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: runningApp,
+            windowsByID: [
+                window.id: RuntimeWindowContext(
+                    id: window.id,
+                    title: window.title,
+                    isMinimized: window.isMinimized,
+                    ownerPID: pid,
+                    cgWindowID: 240_721,
+                    spaceIDs: [5]
+                )
+            ]
+        )
+        let payload = RuntimeCurrentAppWindowPayload(
+            summary: RuntimeHomeAppSummary(
+                appID: appID,
+                displayName: candidate.displayName,
+                groupID: candidate.groupID,
+                lastActiveAt: candidate.lastActiveAt,
+                windowCount: candidate.windows.count,
+                pid: pid
+            ),
+            candidate: candidate,
+            context: context,
+            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: runningApp)]
+        )
+        let store = RuntimeReadModelStore()
+        store.seedAppSwitcherProjectionForTesting(
+            apps: [candidate],
+            contextsByID: [appID: context],
+            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: runningApp)],
+            generatedAt: 40
+        )
+        commitMainTableSearchFreshnessBarrierForTesting(store, generatedAt: 41)
+        store.commitCurrentAppWindowProjection(
+            payload,
+            clearsDirtyState: true,
+            generatedAt: 42
+        )
+
+        store.markSpaceTopologyDirty(
+            affectedCGWindowIDs: [240_722],
+            signatureSummary: "unrelated-topology",
+            pendingScope: "spaceTopology",
+            generatedAt: 43
+        )
+
+        let projection = try XCTUnwrap(store.readCurrentAppWindowProjection(appID: appID))
+        XCTAssertTrue(projection.freshness.isCompleteForScope)
+        XCTAssertEqual(projection.freshness.dirtyCGWindowIDs, [240_722])
+        XCTAssertEqual(projection.currentAppWindowPayload.candidate.windows.map(\.id), [window.id])
+        let searchRead = store.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(searchRead.readiness, .degradedStaleCommitted)
+        XCTAssertEqual(searchRead.resultState, .degradedStaleCommittedResult)
+        XCTAssertFalse(searchRead.freshness?.isCompleteForScope ?? true)
+    }
+
+    func testRuntimeReadModelStoreCurrentAppCommitClearsCoveredTopologyDirtyWindowIDs() throws {
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let pid = runningApp.processIdentifier
+        let cgWindowID = CGWindowID(240_731)
+        let window = WindowCandidate(
+            id: "current-app-covered-topology-window",
+            title: "Current App Covered Topology",
+            isMinimized: false,
+            lastActiveAt: 530
+        )
+        let candidate = AppSwitchCandidate(
+            id: appID,
+            displayName: runningApp.localizedName ?? appID,
+            groupID: RuntimeAppIdentity.groupID(
+                for: runningApp.bundleIdentifier,
+                fallbackName: runningApp.localizedName ?? appID
+            ),
+            lastActiveAt: 530,
+            windows: [window]
+        )
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: runningApp,
+            windowsByID: [
+                window.id: RuntimeWindowContext(
+                    id: window.id,
+                    title: window.title,
+                    isMinimized: window.isMinimized,
+                    ownerPID: pid,
+                    cgWindowID: cgWindowID,
+                    spaceIDs: [5]
+                )
+            ]
+        )
+        let payload = RuntimeCurrentAppWindowPayload(
+            summary: RuntimeHomeAppSummary(
+                appID: appID,
+                displayName: candidate.displayName,
+                groupID: candidate.groupID,
+                lastActiveAt: candidate.lastActiveAt,
+                windowCount: candidate.windows.count,
+                pid: pid
+            ),
+            candidate: candidate,
+            context: context,
+            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: runningApp)]
+        )
+        let store = RuntimeReadModelStore()
+        store.markSpaceTopologyDirty(
+            affectedCGWindowIDs: [cgWindowID],
+            signatureSummary: "covered-topology",
+            pendingScope: "spaceTopology",
+            generatedAt: 43
+        )
+        store.markAppWindowsDirty(
+            appID: appID,
+            pid: pid,
+            pendingScope: "selectedCurrentAppWindows:\(appID)"
+        )
+        store.commitCurrentAppWindowProjection(
+            payload,
+            clearsDirtyState: true,
+            generatedAt: 44
+        )
+
+        let projection = try XCTUnwrap(store.readCurrentAppWindowProjection(appID: appID))
+        XCTAssertTrue(projection.freshness.isCompleteForScope)
+        XCTAssertTrue(projection.freshness.dirtyCGWindowIDs.isEmpty)
+        XCTAssertFalse(projection.freshness.pendingRepairScopes.contains("spaceTopology"))
+        XCTAssertEqual(projection.currentAppWindowPayload.context.windowsByID[window.id]?.cgWindowID, cgWindowID)
+    }
+
+    func testRuntimeReadModelStoreCurrentAppCommitPromotesVerifiedFocusReadbackWindow() throws {
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let pid = runningApp.processIdentifier
+        let incognitoCGWindowID = CGWindowID(240_741)
+        let normalCGWindowID = CGWindowID(240_742)
+        let incognitoWindow = WindowCandidate(
+            id: "current-app-incognito-window",
+            title: "Chrome Incognito Tab",
+            isMinimized: false,
+            lastActiveAt: 610
+        )
+        let normalWindow = WindowCandidate(
+            id: "current-app-normal-window",
+            title: "Chrome Normal Tab",
+            isMinimized: false,
+            lastActiveAt: 600
+        )
+        let candidate = AppSwitchCandidate(
+            id: appID,
+            displayName: runningApp.localizedName ?? appID,
+            groupID: RuntimeAppIdentity.groupID(
+                for: runningApp.bundleIdentifier,
+                fallbackName: runningApp.localizedName ?? appID
+            ),
+            lastActiveAt: 610,
+            windows: [incognitoWindow, normalWindow]
+        )
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: runningApp,
+            windowsByID: [
+                incognitoWindow.id: RuntimeWindowContext(
+                    id: incognitoWindow.id,
+                    title: incognitoWindow.title,
+                    isMinimized: false,
+                    ownerPID: pid,
+                    cgWindowID: incognitoCGWindowID,
+                    spaceIDs: [1]
+                ),
+                normalWindow.id: RuntimeWindowContext(
+                    id: normalWindow.id,
+                    title: normalWindow.title,
+                    isMinimized: false,
+                    ownerPID: pid,
+                    cgWindowID: normalCGWindowID,
+                    spaceIDs: [1]
+                )
+            ]
+        )
+        let payload = RuntimeCurrentAppWindowPayload(
+            summary: RuntimeHomeAppSummary(
+                appID: appID,
+                displayName: candidate.displayName,
+                groupID: candidate.groupID,
+                lastActiveAt: candidate.lastActiveAt,
+                windowCount: candidate.windows.count,
+                pid: pid
+            ),
+            candidate: candidate,
+            context: context,
+            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: runningApp)]
+        )
+        let store = RuntimeReadModelStore()
+
+        store.markWindowFocusVerified(
+            RuntimeWindowFocusVerification(
+                appID: appID,
+                windowID: normalWindow.id,
+                ownerPID: pid,
+                targetCGWindowID: normalCGWindowID,
+                focusedCGWindowID: normalCGWindowID,
+                focusedAXWindow: nil,
+                title: normalWindow.title,
+                frame: nil,
+                allowedActions: [.exposeInSwitcher]
+            ),
+            affectedCGWindowIDs: [normalCGWindowID],
+            generatedAt: 70
+        )
+        store.commitCurrentAppWindowProjection(
+            payload,
+            clearsDirtyState: true,
+            generatedAt: 71
+        )
+
+        let projection = try XCTUnwrap(store.readCurrentAppWindowProjection(appID: appID))
+        XCTAssertEqual(projection.currentAppWindowPayload.candidate.windows.map(\.id), [
+            normalWindow.id,
+            incognitoWindow.id
+        ])
+        XCTAssertGreaterThan(
+            projection.currentAppWindowPayload.candidate.windows[0].lastActiveAt,
+            projection.currentAppWindowPayload.candidate.windows[1].lastActiveAt
+        )
+        XCTAssertTrue(projection.freshness.isCompleteForScope)
+    }
+
+    func testRuntimeReadModelStoreCurrentAppCommitKeepsPriorTopologyOrderAfterVerifiedReadback() throws {
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let pid = runningApp.processIdentifier
+        let fullscreenCGWindowID = CGWindowID(240_751)
+        let incognitoCGWindowID = CGWindowID(240_752)
+        let normalCGWindowID = CGWindowID(240_753)
+        let fullscreenWindow = WindowCandidate(
+            id: "current-app-fullscreen-window",
+            title: "Chrome Fullscreen Tab",
+            isMinimized: false,
+            lastActiveAt: 620
+        )
+        let incognitoWindow = WindowCandidate(
+            id: "current-app-incognito-window",
+            title: "Chrome Incognito Tab",
+            isMinimized: false,
+            lastActiveAt: 610
+        )
+        let normalWindow = WindowCandidate(
+            id: "current-app-normal-window",
+            title: "Chrome Normal Tab",
+            isMinimized: false,
+            lastActiveAt: 600
+        )
+        func payload(windows: [WindowCandidate]) -> RuntimeCurrentAppWindowPayload {
+            let contextWindows = Dictionary(
+                uniqueKeysWithValues: [
+                    (fullscreenWindow.id, RuntimeWindowContext(
+                        id: fullscreenWindow.id,
+                        title: fullscreenWindow.title,
+                        isMinimized: fullscreenWindow.isMinimized,
+                        ownerPID: pid,
+                        cgWindowID: fullscreenCGWindowID,
+                        spaceIDs: [25_100]
+                    )),
+                    (incognitoWindow.id, RuntimeWindowContext(
+                        id: incognitoWindow.id,
+                        title: incognitoWindow.title,
+                        isMinimized: incognitoWindow.isMinimized,
+                        ownerPID: pid,
+                        cgWindowID: incognitoCGWindowID,
+                        spaceIDs: [1]
+                    )),
+                    (normalWindow.id, RuntimeWindowContext(
+                        id: normalWindow.id,
+                        title: normalWindow.title,
+                        isMinimized: normalWindow.isMinimized,
+                        ownerPID: pid,
+                        cgWindowID: normalCGWindowID,
+                        spaceIDs: [1]
+                    ))
+                ]
+            )
+            let candidate = AppSwitchCandidate(
+                id: appID,
+                displayName: runningApp.localizedName ?? appID,
+                groupID: RuntimeAppIdentity.groupID(
+                    for: runningApp.bundleIdentifier,
+                    fallbackName: runningApp.localizedName ?? appID
+                ),
+                lastActiveAt: 620,
+                windows: windows
+            )
+            return RuntimeCurrentAppWindowPayload(
+                summary: RuntimeHomeAppSummary(
+                    appID: appID,
+                    displayName: candidate.displayName,
+                    groupID: candidate.groupID,
+                    lastActiveAt: candidate.lastActiveAt,
+                    windowCount: candidate.windows.count,
+                    pid: pid
+                ),
+                candidate: candidate,
+                context: RuntimeAppContext(
+                    appID: appID,
+                    runningApp: runningApp,
+                    windowsByID: contextWindows
+                ),
+                appDirectoryEntries: [RuntimeAppDirectoryEntry(app: runningApp)]
+            )
+        }
+        let store = RuntimeReadModelStore()
+        store.commitCurrentAppWindowProjection(
+            payload(windows: [fullscreenWindow, incognitoWindow, normalWindow]),
+            clearsDirtyState: true,
+            generatedAt: 80
+        )
+
+        store.markWindowFocusVerified(
+            RuntimeWindowFocusVerification(
+                appID: appID,
+                windowID: normalWindow.id,
+                ownerPID: pid,
+                targetCGWindowID: normalCGWindowID,
+                focusedCGWindowID: normalCGWindowID,
+                focusedAXWindow: nil,
+                title: normalWindow.title,
+                frame: nil,
+                allowedActions: [.exposeInSwitcher]
+            ),
+            affectedCGWindowIDs: [normalCGWindowID],
+            generatedAt: 81
+        )
+        store.commitCurrentAppWindowProjection(
+            payload(windows: [normalWindow, incognitoWindow, fullscreenWindow]),
+            clearsDirtyState: true,
+            generatedAt: 82
+        )
+
+        let projection = try XCTUnwrap(store.readCurrentAppWindowProjection(appID: appID))
+        XCTAssertEqual(projection.currentAppWindowPayload.candidate.windows.map(\.id), [
+            normalWindow.id,
+            fullscreenWindow.id,
+            incognitoWindow.id
+        ])
     }
 
     func testRuntimeReadModelStoreReadsFocusedCurrentAppProjectionFromAppDirectoryRank() throws {

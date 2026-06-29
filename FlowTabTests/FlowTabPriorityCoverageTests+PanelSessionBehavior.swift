@@ -490,7 +490,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testLiveSwitcherModelDoesNotApplyStaleSelectedAppWindowProjection() {
+    func testLiveSwitcherModelAppliesStaleSelectedAppWindowProjectionAsDegradedCommittedResult() {
         let appID = "com.example.stale-projected-current-app"
         let runningApp = NSRunningApplication.current
         let appOnlyCandidate = AppSwitchCandidate(
@@ -563,8 +563,10 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertTrue(model.scheduleSelectedAppWindowProjectionIfNeeded(for: appID))
 
-        XCTAssertEqual(model.session?.mode, .appCycle)
-        XCTAssertEqual(model.session?.selectedApp.windows.map(\.id), [])
+        XCTAssertEqual(model.session?.selectedApp.windows.map(\.id), [
+            "stale-projected-window-1",
+            "stale-projected-window-2"
+        ])
         XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 1)
         XCTAssertEqual(runtimeProjectionService.selectedCurrentAppWindowChangeSignalsRecorded().map(\.appID), [appID])
         XCTAssertEqual(
@@ -1306,6 +1308,203 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(
             controller.modelForTesting.session?.selectedApp.windows.map(\.id),
             ["deferred-1", "deferred-2"]
+        )
+        controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerDelayedAutoEnterAppliesSelectedProjectionCommittedAfterDirtySignal() async {
+        let currentApp = NSRunningApplication.current
+        let appID = "com.example.deferred-selected-projection"
+        let windows = [
+            WindowCandidate(id: "deferred-after-dirty-1", title: "Deferred One", isMinimized: false, lastActiveAt: 30),
+            WindowCandidate(id: "deferred-after-dirty-2", title: "Deferred Two", isMinimized: false, lastActiveAt: 20)
+        ]
+        let appOnlyCandidate = AppSwitchCandidate(
+            id: appID,
+            displayName: "Deferred Projection",
+            groupID: "deferred",
+            lastActiveAt: 100,
+            windows: []
+        )
+        let windowCandidate = AppSwitchCandidate(
+            id: appID,
+            displayName: "Deferred Projection",
+            groupID: "deferred",
+            lastActiveAt: 100,
+            windows: windows
+        )
+        let emptyContext = makeRuntimeAppContext(appID: appID, runningApp: currentApp, windows: [])
+        let repairedContext = makeRuntimeAppContext(appID: appID, runningApp: currentApp, windows: windows)
+        let selectedCurrentAppWindowPayload = RuntimeCurrentAppWindowPayload(
+            summary: RuntimeHomeAppSummary(
+                appID: appID,
+                displayName: "Deferred Projection",
+                groupID: "deferred",
+                lastActiveAt: 100,
+                windowCount: windows.count,
+                pid: currentApp.processIdentifier
+            ),
+            candidate: windowCandidate,
+            context: repairedContext,
+            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: currentApp)]
+        )
+        let freshness = RuntimeProjectionFreshness(
+            generatedAt: 12,
+            sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+            dirtyAppIDs: [],
+            dirtyPIDs: [],
+            dirtyCGWindowIDs: [],
+            pendingRepairScopes: [],
+            isCompleteForScope: true
+        )
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
+            appSwitcherProjection: RuntimeAppSwitcherProjection(
+                apps: [appOnlyCandidate],
+                contextsByID: [appID: emptyContext],
+                freshness: freshness
+            )
+        )
+        let controller = SwitcherPanelController(
+            model: LiveSwitcherModel(
+                runtimeProjectionService: runtimeProjectionService
+            )
+        )
+        controller.windowLayerPresentationDelayOverride = 0.05
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        XCTAssertEqual(controller.modelForTesting.session?.selectedApp.windows.count, 0)
+
+        controller.scheduleDelayedWindowLayerEntryForTesting()
+
+        let didRequestProjection = await waitUntil(
+            "delayed auto-enter requests selected-app projection maintenance",
+            timeoutNanoseconds: 1_000_000_000,
+            pollIntervalNanoseconds: 10_000_000
+        ) {
+            !runtimeProjectionService.selectedCurrentAppWindowChangeSignalsRecorded().isEmpty
+        }
+        XCTAssertTrue(didRequestProjection)
+        XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 1)
+        runtimeProjectionService.setCurrentAppWindowProjection(
+            RuntimeCurrentAppWindowProjection(
+                appID: appID,
+                currentAppWindowPayload: selectedCurrentAppWindowPayload,
+                freshness: freshness
+            ),
+            appID: appID
+        )
+
+        let didUseProjection = await waitUntil(
+            "delayed auto-enter applies projection committed after dirty signal",
+            timeoutNanoseconds: 1_000_000_000,
+            pollIntervalNanoseconds: 10_000_000
+        ) {
+            controller.modelForTesting.session?.mode == .windowCycle(appID: appID)
+        }
+        XCTAssertTrue(didUseProjection)
+        XCTAssertGreaterThanOrEqual(
+            runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID),
+            2
+        )
+        XCTAssertEqual(
+            controller.modelForTesting.session?.selectedApp.windows.map(\.id),
+            ["deferred-after-dirty-1", "deferred-after-dirty-2"]
+        )
+        controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerManualWindowLayerEntryAppliesProjectionBeforeLongAutoEnterDelay() async {
+        let currentApp = NSRunningApplication.current
+        let appID = "com.example.manual-selected-projection"
+        let windows = [
+            WindowCandidate(id: "manual-after-dirty-1", title: "Manual One", isMinimized: false, lastActiveAt: 30),
+            WindowCandidate(id: "manual-after-dirty-2", title: "Manual Two", isMinimized: false, lastActiveAt: 20)
+        ]
+        let appOnlyCandidate = AppSwitchCandidate(
+            id: appID,
+            displayName: "Manual Projection",
+            groupID: "manual",
+            lastActiveAt: 100,
+            windows: []
+        )
+        let windowCandidate = AppSwitchCandidate(
+            id: appID,
+            displayName: "Manual Projection",
+            groupID: "manual",
+            lastActiveAt: 100,
+            windows: windows
+        )
+        let emptyContext = makeRuntimeAppContext(appID: appID, runningApp: currentApp, windows: [])
+        let repairedContext = makeRuntimeAppContext(appID: appID, runningApp: currentApp, windows: windows)
+        let selectedCurrentAppWindowPayload = RuntimeCurrentAppWindowPayload(
+            summary: RuntimeHomeAppSummary(
+                appID: appID,
+                displayName: "Manual Projection",
+                groupID: "manual",
+                lastActiveAt: 100,
+                windowCount: windows.count,
+                pid: currentApp.processIdentifier
+            ),
+            candidate: windowCandidate,
+            context: repairedContext,
+            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: currentApp)]
+        )
+        let freshness = RuntimeProjectionFreshness(
+            generatedAt: 12,
+            sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+            dirtyAppIDs: [],
+            dirtyPIDs: [],
+            dirtyCGWindowIDs: [],
+            pendingRepairScopes: [],
+            isCompleteForScope: true
+        )
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
+            appSwitcherProjection: RuntimeAppSwitcherProjection(
+                apps: [appOnlyCandidate],
+                contextsByID: [appID: emptyContext],
+                freshness: freshness
+            )
+        )
+        let controller = SwitcherPanelController(
+            model: LiveSwitcherModel(
+                runtimeProjectionService: runtimeProjectionService
+            )
+        )
+        controller.windowLayerPresentationDelayOverride = 30
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        controller.advance(.downArrow)
+
+        let didRequestProjection = await waitUntil(
+            "manual window-layer entry requests selected-app projection maintenance",
+            timeoutNanoseconds: 1_000_000_000,
+            pollIntervalNanoseconds: 10_000_000
+        ) {
+            !runtimeProjectionService.selectedCurrentAppWindowChangeSignalsRecorded().isEmpty
+        }
+        XCTAssertTrue(didRequestProjection)
+        runtimeProjectionService.setCurrentAppWindowProjection(
+            RuntimeCurrentAppWindowProjection(
+                appID: appID,
+                currentAppWindowPayload: selectedCurrentAppWindowPayload,
+                freshness: freshness
+            ),
+            appID: appID
+        )
+
+        let didUseProjection = await waitUntil(
+            "manual window-layer entry applies projection before long auto-enter delay",
+            timeoutNanoseconds: 1_000_000_000,
+            pollIntervalNanoseconds: 10_000_000
+        ) {
+            controller.modelForTesting.session?.mode == .windowCycle(appID: appID)
+        }
+        XCTAssertTrue(didUseProjection)
+        XCTAssertEqual(
+            controller.modelForTesting.session?.selectedApp.windows.map(\.id),
+            ["manual-after-dirty-1", "manual-after-dirty-2"]
         )
         controller.cancelSelectionForTesting()
     }

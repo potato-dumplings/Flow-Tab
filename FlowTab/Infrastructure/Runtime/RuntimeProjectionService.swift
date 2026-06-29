@@ -516,12 +516,24 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 evidence.appDirectoryEntries,
                 generatedAt: generatedAt
             )
-            commitMainTableCurrentAppProjectionLocked(
-                appID: evidence.appID,
-                pid: evidence.pid,
-                clearsDirtyState: true,
-                generatedAt: generatedAt
-            )
+            if let currentAppWindowPayload = evidence.currentAppWindowPayload {
+                RuntimeLog.debug(
+                    .projection,
+                    "currentAppProjectionCommit result=directRepairPayload appID=\(currentAppWindowPayload.summary.appID) pid=\(currentAppWindowPayload.summary.pid) windows=\(currentAppWindowPayload.candidate.windows.count)"
+                )
+                readModelStore.commitCurrentAppWindowProjection(
+                    currentAppWindowPayload,
+                    clearsDirtyState: true,
+                    generatedAt: generatedAt
+                )
+            } else {
+                commitMainTableCurrentAppProjectionLocked(
+                    appID: evidence.appID,
+                    pid: evidence.pid,
+                    clearsDirtyState: true,
+                    generatedAt: generatedAt
+                )
+            }
         }
     }
 

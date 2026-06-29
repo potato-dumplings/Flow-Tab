@@ -151,6 +151,7 @@ struct RuntimeProjectionRepairFactSource {
                         appID: payload.summary.appID,
                         pid: payload.summary.pid,
                         appDirectoryEntries: payload.appDirectoryEntries,
+                        currentAppWindowPayload: payload,
                         currentAppWindowPayloadWasEmpty: payload.candidate.windows.isEmpty
                     )
                 )
@@ -331,14 +332,13 @@ struct RuntimeProjectionRepairFactSource {
             options: [.optionAll, .excludeDesktopElements],
             now: ProcessInfo.processInfo.systemUptime
         ).windowsByPID
-        _ = runtimeFactProvider.collectAXWindowData(
+        let sampledWindowsByPID = runtimeFactProvider.collectAXWindowData(
             for: matchingApps,
             cgWindowsByPID: cgWindowsByPID,
             allCGWindowsByPID: allCGWindowsByPID
         )
-        let windowsByPID = projectedWindowEntriesByPID(for: matchingApps)
         return RuntimeCurrentAppWindowFacts(
-            windowsByPID: windowsByPID,
+            windowsByPID: sampledWindowsByPID,
             rankByPID: rankByPID
         )
     }
@@ -398,15 +398,14 @@ struct RuntimeProjectionRepairFactSource {
             now: ProcessInfo.processInfo.systemUptime
         ).windowsByPID
         let allCGReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        _ = runtimeFactProvider.collectAXWindowData(
+        let sampledWindowsByPID = runtimeFactProvider.collectAXWindowData(
             for: [app],
             cgWindowsByPID: cgWindowsByPID,
             allCGWindowsByPID: allCGWindowsByPID
         )
         let axReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let windowsByPID = projectedWindowEntriesByPID(for: [app])
         return RuntimeFocusedCurrentAppWindowFacts(
-            windowsByPID: windowsByPID,
+            windowsByPID: sampledWindowsByPID,
             rankByPID: [pid: 0],
             timings: RuntimeFocusedCurrentAppWindowFactTimings(
                 cleanupMs: cleanupReadyMs - startMs,

@@ -5,18 +5,28 @@ struct RuntimeCurrentAppRepairEvidence: Equatable, Sendable {
     let appID: String
     let pid: pid_t
     let appDirectoryEntries: [RuntimeAppDirectoryEntry]
+    let currentAppWindowPayload: RuntimeCurrentAppWindowPayload?
     let currentAppWindowPayloadWasEmpty: Bool
 
     init(
         appID: String,
         pid: pid_t,
         appDirectoryEntries: [RuntimeAppDirectoryEntry],
+        currentAppWindowPayload: RuntimeCurrentAppWindowPayload? = nil,
         currentAppWindowPayloadWasEmpty: Bool
     ) {
         self.appID = appID
         self.pid = pid
         self.appDirectoryEntries = appDirectoryEntries
+        self.currentAppWindowPayload = currentAppWindowPayload
         self.currentAppWindowPayloadWasEmpty = currentAppWindowPayloadWasEmpty
+    }
+
+    static func == (lhs: RuntimeCurrentAppRepairEvidence, rhs: RuntimeCurrentAppRepairEvidence) -> Bool {
+        lhs.appID == rhs.appID
+            && lhs.pid == rhs.pid
+            && lhs.appDirectoryEntries == rhs.appDirectoryEntries
+            && lhs.currentAppWindowPayloadWasEmpty == rhs.currentAppWindowPayloadWasEmpty
     }
 
 }

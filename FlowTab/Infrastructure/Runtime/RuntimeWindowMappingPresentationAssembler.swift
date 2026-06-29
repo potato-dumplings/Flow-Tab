@@ -249,15 +249,29 @@ enum RuntimeWindowMappingPresentationAssembler {
             appName: appName,
             stage: "presentation"
         )
-        let duplicateFilteredPresentationEntries = RuntimeWindowPresentationFilter.filterDuplicateFullscreenContentEntries(
+        let activationCoveredPresentationEntries = RuntimeWindowPresentationFilter.filterCGOnlyEntriesCoveredByActivationEntries(
             overlayFilteredPresentationEntries,
+            knownCGWindowsByID: knownCGWindowsByID,
+            appName: appName,
+            hasFullscreenTopology: !fullscreenContentBounds.isEmpty,
+            stage: "presentation"
+        )
+        let duplicateFilteredPresentationEntries = RuntimeWindowPresentationFilter.filterDuplicateFullscreenContentEntries(
+            activationCoveredPresentationEntries,
             knownCGWindowsByID: knownCGWindowsByID,
             appName: appName,
             stage: "presentation-final"
         )
+        let titleFilteredPresentationEntries = RuntimeWindowPresentationFilter.filterRepeatedFullscreenPresentationTitles(
+            duplicateFilteredPresentationEntries,
+            knownCGWindowsByID: knownCGWindowsByID,
+            appName: appName,
+            hasFullscreenTopology: !fullscreenContentBounds.isEmpty,
+            stage: "presentation-final"
+        )
 
         return RuntimeWindowPresentationFilter.orderWindowEntriesForPresentation(
-            duplicateFilteredPresentationEntries,
+            titleFilteredPresentationEntries,
             prioritizesOnscreen: !fullscreenContentBounds.isEmpty,
             cgWindowOrderByID: cgWindowOrderByID,
             knownCGWindowsByID: knownCGWindowsByID,

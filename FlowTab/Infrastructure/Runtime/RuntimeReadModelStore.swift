@@ -115,13 +115,15 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
 
+        let committedPayload = currentAppWindowPayloadByApplyingActivationReadbackLocked(payload)
         markProjectionCommittedLocked()
         if clearsDirtyState {
-            clearDirtyStateForAppLocked(appID: payload.summary.appID, pid: payload.summary.pid)
+            clearDirtyStateForAppLocked(appID: committedPayload.summary.appID, pid: committedPayload.summary.pid)
+            clearDirtyStateForProjectedCGWindowsLocked(in: committedPayload)
         }
-        currentAppWindowProjectionsByAppID[payload.summary.appID] = RuntimeCurrentAppWindowProjection(
-            appID: payload.summary.appID,
-            currentAppWindowPayload: payload,
+        currentAppWindowProjectionsByAppID[committedPayload.summary.appID] = RuntimeCurrentAppWindowProjection(
+            appID: committedPayload.summary.appID,
+            currentAppWindowPayload: committedPayload,
             freshness: freshnessLocked(
                 generatedAt: generatedAt,
                 isCompleteForScope: clearsDirtyState
@@ -438,10 +440,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
 
     private func currentAppWindowProjectionLocked(appID: String) -> RuntimeCurrentAppWindowProjection? {
         guard var projection = currentAppWindowProjectionsByAppID[appID] else { return nil }
-        let isScopeDirty = dirtyAppIDs.contains(appID)
-            || dirtyPIDs.contains(projection.currentAppWindowPayload.summary.pid)
-            || !dirtyCGWindowIDs.isEmpty
-            || !pendingRepairScopes.isEmpty
+        let isScopeDirty = isCurrentAppWindowProjectionScopeDirtyLocked(projection)
         projection.freshness = freshnessLocked(
             generatedAt: projection.freshness.generatedAt,
             isCompleteForScope: projection.freshness.isCompleteForScope && !isScopeDirty
@@ -573,6 +572,164 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         }
     }
 
+    private func clearDirtyStateForProjectedCGWindowsLocked(in payload: RuntimeCurrentAppWindowPayload) {
+        let projectedCGWindowIDs = currentAppProjectedCGWindowIDs(in: payload)
+        guard !projectedCGWindowIDs.isEmpty else { return }
+        dirtyCGWindowIDs.subtract(projectedCGWindowIDs)
+        if dirtyCGWindowIDs.isEmpty {
+            pendingRepairScopes.remove("spaceTopology")
+            spaceTopologySignatureSummary = nil
+        }
+    }
+
+    private func currentAppWindowPayloadByApplyingActivationReadbackLocked(
+        _ payload: RuntimeCurrentAppWindowPayload
+    ) -> RuntimeCurrentAppWindowPayload {
+        guard let activationTargetProjection else { return payload }
+        guard activationTargetProjection.appID == payload.summary.appID else { return payload }
+        guard activationTargetProjection.ownerPID == payload.summary.pid
+            || activationTargetProjection.ownerPID == payload.context.runningApp.processIdentifier
+        else {
+            return payload
+        }
+        guard payload.candidate.windows.count > 1 else { return payload }
+
+        let readbackCGWindowIDs = Set([
+            activationTargetProjection.focusedCGWindowID,
+            activationTargetProjection.targetCGWindowID
+        ].compactMap { $0 })
+        guard !readbackCGWindowIDs.isEmpty || !activationTargetProjection.windowID.isEmpty else {
+            return payload
+        }
+        guard let verifiedWindowID = payload.candidate.windows.first(where: { window in
+            if window.id == activationTargetProjection.windowID {
+                return true
+            }
+            return payload.context.windowsByID[window.id]?.cgWindowID.map {
+                readbackCGWindowIDs.contains($0)
+            } ?? false
+        })?.id else {
+            return payload
+        }
+
+        let baseLastActiveAt = payload.candidate.windows.map(\.lastActiveAt).max() ?? payload.candidate.lastActiveAt
+        let priorOrderByWindowID = currentAppWindowProjectionPriorOrderLocked(
+            for: payload,
+            excludingWindowID: verifiedWindowID
+        )
+        let originalOrderByWindowID = Dictionary(
+            uniqueKeysWithValues: payload.candidate.windows.enumerated().map { index, window in
+                (window.id, index)
+            }
+        )
+        let reorderedWindows = payload.candidate.windows.map { window in
+            guard window.id == verifiedWindowID else { return window }
+            return WindowCandidate(
+                id: window.id,
+                title: window.title,
+                isMinimized: window.isMinimized,
+                lastActiveAt: baseLastActiveAt + 1
+            )
+        }.sorted { lhs, rhs in
+            if lhs.id == verifiedWindowID {
+                return true
+            }
+            if rhs.id == verifiedWindowID {
+                return false
+            }
+            let lhsPriorOrder = priorOrderByWindowID[lhs.id]
+            let rhsPriorOrder = priorOrderByWindowID[rhs.id]
+            switch (lhsPriorOrder, rhsPriorOrder) {
+            case let (.some(lhsPriorOrder), .some(rhsPriorOrder)) where lhsPriorOrder != rhsPriorOrder:
+                return lhsPriorOrder < rhsPriorOrder
+            case (.some, .none):
+                return true
+            case (.none, .some):
+                return false
+            default:
+                return (originalOrderByWindowID[lhs.id] ?? .max)
+                    < (originalOrderByWindowID[rhs.id] ?? .max)
+            }
+        }
+        let candidate = AppSwitchCandidate(
+            id: payload.candidate.id,
+            displayName: payload.candidate.displayName,
+            groupID: payload.candidate.groupID,
+            lastActiveAt: payload.candidate.lastActiveAt,
+            windows: reorderedWindows
+        )
+        return RuntimeCurrentAppWindowPayload(
+            summary: payload.summary,
+            candidate: candidate,
+            context: payload.context,
+            appDirectoryEntries: payload.appDirectoryEntries
+        )
+    }
+
+    private func currentAppWindowProjectionPriorOrderLocked(
+        for payload: RuntimeCurrentAppWindowPayload,
+        excludingWindowID verifiedWindowID: String
+    ) -> [String: Int] {
+        guard let priorPayload = currentAppWindowProjectionsByAppID[payload.summary.appID]?.currentAppWindowPayload
+        else {
+            return [:]
+        }
+        guard priorPayload.summary.pid == payload.summary.pid
+            || priorPayload.context.runningApp.processIdentifier == payload.context.runningApp.processIdentifier
+        else {
+            return [:]
+        }
+
+        let priorOrderByWindowID = Dictionary(
+            uniqueKeysWithValues: priorPayload.candidate.windows.enumerated().map { index, window in
+                (window.id, index)
+            }
+        )
+        var priorOrderByCGWindowID: [CGWindowID: Int] = [:]
+        for window in priorPayload.candidate.windows {
+            guard let order = priorOrderByWindowID[window.id],
+                  let cgWindowID = priorPayload.context.windowsByID[window.id]?.cgWindowID
+            else {
+                continue
+            }
+            priorOrderByCGWindowID[cgWindowID] = priorOrderByCGWindowID[cgWindowID] ?? order
+        }
+        var resolvedOrderByWindowID: [String: Int] = [:]
+        for window in payload.candidate.windows where window.id != verifiedWindowID {
+            if let order = priorOrderByWindowID[window.id] {
+                resolvedOrderByWindowID[window.id] = order
+                continue
+            }
+            if let cgWindowID = payload.context.windowsByID[window.id]?.cgWindowID,
+               let order = priorOrderByCGWindowID[cgWindowID] {
+                resolvedOrderByWindowID[window.id] = order
+            }
+        }
+        return resolvedOrderByWindowID
+    }
+
+    private func isCurrentAppWindowProjectionScopeDirtyLocked(
+        _ projection: RuntimeCurrentAppWindowProjection
+    ) -> Bool {
+        let payload = projection.currentAppWindowPayload
+        if dirtyAppIDs.contains(payload.summary.appID)
+            || dirtyPIDs.contains(payload.summary.pid)
+            || pendingRepairScopes.contains(where: { $0.contains(payload.summary.appID) }) {
+            return true
+        }
+
+        guard !dirtyCGWindowIDs.isEmpty else { return false }
+        let projectedCGWindowIDs = currentAppProjectedCGWindowIDs(in: payload)
+        return projectedCGWindowIDs.isEmpty
+            || !dirtyCGWindowIDs.isDisjoint(with: projectedCGWindowIDs)
+    }
+
+    private func currentAppProjectedCGWindowIDs(
+        in payload: RuntimeCurrentAppWindowPayload
+    ) -> Set<CGWindowID> {
+        Set(payload.context.windowsByID.values.compactMap(\.cgWindowID))
+    }
+
     @discardableResult
     private func replaceAppDirectoryStateLocked(
         entries: [RuntimeAppDirectoryEntry],
@@ -616,10 +773,11 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             windowStatsByPID: [:],
             rankByPID: rankByPID
         )
-        let apps = Self.sortedAppDirectoryEntriesForProjection(
+        let sortedEntries = Self.sortedAppDirectoryEntriesForProjection(
             selectedEntries,
             rankByPID: rankByPID
-        ).enumerated().map { index, entry in
+        )
+        let apps = sortedEntries.enumerated().map { index, entry in
             let rank = rankByPID[entry.pid] ?? index
             let displayName = entry.localizedName ?? entry.bundleIdentifier ?? entry.appID
             return AppSwitchCandidate(
@@ -633,9 +791,23 @@ final class RuntimeReadModelStore: @unchecked Sendable {
                 windows: []
             )
         }
+        let contextsByID = Dictionary(
+            uniqueKeysWithValues: sortedEntries.compactMap { entry in
+                entry.runningApplication.map { runningApp in
+                    (
+                        entry.appID,
+                        RuntimeAppContext(
+                            appID: entry.appID,
+                            runningApp: runningApp,
+                            windowsByID: [:]
+                        )
+                    )
+                }
+            }
+        )
         return RuntimeAppSwitcherProjection(
             apps: apps,
-            contextsByID: [:],
+            contextsByID: contextsByID,
             freshness: appDirectoryDerivedProjectionFreshnessLocked(generatedAt: generatedAt)
         )
     }

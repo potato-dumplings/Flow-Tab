@@ -183,16 +183,35 @@ extension LiveSwitcherModel {
             "selectedAppWindowProjection result=scheduled appID=\(targetAppID)"
         )
 
-        if let projection = runtimeService.readCurrentAppWindowProjection(appID: targetAppID),
-           projection.freshness.isCompleteForScope {
-            completeSelectedAppWindowProjection(
-                projection.currentAppWindowPayload,
-                appID: targetAppID,
-                generation: generation,
-                startMs: startMs,
-                projectionReadMs: Self.monotonicMilliseconds()
-            )
-            return true
+        if let projection = runtimeService.readCurrentAppWindowProjection(appID: targetAppID) {
+            let projectionReadMs = Self.monotonicMilliseconds()
+            if projection.freshness.isCompleteForScope {
+                completeSelectedAppWindowProjection(
+                    projection.currentAppWindowPayload,
+                    appID: targetAppID,
+                    generation: generation,
+                    startMs: startMs,
+                    projectionReadMs: projectionReadMs
+                )
+                return true
+            }
+            if !projection.currentAppWindowPayload.candidate.windows.isEmpty {
+                if let pid = runtimeContextsByID[targetAppID]?.runningApp.processIdentifier {
+                    runtimeService.signalSelectedCurrentAppWindowsChanged(appID: targetAppID, pid: pid)
+                }
+                RuntimeLog.debug(
+                    .projection,
+                    "selectedAppWindowProjection result=degradedStaleCommitted appID=\(targetAppID) windows=\(projection.currentAppWindowPayload.candidate.windows.count)"
+                )
+                completeSelectedAppWindowProjection(
+                    projection.currentAppWindowPayload,
+                    appID: targetAppID,
+                    generation: generation,
+                    startMs: startMs,
+                    projectionReadMs: projectionReadMs
+                )
+                return true
+            }
         }
 
         let projectionReadMs = Self.monotonicMilliseconds()
@@ -207,6 +226,40 @@ extension LiveSwitcherModel {
             projectionReadMs: projectionReadMs
         )
         return runtimeContextsByID[targetAppID] != nil
+    }
+
+    @discardableResult
+    func applySelectedAppWindowProjectionIfReady(for appID: String? = nil) -> Bool {
+        guard let currentSession = session else { return false }
+        guard case .appCycle = currentSession.mode else { return false }
+        let targetAppID = appID ?? currentSession.selectedApp.id
+        guard targetAppID == currentSession.selectedApp.id else { return false }
+        guard currentSession.selectedApp.windows.isEmpty else { return false }
+
+        let startMs = Self.monotonicMilliseconds()
+        guard
+            let projection = runtimeProjectionService.readCurrentAppWindowProjection(appID: targetAppID),
+            projection.freshness.isCompleteForScope
+                || !projection.currentAppWindowPayload.candidate.windows.isEmpty
+        else {
+            return false
+        }
+        if !projection.freshness.isCompleteForScope {
+            RuntimeLog.debug(
+                .projection,
+                "selectedAppWindowProjection result=degradedStaleCommitted appID=\(targetAppID) windows=\(projection.currentAppWindowPayload.candidate.windows.count)"
+            )
+        }
+
+        selectedAppWindowProjectionGeneration &+= 1
+        completeSelectedAppWindowProjection(
+            projection.currentAppWindowPayload,
+            appID: targetAppID,
+            generation: selectedAppWindowProjectionGeneration,
+            startMs: startMs,
+            projectionReadMs: Self.monotonicMilliseconds()
+        )
+        return true
     }
 
     func completeSelectedAppWindowProjection(

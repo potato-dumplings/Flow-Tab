@@ -181,6 +181,112 @@ enum RuntimeWindowPresentationFilter {
         return filteredEntries
     }
 
+    static func filterCGOnlyEntriesCoveredByActivationEntries(
+        _ entries: [RuntimeWindowListEntry],
+        knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry],
+        appName: String,
+        hasFullscreenTopology: Bool,
+        stage: String
+    ) -> [RuntimeWindowListEntry] {
+        guard entries.count > 1 else { return entries }
+        let hasKnownFullscreenTopology = knownCGWindowsByID.values.contains { cgWindow in
+            RuntimeWindowTopologyClassifier.hasOffDesktopSpace(spaceIDs: cgWindow.spaceIDs)
+                && boundsLookLikeFullscreenContentSurface(cgWindow.bounds)
+        }
+        guard hasFullscreenTopology || hasKnownFullscreenTopology else { return entries }
+
+        let activationTitleKeys = Set(
+            entries.compactMap { entry -> String? in
+                guard entry.activationHandleID != nil || entry.axWindow != nil else { return nil }
+                guard !RuntimeWindowTitleResolver.titleLooksLikeAppNameFallback(
+                    entry.title,
+                    appName: appName
+                ) else {
+                    return nil
+                }
+                return normalizedTitleKey(entry.title)
+            }
+        )
+        guard !activationTitleKeys.isEmpty else { return entries }
+
+        var droppedCount = 0
+        let filteredEntries = entries.filter { entry in
+            guard entry.activationHandleID == nil, entry.axWindow == nil else { return true }
+
+            let isCoveredByActivationTitle = normalizedTitleKey(entry.title).map {
+                activationTitleKeys.contains($0)
+            } ?? false
+            let isFullscreenFallbackArtifact = RuntimeWindowTitleResolver.titleLooksLikeAppNameFallback(
+                entry.title,
+                appName: appName
+            )
+            let shouldDrop = isCoveredByActivationTitle || isFullscreenFallbackArtifact
+            if shouldDrop {
+                droppedCount += 1
+            }
+            return !shouldDrop
+        }
+
+        if droppedCount > 0 {
+            RuntimeLog.debug(
+                .axMatch,
+                "\(appName) filtered-cg-only-covered-by-activation stage=\(stage) dropped=\(droppedCount)"
+            )
+        }
+        return filteredEntries
+    }
+
+    static func filterRepeatedFullscreenPresentationTitles(
+        _ entries: [RuntimeWindowListEntry],
+        knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry],
+        appName: String,
+        hasFullscreenTopology: Bool,
+        stage: String
+    ) -> [RuntimeWindowListEntry] {
+        guard entries.count > 1 else { return entries }
+        let hasKnownFullscreenTopology = knownCGWindowsByID.values.contains { cgWindow in
+            RuntimeWindowTopologyClassifier.hasOffDesktopSpace(spaceIDs: cgWindow.spaceIDs)
+                && boundsLookLikeFullscreenContentSurface(cgWindow.bounds)
+        }
+        guard hasFullscreenTopology || hasKnownFullscreenTopology else { return entries }
+        let hasUserTitle = entries.contains { entry in
+            !RuntimeWindowTitleResolver.titleLooksLikeAppNameFallback(entry.title, appName: appName)
+                && normalizedTitleKey(entry.title) != nil
+        }
+        guard hasUserTitle else { return entries }
+
+        var seenFullscreenTitleKeys: Set<String> = []
+        var droppedCount = 0
+        let filteredEntries = entries.filter { entry in
+            if RuntimeWindowTitleResolver.titleLooksLikeAppNameFallback(entry.title, appName: appName) {
+                droppedCount += 1
+                return false
+            }
+            guard let titleKey = normalizedTitleKey(entry.title) else { return true }
+            guard entryLooksLikeFullscreenPresentationSurface(
+                entry,
+                knownCGWindowsByID: knownCGWindowsByID,
+                appName: appName
+            ) else {
+                return true
+            }
+            if seenFullscreenTitleKeys.contains(titleKey) {
+                droppedCount += 1
+                return false
+            }
+            seenFullscreenTitleKeys.insert(titleKey)
+            return true
+        }
+
+        if droppedCount > 0 {
+            RuntimeLog.debug(
+                .axMatch,
+                "\(appName) filtered-repeated-fullscreen-presentation-titles stage=\(stage) dropped=\(droppedCount)"
+            )
+        }
+        return filteredEntries
+    }
+
     static func orderWindowEntriesForPresentation(
         _ entries: [RuntimeWindowListEntry],
         prioritizesOnscreen: Bool = false,
@@ -431,6 +537,30 @@ enum RuntimeWindowPresentationFilter {
             return false
         }
         return boundsLookLikeFullscreenContentSurface(entryBounds(entry, knownCGWindowsByID: knownCGWindowsByID))
+    }
+
+    private static func entryLooksLikeFullscreenPresentationSurface(
+        _ entry: RuntimeWindowListEntry,
+        knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry],
+        appName: String
+    ) -> Bool {
+        if entryLooksLikeTopologyFullscreenContentSurface(
+            entry,
+            knownCGWindowsByID: knownCGWindowsByID,
+            appName: appName
+        ) {
+            return true
+        }
+        if entryLooksLikeDesktopFullscreenSiblingSurface(
+            entry,
+            knownCGWindowsByID: knownCGWindowsByID,
+            appName: appName
+        ) {
+            return true
+        }
+        return boundsLookLikeFullscreenContentSurface(
+            entryBounds(entry, knownCGWindowsByID: knownCGWindowsByID)
+        )
     }
 
     private static func entryLooksLikeDuplicateFullscreenGeometryHost(

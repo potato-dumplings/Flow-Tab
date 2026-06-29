@@ -193,24 +193,40 @@ extension SwitcherPanelController {
 
         let deadlineMs = delayedWindowLayerDeadlineMs ?? nowMs
         let requestedProjection = model.scheduleSelectedAppWindowProjectionIfNeeded(for: selectedAppID)
+        let remainingDelay = max(0, (deadlineMs - nowMs) / 1_000)
+        let hasManualWindowLayerEntry = model.pendingManualWindowLayerEntryAppID == selectedAppID
         guard model.canAutoEnterWindowLayer else {
             RuntimeLog.debug(
                 .autoEnter,
                 "pending appID=\(selectedAppID) requestedProjection=\(requestedProjection) deadlineMs=\(formatMilliseconds(deadlineMs)) \(self.model.debugSelectionSummary())"
             )
+            if requestedProjection {
+                let projectionApplyDelay = hasManualWindowLayerEntry
+                    ? min(remainingDelay, manualWindowLayerProjectionApplyDelay)
+                    : remainingDelay
+                RuntimeLog.debug(
+                    .autoEnter,
+                    "schedule projectionApplyDelay=\(projectionApplyDelay)s manual=\(hasManualWindowLayerEntry) \(self.model.debugSelectionSummary())"
+                )
+                scheduleDelayedWindowLayerTimer(remainingDelay: projectionApplyDelay)
+            }
             return
         }
-        let remainingDelay = max(0, (deadlineMs - nowMs) / 1_000)
         RuntimeLog.debug(
             .autoEnter,
             "schedule delay=\(remainingDelay)s deadlineMs=\(formatMilliseconds(deadlineMs)) \(self.model.debugSelectionSummary())"
         )
 
+        scheduleDelayedWindowLayerTimer(remainingDelay: remainingDelay)
+    }
+
+    func scheduleDelayedWindowLayerTimer(remainingDelay: TimeInterval) {
         guard remainingDelay > 0 else {
             enterDelayedWindowLayerIfReady(reason: "deadlineElapsed")
             return
         }
 
+        RuntimeLog.debug(.autoEnter, "schedule timer delay=\(remainingDelay)s")
         let timer = Timer(timeInterval: remainingDelay, repeats: false) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -229,6 +245,9 @@ extension SwitcherPanelController {
         let nowMs = monotonicMilliseconds()
         let deadlineMs = delayedWindowLayerDeadlineMs ?? nowMs
         let overshootMs = max(0, nowMs - deadlineMs)
+        if !model.canAutoEnterWindowLayer {
+            _ = model.applySelectedAppWindowProjectionIfReady(for: delayedWindowLayerAppID)
+        }
         if model.autoEnterWindowLayerIfPossible() {
             RuntimeLog.debug(
                 .autoEnter,
