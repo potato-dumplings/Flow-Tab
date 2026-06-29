@@ -282,12 +282,19 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
 
-        guard var projection = appSwitcherProjection ?? appSwitcherProjectionFromAppDirectoryLocked() else {
+        if var projection = appSwitcherProjection {
+            projection.freshness = freshnessLocked(
+                generatedAt: projection.freshness.generatedAt,
+                isCompleteForScope: !isDirtyLocked
+            )
+            return projection
+        }
+
+        guard var projection = appSwitcherProjectionFromAppDirectoryLocked() else {
             return nil
         }
-        projection.freshness = freshnessLocked(
-            generatedAt: projection.freshness.generatedAt,
-            isCompleteForScope: !isDirtyLocked
+        projection.freshness = appDirectoryDerivedProjectionFreshnessLocked(
+            generatedAt: projection.freshness.generatedAt
         )
         return projection
     }
@@ -296,12 +303,19 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
 
-        guard var projection = homeSummaryProjection ?? homeSummaryProjectionFromAppDirectoryLocked() else {
+        if var projection = homeSummaryProjection {
+            projection.freshness = freshnessLocked(
+                generatedAt: projection.freshness.generatedAt,
+                isCompleteForScope: !isDirtyLocked
+            )
+            return projection
+        }
+
+        guard var projection = homeSummaryProjectionFromAppDirectoryLocked() else {
             return nil
         }
-        projection.freshness = freshnessLocked(
-            generatedAt: projection.freshness.generatedAt,
-            isCompleteForScope: !isDirtyLocked
+        projection.freshness = appDirectoryDerivedProjectionFreshnessLocked(
+            generatedAt: projection.freshness.generatedAt
         )
         return projection
     }
@@ -489,7 +503,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         return RuntimeAppSwitcherProjection(
             apps: apps,
             contextsByID: [:],
-            freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: !isDirtyLocked)
+            freshness: appDirectoryDerivedProjectionFreshnessLocked(generatedAt: generatedAt)
         )
     }
 
@@ -522,7 +536,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         }
         return RuntimeHomeSummaryProjection(
             summaries: summaries,
-            freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: !isDirtyLocked)
+            freshness: appDirectoryDerivedProjectionFreshnessLocked(generatedAt: generatedAt)
         )
     }
 
@@ -585,6 +599,15 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             spaceTopologySignatureSummary: spaceTopologySignatureSummary,
             pendingRepairScopes: pendingRepairScopes,
             isCompleteForScope: isCompleteForScope
+        )
+    }
+
+    private func appDirectoryDerivedProjectionFreshnessLocked(
+        generatedAt: TimeInterval
+    ) -> RuntimeProjectionFreshness {
+        freshnessLocked(
+            generatedAt: generatedAt,
+            isCompleteForScope: false
         )
     }
 

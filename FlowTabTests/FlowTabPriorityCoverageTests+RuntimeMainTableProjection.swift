@@ -192,8 +192,17 @@ extension FlowTabPriorityCoverageTests {
         var appProjection = try XCTUnwrap(store.readAppSwitcherProjection())
         XCTAssertEqual(appProjection.apps.map(\.id), ["com.example.front", "com.example.alpha"])
         XCTAssertEqual(appProjection.apps.map(\.lastActiveAt), [0, -1])
+        XCTAssertTrue(appProjection.contextsByID.isEmpty)
+        XCTAssertFalse(appProjection.freshness.isCompleteForScope)
+        XCTAssertEqual(appProjection.freshness.sourceGeneration.appLifecycle, 1)
+        let homeProjection = try XCTUnwrap(store.readHomeSummaryProjection())
+        XCTAssertEqual(homeProjection.summaries.map(\.appID), ["com.example.front", "com.example.alpha"])
+        XCTAssertEqual(homeProjection.summaries.map(\.windowCount), [0, 0])
+        XCTAssertFalse(homeProjection.freshness.isCompleteForScope)
+        XCTAssertEqual(homeProjection.freshness.sourceGeneration.appLifecycle, 1)
         var appDirectoryProjection = try XCTUnwrap(store.readAppDirectoryProjection())
         XCTAssertEqual(appDirectoryProjection.freshness.sourceGeneration.appLifecycle, 1)
+        XCTAssertTrue(appDirectoryProjection.freshness.isCompleteForScope)
         XCTAssertEqual(
             store.readCommittedSearchIndexForSearch().readiness,
             .missingCommittedIndex
@@ -224,6 +233,7 @@ extension FlowTabPriorityCoverageTests {
 
         appProjection = try XCTUnwrap(store.readAppSwitcherProjection())
         XCTAssertEqual(appProjection.apps.map(\.id), ["com.example.alpha", "com.example.front"])
+        XCTAssertFalse(appProjection.freshness.isCompleteForScope)
         appDirectoryProjection = try XCTUnwrap(store.readAppDirectoryProjection())
         XCTAssertEqual(appDirectoryProjection.freshness.sourceGeneration.appLifecycle, 2)
     }
@@ -538,6 +548,63 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(
             searchRead.projection?.windowEntries.filter { $0.appID == appID }.map(\.windowID),
             [legacyWindow.id]
+        )
+    }
+
+    func testRuntimeProjectionServiceKeepsAppDirectoryDerivedProjectionDegradedWithoutMainTableCommit() throws {
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let appDirectoryEntry = RuntimeAppDirectoryEntry(app: runningApp)
+        let readModelStore = RuntimeReadModelStore()
+        let requestLock = NSLock()
+        var startedRequests: [RuntimeReconciliationRequest] = []
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.AppDirectoryDerivedProjection",
+            repairProvider: RuntimeProjectionRepairProvider(
+                windowRecordStore: RuntimeWindowRecordStore(),
+                reconciliationCoordinator: RuntimeReconciliationCoordinator()
+            ),
+            mainTableProjectionBuilder: RuntimeUnavailableMainTableProjectionBuilder(),
+            appDirectoryProvider: FixedRuntimeAppDirectoryProvider(entries: [appDirectoryEntry]),
+            readModelStore: readModelStore,
+            reconciliationExecutor: { request, _ in
+                requestLock.lock()
+                startedRequests.append(request)
+                requestLock.unlock()
+                return .completed
+            }
+        )
+
+        service.requestAppSwitcherProjectionMaintenance(reason: .switcherSessionStarted)
+        service.waitForMaintenanceQueueForTesting()
+
+        let appDirectoryProjection = try XCTUnwrap(readModelStore.readAppDirectoryProjection())
+        XCTAssertEqual(appDirectoryProjection.entries, [appDirectoryEntry])
+        XCTAssertTrue(appDirectoryProjection.freshness.isCompleteForScope)
+        XCTAssertEqual(appDirectoryProjection.freshness.sourceGeneration.appLifecycle, 1)
+
+        let appProjection = try XCTUnwrap(readModelStore.readAppSwitcherProjection())
+        XCTAssertEqual(appProjection.apps.map(\.id), [appID])
+        XCTAssertTrue(appProjection.apps.first?.windows.isEmpty == true)
+        XCTAssertTrue(appProjection.contextsByID.isEmpty)
+        XCTAssertFalse(appProjection.freshness.isCompleteForScope)
+        XCTAssertEqual(appProjection.freshness.sourceGeneration.appLifecycle, 1)
+        XCTAssertEqual(appProjection.freshness.sourceGeneration.projection, 0)
+
+        let homeProjection = try XCTUnwrap(readModelStore.readHomeSummaryProjection())
+        XCTAssertEqual(homeProjection.summaries.map(\.appID), [appID])
+        XCTAssertEqual(homeProjection.summary(for: appID)?.windowCount, 0)
+        XCTAssertFalse(homeProjection.freshness.isCompleteForScope)
+        XCTAssertEqual(homeProjection.freshness.sourceGeneration.appLifecycle, 1)
+        XCTAssertEqual(homeProjection.freshness.sourceGeneration.projection, 0)
+
+        requestLock.lock()
+        let startedTargets = startedRequests.map(\.target)
+        requestLock.unlock()
+        XCTAssertEqual(startedTargets, [])
+        XCTAssertEqual(
+            readModelStore.readCommittedSearchIndexForSearch().readiness,
+            .missingCommittedIndex
         )
     }
 
