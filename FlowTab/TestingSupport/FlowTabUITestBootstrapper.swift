@@ -112,14 +112,6 @@ enum FlowTabUITestBootstrapper {
     static func configurePanelControllerIfNeeded(panelController: SwitcherPanelController) {
         installMockWindowPreviewsIfNeeded(panelController: panelController)
 
-        if let bundleIdentifier = FlowTabTestLaunchOptions.frontmostBundleIdentifierOverride {
-            panelController.modelForTesting.frontmostApplicationOverride = {
-                NSRunningApplication
-                    .runningApplications(withBundleIdentifier: bundleIdentifier)
-                    .first { !$0.isTerminated }
-            }
-        }
-
         if FlowTabTestLaunchOptions.suppressesPanelApplicationActivation {
             panelController.activateApplicationIgnoringOtherAppsOverride = {
                 RuntimeLog.info("UITest", "suppressed panel application activation")

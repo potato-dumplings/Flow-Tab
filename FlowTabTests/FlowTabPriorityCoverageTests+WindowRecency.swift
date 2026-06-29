@@ -622,8 +622,6 @@ extension FlowTabPriorityCoverageTests {
             windowID: "current-focused",
             context: currentContext
         )
-        model.frontmostApplicationOverride = { currentApp }
-
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         assertAppSwitcherProjectionRead(from: runtimeProjectionService)
         XCTAssertEqual(model.selectedApp?.id, otherAppID)
@@ -687,7 +685,6 @@ extension FlowTabPriorityCoverageTests {
                 )
             ]
         )
-        model.frontmostApplicationOverride = { currentApp }
         model.windowRecencyTracker.recordVerifiedFocus(
             appID: appID,
             windowID: "fullscreen",
@@ -794,7 +791,6 @@ extension FlowTabPriorityCoverageTests {
             windowRecencyTracker: RuntimeWindowRecencyTracker(),
             runtimeProjectionService: runtimeProjectionService
         )
-        model.frontmostApplicationOverride = { currentApp }
         model.windowRecencyTracker.recordVerifiedFocus(
             appID: appID,
             windowID: "fullscreen",
@@ -874,8 +870,6 @@ extension FlowTabPriorityCoverageTests {
             windowRecencyTracker: RuntimeWindowRecencyTracker(),
             runtimeProjectionService: runtimeProjectionService
         )
-        model.frontmostApplicationOverride = { currentApp }
-
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         assertAppSwitcherProjectionRead(from: runtimeProjectionService)
         XCTAssertEqual(model.session?.apps.first?.windows.map(\.id), ["fullscreen", "incognito", "normal"])

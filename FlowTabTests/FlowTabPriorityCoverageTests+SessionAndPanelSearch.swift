@@ -222,8 +222,6 @@ extension FlowTabPriorityCoverageTests {
         let controller = SwitcherPanelController(
             model: LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
         )
-        controller.modelForTesting.frontmostApplicationOverride = { currentApp }
-
         XCTAssertTrue(controller.beginInAppWindowHotkeySessionForTesting())
         assertCurrentAppWindowProjectionRead(appID: appID, from: runtimeProjectionService)
         let initialSelectedWindowID = controller.modelForTesting.session?.selectedWindow?.id
@@ -327,7 +325,6 @@ extension FlowTabPriorityCoverageTests {
         let controller = SwitcherPanelController(
             model: LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
         )
-        controller.modelForTesting.frontmostApplicationOverride = { currentApp }
         var activatedTarget: ActivationTarget?
         controller.modelForTesting.activationOverride = { target, _ in
             activatedTarget = target
@@ -763,8 +760,6 @@ extension FlowTabPriorityCoverageTests {
             windows: windows
         )
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
-
-        model.frontmostApplicationOverride = { currentApp }
 
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
         assertCurrentAppWindowProjectionRead(appID: appID, from: runtimeProjectionService)

@@ -231,7 +231,6 @@ final class LiveSwitcherModel: ObservableObject {
     var onSearchStateChanged: (() -> Void)?
     var onSessionLayoutChanged: (() -> Void)?
     var onSearchResultScrollRequestForTesting: ((String) -> Void)?
-    var frontmostApplicationOverride: (() -> NSRunningApplication?)?
     var activationOverride: ((ActivationTarget, [String: RuntimeAppContext]) -> Void)?
     var terminateRequestOverride: ((String) -> (sent: Bool, pid: pid_t))?
     var isProcessRunningOverride: ((pid_t) -> Bool)?
@@ -932,13 +931,6 @@ final class LiveSwitcherModel: ObservableObject {
         _ payload: RuntimeCurrentAppWindowPayload
     ) -> RuntimeCurrentAppWindowPayload {
         return windowRecencyTracker.currentAppWindowPayloadWithRecencyApplied(payload)
-    }
-
-    func resolveFrontmostApplication() -> NSRunningApplication? {
-        if let frontmostApplicationOverride {
-            return frontmostApplicationOverride()
-        }
-        return NSWorkspace.shared.frontmostApplication
     }
 
     func makeTerminateRequest(forAppID appID: String) -> (sent: Bool, pid: pid_t)? {

@@ -1256,7 +1256,6 @@ extension FlowTabTests {
         }
         let runtimeService = RecordingRuntimeProjectionService(appSwitcherApps: apps)
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeService)
-        model.frontmostApplicationOverride = { nil }
 
         let iterations = 120
         var samples: [Double] = []
@@ -1299,7 +1298,6 @@ extension FlowTabTests {
             appSwitcherApps: appOnlyAppSwitcherApps(from: projectionSeed.apps)
         )
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeService)
-        model.frontmostApplicationOverride = { nil }
 
         let iterations = 80
         var samples: [Double] = []
@@ -1399,7 +1397,6 @@ extension FlowTabTests {
             ]
         )
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
-        model.frontmostApplicationOverride = { runningApp }
 
         let iterations = 80
         var samples: [Double] = []
@@ -1510,7 +1507,6 @@ extension FlowTabTests {
                 appSwitcherApps: appOnlyAppSwitcherApps(from: projectionSeed.apps)
             )
         )
-        model.frontmostApplicationOverride = { nil }
         model.runtimeProjectionMaintenanceEnabled = false
         var previewCaptureCalls = 0
         model.previewCaptureOverride = { _, _, _, _ in

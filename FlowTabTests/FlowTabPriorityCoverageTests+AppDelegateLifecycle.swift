@@ -750,7 +750,6 @@ extension FlowTabPriorityCoverageTests {
             clearIsolatedUserDefaults(userDefaults)
         }
 
-        panelController.modelForTesting.frontmostApplicationOverride = { currentApp }
         AccessibilityPermissionChecker.isTrustedOverrideForTesting = { true }
         AccessibilityPermissionChecker.requestPermissionOverrideForTesting = { true }
         AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride = {}

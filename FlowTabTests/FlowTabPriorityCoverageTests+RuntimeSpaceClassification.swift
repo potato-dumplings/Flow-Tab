@@ -669,8 +669,6 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
-        model.frontmostApplicationOverride = { currentApp }
-
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         XCTAssertEqual(runtimeProjectionService.appSwitcherProjectionReadCount(), 1)
         XCTAssertEqual(runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(), [.switcherSessionStarted])

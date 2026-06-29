@@ -3119,8 +3119,6 @@ extension FlowTabPriorityCoverageTests {
         )
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
 
-        model.frontmostApplicationOverride = { currentApp }
-
         var captureCallCount = 0
         model.previewCaptureOverride = { _, _, title, _ in
             captureCallCount += 1
@@ -3180,8 +3178,6 @@ extension FlowTabPriorityCoverageTests {
             context: context
         )
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
-
-        model.frontmostApplicationOverride = { currentApp }
 
         var captureCallCount = 0
         model.previewCaptureOverride = { _, _, _, _ in
@@ -3259,8 +3255,6 @@ extension FlowTabPriorityCoverageTests {
             context: context
         )
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
-
-        model.frontmostApplicationOverride = { currentApp }
 
         enum PreviewPhase {
             case initial
@@ -3345,8 +3339,6 @@ extension FlowTabPriorityCoverageTests {
         )
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
 
-        model.frontmostApplicationOverride = { currentApp }
-
         var captureCallCount = 0
         model.previewCaptureOverride = { _, _, _, _ in
             captureCallCount += 1
@@ -3419,8 +3411,6 @@ extension FlowTabPriorityCoverageTests {
         )
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
         model.runtimeProjectionMaintenanceEnabled = false
-
-        model.frontmostApplicationOverride = { currentApp }
 
         var captureCallCount = 0
         model.previewCaptureOverride = { _, _, _, _ in

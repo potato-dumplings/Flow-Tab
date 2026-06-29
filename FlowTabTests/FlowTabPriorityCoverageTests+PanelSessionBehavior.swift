@@ -7,7 +7,7 @@ import FlowTabCore
 
 extension FlowTabPriorityCoverageTests {
     @MainActor
-    func testSwitcherPanelControllerInAppHotkeyReleaseCommitsFocusedWindowSession() async {
+    func testSwitcherPanelControllerInAppHotkeySessionCommitsFocusedRuntimeProjectionWindow() {
         let currentApp = NSRunningApplication.current
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let windows = [
@@ -23,8 +23,6 @@ extension FlowTabPriorityCoverageTests {
                 )
             )
         )
-        controller.modelForTesting.frontmostApplicationOverride = { currentApp }
-
         var activatedTarget: ActivationTarget?
         controller.modelForTesting.activationOverride = { target, _ in
             activatedTarget = target
@@ -36,13 +34,8 @@ extension FlowTabPriorityCoverageTests {
         let selectedWindowID = controller.modelForTesting.session?.selectedWindow?.id
         XCTAssertNotNil(selectedWindowID)
 
-        controller.inAppPrimaryModifierPressedOverride = false
-        controller.handleInAppWindowHotkeyReleased()
+        controller.finishSelection()
 
-        let didCommitInAppRelease = await waitUntil("in-app hotkey release commits selection") {
-            controller.modelForTesting.session == nil && activatedTarget != nil
-        }
-        XCTAssertTrue(didCommitInAppRelease)
         XCTAssertNil(controller.modelForTesting.session)
         XCTAssertEqual(
             activatedTarget,
@@ -71,8 +64,6 @@ extension FlowTabPriorityCoverageTests {
                 )
             )
         )
-        controller.modelForTesting.frontmostApplicationOverride = { currentApp }
-
         XCTAssertTrue(controller.beginInAppWindowHotkeySessionForTesting())
         let summary = controller.panelContentProbeSummary()
 
@@ -320,8 +311,6 @@ extension FlowTabPriorityCoverageTests {
         let controller = SwitcherPanelController(
             model: LiveSwitcherModel(runtimeProjectionService: runtimeService)
         )
-        controller.modelForTesting.frontmostApplicationOverride = { nil }
-
         let start = DispatchTime.now().uptimeNanoseconds
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
         let elapsedMs = Double(DispatchTime.now().uptimeNanoseconds - start) / 1_000_000.0
@@ -753,8 +742,6 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
-        model.frontmostApplicationOverride = { runningApp }
-
         XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
 
         XCTAssertEqual(runtimeProjectionService.focusedCurrentAppWindowProjectionReadCount(), 1)
@@ -776,8 +763,6 @@ extension FlowTabPriorityCoverageTests {
             )
         )
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
-        model.frontmostApplicationOverride = { runningApp }
-
         XCTAssertFalse(model.startFocusedAppWindowSession(triggerDirection: .forward))
 
         XCTAssertTrue(runtimeProjectionService.appWindowChangeSignalsRecorded().isEmpty)
@@ -838,8 +823,6 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
-        model.frontmostApplicationOverride = { runningApp }
-
         XCTAssertFalse(model.startFocusedAppWindowSession(triggerDirection: .forward))
 
         XCTAssertEqual(runtimeProjectionService.focusedCurrentAppWindowProjectionReadCount(), 1)
