@@ -10,6 +10,7 @@ extension RuntimeReadModelStore {
         apps: [AppSwitchCandidate],
         contextsByID: [String: RuntimeAppContext],
         appDirectoryEntries: [RuntimeAppDirectoryEntry]?,
+        hasCompleteWindowCoverage: Bool = true,
         generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
     ) {
         if let appDirectoryEntries {
@@ -18,7 +19,8 @@ extension RuntimeReadModelStore {
         commitMainTableAppSwitcherProjectionPayload(
             RuntimeAppSwitcherProjectionPayload(
                 apps: apps,
-                contextsByID: contextsByID
+                contextsByID: contextsByID,
+                hasCompleteWindowCoverage: hasCompleteWindowCoverage
             ),
             generatedAt: generatedAt
         )

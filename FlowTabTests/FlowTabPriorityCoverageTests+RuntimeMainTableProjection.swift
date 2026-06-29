@@ -1743,7 +1743,8 @@ extension FlowTabPriorityCoverageTests {
         store.commitMainTableAppSwitcherProjectionPayload(
             RuntimeAppSwitcherProjectionPayload(
                 apps: [repairedApp],
-                contextsByID: [appID: context]
+                contextsByID: [appID: context],
+                hasCompleteWindowCoverage: true
             ),
             clearsDirtyForAppID: appID,
             clearsDirtyForPID: pid,
@@ -2315,7 +2316,8 @@ extension FlowTabPriorityCoverageTests {
         store.commitMainTableAppSwitcherProjectionPayload(
             RuntimeAppSwitcherProjectionPayload(
                 apps: [candidate],
-                contextsByID: [appID: context]
+                contextsByID: [appID: context],
+                hasCompleteWindowCoverage: true
             ),
             clearsDirtyForAppID: appID,
             clearsDirtyForPID: pid,

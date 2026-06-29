@@ -181,10 +181,10 @@ extension FlowTabPriorityCoverageTests {
             generatedAt: 30
         )
 
-        XCTAssertEqual(summary.coldStartCommittedCount, 1)
-        XCTAssertEqual(summary.degradedCommittedCount, 0)
+        XCTAssertEqual(summary.coldStartCommittedCount, 0)
+        XCTAssertEqual(summary.degradedCommittedCount, 1)
         let appSwitcherProjection = try XCTUnwrap(store.readAppSwitcherProjection())
-        XCTAssertTrue(appSwitcherProjection.freshness.isCompleteForScope)
+        XCTAssertFalse(appSwitcherProjection.freshness.isCompleteForScope)
         XCTAssertEqual(appSwitcherProjection.freshness.sourceGeneration.appLifecycle, 1)
         XCTAssertEqual(appSwitcherProjection.freshness.sourceGeneration.projection, 1)
         XCTAssertEqual(appSwitcherProjection.apps.map(\.id), apps.map(\.id))
@@ -371,7 +371,7 @@ extension FlowTabPriorityCoverageTests {
 
         let appProjection = try XCTUnwrap(store.readAppSwitcherProjection())
         XCTAssertEqual(appProjection.apps.map(\.id), [remainingApp.id])
-        XCTAssertTrue(appProjection.freshness.isCompleteForScope)
+        XCTAssertFalse(appProjection.freshness.isCompleteForScope)
 
         let searchRead = store.readCommittedSearchIndexForSearch()
         XCTAssertEqual(searchRead.readiness, .degradedStaleCommitted)

@@ -15,7 +15,7 @@ struct RuntimeAppSwitcherProjectionPayload {
         apps: [AppSwitchCandidate],
         contextsByID: [String: RuntimeAppContext],
         homeSummaries: [RuntimeHomeAppSummary]? = nil,
-        hasCompleteWindowCoverage: Bool = true,
+        hasCompleteWindowCoverage: Bool = false,
         coveredCGWindowIDs: Set<CGWindowID>? = nil
     ) {
         self.apps = apps
