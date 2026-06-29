@@ -336,24 +336,57 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(store.readAppDirectoryProjection()?.entries.map(\.pid), [pid + 1])
     }
 
-    func testRuntimeReadModelStoreDoesNotUseSearchOnlyStateForAppTermination() throws {
+    func testRuntimeReadModelStoreMarksTerminationDirtyWithoutUsingProjectionOrSearchState() throws {
         let store = RuntimeReadModelStore()
         let apps = searchScenarioApps()
         let terminatedApp = try XCTUnwrap(apps.first)
-        let remainingApp = try XCTUnwrap(apps.dropFirst().first)
         let terminatedPID = pid_t(54_321)
+        let projectionOnlyWindow = WindowCandidate(
+            id: "projection-only-terminated-window",
+            title: "Projection Only Terminated Window",
+            isMinimized: false,
+            lastActiveAt: 90
+        )
+        let projectionOnlyCandidate = AppSwitchCandidate(
+            id: terminatedApp.id,
+            displayName: terminatedApp.displayName,
+            groupID: terminatedApp.groupID,
+            lastActiveAt: terminatedApp.lastActiveAt,
+            windows: [projectionOnlyWindow]
+        )
+        let projectionOnlyContext = RuntimeAppContext(
+            appID: terminatedApp.id,
+            runningApp: .current,
+            windowsByID: [
+                projectionOnlyWindow.id: RuntimeWindowContext(
+                    id: projectionOnlyWindow.id,
+                    title: projectionOnlyWindow.title,
+                    isMinimized: false,
+                    ownerPID: terminatedPID
+                )
+            ]
+        )
 
         store.seedAppSwitcherProjectionForTesting(
-            apps: [terminatedApp],
-            contextsByID: [:],
+            apps: [projectionOnlyCandidate],
+            contextsByID: [terminatedApp.id: projectionOnlyContext],
             appDirectoryEntries: nil,
             generatedAt: 10
         )
         commitSearchFreshnessBarrierForTesting(store, generatedAt: 11)
-        store.commitMainTableAppSwitcherProjectionPayload(
-            RuntimeAppSwitcherProjectionPayload(
-                apps: [remainingApp],
-                contextsByID: [:]
+        store.commitCurrentAppWindowProjection(
+            RuntimeCurrentAppWindowPayload(
+                summary: RuntimeHomeAppSummary(
+                    appID: terminatedApp.id,
+                    displayName: terminatedApp.displayName,
+                    groupID: terminatedApp.groupID,
+                    lastActiveAt: terminatedApp.lastActiveAt,
+                    windowCount: 1,
+                    pid: terminatedPID
+                ),
+                candidate: projectionOnlyCandidate,
+                context: projectionOnlyContext,
+                appDirectoryEntries: []
             ),
             generatedAt: 12
         )
@@ -367,15 +400,19 @@ extension FlowTabPriorityCoverageTests {
         store.markAppTerminatedForMainTableProjection(appID: terminatedApp.id, pid: terminatedPID)
 
         let diagnostics = store.diagnostics()
-        XCTAssertEqual(diagnostics.generation.appLifecycle, 0)
-        XCTAssertEqual(diagnostics.dirtyAppIDs, [])
+        XCTAssertEqual(diagnostics.generation.appLifecycle, 1)
+        XCTAssertEqual(diagnostics.dirtyAppIDs, [terminatedApp.id])
         XCTAssertEqual(diagnostics.dirtyPIDs, [])
-        XCTAssertEqual(diagnostics.pendingRepairScopes, [])
+        XCTAssertEqual(diagnostics.pendingRepairScopes, ["appTerminated:\(terminatedApp.id)"])
         XCTAssertEqual(diagnostics.currentAppWindowProjectionAppIDs, [])
+        XCTAssertFalse(diagnostics.hasAppDirectoryProjection)
 
         let appProjection = try XCTUnwrap(store.readAppSwitcherProjection())
-        XCTAssertEqual(appProjection.apps.map(\.id), [remainingApp.id])
+        XCTAssertEqual(appProjection.apps.map(\.id), [terminatedApp.id])
+        XCTAssertEqual(appProjection.apps.first?.windows.map(\.id), [projectionOnlyWindow.id])
         XCTAssertFalse(appProjection.freshness.isCompleteForScope)
+
+        XCTAssertNil(store.readCurrentAppWindowProjection(appID: terminatedApp.id))
 
         let searchRead = store.readCommittedSearchIndexForSearch()
         XCTAssertEqual(searchRead.readiness, .degradedStaleCommitted)
