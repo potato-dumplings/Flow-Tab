@@ -175,8 +175,10 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             let signalFacts = repairProvider.recordSpaceTopologyChanged(now: now)
             readModelStore.markSpaceTopologyDirty(
                 affectedCGWindowIDs: signalFacts.affectedCGWindowIDs,
+                signature: signalFacts.signature,
                 signatureSummary: signalFacts.signatureSummary,
-                pendingScope: "spaceTopology"
+                pendingScope: "spaceTopology",
+                generatedAt: now
             )
             commitAppDirectoryProviderEvidenceLocked(generatedAt: now)
             commitMainTableAppSwitcherProjectionLocked(

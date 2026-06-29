@@ -11,6 +11,9 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     private var spaceTopologySignatureSummary: String?
     private var pendingRepairScopes: Set<String> = []
     private var appDirectoryState = RuntimeAppDirectoryState()
+    private var spaceTopologySignature: RuntimeSpaceTopologySignature?
+    private var spaceTopologyAffectedCGWindowIDs: Set<CGWindowID> = []
+    private var spaceTopologyGeneratedAt: TimeInterval?
     private var appSwitcherProjection: RuntimeAppSwitcherProjection?
     private var homeSummaryProjection: RuntimeHomeSummaryProjection?
     private var currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection] = [:]
@@ -180,15 +183,22 @@ final class RuntimeReadModelStore: @unchecked Sendable {
 
     func markSpaceTopologyDirty(
         affectedCGWindowIDs: Set<CGWindowID>,
+        signature: RuntimeSpaceTopologySignature? = nil,
         signatureSummary: String?,
-        pendingScope: String
+        pendingScope: String,
+        generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
     ) {
         lock.lock()
         defer { lock.unlock() }
 
         generation.space &+= 1
         dirtyCGWindowIDs.formUnion(affectedCGWindowIDs)
-        spaceTopologySignatureSummary = signatureSummary
+        if let signature {
+            spaceTopologySignature = signature
+            spaceTopologyGeneratedAt = generatedAt
+        }
+        spaceTopologyAffectedCGWindowIDs = affectedCGWindowIDs
+        spaceTopologySignatureSummary = signature?.diagnosticSummary ?? signatureSummary
         pendingRepairScopes.insert(pendingScope)
     }
 
@@ -329,6 +339,31 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         return appDirectoryProjectionLocked()
     }
 
+    func readSpaceTopologyProjection() -> RuntimeSpaceTopologyProjection? {
+        lock.lock()
+        defer { lock.unlock() }
+
+        guard let signature = spaceTopologySignature,
+              let generatedAt = spaceTopologyGeneratedAt
+        else {
+            return nil
+        }
+        return RuntimeSpaceTopologyProjection(
+            signature: signature,
+            affectedCGWindowIDs: spaceTopologyAffectedCGWindowIDs,
+            freshness: RuntimeProjectionFreshness(
+                generatedAt: generatedAt,
+                sourceGeneration: generation,
+                dirtyAppIDs: dirtyAppIDs,
+                dirtyPIDs: dirtyPIDs,
+                dirtyCGWindowIDs: dirtyCGWindowIDs,
+                spaceTopologySignatureSummary: signature.diagnosticSummary,
+                pendingRepairScopes: pendingRepairScopes,
+                isCompleteForScope: false
+            )
+        )
+    }
+
     func readHomeAppDetailProjection(appID: String) -> RuntimeHomeAppDetailProjection? {
         lock.lock()
         defer { lock.unlock() }
@@ -416,6 +451,10 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             hasAppDirectoryProjection: appDirectoryState.isInitialized,
             hasCompleteAppDirectoryProjection: appDirectoryState.hasCompleteAppLayerCoverage
                 && !isDirtyLocked,
+            hasSpaceTopologyProjection: spaceTopologySignature != nil,
+            spaceTopologyTrackedSpaceCount: spaceTopologySignature?.trackedSpaceCount ?? 0,
+            spaceTopologyTrackedWindowCount: spaceTopologySignature?.trackedWindowCount ?? 0,
+            spaceTopologyFullscreenWindowCount: spaceTopologySignature?.fullscreenWindowCount ?? 0,
             hasCommittedSearchIndex: committedSearchIndex != nil,
             currentAppWindowProjectionAppIDs: Set(currentAppWindowProjectionsByAppID.keys),
             appDirectoryEntryPIDs: appDirectoryState.entryPIDs

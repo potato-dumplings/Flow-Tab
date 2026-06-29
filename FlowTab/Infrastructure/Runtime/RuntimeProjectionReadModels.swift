@@ -117,6 +117,12 @@ struct RuntimeAppDirectoryProjection {
     }
 }
 
+struct RuntimeSpaceTopologyProjection {
+    let signature: RuntimeSpaceTopologySignature
+    let affectedCGWindowIDs: Set<CGWindowID>
+    var freshness: RuntimeProjectionFreshness
+}
+
 struct RuntimeCurrentAppWindowProjection {
     let appID: String
     let currentAppWindowPayload: RuntimeCurrentAppWindowPayload
@@ -146,6 +152,10 @@ struct RuntimeReadModelDiagnostics: Equatable {
     let hasCompleteHomeSummaryProjection: Bool
     let hasAppDirectoryProjection: Bool
     let hasCompleteAppDirectoryProjection: Bool
+    let hasSpaceTopologyProjection: Bool
+    let spaceTopologyTrackedSpaceCount: Int
+    let spaceTopologyTrackedWindowCount: Int
+    let spaceTopologyFullscreenWindowCount: Int
     let hasCommittedSearchIndex: Bool
     let currentAppWindowProjectionAppIDs: Set<String>
     let appDirectoryEntryPIDs: Set<pid_t>

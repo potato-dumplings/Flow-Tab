@@ -54,6 +54,7 @@ struct RuntimeRepairAppLayerPolicyFacts {
 
 struct RuntimeSpaceTopologySignalFacts {
     let affectedCGWindowIDs: Set<CGWindowID>
+    let signature: RuntimeSpaceTopologySignature?
     let signatureSummary: String?
 }
 
@@ -196,6 +197,7 @@ struct RuntimeProjectionRepairFactSource {
         )
         return RuntimeSpaceTopologySignalFacts(
             affectedCGWindowIDs: collection.spaceTopologyDiff?.affectedCGWindowIDs ?? [],
+            signature: collection.spaceTopologyDiff?.currentSignature,
             signatureSummary: collection.spaceTopologyDiff?.currentSignature.diagnosticSummary
         )
     }

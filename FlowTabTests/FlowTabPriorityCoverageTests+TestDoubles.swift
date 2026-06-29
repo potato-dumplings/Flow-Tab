@@ -331,6 +331,10 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
             hasCompleteHomeSummaryProjection: false,
             hasAppDirectoryProjection: false,
             hasCompleteAppDirectoryProjection: false,
+            hasSpaceTopologyProjection: false,
+            spaceTopologyTrackedSpaceCount: 0,
+            spaceTopologyTrackedWindowCount: 0,
+            spaceTopologyFullscreenWindowCount: 0,
             hasCommittedSearchIndex: hasCommittedSearchIndex,
             currentAppWindowProjectionAppIDs: [],
             appDirectoryEntryPIDs: []
