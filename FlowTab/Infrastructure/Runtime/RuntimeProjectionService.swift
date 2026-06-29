@@ -282,9 +282,9 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     }
 
     func signalAppTerminated(appID: String, pid: pid_t) {
-        readModelStore.markAppTerminatedForMainTableProjection(appID: appID, pid: pid)
         maintenanceQueue.async { [self] in
             let now = Date.timeIntervalSinceReferenceDate
+            readModelStore.markAppTerminatedForMainTableProjection(appID: appID, pid: pid)
             repairProvider.recordAppTerminated(processIdentifier: pid)
             commitAppDirectoryProviderEvidenceLocked(generatedAt: now)
             commitMainTableAppSwitcherProjectionLocked(
