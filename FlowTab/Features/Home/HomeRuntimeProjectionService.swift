@@ -101,6 +101,15 @@ enum HomeRuntimeRefreshReader {
     }
 }
 
+enum HomeRuntimeProjectionRefreshPolicy {
+    static func shouldRequestAppSummaryRefresh(
+        appSummaryCount: Int,
+        loadingWindowCountAppCount: Int
+    ) -> Bool {
+        appSummaryCount > 0 && loadingWindowCountAppCount == 0
+    }
+}
+
 enum HomeInitialAppSummaryReader {
     static func appSummaries(from service: any RuntimeProjectionServing) -> [RuntimeHomeAppSummary] {
         HomeRuntimeProjectionReader.initialAppSummaries(from: service) ?? []

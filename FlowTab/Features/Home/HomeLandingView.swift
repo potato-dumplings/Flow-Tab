@@ -9,7 +9,6 @@ struct HomeLandingView: View {
     private static var cachedSelectedAppID: String?
     private static var cachedAccessibilityTrusted = AccessibilityPermissionChecker.isTrusted()
     private static var cachedScreenCaptureTrusted = ScreenCapturePermissionChecker.hasScreenCapturePermission
-    private static var cachedRunningAppSignature: Set<String> = []
 
     let isActive: Bool
     let appLanguage: AppLanguage
@@ -146,7 +145,7 @@ struct HomeLandingView: View {
         )) { _ in
             guard isActive else { return }
             refreshPermissionsIfNeeded(reason: "app_active")
-            scheduleRefreshIfRunningAppsChanged(reason: "app_active")
+            scheduleRuntimeProjectionRefresh(reason: "app_active")
         }
         .onReceive(NotificationCenter.default.publisher(
             for: .flowTabAppVisibilityPreferenceChanged
@@ -436,7 +435,7 @@ struct HomeLandingView: View {
             return
         }
 
-        scheduleRefreshIfRunningAppsChanged(reason: "appear")
+        scheduleRuntimeProjectionRefresh(reason: "appear")
         if let selectedAppID = currentSelectedAppID {
             scheduleSelectedAppRefresh(
                 appID: selectedAppID,
@@ -515,28 +514,18 @@ struct HomeLandingView: View {
         persistCache()
     }
 
-    private func scheduleRefreshIfRunningAppsChanged(reason: String) {
-        guard !appSummaries.isEmpty, loadingWindowCountAppIDs.isEmpty else {
+    private func scheduleRuntimeProjectionRefresh(reason: String) {
+        guard HomeRuntimeProjectionRefreshPolicy.shouldRequestAppSummaryRefresh(
+            appSummaryCount: appSummaries.count,
+            loadingWindowCountAppCount: loadingWindowCountAppIDs.count
+        ) else {
             RuntimeLog.debug(
                 .projection,
-                "homeSkipRunningAppsRefresh reason=\(reason) phase=initializing apps=\(appSummaries.count) loadingCounts=\(loadingWindowCountAppIDs.count)"
+                "homeSkipRuntimeProjectionRefresh reason=\(reason) phase=initializing apps=\(appSummaries.count) loadingCounts=\(loadingWindowCountAppIDs.count)"
             )
             return
         }
-        if currentRunningAppSignature() != Self.cachedRunningAppSignature {
-            scheduleAppSummariesRefresh(reason: "running_apps_changed_\(reason)")
-        }
-    }
-
-    private func currentRunningAppSignature() -> Set<String> {
-        let currentPID = ProcessInfo.processInfo.processIdentifier
-        let includeCurrentProcessInAppLayer = AppVisibilityPreferencesStore.loadShowInCommandTab()
-        return Set(NSWorkspace.shared.runningApplications.compactMap { app in
-            guard app.activationPolicy == .regular, !app.isTerminated else { return nil }
-            guard includeCurrentProcessInAppLayer || app.processIdentifier != currentPID else { return nil }
-            let appID = app.bundleIdentifier ?? "pid:\(app.processIdentifier)"
-            return "\(appID)#\(app.processIdentifier)"
-        })
+        scheduleAppSummariesRefresh(reason: "runtime_projection_refresh_\(reason)")
     }
 
     private func selectApp(_ appID: String) {
@@ -609,7 +598,7 @@ struct HomeLandingView: View {
         appSummaries = summaries
         loadingWindowCountAppIDs = accessibilityTrusted ? Set(summaries.map(\.appID)) : []
         syncSelectedApp()
-        persistCache(updateRunningSignature: !accessibilityTrusted)
+        persistCache()
 
         if accessibilityTrusted, let selectedAppID = currentSelectedAppID {
             scheduleSelectedAppRefresh(
@@ -637,7 +626,7 @@ struct HomeLandingView: View {
         homeDetailProjectionsByAppID = homeDetailProjectionsByAppID.filter { validAppIDs.contains($0.key) }
         syncSelectedApp()
         setupWindowMonitorIfNeeded()
-        persistCache(updateRunningSignature: true)
+        persistCache()
 
         if let selectedAppID = currentSelectedAppID {
             let summaryCount = summaries.first(where: { $0.appID == selectedAppID })?.windowCount
@@ -822,16 +811,13 @@ struct HomeLandingView: View {
         selectedAppID = appSummaries.first?.appID
     }
 
-    private func persistCache(updateRunningSignature: Bool = false) {
+    private func persistCache() {
         Self.cachedAccessibilityTrusted = accessibilityTrusted
         Self.cachedScreenCaptureTrusted = screenCaptureTrusted
         if loadingWindowCountAppIDs.isEmpty {
             Self.cachedAppSummaries = appSummaries
             Self.cachedWindowsByAppID = windowsByAppID
             Self.cachedSelectedAppID = selectedAppID
-        }
-        if updateRunningSignature {
-            Self.cachedRunningAppSignature = currentRunningAppSignature()
         }
     }
 

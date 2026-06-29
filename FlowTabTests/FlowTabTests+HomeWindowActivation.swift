@@ -618,6 +618,27 @@ extension FlowTabTests {
         )
     }
 
+    func testHomeRuntimeProjectionRefreshPolicyRequestsOnlyAfterProjectionStateIsLoaded() {
+        XCTAssertFalse(
+            HomeRuntimeProjectionRefreshPolicy.shouldRequestAppSummaryRefresh(
+                appSummaryCount: 0,
+                loadingWindowCountAppCount: 0
+            )
+        )
+        XCTAssertFalse(
+            HomeRuntimeProjectionRefreshPolicy.shouldRequestAppSummaryRefresh(
+                appSummaryCount: 2,
+                loadingWindowCountAppCount: 1
+            )
+        )
+        XCTAssertTrue(
+            HomeRuntimeProjectionRefreshPolicy.shouldRequestAppSummaryRefresh(
+                appSummaryCount: 2,
+                loadingWindowCountAppCount: 0
+            )
+        )
+    }
+
     func testHomeOverviewStatsCountsVisibilityAndReadyWindows() {
         let summaries = [
             makeHomeAppSummary(appID: "com.example.mail", displayName: "Mail", rank: 0, windowCount: 2),
