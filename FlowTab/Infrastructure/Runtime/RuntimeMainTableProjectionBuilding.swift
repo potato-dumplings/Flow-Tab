@@ -30,8 +30,8 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
         generatedAt: TimeInterval
     ) -> RuntimeCurrentAppWindowPayload? {
         guard
-            let runningApp = NSRunningApplication(processIdentifier: pid),
-            let selectedEntry = appDirectoryEntries.first(where: { $0.appID == appID && $0.pid == pid })
+            let selectedEntry = appDirectoryEntries.first(where: { $0.appID == appID && $0.pid == pid }),
+            let runningApp = selectedEntry.runningApplication
         else {
             return nil
         }
@@ -143,7 +143,7 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
                 lastActiveAt: RuntimeAppDirectory.stableLastActiveValue(forRank: rankByPID[entry.pid] ?? index),
                 windows: windowSeeds.map(\.candidate)
             )
-            let context = NSRunningApplication(processIdentifier: entry.pid).map { runningApp in
+            let context = entry.runningApplication.map { runningApp in
                 RuntimeAppContext(
                     appID: entry.appID,
                     runningApp: runningApp,

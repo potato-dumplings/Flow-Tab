@@ -101,6 +101,7 @@ struct RuntimeAppDirectoryEntry: Equatable {
     let bundleURL: URL?
     let launchDate: Date?
     let activationRank: Int?
+    let runningApplication: NSRunningApplication?
 
     init(
         pid: pid_t,
@@ -109,7 +110,8 @@ struct RuntimeAppDirectoryEntry: Equatable {
         localizedName: String?,
         bundleURL: URL? = nil,
         launchDate: Date?,
-        activationRank: Int? = nil
+        activationRank: Int? = nil,
+        runningApplication: NSRunningApplication? = nil
     ) {
         self.pid = pid
         self.appID = appID
@@ -118,6 +120,7 @@ struct RuntimeAppDirectoryEntry: Equatable {
         self.bundleURL = bundleURL
         self.launchDate = launchDate
         self.activationRank = activationRank
+        self.runningApplication = runningApplication
     }
 
     init(app: NSRunningApplication, activationRank: Int? = nil) {
@@ -128,14 +131,30 @@ struct RuntimeAppDirectoryEntry: Equatable {
             localizedName: app.localizedName,
             bundleURL: app.bundleURL,
             launchDate: app.launchDate,
-            activationRank: activationRank
+            activationRank: activationRank,
+            runningApplication: app
         )
+    }
+
+    static func == (lhs: RuntimeAppDirectoryEntry, rhs: RuntimeAppDirectoryEntry) -> Bool {
+        lhs.pid == rhs.pid
+            && lhs.appID == rhs.appID
+            && lhs.bundleIdentifier == rhs.bundleIdentifier
+            && lhs.localizedName == rhs.localizedName
+            && lhs.bundleURL == rhs.bundleURL
+            && lhs.launchDate == rhs.launchDate
+            && lhs.activationRank == rhs.activationRank
+            && lhs.runningApplication?.processIdentifier == rhs.runningApplication?.processIdentifier
     }
 
     func preservingMissingRuntimeFacts(from existing: RuntimeAppDirectoryEntry?) -> RuntimeAppDirectoryEntry {
         let preservedRank = activationRank ?? existing?.activationRank
         let preservedBundleURL = bundleURL ?? existing?.bundleURL
-        guard preservedRank != activationRank || preservedBundleURL != bundleURL else { return self }
+        let preservedRunningApplication = runningApplication ?? existing?.runningApplication
+        guard preservedRank != activationRank
+            || preservedBundleURL != bundleURL
+            || preservedRunningApplication?.processIdentifier != runningApplication?.processIdentifier
+        else { return self }
         return RuntimeAppDirectoryEntry(
             pid: pid,
             appID: appID,
@@ -143,7 +162,8 @@ struct RuntimeAppDirectoryEntry: Equatable {
             localizedName: localizedName,
             bundleURL: preservedBundleURL,
             launchDate: launchDate,
-            activationRank: preservedRank
+            activationRank: preservedRank,
+            runningApplication: preservedRunningApplication
         )
     }
 }

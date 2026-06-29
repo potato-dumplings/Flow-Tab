@@ -48,6 +48,25 @@ extension FlowTabPriorityCoverageTests {
             windowRecordStore: windowRecordStore
         )
         let appDirectoryEntry = RuntimeAppDirectoryEntry(app: runningApp)
+        let entryWithoutActivationHandle = RuntimeAppDirectoryEntry(
+            pid: pid,
+            appID: appID,
+            bundleIdentifier: runningApp.bundleIdentifier,
+            localizedName: runningApp.localizedName ?? appID,
+            bundleURL: runningApp.bundleURL,
+            launchDate: runningApp.launchDate,
+            activationRank: 0
+        )
+
+        let degradedPayload = try XCTUnwrap(
+            builder.appSwitcherProjectionPayloadFromMainTables(
+                appDirectoryEntries: [entryWithoutActivationHandle],
+                generatedAt: 79
+            )
+        )
+        XCTAssertEqual(degradedPayload.apps.map(\.id), [appID])
+        XCTAssertTrue(degradedPayload.contextsByID.isEmpty)
+        XCTAssertFalse(degradedPayload.hasCompleteWindowCoverage)
 
         let payload = try XCTUnwrap(
             builder.appSwitcherProjectionPayloadFromMainTables(
@@ -403,6 +422,30 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
+    func testRuntimeReadModelStoreCurrentAppRepairEvidencePreservesActivationHandle() throws {
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let providerEntry = RuntimeAppDirectoryEntry(app: runningApp, activationRank: 0)
+        let scopedRepairEntry = RuntimeAppDirectoryEntry(
+            pid: runningApp.processIdentifier,
+            appID: appID,
+            bundleIdentifier: runningApp.bundleIdentifier,
+            localizedName: runningApp.localizedName ?? appID,
+            bundleURL: runningApp.bundleURL,
+            launchDate: runningApp.launchDate
+        )
+        let store = RuntimeReadModelStore()
+
+        store.commitAppDirectoryProviderEvidence([providerEntry], generatedAt: 10)
+        store.commitCurrentAppRepairAppDirectoryEvidence([scopedRepairEntry], generatedAt: 11)
+
+        let appDirectoryProjection = try XCTUnwrap(store.readAppDirectoryProjection())
+        let entry = try XCTUnwrap(appDirectoryProjection.entries(forAppID: appID).first)
+        XCTAssertEqual(entry.runningApplication?.processIdentifier, runningApp.processIdentifier)
+        XCTAssertEqual(entry.activationRank, 0)
+        XCTAssertEqual(appDirectoryProjection.freshness.sourceGeneration.appLifecycle, 1)
+    }
+
     func testRuntimeReadModelStoreKeepsScopedAppDirectoryEvidencePartialUntilCompleteCoverage() throws {
         let scopedEntry = RuntimeAppDirectoryEntry(
             pid: 260_931,
@@ -500,6 +543,23 @@ extension FlowTabPriorityCoverageTests {
                 generatedAt: 81
             )
         )
+        XCTAssertNil(
+            builder.currentAppWindowPayloadFromMainTables(
+                appID: appID,
+                pid: pid,
+                appDirectoryEntries: [
+                    RuntimeAppDirectoryEntry(
+                        pid: pid,
+                        appID: appID,
+                        bundleIdentifier: runningApp.bundleIdentifier,
+                        localizedName: runningApp.localizedName ?? appID,
+                        bundleURL: runningApp.bundleURL,
+                        launchDate: runningApp.launchDate
+                    )
+                ],
+                generatedAt: 81
+            )
+        )
 
         let payload = try XCTUnwrap(
             builder.currentAppWindowPayloadFromMainTables(
@@ -545,6 +605,11 @@ extension FlowTabPriorityCoverageTests {
             pid: pid,
             pendingScope: "appWindows:\(appID)"
         )
+        var appDirectoryProjection = try XCTUnwrap(readModelStore.readAppDirectoryProjection())
+        XCTAssertEqual(
+            appDirectoryProjection.entries(forAppID: appID).first?.runningApplication?.processIdentifier,
+            pid
+        )
         let cgWindowID = CGWindowID(240_802)
         let axWindowID = "ax:\(pid):main-table-switcher"
         let windowRecordStore = RuntimeWindowRecordStore(
@@ -573,13 +638,21 @@ extension FlowTabPriorityCoverageTests {
             mainTableProjectionBuilder: RuntimeMainTableProjectionBuilder(
                 windowRecordStore: windowRecordStore
             ),
-            readModelStore: readModelStore
+            appDirectoryProvider: FixedRuntimeAppDirectoryProvider(entries: [appDirectoryEntry]),
+            readModelStore: readModelStore,
+            reconciliationExecutor: { _, _ in .completed }
         )
 
         service.requestAppSwitcherProjectionMaintenance(reason: .switcherSessionStarted)
         service.waitForMaintenanceQueueForTesting()
 
+        appDirectoryProjection = try XCTUnwrap(readModelStore.readAppDirectoryProjection())
+        XCTAssertEqual(
+            appDirectoryProjection.entries(forAppID: appID).first?.runningApplication?.processIdentifier,
+            pid
+        )
         let appProjection = try XCTUnwrap(readModelStore.readAppSwitcherProjection())
+        XCTAssertEqual(appProjection.apps.map(\.id), [appID])
         let app = try XCTUnwrap(appProjection.apps.first(where: { $0.id == appID }))
         XCTAssertEqual(app.windows.map(\.id), [
             RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindowID)
@@ -1488,16 +1561,34 @@ extension FlowTabPriorityCoverageTests {
                 )
             ]
         )
+        let coordinator = RuntimeReconciliationCoordinator()
+        coordinator.markAppDirty(
+            appID: appID,
+            pid: pid,
+            reason: .axNotification,
+            now: 10
+        )
         let service = RuntimeProjectionService(
             label: "FlowTabTests.RuntimeProjectionService.MainTableSearchProjection",
             repairProvider: RuntimeProjectionRepairProvider(
                 windowRecordStore: windowRecordStore,
-                reconciliationCoordinator: RuntimeReconciliationCoordinator()
+                reconciliationCoordinator: coordinator
             ),
             mainTableProjectionBuilder: RuntimeMainTableProjectionBuilder(
                 windowRecordStore: windowRecordStore
             ),
-            readModelStore: readModelStore
+            appDirectoryProvider: FixedRuntimeAppDirectoryProvider(entries: [appDirectoryEntry]),
+            readModelStore: readModelStore,
+            reconciliationExecutor: { _, _ in
+                .completedWithCurrentAppRepairEvidence([
+                    RuntimeCurrentAppRepairEvidence(
+                        appID: appID,
+                        pid: pid,
+                        appDirectoryEntries: [appDirectoryEntry],
+                        currentAppWindowPayloadWasEmpty: false
+                    )
+                ])
+            }
         )
 
         service.requestAppSwitcherProjectionMaintenance(reason: .switcherSessionStarted)
