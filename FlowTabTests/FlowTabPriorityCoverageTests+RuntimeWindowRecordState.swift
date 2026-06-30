@@ -795,6 +795,99 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertNil(entries.first?.activationHandleID)
     }
 
+    func testRuntimeWindowRecordStoreSuppressesCGActivationFallbackAfterReadbackMismatch() throws {
+        let windowRecordStore = RuntimeWindowRecordStore()
+        let pid: pid_t = 18_405
+        let cgWindowID = CGWindowID(250_003)
+        let stableWindowID = RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindowID)
+        var record = RuntimeWindowRecord(
+            cgWindowID: cgWindowID,
+            stableWindowID: stableWindowID,
+            firstSeenAt: 10
+        )
+        record.lastKnownCGTitle = "Recovered Route"
+        record.lastKnownDisplayTitle = "Recovered Route"
+        record.lastKnownCGFrame = CGRect(x: 30, y: 124, width: 1_200, height: 820)
+        record.spaceRecovery = RuntimeSpaceRecoveryState(
+            cgWindowID: cgWindowID,
+            spaceIDs: [11_683],
+            hasConfirmedActivationRoute: true,
+            lastValidatedAt: 10,
+            invalidatedAt: nil
+        )
+        windowRecordStore.setState(
+            RuntimeWindowMappingState(
+                windowRecordsByCGWindowID: [cgWindowID: record],
+                validCGWindowIDs: [cgWindowID],
+                hasRecordedWindowCollection: true
+            ),
+            for: pid
+        )
+
+        let initialEntry = try XCTUnwrap(
+            windowRecordStore.projectedWindowEntries(
+                processIdentifier: pid,
+                appName: "Google Chrome"
+            ).first
+        )
+        XCTAssertEqual(initialEntry.bindingConfidence, .inferred)
+        XCTAssertTrue(initialEntry.bindingAllowedActions.contains(.useForCGActivationFallback))
+
+        windowRecordStore.recordWindowFocusReadbackMismatch(
+            WindowBindingReadbackDiagnostic(
+                appID: "com.google.Chrome",
+                windowID: stableWindowID,
+                ownerPID: pid,
+                route: "cg",
+                reason: .targetCGNotVisible,
+                targetCGWindowID: cgWindowID,
+                focusedCGWindowID: 250_004,
+                visibleCGWindowIDs: [250_004],
+                bindingConfidence: .inferred,
+                allowedActions: WindowBindingConfidence.inferred.allowedActions
+            ),
+            now: 11
+        )
+
+        let downgradedRecord = try XCTUnwrap(
+            windowRecordStore.state(for: pid)?.windowRecordsByCGWindowID[cgWindowID]
+        )
+        XCTAssertEqual(downgradedRecord.activationRouteFailure?.route, "cg")
+        XCTAssertEqual(downgradedRecord.activationRouteFailure?.reason, .targetCGNotVisible)
+        XCTAssertTrue(downgradedRecord.needsReconciliation)
+
+        let downgradedEntry = try XCTUnwrap(
+            windowRecordStore.projectedWindowEntries(
+                processIdentifier: pid,
+                appName: "Google Chrome"
+            ).first
+        )
+        XCTAssertEqual(downgradedEntry.windowID, stableWindowID)
+        XCTAssertEqual(downgradedEntry.bindingConfidence, .inferred)
+        XCTAssertTrue(downgradedEntry.bindingAllowedActions.contains(.exposeInSwitcher))
+        XCTAssertTrue(downgradedEntry.bindingAllowedActions.contains(.capturePreview))
+        XCTAssertFalse(downgradedEntry.bindingAllowedActions.contains(.useForCGActivationFallback))
+
+        var verifiedRecord = downgradedRecord
+        verifiedRecord.applyExactMatch(
+            axWindow: RuntimeAXWindowEntry(
+                index: 0,
+                id: "ax:\(pid):0",
+                title: "Recovered Route",
+                sourceTitle: "Recovered Route",
+                isMinimized: false,
+                window: AXUIElementCreateApplication(pid),
+                frame: CGRect(x: 30, y: 124, width: 1_200, height: 820)
+            ),
+            resolvedTitle: "Recovered Route",
+            confirmationSource: .verifiedFocusReadback,
+            observedAt: 12,
+            matchedCGWindow: nil
+        )
+        XCTAssertNil(verifiedRecord.activationRouteFailure)
+        XCTAssertTrue(verifiedRecord.bindingAllowedActions.contains(.useForCGActivationFallback))
+    }
+
     func testRuntimeWindowRecordStoreProjectionPreservesLiveCGOnscreenOrderingForStickyFullscreenRecord() {
         let pid: pid_t = 18_405
         let normalCGWindowID = CGWindowID(250_101)

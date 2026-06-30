@@ -79,6 +79,17 @@ final class RuntimeWindowRecordStore {
         )
     }
 
+    func recordWindowFocusReadbackMismatch(
+        _ diagnostic: WindowBindingReadbackDiagnostic,
+        now: TimeInterval
+    ) {
+        RuntimeWindowRecordEvidence.recordWindowFocusReadbackMismatch(
+            diagnostic,
+            now: now,
+            mappingStatesByPID: &mappingStatesByPID
+        )
+    }
+
     @discardableResult
     func clearDestroyedAXAttachment(
         processIdentifier pid: pid_t,
@@ -408,6 +419,7 @@ private extension RuntimeWindowRecord {
             || spaceRecovery?.hasConfirmedActivationRoute == true
         guard exposesWithoutCurrentAX else { return nil }
 
+        let projectedBindingConfidence = hasStickyBinding ? bindingConfidence : .inferred
         return RuntimeWindowListEntry(
             windowID: stableWindowID,
             title: title,
@@ -422,7 +434,8 @@ private extension RuntimeWindowRecord {
             allowsPublicAXRecovery: spaceEvidence.allowsPublicAXRecovery,
             hasStickyBinding: hasStickyBinding,
             lastConfirmationSource: lastConfirmationSource,
-            bindingConfidenceOverride: hasStickyBinding ? nil : .inferred,
+            bindingConfidenceOverride: hasStickyBinding ? nil : projectedBindingConfidence,
+            bindingAllowedActionsOverride: bindingAllowedActions(for: projectedBindingConfidence),
             spaceEvidence: spaceEvidence
         )
     }
@@ -508,6 +521,43 @@ private enum RuntimeWindowRecordEvidence {
             lastAXWindowIDs: lastAXWindowIDs,
             hasObservedAXWindowHandle: true,
             consecutiveAXCollectionMisses: 0
+        )
+    }
+
+    static func recordWindowFocusReadbackMismatch(
+        _ diagnostic: WindowBindingReadbackDiagnostic,
+        now: TimeInterval,
+        mappingStatesByPID: inout [pid_t: RuntimeWindowMappingState]
+    ) {
+        guard let targetCGWindowID = diagnostic.targetCGWindowID else { return }
+
+        var mappingState = mappingStatesByPID[diagnostic.ownerPID] ?? RuntimeWindowMappingState()
+        let stableWindowID = diagnostic.windowID.isEmpty
+            ? RuntimeWindowListEntry.cgStableWindowID(
+                pid: diagnostic.ownerPID,
+                cgWindowID: targetCGWindowID
+            )
+            : diagnostic.windowID
+        var record = mappingState.windowRecordsByCGWindowID[targetCGWindowID]
+            ?? RuntimeWindowRecord(
+                cgWindowID: targetCGWindowID,
+                stableWindowID: stableWindowID,
+                firstSeenAt: now
+            )
+        record.recordActivationRouteFailure(
+            route: diagnostic.route,
+            reason: diagnostic.reason,
+            observedAt: now
+        )
+        mappingState.windowRecordsByCGWindowID[targetCGWindowID] = record
+        mappingStatesByPID[diagnostic.ownerPID] = RuntimeWindowMappingState(
+            windowRecordsByCGWindowID: mappingState.windowRecordsByCGWindowID,
+            currentAXToCG: mappingState.currentAXToCG,
+            validCGWindowIDs: mappingState.validCGWindowIDs.union([targetCGWindowID]),
+            lastAXWindowIDs: mappingState.lastAXWindowIDs,
+            hasRecordedWindowCollection: mappingState.hasRecordedWindowCollection,
+            hasObservedAXWindowHandle: mappingState.hasObservedAXWindowHandle,
+            consecutiveAXCollectionMisses: mappingState.consecutiveAXCollectionMisses
         )
     }
 

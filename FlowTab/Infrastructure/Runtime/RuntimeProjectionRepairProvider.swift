@@ -261,6 +261,7 @@ extension RuntimeProjectionRepairProvider {
         _ diagnostic: WindowBindingReadbackDiagnostic,
         now: TimeInterval
     ) -> Set<CGWindowID> {
+        windowRecordStore.recordWindowFocusReadbackMismatch(diagnostic, now: now)
         let affectedCGWindowIDs = diagnostic.affectedCGWindowIDs
         reconciliationCoordinator.markAppDirty(
             appID: diagnostic.appID,

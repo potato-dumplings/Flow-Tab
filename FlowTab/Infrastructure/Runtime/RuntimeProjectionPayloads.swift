@@ -83,6 +83,7 @@ struct RuntimeAppWindowProjectionSeed {
     let hasStickyBinding: Bool
     let lastConfirmationSource: WindowBindingConfirmationSource?
     let bindingConfidenceOverride: WindowBindingConfidence?
+    let bindingAllowedActionsOverride: Set<WindowBindingAction>?
     let bindingCandidateCount: Int?
     let spaceEvidence: RuntimeSpaceEvidence?
 
@@ -101,6 +102,7 @@ struct RuntimeAppWindowProjectionSeed {
         hasStickyBinding: Bool = false,
         lastConfirmationSource: WindowBindingConfirmationSource? = nil,
         bindingConfidenceOverride: WindowBindingConfidence? = nil,
+        bindingAllowedActionsOverride: Set<WindowBindingAction>? = nil,
         bindingCandidateCount: Int? = nil,
         spaceEvidence: RuntimeSpaceEvidence? = nil
     ) {
@@ -118,6 +120,7 @@ struct RuntimeAppWindowProjectionSeed {
         self.hasStickyBinding = hasStickyBinding
         self.lastConfirmationSource = lastConfirmationSource
         self.bindingConfidenceOverride = bindingConfidenceOverride
+        self.bindingAllowedActionsOverride = bindingAllowedActionsOverride
         self.bindingCandidateCount = bindingCandidateCount
         self.spaceEvidence = spaceEvidence
     }
@@ -147,6 +150,7 @@ struct RuntimeAppWindowProjectionSeed {
             hasStickyBinding: hasStickyBinding,
             lastConfirmationSource: lastConfirmationSource,
             bindingConfidenceOverride: bindingConfidenceOverride,
+            bindingAllowedActionsOverride: bindingAllowedActionsOverride,
             bindingCandidateCount: bindingCandidateCount,
             spaceEvidence: spaceEvidence
         )
@@ -170,6 +174,7 @@ extension RuntimeWindowListEntry {
             hasStickyBinding: hasStickyBinding,
             lastConfirmationSource: lastConfirmationSource,
             bindingConfidenceOverride: bindingConfidenceOverride,
+            bindingAllowedActionsOverride: bindingAllowedActionsOverride,
             bindingCandidateCount: bindingCandidateCount,
             spaceEvidence: spaceEvidence
         )

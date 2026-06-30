@@ -67,6 +67,12 @@ struct RuntimeSpaceRecoveryState {
     var invalidatedAt: TimeInterval?
 }
 
+struct RuntimeActivationRouteFailure {
+    let route: String
+    let reason: WindowBindingReadbackMismatchReason
+    let failedAt: TimeInterval
+}
+
 struct RuntimeWindowRecordDerivedIndexes: Equatable {
     let currentAXToCG: [String: CGWindowID]
     let validCGWindowIDs: Set<CGWindowID>
@@ -415,6 +421,7 @@ struct RuntimeWindowRecord {
     var lastConfirmationSource: WindowBindingConfirmationSource?
     var lastExactConfirmedAt: TimeInterval?
     var spaceRecovery: RuntimeSpaceRecoveryState?
+    var activationRouteFailure: RuntimeActivationRouteFailure?
     let firstSeenAt: TimeInterval
     var lastSeenAt: TimeInterval
     var suspectDeletedAt: TimeInterval?
@@ -438,6 +445,7 @@ struct RuntimeWindowRecord {
         lastConfirmationSource = nil
         lastExactConfirmedAt = nil
         spaceRecovery = nil
+        activationRouteFailure = nil
         self.firstSeenAt = firstSeenAt
         lastSeenAt = firstSeenAt
         suspectDeletedAt = nil
@@ -460,7 +468,7 @@ struct RuntimeWindowRecord {
     }
 
     var bindingAllowedActions: Set<WindowBindingAction> {
-        bindingConfidence.allowedActions
+        bindingAllowedActions(for: bindingConfidence)
     }
 
     var bindingDiagnostic: WindowBindingDiagnostic {
@@ -482,6 +490,14 @@ struct RuntimeWindowRecord {
 
     var currentAXWindowID: String? {
         currentAXAttachment?.axWindowID
+    }
+
+    func bindingAllowedActions(for confidence: WindowBindingConfidence) -> Set<WindowBindingAction> {
+        var actions = confidence.allowedActions
+        if activationRouteFailure != nil {
+            actions.remove(.useForCGActivationFallback)
+        }
+        return actions
     }
 
     var displayTitle: String? {
@@ -579,6 +595,19 @@ struct RuntimeWindowRecord {
         markNeedsReconciliation(observedAt: observedAt)
     }
 
+    mutating func recordActivationRouteFailure(
+        route: String,
+        reason: WindowBindingReadbackMismatchReason,
+        observedAt: TimeInterval
+    ) {
+        activationRouteFailure = RuntimeActivationRouteFailure(
+            route: route,
+            reason: reason,
+            failedAt: observedAt
+        )
+        markNeedsReconciliation(observedAt: observedAt)
+    }
+
     mutating func markNeedsReconciliation(observedAt: TimeInterval) {
         needsReconciliation = true
         lastReconciliationMarkedAt = observedAt
@@ -623,6 +652,7 @@ struct RuntimeWindowRecord {
             frame: axWindow.frame,
             state: axWindow.state
         )
+        activationRouteFailure = nil
         lastKnownDisplayTitle = currentAXAttachment?.title ?? lastKnownDisplayTitle
         lastConfirmationSource = confirmationSource
         let allowsStickyHistoryUpdate = confirmationSource.bindingConfidence

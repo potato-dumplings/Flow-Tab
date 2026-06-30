@@ -143,6 +143,7 @@ struct RuntimeWindowContext {
     let hasStickyBinding: Bool
     let lastConfirmationSource: WindowBindingConfirmationSource?
     let bindingConfidenceOverride: WindowBindingConfidence?
+    let bindingAllowedActionsOverride: Set<WindowBindingAction>?
     let bindingCandidateCount: Int
     let spaceEvidence: RuntimeSpaceEvidence?
 
@@ -160,7 +161,7 @@ struct RuntimeWindowContext {
     }
 
     var bindingAllowedActions: Set<WindowBindingAction> {
-        bindingConfidence.allowedActions
+        bindingAllowedActionsOverride ?? bindingConfidence.allowedActions
     }
 
     var bindingDiagnostic: WindowBindingDiagnostic {
@@ -191,6 +192,7 @@ struct RuntimeWindowContext {
         hasStickyBinding: Bool = false,
         lastConfirmationSource: WindowBindingConfirmationSource? = nil,
         bindingConfidenceOverride: WindowBindingConfidence? = nil,
+        bindingAllowedActionsOverride: Set<WindowBindingAction>? = nil,
         bindingCandidateCount: Int? = nil,
         spaceEvidence: RuntimeSpaceEvidence? = nil
     ) {
@@ -209,6 +211,7 @@ struct RuntimeWindowContext {
         self.hasStickyBinding = hasStickyBinding
         self.lastConfirmationSource = lastConfirmationSource
         self.bindingConfidenceOverride = bindingConfidenceOverride
+        self.bindingAllowedActionsOverride = bindingAllowedActionsOverride
         self.bindingCandidateCount = bindingCandidateCount ?? (cgWindowID == nil ? 0 : 1)
         self.spaceEvidence = spaceEvidence ?? cgWindowID.map {
             RuntimeWindowTopologyClassifier.spaceEvidence(
