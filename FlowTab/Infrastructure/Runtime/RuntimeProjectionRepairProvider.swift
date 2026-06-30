@@ -280,6 +280,15 @@ extension RuntimeProjectionRepairProvider {
         )
     }
 
+    func recordSearchWindowCoverageNeeded(appID: String, pid: pid_t, now: TimeInterval) {
+        reconciliationCoordinator.markAppDirty(
+            appID: appID,
+            pid: pid,
+            reason: .searchFreshnessBarrier,
+            now: now
+        )
+    }
+
     func recordAppWindowsChanged(appID: String, pid: pid_t, now: TimeInterval) {
         reconciliationCoordinator.markAppDirty(
             appID: appID,

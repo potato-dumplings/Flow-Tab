@@ -144,6 +144,9 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         maintenanceQueue.async { [self] in
             let now = Date.timeIntervalSinceReferenceDate
             let appDirectoryProviderEvidenceCount = commitAppDirectoryProviderEvidenceLocked(generatedAt: now)
+            let scheduledMissingCoverageRepairs = scheduleSearchMissingWindowCoverageRepairsLocked(
+                generatedAt: now
+            )
             let promotedRequests = repairProvider.promoteSearchFreshnessBarrierRequests(now: now)
             let drainResult = reconciliationDrainer.drainReadyRequests(
                 now: now,
@@ -177,6 +180,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                     "dirtyCGWindowIDs=\(diagnostics.dirtyCGWindowIDs.count)",
                     "pendingScopes=\(diagnostics.pendingRepairScopes.count)",
                     "appDirectoryProviderEvidence=\(appDirectoryProviderEvidenceCount)",
+                    "scheduledMissingCoverageRepairs=\(scheduledMissingCoverageRepairs)",
                     "promotedRequests=\(promotedRequests.count)",
                     "startedRequests=\(drainResult.startedRequests.count)",
                     "maxReadyRepairs=\(runtimeSearchFreshnessBarrierMaxReadyRepairs)",
@@ -507,6 +511,45 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         }
         readModelStore.commitAppDirectoryProviderEvidence(entries, generatedAt: generatedAt)
         return entries.count
+    }
+
+    @discardableResult
+    private func scheduleSearchMissingWindowCoverageRepairsLocked(
+        generatedAt: TimeInterval
+    ) -> Int {
+        guard let appDirectoryEntries = readModelStore.readAppDirectoryProjection()?.entries,
+              let payload = mainTableProjectionBuilder.searchIndexPayloadFromMainTables(
+                appDirectoryEntries: appDirectoryEntries,
+                generatedAt: generatedAt
+              )
+        else {
+            return 0
+        }
+
+        let diagnostics = readModelStore.diagnostics()
+        let entriesByPID = Dictionary(
+            uniqueKeysWithValues: appDirectoryEntries.map { ($0.pid, $0) }
+        )
+        var scheduledCount = 0
+        for pid in payload.coverageDiagnostics.missingWindowCoveragePIDs.sorted() {
+            guard !diagnostics.dirtyPIDs.contains(pid),
+                  let entry = entriesByPID[pid]
+            else {
+                continue
+            }
+            readModelStore.markAppWindowsDirty(
+                appID: entry.appID,
+                pid: pid,
+                pendingScope: "searchWindowCoverage:\(entry.appID)"
+            )
+            repairProvider.recordSearchWindowCoverageNeeded(
+                appID: entry.appID,
+                pid: pid,
+                now: generatedAt
+            )
+            scheduledCount += 1
+        }
+        return scheduledCount
     }
 
     private func commitCurrentAppRepairEvidenceLocked(
