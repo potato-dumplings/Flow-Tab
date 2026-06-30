@@ -414,6 +414,26 @@ extension SwitcherPanelController {
         beginIgnoringActiveSpaceChanges(trigger: "terminate_refresh")
     }
 
+    @discardableResult
+    func handleAppSwitcherProjectionDidUpdate() -> Bool {
+        guard isPanelPresented else { return false }
+        guard model.handleAppSwitcherProjectionDidUpdate() else { return false }
+        resetPointerSelectionGate()
+        updatePanelSize()
+        scheduleDelayedWindowLayerEntryIfNeeded(preservingDeadline: true)
+        return true
+    }
+
+    @discardableResult
+    func handleCurrentAppWindowProjectionDidUpdate(appID: String?) -> Bool {
+        guard isPanelPresented else { return false }
+        guard model.handleCurrentAppWindowProjectionDidUpdate(appID: appID) else { return false }
+        resetPointerSelectionGate()
+        updatePanelSize()
+        scheduleDelayedWindowLayerEntryIfNeeded(preservingDeadline: true)
+        return true
+    }
+
     func handleRecoverableSystemInterruption(trigger: String) {
         if handleProtectedTerminateSystemInterruption(trigger: trigger) {
             return

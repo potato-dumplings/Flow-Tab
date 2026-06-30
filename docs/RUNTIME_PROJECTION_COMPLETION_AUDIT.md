@@ -13,15 +13,17 @@ reclassifying breadth proof as core completion work.
   aligned with this audit.
 - P2: keep remaining topology and public-AX breadth gaps explicit.
 
-This is not a new runtime behavior slice. It is an evidence audit over the
-current production boundaries, tests, UI proof, pressure proof, and documented
-remaining gaps.
+This slice also closes the behavior-level open Switcher session mutation gap:
+runtime projection commits now publish commit notifications, and an open
+Switcher session responds by re-reading committed projections without adding
+surface-local topology state, retry/debounce, or sampling.
 
 ## Required Evidence
 
 | Exit contract item | Current evidence | Status |
 | --- | --- | --- |
 | Switcher normal paths read projection/Search APIs or send dirty signals | `scripts/audit/runtime-projection-exit-contract.sh` verifies Switcher references `readAppSwitcherProjection`, `readCurrentAppWindowProjection`, `readCommittedSearchIndexForSearch`, and `requestSearchIndexFreshnessBarrier`, while rejecting legacy snapshot, repair-provider, CG, and AX sampling APIs in Switcher hot paths. | Proven by source audit |
+| Open Switcher sessions refresh from runtime projection commits | `RuntimeProjectionService` posts app-switcher and current-app window projection commit notifications after `RuntimeReadModelStore` commits. `SwitcherPanelController` observes those notifications and only re-reads committed projections; it does not create surface-local scheduler/retry state or call snapshot/CG/AX sampling. `testSwitcherPanelControllerAppSwitcherProjectionCommitRefreshesOpenSession` and `testSwitcherPanelControllerCurrentAppProjectionCommitAppliesPendingManualWindowLayerEntry` prove app-cycle and pending manual window-layer refresh behavior. | Proven by behavior tests |
 | Control+Tab focused-current-app path does not synchronously sample frontmost/focused app state | The exit audit now separately rejects `NSWorkspace.shared.frontmostApplication`, `kAXFocusedWindowAttribute`, old focused snapshot/frontmost resolver seams, and the removed frontmost bundle launch override in the Switcher/TestingSupport hot path. It also requires `readFocusedCurrentAppWindowProjection()` and `signalFocusedCurrentAppWindowsChanged()` evidence, proving the focused path either reads runtime projection or sends a dirty signal. | Proven by source audit |
 | Home normal paths read projection APIs or send dirty signals | The exit audit verifies Home references `readHomeSummaryProjection`, `readHomeAppDetailProjection`, `readCurrentAppWindowProjection`, and `signalAppWindowsChanged`, while rejecting legacy snapshot, repair-provider, CG, and AX sampling APIs in Home hot paths. | Proven by source audit |
 | Search reads only committed index and cannot expose staging/repair/partial/session completeness as latest | The exit audit verifies production Search freshness commits only through `RuntimeMainTableProjectionBuilding.searchIndexPayloadFromMainTables(...)` and `RuntimeReadModelStore.commitSearchFreshnessBarrierFromMainTablePayload(...)`. `TEST_COVERAGE_MATRIX.md` records behavior/UI/pressure proof for pre-commit reads that are `missingCommittedIndex` or degraded/stale committed result, committed-generation async re-entry, and external committed-index Search CPU/RSS sampling. | Proven by source audit plus behavior/UI/pressure evidence |
@@ -43,6 +45,8 @@ Representative neighboring behavior proof already used by the current audit:
 
 ```bash
 ./scripts/testing/run-flowtabtests-local.sh \
+  -only-testing:FlowTabTests/FlowTabPriorityCoverageTests/testSwitcherPanelControllerAppSwitcherProjectionCommitRefreshesOpenSession \
+  -only-testing:FlowTabTests/FlowTabPriorityCoverageTests/testSwitcherPanelControllerCurrentAppProjectionCommitAppliesPendingManualWindowLayerEntry \
   -only-testing:FlowTabTests/FlowTabPriorityCoverageTests/testRuntimeActivatorDoesNotVerifyCGFallbackWhenTargetIsVisibleButNotFrontmost \
   -only-testing:FlowTabTests/FlowTabPriorityCoverageTests/testRuntimeActivatorVerifiesFocusWhenFocusedAXCGMatchesOffscreenTargetCG \
   -only-testing:FlowTabTests/FlowTabPriorityCoverageTests/testRuntimeProjectionServiceCommitsVerifiedFocusProjectionFromMainTablesAsStale
@@ -86,8 +90,9 @@ runtime shape:
   matcher coverage is now present.
 - Broader multi-display/fullscreen topology and system-authoritative fullscreen
   owner proof remain partial.
-- Broader lifecycle refresh while an open Switcher session mutates continues to
-  be tracked under runtime snapshot/window-record coverage.
+- Real UI breadth for open Switcher lifecycle mutation across more topology
+  combinations remains open; behavior proof now covers runtime commit signal
+  handling and committed projection re-read for open sessions.
 
 Do not mark these as completed from mock-only evidence. They need representative
 UI/E2E, runtime log, or pressure evidence before moving from breadth gap to

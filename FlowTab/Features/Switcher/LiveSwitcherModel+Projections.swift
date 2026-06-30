@@ -255,6 +255,30 @@ extension LiveSwitcherModel {
         return true
     }
 
+    @discardableResult
+    func applyCurrentAppWindowProjectionIfReady(appID: String) -> Bool {
+        guard let currentSession = session else { return false }
+        guard currentSession.apps.contains(where: { $0.id == appID }) else { return false }
+
+        let startMs = Self.monotonicMilliseconds()
+        guard
+            let projection = runtimeProjectionService.readCurrentAppWindowProjection(appID: appID),
+            projection.freshness.isCompleteForScope
+        else {
+            return false
+        }
+
+        selectedAppWindowProjectionGeneration &+= 1
+        completeSelectedAppWindowProjection(
+            projection.currentAppWindowPayload,
+            appID: appID,
+            generation: selectedAppWindowProjectionGeneration,
+            startMs: startMs,
+            projectionReadMs: Self.monotonicMilliseconds()
+        )
+        return true
+    }
+
     func completeSelectedAppWindowProjection(
         _ currentAppWindowPayload: RuntimeCurrentAppWindowPayload?,
         appID: String,
@@ -334,7 +358,10 @@ extension LiveSwitcherModel {
         _ = rebuiltSession.selectApp(withID: currentSession.selectedApp.id)
         if case .windowCycle(let windowLayerAppID) = currentSession.mode, windowLayerAppID == appID {
             if let selectedWindowID = currentSession.selectedWindow?.id {
-                _ = rebuiltSession.selectWindow(appID: appID, windowID: selectedWindowID)
+                if !rebuiltSession.selectWindow(appID: appID, windowID: selectedWindowID) {
+                    _ = rebuiltSession.selectApp(withID: appID)
+                    _ = rebuiltSession.enterWindowCycle(allowSingleWindow: false)
+                }
             } else {
                 _ = rebuiltSession.enterWindowCycle(allowSingleWindow: false)
             }

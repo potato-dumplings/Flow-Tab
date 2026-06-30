@@ -535,6 +535,10 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             clearsDirtyCGWindowIDs: clearsDirtyCGWindowIDs,
             generatedAt: generatedAt
         )
+        NotificationCenter.default.post(
+            name: .runtimeAppSwitcherProjectionDidUpdate,
+            object: self
+        )
         return true
     }
 
@@ -648,6 +652,11 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             mainTablePayload,
             clearsDirtyState: clearsDirtyState,
             generatedAt: generatedAt
+        )
+        NotificationCenter.default.post(
+            name: .runtimeCurrentAppWindowProjectionDidUpdate,
+            object: self,
+            userInfo: [RuntimeProjectionNotificationUserInfoKey.appID: appID]
         )
         return true
     }

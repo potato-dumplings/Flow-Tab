@@ -519,6 +519,60 @@ final class LiveSwitcherModel: ObservableObject {
     }
 
     @discardableResult
+    func handleAppSwitcherProjectionDidUpdate() -> Bool {
+        guard let currentSession = session else { return false }
+        guard !searchViewState.isActive else { return false }
+        let preferredSelectedAppID = currentSession.selectedApp.id
+        let previousMode = currentSession.mode
+        let previousSelectedWindowID = currentSession.selectedWindow?.id
+        let refreshed = loadAppSwitcherProjectionSession(
+            triggerDirection: .forward,
+            preferredSelectedAppID: preferredSelectedAppID,
+            animateAppStripUpdate: true,
+            preserveSearchState: false,
+            resetWhenEmpty: false
+        )
+        guard refreshed else { return false }
+        restoreSessionModeAfterProjectionUpdate(
+            previousMode: previousMode,
+            previousSelectedWindowID: previousSelectedWindowID
+        )
+        return true
+    }
+
+    @discardableResult
+    func handleCurrentAppWindowProjectionDidUpdate(appID: String?) -> Bool {
+        guard let currentSession = session else { return false }
+        guard !searchViewState.isActive else { return false }
+        let targetAppID = appID ?? currentSession.selectedApp.id
+        guard currentSession.apps.contains(where: { $0.id == targetAppID }) else { return false }
+        guard targetAppID == currentSession.selectedApp.id else { return false }
+        return applyCurrentAppWindowProjectionIfReady(appID: targetAppID)
+    }
+
+    func restoreSessionModeAfterProjectionUpdate(
+        previousMode: SessionMode,
+        previousSelectedWindowID: String?
+    ) {
+        guard var refreshedSession = session else { return }
+        switch previousMode {
+        case .appCycle:
+            return
+        case .groupCycle:
+            return
+        case .windowCycle(let appID):
+            if let previousSelectedWindowID,
+               refreshedSession.selectWindow(appID: appID, windowID: previousSelectedWindowID) {
+                session = refreshedSession
+                return
+            }
+            guard refreshedSession.selectApp(withID: appID) else { return }
+            _ = refreshedSession.enterWindowCycle(allowSingleWindow: false)
+            session = refreshedSession
+        }
+    }
+
+    @discardableResult
     func refreshSessionAfterTerminatedApplication(appID: String, pid: pid_t, reason: String) -> Bool {
         guard session != nil else { return false }
 

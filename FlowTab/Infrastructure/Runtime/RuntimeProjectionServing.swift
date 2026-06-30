@@ -1,9 +1,19 @@
 import Foundation
 
 extension Notification.Name {
+    static let runtimeAppSwitcherProjectionDidUpdate = Notification.Name(
+        "FlowTab.runtimeAppSwitcherProjectionDidUpdate"
+    )
+    static let runtimeCurrentAppWindowProjectionDidUpdate = Notification.Name(
+        "FlowTab.runtimeCurrentAppWindowProjectionDidUpdate"
+    )
     static let runtimeCommittedSearchIndexDidUpdate = Notification.Name(
         "FlowTab.runtimeCommittedSearchIndexDidUpdate"
     )
+}
+
+enum RuntimeProjectionNotificationUserInfoKey {
+    static let appID = "appID"
 }
 
 protocol RuntimeProjectionServing: Sendable {

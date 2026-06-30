@@ -149,6 +149,8 @@ final class SwitcherPanelController {
     var appDidResignActiveObserver: NSObjectProtocol?
     var activeSpaceDidChangeObserver: NSObjectProtocol?
     var workspaceDidTerminateApplicationObserver: NSObjectProtocol?
+    var appSwitcherProjectionDidUpdateObserver: NSObjectProtocol?
+    var currentAppWindowProjectionDidUpdateObserver: NSObjectProtocol?
     var committedSearchIndexDidUpdateObserver: NSObjectProtocol?
     var panelOcclusionObserver: NSObjectProtocol?
     var panelDidResignKeyObserver: NSObjectProtocol?
@@ -375,6 +377,25 @@ final class SwitcherPanelController {
                 self?.handleWorkspaceApplicationTerminated(appID: appID, pid: pid)
             }
         }
+        appSwitcherProjectionDidUpdateObserver = NotificationCenter.default.addObserver(
+            forName: .runtimeAppSwitcherProjectionDidUpdate,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.handleAppSwitcherProjectionDidUpdate()
+            }
+        }
+        currentAppWindowProjectionDidUpdateObserver = NotificationCenter.default.addObserver(
+            forName: .runtimeCurrentAppWindowProjectionDidUpdate,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            let appID = notification.userInfo?[RuntimeProjectionNotificationUserInfoKey.appID] as? String
+            Task { @MainActor [weak self] in
+                self?.handleCurrentAppWindowProjectionDidUpdate(appID: appID)
+            }
+        }
         committedSearchIndexDidUpdateObserver = NotificationCenter.default.addObserver(
             forName: .runtimeCommittedSearchIndexDidUpdate,
             object: nil,
@@ -498,6 +519,16 @@ final class SwitcherPanelController {
     }
 
     @discardableResult
+    func handleAppSwitcherProjectionDidUpdateForTesting() -> Bool {
+        handleAppSwitcherProjectionDidUpdate()
+    }
+
+    @discardableResult
+    func handleCurrentAppWindowProjectionDidUpdateForTesting(appID: String? = nil) -> Bool {
+        handleCurrentAppWindowProjectionDidUpdate(appID: appID)
+    }
+
+    @discardableResult
     func handleCommittedSearchIndexDidUpdateForTesting() -> Bool {
         handleCommittedSearchIndexDidUpdate()
     }
@@ -538,6 +569,12 @@ final class SwitcherPanelController {
         }
         if let workspaceDidTerminateApplicationObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(workspaceDidTerminateApplicationObserver)
+        }
+        if let appSwitcherProjectionDidUpdateObserver {
+            NotificationCenter.default.removeObserver(appSwitcherProjectionDidUpdateObserver)
+        }
+        if let currentAppWindowProjectionDidUpdateObserver {
+            NotificationCenter.default.removeObserver(currentAppWindowProjectionDidUpdateObserver)
         }
         if let committedSearchIndexDidUpdateObserver {
             NotificationCenter.default.removeObserver(committedSearchIndexDidUpdateObserver)

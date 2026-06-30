@@ -323,6 +323,70 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testSwitcherPanelControllerAppSwitcherProjectionCommitRefreshesOpenSession() {
+        let initialApps = [
+            AppSwitchCandidate(
+                id: "com.example.alpha",
+                displayName: "Alpha",
+                groupID: "alpha",
+                lastActiveAt: 100,
+                windows: []
+            ),
+            AppSwitchCandidate(
+                id: "com.example.beta",
+                displayName: "Beta",
+                groupID: "beta",
+                lastActiveAt: 90,
+                windows: []
+            )
+        ]
+        let updatedApps = [
+            initialApps[0],
+            AppSwitchCandidate(
+                id: "com.example.beta",
+                displayName: "Beta",
+                groupID: "beta",
+                lastActiveAt: 90,
+                windows: [
+                    WindowCandidate(
+                        id: "beta-1",
+                        title: "Beta One",
+                        isMinimized: false,
+                        lastActiveAt: 30
+                    )
+                ]
+            ),
+            AppSwitchCandidate(
+                id: "com.example.gamma",
+                displayName: "Gamma",
+                groupID: "gamma",
+                lastActiveAt: 80,
+                windows: []
+            )
+        ]
+        let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: initialApps)
+        let controller = SwitcherPanelController(
+            model: LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
+        )
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        let selectedAppIDBeforeUpdate = controller.modelForTesting.selectedApp?.id
+        XCTAssertEqual(controller.modelForTesting.session?.apps.map(\.id), initialApps.map(\.id))
+
+        runtimeProjectionService.installAppSwitcherProjection(apps: updatedApps, generatedAt: 20)
+        XCTAssertTrue(controller.handleAppSwitcherProjectionDidUpdateForTesting())
+
+        XCTAssertEqual(controller.modelForTesting.session?.apps.map(\.id), updatedApps.map(\.id))
+        XCTAssertEqual(controller.modelForTesting.selectedApp?.id, selectedAppIDBeforeUpdate)
+        XCTAssertEqual(runtimeProjectionService.appSwitcherProjectionReadCount(), 2)
+        XCTAssertEqual(
+            runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(),
+            [.switcherSessionStarted]
+        )
+        controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
     func testLiveSwitcherModelStartsAppSessionFromRuntimeProjectionWithoutLightweightSampling() {
         let apps = searchScenarioApps().map { app in
             AppSwitchCandidate(
@@ -1586,6 +1650,90 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(
             controller.modelForTesting.session?.selectedApp.windows.map(\.id),
             ["manual-after-dirty-1", "manual-after-dirty-2"]
+        )
+        controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerCurrentAppProjectionCommitAppliesPendingManualWindowLayerEntry() {
+        let currentApp = NSRunningApplication.current
+        let appID = "com.example.manual-commit-projection"
+        let windows = [
+            WindowCandidate(id: "manual-commit-1", title: "Manual Commit One", isMinimized: false, lastActiveAt: 30),
+            WindowCandidate(id: "manual-commit-2", title: "Manual Commit Two", isMinimized: false, lastActiveAt: 20)
+        ]
+        let appOnlyCandidate = AppSwitchCandidate(
+            id: appID,
+            displayName: "Manual Commit Projection",
+            groupID: "manual-commit",
+            lastActiveAt: 100,
+            windows: []
+        )
+        let windowCandidate = AppSwitchCandidate(
+            id: appID,
+            displayName: "Manual Commit Projection",
+            groupID: "manual-commit",
+            lastActiveAt: 100,
+            windows: windows
+        )
+        let emptyContext = makeRuntimeAppContext(appID: appID, runningApp: currentApp, windows: [])
+        let repairedContext = makeRuntimeAppContext(appID: appID, runningApp: currentApp, windows: windows)
+        let selectedCurrentAppWindowPayload = RuntimeCurrentAppWindowPayload(
+            summary: RuntimeHomeAppSummary(
+                appID: appID,
+                displayName: "Manual Commit Projection",
+                groupID: "manual-commit",
+                lastActiveAt: 100,
+                windowCount: windows.count,
+                pid: currentApp.processIdentifier
+            ),
+            candidate: windowCandidate,
+            context: repairedContext,
+            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: currentApp)]
+        )
+        let freshness = RuntimeProjectionFreshness(
+            generatedAt: 12,
+            sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+            dirtyAppIDs: [],
+            dirtyPIDs: [],
+            dirtyCGWindowIDs: [],
+            pendingRepairScopes: [],
+            isCompleteForScope: true
+        )
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
+            appSwitcherProjection: RuntimeAppSwitcherProjection(
+                apps: [appOnlyCandidate],
+                contextsByID: [appID: emptyContext],
+                freshness: freshness
+            )
+        )
+        let controller = SwitcherPanelController(
+            model: LiveSwitcherModel(
+                runtimeProjectionService: runtimeProjectionService
+            )
+        )
+        controller.windowLayerPresentationDelayOverride = 30
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        controller.advance(.downArrow)
+        XCTAssertEqual(runtimeProjectionService.selectedCurrentAppWindowChangeSignalsRecorded().map(\.appID), [appID])
+        XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 1)
+
+        runtimeProjectionService.setCurrentAppWindowProjection(
+            RuntimeCurrentAppWindowProjection(
+                appID: appID,
+                currentAppWindowPayload: selectedCurrentAppWindowPayload,
+                freshness: freshness
+            ),
+            appID: appID
+        )
+        XCTAssertTrue(controller.handleCurrentAppWindowProjectionDidUpdateForTesting(appID: appID))
+
+        XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 2)
+        XCTAssertEqual(controller.modelForTesting.session?.mode, .windowCycle(appID: appID))
+        XCTAssertEqual(
+            controller.modelForTesting.session?.selectedApp.windows.map(\.id),
+            ["manual-commit-1", "manual-commit-2"]
         )
         controller.cancelSelectionForTesting()
     }
