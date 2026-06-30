@@ -57,6 +57,14 @@ production_paths=(
   FlowTabCore
 )
 
+activation_paths=(
+  FlowTab/Infrastructure/Runtime/RuntimeActivator.swift
+  FlowTab/Infrastructure/Runtime/RuntimeWindowFocusRequest.swift
+  FlowTab/Infrastructure/Runtime/RuntimeProjectionService.swift
+  FlowTab/Infrastructure/Runtime/RuntimeProjectionServing.swift
+  FlowTab/Infrastructure/Runtime/RuntimeWindowRecordStore.swift
+)
+
 check_no_matches \
   "surface hot paths do not reference legacy snapshot, repair provider, or direct CG/AX sampling APIs" \
   "RuntimeSnapshotProvider|RuntimeSnapshot\\(|snapshotQueue|collectAXWindowData|RuntimeSystemRepairFactProvider|RuntimeProjectionRepairProvider|fullRepairEvidence|commitSearchFreshnessBarrier|readCommittedSearchIndexProjection|CGWindowListCopyWindowInfo|AXUIElementCreateApplication" \
@@ -81,6 +89,21 @@ check_has_matches \
   "Search freshness commits only from main-table payload in production runtime" \
   "searchIndexPayloadFromMainTables|commitSearchFreshnessBarrierFromMainTablePayload" \
   FlowTab/Infrastructure/Runtime/RuntimeProjectionService.swift FlowTab/Infrastructure/Runtime/RuntimeReadModelStore.swift
+
+check_no_matches \
+  "production activation paths do not use direct Space setting or Window-menu shortcuts as success oracles" \
+  "ManagedDisplaySetCurrentSpace|SLSSetCurrentSpace|CGSSetCurrentSpace|SetCurrentSpace|kAXMenu(Item|Bar)?Attribute|kAXPressAction" \
+  "${production_paths[@]}"
+
+check_has_matches \
+  "activation verifies selected-window success through focused AX/CG or frontmost CG readback" \
+  "verifyFocusAttempt|targetCGWindowHasActivationReadback|focusedAXWindowCGWindowID|frontmostVisibleCGWindowID|reportBindingReadbackMismatch" \
+  FlowTab/Infrastructure/Runtime/RuntimeActivator.swift FlowTab/Infrastructure/Runtime/RuntimeWindowFocusRequest.swift
+
+check_has_matches \
+  "verified activation readback is committed into WindowRecord and runtime projection state" \
+  "recordWindowFocusVerification|verifiedFocusReadback|signalWindowFocusVerified|readActivationTargetProjection" \
+  "${activation_paths[@]}"
 
 if [[ "$failures" -ne 0 ]]; then
   echo "Runtime projection exit-contract audit failed: $failures check(s)"
