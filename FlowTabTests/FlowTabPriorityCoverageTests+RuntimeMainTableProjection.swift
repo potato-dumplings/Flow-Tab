@@ -26,6 +26,227 @@ extension FlowTabPriorityCoverageTests {
         return committed
     }
 
+    private func makeCurrentAppProjectionPayloadForTesting(
+        appID: String,
+        runningApp: NSRunningApplication,
+        windows: [WindowCandidate],
+        cgWindowIDsByWindowID: [String: CGWindowID],
+        bindingAllowedActionsByWindowID: [String: Set<WindowBindingAction>] = [:]
+    ) -> RuntimeCurrentAppWindowPayload {
+        let pid = runningApp.processIdentifier
+        let displayName = runningApp.localizedName ?? appID
+        return RuntimeCurrentAppWindowPayload(
+            summary: RuntimeHomeAppSummary(
+                appID: appID,
+                displayName: displayName,
+                groupID: RuntimeAppIdentity.groupID(
+                    for: runningApp.bundleIdentifier,
+                    fallbackName: displayName
+                ),
+                lastActiveAt: 100,
+                windowCount: windows.count,
+                pid: pid,
+                bundleIdentifier: runningApp.bundleIdentifier,
+                bundleURL: runningApp.bundleURL
+            ),
+            candidate: AppSwitchCandidate(
+                id: appID,
+                displayName: displayName,
+                groupID: RuntimeAppIdentity.groupID(
+                    for: runningApp.bundleIdentifier,
+                    fallbackName: displayName
+                ),
+                lastActiveAt: 100,
+                windows: windows
+            ),
+            context: RuntimeAppContext(
+                appID: appID,
+                runningApp: runningApp,
+                windowsByID: Dictionary(
+                    uniqueKeysWithValues: windows.map { window in
+                        (
+                            window.id,
+                            RuntimeWindowContext(
+                                id: window.id,
+                                title: window.title,
+                                isMinimized: window.isMinimized,
+                                ownerPID: pid,
+                                cgWindowID: cgWindowIDsByWindowID[window.id],
+                                spaceIDs: [5],
+                                allowsPublicAXRecovery: true,
+                                hasStickyBinding: true,
+                                lastConfirmationSource: .publicExactMatch,
+                                bindingAllowedActionsOverride: bindingAllowedActionsByWindowID[window.id]
+                            )
+                        )
+                    }
+                )
+            ),
+            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: runningApp)]
+        )
+    }
+
+    func testRuntimeReadModelStorePreservesCommittedCurrentAppSiblingRowsUntilDirtyCGInvalidatesThem() throws {
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let pid = runningApp.processIdentifier
+        let store = RuntimeReadModelStore()
+
+        let fullscreen = WindowCandidate(
+            id: "fullscreen",
+            title: "Chrome Fullscreen Tab",
+            isMinimized: false,
+            lastActiveAt: 30
+        )
+        let incognito = WindowCandidate(
+            id: "incognito",
+            title: "Chrome Incognito Tab",
+            isMinimized: false,
+            lastActiveAt: 20
+        )
+        let fullPayload = makeCurrentAppProjectionPayloadForTesting(
+            appID: appID,
+            runningApp: runningApp,
+            windows: [fullscreen, incognito],
+            cgWindowIDsByWindowID: [
+                "fullscreen": 240_831,
+                "incognito": 240_832
+            ]
+        )
+        store.commitCurrentAppWindowProjection(
+            fullPayload,
+            clearsDirtyState: true,
+            generatedAt: 10
+        )
+
+        let partialPayload = makeCurrentAppProjectionPayloadForTesting(
+            appID: appID,
+            runningApp: runningApp,
+            windows: [fullscreen],
+            cgWindowIDsByWindowID: ["fullscreen": 240_831]
+        )
+        store.commitCurrentAppWindowProjection(
+            partialPayload,
+            clearsDirtyState: true,
+            generatedAt: 11
+        )
+
+        var projection = try XCTUnwrap(store.readCurrentAppWindowProjection(appID: appID))
+        XCTAssertEqual(
+            projection.currentAppWindowPayload.candidate.windows.map(\.id),
+            ["fullscreen", "incognito"]
+        )
+        XCTAssertEqual(projection.currentAppWindowPayload.summary.windowCount, 2)
+        XCTAssertEqual(
+            projection.currentAppWindowPayload.context.windowsByID["incognito"]?.cgWindowID,
+            240_832
+        )
+        XCTAssertEqual(projection.currentAppWindowPayload.summary.pid, pid)
+        XCTAssertTrue(projection.freshness.isCompleteForScope)
+
+        store.markSpaceTopologyDirty(
+            affectedCGWindowIDs: [240_832],
+            signatureSummary: "dirty-incognito",
+            pendingScope: "spaceTopology",
+            generatedAt: 12
+        )
+        store.commitCurrentAppWindowProjection(
+            partialPayload,
+            clearsDirtyState: true,
+            generatedAt: 13
+        )
+
+        projection = try XCTUnwrap(store.readCurrentAppWindowProjection(appID: appID))
+        XCTAssertEqual(
+            projection.currentAppWindowPayload.candidate.windows.map(\.id),
+            ["fullscreen"]
+        )
+        XCTAssertNil(projection.currentAppWindowPayload.context.windowsByID["incognito"])
+        XCTAssertEqual(projection.currentAppWindowPayload.summary.windowCount, 1)
+        XCTAssertEqual(projection.freshness.dirtyCGWindowIDs, [240_832])
+        XCTAssertTrue(projection.freshness.pendingRepairScopes.contains("spaceTopology"))
+    }
+
+    func testRuntimeReadModelStorePreservesCurrentAppSiblingsFromCommittedAppSwitcherProjection() throws {
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let store = RuntimeReadModelStore()
+        let fullscreen = WindowCandidate(
+            id: "fullscreen",
+            title: "Chrome Fullscreen Tab",
+            isMinimized: false,
+            lastActiveAt: 30
+        )
+        let normal = WindowCandidate(
+            id: "normal",
+            title: "Chrome Normal Tab",
+            isMinimized: false,
+            lastActiveAt: 20
+        )
+        let incognito = WindowCandidate(
+            id: "incognito",
+            title: "Chrome Incognito Tab",
+            isMinimized: false,
+            lastActiveAt: 10
+        )
+        let artifact = WindowCandidate(
+            id: "artifact",
+            title: "Chrome Fixture",
+            isMinimized: false,
+            lastActiveAt: 5
+        )
+        let fullPayload = makeCurrentAppProjectionPayloadForTesting(
+            appID: appID,
+            runningApp: runningApp,
+            windows: [fullscreen, normal, incognito, artifact],
+            cgWindowIDsByWindowID: [
+                "fullscreen": 240_841,
+                "normal": 240_842,
+                "incognito": 240_843,
+                "artifact": 240_844
+            ],
+            bindingAllowedActionsByWindowID: [
+                "artifact": [.exposeInSwitcher]
+            ]
+        )
+        store.commitMainTableAppSwitcherProjectionPayload(
+            RuntimeAppSwitcherProjectionPayload(
+                apps: [fullPayload.candidate],
+                contextsByID: [appID: fullPayload.context],
+                hasCompleteWindowCoverage: true
+            ),
+            generatedAt: 20
+        )
+
+        let partialPayload = makeCurrentAppProjectionPayloadForTesting(
+            appID: appID,
+            runningApp: runningApp,
+            windows: [fullscreen, normal],
+            cgWindowIDsByWindowID: [
+                "fullscreen": 240_841,
+                "normal": 240_842
+            ]
+        )
+        store.commitCurrentAppWindowProjection(
+            partialPayload,
+            clearsDirtyState: true,
+            generatedAt: 21
+        )
+
+        let projection = try XCTUnwrap(store.readCurrentAppWindowProjection(appID: appID))
+        XCTAssertEqual(
+            projection.currentAppWindowPayload.candidate.windows.map(\.id),
+            ["fullscreen", "normal", "incognito"]
+        )
+        XCTAssertEqual(projection.currentAppWindowPayload.summary.windowCount, 3)
+        XCTAssertEqual(
+            projection.currentAppWindowPayload.context.windowsByID["incognito"]?.cgWindowID,
+            240_843
+        )
+        XCTAssertNil(projection.currentAppWindowPayload.context.windowsByID["artifact"])
+        XCTAssertTrue(projection.freshness.isCompleteForScope)
+    }
+
     func testRuntimeMainTableProjectionBuilderBuildsAppSwitcherPayloadFromMainTables() throws {
         let runningApp = NSRunningApplication.current
         let appID = RuntimeAppIdentity.appID(for: runningApp)

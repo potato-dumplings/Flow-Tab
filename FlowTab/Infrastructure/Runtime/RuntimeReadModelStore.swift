@@ -114,7 +114,8 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
 
-        let committedPayload = currentAppWindowPayloadByApplyingActivationReadbackLocked(payload)
+        let preservedPayload = currentAppWindowPayloadByPreservingPriorCommittedWindowsLocked(payload)
+        let committedPayload = currentAppWindowPayloadByApplyingActivationReadbackLocked(preservedPayload)
         markProjectionCommittedLocked()
         if clearsDirtyState {
             clearDirtyStateForAppLocked(appID: committedPayload.summary.appID, pid: committedPayload.summary.pid)
@@ -648,6 +649,118 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             context: payload.context,
             appDirectoryEntries: payload.appDirectoryEntries
         )
+    }
+
+    private func currentAppWindowPayloadByPreservingPriorCommittedWindowsLocked(
+        _ payload: RuntimeCurrentAppWindowPayload
+    ) -> RuntimeCurrentAppWindowPayload {
+        let priorSources = currentAppWindowPreservationSourcesLocked(for: payload)
+        guard !priorSources.isEmpty else { return payload }
+        let projectedWindowIDs = Set(payload.candidate.windows.map(\.id))
+        var projectedCGWindowIDs = Set(payload.context.windowsByID.values.compactMap(\.cgWindowID))
+        var preservedWindows: [WindowCandidate] = []
+        var preservedContextsByID: [String: RuntimeWindowContext] = [:]
+        var preservedWindowIDs: Set<String> = []
+        for source in priorSources {
+            for window in source.candidate.windows {
+                guard !projectedWindowIDs.contains(window.id),
+                      !preservedWindowIDs.contains(window.id),
+                      let priorContext = source.context.windowsByID[window.id]
+                else {
+                    continue
+                }
+                guard currentAppWindowPreservationAllowsActivationLocked(priorContext) else {
+                    continue
+                }
+                if let cgWindowID = priorContext.cgWindowID {
+                    guard !projectedCGWindowIDs.contains(cgWindowID),
+                          !dirtyCGWindowIDs.contains(cgWindowID)
+                    else {
+                        continue
+                    }
+                    projectedCGWindowIDs.insert(cgWindowID)
+                }
+                preservedWindows.append(window)
+                preservedContextsByID[window.id] = priorContext
+                preservedWindowIDs.insert(window.id)
+            }
+        }
+        guard !preservedWindows.isEmpty else { return payload }
+
+        var windowsByID = payload.context.windowsByID
+        for (windowID, context) in preservedContextsByID {
+            windowsByID[windowID] = context
+        }
+        let candidate = AppSwitchCandidate(
+            id: payload.candidate.id,
+            displayName: payload.candidate.displayName,
+            groupID: payload.candidate.groupID,
+            lastActiveAt: payload.candidate.lastActiveAt,
+            windows: payload.candidate.windows + preservedWindows
+        )
+        let summary = RuntimeHomeAppSummary(
+            appID: payload.summary.appID,
+            displayName: payload.summary.displayName,
+            groupID: payload.summary.groupID,
+            lastActiveAt: payload.summary.lastActiveAt,
+            windowCount: candidate.windows.count,
+            pid: payload.summary.pid,
+            bundleIdentifier: payload.summary.bundleIdentifier,
+            bundleURL: payload.summary.bundleURL
+        )
+        return RuntimeCurrentAppWindowPayload(
+            summary: summary,
+            candidate: candidate,
+            context: RuntimeAppContext(
+                appID: payload.context.appID,
+                runningApp: payload.context.runningApp,
+                windowsByID: windowsByID
+            ),
+            appDirectoryEntries: payload.appDirectoryEntries
+        )
+    }
+
+    private func currentAppWindowPreservationSourcesLocked(
+        for payload: RuntimeCurrentAppWindowPayload
+    ) -> [(candidate: AppSwitchCandidate, context: RuntimeAppContext)] {
+        var sources: [(candidate: AppSwitchCandidate, context: RuntimeAppContext)] = []
+        if let priorPayload = currentAppWindowProjectionsByAppID[payload.summary.appID]?.currentAppWindowPayload,
+           currentAppWindowPreservationSourceMatchesProcessLocked(
+            sourcePID: priorPayload.summary.pid,
+            sourceContext: priorPayload.context,
+            payload: payload
+           ) {
+            sources.append((priorPayload.candidate, priorPayload.context))
+        }
+        if let appSwitcherProjection,
+           let appSwitcherCandidate = appSwitcherProjection.apps.first(where: { $0.id == payload.summary.appID }),
+           let appSwitcherContext = appSwitcherProjection.contextsByID[payload.summary.appID],
+           currentAppWindowPreservationSourceMatchesProcessLocked(
+            sourcePID: appSwitcherContext.runningApp.processIdentifier,
+            sourceContext: appSwitcherContext,
+            payload: payload
+           ) {
+            sources.append((appSwitcherCandidate, appSwitcherContext))
+        }
+        return sources
+    }
+
+    private func currentAppWindowPreservationAllowsActivationLocked(
+        _ context: RuntimeWindowContext
+    ) -> Bool {
+        context.bindingAllowedActions.contains(.useForAXActivation)
+            || context.bindingAllowedActions.contains(.useForCGActivationFallback)
+    }
+
+    private func currentAppWindowPreservationSourceMatchesProcessLocked(
+        sourcePID: pid_t,
+        sourceContext: RuntimeAppContext,
+        payload: RuntimeCurrentAppWindowPayload
+    ) -> Bool {
+        sourcePID == payload.summary.pid
+            || sourcePID == payload.context.runningApp.processIdentifier
+            || sourceContext.runningApp.processIdentifier == payload.summary.pid
+            || sourceContext.runningApp.processIdentifier == payload.context.runningApp.processIdentifier
     }
 
     private func currentAppWindowProjectionPriorOrderLocked(
