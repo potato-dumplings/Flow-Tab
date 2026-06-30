@@ -347,6 +347,11 @@ extension LiveSwitcherModel {
         }
         if !preservesWindowLayerPreview {
             clearPreviewSnapshotState()
+        } else {
+            refreshFrozenPreviewOrderIfChanged(
+                for: appID,
+                windows: currentAppWindowPayload.candidate.windows
+            )
         }
 
         var rebuiltSession = SwitcherSession(

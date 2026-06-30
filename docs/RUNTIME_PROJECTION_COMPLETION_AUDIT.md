@@ -8,22 +8,23 @@ reclassifying breadth proof as core completion work.
 
 ## Phase 7 Slice
 
-- P0: make the current exit-contract evidence reviewable in one place.
+- P0: close the representative real open Switcher window-layer mutation proof.
 - P1: keep `RUNTIME_AX_CG_SPACE_WINDOW_MAPPING.md` and `TEST_COVERAGE_MATRIX.md`
   aligned with this audit.
-- P2: keep remaining topology and public-AX breadth gaps explicit.
+- P2: keep broader topology and public-AX breadth gaps explicit.
 
-This slice also closes the behavior-level open Switcher session mutation gap:
-runtime projection commits now publish commit notifications, and an open
-Switcher session responds by re-reading committed projections without adding
-surface-local topology state, retry/debounce, or sampling.
+This slice closes the representative real open Switcher session mutation gap:
+runtime projection commits already published commit notifications, and an open
+Switcher session re-read committed projections without adding surface-local
+topology state, retry/debounce, or sampling. The new real fixture proof exposed
+and fixed stale frozen preview rows while the window layer was already open.
 
 ## Required Evidence
 
 | Exit contract item | Current evidence | Status |
 | --- | --- | --- |
 | Switcher normal paths read projection/Search APIs or send dirty signals | `scripts/audit/runtime-projection-exit-contract.sh` verifies Switcher references `readAppSwitcherProjection`, `readCurrentAppWindowProjection`, `readCommittedSearchIndexForSearch`, and `requestSearchIndexFreshnessBarrier`, while rejecting legacy snapshot, repair-provider, CG, and AX sampling APIs in Switcher hot paths. | Proven by source audit |
-| Open Switcher sessions refresh from runtime projection commits | `RuntimeProjectionService` posts app-switcher and current-app window projection commit notifications after `RuntimeReadModelStore` commits. `SwitcherPanelController` observes those notifications and only re-reads committed projections; it does not create surface-local scheduler/retry state or call snapshot/CG/AX sampling. `testSwitcherPanelControllerAppSwitcherProjectionCommitRefreshesOpenSession` and `testSwitcherPanelControllerCurrentAppProjectionCommitAppliesPendingManualWindowLayerEntry` prove app-cycle and pending manual window-layer refresh behavior. | Proven by behavior tests |
+| Open Switcher sessions refresh from runtime projection commits | `RuntimeProjectionService` posts app-switcher and current-app window projection commit notifications after `RuntimeReadModelStore` commits. `SwitcherPanelController` observes those notifications and only re-reads committed projections; it does not create surface-local scheduler/retry state or call snapshot/CG/AX sampling. `testSwitcherPanelControllerAppSwitcherProjectionCommitRefreshesOpenSession`, `testSwitcherPanelControllerCurrentAppProjectionCommitAppliesPendingManualWindowLayerEntry`, and `testSwitcherPanelControllerCurrentAppProjectionCommitRefreshesFrozenWindowLayerPreview` prove app-cycle, pending manual window-layer, and already-open window-layer preview refresh behavior. `testSwitcherPanelRefreshesOpenWindowLayerAfterRealFixtureWindowSetMutation` proves a real fixture close-window mutation routes through shared runtime `runtimeAXDestroyed ... affectedCGWindowID=...` evidence and updates the open Switcher window layer from 2 cards to 1 while the fixture process remains running. | Proven by behavior and real UI tests |
 | Control+Tab focused-current-app path does not synchronously sample frontmost/focused app state | The exit audit now separately rejects `NSWorkspace.shared.frontmostApplication`, `kAXFocusedWindowAttribute`, old focused snapshot/frontmost resolver seams, and the removed frontmost bundle launch override in the Switcher/TestingSupport hot path. It also requires `readFocusedCurrentAppWindowProjection()` and `signalFocusedCurrentAppWindowsChanged()` evidence, proving the focused path either reads runtime projection or sends a dirty signal. | Proven by source audit |
 | Home normal paths read projection APIs or send dirty signals | The exit audit verifies Home references `readHomeSummaryProjection`, `readHomeAppDetailProjection`, `readCurrentAppWindowProjection`, and `signalAppWindowsChanged`, while rejecting legacy snapshot, repair-provider, CG, and AX sampling APIs in Home hot paths. | Proven by source audit |
 | Search reads only committed index and cannot expose staging/repair/partial/session completeness as latest | The exit audit verifies production Search freshness commits only through `RuntimeMainTableProjectionBuilding.searchIndexPayloadFromMainTables(...)` and `RuntimeReadModelStore.commitSearchFreshnessBarrierFromMainTablePayload(...)`. `TEST_COVERAGE_MATRIX.md` records behavior/UI/pressure proof for pre-commit reads that are `missingCommittedIndex` or degraded/stale committed result, committed-generation async re-entry, and external committed-index Search CPU/RSS sampling. | Proven by source audit plus behavior/UI/pressure evidence |
@@ -47,6 +48,7 @@ Representative neighboring behavior proof already used by the current audit:
 ./scripts/testing/run-flowtabtests-local.sh \
   -only-testing:FlowTabTests/FlowTabPriorityCoverageTests/testSwitcherPanelControllerAppSwitcherProjectionCommitRefreshesOpenSession \
   -only-testing:FlowTabTests/FlowTabPriorityCoverageTests/testSwitcherPanelControllerCurrentAppProjectionCommitAppliesPendingManualWindowLayerEntry \
+  -only-testing:FlowTabTests/FlowTabPriorityCoverageTests/testSwitcherPanelControllerCurrentAppProjectionCommitRefreshesFrozenWindowLayerPreview \
   -only-testing:FlowTabTests/FlowTabPriorityCoverageTests/testRuntimeActivatorDoesNotVerifyCGFallbackWhenTargetIsVisibleButNotFrontmost \
   -only-testing:FlowTabTests/FlowTabPriorityCoverageTests/testRuntimeActivatorVerifiesFocusWhenFocusedAXCGMatchesOffscreenTargetCG \
   -only-testing:FlowTabTests/FlowTabPriorityCoverageTests/testRuntimeProjectionServiceCommitsVerifiedFocusProjectionFromMainTablesAsStale
@@ -62,15 +64,22 @@ Post-runner-fix representative UI proof refreshed for this audit:
   -only-testing:FlowTabUITests/FlowTabUITests/testSwitcherPanelWindowSearchRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithoutAppAXWindows \
   -only-testing:FlowTabUITests/FlowTabUITests/testSwitcherPanelPreviewKeepsIdenticalRealWorkflowWindowsDistinct \
   -only-testing:FlowTabUITests/FlowTabUITests/testSwitcherPanelPreviewCapturesRealMinimizedPublicAXState
+
+./scripts/testing/run-ui-tests-local.sh \
+  -only-testing:FlowTabUITests/FlowTabUITests/testSwitcherPanelRefreshesOpenWindowLayerAfterRealFixtureWindowSetMutation
 ```
 
 The install step built and signed `{user-home}/Applications/Flow Tab UITest.app`
 with Apple Development signing. The UI wrapper used that fixed app path and
-passed 4 selected tests with 0 failures in 123.975 seconds
-(`125.622` seconds elapsed in XCTest). This refresh proves
+passed the first 4 selected tests with 0 failures in 123.975 seconds
+(`125.622` seconds elapsed in XCTest). The new open-window-layer mutation proof
+was then run separately and passed 1 selected UI test in 27.240 seconds. Together
+these refreshed tests prove
 the representative noisy fullscreen/off-space topology round trip, committed
 Search-index real UI re-entry and activation, target-app focused public AX
-tie-breaker, and minimized public AX state capture on the repaired runner.
+tie-breaker, minimized public AX state capture, and real open Switcher
+window-layer refresh after shared runtime AX-destroyed reconciliation on the
+repaired runner.
 
 Broader pressure proof was not re-run for this validation slice because no
 production behavior, hot path, activation route, Search barrier, scheduler, or
@@ -90,9 +99,10 @@ runtime shape:
   matcher coverage is now present.
 - Broader multi-display/fullscreen topology and system-authoritative fullscreen
   owner proof remain partial.
-- Real UI breadth for open Switcher lifecycle mutation across more topology
-  combinations remains open; behavior proof now covers runtime commit signal
-  handling and committed projection re-read for open sessions.
+- Real UI breadth for open Switcher lifecycle mutation across multi-app,
+  cross-Space, selected-window-removed, and fullscreen topology combinations
+  remains open; the representative single-app open window-layer mutation is now
+  covered by behavior plus real UI proof.
 
 Do not mark these as completed from mock-only evidence. They need representative
 UI/E2E, runtime log, or pressure evidence before moving from breadth gap to

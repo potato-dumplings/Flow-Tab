@@ -1739,6 +1739,92 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testSwitcherPanelControllerCurrentAppProjectionCommitRefreshesFrozenWindowLayerPreview() {
+        let currentApp = NSRunningApplication.current
+        let appID = "com.example.open-layer-mutation"
+        let initialWindows = [
+            WindowCandidate(id: "open-layer-1", title: "Open Layer One", isMinimized: false, lastActiveAt: 30),
+            WindowCandidate(id: "open-layer-2", title: "Open Layer Two", isMinimized: false, lastActiveAt: 20)
+        ]
+        let remainingWindows = [initialWindows[0]]
+        let initialCandidate = AppSwitchCandidate(
+            id: appID,
+            displayName: "Open Layer Mutation",
+            groupID: "open-layer",
+            lastActiveAt: 100,
+            windows: initialWindows
+        )
+        let repairedCandidate = AppSwitchCandidate(
+            id: appID,
+            displayName: "Open Layer Mutation",
+            groupID: "open-layer",
+            lastActiveAt: 100,
+            windows: remainingWindows
+        )
+        let initialContext = makeRuntimeAppContext(appID: appID, runningApp: currentApp, windows: initialWindows)
+        let repairedContext = makeRuntimeAppContext(appID: appID, runningApp: currentApp, windows: remainingWindows)
+        let repairedCurrentAppWindowPayload = RuntimeCurrentAppWindowPayload(
+            summary: RuntimeHomeAppSummary(
+                appID: appID,
+                displayName: "Open Layer Mutation",
+                groupID: "open-layer",
+                lastActiveAt: 100,
+                windowCount: remainingWindows.count,
+                pid: currentApp.processIdentifier
+            ),
+            candidate: repairedCandidate,
+            context: repairedContext,
+            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: currentApp)]
+        )
+        let freshness = RuntimeProjectionFreshness(
+            generatedAt: 12,
+            sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+            dirtyAppIDs: [],
+            dirtyPIDs: [],
+            dirtyCGWindowIDs: [],
+            pendingRepairScopes: [],
+            isCompleteForScope: true
+        )
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
+            appSwitcherProjection: RuntimeAppSwitcherProjection(
+                apps: [initialCandidate],
+                contextsByID: [appID: initialContext],
+                freshness: freshness
+            )
+        )
+        let controller = SwitcherPanelController(
+            model: LiveSwitcherModel(
+                runtimeProjectionService: runtimeProjectionService
+            )
+        )
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        controller.advance(.downArrow)
+        XCTAssertEqual(controller.modelForTesting.session?.mode, .windowCycle(appID: appID))
+        XCTAssertEqual(
+            controller.modelForTesting.windowPreviewSnapshotForTesting().map(\.id),
+            ["open-layer-1", "open-layer-2"]
+        )
+
+        runtimeProjectionService.setCurrentAppWindowProjection(
+            RuntimeCurrentAppWindowProjection(
+                appID: appID,
+                currentAppWindowPayload: repairedCurrentAppWindowPayload,
+                freshness: freshness
+            ),
+            appID: appID
+        )
+        XCTAssertTrue(controller.handleCurrentAppWindowProjectionDidUpdateForTesting(appID: appID))
+
+        XCTAssertEqual(controller.modelForTesting.session?.selectedApp.windows.map(\.id), ["open-layer-1"])
+        XCTAssertEqual(
+            controller.modelForTesting.windowPreviewSnapshotForTesting().map(\.id),
+            ["open-layer-1"]
+        )
+        controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
     func testLiveSwitcherModelStartSessionRequestsRuntimeMaintenanceWithoutSurfaceSampling() {
         let appID = "com.flowtab.tests.runtime-maintenance"
         let candidate = AppSwitchCandidate(
