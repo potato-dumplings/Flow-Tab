@@ -1339,6 +1339,44 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(readyRequests.contains { $0.id == fullRepair.id })
     }
 
+    func testRuntimeReconciliationCoordinatorCancelsPendingFullRepairForNormalScopedRepair() {
+        let coordinator = RuntimeReconciliationCoordinator()
+        let fullRepair = coordinator.scheduleFullRepairFallback(now: 10)
+
+        let scopedRepair = coordinator.markSpaceTopologyDirty(
+            affectedCGWindowIDs: [240_305],
+            now: 10.1
+        )
+
+        let readyRequests = coordinator.readyRequests(now: 10.1)
+        XCTAssertEqual(fullRepair.target, .fullRepair)
+        XCTAssertEqual(fullRepair.priority, .low)
+        XCTAssertEqual(readyRequests.map(\.id), [scopedRepair.id])
+        XCTAssertEqual(readyRequests.map(\.target), [.spaceTopology])
+        XCTAssertFalse(readyRequests.contains { $0.id == fullRepair.id })
+    }
+
+    func testRuntimeReconciliationCoordinatorHoldsFullRepairUntilScopedRepairCompletes() {
+        let coordinator = RuntimeReconciliationCoordinator()
+        let scopedRepair = coordinator.markAppDirty(
+            appID: "com.example.editor",
+            pid: 18_405,
+            reason: .manualRefresh,
+            now: 10
+        )
+        let fullRepair = coordinator.scheduleFullRepairFallback(now: 10.1)
+
+        var readyRequests = coordinator.readyRequests(now: 10.1)
+        XCTAssertEqual(readyRequests.map(\.id), [scopedRepair.id])
+        XCTAssertFalse(readyRequests.contains { $0.id == fullRepair.id })
+
+        coordinator.completeRequest(id: scopedRepair.id)
+
+        readyRequests = coordinator.readyRequests(now: 10.2)
+        XCTAssertEqual(readyRequests.map(\.id), [fullRepair.id])
+        XCTAssertEqual(readyRequests.map(\.target), [.fullRepair])
+    }
+
     func testRuntimeReconciliationCoordinatorMarksVerifiedFocusReadbackAffectedWindows() throws {
         let coordinator = RuntimeReconciliationCoordinator()
 
@@ -2245,6 +2283,48 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(retry.target, .app(18_405))
         XCTAssertEqual(retry.state, .waitingRetry)
         XCTAssertEqual(retry.attempt, 1)
+    }
+
+    func testRuntimeProjectionServiceDoesNotDrainFullRepairWhileScopedRetryIsWaiting() throws {
+        let coordinator = RuntimeReconciliationCoordinator(
+            retryPolicy: RuntimeReconciliationRetryPolicy(delays: [60])
+        )
+        let windowRecordStore = RuntimeWindowRecordStore()
+        let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
+        let scopedRepair = coordinator.markAppDirty(
+            appID: "com.example.editor",
+            pid: 18_405,
+            reason: .manualRefresh,
+            now: 10
+        )
+        let fullRepair = coordinator.scheduleFullRepairFallback(now: 10.1)
+        let lock = NSLock()
+        var executedRequests: [RuntimeReconciliationRequest] = []
+        let expectation = expectation(description: "runtime maintenance defers full repair while scoped retry waits")
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.FullRepairWaitsForScopedRetry",
+            repairProvider: RuntimeProjectionRepairProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator),
+            reconciliationExecutor: { request, _ in
+                lock.lock()
+                executedRequests.append(request)
+                lock.unlock()
+                expectation.fulfill()
+                return .transientEmptyCurrentAppWindowPayload
+            }
+        )
+
+        service.requestAppSwitcherProjectionMaintenance(reason: .switcherSessionStarted)
+        wait(for: [expectation], timeout: 1)
+        service.waitForMaintenanceQueueForTesting()
+
+        XCTAssertEqual(executedRequests.map(\.id), [scopedRepair.id])
+        XCTAssertFalse(executedRequests.contains { $0.id == fullRepair.id })
+        XCTAssertTrue(coordinator.readyRequests(now: 11).isEmpty)
+        let retryReadyTime = Date.timeIntervalSinceReferenceDate + 61
+        let retry = try XCTUnwrap(coordinator.readyRequests(now: retryReadyTime).first)
+        XCTAssertEqual(retry.id, scopedRepair.id)
+        XCTAssertEqual(retry.state, .waitingRetry)
+        XCTAssertFalse(coordinator.readyRequests(now: retryReadyTime).contains { $0.id == fullRepair.id })
     }
 
     func testRuntimeProjectionServiceMaintenanceRequestDrainsReadyRequestsBySchedulerPriority() {

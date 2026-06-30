@@ -158,11 +158,13 @@ final class RuntimeReconciliationCoordinator {
         now: TimeInterval,
         includeFullRepair: Bool = true
     ) -> [RuntimeReconciliationRequest] {
-        requestsByTarget.values
+        let hasScopedRequests = requestsByTarget.values.contains { $0.target != .fullRepair }
+        return requestsByTarget.values
             .filter {
                 $0.notBefore <= now
                     && $0.state != .inFlight
                     && (includeFullRepair || $0.target != .fullRepair)
+                    && !(includeFullRepair && $0.target == .fullRepair && hasScopedRequests)
             }
             .sorted {
                 if $0.priority == $1.priority {
@@ -281,7 +283,7 @@ final class RuntimeReconciliationCoordinator {
             request.notBefore = min(request.notBefore, now)
         }
         requestsByTarget[target] = request
-        cancelPendingFullRepairForHighPriorityScopedRepair(
+        cancelPendingFullRepairForHigherPriorityScopedRepair(
             target: target,
             incomingPriority: incomingPriority
         )
@@ -292,13 +294,13 @@ final class RuntimeReconciliationCoordinator {
         requestsByTarget.first { $0.value.id == id }?.key
     }
 
-    private func cancelPendingFullRepairForHighPriorityScopedRepair(
+    private func cancelPendingFullRepairForHigherPriorityScopedRepair(
         target: RuntimeReconciliationTarget,
         incomingPriority: RuntimeReconciliationPriority
     ) {
-        guard target != .fullRepair, incomingPriority == .high else { return }
+        guard target != .fullRepair else { return }
         guard let fullRepair = requestsByTarget[.fullRepair] else { return }
-        guard fullRepair.state != .inFlight, fullRepair.priority < incomingPriority else { return }
+        guard fullRepair.state != .inFlight, incomingPriority > fullRepair.priority else { return }
         requestsByTarget.removeValue(forKey: .fullRepair)
     }
 }
