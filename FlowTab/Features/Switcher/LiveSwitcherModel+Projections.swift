@@ -378,6 +378,10 @@ extension LiveSwitcherModel {
             )
             pendingManualWindowLayerEntryAppID = nil
         }
+        recordWindowCycleEntryRecencyIfNeeded(
+            in: rebuiltSession,
+            contextOverride: currentAppWindowPayload.context
+        )
 
         session = rebuiltSession
         let applyEndMs = Self.monotonicMilliseconds()

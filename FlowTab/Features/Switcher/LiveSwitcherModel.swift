@@ -441,6 +441,7 @@ final class LiveSwitcherModel: ObservableObject {
             return false
         }
 
+        recordWindowCycleEntryRecencyIfNeeded(in: rebuiltSession)
         session = rebuiltSession
         _ = searchCoordinator.exit()
         publishSearchStateIfNeeded()
@@ -647,6 +648,7 @@ final class LiveSwitcherModel: ObservableObject {
         {
             autoEnterSuppressedAppID = nil
             pendingManualWindowLayerEntryAppID = nil
+            recordWindowCycleEntryRecencyIfNeeded(in: session)
         } else if
             case .appCycle = previousMode,
             case .appCycle = session.mode,
@@ -713,6 +715,7 @@ final class LiveSwitcherModel: ObservableObject {
         }
         guard session.selectedApp.windows.count >= 2 else { return false }
         session.enterWindowCycleIfPossible()
+        recordWindowCycleEntryRecencyIfNeeded(in: session)
         self.session = session
         if case .windowCycle = session.mode {
             return true
@@ -725,10 +728,25 @@ final class LiveSwitcherModel: ObservableObject {
         return "app=\(session.selectedApp.displayName) windows=\(session.selectedApp.windows.count) mode=\(session.mode.debugName)"
     }
 
+    func recordWindowCycleEntryRecencyIfNeeded(
+        in session: SwitcherSession,
+        contextOverride: RuntimeAppContext? = nil
+    ) {
+        guard case .windowCycle(let appID) = session.mode else { return }
+        guard let selectedWindow = session.selectedWindow else { return }
+        guard let context = contextOverride ?? runtimeContextsByID[appID] else { return }
+        windowRecencyTracker.recordSelectedWindow(
+            appID: appID,
+            windowID: selectedWindow.id,
+            context: context
+        )
+    }
+
     func commitSelection() {
         guard var session else { return }
         let target = session.commitSelection()
         rememberedWindowIDByAppID = session.rememberedWindowIDByAppID
+        recordCommittedSelectionRecencyIfNeeded(target)
         invalidateRuntimeProjectionMaintenanceRequest(reason: .commitSelection)
         clearTerminateSelectedAppAnimation()
         cancelPendingSearchComputation()
@@ -749,6 +767,20 @@ final class LiveSwitcherModel: ObservableObject {
         }
         overlayStyle = .appAndWindow
         resetRuntimeState()
+    }
+
+    private func recordCommittedSelectionRecencyIfNeeded(_ target: ActivationTarget?) {
+        guard
+            case .window(let appID, let windowID, _) = target,
+            let context = runtimeContextsByID[appID]
+        else {
+            return
+        }
+        windowRecencyTracker.recordSelectedWindow(
+            appID: appID,
+            windowID: windowID,
+            context: context
+        )
     }
 
     func cancelSelection() {

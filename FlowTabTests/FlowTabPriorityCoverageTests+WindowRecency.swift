@@ -811,6 +811,7 @@ extension FlowTabPriorityCoverageTests {
         let restoreCurrentAppVisibility = enableCurrentAppInSwitcherForTesting()
         defer { restoreCurrentAppVisibility() }
 
+        var now: TimeInterval = 1_000
         let currentApp = NSRunningApplication.current
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let initialWindows = [
@@ -833,7 +834,7 @@ extension FlowTabPriorityCoverageTests {
                     isMinimized: false,
                     ownerPID: currentApp.processIdentifier,
                     cgWindowID: 30,
-                    lastConfirmationSource: .publicExactMatch
+                    hasStickyBinding: true
                 ),
                 "incognito": RuntimeWindowContext(
                     id: "incognito",
@@ -866,14 +867,22 @@ extension FlowTabPriorityCoverageTests {
             ],
             contextsByID: [appID: context]
         )
+        let tracker = RuntimeWindowRecencyTracker(clock: { now })
         let model = LiveSwitcherModel(
-            windowRecencyTracker: RuntimeWindowRecencyTracker(),
+            windowRecencyTracker: tracker,
             runtimeProjectionService: runtimeProjectionService
         )
+        var committedTargets: [ActivationTarget] = []
+        model.activationOverride = { target, _ in
+            committedTargets.append(target)
+        }
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         assertAppSwitcherProjectionRead(from: runtimeProjectionService)
         XCTAssertEqual(model.session?.apps.first?.windows.map(\.id), ["fullscreen", "incognito", "normal"])
+        model.handle(.downArrow)
+        XCTAssertEqual(model.session?.selectedWindow?.id, "fullscreen")
 
+        now = 1_100
         model.windowRecencyTracker.recordVerifiedFocus(appID: appID, windowID: "normal", context: context)
         runtimeProjectionService.installAppSwitcherProjection(
             apps: [
@@ -890,7 +899,26 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         assertAppSwitcherProjectionRead(from: runtimeProjectionService, readCount: 2)
-        XCTAssertEqual(model.session?.apps.first?.windows.map(\.id), ["normal", "incognito", "fullscreen"])
+        XCTAssertEqual(model.session?.apps.first?.windows.map(\.id), ["normal", "fullscreen", "incognito"])
+        model.handle(.downArrow)
+        XCTAssertEqual(model.session?.selectedWindow?.id, "normal")
+        model.handle(.rightArrow)
+        XCTAssertEqual(model.session?.selectedWindow?.id, "fullscreen")
+
+        now = 1_200
+        model.commitSelection()
+        XCTAssertEqual(
+            committedTargets,
+            [.window(appID: appID, windowID: "fullscreen", restoreIfMinimized: false)]
+        )
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        assertAppSwitcherProjectionRead(from: runtimeProjectionService, readCount: 3)
+        XCTAssertEqual(model.session?.apps.first?.windows.map(\.id), ["fullscreen", "normal", "incognito"])
+        model.handle(.downArrow)
+        XCTAssertEqual(model.session?.selectedWindow?.id, "fullscreen")
+        model.handle(.rightArrow)
+        XCTAssertEqual(model.session?.selectedWindow?.id, "normal")
     }
 
     @MainActor

@@ -206,6 +206,28 @@ final class RuntimeWindowRecencyTracker: @unchecked Sendable {
         )
     }
 
+    func recordSelectedWindow(appID: String, windowID: String, context: RuntimeAppContext) {
+        guard let window = context.windowsByID[windowID] else { return }
+        guard Self.allowsSelectedWindowRecencyUpdate(window.bindingAllowedActions) else {
+            logSkippedRecencyUpdate(
+                appID: appID,
+                windowID: windowID,
+                reason: "selected_window_action_disallowed",
+                allowedActions: window.bindingAllowedActions
+            )
+            return
+        }
+        record(
+            appID: appID,
+            windowID: windowID,
+            ownerPID: ownerPID(for: window, context: context),
+            cgWindowID: window.cgWindowID,
+            title: window.title,
+            frame: window.frame,
+            allowedActions: window.bindingAllowedActions.union([.updateRecency])
+        )
+    }
+
     func appsWithRecencyApplied(
         _ apps: [AppSwitchCandidate],
         contextsByID: [String: RuntimeAppContext]
@@ -501,6 +523,14 @@ final class RuntimeWindowRecencyTracker: @unchecked Sendable {
     }
 
     private static func allowsVerifiedFocusRecencyUpdate(
+        _ allowedActions: Set<WindowBindingAction>
+    ) -> Bool {
+        allowedActions.contains(.updateRecency)
+            || allowedActions.contains(.useForAXActivation)
+            || allowedActions.contains(.useForCGActivationFallback)
+    }
+
+    private static func allowsSelectedWindowRecencyUpdate(
         _ allowedActions: Set<WindowBindingAction>
     ) -> Bool {
         allowedActions.contains(.updateRecency)
