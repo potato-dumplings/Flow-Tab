@@ -32,6 +32,7 @@ typealias WindowFocusRequest = RuntimeWindowFocusRequest
 enum WindowBindingReadbackMismatchReason: String, Equatable {
     case targetCGNotVisible
     case focusedAXCGWindowMismatch
+    case frontmostCGWindowMismatch
 }
 
 struct WindowBindingReadbackDiagnostic: Equatable {

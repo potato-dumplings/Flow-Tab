@@ -765,6 +765,66 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(entries.first?.hasStickyBinding == false)
         XCTAssertNil(entries.first?.activationHandleID)
     }
+
+    func testRuntimeWindowRecordStoreProjectionPreservesLiveCGOnscreenOrderingForStickyFullscreenRecord() {
+        let pid: pid_t = 18_405
+        let normalCGWindowID = CGWindowID(250_101)
+        let fullscreenCGWindowID = CGWindowID(250_102)
+        let normalFrame = CGRect(x: 384, y: 258, width: 960, height: 640)
+        let fullscreenFrame = CGRect(x: 0, y: 37, width: 1_728, height: 1_080)
+        var state = RuntimeWindowMappingState()
+        state.refreshCGWindowRecords(
+            validCGWindows: [
+                RuntimeCGWindowEntry(
+                    id: normalCGWindowID,
+                    title: "Chrome Normal Tab",
+                    bounds: normalFrame,
+                    isOnscreen: false,
+                    spaceIDs: [1]
+                ),
+                RuntimeCGWindowEntry(
+                    id: fullscreenCGWindowID,
+                    title: "Chrome Fullscreen Tab",
+                    bounds: fullscreenFrame,
+                    isOnscreen: true,
+                    spaceIDs: [24_512]
+                )
+            ],
+            pid: pid,
+            observedAt: 10
+        )
+        let normalAXWindowID = "ax:\(pid):normal"
+        var normalRecord = state.windowRecordsByCGWindowID[normalCGWindowID]
+        normalRecord?.currentAXAttachment = RuntimeCurrentAXAttachment(
+            axWindowID: normalAXWindowID,
+            axWindow: AXUIElementCreateApplication(pid),
+            title: "Chrome Normal Tab",
+            frame: normalFrame,
+            state: RuntimeAXWindowState(isMinimized: false, isFocused: false, isMain: false)
+        )
+        var fullscreenRecord = state.windowRecordsByCGWindowID[fullscreenCGWindowID]
+        fullscreenRecord?.lastConfirmationSource = .stickyBinding
+        state.windowRecordsByCGWindowID[normalCGWindowID] = normalRecord
+        state.windowRecordsByCGWindowID[fullscreenCGWindowID] = fullscreenRecord
+        let indexedState = RuntimeWindowMappingState(
+            windowRecordsByCGWindowID: state.windowRecordsByCGWindowID,
+            currentAXToCG: [normalAXWindowID: normalCGWindowID],
+            validCGWindowIDs: [normalCGWindowID, fullscreenCGWindowID],
+            lastAXWindowIDs: [normalAXWindowID],
+            hasObservedAXWindowHandle: true
+        )
+        let store = RuntimeWindowRecordStore(mappingStatesByPID: [pid: indexedState])
+
+        let entries = store.projectedWindowEntries(
+            processIdentifier: pid,
+            appName: "Chrome Fixture"
+        )
+
+        XCTAssertEqual(entries.map(\.title), ["Chrome Fullscreen Tab", "Chrome Normal Tab"])
+        XCTAssertEqual(entries.map(\.isOnscreen), [true, false])
+        XCTAssertNil(entries.first?.activationHandleID)
+        XCTAssertEqual(entries.first?.lastConfirmationSource, .stickyBinding)
+    }
 }
 
 private struct RuntimeWindowRecordProjectionFactSourceFixture {

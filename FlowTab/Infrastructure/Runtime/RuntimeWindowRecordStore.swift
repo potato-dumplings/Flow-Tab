@@ -418,7 +418,7 @@ private extension RuntimeWindowRecord {
             axWindow: currentAXAttachment?.axWindow,
             frame: frame,
             spaceIDs: normalizedSpaceIDs,
-            isOnscreen: false,
+            isOnscreen: synthesizedCGWindow?.isOnscreen ?? false,
             allowsPublicAXRecovery: spaceEvidence.allowsPublicAXRecovery,
             hasStickyBinding: hasStickyBinding,
             lastConfirmationSource: lastConfirmationSource,

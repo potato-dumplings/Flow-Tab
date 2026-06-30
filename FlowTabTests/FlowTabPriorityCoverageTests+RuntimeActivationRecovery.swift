@@ -568,6 +568,83 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testRuntimeActivatorDoesNotVerifyCGFallbackWhenTargetIsVisibleButNotFrontmost() {
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let activator = RuntimeActivator()
+        activator.activateCurrentAppIfNeededOverride = { _ in false }
+        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusedAXWindowOverride = { _ in nil }
+
+        let frontmostCGWindowID: CGWindowID = 245_251
+        let targetCGWindowID: CGWindowID = 245_252
+        var focusedCGWindowIDs: [CGWindowID] = []
+        activator.focusCGWindowOverride = { app, cgWindowID in
+            XCTAssertEqual(app.processIdentifier, currentApp.processIdentifier)
+            focusedCGWindowIDs.append(cgWindowID)
+            return true
+        }
+        activator.currentCGWindowsOverride = { pid in
+            XCTAssertEqual(pid, currentApp.processIdentifier)
+            return [
+                RuntimeCGWindowEntry(
+                    id: frontmostCGWindowID,
+                    title: "Actual Frontmost",
+                    bounds: CGRect(x: 40, y: 60, width: 960, height: 640),
+                    isOnscreen: true,
+                    alpha: 1.0,
+                    storeType: 1
+                ),
+                RuntimeCGWindowEntry(
+                    id: targetCGWindowID,
+                    title: "Visible But Not Focused",
+                    bounds: CGRect(x: 0, y: 40, width: 1_728, height: 1_080),
+                    isOnscreen: true,
+                    alpha: 1.0,
+                    storeType: 1
+                )
+            ]
+        }
+
+        var verifiedFocuses: [RuntimeWindowFocusVerification] = []
+        activator.windowFocusVerifiedHandler = {
+            verifiedFocuses.append($0)
+        }
+        var mismatchDiagnostics: [WindowBindingReadbackDiagnostic] = []
+        activator.windowFocusReadbackMismatchHandler = {
+            mismatchDiagnostics.append($0)
+        }
+
+        let windowID = "cg:\(currentApp.processIdentifier):\(targetCGWindowID)"
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windowsByID: [
+                windowID: RuntimeWindowContext(
+                    id: windowID,
+                    title: "Visible But Not Focused",
+                    isMinimized: false,
+                    ownerPID: currentApp.processIdentifier,
+                    cgWindowID: targetCGWindowID,
+                    frame: CGRect(x: 0, y: 40, width: 1_728, height: 1_080),
+                    hasStickyBinding: true,
+                    lastConfirmationSource: .stickyBinding
+                )
+            ]
+        )
+
+        activator.activate(
+            target: .window(appID: appID, windowID: windowID, restoreIfMinimized: false),
+            contextsByID: [appID: context]
+        )
+
+        XCTAssertEqual(focusedCGWindowIDs, [targetCGWindowID])
+        XCTAssertTrue(verifiedFocuses.isEmpty)
+        XCTAssertEqual(mismatchDiagnostics.map(\.reason), [.frontmostCGWindowMismatch])
+        XCTAssertEqual(mismatchDiagnostics.first?.visibleCGWindowIDs, [frontmostCGWindowID, targetCGWindowID])
+    }
+
+    @MainActor
     func testRuntimeActivatorAllowsDirectAXFallbackForStickyBindingWithExactCGReadback() {
         let currentApp = NSRunningApplication.current
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"

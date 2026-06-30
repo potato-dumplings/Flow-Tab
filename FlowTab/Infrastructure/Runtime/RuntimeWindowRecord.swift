@@ -407,6 +407,7 @@ struct RuntimeWindowRecord {
     let stableWindowID: String
     var lastKnownCGTitle: String?
     var lastKnownCGFrame: CGRect?
+    var lastKnownCGIsOnscreen: Bool?
     var lastKnownDisplayTitle: String?
     var currentAXAttachment: RuntimeCurrentAXAttachment?
     var lastExactAXWindowID: String?
@@ -429,6 +430,7 @@ struct RuntimeWindowRecord {
         self.stableWindowID = stableWindowID
         lastKnownCGTitle = nil
         lastKnownCGFrame = nil
+        lastKnownCGIsOnscreen = nil
         lastKnownDisplayTitle = nil
         currentAXAttachment = nil
         lastExactAXWindowID = nil
@@ -512,6 +514,7 @@ struct RuntimeWindowRecord {
         if let cgBounds = cgWindow.bounds {
             lastKnownCGFrame = cgBounds
         }
+        lastKnownCGIsOnscreen = cgWindow.isOnscreen
         let normalizedSpaceIDs = RuntimeWindowTopologyClassifier.normalizedSpaceIDs(cgWindow.spaceIDs)
         if !normalizedSpaceIDs.isEmpty {
             var recovery = spaceRecovery ?? RuntimeSpaceRecoveryState(
@@ -653,7 +656,7 @@ struct RuntimeWindowRecord {
             id: cgWindowID,
             title: lastKnownCGTitle,
             bounds: lastKnownCGFrame,
-            isOnscreen: false,
+            isOnscreen: lastKnownCGIsOnscreen ?? false,
             alpha: 1.0,
             storeType: 1,
             spaceIDs: spaceIDs
