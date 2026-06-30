@@ -77,7 +77,9 @@ sampling cadence changes here. Current pressure proof remains recorded in
 These are breadth/hardening gaps and do not currently contradict the target
 runtime shape:
 
-- Real UI occurrence of non-registry focused AX readback is not separately forced.
+- Real UI occurrence of non-registry focused AX readback is not separately
+  forced; production logs can now identify natural fallback hits with
+  `verifiedFocusFallbackAX=1`, but no real occurrence has closed the gap yet.
 - Main/minimized public AX tie-breaker variants still need broader state
   permutation proof.
 - Broader multi-display/fullscreen topology and system-authoritative fullscreen

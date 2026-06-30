@@ -640,9 +640,11 @@ struct RuntimeWindowRecord {
         }
         let currentConfidence = bindingConfidence
         if previousSource != confirmationSource || previousConfidence != currentConfidence {
+            let usesVerifiedFocusFallbackAX = confirmationSource == .verifiedFocusReadback
+                && AXWindowInspector.verifiedFocusFallbackCGWindowID(from: axWindow.id) == cgWindowID
             RuntimeLog.debug(
                 .axMatch,
-                "binding-confidence-change windowID=\(stableWindowID) cg=\(cgWindowID) ax=\(axWindow.id) confidence=\(previousConfidence.rawValue)->\(currentConfidence.rawValue) source=\(previousSource?.rawValue ?? "none")->\(confirmationSource.rawValue)"
+                "binding-confidence-change windowID=\(stableWindowID) cg=\(cgWindowID) ax=\(axWindow.id) confidence=\(previousConfidence.rawValue)->\(currentConfidence.rawValue) source=\(previousSource?.rawValue ?? "none")->\(confirmationSource.rawValue) verifiedFocusFallbackAX=\(usesVerifiedFocusFallbackAX ? 1 : 0)"
             )
         }
     }

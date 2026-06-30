@@ -10,6 +10,10 @@ enum AXWindowInspectorForTesting {
         AXWindowInspector.makeVerifiedFocusFallbackWindowID(pid: pid, cgWindowID: cgWindowID)
     }
 
+    static func verifiedFocusFallbackCGWindowID(from windowID: String) -> CGWindowID? {
+        AXWindowInspector.verifiedFocusFallbackCGWindowID(from: windowID)
+    }
+
     static func windowIndex(from windowID: String, expectedPID: pid_t) -> Int? {
         AXWindowInspector.windowIndex(from: windowID, expectedPID: expectedPID)
     }

@@ -2249,6 +2249,10 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(record.lastConfirmationSource, .verifiedFocusReadback)
         XCTAssertEqual(record.lastExactAXWindowID, focusedAXWindowID)
         XCTAssertEqual(mappingState.currentAXToCG[focusedAXWindowID], focusedCGWindowID)
+        XCTAssertEqual(
+            AXWindowInspectorForTesting.verifiedFocusFallbackCGWindowID(from: focusedAXWindowID),
+            focusedCGWindowID
+        )
         XCTAssertNil(AXWindowInspectorForTesting.windowIndex(from: focusedAXWindowID, expectedPID: pid))
         XCTAssertEqual(mappingState.validCGWindowIDs, [focusedCGWindowID])
     }
