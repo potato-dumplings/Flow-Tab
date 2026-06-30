@@ -132,33 +132,6 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     }
 
     @discardableResult
-    func commitSearchFreshnessBarrierFromProjectionCache(
-        deferredRequestCount: Int,
-        hasPendingRequests: Bool,
-        generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
-    ) -> RuntimeSearchIndexProjection? {
-        lock.lock()
-        defer { lock.unlock() }
-
-        guard deferredRequestCount == 0,
-              !hasPendingRequests,
-              let projection = appSwitcherProjection,
-              projection.freshness.isCompleteForScope,
-              projection.freshness.sourceGeneration == generation
-        else {
-            return nil
-        }
-        markProjectionCommittedLocked()
-        clearDirtyStateLocked()
-        committedSearchIndex = buildSearchIndexLocked(
-            apps: projection.apps,
-            generatedAt: generatedAt,
-            isCompleteForScope: true
-        )
-        return committedSearchIndex
-    }
-
-    @discardableResult
     func commitSearchFreshnessBarrierFromMainTablePayload(
         _ payload: RuntimeSearchIndexPayload,
         deferredRequestCount: Int,
@@ -893,56 +866,4 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         )
     }
 
-    private func buildSearchIndexLocked(
-        apps: [AppSwitchCandidate],
-        generatedAt: TimeInterval,
-        isCompleteForScope: Bool
-    ) -> RuntimeSearchIndexProjection {
-        let appEntries = apps.map(buildSearchAppIndexEntryLocked)
-        let appSearchIndexes = Dictionary(uniqueKeysWithValues: appEntries.map { ($0.appID, $0.searchIndex) })
-        let windowEntries = apps.flatMap { app -> [RuntimeSearchWindowIndexEntry] in
-            let appSearchIndex = appSearchIndexes[app.id]
-                ?? SearchTextMatcher.buildIndex(for: app.displayName, identifier: app.id)
-            return buildSearchWindowIndexEntriesLocked(
-                app: app,
-                appSearchIndex: appSearchIndex
-            )
-        }
-        return RuntimeSearchIndexProjection(
-            appEntries: appEntries,
-            windowEntries: windowEntries,
-            freshness: freshnessLocked(
-                generatedAt: generatedAt,
-                isCompleteForScope: isCompleteForScope && !isDirtyLocked
-            )
-        )
-    }
-
-    private func buildSearchAppIndexEntryLocked(app: AppSwitchCandidate) -> RuntimeSearchAppIndexEntry {
-        RuntimeSearchAppIndexEntry(
-            appID: app.id,
-            appDisplayName: app.displayName,
-            appGroupID: app.groupID,
-            appLastActiveAt: app.lastActiveAt,
-            searchIndex: SearchTextMatcher.buildIndex(for: app.displayName, identifier: app.id)
-        )
-    }
-
-    private func buildSearchWindowIndexEntriesLocked(
-        app: AppSwitchCandidate,
-        appSearchIndex: SearchTextMatcher.Index
-    ) -> [RuntimeSearchWindowIndexEntry] {
-        app.windows.map { window in
-            RuntimeSearchWindowIndexEntry(
-                appID: app.id,
-                appDisplayName: app.displayName,
-                windowID: window.id,
-                windowTitle: window.title.trimmingCharacters(in: .whitespacesAndNewlines),
-                windowIsMinimized: window.isMinimized,
-                windowLastActiveAt: window.lastActiveAt,
-                windowSearchIndex: SearchTextMatcher.buildIndex(for: window.title),
-                appSearchIndex: appSearchIndex
-            )
-        }
-    }
 }

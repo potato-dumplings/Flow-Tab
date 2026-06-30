@@ -5,6 +5,43 @@ import XCTest
 @testable import FlowTab
 import FlowTabCore
 
+func makeRuntimeSearchIndexPayloadForTesting(
+    apps: [AppSwitchCandidate],
+    hasCompleteWindowCoverage: Bool = true
+) -> RuntimeSearchIndexPayload {
+    let appEntries = apps.map { app in
+        RuntimeSearchAppIndexEntry(
+            appID: app.id,
+            appDisplayName: app.displayName,
+            appGroupID: app.groupID,
+            appLastActiveAt: app.lastActiveAt,
+            searchIndex: SearchTextMatcher.buildIndex(for: app.displayName, identifier: app.id)
+        )
+    }
+    let appSearchIndexes = Dictionary(uniqueKeysWithValues: appEntries.map { ($0.appID, $0.searchIndex) })
+    let windowEntries = apps.flatMap { app -> [RuntimeSearchWindowIndexEntry] in
+        let appSearchIndex = appSearchIndexes[app.id]
+            ?? SearchTextMatcher.buildIndex(for: app.displayName, identifier: app.id)
+        return app.windows.map { window in
+            RuntimeSearchWindowIndexEntry(
+                appID: app.id,
+                appDisplayName: app.displayName,
+                windowID: window.id,
+                windowTitle: window.title.trimmingCharacters(in: .whitespacesAndNewlines),
+                windowIsMinimized: window.isMinimized,
+                windowLastActiveAt: window.lastActiveAt,
+                windowSearchIndex: SearchTextMatcher.buildIndex(for: window.title),
+                appSearchIndex: appSearchIndex
+            )
+        }
+    }
+    return RuntimeSearchIndexPayload(
+        appEntries: appEntries,
+        windowEntries: windowEntries,
+        hasCompleteWindowCoverage: hasCompleteWindowCoverage
+    )
+}
+
 final class SpyHotkeyMonitor: HotkeyMonitoring {
     var onHotkeyPressed: ((Bool) -> Void)?
     var onHotkeyReleased: ((Bool) -> Void)?
@@ -546,7 +583,8 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
             appDirectoryEntries: nil,
             generatedAt: generatedAt
         )
-        store.commitSearchFreshnessBarrierFromProjectionCache(
+        store.commitSearchFreshnessBarrierFromMainTablePayload(
+            makeRuntimeSearchIndexPayloadForTesting(apps: apps),
             deferredRequestCount: 0,
             hasPendingRequests: false,
             generatedAt: generatedAt

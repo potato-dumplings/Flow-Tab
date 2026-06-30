@@ -840,7 +840,8 @@ extension FlowTabTests {
             appDirectoryEntries: nil,
             generatedAt: 10
         )
-        store.commitSearchFreshnessBarrierFromProjectionCache(
+        store.commitSearchFreshnessBarrierFromMainTablePayload(
+            makeRuntimeSearchIndexPayloadForTesting(apps: [committedSearchApp]),
             deferredRequestCount: 0,
             hasPendingRequests: false,
             generatedAt: 11

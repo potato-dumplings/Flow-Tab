@@ -24,7 +24,12 @@ extension FlowTabPriorityCoverageTests {
         file: StaticString = #filePath,
         line: UInt = #line
     ) -> RuntimeSearchIndexProjection? {
-        let committed = store.commitSearchFreshnessBarrierFromProjectionCache(
+        guard let projection = store.readAppSwitcherProjection() else {
+            XCTFail("expected app-switcher projection before seeding committed Search index", file: file, line: line)
+            return nil
+        }
+        let committed = store.commitSearchFreshnessBarrierFromMainTablePayload(
+            makeRuntimeSearchIndexPayloadForTesting(apps: projection.apps),
             deferredRequestCount: 0,
             hasPendingRequests: false,
             generatedAt: generatedAt

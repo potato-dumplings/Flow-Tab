@@ -12,7 +12,12 @@ extension FlowTabPriorityCoverageTests {
         file: StaticString = #filePath,
         line: UInt = #line
     ) -> RuntimeSearchIndexProjection? {
-        let committed = store.commitSearchFreshnessBarrierFromProjectionCache(
+        guard let projection = store.readAppSwitcherProjection() else {
+            XCTFail("expected app-switcher projection before seeding committed Search index", file: file, line: line)
+            return nil
+        }
+        let committed = store.commitSearchFreshnessBarrierFromMainTablePayload(
+            makeRuntimeSearchIndexPayloadForTesting(apps: projection.apps),
             deferredRequestCount: 0,
             hasPendingRequests: false,
             generatedAt: generatedAt
@@ -1812,7 +1817,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(readModelStore.diagnostics().dirtyAppIDs.isEmpty)
     }
 
-    func testRuntimeReadModelStoreDoesNotCommitSearchFromStaleProjectionCache() throws {
+    func testRuntimeReadModelStoreRejectsSearchPayloadWhileProjectionCacheIsStale() throws {
         let store = RuntimeReadModelStore()
         let committedApps = searchScenarioApps()
         let repairedApp = try XCTUnwrap(committedApps.first)
@@ -1830,7 +1835,9 @@ extension FlowTabPriorityCoverageTests {
             pendingScope: "appWindows:\(repairedApp.id)"
         )
 
-        let committed = store.commitSearchFreshnessBarrierFromProjectionCache(
+        let staleProjectionPayload = makeRuntimeSearchIndexPayloadForTesting(apps: committedApps)
+        let committed = store.commitSearchFreshnessBarrierFromMainTablePayload(
+            staleProjectionPayload,
             deferredRequestCount: 0,
             hasPendingRequests: false,
             generatedAt: 20
