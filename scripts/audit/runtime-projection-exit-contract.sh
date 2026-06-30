@@ -80,6 +80,16 @@ check_has_matches \
   "readAppSwitcherProjection|readCurrentAppWindowProjection|readCommittedSearchIndexForSearch|requestSearchIndexFreshnessBarrier" \
   FlowTab/Features/Switcher FlowTab/Infrastructure/Runtime/RuntimeProjectionServing.swift
 
+check_no_matches \
+  "Control+Tab focused current-app hot path has no frontmost/focused snapshot fallback" \
+  "NSWorkspace\\.shared\\.frontmostApplication|kAXFocusedWindowAttribute|FocusedWindowInspector|focusedSnapshot|frontmostApplicationOverride|frontmostAppResolver|flowtab-ui-frontmost-bundle-id" \
+  FlowTab/Features/Switcher FlowTab/TestingSupport
+
+check_has_matches \
+  "Control+Tab focused current-app path reads runtime projection or signals dirty" \
+  "readFocusedCurrentAppWindowProjection|signalFocusedCurrentAppWindowsChanged" \
+  FlowTab/Features/Switcher FlowTab/Infrastructure/Runtime/RuntimeProjectionServing.swift
+
 check_has_matches \
   "Home reads runtime projection APIs and signals dirty app-window scope" \
   "readHomeSummaryProjection|readHomeAppDetailProjection|readCurrentAppWindowProjection|signalAppWindowsChanged" \
