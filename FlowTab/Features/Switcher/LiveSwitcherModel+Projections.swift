@@ -187,7 +187,9 @@ extension LiveSwitcherModel {
             let projectionReadMs = Self.monotonicMilliseconds()
             if projection.freshness.isCompleteForScope {
                 completeSelectedAppWindowProjection(
-                    projection.currentAppWindowPayload,
+                    currentAppWindowPayloadWithWindowRecencyApplied(
+                        projection.currentAppWindowPayload
+                    ),
                     appID: targetAppID,
                     generation: generation,
                     startMs: startMs,
@@ -256,7 +258,10 @@ extension LiveSwitcherModel {
     }
 
     @discardableResult
-    func applyCurrentAppWindowProjectionIfReady(appID: String) -> Bool {
+    func applyCurrentAppWindowProjectionIfReady(
+        appID: String,
+        restoringWindowCycleSelectedWindowID: String? = nil
+    ) -> Bool {
         guard let currentSession = session else { return false }
         guard currentSession.apps.contains(where: { $0.id == appID }) else { return false }
 
@@ -269,9 +274,13 @@ extension LiveSwitcherModel {
         }
 
         selectedAppWindowProjectionGeneration &+= 1
+        let payload = currentAppWindowPayloadWithWindowRecencyApplied(
+            projection.currentAppWindowPayload
+        )
         completeSelectedAppWindowProjection(
-            projection.currentAppWindowPayload,
+            payload,
             appID: appID,
+            restoringWindowCycleSelectedWindowID: restoringWindowCycleSelectedWindowID,
             generation: selectedAppWindowProjectionGeneration,
             startMs: startMs,
             projectionReadMs: Self.monotonicMilliseconds()
@@ -282,6 +291,7 @@ extension LiveSwitcherModel {
     func completeSelectedAppWindowProjection(
         _ currentAppWindowPayload: RuntimeCurrentAppWindowPayload?,
         appID: String,
+        restoringWindowCycleSelectedWindowID: String? = nil,
         generation: UInt64,
         startMs: Double,
         projectionReadMs: Double
@@ -339,8 +349,17 @@ extension LiveSwitcherModel {
         var apps = currentSession.apps
         apps[appIndex] = currentAppWindowPayload.candidate
         runtimeContextsByID[appID] = currentAppWindowPayload.context
-        let preservesWindowLayerPreview: Bool
+        let currentSessionIsWindowLayerForApp: Bool
         if case .windowCycle(let windowLayerAppID) = currentSession.mode, windowLayerAppID == appID {
+            currentSessionIsWindowLayerForApp = true
+        } else {
+            currentSessionIsWindowLayerForApp = false
+        }
+        let restoringWindowCycle = restoringWindowCycleSelectedWindowID != nil
+        let preservesWindowLayerPreview: Bool
+        if currentSessionIsWindowLayerForApp {
+            preservesWindowLayerPreview = true
+        } else if restoringWindowCycle {
             preservesWindowLayerPreview = true
         } else {
             preservesWindowLayerPreview = false
@@ -361,8 +380,8 @@ extension LiveSwitcherModel {
             rememberedWindowIDByAppID: currentSession.rememberedWindowIDByAppID
         )
         _ = rebuiltSession.selectApp(withID: currentSession.selectedApp.id)
-        if case .windowCycle(let windowLayerAppID) = currentSession.mode, windowLayerAppID == appID {
-            if let selectedWindowID = currentSession.selectedWindow?.id {
+        if currentSessionIsWindowLayerForApp || restoringWindowCycle {
+            if let selectedWindowID = currentSession.selectedWindow?.id ?? restoringWindowCycleSelectedWindowID {
                 if !rebuiltSession.selectWindow(appID: appID, windowID: selectedWindowID) {
                     _ = rebuiltSession.selectApp(withID: appID)
                     _ = rebuiltSession.enterWindowCycle(allowSingleWindow: true)

@@ -867,6 +867,41 @@ extension FlowTabPriorityCoverageTests {
             ],
             contextsByID: [appID: context]
         )
+        let currentAppWindowProjection = RuntimeCurrentAppWindowProjection(
+            appID: appID,
+            currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
+                summary: RuntimeHomeAppSummary(
+                    appID: appID,
+                    displayName: "Chrome Fixture",
+                    groupID: "chrome",
+                    lastActiveAt: 100,
+                    windowCount: reorderedWindows.count,
+                    pid: currentApp.processIdentifier
+                ),
+                candidate: AppSwitchCandidate(
+                    id: appID,
+                    displayName: "Chrome Fixture",
+                    groupID: "chrome",
+                    lastActiveAt: 100,
+                    windows: reorderedWindows
+                ),
+                context: context,
+                appDirectoryEntries: [RuntimeAppDirectoryEntry(app: currentApp)]
+            ),
+            freshness: RuntimeProjectionFreshness(
+                generatedAt: 14,
+                sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+                dirtyAppIDs: [],
+                dirtyPIDs: [],
+                dirtyCGWindowIDs: [],
+                pendingRepairScopes: [],
+                isCompleteForScope: true
+            )
+        )
+        runtimeProjectionService.setCurrentAppWindowProjection(
+            currentAppWindowProjection,
+            appID: appID
+        )
         let tracker = RuntimeWindowRecencyTracker(clock: { now })
         let model = LiveSwitcherModel(
             windowRecencyTracker: tracker,
@@ -916,6 +951,22 @@ extension FlowTabPriorityCoverageTests {
         assertAppSwitcherProjectionRead(from: runtimeProjectionService, readCount: 3)
         XCTAssertEqual(model.session?.apps.first?.windows.map(\.id), ["fullscreen", "normal", "incognito"])
         model.handle(.downArrow)
+        XCTAssertEqual(model.session?.selectedWindow?.id, "fullscreen")
+
+        runtimeProjectionService.installAppSwitcherProjection(
+            apps: [
+                AppSwitchCandidate(
+                    id: appID,
+                    displayName: "Chrome Fixture",
+                    groupID: "chrome",
+                    lastActiveAt: 100,
+                    windows: []
+                )
+            ],
+            generatedAt: 15
+        )
+        XCTAssertTrue(model.handleAppSwitcherProjectionDidUpdate())
+        XCTAssertEqual(model.session?.apps.first?.windows.map(\.id), ["fullscreen", "normal", "incognito"])
         XCTAssertEqual(model.session?.selectedWindow?.id, "fullscreen")
         model.handle(.rightArrow)
         XCTAssertEqual(model.session?.selectedWindow?.id, "normal")

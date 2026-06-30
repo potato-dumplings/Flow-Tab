@@ -541,6 +541,12 @@ final class LiveSwitcherModel: ObservableObject {
             previousMode: previousMode,
             previousSelectedWindowID: previousSelectedWindowID
         )
+        if case .windowCycle(let appID) = previousMode {
+            _ = applyCurrentAppWindowProjectionIfReady(
+                appID: appID,
+                restoringWindowCycleSelectedWindowID: previousSelectedWindowID
+            )
+        }
         return true
     }
 
@@ -828,7 +834,7 @@ final class LiveSwitcherModel: ObservableObject {
         )
     }
 
-    private func currentAppWindowPayloadWithWindowRecencyApplied(
+    func currentAppWindowPayloadWithWindowRecencyApplied(
         _ payload: RuntimeCurrentAppWindowPayload
     ) -> RuntimeCurrentAppWindowPayload {
         return windowRecencyTracker.currentAppWindowPayloadWithRecencyApplied(payload)

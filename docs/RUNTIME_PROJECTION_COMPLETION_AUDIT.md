@@ -45,7 +45,7 @@ the diagnostic; they do not maintain surface-local activation repair state.
 | Non-registry verified-focus fallback AX readback is observable when it happens | `testRuntimeProjectionServiceSeedsVerifiedFocusRecordWhenFocusedAXWindowIsNotInRegistry` now proves the non-registry fallback AX id writes exact WindowRecord evidence, parses back to the focused `CGWindowID`, and emits a production `binding-confidence-change ... verifiedFocusFallbackAX=1` marker under debug+verbose logs. The exit audit also requires `AXWindowInspector.verifiedFocusFallbackCGWindowID(...)` and the WindowRecord `verifiedFocusFallbackAX` marker so the runtime-log oracle cannot silently disappear from production. This protects the marker that future real UI proof must use, but it does not close the real UI occurrence gap by itself. | Proven by source audit and behavior test; real UI occurrence still gap |
 | Full snapshot/full repair is repair, fallback, cold-start, diagnostic, or migration compatibility only | The exit audit rejects provider-facing full-repair projection payload APIs in production. `RUNTIME_AX_CG_SPACE_WINDOW_MAPPING.md` records full repair as low-priority repair/fallback with backoff and fact-splitting: app-directory evidence may cross the service boundary, while WindowRecord refresh is only a separate summary. | Proven by source audit plus behavior tests |
 | Normal projection rows come from runtime main tables/read model, not repair/full-repair/session/staging/direct fallback payloads | `RUNTIME_AX_CG_SPACE_WINDOW_MAPPING.md` and `TEST_COVERAGE_MATRIX.md` record main-table builders for app-switcher/Home/current-app/Search, production removal of direct app-switcher/Home/Search projection-cache commit bridges, and evidence-only current/full repair boundaries. | Proven by source audit plus behavior tests |
-| Representative real topology, Search, activation, and pressure proof exists | `TEST_COVERAGE_MATRIX.md` records the noisy fullscreen/off-space Option+Tab round trip, committed-index Window Search real UI re-entry and activation proof, runtime-topology pressure, and external committed-index Search CPU/RSS sampling. Historical fixed-path proof exists for the representative set below. The 2026-06-30 post-runner-fix targeted Noisy Option+Tab refresh reached the test body and exposed app-local window-order assertions; the current slice routes selected projection and committed selection recency through `RuntimeWindowRecencyTracker`, and behavior coverage now proves the `Fullscreen -> Normal` post-commit sequence stays ahead of fallback. Post-fix targeted UI reruns are currently blocked before the test body by XCTest automation-mode initialization timeouts, so the current noisy UI proof is not refreshed. The pure space-backed CG-only fullscreen fixture now proves projection/selection/CG-route submission plus readback rejection (`targetCGNotVisible`) rather than exact activation success. | Historically proven for representative paths; behavior-fixed noisy ordering, post-fix UI refresh blocked by XCTest automation; pure CG-only fullscreen activation success remains a gap |
+| Representative real topology, Search, activation, and pressure proof exists | `TEST_COVERAGE_MATRIX.md` records the noisy fullscreen/off-space Option+Tab round trip, committed-index Window Search real UI re-entry and activation proof, runtime-topology pressure, and external committed-index Search CPU/RSS sampling. Historical fixed-path proof exists for the representative set below. The 2026-06-30 post-runner-fix targeted Noisy Option+Tab refresh reached the test body and exposed app-local window-order assertions. The current slice fixes the projection update race behind that failure: app-switcher projection updates that temporarily read a degraded zero-window app row now immediately restore an already-open window layer from the committed current-app projection, and selected/current-app projection apply uses the same runtime recency ordering. Behavior coverage proves the `Fullscreen -> Normal` post-commit sequence survives the degraded app-switcher update race. Post-fix targeted UI reruns are currently blocked before the test body by XCTest automation-mode initialization timeouts, so the current noisy UI proof is not refreshed. The pure space-backed CG-only fullscreen fixture now proves projection/selection/CG-route submission plus readback rejection (`targetCGNotVisible`) rather than exact activation success. | Historically proven for representative paths; behavior-fixed noisy ordering and projection-update race, post-fix UI refresh blocked by XCTest automation; pure CG-only fullscreen activation success remains a gap |
 
 ## Validation Commands
 
@@ -150,10 +150,16 @@ workflow app refreshes an already-open `windowCycle` after its fullscreen target
 window closes, removing the closed fullscreen card while keeping the remaining
 Notes window isolated.
 
-After this selected-recency slice, the app was reinstalled with Apple
-Development signing and the targeted Noisy Option+Tab UI test was rerun twice.
-Both post-fix reruns failed before the test body with `Timed out while enabling
-automation mode`, so they do not refresh or refute the representative UI proof.
+After the first selected-recency slice, the app was reinstalled with Apple
+Development signing and the targeted Noisy Option+Tab UI test reached the test
+body, where it exposed a remaining product race: an app-switcher projection
+update with a degraded zero-window app row could overwrite an already-open
+current-app window layer before the next current-app projection apply. The
+current slice fixes that race at the projection-read boundary and extends
+behavior coverage. The fixed-path UI app was reinstalled again, but two
+post-fix targeted Noisy Option+Tab reruns failed before the test body with
+`Timed out while enabling automation mode`; they do not refresh or refute the
+representative UI proof.
 
 Broader pressure proof was not re-run for this validation slice because no
 production behavior, hot path, activation route, Search barrier, scheduler, or
@@ -171,13 +177,14 @@ runtime shape:
   no real occurrence has closed the gap yet. After the 2026-06-30 runner fix,
   the fixed-path Apple Development signed app reached the targeted Noisy
   Option+Tab test body and exposed product assertions for app-local window
-  order. The current slice fixes that ordering at behavior level by recording
-  selected activation-capable sticky/fullscreen windows through runtime recency
-  before fallback windows. Post-fix targeted UI proof was reattempted after
-  reinstalling the Apple Development signed app, but two consecutive reruns
-  failed before the test body with `Timed out while enabling automation mode`;
-  therefore the noisy UI proof remains unrefreshed, and no real
-  `verifiedFocusFallbackAX=1` occurrence proof was produced.
+  order. The first selected-recency slice fixed the selected sticky/fullscreen
+  ordering behavior, and the current slice fixes the remaining degraded
+  app-switcher projection update race by restoring open `windowCycle` state from
+  the committed current-app projection. Post-fix targeted UI proof was
+  reattempted after reinstalling the Apple Development signed app, but two
+  consecutive reruns failed before the test body with `Timed out while enabling
+  automation mode`; therefore the noisy UI proof remains unrefreshed, and no
+  real `verifiedFocusFallbackAX=1` occurrence proof was produced.
 - Public AX main/minimized tie-breaker variants still need real UI occurrence
   and broader state permutation proof; focused/main/minimized deterministic
   matcher coverage is now present.
