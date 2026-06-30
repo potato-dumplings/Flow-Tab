@@ -1825,6 +1825,91 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testSwitcherPanelControllerCurrentAppProjectionCommitKeepsWindowLayerWhenSelectedWindowIsRemoved() {
+        let currentApp = NSRunningApplication.current
+        let appID = "com.example.open-layer-selected-removed"
+        let initialWindows = [
+            WindowCandidate(id: "open-layer-remaining", title: "Open Layer Remaining", isMinimized: false, lastActiveAt: 30),
+            WindowCandidate(id: "open-layer-removed", title: "Open Layer Removed", isMinimized: false, lastActiveAt: 20)
+        ]
+        let remainingWindows = [initialWindows[0]]
+        let initialCandidate = AppSwitchCandidate(
+            id: appID,
+            displayName: "Open Layer Selected Removed",
+            groupID: "open-layer",
+            lastActiveAt: 100,
+            windows: initialWindows
+        )
+        let repairedCandidate = AppSwitchCandidate(
+            id: appID,
+            displayName: "Open Layer Selected Removed",
+            groupID: "open-layer",
+            lastActiveAt: 100,
+            windows: remainingWindows
+        )
+        let initialContext = makeRuntimeAppContext(appID: appID, runningApp: currentApp, windows: initialWindows)
+        let repairedContext = makeRuntimeAppContext(appID: appID, runningApp: currentApp, windows: remainingWindows)
+        let repairedCurrentAppWindowPayload = RuntimeCurrentAppWindowPayload(
+            summary: RuntimeHomeAppSummary(
+                appID: appID,
+                displayName: "Open Layer Selected Removed",
+                groupID: "open-layer",
+                lastActiveAt: 100,
+                windowCount: remainingWindows.count,
+                pid: currentApp.processIdentifier
+            ),
+            candidate: repairedCandidate,
+            context: repairedContext,
+            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: currentApp)]
+        )
+        let freshness = RuntimeProjectionFreshness(
+            generatedAt: 12,
+            sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+            dirtyAppIDs: [],
+            dirtyPIDs: [],
+            dirtyCGWindowIDs: [],
+            pendingRepairScopes: [],
+            isCompleteForScope: true
+        )
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
+            appSwitcherProjection: RuntimeAppSwitcherProjection(
+                apps: [initialCandidate],
+                contextsByID: [appID: initialContext],
+                freshness: freshness
+            )
+        )
+        let controller = SwitcherPanelController(
+            model: LiveSwitcherModel(
+                runtimeProjectionService: runtimeProjectionService
+            )
+        )
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        controller.advance(.downArrow)
+        controller.advance(.rightArrow)
+        XCTAssertEqual(controller.modelForTesting.session?.mode, .windowCycle(appID: appID))
+        XCTAssertEqual(controller.modelForTesting.session?.selectedWindow?.id, "open-layer-removed")
+
+        runtimeProjectionService.setCurrentAppWindowProjection(
+            RuntimeCurrentAppWindowProjection(
+                appID: appID,
+                currentAppWindowPayload: repairedCurrentAppWindowPayload,
+                freshness: freshness
+            ),
+            appID: appID
+        )
+        XCTAssertTrue(controller.handleCurrentAppWindowProjectionDidUpdateForTesting(appID: appID))
+
+        XCTAssertEqual(controller.modelForTesting.session?.mode, .windowCycle(appID: appID))
+        XCTAssertEqual(controller.modelForTesting.session?.selectedWindow?.id, "open-layer-remaining")
+        XCTAssertEqual(
+            controller.modelForTesting.windowPreviewSnapshotForTesting().map(\.id),
+            ["open-layer-remaining"]
+        )
+        controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
     func testLiveSwitcherModelStartSessionRequestsRuntimeMaintenanceWithoutSurfaceSampling() {
         let appID = "com.flowtab.tests.runtime-maintenance"
         let candidate = AppSwitchCandidate(

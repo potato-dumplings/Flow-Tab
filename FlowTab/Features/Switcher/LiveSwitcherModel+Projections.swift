@@ -365,10 +365,10 @@ extension LiveSwitcherModel {
             if let selectedWindowID = currentSession.selectedWindow?.id {
                 if !rebuiltSession.selectWindow(appID: appID, windowID: selectedWindowID) {
                     _ = rebuiltSession.selectApp(withID: appID)
-                    _ = rebuiltSession.enterWindowCycle(allowSingleWindow: false)
+                    _ = rebuiltSession.enterWindowCycle(allowSingleWindow: true)
                 }
             } else {
-                _ = rebuiltSession.enterWindowCycle(allowSingleWindow: false)
+                _ = rebuiltSession.enterWindowCycle(allowSingleWindow: true)
             }
         } else if pendingManualWindowLayerEntryAppID == appID {
             let enteredWindowLayer = rebuiltSession.enterWindowCycle(allowSingleWindow: false)

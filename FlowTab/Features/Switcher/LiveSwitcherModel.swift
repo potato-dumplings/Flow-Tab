@@ -567,7 +567,7 @@ final class LiveSwitcherModel: ObservableObject {
                 return
             }
             guard refreshedSession.selectApp(withID: appID) else { return }
-            _ = refreshedSession.enterWindowCycle(allowSingleWindow: false)
+            _ = refreshedSession.enterWindowCycle(allowSingleWindow: true)
             session = refreshedSession
         }
     }
