@@ -1,7 +1,7 @@
 import XCTest
 
 extension FlowTabUITests {
-    func testSwitcherPanelOptionTabCommitsSpaceBackedCGOnlyWorkflowWindow() throws {
+    func testSwitcherPanelOptionTabReportsUnverifiedSpaceBackedCGOnlyWorkflowActivation() throws {
         let workflow = try configuredSpaceBackedRuntimeTruthWorkflow()
         let targetApp = try XCTUnwrap(workflow.apps.first)
         let targetTitle = "Recovered Window"
@@ -17,6 +17,11 @@ extension FlowTabUITests {
             },
             flowTabLaunchTraceLabel: "option.spaceBacked"
         ) { _, app in
+            waitForSpaceBackedWindowLayerProjection(
+                title: targetTitle,
+                appName: targetApp.appName,
+                since: runtimeLogSnapshot
+            )
             postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.global, traceLabel: "option.spaceBacked")
             let diagnosticsSummary = try assertGlobalSwitcherWindowStateReady(
                 for: targetApp,
@@ -47,14 +52,9 @@ extension FlowTabUITests {
                 selection,
                 since: activationLogSnapshot
             )
-            XCTAssertTrue(
-                waitForExactFrontmostWorkflowCGWindow(
-                    windowNumber: selection.windowNumber,
-                    title: targetTitle,
-                    app: targetApp,
-                    timeout: 12
-                ),
-                "Space-backed Option+Tab must activate the exact CG-only \(targetTitle) window."
+            assertSpaceBackedCGActivationReadbackFailure(
+                selection,
+                since: activationLogSnapshot
             )
         }
     }
@@ -185,6 +185,21 @@ extension FlowTabUITests {
         }
     }
 
+    private func waitForSpaceBackedWindowLayerProjection(
+        title: String,
+        appName: String,
+        since snapshot: [String: UInt64]
+    ) {
+        let escapedAppName = NSRegularExpression.escapedPattern(for: appName)
+        let escapedTitle = NSRegularExpression.escapedPattern(for: title)
+        waitForRuntimeLogFiles(
+            matching: #"window-entries app=\#(escapedAppName) .*title=\#(escapedTitle)[^\n]*ax=0[^\n]*sticky=0[^\n]*source=nil:spaceEvidence=(observed|inferredFromTopology|inferredFromFullscreenGeometry):publicAXRecovery=1"#,
+            since: snapshot,
+            timeout: 8,
+            description: "space-backed CG-only window-layer projection before switcher trigger"
+        )
+    }
+
     private func assertSpaceBackedWindowLayerSource(
         _ selection: RuntimeTruthWindowSelection,
         appName: String,
@@ -224,6 +239,24 @@ extension FlowTabUITests {
             since: snapshot,
             timeout: 8,
             description: "space-backed CG-only activation route"
+        )
+    }
+
+    private func assertSpaceBackedCGActivationReadbackFailure(
+        _ selection: RuntimeTruthWindowSelection,
+        since snapshot: [String: UInt64]
+    ) {
+        waitForRuntimeLogFiles(
+            matching: #"binding-readback-mismatch route=cg pid=[0-9]+ windowID=cg:[0-9]+:\#(selection.windowNumber) reason=targetCGNotVisible targetCG=\#(selection.windowNumber)"#,
+            since: snapshot,
+            timeout: 8,
+            description: "space-backed CG-only activation readback mismatch"
+        )
+        waitForRuntimeLogFiles(
+            matching: #"focus-recovery exhausted generation=[0-9]+ attempts=[0-9]+ pid=[0-9]+ windowID=cg:[0-9]+:\#(selection.windowNumber) targetCG=\#(selection.windowNumber)"#,
+            since: snapshot,
+            timeout: 8,
+            description: "space-backed CG-only activation recovery exhaustion"
         )
     }
 

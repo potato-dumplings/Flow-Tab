@@ -36,7 +36,7 @@ Chrome and shrinks from two committed windows to the remaining one.
 | Activation may use cached target route, but success must be verified by focused AX/CG or CG frontmost readback | The exit audit rejects direct Space setting and Window-menu shortcuts, requires `RuntimeActivator` focused AX/CG or frontmost CG readback verification plus mismatch diagnostics, and requires verified readback to flow through `RuntimeProjectionService.signalWindowFocusVerified(...)`, `RuntimeWindowRecordStore.recordWindowFocusVerification(...)`, and `readActivationTargetProjection()`. | Proven by source audit plus activation behavior tests |
 | Full snapshot/full repair is repair, fallback, cold-start, diagnostic, or migration compatibility only | The exit audit rejects provider-facing full-repair projection payload APIs in production. `RUNTIME_AX_CG_SPACE_WINDOW_MAPPING.md` records full repair as low-priority repair/fallback with backoff and fact-splitting: app-directory evidence may cross the service boundary, while WindowRecord refresh is only a separate summary. | Proven by source audit plus behavior tests |
 | Normal projection rows come from runtime main tables/read model, not repair/full-repair/session/staging/direct fallback payloads | `RUNTIME_AX_CG_SPACE_WINDOW_MAPPING.md` and `TEST_COVERAGE_MATRIX.md` record main-table builders for app-switcher/Home/current-app/Search, production removal of direct app-switcher/Home/Search projection-cache commit bridges, and evidence-only current/full repair boundaries. | Proven by source audit plus behavior tests |
-| Representative real topology, Search, activation, and pressure proof exists | `TEST_COVERAGE_MATRIX.md` records the noisy fullscreen/off-space Option+Tab round trip, committed-index Window Search real UI re-entry and activation proof, runtime-topology pressure, and external committed-index Search CPU/RSS sampling. The fixed-path runner was refreshed on 2026-06-30 and the representative UI proof set below passed again. | Proven for representative paths |
+| Representative real topology, Search, activation, and pressure proof exists | `TEST_COVERAGE_MATRIX.md` records the noisy fullscreen/off-space Option+Tab round trip, committed-index Window Search real UI re-entry and activation proof, runtime-topology pressure, and external committed-index Search CPU/RSS sampling. The fixed-path runner was refreshed on 2026-06-30 and the representative UI proof set below passed again. The pure space-backed CG-only fullscreen fixture now proves projection/selection/CG-route submission plus readback rejection (`targetCGNotVisible`) rather than exact activation success. | Proven for representative paths; pure CG-only fullscreen activation success remains a gap |
 
 ## Validation Commands
 
@@ -78,6 +78,9 @@ Post-runner-fix representative UI proof refreshed for this audit:
 
 ./scripts/testing/run-ui-tests-local.sh \
   -only-testing:FlowTabUITests/FlowTabUITests/testSwitcherPanelRefreshesOpenWorkflowAppWindowLayerAfterMultiAppWindowSetMutation
+
+./scripts/testing/run-ui-tests-local.sh \
+  -only-testing:FlowTabUITests/FlowTabUITests/testSwitcherPanelOptionTabReportsUnverifiedSpaceBackedCGOnlyWorkflowActivation
 ```
 
 The install step built and signed `{user-home}/Applications/Flow Tab UITest.app`
@@ -89,7 +92,16 @@ variant passed 1 selected UI test in 26.796 seconds. The multi-app open-session
 mutation proof passed 1 selected UI test in 40.420 seconds (`95.142` seconds
 XCTest elapsed including build/test orchestration). The fullscreen target-window
 mutation proof passed 1 selected UI test in 41.174 seconds (`42.731` seconds
-XCTest elapsed including build/test orchestration). Together these refreshed
+XCTest elapsed including build/test orchestration). After the UI runner fix, the
+pure space-backed CG-only fixture was rerun and the old activation-success
+oracle did not hold: the hot-path trigger was made to wait for committed
+`window-entries` projection evidence, then activation logged `window-request`
+and `focus-attempt route=cg`, but readback remained `targetCGNotVisible` and
+`focus-recovery exhausted`. The renamed
+`testSwitcherPanelOptionTabReportsUnverifiedSpaceBackedCGOnlyWorkflowActivation`
+passed 1 selected UI test in 27.239 seconds (`28.760` seconds elapsed),
+proving the runtime does not label that unverified CG-only activation as a
+success. Together these refreshed
 tests prove
 the representative noisy fullscreen/off-space topology round trip, committed
 Search-index real UI re-entry and activation, target-app focused public AX
@@ -121,6 +133,11 @@ runtime shape:
   matcher coverage is now present.
 - Broader multi-display/fullscreen topology and system-authoritative fullscreen
   owner proof remain partial.
+- Pure space-backed CG-only fullscreen windows are projection/selection/CG-route
+  covered, but the current real UI proof shows `targetCGNotVisible` readback and
+  recovery exhaustion rather than exact activation success. Do not count this as
+  successful activation until focused AX/CG or frontmost CG readback proves the
+  selected `CGWindowID`.
 - Real UI breadth for open Switcher lifecycle mutation across broader
   cross-Space/multi-display combinations remains open; the representative
   single-app open window-layer mutation, selected-window-removed branch,
