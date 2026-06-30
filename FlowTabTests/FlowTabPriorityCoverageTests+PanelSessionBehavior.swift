@@ -1136,6 +1136,26 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testSwitcherPanelPresentationFailsClosedForIncompleteSpaceTopologyProjection() {
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
+            appSwitcherApps: searchScenarioApps(),
+            spaceTopologyProjection: makeCompleteCurrentSpaceFullscreenProjectionForTesting(
+                isCompleteForScope: false,
+                pendingRepairScopes: ["spaceTopology"]
+            )
+        )
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
+        let controller = SwitcherPanelController(model: model)
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+
+        XCTAssertEqual(controller.panel.level, SwitcherPanelWindowConfiguration.level)
+        XCTAssertEqual(runtimeProjectionService.spaceTopologyProjectionReadCount(), 1)
+        XCTAssertEqual(runtimeProjectionService.spaceTopologyChangeSignalCount(), 0)
+        controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
     func testSwitcherPanelControllerActiveSpaceChangeCancelsSessionAfterModifierRelease() async {
         let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: searchScenarioApps())
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
@@ -2056,7 +2076,10 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(previewLayerFrame.maxY, appLayerFrame.maxY, accuracy: 0.5)
     }
 
-    private func makeCompleteCurrentSpaceFullscreenProjectionForTesting() -> RuntimeSpaceTopologyProjection {
+    private func makeCompleteCurrentSpaceFullscreenProjectionForTesting(
+        isCompleteForScope: Bool = true,
+        pendingRepairScopes: Set<String> = []
+    ) -> RuntimeSpaceTopologyProjection {
         let displays = NSScreen.screens.compactMap { screen -> RuntimeDisplaySpaceSignature? in
             let key = NSDeviceDescriptionKey("NSScreenNumber")
             guard let number = screen.deviceDescription[key] as? NSNumber else { return nil }
@@ -2097,8 +2120,8 @@ extension FlowTabPriorityCoverageTests {
                 dirtyAppIDs: [],
                 dirtyPIDs: [],
                 dirtyCGWindowIDs: [],
-                pendingRepairScopes: [],
-                isCompleteForScope: true
+                pendingRepairScopes: pendingRepairScopes,
+                isCompleteForScope: isCompleteForScope
             )
         )
     }
