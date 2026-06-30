@@ -1,5 +1,11 @@
 import Foundation
 
+extension Notification.Name {
+    static let runtimeCommittedSearchIndexDidUpdate = Notification.Name(
+        "FlowTab.runtimeCommittedSearchIndexDidUpdate"
+    )
+}
+
 protocol RuntimeProjectionServing: Sendable {
     func readAppSwitcherProjection() -> RuntimeAppSwitcherProjection?
     func readHomeSummaryProjection() -> RuntimeHomeSummaryProjection?

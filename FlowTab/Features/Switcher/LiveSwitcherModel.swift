@@ -238,6 +238,7 @@ final class LiveSwitcherModel: ObservableObject {
     var lastProjectionInvalidationRecord: ProjectionInvalidationRecord?
     var lastRuntimeProjectionMaintenanceDiagnostic: RuntimeProjectionMaintenanceDiagnostic?
     var lastSearchIndexReadDiagnostic: SearchIndexReadDiagnostic?
+    var pendingSearchActivationAfterFreshnessBarrier = false
     var searchComputationRevision: UInt64 = 0
     var searchDebounceNanoseconds: UInt64 = 20_000_000
 
@@ -674,6 +675,7 @@ final class LiveSwitcherModel: ObservableObject {
         invalidateRuntimeProjectionMaintenanceRequest(reason: .commitSelection)
         clearTerminateSelectedAppAnimation()
         cancelPendingSearchComputation()
+        pendingSearchActivationAfterFreshnessBarrier = false
         self.session = nil
         _ = searchCoordinator.exit()
         publishSearchStateIfNeeded()
@@ -699,6 +701,7 @@ final class LiveSwitcherModel: ObservableObject {
     func resetSessionState() {
         invalidateRuntimeProjectionMaintenanceRequest(reason: .resetSession)
         cancelPendingSearchComputation()
+        pendingSearchActivationAfterFreshnessBarrier = false
         session = nil
         pendingTerminateRequest = nil
         terminatingAppID = nil

@@ -679,6 +679,49 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testSwitcherPanelControllerEntersSearchAfterCommittedIndexUpdateNotification() async {
+        await withTemporarySearchPreferences(enabled: true, defaultScope: .window) {
+            let apps = self.searchScenarioApps()
+            let runtimeProjectionService = RecordingRuntimeProjectionService(
+                appSwitcherApps: apps,
+                committedSearchReadiness: .missingCommittedIndex
+            )
+            let controller = SwitcherPanelController(
+                model: LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
+            )
+
+            XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+            XCTAssertFalse(controller.enterSearchModeIfPossible())
+            XCTAssertFalse(controller.modelForTesting.isSearchActive)
+            XCTAssertEqual(
+                runtimeProjectionService.searchIndexFreshnessBarrierRequestsRecorded(),
+                [.searchFreshnessBarrier]
+            )
+
+            runtimeProjectionService.installCommittedSearchIndex(for: apps, generatedAt: 20)
+
+            XCTAssertTrue(controller.handleCommittedSearchIndexDidUpdateForTesting())
+            XCTAssertTrue(controller.modelForTesting.isSearchActive)
+            XCTAssertTrue(controller.modelForTesting.isSearchInputFocused)
+            XCTAssertEqual(controller.modelForTesting.searchViewState.scope, .window)
+            XCTAssertEqual(
+                controller.modelForTesting.lastSearchIndexReadDiagnostic?.readiness,
+                .committedGenerationValidated
+            )
+            XCTAssertEqual(
+                controller.modelForTesting.lastSearchIndexReadDiagnostic?.resultState,
+                .committedGenerationResult
+            )
+            XCTAssertTrue(
+                controller.searchTraceStateSummary().contains(
+                    "searchIndexResultState=committedGenerationResult"
+                )
+            )
+            controller.cancelSelectionForTesting()
+        }
+    }
+
+    @MainActor
     func testSwitcherPanelControllerSearchHeightChangeKeepsPresentedPanelAnchoredAtTop() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
             let controller = SwitcherPanelController(

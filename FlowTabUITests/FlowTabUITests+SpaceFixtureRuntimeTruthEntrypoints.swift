@@ -581,35 +581,42 @@ extension FlowTabUITests {
         stage: String,
         allowsNoisyCGSiblings: Bool = false
     ) {
-        if allowsNoisyCGSiblings {
-            XCTAssertTrue(
-                waitForSwitcherAppEntry(
-                    diagnosticsSummary,
-                    bundleIdentifier: workflowApp.identity.bundleIdentifier,
-                    timeout: 4
-                ),
-                """
-                Window search data did not include \(workflowApp.appName) \(stage).
+        XCTAssertTrue(
+            waitForWindowSearchResults(
+                diagnosticsSummary,
+                matching: workflowApp,
+                requiresExactCount: !allowsNoisyCGSiblings,
+                timeout: 4
+            ),
+            """
+            Window search committed index exposed the wrong window rows for \
+            \(workflowApp.appName) \(stage). Expected titles \
+            \(workflowApp.expectedWindowTitles.sorted())\(allowsNoisyCGSiblings ? "" : " count=\(workflowApp.windowCount)").
 
-                \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-                """
-            )
-        } else {
-            XCTAssertTrue(
-                waitForSwitcherAppsSummary(
-                    diagnosticsSummary,
-                    toContain: switcherAppStripSummary(for: workflowApp),
-                    timeout: 4
-                ),
-                """
-                Window search data counted the wrong number of windows for \
-                \(workflowApp.appName) \(stage). Expected \
-                \(switcherAppStripSummary(for: workflowApp)).
+            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
+            """
+        )
+    }
 
-                \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
-                """
-            )
-        }
+    private func waitForWindowSearchResults(
+        _ diagnosticsSummary: XCUIElement,
+        matching workflowApp: SpaceFixtureResolvedWorkflow.App,
+        requiresExactCount: Bool,
+        timeout: TimeInterval
+    ) -> Bool {
+        let expectedTitles = Set(workflowApp.expectedWindowTitles)
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            let rows = searchWindowResultObservations(from: diagnosticsSummary)
+                .filter { $0.appID == workflowApp.identity.bundleIdentifier }
+            let titles = Set(rows.compactMap(\.title))
+            let countMatches = !requiresExactCount || rows.count == workflowApp.windowCount
+            if expectedTitles.isSubset(of: titles), countMatches {
+                return true
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+        return false
     }
 
     private func assertWindowSearchUsesCommittedGenerationIndex(

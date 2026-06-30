@@ -149,6 +149,7 @@ final class SwitcherPanelController {
     var appDidResignActiveObserver: NSObjectProtocol?
     var activeSpaceDidChangeObserver: NSObjectProtocol?
     var workspaceDidTerminateApplicationObserver: NSObjectProtocol?
+    var committedSearchIndexDidUpdateObserver: NSObjectProtocol?
     var panelOcclusionObserver: NSObjectProtocol?
     var panelDidResignKeyObserver: NSObjectProtocol?
     var suppressHotkeyReplayUntilRelease = false
@@ -374,6 +375,15 @@ final class SwitcherPanelController {
                 self?.handleWorkspaceApplicationTerminated(appID: appID, pid: pid)
             }
         }
+        committedSearchIndexDidUpdateObserver = NotificationCenter.default.addObserver(
+            forName: .runtimeCommittedSearchIndexDidUpdate,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.handleCommittedSearchIndexDidUpdate()
+            }
+        }
         panelOcclusionObserver = NotificationCenter.default.addObserver(
             forName: NSWindow.didChangeOcclusionStateNotification,
             object: panel,
@@ -487,6 +497,11 @@ final class SwitcherPanelController {
         handleWorkspaceApplicationTerminated(appID: appID, pid: pid)
     }
 
+    @discardableResult
+    func handleCommittedSearchIndexDidUpdateForTesting() -> Bool {
+        handleCommittedSearchIndexDidUpdate()
+    }
+
     func syncPanelAccessibilityAnchors() {
         let appStripHeaderOffset =
             searchFeatureEnabled && !model.isPreviewLayerMode && !model.isSearchActive
@@ -523,6 +538,9 @@ final class SwitcherPanelController {
         }
         if let workspaceDidTerminateApplicationObserver {
             NSWorkspace.shared.notificationCenter.removeObserver(workspaceDidTerminateApplicationObserver)
+        }
+        if let committedSearchIndexDidUpdateObserver {
+            NotificationCenter.default.removeObserver(committedSearchIndexDidUpdateObserver)
         }
         if let panelOcclusionObserver {
             NotificationCenter.default.removeObserver(panelOcclusionObserver)

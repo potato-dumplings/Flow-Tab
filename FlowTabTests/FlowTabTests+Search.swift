@@ -1058,6 +1058,98 @@ extension FlowTabTests {
         XCTAssertNil(model.searchViewState.indexStatus)
     }
 
+    @MainActor
+    func testLiveSwitcherModelSearchActivatesAfterAsyncCommittedIndexUpdateWithoutSessionFallback() {
+        let defaults = UserDefaults.standard
+        let previousSearchEnabled = defaults.object(forKey: AppPreferenceKeys.searchEnabled)
+        let previousSearchDefaultScope = defaults.object(forKey: AppPreferenceKeys.searchDefaultScope)
+        defer {
+            restoreUserDefaultsValue(
+                previousSearchEnabled,
+                forKey: AppPreferenceKeys.searchEnabled,
+                userDefaults: defaults
+            )
+            restoreUserDefaultsValue(
+                previousSearchDefaultScope,
+                forKey: AppPreferenceKeys.searchDefaultScope,
+                userDefaults: defaults
+            )
+        }
+        defaults.set(true, forKey: AppPreferenceKeys.searchEnabled)
+        defaults.set(SwitcherSearchScope.window.rawValue, forKey: AppPreferenceKeys.searchDefaultScope)
+
+        let sessionApp = AppSwitchCandidate(
+            id: "com.example.session-searchable",
+            displayName: "Session Searchable",
+            groupID: "session",
+            lastActiveAt: 100,
+            windows: [
+                WindowCandidate(
+                    id: "session-window",
+                    title: "Session Window",
+                    isMinimized: false,
+                    lastActiveAt: 100
+                )
+            ]
+        )
+        let committedApp = AppSwitchCandidate(
+            id: "com.example.committed-searchable",
+            displayName: "Committed Searchable",
+            groupID: "committed",
+            lastActiveAt: 90,
+            windows: [
+                WindowCandidate(
+                    id: "committed-window",
+                    title: "Committed Window",
+                    isMinimized: false,
+                    lastActiveAt: 90
+                )
+            ]
+        )
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
+            appSwitcherProjection: RuntimeAppSwitcherProjection(
+                apps: [sessionApp],
+                contextsByID: [:],
+                freshness: RuntimeProjectionFreshness(
+                    generatedAt: 10,
+                    sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+                    dirtyAppIDs: [],
+                    dirtyPIDs: [],
+                    dirtyCGWindowIDs: [],
+                    pendingRepairScopes: [],
+                    isCompleteForScope: true
+                )
+            )
+        )
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        XCTAssertFalse(model.enterSearchMode())
+        XCTAssertFalse(model.isSearchActive)
+        XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.readiness, .missingCommittedIndex)
+        XCTAssertEqual(
+            runtimeProjectionService.searchIndexFreshnessBarrierRequestsRecorded(),
+            [.searchFreshnessBarrier]
+        )
+
+        runtimeProjectionService.installCommittedSearchIndex(for: [committedApp], generatedAt: 20)
+
+        XCTAssertTrue(model.handleCommittedSearchIndexDidUpdate())
+        XCTAssertTrue(model.isSearchActive)
+        XCTAssertEqual(model.searchViewState.scope, .window)
+        XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.readiness, .committedGenerationValidated)
+        XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.resultState, .committedGenerationResult)
+        XCTAssertEqual(model.lastSearchIndexReadDiagnostic?.requestedFreshnessBarrier, false)
+        XCTAssertEqual(model.searchViewState.indexStatus?.resultState, .committedGenerationResult)
+        XCTAssertEqual(
+            model.searchViewState.results.map(\.kind),
+            [.window(appID: committedApp.id, windowID: "committed-window")]
+        )
+        XCTAssertEqual(model.committedSearchAppsByID[committedApp.id]?.displayName, committedApp.displayName)
+        XCTAssertNil(model.committedSearchAppsByID[sessionApp.id])
+        XCTAssertEqual(runtimeProjectionService.committedSearchIndexReadCount(), 2)
+    }
+
     func testSearchPerformanceWindowScope() {
         let apps = makeBenchmarkApps(appCount: 400, windowsPerApp: 25)
         let queries = benchmarkQueries()

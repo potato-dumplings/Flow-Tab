@@ -224,6 +224,25 @@ extension SwitcherPanelController {
         return true
     }
 
+    @discardableResult
+    func handleCommittedSearchIndexDidUpdate() -> Bool {
+        logSearchTrace("committedSearchIndexDidUpdate action=attempt \(searchTraceStateSummary())")
+        guard isPanelPresented else {
+            logSearchTrace("committedSearchIndexDidUpdate action=ignored reason=panelHidden \(searchTraceStateSummary())")
+            return false
+        }
+        guard model.handleCommittedSearchIndexDidUpdate() else {
+            logSearchTrace("committedSearchIndexDidUpdate action=ignored reason=modelRejected \(searchTraceStateSummary())")
+            return false
+        }
+        cancelPendingModifierReleaseConfirmation()
+        resetPointerSelectionGate()
+        updatePanelSize()
+        RuntimeLog.info(.session, "enter search mode")
+        logSearchTrace("committedSearchIndexDidUpdate action=entered \(searchTraceStateSummary())")
+        return true
+    }
+
     func handleSearchModeKeyDown(_ event: NSEvent) -> Bool {
         let isComposingMarkedText = model.hasMarkedSearchText
         switch event.keyCode {

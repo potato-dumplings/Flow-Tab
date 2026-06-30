@@ -757,7 +757,7 @@ extension FlowTabUITests {
         return searchWindowResultObservationsFromElements(in: app)
     }
 
-    private func searchWindowResultObservations(
+    func searchWindowResultObservations(
         from diagnosticsSummaryElement: XCUIElement
     ) -> [SwitcherSearchWindowResultObservation] {
         let rawValue = switcherPanelDiagnosticsValue(diagnosticsSummaryElement, key: "searchResults")

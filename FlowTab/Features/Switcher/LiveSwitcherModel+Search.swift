@@ -11,14 +11,18 @@ extension LiveSwitcherModel {
         guard overlayStyle == .appAndWindow else { return false }
         guard let session, case .appCycle = session.mode else { return false }
         cancelPendingSearchComputation()
+        pendingSearchActivationAfterFreshnessBarrier = true
         sessionAppsByID = Dictionary(uniqueKeysWithValues: session.apps.map { ($0.id, $0) })
         guard rebuildSearchIndexFromCommittedProjection(reason: "enterSearchMode") else {
+            pendingSearchActivationAfterFreshnessBarrier =
+                lastSearchIndexReadDiagnostic?.requestedFreshnessBarrier == true
             RuntimeLog.debug(
                 .searchModel,
                 "enterSearchMode changed=0 reason=noCommittedSearchIndex sessionAppCount=\(session.apps.count)"
             )
             return false
         }
+        pendingSearchActivationAfterFreshnessBarrier = false
         let defaultScope = SearchInteractionPreferencesStore.loadDefaultScope()
         let changed = searchCoordinator.activate(defaultScope: defaultScope)
         publishSearchStateIfNeeded()
@@ -27,6 +31,51 @@ extension LiveSwitcherModel {
             "enterSearchMode changed=\(changed ? 1 : 0) scope=\(defaultScope.rawValue) appCount=\(session.apps.count) inputFocused=\(searchViewState.isInputFocused ? 1 : 0)"
         )
         return changed
+    }
+
+    @discardableResult
+    func handleCommittedSearchIndexDidUpdate() -> Bool {
+        if pendingSearchActivationAfterFreshnessBarrier {
+            return activatePendingSearchAfterCommittedIndexUpdate()
+        }
+        return refreshActiveSearchAfterCommittedIndexUpdate()
+    }
+
+    private func activatePendingSearchAfterCommittedIndexUpdate() -> Bool {
+        guard pendingSearchActivationAfterFreshnessBarrier else { return false }
+        pendingSearchActivationAfterFreshnessBarrier = false
+        guard SearchInteractionPreferencesStore.loadIsEnabled() else { return false }
+        guard overlayStyle == .appAndWindow else { return false }
+        guard let session, case .appCycle = session.mode else { return false }
+        cancelPendingSearchComputation()
+        sessionAppsByID = Dictionary(uniqueKeysWithValues: session.apps.map { ($0.id, $0) })
+        guard rebuildSearchIndexFromCommittedProjection(reason: "committedSearchIndexDidUpdate") else {
+            RuntimeLog.debug(
+                .searchModel,
+                "committedSearchIndexDidUpdate changed=0 reason=noCommittedSearchIndex sessionAppCount=\(session.apps.count)"
+            )
+            return false
+        }
+        let defaultScope = SearchInteractionPreferencesStore.loadDefaultScope()
+        let changed = searchCoordinator.activate(defaultScope: defaultScope)
+        publishSearchStateIfNeeded()
+        RuntimeLog.debug(
+            .searchModel,
+            "committedSearchIndexDidUpdate changed=\(changed ? 1 : 0) scope=\(defaultScope.rawValue) appCount=\(session.apps.count) inputFocused=\(searchViewState.isInputFocused ? 1 : 0)"
+        )
+        return changed
+    }
+
+    private func refreshActiveSearchAfterCommittedIndexUpdate() -> Bool {
+        guard searchViewState.isActive else { return false }
+        let previousSearchState = searchViewState
+        cancelPendingSearchComputation()
+        guard rebuildSearchIndexFromCommittedProjection(reason: "committedSearchIndexDidUpdate") else {
+            return false
+        }
+        restoreSearchStateAfterProjectionRefreshIfNeeded(previousSearchState)
+        publishSearchStateIfNeeded()
+        return true
     }
 
     @discardableResult
@@ -224,6 +273,9 @@ extension LiveSwitcherModel {
     func handleSearchEscape() -> SwitcherSearchEscapeAction {
         cancelPendingSearchComputation()
         let action = searchCoordinator.handleEscape()
+        if case .exitSearch = action {
+            pendingSearchActivationAfterFreshnessBarrier = false
+        }
         publishSearchStateIfNeeded()
         return action
     }
@@ -264,6 +316,7 @@ extension LiveSwitcherModel {
 
         autoEnterSuppressedAppID = nil
         cancelPendingSearchComputation()
+        pendingSearchActivationAfterFreshnessBarrier = false
         self.session = session
         _ = searchCoordinator.exit()
         publishSearchStateIfNeeded()

@@ -197,6 +197,12 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                     "mainTableSearchCommit=\(mainTableSearchCommit != nil ? 1 : 0)"
                 ].joined(separator: " ")
             )
+            if mainTableSearchCommit != nil {
+                NotificationCenter.default.post(
+                    name: .runtimeCommittedSearchIndexDidUpdate,
+                    object: self
+                )
+            }
         }
     }
 
