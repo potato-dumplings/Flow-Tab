@@ -65,6 +65,11 @@ activation_paths=(
   FlowTab/Infrastructure/Runtime/RuntimeWindowRecordStore.swift
 )
 
+switcher_presentation_paths=(
+  FlowTab/Features/Switcher/SwitcherPanelController+Presentation.swift
+  FlowTab/Infrastructure/Runtime/RuntimeProjectionServing.swift
+)
+
 check_no_matches \
   "surface hot paths do not reference legacy snapshot, repair provider, or direct CG/AX sampling APIs" \
   "RuntimeSnapshotProvider|RuntimeSnapshot\\(|snapshotQueue|collectAXWindowData|RuntimeSystemRepairFactProvider|RuntimeProjectionRepairProvider|fullRepairEvidence|commitSearchFreshnessBarrier|readCommittedSearchIndexProjection|CGWindowListCopyWindowInfo|AXUIElementCreateApplication" \
@@ -89,6 +94,16 @@ check_has_matches \
   "Control+Tab focused current-app path reads runtime projection or signals dirty" \
   "readFocusedCurrentAppWindowProjection|signalFocusedCurrentAppWindowsChanged" \
   FlowTab/Features/Switcher FlowTab/Infrastructure/Runtime/RuntimeProjectionServing.swift
+
+check_no_matches \
+  "Switcher fullscreen presentation has no frontmost, focused-window, or AX fullscreen probe fallback" \
+  "NSWorkspace\\.shared\\.frontmostApplication|kAXFocusedWindowAttribute|kAXFullScreenAttribute|AXFullScreen|FrontmostWindowInspector|FocusedWindowInspector|CGWindowListCopyWindowInfo|AXUIElementCreateApplication" \
+  "${switcher_presentation_paths[@]}"
+
+check_has_matches \
+  "Switcher fullscreen presentation reads runtime Space topology projection or signals dirty" \
+  "readSpaceTopologyProjection|signalSpaceTopologyChanged" \
+  "${switcher_presentation_paths[@]}"
 
 check_has_matches \
   "Home reads runtime projection APIs and signals dirty app-window scope" \
