@@ -179,12 +179,40 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
                 windowCoverageByPID[$0.pid] == true
             }
             return (
+                appID: entry.appID,
+                appGroupPIDs: Set(appGroup.map(\.pid)),
                 candidate: candidate,
                 homeSummary: homeSummary,
                 context: context,
                 hasCoveredAppGroupWindowState: hasCoveredAppGroupWindowState
             )
         }
+        let incompleteContextAppIDs = Set(rows.compactMap { row -> String? in
+            guard let context = row.context,
+                  context.windowsByID.count == row.candidate.windows.count
+            else {
+                return row.appID
+            }
+            return nil
+        })
+        let missingWindowCoveragePIDs = Set(rows.flatMap { row in
+            row.appGroupPIDs.filter { windowCoverageByPID[$0] != true }
+        })
+        let completeAppGroupCount = rows.filter { row in
+            guard let context = row.context,
+                  context.windowsByID.count == row.candidate.windows.count
+            else {
+                return false
+            }
+            return row.hasCoveredAppGroupWindowState
+        }.count
+        let coverageDiagnostics = RuntimeProjectionCoverageDiagnostics(
+            projectedAppCount: rows.count,
+            contextAppCount: rows.compactMap { $0.context }.count,
+            completeAppGroupCount: completeAppGroupCount,
+            missingWindowCoveragePIDs: missingWindowCoveragePIDs,
+            incompleteContextAppIDs: incompleteContextAppIDs
+        )
 
         return RuntimeAppSwitcherProjectionPayload(
             apps: rows.map(\.candidate),
@@ -194,12 +222,8 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
                 }
             ),
             homeSummaries: rows.map(\.homeSummary),
-            hasCompleteWindowCoverage: rows.allSatisfy { row in
-                guard let context = row.context,
-                      row.hasCoveredAppGroupWindowState
-                else { return false }
-                return context.windowsByID.count == row.candidate.windows.count
-            }
+            hasCompleteWindowCoverage: coverageDiagnostics.hasCompleteCoverage,
+            coverageDiagnostics: coverageDiagnostics
         )
     }
 
@@ -242,7 +266,8 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
         return RuntimeSearchIndexPayload(
             appEntries: appEntries,
             windowEntries: windowEntries,
-            hasCompleteWindowCoverage: appSwitcherPayload.hasCompleteWindowCoverage
+            hasCompleteWindowCoverage: appSwitcherPayload.hasCompleteWindowCoverage,
+            coverageDiagnostics: appSwitcherPayload.coverageDiagnostics
         )
     }
 

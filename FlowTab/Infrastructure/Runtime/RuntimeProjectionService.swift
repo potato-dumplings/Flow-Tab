@@ -559,20 +559,82 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         hasPendingRequests: Bool,
         generatedAt: TimeInterval
     ) -> RuntimeSearchIndexProjection? {
-        guard
-            let appDirectoryEntries = readModelStore.readAppDirectoryProjection()?.entries,
-            let payload = mainTableProjectionBuilder.searchIndexPayloadFromMainTables(
-                appDirectoryEntries: appDirectoryEntries,
-                generatedAt: generatedAt
+        guard let appDirectoryEntries = readModelStore.readAppDirectoryProjection()?.entries else {
+            logSearchIndexCommitRejectedLocked(
+                reason: "missingAppDirectory",
+                deferredRequestCount: deferredRequestCount,
+                hasPendingRequests: hasPendingRequests,
+                payload: nil
             )
-        else {
             return nil
         }
-        return readModelStore.commitSearchFreshnessBarrierFromMainTablePayload(
+        guard let payload = mainTableProjectionBuilder.searchIndexPayloadFromMainTables(
+            appDirectoryEntries: appDirectoryEntries,
+            generatedAt: generatedAt
+        ) else {
+            logSearchIndexCommitRejectedLocked(
+                reason: "missingMainTablePayload",
+                deferredRequestCount: deferredRequestCount,
+                hasPendingRequests: hasPendingRequests,
+                payload: nil
+            )
+            return nil
+        }
+        let committed = readModelStore.commitSearchFreshnessBarrierFromMainTablePayload(
             payload,
             deferredRequestCount: deferredRequestCount,
             hasPendingRequests: hasPendingRequests,
             generatedAt: generatedAt
+        )
+        if committed == nil {
+            let diagnostics = readModelStore.diagnostics()
+            let reason: String
+            if deferredRequestCount > 0 {
+                reason = "deferredRepair"
+            } else if hasPendingRequests {
+                reason = "pendingRepair"
+            } else if !diagnostics.dirtyAppIDs.isEmpty
+                || !diagnostics.dirtyPIDs.isEmpty
+                || !diagnostics.dirtyCGWindowIDs.isEmpty
+                || !diagnostics.pendingRepairScopes.isEmpty {
+                reason = "dirtyReadModel"
+            } else if !payload.hasCompleteWindowCoverage {
+                reason = "incompleteMainTableCoverage"
+            } else {
+                reason = "storeRejected"
+            }
+            logSearchIndexCommitRejectedLocked(
+                reason: reason,
+                deferredRequestCount: deferredRequestCount,
+                hasPendingRequests: hasPendingRequests,
+                payload: payload
+            )
+        }
+        return committed
+    }
+
+    private func logSearchIndexCommitRejectedLocked(
+        reason: String,
+        deferredRequestCount: Int,
+        hasPendingRequests: Bool,
+        payload: RuntimeSearchIndexPayload?
+    ) {
+        let diagnostics = readModelStore.diagnostics()
+        RuntimeLog.debug(
+            .projection,
+            [
+                "searchIndexCommitRejected",
+                "reason=\(reason)",
+                "dirtyApps=\(diagnostics.dirtyAppIDs.count)",
+                "dirtyPIDs=\(diagnostics.dirtyPIDs.count)",
+                "dirtyCGWindowIDs=\(diagnostics.dirtyCGWindowIDs.count)",
+                "pendingScopes=\(diagnostics.pendingRepairScopes.count)",
+                "deferredRequests=\(deferredRequestCount)",
+                "pendingRequests=\(hasPendingRequests ? 1 : 0)",
+                "hasPayload=\(payload == nil ? 0 : 1)",
+                "hasCompleteWindowCoverage=\(payload?.hasCompleteWindowCoverage == true ? 1 : 0)",
+                "coverage=\(payload?.coverageDiagnostics.logSummary ?? "none")"
+            ].joined(separator: " ")
         )
     }
 

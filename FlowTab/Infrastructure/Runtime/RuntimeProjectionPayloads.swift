@@ -10,13 +10,15 @@ struct RuntimeAppSwitcherProjectionPayload {
     let homeSummaries: [RuntimeHomeAppSummary]
     let hasCompleteWindowCoverage: Bool
     let coveredCGWindowIDs: Set<CGWindowID>
+    let coverageDiagnostics: RuntimeProjectionCoverageDiagnostics
 
     init(
         apps: [AppSwitchCandidate],
         contextsByID: [String: RuntimeAppContext],
         homeSummaries: [RuntimeHomeAppSummary]? = nil,
         hasCompleteWindowCoverage: Bool = false,
-        coveredCGWindowIDs: Set<CGWindowID>? = nil
+        coveredCGWindowIDs: Set<CGWindowID>? = nil,
+        coverageDiagnostics: RuntimeProjectionCoverageDiagnostics? = nil
     ) {
         self.apps = apps
         self.contextsByID = contextsByID
@@ -24,7 +26,15 @@ struct RuntimeAppSwitcherProjectionPayload {
             for: apps,
             contextsByID: contextsByID
         )
+        self.coverageDiagnostics = coverageDiagnostics ?? RuntimeProjectionCoverageDiagnostics(
+            projectedAppCount: apps.count,
+            contextAppCount: contextsByID.count,
+            completeAppGroupCount: hasCompleteWindowCoverage ? apps.count : 0,
+            missingWindowCoveragePIDs: [],
+            incompleteContextAppIDs: Set(apps.map(\.id)).subtracting(contextsByID.keys)
+        )
         self.hasCompleteWindowCoverage = hasCompleteWindowCoverage
+            && self.coverageDiagnostics.hasCompleteCoverage
         self.coveredCGWindowIDs = coveredCGWindowIDs ?? Set(
             contextsByID.values.flatMap { context in
                 context.windowsByID.values.compactMap(\.cgWindowID)

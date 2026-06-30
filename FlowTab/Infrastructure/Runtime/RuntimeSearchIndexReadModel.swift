@@ -48,10 +48,58 @@ struct RuntimeSearchIndexProjection: Equatable, Sendable {
     }
 }
 
+struct RuntimeProjectionCoverageDiagnostics: Equatable, Sendable {
+    let projectedAppCount: Int
+    let contextAppCount: Int
+    let completeAppGroupCount: Int
+    let missingWindowCoveragePIDs: Set<pid_t>
+    let incompleteContextAppIDs: Set<String>
+
+    var hasCompleteCoverage: Bool {
+        missingWindowCoveragePIDs.isEmpty
+            && incompleteContextAppIDs.isEmpty
+            && completeAppGroupCount == projectedAppCount
+    }
+
+    var logSummary: String {
+        [
+            "projectedApps=\(projectedAppCount)",
+            "contextApps=\(contextAppCount)",
+            "completeAppGroups=\(completeAppGroupCount)",
+            "missingWindowCoveragePIDs=\(Self.sortedDescription(missingWindowCoveragePIDs))",
+            "incompleteContextAppIDs=\(Self.sortedDescription(incompleteContextAppIDs))"
+        ].joined(separator: ",")
+    }
+
+    private static func sortedDescription<T: Comparable>(_ values: Set<T>) -> String {
+        values.sorted().map(String.init(describing:)).joined(separator: "|")
+    }
+}
+
 struct RuntimeSearchIndexPayload: Equatable, Sendable {
     let appEntries: [RuntimeSearchAppIndexEntry]
     let windowEntries: [RuntimeSearchWindowIndexEntry]
     let hasCompleteWindowCoverage: Bool
+    let coverageDiagnostics: RuntimeProjectionCoverageDiagnostics
+
+    init(
+        appEntries: [RuntimeSearchAppIndexEntry],
+        windowEntries: [RuntimeSearchWindowIndexEntry],
+        hasCompleteWindowCoverage: Bool,
+        coverageDiagnostics: RuntimeProjectionCoverageDiagnostics? = nil
+    ) {
+        self.appEntries = appEntries
+        self.windowEntries = windowEntries
+        self.coverageDiagnostics = coverageDiagnostics ?? RuntimeProjectionCoverageDiagnostics(
+            projectedAppCount: appEntries.count,
+            contextAppCount: hasCompleteWindowCoverage ? appEntries.count : 0,
+            completeAppGroupCount: hasCompleteWindowCoverage ? appEntries.count : 0,
+            missingWindowCoveragePIDs: [],
+            incompleteContextAppIDs: []
+        )
+        self.hasCompleteWindowCoverage = hasCompleteWindowCoverage
+            && self.coverageDiagnostics.hasCompleteCoverage
+    }
 }
 
 enum RuntimeSearchIndexReadiness: String, Equatable, Sendable {

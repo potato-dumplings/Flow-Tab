@@ -86,6 +86,11 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(degradedSearchPayload.appEntries.map(\.appID), [appID])
         XCTAssertEqual(degradedSearchPayload.windowEntries.map(\.appID), [appID])
         XCTAssertFalse(degradedSearchPayload.hasCompleteWindowCoverage)
+        XCTAssertEqual(degradedSearchPayload.coverageDiagnostics.projectedAppCount, 1)
+        XCTAssertEqual(degradedSearchPayload.coverageDiagnostics.contextAppCount, 0)
+        XCTAssertEqual(degradedSearchPayload.coverageDiagnostics.completeAppGroupCount, 0)
+        XCTAssertEqual(degradedSearchPayload.coverageDiagnostics.incompleteContextAppIDs, [appID])
+        XCTAssertTrue(degradedSearchPayload.coverageDiagnostics.missingWindowCoveragePIDs.isEmpty)
 
         let payload = try XCTUnwrap(
             builder.appSwitcherProjectionPayloadFromMainTables(
@@ -110,6 +115,11 @@ extension FlowTabPriorityCoverageTests {
             [5]
         )
         XCTAssertTrue(payload.hasCompleteWindowCoverage)
+        XCTAssertEqual(payload.coverageDiagnostics.projectedAppCount, 1)
+        XCTAssertEqual(payload.coverageDiagnostics.contextAppCount, 1)
+        XCTAssertEqual(payload.coverageDiagnostics.completeAppGroupCount, 1)
+        XCTAssertTrue(payload.coverageDiagnostics.incompleteContextAppIDs.isEmpty)
+        XCTAssertTrue(payload.coverageDiagnostics.missingWindowCoveragePIDs.isEmpty)
         let searchPayload = try XCTUnwrap(
             builder.searchIndexPayloadFromMainTables(
                 appDirectoryEntries: [appDirectoryEntry],
@@ -121,6 +131,52 @@ extension FlowTabPriorityCoverageTests {
             RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindowID)
         ])
         XCTAssertTrue(searchPayload.hasCompleteWindowCoverage)
+    }
+
+    func testRuntimeProjectionServiceSearchFreshnessBarrierKeepsMissingCommittedIndexWhenCleanMainTableCoverageIsIncomplete() throws {
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let pid = runningApp.processIdentifier
+        let appDirectoryEntry = RuntimeAppDirectoryEntry(app: runningApp)
+        let readModelStore = RuntimeReadModelStore()
+        let windowRecordStore = RuntimeWindowRecordStore()
+        let builder = RuntimeMainTableProjectionBuilder(windowRecordStore: windowRecordStore)
+        let incompletePayload = try XCTUnwrap(
+            builder.searchIndexPayloadFromMainTables(
+                appDirectoryEntries: [appDirectoryEntry],
+                generatedAt: 80
+            )
+        )
+        XCTAssertFalse(incompletePayload.hasCompleteWindowCoverage)
+        XCTAssertEqual(incompletePayload.coverageDiagnostics.missingWindowCoveragePIDs, [pid])
+        XCTAssertEqual(incompletePayload.coverageDiagnostics.incompleteContextAppIDs, [])
+
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.SearchCleanIncompleteCoverage",
+            repairProvider: RuntimeProjectionRepairProvider(
+                windowRecordStore: windowRecordStore,
+                reconciliationCoordinator: RuntimeReconciliationCoordinator()
+            ),
+            mainTableProjectionBuilder: builder,
+            appDirectoryProvider: FixedRuntimeAppDirectoryProvider(entries: [appDirectoryEntry]),
+            readModelStore: readModelStore
+        )
+
+        service.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
+        service.waitForMaintenanceQueueForTesting()
+
+        let diagnostics = readModelStore.diagnostics()
+        XCTAssertTrue(diagnostics.dirtyAppIDs.isEmpty)
+        XCTAssertTrue(diagnostics.dirtyPIDs.isEmpty)
+        XCTAssertTrue(diagnostics.dirtyCGWindowIDs.isEmpty)
+        XCTAssertTrue(diagnostics.pendingRepairScopes.isEmpty)
+        XCTAssertTrue(diagnostics.hasAppDirectoryProjection)
+        XCTAssertFalse(diagnostics.hasCommittedSearchIndex)
+
+        let searchRead = readModelStore.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(searchRead.readiness, .missingCommittedIndex)
+        XCTAssertEqual(searchRead.resultState, .missingCommittedIndex)
+        XCTAssertFalse(searchRead.committedIndexCoversCurrentGeneration)
     }
 
     func testRuntimeProjectionServiceFiltersNestedZeroWindowDirectoryEntriesBeforeMainTableProjection() throws {
