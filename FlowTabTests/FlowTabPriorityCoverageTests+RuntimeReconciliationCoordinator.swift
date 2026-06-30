@@ -2199,7 +2199,28 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(mappingState.validCGWindowIDs, [focusedCGWindowID])
     }
 
-    func testRuntimeProjectionServiceSeedsVerifiedFocusRecordWhenFocusedAXWindowIsNotInRegistry() throws {
+    func testRuntimeProjectionServiceSeedsVerifiedFocusRecordWhenFocusedAXWindowIsNotInRegistry() async throws {
+        let defaults = UserDefaults.standard
+        let previousVerbose = defaults.object(forKey: AppPreferenceKeys.enableVerboseDiagnostics)
+        let previousLevel = defaults.object(forKey: AppPreferenceKeys.runtimeLogLevel)
+        defer {
+            if let previousVerbose {
+                defaults.set(previousVerbose, forKey: AppPreferenceKeys.enableVerboseDiagnostics)
+            } else {
+                defaults.removeObject(forKey: AppPreferenceKeys.enableVerboseDiagnostics)
+            }
+            if let previousLevel {
+                defaults.set(previousLevel, forKey: AppPreferenceKeys.runtimeLogLevel)
+            } else {
+                defaults.removeObject(forKey: AppPreferenceKeys.runtimeLogLevel)
+            }
+            RuntimeDiagnostics.shared.clear()
+        }
+        defaults.set(true, forKey: AppPreferenceKeys.enableVerboseDiagnostics)
+        defaults.set(RuntimeLogLevel.debug.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
+        RuntimeDiagnostics.shared.clear()
+        let logSnapshot = await RuntimeDiagnostics.shared.makeReadSnapshot()
+
         let coordinator = RuntimeReconciliationCoordinator()
         let windowRecordStore = RuntimeWindowRecordStore()
         let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator)
@@ -2255,6 +2276,21 @@ extension FlowTabPriorityCoverageTests {
         )
         XCTAssertNil(AXWindowInspectorForTesting.windowIndex(from: focusedAXWindowID, expectedPID: pid))
         XCTAssertEqual(mappingState.validCGWindowIDs, [focusedCGWindowID])
+        let logLines = await RuntimeDiagnostics.shared.readRecentLines(
+            limit: 20,
+            minimumLevel: .debug,
+            since: logSnapshot
+        )
+        XCTAssertTrue(
+            logLines.contains {
+                $0.contains("binding-confidence-change windowID=cg:\(pid):\(focusedCGWindowID)")
+                    && $0.contains("cg=\(focusedCGWindowID)")
+                    && $0.contains("ax=\(focusedAXWindowID)")
+                    && $0.contains("source=none->verifiedFocusReadback")
+                    && $0.contains("verifiedFocusFallbackAX=1")
+            },
+            "Verified-focus fallback AX readback must leave a grep-able production log marker. Lines: \(logLines)"
+        )
     }
 
     func testRuntimeProjectionServiceSchedulesRetryWhenDrainSeesTransientEmptyCurrentAppWindowPayload() throws {
