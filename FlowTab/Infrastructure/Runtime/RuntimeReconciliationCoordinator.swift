@@ -130,6 +130,20 @@ final class RuntimeReconciliationCoordinator {
     }
 
     @discardableResult
+    func markSpaceTopologyDirty(
+        affectedCGWindowIDs: Set<CGWindowID>,
+        now: TimeInterval
+    ) -> RuntimeReconciliationRequest {
+        updateRequest(
+            target: .spaceTopology,
+            appID: nil,
+            reasons: [.spaceTopologyChanged],
+            affectedCGWindowIDs: affectedCGWindowIDs,
+            now: now
+        )
+    }
+
+    @discardableResult
     func scheduleFullRepairFallback(now: TimeInterval) -> RuntimeReconciliationRequest {
         updateRequest(
             target: .fullRepair,
@@ -158,8 +172,17 @@ final class RuntimeReconciliationCoordinator {
             }
     }
 
-    func hasPendingRequests() -> Bool {
-        !requestsByTarget.isEmpty
+    func hasPendingRequests(includeFullRepair: Bool = true) -> Bool {
+        requestsByTarget.values.contains {
+            includeFullRepair || $0.target != .fullRepair
+        }
+    }
+
+    func pendingScopedAffectedCGWindowIDs() -> Set<CGWindowID> {
+        requestsByTarget.values.reduce(into: Set<CGWindowID>()) { result, request in
+            guard request.target != .fullRepair else { return }
+            result.formUnion(request.affectedCGWindowIDs)
+        }
     }
 
     @discardableResult

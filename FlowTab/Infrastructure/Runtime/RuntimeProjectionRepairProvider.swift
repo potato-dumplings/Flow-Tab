@@ -256,8 +256,12 @@ extension RuntimeProjectionRepairProvider {
         return verification.affectedCGWindowIDs
     }
 
-    func hasPendingReconciliationRequests() -> Bool {
-        reconciliationCoordinator.hasPendingRequests()
+    func hasPendingReconciliationRequests(includeFullRepair: Bool) -> Bool {
+        reconciliationCoordinator.hasPendingRequests(includeFullRepair: includeFullRepair)
+    }
+
+    func pendingScopedReconciliationAffectedCGWindowIDs() -> Set<CGWindowID> {
+        reconciliationCoordinator.pendingScopedAffectedCGWindowIDs()
     }
 
     func scheduleFullRepairFallback(now: TimeInterval) {
@@ -285,6 +289,16 @@ extension RuntimeProjectionRepairProvider {
             appID: appID,
             pid: pid,
             reason: .searchFreshnessBarrier,
+            now: now
+        )
+    }
+
+    func recordSpaceTopologyRepairNeeded(
+        affectedCGWindowIDs: Set<CGWindowID>,
+        now: TimeInterval
+    ) {
+        reconciliationCoordinator.markSpaceTopologyDirty(
+            affectedCGWindowIDs: affectedCGWindowIDs,
             now: now
         )
     }

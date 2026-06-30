@@ -2780,6 +2780,128 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(diagnostics.pendingRepairScopes.isEmpty)
     }
 
+    func testRuntimeProjectionServiceSearchFreshnessBarrierSchedulesDirtyTopologyRepairWithoutFullRepairOracle() throws {
+        let coordinator = RuntimeReconciliationCoordinator()
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let pid = runningApp.processIdentifier
+        let displayName = runningApp.localizedName ?? appID
+        let appDirectoryEntry = RuntimeAppDirectoryEntry(app: runningApp)
+        let cgWindowID = CGWindowID(241_108)
+        let axWindowID = "ax:\(pid):search-barrier-dirty-topology"
+        var mainTableRecord = RuntimeWindowRecord(
+            cgWindowID: cgWindowID,
+            stableWindowID: RuntimeWindowListEntry.cgStableWindowID(
+                pid: pid,
+                cgWindowID: cgWindowID
+            ),
+            firstSeenAt: 10
+        )
+        mainTableRecord.currentAXAttachment = RuntimeCurrentAXAttachment(
+            axWindowID: axWindowID,
+            axWindow: AXUIElementCreateApplication(pid),
+            title: "Dirty Topology Runtime Docs",
+            frame: CGRect(x: 40, y: 50, width: 900, height: 700),
+            state: RuntimeAXWindowState(isMinimized: false, isFocused: true, isMain: true)
+        )
+        mainTableRecord.lastKnownCGTitle = "Dirty Topology Runtime Docs"
+        mainTableRecord.lastKnownCGFrame = CGRect(x: 40, y: 50, width: 900, height: 700)
+        mainTableRecord.lastConfirmationSource = .verifiedFocusReadback
+        mainTableRecord.lastExactConfirmedAt = 12
+        let windowRecordStore = RuntimeWindowRecordStore(
+            mappingStatesByPID: [
+                pid: RuntimeWindowMappingState(
+                    windowRecordsByCGWindowID: [cgWindowID: mainTableRecord],
+                    currentAXToCG: [axWindowID: cgWindowID],
+                    validCGWindowIDs: [cgWindowID],
+                    lastAXWindowIDs: [axWindowID],
+                    hasObservedAXWindowHandle: true
+                )
+            ]
+        )
+        let store = RuntimeReadModelStore()
+        let committedApp = AppSwitchCandidate(
+            id: appID,
+            displayName: displayName,
+            groupID: RuntimeAppIdentity.groupID(
+                for: runningApp.bundleIdentifier,
+                fallbackName: displayName
+            ),
+            lastActiveAt: 300,
+            windows: [
+                WindowCandidate(
+                    id: "committed-before-dirty-topology",
+                    title: "Committed Before Dirty Topology",
+                    isMinimized: false,
+                    lastActiveAt: 300
+                )
+            ]
+        )
+        store.seedAppSwitcherProjectionForTesting(
+            apps: [committedApp],
+            contextsByID: [:],
+            appDirectoryEntries: nil,
+            generatedAt: 10
+        )
+        commitSearchFreshnessBarrierForTesting(store, generatedAt: 11)
+        store.markSpaceTopologyDirty(
+            affectedCGWindowIDs: [cgWindowID],
+            signatureSummary: "d=1,current=7,spaces=1,windows=1,fullscreen=0",
+            pendingScope: "spaceTopology",
+            generatedAt: 12
+        )
+        let fullRepair = coordinator.scheduleFullRepairFallback(now: 12)
+        let expectation = expectation(description: "search freshness barrier schedules dirty topology repair")
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.SearchFreshnessBarrierDirtyTopologyRepair",
+            repairProvider: RuntimeProjectionRepairProvider(
+                windowRecordStore: windowRecordStore,
+                reconciliationCoordinator: coordinator
+            ),
+            mainTableProjectionBuilder: RuntimeMainTableProjectionBuilder(
+                windowRecordStore: windowRecordStore
+            ),
+            appDirectoryProvider: ReconciliationRuntimeAppDirectoryProvider(entries: [appDirectoryEntry]),
+            readModelStore: store,
+            reconciliationExecutor: { request, _ in
+                XCTAssertEqual(request.target, .spaceTopology)
+                XCTAssertEqual(request.affectedCGWindowIDs, [cgWindowID])
+                XCTAssertTrue(request.reasons.contains(.searchFreshnessBarrier))
+                expectation.fulfill()
+                return .completedWithCurrentAppRepairEvidence([
+                    RuntimeCurrentAppRepairEvidence(
+                        appID: appID,
+                        pid: pid,
+                        appDirectoryEntries: [appDirectoryEntry],
+                        currentAppWindowPayloadWasEmpty: false
+                    )
+                ])
+            }
+        )
+
+        XCTAssertEqual(store.readCommittedSearchIndexForSearch().readiness, .degradedStaleCommitted)
+        service.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
+        wait(for: [expectation], timeout: 1)
+        service.waitForMaintenanceQueueForTesting()
+
+        let read = store.readCommittedSearchIndexForSearch()
+        let projection = try XCTUnwrap(read.projection)
+        XCTAssertEqual(read.readiness, .committedGenerationValidated)
+        XCTAssertEqual(read.resultState, .committedGenerationResult)
+        XCTAssertTrue(read.committedIndexCoversCurrentGeneration)
+        XCTAssertEqual(
+            projection.windowEntries.filter { $0.appID == appID }.map(\.windowID),
+            [RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindowID)]
+        )
+        let diagnostics = store.diagnostics()
+        XCTAssertTrue(diagnostics.dirtyCGWindowIDs.isEmpty)
+        XCTAssertTrue(diagnostics.pendingRepairScopes.isEmpty)
+        XCTAssertFalse(
+            coordinator.readyRequests(now: Date.timeIntervalSinceReferenceDate + 1)
+                .contains { $0.id == fullRepair.id }
+        )
+    }
+
     func testRuntimeProjectionServiceSearchFreshnessBarrierDoesNotCommitWithoutRepairEvidence() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let windowRecordStore = RuntimeWindowRecordStore()

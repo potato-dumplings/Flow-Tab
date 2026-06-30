@@ -96,7 +96,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             )
             let diagnostics = readModelStore.diagnostics()
             if !diagnostics.hasCompleteAppSwitcherProjection
-                && !repairProvider.hasPendingReconciliationRequests() {
+                && !repairProvider.hasPendingReconciliationRequests(includeFullRepair: true) {
                 repairProvider.scheduleFullRepairFallback(now: now)
             }
             let drainResult = reconciliationDrainer.drainReadyRequests(
@@ -147,6 +147,9 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             let scheduledMissingCoverageRepairs = scheduleSearchMissingWindowCoverageRepairsLocked(
                 generatedAt: now
             )
+            let scheduledDirtyTopologyRepairs = scheduleSearchDirtySpaceTopologyRepairsLocked(
+                generatedAt: now
+            )
             let promotedRequests = repairProvider.promoteSearchFreshnessBarrierRequests(now: now)
             let drainResult = reconciliationDrainer.drainReadyRequests(
                 now: now,
@@ -162,7 +165,9 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 requiresExistingProjectionCoverage: true,
                 clearsDirtyCGWindowIDs: drainResult.completedAffectedCGWindowIDs
             )
-            let hasPendingRequests = repairProvider.hasPendingReconciliationRequests()
+            let hasPendingRequests = repairProvider.hasPendingReconciliationRequests(
+                includeFullRepair: false
+            )
             let diagnostics = readModelStore.diagnostics()
             let mainTableSearchCommit = commitSearchIndexFromMainTablesLocked(
                 deferredRequestCount: drainResult.deferredCount,
@@ -181,6 +186,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                     "pendingScopes=\(diagnostics.pendingRepairScopes.count)",
                     "appDirectoryProviderEvidence=\(appDirectoryProviderEvidenceCount)",
                     "scheduledMissingCoverageRepairs=\(scheduledMissingCoverageRepairs)",
+                    "scheduledDirtyTopologyRepairs=\(scheduledDirtyTopologyRepairs)",
                     "promotedRequests=\(promotedRequests.count)",
                     "startedRequests=\(drainResult.startedRequests.count)",
                     "maxReadyRepairs=\(runtimeSearchFreshnessBarrierMaxReadyRepairs)",
@@ -550,6 +556,28 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             scheduledCount += 1
         }
         return scheduledCount
+    }
+
+    @discardableResult
+    private func scheduleSearchDirtySpaceTopologyRepairsLocked(
+        generatedAt: TimeInterval
+    ) -> Int {
+        let diagnostics = readModelStore.diagnostics()
+        guard diagnostics.pendingRepairScopes.contains("spaceTopology"),
+              !diagnostics.dirtyCGWindowIDs.isEmpty
+        else {
+            return 0
+        }
+        let alreadyScheduledCGWindowIDs = repairProvider.pendingScopedReconciliationAffectedCGWindowIDs()
+        let unscheduledDirtyCGWindowIDs = diagnostics.dirtyCGWindowIDs.subtracting(
+            alreadyScheduledCGWindowIDs
+        )
+        guard !unscheduledDirtyCGWindowIDs.isEmpty else { return 0 }
+        repairProvider.recordSpaceTopologyRepairNeeded(
+            affectedCGWindowIDs: unscheduledDirtyCGWindowIDs,
+            now: generatedAt
+        )
+        return 1
     }
 
     private func commitCurrentAppRepairEvidenceLocked(

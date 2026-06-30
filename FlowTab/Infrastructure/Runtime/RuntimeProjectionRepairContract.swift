@@ -58,9 +58,14 @@ protocol RuntimeProjectionRepairProviding: AnyObject {
     func recordAppLaunched(appID: String, pid: pid_t, now: TimeInterval)
     func recordAppWindowsChanged(appID: String, pid: pid_t, now: TimeInterval)
     func recordSelectedCurrentAppWindowsChanged(appID: String, pid: pid_t, now: TimeInterval)
-    func hasPendingReconciliationRequests() -> Bool
+    func hasPendingReconciliationRequests(includeFullRepair: Bool) -> Bool
+    func pendingScopedReconciliationAffectedCGWindowIDs() -> Set<CGWindowID>
     func scheduleFullRepairFallback(now: TimeInterval)
     func promoteSearchFreshnessBarrierRequests(now: TimeInterval) -> [RuntimeReconciliationRequest]
+    func recordSpaceTopologyRepairNeeded(
+        affectedCGWindowIDs: Set<CGWindowID>,
+        now: TimeInterval
+    )
     func readyReconciliationRequests(
         now: TimeInterval,
         includeFullRepair: Bool
