@@ -131,8 +131,20 @@ struct SwitcherPanelRootView: View {
             previewSummary = "inactive"
         }
         let selectedWindow = session.selectedWindow
+        let searchIndexDiagnosticsFields = (
+            model.lastSearchIndexReadDiagnostic?.searchTraceFields
+                ?? [
+                    "searchIndexReadiness=none",
+                    "searchIndexResultState=none",
+                    "searchIndexDegraded=0",
+                    "searchIndexCoversCurrentGeneration=0",
+                    "searchFreshnessBarrierRequested=0"
+                ].joined(separator: " ")
+        )
+        .split(separator: " ")
+        .map(String.init)
 
-        return [
+        return ([
             "apps=\(appsSummary)",
             "selected=\(session.selectedApp.id)",
             "mode=\(session.mode.debugName)",
@@ -142,7 +154,7 @@ struct SwitcherPanelRootView: View {
             "searchScope=\(model.searchViewState.isActive ? model.searchViewState.scope.rawValue : "inactive")",
             "searchSelectedResult=\(diagnosticsEscaped(model.searchViewState.selectedResult?.id ?? "none"))",
             "searchResults=\(searchResultsDiagnosticsSummary)"
-        ].joined(separator: ";")
+        ] + searchIndexDiagnosticsFields).joined(separator: ";")
     }
 
     private var searchResultsDiagnosticsSummary: String {

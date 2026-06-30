@@ -269,6 +269,11 @@ extension FlowTabUITests {
                 stage: "before first search query",
                 allowsNoisyCGSiblings: allowsNoisyCGSiblings
             )
+            assertWindowSearchUsesCommittedGenerationIndex(
+                in: app,
+                diagnosticsSummary: diagnosticsSummary,
+                stage: "before first search query"
+            )
             logWorkflowSpaceObservation("\(traceLabel).afterSearchReady", app: targetApp)
             XCTAssertTrue(
                 allowsNoisyCGSiblings
@@ -323,6 +328,11 @@ extension FlowTabUITests {
                 diagnosticsSummary: diagnosticsSummary,
                 stage: "before second search query",
                 allowsNoisyCGSiblings: allowsNoisyCGSiblings
+            )
+            assertWindowSearchUsesCommittedGenerationIndex(
+                in: app,
+                diagnosticsSummary: diagnosticsSummary,
+                stage: "before second search query"
             )
             logWorkflowSpaceObservation("\(traceLabel).afterSecondSearchReady", app: targetApp)
             XCTAssertTrue(
@@ -395,6 +405,11 @@ extension FlowTabUITests {
                     diagnosticsSummary: diagnosticsSummary,
                     stage: "before \(phase.trace) search query",
                     allowsNoisyCGSiblings: true
+                )
+                assertWindowSearchUsesCommittedGenerationIndex(
+                    in: app,
+                    diagnosticsSummary: diagnosticsSummary,
+                    stage: "before \(phase.trace) search query"
                 )
                 if let currentSelection {
                     XCTAssertTrue(
@@ -595,6 +610,52 @@ extension FlowTabUITests {
                 """
             )
         }
+    }
+
+    private func assertWindowSearchUsesCommittedGenerationIndex(
+        in app: XCUIApplication,
+        diagnosticsSummary: XCUIElement,
+        stage: String
+    ) {
+        let deadline = Date().addingTimeInterval(4)
+        repeat {
+            let readiness = switcherPanelDiagnosticsValue(
+                diagnosticsSummary,
+                key: "searchIndexReadiness"
+            )
+            let resultState = switcherPanelDiagnosticsValue(
+                diagnosticsSummary,
+                key: "searchIndexResultState"
+            )
+            let degraded = switcherPanelDiagnosticsValue(
+                diagnosticsSummary,
+                key: "searchIndexDegraded"
+            )
+            let coversCurrentGeneration = switcherPanelDiagnosticsValue(
+                diagnosticsSummary,
+                key: "searchIndexCoversCurrentGeneration"
+            )
+            let barrierRequested = switcherPanelDiagnosticsValue(
+                diagnosticsSummary,
+                key: "searchFreshnessBarrierRequested"
+            )
+            if readiness == "committedGenerationValidated",
+               resultState == "committedGenerationResult",
+               degraded == "0",
+               coversCurrentGeneration == "1",
+               barrierRequested == "0" {
+                return
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+
+        XCTFail(
+            """
+            Window search did not read a committed-generation Search index \(stage).
+
+            \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
+            """
+        )
     }
 
     func selectGlobalSwitcherWindow(
