@@ -41,9 +41,8 @@ final class RuntimeReadModelStore: @unchecked Sendable {
                 dirtyPIDs.remove(clearsDirtyForPID)
             }
         }
-        clearDirtyStateForCoveredCGWindowsLocked(
+        clearDirtyStateForCompletedCGWindowRequestsLocked(
             clearsDirtyCGWindowIDs,
-            coveredCGWindowIDs: payload.coveredCGWindowIDs,
             hasCompleteWindowCoverage: payload.hasCompleteWindowCoverage
         )
         let isCompleteForScope = !isDirtyLocked && payload.hasCompleteWindowCoverage
@@ -530,16 +529,12 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         pendingRepairScopes = pendingRepairScopes.filter { !$0.contains(appID) }
     }
 
-    private func clearDirtyStateForCoveredCGWindowsLocked(
+    private func clearDirtyStateForCompletedCGWindowRequestsLocked(
         _ requestedCGWindowIDs: Set<CGWindowID>,
-        coveredCGWindowIDs: Set<CGWindowID>,
         hasCompleteWindowCoverage: Bool
     ) {
         guard hasCompleteWindowCoverage, !requestedCGWindowIDs.isEmpty else { return }
-        let reconciledCGWindowIDs = requestedCGWindowIDs.intersection(coveredCGWindowIDs)
-        guard !reconciledCGWindowIDs.isEmpty else { return }
-
-        dirtyCGWindowIDs.subtract(reconciledCGWindowIDs)
+        dirtyCGWindowIDs.subtract(requestedCGWindowIDs)
         if dirtyCGWindowIDs.isEmpty {
             pendingRepairScopes.remove("spaceTopology")
             spaceTopologySignatureSummary = nil

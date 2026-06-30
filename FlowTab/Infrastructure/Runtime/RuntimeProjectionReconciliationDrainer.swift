@@ -26,6 +26,15 @@ struct RuntimeProjectionReconciliationDrainResult {
     var fullRepairEvidence: [RuntimeFullRepairEvidence] = []
     var currentAppRepairEvidence: [RuntimeCurrentAppRepairEvidence] = []
     var completedAffectedCGWindowIDs: Set<CGWindowID> = []
+
+    mutating func append(_ result: RuntimeProjectionReconciliationDrainResult) {
+        startedRequests.append(contentsOf: result.startedRequests)
+        completedCount += result.completedCount
+        deferredCount += result.deferredCount
+        fullRepairEvidence.append(contentsOf: result.fullRepairEvidence)
+        currentAppRepairEvidence.append(contentsOf: result.currentAppRepairEvidence)
+        completedAffectedCGWindowIDs.formUnion(result.completedAffectedCGWindowIDs)
+    }
 }
 
 typealias RuntimeProjectionReconciliationExecutor = (

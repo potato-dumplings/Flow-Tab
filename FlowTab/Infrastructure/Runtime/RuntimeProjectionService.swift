@@ -151,10 +151,8 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 generatedAt: now
             )
             let promotedRequests = repairProvider.promoteSearchFreshnessBarrierRequests(now: now)
-            let drainResult = reconciliationDrainer.drainReadyRequests(
-                now: now,
-                maxRequests: runtimeSearchFreshnessBarrierMaxReadyRepairs,
-                includeFullRepair: false
+            let drainResult = drainSearchFreshnessBarrierReadyRequestsLocked(
+                now: now
             )
             commitCurrentAppRepairEvidenceLocked(
                 drainResult.currentAppRepairEvidence,
@@ -200,6 +198,29 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 ].joined(separator: " ")
             )
         }
+    }
+
+    private func drainSearchFreshnessBarrierReadyRequestsLocked(
+        now: TimeInterval
+    ) -> RuntimeProjectionReconciliationDrainResult {
+        var remainingBudget = runtimeSearchFreshnessBarrierMaxReadyRepairs
+        var aggregateResult = RuntimeProjectionReconciliationDrainResult()
+
+        while remainingBudget > 0 {
+            let drainResult = reconciliationDrainer.drainReadyRequests(
+                now: now,
+                maxRequests: remainingBudget,
+                includeFullRepair: false
+            )
+            guard !drainResult.startedRequests.isEmpty else { break }
+            aggregateResult.append(drainResult)
+            remainingBudget -= drainResult.startedRequests.count
+            if drainResult.deferredCount > 0 {
+                break
+            }
+        }
+
+        return aggregateResult
     }
 
     func signalSpaceTopologyChanged() {

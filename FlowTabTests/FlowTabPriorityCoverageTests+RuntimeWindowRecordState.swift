@@ -204,6 +204,35 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(projectedEntry?.activationHandleID, fixture.axWindowID)
     }
 
+    func testRuntimeProjectionRepairFactSourceFocusedRepairPreservesUnrelatedWindowRecordCoverage() {
+        let fixture = makeRuntimeWindowRecordProjectionFactSourceFixture(
+            axWindowIDSuffix: "focused-coverage",
+            cgWindowID: 240_103,
+            title: "Focused Coverage Projection",
+            sampledWindowID: "focused-coverage-sampled-window",
+            sampledTitle: "Focused Coverage Sampled Window",
+            sampledCGWindowID: 999_997
+        )
+        let unrelatedPID = pid_t(42_103)
+        fixture.windowRecordStore.setState(
+            RuntimeWindowMappingState(
+                windowRecordsByCGWindowID: [:],
+                hasRecordedWindowCollection: true
+            ),
+            for: unrelatedPID
+        )
+
+        _ = fixture.factSource.collectFocusedCurrentAppWindowFacts(
+            for: fixture.app,
+            in: [fixture.app],
+            processIdentifier: fixture.pid
+        )
+
+        XCTAssertTrue(fixture.windowRecordStore.hasWindowProjectionCoverage(processIdentifier: unrelatedPID))
+        XCTAssertTrue(fixture.windowRecordStore.state(for: unrelatedPID)?.windowRecordsByCGWindowID.isEmpty == true)
+        XCTAssertTrue(fixture.windowRecordStore.hasWindowProjectionCoverage(processIdentifier: fixture.pid))
+    }
+
     func testRuntimeWindowRecordStoreGroupsAffectedCGWindowIDsByPIDFromCurrentAndRecordedFacts() {
         let currentPID = pid_t(18_405)
         let recordedPID = pid_t(18_406)
@@ -832,6 +861,7 @@ private struct RuntimeWindowRecordProjectionFactSourceFixture {
     let pid: pid_t
     let axWindowID: String
     let cgWindowID: CGWindowID
+    let windowRecordStore: RuntimeWindowRecordStore
     let provider: RuntimeWindowRecordProjectionFakeFactProvider
     let factSource: RuntimeProjectionRepairFactSource
 
@@ -906,6 +936,7 @@ private func makeRuntimeWindowRecordProjectionFactSourceFixture(
         pid: pid,
         axWindowID: axWindowID,
         cgWindowID: cgWindowID,
+        windowRecordStore: windowRecordStore,
         provider: provider,
         factSource: RuntimeProjectionRepairFactSource(
             runtimeFactProvider: provider,

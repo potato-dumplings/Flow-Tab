@@ -385,7 +385,6 @@ struct RuntimeProjectionRepairFactSource {
         processIdentifier pid: pid_t
     ) -> RuntimeFocusedCurrentAppWindowFacts {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
-        windowRecordStore.cleanup(keepingRunningApps: runningApps)
         AXLiveWindowRegistry.shared.prune(to: runningApps)
         let cleanupReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let cgWindowsByPID = runtimeFactProvider.collectCGWindowsWithSpaceTopologyDiff(
