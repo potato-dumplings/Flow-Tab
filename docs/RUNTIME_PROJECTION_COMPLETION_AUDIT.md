@@ -62,7 +62,8 @@ Post-runner-fix representative UI proof refreshed for this audit:
 
 The install step built and signed `{user-home}/Applications/Flow Tab UITest.app`
 with Apple Development signing. The UI wrapper used that fixed app path and
-passed 4 selected tests with 0 failures in 125.302 seconds. This refresh proves
+passed 4 selected tests with 0 failures in 123.975 seconds
+(`125.622` seconds elapsed in XCTest). This refresh proves
 the representative noisy fullscreen/off-space topology round trip, committed
 Search-index real UI re-entry and activation, target-app focused public AX
 tie-breaker, and minimized public AX state capture on the repaired runner.
