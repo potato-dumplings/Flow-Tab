@@ -694,6 +694,7 @@ extension FlowTabUITests {
         preservesDesktopAfterFullscreen: Bool = true,
         prelaunchesFlowTabBeforeFixture: Bool = false,
         flowTabLaunchTraceLabel: String? = nil,
+        workflowAppLaunchArguments: (SpaceFixtureResolvedWorkflow.App) -> [String] = { _ in [] },
         afterFlowTabLaunch: ((SpaceFixtureResolvedWorkflow, XCUIApplication) throws -> Void)? = nil,
         perform assertions: (SpaceFixtureResolvedWorkflow, XCUIApplication) throws -> Void
     ) throws {
@@ -721,6 +722,7 @@ extension FlowTabUITests {
             preservesDesktopAfterFullscreen: preservesDesktopAfterFullscreen,
             prelaunchesFlowTabBeforeFixture: prelaunchesFlowTabBeforeFixture,
             flowTabLaunchTraceLabel: flowTabLaunchTraceLabel,
+            workflowAppLaunchArguments: workflowAppLaunchArguments,
             afterFlowTabLaunch: afterFlowTabLaunch,
             perform: assertions
         )
@@ -736,6 +738,7 @@ extension FlowTabUITests {
         prelaunchesFlowTabBeforeFixture: Bool = false,
         beforeFlowTabLaunch: ((SpaceFixtureResolvedWorkflow) throws -> Void)? = nil,
         flowTabLaunchTraceLabel: String? = nil,
+        workflowAppLaunchArguments: (SpaceFixtureResolvedWorkflow.App) -> [String] = { _ in [] },
         afterFlowTabLaunch: ((SpaceFixtureResolvedWorkflow, XCUIApplication) throws -> Void)? = nil,
         perform assertions: (SpaceFixtureResolvedWorkflow, XCUIApplication) throws -> Void
     ) throws {
@@ -771,7 +774,8 @@ extension FlowTabUITests {
             workflow,
             waitsForFullscreenMarkers: waitsForFullscreenMarkers,
             suppressesAppAccessibilityChildren: suppressesAppAccessibilityChildren,
-            preservesDesktopAfterFullscreen: preservesDesktopAfterFullscreen
+            preservesDesktopAfterFullscreen: preservesDesktopAfterFullscreen,
+            workflowAppLaunchArguments: workflowAppLaunchArguments
         )
         logFullscreenWorkflowSpaceObservations("workflow.afterFixtureLaunch", workflow: workflow)
         defer {
@@ -1026,7 +1030,8 @@ extension FlowTabUITests {
         _ workflow: SpaceFixtureResolvedWorkflow,
         waitsForFullscreenMarkers: Bool,
         suppressesAppAccessibilityChildren: Bool,
-        preservesDesktopAfterFullscreen: Bool
+        preservesDesktopAfterFullscreen: Bool,
+        workflowAppLaunchArguments: (SpaceFixtureResolvedWorkflow.App) -> [String] = { _ in [] }
     ) -> [XCUIApplication] {
         var launchedApps: [XCUIApplication] = []
 
@@ -1044,6 +1049,7 @@ extension FlowTabUITests {
             if suppressesAppAccessibilityChildren {
                 app.launchArguments += ["--suppress-app-accessibility-children"]
             }
+            app.launchArguments += workflowAppLaunchArguments(workflowApp)
             if workflowApp.fullscreenWindowIndex != nil {
                 logWorkflowSpaceObservation("workflow.beforeLaunch.\(workflowApp.appID)", app: workflowApp)
             }

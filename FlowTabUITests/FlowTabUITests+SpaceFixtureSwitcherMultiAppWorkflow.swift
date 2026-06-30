@@ -224,6 +224,93 @@ extension FlowTabUITests {
         }
     }
 
+    func testSwitcherPanelRefreshesOpenWorkflowAppWindowLayerAfterMultiAppWindowSetMutation() throws {
+        let workflow = try configuredSwitcherSpaceFixtureWorkflow()
+        let targetApp = try XCTUnwrap(
+            workflow.apps.first { $0.appID == "chrome" },
+            "Switcher workflow must include the Chrome-style fixture app for multi-app mutation proof"
+        )
+        let remainingTitles = Array(targetApp.expectedWindowTitles.prefix(1))
+        XCTAssertEqual(targetApp.expectedWindowTitles.count, 2)
+        XCTAssertEqual(remainingTitles.count, 1)
+
+        try runRealSpaceFixtureWorkflow(
+            workflow,
+            flowTabAdditionalArguments: [
+                "--flowtab-ui-open-switcher",
+                "--flowtab-ui-runtime-log-level",
+                "DEBUG",
+                "--flowtab-ui-enable-verbose-logs",
+                "--flowtab-ui-listen-switcher-trigger",
+                "-windowLayerAutoEnterDelay", "30.0"
+            ] + FlowTabUITestSwitcherCommandPayload.launchArguments,
+            workflowAppLaunchArguments: { workflowApp in
+                guard workflowApp.appID == targetApp.appID else { return [] }
+                return [
+                    "--close-window-index", "2",
+                    "--close-window-delay-ms", "30000"
+                ]
+            }
+        ) { workflow, app in
+            let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
+            XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
+            XCTAssertTrue(
+                element(
+                    in: app,
+                    identifier: targetApp.identity.switcherAppAccessibilityIdentifier
+                ).waitForExistence(timeout: 8)
+            )
+
+            let mutationLogSnapshot = makeRuntimeLogFileSnapshot()
+            selectSwitcherWorkflowApp(targetApp, in: app, diagnosticsSummary: diagnosticsSummary)
+            app.activate()
+            app.typeKey(.downArrow, modifierFlags: [])
+            XCTAssertTrue(waitForSwitcherMode(diagnosticsSummary, modePrefix: "windowCycle", timeout: 5))
+            assertSwitcherPreviewShowsOnlyExpectedTitles(
+                targetApp.expectedWindowTitles,
+                in: diagnosticsSummary,
+                timeout: 8
+            )
+
+            assertSwitcherPreviewShowsOnlyExpectedTitles(
+                remainingTitles,
+                in: diagnosticsSummary,
+                timeout: 40
+            )
+            XCTAssertTrue(waitForSwitcherMode(diagnosticsSummary, modePrefix: "windowCycle", timeout: 5))
+            waitForRuntimeLogFiles(
+                containing: [
+                    "runtimeAXDestroyed appID=\(targetApp.identity.bundleIdentifier)",
+                    "affectedCGWindowID="
+                ],
+                since: mutationLogSnapshot,
+                timeout: 8
+            )
+            XCTAssertNotEqual(
+                XCUIApplication(bundleIdentifier: targetApp.identity.bundleIdentifier).state,
+                .notRunning
+            )
+            XCTAssertEqual(
+                Set(switcherPreviewTitles(from: diagnosticsSummary)),
+                Set(remainingTitles),
+                """
+                Multi-app open Switcher mutation should keep the selected app's window layer isolated.
+
+                \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
+                """
+            )
+            XCTAssertTrue(
+                Set(switcherPreviewTitles(from: diagnosticsSummary))
+                    .isDisjoint(with: Set(workflow.otherExpectedWindowTitles(excluding: targetApp.appID))),
+                """
+                Multi-app open Switcher mutation exposed another app's window card.
+
+                \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
+                """
+            )
+        }
+    }
+
     func selectSwitcherWorkflowApp(
         _ workflowApp: SpaceFixtureResolvedWorkflow.App,
         in app: XCUIApplication,
@@ -661,6 +748,23 @@ extension FlowTabUITests {
             found \(visibleTitles.sorted())
             """
         )
+    }
+
+    private func waitForSwitcherMode(
+        _ diagnosticsSummaryElement: XCUIElement,
+        modePrefix: String,
+        timeout: TimeInterval
+    ) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            let mode = switcherPanelDiagnosticsValue(diagnosticsSummaryElement, key: "mode")
+            if mode.hasPrefix(modePrefix) {
+                return true
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+
+        return false
     }
 
     private func assertSwitcherPreviewWindowCards(
