@@ -25,7 +25,7 @@ struct RuntimeProjectionReconciliationDrainResult {
     var deferredCount = 0
     var fullRepairEvidence: [RuntimeFullRepairEvidence] = []
     var currentAppRepairEvidence: [RuntimeCurrentAppRepairEvidence] = []
-    var completedSpaceTopologyAffectedCGWindowIDs: Set<CGWindowID> = []
+    var completedAffectedCGWindowIDs: Set<CGWindowID> = []
 }
 
 typealias RuntimeProjectionReconciliationExecutor = (
@@ -60,11 +60,9 @@ struct RuntimeProjectionReconciliationDrainer {
             case .completed, .completedWithFullRepairEvidence, .completedWithCurrentAppRepairEvidence:
                 repairProvider.completeReconciliationRequest(id: startedRequest.id)
                 result.completedCount += 1
-                if startedRequest.target == .spaceTopology {
-                    result.completedSpaceTopologyAffectedCGWindowIDs.formUnion(
-                        startedRequest.affectedCGWindowIDs
-                    )
-                }
+                result.completedAffectedCGWindowIDs.formUnion(
+                    startedRequest.affectedCGWindowIDs
+                )
                 if case let .completedWithFullRepairEvidence(evidence) = outcome {
                     result.fullRepairEvidence.append(evidence)
                 }

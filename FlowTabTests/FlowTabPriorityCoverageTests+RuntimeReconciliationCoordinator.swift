@@ -2668,6 +2668,118 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(coordinator.readyRequests(now: 10.49).isEmpty)
     }
 
+    func testRuntimeProjectionServiceSearchFreshnessBarrierCommitsWhenCompletedScopedRepairCoversDirtyCGWindowID() throws {
+        let coordinator = RuntimeReconciliationCoordinator()
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let pid = runningApp.processIdentifier
+        let displayName = runningApp.localizedName ?? appID
+        let appDirectoryEntry = RuntimeAppDirectoryEntry(app: runningApp)
+        let cgWindowID = CGWindowID(241_107)
+        let axWindowID = "ax:\(pid):search-barrier-covered-cg"
+        var mainTableRecord = RuntimeWindowRecord(
+            cgWindowID: cgWindowID,
+            stableWindowID: RuntimeWindowListEntry.cgStableWindowID(
+                pid: pid,
+                cgWindowID: cgWindowID
+            ),
+            firstSeenAt: 10
+        )
+        mainTableRecord.currentAXAttachment = RuntimeCurrentAXAttachment(
+            axWindowID: axWindowID,
+            axWindow: AXUIElementCreateApplication(pid),
+            title: "Scoped Repair Covered Runtime Docs",
+            frame: CGRect(x: 40, y: 50, width: 900, height: 700),
+            state: RuntimeAXWindowState(isMinimized: false, isFocused: true, isMain: true)
+        )
+        mainTableRecord.lastKnownCGTitle = "Scoped Repair Covered Runtime Docs"
+        mainTableRecord.lastKnownCGFrame = CGRect(x: 40, y: 50, width: 900, height: 700)
+        mainTableRecord.lastConfirmationSource = .verifiedFocusReadback
+        mainTableRecord.lastExactConfirmedAt = 12
+        let windowRecordStore = RuntimeWindowRecordStore(
+            mappingStatesByPID: [
+                pid: RuntimeWindowMappingState(
+                    windowRecordsByCGWindowID: [cgWindowID: mainTableRecord],
+                    currentAXToCG: [axWindowID: cgWindowID],
+                    validCGWindowIDs: [cgWindowID],
+                    lastAXWindowIDs: [axWindowID],
+                    hasObservedAXWindowHandle: true
+                )
+            ]
+        )
+        let store = RuntimeReadModelStore()
+        let committedApp = AppSwitchCandidate(
+            id: appID,
+            displayName: displayName,
+            groupID: RuntimeAppIdentity.groupID(
+                for: runningApp.bundleIdentifier,
+                fallbackName: displayName
+            ),
+            lastActiveAt: 300,
+            windows: [
+                WindowCandidate(
+                    id: "committed-before-scoped-repair",
+                    title: "Committed Before Scoped Repair",
+                    isMinimized: false,
+                    lastActiveAt: 300
+                )
+            ]
+        )
+        store.seedAppSwitcherProjectionForTesting(
+            apps: [committedApp],
+            contextsByID: [:],
+            appDirectoryEntries: nil,
+            generatedAt: 10
+        )
+        commitSearchFreshnessBarrierForTesting(store, generatedAt: 11)
+        store.markSpaceTopologyDirty(
+            affectedCGWindowIDs: [cgWindowID],
+            signatureSummary: "d=1,current=7,spaces=1,windows=1,fullscreen=0",
+            pendingScope: "spaceTopology",
+            generatedAt: 12
+        )
+        coordinator.markAppDirty(
+            appID: appID,
+            pid: pid,
+            reason: .manualRefresh,
+            affectedCGWindowIDs: [cgWindowID],
+            now: 12
+        )
+        let expectation = expectation(description: "search freshness barrier completes scoped repair")
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.SearchFreshnessBarrierCoveredScopedRepair",
+            repairProvider: RuntimeProjectionRepairProvider(windowRecordStore: windowRecordStore, reconciliationCoordinator: coordinator),
+            mainTableProjectionBuilder: RuntimeMainTableProjectionBuilder(
+                windowRecordStore: windowRecordStore
+            ),
+            appDirectoryProvider: ReconciliationRuntimeAppDirectoryProvider(entries: [appDirectoryEntry]),
+            readModelStore: store,
+            reconciliationExecutor: { request, _ in
+                XCTAssertEqual(request.affectedCGWindowIDs, [cgWindowID])
+                expectation.fulfill()
+                return .completed
+            }
+        )
+
+        XCTAssertEqual(store.readCommittedSearchIndexForSearch().readiness, .degradedStaleCommitted)
+        service.requestSearchIndexFreshnessBarrier(reason: RuntimeProjectionMaintenanceReason.searchFreshnessBarrier)
+        wait(for: [expectation], timeout: 1)
+        service.waitForMaintenanceQueueForTesting()
+
+        let read = store.readCommittedSearchIndexForSearch()
+        let projection = try XCTUnwrap(read.projection)
+        XCTAssertEqual(read.readiness, .committedGenerationValidated)
+        XCTAssertEqual(read.resultState, .committedGenerationResult)
+        XCTAssertTrue(read.committedIndexCoversCurrentGeneration)
+        XCTAssertEqual(
+            projection.windowEntries.filter { $0.appID == appID }.map(\.windowID),
+            [RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindowID)]
+        )
+        let diagnostics = store.diagnostics()
+        XCTAssertTrue(diagnostics.dirtyCGWindowIDs.isEmpty)
+        XCTAssertTrue(diagnostics.pendingRepairScopes.isEmpty)
+    }
+
     func testRuntimeProjectionServiceSearchFreshnessBarrierDoesNotCommitWithoutRepairEvidence() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let windowRecordStore = RuntimeWindowRecordStore()
@@ -2977,5 +3089,17 @@ extension FlowTabPriorityCoverageTests {
             ),
             appDirectoryEntries: [RuntimeAppDirectoryEntry(app: .current)]
         )
+    }
+
+    private final class ReconciliationRuntimeAppDirectoryProvider: RuntimeAppDirectoryProviding {
+        private let entries: [RuntimeAppDirectoryEntry]
+
+        init(entries: [RuntimeAppDirectoryEntry]) {
+            self.entries = entries
+        }
+
+        func appDirectoryEntriesForRuntimeMaintenance() -> [RuntimeAppDirectoryEntry] {
+            entries
+        }
     }
 }

@@ -110,11 +110,11 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 drainResult.currentAppRepairEvidence,
                 generatedAt: now
             )
-            if !drainResult.completedSpaceTopologyAffectedCGWindowIDs.isEmpty {
+            if !drainResult.completedAffectedCGWindowIDs.isEmpty {
                 mainTableProjectionCommitted = commitMainTableAppSwitcherProjectionLocked(
                     generatedAt: now,
                     requiresExistingProjectionCoverage: true,
-                    clearsDirtyCGWindowIDs: drainResult.completedSpaceTopologyAffectedCGWindowIDs
+                    clearsDirtyCGWindowIDs: drainResult.completedAffectedCGWindowIDs
                 ) || mainTableProjectionCommitted
             }
             RuntimeLog.debug(
@@ -157,7 +157,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             let mainTableProjectionCommitted = commitMainTableAppSwitcherProjectionLocked(
                 generatedAt: now,
                 requiresExistingProjectionCoverage: true,
-                clearsDirtyCGWindowIDs: drainResult.completedSpaceTopologyAffectedCGWindowIDs
+                clearsDirtyCGWindowIDs: drainResult.completedAffectedCGWindowIDs
             )
             let hasPendingRequests = repairProvider.hasPendingReconciliationRequests()
             let diagnostics = readModelStore.diagnostics()
@@ -209,11 +209,11 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 requiresExistingProjectionCoverage: true
             )
             let drainResult = drainReadyReconciliationRequestResultLocked(now: now)
-            if !drainResult.completedSpaceTopologyAffectedCGWindowIDs.isEmpty {
+            if !drainResult.completedAffectedCGWindowIDs.isEmpty {
                 commitMainTableAppSwitcherProjectionLocked(
                     generatedAt: now,
                     requiresExistingProjectionCoverage: true,
-                    clearsDirtyCGWindowIDs: drainResult.completedSpaceTopologyAffectedCGWindowIDs
+                    clearsDirtyCGWindowIDs: drainResult.completedAffectedCGWindowIDs
                 )
             }
         }
