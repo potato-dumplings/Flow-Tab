@@ -80,8 +80,9 @@ runtime shape:
 - Real UI occurrence of non-registry focused AX readback is not separately
   forced; production logs can now identify natural fallback hits with
   `verifiedFocusFallbackAX=1`, but no real occurrence has closed the gap yet.
-- Main/minimized public AX tie-breaker variants still need broader state
-  permutation proof.
+- Public AX main/minimized tie-breaker variants still need real UI occurrence
+  and broader state permutation proof; focused/main/minimized deterministic
+  matcher coverage is now present.
 - Broader multi-display/fullscreen topology and system-authoritative fullscreen
   owner proof remain partial.
 - Broader lifecycle refresh while an open Switcher session mutates continues to

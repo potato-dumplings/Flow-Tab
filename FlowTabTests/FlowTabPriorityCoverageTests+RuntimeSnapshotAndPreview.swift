@@ -2663,6 +2663,31 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(diagnostics.isEmpty)
     }
 
+    func testRuntimeSystemRepairFactProviderResolveCGWindowAssignmentsUsesMainAXStateAsPublicTieBreaker() {
+        let bounds = CGRect(x: 100, y: 100, width: 800, height: 500)
+        let axWindows: [RuntimeAXWindowEntry] = [
+            .init(id: "ax:315:0", index: 0, title: "Document", bounds: bounds, isMain: true),
+            .init(id: "ax:315:1", index: 1, title: "Document", bounds: bounds)
+        ]
+        let cgWindows: [RuntimeCGWindowEntry] = [
+            .init(id: 316, title: "Document", bounds: bounds, isOnscreen: true),
+            .init(id: 317, title: "Document", bounds: bounds, isOnscreen: true)
+        ]
+
+        let assignments = RuntimeWindowMappingTestSupport.resolveCGWindowAssignments(
+            axWindows: axWindows,
+            cgWindows: cgWindows
+        )
+        let diagnostics = RuntimeWindowMappingTestSupport.resolveCGWindowAssignmentDiagnostics(
+            axWindows: axWindows,
+            cgWindows: cgWindows
+        )
+
+        XCTAssertEqual(assignments["ax:315:0"], 316)
+        XCTAssertEqual(assignments["ax:315:1"], 317)
+        XCTAssertTrue(diagnostics.isEmpty)
+    }
+
     func testRuntimeSystemRepairFactProviderResolveCGWindowAssignmentsUsesMinimizedAXStateAsPublicTieBreaker() {
         let bounds = CGRect(x: 100, y: 100, width: 800, height: 500)
         let axWindows: [RuntimeAXWindowEntry] = [
