@@ -63,11 +63,12 @@ extension FlowTabUITests {
             XCTAssertEqual(cards.count, targetApp.expectedWindowTitles.count)
             XCTAssertEqual(Set(cards.map(\.identifier)).count, cards.count)
             XCTAssertEqual(edgeTitleCounts(cards.map(\.title)), edgeTitleCounts(targetApp.expectedWindowTitles))
+            let targetPID = try targetProcessIdentifier(for: targetApp)
             waitForRuntimeLogFiles(
-                matching: #"binding-assignment public-state-tiebreak state=(focused|main|minimized) ax=.* cg=[0-9]+ axCandidates=[2-9][0-9]* cgCandidates=[2-9][0-9]*"#,
+                matching: #"binding-assignment public-state-tiebreak state=focused ax=ax:\#(targetPID):[0-9]+ cg=[0-9]+ axCandidates=[2-9][0-9]* cgCandidates=[2-9][0-9]*"#,
                 since: logSnapshot,
                 timeout: 8,
-                description: "real edge workflow resolves identical AX/CG candidates through public AX state"
+                description: "real edge workflow resolves identical AX/CG candidates through the target app's focused public AX state"
             )
         }
     }
@@ -110,14 +111,15 @@ extension FlowTabUITests {
                 expectedTitles: targetApp.expectedWindowTitles,
                 timeout: 8
             )
+            let targetPID = try targetProcessIdentifier(for: targetApp)
             waitForRuntimeLogFiles(
-                matching: #"chrome-topology app=Chrome Fixture .* ax=\[.*min=1.*\] cg=\[.*Shared Docs:off:spaces=\[[0-9,]*\]:frame="#,
+                matching: #"chrome-topology app=Chrome Fixture pid=\#(targetPID) .* ax=\[.*min=1.*\] cg=\[.*Shared Docs:off:spaces=\[[0-9,]*\]:frame="#,
                 since: logSnapshot,
                 timeout: 8,
                 description: "real edge workflow exposes a minimized AX window with an offscreen CG counterpart"
             )
             waitForRuntimeLogFiles(
-                matching: #"window-entries app=Chrome Fixture .*off:minimized=1"#,
+                matching: #"window-entries app=Chrome Fixture pid=\#(targetPID) .*off:minimized=1"#,
                 since: logSnapshot,
                 timeout: 8,
                 description: "real edge workflow carries minimized public AX state into window-layer output"
@@ -339,6 +341,16 @@ extension FlowTabUITests {
             app.terminate()
             waitForSpaceFixtureApplicationToTerminate(app)
         }
+    }
+
+    private func targetProcessIdentifier(for workflowApp: SpaceFixtureResolvedWorkflow.App) throws -> pid_t {
+        let runningApp = try XCTUnwrap(
+            NSRunningApplication
+                .runningApplications(withBundleIdentifier: workflowApp.identity.bundleIdentifier)
+                .first,
+            "Expected \(workflowApp.identity.bundleIdentifier) to be running for runtime-log PID assertions."
+        )
+        return runningApp.processIdentifier
     }
 
     private func edgeInputsWorkflowSetupMessage(reason: String) -> String {
