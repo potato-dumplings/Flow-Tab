@@ -131,6 +131,16 @@ check_has_matches \
   "${activation_paths[@]}"
 
 check_has_matches \
+  "non-registry verified-focus fallback AX id parser remains runtime-owned" \
+  "verifiedFocusFallbackCGWindowID" \
+  FlowTab/Infrastructure/Runtime/AXWindowInspector.swift
+
+check_has_matches \
+  "non-registry verified-focus fallback marker remains grep-able in WindowRecord logs" \
+  "binding-confidence-change|verifiedFocusFallbackAX|AXWindowInspector\\.verifiedFocusFallbackCGWindowID" \
+  FlowTab/Infrastructure/Runtime/RuntimeWindowRecord.swift
+
+check_has_matches \
   "activation readback mismatch is routed to runtime dirty stale projection state" \
   "signalWindowFocusReadbackMismatch|markWindowFocusReadbackMismatch|recordWindowFocusReadbackMismatch|activationReadbackMismatch" \
   FlowTab/Features/Switcher FlowTab/Features/Home FlowTab/Infrastructure/Runtime
