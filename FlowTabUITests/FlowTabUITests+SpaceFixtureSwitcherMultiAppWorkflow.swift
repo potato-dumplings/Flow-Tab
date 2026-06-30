@@ -311,6 +311,105 @@ extension FlowTabUITests {
         }
     }
 
+    func testSwitcherPanelRefreshesOpenFullscreenWorkflowAppWindowLayerAfterTargetWindowCloses() throws {
+        let workflow = try configuredSwitcherSpaceFixtureWorkflow()
+        let targetApp = try XCTUnwrap(
+            workflow.apps.first { $0.appID == "notes" },
+            "Switcher workflow must include the Notes-style fixture app for fullscreen target-window mutation proof"
+        )
+        let fullscreenWindowIndex = try XCTUnwrap(targetApp.fullscreenWindowIndex)
+        let fullscreenTitles = Set(targetApp.fullscreenWindowTitles)
+        let remainingTitles = targetApp.expectedWindowTitles.filter { !fullscreenTitles.contains($0) }
+        XCTAssertEqual(targetApp.expectedWindowTitles.count, 2)
+        XCTAssertEqual(fullscreenTitles.count, 1)
+        XCTAssertEqual(remainingTitles.count, 1)
+
+        try runRealSpaceFixtureWorkflow(
+            workflow,
+            flowTabAdditionalArguments: [
+                "--flowtab-ui-open-switcher",
+                "--flowtab-ui-runtime-log-level",
+                "DEBUG",
+                "--flowtab-ui-enable-verbose-logs",
+                "--flowtab-ui-listen-switcher-trigger",
+                "-windowLayerAutoEnterDelay", "30.0"
+            ] + FlowTabUITestSwitcherCommandPayload.launchArguments,
+            workflowAppLaunchArguments: { workflowApp in
+                guard workflowApp.appID == targetApp.appID else { return [] }
+                return [
+                    "--close-window-index", "\(fullscreenWindowIndex)",
+                    "--close-window-delay-ms", "30000"
+                ]
+            }
+        ) { workflow, app in
+            let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
+            XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
+            XCTAssertTrue(
+                element(
+                    in: app,
+                    identifier: targetApp.identity.switcherAppAccessibilityIdentifier
+                ).waitForExistence(timeout: 8)
+            )
+
+            let mutationLogSnapshot = makeRuntimeLogFileSnapshot()
+            selectSwitcherWorkflowApp(targetApp, in: app, diagnosticsSummary: diagnosticsSummary)
+            app.activate()
+            app.typeKey(.downArrow, modifierFlags: [])
+            XCTAssertTrue(waitForSwitcherMode(diagnosticsSummary, modePrefix: "windowCycle", timeout: 5))
+            XCTAssertTrue(
+                waitForNoisyFullscreenWorkflowPreviewTitles(
+                    diagnosticsSummary,
+                    for: targetApp,
+                    timeout: 12
+                ),
+                """
+                Expected the open Switcher window layer to expose the Notes fullscreen target before mutation.
+
+                \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
+                """
+            )
+            let closedFullscreenTitle = try XCTUnwrap(
+                visibleFullscreenWindowTitle(in: diagnosticsSummary, for: targetApp)
+            )
+
+            assertSwitcherPreviewShowsOnlyExpectedTitles(
+                remainingTitles,
+                in: diagnosticsSummary,
+                timeout: 45
+            )
+            XCTAssertTrue(waitForSwitcherMode(diagnosticsSummary, modePrefix: "windowCycle", timeout: 5))
+            waitForRuntimeLogFiles(
+                containing: [
+                    "runtimeAXDestroyed appID=\(targetApp.identity.bundleIdentifier)",
+                    "affectedCGWindowID="
+                ],
+                since: mutationLogSnapshot,
+                timeout: 8
+            )
+            XCTAssertNotEqual(
+                XCUIApplication(bundleIdentifier: targetApp.identity.bundleIdentifier).state,
+                .notRunning
+            )
+            XCTAssertFalse(
+                switcherPreviewTitles(from: diagnosticsSummary).contains(closedFullscreenTitle),
+                """
+                Open Switcher window layer still exposed the closed fullscreen target window.
+
+                \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
+                """
+            )
+            XCTAssertTrue(
+                Set(switcherPreviewTitles(from: diagnosticsSummary))
+                    .isDisjoint(with: Set(workflow.otherExpectedWindowTitles(excluding: targetApp.appID))),
+                """
+                Fullscreen target-window mutation exposed another app's window card.
+
+                \(switcherDebugSummary(app, diagnosticsSummary: diagnosticsSummary))
+                """
+            )
+        }
+    }
+
     func selectSwitcherWorkflowApp(
         _ workflowApp: SpaceFixtureResolvedWorkflow.App,
         in app: XCUIApplication,

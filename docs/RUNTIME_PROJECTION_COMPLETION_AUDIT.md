@@ -87,6 +87,8 @@ passed the first 4 selected tests with 0 failures in 123.975 seconds
 then passed 1 selected UI test in 27.240 seconds, and the selected-window-removed
 variant passed 1 selected UI test in 26.796 seconds. The multi-app open-session
 mutation proof passed 1 selected UI test in 40.420 seconds (`95.142` seconds
+XCTest elapsed including build/test orchestration). The fullscreen target-window
+mutation proof passed 1 selected UI test in 41.174 seconds (`42.731` seconds
 XCTest elapsed including build/test orchestration). Together these refreshed
 tests prove
 the representative noisy fullscreen/off-space topology round trip, committed
@@ -96,7 +98,10 @@ refresh after shared runtime AX-destroyed reconciliation, and the
 selected-window-removed branch preserving `windowCycle` on the repaired runner.
 They also prove that a selected Chrome workflow app in a three-app fixture keeps
 its open window layer isolated after one of its real windows closes while a
-neighboring Notes fullscreen fixture is present.
+neighboring Notes fullscreen fixture is present, and that the selected Notes
+workflow app refreshes an already-open `windowCycle` after its fullscreen target
+window closes, removing the closed fullscreen card while keeping the remaining
+Notes window isolated.
 
 Broader pressure proof was not re-run for this validation slice because no
 production behavior, hot path, activation route, Search barrier, scheduler, or
@@ -116,11 +121,11 @@ runtime shape:
   matcher coverage is now present.
 - Broader multi-display/fullscreen topology and system-authoritative fullscreen
   owner proof remain partial.
-- Real UI breadth for open Switcher lifecycle mutation across cross-Space and
-  fullscreen target-window combinations remains open; the representative
-  single-app open window-layer mutation, selected-window-removed branch, and
-  multi-app selected-app isolation branch are now covered by behavior plus real
-  UI proof.
+- Real UI breadth for open Switcher lifecycle mutation across broader
+  cross-Space/multi-display combinations remains open; the representative
+  single-app open window-layer mutation, selected-window-removed branch,
+  multi-app selected-app isolation branch, and fullscreen target-window close
+  branch are now covered by behavior plus real UI proof.
 
 Do not mark these as completed from mock-only evidence. They need representative
 UI/E2E, runtime log, or pressure evidence before moving from breadth gap to
