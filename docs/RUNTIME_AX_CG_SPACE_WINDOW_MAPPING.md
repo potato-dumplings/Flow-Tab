@@ -1038,6 +1038,8 @@ Runtime infrastructure 负责：
 
 ## Known Gaps
 
+Phase 7 completion-audit ledger: [RUNTIME_PROJECTION_COMPLETION_AUDIT.md](RUNTIME_PROJECTION_COMPLETION_AUDIT.md).
+
 当前文档目标下仍需显式保留这些 gap，直到代码和验证都闭环：
 
 - Phase 5 本轮 P0 继续补 Space signature 到 read-model freshness metadata：`RuntimeSpaceTopologySignalFacts` 现在携带 `affectedCGWindowIDs` 与 `signatureSummary`，`RuntimeProjectionService.signalSpaceTopologyChanged()` 把它提交给 `RuntimeReadModelStore.markSpaceTopologyDirty(...)`，store diagnostics 与 projection/Search freshness 都会带 `spaceTopologySignatureSummary`。这让 Search 在 freshness barrier 未提交新 generation 时读取 last committed index 的 stale/degraded result，也能携带触发 stale 的 Space signature evidence；不会在 Search hot path 同步采样 CG/AX/Space，也不新增 surface-local topology state。真实多显示器/fullscreen owner/topology pressure 仍是 gap；Search freshness contract 不变：freshness barrier 未成功提交新 generation 时当前行为必须暴露为 degraded/stale committed result 与 dirty/freshness metadata，不能命名为 fresh、complete、latest 或 current-generation committed。
