@@ -3,6 +3,7 @@ import Foundation
 
 enum RuntimeReconciliationReason: String, Hashable {
     case axNotification
+    case activationReadbackMismatch
     case activationVerified
     case appLaunched
     case searchFreshnessBarrier
@@ -13,7 +14,11 @@ enum RuntimeReconciliationReason: String, Hashable {
 
     var schedulerPriority: RuntimeReconciliationPriority {
         switch self {
-        case .activationVerified, .appLaunched, .searchFreshnessBarrier, .selectedCurrentAppWindows:
+        case .activationReadbackMismatch,
+             .activationVerified,
+             .appLaunched,
+             .searchFreshnessBarrier,
+             .selectedCurrentAppWindows:
             .high
         case .axNotification, .spaceTopologyChanged:
             .normal

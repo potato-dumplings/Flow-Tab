@@ -115,6 +115,11 @@ check_has_matches \
   "recordWindowFocusVerification|verifiedFocusReadback|signalWindowFocusVerified|readActivationTargetProjection" \
   "${activation_paths[@]}"
 
+check_has_matches \
+  "activation readback mismatch is routed to runtime dirty stale projection state" \
+  "signalWindowFocusReadbackMismatch|markWindowFocusReadbackMismatch|recordWindowFocusReadbackMismatch|activationReadbackMismatch" \
+  FlowTab/Features/Switcher FlowTab/Features/Home FlowTab/Infrastructure/Runtime
+
 if [[ "$failures" -ne 0 ]]; then
   echo "Runtime projection exit-contract audit failed: $failures check(s)"
   exit 1

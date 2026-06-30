@@ -257,6 +257,21 @@ extension RuntimeProjectionRepairProvider {
         return verification.affectedCGWindowIDs
     }
 
+    func recordWindowFocusReadbackMismatch(
+        _ diagnostic: WindowBindingReadbackDiagnostic,
+        now: TimeInterval
+    ) -> Set<CGWindowID> {
+        let affectedCGWindowIDs = diagnostic.affectedCGWindowIDs
+        reconciliationCoordinator.markAppDirty(
+            appID: diagnostic.appID,
+            pid: diagnostic.ownerPID,
+            reason: .activationReadbackMismatch,
+            affectedCGWindowIDs: affectedCGWindowIDs,
+            now: now
+        )
+        return affectedCGWindowIDs
+    }
+
     func hasPendingReconciliationRequests(includeFullRepair: Bool) -> Bool {
         reconciliationCoordinator.hasPendingRequests(includeFullRepair: includeFullRepair)
     }

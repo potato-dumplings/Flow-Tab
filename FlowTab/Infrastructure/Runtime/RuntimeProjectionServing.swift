@@ -41,4 +41,5 @@ protocol RuntimeProjectionServing: Sendable {
     func signalAppTerminated(appID: String, pid: pid_t)
     func signalWindowFocusVerified(_ verification: RuntimeWindowFocusVerification)
     func signalWindowFocusVerified(appID: String, pid: pid_t)
+    func signalWindowFocusReadbackMismatch(_ diagnostic: WindowBindingReadbackDiagnostic)
 }

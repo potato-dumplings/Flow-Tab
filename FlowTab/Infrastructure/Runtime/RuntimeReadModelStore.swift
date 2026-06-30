@@ -230,6 +230,21 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         )
     }
 
+    func markWindowFocusReadbackMismatch(
+        _ diagnostic: WindowBindingReadbackDiagnostic,
+        affectedCGWindowIDs: Set<CGWindowID>,
+        generatedAt _: TimeInterval = Date.timeIntervalSinceReferenceDate
+    ) {
+        lock.lock()
+        defer { lock.unlock() }
+
+        generation.axDirty &+= 1
+        dirtyAppIDs.insert(diagnostic.appID)
+        dirtyPIDs.insert(diagnostic.ownerPID)
+        dirtyCGWindowIDs.formUnion(affectedCGWindowIDs)
+        pendingRepairScopes.insert("activationReadbackMismatch:\(diagnostic.appID)")
+    }
+
     func markAppTerminatedForMainTableProjection(appID: String, pid: pid_t) {
         lock.lock()
         defer { lock.unlock() }

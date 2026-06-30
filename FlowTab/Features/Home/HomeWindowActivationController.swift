@@ -41,6 +41,9 @@ final class HomeWindowActivationController {
                 )
                 runtimeProjectionService.signalWindowFocusVerified(verification)
             }
+            runtimeActivator.windowFocusReadbackMismatchHandler = { diagnostic in
+                runtimeProjectionService.signalWindowFocusReadbackMismatch(diagnostic)
+            }
             self.activationHandler = { target, contextsByID in
                 runtimeActivator.activate(target: target, contextsByID: contextsByID)
             }

@@ -260,6 +260,9 @@ final class LiveSwitcherModel: ObservableObject {
             )
             runtimeProjectionService.signalWindowFocusVerified(verification)
         }
+        activator.windowFocusReadbackMismatchHandler = { [runtimeProjectionService] diagnostic in
+            runtimeProjectionService.signalWindowFocusReadbackMismatch(diagnostic)
+        }
     }
 
     func signalSpaceTopologyChanged() {

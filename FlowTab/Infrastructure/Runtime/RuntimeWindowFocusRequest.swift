@@ -46,6 +46,10 @@ struct WindowBindingReadbackDiagnostic: Equatable {
     let visibleCGWindowIDs: [CGWindowID]
     let bindingConfidence: WindowBindingConfidence
     let allowedActions: Set<WindowBindingAction>
+
+    var affectedCGWindowIDs: Set<CGWindowID> {
+        Set([targetCGWindowID, focusedCGWindowID].compactMap { $0 })
+    }
 }
 
 struct RuntimeWindowFocusVerification: Equatable {

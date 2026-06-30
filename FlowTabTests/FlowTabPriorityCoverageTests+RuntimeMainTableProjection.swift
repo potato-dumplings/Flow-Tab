@@ -1853,6 +1853,104 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
+    func testRuntimeProjectionServiceTreatsActivationReadbackMismatchAsDirtyStaleCommittedState() throws {
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let pid = runningApp.processIdentifier
+        let displayName = runningApp.localizedName ?? appID
+        let appDirectoryEntry = RuntimeAppDirectoryEntry(app: runningApp)
+        let staleWindow = WindowCandidate(
+            id: "legacy-mismatch-window",
+            title: "Legacy Mismatch Window",
+            isMinimized: false,
+            lastActiveAt: 100
+        )
+        let committedApp = AppSwitchCandidate(
+            id: appID,
+            displayName: displayName,
+            groupID: RuntimeAppIdentity.groupID(
+                for: runningApp.bundleIdentifier,
+                fallbackName: displayName
+            ),
+            lastActiveAt: 100,
+            windows: [staleWindow]
+        )
+        let readModelStore = RuntimeReadModelStore()
+        readModelStore.seedAppSwitcherProjectionForTesting(
+            apps: [committedApp],
+            contextsByID: [:],
+            appDirectoryEntries: [appDirectoryEntry],
+            generatedAt: 10
+        )
+        commitMainTableSearchFreshnessBarrierForTesting(readModelStore, generatedAt: 11)
+        let targetCGWindowID = CGWindowID(240_819)
+        let focusedCGWindowID = CGWindowID(240_820)
+        let coordinator = RuntimeReconciliationCoordinator()
+        let requestLock = NSLock()
+        var startedRequests: [RuntimeReconciliationRequest] = []
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.ReadbackMismatchDirtyState",
+            repairProvider: RuntimeProjectionRepairProvider(
+                windowRecordStore: RuntimeWindowRecordStore(),
+                reconciliationCoordinator: coordinator
+            ),
+            readModelStore: readModelStore,
+            reconciliationExecutor: { request, _ in
+                requestLock.lock()
+                startedRequests.append(request)
+                requestLock.unlock()
+                return .completed
+            }
+        )
+
+        service.signalWindowFocusReadbackMismatch(
+            WindowBindingReadbackDiagnostic(
+                appID: appID,
+                windowID: RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: targetCGWindowID),
+                ownerPID: pid,
+                route: "cg",
+                reason: .targetCGNotVisible,
+                targetCGWindowID: targetCGWindowID,
+                focusedCGWindowID: focusedCGWindowID,
+                visibleCGWindowIDs: [focusedCGWindowID],
+                bindingConfidence: .inferred,
+                allowedActions: WindowBindingConfidence.inferred.allowedActions
+            )
+        )
+        service.waitForMaintenanceQueueForTesting()
+
+        requestLock.lock()
+        let startedRequest = startedRequests.first
+        requestLock.unlock()
+        let request = try XCTUnwrap(startedRequest)
+        XCTAssertEqual(request.appID, appID)
+        XCTAssertEqual(request.target, .app(pid))
+        XCTAssertEqual(request.reasons, Set([.activationReadbackMismatch]))
+        XCTAssertEqual(request.priority, .high)
+        XCTAssertEqual(request.affectedCGWindowIDs, Set([targetCGWindowID, focusedCGWindowID]))
+
+        let diagnostics = readModelStore.diagnostics()
+        XCTAssertEqual(diagnostics.dirtyAppIDs, [appID])
+        XCTAssertEqual(diagnostics.dirtyPIDs, [pid])
+        XCTAssertEqual(diagnostics.dirtyCGWindowIDs, Set([targetCGWindowID, focusedCGWindowID]))
+        XCTAssertTrue(diagnostics.pendingRepairScopes.contains("activationReadbackMismatch:\(appID)"))
+        XCTAssertFalse(diagnostics.hasActivationTargetProjection)
+
+        let searchRead = readModelStore.readCommittedSearchIndexForSearch()
+        XCTAssertEqual(searchRead.readiness, .degradedStaleCommitted)
+        XCTAssertEqual(searchRead.resultState, .degradedStaleCommittedResult)
+        XCTAssertEqual(
+            searchRead.projection?.windowEntries.filter { $0.appID == appID }.map(\.windowID),
+            [staleWindow.id]
+        )
+        XCTAssertFalse(searchRead.projection?.freshness.isCompleteForScope ?? true)
+        XCTAssertTrue(
+            searchRead.projection?.freshness.pendingRepairScopes.contains(
+                "activationReadbackMismatch:\(appID)"
+            ) ?? false
+        )
+    }
+
     func testRuntimeProjectionServiceCommitsSearchIndexFromMainTableProjectionOnlyAfterBarrier() throws {
         let runningApp = NSRunningApplication.current
         let appID = RuntimeAppIdentity.appID(for: runningApp)

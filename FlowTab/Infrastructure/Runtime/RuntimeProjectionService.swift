@@ -440,6 +440,41 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         )
     }
 
+    func signalWindowFocusReadbackMismatch(_ diagnostic: WindowBindingReadbackDiagnostic) {
+        maintenanceQueue.async { [self] in
+            let now = Date.timeIntervalSinceReferenceDate
+            let affectedCGWindowIDs = repairProvider.recordWindowFocusReadbackMismatch(
+                diagnostic,
+                now: now
+            )
+            readModelStore.markWindowFocusReadbackMismatch(
+                diagnostic,
+                affectedCGWindowIDs: affectedCGWindowIDs,
+                generatedAt: now
+            )
+            commitAppDirectoryProviderEvidenceLocked(generatedAt: now)
+            commitMainTableCurrentAppProjectionLocked(
+                appID: diagnostic.appID,
+                pid: diagnostic.ownerPID,
+                clearsDirtyState: false,
+                generatedAt: now
+            )
+            drainReadyReconciliationRequestsLocked(now: now)
+            RuntimeLog.debug(
+                .projection,
+                [
+                    "runtimeActivationReadbackMismatch",
+                    "appID=\(diagnostic.appID)",
+                    "pid=\(diagnostic.ownerPID)",
+                    "windowID=\(diagnostic.windowID)",
+                    "route=\(diagnostic.route)",
+                    "reason=\(diagnostic.reason.rawValue)",
+                    "affectedCGWindowIDs=\(affectedCGWindowIDs.map(String.init).sorted().joined(separator: ","))"
+                ].joined(separator: " ")
+            )
+        }
+    }
+
     @discardableResult
     func drainReadyReconciliationRequestsSynchronouslyForTesting(
         now: TimeInterval = Date.timeIntervalSinceReferenceDate

@@ -69,6 +69,10 @@ protocol RuntimeProjectionRepairProviding: AnyObject {
         _ verification: RuntimeWindowFocusVerification,
         now: TimeInterval
     ) -> Set<CGWindowID>
+    func recordWindowFocusReadbackMismatch(
+        _ diagnostic: WindowBindingReadbackDiagnostic,
+        now: TimeInterval
+    ) -> Set<CGWindowID>
     func recordSearchWindowCoverageNeeded(appID: String, pid: pid_t, now: TimeInterval)
     func recordAppLaunched(appID: String, pid: pid_t, now: TimeInterval)
     func recordAppWindowsChanged(appID: String, pid: pid_t, now: TimeInterval)

@@ -144,6 +144,7 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     private var appTerminationSignals: [(appID: String, pid: pid_t)] = []
     private var windowFocusVerifiedSignals: [(appID: String, pid: pid_t)] = []
     private var windowFocusVerificationSignals: [RuntimeWindowFocusVerification] = []
+    private var windowFocusReadbackMismatchSignals: [WindowBindingReadbackDiagnostic] = []
 
     init(
         appSwitcherProjection: RuntimeAppSwitcherProjection? = nil,
@@ -568,6 +569,12 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         lock.lock()
         windowFocusVerifiedSignals.append((verification.appID, verification.ownerPID))
         windowFocusVerificationSignals.append(verification)
+        lock.unlock()
+    }
+
+    func signalWindowFocusReadbackMismatch(_ diagnostic: WindowBindingReadbackDiagnostic) {
+        lock.lock()
+        windowFocusReadbackMismatchSignals.append(diagnostic)
         lock.unlock()
     }
 
