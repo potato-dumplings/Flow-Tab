@@ -2409,7 +2409,12 @@ extension FlowTabPriorityCoverageTests {
                 expectation.fulfill()
                 return .completedWithFullRepairEvidence(
                     RuntimeFullRepairEvidence(
-                        appDirectoryEntries: appDirectoryEntries
+                        appDirectoryEntries: appDirectoryEntries,
+                        windowRecordRefresh: RuntimeFullRepairWindowRecordRefreshEvidence(
+                            runningAppCount: 2,
+                            projectedWindowPIDCount: 0,
+                            projectedWindowCount: 0
+                        )
                     )
                 )
             }

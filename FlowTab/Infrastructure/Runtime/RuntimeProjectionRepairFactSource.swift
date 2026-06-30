@@ -14,6 +14,7 @@ struct RuntimeFullRepairRunningAppFacts {
 struct RuntimeFullRepairWindowFacts {
     let windowsByPID: [pid_t: [RuntimeWindowListEntry]]
     let rankByPID: [pid_t: Int]
+    let refreshEvidence: RuntimeFullRepairWindowRecordRefreshEvidence
 }
 
 struct RuntimeFullRepairAppSelectionFacts {
@@ -269,7 +270,12 @@ struct RuntimeProjectionRepairFactSource {
         // Sampling updates WindowRecord; projection selection reads the long-lived record table.
         return RuntimeFullRepairWindowFacts(
             windowsByPID: windowsByPID,
-            rankByPID: rankByPID
+            rankByPID: rankByPID,
+            refreshEvidence: RuntimeFullRepairWindowRecordRefreshEvidence(
+                runningAppCount: runningApps.count,
+                projectedWindowPIDCount: windowsByPID.count,
+                projectedWindowCount: windowsByPID.values.reduce(0) { $0 + $1.count }
+            )
         )
     }
 

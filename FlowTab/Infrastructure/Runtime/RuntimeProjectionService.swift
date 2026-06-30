@@ -131,6 +131,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                     "startedRequests=\(drainResult.startedRequests.count)",
                     "completedRequests=\(drainResult.completedCount)",
                     "fullRepairEvidence=\(drainResult.fullRepairEvidence.count)",
+                    "fullRepairWindowRecordRefreshes=\(drainResult.fullRepairEvidence.filter { $0.windowRecordRefresh != nil }.count)",
                     "fullRepairColdStartCommits=\(fullRepairProjectionCommitSummary.coldStartCommittedCount)",
                     "fullRepairDegradedCommits=\(fullRepairProjectionCommitSummary.degradedCommittedCount)",
                     "mainTableProjectionCommitted=\(mainTableProjectionCommitted ? 1 : 0)",

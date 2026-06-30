@@ -92,7 +92,8 @@ extension RuntimeProjectionRepairProvider {
             ]
         )
         return RuntimeFullRepairEvidence(
-            appDirectoryEntries: runningAppFacts.appDirectoryEntries
+            appDirectoryEntries: runningAppFacts.appDirectoryEntries,
+            windowRecordRefresh: windowData.refreshEvidence
         )
     }
 

@@ -22,6 +22,21 @@ struct RuntimeCurrentAppRepairEvidence: Equatable, Sendable {
 
 struct RuntimeFullRepairEvidence: Equatable, Sendable {
     let appDirectoryEntries: [RuntimeAppDirectoryEntry]
+    let windowRecordRefresh: RuntimeFullRepairWindowRecordRefreshEvidence?
+
+    init(
+        appDirectoryEntries: [RuntimeAppDirectoryEntry],
+        windowRecordRefresh: RuntimeFullRepairWindowRecordRefreshEvidence? = nil
+    ) {
+        self.appDirectoryEntries = appDirectoryEntries
+        self.windowRecordRefresh = windowRecordRefresh
+    }
+}
+
+struct RuntimeFullRepairWindowRecordRefreshEvidence: Equatable, Sendable {
+    let runningAppCount: Int
+    let projectedWindowPIDCount: Int
+    let projectedWindowCount: Int
 }
 
 struct RuntimeAppWindowReconciliationResult {

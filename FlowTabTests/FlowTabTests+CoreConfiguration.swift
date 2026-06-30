@@ -532,6 +532,13 @@ extension FlowTabTests {
             )
 
             XCTAssertFalse(repairEvidence.appDirectoryEntries.isEmpty)
+            guard let windowRecordRefresh = repairEvidence.windowRecordRefresh else {
+                XCTFail("expected full repair to report WindowRecord refresh evidence separately")
+                return
+            }
+            XCTAssertEqual(windowRecordRefresh.runningAppCount, repairEvidence.appDirectoryEntries.count)
+            XCTAssertEqual(windowRecordRefresh.projectedWindowPIDCount, 0)
+            XCTAssertEqual(windowRecordRefresh.projectedWindowCount, 0)
             XCTAssertFalse(projectionPayload?.apps.isEmpty ?? true)
             XCTAssertEqual(projectionPayload?.contextsByID.count, projectionPayload?.apps.count)
             XCTAssertTrue(projectionPayload?.apps.allSatisfy { $0.windows.isEmpty } == true)
