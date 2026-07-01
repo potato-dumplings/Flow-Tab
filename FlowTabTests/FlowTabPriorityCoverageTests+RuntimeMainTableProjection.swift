@@ -206,7 +206,7 @@ extension FlowTabPriorityCoverageTests {
                 "artifact": 240_844
             ],
             bindingAllowedActionsByWindowID: [
-                "artifact": [.exposeInSwitcher]
+                "artifact": WindowBindingConfidence.inferred.allowedActions
             ]
         )
         store.commitMainTableAppSwitcherProjectionPayload(
