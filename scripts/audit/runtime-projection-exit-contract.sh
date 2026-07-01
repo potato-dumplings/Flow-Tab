@@ -110,6 +110,31 @@ check_has_matches \
   "readHomeSummaryProjection|readHomeAppDetailProjection|readCurrentAppWindowProjection|signalAppWindowsChanged" \
   FlowTab/Features/Home FlowTab/Infrastructure/Runtime/RuntimeProjectionServing.swift
 
+check_no_matches \
+  "Switcher does not own current-app sibling preservation state" \
+  "preservingExistingWindowCandidates|currentAppWindowPayloadByPreservingPriorCommittedWindows|currentAppWindowPreservationAllowsActivation" \
+  FlowTab/Features/Switcher
+
+check_has_matches \
+  "current-app sibling preservation is owned by RuntimeReadModelStore" \
+  "currentAppWindowPayloadByPreservingPriorCommittedWindowsLocked|currentAppWindowPreservationSourcesLocked" \
+  FlowTab/Infrastructure/Runtime/RuntimeReadModelStore.swift
+
+check_has_matches \
+  "current-app sibling preservation can only use committed current-app or app-switcher projection sources" \
+  "currentAppWindowProjectionsByAppID|appSwitcherProjection" \
+  FlowTab/Infrastructure/Runtime/RuntimeReadModelStore.swift
+
+check_has_matches \
+  "current-app sibling preservation is activation-action gated" \
+  "currentAppWindowPreservationAllowsActivationLocked|useForAXActivation|useForCGActivationFallback" \
+  FlowTab/Infrastructure/Runtime/RuntimeReadModelStore.swift
+
+check_has_matches \
+  "current-app sibling preservation rejects dirty affected CG windows" \
+  "dirtyCGWindowIDs\\.contains\\(cgWindowID\\)" \
+  FlowTab/Infrastructure/Runtime/RuntimeReadModelStore.swift
+
 check_has_matches \
   "Search freshness commits only from main-table payload in production runtime" \
   "searchIndexPayloadFromMainTables|commitSearchFreshnessBarrierFromMainTablePayload" \

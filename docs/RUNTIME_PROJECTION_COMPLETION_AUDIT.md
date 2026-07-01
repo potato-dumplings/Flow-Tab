@@ -1,6 +1,6 @@
 # Runtime Projection Completion Audit
 
-Updated: 2026-06-30
+Updated: 2026-07-01
 
 This audit is the Phase 7 closure ledger for `RUNTIME_AX_CG_SPACE_WINDOW_MAPPING.md`.
 It records current evidence for the projection-driven runtime exit contract without
@@ -37,6 +37,7 @@ the diagnostic; they do not maintain surface-local activation repair state.
 | Switcher normal paths read projection/Search APIs or send dirty signals | `scripts/audit/runtime-projection-exit-contract.sh` verifies Switcher references `readAppSwitcherProjection`, `readCurrentAppWindowProjection`, `readCommittedSearchIndexForSearch`, and `requestSearchIndexFreshnessBarrier`, while rejecting legacy snapshot, repair-provider, CG, and AX sampling APIs in Switcher hot paths. | Proven by source audit |
 | Switcher fullscreen presentation reads runtime Space topology projection, not frontmost/AX fullscreen probes | The exit audit now separately rejects `NSWorkspace.shared.frontmostApplication`, focused-window attributes, AX fullscreen probes, CG window-list sampling, and AX app creation inside `SwitcherPanelController+Presentation`, while requiring `readSpaceTopologyProjection()` / `signalSpaceTopologyChanged()` evidence. `testSwitcherPanelPresentationReadsRuntimeSpaceTopologyProjectionForFullscreenLevel`, `testSwitcherPanelPresentationSignalsRuntimeWhenSpaceTopologyProjectionIsMissing`, and `testSwitcherPanelPresentationFailsClosedForIncompleteSpaceTopologyProjection` prove the panel elevates only from a complete/current runtime Space topology projection, sends the dirty signal when projection is missing, and keeps the normal level without extra dirty signaling when projection freshness is incomplete/pending. | Proven by source audit and behavior tests |
 | Open Switcher sessions refresh from runtime projection commits | `RuntimeProjectionService` posts app-switcher and current-app window projection commit notifications after `RuntimeReadModelStore` commits. `SwitcherPanelController` observes those notifications and only re-reads committed projections; it does not create surface-local scheduler/retry state or call snapshot/CG/AX sampling. `testSwitcherPanelControllerAppSwitcherProjectionCommitRefreshesOpenSession`, `testSwitcherPanelControllerCurrentAppProjectionCommitAppliesPendingManualWindowLayerEntry`, `testSwitcherPanelControllerCurrentAppProjectionCommitRefreshesFrozenWindowLayerPreview`, and `testSwitcherPanelControllerCurrentAppProjectionCommitKeepsWindowLayerWhenSelectedWindowIsRemoved` prove app-cycle, pending manual window-layer, already-open window-layer preview refresh, and selected-window-removed fallback behavior. `testSwitcherPanelRefreshesOpenWindowLayerAfterRealFixtureWindowSetMutation`, `testSwitcherPanelKeepsWindowLayerWhenSelectedFixtureWindowCloses`, and `testSwitcherPanelRefreshesOpenWorkflowAppWindowLayerAfterMultiAppWindowSetMutation` prove real fixture close-window mutations route through shared runtime `runtimeAXDestroyed ... affectedCGWindowID=...` evidence, keep the open Switcher window layer on the remaining committed window while the fixture process remains running, and preserve selected-app isolation in a multi-app workflow with a neighboring fullscreen fixture app. | Proven by behavior and real UI tests |
+| Current-app sibling preservation is runtime-owned and activation/dirty gated | `scripts/audit/runtime-projection-exit-contract.sh` now rejects Switcher-owned current-app sibling preservation helpers and requires `RuntimeReadModelStore` to own `currentAppWindowPayloadByPreservingPriorCommittedWindowsLocked(...)`, committed current-app/app-switcher projection sources, activation-action gating through `useForAXActivation` / `useForCGActivationFallback`, and dirty `CGWindowID` rejection. `testRuntimeReadModelStorePreservesCommittedCurrentAppSiblingRowsUntilDirtyCGInvalidatesThem`, `testRuntimeReadModelStorePreservesCurrentAppSiblingsFromCommittedAppSwitcherProjection`, and `testLiveSwitcherModelAppliesCommittedRuntimeWindowRecencyWhenProjectionOrderChanges` prove committed sibling preservation, dirty affected-CG invalidation, app-switcher-source migration preservation, non-activatable artifact rejection, and restored window-cycle ordering. | Proven by source audit and behavior tests |
 | Control+Tab focused-current-app path does not synchronously sample frontmost/focused app state | The exit audit now separately rejects `NSWorkspace.shared.frontmostApplication`, `kAXFocusedWindowAttribute`, old focused snapshot/frontmost resolver seams, and the removed frontmost bundle launch override in the Switcher/TestingSupport hot path. It also requires `readFocusedCurrentAppWindowProjection()` and `signalFocusedCurrentAppWindowsChanged()` evidence, proving the focused path either reads runtime projection or sends a dirty signal. | Proven by source audit |
 | Home normal paths read projection APIs or send dirty signals | The exit audit verifies Home references `readHomeSummaryProjection`, `readHomeAppDetailProjection`, `readCurrentAppWindowProjection`, and `signalAppWindowsChanged`, while rejecting legacy snapshot, repair-provider, CG, and AX sampling APIs in Home hot paths. | Proven by source audit |
 | Search reads only committed index and cannot expose staging/repair/partial/session completeness as latest | The exit audit verifies production Search freshness commits only through `RuntimeMainTableProjectionBuilding.searchIndexPayloadFromMainTables(...)` and `RuntimeReadModelStore.commitSearchFreshnessBarrierFromMainTablePayload(...)`. `TEST_COVERAGE_MATRIX.md` records behavior/UI/pressure proof for pre-commit reads that are `missingCommittedIndex` or degraded/stale committed result, committed-generation async re-entry, and external committed-index Search CPU/RSS sampling. | Proven by source audit plus behavior/UI/pressure evidence |
@@ -56,7 +57,9 @@ Required for this audit slice:
 ```
 
 The audit now includes production checks for the non-registry verified-focus
-fallback parser and grep-able `verifiedFocusFallbackAX` WindowRecord log marker.
+fallback parser, grep-able `verifiedFocusFallbackAX` WindowRecord log marker,
+and current-app sibling preservation ownership in `RuntimeReadModelStore`
+instead of Switcher surface state.
 
 Representative neighboring behavior proof already used by the current audit:
 
@@ -91,6 +94,21 @@ This targeted behavior run passed 5 selected tests with 0 failures. It proves
 that selected projection windows and committed sticky/fullscreen selections
 update runtime recency before fallback windows, without treating that selected
 recency as activation success.
+
+Current-app sibling preservation behavior proof for the current audit:
+
+```bash
+./scripts/testing/run-flowtabtests-local.sh \
+  -only-testing:FlowTabTests/FlowTabPriorityCoverageTests/testRuntimeReadModelStorePreservesCommittedCurrentAppSiblingRowsUntilDirtyCGInvalidatesThem \
+  -only-testing:FlowTabTests/FlowTabPriorityCoverageTests/testRuntimeReadModelStorePreservesCurrentAppSiblingsFromCommittedAppSwitcherProjection \
+  -only-testing:FlowTabTests/FlowTabPriorityCoverageTests/testLiveSwitcherModelAppliesCommittedRuntimeWindowRecencyWhenProjectionOrderChanges
+```
+
+This targeted behavior run passed 3 selected tests with 0 failures. It proves
+that missing current-app siblings can be preserved from committed projection
+state, dirty affected `CGWindowID`s invalidate preserved siblings, app-switcher
+projection can serve as a migration source, and non-activatable artifact rows
+are not carried into current-app window-cycle projection.
 
 Post-runner-fix representative UI proof refreshed for this audit:
 
