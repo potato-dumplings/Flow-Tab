@@ -172,7 +172,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(projection.freshness.pendingRepairScopes.contains("spaceTopology"))
     }
 
-    func testRuntimeReadModelStorePreservesCurrentAppSiblingsFromCommittedAppSwitcherProjection() throws {
+    func testRuntimeReadModelStoreDoesNotPreserveCurrentAppSiblingsFromCommittedAppSwitcherProjection() throws {
         let runningApp = NSRunningApplication.current
         let appID = RuntimeAppIdentity.appID(for: runningApp)
         let store = RuntimeReadModelStore()
@@ -241,13 +241,10 @@ extension FlowTabPriorityCoverageTests {
         let projection = try XCTUnwrap(store.readCurrentAppWindowProjection(appID: appID))
         XCTAssertEqual(
             projection.currentAppWindowPayload.candidate.windows.map(\.id),
-            ["fullscreen", "normal", "incognito"]
+            ["fullscreen", "normal"]
         )
-        XCTAssertEqual(projection.currentAppWindowPayload.summary.windowCount, 3)
-        XCTAssertEqual(
-            projection.currentAppWindowPayload.context.windowsByID["incognito"]?.cgWindowID,
-            240_843
-        )
+        XCTAssertEqual(projection.currentAppWindowPayload.summary.windowCount, 2)
+        XCTAssertNil(projection.currentAppWindowPayload.context.windowsByID["incognito"])
         XCTAssertNil(projection.currentAppWindowPayload.context.windowsByID["artifact"])
         XCTAssertTrue(projection.freshness.isCompleteForScope)
     }

@@ -121,8 +121,13 @@ check_has_matches \
   FlowTab/Infrastructure/Runtime/RuntimeReadModelStore.swift
 
 check_has_matches \
-  "current-app sibling preservation can only use committed current-app or app-switcher projection sources" \
-  "currentAppWindowProjectionsByAppID|appSwitcherProjection" \
+  "current-app sibling preservation can only use committed current-app projection source" \
+  "currentAppWindowProjectionsByAppID|currentAppWindowPreservationSourcesLocked" \
+  FlowTab/Infrastructure/Runtime/RuntimeReadModelStore.swift
+
+check_no_matches \
+  "current-app sibling preservation does not use app-switcher projection as a fact source" \
+  "appSwitcherCandidate|appSwitcherContext|sources\\.append\\(\\(\\.appSwitcherProjection|CurrentAppWindowPreservationSourceKind" \
   FlowTab/Infrastructure/Runtime/RuntimeReadModelStore.swift
 
 check_has_matches \

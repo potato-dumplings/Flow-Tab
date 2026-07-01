@@ -3,11 +3,6 @@ import Foundation
 import FlowTabCore
 
 final class RuntimeReadModelStore: @unchecked Sendable {
-    private enum CurrentAppWindowPreservationSourceKind {
-        case currentAppProjection
-        case appSwitcherProjection
-    }
-
     private let lock = NSLock()
     private var generation = RuntimeReadModelGeneration()
     private var dirtyAppIDs: Set<String> = []
@@ -842,7 +837,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
                 else {
                     continue
                 }
-                guard currentAppWindowPreservationAllowsActivationLocked(priorContext, from: source.kind) else {
+                guard currentAppWindowPreservationAllowsActivationLocked(priorContext) else {
                     continue
                 }
                 if let cgWindowID = priorContext.cgWindowID {
@@ -895,36 +890,22 @@ final class RuntimeReadModelStore: @unchecked Sendable {
 
     private func currentAppWindowPreservationSourcesLocked(
         for payload: RuntimeCurrentAppWindowPayload
-    ) -> [(kind: CurrentAppWindowPreservationSourceKind, candidate: AppSwitchCandidate, context: RuntimeAppContext)] {
-        var sources: [(kind: CurrentAppWindowPreservationSourceKind, candidate: AppSwitchCandidate, context: RuntimeAppContext)] = []
+    ) -> [(candidate: AppSwitchCandidate, context: RuntimeAppContext)] {
+        var sources: [(candidate: AppSwitchCandidate, context: RuntimeAppContext)] = []
         if let priorPayload = currentAppWindowProjectionsByAppID[payload.summary.appID]?.currentAppWindowPayload,
            currentAppWindowPreservationSourceMatchesProcessLocked(
             sourcePID: priorPayload.summary.pid,
             sourceContext: priorPayload.context,
             payload: payload
            ) {
-            sources.append((.currentAppProjection, priorPayload.candidate, priorPayload.context))
-        }
-        if let appSwitcherProjection,
-           let appSwitcherCandidate = appSwitcherProjection.apps.first(where: { $0.id == payload.summary.appID }),
-           let appSwitcherContext = appSwitcherProjection.contextsByID[payload.summary.appID],
-           currentAppWindowPreservationSourceMatchesProcessLocked(
-            sourcePID: appSwitcherContext.runningApp.processIdentifier,
-            sourceContext: appSwitcherContext,
-            payload: payload
-           ) {
-            sources.append((.appSwitcherProjection, appSwitcherCandidate, appSwitcherContext))
+            sources.append((priorPayload.candidate, priorPayload.context))
         }
         return sources
     }
 
     private func currentAppWindowPreservationAllowsActivationLocked(
-        _ context: RuntimeWindowContext,
-        from sourceKind: CurrentAppWindowPreservationSourceKind
+        _ context: RuntimeWindowContext
     ) -> Bool {
-        if sourceKind == .appSwitcherProjection {
-            return context.bindingAllowedActions.contains(.useForAXActivation)
-        }
         return context.bindingAllowedActions.contains(.useForAXActivation)
             || context.bindingAllowedActions.contains(.useForCGActivationFallback)
     }
