@@ -50,14 +50,15 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             clearsDirtyCGWindowIDs,
             hasCompleteWindowCoverage: payload.hasCompleteWindowCoverage
         )
-        let isCompleteForScope = !isDirtyLocked && payload.hasCompleteWindowCoverage
+        let normalizedPayload = mainTableAppSwitcherProjectionPayloadByNormalizingPresentationLocked(payload)
+        let isCompleteForScope = !isDirtyLocked && normalizedPayload.hasCompleteWindowCoverage
         appSwitcherProjection = RuntimeAppSwitcherProjection(
-            apps: payload.apps,
-            contextsByID: payload.contextsByID,
+            apps: normalizedPayload.apps,
+            contextsByID: normalizedPayload.contextsByID,
             freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: isCompleteForScope)
         )
         homeSummaryProjection = RuntimeHomeSummaryProjection(
-            summaries: payload.homeSummaries,
+            summaries: normalizedPayload.homeSummaries,
             freshness: freshnessLocked(generatedAt: generatedAt, isCompleteForScope: isCompleteForScope)
         )
         return RuntimeAppSwitcherProjectionCommitSummary(
@@ -120,7 +121,8 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         defer { lock.unlock() }
 
         let preservedPayload = currentAppWindowPayloadByPreservingPriorCommittedWindowsLocked(payload)
-        let committedPayload = currentAppWindowPayloadByApplyingActivationReadbackLocked(preservedPayload)
+        let normalizedPayload = currentAppWindowPayloadByNormalizingPresentationLocked(preservedPayload)
+        let committedPayload = currentAppWindowPayloadByApplyingActivationReadbackLocked(normalizedPayload)
         markProjectionCommittedLocked()
         if clearsDirtyState {
             clearDirtyStateForAppLocked(appID: committedPayload.summary.appID, pid: committedPayload.summary.pid)
@@ -653,6 +655,172 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             candidate: candidate,
             context: payload.context,
             appDirectoryEntries: payload.appDirectoryEntries
+        )
+    }
+
+    private func mainTableAppSwitcherProjectionPayloadByNormalizingPresentationLocked(
+        _ payload: RuntimeAppSwitcherProjectionPayload
+    ) -> RuntimeAppSwitcherProjectionPayload {
+        guard !payload.apps.isEmpty else { return payload }
+
+        var contextsByID = payload.contextsByID
+        let apps = payload.apps.map { app -> AppSwitchCandidate in
+            guard let context = contextsByID[app.id] else { return app }
+            let normalized = appCandidateAndContextByNormalizingPresentationLocked(
+                candidate: app,
+                context: context,
+                appName: app.displayName,
+                stage: "read-model-app-switcher-normalization"
+            )
+            contextsByID[app.id] = normalized.context
+            return normalized.candidate
+        }
+        let homeSummaries = payload.homeSummaries.map { summary -> RuntimeHomeAppSummary in
+            guard let app = apps.first(where: { $0.id == summary.appID }) else { return summary }
+            return RuntimeHomeAppSummary(
+                appID: summary.appID,
+                displayName: summary.displayName,
+                groupID: summary.groupID,
+                lastActiveAt: summary.lastActiveAt,
+                windowCount: app.windows.count,
+                pid: summary.pid,
+                bundleIdentifier: summary.bundleIdentifier,
+                bundleURL: summary.bundleURL
+            )
+        }
+        return RuntimeAppSwitcherProjectionPayload(
+            apps: apps,
+            contextsByID: contextsByID,
+            homeSummaries: homeSummaries,
+            hasCompleteWindowCoverage: payload.hasCompleteWindowCoverage,
+            coverageDiagnostics: payload.coverageDiagnostics
+        )
+    }
+
+    private func currentAppWindowPayloadByNormalizingPresentationLocked(
+        _ payload: RuntimeCurrentAppWindowPayload
+    ) -> RuntimeCurrentAppWindowPayload {
+        let normalized = appCandidateAndContextByNormalizingPresentationLocked(
+            candidate: payload.candidate,
+            context: payload.context,
+            appName: payload.candidate.displayName,
+            stage: "read-model-current-app-normalization"
+        )
+        guard normalized.candidate.windows.map(\.id) != payload.candidate.windows.map(\.id) else {
+            return payload
+        }
+
+        let summary = RuntimeHomeAppSummary(
+            appID: payload.summary.appID,
+            displayName: payload.summary.displayName,
+            groupID: payload.summary.groupID,
+            lastActiveAt: payload.summary.lastActiveAt,
+            windowCount: normalized.candidate.windows.count,
+            pid: payload.summary.pid,
+            bundleIdentifier: payload.summary.bundleIdentifier,
+            bundleURL: payload.summary.bundleURL
+        )
+        return RuntimeCurrentAppWindowPayload(
+            summary: summary,
+            candidate: normalized.candidate,
+            context: normalized.context,
+            appDirectoryEntries: payload.appDirectoryEntries
+        )
+    }
+
+    private func appCandidateAndContextByNormalizingPresentationLocked(
+        candidate: AppSwitchCandidate,
+        context: RuntimeAppContext,
+        appName: String,
+        stage: String
+    ) -> (candidate: AppSwitchCandidate, context: RuntimeAppContext) {
+        guard candidate.windows.count > 1 else {
+            return (candidate, context)
+        }
+
+        let entries = candidate.windows.compactMap { window -> RuntimeWindowListEntry? in
+            guard let windowContext = context.windowsByID[window.id] else { return nil }
+            return RuntimeWindowListEntry(
+                windowID: window.id,
+                title: window.title,
+                isMinimized: window.isMinimized,
+                ownerPID: windowContext.ownerPID,
+                cgWindowID: windowContext.cgWindowID,
+                activationHandleID: windowContext.activationHandleID,
+                axWindow: windowContext.axWindow,
+                frame: windowContext.frame,
+                spaceIDs: windowContext.spaceIDs,
+                isOnscreen: false,
+                allowsPublicAXRecovery: windowContext.allowsPublicAXRecovery,
+                hasStickyBinding: windowContext.hasStickyBinding,
+                lastConfirmationSource: windowContext.lastConfirmationSource,
+                bindingConfidenceOverride: windowContext.bindingConfidenceOverride,
+                bindingAllowedActionsOverride: windowContext.bindingAllowedActionsOverride,
+                bindingCandidateCount: windowContext.bindingCandidateCount,
+                spaceEvidence: windowContext.spaceEvidence
+            )
+        }
+        guard !entries.isEmpty else {
+            return (candidate, context)
+        }
+
+        let knownCGWindowsByID = Dictionary(
+            uniqueKeysWithValues: entries.compactMap { entry -> (CGWindowID, RuntimeCGWindowEntry)? in
+                guard let cgWindowID = entry.cgWindowID else { return nil }
+                return (
+                    cgWindowID,
+                    RuntimeCGWindowEntry(
+                        id: cgWindowID,
+                        title: entry.title,
+                        bounds: entry.frame,
+                        isOnscreen: entry.isOnscreen,
+                        spaceIDs: entry.spaceIDs
+                    )
+                )
+            }
+        )
+        let hasFullscreenTopology = knownCGWindowsByID.values.contains {
+            RuntimeWindowTopologyClassifier.isLikelyOffDesktopFullscreenContent(
+                bounds: $0.bounds,
+                spaceIDs: $0.spaceIDs
+            )
+        }
+        let cgWindowOrderByID = Dictionary(
+            uniqueKeysWithValues: entries.enumerated().compactMap { index, entry in
+                entry.cgWindowID.map { ($0, index) }
+            }
+        )
+        let filteredEntries = RuntimeWindowPresentationFilter.filteredAndOrderedEntriesForPresentation(
+            entries,
+            allEntriesForHostArtifacts: entries,
+            knownCGWindowsByID: knownCGWindowsByID,
+            appName: appName,
+            hasFullscreenTopology: hasFullscreenTopology,
+            cgWindowOrderByID: cgWindowOrderByID,
+            stage: stage,
+            finalStage: "\(stage)-final"
+        )
+        guard filteredEntries.map(\.windowID) != candidate.windows.map(\.id) else {
+            return (candidate, context)
+        }
+
+        let windowByID = Dictionary(uniqueKeysWithValues: candidate.windows.map { ($0.id, $0) })
+        let windows = filteredEntries.compactMap { windowByID[$0.windowID] }
+        let retainedWindowIDs = Set(windows.map(\.id))
+        let windowsByID = context.windowsByID.filter { retainedWindowIDs.contains($0.key) }
+        return (
+            AppSwitchCandidate(
+                id: candidate.id,
+                displayName: candidate.displayName,
+                groupID: candidate.groupID,
+                lastActiveAt: candidate.lastActiveAt,
+                windows: windows
+            ),
+            RuntimeAppContext(
+                appID: context.appID,
+                runningApp: context.runningApp,
+                windowsByID: windowsByID
+            )
         )
     }
 

@@ -791,6 +791,193 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testLiveSwitcherModelKeepsActiveWindowCycleOrderWhenCurrentAppProjectionRefreshes() {
+        let appID = "com.example.active-window-cycle-refresh"
+        let runningApp = NSRunningApplication.current
+        let initialWindows = [
+            WindowCandidate(id: "fullscreen", title: "Chrome Fullscreen Tab", isMinimized: false, lastActiveAt: 40),
+            WindowCandidate(id: "normal", title: "Chrome Normal Tab", isMinimized: false, lastActiveAt: 30),
+            WindowCandidate(id: "incognito", title: "Chrome Incognito Tab", isMinimized: false, lastActiveAt: 20),
+            WindowCandidate(id: "second-fullscreen", title: "Chrome Second Fullscreen Tab", isMinimized: false, lastActiveAt: 10)
+        ]
+        let refreshedWindows = [
+            WindowCandidate(id: "normal", title: "Chrome Normal Tab", isMinimized: false, lastActiveAt: 50),
+            WindowCandidate(id: "fullscreen", title: "Chrome Fullscreen Tab", isMinimized: false, lastActiveAt: 45),
+            WindowCandidate(id: "incognito", title: "Chrome Incognito Tab", isMinimized: false, lastActiveAt: 20),
+            WindowCandidate(id: "second-fullscreen", title: "Chrome Second Fullscreen Tab", isMinimized: false, lastActiveAt: 10)
+        ]
+        let initialCandidate = AppSwitchCandidate(
+            id: appID,
+            displayName: "Chrome Fixture",
+            groupID: "chrome-fixture",
+            lastActiveAt: 100,
+            windows: initialWindows
+        )
+        let refreshedCandidate = AppSwitchCandidate(
+            id: appID,
+            displayName: "Chrome Fixture",
+            groupID: "chrome-fixture",
+            lastActiveAt: 100,
+            windows: refreshedWindows
+        )
+        let context = makeRuntimeAppContext(appID: appID, runningApp: runningApp, windows: refreshedWindows)
+        let refreshedPayload = RuntimeCurrentAppWindowPayload(
+            summary: RuntimeHomeAppSummary(
+                appID: appID,
+                displayName: "Chrome Fixture",
+                groupID: "chrome-fixture",
+                lastActiveAt: 100,
+                windowCount: refreshedWindows.count,
+                pid: runningApp.processIdentifier
+            ),
+            candidate: refreshedCandidate,
+            context: context,
+            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: runningApp)]
+        )
+        let freshness = RuntimeProjectionFreshness(
+            generatedAt: 12,
+            sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+            dirtyAppIDs: [],
+            dirtyPIDs: [],
+            dirtyCGWindowIDs: [],
+            pendingRepairScopes: [],
+            isCompleteForScope: true
+        )
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
+            appSwitcherProjection: RuntimeAppSwitcherProjection(
+                apps: [initialCandidate],
+                contextsByID: [appID: context],
+                freshness: freshness
+            ),
+            currentAppWindowProjectionsByAppID: [
+                appID: RuntimeCurrentAppWindowProjection(
+                    appID: appID,
+                    currentAppWindowPayload: refreshedPayload,
+                    freshness: freshness
+                )
+            ]
+        )
+        let model = LiveSwitcherModel(
+            windowRecencyTracker: RuntimeWindowRecencyTracker(),
+            runtimeProjectionService: runtimeProjectionService
+        )
+        model.runtimeProjectionMaintenanceEnabled = false
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        model.handle(.downArrow)
+        XCTAssertEqual(model.session?.selectedWindow?.id, "fullscreen")
+        model.handle(.rightArrow)
+        XCTAssertEqual(model.session?.selectedWindow?.id, "normal")
+
+        XCTAssertTrue(model.applyCurrentAppWindowProjectionIfReady(appID: appID))
+        XCTAssertEqual(
+            model.session?.selectedApp.windows.map(\.id),
+            ["fullscreen", "normal", "incognito", "second-fullscreen"]
+        )
+        XCTAssertEqual(model.session?.selectedWindow?.id, "normal")
+
+        model.handle(.rightArrow)
+
+        XCTAssertEqual(model.session?.selectedWindow?.id, "incognito")
+    }
+
+    @MainActor
+    func testLiveSwitcherModelKeepsActiveWindowCycleOrderWhenAppSwitcherProjectionRefreshes() {
+        let appID = "com.example.active-window-cycle-app-refresh"
+        let runningApp = NSRunningApplication.current
+        let initialWindows = [
+            WindowCandidate(id: "fullscreen", title: "Chrome Fullscreen Tab", isMinimized: false, lastActiveAt: 40),
+            WindowCandidate(id: "normal", title: "Chrome Normal Tab", isMinimized: false, lastActiveAt: 30),
+            WindowCandidate(id: "incognito", title: "Chrome Incognito Tab", isMinimized: false, lastActiveAt: 20),
+            WindowCandidate(id: "second-fullscreen", title: "Chrome Second Fullscreen Tab", isMinimized: false, lastActiveAt: 10)
+        ]
+        let refreshedWindows = [
+            WindowCandidate(id: "normal", title: "Chrome Normal Tab", isMinimized: false, lastActiveAt: 50),
+            WindowCandidate(id: "fullscreen", title: "Chrome Fullscreen Tab", isMinimized: false, lastActiveAt: 45),
+            WindowCandidate(id: "incognito", title: "Chrome Incognito Tab", isMinimized: false, lastActiveAt: 20),
+            WindowCandidate(id: "second-fullscreen", title: "Chrome Second Fullscreen Tab", isMinimized: false, lastActiveAt: 10)
+        ]
+        let initialCandidate = AppSwitchCandidate(
+            id: appID,
+            displayName: "Chrome Fixture",
+            groupID: "chrome-fixture",
+            lastActiveAt: 100,
+            windows: initialWindows
+        )
+        let refreshedCandidate = AppSwitchCandidate(
+            id: appID,
+            displayName: "Chrome Fixture",
+            groupID: "chrome-fixture",
+            lastActiveAt: 100,
+            windows: refreshedWindows
+        )
+        let context = makeRuntimeAppContext(appID: appID, runningApp: runningApp, windows: refreshedWindows)
+        let refreshedPayload = RuntimeCurrentAppWindowPayload(
+            summary: RuntimeHomeAppSummary(
+                appID: appID,
+                displayName: "Chrome Fixture",
+                groupID: "chrome-fixture",
+                lastActiveAt: 100,
+                windowCount: refreshedWindows.count,
+                pid: runningApp.processIdentifier
+            ),
+            candidate: refreshedCandidate,
+            context: context,
+            appDirectoryEntries: [RuntimeAppDirectoryEntry(app: runningApp)]
+        )
+        let freshness = RuntimeProjectionFreshness(
+            generatedAt: 12,
+            sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+            dirtyAppIDs: [],
+            dirtyPIDs: [],
+            dirtyCGWindowIDs: [],
+            pendingRepairScopes: [],
+            isCompleteForScope: true
+        )
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
+            appSwitcherProjection: RuntimeAppSwitcherProjection(
+                apps: [initialCandidate],
+                contextsByID: [appID: context],
+                freshness: freshness
+            ),
+            currentAppWindowProjectionsByAppID: [
+                appID: RuntimeCurrentAppWindowProjection(
+                    appID: appID,
+                    currentAppWindowPayload: refreshedPayload,
+                    freshness: freshness
+                )
+            ]
+        )
+        let model = LiveSwitcherModel(
+            windowRecencyTracker: RuntimeWindowRecencyTracker(),
+            runtimeProjectionService: runtimeProjectionService
+        )
+        model.runtimeProjectionMaintenanceEnabled = false
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        model.handle(.downArrow)
+        model.handle(.rightArrow)
+        XCTAssertEqual(model.session?.selectedWindow?.id, "normal")
+
+        runtimeProjectionService.installAppSwitcherProjection(
+            apps: [refreshedCandidate],
+            contextsByID: [appID: context],
+            generatedAt: 13
+        )
+
+        XCTAssertTrue(model.handleAppSwitcherProjectionDidUpdate())
+        XCTAssertEqual(
+            model.session?.selectedApp.windows.map(\.id),
+            ["fullscreen", "normal", "incognito", "second-fullscreen"]
+        )
+        XCTAssertEqual(model.session?.selectedWindow?.id, "normal")
+
+        model.handle(.rightArrow)
+
+        XCTAssertEqual(model.session?.selectedWindow?.id, "incognito")
+    }
+
+    @MainActor
     func testLiveSwitcherModelSelectedAppWindowProjectionSignalsRuntimeRepairWhenProjectionIsMissing() {
         let appID = "com.example.missing-window-projection"
         let runningApp = NSRunningApplication.current

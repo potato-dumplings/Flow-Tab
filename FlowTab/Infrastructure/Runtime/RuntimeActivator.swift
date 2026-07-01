@@ -286,16 +286,26 @@ final class RuntimeActivator {
             .activation,
             "ax-recovery fetched pid=\(app.processIdentifier) windowID=\(request.windowID) count=\(windows.count)"
         )
-        if cgFocusWasAccepted, targetCGWindowIsVisible(
-            targetCGWindowID,
-            in: app,
-            currentWindows: currentCGWindows(forPID: app.processIdentifier)
-        ) {
-            RuntimeLog.debug(
-                .activation,
-                "focus-attempt route=ax-recovery-visible result=verified pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID.map(String.init) ?? "nil")"
+        if cgFocusWasAccepted {
+            let currentWindows = currentCGWindows(forPID: app.processIdentifier)
+            let hasActivationReadback = targetCGWindowHasActivationReadback(
+                targetCGWindowID,
+                in: app,
+                currentWindows: currentWindows
             )
-            return reportWindowFocusVerified(request, in: app)
+            if hasActivationReadback {
+                RuntimeLog.debug(
+                    .activation,
+                    "focus-attempt route=ax-recovery-readback result=verified pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID.map(String.init) ?? "nil")"
+                )
+                return reportWindowFocusVerified(request, in: app)
+            }
+            if targetCGWindowIsVisible(targetCGWindowID, in: app, currentWindows: currentWindows) {
+                RuntimeLog.debug(
+                    .activation,
+                    "focus-attempt route=ax-recovery-visible result=unverified pid=\(app.processIdentifier) windowID=\(request.windowID) targetCG=\(targetCGWindowID.map(String.init) ?? "nil")"
+                )
+            }
         }
         if windows.isEmpty {
             RuntimeLog.debug(

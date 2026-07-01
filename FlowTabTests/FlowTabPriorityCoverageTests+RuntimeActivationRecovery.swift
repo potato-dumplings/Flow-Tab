@@ -645,6 +645,117 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testRuntimeActivatorContinuesRecoveryWhenCGFallbackIsVisibleWithoutActivationReadback() {
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let activator = RuntimeActivator()
+        activator.activateCurrentAppIfNeededOverride = { _ in false }
+        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusedAXWindowOverride = { _ in nil }
+        activator.currentAXWindowsOverride = { _ in [] }
+
+        let frontmostCGWindowID: CGWindowID = 245_253
+        let targetCGWindowID: CGWindowID = 245_254
+        let sameSpaceCGWindowID: CGWindowID = 245_255
+        let targetFrame = CGRect(x: 0, y: 37, width: 1_728, height: 1_080)
+        var focusedCGWindowIDs: [CGWindowID] = []
+        activator.focusCGWindowOverride = { app, cgWindowID in
+            XCTAssertEqual(app.processIdentifier, currentApp.processIdentifier)
+            focusedCGWindowIDs.append(cgWindowID)
+            return true
+        }
+        activator.currentCGWindowsOverride = { pid in
+            XCTAssertEqual(pid, currentApp.processIdentifier)
+            let sameSpaceSurfaceWasFocused = focusedCGWindowIDs.last == sameSpaceCGWindowID
+            if sameSpaceSurfaceWasFocused {
+                return [
+                    RuntimeCGWindowEntry(
+                        id: targetCGWindowID,
+                        title: "Chrome Fullscreen Tab",
+                        bounds: targetFrame,
+                        isOnscreen: true,
+                        alpha: 1.0,
+                        storeType: 1,
+                        spaceIDs: [7_128]
+                    ),
+                    RuntimeCGWindowEntry(
+                        id: sameSpaceCGWindowID,
+                        title: nil,
+                        bounds: CGRect(x: 0, y: 37, width: 1_728, height: 44),
+                        isOnscreen: true,
+                        alpha: 0.0,
+                        storeType: 1,
+                        spaceIDs: [7_128]
+                    )
+                ]
+            }
+            return [
+                RuntimeCGWindowEntry(
+                    id: frontmostCGWindowID,
+                    title: "Chrome Normal Tab",
+                    bounds: CGRect(x: 64, y: 82, width: 1_320, height: 860),
+                    isOnscreen: true,
+                    alpha: 1.0,
+                    storeType: 1,
+                    spaceIDs: [1]
+                ),
+                RuntimeCGWindowEntry(
+                    id: targetCGWindowID,
+                    title: "Chrome Fullscreen Tab",
+                    bounds: targetFrame,
+                    isOnscreen: true,
+                    alpha: 1.0,
+                    storeType: 1,
+                    spaceIDs: [7_128]
+                ),
+                RuntimeCGWindowEntry(
+                    id: sameSpaceCGWindowID,
+                    title: nil,
+                    bounds: CGRect(x: 0, y: 37, width: 1_728, height: 44),
+                    isOnscreen: false,
+                    alpha: 0.0,
+                    storeType: 1,
+                    spaceIDs: [7_128]
+                )
+            ]
+        }
+
+        var verifiedFocuses: [RuntimeWindowFocusVerification] = []
+        activator.windowFocusVerifiedHandler = {
+            verifiedFocuses.append($0)
+        }
+
+        let windowID = "cg:\(currentApp.processIdentifier):\(targetCGWindowID)"
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: currentApp,
+            windowsByID: [
+                windowID: RuntimeWindowContext(
+                    id: windowID,
+                    title: "Chrome Fullscreen Tab",
+                    isMinimized: false,
+                    ownerPID: currentApp.processIdentifier,
+                    cgWindowID: targetCGWindowID,
+                    spaceIDs: [7_128],
+                    inferredTitleBarStyle: nil,
+                    frame: targetFrame,
+                    allowsPublicAXRecovery: true,
+                    bindingConfidenceOverride: .inferred,
+                    bindingCandidateCount: 1
+                )
+            ]
+        )
+
+        activator.activate(
+            target: .window(appID: appID, windowID: windowID, restoreIfMinimized: false),
+            contextsByID: [appID: context]
+        )
+
+        XCTAssertEqual(focusedCGWindowIDs, [targetCGWindowID, sameSpaceCGWindowID])
+        XCTAssertEqual(verifiedFocuses.map(\.targetCGWindowID), [targetCGWindowID])
+    }
+
+    @MainActor
     func testRuntimeActivatorAllowsDirectAXFallbackForStickyBindingWithExactCGReadback() {
         let currentApp = NSRunningApplication.current
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"

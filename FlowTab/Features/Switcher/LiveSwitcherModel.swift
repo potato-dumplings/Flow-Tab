@@ -441,7 +441,6 @@ final class LiveSwitcherModel: ObservableObject {
             return false
         }
 
-        recordWindowCycleEntryRecencyIfNeeded(in: rebuiltSession)
         session = rebuiltSession
         _ = searchCoordinator.exit()
         publishSearchStateIfNeeded()
@@ -529,6 +528,12 @@ final class LiveSwitcherModel: ObservableObject {
         let preferredSelectedAppID = currentSession.selectedApp.id
         let previousMode = currentSession.mode
         let previousSelectedWindowID = currentSession.selectedWindow?.id
+        let previousWindowOrderIDs: [String]
+        if case .windowCycle(let appID) = previousMode, appID == currentSession.selectedApp.id {
+            previousWindowOrderIDs = currentSession.selectedApp.windows.map(\.id)
+        } else {
+            previousWindowOrderIDs = []
+        }
         let refreshed = loadAppSwitcherProjectionSession(
             triggerDirection: .forward,
             preferredSelectedAppID: preferredSelectedAppID,
@@ -539,7 +544,8 @@ final class LiveSwitcherModel: ObservableObject {
         guard refreshed else { return false }
         restoreSessionModeAfterProjectionUpdate(
             previousMode: previousMode,
-            previousSelectedWindowID: previousSelectedWindowID
+            previousSelectedWindowID: previousSelectedWindowID,
+            previousWindowOrderIDs: previousWindowOrderIDs
         )
         if case .windowCycle(let appID) = previousMode {
             _ = applyCurrentAppWindowProjectionIfReady(
@@ -562,7 +568,8 @@ final class LiveSwitcherModel: ObservableObject {
 
     func restoreSessionModeAfterProjectionUpdate(
         previousMode: SessionMode,
-        previousSelectedWindowID: String?
+        previousSelectedWindowID: String?,
+        previousWindowOrderIDs: [String] = []
     ) {
         guard var refreshedSession = session else { return }
         switch previousMode {
@@ -571,6 +578,31 @@ final class LiveSwitcherModel: ObservableObject {
         case .groupCycle:
             return
         case .windowCycle(let appID):
+            if !previousWindowOrderIDs.isEmpty,
+               let appIndex = refreshedSession.apps.firstIndex(where: { $0.id == appID }) {
+                let app = refreshedSession.apps[appIndex]
+                let reorderedWindows = windowsByPreservingSessionOrder(
+                    app.windows,
+                    previousWindowOrderIDs: previousWindowOrderIDs
+                )
+                if reorderedWindows.map(\.id) != app.windows.map(\.id) {
+                    var apps = refreshedSession.apps
+                    apps[appIndex] = AppSwitchCandidate(
+                        id: app.id,
+                        displayName: app.displayName,
+                        groupID: app.groupID,
+                        lastActiveAt: app.lastActiveAt,
+                        windows: reorderedWindows
+                    )
+                    refreshedSession = SwitcherSession(
+                        apps: apps,
+                        preferences: refreshedSession.preferences,
+                        triggerDirection: .forward,
+                        rememberedWindowIDByAppID: refreshedSession.rememberedWindowIDByAppID
+                    )
+                    _ = refreshedSession.selectApp(withID: appID)
+                }
+            }
             if let previousSelectedWindowID,
                refreshedSession.selectWindow(appID: appID, windowID: previousSelectedWindowID) {
                 session = refreshedSession
@@ -580,6 +612,18 @@ final class LiveSwitcherModel: ObservableObject {
             _ = refreshedSession.enterWindowCycle(allowSingleWindow: true)
             session = refreshedSession
         }
+    }
+
+    private func windowsByPreservingSessionOrder(
+        _ windows: [WindowCandidate],
+        previousWindowOrderIDs: [String]
+    ) -> [WindowCandidate] {
+        let windowsByID = Dictionary(uniqueKeysWithValues: windows.map { ($0.id, $0) })
+        let retainedWindows = previousWindowOrderIDs.compactMap { windowsByID[$0] }
+        guard !retainedWindows.isEmpty else { return windows }
+        let retainedWindowIDs = Set(retainedWindows.map(\.id))
+        let appendedWindows = windows.filter { !retainedWindowIDs.contains($0.id) }
+        return retainedWindows + appendedWindows
     }
 
     @discardableResult
@@ -654,7 +698,6 @@ final class LiveSwitcherModel: ObservableObject {
         {
             autoEnterSuppressedAppID = nil
             pendingManualWindowLayerEntryAppID = nil
-            recordWindowCycleEntryRecencyIfNeeded(in: session)
         } else if
             case .appCycle = previousMode,
             case .appCycle = session.mode,
@@ -721,7 +764,6 @@ final class LiveSwitcherModel: ObservableObject {
         }
         guard session.selectedApp.windows.count >= 2 else { return false }
         session.enterWindowCycleIfPossible()
-        recordWindowCycleEntryRecencyIfNeeded(in: session)
         self.session = session
         if case .windowCycle = session.mode {
             return true
@@ -732,20 +774,6 @@ final class LiveSwitcherModel: ObservableObject {
     func debugSelectionSummary() -> String {
         guard let session else { return "session=nil" }
         return "app=\(session.selectedApp.displayName) windows=\(session.selectedApp.windows.count) mode=\(session.mode.debugName)"
-    }
-
-    func recordWindowCycleEntryRecencyIfNeeded(
-        in session: SwitcherSession,
-        contextOverride: RuntimeAppContext? = nil
-    ) {
-        guard case .windowCycle(let appID) = session.mode else { return }
-        guard let selectedWindow = session.selectedWindow else { return }
-        guard let context = contextOverride ?? runtimeContextsByID[appID] else { return }
-        windowRecencyTracker.recordSelectedWindow(
-            appID: appID,
-            windowID: selectedWindow.id,
-            context: context
-        )
     }
 
     func commitSelection() {

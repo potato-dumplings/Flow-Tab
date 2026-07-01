@@ -346,15 +346,22 @@ extension LiveSwitcherModel {
             return
         }
 
-        var apps = currentSession.apps
-        apps[appIndex] = currentAppWindowPayload.candidate
-        runtimeContextsByID[appID] = currentAppWindowPayload.context
         let currentSessionIsWindowLayerForApp: Bool
         if case .windowCycle(let windowLayerAppID) = currentSession.mode, windowLayerAppID == appID {
             currentSessionIsWindowLayerForApp = true
         } else {
             currentSessionIsWindowLayerForApp = false
         }
+        let appliedPayload = currentSessionIsWindowLayerForApp
+            ? currentAppWindowPayloadByPreservingActiveWindowLayerOrder(
+                currentAppWindowPayload,
+                currentSession: currentSession
+            )
+            : currentAppWindowPayload
+
+        var apps = currentSession.apps
+        apps[appIndex] = appliedPayload.candidate
+        runtimeContextsByID[appID] = appliedPayload.context
         let restoringWindowCycle = restoringWindowCycleSelectedWindowID != nil
         let preservesWindowLayerPreview: Bool
         if currentSessionIsWindowLayerForApp {
@@ -369,7 +376,7 @@ extension LiveSwitcherModel {
         } else {
             refreshFrozenPreviewOrderIfChanged(
                 for: appID,
-                windows: currentAppWindowPayload.candidate.windows
+                windows: appliedPayload.candidate.windows
             )
         }
 
@@ -397,22 +404,58 @@ extension LiveSwitcherModel {
             )
             pendingManualWindowLayerEntryAppID = nil
         }
-        recordWindowCycleEntryRecencyIfNeeded(
-            in: rebuiltSession,
-            contextOverride: currentAppWindowPayload.context
-        )
-
         session = rebuiltSession
         let applyEndMs = Self.monotonicMilliseconds()
         logSelectedAppWindowProjection(
             result: "applied",
             appID: appID,
-            currentAppWindowPayload: currentAppWindowPayload,
+            currentAppWindowPayload: appliedPayload,
             startMs: startMs,
             projectionReadMs: projectionReadMs,
             applyEndMs: applyEndMs
         )
         onSessionLayoutChanged?()
+    }
+
+    private func currentAppWindowPayloadByPreservingActiveWindowLayerOrder(
+        _ payload: RuntimeCurrentAppWindowPayload,
+        currentSession: SwitcherSession
+    ) -> RuntimeCurrentAppWindowPayload {
+        let currentWindows = currentSession.selectedApp.windows
+        guard !currentWindows.isEmpty else { return payload }
+        let currentWindowIDs = currentWindows.map(\.id)
+        let projectedWindowsByID = Dictionary(uniqueKeysWithValues: payload.candidate.windows.map { ($0.id, $0) })
+        let retainedWindows = currentWindowIDs.compactMap { projectedWindowsByID[$0] }
+        guard !retainedWindows.isEmpty else { return payload }
+        let retainedWindowIDs = Set(retainedWindows.map(\.id))
+        let appendedWindows = payload.candidate.windows.filter { !retainedWindowIDs.contains($0.id) }
+        let windows = retainedWindows + appendedWindows
+        guard windows.map(\.id) != payload.candidate.windows.map(\.id) else {
+            return payload
+        }
+        let candidate = AppSwitchCandidate(
+            id: payload.candidate.id,
+            displayName: payload.candidate.displayName,
+            groupID: payload.candidate.groupID,
+            lastActiveAt: payload.candidate.lastActiveAt,
+            windows: windows
+        )
+        let summary = RuntimeHomeAppSummary(
+            appID: payload.summary.appID,
+            displayName: payload.summary.displayName,
+            groupID: payload.summary.groupID,
+            lastActiveAt: payload.summary.lastActiveAt,
+            windowCount: windows.count,
+            pid: payload.summary.pid,
+            bundleIdentifier: payload.summary.bundleIdentifier,
+            bundleURL: payload.summary.bundleURL
+        )
+        return RuntimeCurrentAppWindowPayload(
+            summary: summary,
+            candidate: candidate,
+            context: payload.context,
+            appDirectoryEntries: payload.appDirectoryEntries
+        )
     }
 
     func invalidateSelectedAppWindowProjection(

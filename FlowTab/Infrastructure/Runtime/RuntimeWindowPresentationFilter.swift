@@ -62,7 +62,15 @@ enum RuntimeWindowPresentationFilter {
         hasFullscreenTopology: Bool,
         stage: String
     ) -> [RuntimeWindowListEntry] {
-        guard hasFullscreenTopology, !entries.isEmpty else { return entries }
+        guard !entries.isEmpty else { return entries }
+        let hasFullscreenPresentationGeometry = allEntries.contains {
+            entryLooksLikeFullscreenPresentationSurface(
+                $0,
+                knownCGWindowsByID: knownCGWindowsByID,
+                appName: appName
+            )
+        }
+        guard hasFullscreenTopology || hasFullscreenPresentationGeometry else { return entries }
 
         let strongTitles = Set(
             allEntries.compactMap { entry -> String? in
@@ -248,13 +256,36 @@ enum RuntimeWindowPresentationFilter {
             RuntimeWindowTopologyClassifier.hasOffDesktopSpace(spaceIDs: cgWindow.spaceIDs)
                 && boundsLookLikeFullscreenContentSurface(cgWindow.bounds)
         }
-        guard hasFullscreenTopology || hasKnownFullscreenTopology else { return entries }
+        let hasFullscreenPresentationGeometry = entries.contains {
+            entryLooksLikeFullscreenPresentationSurface(
+                $0,
+                knownCGWindowsByID: knownCGWindowsByID,
+                appName: appName
+            )
+        }
+        let repeatedUserTitleKeys = repeatedUserTitleKeys(in: entries, appName: appName)
+        let hasFallbackPresentationNoise = entries.contains {
+            RuntimeWindowTitleResolver.titleLooksLikeAppNameFallback($0.title, appName: appName)
+        } && !repeatedUserTitleKeys.isEmpty
+        guard hasFullscreenTopology
+            || hasKnownFullscreenTopology
+            || hasFullscreenPresentationGeometry
+            || hasFallbackPresentationNoise
+        else {
+            return entries
+        }
         let hasUserTitle = entries.contains { entry in
             !RuntimeWindowTitleResolver.titleLooksLikeAppNameFallback(entry.title, appName: appName)
                 && normalizedTitleKey(entry.title) != nil
         }
         guard hasUserTitle else { return entries }
 
+        let retainedRepeatedFullscreenWindowIDsByTitle = repeatedFullscreenPresentationWindowIDsToRetain(
+            entries,
+            knownCGWindowsByID: knownCGWindowsByID,
+            appName: appName,
+            collapsesFallbackNoiseTitleKeys: hasFallbackPresentationNoise ? repeatedUserTitleKeys : []
+        )
         var seenFullscreenTitleKeys: Set<String> = []
         var droppedCount = 0
         let filteredEntries = entries.filter { entry in
@@ -263,11 +294,25 @@ enum RuntimeWindowPresentationFilter {
                 return false
             }
             guard let titleKey = normalizedTitleKey(entry.title) else { return true }
-            guard entryLooksLikeFullscreenPresentationSurface(
+            if let retainedWindowID = retainedRepeatedFullscreenWindowIDsByTitle[titleKey] {
+                if entry.windowID != retainedWindowID {
+                    droppedCount += 1
+                    return false
+                }
+                seenFullscreenTitleKeys.insert(titleKey)
+                return true
+            }
+            let hasActivationHandle = entry.activationHandleID != nil || entry.axWindow != nil
+            let looksLikeFullscreenSurface = entryLooksLikeFullscreenPresentationSurface(
                 entry,
                 knownCGWindowsByID: knownCGWindowsByID,
                 appName: appName
-            ) else {
+            )
+            if seenFullscreenTitleKeys.contains(titleKey), !hasActivationHandle {
+                droppedCount += 1
+                return false
+            }
+            guard looksLikeFullscreenSurface else {
                 return true
             }
             if seenFullscreenTitleKeys.contains(titleKey) {
@@ -285,6 +330,52 @@ enum RuntimeWindowPresentationFilter {
             )
         }
         return filteredEntries
+    }
+
+    private static func repeatedFullscreenPresentationWindowIDsToRetain(
+        _ entries: [RuntimeWindowListEntry],
+        knownCGWindowsByID: [CGWindowID: RuntimeCGWindowEntry],
+        appName: String,
+        collapsesFallbackNoiseTitleKeys: Set<String>
+    ) -> [String: String] {
+        let entriesByTitle = Dictionary(grouping: entries) { entry in
+            normalizedTitleKey(entry.title) ?? ""
+        }
+        var retainedWindowIDsByTitle: [String: String] = [:]
+        for (titleKey, titleEntries) in entriesByTitle {
+            guard !titleKey.isEmpty, titleEntries.count > 1 else { continue }
+            let fullscreenEntries = titleEntries.filter {
+                entryLooksLikeFullscreenPresentationSurface(
+                    $0,
+                    knownCGWindowsByID: knownCGWindowsByID,
+                    appName: appName
+                )
+            }
+            if !fullscreenEntries.isEmpty {
+                retainedWindowIDsByTitle[titleKey] = fullscreenEntries[0].windowID
+            } else if collapsesFallbackNoiseTitleKeys.contains(titleKey) {
+                retainedWindowIDsByTitle[titleKey] = titleEntries[0].windowID
+            }
+        }
+        return retainedWindowIDsByTitle
+    }
+
+    private static func repeatedUserTitleKeys(
+        in entries: [RuntimeWindowListEntry],
+        appName: String
+    ) -> Set<String> {
+        var titleCounts: [String: Int] = [:]
+        for entry in entries {
+            guard !RuntimeWindowTitleResolver.titleLooksLikeAppNameFallback(entry.title, appName: appName),
+                  let titleKey = normalizedTitleKey(entry.title)
+            else {
+                continue
+            }
+            titleCounts[titleKey, default: 0] += 1
+        }
+        return Set(titleCounts.compactMap { titleKey, count in
+            count > 1 ? titleKey : nil
+        })
     }
 
     static func orderWindowEntriesForPresentation(

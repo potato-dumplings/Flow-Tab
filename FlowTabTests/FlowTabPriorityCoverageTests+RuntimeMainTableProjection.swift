@@ -31,6 +31,9 @@ extension FlowTabPriorityCoverageTests {
         runningApp: NSRunningApplication,
         windows: [WindowCandidate],
         cgWindowIDsByWindowID: [String: CGWindowID],
+        framesByWindowID: [String: CGRect] = [:],
+        spaceIDsByWindowID: [String: [Int]] = [:],
+        activationHandleIDsByWindowID: [String: String] = [:],
         bindingAllowedActionsByWindowID: [String: Set<WindowBindingAction>] = [:]
     ) -> RuntimeCurrentAppWindowPayload {
         let pid = runningApp.processIdentifier
@@ -72,7 +75,9 @@ extension FlowTabPriorityCoverageTests {
                                 isMinimized: window.isMinimized,
                                 ownerPID: pid,
                                 cgWindowID: cgWindowIDsByWindowID[window.id],
-                                spaceIDs: [5],
+                                spaceIDs: spaceIDsByWindowID[window.id] ?? [5],
+                                activationHandleID: activationHandleIDsByWindowID[window.id],
+                                frame: framesByWindowID[window.id],
                                 allowsPublicAXRecovery: true,
                                 hasStickyBinding: true,
                                 lastConfirmationSource: .publicExactMatch,
@@ -245,6 +250,127 @@ extension FlowTabPriorityCoverageTests {
         )
         XCTAssertNil(projection.currentAppWindowPayload.context.windowsByID["artifact"])
         XCTAssertTrue(projection.freshness.isCompleteForScope)
+    }
+
+    func testRuntimeReadModelStoreNormalizesNoisyFullscreenRowsAtProjectionCommitBoundary() throws {
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let displayName = runningApp.localizedName ?? appID
+        let store = RuntimeReadModelStore()
+
+        let windows = [
+            WindowCandidate(id: "normal", title: "Chrome Normal Tab", isMinimized: false, lastActiveAt: 90),
+            WindowCandidate(id: "fullscreen", title: "Chrome Fullscreen Tab", isMinimized: false, lastActiveAt: 80),
+            WindowCandidate(id: "incognito", title: "Chrome Incognito Tab", isMinimized: false, lastActiveAt: 70),
+            WindowCandidate(id: "second-fullscreen", title: "Chrome Second Fullscreen Tab", isMinimized: false, lastActiveAt: 60),
+            WindowCandidate(id: "second-support-band", title: "Chrome Second Fullscreen Tab", isMinimized: false, lastActiveAt: 50),
+            WindowCandidate(id: "fallback-host", title: displayName, isMinimized: false, lastActiveAt: 40),
+            WindowCandidate(id: "second-duplicate", title: "Chrome Second Fullscreen Tab", isMinimized: false, lastActiveAt: 30),
+            WindowCandidate(id: "fallback-band", title: displayName, isMinimized: false, lastActiveAt: 20),
+            WindowCandidate(id: "fallback-overlay", title: displayName, isMinimized: false, lastActiveAt: 10),
+            WindowCandidate(id: "fullscreen-duplicate", title: "Chrome Fullscreen Tab", isMinimized: false, lastActiveAt: 5)
+        ]
+        let cgWindowIDsByWindowID: [String: CGWindowID] = [
+            "normal": 765_714,
+            "fullscreen": 765_715,
+            "incognito": 765_717,
+            "second-fullscreen": 765_716,
+            "second-support-band": 765_779,
+            "fallback-host": 765_780,
+            "second-duplicate": 765_781,
+            "fallback-band": 765_782,
+            "fallback-overlay": 765_783,
+            "fullscreen-duplicate": 765_784
+        ]
+        let framesByWindowID: [String: CGRect] = [
+            "normal": CGRect(x: 384, y: 258, width: 960, height: 640),
+            "fullscreen": CGRect(x: 0, y: 37, width: 1728, height: 1080),
+            "incognito": CGRect(x: 492, y: 354, width: 960, height: 640),
+            "second-fullscreen": CGRect(x: 0, y: 37, width: 1728, height: 1080),
+            "second-support-band": CGRect(x: 0, y: 115, width: 1728, height: 80),
+            "fallback-host": CGRect(x: 0, y: 195, width: 1728, height: 922),
+            "second-duplicate": CGRect(x: 0, y: 74, width: 1728, height: 165),
+            "fallback-band": CGRect(x: 96, y: 100, width: 1536, height: 270),
+            "fallback-overlay": CGRect(x: 160, y: 239, width: 1408, height: 80),
+            "fullscreen-duplicate": CGRect(x: 0, y: 37, width: 1728, height: 1080)
+        ]
+        let spaceIDsByWindowID: [String: [Int]] = [
+            "normal": [5],
+            "incognito": [5],
+            "fullscreen": [91],
+            "second-fullscreen": [92],
+            "second-support-band": [5],
+            "fallback-host": [91],
+            "second-duplicate": [5],
+            "fallback-band": [5],
+            "fallback-overlay": [5],
+            "fullscreen-duplicate": [91]
+        ]
+        let payload = makeCurrentAppProjectionPayloadForTesting(
+            appID: appID,
+            runningApp: runningApp,
+            windows: windows,
+            cgWindowIDsByWindowID: cgWindowIDsByWindowID,
+            framesByWindowID: framesByWindowID,
+            spaceIDsByWindowID: spaceIDsByWindowID
+        )
+
+        store.commitMainTableAppSwitcherProjectionPayload(
+            RuntimeAppSwitcherProjectionPayload(
+                apps: [
+                    AppSwitchCandidate(
+                        id: payload.candidate.id,
+                        displayName: payload.candidate.displayName,
+                        groupID: payload.candidate.groupID,
+                        lastActiveAt: payload.candidate.lastActiveAt,
+                        windows: payload.candidate.windows + [
+                            WindowCandidate(
+                                id: "orphan-fullscreen-duplicate",
+                                title: "Chrome Fullscreen Tab",
+                                isMinimized: false,
+                                lastActiveAt: 1
+                            )
+                        ]
+                    )
+                ],
+                contextsByID: [appID: payload.context],
+                hasCompleteWindowCoverage: true
+            ),
+            generatedAt: 20
+        )
+
+        let appSwitcherProjection = try XCTUnwrap(store.readAppSwitcherProjection())
+        XCTAssertEqual(
+            appSwitcherProjection.apps.first(where: { $0.id == appID })?.windows.map(\.id),
+            ["normal", "fullscreen", "incognito", "second-fullscreen"]
+        )
+        XCTAssertEqual(
+            appSwitcherProjection.contextsByID[appID]?.windowsByID.keys.sorted(),
+            ["fullscreen", "incognito", "normal", "second-fullscreen"]
+        )
+
+        let partialPayload = makeCurrentAppProjectionPayloadForTesting(
+            appID: appID,
+            runningApp: runningApp,
+            windows: [windows[0]],
+            cgWindowIDsByWindowID: ["normal": 765_714],
+            framesByWindowID: ["normal": framesByWindowID["normal"]!],
+            spaceIDsByWindowID: ["normal": [5]]
+        )
+        store.commitCurrentAppWindowProjection(
+            partialPayload,
+            clearsDirtyState: true,
+            generatedAt: 21
+        )
+
+        let currentAppProjection = try XCTUnwrap(store.readCurrentAppWindowProjection(appID: appID))
+        XCTAssertEqual(
+            currentAppProjection.currentAppWindowPayload.candidate.windows.map(\.id),
+            ["normal", "fullscreen", "incognito", "second-fullscreen"]
+        )
+        XCTAssertEqual(currentAppProjection.currentAppWindowPayload.summary.windowCount, 4)
+        XCTAssertNil(currentAppProjection.currentAppWindowPayload.context.windowsByID["fallback-host"])
+        XCTAssertNil(currentAppProjection.currentAppWindowPayload.context.windowsByID["fullscreen-duplicate"])
     }
 
     func testRuntimeMainTableProjectionBuilderBuildsAppSwitcherPayloadFromMainTables() throws {
