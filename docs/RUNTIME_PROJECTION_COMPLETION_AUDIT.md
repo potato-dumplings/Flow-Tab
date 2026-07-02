@@ -8,20 +8,20 @@ reclassifying breadth proof as core completion work.
 
 ## Current Phase 7 Slice
 
-- P0: close the runner-fixed Search launch-argument UI smoke validation gap
-  without changing runtime ownership. The fixed-path app is rebuilt and Apple
-  Development signed, then the existing `testSearchPanelEntryAndResultActivation`
-  path proves Search can open from launch arguments, read the search input, show
-  the fixture app result, and close after activation.
+- P0: make the final completion decision for the projection-driven runtime
+  migration by rerunning the repeatable source-boundary audit and classifying
+  the remaining topology items as breadth/hardening gaps rather than core Exit
+  Contract blockers.
 - P1: keep `RUNTIME_AX_CG_SPACE_WINDOW_MAPPING.md`, `TEST_COVERAGE_MATRIX.md`,
-  and this audit aligned with the refreshed Search UI smoke proof. Docs continue
-  to require `missingCommittedIndex` or degraded/stale committed wording until a
+  and this audit aligned with the final completion decision. Docs continue to
+  require `missingCommittedIndex` or degraded/stale committed wording until a
   bounded freshness barrier commits a new generation.
 - P2: keep pure CG-only activation success, broader multi-display/system-owner
   topology, real non-registry focused AX occurrence, and public AX main-state
-  real UI occurrence explicit. Do not reclassify Search smoke as Search
-  freshness proof; committed-index freshness remains covered by the dedicated
-  behavior/UI/pressure evidence below.
+  real UI occurrence explicit. They are not marked complete from mock-only or
+  indirect evidence, but they no longer block the core projection-driven runtime
+  goal because the normal paths and representative UI/pressure proofs below
+  satisfy the Exit Contract.
 
 The committed Search index invariant is now guarded in three places: production
 Search freshness commits still come only from main-table payloads; Search result
@@ -535,7 +535,7 @@ Do not mark these as completed from mock-only evidence. They need representative
 UI/E2E, runtime log, or pressure evidence before moving from breadth gap to
 closed proof.
 
-## Current Conclusion
+## Final Completion Decision
 
 The current production boundary is projection-driven for the named normal paths:
 Switcher, Home, Search, and activation either read runtime projections/committed
@@ -545,6 +545,25 @@ repair/fallback/cold-start/diagnostic or test compatibility boundaries. Search
 must remain `missingCommittedIndex` or a degraded/stale committed result until a
 bounded freshness barrier commits a new main-table generation.
 
-The goal should stay open until the final handoff chooses whether the remaining
-breadth gaps are accepted as non-blocking or one of them is promoted to required
-completion proof.
+The final Phase 7 completion audit accepts the remaining gaps above as
+breadth/hardening gaps, not blockers for the requested target shape. They still
+need future representative UI/E2E, runtime-log, or pressure evidence before they
+can move from gap to closed proof, but they do not show a normal user path
+falling back to shared snapshots, repair payload rows, Search staging/session
+completeness, direct Space setting, Window-menu shortcuts, or unverified
+activation success.
+
+Final validation for this decision:
+
+```bash
+scripts/audit/runtime-projection-exit-contract.sh
+```
+
+The audit passed on 2026-07-02, including surface hot-path no-snapshot checks,
+Switcher/Home projection and dirty-signal evidence, Control+Tab focused
+projection evidence, Search committed-index/main-table barrier evidence,
+pre-barrier Search naming guards, activation focused AX/CG or frontmost CG
+readback guards, CG-only exposure policy ownership, and UI-runner blocker
+classification. Existing behavior, UI, and pressure evidence recorded above and
+in `TEST_COVERAGE_MATRIX.md` remains the representative validation set for the
+completed core goal.
