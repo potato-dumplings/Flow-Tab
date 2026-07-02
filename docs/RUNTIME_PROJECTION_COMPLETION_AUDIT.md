@@ -8,18 +8,16 @@ reclassifying breadth proof as core completion work.
 
 ## Current Phase 7 Slice
 
-- P0: tighten the committed Search index surface boundary in the repeatable
-  exit-contract audit. Search already reads `readCommittedSearchIndexForSearch`
-  and has behavior/UI proof for committed-index start/re-entry, but the source
-  audit now directly rejects Switcher/Search surface construction of
-  `RuntimeSearchIndexProjection`, `RuntimeSearchIndexPayload`, or search index
-  entries from session/staging/repair state.
+- P0: refresh representative real UI proof now that the fixed-path UI runner is
+  repaired. The selected runner-fixed set covers Noisy Option+Tab projection and
+  activation readback, committed-index Window Search duplicate/edge activation,
+  and CG-only degraded/readback-rejection paths without relying on surface-local
+  sampling or session-built Search state.
 - P1: keep `RUNTIME_AX_CG_SPACE_WINDOW_MAPPING.md`, `TEST_COVERAGE_MATRIX.md`,
   this audit, and the repeatable exit-contract audit aligned with the Search
-  committed-index boundary. Existing behavior tests prove direct Search trigger
-  can start from a degraded/stale committed index when app-switcher projection
-  is missing, and async committed-index update is the path to
-  `committedGenerationResult`.
+  freshness wording. The audit now requires docs to keep pre-barrier Search as
+  degraded/stale committed until a bounded barrier commits a new generation, and
+  to reject fresh/complete/latest/current-generation wording before that commit.
 - P2: keep pure CG-only activation success, broader multi-display/system-owner
   topology, real non-registry focused AX occurrence, and public AX main-state
   real UI occurrence gaps explicit.
@@ -311,6 +309,31 @@ The pressure run passed the same UI test in 41.559 seconds with 72 samples at
 0.5s cadence (`cpuAvg=30.11`, `cpuP95=60.00`, `cpuMax=76.40`,
 `rssAvgMB=113.05`, `rssP95MB=168.59`, `rssMaxMB=177.86`), comparable to the
 2026-06-30 70-sample baseline.
+
+Current runner-fixed representative UI proof for this slice:
+
+```bash
+./scripts/testing/install-ui-test-app.sh
+
+./scripts/testing/run-ui-tests-local.sh \
+  -only-testing:FlowTabUITests/FlowTabUITests/testSwitcherPanelOptionTabWindowStateRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithNoisyCGSiblingsWithoutAppAXWindows \
+  -only-testing:FlowTabUITests/FlowTabUITests/testSwitcherPanelWindowSearchKeepsDuplicateRealWorkflowTitlesDistinct \
+  -only-testing:FlowTabUITests/FlowTabUITests/testSwitcherPanelWindowSearchMatchesAndActivatesRealWorkflowEdgeTitle \
+  -only-testing:FlowTabUITests/FlowTabUITests/testSwitcherPanelOptionTabReportsUnverifiedSpaceBackedCGOnlyWorkflowActivation \
+  -only-testing:FlowTabUITests/FlowTabUITests/testSwitcherPanelOptionTabHidesDesktopProvisionalCGOnlyWorkflowWindow
+```
+
+The install step rebuilt `{user-home}/Applications/Flow Tab UITest.app` and signed
+it with Apple Development signing. The UI wrapper used the fixed app path and
+passed 5 selected tests with 0 failures in 141.582 seconds (`147.291` seconds
+XCTest operation elapsed). This refreshes the representative proof that Noisy
+Option+Tab reads committed projection rows and requires activation readback,
+Window Search waits for committed-index results and activates the edge-title
+fixture row, duplicate same-title Search rows stay distinct, desktop provisional
+CG-only rows stay out of `windowCycle`/preview, and space-backed CG-only routes
+remain degraded/unverified until readback. It does not close the public AX
+main-state occurrence, non-registry focused AX occurrence, pure CG-only exact
+activation success, or broader multi-display/system-owner topology gaps.
 
 ## Remaining Gaps
 
