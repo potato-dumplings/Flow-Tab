@@ -8,27 +8,28 @@ reclassifying breadth proof as core completion work.
 
 ## Current Phase 7 Slice
 
-- P0: add a reusable `FlowTabSpaceFixture` panel window kind and in-process
-  launch-order proof so future real topology runs can attempt public AX
-  focused/main separation without private Space APIs, Window-menu shortcuts, or
-  runtime production changes. The panel path launches the document window,
-  activates the fixture app, then shows a key-only non-main panel.
+- P0: refresh the previously blocked UI runner validation boundary after the
+  runner fix by reinstalling the fixed-path Apple Development signed app and
+  proving the minimal UI identity case now enters the test body and passes.
 - P1: keep `RUNTIME_AX_CG_SPACE_WINDOW_MAPPING.md`, `TEST_COVERAGE_MATRIX.md`,
-  and this audit aligned with the actual evidence: the behavior fixture support
-  is proven, but the real UI `public-state-tiebreak state=main` occurrence is
-  still not closed.
+  and this audit aligned with the actual evidence: UI automation is available
+  again for targeted proof, while the public AX `state=main` occurrence and
+  non-registry verified-focus occurrence remain unclosed because no runtime log
+  emitted those markers.
 - P2: keep pure CG-only activation success, broader multi-display/system-owner
   topology, real non-registry focused AX occurrence, and public AX main-state
   real UI occurrence gaps explicit.
 
 This slice does not add a new runtime state owner, alter surface read paths, or
-change Search behavior. A targeted panel-backed UI attempt reached the real
-workflow and produced three Chrome fixture window cards, but the public AX fact
-source still reported the same window as both `focused=1` and `main=1`; no
-`binding-assignment public-state-tiebreak state=main` marker appeared anywhere
-in the runtime logs. Therefore the main-state occurrence remains a real UI gap,
-not a completed proof. Search remains missing committed index or degraded/stale
-committed until a bounded freshness barrier commits a new main-table generation.
+change Search behavior. The old runner-initialization blocker no longer applies
+to the minimal identity proof: `testFlowTabUITestAppIdentityUsesEnvironmentOverridePath`
+now passes through the fixed-path wrapper. This is validation-layer evidence,
+not a new topology oracle. The panel-backed attempt still remains the latest
+real public AX main-state evidence, and it did not produce
+`binding-assignment public-state-tiebreak state=main`; therefore main-state
+occurrence remains a real UI gap. Search remains missing committed index or
+degraded/stale committed until a bounded freshness barrier commits a new
+main-table generation.
 
 ## Required Evidence
 
@@ -97,19 +98,22 @@ checks, Search main-table committed barrier checks, Search naming checks, Space
 topology projection checks, activation focused AX/CG/frontmost CG readback
 checks, and UI runner classification guard.
 
-Current UI runner classification proof:
+Current UI runner fixed-path proof:
 
 ```bash
 ./scripts/testing/run-ui-tests-local.sh --skip-space-fixtures \
   -only-testing:FlowTabUITests/FlowTabUITests/testFlowTabUITestAppIdentityUsesEnvironmentOverridePath
 ```
 
-The wrapper built and signed the UI runner, then failed before the test body
-with `Timed out while enabling automation mode`. The wrapper now emits
-`Classification: UI automation initialization blocker` plus the fixed-path app,
-runner app, result bundle, and xcodebuild log paths. This proves the validation
-boundary classifies the blocker instead of leaving later handoffs to infer
-whether the failure is a product/runtime assertion.
+The earlier wrapper run built and signed the UI runner, then failed before the
+test body with `Timed out while enabling automation mode`. After the runner fix,
+`./scripts/testing/install-ui-test-app.sh` rebuilt and signed
+`{user-home}/Applications/Flow Tab UITest.app` with Apple Development signing,
+and the same targeted UI wrapper run passed 1 selected test with 0 failures in
+0.351 seconds (`1.148` seconds XCTest operation elapsed). This proves the
+fixed-path runner can now enter the test body for targeted UI validation. The
+blocker classifier remains guarded by the exit audit for future pre-test-body
+automation failures, but the current validation state is no longer blocked.
 
 Representative neighboring behavior proof already used by the current audit:
 
