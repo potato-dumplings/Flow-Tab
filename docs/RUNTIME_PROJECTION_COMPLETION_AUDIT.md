@@ -8,21 +8,19 @@ reclassifying breadth proof as core completion work.
 
 ## Current Phase 7 Slice
 
-- P0: close the committed-index Search pressure gap with the fixed-path runner
-  repaired. `scripts/perf/search-committed-index-pressure.sh` now enforces the
-  30s minimum pressure window, tolerates short-lived sampled child processes,
-  and captures the `CommittedSearchIndexPressure` metric in addition to the
-  deterministic coordinator pressure metrics.
+- P0: close the app-hosted mock dataset `FlowTabTests` validation gap now that
+  the local runner/build setup is repaired. The previous segv was reproduced,
+  a clean rebuild was performed through the approved app-test DerivedData path,
+  the temporary non-semantic TestingSupport edit was discarded, and the original
+  implementation now passes the required mock projection seed set.
 - P1: keep `RUNTIME_AX_CG_SPACE_WINDOW_MAPPING.md`, `TEST_COVERAGE_MATRIX.md`,
-  this audit, and the repeatable exit-contract audit aligned with the Search
-  pressure proof. Docs continue to require `missingCommittedIndex` or
-  degraded/stale committed wording until a bounded barrier commits a new
-  generation.
+  and this audit aligned with the refreshed app-hosted mock dataset proof.
+  Docs continue to require `missingCommittedIndex` or degraded/stale committed
+  wording until a bounded barrier commits a new generation.
 - P2: keep pure CG-only activation success, broader multi-display/system-owner
   topology, real non-registry focused AX occurrence, public AX main-state real
-  UI occurrence, optional Search UI smoke failures, and app-hosted mock dataset
-  runner segv explicit rather than reclassifying them as this slice's required
-  proof.
+  UI occurrence, and optional Search UI smoke failures explicit rather than
+  reclassifying them as this slice's required proof.
 
 The committed Search index invariant is now guarded in three places: production
 Search freshness commits still come only from main-table payloads; Search result
@@ -59,6 +57,27 @@ wrapper passed 2 batches of 3 selected FlowTabTests with 0 failures, collected
 `resultState=committedGenerationResult` and `freshnessBarrierRequests=0` only
 because the test fixture installs a validated committed generation before the
 hot Search read; this is not a pre-barrier fresh/complete/latest result.
+
+Current app-hosted mock dataset proof:
+
+```bash
+./scripts/testing/run-flowtabtests-local.sh \
+  -only-testing:FlowTabTests/FlowTabTests/testUITestMockDatasetBuildsExplicitFullRepairProjectionPayloadWhenLaunchFlagEnabled \
+  -only-testing:FlowTabTests/FlowTabTests/testAppInventoryServiceReadsUITestRuntimeProjectionDataset \
+  -only-testing:FlowTabTests/FlowTabTests/testRuntimeProjectionRepairProviderMockRuntimeKeepsCurrentAppPayloadsScopedPerApp \
+  -only-testing:FlowTabTests/FlowTabTests/testRuntimeProjectionRepairProviderMockSingleAppFiveWindowsProjectionPayloadKeepsAllWindowsInHomeLayer \
+  -only-testing:FlowTabTests/FlowTabTests/testRuntimeProjectionRepairProviderMockSingleAppFiveWindowsCGOffSpaceProjectionPayloadKeepsAllWindowsInHomeLayer \
+  -only-testing:FlowTabTests/FlowTabTests/testRuntimeProjectionRepairProviderMockSingleAppFiveWindowsCGOffSpaceProjectionPayloadUsesExplicitTitles \
+  -only-testing:FlowTabTests/FlowTabTests/testRuntimeWindowRecencyTrackerAppliesToRuntimeProjectionRepairProviderCurrentAppPayload
+```
+
+The selected run passed 7 tests with 0 failures after the approved clean rebuild.
+It proves the app-hosted mock runtime projection seed can still build explicit
+full-repair fixture payloads, AppInventory mock app records, appID-scoped
+current-app payloads, single-app/five-window variants including CG-off-Space
+IDs and explicit titles, and recency-applied current-app payloads. This closes
+the runner segv validation gap only; mock projection seeds remain TestingSupport
+fixture/evidence boundaries and do not become normal runtime read sources.
 
 ## Required Evidence
 
@@ -422,9 +441,9 @@ again with dirty metadata cleared does Search report `committedGenerationResult`
 with `committedIndexCoversCurrentGeneration=1`. This is degraded/stale committed
 behavior until barrier success, not a fresh/complete/latest result.
 
-`FlowTabTests` app-hosted mock dataset tests still segv in the current local
-runner, so that runner failure remains a validation blocker for those specific
-tests. It is not used as completion proof for this slice.
+The previous app-hosted mock dataset segv is now superseded by the 7-test
+FlowTabTests run above. No production runtime behavior or TestingSupport
+semantics changed to obtain that proof.
 
 ## Remaining Gaps
 
@@ -470,13 +489,6 @@ runtime shape:
   single-app open window-layer mutation, selected-window-removed branch,
   multi-app selected-app isolation branch, and fullscreen target-window close
   branch are now covered by behavior plus real UI proof.
-- Search mock UI and committed-index Search pressure now have proof, but
-  app-hosted mock dataset FlowTabTests remain open: the current runner crashes
-  those mock dataset tests with signal segv, while fixed-path UI runner tests,
-  runtime logs, and the external committed-index pressure wrapper prove
-  missing/degraded/stale committed semantics before the barrier commits a clean
-  generation.
-
 Do not mark these as completed from mock-only evidence. They need representative
 UI/E2E, runtime log, or pressure evidence before moving from breadth gap to
 closed proof.
