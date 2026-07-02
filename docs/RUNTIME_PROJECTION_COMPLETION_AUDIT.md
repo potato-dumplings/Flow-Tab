@@ -238,12 +238,14 @@ runtime shape:
   path, but they did not naturally emit a `verifiedFocusFallbackAX=1`
   non-registry focused AX occurrence.
 - Public AX main/minimized tie-breaker variants still need real UI occurrence
-  and broader state permutation proof; focused/main/minimized deterministic
-  matcher coverage is now present. On 2026-07-02 the fixed-path app was
-  reinstalled with Apple Development signing and the existing edge-input UI
-  tests were attempted twice to look for real `state=main` evidence, but both
-  runs failed before the test body with `Timed out while enabling automation
-  mode`; no main-state UI proof was produced.
+  proof. Focused/main/minimized deterministic matcher coverage is now present,
+  including the combined priority order where focused claims the first onscreen
+  candidate, main claims the next onscreen candidate, and minimized claims the
+  offscreen candidate. On 2026-07-02 the fixed-path app was reinstalled with
+  Apple Development signing and the existing edge-input UI tests were attempted
+  twice to look for real `state=main` evidence, but both runs failed before the
+  test body with `Timed out while enabling automation mode`; no main-state UI
+  proof was produced.
 - Broader multi-display/fullscreen topology and system-authoritative fullscreen
   owner proof remain partial. The production boundary now has a repeatable
   source audit and behavior proof for Switcher fullscreen presentation reading

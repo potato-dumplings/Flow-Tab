@@ -2909,6 +2909,34 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(diagnostics.isEmpty)
     }
 
+    func testRuntimeSystemRepairFactProviderResolveCGWindowAssignmentsAppliesPublicAXStatePriorityOrder() {
+        let bounds = CGRect(x: 100, y: 100, width: 800, height: 500)
+        let axWindows: [RuntimeAXWindowEntry] = [
+            .init(id: "ax:325:0", index: 0, title: "Document", bounds: bounds, isMinimized: true),
+            .init(id: "ax:325:1", index: 1, title: "Document", bounds: bounds, isMain: true),
+            .init(id: "ax:325:2", index: 2, title: "Document", bounds: bounds, isFocused: true)
+        ]
+        let cgWindows: [RuntimeCGWindowEntry] = [
+            .init(id: 326, title: "Document", bounds: bounds, isOnscreen: true),
+            .init(id: 327, title: "Document", bounds: bounds, isOnscreen: true),
+            .init(id: 328, title: "Document", bounds: bounds, isOnscreen: false)
+        ]
+
+        let assignments = RuntimeWindowMappingTestSupport.resolveCGWindowAssignments(
+            axWindows: axWindows,
+            cgWindows: cgWindows
+        )
+        let diagnostics = RuntimeWindowMappingTestSupport.resolveCGWindowAssignmentDiagnostics(
+            axWindows: axWindows,
+            cgWindows: cgWindows
+        )
+
+        XCTAssertEqual(assignments["ax:325:2"], 326)
+        XCTAssertEqual(assignments["ax:325:1"], 327)
+        XCTAssertEqual(assignments["ax:325:0"], 328)
+        XCTAssertTrue(diagnostics.isEmpty)
+    }
+
     func testRuntimeSystemRepairFactProviderPrivateExactBridgeConflictWithStickyBindingReportsDiagnosticAndUsesExactTarget() {
         let fullscreenBounds = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let axWindows: [RuntimeAXWindowEntry] = [
