@@ -42,6 +42,7 @@ extension FlowTabUITests {
         )
         let fullscreenTitle = try XCTUnwrap(fullscreenWindowTitle(in: targetApp))
         let standardTitle = try XCTUnwrap(firstStandardWindowTitle(in: targetApp))
+        var runtimeLogSnapshot = makeRuntimeLogFileSnapshot()
 
         try runRealSpaceFixtureWorkflow(
             workflow,
@@ -122,7 +123,8 @@ extension FlowTabUITests {
                     targetApp: targetApp,
                     diagnosticsSummary: diagnosticsSummary,
                     primaryFullscreenTitle: fullscreenTitle,
-                    traceLabel: traceLabel
+                    traceLabel: traceLabel,
+                    runtimeLogSnapshot: runtimeLogSnapshot
                 )
                 return
             }
@@ -215,7 +217,8 @@ extension FlowTabUITests {
         targetApp: SpaceFixtureResolvedWorkflow.App,
         diagnosticsSummary initialDiagnosticsSummary: XCUIElement,
         primaryFullscreenTitle: String,
-        traceLabel: String
+        traceLabel: String,
+        runtimeLogSnapshot: [String: UInt64]
     ) throws {
         let standardTitles = standardWindowTitles(in: targetApp)
         let normalOneTitle = try XCTUnwrap(
@@ -271,19 +274,19 @@ extension FlowTabUITests {
             (
                 normalOneTitle,
                 primaryFullscreenTitle,
-                [normalOneTitle, primaryFullscreenTitle],
+                [normalOneTitle],
                 "fullscreen1"
             ),
             (
                 primaryFullscreenTitle,
                 normalTwoTitle,
-                [primaryFullscreenTitle, normalOneTitle, normalTwoTitle],
+                [primaryFullscreenTitle],
                 "normal2"
             ),
             (
                 normalTwoTitle,
                 fullscreenTwoTitle,
-                [normalTwoTitle, primaryFullscreenTitle, normalOneTitle, fullscreenTwoTitle],
+                [normalTwoTitle],
                 "fullscreen2"
             )
         ]
@@ -335,12 +338,21 @@ extension FlowTabUITests {
                 diagnosticsSummary: diagnosticsSummary,
                 traceLabel: "\(traceLabel).\(phase.trace)"
             )
+            assertNoisyInAppFilteredCGOnlyArtifactSource(
+                since: runtimeLogSnapshot
+            )
+            assertNoisyInAppWindowLayerSource(
+                selection,
+                phaseTrace: phase.trace,
+                since: runtimeLogSnapshot
+            )
             waitForRuntimeLogFiles(
                 containing: ["inAppHotkeyPressed dir=forward panelVisible=1", "advance key=tabForward"],
                 since: logSnapshot,
                 timeout: 8
             )
 
+            let activationLogSnapshot = makeRuntimeLogFileSnapshot()
             postFlowTabUITestSwitcherCommandAndWaitForDelivery(
                 .confirm,
                 traceLabel: "\(traceLabel).confirm.\(phase.trace)"
@@ -355,9 +367,74 @@ extension FlowTabUITests {
                 ),
                 "Noisy Control+Tab must activate the exact \(phase.targetTitle) CG window selected in \(phase.trace)."
             )
+            assertNoisyInAppWindowRequestSource(
+                selection,
+                appID: targetApp.identity.bundleIdentifier,
+                phaseTrace: phase.trace,
+                since: activationLogSnapshot
+            )
+            assertNoisyInAppVerifiedFocusReadback(
+                selection,
+                phaseTrace: phase.trace,
+                since: activationLogSnapshot
+            )
             currentSelection = selection
             logWorkflowSpaceObservation("\(traceLabel).afterConfirm.\(phase.trace)", app: targetApp)
         }
+    }
+
+    private func assertNoisyInAppFilteredCGOnlyArtifactSource(
+        since snapshot: [String: UInt64]
+    ) {
+        waitForRuntimeLogFiles(
+            matching: #"Chrome Fixture (filtered-fullscreen-((sibling|host)-artifacts stage=(pre-dedupe|presentation|window-record-projection|read-model-current-app-normalization)|duplicate-surfaces stage=(presentation-final|window-record-projection|read-model-current-app-normalization))|filtered-cg-only-covered-by-activation stage=read-model-current-app-normalization) dropped=[1-9][0-9]*"#,
+            since: snapshot,
+            timeout: 8,
+            description: "Noisy Control+Tab filtered CG-only/fullscreen artifact or duplicate surface source"
+        )
+    }
+
+    private func assertNoisyInAppWindowLayerSource(
+        _ selection: InAppWindowSelection,
+        phaseTrace: String,
+        since snapshot: [String: UInt64]
+    ) {
+        let escapedTitle = NSRegularExpression.escapedPattern(for: selection.title)
+        waitForRuntimeLogFiles(
+            matching: #"window-entries app=Chrome Fixture .*id=cg:[0-9]+:\#(selection.windowNumber):title=\#(escapedTitle)[^\n]*source=stickyBinding:spaceEvidence=(observed|inferredFromTopology)"#,
+            since: snapshot,
+            timeout: 8,
+            description: "sticky current-app window-layer source for selected Noisy Control+Tab \(phaseTrace) window"
+        )
+    }
+
+    private func assertNoisyInAppWindowRequestSource(
+        _ selection: InAppWindowSelection,
+        appID: String,
+        phaseTrace: String,
+        since snapshot: [String: UInt64]
+    ) {
+        let escapedAppID = NSRegularExpression.escapedPattern(for: appID)
+        let escapedTitle = NSRegularExpression.escapedPattern(for: selection.title)
+        waitForRuntimeLogFiles(
+            matching: #"window-request appID=\#(escapedAppID) pid=[0-9]+ windowID=cg:[0-9]+:\#(selection.windowNumber) title=\#(escapedTitle)[^\n]* sticky=true source=stickyBinding"#,
+            since: snapshot,
+            timeout: 8,
+            description: "sticky current-app window request source for selected Noisy Control+Tab \(phaseTrace) window"
+        )
+    }
+
+    private func assertNoisyInAppVerifiedFocusReadback(
+        _ selection: InAppWindowSelection,
+        phaseTrace: String,
+        since snapshot: [String: UInt64]
+    ) {
+        waitForRuntimeLogFiles(
+            matching: "binding-confidence-change windowID=cg:[0-9]+:\(selection.windowNumber) cg=\(selection.windowNumber) .* source=.*->verifiedFocusReadback",
+            since: snapshot,
+            timeout: 8,
+            description: "verified-focus exact WindowRecord relearn after Noisy Control+Tab \(phaseTrace) confirm"
+        )
     }
 
     func waitForApplicationAXWindowsSuppressed(
@@ -505,7 +582,7 @@ extension FlowTabUITests {
         XCTAssertEqual(
             Array(expectedPrefix.prefix(1)),
             [selection.title],
-            "Noisy Control+Tab \(phaseTrace) phase must start with the first expected app-local recency window."
+            "Noisy Control+Tab \(phaseTrace) phase must start from the activated current window."
         )
         if let expectedSelection {
             XCTAssertEqual(
@@ -580,7 +657,7 @@ extension FlowTabUITests {
         XCTAssertEqual(
             Array(observedPrefix.prefix(prefixLength)),
             Array(expectedPrefix.prefix(prefixLength)),
-            "Noisy Control+Tab \(traceLabel) window order must follow app-local recency before fallback."
+            "Noisy Control+Tab \(traceLabel) must preserve the activated current window before cycling fallback."
         )
     }
 
@@ -645,6 +722,7 @@ extension FlowTabUITests {
         allowsNoisyCGSiblings: Bool = false
     ) -> XCUIElement {
         XCTAssertTrue(app.state == .runningForeground || app.state == .runningBackground)
+        XCUIApplication(bundleIdentifier: workflowApp.identity.bundleIdentifier).activate()
         RunLoop.current.run(until: Date().addingTimeInterval(0.35))
         postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.inApp, traceLabel: "control.reopen")
         return assertInAppWindowSwitcherReady(

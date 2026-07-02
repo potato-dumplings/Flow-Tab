@@ -379,16 +379,30 @@ final class LiveSwitcherModel: ObservableObject {
         let recencyAppliedMs: Double
         var resolvedAppCandidate: AppSwitchCandidate?
         var resolvedContext: RuntimeAppContext?
+        var readyResult = "ready"
 
-        if let projection = focusedRead.projection,
-           projection.freshness.isCompleteForScope {
+        if let projection = focusedRead.projection {
             projectionReadMs = Self.monotonicMilliseconds()
-            let payload = currentAppWindowPayloadWithWindowRecencyApplied(
-                projection.currentAppWindowPayload
-            )
-            recencyAppliedMs = Self.monotonicMilliseconds()
-            resolvedAppCandidate = payload.candidate
-            resolvedContext = payload.context
+            if projection.freshness.isCompleteForScope {
+                let payload = currentAppWindowPayloadWithWindowRecencyApplied(
+                    projection.currentAppWindowPayload
+                )
+                recencyAppliedMs = Self.monotonicMilliseconds()
+                resolvedAppCandidate = payload.candidate
+                resolvedContext = payload.context
+            } else if !projection.currentAppWindowPayload.candidate.windows.isEmpty {
+                runtimeProjectionService.signalFocusedCurrentAppWindowsChanged()
+                let payload = currentAppWindowPayloadWithWindowRecencyApplied(
+                    projection.currentAppWindowPayload
+                )
+                recencyAppliedMs = Self.monotonicMilliseconds()
+                resolvedAppCandidate = payload.candidate
+                resolvedContext = payload.context
+                readyResult = "degradedStaleCommitted"
+            } else {
+                runtimeProjectionService.signalFocusedCurrentAppWindowsChanged()
+                recencyAppliedMs = Self.monotonicMilliseconds()
+            }
         } else {
             projectionReadMs = Self.monotonicMilliseconds()
             runtimeProjectionService.signalFocusedCurrentAppWindowsChanged()
@@ -446,7 +460,7 @@ final class LiveSwitcherModel: ObservableObject {
         publishSearchStateIfNeeded()
         let completeMs = Self.monotonicMilliseconds()
         logStartFocusedWindowSession(
-            result: "ready",
+            result: readyResult,
             frontmostAppID: frontmostAppID,
             frontmostReadyMs: frontmostReadyMs,
             projectionReadMs: projectionReadMs,

@@ -1107,7 +1107,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testLiveSwitcherModelFocusedWindowSessionTreatsStaleCurrentAppProjectionAsRepairPending() {
+    func testLiveSwitcherModelFocusedWindowSessionUsesStaleCommittedProjectionAsDegradedRead() {
         let runningApp = NSRunningApplication.current
         let appID = runningApp.bundleIdentifier ?? "pid:\(runningApp.processIdentifier)"
         let windows = [
@@ -1153,7 +1153,7 @@ extension FlowTabPriorityCoverageTests {
             ]
         )
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
-        XCTAssertFalse(model.startFocusedAppWindowSession(triggerDirection: .forward))
+        XCTAssertTrue(model.startFocusedAppWindowSession(triggerDirection: .forward))
 
         XCTAssertEqual(runtimeProjectionService.focusedCurrentAppWindowProjectionReadCount(), 1)
         XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: appID), 1)
@@ -1162,7 +1162,11 @@ extension FlowTabPriorityCoverageTests {
             runtimeProjectionService.selectedCurrentAppWindowChangeSignalsRecorded().map(\.pid),
             [runningApp.processIdentifier]
         )
-        XCTAssertNil(model.session)
+        XCTAssertEqual(model.session?.mode, .windowCycle(appID: appID))
+        XCTAssertEqual(
+            model.session?.selectedApp.windows.map(\.id),
+            ["stale-focused-projected-1", "stale-focused-projected-2"]
+        )
     }
 
     @MainActor

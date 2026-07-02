@@ -445,6 +445,45 @@ The previous app-hosted mock dataset segv is now superseded by the 7-test
 FlowTabTests run above. No production runtime behavior or TestingSupport
 semantics changed to obtain that proof.
 
+## Phase 7 Control+Tab Degraded Current-App Read
+
+This slice closes the Control+Tab read-path gap exposed by the repaired UI
+runner. `LiveSwitcherModel.startFocusedAppWindowSession(...)` still reads only
+the focused current-app projection from `RuntimeReadModelStore`; when that
+projection is stale but contains committed windows, it opens the window layer as
+`degradedStaleCommitted` and sends `signalFocusedCurrentAppWindowsChanged()` for
+background maintenance. It does not synchronously wait for CG/AX/Space sampling
+and it does not describe the stale order as fresh, complete, latest, or
+current-generation.
+
+Validation:
+
+```bash
+./scripts/testing/run-flowtabtests-local.sh \
+  -only-testing:FlowTabTests/FlowTabPriorityCoverageTests/testLiveSwitcherModelFocusedWindowSessionUsesStaleCommittedProjectionAsDegradedRead
+
+./scripts/testing/install-ui-test-app.sh
+
+./scripts/testing/run-ui-tests-local.sh \
+  -only-testing:FlowTabUITests/FlowTabUITests/testInAppWindowSwitcherControlTabRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithNoisyCGSiblingsWithoutAppAXWindows
+```
+
+The behavior test passed 1 selected FlowTabTests test with 0 failures. The
+fixed-path UI app was rebuilt and Apple Development signed; after one pre-test
+automation-mode timeout and one stale-order oracle correction, the targeted
+Noisy Control+Tab UI proof passed 1 selected test with 0 failures in 39.785s
+(`40.657s` XCTest elapsed). Runtime logs show reopen using
+`startFocusedWindowSession result=degradedStaleCommitted ... windows=4`, and the
+UI proof verifies the four real workflow windows, filtered noisy CG/fullscreen
+artifacts, sticky/runtime-owned window source logs, exact selected `CGWindowID`
+activation, and verified focus readback.
+
+Search is unchanged in this slice. Before a bounded freshness barrier
+successfully commits a new generation, Search remains `missingCommittedIndex` or
+a degraded/stale committed result with dirty/freshness metadata; it is not a
+fresh, complete, latest, current-generation committed, or newest complete
+result.
+
 ## Remaining Gaps
 
 These are breadth/hardening gaps and do not currently contradict the target
