@@ -10,6 +10,11 @@ enum SpaceFixtureWindowStartupState: String, Codable, Equatable {
     case minimized
 }
 
+enum SpaceFixtureWindowKind: String, Codable, Equatable {
+    case standard
+    case panel
+}
+
 enum SpaceFixtureLaunchConfigurationError: LocalizedError, Equatable {
     case missingWorkflowConfigPath
     case missingWorkflowAppID
@@ -137,6 +142,7 @@ struct SpaceFixtureWorkflowWindowConfiguration: Codable, Equatable {
     let publishesApplicationAXWindow: Bool
     let suppressesWindowAccessibilityExposure: Bool
     let startupState: SpaceFixtureWindowStartupState
+    let kind: SpaceFixtureWindowKind
 
     enum CodingKeys: String, CodingKey {
         case title
@@ -146,6 +152,7 @@ struct SpaceFixtureWorkflowWindowConfiguration: Codable, Equatable {
         case publishesApplicationAXWindow
         case suppressesWindowAccessibilityExposure
         case startupState
+        case kind
     }
 
     init(
@@ -155,7 +162,8 @@ struct SpaceFixtureWorkflowWindowConfiguration: Codable, Equatable {
         noisyCGSiblings: Bool = false,
         publishesApplicationAXWindow: Bool = true,
         suppressesWindowAccessibilityExposure: Bool = false,
-        startupState: SpaceFixtureWindowStartupState = .normal
+        startupState: SpaceFixtureWindowStartupState = .normal,
+        kind: SpaceFixtureWindowKind = .standard
     ) {
         self.title = title
         self.mode = mode
@@ -164,6 +172,7 @@ struct SpaceFixtureWorkflowWindowConfiguration: Codable, Equatable {
         self.publishesApplicationAXWindow = publishesApplicationAXWindow
         self.suppressesWindowAccessibilityExposure = suppressesWindowAccessibilityExposure
         self.startupState = startupState
+        self.kind = kind
     }
 
     init(from decoder: Decoder) throws {
@@ -184,7 +193,11 @@ struct SpaceFixtureWorkflowWindowConfiguration: Codable, Equatable {
             startupState: try container.decodeIfPresent(
                 SpaceFixtureWindowStartupState.self,
                 forKey: .startupState
-            ) ?? .normal
+            ) ?? .normal,
+            kind: try container.decodeIfPresent(
+                SpaceFixtureWindowKind.self,
+                forKey: .kind
+            ) ?? .standard
         )
     }
 }

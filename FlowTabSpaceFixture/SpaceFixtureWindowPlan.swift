@@ -24,6 +24,7 @@ struct SpaceFixtureWindowPlan: Equatable {
     let publishesApplicationAXWindow: Bool
     let suppressesWindowAccessibilityExposure: Bool
     let startupState: SpaceFixtureWindowStartupState
+    let kind: SpaceFixtureWindowKind
 
     init(
         index: Int,
@@ -37,7 +38,8 @@ struct SpaceFixtureWindowPlan: Equatable {
         noisyCGSiblings: Bool,
         publishesApplicationAXWindow: Bool = true,
         suppressesWindowAccessibilityExposure: Bool = false,
-        startupState: SpaceFixtureWindowStartupState = .normal
+        startupState: SpaceFixtureWindowStartupState = .normal,
+        kind: SpaceFixtureWindowKind = .standard
     ) {
         self.index = index
         self.totalWindowCount = totalWindowCount
@@ -51,6 +53,7 @@ struct SpaceFixtureWindowPlan: Equatable {
         self.publishesApplicationAXWindow = publishesApplicationAXWindow
         self.suppressesWindowAccessibilityExposure = suppressesWindowAccessibilityExposure
         self.startupState = startupState
+        self.kind = kind
     }
 
     var rootAccessibilityIdentifier: String {
@@ -139,7 +142,8 @@ enum SpaceFixtureWindowPlanner {
                 noisyCGSiblings: configuredWindow.noisyCGSiblings,
                 publishesApplicationAXWindow: configuredWindow.publishesApplicationAXWindow,
                 suppressesWindowAccessibilityExposure: configuredWindow.suppressesWindowAccessibilityExposure,
-                startupState: configuredWindow.startupState
+                startupState: configuredWindow.startupState,
+                kind: configuredWindow.kind
             )
         }
     }

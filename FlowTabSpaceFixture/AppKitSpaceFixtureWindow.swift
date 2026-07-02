@@ -5,7 +5,7 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
     let plan: SpaceFixtureWindowPlan
 
     private let contentView: SpaceFixtureWindowContentView
-    private let window: ChromeLikeSpaceFixtureWindow
+    private let window: NSWindow & FixtureAccessibilitySuppressing
     private let noisyCGSiblings: NoisyCGSiblingWindowSet?
     private var fullScreenObservationToken: NSObjectProtocol?
 
@@ -17,12 +17,7 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
         self.plan = plan
         let contentView = SpaceFixtureWindowContentView(plan: plan)
 
-        let window = ChromeLikeSpaceFixtureWindow(
-            contentRect: plan.frame,
-            styleMask: [.titled, .closable, .miniaturizable, .resizable],
-            backing: .buffered,
-            defer: false
-        )
+        let window = Self.makeWindow(for: plan)
         window.title = plan.title
         window.identifier = NSUserInterfaceItemIdentifier(plan.windowAccessibilityIdentifier)
         window.isRestorable = false
@@ -39,6 +34,30 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
         self.contentView = contentView
         self.window = window
         self.noisyCGSiblings = plan.noisyCGSiblings ? NoisyCGSiblingWindowSet(plan: plan) : nil
+    }
+
+    private static func makeWindow(for plan: SpaceFixtureWindowPlan) -> NSWindow & FixtureAccessibilitySuppressing {
+        let styleMask: NSWindow.StyleMask = [.titled, .closable, .miniaturizable, .resizable]
+        switch plan.kind {
+        case .standard:
+            return ChromeLikeSpaceFixtureWindow(
+                contentRect: plan.frame,
+                styleMask: styleMask,
+                backing: .buffered,
+                defer: false
+            )
+        case .panel:
+            let panel = ChromeLikeSpaceFixturePanel(
+                contentRect: plan.frame,
+                styleMask: styleMask,
+                backing: .buffered,
+                defer: false
+            )
+            panel.isFloatingPanel = true
+            panel.hidesOnDeactivate = false
+            panel.becomesKeyOnlyIfNeeded = false
+            return panel
+        }
     }
 
     func show(isKey: Bool) {
@@ -110,8 +129,49 @@ final class AppKitSpaceFixtureWindow: SpaceFixtureWindowing {
 }
 
 @MainActor
-private final class ChromeLikeSpaceFixtureWindow: NSWindow {
+private protocol FixtureAccessibilitySuppressing: AnyObject {
+    func suppressAccessibilityExposure()
+}
+
+@MainActor
+private final class ChromeLikeSpaceFixtureWindow: NSWindow, FixtureAccessibilitySuppressing {
     private var suppressesAccessibilityExposure = false
+
+    func suppressAccessibilityExposure() {
+        suppressesAccessibilityExposure = true
+        setAccessibilityElement(false)
+        setAccessibilityChildren([])
+        setAccessibilityWindows([])
+    }
+
+    override func isAccessibilityElement() -> Bool {
+        suppressesAccessibilityExposure ? false : super.isAccessibilityElement()
+    }
+
+    override func accessibilityRole() -> NSAccessibility.Role? {
+        suppressesAccessibilityExposure ? nil : super.accessibilityRole()
+    }
+
+    override func accessibilitySubrole() -> NSAccessibility.Subrole? {
+        suppressesAccessibilityExposure ? nil : super.accessibilitySubrole()
+    }
+
+    override func accessibilityChildren() -> [Any]? {
+        suppressesAccessibilityExposure ? [] : super.accessibilityChildren()
+    }
+}
+
+@MainActor
+private final class ChromeLikeSpaceFixturePanel: NSPanel, FixtureAccessibilitySuppressing {
+    private var suppressesAccessibilityExposure = false
+
+    override var canBecomeKey: Bool {
+        true
+    }
+
+    override var canBecomeMain: Bool {
+        false
+    }
 
     func suppressAccessibilityExposure() {
         suppressesAccessibilityExposure = true

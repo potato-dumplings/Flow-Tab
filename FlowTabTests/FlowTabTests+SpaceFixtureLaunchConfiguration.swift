@@ -151,6 +151,7 @@ extension FlowTabTests {
                     {
                       "title": "Chrome Window 1",
                       "mode": "standard",
+                      "kind": "panel",
                       "tabs": [
                         { "title": "Docs", "isSelected": true },
                         { "title": "PR", "isSelected": false }
@@ -201,6 +202,7 @@ extension FlowTabTests {
         XCTAssertFalse(configuration.publishesApplicationAccessibilityChildren)
         XCTAssertEqual(configuration.windows[0].configuredTitle, "Chrome Window 1")
         XCTAssertFalse(configuration.windows[0].noisyCGSiblings)
+        XCTAssertEqual(configuration.windows[0].kind, .panel)
         XCTAssertTrue(configuration.windows[0].publishesApplicationAXWindow)
         XCTAssertFalse(configuration.windows[0].suppressesWindowAccessibilityExposure)
         XCTAssertTrue(configuration.windows[1].noisyCGSiblings)
@@ -210,6 +212,38 @@ extension FlowTabTests {
         XCTAssertEqual(configuration.windows[0].tabs.map(\.title), ["Docs", "PR"])
         XCTAssertEqual(configuration.windows[0].tabs.map(\.isSelected), [true, false])
         XCTAssertEqual(configuration.windows[1].tabs.map(\.isSelected), [false, true])
+    }
+
+    func testSpaceFixtureWindowPlannerCarriesWorkflowWindowKind() {
+        let configuration = SpaceFixtureLaunchConfiguration(
+            windows: [
+                SpaceFixtureConfiguredWindow(
+                    configuredTitle: "Document",
+                    windowTitle: "Shared Docs",
+                    mode: .standard,
+                    tabs: []
+                ),
+                SpaceFixtureConfiguredWindow(
+                    configuredTitle: "Inspector",
+                    windowTitle: "Shared Docs",
+                    mode: .standard,
+                    tabs: [],
+                    kind: .panel
+                )
+            ],
+            windowTitlePrefix: SpaceFixtureLaunchConfiguration.defaultWindowTitlePrefix,
+            usesStaggeredLayout: false,
+            enterFullscreenDelayMilliseconds: 0,
+            preservesDesktopAfterFullscreen: false
+        )
+
+        let plans = SpaceFixtureWindowPlanner.makePlans(
+            configuration: configuration,
+            visibleFrame: CGRect(x: 0, y: 0, width: 1440, height: 900)
+        )
+
+        XCTAssertEqual(plans.map(\.kind), [.standard, .panel])
+        XCTAssertEqual(plans.map(\.title), ["Shared Docs", "Shared Docs"])
     }
 
     func testSpaceFixtureLaunchConfigurationSelectsFirstWorkflowTabWhenNoneMarkedSelected() throws {

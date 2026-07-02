@@ -64,13 +64,11 @@ final class SpaceFixtureWindowCoordinator {
         windows = windowPlans.map(windowFactory)
         let windowTitles = windowPlans.map(\.title)
 
-        let keyWindowIndex = configuration.fullscreenWindowIndex ?? 1
-        for window in windows where window.plan.index != keyWindowIndex {
-            window.show(isKey: false)
-        }
-        windows.first(where: { $0.plan.index == keyWindowIndex })?.show(isKey: true)
-
+        let deferredPanelWindows = showInitialWindows()
         activateApplication()
+        for panelWindow in deferredPanelWindows {
+            panelWindow.show(isKey: true)
+        }
         windows.forEach { $0.updateWorkflowReadiness(windowTitles: windowTitles) }
         publishApplicationAccessibilityElements()
         scheduleWindowCloseIfNeeded()
@@ -97,6 +95,27 @@ final class SpaceFixtureWindowCoordinator {
             window.close()
             self.publishApplicationAccessibilityElements()
         }
+    }
+
+    private func showInitialWindows() -> [any SpaceFixtureWindowing] {
+        let panelWindows = windows.filter { $0.plan.kind == .panel }
+        guard !panelWindows.isEmpty else {
+            let keyWindowIndex = configuration.fullscreenWindowIndex ?? 1
+            for window in windows where window.plan.index != keyWindowIndex {
+                window.show(isKey: false)
+            }
+            windows.first(where: { $0.plan.index == keyWindowIndex })?.show(isKey: true)
+            return []
+        }
+
+        let primaryMainWindowIndex = configuration.fullscreenWindowIndex
+            ?? windows.first(where: { $0.plan.kind != .panel })?.plan.index
+            ?? 1
+        for window in windows where window.plan.index != primaryMainWindowIndex && window.plan.kind != .panel {
+            window.show(isKey: false)
+        }
+        windows.first(where: { $0.plan.index == primaryMainWindowIndex })?.show(isKey: true)
+        return panelWindows
     }
 
     private func orderedFullscreenWindowsForTransition() -> [any SpaceFixtureWindowing] {

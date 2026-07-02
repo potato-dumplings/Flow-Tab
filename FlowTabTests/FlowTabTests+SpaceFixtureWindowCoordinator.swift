@@ -12,14 +12,17 @@ private final class SpaceFixtureWindowSpy: SpaceFixtureWindowing {
     private(set) var enterFullScreenCallCount = 0
     private(set) var enterFullScreenCompletions: [(@MainActor () -> Void)] = []
     private(set) var workflowReadyCalls: [[String]] = []
+    private let showRecorder: @MainActor (Int, Bool) -> Void
 
-    init(plan: SpaceFixtureWindowPlan) {
+    init(plan: SpaceFixtureWindowPlan, showRecorder: @escaping @MainActor (Int, Bool) -> Void = { _, _ in }) {
         self.plan = plan
         self.applicationAccessibilityElement = "ax-element-\(plan.index)"
+        self.showRecorder = showRecorder
     }
 
     func show(isKey: Bool) {
         showCalls.append(isKey)
+        showRecorder(plan.index, isKey)
     }
 
     func close() {
@@ -474,6 +477,78 @@ extension FlowTabTests {
         XCTAssertEqual(windowSpies[1].showCalls, [false])
         XCTAssertEqual(windowSpies[0].workflowReadyCalls, [["Fixture 1", "Fixture 2"]])
         XCTAssertEqual(windowSpies[1].workflowReadyCalls, [["Fixture 1", "Fixture 2"]])
+        XCTAssertEqual(scheduledCallCount, 0)
+    }
+
+    @MainActor
+    func testSpaceFixtureWindowCoordinatorLaunchesPanelAfterMainDocumentWindow() {
+        let configuration = SpaceFixtureLaunchConfiguration(
+            windows: [
+                SpaceFixtureConfiguredWindow(
+                    configuredTitle: "Document",
+                    windowTitle: "Shared Docs",
+                    mode: .standard,
+                    tabs: []
+                ),
+                SpaceFixtureConfiguredWindow(
+                    configuredTitle: "Inspector",
+                    windowTitle: "Shared Docs",
+                    mode: .standard,
+                    tabs: [],
+                    kind: .panel
+                ),
+                SpaceFixtureConfiguredWindow(
+                    configuredTitle: "Reference",
+                    windowTitle: "Reference",
+                    mode: .standard,
+                    tabs: []
+                )
+            ],
+            windowTitlePrefix: SpaceFixtureLaunchConfiguration.defaultWindowTitlePrefix,
+            usesStaggeredLayout: false,
+            enterFullscreenDelayMilliseconds: 0,
+            preservesDesktopAfterFullscreen: false
+        )
+
+        var windowSpies: [SpaceFixtureWindowSpy] = []
+        var showEvents: [(Int, Bool)] = []
+        var launchEvents: [String] = []
+        var scheduledCallCount = 0
+        var publishedAccessibilityElements: [[String]] = []
+
+        let coordinator = SpaceFixtureWindowCoordinator(
+            configuration: configuration,
+            visibleFrameProvider: { CGRect(x: 0, y: 0, width: 1440, height: 900) },
+            windowFactory: { plan in
+                let spy = SpaceFixtureWindowSpy(plan: plan) { index, isKey in
+                    showEvents.append((index, isKey))
+                    launchEvents.append("show:\(index):\(isKey)")
+                }
+                windowSpies.append(spy)
+                return spy
+            },
+            fullscreenScheduler: { _, _ in
+                scheduledCallCount += 1
+            },
+            activateApplication: {
+                launchEvents.append("activate")
+            },
+            applicationAccessibilityElementsPublisher: { elements in
+                publishedAccessibilityElements.append(elements.compactMap { $0 as? String })
+            }
+        )
+
+        coordinator.launch()
+
+        XCTAssertEqual(windowSpies.map(\.plan.kind), [.standard, .panel, .standard])
+        XCTAssertEqual(windowSpies.map(\.plan.title), ["Shared Docs", "Shared Docs", "Reference"])
+        XCTAssertEqual(windowSpies.map(\.showCalls), [[true], [true], [false]])
+        XCTAssertEqual(showEvents.map { "\($0.0):\($0.1)" }, ["3:false", "1:true", "2:true"])
+        XCTAssertEqual(launchEvents, ["show:3:false", "show:1:true", "activate", "show:2:true"])
+        XCTAssertEqual(windowSpies[0].workflowReadyCalls, [["Shared Docs", "Shared Docs", "Reference"]])
+        XCTAssertEqual(windowSpies[1].workflowReadyCalls, [["Shared Docs", "Shared Docs", "Reference"]])
+        XCTAssertEqual(windowSpies[2].workflowReadyCalls, [["Shared Docs", "Shared Docs", "Reference"]])
+        XCTAssertEqual(publishedAccessibilityElements, [["ax-element-1", "ax-element-2", "ax-element-3"]])
         XCTAssertEqual(scheduledCallCount, 0)
     }
 

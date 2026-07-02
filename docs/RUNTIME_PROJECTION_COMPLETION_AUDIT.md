@@ -8,26 +8,26 @@ reclassifying breadth proof as core completion work.
 
 ## Current Phase 7 Slice
 
-- P0: harden the UI validation runner boundary after repeated
-  `Timed out while enabling automation mode` failures. `run-ui-tests-local.sh`
-  now captures each xcodebuild action log under `.build-local/ui-tests/logs/`
-  and classifies automation-mode initialization timeouts as a UI automation
-  initialization blocker before any test body can produce product/runtime
-  evidence. The repeatable exit-contract audit now requires that log capture,
-  timeout detection, blocker classification, and "not a FlowTab runtime
-  assertion failure" wording remain present in the UI wrapper.
+- P0: add a reusable `FlowTabSpaceFixture` panel window kind and in-process
+  launch-order proof so future real topology runs can attempt public AX
+  focused/main separation without private Space APIs, Window-menu shortcuts, or
+  runtime production changes. The panel path launches the document window,
+  activates the fixture app, then shows a key-only non-main panel.
 - P1: keep `RUNTIME_AX_CG_SPACE_WINDOW_MAPPING.md`, `TEST_COVERAGE_MATRIX.md`,
-  and this audit aligned with the new validation-runner evidence, then rerun
-  the repeatable source exit-contract audit.
+  and this audit aligned with the actual evidence: the behavior fixture support
+  is proven, but the real UI `public-state-tiebreak state=main` occurrence is
+  still not closed.
 - P2: keep pure CG-only activation success, broader multi-display/system-owner
   topology, real non-registry focused AX occurrence, and public AX main-state
   real UI occurrence gaps explicit.
 
-This slice does not add a new runtime state owner, alter UI test semantics, or
-change Search behavior. It makes a required Phase 7 validation failure mode
-machine-readable in the runner output: when XCTest never enters a UI test body,
-the result is an environment/runner blocker, not evidence for or against the
-projection runtime. Search remains missing committed index or degraded/stale
+This slice does not add a new runtime state owner, alter surface read paths, or
+change Search behavior. A targeted panel-backed UI attempt reached the real
+workflow and produced three Chrome fixture window cards, but the public AX fact
+source still reported the same window as both `focused=1` and `main=1`; no
+`binding-assignment public-state-tiebreak state=main` marker appeared anywhere
+in the runtime logs. Therefore the main-state occurrence remains a real UI gap,
+not a completed proof. Search remains missing committed index or degraded/stale
 committed until a bounded freshness barrier commits a new main-table generation.
 
 ## Required Evidence
@@ -51,6 +51,35 @@ committed until a bounded freshness barrier commits a new main-table generation.
 ## Validation Commands
 
 Required for this audit slice:
+
+```bash
+./scripts/testing/run-flowtabtests-local.sh \
+  -only-testing:FlowTabTests/FlowTabTests/testSpaceFixtureLaunchConfigurationLoadsWorkflowWindowsAndTabs \
+  -only-testing:FlowTabTests/FlowTabTests/testSpaceFixtureWindowPlannerCarriesWorkflowWindowKind \
+  -only-testing:FlowTabTests/FlowTabTests/testSpaceFixtureWindowCoordinatorLaunchesPanelAfterMainDocumentWindow \
+  -only-testing:FlowTabTests/FlowTabTests/testSpaceFixtureWindowCoordinatorLaunchesWindowsAndSchedulesFullscreenTarget \
+  -only-testing:FlowTabTests/FlowTabTests/testSpaceFixtureWindowCoordinatorSkipsFullscreenSchedulingWhenNoTargetConfigured
+```
+
+The targeted `FlowTabTests` run passed 5 selected tests with 0 failures,
+proving workflow `kind` decoding, plan propagation, panel launch order
+(`document -> activate -> panel`), and unchanged no-panel launch behavior.
+
+Attempted real UI evidence:
+
+```bash
+./scripts/testing/install-ui-test-app.sh
+./scripts/testing/run-ui-tests-local.sh \
+  -only-testing:FlowTabUITests/FlowTabUITests/testSwitcherPanelPreviewUsesRealMainPublicAXStateForPanelBackedDuplicateWindows
+```
+
+The temporary targeted UI assertion was not kept because it failed honestly:
+runtime logs for the panel-backed Chrome fixture showed three public AX windows
+and three CG cards, but AX topology still reported `ax:<pid>:0` as both
+`focused=1` and `main=1`; no `state=main` assignment marker was present in any
+runtime log. The general edge-input workflow was not expanded because doing so
+also disturbed the existing Window Search edge proof. This is a real topology
+gap, not an environment blocker and not completion evidence.
 
 ```bash
 ./scripts/audit/runtime-projection-exit-contract.sh
@@ -247,7 +276,11 @@ runtime shape:
   Apple Development signing and the runner-fixed existing edge-input UI tests
   passed, refreshing target-app `state=focused` and minimized-state capture
   proof. The same runtime log did not emit `public-state-tiebreak state=main`,
-  so no main-state UI proof was produced.
+  so no main-state UI proof was produced. A later panel-backed fixture attempt
+  added a standard document plus key-only panel capability and reached a real UI
+  run with three Chrome fixture cards, but public AX still exposed the same
+  window as `focused=1` and `main=1`; the attempted proof was not committed as a
+  passing UI test and the gap remains open.
 - Broader multi-display/fullscreen topology and system-authoritative fullscreen
   owner proof remain partial. The production boundary now has a repeatable
   source audit and behavior proof for Switcher fullscreen presentation reading
