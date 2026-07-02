@@ -8,27 +8,24 @@ reclassifying breadth proof as core completion work.
 
 ## Current Phase 7 Slice
 
-- P0: refresh the completion-audit ledger to the current production evidence:
-  Noisy Option+Tab projection commit normalization, active window-cycle order
-  preservation, activation readback verification, and runtime-topology pressure
-  proof are now covered by behavior/UI/pressure validation.
+- P0: make the Search freshness naming contract repeatable in the production
+  source audit. The exit-contract audit now requires the committed-index read
+  model/Search surface to expose `missingCommittedIndex`,
+  `degradedStaleCommittedResult`, or `committedGenerationResult`, and rejects
+  the old `latestCommittedResult`, `freshResult`, and `completeResult` labels in
+  production Search paths.
 - P1: keep `RUNTIME_AX_CG_SPACE_WINDOW_MAPPING.md` and `TEST_COVERAGE_MATRIX.md`
   aligned with this audit and rerun the repeatable source exit-contract audit.
 - P2: keep pure CG-only activation success, broader multi-display/system-owner
-  topology, and real non-registry focused AX occurrence gaps explicit.
+  topology, real non-registry focused AX occurrence, and public AX main-state
+  real UI occurrence gaps explicit.
 
-This slice does not add a new runtime state owner. It corrects the Phase 7
-completion ledger after later proof closed the Noisy Option+Tab ordering,
-normalization, UI, and pressure gaps that the earlier audit still listed as
-unrefreshed. `RuntimeReadModelStore` now owns noisy fullscreen presentation
-normalization at projection commit; `LiveSwitcherModel` preserves active
-`windowCycle` order across projection refresh without writing surface-entry
-recency; `RuntimeActivator` treats visible-only CG fallback as unverified until
-focused AX/CG or frontmost CG readback proves the selected target; and the
-representative runtime-topology pressure wrapper has passed on the updated path.
-Search semantics are unchanged: before a bounded freshness barrier commits a
-new main-table generation, Search remains `missingCommittedIndex` or a
-degraded/stale committed result.
+This slice does not add a new runtime state owner and does not change Search
+behavior. It turns the documented Search rule into repeatable audit evidence:
+before a bounded freshness barrier commits a new main-table generation, Search
+can only be missing committed index or a degraded/stale committed read. A fresh,
+complete, latest, or current-generation result state is allowed only after the
+runtime commits the new generation from main-table payload.
 
 ## Required Evidence
 
@@ -40,8 +37,8 @@ degraded/stale committed result.
 | Current-app sibling preservation is runtime-owned and activation/dirty gated | `scripts/audit/runtime-projection-exit-contract.sh` now rejects Switcher-owned current-app sibling preservation helpers and rejects app-switcher projection as a current-app sibling fact source. The positive contract requires `RuntimeReadModelStore` to own `currentAppWindowPayloadByPreservingPriorCommittedWindowsLocked(...)`, use only prior committed current-app projection state for sibling preservation, keep activation-action gating through `useForAXActivation` / `useForCGActivationFallback`, and reject dirty `CGWindowID`s. `testRuntimeReadModelStorePreservesCommittedCurrentAppSiblingRowsUntilDirtyCGInvalidatesThem`, `testRuntimeReadModelStoreDoesNotPreserveCurrentAppSiblingsFromCommittedAppSwitcherProjection`, and `testLiveSwitcherModelAppliesCommittedRuntimeWindowRecencyWhenProjectionOrderChanges` prove committed current-app sibling preservation, dirty affected-CG invalidation, prior current-app AX/CG preservation, app-switcher projection contamination rejection, activation-capable inferred CG-fallback artifact rejection, and restored window-cycle ordering. | Proven by source audit and behavior tests |
 | Control+Tab focused-current-app path does not synchronously sample frontmost/focused app state | The exit audit now separately rejects `NSWorkspace.shared.frontmostApplication`, `kAXFocusedWindowAttribute`, old focused snapshot/frontmost resolver seams, and the removed frontmost bundle launch override in the Switcher/TestingSupport hot path. It also requires `readFocusedCurrentAppWindowProjection()` and `signalFocusedCurrentAppWindowsChanged()` evidence, proving the focused path either reads runtime projection or sends a dirty signal. | Proven by source audit |
 | Home normal paths read projection APIs or send dirty signals | The exit audit verifies Home references `readHomeSummaryProjection`, `readHomeAppDetailProjection`, `readCurrentAppWindowProjection`, and `signalAppWindowsChanged`, while rejecting legacy snapshot, repair-provider, CG, and AX sampling APIs in Home hot paths. | Proven by source audit |
-| Search reads only committed index and cannot expose staging/repair/partial/session completeness as latest | The exit audit verifies production Search freshness commits only through `RuntimeMainTableProjectionBuilding.searchIndexPayloadFromMainTables(...)` and `RuntimeReadModelStore.commitSearchFreshnessBarrierFromMainTablePayload(...)`. `TEST_COVERAGE_MATRIX.md` records behavior/UI/pressure proof for pre-commit reads that are `missingCommittedIndex` or degraded/stale committed result, committed-generation async re-entry, and external committed-index Search CPU/RSS sampling. | Proven by source audit plus behavior/UI/pressure evidence |
-| Search freshness barrier success requires a committed new generation | `TEST_COVERAGE_MATRIX.md` records `committedGenerationResult` only after bounded barrier commit from main-table payload, and records pre-commit real UI state as `missingCommittedIndex` or degraded/stale committed result rather than fresh/complete/latest. | Proven by matrix-backed tests and UI proof |
+| Search reads only committed index and cannot expose staging/repair/partial/session completeness as latest | The exit audit verifies production Search freshness commits only through `RuntimeMainTableProjectionBuilding.searchIndexPayloadFromMainTables(...)` and `RuntimeReadModelStore.commitSearchFreshnessBarrierFromMainTablePayload(...)`. It also requires the runtime/Search read-model labels `missingCommittedIndex`, `degradedStaleCommittedResult`, and `committedGenerationResult`, while rejecting the old `latestCommittedResult`, `freshResult`, and `completeResult` names in production Search paths. `TEST_COVERAGE_MATRIX.md` records behavior/UI/pressure proof for pre-commit reads that are `missingCommittedIndex` or degraded/stale committed result, committed-generation async re-entry, and external committed-index Search CPU/RSS sampling. | Proven by source audit plus behavior/UI/pressure evidence |
+| Search freshness barrier success requires a committed new generation | `TEST_COVERAGE_MATRIX.md` records `committedGenerationResult` only after bounded barrier commit from main-table payload, and records pre-commit real UI state as `missingCommittedIndex` or degraded/stale committed result rather than fresh/complete/latest. The exit audit now makes this naming contract repeatable by rejecting production Search result-state labels that would call pre-barrier reads fresh, complete, or latest. | Proven by matrix-backed tests and UI proof |
 | Activation may use cached target route, but success must be verified by focused AX/CG or CG frontmost readback | The exit audit rejects direct Space setting and Window-menu shortcuts, requires `RuntimeActivator` focused AX/CG or frontmost CG readback verification plus mismatch diagnostics, and requires verified readback to flow through `RuntimeProjectionService.signalWindowFocusVerified(...)`, `RuntimeWindowRecordStore.recordWindowFocusVerification(...)`, and `readActivationTargetProjection()`. Readback mismatch now flows through `RuntimeProjectionService.signalWindowFocusReadbackMismatch(...)`, runtime dirty/freshness metadata, high-priority scoped reconciliation, and WindowRecord-owned route failure evidence that removes `useForCGActivationFallback` from the failed target projection while preserving display/preview actions. It is not an activation success and keeps committed Search reads degraded/stale until a new generation is committed. | Proven by source audit plus activation behavior tests |
 | Non-registry verified-focus fallback AX readback is observable when it happens | `testRuntimeProjectionServiceSeedsVerifiedFocusRecordWhenFocusedAXWindowIsNotInRegistry` now proves the non-registry fallback AX id writes exact WindowRecord evidence, parses back to the focused `CGWindowID`, and emits a production `binding-confidence-change ... verifiedFocusFallbackAX=1` marker under debug+verbose logs. The exit audit also requires `AXWindowInspector.verifiedFocusFallbackCGWindowID(...)` and the WindowRecord `verifiedFocusFallbackAX` marker so the runtime-log oracle cannot silently disappear from production. This protects the marker that future real UI proof must use, but it does not close the real UI occurrence gap by itself. | Proven by source audit and behavior test; real UI occurrence still gap |
 | Full snapshot/full repair is repair, fallback, cold-start, diagnostic, or migration compatibility only | The exit audit rejects provider-facing full-repair projection payload APIs in production. `RUNTIME_AX_CG_SPACE_WINDOW_MAPPING.md` records full repair as low-priority repair/fallback with backoff and fact-splitting: app-directory evidence may cross the service boundary, while WindowRecord refresh is only a separate summary. | Proven by source audit plus behavior tests |
@@ -58,11 +55,13 @@ Required for this audit slice:
 
 The audit now includes production checks for the non-registry verified-focus
 fallback parser, grep-able `verifiedFocusFallbackAX` WindowRecord log marker,
-and current-app sibling preservation ownership in `RuntimeReadModelStore`
-instead of Switcher surface state. The 2026-07-02 rerun passed with all checks
-green, including the Switcher/Home hot-path no-snapshot checks, Search
-main-table committed barrier checks, Space topology projection checks, and
-activation focused AX/CG/frontmost CG readback checks.
+current-app sibling preservation ownership in `RuntimeReadModelStore` instead
+of Switcher surface state, and Search freshness result-state naming that keeps
+pre-barrier reads missing or degraded/stale committed. The 2026-07-02 rerun
+passed with all checks green, including the Switcher/Home hot-path no-snapshot
+checks, Search main-table committed barrier checks, Search naming checks, Space
+topology projection checks, and activation focused AX/CG/frontmost CG readback
+checks.
 
 Representative neighboring behavior proof already used by the current audit:
 
@@ -221,7 +220,11 @@ runtime shape:
   non-registry focused AX occurrence.
 - Public AX main/minimized tie-breaker variants still need real UI occurrence
   and broader state permutation proof; focused/main/minimized deterministic
-  matcher coverage is now present.
+  matcher coverage is now present. On 2026-07-02 the fixed-path app was
+  reinstalled with Apple Development signing and the existing edge-input UI
+  tests were attempted twice to look for real `state=main` evidence, but both
+  runs failed before the test body with `Timed out while enabling automation
+  mode`; no main-state UI proof was produced.
 - Broader multi-display/fullscreen topology and system-authoritative fullscreen
   owner proof remain partial. The production boundary now has a repeatable
   source audit and behavior proof for Switcher fullscreen presentation reading

@@ -145,6 +145,16 @@ check_has_matches \
   "searchIndexPayloadFromMainTables|commitSearchFreshnessBarrierFromMainTablePayload" \
   FlowTab/Infrastructure/Runtime/RuntimeProjectionService.swift FlowTab/Infrastructure/Runtime/RuntimeReadModelStore.swift
 
+check_has_matches \
+  "Search pre-barrier reads are named missing or degraded/stale committed until committed generation validation" \
+  "missingCommittedIndex|degradedStaleCommitted(Result)?|committedGeneration(Result|Validated)" \
+  FlowTab/Infrastructure/Runtime/RuntimeSearchIndexReadModel.swift FlowTab/Features/Switcher/LiveSwitcherModel+Search.swift
+
+check_no_matches \
+  "production Search result-state naming does not call pre-barrier reads fresh, complete, or latest" \
+  "latestCommittedResult|freshResult|completeResult" \
+  FlowTab/Features/Switcher FlowTab/Infrastructure/Runtime
+
 check_no_matches \
   "production activation paths do not use direct Space setting or Window-menu shortcuts as success oracles" \
   "ManagedDisplaySetCurrentSpace|SLSSetCurrentSpace|CGSSetCurrentSpace|SetCurrentSpace|kAXMenu(Item|Bar)?Attribute|kAXPressAction" \
