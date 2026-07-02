@@ -6,6 +6,31 @@ import FlowTabCore
 
 extension LiveSwitcherModel {
     @discardableResult
+    func startSearchSession(triggerDirection: CycleDirection) -> Bool {
+        guard SearchInteractionPreferencesStore.loadIsEnabled() else { return false }
+        invalidateSelectedAppWindowProjection(reason: .startSession)
+        clearTerminateSelectedAppAnimation()
+        overlayStyle = .appAndWindow
+        titleBarStyleInferenceEnabled = false
+
+        if loadFastAppSwitcherProjectionSession(
+            triggerDirection: triggerDirection,
+            preferredSelectedAppID: nil
+        ) {
+            requestRuntimeProjectionMaintenance(triggerDirection: triggerDirection)
+            return enterSearchMode()
+        }
+
+        requestRuntimeProjectionMaintenance(triggerDirection: triggerDirection)
+        guard startSearchSessionFromCommittedIndex(triggerDirection: triggerDirection) else {
+            pendingSearchActivationAfterFreshnessBarrier =
+                lastSearchIndexReadDiagnostic?.requestedFreshnessBarrier == true
+            return false
+        }
+        return enterSearchMode()
+    }
+
+    @discardableResult
     func enterSearchMode() -> Bool {
         guard SearchInteractionPreferencesStore.loadIsEnabled() else { return false }
         guard overlayStyle == .appAndWindow else { return false }
@@ -31,6 +56,40 @@ extension LiveSwitcherModel {
             "enterSearchMode changed=\(changed ? 1 : 0) scope=\(defaultScope.rawValue) appCount=\(session.apps.count) inputFocused=\(searchViewState.isInputFocused ? 1 : 0)"
         )
         return changed
+    }
+
+    @discardableResult
+    private func startSearchSessionFromCommittedIndex(triggerDirection: CycleDirection) -> Bool {
+        let read = runtimeProjectionService.readCommittedSearchIndexForSearch()
+        guard let projection = read.projection else {
+            _ = rebuildSearchIndexFromCommittedProjection(reason: "startSearchSession")
+            return false
+        }
+
+        let searchProjection = projection.filteringApps(
+            using: AppVisibilityPreferencesStore.visibilityFilter()
+        )
+        let apps = Self.committedSearchSessionApps(from: searchProjection)
+        guard !apps.isEmpty else {
+            _ = rebuildSearchIndexFromCommittedProjection(reason: "startSearchSession")
+            return false
+        }
+
+        runtimeContextsByID = [:]
+        clearPreviewSnapshotState()
+        autoEnterSuppressedAppID = nil
+        let preferences = SwitcherBehaviorPreferencesStore.loadSwitcherPreferences()
+        session = SwitcherSession(
+            apps: apps,
+            preferences: preferences,
+            triggerDirection: triggerDirection,
+            rememberedWindowIDByAppID: rememberedWindowIDByAppID
+        )
+        RuntimeLog.debug(
+            .searchModel,
+            "startSearchSession source=committedRuntimeIndex readiness=\(read.readiness.rawValue) resultState=\(read.resultState.rawValue) apps=\(apps.count) windows=\(apps.reduce(0) { $0 + $1.windows.count })"
+        )
+        return true
     }
 
     @discardableResult
@@ -145,6 +204,15 @@ extension LiveSwitcherModel {
     private static func committedSearchAppsByID(
         from projection: RuntimeSearchIndexProjection
     ) -> [String: AppSwitchCandidate] {
+        Dictionary(
+            committedSearchSessionApps(from: projection).map { ($0.id, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+    }
+
+    private static func committedSearchSessionApps(
+        from projection: RuntimeSearchIndexProjection
+    ) -> [AppSwitchCandidate] {
         let windowsByAppID = Dictionary(grouping: projection.windowEntries, by: \.appID)
             .mapValues { entries in
                 entries.map { entry in
@@ -156,21 +224,15 @@ extension LiveSwitcherModel {
                     )
                 }
             }
-        return Dictionary(
-            projection.appEntries.map { entry in
-                (
-                    entry.appID,
-                    AppSwitchCandidate(
-                        id: entry.appID,
-                        displayName: entry.appDisplayName,
-                        groupID: entry.appGroupID,
-                        lastActiveAt: entry.appLastActiveAt,
-                        windows: windowsByAppID[entry.appID] ?? []
-                    )
-                )
-            },
-            uniquingKeysWith: { first, _ in first }
-        )
+        return projection.appEntries.map { entry in
+            AppSwitchCandidate(
+                id: entry.appID,
+                displayName: entry.appDisplayName,
+                groupID: entry.appGroupID,
+                lastActiveAt: entry.appLastActiveAt,
+                windows: windowsByAppID[entry.appID] ?? []
+            )
+        }
     }
 
     @discardableResult

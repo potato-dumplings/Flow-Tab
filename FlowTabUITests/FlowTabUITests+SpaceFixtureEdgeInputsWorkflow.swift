@@ -139,14 +139,18 @@ extension FlowTabUITests {
 
         try runRealSpaceFixtureEdgeInputsWorkflow(
             workflow,
-            flowTabAdditionalArguments: [
-                "--flowtab-ui-open-switcher-search",
-                "-searchDefaultScope",
-                "window"
-            ]
+            flowTabAdditionalArguments: runtimeTruthSwitcherLaunchArguments(
+                additionalArguments: [
+                    "-searchDefaultScope",
+                    "window"
+                ],
+                suppressesPanelActivation: false
+            )
         ) { _, app in
-            let searchInput = element(in: app, identifier: Identifier.switcherSearchInput)
-            XCTAssertTrue(searchInput.waitForExistence(timeout: 8))
+            let searchInput = openEdgeWorkflowWindowSearch(
+                in: app,
+                traceLabel: "edgeInputs.search.duplicates"
+            )
 
             RunLoop.current.run(until: Date().addingTimeInterval(0.4))
             app.typeText(sharedTitle)
@@ -181,14 +185,18 @@ extension FlowTabUITests {
 
         try runRealSpaceFixtureEdgeInputsWorkflow(
             workflow,
-            flowTabAdditionalArguments: [
-                "--flowtab-ui-open-switcher-search",
-                "-searchDefaultScope",
-                "window"
-            ]
+            flowTabAdditionalArguments: runtimeTruthSwitcherLaunchArguments(
+                additionalArguments: [
+                    "-searchDefaultScope",
+                    "window"
+                ],
+                suppressesPanelActivation: false
+            )
         ) { _, app in
-            let searchInput = element(in: app, identifier: Identifier.switcherSearchInput)
-            XCTAssertTrue(searchInput.waitForExistence(timeout: 8))
+            let searchInput = openEdgeWorkflowWindowSearch(
+                in: app,
+                traceLabel: "edgeInputs.search.edgeTitle"
+            )
 
             RunLoop.current.run(until: Date().addingTimeInterval(0.4))
             app.typeText("punctuation")
@@ -216,6 +224,28 @@ extension FlowTabUITests {
                 "Search confirmation did not activate the edge-title fixture window id."
             )
         }
+    }
+
+    private func openEdgeWorkflowWindowSearch(
+        in app: XCUIApplication,
+        traceLabel: String
+    ) -> XCUIElement {
+        let searchInput = element(in: app, identifier: Identifier.switcherSearchInput)
+        let deadline = Date().addingTimeInterval(10)
+        var attempt = 1
+        repeat {
+            postFlowTabUITestSwitcherTrigger(
+                .search,
+                traceLabel: "\(traceLabel).attempt\(attempt)"
+            )
+            if searchInput.waitForExistence(timeout: 1.2) {
+                return searchInput
+            }
+            attempt += 1
+        } while Date() < deadline
+
+        XCTFail("Edge workflow window Search did not present from committed runtime index.")
+        return searchInput
     }
 
     private func configuredSwitcherEdgeInputsWorkflow(

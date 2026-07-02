@@ -722,6 +722,78 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testSwitcherPanelControllerSearchHotkeyStartsFromCommittedIndexWhenAppSwitcherProjectionMissing() async {
+        await withTemporarySearchPreferences(enabled: true, defaultScope: .window) {
+            let apps = self.searchScenarioApps()
+            let store = RuntimeReadModelStore()
+            store.seedAppSwitcherProjectionForTesting(
+                apps: apps,
+                contextsByID: [:],
+                appDirectoryEntries: nil,
+                generatedAt: 10
+            )
+            store.commitSearchFreshnessBarrierFromMainTablePayload(
+                makeRuntimeSearchIndexPayloadForTesting(apps: apps),
+                deferredRequestCount: 0,
+                hasPendingRequests: false,
+                generatedAt: 10
+            )
+            var committedProjection = try! XCTUnwrap(
+                store.readCommittedSearchIndexForSearch().projection
+            )
+            committedProjection.freshness = RuntimeProjectionFreshness(
+                generatedAt: committedProjection.freshness.generatedAt,
+                sourceGeneration: committedProjection.freshness.sourceGeneration,
+                dirtyAppIDs: ["com.example.dirty"],
+                dirtyPIDs: [],
+                dirtyCGWindowIDs: [],
+                pendingRepairScopes: ["appSwitcherProjection"],
+                isCompleteForScope: false
+            )
+            let runtimeProjectionService = RecordingRuntimeProjectionService(
+                committedSearchIndexRead: RuntimeSearchIndexRead(
+                    projection: committedProjection,
+                    readiness: .degradedStaleCommitted
+                )
+            )
+            let controller = SwitcherPanelController(
+                model: LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
+            )
+
+            XCTAssertTrue(controller.presentSearchHotkeySessionForTesting())
+            XCTAssertTrue(controller.modelForTesting.isSearchActive)
+            XCTAssertTrue(controller.modelForTesting.isSearchInputFocused)
+            XCTAssertEqual(
+                controller.modelForTesting.session?.apps.map(\.id),
+                apps.map(\.id)
+            )
+            XCTAssertEqual(runtimeProjectionService.appSwitcherProjectionReadCount(), 1)
+            XCTAssertEqual(
+                runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(),
+                [.switcherSessionStarted]
+            )
+            XCTAssertEqual(
+                runtimeProjectionService.searchIndexFreshnessBarrierRequestsRecorded(),
+                [.searchFreshnessBarrier]
+            )
+            XCTAssertEqual(
+                controller.modelForTesting.lastSearchIndexReadDiagnostic?.readiness,
+                .degradedStaleCommitted
+            )
+            XCTAssertEqual(
+                controller.modelForTesting.lastSearchIndexReadDiagnostic?.resultState,
+                .degradedStaleCommittedResult
+            )
+            XCTAssertTrue(
+                controller.searchTraceStateSummary().contains(
+                    "searchIndexResultState=degradedStaleCommittedResult"
+                )
+            )
+            controller.cancelSelectionForTesting()
+        }
+    }
+
+    @MainActor
     func testSwitcherPanelControllerSearchHeightChangeKeepsPresentedPanelAnchoredAtTop() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .app) {
             let controller = SwitcherPanelController(

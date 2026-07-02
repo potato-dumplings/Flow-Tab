@@ -476,9 +476,7 @@ private final class SwitcherTriggerNotificationObserver: NSObject {
         case .inApp:
             return panelController.presentInAppWindowHotkeySessionForTesting()
         case .search:
-            guard panelController.presentGlobalHotkeySessionForTesting() else { return false }
-            _ = panelController.enterSearchModeIfPossible()
-            return true
+            return panelController.presentSearchHotkeySessionForTesting()
         }
     }
 }

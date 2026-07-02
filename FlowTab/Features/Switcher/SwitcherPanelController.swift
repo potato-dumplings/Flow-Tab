@@ -467,6 +467,14 @@ final class SwitcherPanelController {
     }
 
     @discardableResult
+    func presentSearchHotkeySessionForTesting(
+        triggerDirection: CycleDirection = .forward
+    ) -> Bool {
+        showSearch(direction: triggerDirection)
+        return model.isSearchActive
+    }
+
+    @discardableResult
     func presentInAppWindowHotkeySessionForTesting(
         triggerDirection: CycleDirection = .forward
     ) -> Bool {

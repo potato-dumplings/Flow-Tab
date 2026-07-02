@@ -276,65 +276,32 @@ extension SwitcherPanelController {
             NSSound.beep()
             return
         }
-        let sessionReadyMs = monotonicMilliseconds()
-        beginPresentationSession(kind: .globalAppSwitcher, trigger: "global_show")
-        lastCommittedTabAdvanceTimestamp = nil
-        RuntimeLog.info(.session, "start direction=\(direction.debugName) \(self.model.debugSelectionSummary())")
-
-        let targetScreen = resolveActivePresentationScreen()
-        let screenReadyMs = monotonicMilliseconds()
-        activePresentationScreen = targetScreen
-        updatePanelSize(for: targetScreen)
-        let sizeReadyMs = monotonicMilliseconds()
-        centerPanelOnActiveScreen(preferredScreen: targetScreen)
-        let centerReadyMs = monotonicMilliseconds()
-        syncPanelAccessibilityAnchors()
-        let accessibilityReadyMs = monotonicMilliseconds()
-        updatePanelPresentationLevel(trigger: "global_show")
-        let levelReadyMs = monotonicMilliseconds()
-        panel.makeKeyAndOrderFront(nil)
-        panel.orderFrontRegardless()
-        let firstOrderReadyMs = monotonicMilliseconds()
-        hideNonPanelWindowsIfNeeded()
-        let hideReadyMs = monotonicMilliseconds()
-        panel.makeKeyAndOrderFront(nil)
-        panel.orderFrontRegardless()
-        let secondOrderReadyMs = monotonicMilliseconds()
-        beginIgnoringActiveSpaceChanges(trigger: "global_show")
-        let ignoreReadyMs = monotonicMilliseconds()
-        scheduleInitialPanelVisibilityRecovery(
+        presentStartedHotkeySession(
+            kind: .globalAppSwitcher,
             trigger: "global_show",
-            activateApplicationIfNeeded: false
-        )
-        let recoveryReadyMs = monotonicMilliseconds()
-        installEventMonitors()
-        let monitorReadyMs = monotonicMilliseconds()
-        scheduleDelayedWindowLayerEntryIfNeeded()
-        let presentedMs = monotonicMilliseconds()
-        logPanelPresentationBreakdown(
-            kind: "global",
+            logKind: "global",
             showStartMs: showStartMs,
-            sessionReadyMs: sessionReadyMs,
-            screenReadyMs: screenReadyMs,
-            sizeReadyMs: sizeReadyMs,
-            centerReadyMs: centerReadyMs,
-            accessibilityReadyMs: accessibilityReadyMs,
-            levelReadyMs: levelReadyMs,
-            firstOrderReadyMs: firstOrderReadyMs,
-            hideReadyMs: hideReadyMs,
-            secondOrderReadyMs: secondOrderReadyMs,
-            ignoreReadyMs: ignoreReadyMs,
-            recoveryReadyMs: recoveryReadyMs,
-            monitorReadyMs: monitorReadyMs,
-            autoEnterReadyMs: presentedMs
+            startLogMessage: "start direction=\(direction.debugName) \(self.model.debugSelectionSummary())"
         )
-        logInputTrace(
-            "show kind=global result=presented sessionMs=\(formatMilliseconds(sessionReadyMs - showStartMs)) totalMs=\(formatMilliseconds(presentedMs - showStartMs)) \(searchTraceStateSummary())"
-        )
-        schedulePanelVisibilityProbe(
-            kind: "global",
+    }
+
+    func showSearch(direction: CycleDirection) {
+        let showStartMs = monotonicMilliseconds()
+        guard model.startSearchSession(triggerDirection: direction) else {
+            let failedMs = monotonicMilliseconds() - showStartMs
+            logInputTrace(
+                "show kind=search result=failed durationMs=\(formatMilliseconds(failedMs)) \(searchTraceStateSummary())"
+            )
+            RuntimeLog.info(.session, "start search failed: no committed search index")
+            NSSound.beep()
+            return
+        }
+        presentStartedHotkeySession(
+            kind: .globalAppSwitcher,
+            trigger: "search_show",
+            logKind: "search",
             showStartMs: showStartMs,
-            presentedMs: presentedMs
+            startLogMessage: "start search direction=\(direction.debugName) \(self.model.debugSelectionSummary())"
         )
     }
 
@@ -349,10 +316,26 @@ extension SwitcherPanelController {
             NSSound.beep()
             return
         }
+        presentStartedHotkeySession(
+            kind: .inAppWindowSwitcher,
+            trigger: "in_app_show",
+            logKind: "inApp",
+            showStartMs: showStartMs,
+            startLogMessage: "start in-app direction=\(direction.debugName) \(self.model.debugSelectionSummary())"
+        )
+    }
+
+    private func presentStartedHotkeySession(
+        kind: HotkeySessionKind,
+        trigger: String,
+        logKind: String,
+        showStartMs: Double,
+        startLogMessage: String
+    ) {
         let sessionReadyMs = monotonicMilliseconds()
-        beginPresentationSession(kind: .inAppWindowSwitcher, trigger: "in_app_show")
+        beginPresentationSession(kind: kind, trigger: trigger)
         lastCommittedTabAdvanceTimestamp = nil
-        RuntimeLog.info(.session, "start in-app direction=\(direction.debugName) \(self.model.debugSelectionSummary())")
+        RuntimeLog.info(.session, startLogMessage)
 
         let targetScreen = resolveActivePresentationScreen()
         let screenReadyMs = monotonicMilliseconds()
@@ -363,7 +346,7 @@ extension SwitcherPanelController {
         let centerReadyMs = monotonicMilliseconds()
         syncPanelAccessibilityAnchors()
         let accessibilityReadyMs = monotonicMilliseconds()
-        updatePanelPresentationLevel(trigger: "in_app_show")
+        updatePanelPresentationLevel(trigger: trigger)
         let levelReadyMs = monotonicMilliseconds()
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
@@ -373,10 +356,10 @@ extension SwitcherPanelController {
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
         let secondOrderReadyMs = monotonicMilliseconds()
-        beginIgnoringActiveSpaceChanges(trigger: "in_app_show")
+        beginIgnoringActiveSpaceChanges(trigger: trigger)
         let ignoreReadyMs = monotonicMilliseconds()
         scheduleInitialPanelVisibilityRecovery(
-            trigger: "in_app_show",
+            trigger: trigger,
             activateApplicationIfNeeded: false
         )
         let recoveryReadyMs = monotonicMilliseconds()
@@ -385,7 +368,7 @@ extension SwitcherPanelController {
         scheduleDelayedWindowLayerEntryIfNeeded()
         let presentedMs = monotonicMilliseconds()
         logPanelPresentationBreakdown(
-            kind: "inApp",
+            kind: logKind,
             showStartMs: showStartMs,
             sessionReadyMs: sessionReadyMs,
             screenReadyMs: screenReadyMs,
@@ -402,10 +385,10 @@ extension SwitcherPanelController {
             autoEnterReadyMs: presentedMs
         )
         logInputTrace(
-            "show kind=inApp result=presented sessionMs=\(formatMilliseconds(sessionReadyMs - showStartMs)) totalMs=\(formatMilliseconds(presentedMs - showStartMs)) \(searchTraceStateSummary())"
+            "show kind=\(logKind) result=presented sessionMs=\(formatMilliseconds(sessionReadyMs - showStartMs)) totalMs=\(formatMilliseconds(presentedMs - showStartMs)) \(searchTraceStateSummary())"
         )
         schedulePanelVisibilityProbe(
-            kind: "inApp",
+            kind: logKind,
             showStartMs: showStartMs,
             presentedMs: presentedMs
         )
