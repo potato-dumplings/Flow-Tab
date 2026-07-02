@@ -8,24 +8,25 @@ reclassifying breadth proof as core completion work.
 
 ## Current Phase 7 Slice
 
-- P0: make the Search freshness naming contract repeatable in the production
-  source audit. The exit-contract audit now requires the committed-index read
-  model/Search surface to expose `missingCommittedIndex`,
-  `degradedStaleCommittedResult`, or `committedGenerationResult`, and rejects
-  the old `latestCommittedResult`, `freshResult`, and `completeResult` labels in
-  production Search paths.
-- P1: keep `RUNTIME_AX_CG_SPACE_WINDOW_MAPPING.md` and `TEST_COVERAGE_MATRIX.md`
-  aligned with this audit and rerun the repeatable source exit-contract audit.
+- P0: harden the UI validation runner boundary after repeated
+  `Timed out while enabling automation mode` failures. `run-ui-tests-local.sh`
+  now captures each xcodebuild action log under `.build-local/ui-tests/logs/`
+  and classifies automation-mode initialization timeouts as a UI automation
+  initialization blocker before any test body can produce product/runtime
+  evidence.
+- P1: keep `RUNTIME_AX_CG_SPACE_WINDOW_MAPPING.md`, `TEST_COVERAGE_MATRIX.md`,
+  and this audit aligned with the new validation-runner evidence, then rerun
+  the repeatable source exit-contract audit.
 - P2: keep pure CG-only activation success, broader multi-display/system-owner
   topology, real non-registry focused AX occurrence, and public AX main-state
   real UI occurrence gaps explicit.
 
-This slice does not add a new runtime state owner and does not change Search
-behavior. It turns the documented Search rule into repeatable audit evidence:
-before a bounded freshness barrier commits a new main-table generation, Search
-can only be missing committed index or a degraded/stale committed read. A fresh,
-complete, latest, or current-generation result state is allowed only after the
-runtime commits the new generation from main-table payload.
+This slice does not add a new runtime state owner, alter UI test semantics, or
+change Search behavior. It makes a required Phase 7 validation failure mode
+machine-readable in the runner output: when XCTest never enters a UI test body,
+the result is an environment/runner blocker, not evidence for or against the
+projection runtime. Search remains missing committed index or degraded/stale
+committed until a bounded freshness barrier commits a new main-table generation.
 
 ## Required Evidence
 
@@ -62,6 +63,20 @@ passed with all checks green, including the Switcher/Home hot-path no-snapshot
 checks, Search main-table committed barrier checks, Search naming checks, Space
 topology projection checks, and activation focused AX/CG/frontmost CG readback
 checks.
+
+Current UI runner classification proof:
+
+```bash
+./scripts/testing/run-ui-tests-local.sh --skip-space-fixtures \
+  -only-testing:FlowTabUITests/FlowTabUITests/testFlowTabUITestAppIdentityUsesEnvironmentOverridePath
+```
+
+The wrapper built and signed the UI runner, then failed before the test body
+with `Timed out while enabling automation mode`. The wrapper now emits
+`Classification: UI automation initialization blocker` plus the fixed-path app,
+runner app, result bundle, and xcodebuild log paths. This proves the validation
+boundary classifies the blocker instead of leaving later handoffs to infer
+whether the failure is a product/runtime assertion.
 
 Representative neighboring behavior proof already used by the current audit:
 

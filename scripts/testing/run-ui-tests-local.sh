@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 BUILD_ROOT="${ROOT_DIR}/.build-local/ui-tests"
 DERIVED_DATA_PATH="${BUILD_ROOT}/DerivedData"
 RESULT_BUNDLE_PATH="${BUILD_ROOT}/results/FlowTabUITests.xcresult"
+LOG_ROOT="${BUILD_ROOT}/logs"
 TMP_ROOT="${BUILD_ROOT}/tmp"
 HOME_ROOT="${BUILD_ROOT}/home"
 MODULE_CACHE_ROOT="${BUILD_ROOT}/module-cache"
@@ -317,6 +318,7 @@ UI_TEST_APP_PATH="$(expand_path "${UI_TEST_APP_PATH}")"
 mkdir -p \
   "${DERIVED_DATA_PATH}" \
   "${BUILD_ROOT}/results" \
+  "${LOG_ROOT}" \
   "${TMP_ROOT}" \
   "${HOME_ROOT}" \
   "${MODULE_CACHE_ROOT}/clang" \
@@ -405,14 +407,31 @@ run_xcodebuild() {
   local include_result_bundle="$2"
   shift 2
   local action_args=("$@")
+  local log_path="${LOG_ROOT}/xcodebuild-${action}.log"
+  local status
 
   build_xcodebuild_cmd "${action}" "${include_result_bundle}"
   if ((${#action_args[@]} > 0)); then
     XCODEBUILD_CMD+=("${action_args[@]}")
   fi
 
-  if ! "${XCODEBUILD_CMD[@]}"; then
+  set +e
+  "${XCODEBUILD_CMD[@]}" 2>&1 | tee "${log_path}"
+  status=${PIPESTATUS[0]}
+  set -e
+
+  if [[ "${status}" -ne 0 ]]; then
     echo >&2
+    if grep -q "Timed out while enabling automation mode" "${log_path}"; then
+      echo "UI automation initialization timed out before any test body could provide product or runtime evidence." >&2
+      echo "Classification: UI automation initialization blocker." >&2
+      echo "Fixed-path app: ${FLOWTAB_UI_TEST_APP_PATH:-DerivedData build product}" >&2
+      echo "UI test runner: ${UI_TEST_RUNNER_PATH}" >&2
+      echo "Result bundle: ${RESULT_BUNDLE_PATH}" >&2
+      echo "xcodebuild log: ${log_path}" >&2
+      echo "Use this as an environment/runner signal, not as a FlowTab runtime assertion failure." >&2
+      echo >&2
+    fi
     echo "UI test run failed." >&2
     echo "If the error still points at sandboxed temporary files, restricted caches, keychain access, signing, or automation permissions," >&2
     echo "treat it as an environment blocker and rerun with elevated permissions or outside the sandbox." >&2
