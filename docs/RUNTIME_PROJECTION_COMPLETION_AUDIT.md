@@ -8,19 +8,20 @@ reclassifying breadth proof as core completion work.
 
 ## Current Phase 7 Slice
 
-- P0: close the app-hosted mock dataset `FlowTabTests` validation gap now that
-  the local runner/build setup is repaired. The previous segv was reproduced,
-  a clean rebuild was performed through the approved app-test DerivedData path,
-  the temporary non-semantic TestingSupport edit was discarded, and the original
-  implementation now passes the required mock projection seed set.
+- P0: close the runner-fixed Search launch-argument UI smoke validation gap
+  without changing runtime ownership. The fixed-path app is rebuilt and Apple
+  Development signed, then the existing `testSearchPanelEntryAndResultActivation`
+  path proves Search can open from launch arguments, read the search input, show
+  the fixture app result, and close after activation.
 - P1: keep `RUNTIME_AX_CG_SPACE_WINDOW_MAPPING.md`, `TEST_COVERAGE_MATRIX.md`,
-  and this audit aligned with the refreshed app-hosted mock dataset proof.
-  Docs continue to require `missingCommittedIndex` or degraded/stale committed
-  wording until a bounded barrier commits a new generation.
+  and this audit aligned with the refreshed Search UI smoke proof. Docs continue
+  to require `missingCommittedIndex` or degraded/stale committed wording until a
+  bounded freshness barrier commits a new generation.
 - P2: keep pure CG-only activation success, broader multi-display/system-owner
-  topology, real non-registry focused AX occurrence, public AX main-state real
-  UI occurrence, and optional Search UI smoke failures explicit rather than
-  reclassifying them as this slice's required proof.
+  topology, real non-registry focused AX occurrence, and public AX main-state
+  real UI occurrence explicit. Do not reclassify Search smoke as Search
+  freshness proof; committed-index freshness remains covered by the dedicated
+  behavior/UI/pressure evidence below.
 
 The committed Search index invariant is now guarded in three places: production
 Search freshness commits still come only from main-table payloads; Search result
@@ -167,7 +168,7 @@ tests prove Search can still start from a degraded/stale committed index when
 app-switcher projection is missing and that only a later committed-index update
 moves the session to `committedGenerationResult`.
 
-Optional UI smoke attempts after the fixed-path runner repair:
+Runner-fixed Search launch-argument UI smoke proof:
 
 ```bash
 ./scripts/testing/run-ui-tests-local.sh --skip-space-fixtures \
@@ -176,16 +177,18 @@ Optional UI smoke attempts after the fixed-path runner repair:
 ./scripts/testing/install-ui-test-app.sh
 
 ./scripts/testing/run-ui-tests-local.sh --skip-space-fixtures \
-  -only-testing:FlowTabUITests/FlowTabUITests/testSearchHeaderHighlightedAppChipStaysContentSizedForShortTitle
+  -only-testing:FlowTabUITests/FlowTabUITests/testSearchPanelEntryAndResultActivation
 ```
 
-The optional Search UI attempts entered the test body but did not find
-`flowtab.switcher.search.input` / `flowtab.switcher.search` after launch. The
-fixed-path app was rebuilt and Apple Development signed successfully before the
-second attempt, so this is recorded as an optional UI smoke failure for the
-Search launch-argument path, not as the required proof for this in-process
-missing-index clearing slice. Existing representative committed-index Window
-Search UI proof remains the latest passing real UI Search evidence.
+After the fixed-path app was rebuilt and Apple Development signed, the targeted
+UI rerun passed 1 selected test with 0 failures in 28.786s (`59.677s` XCTest
+operation elapsed). The test entered the real fixture path, found
+`flowtab.switcher.search.input`, typed the fixture query, found the fixture app
+Search result, and closed the panel after Return activation. This supersedes the
+older optional Search launch-argument smoke failure. It does not change the
+Search committed-index freshness contract: pre-barrier reads are still
+`missingCommittedIndex` or degraded/stale committed, not fresh, complete,
+latest, or current-generation committed.
 
 Current UI runner fixed-path proof:
 
