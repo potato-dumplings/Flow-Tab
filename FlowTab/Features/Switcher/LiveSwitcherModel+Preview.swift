@@ -662,6 +662,7 @@ extension LiveSwitcherModel {
         appContext = RuntimeAppContext(
             appID: appContext.appID,
             runningApp: appContext.runningApp,
+            ownerPID: appContext.ownerPID,
             windowsByID: windowsByID
         )
         runtimeContextsByID[appID] = appContext

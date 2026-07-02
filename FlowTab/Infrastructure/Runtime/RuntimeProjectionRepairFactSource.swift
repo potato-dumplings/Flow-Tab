@@ -68,17 +68,20 @@ struct RuntimeUITestProjectionDatasetFacts {
     let appDirectoryEntries: [RuntimeAppDirectoryEntry]
     let appCount: Int
     let windowCount: Int
+    let windowRecordRefresh: RuntimeFullRepairWindowRecordRefreshEvidence
     private let focusedRepairEvidenceByPID: [pid_t: RuntimeCurrentAppRepairEvidence]
 
     init(
         appDirectoryEntries: [RuntimeAppDirectoryEntry],
         appCount: Int,
         windowCount: Int,
+        windowRecordRefresh: RuntimeFullRepairWindowRecordRefreshEvidence,
         focusedRepairEvidenceByPID: [pid_t: RuntimeCurrentAppRepairEvidence]
     ) {
         self.appDirectoryEntries = appDirectoryEntries
         self.appCount = appCount
         self.windowCount = windowCount
+        self.windowRecordRefresh = windowRecordRefresh
         self.focusedRepairEvidenceByPID = focusedRepairEvidenceByPID
     }
 
@@ -144,6 +147,7 @@ struct RuntimeProjectionRepairFactSource {
 
     func collectUITestProjectionDatasetFacts() -> RuntimeUITestProjectionDatasetFacts? {
         guard let dataset = FlowTabUITestRuntimeProjectionDataset.current() else { return nil }
+        let windowRecordRefresh = seedUITestWindowRecordCoverage(from: dataset)
         let focusedRepairEvidenceByPID = Dictionary(
             dataset.currentAppWindowPayloadsByAppID.values.map { payload in
                 (
@@ -162,7 +166,24 @@ struct RuntimeProjectionRepairFactSource {
             appDirectoryEntries: dataset.appDirectoryEntries,
             appCount: dataset.appSwitcherApps.count,
             windowCount: dataset.appSwitcherApps.reduce(0) { $0 + $1.windows.count },
+            windowRecordRefresh: windowRecordRefresh,
             focusedRepairEvidenceByPID: focusedRepairEvidenceByPID
+        )
+    }
+
+    private func seedUITestWindowRecordCoverage(
+        from dataset: FlowTabUITestRuntimeProjectionDataset
+    ) -> RuntimeFullRepairWindowRecordRefreshEvidence {
+        for entry in dataset.appDirectoryEntries {
+            windowRecordStore.setState(
+                RuntimeWindowMappingState(hasRecordedWindowCollection: true),
+                for: entry.pid
+            )
+        }
+        return RuntimeFullRepairWindowRecordRefreshEvidence(
+            runningAppCount: dataset.appDirectoryEntries.count,
+            projectedWindowPIDCount: dataset.appDirectoryEntries.count,
+            projectedWindowCount: 0
         )
     }
 

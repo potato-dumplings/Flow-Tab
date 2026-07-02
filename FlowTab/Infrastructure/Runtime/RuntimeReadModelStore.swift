@@ -814,6 +814,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             RuntimeAppContext(
                 appID: context.appID,
                 runningApp: context.runningApp,
+                ownerPID: context.ownerPID,
                 windowsByID: windowsByID
             )
         )
@@ -882,6 +883,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             context: RuntimeAppContext(
                 appID: payload.context.appID,
                 runningApp: payload.context.runningApp,
+                ownerPID: payload.context.ownerPID,
                 windowsByID: windowsByID
             ),
             appDirectoryEntries: payload.appDirectoryEntries
@@ -1054,6 +1056,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
                         RuntimeAppContext(
                             appID: entry.appID,
                             runningApp: runningApp,
+                            ownerPID: entry.pid,
                             windowsByID: [:]
                         )
                     )

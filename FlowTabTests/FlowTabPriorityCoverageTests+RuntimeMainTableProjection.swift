@@ -436,6 +436,27 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(degradedSearchPayload.coverageDiagnostics.incompleteContextAppIDs, [appID])
         XCTAssertTrue(degradedSearchPayload.coverageDiagnostics.missingWindowCoveragePIDs.isEmpty)
 
+        let mockDirectoryPID = pid_t(pid + 7_000)
+        let mockDirectoryEntry = RuntimeAppDirectoryEntry(
+            pid: mockDirectoryPID,
+            appID: appID,
+            bundleIdentifier: runningApp.bundleIdentifier,
+            localizedName: runningApp.localizedName ?? appID,
+            bundleURL: runningApp.bundleURL,
+            launchDate: runningApp.launchDate,
+            activationRank: 0,
+            runningApplication: runningApp
+        )
+        let mockPIDPayload = try XCTUnwrap(
+            builder.appSwitcherProjectionPayloadFromMainTables(
+                appDirectoryEntries: [mockDirectoryEntry],
+                generatedAt: 80
+            )
+        )
+        XCTAssertEqual(mockPIDPayload.contextsByID[appID]?.ownerPID, mockDirectoryPID)
+        XCTAssertEqual(mockPIDPayload.homeSummaries.first?.pid, mockDirectoryPID)
+        XCTAssertNotEqual(mockPIDPayload.contextsByID[appID]?.ownerPID, runningApp.processIdentifier)
+
         let payload = try XCTUnwrap(
             builder.appSwitcherProjectionPayloadFromMainTables(
                 appDirectoryEntries: [appDirectoryEntry],

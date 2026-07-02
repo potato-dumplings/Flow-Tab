@@ -198,7 +198,7 @@ extension LiveSwitcherModel {
                 return true
             }
             if !projection.currentAppWindowPayload.candidate.windows.isEmpty {
-                if let pid = runtimeContextsByID[targetAppID]?.runningApp.processIdentifier {
+                if let pid = runtimeContextsByID[targetAppID]?.ownerPID {
                     runtimeService.signalSelectedCurrentAppWindowsChanged(appID: targetAppID, pid: pid)
                 }
                 RuntimeLog.debug(
@@ -217,7 +217,7 @@ extension LiveSwitcherModel {
         }
 
         let projectionReadMs = Self.monotonicMilliseconds()
-        if let pid = runtimeContextsByID[targetAppID]?.runningApp.processIdentifier {
+        if let pid = runtimeContextsByID[targetAppID]?.ownerPID {
             runtimeService.signalSelectedCurrentAppWindowsChanged(appID: targetAppID, pid: pid)
         }
         completeSelectedAppWindowProjection(

@@ -30,23 +30,44 @@ extension FlowTabUITests {
     }
 
     private var searchPointerHoverArguments: [String] {
-        [
-            "--flowtab-ui-reset-defaults",
-            "--flowtab-ui-mock-runtime",
-            "--flowtab-ui-open-switcher-search",
-            "-showPermissionReminder",
-            "NO"
-        ]
+        searchMockRuntimeArguments()
     }
 
     private var searchPointerHoverTriggerArguments: [String] {
-        [
+        searchMockRuntimeArguments(opensSearchOnLaunch: false, listensForTrigger: true)
+    }
+
+    private func searchMockRuntimeArguments(
+        mockRuntimeVariant: String? = nil,
+        opensSearchOnLaunch: Bool = true,
+        listensForTrigger: Bool = false
+    ) -> [String] {
+        var arguments = [
             "--flowtab-ui-reset-defaults",
             "--flowtab-ui-mock-runtime",
-            "--flowtab-ui-listen-switcher-trigger",
             "-showPermissionReminder",
-            "NO"
+            "NO",
+            "--flowtab-ui-ax-trusted",
+            "YES",
+            "--flowtab-ui-screen-trusted",
+            "YES",
+            "--flowtab-ui-runtime-log-level",
+            "DEBUG",
+            "--flowtab-ui-enable-verbose-logs"
         ]
+        if let mockRuntimeVariant {
+            arguments += [
+                "--flowtab-ui-mock-runtime-variant",
+                mockRuntimeVariant
+            ]
+        }
+        if opensSearchOnLaunch {
+            arguments.append("--flowtab-ui-open-switcher-search")
+        }
+        if listensForTrigger {
+            arguments.append("--flowtab-ui-listen-switcher-trigger")
+        }
+        return arguments
     }
 
     func testSearchPanelEntryAndResultActivation() throws {
@@ -93,13 +114,7 @@ extension FlowTabUITests {
 
     func testSearchPanelChineseQueryShowsChineseMockResult() throws {
         let app = makeApp(
-            additionalArguments: [
-                "--flowtab-ui-reset-defaults",
-                "--flowtab-ui-mock-runtime",
-                "--flowtab-ui-open-switcher-search",
-                "-showPermissionReminder",
-                "NO"
-            ]
+            additionalArguments: searchMockRuntimeArguments()
         )
         launchFlowTabUITestApplication(app)
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
@@ -117,13 +132,7 @@ extension FlowTabUITests {
 
     func testSearchPanelPinyinInitialsShowChineseMockResult() throws {
         let app = makeApp(
-            additionalArguments: [
-                "--flowtab-ui-reset-defaults",
-                "--flowtab-ui-mock-runtime",
-                "--flowtab-ui-open-switcher-search",
-                "-showPermissionReminder",
-                "NO"
-            ]
+            additionalArguments: searchMockRuntimeArguments()
         )
         launchFlowTabUITestApplication(app)
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
@@ -141,13 +150,7 @@ extension FlowTabUITests {
 
     func testSearchPanelSharedCsQueryShowsCSGOAndChineseMockResults() throws {
         let app = makeApp(
-            additionalArguments: [
-                "--flowtab-ui-reset-defaults",
-                "--flowtab-ui-mock-runtime",
-                "--flowtab-ui-open-switcher-search",
-                "-showPermissionReminder",
-                "NO"
-            ]
+            additionalArguments: searchMockRuntimeArguments()
         )
         launchFlowTabUITestApplication(app)
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
@@ -170,13 +173,7 @@ extension FlowTabUITests {
 
     func testSearchPanelCodeLikeSubsequenceShowsMockResult() throws {
         let app = makeApp(
-            additionalArguments: [
-                "--flowtab-ui-reset-defaults",
-                "--flowtab-ui-mock-runtime",
-                "--flowtab-ui-open-switcher-search",
-                "-showPermissionReminder",
-                "NO"
-            ]
+            additionalArguments: searchMockRuntimeArguments()
         )
         launchFlowTabUITestApplication(app)
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
@@ -194,13 +191,7 @@ extension FlowTabUITests {
 
     func testSearchPanelSegmentedChineseQueryShowsCompoundMockResult() throws {
         let app = makeApp(
-            additionalArguments: [
-                "--flowtab-ui-reset-defaults",
-                "--flowtab-ui-mock-runtime",
-                "--flowtab-ui-open-switcher-search",
-                "-showPermissionReminder",
-                "NO"
-            ]
+            additionalArguments: searchMockRuntimeArguments()
         )
         launchFlowTabUITestApplication(app)
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
@@ -678,15 +669,7 @@ extension FlowTabUITests {
 
     func testSearchPanelWrapFromLastResultScrollsBackToFirstResult() throws {
         let app = makeApp(
-            additionalArguments: [
-                "--flowtab-ui-reset-defaults",
-                "--flowtab-ui-mock-runtime",
-                "--flowtab-ui-mock-runtime-variant",
-                "search-wrap",
-                "--flowtab-ui-open-switcher-search",
-                "-showPermissionReminder",
-                "NO"
-            ]
+            additionalArguments: searchMockRuntimeArguments(mockRuntimeVariant: "search-wrap")
         )
         launchFlowTabUITestApplication(app)
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))

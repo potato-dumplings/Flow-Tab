@@ -53,7 +53,8 @@ extension RuntimeProjectionRepairProvider {
                 ]
             )
             return RuntimeFullRepairEvidence(
-                appDirectoryEntries: uiTestProjectionFacts.appDirectoryEntries
+                appDirectoryEntries: uiTestProjectionFacts.appDirectoryEntries,
+                windowRecordRefresh: uiTestProjectionFacts.windowRecordRefresh
             )
         }
 

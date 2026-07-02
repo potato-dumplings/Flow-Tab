@@ -55,7 +55,9 @@ extension AppDelegate {
     }
 
     func makePanelController() -> SwitcherPanelController {
-        Self.testHooks.makePanelController?() ?? SwitcherPanelController()
+        Self.testHooks.makePanelController?() ?? SwitcherPanelController(
+            model: LiveSwitcherModel(runtimeProjectionService: resolvedRuntimeProjectionService)
+        )
     }
 
     func makeHotkeyMonitor(

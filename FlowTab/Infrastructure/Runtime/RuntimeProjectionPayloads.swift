@@ -54,7 +54,7 @@ struct RuntimeAppSwitcherProjectionPayload {
                 groupID: app.groupID,
                 lastActiveAt: app.lastActiveAt,
                 windowCount: app.windows.count,
-                pid: context?.runningApp.processIdentifier ?? 0,
+                pid: context?.ownerPID ?? 0,
                 bundleIdentifier: context?.runningApp.bundleIdentifier,
                 bundleURL: context?.runningApp.bundleURL
             )
@@ -65,7 +65,20 @@ struct RuntimeAppSwitcherProjectionPayload {
 struct RuntimeAppContext {
     let appID: String
     let runningApp: NSRunningApplication
+    let ownerPID: pid_t
     let windowsByID: [String: RuntimeWindowContext]
+
+    init(
+        appID: String,
+        runningApp: NSRunningApplication,
+        ownerPID: pid_t? = nil,
+        windowsByID: [String: RuntimeWindowContext]
+    ) {
+        self.appID = appID
+        self.runningApp = runningApp
+        self.ownerPID = ownerPID ?? runningApp.processIdentifier
+        self.windowsByID = windowsByID
+    }
 }
 
 struct RuntimeAppWindowProjectionSeed {
@@ -302,6 +315,7 @@ struct RuntimeCurrentAppWindowPayload {
             context: RuntimeAppContext(
                 appID: appID,
                 runningApp: runningApp,
+                ownerPID: pid,
                 windowsByID: windowContexts
             ),
             appDirectoryEntries: appDirectoryEntries

@@ -46,6 +46,8 @@ enum FlowTabUITestBootstrapper {
             RuntimeWindowRecencyTracker.shared.removeAll()
         }
 
+        installMockRuntimeProjectionServiceIfNeeded()
+
         if FlowTabTestLaunchOptions.resetsUserDefaultsOnLaunch {
             AppPreferenceKeys.allKeys.forEach { userDefaults.removeObject(forKey: $0) }
             userDefaults.removeObject(forKey: CommandTabTakeoverController.takeoverMarkerKey)
@@ -84,6 +86,15 @@ enum FlowTabUITestBootstrapper {
                 }
             }
         }
+    }
+
+    private static func installMockRuntimeProjectionServiceIfNeeded() {
+        guard FlowTabTestLaunchOptions.usesMockRuntimeProjection else { return }
+        guard AppDelegate.testHooks.runtimeProjectionService == nil else { return }
+        AppDelegate.testHooks.runtimeProjectionService = RuntimeProjectionService(
+            label: "FlowTab.UITest.MockRuntimeProjectionService",
+            appDirectoryProvider: RuntimeUITestProjectionAppDirectoryProvider()
+        )
     }
 
     private static func seedWindowRecencyIfNeeded() {

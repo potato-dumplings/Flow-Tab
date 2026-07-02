@@ -399,7 +399,8 @@ struct FlowTabUITestRuntimeProjectionDataset {
                 appID: definition.appID,
                 bundleIdentifier: definition.appID,
                 localizedName: definition.name,
-                launchDate: nil
+                launchDate: nil,
+                activationRank: index
             )
         }
 
@@ -428,6 +429,7 @@ struct FlowTabUITestRuntimeProjectionDataset {
                     RuntimeAppContext(
                         appID: definition.appID,
                         runningApp: runningApp,
+                        ownerPID: ownerPID,
                         windowsByID: windowContexts
                     )
                 )
@@ -437,13 +439,17 @@ struct FlowTabUITestRuntimeProjectionDataset {
         let currentAppWindowPayloadsByAppID = Dictionary(
             uniqueKeysWithValues: appDefinitions.enumerated().map { index, definition in
                 let windowContexts = Dictionary(uniqueKeysWithValues: definition.windows.map { window in
-                    (
+                    let ownerPID = uiTestContextOwnerPID(
+                        for: definition,
+                        runningApp: runningApp
+                    )
+                    return (
                         window.id,
                         RuntimeWindowContext(
                             id: window.id,
                             title: window.title,
                             isMinimized: window.isMinimized,
-                            ownerPID: runningApp.processIdentifier,
+                            ownerPID: ownerPID,
                             cgWindowID: mockCGWindowID(from: window.id),
                             inferredTitleBarStyle: nil,
                             allowsPublicAXRecovery: mockCGWindowID(from: window.id) != nil
@@ -453,6 +459,7 @@ struct FlowTabUITestRuntimeProjectionDataset {
                 let context = RuntimeAppContext(
                     appID: definition.appID,
                     runningApp: runningApp,
+                    ownerPID: appDirectoryEntries[index].pid,
                     windowsByID: windowContexts
                 )
                 let currentAppWindowPayload = RuntimeCurrentAppWindowPayload(
@@ -526,5 +533,24 @@ struct FlowTabUITestRuntimeProjectionDataset {
             hasVisibleWindow: hasVisibleWindow,
             hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer
         )
+    }
+}
+
+final class RuntimeUITestProjectionAppDirectoryProvider: RuntimeAppDirectoryProviding {
+    func appDirectoryEntriesForRuntimeMaintenance() -> [RuntimeAppDirectoryEntry] {
+        guard let dataset = FlowTabUITestRuntimeProjectionDataset.current() else { return [] }
+        let runningApp = NSRunningApplication.current
+        return dataset.appDirectoryEntries.map { entry in
+            RuntimeAppDirectoryEntry(
+                pid: entry.pid,
+                appID: entry.appID,
+                bundleIdentifier: entry.bundleIdentifier,
+                localizedName: entry.localizedName,
+                bundleURL: entry.bundleURL,
+                launchDate: entry.launchDate,
+                activationRank: entry.activationRank,
+                runningApplication: runningApp
+            )
+        }
     }
 }

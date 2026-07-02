@@ -168,6 +168,7 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
                 RuntimeAppContext(
                     appID: entry.appID,
                     runningApp: runningApp,
+                    ownerPID: entry.pid,
                     windowsByID: Dictionary(
                         uniqueKeysWithValues: windowSeeds.map { seed in
                             (seed.windowID, seed.context)

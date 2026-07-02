@@ -367,6 +367,47 @@ remain degraded/unverified until readback. It does not close the public AX
 main-state occurrence, non-registry focused AX occurrence, pure CG-only exact
 activation success, or broader multi-display/system-owner topology gaps.
 
+### 2026-07-02 Search Mock UI Freshness Proof
+
+The fixed-path UI runner now also proves the mock-runtime Search path that
+previously stalled before the committed-index barrier could be observed. The
+slice wires the panel's `LiveSwitcherModel` to the resolved runtime projection
+service, installs the mock runtime app-directory provider only through the
+runtime maintenance boundary, and preserves app-directory PID ownership through
+`RuntimeAppContext.ownerPID` so mock selected-app dirty signals do not use the
+FlowTab process PID as the target app PID.
+
+Validation:
+
+```bash
+./scripts/testing/run-flowtabtests-local.sh \
+  -only-testing:FlowTabTests/FlowTabPriorityCoverageTests/testRuntimeMainTableProjectionBuilderBuildsAppSwitcherPayloadFromMainTables
+
+./scripts/testing/install-ui-test-app.sh
+
+./scripts/testing/run-ui-tests-local.sh --skip-space-fixtures \
+  -only-testing:FlowTabUITests/FlowTabUITests/testSearchHeaderHighlightedAppChipStaysContentSizedForShortTitle
+
+./scripts/testing/run-ui-tests-local.sh --skip-space-fixtures \
+  -only-testing:FlowTabUITests/FlowTabUITests/testSearchPanelChineseQueryShowsChineseMockResult
+
+./scripts/audit/runtime-projection-exit-contract.sh
+```
+
+The targeted builder test passed 1 selected test with 0 failures. The UI app was
+rebuilt and Apple Development signed, then both Search UI tests passed with 0
+failures. Runtime log `Flow_Tab_20260702_210230.log` shows the required
+freshness progression: initial Search read is `missingCommittedIndex`; the first
+committed-index notification is still `degradedStaleCommittedResult` with
+`committedIndexCoversCurrentGeneration=0`; only after the bounded barrier commits
+again with dirty metadata cleared does Search report `committedGenerationResult`
+with `committedIndexCoversCurrentGeneration=1`. This is degraded/stale committed
+behavior until barrier success, not a fresh/complete/latest result.
+
+`FlowTabTests` app-hosted mock dataset tests still segv in the current local
+runner, so that runner failure remains a validation blocker for those specific
+tests. It is not used as completion proof for this slice.
+
 ## Remaining Gaps
 
 These are breadth/hardening gaps and do not currently contradict the target
@@ -411,6 +452,11 @@ runtime shape:
   single-app open window-layer mutation, selected-window-removed branch,
   multi-app selected-app isolation branch, and fullscreen target-window close
   branch are now covered by behavior plus real UI proof.
+- Search mock UI now has committed-index freshness proof, but Search pressure
+  sampling and app-hosted mock dataset FlowTabTests remain open: the current
+  runner crashes those mock dataset tests with signal segv, while fixed-path UI
+  runner tests pass and runtime logs prove missing/degraded/stale committed
+  semantics before the barrier commits a clean generation.
 
 Do not mark these as completed from mock-only evidence. They need representative
 UI/E2E, runtime log, or pressure evidence before moving from breadth gap to

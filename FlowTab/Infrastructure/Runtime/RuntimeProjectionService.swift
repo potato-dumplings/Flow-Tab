@@ -12,6 +12,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     private let readModelStore: RuntimeReadModelStore
     private let appDirectoryProvider: RuntimeAppDirectoryProviding?
     private let reconciliationDrainer: RuntimeProjectionReconciliationDrainer
+    private var pendingSearchIndexFreshnessBarrier = false
 
     init(
         label: String = "FlowTab.RuntimeProjectionService",
@@ -117,6 +118,9 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                     clearsDirtyCGWindowIDs: drainResult.completedAffectedCGWindowIDs
                 ) || mainTableProjectionCommitted
             }
+            let pendingSearchIndexCommit = commitPendingSearchIndexFreshnessBarrierIfNeededLocked(
+                generatedAt: now
+            )
             RuntimeLog.debug(
                 .projection,
                 [
@@ -135,6 +139,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                     "fullRepairColdStartCommits=\(fullRepairProjectionCommitSummary.coldStartCommittedCount)",
                     "fullRepairDegradedCommits=\(fullRepairProjectionCommitSummary.degradedCommittedCount)",
                     "mainTableProjectionCommitted=\(mainTableProjectionCommitted ? 1 : 0)",
+                    "pendingSearchIndexCommit=\(pendingSearchIndexCommit != nil ? 1 : 0)",
                     "currentAppRepairEvidence=\(drainResult.currentAppRepairEvidence.count)"
                 ].joined(separator: " ")
             )
@@ -144,6 +149,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     func requestSearchIndexFreshnessBarrier(reason: RuntimeProjectionMaintenanceReason) {
         maintenanceQueue.async { [self] in
             let now = Date.timeIntervalSinceReferenceDate
+            pendingSearchIndexFreshnessBarrier = true
             let appDirectoryProviderEvidenceCount = commitAppDirectoryProviderEvidenceLocked(generatedAt: now)
             let scheduledMissingCoverageRepairs = scheduleSearchMissingWindowCoverageRepairsLocked(
                 generatedAt: now
@@ -168,7 +174,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 includeFullRepair: false
             )
             let diagnostics = readModelStore.diagnostics()
-            let mainTableSearchCommit = commitSearchIndexFromMainTablesLocked(
+            let mainTableSearchCommit = commitPendingSearchIndexFreshnessBarrierIfNeededLocked(
                 deferredRequestCount: drainResult.deferredCount,
                 hasPendingRequests: hasPendingRequests,
                 generatedAt: now
@@ -198,12 +204,6 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                     "mainTableSearchCommit=\(mainTableSearchCommit != nil ? 1 : 0)"
                 ].joined(separator: " ")
             )
-            if mainTableSearchCommit != nil {
-                NotificationCenter.default.post(
-                    name: .runtimeCommittedSearchIndexDidUpdate,
-                    object: self
-                )
-            }
         }
     }
 
@@ -694,6 +694,30 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             userInfo: [RuntimeProjectionNotificationUserInfoKey.appID: appID]
         )
         return true
+    }
+
+    @discardableResult
+    private func commitPendingSearchIndexFreshnessBarrierIfNeededLocked(
+        deferredRequestCount: Int = 0,
+        hasPendingRequests: Bool? = nil,
+        generatedAt: TimeInterval
+    ) -> RuntimeSearchIndexProjection? {
+        guard pendingSearchIndexFreshnessBarrier else { return nil }
+        let pendingRequests = hasPendingRequests ?? repairProvider.hasPendingReconciliationRequests(
+            includeFullRepair: false
+        )
+        let committed = commitSearchIndexFromMainTablesLocked(
+            deferredRequestCount: deferredRequestCount,
+            hasPendingRequests: pendingRequests,
+            generatedAt: generatedAt
+        )
+        guard committed != nil else { return nil }
+        pendingSearchIndexFreshnessBarrier = false
+        NotificationCenter.default.post(
+            name: .runtimeCommittedSearchIndexDidUpdate,
+            object: self
+        )
+        return committed
     }
 
     @discardableResult
