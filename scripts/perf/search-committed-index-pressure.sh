@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 SAMPLE_INTERVAL_SECONDS="${1:-0.5}"
+MIN_SAMPLE_SECONDS="${FLOWTAB_SEARCH_PRESSURE_MIN_SECONDS:-30}"
 RESULTS_ROOT="${ROOT_DIR}/.build-local/search-committed-index-pressure"
 RESULTS_DIR="${RESULTS_ROOT}/results-$(date +%Y%m%d-%H%M%S)"
 SAMPLES_FILE="${RESULTS_DIR}/process-samples.csv"
@@ -53,7 +54,7 @@ sample_process_tree() {
   while IFS= read -r pid; do
     [[ -n "${pid}" ]] || continue
     local line
-    line="$(ps -p "${pid}" -o %cpu= -o rss= | awk '{$1=$1; print}')"
+    line="$(ps -p "${pid}" -o %cpu= -o rss= 2>/dev/null | awk '{$1=$1; print}' || true)"
     [[ -n "${line}" ]] || continue
 
     local cpu
@@ -83,10 +84,30 @@ echo "Results: ${RESULTS_DIR}"
 "${ROOT_DIR}/scripts/testing/run-flowtabtests-local.sh" build-for-testing >"${BUILD_LOG_FILE}" 2>&1
 
 echo "[2/4] Starting committed-index Search pressure tests..."
-"${ROOT_DIR}/scripts/testing/run-flowtabtests-local.sh" test-without-building "${TEST_FILTERS[@]}" >"${TEST_LOG_FILE}" 2>&1 &
+(
+  batch=0
+  start_seconds="$(date +%s)"
+  while true; do
+    batch=$((batch + 1))
+    echo "[SearchCommittedIndexPressureBatch] batch=${batch} started" >>"${TEST_LOG_FILE}"
+    if "${ROOT_DIR}/scripts/testing/run-flowtabtests-local.sh" test-without-building "${TEST_FILTERS[@]}" >>"${TEST_LOG_FILE}" 2>&1; then
+      status=0
+    else
+      status=$?
+    fi
+    elapsed_seconds=$(( $(date +%s) - start_seconds ))
+    echo "[SearchCommittedIndexPressureBatch] batch=${batch} status=${status} elapsedSeconds=${elapsed_seconds}" >>"${TEST_LOG_FILE}"
+    if [[ "${status}" -ne 0 ]]; then
+      exit "${status}"
+    fi
+    if [[ "${elapsed_seconds}" -ge "${MIN_SAMPLE_SECONDS}" ]]; then
+      break
+    fi
+  done
+) &
 TEST_PID=$!
 
-echo "[3/4] Sampling xcodebuild/test runner CPU/RSS every ${SAMPLE_INTERVAL_SECONDS}s..."
+echo "[3/4] Sampling xcodebuild/test runner CPU/RSS every ${SAMPLE_INTERVAL_SECONDS}s for at least ${MIN_SAMPLE_SECONDS}s..."
 while kill -0 "${TEST_PID}" 2>/dev/null; do
   sample_process_tree "${TEST_PID}"
   sleep "${SAMPLE_INTERVAL_SECONDS}"
@@ -96,13 +117,13 @@ TEST_STATUS=0
 wait "${TEST_PID}" || TEST_STATUS=$?
 
 echo "[4/4] Aggregating samples..."
-/usr/bin/python3 - "${SAMPLES_FILE}" "${SUMMARY_FILE}" "${SAMPLE_INTERVAL_SECONDS}" "${TEST_STATUS}" "${TEST_LOG_FILE}" <<'PY'
+/usr/bin/python3 - "${SAMPLES_FILE}" "${SUMMARY_FILE}" "${SAMPLE_INTERVAL_SECONDS}" "${MIN_SAMPLE_SECONDS}" "${TEST_STATUS}" "${TEST_LOG_FILE}" <<'PY'
 import csv
 import math
 import re
 import sys
 
-samples_path, summary_path, sample_interval, test_status, test_log_path = sys.argv[1:6]
+samples_path, summary_path, sample_interval, min_sample_seconds, test_status, test_log_path = sys.argv[1:7]
 
 with open(samples_path, newline="", encoding="utf-8") as handle:
     rows = list(csv.DictReader(handle))
@@ -122,17 +143,23 @@ def percentile(values, pct):
     return ordered[index]
 
 search_metrics = []
-metric_pattern = re.compile(r"\[(SearchPerformanceWindowScope|SearchPressureUnified)\].*")
+batch_count = 0
+metric_pattern = re.compile(r"\[(SearchPerformanceWindowScope|SearchPressureUnified|CommittedSearchIndexPressure)\].*")
+batch_pattern = re.compile(r"\[SearchCommittedIndexPressureBatch\].*status=0")
 with open(test_log_path, encoding="utf-8", errors="replace") as handle:
     for line in handle:
         match = metric_pattern.search(line)
         if match:
             search_metrics.append(match.group(0).strip())
+        if batch_pattern.search(line):
+            batch_count += 1
 
 summary = [
     "Committed-index Search pressure summary",
     f"testStatus={test_status}",
     f"sampleIntervalSeconds={sample_interval}",
+    f"minSampleSeconds={min_sample_seconds}",
+    f"testBatches={batch_count}",
     f"samples={len(rows)}",
     f"cpuAvg={sum(cpu_values) / len(cpu_values):.2f}",
     f"cpuP95={percentile(cpu_values, 95):.2f}",

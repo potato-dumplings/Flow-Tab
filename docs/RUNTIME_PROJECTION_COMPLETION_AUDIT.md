@@ -8,21 +8,21 @@ reclassifying breadth proof as core completion work.
 
 ## Current Phase 7 Slice
 
-- P0: close the active Search stale-result gap when the committed Search index
-  read becomes `missingCommittedIndex`. The Search surface now clears its
-  committed app metadata, resets the coordinator index, publishes an empty
-  inactive Search state, and requests the bounded freshness barrier instead of
-  leaving prior committed rows visible as normal results.
+- P0: close the committed-index Search pressure gap with the fixed-path runner
+  repaired. `scripts/perf/search-committed-index-pressure.sh` now enforces the
+  30s minimum pressure window, tolerates short-lived sampled child processes,
+  and captures the `CommittedSearchIndexPressure` metric in addition to the
+  deterministic coordinator pressure metrics.
 - P1: keep `RUNTIME_AX_CG_SPACE_WINDOW_MAPPING.md`, `TEST_COVERAGE_MATRIX.md`,
-  this audit, and the repeatable exit-contract audit aligned with the stricter
-  Search committed-index surface boundary. The audit now guards both the
-  committed-only rebuild source and the missing-index active-state reset, while
-  docs continue to require degraded/stale committed wording until a bounded
-  barrier commits a new generation.
+  this audit, and the repeatable exit-contract audit aligned with the Search
+  pressure proof. Docs continue to require `missingCommittedIndex` or
+  degraded/stale committed wording until a bounded barrier commits a new
+  generation.
 - P2: keep pure CG-only activation success, broader multi-display/system-owner
   topology, real non-registry focused AX occurrence, public AX main-state real
-  UI occurrence, and optional Search UI smoke failures explicit rather than
-  reclassifying them as this slice's required proof.
+  UI occurrence, optional Search UI smoke failures, and app-hosted mock dataset
+  runner segv explicit rather than reclassifying them as this slice's required
+  proof.
 
 The committed Search index invariant is now guarded in three places: production
 Search freshness commits still come only from main-table payloads; Search result
@@ -41,6 +41,24 @@ index disappear, the surface must leave Search inactive with no visible results
 and record `missingCommittedIndex`; it may request the freshness barrier, but it
 must not present old committed rows as fresh, complete, latest, or normal
 current-generation results.
+
+Current Search pressure proof:
+
+```bash
+./scripts/perf/search-committed-index-pressure.sh 0.5
+```
+
+The sandboxed first attempt failed during SwiftPM manifest compilation with
+`unable to make temporary file: Operation not permitted`, so the wrapper was
+rerun outside the sandbox as required by the FlowTabTests workflow. The fixed
+wrapper passed 2 batches of 3 selected FlowTabTests with 0 failures, collected
+80 samples at 0.5s cadence with `minSampleSeconds=30`, and recorded
+`cpuAvg=4.22`, `cpuP95=15.00`, `cpuMax=103.60`, `rssAvgMB=160.80`,
+`rssP95MB=174.53`, and `rssMaxMB=233.44`. The dataset stayed at
+400 apps / 10,000 windows. The committed runtime index pressure metric reported
+`resultState=committedGenerationResult` and `freshnessBarrierRequests=0` only
+because the test fixture installs a validated committed generation before the
+hot Search read; this is not a pre-barrier fresh/complete/latest result.
 
 ## Required Evidence
 
@@ -452,11 +470,12 @@ runtime shape:
   single-app open window-layer mutation, selected-window-removed branch,
   multi-app selected-app isolation branch, and fullscreen target-window close
   branch are now covered by behavior plus real UI proof.
-- Search mock UI now has committed-index freshness proof, but Search pressure
-  sampling and app-hosted mock dataset FlowTabTests remain open: the current
-  runner crashes those mock dataset tests with signal segv, while fixed-path UI
-  runner tests pass and runtime logs prove missing/degraded/stale committed
-  semantics before the barrier commits a clean generation.
+- Search mock UI and committed-index Search pressure now have proof, but
+  app-hosted mock dataset FlowTabTests remain open: the current runner crashes
+  those mock dataset tests with signal segv, while fixed-path UI runner tests,
+  runtime logs, and the external committed-index pressure wrapper prove
+  missing/degraded/stale committed semantics before the barrier commits a clean
+  generation.
 
 Do not mark these as completed from mock-only evidence. They need representative
 UI/E2E, runtime log, or pressure evidence before moving from breadth gap to
