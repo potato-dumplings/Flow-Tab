@@ -363,6 +363,12 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         lock.unlock()
     }
 
+    func clearCommittedSearchIndex() {
+        lock.lock()
+        committedSearchIndexRead = nil
+        lock.unlock()
+    }
+
     func readAppSwitcherProjection() -> RuntimeAppSwitcherProjection? {
         lock.lock()
         defer { lock.unlock() }

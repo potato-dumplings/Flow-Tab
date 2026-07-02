@@ -155,6 +155,21 @@ check_has_matches \
   "readCommittedSearchIndexForSearch|rebuildSearchIndexFromCommittedProjection|searchCoordinator\\.rebuildIndex\\(with: searchProjection|committedSearchAppsByID" \
   FlowTab/Features/Switcher/LiveSwitcherModel+Search.swift
 
+check_has_matches \
+  "Search missing committed index clears committed app metadata" \
+  "committedSearchAppsByID = \\[:\\]" \
+  FlowTab/Features/Switcher/LiveSwitcherModel+Search.swift
+
+check_has_matches \
+  "Search missing committed index resets active coordinator index" \
+  "searchCoordinator\\.resetIndex\\(\\)" \
+  FlowTab/Features/Switcher/LiveSwitcherModel+Search.swift
+
+check_has_matches \
+  "Search missing committed index requests bounded freshness barrier" \
+  "requestSearchIndexFreshnessBarrier\\(reason: \\.searchFreshnessBarrier\\)" \
+  FlowTab/Features/Switcher/LiveSwitcherModel+Search.swift
+
 check_no_matches \
   "Search surface does not construct session, staging, or repair Search projections" \
   "RuntimeSearchIndexProjection\\(|RuntimeSearchIndexPayload\\(|RuntimeSearch(App|Window)IndexEntry\\(" \

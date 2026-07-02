@@ -152,6 +152,8 @@ extension LiveSwitcherModel {
         let read = runtimeProjectionService.readCommittedSearchIndexForSearch()
         guard let projection = read.projection else {
             committedSearchAppsByID = [:]
+            searchCoordinator.resetIndex()
+            publishSearchStateIfNeeded()
             if read.shouldRequestFreshnessBarrier {
                 runtimeProjectionService.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
             }

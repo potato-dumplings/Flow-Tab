@@ -8,19 +8,21 @@ reclassifying breadth proof as core completion work.
 
 ## Current Phase 7 Slice
 
-- P0: refresh representative real UI proof now that the fixed-path UI runner is
-  repaired. The selected runner-fixed set covers Noisy Option+Tab projection and
-  activation readback, committed-index Window Search duplicate/edge activation,
-  and CG-only degraded/readback-rejection paths without relying on surface-local
-  sampling or session-built Search state.
+- P0: close the active Search stale-result gap when the committed Search index
+  read becomes `missingCommittedIndex`. The Search surface now clears its
+  committed app metadata, resets the coordinator index, publishes an empty
+  inactive Search state, and requests the bounded freshness barrier instead of
+  leaving prior committed rows visible as normal results.
 - P1: keep `RUNTIME_AX_CG_SPACE_WINDOW_MAPPING.md`, `TEST_COVERAGE_MATRIX.md`,
-  this audit, and the repeatable exit-contract audit aligned with the Search
-  freshness wording. The audit now requires docs to keep pre-barrier Search as
-  degraded/stale committed until a bounded barrier commits a new generation, and
-  to reject fresh/complete/latest/current-generation wording before that commit.
+  this audit, and the repeatable exit-contract audit aligned with the stricter
+  Search committed-index surface boundary. The audit now guards both the
+  committed-only rebuild source and the missing-index active-state reset, while
+  docs continue to require degraded/stale committed wording until a bounded
+  barrier commits a new generation.
 - P2: keep pure CG-only activation success, broader multi-display/system-owner
-  topology, real non-registry focused AX occurrence, and public AX main-state
-  real UI occurrence gaps explicit.
+  topology, real non-registry focused AX occurrence, public AX main-state real
+  UI occurrence, and optional Search UI smoke failures explicit rather than
+  reclassifying them as this slice's required proof.
 
 The committed Search index invariant is now guarded in three places: production
 Search freshness commits still come only from main-table payloads; Search result
@@ -34,7 +36,11 @@ real public AX main-state evidence, and it did not produce
 `binding-assignment public-state-tiebreak state=main`; therefore main-state
 occurrence remains a real UI gap. Search remains missing committed index or
 degraded/stale committed until a bounded freshness barrier commits a new
-main-table generation.
+main-table generation. If a previously active Search session sees the committed
+index disappear, the surface must leave Search inactive with no visible results
+and record `missingCommittedIndex`; it may request the freshness barrier, but it
+must not present old committed rows as fresh, complete, latest, or normal
+current-generation results.
 
 ## Required Evidence
 
@@ -46,7 +52,7 @@ main-table generation.
 | Current-app sibling preservation is runtime-owned and activation/dirty gated | `scripts/audit/runtime-projection-exit-contract.sh` now rejects Switcher-owned current-app sibling preservation helpers and rejects app-switcher projection as a current-app sibling fact source. The positive contract requires `RuntimeReadModelStore` to own `currentAppWindowPayloadByPreservingPriorCommittedWindowsLocked(...)`, use only prior committed current-app projection state for sibling preservation, keep activation-action gating through `useForAXActivation` / `useForCGActivationFallback`, and reject dirty `CGWindowID`s. `testRuntimeReadModelStorePreservesCommittedCurrentAppSiblingRowsUntilDirtyCGInvalidatesThem`, `testRuntimeReadModelStoreDoesNotPreserveCurrentAppSiblingsFromCommittedAppSwitcherProjection`, and `testLiveSwitcherModelAppliesCommittedRuntimeWindowRecencyWhenProjectionOrderChanges` prove committed current-app sibling preservation, dirty affected-CG invalidation, prior current-app AX/CG preservation, app-switcher projection contamination rejection, activation-capable inferred CG-fallback artifact rejection, and restored window-cycle ordering. | Proven by source audit and behavior tests |
 | Control+Tab focused-current-app path does not synchronously sample frontmost/focused app state | The exit audit now separately rejects `NSWorkspace.shared.frontmostApplication`, `kAXFocusedWindowAttribute`, old focused snapshot/frontmost resolver seams, and the removed frontmost bundle launch override in the Switcher/TestingSupport hot path. It also requires `readFocusedCurrentAppWindowProjection()` and `signalFocusedCurrentAppWindowsChanged()` evidence, proving the focused path either reads runtime projection or sends a dirty signal. | Proven by source audit |
 | Home normal paths read projection APIs or send dirty signals | The exit audit verifies Home references `readHomeSummaryProjection`, `readHomeAppDetailProjection`, `readCurrentAppWindowProjection`, and `signalAppWindowsChanged`, while rejecting legacy snapshot, repair-provider, CG, and AX sampling APIs in Home hot paths. | Proven by source audit |
-| Search reads only committed index and cannot expose staging/repair/partial/session completeness as latest | The exit audit verifies production Search freshness commits only through `RuntimeMainTableProjectionBuilding.searchIndexPayloadFromMainTables(...)` and `RuntimeReadModelStore.commitSearchFreshnessBarrierFromMainTablePayload(...)`. It also requires the runtime/Search read-model labels `missingCommittedIndex`, `degradedStaleCommittedResult`, and `committedGenerationResult`, while rejecting the old `latestCommittedResult`, `freshResult`, and `completeResult` names in production Search paths. The audit now separately requires Search surface rebuilds to call `readCommittedSearchIndexForSearch()` / `rebuildSearchIndexFromCommittedProjection(...)`, rejects Switcher/Search construction of `RuntimeSearchIndexProjection`, `RuntimeSearchIndexPayload`, `RuntimeSearchAppIndexEntry`, or `RuntimeSearchWindowIndexEntry`, and requires Search result display metadata to come from `committedSearchAppsByID`. `testSwitcherPanelControllerSearchHotkeyStartsFromCommittedIndexWhenAppSwitcherProjectionMissing` proves direct Search trigger falls back from missing app-switcher projection to committed Search index without snapshot/session fallback and preserves degraded/stale metadata. `TEST_COVERAGE_MATRIX.md` records behavior/UI/pressure proof for pre-commit reads that are `missingCommittedIndex` or degraded/stale committed result, committed-generation async re-entry, direct trigger committed-index start, and external committed-index Search CPU/RSS sampling. | Proven by source audit plus behavior/UI/pressure evidence |
+| Search reads only committed index and cannot expose staging/repair/partial/session completeness as latest | The exit audit verifies production Search freshness commits only through `RuntimeMainTableProjectionBuilding.searchIndexPayloadFromMainTables(...)` and `RuntimeReadModelStore.commitSearchFreshnessBarrierFromMainTablePayload(...)`. It also requires the runtime/Search read-model labels `missingCommittedIndex`, `degradedStaleCommittedResult`, and `committedGenerationResult`, while rejecting the old `latestCommittedResult`, `freshResult`, and `completeResult` names in production Search paths. The audit now separately requires Search surface rebuilds to call `readCommittedSearchIndexForSearch()` / `rebuildSearchIndexFromCommittedProjection(...)`, rejects Switcher/Search construction of `RuntimeSearchIndexProjection`, `RuntimeSearchIndexPayload`, `RuntimeSearchAppIndexEntry`, or `RuntimeSearchWindowIndexEntry`, requires Search result display metadata to come from `committedSearchAppsByID`, and guards the missing committed-index branch so it clears active Search state before requesting the freshness barrier. `testSwitcherPanelControllerSearchHotkeyStartsFromCommittedIndexWhenAppSwitcherProjectionMissing` proves direct Search trigger falls back from missing app-switcher projection to committed Search index without snapshot/session fallback and preserves degraded/stale metadata. `testSwitcherPanelControllerClearsActiveSearchWhenCommittedIndexBecomesMissing` proves an already-active Search clears old results, clears status, records `missingCommittedIndex`, and requests `.searchFreshnessBarrier` when the committed index read disappears. `TEST_COVERAGE_MATRIX.md` records behavior/UI/pressure proof for pre-commit reads that are `missingCommittedIndex` or degraded/stale committed result, committed-generation async re-entry, direct trigger committed-index start, active missing-index clearing, and external committed-index Search CPU/RSS sampling. | Proven by source audit plus behavior/UI/pressure evidence |
 | Search freshness barrier success requires a committed new generation | `TEST_COVERAGE_MATRIX.md` records `committedGenerationResult` only after bounded barrier commit from main-table payload, and records pre-commit real UI state as `missingCommittedIndex` or degraded/stale committed result rather than fresh/complete/latest. The exit audit now makes this naming contract repeatable by rejecting production Search result-state labels that would call pre-barrier reads fresh, complete, or latest. | Proven by matrix-backed tests and UI proof |
 | Activation may use cached target route, but success must be verified by focused AX/CG or CG frontmost readback | The exit audit rejects direct Space setting and Window-menu shortcuts, requires `RuntimeActivator` focused AX/CG or frontmost CG readback verification plus mismatch diagnostics, and requires verified readback to flow through `RuntimeProjectionService.signalWindowFocusVerified(...)`, `RuntimeWindowRecordStore.recordWindowFocusVerification(...)`, and `readActivationTargetProjection()`. Readback mismatch now flows through `RuntimeProjectionService.signalWindowFocusReadbackMismatch(...)`, runtime dirty/freshness metadata, high-priority scoped reconciliation, and WindowRecord-owned route failure evidence that removes `useForCGActivationFallback` from the failed target projection while preserving display/preview actions. It is not an activation success and keeps committed Search reads degraded/stale until a new generation is committed. | Proven by source audit plus activation behavior tests |
 | Non-registry verified-focus fallback AX readback is observable when it happens | `testRuntimeProjectionServiceSeedsVerifiedFocusRecordWhenFocusedAXWindowIsNotInRegistry` now proves the non-registry fallback AX id writes exact WindowRecord evidence, parses back to the focused `CGWindowID`, and emits a production `binding-confidence-change ... verifiedFocusFallbackAX=1` marker under debug+verbose logs. The exit audit also requires `AXWindowInspector.verifiedFocusFallbackCGWindowID(...)` and the WindowRecord `verifiedFocusFallbackAX` marker so the runtime-log oracle cannot silently disappear from production. This protects the marker that future real UI proof must use, but it does not close the real UI occurrence gap by itself. | Proven by source audit and behavior test; real UI occurrence still gap |
@@ -108,15 +114,41 @@ Current Search committed-index surface guard proof:
 
 ```bash
 ./scripts/testing/run-flowtabtests-local.sh \
+  -only-testing:FlowTabTests/FlowTabPriorityCoverageTests/testSwitcherPanelControllerClearsActiveSearchWhenCommittedIndexBecomesMissing \
   -only-testing:FlowTabTests/FlowTabPriorityCoverageTests/testSwitcherPanelControllerSearchHotkeyStartsFromCommittedIndexWhenAppSwitcherProjectionMissing \
   -only-testing:FlowTabTests/FlowTabPriorityCoverageTests/testSwitcherPanelControllerEntersSearchAfterCommittedIndexUpdateNotification
 ```
 
-The targeted behavior run passed 2 selected tests with 0 failures. It proves the
-same committed-index contract now guarded by source audit: Search can start from
-a degraded/stale committed index when app-switcher projection is missing and
-requests a bounded freshness barrier; only a later committed-index update moves
-the session to `committedGenerationResult`.
+The targeted behavior run passed 3 selected tests with 0 failures. Before the
+production fix, `testSwitcherPanelControllerClearsActiveSearchWhenCommittedIndexBecomesMissing`
+failed because active Search stayed visible with old committed rows and a
+`committedGenerationResult` status after the committed-index read became
+`missingCommittedIndex`. After the fix, the same test proves old results are
+cleared, Search is inactive, status is nil, diagnostics record
+`missingCommittedIndex`, and `.searchFreshnessBarrier` is requested. The adjacent
+tests prove Search can still start from a degraded/stale committed index when
+app-switcher projection is missing and that only a later committed-index update
+moves the session to `committedGenerationResult`.
+
+Optional UI smoke attempts after the fixed-path runner repair:
+
+```bash
+./scripts/testing/run-ui-tests-local.sh --skip-space-fixtures \
+  -only-testing:FlowTabUITests/FlowTabUITests/testSearchPanelEntryAndResultActivation
+
+./scripts/testing/install-ui-test-app.sh
+
+./scripts/testing/run-ui-tests-local.sh --skip-space-fixtures \
+  -only-testing:FlowTabUITests/FlowTabUITests/testSearchHeaderHighlightedAppChipStaysContentSizedForShortTitle
+```
+
+The optional Search UI attempts entered the test body but did not find
+`flowtab.switcher.search.input` / `flowtab.switcher.search` after launch. The
+fixed-path app was rebuilt and Apple Development signed successfully before the
+second attempt, so this is recorded as an optional UI smoke failure for the
+Search launch-argument path, not as the required proof for this in-process
+missing-index clearing slice. Existing representative committed-index Window
+Search UI proof remains the latest passing real UI Search evidence.
 
 Current UI runner fixed-path proof:
 

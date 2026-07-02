@@ -722,6 +722,49 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testSwitcherPanelControllerClearsActiveSearchWhenCommittedIndexBecomesMissing() async {
+        await withTemporarySearchPreferences(enabled: true, defaultScope: .window) {
+            let apps = self.searchScenarioApps()
+            let runtimeProjectionService = RecordingRuntimeProjectionService(
+                appSwitcherApps: apps,
+                committedSearchReadiness: .committedGenerationValidated
+            )
+            let controller = SwitcherPanelController(
+                model: LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
+            )
+
+            XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+            XCTAssertTrue(controller.enterSearchModeIfPossible())
+            XCTAssertTrue(controller.modelForTesting.isSearchActive)
+            XCTAssertEqual(
+                controller.modelForTesting.searchViewState.indexStatus?.resultState,
+                .committedGenerationResult
+            )
+            XCTAssertFalse(controller.modelForTesting.searchViewState.results.isEmpty)
+
+            runtimeProjectionService.clearCommittedSearchIndex()
+
+            XCTAssertFalse(controller.handleCommittedSearchIndexDidUpdateForTesting())
+            XCTAssertFalse(controller.modelForTesting.isSearchActive)
+            XCTAssertEqual(controller.modelForTesting.searchViewState.results, [])
+            XCTAssertNil(controller.modelForTesting.searchViewState.indexStatus)
+            XCTAssertEqual(
+                controller.modelForTesting.lastSearchIndexReadDiagnostic?.readiness,
+                .missingCommittedIndex
+            )
+            XCTAssertEqual(
+                controller.modelForTesting.lastSearchIndexReadDiagnostic?.resultState,
+                .missingCommittedIndex
+            )
+            XCTAssertEqual(
+                runtimeProjectionService.searchIndexFreshnessBarrierRequestsRecorded(),
+                [.searchFreshnessBarrier]
+            )
+            controller.cancelSelectionForTesting()
+        }
+    }
+
+    @MainActor
     func testSwitcherPanelControllerSearchHotkeyStartsFromCommittedIndexWhenAppSwitcherProjectionMissing() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .window) {
             let apps = self.searchScenarioApps()
