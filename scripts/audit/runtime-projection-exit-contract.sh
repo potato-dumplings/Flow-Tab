@@ -150,6 +150,21 @@ check_has_matches \
   "missingCommittedIndex|degradedStaleCommitted(Result)?|committedGeneration(Result|Validated)" \
   FlowTab/Infrastructure/Runtime/RuntimeSearchIndexReadModel.swift FlowTab/Features/Switcher/LiveSwitcherModel+Search.swift
 
+check_has_matches \
+  "Search surface rebuilds only from committed runtime Search index reads" \
+  "readCommittedSearchIndexForSearch|rebuildSearchIndexFromCommittedProjection|searchCoordinator\\.rebuildIndex\\(with: searchProjection|committedSearchAppsByID" \
+  FlowTab/Features/Switcher/LiveSwitcherModel+Search.swift
+
+check_no_matches \
+  "Search surface does not construct session, staging, or repair Search projections" \
+  "RuntimeSearchIndexProjection\\(|RuntimeSearchIndexPayload\\(|RuntimeSearch(App|Window)IndexEntry\\(" \
+  FlowTab/Features/Switcher
+
+check_has_matches \
+  "Search result display metadata comes from committed Search index app rows" \
+  "committedSearchAppsByID\\[appID\\]|guard let app = committedSearchAppsByID\\[appID\\]" \
+  FlowTab/Features/Switcher/LiveSwitcherModel+Preview.swift
+
 check_no_matches \
   "production Search result-state naming does not call pre-barrier reads fresh, complete, or latest" \
   "latestCommittedResult|freshResult|completeResult" \
