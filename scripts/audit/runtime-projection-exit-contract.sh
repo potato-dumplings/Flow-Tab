@@ -186,6 +186,21 @@ check_has_matches \
   FlowTab/Features/Switcher FlowTab/Features/Home FlowTab/Infrastructure/Runtime
 
 check_has_matches \
+  "CG-only window-layer exposure policy is owned by runtime topology classification" \
+  "canExposeWithoutCurrentAXHandle|isDesktopOnlySpaceWindow|hasFullscreenTopology" \
+  FlowTab/Infrastructure/Runtime/RuntimeWindowSpaceClassification.swift FlowTab/Infrastructure/Runtime/RuntimeWindowMappingPresentationAssembler.swift
+
+check_has_matches \
+  "main-table WindowRecord projection applies CG-only exposure policy before surface reads" \
+  "canExposeWithoutCurrentAXHandle|allowSpaceOneWithoutCurrentAXHandle|projectedWindowEntry" \
+  FlowTab/Infrastructure/Runtime/RuntimeWindowRecordStore.swift
+
+check_has_matches \
+  "space-backed CG-only candidates carry runtime Space evidence while provisional CG-only candidates are hidden" \
+  "spaceEvidence: spaceEvidence|allowsPublicAXRecovery: spaceEvidence\\.allowsPublicAXRecovery|hidden-provisional-cg" \
+  FlowTab/Infrastructure/Runtime/RuntimeWindowMappingPresentationAssembler.swift
+
+check_has_matches \
   "UI runner classifies automation initialization timeouts before runtime evidence" \
   "LOG_ROOT|xcodebuild-\\$\\{action\\}\\.log|Timed out while enabling automation mode|Classification: UI automation initialization blocker|not as a FlowTab runtime assertion failure" \
   scripts/testing/run-ui-tests-local.sh

@@ -795,6 +795,42 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertNil(entries.first?.activationHandleID)
     }
 
+    func testRuntimeWindowRecordStoreDoesNotProjectDesktopProvisionalCGOnlyRecordWithoutAXHandle() {
+        let windowRecordStore = RuntimeWindowRecordStore()
+        let pid: pid_t = 18_405
+        let cgWindowID = CGWindowID(250_004)
+        var record = RuntimeWindowRecord(
+            cgWindowID: cgWindowID,
+            stableWindowID: RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindowID),
+            firstSeenAt: 10
+        )
+        record.lastKnownCGTitle = "Desktop CG Only"
+        record.lastKnownDisplayTitle = "Desktop CG Only"
+        record.lastKnownCGFrame = CGRect(x: 30, y: 124, width: 1_200, height: 820)
+        record.spaceRecovery = RuntimeSpaceRecoveryState(
+            cgWindowID: cgWindowID,
+            spaceIDs: [RuntimeWindowTopologyClassifier.desktopSpaceID],
+            hasConfirmedActivationRoute: true,
+            lastValidatedAt: 10,
+            invalidatedAt: nil
+        )
+        windowRecordStore.setState(
+            RuntimeWindowMappingState(
+                windowRecordsByCGWindowID: [cgWindowID: record],
+                validCGWindowIDs: [cgWindowID],
+                hasRecordedWindowCollection: true
+            ),
+            for: pid
+        )
+
+        let entries = windowRecordStore.projectedWindowEntries(
+            processIdentifier: pid,
+            appName: "Google Chrome"
+        )
+
+        XCTAssertTrue(entries.isEmpty)
+    }
+
     func testRuntimeWindowRecordStoreSuppressesCGActivationFallbackAfterReadbackMismatch() throws {
         let windowRecordStore = RuntimeWindowRecordStore()
         let pid: pid_t = 18_405

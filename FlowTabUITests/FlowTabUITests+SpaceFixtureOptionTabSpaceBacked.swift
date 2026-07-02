@@ -75,6 +75,7 @@ extension FlowTabUITests {
             },
             flowTabLaunchTraceLabel: "option.provisionalHidden"
         ) { _, app in
+            assertHiddenProvisionalCGOnlyRuntimeLog(appName: targetApp.appName, since: runtimeLogSnapshot)
             postFlowTabUITestSwitcherTriggerAndWaitForDelivery(.global, traceLabel: "option.provisionalHidden")
             let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
             XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
@@ -122,7 +123,6 @@ extension FlowTabUITests {
                 switcherPreviewTitles(from: diagnosticsSummary).contains(hiddenTitle),
                 "Desktop provisional CG-only \(hiddenTitle) must not enter the main switcher window layer."
             )
-            assertHiddenProvisionalCGOnlyRuntimeLog(appName: targetApp.appName, since: runtimeLogSnapshot)
         }
     }
 

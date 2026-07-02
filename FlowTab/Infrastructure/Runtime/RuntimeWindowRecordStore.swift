@@ -340,6 +340,18 @@ private extension RuntimeWindowMappingState {
         processIdentifier pid: pid_t,
         appName: String
     ) -> [RuntimeWindowListEntry] {
+        let knownCGWindowsByID = RuntimeWindowRecord.knownCGWindowsByID(
+            windowRecordsByCGWindowID: windowRecordsByCGWindowID,
+            validCGWindows: []
+        )
+        let fullscreenContentBounds = knownCGWindowsByID.values.compactMap { cgWindow -> CGRect? in
+            guard RuntimeWindowTopologyClassifier.isLikelyOffDesktopFullscreenContent(
+                bounds: cgWindow.bounds,
+                spaceIDs: cgWindow.spaceIDs
+            ) else { return nil }
+            return cgWindow.bounds
+        }
+        let hasFullscreenTopology = !fullscreenContentBounds.isEmpty
         let rawEntries = windowRecordsByCGWindowID.values
             .sorted { lhs, rhs in
                 if lhs.isFocused != rhs.isFocused {
@@ -357,20 +369,16 @@ private extension RuntimeWindowMappingState {
                 return lhs.cgWindowID < rhs.cgWindowID
             }
             .compactMap { record in
-                record.projectedWindowEntry(processIdentifier: pid, appName: appName)
+                record.projectedWindowEntry(
+                    processIdentifier: pid,
+                    appName: appName,
+                    fullscreenContentBounds: fullscreenContentBounds,
+                    hasFullscreenTopology: hasFullscreenTopology,
+                    allowSpaceOneWithoutCurrentAXHandle: false
+                )
             }
         guard rawEntries.count > 1 else { return rawEntries }
 
-        let knownCGWindowsByID = RuntimeWindowRecord.knownCGWindowsByID(
-            windowRecordsByCGWindowID: windowRecordsByCGWindowID,
-            validCGWindows: []
-        )
-        let hasFullscreenTopology = knownCGWindowsByID.values.contains {
-            RuntimeWindowTopologyClassifier.isLikelyOffDesktopFullscreenContent(
-                bounds: $0.bounds,
-                spaceIDs: $0.spaceIDs
-            )
-        }
         let cgWindowOrderByID = Dictionary(
             uniqueKeysWithValues: rawEntries.enumerated().compactMap { index, entry in
                 entry.cgWindowID.map { ($0, index) }
@@ -393,7 +401,10 @@ private extension RuntimeWindowMappingState {
 private extension RuntimeWindowRecord {
     func projectedWindowEntry(
         processIdentifier pid: pid_t,
-        appName: String
+        appName: String,
+        fullscreenContentBounds: [CGRect],
+        hasFullscreenTopology: Bool,
+        allowSpaceOneWithoutCurrentAXHandle: Bool
     ) -> RuntimeWindowListEntry? {
         let synthesizedCGWindow = synthesizedKnownCGWindowEntry()
         let title = displayTitle
@@ -418,6 +429,21 @@ private extension RuntimeWindowRecord {
             || hasStickyBinding
             || spaceRecovery?.hasConfirmedActivationRoute == true
         guard exposesWithoutCurrentAX else { return nil }
+        if currentAXAttachment == nil {
+            let isLikelyDesktopWrapper = RuntimeWindowTopologyClassifier.isLikelyDesktopWrapper(
+                bounds: frame,
+                spaceIDs: normalizedSpaceIDs,
+                fullscreenContentBounds: fullscreenContentBounds
+            )
+            guard RuntimeWindowTopologyClassifier.canExposeWithoutCurrentAXHandle(
+                spaceIDs: normalizedSpaceIDs,
+                isLikelyDesktopWrapper: isLikelyDesktopWrapper,
+                hasFullscreenTopology: hasFullscreenTopology,
+                allowSpaceOneWithoutCurrentAXHandle: allowSpaceOneWithoutCurrentAXHandle
+            ) else {
+                return nil
+            }
+        }
 
         let projectedBindingConfidence = hasStickyBinding ? bindingConfidence : .inferred
         return RuntimeWindowListEntry(

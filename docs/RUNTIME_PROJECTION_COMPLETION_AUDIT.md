@@ -8,32 +8,34 @@ reclassifying breadth proof as core completion work.
 
 ## Current Phase 7 Slice
 
-- P0: refresh the previously blocked UI runner validation boundary after the
-  runner fix by reinstalling the fixed-path Apple Development signed app and
-  proving the minimal UI identity case now enters the test body and passes.
-- P0: close the Search trigger read-path gap exposed by the repaired runner:
-  when app-switcher projection is missing, Search trigger may read only the
-  runtime-owned committed Search index to start Search, while missing or stale
-  committed index remains `missingCommittedIndex` or degraded/stale committed
-  with bounded freshness-barrier request.
+- P0: close the CG-only window-layer exposure gap exposed by the fixed UI
+  runner. A desktop Space 1 provisional CG-only record that repair classified
+  as hidden could still be re-projected from the long-lived
+  `RuntimeWindowRecordStore` main table into app-switcher/current-app/Home/Search
+  window counts. `RuntimeWindowRecordStore.projectedWindowEntries(...)` now
+  applies the same runtime topology exposure policy for no-AX records before
+  producing normal projection rows.
 - P1: keep `RUNTIME_AX_CG_SPACE_WINDOW_MAPPING.md`, `TEST_COVERAGE_MATRIX.md`,
-  and this audit aligned with the actual evidence: UI automation is available
-  again for targeted proof, while the public AX `state=main` occurrence and
-  non-registry verified-focus occurrence remain unclosed because no runtime log
-  emitted those markers.
+  this audit, and the repeatable exit-contract audit aligned with the runner-
+  fixed proof. The UI runner now proves both sides of the representative
+  CG-only policy: desktop provisional CG-only stays hidden, while space-backed
+  CG-only can be selected/submitted but remains unverified after readback
+  rejection.
 - P2: keep pure CG-only activation success, broader multi-display/system-owner
   topology, real non-registry focused AX occurrence, and public AX main-state
   real UI occurrence gaps explicit.
 
-The old runner-initialization blocker no longer applies to the minimal identity
-proof: `testFlowTabUITestAppIdentityUsesEnvironmentOverridePath` now passes
-through the fixed-path wrapper. This is validation-layer evidence, not a new
-topology oracle. The same repaired runner also exposed and then proved the
-Search trigger boundary: direct Search trigger no longer depends on a successful
-app-cycle session when a committed Search index is available, and it still does
-not call snapshot/CG/AX/Space sampling or read staging/repair/session
-completeness. The panel-backed attempt still remains the latest real public AX
-main-state evidence, and it did not produce
+The old runner-initialization blocker no longer applies to targeted UI proof.
+In this slice, the repaired runner first exposed a product mismatch:
+`hidden-provisional-cg windows=1` appeared in runtime logs, but the app strip
+still counted the Chrome fixture as two windows because the main-table
+projection path did not reapply the runtime topology exposure gate. The fix
+makes the main-table projection boundary own that policy, so repair-hidden
+desktop provisional CG-only records cannot re-enter normal surface rows. The
+same runner-fixed proof keeps the pure space-backed CG-only path correctly
+classified as route/readback rejection, not activation success. The panel-backed
+attempt still remains the latest real public AX main-state evidence, and it did
+not produce
 `binding-assignment public-state-tiebreak state=main`; therefore main-state
 occurrence remains a real UI gap. Search remains missing committed index or
 degraded/stale committed until a bounded freshness barrier commits a new
@@ -55,6 +57,7 @@ main-table generation.
 | Non-registry verified-focus fallback AX readback is observable when it happens | `testRuntimeProjectionServiceSeedsVerifiedFocusRecordWhenFocusedAXWindowIsNotInRegistry` now proves the non-registry fallback AX id writes exact WindowRecord evidence, parses back to the focused `CGWindowID`, and emits a production `binding-confidence-change ... verifiedFocusFallbackAX=1` marker under debug+verbose logs. The exit audit also requires `AXWindowInspector.verifiedFocusFallbackCGWindowID(...)` and the WindowRecord `verifiedFocusFallbackAX` marker so the runtime-log oracle cannot silently disappear from production. This protects the marker that future real UI proof must use, but it does not close the real UI occurrence gap by itself. | Proven by source audit and behavior test; real UI occurrence still gap |
 | Full snapshot/full repair is repair, fallback, cold-start, diagnostic, or migration compatibility only | The exit audit rejects provider-facing full-repair projection payload APIs in production. `RUNTIME_AX_CG_SPACE_WINDOW_MAPPING.md` records full repair as low-priority repair/fallback with backoff and fact-splitting: app-directory evidence may cross the service boundary, while WindowRecord refresh is only a separate summary. | Proven by source audit plus behavior tests |
 | Normal projection rows come from runtime main tables/read model, not repair/full-repair/session/staging/direct fallback payloads | `RUNTIME_AX_CG_SPACE_WINDOW_MAPPING.md` and `TEST_COVERAGE_MATRIX.md` record main-table builders for app-switcher/Home/current-app/Search, production removal of direct app-switcher/Home/Search projection-cache commit bridges, and evidence-only current/full repair boundaries. | Proven by source audit plus behavior tests |
+| CG-only window-layer exposure is owned by runtime topology classification at the main-table projection boundary | `RuntimeWindowRecordStore.projectedWindowEntries(...)` now applies `RuntimeWindowTopologyClassifier.canExposeWithoutCurrentAXHandle(...)` to no-AX main-table rows, using the same desktop-wrapper/fullscreen-topology evidence as the repair assembler. `testRuntimeWindowRecordStoreDoesNotProjectDesktopProvisionalCGOnlyRecordWithoutAXHandle` proves a desktop Space 1 provisional CG-only WindowRecord with a prior activation route does not produce a normal window entry. `testSwitcherPanelOptionTabHidesDesktopProvisionalCGOnlyWorkflowWindow` first exposed the old main-table leak (`hidden-provisional-cg windows=1` but Chrome Fixture counted as `:2`), then passed after the store fix with the app strip at one AX-backed user window and no `windowCycle`/preview. The exit audit now guards the source ownership for CG-only exposure and hidden-provisional evidence. | Proven by source audit, behavior test, and real UI test |
 | Representative real topology, Search, activation, and pressure proof exists | `TEST_COVERAGE_MATRIX.md` records the noisy fullscreen/off-space Option+Tab round trip, committed-index Window Search real UI re-entry and activation proof, runtime-topology pressure, and external committed-index Search CPU/RSS sampling. The latest Search trigger slice passes `testSwitcherPanelWindowSearchKeepsDuplicateRealWorkflowTitlesDistinct` and `testSwitcherPanelWindowSearchMatchesAndActivatesRealWorkflowEdgeTitle`, proving trigger-driven Window Search waits for runtime committed index, shows duplicate same-title committed rows, and activates the edge-title fixture window. The latest Noisy Option+Tab slice moved noisy fullscreen row normalization into `RuntimeReadModelStore` commit ownership, preserves active `windowCycle` order across app-switcher/current-app projection refresh, removes surface-entry recency writes, and requires activation readback instead of visible-only CG fallback. The fixed-path UI runner now passes `testSwitcherPanelOptionTabWindowStateRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithNoisyCGSiblingsWithoutAppAXWindows`, proving the representative normal/fullscreen/incognito/second-fullscreen round trip on the updated projection/readback path. The runtime-topology pressure wrapper also passes the same UI path with 72 samples at 0.5s cadence. The pure space-backed CG-only fullscreen fixture still proves projection/selection/CG-route submission plus readback rejection (`targetCGNotVisible`) rather than exact activation success. | Proven for representative noisy topology, committed Search, activation readback rejection, and pressure paths; pure CG-only fullscreen activation success remains a gap |
 
 ## Validation Commands
@@ -122,6 +125,38 @@ and the same targeted UI wrapper run passed 1 selected test with 0 failures in
 fixed-path runner can now enter the test body for targeted UI validation. The
 blocker classifier remains guarded by the exit audit for future pre-test-body
 automation failures, but the current validation state is no longer blocked.
+
+Current CG-only exposure gate proof added by this slice:
+
+```bash
+./scripts/testing/run-flowtabtests-local.sh \
+  -only-testing:FlowTabTests/FlowTabPriorityCoverageTests/testRuntimeWindowRecordStoreDoesNotProjectDesktopProvisionalCGOnlyRecordWithoutAXHandle \
+  -only-testing:FlowTabTests/FlowTabPriorityCoverageTests/testRuntimeSystemRepairFactProviderWindowLayerExposesInGraceSpaceBackedRecordWithoutStickyBinding \
+  -only-testing:FlowTabTests/FlowTabPriorityCoverageTests/testRuntimeWindowRecordStoreSuppressesCGActivationFallbackAfterReadbackMismatch
+```
+
+This targeted behavior run passed 3 selected tests with 0 failures. It proves
+the new main-table projection gate for desktop provisional CG-only records,
+keeps the existing space-backed in-grace exposure contract, and preserves the
+activation-readback mismatch action downgrade.
+
+```bash
+./scripts/testing/install-ui-test-app.sh
+./scripts/testing/run-ui-tests-local.sh \
+  -only-testing:FlowTabUITests/FlowTabUITests/testSwitcherPanelOptionTabReportsUnverifiedSpaceBackedCGOnlyWorkflowActivation \
+  -only-testing:FlowTabUITests/FlowTabUITests/testSwitcherPanelOptionTabHidesDesktopProvisionalCGOnlyWorkflowWindow
+```
+
+The first runner-fixed attempt for the desktop provisional case exposed the
+pre-fix product signal: runtime logged `hidden-provisional-cg windows=1`, but
+the app strip still showed the Chrome fixture with two windows because the
+main-table projection read path reintroduced the hidden CG-only row. After the
+`RuntimeWindowRecordStore` fix and reinstalling the Apple Development signed
+fixed-path app, the two selected UI tests passed with 0 failures in 45.409
+seconds (`46.267` seconds XCTest elapsed). This proves the representative
+desktop provisional CG-only row stays out of app-switcher/window-layer UI, and
+the representative space-backed CG-only route remains unverified until readback
+instead of being counted as activation success.
 
 Representative neighboring behavior proof already used by the current audit:
 
