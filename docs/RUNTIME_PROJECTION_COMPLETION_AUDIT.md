@@ -13,7 +13,9 @@ reclassifying breadth proof as core completion work.
   now captures each xcodebuild action log under `.build-local/ui-tests/logs/`
   and classifies automation-mode initialization timeouts as a UI automation
   initialization blocker before any test body can produce product/runtime
-  evidence.
+  evidence. The repeatable exit-contract audit now requires that log capture,
+  timeout detection, blocker classification, and "not a FlowTab runtime
+  assertion failure" wording remain present in the UI wrapper.
 - P1: keep `RUNTIME_AX_CG_SPACE_WINDOW_MAPPING.md`, `TEST_COVERAGE_MATRIX.md`,
   and this audit aligned with the new validation-runner evidence, then rerun
   the repeatable source exit-contract audit.
@@ -58,11 +60,13 @@ The audit now includes production checks for the non-registry verified-focus
 fallback parser, grep-able `verifiedFocusFallbackAX` WindowRecord log marker,
 current-app sibling preservation ownership in `RuntimeReadModelStore` instead
 of Switcher surface state, and Search freshness result-state naming that keeps
-pre-barrier reads missing or degraded/stale committed. The 2026-07-02 rerun
+pre-barrier reads missing or degraded/stale committed. It also guards the UI
+runner's automation-initialization blocker classification so a test-body-before
+failure cannot be confused with product/runtime evidence. The 2026-07-02 rerun
 passed with all checks green, including the Switcher/Home hot-path no-snapshot
 checks, Search main-table committed barrier checks, Search naming checks, Space
-topology projection checks, and activation focused AX/CG/frontmost CG readback
-checks.
+topology projection checks, activation focused AX/CG/frontmost CG readback
+checks, and UI runner classification guard.
 
 Current UI runner classification proof:
 

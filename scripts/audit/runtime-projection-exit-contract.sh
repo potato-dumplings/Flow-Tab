@@ -185,6 +185,11 @@ check_has_matches \
   "signalWindowFocusReadbackMismatch|markWindowFocusReadbackMismatch|recordWindowFocusReadbackMismatch|activationReadbackMismatch" \
   FlowTab/Features/Switcher FlowTab/Features/Home FlowTab/Infrastructure/Runtime
 
+check_has_matches \
+  "UI runner classifies automation initialization timeouts before runtime evidence" \
+  "LOG_ROOT|xcodebuild-\\$\\{action\\}\\.log|Timed out while enabling automation mode|Classification: UI automation initialization blocker|not as a FlowTab runtime assertion failure" \
+  scripts/testing/run-ui-tests-local.sh
+
 if [[ "$failures" -ne 0 ]]; then
   echo "Runtime projection exit-contract audit failed: $failures check(s)"
   exit 1
