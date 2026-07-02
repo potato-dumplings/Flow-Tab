@@ -235,17 +235,19 @@ runtime shape:
   `verifiedFocusFallbackAX=1`, and behavior coverage protects that marker, but
   no real occurrence has closed the gap yet. The refreshed Noisy Option+Tab UI
   and pressure proofs close the representative noisy topology/order/readback
-  path, but they did not naturally emit a `verifiedFocusFallbackAX=1`
-  non-registry focused AX occurrence.
+  path. A 2026-07-02 runner-fixed targeted UI rerun also passed Noisy
+  Option+Tab plus the focused/minimized edge-input proof set, but the runtime
+  log still did not naturally emit a `verifiedFocusFallbackAX=1` non-registry
+  focused AX occurrence.
 - Public AX main/minimized tie-breaker variants still need real UI occurrence
   proof. Focused/main/minimized deterministic matcher coverage is now present,
   including the combined priority order where focused claims the first onscreen
   candidate, main claims the next onscreen candidate, and minimized claims the
   offscreen candidate. On 2026-07-02 the fixed-path app was reinstalled with
-  Apple Development signing and the existing edge-input UI tests were attempted
-  twice to look for real `state=main` evidence, but both runs failed before the
-  test body with `Timed out while enabling automation mode`; no main-state UI
-  proof was produced.
+  Apple Development signing and the runner-fixed existing edge-input UI tests
+  passed, refreshing target-app `state=focused` and minimized-state capture
+  proof. The same runtime log did not emit `public-state-tiebreak state=main`,
+  so no main-state UI proof was produced.
 - Broader multi-display/fullscreen topology and system-authoritative fullscreen
   owner proof remain partial. The production boundary now has a repeatable
   source audit and behavior proof for Switcher fullscreen presentation reading
