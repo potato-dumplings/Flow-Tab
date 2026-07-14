@@ -2,6 +2,14 @@
 
 Use this reference before deciding how much process, coverage, and reporting a FlowTab change needs. The goal is to keep the repository strict where behavior can regress, while avoiding heavyweight ceremony for changes that do not touch runtime behavior.
 
+## Contents
+
+- [Required Outcome](#required-outcome)
+- [Risk Classes](#risk-classes)
+- [Layer Not-Relevant Rules](#layer-not-relevant-rules)
+- [Process And Tooling Validation](#process-and-tooling-validation)
+- [Fast Decision Table](#fast-decision-table)
+
 ## Required Outcome
 
 - Classify the change by user-visible and runtime risk before choosing validation.
@@ -13,17 +21,18 @@ Use this reference before deciding how much process, coverage, and reporting a F
 
 ### Documentation Or Skill-Only
 
-Use this class for changes limited to `docs/`, `README*`, `AGENTS.md`, `skills/`, comments, or explanatory text that does not alter source, build settings, scripts, fixtures, launch arguments, or runtime configuration.
+Use this class for changes limited to `docs/`, `README*`, `AGENTS.md`, `.agents/skills/`, comments, or explanatory text that does not alter source, build settings, runtime scripts, fixtures, launch arguments, or runtime configuration.
 
 Minimum validation:
 
 - Inspect the edited files.
-- Check links and referenced paths when practical.
-- Run no app tests unless the documentation embeds a command, path, or workflow whose correctness is uncertain and can be verified cheaply.
+- Check links, referenced paths, metadata, and applicable process contracts.
+- Run the relevant Process/Tooling validation for Skill, prompt, command, package, or protocol changes.
 
 Reporting:
 
-- Unit, behavior, UI, and pressure layers are `not relevant: documentation or skill-only change`.
+- Runtime validation: unit, behavior, UI, and pressure are `not relevant: documentation, Skill, or prompt-only change`.
+- Process/Tooling validation: report every required structural, path, protocol, command-interface, package, or eval check and its result.
 
 ### Mechanical Refactor Or File Movement
 
@@ -91,14 +100,27 @@ A test layer can be marked `not relevant` only when the reason is specific:
 
 Do not mark a layer not relevant merely because the current code lacks a seam. For feature work, a missing unit seam is usually a design signal; either extract the deterministic rule or state why the behavior truly has no rule-level surface.
 
+## Process And Tooling Validation
+
+Process/Tooling is a reporting dimension alongside the runtime layers. It is required when a change affects engineering instructions, repository paths, build or test command documentation, wrappers, prompt contracts, Skill metadata, bundled resources, packaging, or audit protocol inputs.
+
+Choose the checks owned by the changed boundary:
+
+- Skill structure: frontmatter, description length, folder/name agreement, `agents/openai.yaml`, direct reference links, and package contents.
+- Repository integration: AGENTS and prompt entry paths, path-intent resolution, stale-path scans, and referenced file existence.
+- Command contracts: syntax, `--help`, wrapper argument ownership, and project-local build/evidence roots.
+- Audit protocol inputs: the existing prompt-local protocol contract and fixtures.
+- Delivery hygiene: `git diff --check` and review of the final changed-file set.
+
+Report Process/Tooling as `passed`, `failed`, `blocked`, or `not run`, with the command or concrete reason. A runtime layer marked `not relevant` does not reduce the required Process/Tooling checks.
+
 ## Fast Decision Table
 
-| Change type | Unit | Behavior | UI | Pressure |
-| --- | --- | --- | --- | --- |
-| Docs or skill text only | Not relevant | Not relevant | Not relevant | Not relevant |
-| Pure `FlowTabCore` rule | Required | As needed for app wiring | Not relevant unless visible path changed | If scale-sensitive |
-| App orchestration change | As needed for rules | Required | If user-visible | If hot path |
-| Visible panel/home/logs/settings change | Required when a rule exists | Required when wiring changes | Required | If repeated or heavy |
-| Bugfix with user-visible impact | Lowest failing layer | Required if orchestration is involved | Required when reasonably automatable | If hot path |
-| Permission, signing, or fixture workflow | As needed for helpers | Required for interpretation/wiring | Required when user-facing or cross-process | Usually not relevant unless repeated workflow cost changed |
-
+| Change type | Unit | Behavior | UI | Pressure | Process/Tooling |
+| --- | --- | --- | --- | --- | --- |
+| Docs, Skill, or prompt text only | Not relevant | Not relevant | Not relevant | Not relevant | Required |
+| Pure `FlowTabCore` rule | Required | As needed for app wiring | Not relevant unless visible path changed | If scale-sensitive | As changed |
+| App orchestration change | As needed for rules | Required | If user-visible | If hot path | As changed |
+| Visible panel/home/logs/settings change | Required when a rule exists | Required when wiring changes | Required | If repeated or heavy | As changed |
+| Bugfix with user-visible impact | Lowest failing layer | Required if orchestration is involved | Required when reasonably automatable | If hot path | As changed |
+| Permission, signing, or fixture workflow | As needed for helpers | Required for interpretation/wiring | Required when user-facing or cross-process | Usually not relevant unless repeated workflow cost changed | Required |

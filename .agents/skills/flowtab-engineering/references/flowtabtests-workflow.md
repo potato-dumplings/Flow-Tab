@@ -39,7 +39,7 @@ Use this reference whenever `FlowTabTests` are required, attempted, narrowed, re
 
 - App unit/behavior: `passed`, `failed`, or `blocked`.
 - Command: include the exact command for normal work. For audit work, report the redacted command ID/hash and retain non-secret argv and secret references in the private project-local evidence manifest.
-- Variation: state `none`, targeted `-only-testing`, or distinct before/after `-derivedDataPath`.
+- Variation: state `none`, targeted `-only-testing`, `build-for-testing`, `test-without-building`, distinct before/after `--build-root`, or an explicit signing investigation.
 - Evidence root: for audit runs, retain the attempt-specific `--output-root`, result bundle, xcodebuild log, and `status.json` path intents in the private manifest; use a redacted archive token in tracked reports.
 - Build root: retain `repository_root` as the resource boundary and the path below `./.build-local/` as the relative path intent; resolve it against the current project immediately before passing `--build-root`.
 - Outcome class: use one of the classes from the fixed workflow.

@@ -2,11 +2,22 @@
 
 Use this reference when choosing concrete local commands for FlowTab validation. Prefer the smallest command that proves the affected layer, then broaden when shared behavior or wiring changed.
 
+## Contents
+
+- [General Rules](#general-rules)
+- [Build](#build)
+- [FlowTabCore Unit Tests](#flowtabcore-unit-tests)
+- [App Unit And Behavior Tests](#app-unit-and-behavior-tests)
+- [UI Tests](#ui-tests)
+- [Space Fixture Workflow](#space-fixture-workflow)
+- [Pressure Checks](#pressure-checks)
+- [Validation Report Shape](#validation-report-shape)
+
 ## General Rules
 
 - Keep repository-local build products, caches, raw evidence, and private manifests under `./.build-local/`. The repository's `.gitignore` excludes this tree so the same relative layout can move with any checkout.
 - Persist project-local locations as `{resource_boundary: repository_root, relative_path_intent: <relative-path>}`. Resolve each intent against the current repository root at the resource-owning boundary immediately before use.
-- Use a distinct `-derivedDataPath` for before-change and after-change runs when comparing bugfix signals.
+- Use distinct before-change and after-change build-root intents when comparing bugfix signals: SwiftPM `--scratch-path`, repository wrappers `--build-root`, and direct `xcodebuild` `-derivedDataPath`.
 - Use `-only-testing:` filters for targeted validation first, then broaden when the touched code is shared.
 - For an audit run, allocate a fresh attempt-specific output path and leave its leaf absent. Pass it to the repository wrapper, which atomically creates the directory and rejects reuse so prior evidence remains intact.
 - Resolve `--build-root`, `--scratch-path`, and `-derivedDataPath` below the current project's ignored `./.build-local/` tree.
@@ -32,16 +43,21 @@ xcodebuild \
 Use this for pure `FlowTabCore` models, grouping, preferences, switcher sessions, and other deterministic rules:
 
 ```bash
-cd FlowTabCore
-swift test
+swift test \
+  --package-path FlowTabCore \
+  --scratch-path ./.build-local/flowtabcore-tests
 ```
 
 Target a single SwiftPM test by name when narrowing a signal:
 
 ```bash
-cd FlowTabCore
-swift test --filter SwitcherSessionTests
+swift test \
+  --package-path FlowTabCore \
+  --scratch-path ./.build-local/flowtabcore-tests \
+  --filter SwitcherSessionTests
 ```
+
+For a before/after bugfix comparison, use distinct scratch roots such as `./.build-local/flowtabcore-tests/before` and `./.build-local/flowtabcore-tests/after`.
 
 ## App Unit And Behavior Tests
 
@@ -180,9 +196,10 @@ The identity-manifest leaf and output-directory leaf must not exist before the r
 
 ## Validation Report Shape
 
-Use this compact shape unless the task needs a full handoff:
+Use this compact shape unless the task needs the full handoff from `handoff-contract.md`:
 
-- Unit: `passed`, `failed`, `blocked`, or `not relevant`; include the command or reason.
-- Behavior: `passed`, `failed`, `blocked`, or `not relevant`; include the command or reason.
-- UI: `passed`, `failed`, `blocked`, or `not relevant`; include the command or reason.
-- Pressure: `passed`, `failed`, `blocked`, or `not relevant`; include the command, baseline, or reason.
+- Unit: `passed`, `failed`, `blocked`, `not relevant`, or `not run`; include the command or reason.
+- Behavior: `passed`, `failed`, `blocked`, `not relevant`, or `not run`; include the command or reason.
+- UI: `passed`, `failed`, `blocked`, `not relevant`, or `not run`; include the command or reason.
+- Pressure: `passed`, `failed`, `blocked`, `not relevant`, or `not run`; include the command, baseline, or reason.
+- Process/Tooling: `passed`, `failed`, `blocked`, or `not run`; include every applicable structural, path, command-contract, protocol, package, or eval check.

@@ -2,8 +2,7 @@
 
 ## Local Skill
 
-- Use the project-local skill `flowtab-engineering` at `skills/flowtab-engineering/SKILL.md` for any feature work, bug fix, refactor, test-coverage decision, logging-placement decision, or module-boundary decision in this repository.
-- Use the project-local skill `flowtab-direct-delivery` at `skills/flowtab-direct-delivery/SKILL.md` for implementation guidance, architecture proposals, change summaries, and remediation or handoff responses in this repository.
+- Use the project-local skill `flowtab-engineering` at `.agents/skills/flowtab-engineering/SKILL.md` for feature work, bug fixes, refactors, test-coverage decisions, logging-placement decisions, module-boundary decisions, implementation guidance, architecture proposals, change summaries, remediation, and handoff responses in this repository.
 - Read the relevant reference file from that skill before editing:
   - `references/feature-workflow.md`
   - `references/bugfix-workflow.md`
@@ -30,4 +29,5 @@
 - Do not consider feature work complete until the required related unit, behavior, and UI tests pass. If a required layer is blocked, report the blocker instead of calling the work complete.
 - For every bug fix, reproduce and diagnose the issue with stable tests, logs, crash output, compiler or static analyzer output, deterministic configuration or permission evidence, or another concrete signal before changing production logic.
 - Keep regression coverage after every bug fix.
-- Run `FlowTabTests` only through `skills/flowtab-engineering/references/flowtabtests-workflow.md`. Do not add signing bypasses or alternate app-test commands to get past certificate failures; report the missing or invalid local signing setup as the blocker.
+- For documentation, Skill, prompt, or other no-runtime-behavior changes, report Unit, Behavior, UI, and Pressure as `not relevant` with the scoped reason, and run the applicable Process/Tooling validation.
+- Run `FlowTabTests` only through `.agents/skills/flowtab-engineering/references/flowtabtests-workflow.md`. Do not add signing bypasses or alternate app-test commands to get past certificate failures; report the missing or invalid local signing setup as the blocker.

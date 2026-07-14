@@ -171,7 +171,9 @@ After fan-out, produce a concise scenario plan before editing test files:
 - Optional: useful variants that are not included by default because they duplicate evidence, are expensive, or are lower risk.
 - Not adding: variants intentionally left out, with the reason they do not change the current risk judgment.
 
-Wait for confirmation before adding new scenario tests. When a relevant variant is intentionally not automated or is blocked, record it as a gap in the product-scenario matrix if it affects scenario status. A single happy path is enough only when the fan-out shows the remaining axes are genuinely not relevant to the changed behavior.
+Add the required set autonomously when the user has authorized implementation and validation. Request confirmation before adding optional variants, expensive fixtures, long-running UI/E2E or pressure scenarios, product semantics beyond the authorized request, or another material scope expansion. Prompt-driven audit campaigns continue to use their versioned scenario-plan and approval gates.
+
+When a relevant variant is intentionally not automated or is blocked, record it as a gap in the stable product contract or audit projection through the owning workflow when it affects scenario status. A single happy path is enough only when the fan-out shows the remaining axes are genuinely not relevant to the changed behavior.
 
 ## Quick Selection Rules
 

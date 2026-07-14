@@ -4,6 +4,18 @@ Use this reference before declaring FlowTab UI automation blocked by the environ
 
 FlowTab UI failures often come from repository-specific setup. Complete these checks before classifying permission-like failures, missing windows, or real-environment workflow failures as unexplained blockers.
 
+## Contents
+
+- [Required Outcome](#required-outcome)
+- [Standard Local Setup](#standard-local-setup)
+- [Audit Evidence Run](#audit-evidence-run)
+- [Why The Fixed Path Matters](#why-the-fixed-path-matters)
+- [Real-Environment And Multi-App Workflow Prerequisites](#real-environment-and-multi-app-workflow-prerequisites)
+- [Recommended Setup For Stable Real-Environment UI Runs](#recommended-setup-for-stable-real-environment-ui-runs)
+- [Proven Permission-Reuse Flow](#proven-permission-reuse-flow)
+- [Before Reporting A UI Environment Blocker](#before-reporting-a-ui-environment-blocker)
+- [Common Misdiagnoses](#common-misdiagnoses)
+
 ## Required Outcome
 
 - Prepare a fixed-path UI test app before relying on UI automation for local validation.

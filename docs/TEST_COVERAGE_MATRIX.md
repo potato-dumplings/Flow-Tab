@@ -446,4 +446,4 @@ Use this matrix when deciding whether a feature has enough automated evidence ac
 - Update this file when adding a feature, fixing a user-visible bug, or changing the meaning of an existing test.
 - Keep detailed per-test scenario text in the layer-specific coverage documents; keep this file focused on cross-layer coverage and gaps.
 - Do not mark UI/E2E as `Strong` when the test only proves a setting value persisted. Mark it `Partial` until the changed setting is proven through the resulting user-visible behavior.
-- Do not use this matrix to skip required FlowTab layers. Use `skills/flowtab-engineering/references/risk-calibration.md` for layer relevance decisions.
+- Use `.agents/skills/flowtab-engineering/references/risk-calibration.md` for layer relevance decisions.

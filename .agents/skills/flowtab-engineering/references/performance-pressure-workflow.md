@@ -7,8 +7,9 @@ Pressure testing is required when the risk concerns sustained CPU, RSS growth, l
 ## Contents
 
 - [Required Outcome](#required-outcome)
-- [When Pressure Testing Is Required](#when-pressure-testing-is-required)
-- [Fast Trigger Heuristic](#fast-trigger-heuristic)
+- [Requiredness Resolution Order](#requiredness-resolution-order)
+- [Hard Triggers](#hard-triggers)
+- [Known-Hot And Scoring Triggers](#known-hot-and-scoring-triggers)
 - [Choose the Right Pressure Scenario](#choose-the-right-pressure-scenario)
 - [Reporting Standard](#reporting-standard)
 - [Rejection Criteria](#rejection-criteria)
@@ -25,31 +26,37 @@ Pressure testing is required when the risk concerns sustained CPU, RSS growth, l
 - If no comparable baseline exists, record the run as a new local baseline and state that it is not a regression comparison.
 - Treat unexplained CPU regressions or warm-state RSS growth as blockers.
 
-## When Pressure Testing Is Required
+## Requiredness Resolution Order
 
-Run pressure validation before submission if the change touches any of these categories:
+Resolve Pressure Requiredness in this order:
 
-- High-frequency interaction paths that run on repeated input or navigation.
-  Examples: search keystrokes, panel-result movement, tab switching, repeated panel presentation, and active-Space interruption handling.
-- Costs that grow with app count, window count, result count, or preview count.
-  Examples: search indexing, candidate filtering, ranking, runtime snapshot assembly, window deduplication, and preview-list generation.
-- Long-lived resources or repeated asynchronous work.
-  Examples: caches, debounce windows, background `Task` chains, timers, observers, preview pipelines, screen-capture polling, and accessibility scans.
-- Heavy SwiftUI or AppKit surfaces that are shown repeatedly or kept alive.
-  Examples: Home, Logs, Settings, switcher-panel content, search-result lists, and preview surfaces.
-- Runtime-topology paths that coordinate real apps, windows, Spaces, fullscreen transitions, or cross-Space activation.
-  Examples: multi-app workflow startup, Space-aware search activation, fullscreen target activation, and off-Space snapshot recovery.
+1. Hard trigger: any hard-trigger category makes pressure validation required.
+2. Known-hot trigger: when no hard trigger applies, a path listed as a known hot area plus at least one scoring condition makes pressure validation required.
+3. Scoring trigger: when neither prior trigger applies, at least two scoring conditions make pressure validation required.
+4. Otherwise mark Pressure `not relevant` and state which trigger conditions were absent.
 
-## Fast Trigger Heuristic
+Stop at the first matching rule.
 
-Pressure testing is required when two or more of the following are true:
+## Hard Triggers
+
+Run pressure validation before completion if the change touches any of these categories:
+
+- Search matching, tokenization, indexing, candidate selection, ranking, caching, debounce, scheduling, or result-publication paths used by the switcher.
+- Home, Logs, Settings, or switcher page-lifecycle and repeated-presentation paths covered by the tab-switch pressure scenario.
+- Runtime snapshot, window mapping, grouping, deduplication, active-Space recovery, fullscreen/off-Space activation, or other paths covered by the runtime-topology pressure scenario.
+- Ownership or cadence changes to long-lived screen-capture polling, accessibility scans, preview pipelines, observers, timers, repeated `Task` chains, or runtime caches.
+- A path with an explicit performance acceptance criterion, a known prior performance regression, or a required pressure scenario recorded in the stable product contract.
+
+## Known-Hot And Scoring Triggers
+
+When no hard trigger applies, score these conditions:
 
 1. The code runs on every key press, tab switch, search refresh, panel refresh, or active-Space change.
 2. The cost can grow with the number of apps, windows, search results, previews, or Spaces.
 3. The change alters caching, object lifetime, asynchronous scheduling, or repeated runtime polling.
 4. The change increases UI-tree complexity, layout work, cross-process calls, or preview generation.
 
-If one condition is true and the path is already listed as a known hot area in `docs/DEVELOPMENT.md`, pressure testing is still required.
+One condition plus a path already listed as a known hot area in `docs/DEVELOPMENT.md` satisfies the known-hot trigger. Two or more conditions satisfy the scoring trigger.
 
 ## Choose the Right Pressure Scenario
 
@@ -121,6 +128,7 @@ Every required pressure run must report:
 ## Rejection Criteria
 
 - Reject a change to a known hot path when pressure validation was skipped without a concrete reason.
+- Reject a Pressure Requiredness decision that bypasses the hard, known-hot, and scoring resolution order.
 - Reject unexplained sustained CPU regression.
 - Reject an RSS curve that continues growing after warm-up without an explanation.
 - Reject toy-scale pressure results when the production risk is scale-sensitive.
