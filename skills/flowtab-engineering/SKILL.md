@@ -1,6 +1,6 @@
 ---
 name: flowtab-engineering
-description: "FlowTab project engineering workflow and architecture rules. Use when changing this repository, reviewing code in it, triaging defects, auditing tests or module boundaries, or analyzing root causes or performance without editing. Enforce FlowTab-specific rules: state assumptions and resolve ambiguity before coding or prescribing changes; feature work must expand the user-named seed scenario into a representative scenario family, add unit, behavior, and UI coverage, and pass related tests before submission; test coverage decisions must consult and maintain the product-scenario coverage matrix; bug fixes and investigations must run or explicitly attempt the relevant tests and gather a reproducible signal before production edits or confident diagnosis, stopping to report blockers when that cannot be done; never introduce single-feature or single-scenario special cases; keep test-only or debug-only code out of production files; respect FlowTabCore, FlowTab, TestingSupport, and test-target boundaries."
+description: "FlowTab project engineering workflow and architecture rules. Use when changing this repository, reviewing code in it, triaging defects, auditing tests or module boundaries, or analyzing root causes or performance without editing. Enforce FlowTab-specific rules: state assumptions and resolve ambiguity before coding or prescribing changes; feature work must expand the user-named seed scenario into a representative scenario family, add unit, behavior, and UI coverage, and pass related tests before submission; test coverage decisions must consult the product-scenario stable contract and maintain its current evidence projection; bug fixes and investigations must run or explicitly attempt the relevant tests and gather a reproducible signal before production edits or confident diagnosis, stopping to report blockers when that cannot be done; never introduce single-feature or single-scenario special cases; keep test-only or debug-only code out of production files; respect FlowTabCore, FlowTab, TestingSupport, and test-target boundaries."
 ---
 
 # FlowTab Engineering
@@ -20,8 +20,8 @@ For no-edit work such as review, audit, root-cause triage, or performance analys
 3. Treat feature work as incomplete until test coverage exists in all required layers.
    Read `risk-calibration.md` before deciding which layers are required. For user-visible feature extensions or new features, add or update unit, behavior, and UI tests. Make each layer provide distinct evidence instead of repeating the same assertion three times. Do not claim completion until the required related suites pass. If a layer is not applicable, state the concrete reason; if a required layer is blocked, report the blocker instead of claiming completion.
 
-4. Keep the product-scenario coverage matrix current.
-   For feature work, user-visible bug fixes, regression coverage, coverage audits, or test strategy changes, read `test-coverage-matrix-workflow.md` and update `docs/TEST_COVERAGE_MATRIX.md` when a product scenario's unit, behavior/integration, UI/E2E, pressure, real-topology, or known-gap status changes. Do not mark UI/E2E coverage strong when it only proves persistence or control state.
+4. Keep the product-scenario coverage contract and evidence projection current.
+   For feature work, user-visible bug fixes, regression coverage, coverage audits, or test strategy changes, read `test-coverage-matrix-workflow.md`. Update `docs/TEST_COVERAGE_MATRIX.md` when a stable contract field changes, and publish current unit, behavior/integration, UI/E2E, pressure, real-topology, or known-gap status in `docs/test-audit/COVERAGE_EVIDENCE_PROJECTION.jsonl` with its derived Markdown.
 
 5. Fan out test scenarios before choosing coverage.
    Treat the user's example as a seed scenario, not the full test plan. Before adding or recommending tests, expand it across the relevant product axes from `test-layer-boundaries.md`: state variants, input variants, runtime topology, lifecycle and persistence, permission or fallback paths, and hot-path or scale pressure. Select a representative set that gives distinct evidence at the cheapest responsible layer, and record important unproven variants as matrix gaps when they affect product-scenario status. Before editing test files to add new scenarios, present the proposed scenario set for confirmation and keep it lean; do not add every plausible variant just because it was identified.
@@ -56,7 +56,7 @@ For no-edit work such as review, audit, root-cause triage, or performance analys
 - For bug investigation and bug fixes, read `references/bugfix-workflow.md`.
 - For risk, coverage, and not-relevant layer decisions, read `references/risk-calibration.md`.
 - For test-scope, test-placement, or unit versus behavior versus UI boundary decisions, read `references/test-layer-boundaries.md`.
-- For product-scenario coverage matrix decisions or updates, read `references/test-coverage-matrix-workflow.md`.
+- For product-scenario coverage contract or evidence-projection decisions, read `references/test-coverage-matrix-workflow.md`.
 - For concrete build, test, UI, and pressure commands, read `references/validation-command-cookbook.md`.
 - For `FlowTabTests` startup, narrowing, signing blockers, or app unit/behavior test reporting, read `references/flowtabtests-workflow.md`.
 - For FlowTab-specific UI automation setup, fixed-path test app preparation, or permission and code-identity prerequisites, read `references/ui-automation-prerequisites.md`.
@@ -81,13 +81,13 @@ For no-edit work such as review, audit, root-cause triage, or performance analys
 8. Expand the seed scenario into the relevant scenario family before selecting tests; avoid letting one named example become the whole coverage plan.
 9. Present a concise test scenario plan before adding new tests. Group scenarios as required, optional, and intentionally not adding; state the owning layer for each required scenario and why the set is not bloated. Wait for confirmation before editing test files to add those scenarios. If confirmation narrows coverage below a required layer, report the incomplete or blocked layer instead of claiming completion.
 10. Decide what unique evidence each confirmed required test layer should provide, then add or update those tests alongside the code change.
-11. Read `test-coverage-matrix-workflow.md` when the work changes test coverage, exposes a coverage gap, or affects a product scenario represented in `docs/TEST_COVERAGE_MATRIX.md`; update the matrix if the scenario status changes.
+11. Read `test-coverage-matrix-workflow.md` when the work changes test coverage, exposes a coverage gap, or affects a product scenario represented in `docs/TEST_COVERAGE_MATRIX.md`; update the stable contract when its fields change and publish current evidence status through the coverage projection.
 12. Use `validation-command-cookbook.md` to choose concrete commands for the required layers.
 13. Decide whether the change also requires pressure validation by reading `performance-pressure-workflow.md`. If it does, run the relevant stress checks or report the concrete blocker.
 14. Run the related test suites before considering the task complete.
     `FlowTabTests` must follow `flowtabtests-workflow.md`.
     Use the documented local wrapper for unsigned app-test builds instead of inventing one-off app-test commands.
-15. Final bugfix handoff must state the pre-change failing signal, pre-change tests attempted, evidence supporting the root cause, post-change tests run, any matrix status change, and any required test layer or pressure check that could not be run with the reason.
+15. Final bugfix handoff must state the pre-change failing signal, pre-change tests attempted, evidence supporting the root cause, post-change tests run, any coverage contract or projected-status change, and any required test layer or pressure check that could not be run with the reason.
 
 ## References
 

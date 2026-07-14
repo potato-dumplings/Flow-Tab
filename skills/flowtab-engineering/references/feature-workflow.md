@@ -9,7 +9,7 @@ Use this workflow for new features and for extending existing behavior.
 - Treat the user-named scenario as a seed; expand it into a representative scenario family before selecting tests.
 - Present the proposed test scenario set and get confirmation before adding new scenario tests.
 - For user-visible features and feature extensions, add or update coverage in all three layers: unit, behavior, and UI.
-- Read `test-coverage-matrix-workflow.md` and update `docs/TEST_COVERAGE_MATRIX.md` when the feature changes a product scenario's coverage status or exposes a new gap.
+- Read `test-coverage-matrix-workflow.md`; update `docs/TEST_COVERAGE_MATRIX.md` when the feature changes a stable contract field, and publish current coverage status or a new gap through the evidence projection.
 - For documentation-only or mechanical changes that are not feature work, use the calibrated minimum and state why any layer is not relevant.
 - Make each test layer prove a different part of the change instead of repeating the same assertion.
 - Run pressure validation when the change touches hot paths, scale-sensitive logic, or repeated heavy UI or runtime work.
@@ -42,7 +42,7 @@ Use this workflow for new features and for extending existing behavior.
 14. Add or update behavior tests for the app-level flow, integration path, and representative confirmed orchestration variants when behavior coverage is required.
 15. Add or update UI tests for the confirmed visible user path; keep UI coverage representative instead of exhaustively repeating variants already proven below.
 16. Implement the production change.
-17. Update `docs/TEST_COVERAGE_MATRIX.md` if the feature changes matrix status, adds a scenario, or leaves an explicit gap.
+17. Update the stable matrix contract when the feature adds or changes a scenario, then publish the evidence projection for every changed status or explicit gap.
 18. Run the related test suites and any required pressure checks, then iterate until they pass. If a required validation layer is blocked, stop at a blocker report instead of completion.
 
 ## Coverage Expectations
@@ -50,7 +50,7 @@ Use this workflow for new features and for extending existing behavior.
 - Unit tests should verify pure logic, state transitions, normalization rules, deterministic helpers, and the smallest shared rule behind the feature.
 - Behavior tests should verify application-level flows, persistence, launch options, permissions, logging behavior, or integration seams that are still stable in-process.
 - UI tests should verify the visible user path, not just internal state.
-- A UI test that only proves a Settings control changed or persisted is not enough to mark UI/E2E matrix coverage `Strong`; the resulting runtime or visible behavior must also be exercised.
+- Project UI/E2E as `Strong` when the test exercises the resulting runtime or visible behavior; persistence-only evidence contributes to its owning layer.
 - Treat these as coverage layers, not simple aliases for Xcode target names. Use `test-layer-boundaries.md` when placement feels ambiguous.
 - Do not make all three layers assert the same branch. The unit layer should prove the rule, the behavior layer should prove orchestration, and the UI layer should prove visibility.
 - Do not let a single happy-path scenario stand in for the full feature risk. Use unit and behavior tests for variant breadth, then reserve UI tests for the most important visible journeys and real-topology proof.

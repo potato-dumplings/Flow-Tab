@@ -14,7 +14,7 @@ Use this workflow for regressions, flaky behavior, broken edge cases, and user-r
 - Use tests and logs to narrow the root cause instead of guessing.
 - Keep each regression layer focused on different evidence instead of cloning the same assertion everywhere.
 - For every new regression test, name the oracle that defines the expected result. The oracle must come from the product contract, official API result, stable fixture state, explicit input, or independent specification; legacy fields, stale caches, and known faulty implementation paths may be contamination only.
-- Read `test-coverage-matrix-workflow.md` and update `docs/TEST_COVERAGE_MATRIX.md` when the bugfix changes a product scenario's coverage status or leaves a known gap.
+- Read `test-coverage-matrix-workflow.md`; update `docs/TEST_COVERAGE_MATRIX.md` when the bugfix changes a stable contract field, and publish current coverage status or a known gap through the evidence projection.
 - Run pressure validation when the bug or the fix touches sustained-load, repeated-interaction, or scale-sensitive behavior.
 - Keep regression coverage after the fix.
 
@@ -40,7 +40,7 @@ Use this workflow for regressions, flaky behavior, broken edge cases, and user-r
 18. If there is still no reproducible signal, if the evidence does not clearly support one theory, or a required layer cannot run because the environment is blocked, stop and report the blocker. Do not edit production files past this point.
 19. Change production code only after the stable signal supports the root-cause theory, and prefer the smallest fix that explains the evidence.
 20. Remove temporary debug-only logging or hooks from the final production path.
-21. Update `docs/TEST_COVERAGE_MATRIX.md` if the regression coverage changes matrix status, adds a scenario, or records a remaining product-scenario gap.
+21. Update the stable matrix contract when regression coverage adds or changes a scenario, then publish the evidence projection for every changed status or remaining product-scenario gap.
 22. Re-run the relevant unit, behavior, and UI tests and any required pressure checks, then keep the new regression coverage.
 
 ## Hard Gates
@@ -89,7 +89,7 @@ Use this workflow for regressions, flaky behavior, broken edge cases, and user-r
 - List the pre-change tests or test attempts by layer and their outcomes.
 - State which logs or observations supported the root-cause theory.
 - List the post-change tests run and their outcomes.
-- State any product-scenario matrix status change, or why the matrix did not need an update.
+- State any stable coverage-contract change and current projected-status change.
 - State any relevant layer that was not run and why it was not possible.
 
 ## Rejection Criteria
