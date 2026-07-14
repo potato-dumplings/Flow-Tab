@@ -73,17 +73,19 @@ Minimum validation:
 
 Use this for:
 
-- `SwitcherSearchCoordinator` matching, tokenization, caches, candidate selection, or ranking changes.
-- Search debounce, async scheduling, result rebuild cadence, or state publication changes.
+- `SwitcherSearchCoordinator` matching, tokenization, caching, candidate selection, or ranking changes.
+- Search debounce, asynchronous scheduling, result-rebuild cadence, or state-publication changes.
 - Any code that can materially affect search-path CPU, memory, or throughput.
 
 Minimum validation:
 
-- Use a dataset of at least `10,000` windows such as `400 apps x 25 windows`
-- Sample `%CPU` and `RSS` every `0.5s`
-- Run each scenario for at least `30s`
-- Cover both `realistic` and `stress` input rhythms
-- Report `avg / p95 / max` and throughput
+- For the process-level committed-index CPU/RSS path, run separate `realistic` and `stress` attempts with `./scripts/perf/search-committed-index-pressure.sh 0.5 --scenario <realistic|stress> --scenario-duration-seconds 30 --build-root <project-local-build-root> --output-dir <attempt-directory>`.
+- Use a dataset of at least `10,000` windows, such as `400 apps x 25 windows`.
+- Sample `%CPU` and `RSS` every `0.5s`.
+- Run each scenario for at least `30s`.
+- Cover both `realistic` and `stress` input rhythms.
+- Report `avg/p95/max` and throughput.
+- Use a distinct, not-yet-existing output directory. The wrapper preserves `process-samples.csv`, `summary.txt`, aggregate logs, `status.json`, and a unique `attempts/flowtabtests/` child output root for the build and every test batch. Every test batch must retain its own `.xcresult` and child `status.json`.
 
 ### Runtime Topology Pressure
 

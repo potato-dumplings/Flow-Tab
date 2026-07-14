@@ -143,15 +143,40 @@ Search quick regression for the current deterministic high-window-count path:
   -only-testing:FlowTabTests/FlowTabTests/testSearchPressureWindowScopeUnified
 ```
 
-Full search pressure still requires external `%CPU` and `RSS` sampling for at least `30s` per scenario. Use `performance-pressure-workflow.md` for the required dataset, cadence, and reporting fields.
+Full search pressure still requires process-level `%CPU` and `RSS` sampling for at least `30s` per scenario. Use `performance-pressure-workflow.md` for the required dataset, cadence, and reporting fields.
 
-Runtime topology pressure for the representative noisy fullscreen/off-space fixture path:
+Committed-index process-level search pressure:
 
 ```bash
-./scripts/perf/runtime-topology-pressure.sh 0.5
+./scripts/perf/search-committed-index-pressure.sh 0.5 \
+  --scenario realistic \
+  --scenario-duration-seconds 30 \
+  --build-root ./.build-local/test-audit/<campaign-id>/build/<realistic-command-id> \
+  --output-dir ./.build-local/test-audit/<campaign-id>/<search-attempt-id>
+
+./scripts/perf/search-committed-index-pressure.sh 0.5 \
+  --scenario stress \
+  --scenario-duration-seconds 30 \
+  --build-root ./.build-local/test-audit/<campaign-id>/build/<stress-command-id> \
+  --output-dir ./.build-local/test-audit/<campaign-id>/<search-stress-attempt-id>
 ```
 
-The wrapper runs the four-window Noisy Option+Tab UI fixture and samples the `FlowTab` process CPU/RSS into `./.build-local/runtime-topology-pressure/`. Use it when validating Space topology, fullscreen/off-space activation, or repeated topology-aware panel interaction pressure.
+The output leaf must not exist before the run. The wrapper preserves `process-samples.csv`, `summary.txt`, aggregate logs, `child-attempts.jsonl`, and `status.json`. Its `build-for-testing` invocation and every `test-without-building` batch receive a distinct `attempts/flowtabtests/<child-attempt-id>/` output root, so every test batch retains its own result bundle, xcodebuild log, and child status.
+
+Runtime-topology pressure for the representative noisy fullscreen/off-Space fixture path:
+
+```bash
+./scripts/testing/create-ui-app-identity-manifest.sh \
+  --app-path "$HOME/Applications/Flow Tab UITest.app" \
+  --output-file ./.build-local/test-audit/<campaign-id>/private/<ui-app-identity>.json
+
+./scripts/perf/runtime-topology-pressure.sh 0.5 \
+  --ui-app-identity-manifest ./.build-local/test-audit/<campaign-id>/private/<ui-app-identity>.json \
+  --build-root ./.build-local/test-audit/<campaign-id>/build/<command-id> \
+  --output-dir ./.build-local/test-audit/<campaign-id>/<topology-attempt-id>
+```
+
+The identity-manifest leaf and output-directory leaf must not exist before the run. The wrapper runs the four-window Noisy Option+Tab UI fixture, samples CPU/RSS for the uniquely bound `FlowTab` process, and preserves `flowtab-samples.csv`, `pid-bindings.csv`, `target-launch-receipt.json`, `summary.txt`, aggregate logs, and the top-level `status.json`. The inner UI wrapper receives the unique `attempts/ui-tests/run/` output root, which retains the result bundle, stage logs, and child status. Use this path for Space topology, fullscreen/off-Space activation, or repeated topology-aware panel-interaction pressure. A normal non-audit run can omit `--output-dir`; the script then creates a unique default result directory.
 
 ## Validation Report Shape
 
