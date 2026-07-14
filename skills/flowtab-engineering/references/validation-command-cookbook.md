@@ -122,14 +122,20 @@ Then run the relevant `FlowTabUITests` case through `run-ui-tests-local.sh`.
 
 ## Pressure Checks
 
-Tab switching pressure:
+Tab-switch pressure:
 
 ```bash
-./scripts/perf/tab-switch-stress.sh 20 20 0.5
-./scripts/perf/tab-switch-stress.sh 20 50 0.5
+./scripts/perf/tab-switch-stress.sh 20 20 0.5 \
+  --build-root ./.build-local/test-audit/<campaign-id>/build/<command-id-20ms> \
+  --output-dir ./.build-local/test-audit/<campaign-id>/<attempt-20ms>
+./scripts/perf/tab-switch-stress.sh 20 50 0.5 \
+  --build-root ./.build-local/test-audit/<campaign-id>/build/<command-id-50ms> \
+  --output-dir ./.build-local/test-audit/<campaign-id>/<attempt-50ms>
 ```
 
-Search quick regression for the current high-window deterministic path:
+Each output directory preserves `samples.csv`, `summary.txt`, `build.log`, `app.log`, and `status.json`. Every run uses a fresh attempt directory; the script atomically creates the leaf and rejects reuse. The summary reports CPU/RSS `avg/p95/max`, and `status.json` preserves build, app, sampling, summary, and log-writer results. Positional-only non-audit calls remain supported and receive a unique default directory under `./.build-local/tab-switch-stress/`.
+
+Search quick regression for the current deterministic high-window-count path:
 
 ```bash
 ./scripts/testing/run-flowtabtests-local.sh \
