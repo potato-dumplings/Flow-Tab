@@ -3,22 +3,20 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 BUILD_ROOT="${ROOT_DIR}/.build-local/space-fixture-workflow"
-DERIVED_DATA_PATH="${BUILD_ROOT}/DerivedData"
-TMP_ROOT="${BUILD_ROOT}/tmp"
-HOME_ROOT="${BUILD_ROOT}/home"
-MODULE_CACHE_ROOT="${BUILD_ROOT}/module-cache"
-PACKAGE_CACHE_PATH="${BUILD_ROOT}/source-packages"
 
 WORKFLOW_CONFIG=""
 CONFIGURATION="Debug"
-OUTPUT_DIR="${BUILD_ROOT}/variants"
+OUTPUT_DIR=""
 RESOLVED_WORKFLOW_PATH=""
+HAS_CUSTOM_BUILD_ROOT=false
+HAS_CUSTOM_OUTPUT_DIR=false
 
 print_help() {
   cat <<'EOF'
 Usage:
   ./scripts/testing/build-space-fixture-workflow.sh \
     --workflow-config /absolute/path/to/workflow.json \
+    [--build-root /custom/build/root] \
     [--configuration Debug|Release] \
     [--output-dir /custom/output/dir] \
     [--resolved-workflow-path /custom/output/resolved-workflow.json]
@@ -53,6 +51,15 @@ set_plist_string() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --build-root)
+      if [[ "${HAS_CUSTOM_BUILD_ROOT}" == true || -z "${2-}" ]]; then
+        echo "--build-root requires one non-empty value and may only be specified once." >&2
+        exit 1
+      fi
+      BUILD_ROOT="${2}"
+      HAS_CUSTOM_BUILD_ROOT=true
+      shift 2
+      ;;
     --workflow-config)
       WORKFLOW_CONFIG="${2-}"
       shift 2
@@ -63,6 +70,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     --output-dir)
       OUTPUT_DIR="${2-}"
+      HAS_CUSTOM_OUTPUT_DIR=true
       shift 2
       ;;
     --resolved-workflow-path)
@@ -80,6 +88,15 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+DERIVED_DATA_PATH="${BUILD_ROOT}/DerivedData"
+TMP_ROOT="${BUILD_ROOT}/tmp"
+HOME_ROOT="${BUILD_ROOT}/home"
+MODULE_CACHE_ROOT="${BUILD_ROOT}/module-cache"
+PACKAGE_CACHE_PATH="${BUILD_ROOT}/source-packages"
+if [[ "${HAS_CUSTOM_OUTPUT_DIR}" == false ]]; then
+  OUTPUT_DIR="${BUILD_ROOT}/variants"
+fi
 
 WORKFLOW_CONFIG="$(trim "$WORKFLOW_CONFIG")"
 if [[ -z "$WORKFLOW_CONFIG" ]]; then

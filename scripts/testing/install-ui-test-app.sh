@@ -3,11 +3,6 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 BUILD_ROOT="${ROOT_DIR}/.build-local/ui-test-app"
-DERIVED_DATA_PATH="${BUILD_ROOT}/DerivedData"
-TMP_ROOT="${BUILD_ROOT}/tmp"
-HOME_ROOT="${BUILD_ROOT}/home"
-MODULE_CACHE_ROOT="${BUILD_ROOT}/module-cache"
-PACKAGE_CACHE_PATH="${BUILD_ROOT}/source-packages"
 USER_HOME="${HOME}"
 ORIGINAL_HOME="${HOME}"
 ORIGINAL_CFFIXED_USER_HOME="${CFFIXED_USER_HOME:-${HOME}}"
@@ -20,6 +15,7 @@ CODE_SIGN_IDENTITY=""
 RESOLVED_CODE_SIGN_IDENTITY=""
 MANUAL_CODESIGN_ENABLED=0
 DEVELOPMENT_TEAM_SOURCE=""
+HAS_CUSTOM_BUILD_ROOT=false
 
 if [[ -n "${DEVELOPMENT_TEAM}" ]]; then
   DEVELOPMENT_TEAM_SOURCE="FLOWTAB_DEVELOPMENT_TEAM"
@@ -102,6 +98,7 @@ print_help() {
 Usage:
   ./scripts/testing/install-ui-test-app.sh \
     [--configuration Debug|Release] \
+    [--build-root /custom/build/root] \
     [--install-path /absolute/path/to/Flow Tab UITest.app] \
     [--development-team TEAMID] \
     [--code-sign-identity "Apple Development"]
@@ -124,6 +121,15 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --build-root)
+      if [[ "${HAS_CUSTOM_BUILD_ROOT}" == true || -z "${2-}" ]]; then
+        echo "--build-root requires one non-empty value and may only be specified once." >&2
+        exit 1
+      fi
+      BUILD_ROOT="${2}"
+      HAS_CUSTOM_BUILD_ROOT=true
+      shift 2
+      ;;
     --configuration)
       CONFIGURATION="${2-}"
       shift 2
@@ -154,6 +160,11 @@ while [[ $# -gt 0 ]]; do
 done
 
 INSTALL_PATH="$(expand_path "${INSTALL_PATH}")"
+DERIVED_DATA_PATH="${BUILD_ROOT}/DerivedData"
+TMP_ROOT="${BUILD_ROOT}/tmp"
+HOME_ROOT="${BUILD_ROOT}/home"
+MODULE_CACHE_ROOT="${BUILD_ROOT}/module-cache"
+PACKAGE_CACHE_PATH="${BUILD_ROOT}/source-packages"
 
 if [[ "${CONFIGURATION}" != "Debug" && "${CONFIGURATION}" != "Release" ]]; then
   echo "Unsupported configuration: ${CONFIGURATION}. Use Debug or Release." >&2
