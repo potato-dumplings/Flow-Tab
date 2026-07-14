@@ -92,16 +92,18 @@ Minimum validation:
 Use this for:
 
 - Multi-app workflow startup changes.
-- Runtime snapshot, window mapping, grouping, dedupe, or active-space recovery changes.
-- Cross-space or fullscreen search-and-activate flows.
-- Changes to repeated preview, activation, or topology-aware panel behavior.
+- Runtime snapshot, window mapping, grouping, deduplication, or active-Space recovery changes.
+- Cross-Space or fullscreen search-and-activate flows.
+- Repeated preview, activation, or topology-aware panel behavior changes.
 
 Minimum validation:
 
-- Use real or fixture-driven multi-app topology, not only mock snapshots
-- Include at least one cross-space or fullscreen target when that path is affected
-- Exercise repeated panel open, search, selection, and activation rather than a single happy-path click
-- Record CPU and RSS behavior for the repeated interaction window and compare against the last known baseline
+- Create an immutable private fixed-app identity manifest with `./scripts/testing/create-ui-app-identity-manifest.sh --app-path <fixed-app> --output-file <project-local-private-manifest>`, then run the representative Noisy Option+Tab path with `./scripts/perf/runtime-topology-pressure.sh 0.5 --ui-app-identity-manifest <project-local-private-manifest> --build-root <project-local-build-root> --output-dir <attempt-directory>`.
+- Use a real or fixture-driven multi-app topology so the result includes actual topology evidence.
+- Include at least one cross-Space or fullscreen target when the affected path requires it.
+- Repeat panel opening, search, selection, and activation across a sustained interaction window.
+- Record CPU and RSS behavior during the repeated interaction window and compare it with the nearest known baseline.
+- Use a distinct, not-yet-existing output directory. The wrapper preserves `flowtab-samples.csv`, `summary.txt`, aggregate logs, the top-level `status.json`, and the UI wrapper's `.xcresult`, stage logs, and child `status.json` under `attempts/ui-tests/run/`.
 
 ## Reporting Standard
 

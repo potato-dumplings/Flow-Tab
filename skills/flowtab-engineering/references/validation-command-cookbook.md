@@ -182,7 +182,7 @@ The identity-manifest leaf and output-directory leaf must not exist before the r
 
 Use this compact shape unless the task needs a full handoff:
 
-- Unit: `passed`, `failed`, `blocked`, or `not relevant`; include command or reason.
-- Behavior: `passed`, `failed`, `blocked`, or `not relevant`; include command or reason.
-- UI: `passed`, `failed`, `blocked`, or `not relevant`; include command or reason.
-- Pressure: `passed`, `failed`, `blocked`, or `not relevant`; include command, baseline, or reason.
+- Unit: `passed`, `failed`, `blocked`, or `not relevant`; include the command or reason.
+- Behavior: `passed`, `failed`, `blocked`, or `not relevant`; include the command or reason.
+- UI: `passed`, `failed`, `blocked`, or `not relevant`; include the command or reason.
+- Pressure: `passed`, `failed`, `blocked`, or `not relevant`; include the command, baseline, or reason.
