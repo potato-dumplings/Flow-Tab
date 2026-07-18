@@ -7,12 +7,18 @@ extension LiveSwitcherModel {
         preferredSelectedAppID: String?,
         animateAppStripUpdate _: Bool = false,
         preserveSearchState: Bool = false,
-        resetWhenEmpty: Bool = true
+        resetWhenEmpty: Bool = true,
+        removingTerminatedAppID: String? = nil,
+        terminatedPID: pid_t? = nil
     ) -> Bool {
         let startMs = Self.monotonicMilliseconds()
         let previousSearchState = preserveSearchState ? searchViewState : .inactive
         cancelPendingSearchComputation()
-        let payload = readAppSwitcherProjectionSessionPayload()
+        let payload = appSwitcherPayload(
+            readAppSwitcherProjectionSessionPayload(),
+            removingTerminatedAppID: removingTerminatedAppID,
+            terminatedPID: terminatedPID
+        )
         let projectionReadMs = Self.monotonicMilliseconds()
         return applyAppSwitcherProjectionPayload(
             payload,
@@ -23,6 +29,29 @@ extension LiveSwitcherModel {
             projectionReadMs: projectionReadMs,
             logEvent: "loadAppSwitcherProjectionSession",
             resetWhenEmpty: resetWhenEmpty
+        )
+    }
+
+    func appSwitcherPayload(
+        _ payload: AppSwitcherProjectionSessionPayload,
+        removingTerminatedAppID appID: String?,
+        terminatedPID: pid_t?
+    ) -> AppSwitcherProjectionSessionPayload {
+        guard let appID, let terminatedPID else { return payload }
+        let knownPIDs = [
+            runtimeContextsByID[appID]?.runningApp.processIdentifier,
+            payload.contextsByID[appID]?.runningApp.processIdentifier,
+        ].compactMap { $0 }
+        guard !knownPIDs.contains(where: { $0 != terminatedPID }) else {
+            return payload
+        }
+
+        // The committed projection may intentionally remain stale while its main-table
+        // generation is repaired; a confirmed process death is still authoritative for
+        // the active Switcher session.
+        return AppSwitcherProjectionSessionPayload(
+            apps: payload.apps.filter { $0.id != appID },
+            contextsByID: payload.contextsByID.filter { $0.key != appID }
         )
     }
 

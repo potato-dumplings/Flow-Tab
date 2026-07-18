@@ -1941,6 +1941,94 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
+    func testRuntimeProjectionServiceTerminationEventOverridesLaggingAppDirectoryProviderSnapshot() throws {
+        let runningApp = NSRunningApplication.current
+        let survivingAppID = RuntimeAppIdentity.appID(for: runningApp)
+        let survivingPID = runningApp.processIdentifier
+        let survivingDisplayName = runningApp.localizedName ?? survivingAppID
+        let survivingWindowID = CGWindowID(240_809)
+        let survivingAXWindowID = "ax:\(survivingPID):termination-provider-order"
+        let terminatedAppID = "com.example.terminated-provider-lag"
+        let terminatedPID = pid_t(survivingPID + 40_809)
+        let survivingEntry = RuntimeAppDirectoryEntry(app: runningApp)
+        let terminatedEntry = RuntimeAppDirectoryEntry(
+            pid: terminatedPID,
+            appID: terminatedAppID,
+            bundleIdentifier: terminatedAppID,
+            localizedName: "Terminated Provider Lag",
+            launchDate: nil
+        )
+        let survivingApp = AppSwitchCandidate(
+            id: survivingAppID,
+            displayName: survivingDisplayName,
+            groupID: RuntimeAppIdentity.groupID(
+                for: runningApp.bundleIdentifier,
+                fallbackName: survivingDisplayName
+            ),
+            lastActiveAt: 100,
+            windows: []
+        )
+        let terminatedApp = AppSwitchCandidate(
+            id: terminatedAppID,
+            displayName: "Terminated Provider Lag",
+            groupID: terminatedAppID,
+            lastActiveAt: 90,
+            windows: []
+        )
+        let readModelStore = RuntimeReadModelStore()
+        readModelStore.seedAppSwitcherProjectionForTesting(
+            apps: [survivingApp, terminatedApp],
+            contextsByID: [:],
+            appDirectoryEntries: [survivingEntry, terminatedEntry],
+            generatedAt: 10
+        )
+        let windowRecordStore = RuntimeWindowRecordStore(
+            mappingStatesByPID: [
+                survivingPID: RuntimeWindowMappingState(
+                    windowRecordsByCGWindowID: [
+                        survivingWindowID: makeMainTableProjectionWindowRecord(
+                            pid: survivingPID,
+                            cgWindowID: survivingWindowID,
+                            axWindowID: survivingAXWindowID
+                        )
+                    ],
+                    currentAXToCG: [survivingAXWindowID: survivingWindowID],
+                    validCGWindowIDs: [survivingWindowID],
+                    lastAXWindowIDs: [survivingAXWindowID],
+                    hasObservedAXWindowHandle: true
+                )
+            ]
+        )
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.TerminationProviderOrder",
+            repairProvider: RuntimeProjectionRepairProvider(
+                windowRecordStore: windowRecordStore,
+                reconciliationCoordinator: RuntimeReconciliationCoordinator()
+            ),
+            mainTableProjectionBuilder: RuntimeMainTableProjectionBuilder(
+                windowRecordStore: windowRecordStore
+            ),
+            appDirectoryProvider: FixedRuntimeAppDirectoryProvider(
+                entries: [survivingEntry, terminatedEntry]
+            ),
+            readModelStore: readModelStore
+        )
+
+        service.signalAppTerminated(appID: terminatedAppID, pid: terminatedPID)
+        service.waitForMaintenanceQueueForTesting()
+
+        XCTAssertFalse(
+            readModelStore.readAppDirectoryProjection()?.entries.contains {
+                $0.appID == terminatedAppID || $0.pid == terminatedPID
+            } ?? true
+        )
+        XCTAssertFalse(
+            readModelStore.readAppSwitcherProjection()?.apps.contains {
+                $0.id == terminatedAppID
+            } ?? true
+        )
+    }
+
     func testRuntimeProjectionServiceCommitsAXDestroyedProjectionFromMainTablesAsStale() throws {
         let runningApp = NSRunningApplication.current
         let appID = RuntimeAppIdentity.appID(for: runningApp)

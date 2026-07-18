@@ -409,7 +409,7 @@ extension SwitcherPanelController {
         beginTerminateInterruptionProtection(
             trigger: "terminate_refresh",
             duration: postTerminateRefreshInterruptionProtectionWindow,
-            extendExisting: false
+            extendExisting: true
         )
         beginIgnoringActiveSpaceChanges(trigger: "terminate_refresh")
     }

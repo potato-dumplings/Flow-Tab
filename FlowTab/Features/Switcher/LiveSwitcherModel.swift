@@ -542,6 +542,8 @@ final class LiveSwitcherModel: ObservableObject {
         let preferredSelectedAppID = currentSession.selectedApp.id
         let previousMode = currentSession.mode
         let previousSelectedWindowID = currentSession.selectedWindow?.id
+        let previousSelectedApp = currentSession.selectedApp
+        let previousSelectedAppContext = runtimeContextsByID[previousSelectedApp.id]
         let previousWindowOrderIDs: [String]
         if case .windowCycle(let appID) = previousMode, appID == currentSession.selectedApp.id {
             previousWindowOrderIDs = currentSession.selectedApp.windows.map(\.id)
@@ -559,7 +561,9 @@ final class LiveSwitcherModel: ObservableObject {
         restoreSessionModeAfterProjectionUpdate(
             previousMode: previousMode,
             previousSelectedWindowID: previousSelectedWindowID,
-            previousWindowOrderIDs: previousWindowOrderIDs
+            previousWindowOrderIDs: previousWindowOrderIDs,
+            previousSelectedApp: previousSelectedApp,
+            previousSelectedAppContext: previousSelectedAppContext
         )
         if case .windowCycle(let appID) = previousMode {
             _ = applyCurrentAppWindowProjectionIfReady(
@@ -583,7 +587,9 @@ final class LiveSwitcherModel: ObservableObject {
     func restoreSessionModeAfterProjectionUpdate(
         previousMode: SessionMode,
         previousSelectedWindowID: String?,
-        previousWindowOrderIDs: [String] = []
+        previousWindowOrderIDs: [String] = [],
+        previousSelectedApp: AppSwitchCandidate,
+        previousSelectedAppContext: RuntimeAppContext?
     ) {
         guard var refreshedSession = session else { return }
         switch previousMode {
@@ -592,6 +598,34 @@ final class LiveSwitcherModel: ObservableObject {
         case .groupCycle:
             return
         case .windowCycle(let appID):
+            if let appIndex = refreshedSession.apps.firstIndex(where: { $0.id == appID }),
+               refreshedSession.apps[appIndex].windows.isEmpty,
+               previousSelectedApp.id == appID,
+               !previousSelectedApp.windows.isEmpty,
+               let previousSelectedAppContext,
+               let refreshedContext = runtimeContextsByID[appID],
+               previousSelectedAppContext.runningApp.processIdentifier
+                   == refreshedContext.runningApp.processIdentifier {
+                // Keep an already-visible window cycle intact while the same process's
+                // current-window projection is being repaired.
+                let refreshedApp = refreshedSession.apps[appIndex]
+                var apps = refreshedSession.apps
+                apps[appIndex] = AppSwitchCandidate(
+                    id: refreshedApp.id,
+                    displayName: refreshedApp.displayName,
+                    groupID: refreshedApp.groupID,
+                    lastActiveAt: refreshedApp.lastActiveAt,
+                    windows: previousSelectedApp.windows
+                )
+                refreshedSession = SwitcherSession(
+                    apps: apps,
+                    preferences: refreshedSession.preferences,
+                    triggerDirection: .forward,
+                    rememberedWindowIDByAppID: refreshedSession.rememberedWindowIDByAppID
+                )
+                _ = refreshedSession.selectApp(withID: appID)
+                runtimeContextsByID[appID] = previousSelectedAppContext
+            }
             if !previousWindowOrderIDs.isEmpty,
                let appIndex = refreshedSession.apps.firstIndex(where: { $0.id == appID }) {
                 let app = refreshedSession.apps[appIndex]
@@ -663,7 +697,9 @@ final class LiveSwitcherModel: ObservableObject {
             preferredSelectedAppID: matchesPending ? pendingRequest?.preferredSelectedAppID : nil,
             animateAppStripUpdate: true,
             preserveSearchState: searchViewState.isActive,
-            resetWhenEmpty: false
+            resetWhenEmpty: false,
+            removingTerminatedAppID: appID,
+            terminatedPID: pid
         )
         RuntimeLog.info(
             .session,
