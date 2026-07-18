@@ -934,24 +934,24 @@ extension FlowTabPriorityCoverageTests {
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         assertAppSwitcherProjectionRead(from: runtimeProjectionService, readCount: 2)
-        XCTAssertEqual(model.session?.apps.first?.windows.map(\.id), ["normal", "fullscreen", "incognito"])
+        XCTAssertEqual(model.session?.apps.first?.windows.map(\.id), ["normal", "incognito", "fullscreen"])
         model.handle(.downArrow)
         XCTAssertEqual(model.session?.selectedWindow?.id, "normal")
         model.handle(.rightArrow)
-        XCTAssertEqual(model.session?.selectedWindow?.id, "fullscreen")
+        XCTAssertEqual(model.session?.selectedWindow?.id, "incognito")
 
         now = 1_200
         model.commitSelection()
         XCTAssertEqual(
             committedTargets,
-            [.window(appID: appID, windowID: "fullscreen", restoreIfMinimized: false)]
+            [.window(appID: appID, windowID: "incognito", restoreIfMinimized: false)]
         )
 
         XCTAssertTrue(model.startSession(triggerDirection: .forward))
         assertAppSwitcherProjectionRead(from: runtimeProjectionService, readCount: 3)
-        XCTAssertEqual(model.session?.apps.first?.windows.map(\.id), ["fullscreen", "normal", "incognito"])
+        XCTAssertEqual(model.session?.apps.first?.windows.map(\.id), ["incognito", "normal", "fullscreen"])
         model.handle(.downArrow)
-        XCTAssertEqual(model.session?.selectedWindow?.id, "fullscreen")
+        XCTAssertEqual(model.session?.selectedWindow?.id, "incognito")
 
         runtimeProjectionService.installAppSwitcherProjection(
             apps: [
@@ -966,12 +966,12 @@ extension FlowTabPriorityCoverageTests {
             generatedAt: 15
         )
         XCTAssertTrue(model.handleAppSwitcherProjectionDidUpdate())
-        XCTAssertEqual(model.session?.apps.first?.windows.map(\.id), ["fullscreen", "normal", "incognito"])
-        XCTAssertEqual(model.session?.selectedWindow?.id, "fullscreen")
+        XCTAssertEqual(model.session?.apps.first?.windows.map(\.id), ["incognito", "normal", "fullscreen"])
+        XCTAssertEqual(model.session?.selectedWindow?.id, "incognito")
         model.handle(.rightArrow)
         XCTAssertEqual(model.session?.selectedWindow?.id, "normal")
         model.handle(.rightArrow)
-        XCTAssertEqual(model.session?.selectedWindow?.id, "incognito")
+        XCTAssertEqual(model.session?.selectedWindow?.id, "fullscreen")
     }
 
     @MainActor

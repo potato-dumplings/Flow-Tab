@@ -196,6 +196,8 @@
 		F8A9B0C335AE000100B0D737 /* RuntimeAXRemoteWindowResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A9B0C235AE000100B0D737 /* RuntimeAXRemoteWindowResolver.swift */; };
 		F8A9B0C535AE000100B0D737 /* RuntimeAXWindowAbsencePolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A9B0C435AE000100B0D737 /* RuntimeAXWindowAbsencePolicy.swift */; };
 		F8A9B0C735AE000100B0D737 /* RuntimeWindowPresentationFilter.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A9B0C635AE000100B0D737 /* RuntimeWindowPresentationFilter.swift */; };
+		F8A9B0CB35AE000100B0D737 /* RuntimeWindowPresentationFilter+TitleDeduplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A9B0CA35AE000100B0D737 /* RuntimeWindowPresentationFilter+TitleDeduplication.swift */; };
+		F8A9B0CD35AE000100B0D737 /* RuntimeCurrentAppWindowPreservationPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A9B0CC35AE000100B0D737 /* RuntimeCurrentAppWindowPreservationPolicy.swift */; };
 		F8A9B0C935AE000100B0D737 /* RuntimeWindowListDeduplicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A9B0C835AE000100B0D737 /* RuntimeWindowListDeduplicator.swift */; };
 		F9C0D1E235AF000100B0D737 /* RuntimeChromeWindowFocusBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9C0D1E135AF000100B0D737 /* RuntimeChromeWindowFocusBridge.swift */; };
 		F50001012F90000100B0D737 /* FlowTabSpaceFixtureApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000022F90000100B0D737 /* FlowTabSpaceFixtureApp.swift */; };
@@ -425,6 +427,8 @@
 		F8A9B0C235AE000100B0D737 /* RuntimeAXRemoteWindowResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeAXRemoteWindowResolver.swift; sourceTree = "<group>"; };
 		F8A9B0C435AE000100B0D737 /* RuntimeAXWindowAbsencePolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeAXWindowAbsencePolicy.swift; sourceTree = "<group>"; };
 		F8A9B0C635AE000100B0D737 /* RuntimeWindowPresentationFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowPresentationFilter.swift; sourceTree = "<group>"; };
+		F8A9B0CA35AE000100B0D737 /* RuntimeWindowPresentationFilter+TitleDeduplication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "RuntimeWindowPresentationFilter+TitleDeduplication.swift"; sourceTree = "<group>"; };
+		F8A9B0CC35AE000100B0D737 /* RuntimeCurrentAppWindowPreservationPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeCurrentAppWindowPreservationPolicy.swift; sourceTree = "<group>"; };
 		F8A9B0C835AE000100B0D737 /* RuntimeWindowListDeduplicator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowListDeduplicator.swift; sourceTree = "<group>"; };
 		F9C0D1E135AF000100B0D737 /* RuntimeChromeWindowFocusBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeChromeWindowFocusBridge.swift; sourceTree = "<group>"; };
 		F50000012F90000100B0D737 /* FlowTabSpaceFixture.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FlowTabSpaceFixture.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -739,6 +743,8 @@
 				F6E7D00B35C1000100B0D737 /* RuntimeAppRankProvider.swift */,
 				F8A9B0C435AE000100B0D737 /* RuntimeAXWindowAbsencePolicy.swift */,
 				F8A9B0C635AE000100B0D737 /* RuntimeWindowPresentationFilter.swift */,
+				F8A9B0CA35AE000100B0D737 /* RuntimeWindowPresentationFilter+TitleDeduplication.swift */,
+				F8A9B0CC35AE000100B0D737 /* RuntimeCurrentAppWindowPreservationPolicy.swift */,
 				F8A9B0C835AE000100B0D737 /* RuntimeWindowListDeduplicator.swift */,
 				F6E7C01335C000100B0D737 /* RuntimeAXWindowRecovery.swift */,
 				F6E7C01535C000100B0D737 /* RuntimeAppDirectory.swift */,
@@ -1163,6 +1169,8 @@
 				F8A9B0C335AE000100B0D737 /* RuntimeAXRemoteWindowResolver.swift in Sources */,
 				F8A9B0C535AE000100B0D737 /* RuntimeAXWindowAbsencePolicy.swift in Sources */,
 				F8A9B0C735AE000100B0D737 /* RuntimeWindowPresentationFilter.swift in Sources */,
+				F8A9B0CB35AE000100B0D737 /* RuntimeWindowPresentationFilter+TitleDeduplication.swift in Sources */,
+				F8A9B0CD35AE000100B0D737 /* RuntimeCurrentAppWindowPreservationPolicy.swift in Sources */,
 				F8A9B0C935AE000100B0D737 /* RuntimeWindowListDeduplicator.swift in Sources */,
 				A1B2C4402F73000100B0D737 /* RuntimeWindowPreviewProvider.swift in Sources */,
 				D2A0001235B9000100B0D737 /* WindowPreviewProviderResolver.swift in Sources */,

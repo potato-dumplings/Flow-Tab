@@ -363,9 +363,9 @@ extension FlowTabPriorityCoverageTests {
         let currentAppProjection = try XCTUnwrap(store.readCurrentAppWindowProjection(appID: appID))
         XCTAssertEqual(
             currentAppProjection.currentAppWindowPayload.candidate.windows.map(\.id),
-            ["normal", "fullscreen", "incognito", "second-fullscreen"]
+            ["normal"]
         )
-        XCTAssertEqual(currentAppProjection.currentAppWindowPayload.summary.windowCount, 4)
+        XCTAssertEqual(currentAppProjection.currentAppWindowPayload.summary.windowCount, 1)
         XCTAssertNil(currentAppProjection.currentAppWindowPayload.context.windowsByID["fallback-host"])
         XCTAssertNil(currentAppProjection.currentAppWindowPayload.context.windowsByID["fullscreen-duplicate"])
     }

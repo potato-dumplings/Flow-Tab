@@ -841,6 +841,13 @@ final class RuntimeReadModelStore: @unchecked Sendable {
                 guard currentAppWindowPreservationAllowsActivationLocked(priorContext) else {
                     continue
                 }
+                guard RuntimeCurrentAppWindowPreservationPolicy.allowsPreserving(
+                    window,
+                    context: priorContext,
+                    currentPayload: payload
+                ) else {
+                    continue
+                }
                 if let cgWindowID = priorContext.cgWindowID {
                     guard !projectedCGWindowIDs.contains(cgWindowID),
                           !dirtyCGWindowIDs.contains(cgWindowID)
@@ -908,7 +915,7 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     private func currentAppWindowPreservationAllowsActivationLocked(
         _ context: RuntimeWindowContext
     ) -> Bool {
-        return context.bindingAllowedActions.contains(.useForAXActivation)
+        context.bindingAllowedActions.contains(.useForAXActivation)
             || context.bindingAllowedActions.contains(.useForCGActivationFallback)
     }
 

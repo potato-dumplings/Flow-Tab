@@ -42,19 +42,19 @@ extension FlowTabUITests {
             (
                 normalOneTitle,
                 primaryFullscreenTitle,
-                [normalOneTitle, primaryFullscreenTitle],
+                [normalOneTitle],
                 "fullscreen1"
             ),
             (
                 primaryFullscreenTitle,
                 normalTwoTitle,
-                [primaryFullscreenTitle, normalOneTitle, normalTwoTitle],
+                [primaryFullscreenTitle],
                 "normal2"
             ),
             (
                 normalTwoTitle,
                 fullscreenTwoTitle,
-                [normalTwoTitle, primaryFullscreenTitle, normalOneTitle, fullscreenTwoTitle],
+                [normalTwoTitle],
                 "fullscreen2"
             )
         ]
