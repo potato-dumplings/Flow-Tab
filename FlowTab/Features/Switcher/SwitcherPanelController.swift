@@ -380,7 +380,7 @@ final class SwitcherPanelController {
         appSwitcherProjectionDidUpdateObserver = NotificationCenter.default.addObserver(
             forName: .runtimeAppSwitcherProjectionDidUpdate,
             object: nil,
-            queue: .main
+            queue: nil
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.handleAppSwitcherProjectionDidUpdate()
@@ -389,7 +389,7 @@ final class SwitcherPanelController {
         currentAppWindowProjectionDidUpdateObserver = NotificationCenter.default.addObserver(
             forName: .runtimeCurrentAppWindowProjectionDidUpdate,
             object: nil,
-            queue: .main
+            queue: nil
         ) { [weak self] notification in
             let appID = notification.userInfo?[RuntimeProjectionNotificationUserInfoKey.appID] as? String
             Task { @MainActor [weak self] in
@@ -399,7 +399,7 @@ final class SwitcherPanelController {
         committedSearchIndexDidUpdateObserver = NotificationCenter.default.addObserver(
             forName: .runtimeCommittedSearchIndexDidUpdate,
             object: nil,
-            queue: .main
+            queue: nil
         ) { [weak self] _ in
             Task { @MainActor [weak self] in
                 self?.handleCommittedSearchIndexDidUpdate()
