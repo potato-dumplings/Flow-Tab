@@ -290,6 +290,7 @@ xcodebuild \
   -destination "platform=macOS,arch=${HOST_ARCH}" \
   -sdk macosx \
   -derivedDataPath "$DERIVED_DATA_DIR" \
+  CODE_SIGNING_ALLOWED=NO \
   build 2>&1 | tee "$BUILD_LOG"
 build_pipeline_status=("${PIPESTATUS[@]}")
 XCODEBUILD_STATUS="${build_pipeline_status[0]}"

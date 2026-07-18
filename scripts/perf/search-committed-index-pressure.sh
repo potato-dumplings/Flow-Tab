@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 RESULTS_ROOT="${ROOT_DIR}/.build-local/search-committed-index-pressure"
 FLOWTABTESTS_RUNNER="${ROOT_DIR}/scripts/testing/run-flowtabtests-local.sh"
+MONOTONIC_CLOCK="${ROOT_DIR}/scripts/perf/lib/monotonic-clock.sh"
 
 usage() {
   cat <<'EOF'
@@ -529,7 +530,7 @@ load_summary_facts() {
 }
 
 monotonic_now_ns() {
-  /usr/bin/python3 -c 'import time; print(time.monotonic_ns())'
+  "$MONOTONIC_CLOCK"
 }
 
 sample_process_tree() {
@@ -606,7 +607,8 @@ test_process_is_live() {
 run_test_loop() {
   local batch=0
   local successful_batches=0
-  local start_seconds
+  local start_monotonic_ns
+  local current_monotonic_ns
   local elapsed_seconds
   local attempt_id
   local attempt_dir
@@ -617,7 +619,7 @@ run_test_loop() {
   local required_loop_seconds=$((MIN_SAMPLE_SECONDS + 5))
 
   trap - EXIT INT TERM
-  start_seconds="$(date +%s)"
+  start_monotonic_ns="$(monotonic_now_ns)"
   write_test_loop_status 0 0 null null
   write_workload_state preparing 0
 
@@ -651,7 +653,8 @@ run_test_loop() {
     fi
     write_test_loop_status "$batch" "$successful_batches" "$wrapper_status" "$log_status"
 
-    elapsed_seconds=$(( $(date +%s) - start_seconds ))
+    current_monotonic_ns="$(monotonic_now_ns)"
+    elapsed_seconds=$(( (current_monotonic_ns - start_monotonic_ns) / 1000000000 ))
     printf '[SearchCommittedIndexPressureBatch] batch=%s wrapperStatus=%s logStatus=%s elapsedSeconds=%s\n' \
       "$batch" "$wrapper_status" "$log_status" "$elapsed_seconds" >>"$TEST_LOG_FILE"
 

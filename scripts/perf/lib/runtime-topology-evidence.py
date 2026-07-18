@@ -21,13 +21,14 @@ def validate_manifest(arguments):
         "designated_requirement_sha256",
         "pid_binding_policy_version",
         "launch_oracle",
+        "stable_identity_window_milliseconds",
     }
     if set(payload) != required:
         missing = sorted(required - set(payload))
         extra = sorted(set(payload) - required)
         raise SystemExit(f"identity manifest fields mismatch; missing={missing}, extra={extra}")
-    if payload["schema_version"] != 1:
-        raise SystemExit("identity manifest schema_version must be 1")
+    if payload["schema_version"] != 2:
+        raise SystemExit("identity manifest schema_version must be 2")
     if payload["resource_boundary"] != "private_manifest":
         raise SystemExit("identity manifest resource_boundary must be private_manifest")
     app_path = payload["resolved_app_path"]
@@ -45,10 +46,13 @@ def validate_manifest(arguments):
     for key in ("executable_sha256", "designated_requirement_sha256"):
         if not isinstance(payload[key], str) or not re.fullmatch(r"[0-9a-f]{64}", payload[key]):
             raise SystemExit(f"{key} must be a lowercase SHA-256")
-    if payload["pid_binding_policy_version"] != "flowtab.runtime.pid-binding.v1":
+    if payload["pid_binding_policy_version"] != "flowtab.runtime.pid-binding.v2":
         raise SystemExit("unsupported pid_binding_policy_version")
-    if payload["launch_oracle"] != "unique_post_request_identity_match":
+    if payload["launch_oracle"] != "stable_unique_post_request_identity_match":
         raise SystemExit("unsupported launch_oracle")
+    stability_window = payload["stable_identity_window_milliseconds"]
+    if not isinstance(stability_window, int) or stability_window < 1000:
+        raise SystemExit("stable_identity_window_milliseconds must be an integer of at least 1000")
     print(
         "\t".join(
             (
@@ -57,6 +61,7 @@ def validate_manifest(arguments):
                 payload["executable_sha256"],
                 payload["designated_requirement_sha256"],
                 payload["pid_binding_policy_version"],
+                str(stability_window),
             )
         )
     )
@@ -95,14 +100,15 @@ def write_json_atomically(output_path, payload, exclusive):
 def write_manifest(arguments):
     output_path, app_path, bundle_id, executable_sha256, requirement_sha256 = arguments
     payload = {
-        "schema_version": 1,
+        "schema_version": 2,
         "resource_boundary": "private_manifest",
         "resolved_app_path": app_path,
         "bundle_id": bundle_id,
         "executable_sha256": executable_sha256,
         "designated_requirement_sha256": requirement_sha256,
-        "pid_binding_policy_version": "flowtab.runtime.pid-binding.v1",
-        "launch_oracle": "unique_post_request_identity_match",
+        "pid_binding_policy_version": "flowtab.runtime.pid-binding.v2",
+        "launch_oracle": "stable_unique_post_request_identity_match",
+        "stable_identity_window_milliseconds": 5000,
     }
     write_json_atomically(output_path, payload, exclusive=True)
 
@@ -116,25 +122,33 @@ def write_launch_receipt(arguments):
         executable_sha256,
         requirement_sha256,
         policy_version,
+        stability_window_milliseconds,
         request_monotonic_ns,
         request_epoch_seconds,
-        observed_monotonic_ns,
+        first_observed_monotonic_ns,
+        qualified_monotonic_ns,
         pid,
         process_start_identity,
         process_start_epoch_seconds,
+        observation_count,
+        rejected_transient_identity_count,
     ) = arguments
     payload = {
-        "schema_version": 1,
+        "schema_version": 2,
         "identity_manifest_sha256": manifest_sha256,
         "resolved_app_path": app_path,
         "bundle_id": bundle_id,
         "executable_sha256": executable_sha256,
         "designated_requirement_sha256": requirement_sha256,
         "pid_binding_policy_version": policy_version,
-        "launch_oracle": "unique_post_request_identity_match",
+        "launch_oracle": "stable_unique_post_request_identity_match",
+        "stable_identity_window_milliseconds": int(stability_window_milliseconds),
         "launch_request_monotonic_ns": int(request_monotonic_ns),
         "launch_request_epoch_seconds": int(request_epoch_seconds),
-        "launch_observed_monotonic_ns": int(observed_monotonic_ns),
+        "candidate_first_observed_monotonic_ns": int(first_observed_monotonic_ns),
+        "candidate_qualified_monotonic_ns": int(qualified_monotonic_ns),
+        "candidate_observation_count": int(observation_count),
+        "rejected_transient_identity_count": int(rejected_transient_identity_count),
         "pid": int(pid),
         "process_start_epoch_seconds": int(process_start_epoch_seconds),
         "process_start_identity": process_start_identity,
@@ -172,8 +186,26 @@ def summarize(arguments):
 
     receipt_pid = str(launch_receipt["pid"])
     receipt_start_epoch_seconds = str(launch_receipt["process_start_epoch_seconds"])
+    stability_window_ns = int(launch_receipt["stable_identity_window_milliseconds"]) * 1_000_000
+    observed_stability_ns = (
+        int(launch_receipt["candidate_qualified_monotonic_ns"])
+        - int(launch_receipt["candidate_first_observed_monotonic_ns"])
+    )
+    observation_order_valid = (
+        int(launch_receipt["launch_request_monotonic_ns"])
+        <= int(launch_receipt["candidate_first_observed_monotonic_ns"])
+        <= int(launch_receipt["candidate_qualified_monotonic_ns"])
+    )
     identity_contract_valid = (
-        len(identity_rows) == len(rows)
+        launch_receipt.get("schema_version") == 2
+        and launch_receipt.get("pid_binding_policy_version")
+        == "flowtab.runtime.pid-binding.v2"
+        and launch_receipt.get("launch_oracle")
+        == "stable_unique_post_request_identity_match"
+        and observation_order_valid
+        and observed_stability_ns >= stability_window_ns
+        and int(launch_receipt.get("candidate_observation_count", 0)) > 1
+        and len(identity_rows) == len(rows)
         and int(identity_check_count) == len(identity_rows)
         and identity_verdict == "matched"
         and launch_receipt.get("verdict") == "matched"
@@ -195,6 +227,11 @@ def summarize(arguments):
         f"identityCheckCount={len(identity_rows)}",
         f"identityVerdict={identity_verdict}",
         f"identityContractVerdict={'matched' if identity_contract_valid else 'mismatch'}",
+        f"pidBindingPolicyVersion={launch_receipt['pid_binding_policy_version']}",
+        f"stableIdentityWindowMilliseconds={launch_receipt['stable_identity_window_milliseconds']}",
+        f"observedIdentityStabilityMilliseconds={observed_stability_ns / 1_000_000.0:.3f}",
+        f"candidateObservationCount={launch_receipt['candidate_observation_count']}",
+        f"rejectedTransientIdentityCount={launch_receipt['rejected_transient_identity_count']}",
         f"samples={len(rows)}",
         f"cpuAvg={sum(cpu_values) / len(cpu_values):.2f}",
         f"cpuP95={percentile(cpu_values, 95):.2f}",

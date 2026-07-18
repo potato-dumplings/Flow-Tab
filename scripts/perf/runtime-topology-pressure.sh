@@ -5,7 +5,11 @@ ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 RESULTS_ROOT="${ROOT_DIR}/.build-local/runtime-topology-pressure"
 UI_TEST_RUNNER="${ROOT_DIR}/scripts/testing/run-ui-tests-local.sh"
 EVIDENCE_TOOL="${ROOT_DIR}/scripts/perf/lib/runtime-topology-evidence.py"
+MONOTONIC_CLOCK="${ROOT_DIR}/scripts/perf/lib/monotonic-clock.sh"
+TARGET_TOOL="${ROOT_DIR}/scripts/perf/lib/runtime-topology-target.sh"
 DEFAULT_TEST="FlowTabUITests/FlowTabUITests/testSwitcherPanelOptionTabWindowStateRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithNoisyCGSiblingsWithoutAppAXWindows"
+
+source "$TARGET_TOOL"
 
 usage() {
   cat <<'EOF'
@@ -67,6 +71,14 @@ IDENTITY_CHECK_COUNT=0
 TARGET_PID=""
 TARGET_START_IDENTITY=""
 TARGET_START_EPOCH_SECONDS=""
+TARGET_STABILITY_WINDOW_MILLISECONDS=""
+TARGET_FIRST_OBSERVED_MONOTONIC_NS=""
+TARGET_QUALIFIED_MONOTONIC_NS=""
+TARGET_OBSERVATION_COUNT=0
+REJECTED_TRANSIENT_IDENTITY_COUNT=0
+TARGET_TERMINAL_EXIT_OBSERVED=false
+TARGET_TERMINATION_VERDICT="not_observed"
+TARGET_EXIT_GRACE_SECONDS=30
 PREEXISTING_TARGET_IDENTITIES=""
 LAUNCH_REQUEST_MONOTONIC_NS=""
 LAUNCH_REQUEST_EPOCH_SECONDS=""
@@ -192,7 +204,7 @@ if [[ ! -f "$UI_APP_IDENTITY_MANIFEST" ]]; then
 fi
 
 IDENTITY_FIELDS="$(/usr/bin/python3 "$EVIDENCE_TOOL" validate-manifest "$UI_APP_IDENTITY_MANIFEST")" || exit 2
-IFS=$'\t' read -r EXPECTED_APP_PATH EXPECTED_BUNDLE_ID EXPECTED_EXECUTABLE_SHA256 EXPECTED_DESIGNATED_REQUIREMENT_SHA256 PID_BINDING_POLICY_VERSION <<<"$IDENTITY_FIELDS"
+IFS=$'\t' read -r EXPECTED_APP_PATH EXPECTED_BUNDLE_ID EXPECTED_EXECUTABLE_SHA256 EXPECTED_DESIGNATED_REQUIREMENT_SHA256 PID_BINDING_POLICY_VERSION TARGET_STABILITY_WINDOW_MILLISECONDS <<<"$IDENTITY_FIELDS"
 
 if [[ ! -d "$EXPECTED_APP_PATH" ]]; then
   echo "Expected UI App bundle not found: $EXPECTED_APP_PATH" >&2
@@ -278,6 +290,8 @@ write_status() {
   local status_temp="${STATUS_FILE}.tmp"
   local sampling_failed_json="false"
   local termination_timed_out_json="false"
+  local target_terminal_exit_observed_json="false"
+  local result_bundle_directory_present="false"
   local result_bundle_present="false"
 
   if [[ "$SAMPLING_FAILED" == true ]]; then
@@ -286,7 +300,13 @@ write_status() {
   if [[ "$TERMINATION_TIMED_OUT" == true ]]; then
     termination_timed_out_json="true"
   fi
+  if [[ "$TARGET_TERMINAL_EXIT_OBSERVED" == true ]]; then
+    target_terminal_exit_observed_json="true"
+  fi
   if [[ -d "${UI_ATTEMPT_DIR}/results/FlowTabUITests.xcresult" ]]; then
+    result_bundle_directory_present="true"
+  fi
+  if [[ -f "${UI_ATTEMPT_DIR}/results/FlowTabUITests.xcresult/Info.plist" ]]; then
     result_bundle_present="true"
   fi
 
@@ -299,11 +319,18 @@ write_status() {
     printf '  "ui_wrapper_exit_code": %s,\n' "$UI_WRAPPER_STATUS"
     printf '  "ui_log_exit_code": %s,\n' "$UI_LOG_STATUS"
     printf '  "ui_process_exit_code": %s,\n' "$([[ "$TEST_PROCESS_STATUS" =~ ^[0-9]+$ ]] && printf '%s' "$TEST_PROCESS_STATUS" || printf 'null')"
+    printf '  "ui_result_bundle_directory_present": %s,\n' "$result_bundle_directory_present"
     printf '  "ui_result_bundle_present": %s,\n' "$result_bundle_present"
+    printf '  "ui_result_bundle_valid": %s,\n' "$result_bundle_present"
     printf '  "sampling_failed": %s,\n' "$sampling_failed_json"
     printf '  "termination_timed_out": %s,\n' "$termination_timed_out_json"
     printf '  "identity_verdict": "%s",\n' "$IDENTITY_VERDICT"
     printf '  "identity_check_count": %s,\n' "$IDENTITY_CHECK_COUNT"
+    printf '  "pid_binding_policy_version": "%s",\n' "$PID_BINDING_POLICY_VERSION"
+    printf '  "stable_identity_window_milliseconds": %s,\n' "$TARGET_STABILITY_WINDOW_MILLISECONDS"
+    printf '  "rejected_transient_identity_count": %s,\n' "$REJECTED_TRANSIENT_IDENTITY_COUNT"
+    printf '  "target_terminal_exit_observed": %s,\n' "$target_terminal_exit_observed_json"
+    printf '  "target_termination_verdict": "%s",\n' "$TARGET_TERMINATION_VERDICT"
     printf '  "target_launch_receipt_present": %s,\n' "$([[ -f "$LAUNCH_RECEIPT_FILE" ]] && printf true || printf false)"
     printf '  "sample_count": %s,\n' "$SAMPLE_COUNT"
     printf '  "summary_exit_code": %s,\n' "$SUMMARY_STATUS"
@@ -450,230 +477,28 @@ trap 'handle_signal 130' INT
 trap 'handle_signal 143' TERM
 trap 'handle_exit "$?"' EXIT
 
-monotonic_ns() {
-  /usr/bin/python3 -c 'import time; print(time.monotonic_ns())'
-}
-
-process_start_record() {
-  local pid="$1"
-  local started_at
-  local started_epoch_seconds
-  local start_identity
-
-  started_at="$(LC_ALL=C ps -p "$pid" -o lstart= 2>/dev/null | LC_ALL=C awk '{$1=$1; print}' || true)"
-  [[ -n "$started_at" ]] || return 1
-  started_epoch_seconds="$(LC_ALL=C /bin/date -j -f '%a %b %e %T %Y' "$started_at" '+%s' 2>/dev/null || true)"
-  [[ "$started_epoch_seconds" =~ ^[0-9]+$ ]] || return 1
-  start_identity="$(printf '%s' "$started_at" | LC_ALL=C shasum -a 256 | awk '{print $1}')"
-  printf '%s:%s' "$start_identity" "$started_epoch_seconds"
-}
-
-process_path_matches_expected() {
-  local pid="$1"
-  local command_name
-  local command_line
-
-  command_name="$(LC_ALL=C ps -p "$pid" -o comm= 2>/dev/null | sed 's/^[[:space:]]*//' || true)"
-  if [[ "$command_name" == "$EXPECTED_EXECUTABLE_PATH" ]]; then
-    return 0
-  fi
-
-  command_line="$(LC_ALL=C ps -p "$pid" -o command= 2>/dev/null | sed 's/^[[:space:]]*//' || true)"
-  [[ "$command_line" == "$EXPECTED_EXECUTABLE_PATH" || "$command_line" == "$EXPECTED_EXECUTABLE_PATH "* ]]
-}
-
-matching_identity_rows() {
-  local pid
-  local start_record
-  local current_executable_sha256
-
-  current_executable_sha256="$(LC_ALL=C shasum -a 256 "$EXPECTED_EXECUTABLE_PATH" 2>/dev/null | awk '{print $1}' || true)"
-  [[ "$current_executable_sha256" == "$EXPECTED_EXECUTABLE_SHA256" ]] || return 0
-
-  while IFS= read -r pid; do
-    [[ -n "$pid" ]] || continue
-    process_is_running "$pid" || continue
-    process_path_matches_expected "$pid" || continue
-    start_record="$(process_start_record "$pid" || true)"
-    [[ -n "$start_record" ]] || continue
-    printf '%s:%s\n' "$pid" "$start_record"
-  done < <(pgrep -x "$EXPECTED_EXECUTABLE_NAME" 2>/dev/null || true)
-}
-
-is_preexisting_target_identity() {
-  local candidate="$1"
-  local existing
-
-  while IFS= read -r existing; do
-    [[ -n "$existing" ]] || continue
-    [[ "$candidate" == "$existing" ]] && return 0
-  done <<<"$PREEXISTING_TARGET_IDENTITIES"
-  return 1
-}
-
-capture_preexisting_target_identities() {
-  PREEXISTING_TARGET_IDENTITIES="$(matching_identity_rows)"
-}
-
-publish_launch_receipt() {
-  local observed_monotonic_ns
-
-  observed_monotonic_ns="$(monotonic_ns)"
-  /usr/bin/python3 "$EVIDENCE_TOOL" write-launch-receipt \
-    "$LAUNCH_RECEIPT_FILE" \
-    "$UI_APP_IDENTITY_MANIFEST_SHA256" \
-    "$EXPECTED_APP_PATH" \
-    "$EXPECTED_BUNDLE_ID" \
-    "$EXPECTED_EXECUTABLE_SHA256" \
-    "$EXPECTED_DESIGNATED_REQUIREMENT_SHA256" \
-    "$PID_BINDING_POLICY_VERSION" \
-    "$LAUNCH_REQUEST_MONOTONIC_NS" \
-    "$LAUNCH_REQUEST_EPOCH_SECONDS" \
-    "$observed_monotonic_ns" \
-    "$TARGET_PID" \
-    "$TARGET_START_IDENTITY" \
-    "$TARGET_START_EPOCH_SECONDS"
-}
-
-await_target_launch() {
-  local attempt=0
-  local row
-  local target_start_record
-  local all_rows=()
-  local new_rows=()
-
-  while test_process_is_live && [[ "$attempt" -lt 300 ]]; do
-    all_rows=()
-    new_rows=()
-    while IFS= read -r row; do
-      [[ -n "$row" ]] || continue
-      all_rows+=("$row")
-      if ! is_preexisting_target_identity "$row"; then
-        new_rows+=("$row")
-      fi
-    done < <(matching_identity_rows)
-
-    if [[ "${#all_rows[@]}" -gt 1 ]]; then
-      IDENTITY_VERDICT="multiple_identity_matches"
-      return 1
-    fi
-    if [[ "${#new_rows[@]}" -eq 1 ]]; then
-      TARGET_PID="${new_rows[0]%%:*}"
-      target_start_record="${new_rows[0]#*:}"
-      TARGET_START_IDENTITY="${target_start_record%%:*}"
-      TARGET_START_EPOCH_SECONDS="${target_start_record##*:}"
-      if [[ "$TARGET_START_EPOCH_SECONDS" -lt "$LAUNCH_REQUEST_EPOCH_SECONDS" ]]; then
-        IDENTITY_VERDICT="launch_started_before_request"
-        return 1
-      fi
-      IDENTITY_VERDICT="matched"
-      publish_launch_receipt
-      return 0
-    fi
-
-    sleep 0.1
-    attempt=$((attempt + 1))
-  done
-
-  IDENTITY_VERDICT="launch_identity_not_observed"
-  return 1
-}
-
-record_identity_binding() {
-  local verdict="$1"
-  local pid="${TARGET_PID:-0}"
-  local start_identity="${TARGET_START_IDENTITY:-unavailable}"
-  local start_epoch_seconds="${TARGET_START_EPOCH_SECONDS:-0}"
-  local path_sha256
-
-  path_sha256="$(printf '%s' "$EXPECTED_EXECUTABLE_PATH" | LC_ALL=C shasum -a 256 | awk '{print $1}')"
-  IDENTITY_CHECK_COUNT=$((IDENTITY_CHECK_COUNT + 1))
-  printf '%s,%s,%s,%s,%s,%s,%s,%s\n' \
-    "$IDENTITY_CHECK_COUNT" \
-    "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
-    "$pid" \
-    "$start_epoch_seconds" \
-    "$start_identity" \
-    "$path_sha256" \
-    "$EXPECTED_EXECUTABLE_SHA256" \
-    "$verdict" >>"$PID_BINDINGS_FILE"
-}
-
-validate_target_identity() {
-  local rows=()
-  local row
-  local current_start_record
-  local current_start_identity
-  local current_start_epoch_seconds
-
-  while IFS= read -r row; do
-    [[ -n "$row" ]] || continue
-    rows+=("$row")
-  done < <(matching_identity_rows)
-
-  if [[ "${#rows[@]}" -ne 1 ]]; then
-    IDENTITY_VERDICT="$([[ "${#rows[@]}" -gt 1 ]] && printf multiple_identity_matches || printf identity_match_lost)"
-    record_identity_binding "$IDENTITY_VERDICT"
-    return 1
-  fi
-  if [[ "${rows[0]%%:*}" != "$TARGET_PID" ]]; then
-    IDENTITY_VERDICT="identity_match_replaced"
-    record_identity_binding "$IDENTITY_VERDICT"
-    return 1
-  fi
-
-  current_start_record="${rows[0]#*:}"
-  current_start_identity="${current_start_record%%:*}"
-  current_start_epoch_seconds="${current_start_record##*:}"
-  if [[ "$current_start_identity" != "$TARGET_START_IDENTITY" ]]; then
-    IDENTITY_VERDICT="pid_reused"
-    record_identity_binding "$IDENTITY_VERDICT"
-    return 1
-  fi
-  if [[ "$current_start_epoch_seconds" != "$TARGET_START_EPOCH_SECONDS" ]]; then
-    IDENTITY_VERDICT="process_start_time_changed"
-    record_identity_binding "$IDENTITY_VERDICT"
-    return 1
-  fi
-
-  IDENTITY_VERDICT="matched"
-  record_identity_binding "$IDENTITY_VERDICT"
-  return 0
-}
-
-sample_flowtab() {
-  local line
-  local cpu
-  local rss
-
-  if ! validate_target_identity; then
-    SAMPLING_FAILED=true
-    return 1
-  fi
-  line="$(LC_ALL=C ps -p "$TARGET_PID" -o %cpu= -o rss= 2>/dev/null | LC_ALL=C awk '{$1=$1; print}' || true)"
-  if [[ -z "$line" ]]; then
-    SAMPLING_FAILED=true
-    IDENTITY_VERDICT="sample_unavailable"
-    return 1
-  fi
-  cpu="$(LC_ALL=C awk '{print $1}' <<<"$line")"
-  rss="$(LC_ALL=C awk '{print $2}' <<<"$line")"
-
-  SAMPLE_COUNT=$((SAMPLE_COUNT + 1))
-  printf '%s,%s,%s,%s,%s\n' \
-    "$SAMPLE_COUNT" \
-    "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" \
-    "$TARGET_PID" \
-    "$cpu" \
-    "$rss" >>"$SAMPLES_FILE"
-}
-
 test_process_is_live() {
   local process_state
 
   kill -0 "$TEST_PID" 2>/dev/null || return 1
   process_state="$(LC_ALL=C ps -p "$TEST_PID" -o stat= 2>/dev/null | LC_ALL=C awk '{$1=$1; print}' || true)"
   [[ "$process_state" != Z* ]]
+}
+
+target_loss_can_be_terminal() {
+  [[ "$IDENTITY_VERDICT" == "identity_match_lost" || "$IDENTITY_VERDICT" == "sample_unavailable" ]]
+}
+
+ui_process_finishes_within_target_exit_grace() {
+  local elapsed_tenths=0
+  local grace_tenths=$((TARGET_EXIT_GRACE_SECONDS * 10))
+
+  # XCTest tears down the App before xcodebuild finalizes its result bundle.
+  while test_process_is_live && [[ "$elapsed_tenths" -lt "$grace_tenths" ]]; do
+    sleep 0.1
+    elapsed_tenths=$((elapsed_tenths + 1))
+  done
+  ! test_process_is_live
 }
 
 run_ui_test() {
@@ -728,6 +553,13 @@ echo "[2/3] Sampling FlowTab CPU/RSS every ${SAMPLE_INTERVAL_SECONDS}s..."
 CURRENT_STAGE="sampling"
 while test_process_is_live; do
   if ! sample_flowtab; then
+    TARGET_TERMINATION_VERDICT="$IDENTITY_VERDICT"
+    if target_loss_can_be_terminal && ui_process_finishes_within_target_exit_grace; then
+      TARGET_TERMINAL_EXIT_OBSERVED=true
+      IDENTITY_VERDICT="matched"
+      break
+    fi
+    SAMPLING_FAILED=true
     IDENTITY_FAILED=true
     break
   fi
@@ -769,6 +601,11 @@ echo "UI child attempt: $UI_ATTEMPT_DIR"
 
 if [[ "$UI_LOG_STATUS" != "null" && "$UI_LOG_STATUS" -ne 0 ]]; then
   CURRENT_STAGE="ui_log_failed"
+  exit 1
+fi
+if [[ ! -f "${UI_ATTEMPT_DIR}/results/FlowTabUITests.xcresult/Info.plist" ]]; then
+  CURRENT_STAGE="ui_result_bundle_invalid"
+  echo "UI pressure result bundle is incomplete: ${UI_ATTEMPT_DIR}/results/FlowTabUITests.xcresult" >&2
   exit 1
 fi
 if [[ "$UI_WRAPPER_STATUS" != "null" && "$UI_WRAPPER_STATUS" -ne 0 ]]; then
