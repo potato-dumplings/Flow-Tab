@@ -88,13 +88,31 @@ enum FlowTabUITestBootstrapper {
         }
     }
 
+    static var resolvedRuntimeProjectionService: any RuntimeProjectionServing {
+        AppDelegate.testHooks.runtimeProjectionService ?? sharedRuntimeProjectionService
+    }
+
     private static func installMockRuntimeProjectionServiceIfNeeded() {
         guard FlowTabTestLaunchOptions.usesMockRuntimeProjection else { return }
         guard AppDelegate.testHooks.runtimeProjectionService == nil else { return }
-        AppDelegate.testHooks.runtimeProjectionService = RuntimeProjectionService(
+        let service = RuntimeProjectionService(
             label: "FlowTab.UITest.MockRuntimeProjectionService",
             appDirectoryProvider: RuntimeUITestProjectionAppDirectoryProvider()
         )
+        AppDelegate.testHooks.runtimeProjectionService = service
+        service.requestAppSwitcherProjectionMaintenance(reason: .switcherSessionStarted)
+        service.waitForMaintenanceQueueForTesting()
+
+        if AccessibilityPermissionChecker.isTrusted(),
+           let dataset = FlowTabUITestRuntimeProjectionDataset.current() {
+            for entry in dataset.appDirectoryEntries {
+                service.signalAppWindowsChanged(appID: entry.appID, pid: entry.pid)
+            }
+            service.waitForMaintenanceQueueForTesting()
+        }
+
+        service.requestSearchIndexFreshnessBarrier(reason: .searchFreshnessBarrier)
+        service.waitForMaintenanceQueueForTesting()
     }
 
     private static func seedWindowRecencyIfNeeded() {

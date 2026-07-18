@@ -769,7 +769,7 @@ final class LiveSwitcherModel: ObservableObject {
 
     @discardableResult
     func autoEnterWindowLayerIfPossible() -> Bool {
-        guard var session else { return false }
+        guard !pendingSearchActivationAfterFreshnessBarrier, var session else { return false }
         if case .windowCycle = session.mode {
             return false
         }

@@ -14,14 +14,18 @@ struct FlowTabApp: App {
 
     var body: some Scene {
         WindowGroup("FlowTab") {
-            HomeRootView()
+            HomeRootView(
+                runtimeProjectionService: FlowTabUITestBootstrapper.resolvedRuntimeProjectionService
+            )
                 .frame(minWidth: AppWindowLayout.width, minHeight: AppWindowLayout.height)
         }
         .defaultSize(width: AppWindowLayout.width, height: AppWindowLayout.height)
         .windowStyle(.hiddenTitleBar)
 
         Settings {
-            HomeRootView()
+            HomeRootView(
+                runtimeProjectionService: FlowTabUITestBootstrapper.resolvedRuntimeProjectionService
+            )
                 .frame(minWidth: AppWindowLayout.width, minHeight: AppWindowLayout.height)
         }
         .windowStyle(.hiddenTitleBar)

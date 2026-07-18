@@ -878,7 +878,7 @@ extension LiveSwitcherModel {
 
     var canAutoEnterWindowLayer: Bool {
         guard let session else { return false }
-        guard !searchViewState.isActive else { return false }
+        guard !searchViewState.isActive, !pendingSearchActivationAfterFreshnessBarrier else { return false }
         if case .windowCycle = session.mode {
             return false
         }

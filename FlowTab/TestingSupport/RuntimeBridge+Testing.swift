@@ -480,6 +480,110 @@ struct FlowTabUITestRuntimeProjectionDataset {
         )
     }
 
+    func seedWindowRecordCoverage(
+        in windowRecordStore: RuntimeWindowRecordStore
+    ) -> RuntimeFullRepairWindowRecordRefreshEvidence {
+        guard AccessibilityPermissionChecker.isTrusted() else {
+            for entry in appDirectoryEntries {
+                windowRecordStore.setState(
+                    RuntimeWindowMappingState(hasRecordedWindowCollection: true),
+                    for: entry.pid
+                )
+            }
+            return RuntimeFullRepairWindowRecordRefreshEvidence(
+                runningAppCount: appDirectoryEntries.count,
+                projectedWindowPIDCount: appDirectoryEntries.count,
+                projectedWindowCount: 0
+            )
+        }
+
+        let seededAt = Date.timeIntervalSinceReferenceDate
+        var seededPIDs: Set<pid_t> = []
+        var projectedWindowCount = 0
+        for payload in currentAppWindowPayloadsByAppID.values {
+            var recordsByCGWindowID: [CGWindowID: RuntimeWindowRecord] = [:]
+            var currentAXToCG: [String: CGWindowID] = [:]
+            let ownerAXElement = AXUIElementCreateApplication(
+                payload.context.runningApp.processIdentifier
+            )
+            for (index, window) in payload.candidate.windows.enumerated() {
+                let context = payload.context.windowsByID[window.id]
+                var cgWindowID = context?.cgWindowID ?? Self.syntheticCGWindowID(
+                    appID: payload.summary.appID,
+                    windowID: window.id
+                )
+                while recordsByCGWindowID[cgWindowID] != nil {
+                    cgWindowID &+= 1
+                }
+                let axWindowID = context?.activationHandleID
+                    ?? "ui-test:\(payload.summary.appID)#\(window.id)"
+                let observedAt = seededAt - Double(index)
+                var record = RuntimeWindowRecord(
+                    cgWindowID: cgWindowID,
+                    stableWindowID: window.id,
+                    firstSeenAt: observedAt
+                )
+                record.lastKnownCGTitle = window.title
+                record.lastKnownCGFrame = context?.frame
+                record.lastKnownCGIsOnscreen = !window.isMinimized
+                record.lastKnownDisplayTitle = window.title
+                record.currentAXAttachment = RuntimeCurrentAXAttachment(
+                    axWindowID: axWindowID,
+                    axWindow: context?.axWindow ?? ownerAXElement,
+                    title: window.title,
+                    frame: context?.frame,
+                    state: RuntimeAXWindowState(
+                        isMinimized: window.isMinimized,
+                        isFocused: index == 0,
+                        isMain: index == 0
+                    )
+                )
+                record.lastExactAXWindowID = axWindowID
+                record.lastExactAXWindow = context?.axWindow ?? ownerAXElement
+                record.lastConfirmationSource = .publicExactMatch
+                record.lastExactConfirmedAt = observedAt
+                recordsByCGWindowID[cgWindowID] = record
+                currentAXToCG[axWindowID] = cgWindowID
+            }
+            windowRecordStore.setState(
+                RuntimeWindowMappingState(
+                    windowRecordsByCGWindowID: recordsByCGWindowID,
+                    currentAXToCG: currentAXToCG,
+                    validCGWindowIDs: Set(recordsByCGWindowID.keys),
+                    lastAXWindowIDs: Set(currentAXToCG.keys),
+                    hasRecordedWindowCollection: true,
+                    hasObservedAXWindowHandle: !recordsByCGWindowID.isEmpty
+                ),
+                for: payload.summary.pid
+            )
+            seededPIDs.insert(payload.summary.pid)
+            projectedWindowCount += recordsByCGWindowID.count
+        }
+        for entry in appDirectoryEntries where !seededPIDs.contains(entry.pid) {
+            windowRecordStore.setState(
+                RuntimeWindowMappingState(hasRecordedWindowCollection: true),
+                for: entry.pid
+            )
+        }
+        return RuntimeFullRepairWindowRecordRefreshEvidence(
+            runningAppCount: appDirectoryEntries.count,
+            projectedWindowPIDCount: appDirectoryEntries.count,
+            projectedWindowCount: projectedWindowCount
+        )
+    }
+
+    private static func syntheticCGWindowID(appID: String, windowID: String) -> CGWindowID {
+        let prime: UInt64 = 1_099_511_628_211
+        var hash: UInt64 = 14_695_981_039_346_656_037
+        for byte in "\(appID)#\(windowID)".utf8 {
+            hash ^= UInt64(byte)
+            hash = hash &* prime
+        }
+        let base: UInt64 = 900_000
+        let range = UInt64(UInt32.max) - base
+        return CGWindowID(base + (hash % range))
+    }
+
     private static func uiTestSummaryPID(
         for definition: UITestAppDefinition,
         runningApp: NSRunningApplication,

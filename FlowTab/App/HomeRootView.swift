@@ -5,6 +5,13 @@ import FlowTabCore
 struct HomeRootView: View {
     @ObservedObject private var tabState = HomeTabState.shared
     @ObservedObject private var presentation = FlowPresentationState.shared
+    private let runtimeProjectionService: any RuntimeProjectionServing
+
+    init(
+        runtimeProjectionService: any RuntimeProjectionServing = homeRuntimeProjectionService
+    ) {
+        self.runtimeProjectionService = runtimeProjectionService
+    }
 
     private var dividerColor: Color {
         presentation.context.resolvedColorScheme == .dark
@@ -39,7 +46,8 @@ struct HomeRootView: View {
                 tabContainer(isSelected: tabState.selectedTab == .home) {
                     HomeLandingView(
                         isActive: tabState.selectedTab == .home,
-                        appLanguage: presentation.context.appLanguage
+                        appLanguage: presentation.context.appLanguage,
+                        runtimeProjectionService: runtimeProjectionService
                     ) {
                         tabState.selectedTab = .settings
                     }

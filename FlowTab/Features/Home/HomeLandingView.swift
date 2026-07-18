@@ -142,6 +142,12 @@ struct HomeLandingView: View {
             scheduleAppSummariesRefresh(reason: "workspace_terminate")
         }
         .onReceive(NotificationCenter.default.publisher(
+            for: .runtimeAppSwitcherProjectionDidUpdate
+        )) { _ in
+            guard isActive else { return }
+            scheduleAppSummariesRefresh(reason: "runtime_projection_updated")
+        }
+        .onReceive(NotificationCenter.default.publisher(
             for: NSApplication.didBecomeActiveNotification
         )) { _ in
             guard isActive else { return }
@@ -699,21 +705,12 @@ struct HomeLandingView: View {
                 ) {
                     loadingWindowCountAppIDs.remove(appID)
                 }
-                if loadingWindowCountAppIDs.isEmpty {
-                    appSummaries.removeAll { $0.appID == appID }
-                    windowsByAppID.removeValue(forKey: appID)
-                    homeDetailProjectionsByAppID.removeValue(forKey: appID)
-                    syncSelectedApp()
-                    setupWindowMonitorIfNeeded()
-                    persistCache()
-                    if let selectedAppID = currentSelectedAppID, windowsByAppID[selectedAppID] == nil {
-                        scheduleSelectedAppRefresh(
-                            appID: selectedAppID,
-                            force: true,
-                            reason: "selected_after_remove"
-                        )
-                    }
-                }
+                setupWindowMonitorIfCountsReady()
+                persistCache()
+                RuntimeLog.debug(
+                    .projection,
+                    "homeRefreshSingleAppProjection result=detailUnavailable appID=\(appID) reason=\(reason) totalMs=\(formatHomeMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))"
+                )
                 return
             }
 

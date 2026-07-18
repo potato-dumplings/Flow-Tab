@@ -490,7 +490,27 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
 
     @discardableResult
     private func drainReadyReconciliationRequestsLocked(now: TimeInterval) -> [RuntimeReconciliationRequest] {
-        drainReadyReconciliationRequestResultLocked(now: now).startedRequests
+        var result = drainReadyReconciliationRequestResultLocked(now: now)
+        var commitGeneratedAt = now
+        if pendingSearchIndexFreshnessBarrier {
+            let followUpNow = Date.timeIntervalSinceReferenceDate
+            let followUpResult = drainSearchFreshnessBarrierReadyRequestsLocked(now: followUpNow)
+            commitCurrentAppRepairEvidenceLocked(
+                followUpResult.currentAppRepairEvidence,
+                generatedAt: followUpNow
+            )
+            if !followUpResult.completedAffectedCGWindowIDs.isEmpty {
+                commitMainTableAppSwitcherProjectionLocked(
+                    generatedAt: followUpNow,
+                    requiresExistingProjectionCoverage: true,
+                    clearsDirtyCGWindowIDs: followUpResult.completedAffectedCGWindowIDs
+                )
+            }
+            result.append(followUpResult)
+            commitGeneratedAt = followUpNow
+        }
+        commitPendingSearchIndexFreshnessBarrierIfNeededLocked(generatedAt: commitGeneratedAt)
+        return result.startedRequests
     }
 
     @discardableResult
