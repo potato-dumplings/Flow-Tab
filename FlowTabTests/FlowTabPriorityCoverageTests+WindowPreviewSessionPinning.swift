@@ -50,7 +50,6 @@ extension FlowTabPriorityCoverageTests {
             windows: windows
         )
         let (model, runtimeProjectionService) = makeAppSwitcherProjectionModel(app: app, context: context)
-
         let allCapturesFinished = expectation(description: "deferred previews captured after visible page")
         var capturedTitles: [String] = []
         model.previewCaptureOverride = { _, _, title, _ in
@@ -124,7 +123,8 @@ extension FlowTabPriorityCoverageTests {
 
         let visibleRange = 240..<256
         let initialSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: visibleRange)
-        XCTAssertTrue(initialSnapshot.isEmpty)
+        XCTAssertEqual(initialSnapshot.count, visibleRange.count)
+        XCTAssertTrue(initialSnapshot.allSatisfy { !$0.hasImage })
 
         await fulfillment(of: [visibleBatchStarted], timeout: 1.0)
         batchStateLock.lock()
@@ -270,7 +270,7 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testLiveSwitcherModelRuntimeVisiblePreviewWaitsForBatchBeforeShowingPage() async {
+    func testLiveSwitcherModelRuntimeVisiblePreviewShowsFallbackWhileBatchIsInFlight() async {
         let currentApp = NSRunningApplication.current
         let appID = "com.flowtab.tests.preview-visible-batch"
         let windows = (0..<6).map { index in
@@ -300,6 +300,7 @@ extension FlowTabPriorityCoverageTests {
         let batchStateLock = NSLock()
         var batchCallCount = 0
         var batchRequestTitles: [String] = []
+        let capturedImage = makeColorImage(color: .systemPurple)
         model.previewCaptureBatchOverride = { requests in
             batchStateLock.lock()
             batchCallCount += 1
@@ -309,7 +310,7 @@ extension FlowTabPriorityCoverageTests {
             batchReleased.wait()
             return requests.enumerated().map { index, _ in
                 RuntimeWindowPreviewProvider.CaptureResult(
-                    image: self.makeColorImage(color: .systemPurple),
+                    image: capturedImage,
                     resolvedWindowID: CGWindowID(index + 1),
                     titleBarStyle: nil
                 )
@@ -322,7 +323,8 @@ extension FlowTabPriorityCoverageTests {
 
         let visibleRange = 0..<6
         let initialSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: visibleRange)
-        XCTAssertTrue(initialSnapshot.isEmpty)
+        XCTAssertEqual(initialSnapshot.count, visibleRange.count)
+        XCTAssertTrue(initialSnapshot.allSatisfy { !$0.hasImage })
 
         await fulfillment(of: [batchStarted], timeout: 1.0)
         batchStateLock.lock()
@@ -332,9 +334,11 @@ extension FlowTabPriorityCoverageTests {
 
         let batchPublished = expectation(description: "visible preview batch published")
         var publishCount = 0
+        var publicationWasOnMainThread = false
         var cancellables: Set<AnyCancellable> = []
         model.objectWillChange.sink {
             publishCount += 1
+            publicationWasOnMainThread = Thread.isMainThread
             if publishCount == 1 {
                 batchPublished.fulfill()
             }
@@ -343,6 +347,7 @@ extension FlowTabPriorityCoverageTests {
         batchReleased.signal()
         await fulfillment(of: [batchPublished], timeout: 1.0)
         XCTAssertEqual(publishCount, 1)
+        XCTAssertTrue(publicationWasOnMainThread)
 
         let completedSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: visibleRange)
         XCTAssertEqual(completedSnapshot.count, visibleRange.count)
@@ -395,7 +400,8 @@ extension FlowTabPriorityCoverageTests {
 
         let visibleRange = 0..<4
         let initialSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: visibleRange)
-        XCTAssertTrue(initialSnapshot.isEmpty)
+        XCTAssertEqual(initialSnapshot.count, visibleRange.count)
+        XCTAssertTrue(initialSnapshot.allSatisfy { !$0.hasImage })
         await fulfillment(of: [batchStarted], timeout: 1.0)
 
         let batchPublished = expectation(description: "failed visible preview batch published")
@@ -467,7 +473,8 @@ extension FlowTabPriorityCoverageTests {
         }.store(in: &cancellables)
 
         let initialSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: visibleRange)
-        XCTAssertTrue(initialSnapshot.isEmpty)
+        XCTAssertEqual(initialSnapshot.count, visibleRange.count)
+        XCTAssertTrue(initialSnapshot.allSatisfy { !$0.hasImage })
 
         await fulfillment(of: [batchPublished], timeout: 1.0)
 

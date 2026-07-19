@@ -119,7 +119,9 @@ enum SwitcherPanelWindowConfiguration {
 
     static let styleMask: NSWindow.StyleMask = [.borderless, .nonactivatingPanel]
     static let level: NSWindow.Level = .statusBar
-    static let sharingType: NSWindow.SharingType = .none
+    static var sharingType: NSWindow.SharingType {
+        resolvedSharingType(isRunningUITests: FlowTabTestLaunchOptions.isRunningUITests)
+    }
     static let fallbackPresentationLevel = NSWindow.Level(
         rawValue: Int(CGShieldingWindowLevel()) + 1
     )
@@ -138,6 +140,10 @@ enum SwitcherPanelWindowConfiguration {
     ) -> NSWindow.Level {
         guard frontmostWindowIsFullScreen else { return level }
         return fallbackPresentationLevel
+    }
+
+    static func resolvedSharingType(isRunningUITests: Bool) -> NSWindow.SharingType {
+        isRunningUITests ? .readOnly : .none
     }
 
     static func presentationCollectionBehavior(

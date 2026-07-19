@@ -4,6 +4,7 @@ import Foundation
 enum FlowTabTestLaunchOptions {
     static let uiTestingEnvironmentKey = "FLOWTAB_UI_TESTING"
     static let uiTestingEnvironmentValue = "1"
+    static let unitTestingBundlePathEnvironmentKey = "XCTestBundlePath"
 
     static var argumentsOverrideForTesting: [String]?
     static var environmentOverrideForTesting: [String: String]?
@@ -65,7 +66,8 @@ enum FlowTabTestLaunchOptions {
     }
 
     static var suppressesHomeWindowOnLaunch: Bool {
-        containsUITestArgument("--flowtab-ui-suppress-home-on-launch")
+        isRunningUnitTests
+            || containsUITestArgument("--flowtab-ui-suppress-home-on-launch")
     }
 
     static var suppressesPanelApplicationActivation: Bool {
@@ -149,6 +151,14 @@ enum FlowTabTestLaunchOptions {
     static var isRunningUITests: Bool {
         environment[uiTestingEnvironmentKey] == uiTestingEnvironmentValue
             && arguments.contains(where: { uiTestArguments.contains($0) })
+    }
+
+    static var isRunningUnitTests: Bool {
+        guard !isRunningUITests else { return false }
+        guard let bundlePath = environment[unitTestingBundlePathEnvironmentKey] else {
+            return false
+        }
+        return URL(fileURLWithPath: bundlePath).lastPathComponent == "FlowTabTests.xctest"
     }
 
     static var showsSwitcherDiagnostics: Bool {

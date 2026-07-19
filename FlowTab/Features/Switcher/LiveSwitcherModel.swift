@@ -555,7 +555,8 @@ final class LiveSwitcherModel: ObservableObject {
             preferredSelectedAppID: preferredSelectedAppID,
             animateAppStripUpdate: true,
             preserveSearchState: false,
-            resetWhenEmpty: false
+            resetWhenEmpty: false,
+            preservePreviewSnapshotState: true
         )
         guard refreshed else { return false }
         restoreSessionModeAfterProjectionUpdate(

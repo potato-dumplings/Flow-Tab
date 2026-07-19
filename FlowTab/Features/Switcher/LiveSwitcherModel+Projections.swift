@@ -8,6 +8,7 @@ extension LiveSwitcherModel {
         animateAppStripUpdate _: Bool = false,
         preserveSearchState: Bool = false,
         resetWhenEmpty: Bool = true,
+        preservePreviewSnapshotState: Bool = false,
         removingTerminatedAppID: String? = nil,
         terminatedPID: pid_t? = nil
     ) -> Bool {
@@ -28,7 +29,8 @@ extension LiveSwitcherModel {
             startMs: startMs,
             projectionReadMs: projectionReadMs,
             logEvent: "loadAppSwitcherProjectionSession",
-            resetWhenEmpty: resetWhenEmpty
+            resetWhenEmpty: resetWhenEmpty,
+            preservePreviewSnapshotState: preservePreviewSnapshotState
         )
     }
 
@@ -71,7 +73,8 @@ extension LiveSwitcherModel {
             startMs: startMs,
             projectionReadMs: projectionReadMs,
             logEvent: "loadFastAppSwitcherProjectionSession",
-            resetWhenEmpty: true
+            resetWhenEmpty: true,
+            preservePreviewSnapshotState: false
         )
     }
 
@@ -84,7 +87,8 @@ extension LiveSwitcherModel {
         startMs: Double,
         projectionReadMs: Double,
         logEvent: String,
-        resetWhenEmpty: Bool
+        resetWhenEmpty: Bool,
+        preservePreviewSnapshotState: Bool
     ) -> Bool {
         let payload = appSwitcherPayloadWithHiddenAppsFiltered(
             appSwitcherPayloadWithWindowRecencyApplied(rawPayload)
@@ -105,7 +109,9 @@ extension LiveSwitcherModel {
         }
 
         runtimeContextsByID = payload.contextsByID
-        clearPreviewSnapshotState()
+        if !preservePreviewSnapshotState {
+            clearPreviewSnapshotState()
+        }
         autoEnterSuppressedAppID = nil
         let preferences = SwitcherBehaviorPreferencesStore.loadSwitcherPreferences()
         var rebuiltSession = SwitcherSession(

@@ -29,10 +29,13 @@
 		B28010012FF100100B0D737 /* SwitcherWindowPreviewPaging.swift in Sources */ = {isa = PBXBuildFile; fileRef = B28000012FF100100B0D737 /* SwitcherWindowPreviewPaging.swift */; };
 		A1B2C4112F73000100B0D737 /* SwitcherPanelWindowConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4012F73000100B0D737 /* SwitcherPanelWindowConfiguration.swift */; };
 		A1B2C4122F73000100B0D737 /* SwitcherPanelController+Presentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4022F73000100B0D737 /* SwitcherPanelController+Presentation.swift */; };
+		D7A200023A21000100B0D737 /* SwitcherPanelController+SelectionLifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7A200013A21000100B0D737 /* SwitcherPanelController+SelectionLifecycle.swift */; };
 		B32010012FF6000100B0D737 /* SwitcherPanelController+InitialVisibilityRecovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = B32000012FF6000100B0D737 /* SwitcherPanelController+InitialVisibilityRecovery.swift */; };
 		A1B2C4132F73000100B0D737 /* SwitcherPanelController+InputHandling.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4032F73000100B0D737 /* SwitcherPanelController+InputHandling.swift */; };
+		D7A100023A21000100B0D737 /* SwitcherPanelController+ModifierDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7A100013A21000100B0D737 /* SwitcherPanelController+ModifierDiagnostics.swift */; };
 		A1B2C4142F73000100B0D737 /* SwitcherPanelController+Hotkeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4042F73000100B0D737 /* SwitcherPanelController+Hotkeys.swift */; };
 		A1B2C4152F73000100B0D737 /* LiveSwitcherModel+Preview.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4052F73000100B0D737 /* LiveSwitcherModel+Preview.swift */; };
+		D7A000023A21000100B0D737 /* LiveSwitcherModel+PreviewSnapshots.swift in Sources */ = {isa = PBXBuildFile; fileRef = D7A000013A21000100B0D737 /* LiveSwitcherModel+PreviewSnapshots.swift */; };
 		A1B2C4162F73000100B0D737 /* LiveSwitcherModel+Search.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4062F73000100B0D737 /* LiveSwitcherModel+Search.swift */; };
 		A1B2C4172F73000100B0D737 /* LiveSwitcherModel+Types.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4072F73000100B0D737 /* LiveSwitcherModel+Types.swift */; };
 		B25010012FD000100B0D737 /* LiveSwitcherModel+Diagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = B25000012FD000100B0D737 /* LiveSwitcherModel+Diagnostics.swift */; };
@@ -91,6 +94,7 @@
 		B10011082F76000100B0D737 /* FlowTabPriorityCoverageTests+HotkeyMonitorAndRuntimeState.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001082F76000100B0D737 /* FlowTabPriorityCoverageTests+HotkeyMonitorAndRuntimeState.swift */; };
 		B10011092F76000100B0D737 /* FlowTabPriorityCoverageTests+AppDelegateLifecycle.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001092F76000100B0D737 /* FlowTabPriorityCoverageTests+AppDelegateLifecycle.swift */; };
 		B100110A2F76000100B0D737 /* FlowTabPriorityCoverageTests+PanelSessionBehavior.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100010A2F76000100B0D737 /* FlowTabPriorityCoverageTests+PanelSessionBehavior.swift */; };
+		C1F000023A20000100B0D737 /* FlowTabPriorityCoverageTests+SwitcherInteractionRegressions.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1F000013A20000100B0D737 /* FlowTabPriorityCoverageTests+SwitcherInteractionRegressions.swift */; };
 		C1A700023A10000100B0D737 /* FlowTabPriorityCoverageTests+SwitcherTerminationProtection.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A700013A10000100B0D737 /* FlowTabPriorityCoverageTests+SwitcherTerminationProtection.swift */; };
 		B100110B2F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeSnapshotAndPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100010B2F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeSnapshotAndPreview.swift */; };
 		B100110C2F76000100B0D737 /* FlowTabPriorityCoverageTests+CacheAndIcons.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100010C2F76000100B0D737 /* FlowTabPriorityCoverageTests+CacheAndIcons.swift */; };
@@ -118,6 +122,7 @@
 		B10012022F76000100B0D737 /* FlowTabUITests+Settings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002022F76000100B0D737 /* FlowTabUITests+Settings.swift */; };
 		E12000033600000100B0D737 /* FlowTabUITests+EnglishLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = E12000023600000100B0D737 /* FlowTabUITests+EnglishLayout.swift */; };
 		B10012032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift */; };
+		C1F100023A20000100B0D737 /* FlowTabUITests+SwitcherInteractionRegressions.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1F100013A20000100B0D737 /* FlowTabUITests+SwitcherInteractionRegressions.swift */; };
 		F8A1000236B0000100B0D737 /* FlowTabUITests+RuntimeProjectionPublication.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8A1000136B0000100B0D737 /* FlowTabUITests+RuntimeProjectionPublication.swift */; };
 		B10012042F76000100B0D737 /* FlowTabUITests+Support.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10002042F76000100B0D737 /* FlowTabUITests+Support.swift */; };
 		F9A1000236C0000100B0D737 /* FlowTabUITests+ScrollingSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9A1000136C0000100B0D737 /* FlowTabUITests+ScrollingSupport.swift */; };
@@ -278,10 +283,13 @@
 		B28000012FF100100B0D737 /* SwitcherWindowPreviewPaging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherWindowPreviewPaging.swift; sourceTree = "<group>"; };
 		A1B2C4012F73000100B0D737 /* SwitcherPanelWindowConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwitcherPanelWindowConfiguration.swift; sourceTree = "<group>"; };
 		A1B2C4022F73000100B0D737 /* SwitcherPanelController+Presentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelController+Presentation.swift"; sourceTree = "<group>"; };
+		D7A200013A21000100B0D737 /* SwitcherPanelController+SelectionLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelController+SelectionLifecycle.swift"; sourceTree = "<group>"; };
 		B32000012FF6000100B0D737 /* SwitcherPanelController+InitialVisibilityRecovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelController+InitialVisibilityRecovery.swift"; sourceTree = "<group>"; };
 		A1B2C4032F73000100B0D737 /* SwitcherPanelController+InputHandling.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelController+InputHandling.swift"; sourceTree = "<group>"; };
+		D7A100013A21000100B0D737 /* SwitcherPanelController+ModifierDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelController+ModifierDiagnostics.swift"; sourceTree = "<group>"; };
 		A1B2C4042F73000100B0D737 /* SwitcherPanelController+Hotkeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelController+Hotkeys.swift"; sourceTree = "<group>"; };
 		A1B2C4052F73000100B0D737 /* LiveSwitcherModel+Preview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LiveSwitcherModel+Preview.swift"; sourceTree = "<group>"; };
+		D7A000013A21000100B0D737 /* LiveSwitcherModel+PreviewSnapshots.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LiveSwitcherModel+PreviewSnapshots.swift"; sourceTree = "<group>"; };
 		A1B2C4062F73000100B0D737 /* LiveSwitcherModel+Search.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LiveSwitcherModel+Search.swift"; sourceTree = "<group>"; };
 		A1B2C4072F73000100B0D737 /* LiveSwitcherModel+Types.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LiveSwitcherModel+Types.swift"; sourceTree = "<group>"; };
 		B25000012FD000100B0D737 /* LiveSwitcherModel+Diagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "LiveSwitcherModel+Diagnostics.swift"; sourceTree = "<group>"; };
@@ -331,6 +339,7 @@
 		B10001082F76000100B0D737 /* FlowTabPriorityCoverageTests+HotkeyMonitorAndRuntimeState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+HotkeyMonitorAndRuntimeState.swift"; sourceTree = "<group>"; };
 		B10001092F76000100B0D737 /* FlowTabPriorityCoverageTests+AppDelegateLifecycle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+AppDelegateLifecycle.swift"; sourceTree = "<group>"; };
 		B100010A2F76000100B0D737 /* FlowTabPriorityCoverageTests+PanelSessionBehavior.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+PanelSessionBehavior.swift"; sourceTree = "<group>"; };
+		C1F000013A20000100B0D737 /* FlowTabPriorityCoverageTests+SwitcherInteractionRegressions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+SwitcherInteractionRegressions.swift"; sourceTree = "<group>"; };
 		C1A700013A10000100B0D737 /* FlowTabPriorityCoverageTests+SwitcherTerminationProtection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+SwitcherTerminationProtection.swift"; sourceTree = "<group>"; };
 		B100010B2F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeSnapshotAndPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+RuntimeSnapshotAndPreview.swift"; sourceTree = "<group>"; };
 		B100010C2F76000100B0D737 /* FlowTabPriorityCoverageTests+CacheAndIcons.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+CacheAndIcons.swift"; sourceTree = "<group>"; };
@@ -358,6 +367,7 @@
 		B10002022F76000100B0D737 /* FlowTabUITests+Settings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+Settings.swift"; sourceTree = "<group>"; };
 		E12000023600000100B0D737 /* FlowTabUITests+EnglishLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+EnglishLayout.swift"; sourceTree = "<group>"; };
 		B10002032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SwitcherAndSearch.swift"; sourceTree = "<group>"; };
+		C1F100013A20000100B0D737 /* FlowTabUITests+SwitcherInteractionRegressions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SwitcherInteractionRegressions.swift"; sourceTree = "<group>"; };
 		F8A1000136B0000100B0D737 /* FlowTabUITests+RuntimeProjectionPublication.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+RuntimeProjectionPublication.swift"; sourceTree = "<group>"; };
 		B10002042F76000100B0D737 /* FlowTabUITests+Support.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+Support.swift"; sourceTree = "<group>"; };
 		F9A1000136C0000100B0D737 /* FlowTabUITests+ScrollingSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+ScrollingSupport.swift"; sourceTree = "<group>"; };
@@ -581,6 +591,7 @@
 				B10001082F76000100B0D737 /* FlowTabPriorityCoverageTests+HotkeyMonitorAndRuntimeState.swift */,
 				B10001092F76000100B0D737 /* FlowTabPriorityCoverageTests+AppDelegateLifecycle.swift */,
 				B100010A2F76000100B0D737 /* FlowTabPriorityCoverageTests+PanelSessionBehavior.swift */,
+				C1F000013A20000100B0D737 /* FlowTabPriorityCoverageTests+SwitcherInteractionRegressions.swift */,
 				C1A700013A10000100B0D737 /* FlowTabPriorityCoverageTests+SwitcherTerminationProtection.swift */,
 				B100010B2F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeSnapshotAndPreview.swift */,
 				B100010C2F76000100B0D737 /* FlowTabPriorityCoverageTests+CacheAndIcons.swift */,
@@ -619,6 +630,7 @@
 				B10002052F76000100B0D737 /* FlowTabUITests+SettingsSearch.swift */,
 				F7B8C9D535B8000100B0D737 /* FlowTabUITests+LaunchAtLoginSettings.swift */,
 				B10002032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift */,
+				C1F100013A20000100B0D737 /* FlowTabUITests+SwitcherInteractionRegressions.swift */,
 				F8A1000136B0000100B0D737 /* FlowTabUITests+RuntimeProjectionPublication.swift */,
 				B31002012FF400100B0D737 /* FlowTabUITests+StatusItem.swift */,
 				B10002042F76000100B0D737 /* FlowTabUITests+Support.swift */,
@@ -680,12 +692,15 @@
 				A1B2C4012F73000100B0D737 /* SwitcherPanelWindowConfiguration.swift */,
 				A1B2C3E12F73000100B0D737 /* SwitcherPanelController.swift */,
 				A1B2C4022F73000100B0D737 /* SwitcherPanelController+Presentation.swift */,
+				D7A200013A21000100B0D737 /* SwitcherPanelController+SelectionLifecycle.swift */,
 				B32000012FF6000100B0D737 /* SwitcherPanelController+InitialVisibilityRecovery.swift */,
 				B26000032FE000100B0D737 /* SwitcherPanelController+PresentationDiagnostics.swift */,
 				A1B2C4032F73000100B0D737 /* SwitcherPanelController+InputHandling.swift */,
+				D7A100013A21000100B0D737 /* SwitcherPanelController+ModifierDiagnostics.swift */,
 				A1B2C4042F73000100B0D737 /* SwitcherPanelController+Hotkeys.swift */,
 				A1B2C3E22F73000100B0D737 /* LiveSwitcherModel.swift */,
 				A1B2C4052F73000100B0D737 /* LiveSwitcherModel+Preview.swift */,
+				D7A000013A21000100B0D737 /* LiveSwitcherModel+PreviewSnapshots.swift */,
 				A1B2C4062F73000100B0D737 /* LiveSwitcherModel+Search.swift */,
 				A1B2C4072F73000100B0D737 /* LiveSwitcherModel+Types.swift */,
 				B25000012FD000100B0D737 /* LiveSwitcherModel+Diagnostics.swift */,
@@ -1197,12 +1212,15 @@
 				A1B2C3F12F73000100B0D737 /* SwitcherPanelController.swift in Sources */,
 				A1B2C4112F73000100B0D737 /* SwitcherPanelWindowConfiguration.swift in Sources */,
 				A1B2C4122F73000100B0D737 /* SwitcherPanelController+Presentation.swift in Sources */,
+				D7A200023A21000100B0D737 /* SwitcherPanelController+SelectionLifecycle.swift in Sources */,
 				B32010012FF6000100B0D737 /* SwitcherPanelController+InitialVisibilityRecovery.swift in Sources */,
 				B26010032FE000100B0D737 /* SwitcherPanelController+PresentationDiagnostics.swift in Sources */,
 				A1B2C4132F73000100B0D737 /* SwitcherPanelController+InputHandling.swift in Sources */,
+				D7A100023A21000100B0D737 /* SwitcherPanelController+ModifierDiagnostics.swift in Sources */,
 				A1B2C4142F73000100B0D737 /* SwitcherPanelController+Hotkeys.swift in Sources */,
 				A1B2C3F22F73000100B0D737 /* LiveSwitcherModel.swift in Sources */,
 				A1B2C4152F73000100B0D737 /* LiveSwitcherModel+Preview.swift in Sources */,
+				D7A000023A21000100B0D737 /* LiveSwitcherModel+PreviewSnapshots.swift in Sources */,
 				A1B2C4162F73000100B0D737 /* LiveSwitcherModel+Search.swift in Sources */,
 				A1B2C4172F73000100B0D737 /* LiveSwitcherModel+Types.swift in Sources */,
 				B25010012FD000100B0D737 /* LiveSwitcherModel+Diagnostics.swift in Sources */,
@@ -1253,6 +1271,7 @@
 				B10011082F76000100B0D737 /* FlowTabPriorityCoverageTests+HotkeyMonitorAndRuntimeState.swift in Sources */,
 				B10011092F76000100B0D737 /* FlowTabPriorityCoverageTests+AppDelegateLifecycle.swift in Sources */,
 				B100110A2F76000100B0D737 /* FlowTabPriorityCoverageTests+PanelSessionBehavior.swift in Sources */,
+				C1F000023A20000100B0D737 /* FlowTabPriorityCoverageTests+SwitcherInteractionRegressions.swift in Sources */,
 				C1A700023A10000100B0D737 /* FlowTabPriorityCoverageTests+SwitcherTerminationProtection.swift in Sources */,
 				B100110B2F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeSnapshotAndPreview.swift in Sources */,
 				B100110C2F76000100B0D737 /* FlowTabPriorityCoverageTests+CacheAndIcons.swift in Sources */,
@@ -1298,6 +1317,7 @@
 				B10012052F76000100B0D737 /* FlowTabUITests+SettingsSearch.swift in Sources */,
 				F7B8C9D635B8000100B0D737 /* FlowTabUITests+LaunchAtLoginSettings.swift in Sources */,
 				B10012032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift in Sources */,
+				C1F100023A20000100B0D737 /* FlowTabUITests+SwitcherInteractionRegressions.swift in Sources */,
 				F8A1000236B0000100B0D737 /* FlowTabUITests+RuntimeProjectionPublication.swift in Sources */,
 				B31012012FF400100B0D737 /* FlowTabUITests+StatusItem.swift in Sources */,
 				B10012042F76000100B0D737 /* FlowTabUITests+Support.swift in Sources */,

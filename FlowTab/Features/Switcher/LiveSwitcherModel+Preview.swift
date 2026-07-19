@@ -53,48 +53,6 @@ extension LiveSwitcherModel {
     private struct ResolvedPreviewData {
         let preview: (image: NSImage?, titleBarStyle: WindowTitleBarStyleGuess?)
         let pendingCapture: PendingPreviewCapture?
-        let isWaitingForCaptureCommit: Bool
-    }
-
-    func handleSessionPreviewSnapshotLifecycle(_ session: SwitcherSession) {
-        guard case .windowCycle(let appID) = session.mode else { return }
-        freezeWindowPreviewOrderIfNeeded(for: appID, session: session)
-    }
-
-    func clearPreviewSnapshotState() {
-        previewImageCache.removeAll()
-        previewCaptureAttemptedKeys = []
-        previewCaptureFailedKeys = []
-        previewCaptureInFlightKeys = []
-        previewCaptureStatesByKey = [:]
-        previewImageReadyLoggedKeys = []
-        previewSessionPinnedKeys = []
-        previewSessionPinnedImagesByKey = [:]
-        previewDeferredCaptureScheduledAppIDs = []
-        previewCaptureGeneration &+= 1
-        previewWindowSnapshotsByAppID = [:]
-        lastWindowPreviewExposureLogSummary = nil
-    }
-
-    func freezeWindowPreviewOrderIfNeeded(
-        for appID: String,
-        session: SwitcherSession? = nil
-    ) {
-        guard previewWindowSnapshotsByAppID[appID] == nil else { return }
-        let resolvedSession = session ?? self.session
-        guard let app = resolvedSession?.apps.first(where: { $0.id == appID }) else { return }
-        previewWindowSnapshotsByAppID[appID] = app.windows
-    }
-
-    func refreshFrozenPreviewOrderIfChanged(
-        for appID: String,
-        windows: [WindowCandidate]
-    ) {
-        guard let frozenWindows = previewWindowSnapshotsByAppID[appID] else { return }
-        guard frozenWindows.map(\.id) != windows.map(\.id) else { return }
-        previewWindowSnapshotsByAppID[appID] = windows
-        previewDeferredCaptureScheduledAppIDs.remove(appID)
-        lastWindowPreviewExposureLogSummary = nil
     }
 
     func windowPreviewPageSummary() -> WindowPreviewPageSummary {
@@ -154,15 +112,13 @@ extension LiveSwitcherModel {
         guard var appContext = runtimeContextsByID[appID] else {
             return ResolvedPreviewData(
                 preview: (image: nil, titleBarStyle: nil),
-                pendingCapture: nil,
-                isWaitingForCaptureCommit: false
+                pendingCapture: nil
             )
         }
         guard var windowContext = appContext.windowsByID[window.id] else {
             return ResolvedPreviewData(
                 preview: (image: nil, titleBarStyle: nil),
-                pendingCapture: nil,
-                isWaitingForCaptureCommit: false
+                pendingCapture: nil
             )
         }
         let ownerPID = windowContext.ownerPID == 0
@@ -189,8 +145,7 @@ extension LiveSwitcherModel {
                     image: nil,
                     titleBarStyle: titleBarStyleInferenceEnabled ? windowContext.inferredTitleBarStyle : nil
                 ),
-                pendingCapture: nil,
-                isWaitingForCaptureCommit: false
+                pendingCapture: nil
             )
         }
         if pinForSession {
@@ -213,8 +168,7 @@ extension LiveSwitcherModel {
                     image: pinned,
                     titleBarStyle: titleBarStyleInferenceEnabled ? windowContext.inferredTitleBarStyle : nil
                 ),
-                pendingCapture: nil,
-                isWaitingForCaptureCommit: false
+                pendingCapture: nil
             )
         }
         if let cached = previewImageCache.image(forKey: previewCacheKey) {
@@ -237,8 +191,7 @@ extension LiveSwitcherModel {
                     image: cached,
                     titleBarStyle: titleBarStyleInferenceEnabled ? windowContext.inferredTitleBarStyle : nil
                 ),
-                pendingCapture: nil,
-                isWaitingForCaptureCommit: false
+                pendingCapture: nil
             )
         }
 
@@ -256,8 +209,7 @@ extension LiveSwitcherModel {
                         image: nil,
                         titleBarStyle: titleBarStyleInferenceEnabled ? windowContext.inferredTitleBarStyle : nil
                     ),
-                    pendingCapture: nil,
-                    isWaitingForCaptureCommit: previewCaptureInFlightKeys.contains(previewCacheKey)
+                    pendingCapture: nil
                 )
             }
         }
@@ -284,8 +236,7 @@ extension LiveSwitcherModel {
                         image: nil,
                         titleBarStyle: titleBarStyleInferenceEnabled ? windowContext.inferredTitleBarStyle : nil
                     ),
-                    pendingCapture: nil,
-                    isWaitingForCaptureCommit: false
+                    pendingCapture: nil
                 )
             }
             applyPreviewCapture(
@@ -307,8 +258,7 @@ extension LiveSwitcherModel {
                     image: capture.image,
                     titleBarStyle: titleBarStyleInferenceEnabled ? capture.titleBarStyle : nil
                 ),
-                pendingCapture: nil,
-                isWaitingForCaptureCommit: false
+                pendingCapture: nil
             )
         }
 
@@ -318,8 +268,7 @@ extension LiveSwitcherModel {
                     image: nil,
                     titleBarStyle: titleBarStyleInferenceEnabled ? windowContext.inferredTitleBarStyle : nil
                 ),
-                pendingCapture: nil,
-                isWaitingForCaptureCommit: true
+                pendingCapture: nil
             )
         }
         previewCaptureInFlightKeys.insert(previewCacheKey)
@@ -341,9 +290,38 @@ extension LiveSwitcherModel {
                 image: nil,
                 titleBarStyle: titleBarStyleInferenceEnabled ? windowContext.inferredTitleBarStyle : nil
             ),
-            pendingCapture: pendingCapture,
-            isWaitingForCaptureCommit: true
+            pendingCapture: pendingCapture
         )
+    }
+
+    @discardableResult
+    func prewarmSelectedAppWindowPreviews(availableWidth: CGFloat) -> Int {
+        guard let session, case .appCycle = session.mode else { return 0 }
+        let app = session.selectedApp
+        guard !app.windows.isEmpty, runtimeContextsByID[app.id] != nil else { return 0 }
+
+        freezeWindowPreviewOrderIfNeeded(for: app.id, session: session)
+        let previewWindows = frozenPreviewWindows(for: app.id, fallbackApp: app)
+        let selectedIndex = session.selectedWindowIndexByAppID[app.id] ?? 0
+        let page = SwitcherWindowPreviewPaging.page(
+            itemCount: previewWindows.count,
+            selectedIndex: selectedIndex,
+            availableWidth: availableWidth
+        )
+        var pendingCaptures: [PendingPreviewCapture] = []
+        pendingCaptures.reserveCapacity(page.visibleRange.count)
+        for index in page.visibleRange {
+            let previewResult = resolvePreviewData(
+                for: app.id,
+                window: previewWindows[index],
+                pinForSession: true
+            )
+            if let pendingCapture = previewResult.pendingCapture {
+                pendingCaptures.append(pendingCapture)
+            }
+        }
+        scheduleRuntimePreviewCaptures(pendingCaptures, qos: .userInitiated)
+        return page.visibleRange.count
     }
 
     func windowPreviewItems(visibleRange: Range<Int>? = nil) -> [WindowPreviewItem] {
@@ -364,7 +342,6 @@ extension LiveSwitcherModel {
             : []
         var pendingCaptures: [PendingPreviewCapture] = []
         var items: [WindowPreviewItem] = []
-        var isWaitingForVisiblePreviewCommit = false
         items.reserveCapacity(indexedWindows.count)
         pendingCaptures.reserveCapacity(previewCaptureWindowIDs.count)
         for (index, window) in indexedWindows {
@@ -383,8 +360,6 @@ extension LiveSwitcherModel {
                 if let pendingCapture = previewResult.pendingCapture {
                     pendingCaptures.append(pendingCapture)
                 }
-                isWaitingForVisiblePreviewCommit = isWaitingForVisiblePreviewCommit
-                    || previewResult.isWaitingForCaptureCommit
             } else {
                 preview = (image: nil, titleBarStyle: nil)
             }
@@ -399,9 +374,6 @@ extension LiveSwitcherModel {
             )
         }
         scheduleRuntimePreviewCaptures(pendingCaptures, qos: .userInitiated)
-        if isWaitingForVisiblePreviewCommit {
-            return []
-        }
         scheduleDeferredPreviewCapturesIfNeeded(
             appID: appID,
             visibleRange: visibleRange,

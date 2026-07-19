@@ -101,7 +101,10 @@ extension SwitcherPanelController {
             "inAppHotkeyPressed dir=\(directionText) panelVisible=0 action=show nowMs=\(formatMilliseconds(nowMs))"
         )
         let direction: CycleDirection = isBackward ? .backward : .forward
-        showInAppWindowSwitcher(direction: direction)
+        showInAppWindowSwitcher(
+            direction: direction,
+            initialKeyInput: isBackward ? .tabBackward : .tabForward
+        )
     }
 
     func handleInAppWindowHotkeyReleased() {
@@ -156,10 +159,8 @@ extension SwitcherPanelController {
     }
 
     func scheduleDelayedWindowLayerEntryIfNeeded(preservingDeadline: Bool = false) {
-        if let delayedWindowLayerTimer {
-            delayedWindowLayerTimer.invalidate()
-            self.delayedWindowLayerTimer = nil
-        }
+        cancelDelayedWindowLayerTimer()
+        let schedulingGeneration = delayedWindowLayerTimerGeneration
         guard autoEnterWindowLayerEnabled else {
             clearDelayedWindowLayerEntryState()
             return
@@ -193,12 +194,20 @@ extension SwitcherPanelController {
 
         let deadlineMs = delayedWindowLayerDeadlineMs ?? nowMs
         let requestedProjection = model.scheduleSelectedAppWindowProjectionIfNeeded(for: selectedAppID)
+        guard schedulingGeneration == delayedWindowLayerTimerGeneration else {
+            RuntimeLog.debug(
+                .autoEnter,
+                "schedule superseded appID=\(selectedAppID) generation=\(schedulingGeneration) currentGeneration=\(delayedWindowLayerTimerGeneration)"
+            )
+            return
+        }
+        let prewarmedPreviewCount = prewarmSelectedAppWindowPreviewPage()
         let remainingDelay = max(0, (deadlineMs - nowMs) / 1_000)
         let hasManualWindowLayerEntry = model.pendingManualWindowLayerEntryAppID == selectedAppID
         guard model.canAutoEnterWindowLayer else {
             RuntimeLog.debug(
                 .autoEnter,
-                "pending appID=\(selectedAppID) requestedProjection=\(requestedProjection) deadlineMs=\(formatMilliseconds(deadlineMs)) \(self.model.debugSelectionSummary())"
+                "pending appID=\(selectedAppID) requestedProjection=\(requestedProjection) prewarmed=\(prewarmedPreviewCount) deadlineMs=\(formatMilliseconds(deadlineMs)) \(self.model.debugSelectionSummary())"
             )
             if requestedProjection {
                 let projectionApplyDelay = hasManualWindowLayerEntry
@@ -208,36 +217,82 @@ extension SwitcherPanelController {
                     .autoEnter,
                     "schedule projectionApplyDelay=\(projectionApplyDelay)s manual=\(hasManualWindowLayerEntry) \(self.model.debugSelectionSummary())"
                 )
-                scheduleDelayedWindowLayerTimer(remainingDelay: projectionApplyDelay)
+                scheduleDelayedWindowLayerTimer(
+                    remainingDelay: projectionApplyDelay,
+                    generation: schedulingGeneration
+                )
             }
             return
         }
         RuntimeLog.debug(
             .autoEnter,
-            "schedule delay=\(remainingDelay)s deadlineMs=\(formatMilliseconds(deadlineMs)) \(self.model.debugSelectionSummary())"
+            "schedule delay=\(remainingDelay)s prewarmed=\(prewarmedPreviewCount) deadlineMs=\(formatMilliseconds(deadlineMs)) \(self.model.debugSelectionSummary())"
         )
 
-        scheduleDelayedWindowLayerTimer(remainingDelay: remainingDelay)
+        scheduleDelayedWindowLayerTimer(
+            remainingDelay: remainingDelay,
+            generation: schedulingGeneration
+        )
     }
 
-    func scheduleDelayedWindowLayerTimer(remainingDelay: TimeInterval) {
+    func prewarmSelectedAppWindowPreviewPage() -> Int {
+        guard let selectedApp = model.selectedApp, !selectedApp.windows.isEmpty else { return 0 }
+        let sizingScreen = resolveSizingScreen(preferredScreen: activePresentationScreen)
+        let visibleFrameSize = sizingScreen?.visibleFrame.size
+            ?? CGSize(width: 1_440, height: 900)
+        let maximumPanelWidth = max(
+            appLayerMinimumWidth,
+            visibleFrameSize.width - panelScreenMargin
+        )
+        let previewPanelWidth = min(
+            maximumPanelWidth,
+            preferredPreviewLayerWidth(
+                appCount: model.appCount,
+                windowCount: selectedApp.windows.count,
+                maxPanelWidth: maximumPanelWidth
+            )
+        )
+        let previewAvailableWidth = max(
+            1,
+            previewPanelWidth
+                - SwitcherPanelLayoutMetrics.horizontalInset
+                - standardPreviewWidthAdjustment
+        )
+        return model.prewarmSelectedAppWindowPreviews(availableWidth: previewAvailableWidth)
+    }
+
+    func scheduleDelayedWindowLayerTimer(
+        remainingDelay: TimeInterval,
+        generation: Int
+    ) {
+        guard generation == delayedWindowLayerTimerGeneration else { return }
         guard remainingDelay > 0 else {
-            enterDelayedWindowLayerIfReady(reason: "deadlineElapsed")
+            enterDelayedWindowLayerIfReady(reason: "deadlineElapsed", generation: generation)
             return
         }
 
-        RuntimeLog.debug(.autoEnter, "schedule timer delay=\(remainingDelay)s")
+        RuntimeLog.debug(
+            .autoEnter,
+            "schedule timer delay=\(remainingDelay)s generation=\(generation)"
+        )
         let timer = Timer(timeInterval: remainingDelay, repeats: false) { [weak self] _ in
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                self.enterDelayedWindowLayerIfReady(reason: "timer")
+                self.enterDelayedWindowLayerIfReady(reason: "timer", generation: generation)
             }
         }
         RunLoop.main.add(timer, forMode: .common)
         delayedWindowLayerTimer = timer
     }
 
-    func enterDelayedWindowLayerIfReady(reason: String) {
+    func enterDelayedWindowLayerIfReady(reason: String, generation: Int) {
+        guard generation == delayedWindowLayerTimerGeneration else {
+            RuntimeLog.debug(
+                .autoEnter,
+                "timer stale reason=\(reason) generation=\(generation) currentGeneration=\(delayedWindowLayerTimerGeneration)"
+            )
+            return
+        }
         guard isPanelPresented else {
             clearDelayedWindowLayerEntryState()
             return
@@ -270,8 +325,15 @@ extension SwitcherPanelController {
     }
 
     func clearDelayedWindowLayerEntryState() {
+        cancelDelayedWindowLayerTimer()
         delayedWindowLayerDeadlineMs = nil
         delayedWindowLayerAppID = nil
+    }
+
+    func cancelDelayedWindowLayerTimer() {
+        delayedWindowLayerTimer?.invalidate()
+        delayedWindowLayerTimer = nil
+        delayedWindowLayerTimerGeneration &+= 1
     }
 
     func terminateSelectedApp() {

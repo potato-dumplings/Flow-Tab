@@ -85,4 +85,27 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(page.hasPreviousPage)
         XCTAssertFalse(page.hasNextPage)
     }
+
+    func testWindowOnlyPanelSizingUsesResponsiveScreenBounds() {
+        let singleWindowSize = SwitcherWindowOnlyPanelSizing.preferredSize(
+            visibleFrameSize: CGSize(width: 1_728, height: 1_117),
+            itemCount: 1
+        )
+        let eightWindowSize = SwitcherWindowOnlyPanelSizing.preferredSize(
+            visibleFrameSize: CGSize(width: 1_728, height: 1_117),
+            itemCount: 8
+        )
+        let compactScreenSize = SwitcherWindowOnlyPanelSizing.preferredSize(
+            visibleFrameSize: CGSize(width: 600, height: 400),
+            itemCount: 8
+        )
+
+        XCTAssertEqual(singleWindowSize, CGSize(width: 640, height: 360))
+        XCTAssertGreaterThan(eightWindowSize.width, singleWindowSize.width)
+        XCTAssertGreaterThan(eightWindowSize.height, singleWindowSize.height)
+        XCTAssertLessThanOrEqual(eightWindowSize.width, 1_728 * 0.82)
+        XCTAssertLessThanOrEqual(eightWindowSize.height, 1_117 * 0.75)
+        XCTAssertEqual(compactScreenSize.width, 492, accuracy: 0.001)
+        XCTAssertEqual(compactScreenSize.height, 300, accuracy: 0.001)
+    }
 }

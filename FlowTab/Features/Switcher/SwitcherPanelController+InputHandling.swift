@@ -81,12 +81,7 @@ extension SwitcherPanelController {
             NSEvent.removeMonitor(globalMouseMovedMonitor)
             self.globalMouseMovedMonitor = nil
         }
-        if let delayedWindowLayerTimer {
-            delayedWindowLayerTimer.invalidate()
-            self.delayedWindowLayerTimer = nil
-        }
-        delayedWindowLayerDeadlineMs = nil
-        delayedWindowLayerAppID = nil
+        clearDelayedWindowLayerEntryState()
     }
 
     func handleKeyDown(_ event: NSEvent) -> Bool {
@@ -130,7 +125,7 @@ extension SwitcherPanelController {
                 _ = model.handleSearchEscape()
                 updatePanelSize()
             } else {
-                cancelSelection()
+                cancelSelection(trigger: "escape_key")
             }
             return true
         default:
@@ -332,7 +327,7 @@ extension SwitcherPanelController {
         logInputTrace(
             "globalMouseDownOutsidePanel action=cancelSelection nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
         )
-        cancelSelection()
+        cancelSelection(trigger: "global_mouse_down_outside_panel")
     }
 
     func handleGlobalKeyDown(_ event: NSEvent) {
@@ -342,7 +337,7 @@ extension SwitcherPanelController {
         logInputTrace(
             "globalEscWhileAppInactive action=cancelSelection nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
         )
-        cancelSelection()
+        cancelSelection(trigger: "global_escape_while_inactive")
     }
 
     func handleApplicationDidResignActive() {
@@ -489,7 +484,7 @@ extension SwitcherPanelController {
         logInputTrace(
             "\(trigger) action=cancelSelection nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
         )
-        cancelSelection()
+        cancelSelection(trigger: "system_interruption:\(trigger)")
         logSearchTrace("cancelSelectionForSystemInterruption trigger=\(trigger) action=finished \(searchTraceStateSummary())")
         if let sessionKind {
             beginHotkeyReplaySuppressionUntilRelease(for: sessionKind, trigger: trigger)

@@ -1,6 +1,6 @@
 # FlowTab Stable Test Coverage Contract
 
-Updated: 2026-07-18
+Updated: 2026-07-19
 
 ## Purpose and authority
 
@@ -67,7 +67,7 @@ The six layer keys are `Unit`, `Behavior`, `Mock UI`, `Real-topology UI`, `Press
 - Not relevant layers:
   - Process/Tooling: Shared launch/UI wrappers are governed by performance-pressure-gates.
 - Current representative test anchors:
-  - Unit: `FlowTabTests.testFlowTabTestLaunchOptionsParsesBooleanAndValueOverrides`
+  - Unit: `FlowTabTests.testFlowTabTestLaunchOptionsParsesBooleanAndValueOverrides`, `FlowTabTests.testFlowTabTestLaunchOptionsSuppressesHomeWindowForUnitTestHost`
   - Behavior: `FlowTabPriorityCoverageTests.testAppDelegateLaunchInstallsObserversPromptsAccessibilityAndStartsStressRunner`, `FlowTabPriorityCoverageTests.testAppDelegateKeepsAppRunningAfterLastWindowCloses`
   - Mock UI: `FlowTabUITests.testStatusItemReopensLastSelectedTabAfterWindowClose`
   - Real-topology UI: `FlowTabUITests.testRuntimeLifecycleRefreshesRealFixtureAppLaunchAndTermination`
@@ -178,7 +178,7 @@ The six layer keys are `Unit`, `Behavior`, `Mock UI`, `Real-topology UI`, `Press
 
 - Requiredness: required
 - Owner: `Switcher`
-- Oracle: The focused app's eligible sibling windows enter a window-only session and commit the exact selected window.
+- Oracle: One physical focused-app shortcut gesture opens a window-only session, advances exactly once to the next eligible sibling, presents its preview, and commits that exact window on modifier release.
 - Risk: `deterministic-rule`, `app-orchestration`, `visible-workflow`, `real-topology-external-system`, `hot-path-scale-sensitive`
 - Required layers:
   - Unit: Own focused-window shortcut normalization and conflict fallback.
@@ -190,8 +190,8 @@ The six layer keys are `Unit`, `Behavior`, `Mock UI`, `Real-topology UI`, `Press
   - Process/Tooling: The canonical UI and pressure runners are shared infrastructure rather than scenario-owned tooling.
 - Current representative test anchors:
   - Unit: `FlowTabTests.testInAppWindowHotkeyResolveAvoidingMainConflictFallsBackToNonConflictingModifier`
-  - Behavior: `FlowTabPriorityCoverageTests.testLiveSwitcherModelFocusedWindowSessionUsesRuntimeProjectionWithoutFocusedSampling`
-  - Mock UI: `FlowTabUITests.testSettingsInAppHotkeyExplicitAndFallbackMatrixStartsFocusedWindowSession`
+  - Behavior: `FlowTabPriorityCoverageTests.testInAppHotkeyFirstPhysicalPressAdvancesToNextWindow`, `FlowTabPriorityCoverageTests.testLiveSwitcherModelFocusedWindowSessionUsesRuntimeProjectionWithoutFocusedSampling`
+  - Mock UI: `FlowTabUITests.testControlTabFirstPhysicalGestureSelectsNextWindowWithVisiblePreview`, `FlowTabUITests.testSettingsInAppHotkeyExplicitAndFallbackMatrixStartsFocusedWindowSession`
   - Real-topology UI: `FlowTabUITests.testInAppWindowSwitcherControlTabRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithNoisyCGSiblingsWithoutAppAXWindows`
   - Pressure: `FlowTabTests.testControlTabFocusedProjectionFastStartPressureIgnoresFocusedSnapshotBridge`
 - Exhaustive mapping: query active ledger rows whose `product_scenario_ids` contains `scenario:in-app-window-hotkey`.
@@ -253,7 +253,7 @@ The six layer keys are `Unit`, `Behavior`, `Mock UI`, `Real-topology UI`, `Press
   - Process/Tooling: Shared real-topology runner validity is owned by performance-pressure-gates.
 - Current representative test anchors:
   - Unit: `FlowTabPriorityCoverageTests.testRuntimeWindowTopologyClassifierClassifiesActivationSurfaces`
-  - Behavior: `FlowTabPriorityCoverageTests.testRuntimeActivatorVerifiesFocusWhenFocusedAXCGMatchesOffscreenTargetCG`
+  - Behavior: `FlowTabPriorityCoverageTests.testRuntimeActivatorDoesNotVerifyCGRouteWhileTargetRemainsOffscreen`
   - Mock UI: `FlowTabUITests.testSearchPanelEntryAndResultActivation`
   - Real-topology UI: `FlowTabUITests.testSwitcherPanelOptionTabReportsUnverifiedSpaceBackedCGOnlyWorkflowActivation`
 - Exhaustive mapping: query active ledger rows whose `product_scenario_ids` contains `scenario:runtime-activation-recovery`.
@@ -409,7 +409,7 @@ The six layer keys are `Unit`, `Behavior`, `Mock UI`, `Real-topology UI`, `Press
 
 - Requiredness: required
 - Owner: `Settings`
-- Oracle: Persisted window-behavior choices deterministically alter switcher delay, filtering, restoration, and visible output.
+- Oracle: Persisted window-behavior choices deterministically alter switcher delay, filtering, restoration, preview readiness, and visible output; each delayed transition applies only its current timer generation.
 - Risk: `deterministic-rule`, `app-orchestration`, `visible-workflow`, `hot-path-scale-sensitive`
 - Required layers:
   - Unit: Own delay normalization, filtering, restoration, and preference defaults.
@@ -422,8 +422,8 @@ The six layer keys are `Unit`, `Behavior`, `Mock UI`, `Real-topology UI`, `Press
   - Process/Tooling: No scenario-specific runner or fixture contract belongs to these preferences.
 - Current representative test anchors:
   - Unit: `FlowTabTests.testWindowLayerNormalizedAutoEnterDelayClampsAndRounds`
-  - Behavior: `FlowTabPriorityCoverageTests.testSwitcherPanelControllerDelayedAutoEnterWindowLayerUsesPreferenceDelay`
-  - Mock UI: `FlowTabUITests.testSettingsWindowBehaviorHideMinimizedAppsAffectsSwitcherAppLayer`
+  - Behavior: `FlowTabPriorityCoverageTests.testSwitcherPanelControllerDelayedAutoEnterWindowLayerUsesPreferenceDelay`, `FlowTabPriorityCoverageTests.testDelayedWindowLayerEntryPrewarmsBoundedVisiblePage`, `FlowTabPriorityCoverageTests.testDelayedWindowLayerEntryIgnoresStaleTimerGeneration`
+  - Mock UI: `FlowTabUITests.testOptionTabDelayedWindowLayerEntryShowsPrewarmedPreviewAtTransition`, `FlowTabUITests.testSettingsWindowBehaviorHideMinimizedAppsAffectsSwitcherAppLayer`
 - Exhaustive mapping: query active ledger rows whose `product_scenario_ids` contains `scenario:settings-window-behavior`.
 
 ### `scenario:space-fixture-infrastructure` — Space fixture workflow infrastructure
@@ -450,7 +450,7 @@ The six layer keys are `Unit`, `Behavior`, `Mock UI`, `Real-topology UI`, `Press
 
 - Requiredness: required
 - Owner: `Switcher`
-- Oracle: Opening, navigating, previewing, and committing the panel preserves session identity and activates the selected target.
+- Oracle: Opening, navigating, previewing, and committing the panel preserves session identity, uses responsive content bounds, and keeps the presented content visible through selected-target activation.
 - Risk: `deterministic-rule`, `app-orchestration`, `visible-workflow`, `real-topology-external-system`, `hot-path-scale-sensitive`
 - Required layers:
   - Unit: Own navigation, commit, paging, and pointer-selection rules.
@@ -462,8 +462,8 @@ The six layer keys are `Unit`, `Behavior`, `Mock UI`, `Real-topology UI`, `Press
   - Process/Tooling: Shared UI and pressure runners are governed by performance-pressure-gates.
 - Current representative test anchors:
   - Unit: `SwitcherSessionEdgeTests.testCommitInWindowCycleReturnsWindowAndStoresRememberedWindowID`
-  - Behavior: `FlowTabPriorityCoverageTests.testSwitcherPanelControllerGlobalHotkeyStartsFromAppSwitcherProjection`, `FlowTabPriorityCoverageTests.testSwitcherRuntimeProjectionNotificationsPublishWhileMainActorIsUnavailable`
-  - Mock UI: `FlowTabUITests.testOptionTabSwitcherClickCommitsAppAndClosesPanel`
+  - Behavior: `FlowTabPriorityCoverageTests.testSwitcherPanelControllerGlobalHotkeyStartsFromAppSwitcherProjection`, `FlowTabPriorityCoverageTests.testSwitcherPanelRemainsPresentedDuringCommittedWindowActivation`, `FlowTabPriorityCoverageTests.testWindowOnlyPanelUsesResponsiveContentBounds`
+  - Mock UI: `FlowTabUITests.testOptionTabDelayedWindowLayerEntryShowsPrewarmedPreviewAtTransition`, `FlowTabUITests.testOptionTabSwitcherClickCommitsAppAndClosesPanel`
   - Real-topology UI: `FlowTabUITests.testSwitcherPanelOptionTabWindowStateRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithNoisyCGSiblingsWithoutAppAXWindows`
   - Pressure: `FlowTabPriorityCoverageTests.testSwitcherInitialVisibilityRecoveryRapidOpenClosePressureDoesNotReplayStaleTasks`
 - Exhaustive mapping: query active ledger rows whose `product_scenario_ids` contains `scenario:switcher-standard-panel`.
@@ -492,7 +492,7 @@ The six layer keys are `Unit`, `Behavior`, `Mock UI`, `Real-topology UI`, `Press
 
 - Requiredness: required
 - Owner: `Runtime`
-- Oracle: Preview and icon providers preserve target identity, cache lifecycle, paging, fallback, and cancellation semantics.
+- Oracle: Preview and icon providers preserve target identity, cache lifecycle, paging, fallback, and cancellation semantics while visible cards remain continuous across capture and same-session projection refreshes.
 - Risk: `deterministic-rule`, `app-orchestration`, `visible-workflow`, `real-topology-external-system`, `hot-path-scale-sensitive`
 - Required layers:
   - Unit: Own sizing, paging, cache, renderer, icon, provider selection, and identity rules.
@@ -503,9 +503,9 @@ The six layer keys are `Unit`, `Behavior`, `Mock UI`, `Real-topology UI`, `Press
 - Not relevant layers:
   - Process/Tooling: Preview evidence uses shared app and UI runners without a scenario-specific command contract.
 - Current representative test anchors:
-  - Unit: `FlowTabPriorityCoverageTests.testWindowPreviewPagingUsesResolutionDependentPageSize`
-  - Behavior: `FlowTabPriorityCoverageTests.testLiveSwitcherModelRuntimeVisiblePreviewWaitsForBatchBeforeShowingPage`
-  - Mock UI: `FlowTabUITests.testSwitcherWindowLayerPaginatesLargeMockWindowSet`
+  - Unit: `FlowTabPriorityCoverageTests.testWindowPreviewPagingUsesResolutionDependentPageSize`, `FlowTabPriorityCoverageTests.testWindowOnlyPanelSizingUsesResponsiveScreenBounds`
+  - Behavior: `FlowTabPriorityCoverageTests.testLiveSwitcherModelRuntimeVisiblePreviewShowsFallbackWhileBatchIsInFlight`, `FlowTabPriorityCoverageTests.testProjectionRefreshKeepsVisiblePreviewImagesInCurrentSession`
+  - Mock UI: `FlowTabUITests.testControlTabFirstPhysicalGestureSelectsNextWindowWithVisiblePreview`, `FlowTabUITests.testOptionTabDelayedWindowLayerEntryShowsPrewarmedPreviewAtTransition`, `FlowTabUITests.testSwitcherWindowLayerPaginatesLargeMockWindowSet`
   - Real-topology UI: `FlowTabUITests.testSwitcherPanelPreviewKeepsIdenticalRealWorkflowWindowsDistinct`
   - Pressure: `FlowTabTests.testOptionTabWindowScalePressureKeepsSelectedAppApplyAndPreviewCaptureBounded`
 - Exhaustive mapping: query active ledger rows whose `product_scenario_ids` contains `scenario:window-previews-icons`.

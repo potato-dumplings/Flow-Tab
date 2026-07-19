@@ -266,6 +266,30 @@ extension FlowTabTests {
         }
     }
 
+    func testFlowTabTestLaunchOptionsSuppressesHomeWindowForUnitTestHost() {
+        withLaunchArgumentsForTesting(
+            ["FlowTab"],
+            environment: [
+                FlowTabTestLaunchOptions.unitTestingBundlePathEnvironmentKey:
+                    "/tmp/FlowTabTests.xctest"
+            ]
+        ) {
+            XCTAssertTrue(FlowTabTestLaunchOptions.isRunningUnitTests)
+            XCTAssertTrue(FlowTabTestLaunchOptions.suppressesHomeWindowOnLaunch)
+        }
+
+        withLaunchArgumentsForTesting(
+            ["FlowTab"],
+            environment: [
+                FlowTabTestLaunchOptions.unitTestingBundlePathEnvironmentKey:
+                    "/tmp/FlowTabUITests.xctest"
+            ]
+        ) {
+            XCTAssertFalse(FlowTabTestLaunchOptions.isRunningUnitTests)
+            XCTAssertFalse(FlowTabTestLaunchOptions.suppressesHomeWindowOnLaunch)
+        }
+    }
+
     func testPermissionCheckersRespectLaunchOptionOverrides() {
         let previousAXTrusted = AccessibilityPermissionChecker.isTrustedOverrideForTesting
         let previousAXRequest = AccessibilityPermissionChecker.requestPermissionOverrideForTesting
@@ -809,7 +833,14 @@ extension FlowTabTests {
         let styleMask = SwitcherPanelWindowConfiguration.styleMask
 
         XCTAssertEqual(SwitcherPanelWindowConfiguration.level, .statusBar)
-        XCTAssertEqual(SwitcherPanelWindowConfiguration.sharingType, .none)
+        XCTAssertEqual(
+            SwitcherPanelWindowConfiguration.resolvedSharingType(isRunningUITests: false),
+            .none
+        )
+        XCTAssertEqual(
+            SwitcherPanelWindowConfiguration.resolvedSharingType(isRunningUITests: true),
+            .readOnly
+        )
         XCTAssertTrue(styleMask.contains(.borderless))
         XCTAssertTrue(styleMask.contains(.nonactivatingPanel))
         XCTAssertTrue(behavior.contains(.canJoinAllSpaces))

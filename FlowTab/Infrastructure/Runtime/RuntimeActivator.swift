@@ -525,7 +525,7 @@ final class RuntimeActivator {
                 in: app
             )
         }
-        return hasActivationReadback ? .verified : .focusedButUnverified
+        return isVisible && hasActivationReadback ? .verified : .focusedButUnverified
     }
 
     private func attemptRelatedAXWindowFocus(

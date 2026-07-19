@@ -312,7 +312,10 @@ extension SwitcherPanelController {
         )
     }
 
-    func showInAppWindowSwitcher(direction: CycleDirection) {
+    func showInAppWindowSwitcher(
+        direction: CycleDirection,
+        initialKeyInput: KeyInput? = nil
+    ) {
         let showStartMs = monotonicMilliseconds()
         guard model.startFocusedAppWindowSession(triggerDirection: direction) else {
             let failedMs = monotonicMilliseconds() - showStartMs
@@ -323,6 +326,12 @@ extension SwitcherPanelController {
             NSSound.beep()
             return
         }
+        if let initialKeyInput {
+            model.handle(initialKeyInput)
+            logInputTrace(
+                "show kind=inApp action=initialAdvance key=\(initialKeyInput.debugName) nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
+            )
+        }
         presentStartedHotkeySession(
             kind: .inAppWindowSwitcher,
             trigger: "in_app_show",
@@ -330,6 +339,9 @@ extension SwitcherPanelController {
             showStartMs: showStartMs,
             startLogMessage: "start in-app direction=\(direction.debugName) \(self.model.debugSelectionSummary())"
         )
+        if initialKeyInput != nil {
+            lastCommittedTabAdvanceTimestamp = ProcessInfo.processInfo.systemUptime
+        }
     }
 
     func presentStartedHotkeySession(
@@ -527,26 +539,6 @@ extension SwitcherPanelController {
         generation == presentationSessionGeneration
     }
 
-    func finishSelection() {
-        guard isPanelPresented || hasActivePresentationSession else { return }
-        endPresentationSession()
-        ignoreHotkeyPressesUntil = ProcessInfo.processInfo.systemUptime + postFinishHotkeyIgnoreWindow
-        logInputTrace(
-            "finishSelection nowMs=\(formatMilliseconds(monotonicMilliseconds())) ignoreUntilMs=\(formatMilliseconds(ignoreHotkeyPressesUntil * 1_000))"
-        )
-        model.commitSelection()
-    }
-
-    func cancelSelection() {
-        guard isPanelPresented || hasActivePresentationSession else { return }
-        endPresentationSession()
-        ignoreHotkeyPressesUntil = ProcessInfo.processInfo.systemUptime + postFinishHotkeyIgnoreWindow
-        logInputTrace(
-            "cancelSelection nowMs=\(formatMilliseconds(monotonicMilliseconds())) ignoreUntilMs=\(formatMilliseconds(ignoreHotkeyPressesUntil * 1_000))"
-        )
-        model.cancelSelection()
-    }
-
     func updatePanelSize(for preferredScreen: NSScreen? = nil) {
         let sizingScreen = resolveSizingScreen(preferredScreen: preferredScreen)
         let visibleFrame = sizingScreen?.visibleFrame
@@ -560,11 +552,9 @@ extension SwitcherPanelController {
 
     private func updatePanelSize(forVisibleFrame visibleFrame: CGRect, recenterScreen: NSScreen?) {
         if model.isWindowOnlyOverlay {
-            let width = max(640, visibleFrame.width - windowOnlyOverlayScreenMargin)
-            let height = max(360, visibleFrame.height - windowOnlyOverlayScreenMargin)
-            let targetSize = NSSize(
-                width: min(visibleFrame.width, width),
-                height: min(visibleFrame.height, height)
+            let targetSize = SwitcherWindowOnlyPanelSizing.preferredSize(
+                visibleFrameSize: visibleFrame.size,
+                itemCount: model.previewWindowCount
             )
             setPanelContentSize(targetSize, recenterScreen: recenterScreen)
             return

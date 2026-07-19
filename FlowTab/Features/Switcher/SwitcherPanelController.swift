@@ -165,6 +165,7 @@ final class SwitcherPanelController {
     var panelVisibilityRecoveryState: PanelVisibilityRecoveryState = .idle
     var lastPanelVisibilityRecoveryDiagnostic: PanelVisibilityRecoveryDiagnostic?
     var delayedWindowLayerTimer: Timer?
+    var delayedWindowLayerTimerGeneration = 0
     var delayedWindowLayerDeadlineMs: Double?
     var delayedWindowLayerAppID: String?
     var lastCommittedTabAdvanceTimestamp: TimeInterval?
@@ -205,7 +206,6 @@ final class SwitcherPanelController {
     let autoEnterWindowLayerEnabled = true
     let tabAdvanceMinimumInterval: TimeInterval = 0.016
     let panelScreenMargin: CGFloat = 80
-    let windowOnlyOverlayScreenMargin: CGFloat = 20
     let appLayerMinimumWidth: CGFloat = 440
     let appLayerStaticHeight: CGFloat = 56
     let appLayerSearchHeaderExtraHeight: CGFloat = 68
@@ -495,7 +495,7 @@ final class SwitcherPanelController {
     }
 
     func cancelSelectionForTesting() {
-        cancelSelection()
+        cancelSelection(trigger: "testing")
     }
 
     func handleFlagsChangedForTesting(_ event: NSEvent) {

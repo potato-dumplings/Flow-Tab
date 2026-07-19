@@ -386,9 +386,10 @@ extension FlowTabPriorityCoverageTests {
         }
         try await body()
     }
+    @MainActor
     func withTemporaryWindowLayerAutoEnterDelay(
         _ delay: Double,
-        perform body: () async throws -> Void
+        perform body: @MainActor () async throws -> Void
     ) async rethrows {
         let defaults = UserDefaults.standard
         let previousDelay = defaults.object(forKey: AppPreferenceKeys.windowLayerAutoEnterDelay)
