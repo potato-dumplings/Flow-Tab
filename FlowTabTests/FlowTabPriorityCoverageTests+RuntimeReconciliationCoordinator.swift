@@ -1918,6 +1918,99 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(coordinator.readyRequests(now: Date.timeIntervalSinceReferenceDate).isEmpty)
     }
 
+    func testRuntimeProjectionServiceReconcilesAppLaunchAfterStartupWindowConvergenceDelay() {
+        let coordinator = RuntimeReconciliationCoordinator()
+        let windowRecordStore = RuntimeWindowRecordStore()
+        let lock = NSLock()
+        var executedRequests: [RuntimeReconciliationRequest] = []
+        let initialRepair = expectation(description: "initial app launch repair")
+        let convergenceRepair = expectation(description: "delayed app launch convergence repair")
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.AppLaunchConvergence",
+            repairProvider: RuntimeProjectionRepairProvider(
+                windowRecordStore: windowRecordStore,
+                reconciliationCoordinator: coordinator
+            ),
+            appLaunchConvergenceDelay: 0.01,
+            reconciliationExecutor: { request, _ in
+                lock.lock()
+                executedRequests.append(request)
+                let executionCount = executedRequests.count
+                lock.unlock()
+                if executionCount == 1 {
+                    initialRepair.fulfill()
+                } else if executionCount == 2 {
+                    convergenceRepair.fulfill()
+                }
+                return .completed
+            }
+        )
+
+        service.signalAppLaunched(
+            appID: "com.example.startup-convergence",
+            pid: 18_408
+        )
+
+        wait(for: [initialRepair, convergenceRepair], timeout: 1)
+        service.waitForMaintenanceQueueForTesting()
+
+        lock.lock()
+        let requests = executedRequests
+        lock.unlock()
+        XCTAssertEqual(requests.count, 2)
+        XCTAssertEqual(requests.map(\.target), [.app(18_408), .app(18_408)])
+        XCTAssertEqual(requests.map(\.reasons), [Set([.appLaunched]), Set([.appLaunched])])
+    }
+
+    func testRuntimeProjectionServiceCancelsAppLaunchConvergenceAfterTermination() {
+        let coordinator = RuntimeReconciliationCoordinator()
+        let windowRecordStore = RuntimeWindowRecordStore()
+        let initialRepair = expectation(description: "initial app launch repair")
+        let staleConvergenceRepair = expectation(description: "stale app launch convergence repair")
+        staleConvergenceRepair.isInverted = true
+        let lock = NSLock()
+        var executionCount = 0
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.AppLaunchConvergenceCancellation",
+            repairProvider: RuntimeProjectionRepairProvider(
+                windowRecordStore: windowRecordStore,
+                reconciliationCoordinator: coordinator
+            ),
+            appLaunchConvergenceDelay: 0.5,
+            reconciliationExecutor: { _, _ in
+                lock.lock()
+                executionCount += 1
+                let currentExecutionCount = executionCount
+                lock.unlock()
+                if currentExecutionCount == 1 {
+                    initialRepair.fulfill()
+                } else {
+                    staleConvergenceRepair.fulfill()
+                }
+                return .completed
+            }
+        )
+
+        service.signalAppLaunched(
+            appID: "com.example.terminated-before-convergence",
+            pid: 18_409
+        )
+        wait(for: [initialRepair], timeout: 1)
+        service.waitForMaintenanceQueueForTesting()
+        service.signalAppTerminated(
+            appID: "com.example.terminated-before-convergence",
+            pid: 18_409
+        )
+
+        wait(for: [staleConvergenceRepair], timeout: 0.6)
+        service.waitForMaintenanceQueueForTesting()
+
+        lock.lock()
+        let finalExecutionCount = executionCount
+        lock.unlock()
+        XCTAssertEqual(finalExecutionCount, 1)
+    }
+
     func testRuntimeProjectionServiceCommitsLaunchedAppRepairIntoAppSwitcherProjection() throws {
         let coordinator = RuntimeReconciliationCoordinator()
         let runningApp = NSRunningApplication.current

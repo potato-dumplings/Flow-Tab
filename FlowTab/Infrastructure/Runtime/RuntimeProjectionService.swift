@@ -17,6 +17,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     private let readModelStore: RuntimeReadModelStore
     private let appDirectoryProvider: RuntimeAppDirectoryProviding?
     private let reconciliationDrainer: RuntimeProjectionReconciliationDrainer
+    private let appLaunchConvergenceScheduler: RuntimeAppLaunchConvergenceScheduler
     private var pendingSearchIndexFreshnessBarrier = false
 
     init(
@@ -25,11 +26,15 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         mainTableProjectionBuilder: RuntimeMainTableProjectionBuilding? = nil,
         appDirectoryProvider: RuntimeAppDirectoryProviding? = nil,
         readModelStore: RuntimeReadModelStore = RuntimeReadModelStore(),
+        appLaunchConvergenceDelay: TimeInterval = runtimeAppLaunchWindowConvergenceDelay,
         reconciliationExecutor: @escaping RuntimeProjectionReconciliationExecutor =
             runtimeProjectionDefaultReconciliationExecutor
     ) {
         maintenanceQueue = DispatchQueue(label: label, qos: .utility)
         maintenanceQueue.setSpecific(key: maintenanceQueueSpecificKey, value: ())
+        appLaunchConvergenceScheduler = RuntimeAppLaunchConvergenceScheduler(
+            delay: appLaunchConvergenceDelay
+        )
         if let repairProvider {
             self.repairProvider = repairProvider
             self.mainTableProjectionBuilder = mainTableProjectionBuilder
@@ -277,6 +282,38 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             repairProvider.recordAppLaunched(appID: appID, pid: pid, now: now)
             RuntimeLog.debug(.projection, "runtimeLifecycle appLaunched appID=\(appID) pid=\(pid)")
             drainReadyReconciliationRequestsLocked(now: now)
+            scheduleAppLaunchWindowConvergenceLocked(appID: appID, pid: pid, now: now)
+        }
+    }
+
+    private func scheduleAppLaunchWindowConvergenceLocked(
+        appID: String,
+        pid: pid_t,
+        now: TimeInterval
+    ) {
+        readModelStore.markAppWindowsDirty(
+            appID: appID,
+            pid: pid,
+            pendingScope: "appLaunchWindowConvergence:\(appID)"
+        )
+        repairProvider.recordAppLaunched(
+            appID: appID,
+            pid: pid,
+            now: now + appLaunchConvergenceScheduler.delay
+        )
+        appLaunchConvergenceScheduler.schedule(pid: pid, on: maintenanceQueue) { [weak self] in
+            guard let self else { return }
+            let convergenceNow = Date.timeIntervalSinceReferenceDate
+            self.repairProvider.recordAppLaunched(
+                appID: appID,
+                pid: pid,
+                now: convergenceNow
+            )
+            let startedRequests = self.drainReadyReconciliationRequestsLocked(now: convergenceNow)
+            RuntimeLog.debug(
+                .projection,
+                "runtimeLifecycle appLaunchWindowConvergence appID=\(appID) pid=\(pid) startedRequests=\(startedRequests.count)"
+            )
         }
     }
 
@@ -388,6 +425,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     func signalAppTerminated(appID: String, pid: pid_t) {
         performMaintenanceSynchronously { [self] in
             let now = Date.timeIntervalSinceReferenceDate
+            appLaunchConvergenceScheduler.cancel(pid: pid)
             repairProvider.recordAppTerminated(processIdentifier: pid)
             commitAppDirectoryProviderEvidenceLocked(generatedAt: now)
             readModelStore.markAppTerminatedForMainTableProjection(appID: appID, pid: pid)

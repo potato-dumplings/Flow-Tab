@@ -1,1089 +1,422 @@
 {
   "schema_version": 1,
   "handoff_kind": "C1",
+  "consumable": true,
   "campaign_id": "c0-20260717-1e3afb7",
   "slice_id": "slice:runtime-projection-fixture-publication",
   "stage": "Stage 02",
   "status": "READY",
   "outcome": "remediated",
-  "generated_at_utc": "2026-07-19T01:36:39Z",
+  "generated_at_utc": "2026-07-19T10:29:16Z",
   "commit_policy": "commit_on_stage_complete",
-  "intended_commit_title": "fix(runtime-projection): close live repair publication gaps",
-  "anchor_policy": "The commit containing this handoff and the exact Stage 02 file set is this slice's C1 anchor.",
+  "intended_commit_title": "fix(runtime-projection): converge app launch window publication",
+  "anchor_policy": "The commit containing this handoff and the exact Stage 02 file set is the replacement runtime-projection-fixture-publication C1 anchor.",
   "input_anchors": {
     "c0_commit": "eec1d40717509d72e52865d7fd8f1cf199e0fd3a",
     "c0_tree": "db73b209ac9514d01ca2268a6fb45ea29abdeb76",
-    "c0_parent": "1e3afb724c3fe89d9d5d3543ae104c8883b83f29",
     "c0_handoff_sha256": "db83f8b915c6cfc8266f19a9160273697ab8e4806e4b6bb22a8940f83fb39485",
-    "asset_ledger_sha256": "3de356a7b78fa60d904dcfa07f690c70689913179539090e27500c52b1a0041e",
+    "entry_head": "edca49aee616e0842063d5d009c958493f55cb52",
+    "entry_tree": "2fcedde76a50cb6dfc1ce1293249ab890b199f1b",
+    "expected_parent_at_commit": "edca49aee616e0842063d5d009c958493f55cb52",
     "baseline_results_sha256": "217f35d1381f171dd9f7c3afc5de4dfe3ae8e7c2a128b9fd03582cedc3d46c51",
-    "entry_head": "d5ecc553c27197f5286844093878cbf6de6e542a",
-    "entry_tree": "b005ebc6525772c4eaa3eed85c5ab75a48755ae9",
-    "expected_parent_at_commit": "d5ecc553c27197f5286844093878cbf6de6e542a",
-    "reopened_from_c1_commit": "c0d0531d7803dc90a3dc6316fd19d065d102bbf8",
-    "asset_ledger_at_entry_sha256": "57aa5a47c4b12b3bcaed89bf857a9f94e2a21bb087d2ab62475a154aa677041d"
+    "entry_asset_ledger_sha256": "84c148d8a5026ec83e6c8f7a88d17396514080039062c60b24906d3222fd1e31",
+    "completed_asset_ledger_sha256": "4649cae87ccab85c7dde48a2d1874539b9cc37fcb58b6eb120c0a0cd5fef1c8a",
+    "superseded_runtime_projection_c1_commit": "b1e31e0fb73a7e1252e01c52ea4247c09e1687f0"
   },
   "audited_snapshot": {
     "branch": "flowtab-clean-runtime-branch",
-    "runtime_and_test_source_at_entry": "committed test-audit candidate d5ecc553 plus this exact reopened runtime-projection publication candidate",
-    "entry_ready_dependencies": [
-      "c1:runtime-projection-maintenance-hang@a5e00832aaea047995ab2a5903d388ba81127b9a",
-      "c1:pressure-runner-contracts@15665c39e5d6ee93a3d56464e5eee442c9b11cbb",
-      "c1:coverage-contract-reconciliation@ea9eade6b9002ba194023ead3910005d2d8bc723",
-      "c1:runtime-window-order-space-truth@14051fce112f3b53227ba858d85ab8ce56e3c825"
-    ],
     "private_evidence_root": {
       "resource_boundary": "repository_root",
-      "relative_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication-reopen"
+      "relative_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication-reopen-2"
     },
-    "process_contract_sha256": {
-      ".agents/skills/flowtab-engineering/SKILL.md": "f63ddd1f58311d2ea685bb9f86e9776da5e00dc73a3dc38f9200c4e7c18e98e1",
-      ".agents/skills/flowtab-engineering/references/risk-calibration.md": "a13bfae85958fdb9ebd073e8c38ecb65ada83ca6a7e27509eba8c516efde80ce",
-      ".agents/skills/flowtab-engineering/references/test-coverage-matrix-workflow.md": "804b58ecadd96d5a702c4688379171dbba7dcd0c7bef986b02928788e7f83017",
-      ".agents/skills/flowtab-engineering/references/test-layer-boundaries.md": "62142d1b2e9a0676ef8471cb9afd41b0478dc7c538b8f8fba13b5956c162889d"
+    "invalidated_candidate_evidence_root": {
+      "resource_boundary": "repository_root",
+      "relative_path_intent": ".build-local/test-audit/c2-20260719-edca49a"
     },
     "candidate_file_sha256": {
-      "FlowTab.xcodeproj/project.pbxproj": "52e3bd081364bb2097c16710ee41b1d308f5f022b457654104008c0ed53be5a3",
-      "FlowTab/Features/Home/HomeLandingView.swift": "b8d8de2f5541f80b09d02abd090f588db92af85e47fa35ab5e9ac13db9f29030",
-      "FlowTab/Features/Home/HomeRuntimeProjectionService.swift": "fe2c297070ab4bf5de24db48382a9e0fe9a21caf4a9533a718ee4590ca62581e",
-      "FlowTab/Features/Switcher/LiveSwitcherModel+Projections.swift": "d3da09613b558d6e197e5e6a73c5d946e57e80ac254779021ad3ef7862e47846",
-      "FlowTab/Features/Switcher/SwitcherPanelController+InputHandling.swift": "47c3d27f3199c765c3c887e77bb84b3ccb204f2f3f219f63d39385482beffe30",
-      "FlowTab/Features/Switcher/SwitcherPanelController+Presentation.swift": "0c3d1a4c9b45a1f8e5bb6be0a6eb704fa1cfa6205d22baf279f726b705fdcd97",
-      "FlowTab/Features/Switcher/SwitcherPanelController.swift": "aab0250ea27487e03ef4af5187630e5b44b0bee5fdd55b16c98d1f34253b6660",
-      "FlowTab/Infrastructure/Runtime/RuntimeProjectionRepairContract.swift": "24c92cddecbfe6b02b5477bfe3ebf96aa7ab0952eb7fd488121bacf71bd6096f",
-      "FlowTab/Infrastructure/Runtime/RuntimeProjectionRepairFactSource.swift": "217b76f653b136e8effb2573829d009e1b1e51452b8f1557b5dcaa8c79cc0a96",
-      "FlowTab/Infrastructure/Runtime/RuntimeProjectionRepairProvider.swift": "4e181e05acc97588255314c1d9efef386ff6023b4b3f2b3dd721e6137da618c0",
-      "FlowTab/Infrastructure/Runtime/RuntimeProjectionService.swift": "4fca5153f691b85d6f702a699d5fd6322c84baffb992e2af38aeb0f41641b46f",
-      "FlowTab/Infrastructure/Runtime/RuntimeReadModelStore.swift": "55ee881aac544c5a6aac821849d679913d8ffcaab77a8a8e433671fe4892458d",
-      "FlowTab/TestingSupport/FlowTabLaunchTesting.swift": "323c280034310abaef022e37f84ef5157da110c1bb1dc2afc42d2e28cf2a7791",
-      "FlowTab/TestingSupport/FlowTabUITestBootstrapper.swift": "508f877f7e6970169dc3d7e30afdbd4ddc6c29e23dce0d6e3b4c4e6dece31576",
-      "FlowTab/TestingSupport/RuntimeFrontmostProjectionTestSupport.swift": "6851ab73fe6062b39a69ccf98ac7951b3d6c87109be04103c46dc8c35bfc12f4",
-      "FlowTabTests/FlowTabPriorityCoverageTests+RuntimeMainTableProjection.swift": "625832138b9fff7883e38e12d093532c12c1f6da040fe4116eb3dc9afe9181cc",
-      "FlowTabTests/FlowTabPriorityCoverageTests+RuntimeReconciliationCoordinator.swift": "0a4d9ccf57da0daebc3e5e8f85c76d296497da707e7473ff0b12dcd05749ea4b",
-      "FlowTabTests/FlowTabPriorityCoverageTests+RuntimeProjectionNotificationPublication.swift": "b52ddf38650f1b0acaea452bffed0ea68a2bedfe1411141dbf8f91efa88e2f0d",
-      "FlowTabTests/FlowTabTests+HomeWindowActivation.swift": "0e19d7730455b30a7c4e2de3ce5423b54b781cb10d02af9579578811156f5637",
-      "FlowTabUITests/FlowTabUITests+ScrollingSupport.swift": "c596e56cd35ab6d7460ad441bc9b53305993aa03133b47a4b9761a25a2ca3f6e",
-      "FlowTabUITests/FlowTabUITests+SpaceFixtureHomeActivation.swift": "609f0910a0c2e7cd747480fcc62bfc1e7daec27fae07e584bc634ec0d6bfd744",
-      "FlowTabUITests/FlowTabUITests+SpaceFixtureMultiAppWorkflow.swift": "d1d8496ce7cc9f1551f8152314fbaf50a663171cd4e5402c7bc9013544e56df0",
-      "FlowTabUITests/FlowTabUITests+Support.swift": "b6410407c0c991e8087779285c36207cfc3fdd214906a0e35125b9fefb0c5e8d",
-      "FlowTabUITests/FlowTabUITests+SpaceFixtureWorkflow.swift": "f0629480d6a7cfdbbbb6404020454ef0b851555ab970dcfcb5b932410a07a3d2",
-      "FlowTabUITests/FlowTabUITests+SpaceFixtureRuntimeTruthEntrypoints.swift": "8ac0030effe67fb0b1b34f7897a76a99d023598e3c633979a4dada3e965b2148",
-      "docs/test-audit/TEST_ASSET_LEDGER.jsonl": "3de356a7b78fa60d904dcfa07f690c70689913179539090e27500c52b1a0041e"
+      "FlowTab/Infrastructure/Runtime/RuntimeProjectionMaintenancePolicy.swift": "18b15ad19fec47b19548f0482a09a424f27ec788bcc21fe49b568d3a9b32ccec",
+      "FlowTab/Infrastructure/Runtime/RuntimeProjectionService.swift": "c0994b2b6978ef5eb7534ae7f271957f60582ad9b761816e337443b6d97a14a5",
+      "FlowTabTests/FlowTabPriorityCoverageTests+RuntimeReconciliationCoordinator.swift": "2018eca73aa73fc6cd3ef952acd5f3231fe1fac0017541bced842149cb6e4105",
+      "docs/test-audit/TEST_ASSET_LEDGER.jsonl": "4649cae87ccab85c7dde48a2d1874539b9cc37fcb58b6eb120c0a0cd5fef1c8a"
     }
   },
   "dirty_path_ownership": {
     "stage_owned": [
-      "FlowTab.xcodeproj/project.pbxproj",
-      "FlowTab/Features/Home/HomeLandingView.swift",
-      "FlowTab/Features/Home/HomeRuntimeProjectionService.swift",
-      "FlowTab/Features/Switcher/LiveSwitcherModel+Projections.swift",
-      "FlowTab/Features/Switcher/SwitcherPanelController+InputHandling.swift",
-      "FlowTab/Features/Switcher/SwitcherPanelController+Presentation.swift",
-      "FlowTab/Features/Switcher/SwitcherPanelController.swift",
-      "FlowTab/Infrastructure/Runtime/RuntimeProjectionRepairContract.swift",
-      "FlowTab/Infrastructure/Runtime/RuntimeProjectionRepairFactSource.swift",
-      "FlowTab/Infrastructure/Runtime/RuntimeProjectionRepairProvider.swift",
+      "FlowTab/Infrastructure/Runtime/RuntimeProjectionMaintenancePolicy.swift",
       "FlowTab/Infrastructure/Runtime/RuntimeProjectionService.swift",
-      "FlowTab/Infrastructure/Runtime/RuntimeReadModelStore.swift",
-      "FlowTab/TestingSupport/FlowTabLaunchTesting.swift",
-      "FlowTab/TestingSupport/FlowTabUITestBootstrapper.swift",
-      "FlowTab/TestingSupport/RuntimeFrontmostProjectionTestSupport.swift",
-      "FlowTabTests/FlowTabPriorityCoverageTests+RuntimeMainTableProjection.swift",
       "FlowTabTests/FlowTabPriorityCoverageTests+RuntimeReconciliationCoordinator.swift",
-      "FlowTabTests/FlowTabPriorityCoverageTests+RuntimeProjectionNotificationPublication.swift",
-      "FlowTabTests/FlowTabTests+HomeWindowActivation.swift",
-      "FlowTabUITests/FlowTabUITests+ScrollingSupport.swift",
-      "FlowTabUITests/FlowTabUITests+SpaceFixtureHomeActivation.swift",
-      "FlowTabUITests/FlowTabUITests+SpaceFixtureMultiAppWorkflow.swift",
-      "FlowTabUITests/FlowTabUITests+Support.swift",
-      "FlowTabUITests/FlowTabUITests+SpaceFixtureWorkflow.swift",
-      "FlowTabUITests/FlowTabUITests+SpaceFixtureRuntimeTruthEntrypoints.swift",
       "docs/test-audit/TEST_ASSET_LEDGER.jsonl",
       "docs/test-audit/slices/runtime-projection-fixture-publication/SLICE_HANDOFF.json"
     ],
     "user_owned_excluded": [
-      ".agents/skills/flowtab-engineering/SKILL.md",
-      ".agents/skills/flowtab-engineering/references/bugfix-workflow.md",
-      ".agents/skills/flowtab-engineering/references/feature-workflow.md",
-      ".agents/skills/flowtab-engineering/references/handoff-contract.md",
-      ".agents/skills/flowtab-engineering/references/risk-calibration.md",
-      ".agents/skills/flowtab-engineering/references/test-coverage-matrix-workflow.md",
-      ".agents/skills/flowtab-engineering/references/test-layer-boundaries.md",
-      "AGENTS.md",
-      "scripts/skill-evals/flowtab-engineering-cases.jsonl",
+      ".agents/skills/flowtab-engineering/",
       ".agents/skills/flowtab-test-audit/",
       ".codex/",
+      "AGENTS.md",
+      "scripts/skill-evals/flowtab-engineering-cases.jsonl",
       "prompts.zip"
     ]
   },
   "scope": {
-    "owner_at_c0_routing": "Runtime and UI Integration",
-    "authoritative_owner": "Runtime projection publication from launch bootstrap through Home and Switcher/Search consumers",
+    "authoritative_owner": "RuntimeProjectionService app-lifecycle reconciliation and runtime projection publication",
+    "entry_consumer": "Home real-fixture app summary and window-count projection",
     "in_scope": [
-      "one runtime projection service shared by UI-test bootstrap and Home roots",
-      "mock app and window facts published before UI-test launch bootstrap returns",
-      "permission-aware WindowRecord coverage for mock fixture windows",
-      "bounded Search freshness closure when a scoped repair creates a nested ready repair",
-      "Home refresh on committed app-switcher projection and retention across transient detail unavailability",
-      "Search activation deferred until the committed index publishes",
-      "Mock and real-fixture window rows visible through Search at launch"
+      "initial app-launch repair before newly launched windows have fully converged",
+      "one bounded delayed app-window convergence repair",
+      "termination cancellation of an obsolete delayed convergence repair",
+      "Home and Switcher consumers of the repaired real-fixture projection",
+      "current exhaustive test-asset ledger projection"
     ],
     "out_of_scope": [
-      "existing projection commit-consistency Oracle changes awaiting explicit clarification",
-      "switcher trigger-panel process lifetime and teardown",
-      "stable product scenario IDs, requiredness, and coverage-matrix anchors",
-      "hot-path scale and resource-pressure policy"
+      "fixture timing changes",
+      "UI wait or expected-count relaxation",
+      "runtime projection persistence schema changes",
+      "stable product-scenario requiredness changes",
+      "unrelated reconciliation reasons"
     ]
+  },
+  "prerequisites": {
+    "c0_reconstructible": true,
+    "prior_c1_anchors_reconstructible": true,
+    "fixed_ui_app_identity": "Apple Development signed {user-home}/Applications/Flow Tab UITest.app",
+    "existing_test_semantics": "unchanged; only additive Behavior regressions were introduced",
+    "stage03_finding_routed_back_to_stage02": true
   },
   "product_contract": {
-    "service_identity": "App roots and UI-test trigger paths consume the runtime projection service installed during launch bootstrap.",
-    "bootstrap_publication": "Mock launch bootstrap returns after app-switcher projection publication; when Accessibility is trusted it also publishes exact fixture window records, Home detail, and a committed Search index.",
-    "window_identity": "Mock window rows use deterministic stable window IDs, deterministic CG IDs, and exact current AX attachment evidence at the testing-support boundary.",
-    "search_freshness": "A pending Search barrier boundedly drains ready repairs created by an earlier repair, commits their main-table evidence, and publishes only a generation-valid index.",
-    "home_continuity": "Home refreshes on committed app-switcher publication and retains the last committed summary and detail during a transient detail-unavailable read.",
-    "search_entry": "A launch-requested Search session remains in the app layer until the committed index is available, then enters the requested Search scope.",
-    "visible_workflow": "Mock and real fixture window titles are discoverable on Home, Switcher, and Search surfaces from the same committed runtime projection candidate."
+    "initial_publication": "An app-launch notification may publish the first available app and window facts immediately.",
+    "window_convergence": "The same launch schedules one bounded delayed app-scoped reconciliation so windows created after the workspace launch notification are projected without another consumer action.",
+    "termination": "A matching termination cancels the delayed launch convergence generation before obsolete app facts can be repaired.",
+    "consumer_result": "Home and Switcher consumers converge to the actual real-fixture window set from committed runtime projection evidence."
   },
   "production_path": [
-    "FlowTabApp prepares UI-test state before constructing scenes and injects the resolved RuntimeProjectionServing instance into every HomeRootView.",
-    "FlowTabUITestBootstrapper installs the mock RuntimeProjectionService, drains app-switcher maintenance, conditionally signals per-app window repairs, then requests and drains the Search freshness barrier.",
-    "RuntimeProjectionRepairFactSource asks the UI-test dataset to seed permission-aware WindowRecord main-table evidence.",
-    "RuntimeProjectionService drains ready reconciliation requests and, while Search freshness is pending, boundedly drains newly created ready follow-up repairs before committing the Search index.",
-    "HomeLandingView refreshes summaries after runtime app-switcher publication and preserves committed UI state while a detail projection is transiently unavailable.",
-    "LiveSwitcherModel blocks automatic window-layer entry while Search activation awaits the freshness barrier, then applies the committed Search index notification.",
-    "Mock and real fixture UI tests query the visible Search surface produced by the committed projection."
+    "signalAppLaunched records and drains the immediate app-scoped reconciliation request.",
+    "RuntimeProjectionService marks that app's windows dirty and records a future appLaunched request.",
+    "RuntimeAppLaunchConvergenceScheduler owns one PID-keyed delayed generation on the maintenance queue.",
+    "At the convergence boundary the service re-records appLaunched, drains the ready request autonomously, and publishes the repaired projection.",
+    "signalAppTerminated cancels the PID generation before recording termination and committing removal evidence."
   ],
-  "test_meaning_conclusion": {
-    "classification": "retain existing tests unchanged and add six independent publication regressions",
-    "protected_meaning": "Fixture rows become visible only through the production RuntimeProjectionService, main-table WindowRecord evidence, committed Search barrier, and ordinary Home/Switcher consumers.",
-    "independent_oracle": [
-      "Bootstrap without Accessibility returns a committed app order with explicit zero-window counts.",
-      "Bootstrap with Accessibility returns exact stable IDs for the two Mail fixture windows in app-switcher, Home detail, and Search index reads.",
-      "A nested Space repair created during an app repair must execute before a pending Search index becomes generation-valid.",
-      "Pending Search activation prevents window auto-entry and activates Search only after committed index publication.",
-      "The visible Mock Search result exposes the Inbox fixture row.",
-      "The visible real-fixture Search result exposes the configured Docs window."
+  "independent_oracle": {
+    "behavior": [
+      "one launch produces an immediate app repair and one delayed app repair",
+      "both repairs target the launched PID and carry appLaunched",
+      "termination after the immediate repair prevents the delayed repair"
+    ],
+    "ui": [
+      "a newly launched one-window real fixture reaches a 1w Home summary without a manual refresh",
+      "a fixture whose second window appears after launch reaches a 2w Home summary",
+      "Home exposes all configured real-fixture workflow windows",
+      "standard Switcher exposes the fixture app tile and all configured window cards"
     ]
   },
+  "test_meaning_conclusion": {
+    "existing_assets": "retained unchanged",
+    "new_behavior_assets": "retain as the lowest-layer regressions for delayed convergence and termination cancellation",
+    "stable_contract": "unchanged",
+    "reason": "The existing UI failures represented a real publication gap; deterministic service-level tests reproduce the missing autonomous repair without relying on fixture timing."
+  },
   "test_quality_conclusion": {
-    "fail_sensitivity": "Before production remediation, two additive behavior tests produced four deterministic assertions and four existing Mock UI tests each failed their visible projection anchor.",
-    "fixture_fidelity": "Mock behavior uses exact dataset app/window identities at the testing-support boundary; real UI uses the signed fixed-App identity and configured multi-app Space fixture.",
-    "async_waiting": "Service tests synchronously drain the maintenance queue; notification and UI waits are bounded at 1, 5, 8, or 10 seconds.",
-    "cleanup": "Canonical UI wrappers terminate FlowTab and fixture processes and retain complete result bundles in unique ignored attempt leaves.",
-    "isolation": "Every final attempt consumed the same build root and used a distinct output directory.",
-    "mock_boundaries": "Mock tests prove deterministic publication wiring; real-fixture tests prove macOS process, AX, CG, and visible Search integration.",
+    "fail_sensitivity": "Before the production change, the convergence regression timed out and observed one repair instead of two; the full UI run observed 0w instead of 1w and 1w instead of 2w.",
+    "fixture_fidelity": "Behavior uses the real RuntimeProjectionService, coordinator, repair provider, record store, and maintenance queue; UI uses the signed fixed app plus the real Space fixture process.",
+    "async_waiting": "Behavior expectations are bounded and followed by maintenance-queue barriers; UI uses existing bounded visible-value waits.",
+    "cleanup": "Canonical wrappers isolate evidence roots; UI teardown terminates FlowTab and fixture processes.",
+    "isolation": "The deterministic red test failed before production remediation; targeted green, full Behavior, and the five affected UI consumers passed in distinct attempts.",
+    "mock_boundaries": "The Behavior executor observes reconciliation requests while production scheduling, request recording, and queue ownership remain real.",
+    "target_reachability": "The additive methods executed through FlowTabTests and the production path executed through the signed real-fixture UI app.",
     "skip": "none",
-    "flake_assessment": "The final candidate passed six app-host tests, seven Mock UI tests, and five real-fixture UI tests across four separate UI attempts.",
-    "target_reachability": "The canonical FlowTabTests and UI wrappers compiled the production and testing-support changes through the FlowTab target."
+    "flake_assessment": "Both lifecycle UI tests passed in the targeted pair and again inside the broader five-test real-fixture sequence."
   },
   "scenario_plan": {
     "required": [
       {
-        "axis": "permission variants",
-        "scenario": "Mock bootstrap with Accessibility denied publishes ordered zero-window summaries; trusted bootstrap publishes exact window rows.",
-        "evidence": "four additive app-host behavior tests passed"
+        "axis": "delayed launch-window convergence",
+        "layer": "Behavior",
+        "status": "passed",
+        "evidence": "behavior-app-launch-regression-green-007: 2 tests, 0 failures; flowtabtests-full-009: 714 tests, 0 failures"
       },
       {
-        "axis": "repair dependency ordering",
-        "scenario": "An app repair creates a Space repair while a Search freshness barrier is pending.",
-        "evidence": "nested-repair publication regression passed"
+        "axis": "real-fixture lifecycle publication",
+        "layer": "UI",
+        "status": "passed",
+        "evidence": "ui-lifecycle-pair-fix-008: 2 tests, 0 failures; ui-fixture-consumers-010: 5 tests, 0 failures"
       },
       {
-        "axis": "session timing",
-        "scenario": "Launch requests window Search before committed index publication while auto-enter is otherwise eligible.",
-        "evidence": "pending-Search model regression and real fixture Search passed"
+        "axis": "bounded runtime AX collection",
+        "layer": "Pressure",
+        "status": "passed",
+        "evidence": "pressure-runtime-011: configured concurrency 4, observed maximum 4"
       },
       {
-        "axis": "Mock visible surfaces",
-        "scenario": "Home summaries, hidden-app ordering, Search results, and window-scope settings consume the published mock projection.",
-        "evidence": "seven Mock UI methods passed"
-      },
-      {
-        "axis": "real fixture visible surfaces",
-        "scenario": "Home, standard Switcher, Search publication, and exact Search activation consume the configured multi-app fixture.",
-        "evidence": "five real-fixture UI methods passed"
+        "axis": "exhaustive current asset inventory",
+        "layer": "Process/Tooling",
+        "status": "passed",
+        "evidence": "962 rows, 866 test methods, 22 stable scenarios"
       }
     ],
     "optional_omitted": [
       {
-        "axis": "resource pressure",
-        "reason": "This slice changes deterministic launch publication and a pre-existing bounded repair drain; it adds no workload scale, polling cadence, cache limit, or resource budget."
-      },
-      {
-        "axis": "additional fixture workflows",
-        "reason": "The selected Mock and real multi-app fixtures cover denied/trusted permission state, zero/multiple windows, Home, Switcher, Search, and exact activation."
+        "axis": "new UI test asset",
+        "reason": "The two existing real-fixture lifecycle methods already expose the user-visible window-count deficiency and remain unchanged."
       }
     ]
   },
   "disposition": {
     "primary": "production_defect",
     "contributing": [
-      "test_asset_gap",
-      "runtime_testing_support_gap",
-      "async_publication_ordering_defect"
+      "coverage_gap"
     ]
   },
   "deficiency_signal": {
-    "prechange_bootstrap_behavior": {
-      "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication/attempts/prechange-bootstrap-unit-001",
-      "executed": 1,
-      "assertion_failures": 2,
-      "signal": "Home summary projection and zero-window counts were nil after bootstrap returned.",
-      "status_sha256": "4f5bbd3f31d28eab4888896ef7f7bc10f883ba5fe1b95b7fcd0040b418f04ae5",
-      "log_sha256": "c9614183dd69e82df692b1c9395ab7f9190f27327787569930a47ad62fb5dc88"
-    },
-    "prechange_window_rows_behavior": {
-      "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication/attempts/prechange-window-rows-unit-001",
-      "executed": 1,
-      "assertion_failures": 2,
-      "signal": "App-switcher window rows were empty and Home detail was missing with Accessibility trusted.",
-      "status_sha256": "4f5bbd3f31d28eab4888896ef7f7bc10f883ba5fe1b95b7fcd0040b418f04ae5",
-      "log_sha256": "c98010c49065758734df6b92ce1b7142151e5e489b59b24c2adc42b359660514"
-    },
-    "prechange_mock_ui": {
-      "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication/attempts/prechange-mock-ui-001",
-      "executed": 4,
-      "failures": 4,
-      "signal": "Home and Option+Tab visible anchors were absent across zero-window and hidden-app scenarios.",
-      "status_sha256": "6b8ccde7cec88a61b951d5d1a6608b8ee306a57a673096a038de1c604b8ef0b8",
-      "log_sha256": "3cc92c52b30b48254ce45b79f729a9fb9619a8665593ba0c0c7af908d962c927"
-    }
+    "invalidated_full_ui_attempt": ".build-local/test-audit/c2-20260719-edca49a/ui-full-003",
+    "executed": 111,
+    "passed": 109,
+    "failures": 2,
+    "observations": [
+      "testRuntimeLifecycleRefreshesRealFixtureAppLaunchAndTermination expected 1w and observed 0w",
+      "testRuntimeLifecycleRefreshesRealFixtureWindowSetMutation expected 2w and observed 1w"
+    ],
+    "deterministic_red_attempt": ".build-local/test-audit/c2-20260719-edca49a/behavior-app-launch-regression-red-005",
+    "deterministic_red_result": "1 test executed with 4 failures: delayed expectation timed out and only one appLaunched repair was observed"
   },
   "root_cause": {
-    "scoped_publication": "A successful scoped current-app repair committed main-table evidence but did not republish the AppSwitcher and Home projections consumed by live surfaces.",
-    "authoritative_removal": "Current-app repair evidence did not distinguish a complete CG identity set from partial evidence, so disappeared windows could remain committed.",
-    "home_retry": "An incomplete empty selected-app detail projection was treated as a settled empty result instead of a retry signal.",
-    "deferred_search": "Search presentation could be requested while its committed index activation was pending, leaving the controller hidden after publication.",
-    "zero_window_layout": "An unchanged empty selected-app projection still published a session layout update, allowing a recursive zero-window transition loop.",
-    "completed_cg_cleanup": "Completed dirty CG identities used one cleanup rule across ordinary repair, activation verification, and explicit maintenance reasons.",
-    "home_fixture_selection": "XCTest reported a clipped Home app row as hittable, so the multi-app fixture could tap outside the visible scroll viewport and retain the prior selection.",
-    "in_app_fixture_frontmost": "The real in-app fixture launch declared a frontmost bundle intent, but no test consumer routed focused projection reads to that fixture process."
+    "production": "The workspace launch repair could run while the app had only a partial nonempty window set. Committing that payload cleared dirty state, and no autonomous later repair verified the settled window set.",
+    "test": "The existing UI assets correctly detected the publication gap but lacked a deterministic service-level regression for the delayed window-creation interval.",
+    "classification": "production lifecycle-publication defect with a lowest-layer coverage gap"
   },
   "semantic_delta": {
-    "scoped_publication": "Every successful scoped repair republishes AppSwitcher and Home from the same committed read-model candidate.",
-    "authoritative_removal": "Authoritative CG identity evidence removes prior rows absent from that set; partial evidence preserves prior rows.",
-    "home_retry": "Incomplete empty Home detail reads signal an app-window change so the normal refresh path retries.",
-    "deferred_search": "Pending Search activation is retained until index publication, then activated and presented through the ordinary controller path.",
-    "zero_window_layout": "Unchanged empty selected-app candidates update context without publishing a new session layout.",
-    "completed_cg_cleanup": "Ordinary repair clears completed CG identities; activation verification keeps readback-mismatch identities stale until a barrier; explicit maintenance clears all.",
-    "home_fixture_selection": "Home fixture selection scrolls until the row is fully contained by its viewport and confirms the selected app through an expected window title.",
-    "in_app_fixture_frontmost": "Real-runtime UI tests may declare a fixture bundle whose focused read and refresh routing are resolved through an isolated TestingSupport decorator.",
-    "tests": "Seven additive behavior tests cover the new contracts; existing UI methods retain their visible oracles while using stable dynamic queries, bounded readiness, and shared AX-destroy, viewport-selection, and fixture-frontmost evidence. Two existing projection-consistency methods encode the explicitly confirmed degraded-context and incomplete-freshness contracts.",
-    "stable_product_contract": "unchanged",
+    "production": "add one bounded 0.8-second app-launch convergence generation and cancel it on termination",
+    "tests": "add service-level delayed-repair and termination-cancellation regressions",
+    "fixtures": "unchanged",
+    "runners": "unchanged",
+    "project_membership": "unchanged",
+    "asset_ledger": "add two test-method assets, update the containing test-case count, and refresh shifted method line and fingerprint metadata",
+    "stable_coverage_matrix": "unchanged",
     "public_api": "unchanged",
-    "persistence": "unchanged"
+    "persistence_schema": "unchanged"
   },
   "existing_test_clarification_gate": {
-    "guard_applied": true,
-    "changed_existing_test_functions": [
-      "FlowTabPriorityCoverageTests.testRuntimeProjectionServiceKeepsAppDirectoryDerivedProjectionDegradedWithoutMainTableCommit",
-      "FlowTabPriorityCoverageTests.testRuntimeReadModelStoreCommitsProjectionsAndMarksDirtyMetadata",
-      "FlowTabTests.makeHomeActivationDetailProjection",
-      "FlowTabUITests.assertWindowSearchReady",
-      "FlowTabUITests.testRuntimeLifecycleRefreshesRealFixtureWindowSetMutation",
-      "FlowTabUITests.testSwitcherPanelRefreshesOpenWindowLayerAfterRealFixtureWindowSetMutation",
-      "FlowTabUITests.testSwitcherPanelKeepsWindowLayerWhenSelectedFixtureWindowCloses",
-      "FlowTabUITests.switcherWindowCardObservations",
-      "FlowTabUITests.waitForSwitcherWindowCards",
-      "FlowTabUITests.assertHomePageShowsOnlySelectedWorkflowAppTitles",
-      "FlowTabUITests.tapElementAfterScrollingIntoView",
-      "FlowTabUITests.isUsableFrame",
-      "FlowTabUITests.scrollContainerForElement",
-      "FlowTabUITests.scrollDeltaY"
-    ],
-    "changed_existing_test_assessment": "Explicitly confirmed projection-consistency oracles, Home fixture completeness input, and oracle-preserving UI observation stabilization",
-    "candidate_authorization_required": true,
-    "candidate_authorization_satisfied": true,
-    "pending_token": "9acae51af3d77566",
-    "pending_token_existing_function_count": 14,
-    "authorization_note": "User explicitly confirmed the documented C1 change package on 2026-07-19.",
-    "minimum_confirmation": "Confirm incomplete Home fixture coverage, 12-second Search readiness, atomic window-card observation, AX-destroy evidence that accepts a mapped or already-cleared CG identity, viewport-confirmed Home selection, fixture-bundle focused routing, preservation of app context in degraded app-directory projections, and incomplete seeded and Home aggregate freshness until authoritative scope coverage.",
-    "added_test_functions": [
-      "FlowTabTests.testFlowTabTestLaunchOptionsParsesFrontmostBundleIdentifierOverride",
-      "FlowTabPriorityCoverageTests.testUITestFrontmostProjectionOverrideRoutesFocusedReadsAndRefreshesToTarget",
-      "FlowTabPriorityCoverageTests.testRuntimeProjectionServiceRepublishesAppSwitcherAfterScopedWindowRepair",
-      "FlowTabPriorityCoverageTests.testRuntimeProjectionServiceRepublishesWindowRemovalAfterScopedRepair",
-      "FlowTabPriorityCoverageTests.testSwitcherPanelControllerPresentsDeferredSearchAfterIndexPublishes",
-      "FlowTabPriorityCoverageTests.testLiveSwitcherModelSkipsLayoutPublicationForUnchangedEmptySelectedProjection",
-      "FlowTabTests.testHomeRuntimeRefreshReaderRetriesIncompleteEmptyDetailProjection"
-    ],
-    "pending_downstream_confirmation": {
-      "state": "resolved",
-      "candidate_slice": "slice:runtime-projection-commit-consistency",
-      "methods": [
-        "testRuntimeProjectionServiceKeepsAppDirectoryDerivedProjectionDegradedWithoutMainTableCommit",
-        "testRuntimeReadModelStoreCommitsProjectionsAndMarksDirtyMetadata"
-      ],
-      "proposed_oracle_delta": {
-        "app_directory_projection": "Retain app context while the derived projection remains degraded and incomplete before a main-table commit.",
-        "seeded_and_home_aggregate_projection": "Remain incomplete until authoritative scope coverage is committed."
-      },
-      "assertion_failures": 3,
-      "authorization_required_before_oracle_change": true,
-      "authorization_satisfied": true,
-      "validated_by_attempt": "post-confirmation-full-flowtabtests-082"
-    }
+    "authorization_required": false,
+    "authorization_satisfied": true,
+    "reason": "No existing test was changed, removed, weakened, or reinterpreted."
   },
   "changed_files": [
     {
-      "path_intent": "FlowTab.xcodeproj/project.pbxproj",
-      "role": "register isolated frontmost-projection and scrolling test support sources",
-      "semantic_change": "register isolated frontmost-projection and scrolling test support sources"
-    },
-    {
-      "path_intent": "FlowTab/Features/Home/HomeLandingView.swift",
-      "role": "stable Home single-app refresh diagnostic marker",
-      "semantic_change": "stable Home single-app refresh diagnostic marker"
-    },
-    {
-      "path_intent": "FlowTab/Features/Home/HomeRuntimeProjectionService.swift",
-      "role": "retry incomplete empty selected-app detail projections",
-      "semantic_change": "retry incomplete empty selected-app detail projections"
-    },
-    {
-      "path_intent": "FlowTab/Features/Switcher/LiveSwitcherModel+Projections.swift",
-      "role": "suppress unchanged zero-window layout republishes while retaining context",
-      "semantic_change": "suppress unchanged zero-window layout republishes while retaining context"
-    },
-    {
-      "path_intent": "FlowTab/Features/Switcher/SwitcherPanelController+InputHandling.swift",
-      "role": "activate committed deferred Search before presentation",
-      "semantic_change": "activate committed deferred Search before presentation"
-    },
-    {
-      "path_intent": "FlowTab/Features/Switcher/SwitcherPanelController+Presentation.swift",
-      "role": "defer pending Search presentation without user-input side effects",
-      "semantic_change": "defer pending Search presentation without user-input side effects"
-    },
-    {
-      "path_intent": "FlowTab/Features/Switcher/SwitcherPanelController.swift",
-      "role": "accept pending Search activation from the UI-test trigger boundary",
-      "semantic_change": "accept pending Search activation from the UI-test trigger boundary"
-    },
-    {
-      "path_intent": "FlowTab/Infrastructure/Runtime/RuntimeProjectionRepairContract.swift",
-      "role": "carry optional authoritative current-app CG window identity coverage",
-      "semantic_change": "carry optional authoritative current-app CG window identity coverage"
-    },
-    {
-      "path_intent": "FlowTab/Infrastructure/Runtime/RuntimeProjectionRepairFactSource.swift",
-      "role": "publish authoritative UI-test fixture CG window identities",
-      "semantic_change": "publish authoritative UI-test fixture CG window identities"
-    },
-    {
-      "path_intent": "FlowTab/Infrastructure/Runtime/RuntimeProjectionRepairProvider.swift",
-      "role": "publish authoritative production current-app CG window identities",
-      "semantic_change": "publish authoritative production current-app CG window identities"
+      "path_intent": "FlowTab/Infrastructure/Runtime/RuntimeProjectionMaintenancePolicy.swift",
+      "role": "bounded lifecycle scheduling policy",
+      "semantic_change": "define the launch convergence delay and PID-keyed delayed-generation scheduler"
     },
     {
       "path_intent": "FlowTab/Infrastructure/Runtime/RuntimeProjectionService.swift",
-      "role": "republish scoped repair results and apply reason-scoped completed-CG cleanup",
-      "semantic_change": "republish scoped repair results and apply reason-scoped completed-CG cleanup"
-    },
-    {
-      "path_intent": "FlowTab/Infrastructure/Runtime/RuntimeReadModelStore.swift",
-      "role": "remove absent rows only when current-app evidence is authoritative",
-      "semantic_change": "remove absent rows only when current-app evidence is authoritative"
-    },
-    {
-      "path_intent": "FlowTab/TestingSupport/FlowTabLaunchTesting.swift",
-      "role": "parse the fixture frontmost-bundle launch intent",
-      "semantic_change": "parse the fixture frontmost-bundle launch intent"
-    },
-    {
-      "path_intent": "FlowTab/TestingSupport/FlowTabUITestBootstrapper.swift",
-      "role": "install and synchronize the real-runtime frontmost projection override",
-      "semantic_change": "install and synchronize the real-runtime frontmost projection override"
-    },
-    {
-      "path_intent": "FlowTab/TestingSupport/RuntimeFrontmostProjectionTestSupport.swift",
-      "role": "route focused UI-test reads and refreshes to the declared fixture app",
-      "semantic_change": "route focused UI-test reads and refreshes to the declared fixture app"
-    },
-    {
-      "path_intent": "FlowTabTests/FlowTabPriorityCoverageTests+RuntimeMainTableProjection.swift",
-      "role": "confirm degraded app-directory projection retains app context before main-table commit",
-      "semantic_change": "confirm degraded app-directory projection retains app context before main-table commit"
+      "role": "runtime projection lifecycle owner",
+      "semantic_change": "schedule an autonomous app-scoped repair after launch and cancel it on termination"
     },
     {
       "path_intent": "FlowTabTests/FlowTabPriorityCoverageTests+RuntimeReconciliationCoordinator.swift",
-      "role": "confirm seeded AppSwitcher and Home aggregate freshness remains incomplete until authoritative scope coverage",
-      "semantic_change": "confirm seeded AppSwitcher and Home aggregate freshness remains incomplete until authoritative scope coverage"
-    },
-    {
-      "path_intent": "FlowTabTests/FlowTabPriorityCoverageTests+RuntimeProjectionNotificationPublication.swift",
-      "role": "four live publication, deferred Search, and zero-window regressions",
-      "semantic_change": "four live publication, deferred Search, and zero-window regressions"
-    },
-    {
-      "path_intent": "FlowTabTests/FlowTabTests+HomeWindowActivation.swift",
-      "role": "incomplete-empty Home detail retry regression",
-      "semantic_change": "incomplete-empty Home detail retry regression"
-    },
-    {
-      "path_intent": "FlowTabUITests/FlowTabUITests+ScrollingSupport.swift",
-      "role": "viewport-contained scrolling and tap confirmation support",
-      "semantic_change": "viewport-contained scrolling and tap confirmation support"
-    },
-    {
-      "path_intent": "FlowTabUITests/FlowTabUITests+SpaceFixtureHomeActivation.swift",
-      "role": "bounded Home fixture selection confirmation support",
-      "semantic_change": "bounded Home fixture selection confirmation support"
-    },
-    {
-      "path_intent": "FlowTabUITests/FlowTabUITests+SpaceFixtureMultiAppWorkflow.swift",
-      "role": "confirm each Home fixture-app selection before asserting window titles",
-      "semantic_change": "confirm each Home fixture-app selection before asserting window titles"
-    },
-    {
-      "path_intent": "FlowTabUITests/FlowTabUITests+Support.swift",
-      "role": "atomic dynamic window-card count and title observation",
-      "semantic_change": "atomic dynamic window-card count and title observation"
-    },
-    {
-      "path_intent": "FlowTabUITests/FlowTabUITests+SpaceFixtureWorkflow.swift",
-      "role": "shared AX-destroy evidence accepts mapped or already-cleared CG identity",
-      "semantic_change": "shared AX-destroy evidence accepts mapped or already-cleared CG identity"
-    },
-    {
-      "path_intent": "FlowTabUITests/FlowTabUITests+SpaceFixtureRuntimeTruthEntrypoints.swift",
-      "role": "bounded Search readiness wait covers measured live repair latency",
-      "semantic_change": "bounded Search readiness wait covers measured live repair latency"
+      "role": "additive Behavior regressions",
+      "semantic_change": "prove delayed repair cardinality and termination cancellation"
     },
     {
       "path_intent": "docs/test-audit/TEST_ASSET_LEDGER.jsonl",
-      "role": "five additive behavior assets and refreshed UI test fingerprints",
-      "semantic_change": "five additive behavior assets and refreshed UI test fingerprints"
+      "role": "current exhaustive asset projection",
+      "semantic_change": "record the two new methods and current shifted line and fingerprint metadata"
     },
     {
       "path_intent": "docs/test-audit/slices/runtime-projection-fixture-publication/SLICE_HANDOFF.json",
-      "role": "reopened C1 evidence, ownership, invalidation, and rollback boundary",
-      "semantic_change": "reopened C1 evidence, ownership, invalidation, and rollback boundary"
+      "role": "consumable replacement C1 handoff",
+      "semantic_change": "publish finding, remediation, validation, invalidations, and rollback boundary"
     }
   ],
   "validation": {
-    "flowtabcore_current": {
+    "Unit": {
+      "status": "not relevant",
+      "reason": "No FlowTabCore rule or pure model changed."
+    },
+    "Behavior": {
       "status": "passed",
-      "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication-reopen/attempts/diagnostic-core-current-042",
-      "status_sha256": "0588ab95c371fe4da6191181459d8b7b3d6d1150ae92a9df7b3f093512499bb5",
-      "log_sha256": "6ce875b4028592e0127795e02a483a29fad9ab67115087b58cc871885ea4f047",
-      "executed": 42,
-      "failures": 0
-    },
-    "unit_and_behavior_targeted": {
-      "status": "passed",
-      "attempts": [
-        {
-          "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication-reopen/attempts/postchange-live-publication-unit-002",
-          "status_sha256": "5a4bf09940ce3b5049712fe8505e26cec88d0e1d907ddc5642c1594956ed5da5",
-          "log_sha256": "275113c7ee60cfc4c1a24719df02d644f8dd9b4dbc08494457768357587dc48c",
-          "xcresult_info_sha256": "83d759034ea5c415337a478b46de2fa1c6993863916687767c191cfc6a3907f3",
-          "executed": 3,
-          "failures": 0
-        },
-        {
-          "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication-reopen/attempts/postchange-related-publication-unit-003",
-          "status_sha256": "5a4bf09940ce3b5049712fe8505e26cec88d0e1d907ddc5642c1594956ed5da5",
-          "log_sha256": "a3277adb029f83270f882232a0ac9957a91cbdc4f3bb8adb6fdad2f63af53820",
-          "xcresult_info_sha256": "84bb80feecb9a06e35e199be04035d07811698bac16b7c2cbb297edb89bcddec",
-          "executed": 7,
-          "failures": 0
-        },
-        {
-          "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication-reopen/attempts/postchange-authoritative-retry-unit-007",
-          "status_sha256": "5a4bf09940ce3b5049712fe8505e26cec88d0e1d907ddc5642c1594956ed5da5",
-          "log_sha256": "296ebee1f437a2ef8c3167cb75b829dbf55e2c7173b6fc49c224a0ebf0314f6b",
-          "xcresult_info_sha256": "1f5c355dfa6b21e2e012553ff81f5e25672c3f29cb338ad70e21c5a5a6f4320b",
-          "executed": 1,
-          "failures": 0
-        },
-        {
-          "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication-reopen/attempts/postchange-authoritative-publication-unit-008",
-          "status_sha256": "5a4bf09940ce3b5049712fe8505e26cec88d0e1d907ddc5642c1594956ed5da5",
-          "log_sha256": "e82fc715a0d407638103637487809004b55a655778cc5f71ed3bbb99bfa5e45f",
-          "xcresult_info_sha256": "56774553140f63523e8280144dfde3e3e15eaed1377129ec9ed6741a238c5105",
-          "executed": 4,
-          "failures": 0
-        },
-        {
-          "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication-reopen/attempts/postchange-zero-window-autoenter-unit-012",
-          "status_sha256": "5a4bf09940ce3b5049712fe8505e26cec88d0e1d907ddc5642c1594956ed5da5",
-          "log_sha256": "7e07db5996650010d65e73d42bc0b0c23ae469dfb69ed0fea8b2b8f2759d82f7",
-          "xcresult_info_sha256": "b8ad52769ff315be2d5fbc3cfe7a0a6702cd6dd09ef5110a574730dfdd05a646",
-          "executed": 4,
-          "failures": 0
-        },
-        {
-          "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication-reopen/attempts/postchange-stale-publication-unit-016",
-          "status_sha256": "5a4bf09940ce3b5049712fe8505e26cec88d0e1d907ddc5642c1594956ed5da5",
-          "log_sha256": "3a127e1c76611bea43ab372beaf4b9e81b74e9d6135fb628edcb8d1487b339f3",
-          "xcresult_info_sha256": "f731d4b98d6fe927a1935f380e394433bb05150d9476e55c1e5482311fef3c8d",
-          "executed": 3,
-          "failures": 0
-        },
-        {
-          "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication-reopen/attempts/postchange-reason-scoped-cleanup-unit-020",
-          "status_sha256": "5a4bf09940ce3b5049712fe8505e26cec88d0e1d907ddc5642c1594956ed5da5",
-          "log_sha256": "49c3f81617031fb6b8fa563d30ff9860772682e382a0c82b9ea6202dfa6d8a81",
-          "xcresult_info_sha256": "2c1f024a7a965909a2e1caced2bb89e0d4ebbb0874c52d7e734c5f6770294a93",
-          "executed": 3,
-          "failures": 0
-        },
-        {
-          "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication-reopen/attempts/remediation-frontmost-wrapper-unit-071",
-          "status_sha256": "5a4bf09940ce3b5049712fe8505e26cec88d0e1d907ddc5642c1594956ed5da5",
-          "log_sha256": "da65de1b2c30c1e2e85642a224364e67f2c1ad0cbc39c450f4a52104b3e3bf3f",
-          "xcresult_info_sha256": "53f07e0e8711ae5f49fcc76025ac3fec6ee3d3c94d4ec3e75d9624db5577f8e3",
-          "executed": 2,
-          "failures": 0
-        }
-      ]
-    },
-    "ui_runner_build": {
-      "status": "passed",
-      "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication-reopen/attempts/remediation-ui-helper-extraction-build-076",
-      "status_sha256": "67ace486d8ce3594685b131ebe39c22ebcc4605f145945e170da1caf0e008439",
-      "log_sha256": "224052049662298ffcd83a4e4b2f520b7e91852cf2ed8046bf9677fcf7f31977"
-    },
-    "ui_prior_targeted_window_removal": {
-      "status": "invalidated_by_subsequent_ui_remediation",
-      "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication-reopen/attempts/postchange-unified-ax-log-contract-targeted-037",
-      "status_sha256": "6294eefac58a899ab61fb0adab86dde86f559e26d02138697ec798a506a09242",
-      "log_sha256": "213fe0dfb5cf6d981fd280d44eb4b2278ca6226e22a79dcc4339f2abb22a420b",
-      "xcresult_info_sha256": "e3c5ebd7d1fd6ba8415a7b0ba1bfe2d6867686ad0019b737ef103792a00cb0b8",
-      "executed": 2,
-      "failures": 0
-    },
-    "ui_prior_affected_closure": {
-      "status": "invalidated_by_subsequent_ui_remediation",
-      "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication-reopen/attempts/postchange-final-remediated-ui-closure-038",
-      "status_sha256": "6294eefac58a899ab61fb0adab86dde86f559e26d02138697ec798a506a09242",
-      "log_sha256": "600455a78f1adac3204e94342c442b437e95cd22bb9c2414c87b44715c1208c3",
-      "xcresult_info_sha256": "1f21dbe5d458b7d23ef2e8aa7ca3d74c54267f90221126aeda8c7ecdf9c6c7d6",
-      "executed": 11,
-      "failures": 0
-    },
-    "ui_home_remediation_diagnostic": {
-      "status": "passed_before_support_extraction",
-      "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication-reopen/attempts/remediation-home-viewport-direction-current-065",
-      "status_sha256": "6294eefac58a899ab61fb0adab86dde86f559e26d02138697ec798a506a09242",
-      "log_sha256": "07819a9dd7297ba54fa927317812db0af8c3ec9d43d8e8a8529ce08e64ea3314",
-      "xcresult_info_sha256": "92ff33e4b9ca7f5c498dc233b39f039eebe2f44edb466616328465e3c3349fee",
-      "executed": 1,
-      "failures": 0
-    },
-    "ui_in_app_remediation": {
-      "status": "passed_current_candidate",
-      "pre_decorator_functional_failure": {
-        "classification": "stale MRU rank selected Terminal instead of the declared fixture app",
-        "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication-reopen/attempts/remediation-frontmost-override-inapp-current-068",
-        "status_sha256": "bd87c446311a7413610851f440ac150a27635688535ad0ae784410c1efeb261e",
-        "log_sha256": "86e8f816ccae204be9365db7c33d283fd6a028366053f81c5c0d9ce02ff11c7a",
-        "xcresult_info_sha256": "c2a19d0a66c1bca5afd60e338c2e56b17253c5dd15c9557ec28b4173e1e36493",
+      "deterministic_red": {
+        "attempt_path_intent": ".build-local/test-audit/c2-20260719-edca49a/behavior-app-launch-regression-red-005",
         "executed": 1,
-        "failures": 1
+        "failures": 4,
+        "duration_seconds": 2.221,
+        "status_sha256": "4f5bbd3f31d28eab4888896ef7f7bc10f883ba5fe1b95b7fcd0040b418f04ae5",
+        "log_sha256": "a8ec9488d12c416df5b5ea02c5f60b59144f8caaecb6f96a85fa9bcd82d78ba9",
+        "xcresult_info_sha256": "87af9f4798896227acf14890ee6719cca83fbed8e7d7ff9bbff4c573425cd457"
       },
-      "post_decorator_activation_failure": {
-        "classification": "Flow Tab remained background during UI-test startup",
-        "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication-reopen/attempts/remediation-frontmost-wrapper-inapp-current-073",
-        "status_sha256": "bd87c446311a7413610851f440ac150a27635688535ad0ae784410c1efeb261e",
-        "log_sha256": "33949d591c9330e8a55075a56a84c822cdbf0f2620f91c5f518b3ffe4af21bfc",
-        "xcresult_info_sha256": "b54496c12613a938cf0a8b1f80580be705b5e7b24d62612749706c1ca2a96ee7",
-        "executed": 1,
-        "failures": 1
-      },
-      "locked_console_attempt": {
-        "classification": "UI runner could not initialize while the macOS console was locked",
-        "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication-reopen/attempts/remediation-frontmost-wrapper-inapp-current-074",
-        "status_sha256": "bd87c446311a7413610851f440ac150a27635688535ad0ae784410c1efeb261e",
-        "log_sha256": "0564a897e2be8e6129114e99fdcda4a19f525a7a5dfc78fbced9f8379aa03663",
-        "xcresult_info_sha256": "844ccc0da95872f09889adb7391cc9abb9bc9d73b6a6b86c5aa844f4929d6aa5",
-        "executed": 0,
-        "failures": 0
-      },
-      "current_candidate_pass": {
-        "status": "passed",
-        "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication-reopen/attempts/resume-inapp-current-079",
-        "status_sha256": "6294eefac58a899ab61fb0adab86dde86f559e26d02138697ec798a506a09242",
-        "log_sha256": "c4ebaef4afaf8c15ee154f8c2a33d953f66624d88a1726504861c0d44d415dd8",
-        "xcresult_info_sha256": "3616fe3b35c76ffc9b661adf48d173b6642a97e15085277a66b5d4ba80c15f6c",
-        "executed": 1,
-        "failures": 0
-      }
-    },
-    "ui_current_candidate_closure": {
-      "status": "passed",
-      "executed": 13,
-      "failures": 0,
-      "attempts": {
-        "home_multi_app_viewport_selection": {
-          "status": "passed",
-          "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication-reopen/attempts/resume-home-current-078",
-          "status_sha256": "6294eefac58a899ab61fb0adab86dde86f559e26d02138697ec798a506a09242",
-          "log_sha256": "b227fc9fad74c01c18ba959a94f9559f7b898359d920af046a072e1d87bde7f6",
-          "xcresult_info_sha256": "bd4db33ef5e68b3a8d3fd515da59c4e176d89654cefca0110950aaaac1dff464",
-          "executed": 1,
-          "failures": 0
-        },
-        "in_app_fixture_frontmost_control_tab": {
-          "status": "passed",
-          "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication-reopen/attempts/resume-inapp-current-079",
-          "status_sha256": "6294eefac58a899ab61fb0adab86dde86f559e26d02138697ec798a506a09242",
-          "log_sha256": "c4ebaef4afaf8c15ee154f8c2a33d953f66624d88a1726504861c0d44d415dd8",
-          "xcresult_info_sha256": "3616fe3b35c76ffc9b661adf48d173b6642a97e15085277a66b5d4ba80c15f6c",
-          "executed": 1,
-          "failures": 0
-        },
-        "affected_ui_closure": {
-          "status": "passed",
-          "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication-reopen/attempts/resume-affected-ui-closure-080",
-          "status_sha256": "6294eefac58a899ab61fb0adab86dde86f559e26d02138697ec798a506a09242",
-          "log_sha256": "ed3af4e562046609f3748ddc274118a4728ea64154983e04a6d3ef75126a3da4",
-          "xcresult_info_sha256": "833bb1c2a0f11cafc75afc71526d9449193c0c5b19d772e8a06dca8c60e4a4a2",
-          "executed": 11,
-          "failures": 0
-        }
-      },
-      "required_scenarios": [
-        "Home multi-app viewport selection",
-        "In-app fixture-frontmost Control+Tab",
-        "affected UI closure"
-      ]
-    },
-    "same_candidate_ui_identity": {
-      "product_build_root_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication-reopen/build/ui-app-072",
-      "product_executable_sha256": "dbaeb3ff9a46ece63c5c2b3277ea5cf5a61efafc58094123d8891295bbea4d4b",
-      "ui_runner_build_root_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication-reopen/build/ui-tests",
-      "ui_runner_executable_sha256": "c49ca80c42ae3e8b696bb28fe82b6133516f29682743323146456189b5e82d2f",
-      "installed_app": {
-        "resource_boundary": "user_applications",
-        "relative_path_intent": "Flow Tab UITest.app",
-        "bundle_identifier": "io.github.potato-dumplings.flowtab"
-      }
-    },
-    "pre_confirmation_flowtabtests": {
-      "status": "resolved_semantic_confirmation_gate",
-      "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication-reopen/attempts/post-remediation-current-full-flowtabtests-077",
-      "status_sha256": "4f5bbd3f31d28eab4888896ef7f7bc10f883ba5fe1b95b7fcd0040b418f04ae5",
-      "log_sha256": "083d9e171027eb9ea748366a1782ca9cc84b78b4487ba2f50a29512b0d38f067",
-      "xcresult_info_sha256": "2788f9d77e6ad1e2df5fa8f0dd39e564de8aa0c726c2410869778404d9b7ee55",
-      "executed": 711,
-      "passed_methods": 709,
-      "assertion_failures": 3,
-      "failed_methods": 2,
-      "classification": "explicit semantic confirmation gate",
-      "failing_assertions": [
-        {
-          "method": "testRuntimeProjectionServiceKeepsAppDirectoryDerivedProjectionDegradedWithoutMainTableCommit",
-          "source_line": 1426,
-          "count": 1
-        },
-        {
-          "method": "testRuntimeReadModelStoreCommitsProjectionsAndMarksDirtyMetadata",
-          "source_lines": [
-            69,
-            139
-          ],
-          "count": 2
-        }
-      ]
-    },
-    "post_confirmation_compile_diagnostic": {
-      "status": "resolved",
-      "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication-reopen/attempts/post-confirmation-full-flowtabtests-081",
-      "status_sha256": "4f5bbd3f31d28eab4888896ef7f7bc10f883ba5fe1b95b7fcd0040b418f04ae5",
-      "log_sha256": "bdc4083ef457c924e0498b01e263987bccf5ecd940de558ec879bfa492602062",
-      "xcresult_info_sha256": "1fb33471f6870c27a04893770080e6e8cc455597ab3f1da416b09d1bae85aa9f",
-      "executed": 0,
-      "failures": 0,
-      "classification": "test-oracle edit location compile diagnostic",
-      "resolution": "Restored the earlier same-shape assertion and applied the confirmed app-context Oracle inside the named target method."
-    },
-    "full_flowtabtests": {
-      "status": "passed",
-      "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication-reopen/attempts/post-confirmation-full-flowtabtests-082",
-      "status_sha256": "5a4bf09940ce3b5049712fe8505e26cec88d0e1d907ddc5642c1594956ed5da5",
-      "log_sha256": "f196700bc91d5000dc0413919e27dfe10df60cd74e213a4632b7f4d22d298212",
-      "xcresult_info_sha256": "ab9aece6225fab93cf683953d77626378c052c348099a4aeb8f95ba4596fd143",
-      "executed": 711,
-      "passed_methods": 711,
-      "failures": 0,
-      "assertion_failures": 0,
-      "failed_methods": 0,
-      "classification": "passed"
-    },
-    "parallel_hook_diagnostic": {
-      "classification": "One full-run AX PID assertion observed an unrelated background process; the isolated method passed and the clean full rerun removed the signal.",
-      "isolated_rerun": {
-        "status": "passed",
-        "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication-reopen/attempts/postchange-ax-window-inspector-isolation-040",
+      "targeted_green": {
+        "attempt_path_intent": ".build-local/test-audit/c2-20260719-edca49a/behavior-app-launch-regression-green-007",
+        "executed": 2,
+        "failures": 0,
+        "duration_seconds": 0.749,
         "status_sha256": "5a4bf09940ce3b5049712fe8505e26cec88d0e1d907ddc5642c1594956ed5da5",
-        "log_sha256": "0875385041be30564b4f219252c3624017cc4aac97e59cb106f6d9e09a581fc2",
-        "xcresult_info_sha256": "d9486c034dbc67fa1522d74521bae5e52ebd678c64b7018bb9bee77f9341ad17",
-        "executed": 1,
-        "failures": 0
+        "log_sha256": "7514912b855bc5c0076e81295a53da1ee5ed598f18eb77ee9d9c661219ba851f",
+        "xcresult_info_sha256": "754420a6e2e76c1f6c285b33b1a8aac949580e3d100a747502fee275947b16cf"
+      },
+      "full_target": {
+        "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication-reopen-2/flowtabtests-full-009",
+        "executed": 714,
+        "failures": 0,
+        "duration_seconds": 54.461,
+        "status_sha256": "5a4bf09940ce3b5049712fe8505e26cec88d0e1d907ddc5642c1594956ed5da5",
+        "log_sha256": "38fc727c84a26708785131efc1aa64bb870974a02e344a8c155369dd4d032f2d",
+        "xcresult_info_sha256": "3a468da7b8cad0e7f9aecd1b0800025b72977a0f23299725593ab9368876890c"
       }
     },
-    "process_tooling": {
-      "test_semantic_guard": {
-        "status": "authorized",
-        "authorized_token": "9acae51af3d77566",
-        "authorized_record_path_intent": ".build-local/codex/test-semantic-guard/authorized/9acae51af3d77566.json",
-        "authorized_record_sha256": "8999c76fd384ec4ba6c335973e82958dab1ccd28fc0628d97a6550696802dfcd",
-        "authorized_existing_functions": 14,
-        "uncovered_existing_functions": 0
+    "UI": {
+      "status": "passed",
+      "pre_remediation_full_candidate": {
+        "attempt_path_intent": ".build-local/test-audit/c2-20260719-edca49a/ui-full-003",
+        "executed": 111,
+        "failures": 2,
+        "duration_seconds": 1944.946,
+        "status_sha256": "bd87c446311a7413610851f440ac150a27635688535ad0ae784410c1efeb261e",
+        "log_sha256": "4d7817cfe0ef7b0579ef7b211dc3eeb2df08e6b04ae825c68bab07c7d40b9f82",
+        "xcresult_info_sha256": "9f2565cb1ec1c8f5f991421012f186c922bea31ff0de562f2791c25bd5244599"
       },
-      "asset_ledger_validation": {
-        "status": "passed",
-        "rows": 959,
-        "test_methods": 863,
+      "lifecycle_pair_green": {
+        "attempt_path_intent": ".build-local/test-audit/c2-20260719-edca49a/ui-lifecycle-pair-fix-008",
+        "executed": 2,
+        "failures": 0,
+        "duration_seconds": 33.639,
+        "status_sha256": "0e3b4fb6bdfbe6ed239b694fe9e2d656a3220373892ef9fff84b447f928a2df0",
+        "test_log_sha256": "4235dd0a59e8deee8f22895d0d84ce584c9bf985aefa7efdf755e9d3f8bdf517",
+        "xcresult_info_sha256": "0eb94427465a83c2e8dee27946701e1a549ffaaeae946cd728e7423670df6977"
+      },
+      "affected_real_fixture_consumers": {
+        "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication-reopen-2/ui-fixture-consumers-010",
+        "executed": 5,
+        "failures": 0,
+        "duration_seconds": 94.516,
+        "status_sha256": "6294eefac58a899ab61fb0adab86dde86f559e26d02138697ec798a506a09242",
+        "log_sha256": "dc23fda442d41f9ca7f2061f31b7e8fccae7bb103634c3ea9006632f1a8c728e",
+        "xcresult_info_sha256": "4af2fc1f11314f1d13e9c18f1b36f2d92692e6373c95c72719877ca9ec412c5d"
+      }
+    },
+    "Pressure": {
+      "status": "passed",
+      "runtime_ax_collection": {
+        "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication-reopen-2/pressure-runtime-011",
+        "executed": 1,
+        "failures": 0,
+        "duration_seconds": 0.196,
+        "tasks": 28,
+        "configured_concurrency": 4,
+        "observed_max_in_flight": 4,
+        "elapsed_milliseconds": 190.99,
+        "status_sha256": "5a4bf09940ce3b5049712fe8505e26cec88d0e1d907ddc5642c1594956ed5da5",
+        "log_sha256": "e6d845adab6fe390df6624f36ae1e679c6a993f75fd3bab1567b2b2f120389e3",
+        "xcresult_info_sha256": "44bf7fc14e81f7a70335519d4155bb901029c04f99cf25ea3c22c6087f67fd3d"
+      }
+    },
+    "Process_Tooling": {
+      "status": "passed",
+      "asset_ledger": {
+        "rows": 962,
+        "test_methods": 866,
         "stable_scenarios": 22,
         "target_counts": {
           "FlowTabCoreTests": 42,
-          "FlowTabTests": 711,
+          "FlowTabTests": 714,
           "FlowTabUITests": 110
-        }
+        },
+        "flowtab_priority_coverage_test_methods": 474,
+        "sha256": "4649cae87ccab85c7dde48a2d1874539b9cc37fcb58b6eb120c0a0cd5fef1c8a"
       },
       "json_and_jsonl_parse": "passed",
-      "path_intent_check": "passed",
-      "git_diff_check": "passed"
-    },
-    "pressure": {
-      "status": "pending_stage_03",
-      "reason": "Run the same-candidate pressure closure after this eligible C1 candidate is committed as the Stage 03 input anchor."
+      "method_fingerprint_reconciliation": "passed",
+      "git_diff_check": "passed",
+      "module_boundary_review": "passed",
+      "file_size_review": "scheduler policy isolated outside the already oversized service file"
     }
   },
   "closure_proof": {
-    "reopened_deficiency_reproduced": true,
-    "root_cause_evidenced": true,
+    "deficiency_reproduced": true,
+    "root_cause_supported": true,
+    "production_change_required": true,
     "additive_regressions_passed": true,
-    "affected_ui_11_of_11_passed": true,
-    "home_and_in_app_ui_2_of_2_passed": true,
-    "ui_current_candidate_13_of_13_passed": true,
-    "full_flowtabtests_gate_isolated": true,
-    "full_flowtabtests_711_of_711_passed": true,
-    "asset_ledger_validated": true,
-    "source_boundary_audit_passed": true,
-    "temporary_production_diagnostics_absent": true,
-    "candidate_validation_complete": true,
-    "existing_test_semantic_guard_authorized": true,
-    "c1_ready_for_commit": true,
-    "c2_full_closure_complete": false
+    "asset_ledger_reconciled": true,
+    "existing_test_semantics_unchanged": true,
+    "affected_ui_consumers_passed": true,
+    "pressure_boundary_passed": true,
+    "exact_c1_file_set_validated": true,
+    "completion_gate_passed": true
   },
   "coverage_effects": {
-    "stable_contract": "unchanged",
-    "asset_ledger": "Seven behavior methods and one TestingSupport asset added; executable inventory is 42 FlowTabCoreTests, 711 FlowTabTests, and 110 FlowTabUITests across 22 stable scenarios.",
-    "strengthened_scenarios": [
+    "ledger_rows": 962,
+    "test_methods": 866,
+    "target_counts": {
+      "FlowTabCoreTests": 42,
+      "FlowTabTests": 714,
+      "FlowTabUITests": 110
+    },
+    "new_asset_ids": [
+      "test:FlowTabTests:FlowTabPriorityCoverageTests/testRuntimeProjectionServiceReconcilesAppLaunchAfterStartupWindowConvergenceDelay",
+      "test:FlowTabTests:FlowTabPriorityCoverageTests/testRuntimeProjectionServiceCancelsAppLaunchConvergenceAfterTermination"
+    ],
+    "scenario_ids": [
+      "scenario:app-launch-lifecycle-status-item",
       "scenario:runtime-snapshot-window-records",
-      "scenario:home-app-window-list",
-      "scenario:switcher-standard-panel",
-      "scenario:search-result-activation",
-      "scenario:in-app-window-hotkey",
-      "scenario:space-fixture-infrastructure"
-    ]
+      "scenario:terminate-selected-app"
+    ],
+    "stable_contract_change": false
   },
   "dependency_and_interaction_invalidations": {
-    "satisfied_dependencies": [
-      "live scoped repair publication now reaches Home and Switcher consumers",
-      "authoritative fixture window removal now reaches the open window layer",
-      "deferred Search publication and zero-window transitions have stable regressions",
-      "fixture-frontmost intent has an isolated focused-read and refresh-routing seam",
-      "Home selection is confirmed inside the visible scroll viewport"
+    "superseded_anchor": "b1e31e0fb73a7e1252e01c52ea4247c09e1687f0",
+    "replacement_anchor": "the commit containing this handoff",
+    "invalidated_stage03_candidate": "c2-20260719-edca49a",
+    "invalidated_stage03_evidence": [
+      "candidate freeze and artifact identity",
+      "same-candidate Core result",
+      "same-candidate full Behavior result",
+      "same-candidate full UI result",
+      "same-candidate pressure results",
+      "prior C2 handoff candidate"
     ],
-    "invalidated_evidence": [
-      "UI closure evidence before postchange-final-remediated-ui-closure-038",
-      "Home remediation pass before the scrolling-support extraction",
-      "locked-console and pre-decorator In-App attempts before resume-inapp-current-079",
-      "FlowTabTests evidence before post-confirmation-full-flowtabtests-082",
-      "The compile-only attempt 081 superseded by the corrected named-method Oracle edit",
-      "asset-ledger fingerprints before the final UI observation stabilization"
+    "unaffected_anchors": [
+      "runtime-projection-maintenance-hang",
+      "pressure-runner-contracts",
+      "coverage-contract-reconciliation",
+      "runtime-window-order-space-truth",
+      "switcher-trigger-panel-process-lifetime",
+      "ui-layout-contracts",
+      "settings-hotkey-delivery"
     ],
     "interaction_peers": [
-      "RuntimeProjectionService scoped repair scheduler",
-      "RuntimeReadModelStore current-app commit coverage",
-      "Home selected-app detail refresh",
-      "Switcher session-layout publication",
-      "Search freshness activation and panel presentation",
-      "Space fixture AX and CG window removal",
-      "TestingSupport fixture-frontmost focused projection routing",
-      "Home fixture viewport selection"
+      "workspace app launch and termination delivery",
+      "RuntimeWindowRecord main-table evidence",
+      "Home app-summary and detail projection",
+      "Switcher app and window projection",
+      "Search committed-index freshness"
     ]
   },
-  "downstream_findings": [
-    {
-      "candidate_slice": "slice:runtime-projection-commit-consistency",
-      "failing_tests": [
-        "testRuntimeProjectionServiceKeepsAppDirectoryDerivedProjectionDegradedWithoutMainTableCommit",
-        "testRuntimeReadModelStoreCommitsProjectionsAndMarksDirtyMetadata"
-      ],
-      "assertion_failures": 3,
-      "state": "resolved by explicit change-package confirmation, semantic token authorization, and post-confirmation-full-flowtabtests-082"
-    },
-    {
-      "candidate_slice": "diagnostic:ax-window-inspector-global-hook-isolation",
-      "signal": "A full-run global override observed a background Terminal PID once; the method passed in isolation and on the clean full rerun.",
-      "state": "diagnostic retained; no candidate source change"
-    },
-    {
-      "candidate_slice": "diagnostic:current-ui-closure",
-      "signal": "After console unlock, the current Home, In-App, and affected UI candidate executed 13 tests with zero failures.",
-      "state": "resolved by attempts 078, 079, and 080"
-    }
-  ],
   "next_candidate_hints": [
-    {
-      "slice_id": "stage-03:same-candidate-closure",
-      "priority": 1,
-      "entry_ready": true,
-      "reason": "After committing this C1 anchor, execute the remaining pressure closure and recompute the dependency schedule against the exact committed candidate."
-    }
+    "Replace the prior runtime-projection-fixture-publication anchor with this replacement C1 anchor in the ordered current set.",
+    "Preserve the replacement settings-hotkey-delivery anchor edca49aee616e0842063d5d009c958493f55cb52.",
+    "Freeze candidate and artifact identities only after the replacement C1 commit exists.",
+    "Rebuild and install the fixed-path signed UI app from the committed candidate before full UI closure.",
+    "Regenerate Core, full Behavior, full UI, tab/search pressure, and runtime-topology evidence against one candidate."
   ],
   "remaining_uncertainty": [
-    "Stage 03 same-candidate pressure closure remains pending after the C1 commit."
+    "the replacement C1 commit and tree identities until the commit gate completes",
+    "same-candidate Stage 03 full closure and C2 identity"
   ],
   "exact_stage_owned_file_set": [
-    "FlowTab.xcodeproj/project.pbxproj",
-    "FlowTab/Features/Home/HomeLandingView.swift",
-    "FlowTab/Features/Home/HomeRuntimeProjectionService.swift",
-    "FlowTab/Features/Switcher/LiveSwitcherModel+Projections.swift",
-    "FlowTab/Features/Switcher/SwitcherPanelController+InputHandling.swift",
-    "FlowTab/Features/Switcher/SwitcherPanelController+Presentation.swift",
-    "FlowTab/Features/Switcher/SwitcherPanelController.swift",
-    "FlowTab/Infrastructure/Runtime/RuntimeProjectionRepairContract.swift",
-    "FlowTab/Infrastructure/Runtime/RuntimeProjectionRepairFactSource.swift",
-    "FlowTab/Infrastructure/Runtime/RuntimeProjectionRepairProvider.swift",
+    "FlowTab/Infrastructure/Runtime/RuntimeProjectionMaintenancePolicy.swift",
     "FlowTab/Infrastructure/Runtime/RuntimeProjectionService.swift",
-    "FlowTab/Infrastructure/Runtime/RuntimeReadModelStore.swift",
-    "FlowTab/TestingSupport/FlowTabLaunchTesting.swift",
-    "FlowTab/TestingSupport/FlowTabUITestBootstrapper.swift",
-    "FlowTab/TestingSupport/RuntimeFrontmostProjectionTestSupport.swift",
-    "FlowTabTests/FlowTabPriorityCoverageTests+RuntimeMainTableProjection.swift",
     "FlowTabTests/FlowTabPriorityCoverageTests+RuntimeReconciliationCoordinator.swift",
-    "FlowTabTests/FlowTabPriorityCoverageTests+RuntimeProjectionNotificationPublication.swift",
-    "FlowTabTests/FlowTabTests+HomeWindowActivation.swift",
-    "FlowTabUITests/FlowTabUITests+ScrollingSupport.swift",
-    "FlowTabUITests/FlowTabUITests+SpaceFixtureHomeActivation.swift",
-    "FlowTabUITests/FlowTabUITests+SpaceFixtureMultiAppWorkflow.swift",
-    "FlowTabUITests/FlowTabUITests+Support.swift",
-    "FlowTabUITests/FlowTabUITests+SpaceFixtureWorkflow.swift",
-    "FlowTabUITests/FlowTabUITests+SpaceFixtureRuntimeTruthEntrypoints.swift",
     "docs/test-audit/TEST_ASSET_LEDGER.jsonl",
     "docs/test-audit/slices/runtime-projection-fixture-publication/SLICE_HANDOFF.json"
   ],
   "rollback_boundary": {
-    "scope": "Revert the reopened C1 commit as one unit.",
+    "scope": "Revert the completed replacement C1 commit as one unit.",
     "effects": [
-      "Restore prior scoped-repair publication and current-app row-retention behavior.",
-      "Restore prior Home incomplete-empty handling and deferred Search presentation timing.",
-      "Restore prior zero-window layout publication and completed-CG cleanup policy.",
-      "Remove seven additive behavior regressions, restore the prior projection-consistency Oracle expectations, remove the fixture-frontmost TestingSupport seam, and restore prior UI helpers and ledger fingerprints.",
-      "Restore the initial C1 handoff as the active slice record."
+      "remove the bounded app-launch convergence scheduler and termination cancellation",
+      "remove the two additive Behavior regressions",
+      "restore the prior asset-ledger projection and runtime-projection C1 handoff"
     ],
     "preserves": [
-      "the committed d5ecc553 entry candidate",
-      "all previously committed C1 anchors",
-      "user-owned process and skill changes",
-      "the explicit semantic-confirmation audit record"
+      "the committed C0 anchor",
+      "the unaffected current C1 anchors",
+      "fixture and runner behavior",
+      "user-owned process changes"
     ]
-  },
-  "initial_c1_validation": {
-    "unit_and_behavior_targeted": {
-      "status": "passed",
-      "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication/attempts/postchange-publication-unit-005",
-      "executed": 6,
-      "failures": 0,
-      "duration_seconds": 0.201,
-      "status_sha256": "5a4bf09940ce3b5049712fe8505e26cec88d0e1d907ddc5642c1594956ed5da5",
-      "log_sha256": "da561b18599084195774133058ef1d8022a3afa1a82d3438eaf4875c0bd60ee9",
-      "xcresult_info_sha256": "6cc87ae040630243c111de3e8eb9e261dd7beb80535f1ca2158f0d0f3f0123c4"
-    },
-    "real_fixture_search_publication": {
-      "status": "passed",
-      "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication/attempts/postchange-real-fixture-ui-005",
-      "executed": 1,
-      "failures": 0,
-      "duration_seconds": 27.297,
-      "status_sha256": "0e3b4fb6bdfbe6ed239b694fe9e2d656a3220373892ef9fff84b447f928a2df0",
-      "log_sha256": "bdec38f4b7f8d4c0578db844a511140d8701ce6d78b7ef443bd1ad2a8d72cb89",
-      "xcresult_info_sha256": "6f50dfe910a3f850802d13283b757115978a01b4c8c4dc5e86ba7bf93b0316e3"
-    },
-    "real_fixture_search_activation_regression": {
-      "status": "passed",
-      "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication/attempts/postchange-real-fixture-ui-006",
-      "executed": 1,
-      "failures": 0,
-      "duration_seconds": 29.688,
-      "status_sha256": "6294eefac58a899ab61fb0adab86dde86f559e26d02138697ec798a506a09242",
-      "log_sha256": "e991481eb5d52d6a95ac91c13fb4a3438027910208d9c523e2bb626e82b333b2",
-      "xcresult_info_sha256": "dcc6d894e3cc764b0324f88751fc5b057b968000ba33ae67f828b1c5ed657f13"
-    },
-    "real_fixture_surface_group": {
-      "status": "passed",
-      "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication/attempts/postchange-real-fixture-ui-007",
-      "executed": 3,
-      "failures": 0,
-      "duration_seconds": 66.295,
-      "methods": [
-        "testHomePageShowsRealSpaceFixtureWorkflowWindows",
-        "testSearchPanelEntryAndResultActivation",
-        "testSwitcherPanelShowsRealSpaceFixtureAppTileInStandardMode"
-      ],
-      "status_sha256": "6294eefac58a899ab61fb0adab86dde86f559e26d02138697ec798a506a09242",
-      "log_sha256": "2f7d80152d2e9b07f6284b50873a9002558a3c9c9e84b34822b251896eb10775",
-      "xcresult_info_sha256": "a997c858e05d10bc00bd0e60d9a6172709c2bdca34751ddb3099f860549dbbd2"
-    },
-    "mock_ui_group": {
-      "status": "passed",
-      "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication/attempts/postchange-mock-ui-008",
-      "executed": 7,
-      "failures": 0,
-      "duration_seconds": 81.992,
-      "methods": [
-        "testHomeAppLayerHidesZeroWindowNestedAppsFromMockWeChatTopology",
-        "testHomeAppLayerMarksHiddenAppsAndSortsThemLast",
-        "testHomeInitialAppLayerUsesRuntimeOrderAndZeroCountsWithoutAccessibilityPermission",
-        "testHomeOverviewChromeShowsCountsStatsAndSidebarPermissionStatus",
-        "testSearchPanelChineseQueryShowsChineseMockResult",
-        "testSettingsSearchDefaultScopePersistsAndShowsWindowThenAppResults",
-        "testWindowSearchPublishesMockWindowRowsAtLaunch"
-      ],
-      "status_sha256": "363d24159f6aab36e58e809a141b2645b45bd1ed7a617d662b17c8bbc5b363a9",
-      "log_sha256": "5175162b732323ec9bd3029917050b32723a3d1257b3ee49d2d7e92de371e62f",
-      "xcresult_info_sha256": "9c2195dcb07e1e3bc9caf2199a9b8b6d34ddacb08eb3b817fec3f43663494218"
-    },
-    "same_candidate_ui_identity": {
-      "installed_app_build_root_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication/build/ui-app-008",
-      "ui_test_runner_build_root_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication/build/ui-tests",
-      "build_executable_sha256": "e1bd6ef9ceb62d583ab3acea21a6372c080c1aebc9c1280db0b1eb66536d4d81",
-      "installed_app_path_intent": {
-        "resource_boundary": "user_applications",
-        "relative_path_intent": "Flow Tab UITest.app"
-      },
-      "bundle_identifier": "io.github.potato-dumplings.flowtab",
-      "team_identifier": "96PUA726W9",
-      "reuse": "The fixed App was built and installed from ui-app-008; real-fixture-ui-005 built the UI runner in ui-tests, and real-fixture-ui-006, real-fixture-ui-007, and mock-ui-008 reused that runner with test-without-building."
-    },
-    "pressure": {
-      "status": "not_relevant",
-      "reason": "No scale, cache, polling, resource budget, or process-identity policy changes; nested repair work remains bounded by the existing Search freshness limit and is covered by deterministic behavior plus visible real-fixture UI."
-    },
-    "process_tooling": {
-      "semantic_guard_self_tests": "passed",
-      "semantic_guard_worktree_analysis": "passed with no existing test-function semantic changes",
-      "asset_ledger_validation": {
-        "status": "passed",
-        "rows": 947,
-        "test_methods": 852,
-        "stable_scenarios": 22,
-        "target_counts": {
-          "FlowTabCoreTests": 42,
-          "FlowTabTests": 700,
-          "FlowTabUITests": 110
-        },
-        "container_counts_match_consumers": true
-      },
-      "json_and_jsonl_parse": "passed",
-      "project_parse": "passed",
-      "path_intent_check": "passed",
-      "git_diff_check": "passed"
-    },
-    "superseded_diagnostic_attempts": [
-      {
-        "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication/attempts/postchange-publication-unit-003",
-        "classification": "exposed that a nested repair created after the original scheduler timestamp stayed deferred",
-        "status_sha256": "4f5bbd3f31d28eab4888896ef7f7bc10f883ba5fe1b95b7fcd0040b418f04ae5",
-        "log_sha256": "c8ccb3bdb33b570a5e9df6ecfba27a91c6fe61f7fafb511775854a8c628198a8",
-        "superseded_by": "postchange-publication-unit-005"
-      },
-      {
-        "attempt_path_intent": ".build-local/test-audit/c1-runtime-projection-fixture-publication/attempts/postchange-real-fixture-ui-004",
-        "classification": "exposed automatic window-layer entry racing launch-requested Search while the index was pending",
-        "status_sha256": "491a9cad8186515ff0117861b877e02f2fe1d063a9a5e81ba926f773da503b2d",
-        "log_sha256": "6b5608535fce217eb70224b58bda844f5c8873b28b1e651202a9744da1d32cd9",
-        "superseded_by": "postchange-real-fixture-ui-005 and postchange-real-fixture-ui-006"
-      }
-    ]
-  },
-  "initial_c1_root_cause": {
-    "service_identity": "UI-test bootstrap installed a dedicated RuntimeProjectionService in AppDelegate test hooks while Home roots constructed their own default service.",
-    "bootstrap_readiness": "The bootstrap installed a service but returned before app-switcher maintenance, per-app window repair, and Search freshness publication completed.",
-    "fixture_main_table": "The UI-test dataset marked every PID as collected but seeded no WindowRecord identities, so trusted mock windows could not reach main-table projections.",
-    "nested_repair": "The ordinary drain evaluated ready requests once. A Space repair created inside an app repair remained pending while the Search barrier stayed uncommitted.",
-    "home_transient_read": "A transient missing Home detail was treated as app removal and discarded the last committed summary and windows.",
-    "search_auto_entry": "Automatic window-layer entry could change the session mode while launch-requested Search waited for its committed index, preventing deferred Search activation."
-  },
-  "initial_c1_semantic_delta": {
-    "service_injection": "FlowTabApp injects the bootstrap-resolved RuntimeProjectionServing instance through HomeRootView to HomeLandingView.",
-    "bootstrap": "Mock bootstrap drains app-switcher maintenance, trusted per-app window repairs, and the Search freshness barrier before returning.",
-    "fixture_records": "Trusted datasets seed deterministic stable WindowRecords with exact current AX attachments; denied datasets preserve explicit zero-window coverage.",
-    "runtime_drain": "Pending Search freshness triggers a bounded follow-up drain with a fresh scheduler timestamp, commits follow-up evidence and cleared dirty CG IDs, then re-evaluates Search publication.",
-    "home": "Home refreshes from runtime publication and preserves committed state during transient detail unavailability.",
-    "switcher": "Pending Search activation blocks both auto-enter eligibility and execution until the committed index notification is handled.",
-    "tests": "Six additive regressions cover bootstrap summaries, exact mock window rows, nested repair closure, Search timing, Mock visible Search, and real-fixture visible Search.",
-    "stable_product_contract": "unchanged",
-    "public_api": "unchanged",
-    "persistence": "unchanged"
-  },
-  "initial_c1_exact_stage_owned_file_set": [
-    "FlowTab.xcodeproj/project.pbxproj",
-    "FlowTab/App/FlowTab.swift",
-    "FlowTab/App/HomeRootView.swift",
-    "FlowTab/Features/Home/HomeLandingView.swift",
-    "FlowTab/Features/Switcher/LiveSwitcherModel+Preview.swift",
-    "FlowTab/Features/Switcher/LiveSwitcherModel.swift",
-    "FlowTab/Infrastructure/Runtime/RuntimeProjectionRepairFactSource.swift",
-    "FlowTab/Infrastructure/Runtime/RuntimeProjectionService.swift",
-    "FlowTab/TestingSupport/FlowTabUITestBootstrapper.swift",
-    "FlowTab/TestingSupport/RuntimeBridge+Testing.swift",
-    "FlowTabTests/FlowTabPriorityCoverageTests+RuntimeProjectionNotificationPublication.swift",
-    "FlowTabUITests/FlowTabUITests+RuntimeProjectionPublication.swift",
-    "docs/test-audit/TEST_ASSET_LEDGER.jsonl",
-    "docs/test-audit/slices/runtime-projection-fixture-publication/SLICE_HANDOFF.json"
-  ],
-  "reopened_remediation": {
-    "reopened_from_commit": "c0d0531d7803dc90a3dc6316fd19d065d102bbf8",
-    "entry_candidate": "d5ecc553c27197f5286844093878cbf6de6e542a",
-    "classification": "production defect with test-asset stabilization",
-    "root_cause": {
-      "scoped_publication": "A successful scoped current-app repair committed main-table evidence but did not republish the AppSwitcher and Home projections consumed by live surfaces.",
-      "authoritative_removal": "Current-app repair evidence did not distinguish a complete CG identity set from partial evidence, so disappeared windows could remain committed.",
-      "home_retry": "An incomplete empty selected-app detail projection was treated as a settled empty result instead of a retry signal.",
-      "deferred_search": "Search presentation could be requested while its committed index activation was pending, leaving the controller hidden after publication.",
-      "zero_window_layout": "An unchanged empty selected-app projection still published a session layout update, allowing a recursive zero-window transition loop.",
-      "completed_cg_cleanup": "Completed dirty CG identities used one cleanup rule across ordinary repair, activation verification, and explicit maintenance reasons.",
-      "home_fixture_selection": "XCTest reported a clipped Home app row as hittable, so the multi-app fixture could tap outside the visible scroll viewport and retain the prior selection.",
-      "in_app_fixture_frontmost": "The real in-app fixture launch declared a frontmost bundle intent, but no test consumer routed focused projection reads to that fixture process."
-    },
-    "semantic_delta": {
-      "scoped_publication": "Every successful scoped repair republishes AppSwitcher and Home from the same committed read-model candidate.",
-      "authoritative_removal": "Authoritative CG identity evidence removes prior rows absent from that set; partial evidence preserves prior rows.",
-      "home_retry": "Incomplete empty Home detail reads signal an app-window change so the normal refresh path retries.",
-      "deferred_search": "Pending Search activation is retained until index publication, then activated and presented through the ordinary controller path.",
-      "zero_window_layout": "Unchanged empty selected-app candidates update context without publishing a new session layout.",
-      "completed_cg_cleanup": "Ordinary repair clears completed CG identities; activation verification keeps readback-mismatch identities stale until a barrier; explicit maintenance clears all.",
-      "home_fixture_selection": "Home fixture selection scrolls until the row is fully contained by its viewport and confirms the selected app through an expected window title.",
-      "in_app_fixture_frontmost": "Real-runtime UI tests may declare a fixture bundle whose focused read and refresh routing are resolved through an isolated TestingSupport decorator.",
-      "tests": "Seven additive behavior tests cover the new contracts; existing UI methods retain their visible oracles while using stable dynamic queries, bounded readiness, and shared AX-destroy, viewport-selection, and fixture-frontmost evidence. Two existing projection-consistency methods encode the explicitly confirmed degraded-context and incomplete-freshness contracts.",
-      "stable_product_contract": "unchanged",
-      "public_api": "unchanged",
-      "persistence": "unchanged"
-    },
-    "added_test_functions": [
-      "FlowTabTests.testFlowTabTestLaunchOptionsParsesFrontmostBundleIdentifierOverride",
-      "FlowTabPriorityCoverageTests.testUITestFrontmostProjectionOverrideRoutesFocusedReadsAndRefreshesToTarget",
-      "FlowTabPriorityCoverageTests.testRuntimeProjectionServiceRepublishesAppSwitcherAfterScopedWindowRepair",
-      "FlowTabPriorityCoverageTests.testRuntimeProjectionServiceRepublishesWindowRemovalAfterScopedRepair",
-      "FlowTabPriorityCoverageTests.testSwitcherPanelControllerPresentsDeferredSearchAfterIndexPublishes",
-      "FlowTabPriorityCoverageTests.testLiveSwitcherModelSkipsLayoutPublicationForUnchangedEmptySelectedProjection",
-      "FlowTabTests.testHomeRuntimeRefreshReaderRetriesIncompleteEmptyDetailProjection"
-    ],
-    "oracle_preserving_ui_stabilization": [
-      "Dynamic window-card shrink waits query atomic counts and title multiplicities.",
-      "Search readiness uses a 12-second bound covering measured live repair latency.",
-      "Shared AX-destroy evidence accepts a mapped CG identity or an identity already removed by authoritative publication.",
-      "Home multi-app selection requires viewport containment and selected-title confirmation.",
-      "In-app real-runtime focus is routed to the fixture bundle declared by the existing launch intent."
-    ],
-    "private_evidence_root": ".build-local/test-audit/c1-runtime-projection-fixture-publication-reopen"
   }
 }
