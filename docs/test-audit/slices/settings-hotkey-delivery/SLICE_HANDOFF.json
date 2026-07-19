@@ -1,465 +1,374 @@
 {
   "schema_version": 1,
   "handoff_kind": "C1",
+  "consumable": true,
   "campaign_id": "c0-20260717-1e3afb7",
   "slice_id": "slice:settings-hotkey-delivery",
   "stage": "Stage 02",
   "status": "READY",
-  "outcome": "audit_completed_no_change",
-  "generated_at_utc": "2026-07-18T11:48:56Z",
+  "outcome": "remediated",
+  "generated_at_utc": "2026-07-19T09:16:39Z",
   "commit_policy": "commit_on_stage_complete",
-  "intended_commit_title": "test-audit(settings-hotkeys): complete test audit",
-  "anchor_policy": "The commit containing this handoff as its exact Stage 02 file set is this slice's C1 anchor.",
+  "intended_commit_title": "test(settings-hotkeys): accept release confirmation trigger race",
+  "anchor_policy": "The commit containing this handoff and the exact Stage 02 file set is the replacement settings-hotkey-delivery C1 anchor.",
   "input_anchors": {
     "c0_commit": "eec1d40717509d72e52865d7fd8f1cf199e0fd3a",
     "c0_tree": "db73b209ac9514d01ca2268a6fb45ea29abdeb76",
-    "c0_parent": "1e3afb724c3fe89d9d5d3543ae104c8883b83f29",
     "c0_handoff_sha256": "db83f8b915c6cfc8266f19a9160273697ab8e4806e4b6bb22a8940f83fb39485",
-    "asset_ledger_at_entry_sha256": "57aa5a47c4b12b3bcaed89bf857a9f94e2a21bb087d2ab62475a154aa677041d",
+    "entry_head": "b1e31e0fb73a7e1252e01c52ea4247c09e1687f0",
+    "entry_tree": "8bef8f3c9f9de23d56195011c6509e7ef10014f4",
+    "expected_parent_at_commit": "b1e31e0fb73a7e1252e01c52ea4247c09e1687f0",
     "baseline_results_sha256": "217f35d1381f171dd9f7c3afc5de4dfe3ae8e7c2a128b9fd03582cedc3d46c51",
-    "stable_coverage_matrix_sha256": "7a515514c6fdd477fa715ed3e0304ce89ffdfb853c4e2ba5a9ce81d1c8224b7d",
-    "entry_head": "768b72eff17204f56bedd141f9521174c5e8d041",
-    "entry_tree": "d5aea0018dc9e0e521646c2814cfb691371e0ab2",
-    "expected_parent_at_commit": "768b72eff17204f56bedd141f9521174c5e8d041"
+    "entry_asset_ledger_sha256": "3de356a7b78fa60d904dcfa07f690c70689913179539090e27500c52b1a0041e",
+    "completed_asset_ledger_sha256": "84c148d8a5026ec83e6c8f7a88d17396514080039062c60b24906d3222fd1e31",
+    "superseded_settings_c1_commit": "d1575fc23517914cd3b4179ff63b5207b0ba3110"
   },
   "audited_snapshot": {
     "branch": "flowtab-clean-runtime-branch",
-    "runtime_and_test_source_at_entry": "committed switcher-trigger-panel-process-lifetime C1 tree; no production, test, fixture, runner, project, or coverage bytes changed by this slice",
-    "entry_ready_dependencies": [
-      "c1:runtime-projection-maintenance-hang@a5e00832aaea047995ab2a5903d388ba81127b9a",
-      "c1:pressure-runner-contracts@15665c39e5d6ee93a3d56464e5eee442c9b11cbb",
-      "c1:coverage-contract-reconciliation@ea9eade6b9002ba194023ead3910005d2d8bc723",
-      "c1:runtime-window-order-space-truth@14051fce112f3b53227ba858d85ab8ce56e3c825",
-      "c1:runtime-projection-fixture-publication@c0d0531d7803dc90a3dc6316fd19d065d102bbf8",
-      "c1:switcher-trigger-panel-process-lifetime@768b72eff17204f56bedd141f9521174c5e8d041"
-    ],
     "private_evidence_root": {
       "resource_boundary": "repository_root",
-      "relative_path_intent": ".build-local/test-audit/c1-settings-hotkey-delivery"
-    },
-    "process_contract_sha256": {
-      ".agents/skills/flowtab-engineering/SKILL.md": "cda87332992ae0fddfbc03dc59eaf57cb829758d345410c887e5a45033269bfc",
-      ".agents/skills/flowtab-engineering/references/bugfix-workflow.md": "08d3f27c8690c84c77aeb0ff6f4292540e2b7b28ac5615dde67797f607f637b8",
-      ".agents/skills/flowtab-engineering/references/module-boundaries.md": "0c50e31c1f715d675f7cd30d2357d0d42628227ba2d49dd7cec63ffccb0924a6",
-      ".agents/skills/flowtab-engineering/references/engineering-specialty-rules.md": "0e3cfd5905d38d8e9350b11cdcd226dffd37a28678097671429118a21048a2df",
-      ".agents/skills/flowtab-engineering/references/risk-calibration.md": "f45b35a50214dfa9f5f9e5089b4d29facf995c18ce4f51d2a4bf44785d327f16",
-      ".agents/skills/flowtab-engineering/references/test-layer-boundaries.md": "f17b3014e58233b7840c0f67aa5166cde9b0ec9e63e83665add8938114e64f1e",
-      ".agents/skills/flowtab-engineering/references/test-coverage-matrix-workflow.md": "2d52ba9d0bef9deb2195c14b520586b9c830ffa290e44deeb9721a250c87bebb",
-      ".agents/skills/flowtab-engineering/references/validation-command-cookbook.md": "5a38c2663a2bdf2ded48b29f32a5e28ebd1d8dcc8f1d1f003a4e3085cbc39dd4",
-      ".agents/skills/flowtab-engineering/references/flowtabtests-workflow.md": "a1dd7fc86e85ce240a4936f9fb9a4144af1cfa9de0139f3720e9712c2a4152f8",
-      ".agents/skills/flowtab-engineering/references/ui-automation-prerequisites.md": "86171aea362bc4bf61202d87b5130b3addccb3897b1d7cafe77a04c0465f0769",
-      ".agents/skills/flowtab-engineering/references/performance-pressure-workflow.md": "cdc75480fe93f2b8ca97e1f9cf6314b279d4dd449bea72857124557ae8cf1403",
-      ".agents/skills/flowtab-engineering/references/handoff-contract.md": "b0018ecf202a2f0cf3bae907b4f85d641d64c51130d65c8213ea9548ce8c034d",
-      ".agents/skills/flowtab-test-audit/SKILL.md": "1d0cb7285787a6159dbab70f0803fe3eca8d36579e9bdb1a842c058a0fcd05ff",
-      ".agents/skills/flowtab-test-audit/references/stage-02-slice-audit-and-remediation.md": "78481b0b622ed83a60fed7d6d3d2de4fa1476bf7dc36ca71dbf19da349eb4c9e",
-      ".agents/skills/flowtab-test-audit/references/stage-03-dependency-scheduling-and-closure.md": "867d98cd2afb10a19536f74a797b3f738a00ebca94e918594f71f55c5f7b5799"
+      "relative_path_intent": ".build-local/test-audit/c1-settings-hotkey-delivery-reopen"
     },
     "candidate_file_sha256": {
-      "FlowTab/Features/Settings/AppSettingsView.swift": "f383533e3a51d5648ac985370ddddb9b583462196e2037b00d47629fd2cded76",
-      "FlowTab/Features/Settings/HotkeySettingsCard.swift": "f0921feba9f784cb00e7be6af986d6d07f4d2c27adc4eb066caffba80f0ba371",
-      "FlowTab/Infrastructure/Preferences/AppPreferences.swift": "28137d06496d44b61681d2b56b418b4ab43c032f4e9a52af21a968aa4e5cbd43",
-      "FlowTab/App/AppDelegate.swift": "e2a8b0f5101e5575007d77665f7e8cffffd47409fad4721c75be1b32941fbadd",
-      "FlowTab/Features/Switcher/OptionTabHotkeyMonitor.swift": "77cab58e7c3674d5d69c4a90144dcd7729ebc56be99cbed007198a7edd054c94",
-      "FlowTab/TestingSupport/FlowTabLaunchTesting.swift": "5dbd2fe93c905b18dfdbc3e18834b1f1370a135edd446f0d383935600efbc59b",
-      "FlowTab/TestingSupport/FlowTabUITestBootstrapper.swift": "fdabf551f4230ed94ed76d11bf8c3d74ff7251298ce0b2c8f51df341326ba7e7",
-      "FlowTabUITests/FlowTabUITests+Settings.swift": "fdc1a3ccb4e1643198544bb469da0f3c6ce77013dfe6b8f664997d16f68d4ced",
-      "docs/test-audit/TEST_ASSET_LEDGER.jsonl": "57aa5a47c4b12b3bcaed89bf857a9f94e2a21bb087d2ab62475a154aa677041d"
+      "FlowTabTests/FlowTabPriorityCoverageTests+PanelSessionBehavior.swift": "add19a831809c4ce796f21ff940146da12883d3a62507f3190c93efb90d5d2d6",
+      "FlowTabUITests/FlowTabUITests+Settings.swift": "305c52935495650c9e8ed6817c457e0f53da8a3de19bdba55d987fed292669ed",
+      "docs/test-audit/TEST_ASSET_LEDGER.jsonl": "84c148d8a5026ec83e6c8f7a88d17396514080039062c60b24906d3222fd1e31"
     }
   },
   "dirty_path_ownership": {
     "stage_owned": [
+      "FlowTabTests/FlowTabPriorityCoverageTests+PanelSessionBehavior.swift",
+      "FlowTabUITests/FlowTabUITests+Settings.swift",
+      "docs/test-audit/TEST_ASSET_LEDGER.jsonl",
       "docs/test-audit/slices/settings-hotkey-delivery/SLICE_HANDOFF.json"
     ],
     "user_owned_excluded": [
-      ".agents/skills/flowtab-engineering/SKILL.md",
-      ".agents/skills/flowtab-engineering/references/bugfix-workflow.md",
-      ".agents/skills/flowtab-engineering/references/feature-workflow.md",
-      ".agents/skills/flowtab-engineering/references/handoff-contract.md",
-      ".agents/skills/flowtab-engineering/references/risk-calibration.md",
-      ".agents/skills/flowtab-engineering/references/test-coverage-matrix-workflow.md",
-      ".agents/skills/flowtab-engineering/references/test-layer-boundaries.md",
-      "AGENTS.md",
-      "scripts/skill-evals/flowtab-engineering-cases.jsonl",
+      ".agents/skills/flowtab-engineering/",
       ".agents/skills/flowtab-test-audit/",
       ".codex/",
+      "AGENTS.md",
+      "scripts/skill-evals/flowtab-engineering-cases.jsonl",
       "prompts.zip"
     ]
   },
   "scope": {
-    "owner_at_c0_routing": "Settings, Preferences, App Lifecycle, and Hotkey Monitor",
-    "authoritative_owner": "Persisted hotkey selection, normalized registration request, monitor reload, Carbon delivery, and visible routed action",
+    "authoritative_owner": "Switcher release-confirmation state machine",
+    "entry_consumer": "Settings hotkey persistence UI workflow",
     "in_scope": [
-      "main, in-app, and quit hotkey explicit selection matrices",
-      "in-app conflict fallback normalization",
-      "selection persistence across relaunch",
-      "AppDelegate notification and direct monitor reload paths",
-      "Carbon press and release dispatch into app, window, and quit workflows",
-      "deterministic Mock visible outcomes",
-      "real noisy AX/CG cross-Space in-app workflow",
-      "focused-projection fast-start pressure at 1000 windows"
+      "overlapping presentation_recovered and flags_changed release observations in one session generation",
+      "first-valid-owner arbitration",
+      "single selection commit and pending-task cleanup",
+      "flags_changed delivery evidence in the settings relaunch UI workflow",
+      "current exhaustive test-asset ledger projection"
     ],
     "out_of_scope": [
-      "runtime-projection commit-consistency Oracle changes awaiting explicit clarification",
-      "UI layout contracts",
-      "new hotkey combinations or takeover policy",
-      "new settings UI structure or persistence schema"
+      "production release-confirmation behavior changes",
+      "new hotkey combinations",
+      "settings persistence schema changes",
+      "stable product-scenario contract changes"
     ]
+  },
+  "prerequisites": {
+    "c0_reconstructible": true,
+    "prior_c1_anchors_reconstructible": true,
+    "ui_automation_handshake": "passed at ui-handshake-probe-016",
+    "existing_test_semantics": "explicitly confirmed by the user",
+    "guard_token": "3eb1f1cfa11b2813"
   },
   "product_contract": {
-    "persistence": "Each settings picker writes its normalized HotkeyRegistrationRequest fields to UserDefaults and reloads the same selection after relaunch.",
-    "conflict_fallback": "An in-app selection conflicting with the main shortcut resolves to the supported non-conflicting modifier before registration.",
-    "monitor_lifecycle": "AppDelegate immediately reloads the global monitor after direct settings changes and posted configuration notifications, stopping the prior registration before recreating it.",
-    "dispatch": "Carbon press and release callbacks route main, in-app, and quit requests to their established Switcher session behavior.",
-    "visible_workflow": "A delivered shortcut opens the appropriate app or focused-window session, and the quit shortcut terminates the selected app through the visible panel workflow.",
-    "pressure": "Focused Control-Tab fast start reads the published projection without consulting the focused-snapshot bridge and remains bounded at 1000 windows."
+    "event_delivery": "The configured hotkey release event reaches the Switcher release-confirmation state machine.",
+    "overlap_arbitration": "The first valid release-confirmation trigger in a session generation retains ownership when another trigger overlaps.",
+    "commit_cardinality": "The owning confirmation commits the selected target exactly once and clears the pending task.",
+    "persistence": "The configured main, quit, and in-app hotkey selections remain present after relaunch."
   },
-  "production_path": [
-    "AppSettingsView and HotkeySettingsCard convert picker values into normalized registration requests.",
-    "AppPreferences persists the selected key code and modifier fields in UserDefaults.",
-    "AppDelegate observes direct and posted changes, stops the active OptionTabHotkeyMonitor, and recreates it from the current preferences.",
-    "OptionTabHotkeyMonitor registers the Carbon hotkey and dispatches press and release callbacks.",
-    "SwitcherPanelController consumes the callback through the main, focused-window, or terminate-selected-app path.",
-    "Existing Mock and real-fixture UI workflows establish the visible result after delivery."
-  ],
-  "test_meaning_conclusion": {
-    "classification": "retain production and existing test assets unchanged",
-    "protected_meaning": "Settings persistence and monitor delivery are established independently from the runtime projection and visible panel prerequisites consumed after dispatch.",
-    "independent_oracle": [
-      "A saved main, in-app, or quit selection survives relaunch with the same normalized request fields.",
-      "A main-shortcut conflict resolves to a supported in-app fallback before monitor registration.",
-      "Posted and direct settings changes replace the monitor and route callbacks immediately.",
-      "Actual XCUI key events produce the expected visible app, focused-window, and quit outcomes.",
-      "A real fullscreen workflow sibling remains reachable across Spaces with noisy CG siblings and no app AX windows.",
-      "The 1000-window focused fast-start path avoids the focused-snapshot bridge across repeated starts."
+  "independent_oracle": {
+    "behavior": [
+      "presentation_recovered schedules the first confirmation for the current generation",
+      "a later flags_changed observation preserves the same generation and first-owner state",
+      "the session closes through exactly one activation",
+      "the pending confirmation task is cleared"
+    ],
+    "ui": [
+      "activeSpaceIgnore confirms the delivered global show path",
+      "releaseConfirm start or alreadyRunning proves flags_changed reached the release-confirmation state machine",
+      "releaseConfirm confirmed with flags_changed or presentation_recovered proves a valid first owner completed finishSelection",
+      "the configured picker selections remain after relaunch"
     ]
   },
+  "test_meaning_conclusion": {
+    "existing_ui_asset": "retain the persistence workflow with separate delivery and confirmation-owner assertions",
+    "new_behavior_asset": "retain as the lowest-layer regression for overlapping release triggers",
+    "stable_contract": "unchanged",
+    "reason": "Event delivery and release-confirmation ownership are independent facts and require separate assertions."
+  },
   "test_quality_conclusion": {
-    "fail_sensitivity": "The C0 methods failed at explicit runtime-projection, frontmost-app, or visible-tile anchors after Carbon delivery; after dependency repair the same unchanged methods pass.",
-    "fixture_fidelity": "Settings methods use actual picker changes, UserDefaults relaunch, and XCUI key events; real topology uses the signed fixed-App identity and multi-Space fixture.",
-    "async_waiting": "Visible state and process termination use existing bounded UI helpers; pressure timing is measured inside a deterministic app-host test.",
-    "cleanup": "Canonical wrappers reset settings defaults and terminate FlowTab and fixture processes while retaining complete result bundles in unique ignored leaves.",
-    "isolation": "Settings, real topology, and pressure validations use separate attempt roots on the same committed candidate.",
-    "mock_boundaries": "Mock UI establishes deterministic settings delivery outcomes; real UI establishes macOS Carbon, AX, CG, Spaces, and frontmost-app integration.",
+    "fail_sensitivity": "The Behavior method fails if the second trigger replaces the first generation, creates a second commit, or leaves a pending task. The UI Oracle fails if flags_changed is absent or no valid confirmation completes finishSelection.",
+    "fixture_fidelity": "Behavior uses the real SwitcherPanelController with an activation override; UI uses actual XCUI hotkey delivery, UserDefaults persistence, termination, and relaunch.",
+    "async_waiting": "Behavior uses the bounded waitUntil helper; UI uses bounded runtime-log helpers and existing relaunch assertions.",
+    "cleanup": "Canonical wrappers isolate build and evidence roots and UI teardown terminates launched applications.",
+    "isolation": "The five-test predecessor sequence reproduces the trigger ordering; the independent 110-test UI run proves the remaining UI set.",
+    "mock_boundaries": "Mock runtime makes settings delivery deterministic while real UI event delivery remains external to the test process.",
+    "target_reachability": "The new method executed through FlowTabTests and the clarified method executed through FlowTabUITests.",
     "skip": "none",
-    "flake_assessment": "Four unchanged settings methods, one real noisy-topology method, and one pressure method pass without retries in their final attempts.",
-    "target_reachability": "Canonical FlowTabTests and UI wrappers compiled and exercised the committed production and existing test sources."
+    "flake_assessment": "The first-owner Behavior family, full Behavior target, clarified predecessor sequence, and independent UI set all pass."
   },
   "scenario_plan": {
     "required": [
       {
-        "axis": "selection and relaunch",
-        "scenario": "Representative main, in-app, and quit selections persist across app relaunch.",
-        "evidence": "testSettingsHotkeySelectionsPersistAcrossRelaunch passed"
+        "axis": "overlapping release triggers",
+        "layer": "Behavior",
+        "status": "passed",
+        "evidence": "flowtabtests-release-family-002: 7 tests, 0 failures; flowtabtests-full-post-oracle-004: 712 tests, 0 failures"
       },
       {
-        "axis": "explicit and fallback in-app matrix",
-        "scenario": "Explicit and conflict-fallback Control-Tab selections start the focused-window session.",
-        "evidence": "testSettingsInAppHotkeyExplicitAndFallbackMatrixStartsFocusedWindowSession passed"
+        "axis": "predecessor-order flags delivery and first-owner confirmation",
+        "layer": "UI",
+        "status": "passed",
+        "evidence": "ui-order-hotkey-post-oracle-020: 5 tests, 0 failures"
       },
       {
-        "axis": "main shortcut matrix",
-        "scenario": "Representative persisted main selections deliver through Carbon and open the app Switcher.",
-        "evidence": "testSettingsMainHotkeyRepresentativeMatrixTriggersSwitcher passed"
+        "axis": "all independent UI consumers",
+        "layer": "UI",
+        "status": "passed",
+        "evidence": "ui-full-minus-pending-oracle-018: 110 tests, 0 failures"
       },
       {
-        "axis": "quit shortcut matrix",
-        "scenario": "Explicit and fallback quit selections terminate the selected fixture app.",
-        "evidence": "testSettingsQuitHotkeyExplicitAndFallbackMatrixTerminatesSelectedApp passed"
-      },
-      {
-        "axis": "real noisy topology",
-        "scenario": "Control-Tab round-trips a fullscreen workflow sibling across Spaces with noisy CG siblings and no app AX windows.",
-        "evidence": "real-topology-ui-002 passed"
-      },
-      {
-        "axis": "scale and timing",
-        "scenario": "Eighty focused-session starts over 1000 windows read the published projection and avoid the focused-snapshot bridge.",
-        "evidence": "focused-hotkey-pressure-003 passed with p95 0.29 ms and max 0.54 ms"
+        "axis": "exhaustive current asset inventory",
+        "layer": "Process/Tooling",
+        "status": "passed",
+        "evidence": "960 rows, 864 test methods, 22 stable scenarios"
       }
     ],
     "optional_omitted": [
       {
-        "axis": "Command-Tab takeover variants",
-        "reason": "The relevant assets passed C0 and no production, settings, fixture, or test bytes changed in this slice."
+        "axis": "additional trigger-order permutations",
+        "reason": "The Behavior family owns generation, replay, flags_changed, presentation lifecycle, and first-owner overlap semantics."
       },
       {
-        "axis": "permission-denied controls",
-        "reason": "The relevant assets passed C0 and this candidate does not change permission handling."
-      },
-      {
-        "axis": "full UI suite",
-        "reason": "Repository-wide same-candidate closure remains scheduled for C2 after all entry-ready Stage 02 slices close."
+        "axis": "Stage 02 pressure rerun",
+        "reason": "This slice changes test coverage and an Oracle while leaving runtime performance behavior unchanged."
       }
     ]
   },
   "disposition": {
-    "primary": "audit_clean",
+    "primary": "test_defect",
     "contributing": [
-      "upstream_dependency_resolution",
-      "c0_routing_hypothesis_reclassified"
+      "coverage_gap"
     ]
   },
   "deficiency_signal": {
-    "c0_settings_ui": {
-      "attempt_path_intent": ".build-local/test-audit/c0-20260717-1e3afb7/attempts/ui-full-001",
-      "executed": 4,
-      "failures": 4,
-      "log_sha256": "0c3a724bb9a1edb18ae9ee0ac2b885deddd53bbc142101dfd41fa318a4f738fd",
-      "signals": [
-        "Persistence and main-matrix delivery reached Carbon dispatch before runtimeProjectionMissing prevented the active-Space or release marker.",
-        "In-app delivery reached dispatch before noFrontmostApp prevented focused-session start.",
-        "Quit delivery reached dispatch before the absent Switcher tile prevented selection and termination."
-      ]
-    },
-    "current_unchanged_settings_ui": {
-      "attempt_path_intent": ".build-local/test-audit/c1-settings-hotkey-delivery/prechange-existing-settings-ui-001",
-      "executed": 4,
-      "failures": 0,
-      "duration_seconds": 218.373,
-      "status_sha256": "0e3b4fb6bdfbe6ed239b694fe9e2d656a3220373892ef9fff84b447f928a2df0",
-      "log_sha256": "51478ff69f09b572120d4df9b799a7e3d114bf89bdd43f7674e120493b46e842",
-      "xcresult_info_sha256": "550f1b1abcab5329c0e68dc90e9cb0726269e110f1883643b43618ef20af0bb3"
-    }
+    "full_ui_attempt": ".build-local/test-audit/c2-20260719-b1e31e0/ui-full-007",
+    "ordered_reproducer": ".build-local/test-audit/c2-20260719-b1e31e0/ui-order-hotkey-011",
+    "observed_sequence": [
+      "releaseConfirm start trigger=presentation_recovered",
+      "releaseConfirm alreadyRunning trigger=flags_changed",
+      "releaseConfirm confirmed trigger=presentation_recovered action=finishSelection"
+    ],
+    "conflict": "The prior UI marker bound flags_changed delivery to confirmation ownership and rejected a valid first-owner completion."
   },
   "root_cause": {
-    "c0_routing": "The C0 route grouped four visible settings workflows under hotkey delivery because their final UI anchors failed.",
-    "evidence_reclassification": "The C0 log already contained successful settings save, monitor reload, and Carbon dispatch evidence; each failure occurred after delivery at runtime projection, frontmost-app, or panel-tile prerequisites.",
-    "dependency_resolution": "Committed runtime-window, fixture-publication, and Switcher lifecycle C1 anchors restored those downstream prerequisites, after which all four unchanged settings methods passed."
+    "production": "The state machine intentionally retains the first valid owner for a generation and commits once.",
+    "test": "The prior UI Oracle represented event delivery and confirmation ownership as one fixed marker.",
+    "classification": "test Oracle defect with a missing lowest-layer overlap regression"
   },
   "semantic_delta": {
     "production": "unchanged",
-    "tests": "unchanged",
+    "tests": "add one Behavior regression and separate flags_changed delivery from first-valid-owner completion in one existing UI Oracle",
     "fixtures": "unchanged",
     "runners": "unchanged",
     "project_membership": "unchanged",
-    "coverage_projection": "unchanged",
-    "audit_metadata": "add one C1 handoff that records the corrected diagnosis and same-candidate evidence",
-    "stable_product_contract": "unchanged",
+    "asset_ledger": "add one test-method asset, update its container, and refresh current method line and fingerprint metadata",
+    "stable_coverage_matrix": "unchanged",
     "public_api": "unchanged",
-    "persistence_schema": "unchanged",
-    "UI_view_structure": "unchanged"
+    "persistence_schema": "unchanged"
   },
   "existing_test_clarification_gate": {
-    "guard_applied": true,
     "guard_path_intent": ".codex/hooks/test_semantic_guard.py",
-    "guard_sha256": "ee58f91dd9c54e13692c391c82c110084a7c267edffa2fb2a3c4305755e7fb5f",
-    "changed_existing_test_functions": [],
-    "added_test_functions": [],
-    "authorization_required": false,
-    "authorization_satisfied": "not_applicable",
-    "pending_unrelated_clarification": "Two existing runtime-projection-commit-consistency methods remain excluded pending explicit product-Oracle confirmation."
+    "guard_token": "3eb1f1cfa11b2813",
+    "affected_symbol": "FlowTabUITests.testSettingsHotkeySelectionsPersistAcrossRelaunch",
+    "authorization_required": true,
+    "authorization_satisfied": true,
+    "clarification_summary": "User confirmed that flags_changed delivery remains required and that flags_changed or presentation_recovered may own the first valid release confirmation completing one selection commit.",
+    "authorization_result": "authorized 3eb1f1cfa11b2813"
   },
   "changed_files": [
     {
+      "path_intent": "FlowTabTests/FlowTabPriorityCoverageTests+PanelSessionBehavior.swift",
+      "role": "additive Behavior regression",
+      "semantic_change": "prove first-owner retention, one activation, and task cleanup when release triggers overlap"
+    },
+    {
+      "path_intent": "FlowTabUITests/FlowTabUITests+Settings.swift",
+      "role": "clarified UI Oracle",
+      "semantic_change": "assert flags_changed delivery independently from the valid confirmation owner"
+    },
+    {
+      "path_intent": "docs/test-audit/TEST_ASSET_LEDGER.jsonl",
+      "role": "current exhaustive asset projection",
+      "semantic_change": "record the new Behavior method and current UI line and fingerprint metadata"
+    },
+    {
       "path_intent": "docs/test-audit/slices/settings-hotkey-delivery/SLICE_HANDOFF.json",
-      "role": "C1 audit handoff",
-      "semantic_change": "record audit-clean disposition, C0 routing reclassification, unchanged asset decision, validation evidence, and rollback boundary"
+      "role": "consumable replacement C1 handoff",
+      "semantic_change": "publish clarification, remediation, validation, invalidations, and rollback boundary"
     }
   ],
   "validation": {
-    "unchanged_settings_ui": {
-      "status": "passed",
-      "attempt_path_intent": ".build-local/test-audit/c1-settings-hotkey-delivery/prechange-existing-settings-ui-001",
-      "executed": 4,
-      "failures": 0,
-      "duration_seconds": 218.373,
-      "methods": [
-        "testSettingsHotkeySelectionsPersistAcrossRelaunch",
-        "testSettingsInAppHotkeyExplicitAndFallbackMatrixStartsFocusedWindowSession",
-        "testSettingsMainHotkeyRepresentativeMatrixTriggersSwitcher",
-        "testSettingsQuitHotkeyExplicitAndFallbackMatrixTerminatesSelectedApp"
-      ],
-      "status_sha256": "0e3b4fb6bdfbe6ed239b694fe9e2d656a3220373892ef9fff84b447f928a2df0",
-      "log_sha256": "51478ff69f09b572120d4df9b799a7e3d114bf89bdd43f7674e120493b46e842",
-      "xcresult_info_sha256": "550f1b1abcab5329c0e68dc90e9cb0726269e110f1883643b43618ef20af0bb3"
+    "Unit": {
+      "status": "not relevant",
+      "reason": "No FlowTabCore rule or production state transition changed."
     },
-    "real_noisy_topology_ui": {
+    "Behavior": {
       "status": "passed",
-      "attempt_path_intent": ".build-local/test-audit/c1-settings-hotkey-delivery/real-topology-ui-002",
-      "executed": 1,
-      "failures": 0,
-      "duration_seconds": 39.870,
-      "methods": [
-        "testInAppWindowSwitcherControlTabRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithNoisyCGSiblingsWithoutAppAXWindows"
-      ],
-      "status_sha256": "0e3b4fb6bdfbe6ed239b694fe9e2d656a3220373892ef9fff84b447f928a2df0",
-      "log_sha256": "88db222c1b91b877f501545567ee63363f4214487eebcdb2571f40019da6716b",
-      "xcresult_info_sha256": "9243aa97b60798c6e7c0a94a7528e3988caec50756fa3c11b08696ab402a2998"
-    },
-    "focused_hotkey_pressure": {
-      "status": "passed",
-      "attempt_path_intent": ".build-local/test-audit/c1-settings-hotkey-delivery/focused-hotkey-pressure-003",
-      "executed": 1,
-      "failures": 0,
-      "duration_seconds": 0.029,
-      "methods": [
-        "testControlTabFocusedProjectionFastStartPressureIgnoresFocusedSnapshotBridge"
-      ],
-      "workload": {
-        "windows": 1000,
-        "iterations": 80,
-        "projection_reads": 80,
-        "p50_milliseconds": 0.28,
-        "p95_milliseconds": 0.29,
-        "max_milliseconds": 0.54
+      "release_family": {
+        "attempt_path_intent": ".build-local/test-audit/c1-settings-hotkey-delivery-reopen/flowtabtests-release-family-002",
+        "executed": 7,
+        "failures": 0,
+        "status_sha256": "ea2a3b229ce8665e0a1f942269021006798dede84ebf1acfd5a642fbf187ce70",
+        "log_sha256": "f1b6fc347c3b41d4e107b5dd4ac8279ef766d496fd5965472bd661952f33049b"
       },
-      "status_sha256": "5a4bf09940ce3b5049712fe8505e26cec88d0e1d907ddc5642c1594956ed5da5",
-      "log_sha256": "67d96e7edf02c44f6933f50cad2aae14d2028289e41b051168003daece920aed",
-      "xcresult_info_sha256": "d61ff069df833620d5a801893395a4dc08c3a70e0dbabbec0e5a60af7a8733f8"
+      "full_post_oracle": {
+        "attempt_path_intent": ".build-local/test-audit/c1-settings-hotkey-delivery-reopen/flowtabtests-full-post-oracle-004",
+        "executed": 712,
+        "failures": 0,
+        "duration_seconds": 52.326,
+        "status_sha256": "5a4bf09940ce3b5049712fe8505e26cec88d0e1d907ddc5642c1594956ed5da5",
+        "log_sha256": "9da94fda82a61c66d5a5ed8f0b89157a2230d29b1ce775dd928a55e6853da2cb",
+        "xcresult_info_sha256": "673079b15da6ad737a4c5da98625eddd5759d0b37247a0a2ea25af44802f1cf6"
+      }
     },
-    "same_candidate_ui_identity": {
-      "installed_app_build_root_path_intent": ".build-local/test-audit/stage03-wave-after-switcher-lifecycle-001/build/ui-app",
-      "build_executable_sha256": "07adc10f48c9023f6ce43003f35f12ee2f747529808ca96efa109801b7c1ae82",
-      "installed_signed_executable_sha256": "e89b6f779e529b75c7966da9527e60872808ed80e11a0a0da94f080797d62381",
-      "installed_app_path_intent": {
-        "resource_boundary": "user_applications",
-        "relative_path_intent": "Flow Tab UITest.app"
+    "UI": {
+      "status": "passed",
+      "build": {
+        "attempt_path_intent": ".build-local/test-audit/c1-settings-hotkey-delivery-reopen/ui-build-post-oracle-019",
+        "status_sha256": "67ace486d8ce3594685b131ebe39c22ebcc4605f145945e170da1caf0e008439",
+        "log_sha256": "12b9310d328653143ea78062e0a0093bb2bb09d7a3e7c07f42ce285c76c4a5ed",
+        "signing_log_sha256": "b3603353690515978f8cdb4264d30f536a5e974612bde8076402675a73dccd28"
       },
-      "bundle_identifier": "io.github.potato-dumplings.flowtab",
-      "team_identifier": "96PUA726W9",
-      "build_installed_at_local": "2026-07-18T19:36:25+0800",
-      "reuse": "The unchanged settings and real-topology UI attempts used the fixed signed App built from entry_head; the pressure attempt used the same committed source candidate through the canonical app-host wrapper."
+      "clarified_predecessor_sequence": {
+        "attempt_path_intent": ".build-local/test-audit/c1-settings-hotkey-delivery-reopen/ui-order-hotkey-post-oracle-020",
+        "executed": 5,
+        "failures": 0,
+        "duration_seconds": 116.004,
+        "status_sha256": "6294eefac58a899ab61fb0adab86dde86f559e26d02138697ec798a506a09242",
+        "log_sha256": "c95a4e87629be46d130135f32a31e523088b9810aba6c6ea4887eca0c9385219",
+        "xcresult_info_sha256": "bdfac7605eb7711733496818d49fdd697a75a20f813ec3ed6aafa38a5d627b7f"
+      },
+      "independent_full_set": {
+        "attempt_path_intent": ".build-local/test-audit/c2-20260719-b1e31e0/ui-full-minus-pending-oracle-018",
+        "executed": 110,
+        "failures": 0,
+        "duration_seconds": 1876.995,
+        "status_sha256": "6294eefac58a899ab61fb0adab86dde86f559e26d02138697ec798a506a09242",
+        "log_sha256": "5f929a1a1b4453c7568ec973e9a45efe6a08e4cf01c1c0cfde9dc7d4e9833d5a"
+      }
     },
-    "process_tooling": {
-      "semantic_guard_worktree_analysis": "passed with no existing test-function semantic changes",
-      "semantic_guard_staged_analysis": "passed with no existing test-function semantic changes",
-      "asset_ledger_validation": {
-        "status": "passed",
-        "rows": 951,
-        "test_methods": 856,
+    "Pressure": {
+      "status": "not relevant",
+      "reason": "No hot-path or scale-sensitive runtime behavior changed in this Stage 02 delta."
+    },
+    "Process_Tooling": {
+      "status": "passed",
+      "asset_ledger": {
+        "rows": 960,
+        "test_methods": 864,
         "stable_scenarios": 22,
         "target_counts": {
           "FlowTabCoreTests": 42,
-          "FlowTabTests": 704,
+          "FlowTabTests": 712,
           "FlowTabUITests": 110
         },
-        "priority_container_count": 466,
-        "container_counts_match_consumers": true
+        "sha256": "84c148d8a5026ec83e6c8f7a88d17396514080039062c60b24906d3222fd1e31"
       },
+      "semantic_guard_authorization": "passed",
+      "resume_package_pre_edit_validation": "passed",
       "json_and_jsonl_parse": "passed",
-      "project_parse": "passed",
-      "path_intent_check": "passed",
       "git_diff_check": "passed",
-      "staged_diff_check": "passed"
+      "non_evidence_attempts": [
+        "A manual semantic-guard hook invocation without the editor JSON payload exited 1 as the protocol requires; the explicit authorization and guarded edit path succeeded."
+      ]
     }
   },
   "closure_proof": {
-    "c0_failure_route_reexamined": true,
-    "delivery_evidence_present_before_c0_failure": true,
-    "unchanged_existing_settings_tests_passed": true,
-    "real_topology_visible_behavior_passed": true,
-    "pressure_contract_passed": true,
-    "same_candidate_ui_build_proved": true,
+    "deficiency_reproduced": true,
+    "root_cause_supported": true,
     "production_change_required": false,
-    "test_change_required": false,
-    "fixture_or_runner_change_required": false,
-    "existing_test_semantics_preserved": true,
-    "source_boundary_audit_passed": true,
-    "temporary_production_diagnostics_absent": true
+    "additive_regression_passed": true,
+    "asset_ledger_reconciled": true,
+    "existing_test_semantics_confirmed": true,
+    "clarified_ui_sequence_passed": true,
+    "exact_c1_file_set_validated": true,
+    "completion_gate_passed": true
   },
   "coverage_effects": {
-    "stable_contract": "unchanged",
-    "asset_ledger": "unchanged at 951 rows, 856 test methods, 22 stable scenarios, and target counts 42/704/110",
-    "current_projection": [
-      {
-        "scenario_id": "scenario:hotkey-normalization",
-        "layers": {
-          "unit": "Strong",
-          "behavior": "Strong",
-          "mock_ui": "Strong"
-        }
-      },
-      {
-        "scenario_id": "scenario:global-hotkey-monitor",
-        "layers": {
-          "behavior": "Strong",
-          "mock_ui": "Strong",
-          "real_topology_ui": "Strong"
-        }
-      },
-      {
-        "scenario_id": "scenario:in-app-window-hotkey",
-        "layers": {
-          "behavior": "Strong",
-          "mock_ui": "Strong",
-          "real_topology_ui": "Strong",
-          "pressure": "Strong"
-        }
-      },
-      {
-        "scenario_id": "scenario:terminate-selected-app",
-        "layers": {
-          "behavior": "Strong",
-          "mock_ui": "Strong",
-          "real_topology_ui": "Strong"
-        }
-      }
-    ]
+    "ledger_rows": 960,
+    "test_methods": 864,
+    "target_counts": {
+      "FlowTabCoreTests": 42,
+      "FlowTabTests": 712,
+      "FlowTabUITests": 110
+    },
+    "new_asset_id": "test:FlowTabTests:FlowTabPriorityCoverageTests/testSwitcherPanelControllerKeepsFirstModifierReleaseConfirmationWhenTriggersOverlap",
+    "scenario_ids": [
+      "scenario:global-hotkey-monitor-lifecycle",
+      "scenario:switcher-standard-panel"
+    ],
+    "stable_contract_change": false
   },
   "dependency_and_interaction_invalidations": {
-    "satisfied_dependencies": [
-      "Committed Switcher lifecycle and runtime-projection C1 anchors satisfy the post-delivery visible prerequisites that failed in C0.",
-      "Stage 03 may consume the unchanged settings, real-topology, and pressure attempt set as this slice's final evidence."
+    "superseded_anchor": "d1575fc23517914cd3b4179ff63b5207b0ba3110",
+    "replacement_anchor": "the commit containing this handoff",
+    "invalidated_stage03_evidence": [
+      "prior final candidate freeze",
+      "prior full UI closure",
+      "prior runtime-topology closure",
+      "prior C2 handoff candidate"
     ],
-    "invalidated_evidence": [
-      "The C0 classification of the four settings methods as a settings-hotkey-delivery deficiency is superseded by prechange-existing-settings-ui-001.",
-      "Downstream evidence that assumes the C0 failures occurred before Carbon dispatch must consume this handoff's log-based reclassification."
+    "unaffected_anchors": [
+      "runtime-projection-maintenance-hang",
+      "pressure-runner-contracts",
+      "coverage-contract-reconciliation",
+      "runtime-window-order-space-truth",
+      "switcher-trigger-panel-process-lifetime",
+      "ui-layout-contracts",
+      "runtime-projection-fixture-publication"
     ],
     "interaction_peers": [
-      "AppSettingsView and HotkeySettingsCard picker bindings",
-      "AppPreferences UserDefaults normalization",
-      "AppDelegate settings observer and monitor reload",
-      "OptionTabHotkeyMonitor Carbon registration and callbacks",
-      "RuntimeProjectionService and frontmost-app publication",
-      "SwitcherPanelController focused, app, and quit sessions",
-      "signed fixed-App and multi-Space fixtures"
+      "Settings picker persistence and monitor reload",
+      "Switcher presentation recovery",
+      "flags-changed event delivery",
+      "session-generation invalidation",
+      "selection activation"
     ]
   },
-  "downstream_findings": [
-    {
-      "candidate_slice": "slice:runtime-projection-commit-consistency",
-      "state": "pending explicit existing-test Oracle clarification",
-      "impact": "independent of the clean settings-delivery disposition"
-    },
-    {
-      "candidate_slice": "diagnostic:observable-main-thread-publication",
-      "signal": "Targeted app-host logs retain a SwiftUI background-publication warning while tests pass.",
-      "state": "retain as a routed diagnostic without changing this slice"
-    }
-  ],
   "next_candidate_hints": [
-    {
-      "slice_id": "slice:ui-layout-contracts",
-      "priority": 1,
-      "entry_ready": true,
-      "reason": "It is independent of the pending runtime-projection Oracle clarification and is the next Stage 03 candidate."
-    },
-    {
-      "slice_id": "slice:runtime-projection-commit-consistency",
-      "priority": 2,
-      "entry_ready": false,
-      "reason": "Two existing test Oracles still require explicit semantic confirmation before modification."
-    }
+    "Replace the prior settings-hotkey-delivery anchor with this replacement C1 anchor in the ordered current set.",
+    "Freeze candidate and artifact identities only after the replacement C1 commit exists.",
+    "Run the final complete UI set with the clarified method included.",
+    "Regenerate same-candidate runtime-topology and required pressure evidence before C2."
   ],
   "remaining_uncertainty": [
-    "Repository-wide same-candidate UI closure remains deferred to C2 after the remaining entry-ready layout slice closes.",
-    "Command-Tab takeover and permission-denied variants were not rerun because they passed C0 and this slice changes no executable bytes.",
-    "The targeted app-host log retains a SwiftUI background-publication warning for its routed diagnostic owner."
+    "the replacement C1 commit and tree identities until the commit gate completes",
+    "same-candidate Stage 03 full closure and C2 identity"
   ],
   "exact_stage_owned_file_set": [
+    "FlowTabTests/FlowTabPriorityCoverageTests+PanelSessionBehavior.swift",
+    "FlowTabUITests/FlowTabUITests+Settings.swift",
+    "docs/test-audit/TEST_ASSET_LEDGER.jsonl",
     "docs/test-audit/slices/settings-hotkey-delivery/SLICE_HANDOFF.json"
   ],
   "rollback_boundary": {
-    "scope": "Revert the C1 handoff commit as one unit.",
+    "scope": "Revert the completed replacement C1 commit as one unit.",
     "effects": [
-      "Remove the settings-hotkey-delivery audit disposition, evidence map, and C0 routing reclassification."
+      "remove the overlap Behavior regression",
+      "restore the prior settings relaunch UI Oracle",
+      "restore the prior asset-ledger projection and settings-hotkey C1 handoff"
     ],
     "preserves": [
-      "all production, test, fixture, runner, project, and coverage assets",
+      "production runtime behavior",
       "the committed C0 anchor",
-      "all prior C1 anchors",
-      "user-owned process changes",
-      "the pending runtime-projection-commit-consistency clarification"
+      "the unaffected current C1 anchors",
+      "user-owned process changes"
     ]
   }
 }

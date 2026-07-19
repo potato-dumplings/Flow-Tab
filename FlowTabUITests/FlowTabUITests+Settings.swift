@@ -315,11 +315,18 @@ extension FlowTabUITests {
         firstLaunchApp.activate()
         firstLaunchApp.typeKey(.space, modifierFlags: .option)
         waitForRuntimeLogFiles(
-            containing: [
-                "activeSpaceIgnore trigger=global_show",
-                "releaseConfirm trigger=flags_changed"
-            ],
+            containing: ["activeSpaceIgnore trigger=global_show"],
             since: hotkeyTriggerLogSnapshot
+        )
+        waitForRuntimeLogFiles(
+            matching: #"releaseConfirm (start|alreadyRunning) trigger=flags_changed"#,
+            since: hotkeyTriggerLogSnapshot,
+            description: "flags-changed release delivery reaches the confirmation state machine"
+        )
+        waitForRuntimeLogFiles(
+            matching: #"releaseConfirm confirmed trigger=(flags_changed|presentation_recovered) action=finishSelection"#,
+            since: hotkeyTriggerLogSnapshot,
+            description: "the first valid release confirmation commits the selection"
         )
 
         firstLaunchApp.terminate()

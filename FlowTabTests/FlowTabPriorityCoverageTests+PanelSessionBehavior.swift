@@ -111,6 +111,41 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
+    func testSwitcherPanelControllerKeepsFirstModifierReleaseConfirmationWhenTriggersOverlap() async {
+        let controller = SwitcherPanelController(
+            model: LiveSwitcherModel(
+                runtimeProjectionService: RecordingRuntimeProjectionService(
+                    appSwitcherApps: searchScenarioApps()
+                )
+            )
+        )
+        var activatedTargets: [ActivationTarget] = []
+        controller.modelForTesting.activationOverride = { target, _ in
+            activatedTargets.append(target)
+        }
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        controller.globalPrimaryModifierPressedOverride = false
+
+        controller.scheduleModifierReleaseConfirmation(trigger: "presentation_recovered")
+        let releaseGeneration = controller.modifierReleaseConfirmationGeneration
+        controller.scheduleModifierReleaseConfirmation(trigger: "flags_changed")
+
+        XCTAssertEqual(controller.modifierReleaseConfirmationGeneration, releaseGeneration)
+        XCTAssertEqual(
+            controller.modifierReleaseState,
+            .releaseObserved(trigger: "presentation_recovered", generation: releaseGeneration)
+        )
+
+        let didCommitRelease = await waitUntil("overlapping release triggers commit once") {
+            controller.modelForTesting.session == nil && activatedTargets.count == 1
+        }
+        XCTAssertTrue(didCommitRelease)
+        XCTAssertEqual(activatedTargets.count, 1)
+        XCTAssertNil(controller.pendingModifierReleaseConfirmationTask)
+    }
+
+    @MainActor
     func testSwitcherPanelControllerReleaseConfirmationGenerationInvalidatesCanceledTask() {
         let controller = SwitcherPanelController(
             model: LiveSwitcherModel(
