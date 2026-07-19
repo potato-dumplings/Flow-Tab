@@ -9,7 +9,7 @@ Use this workflow for new features and for extending existing behavior.
 - Treat the user-named scenario as a seed; expand it into a representative scenario family before selecting tests.
 - Add the smallest representative scenario set required by the risk classification, using the authorization boundary in `test-layer-boundaries.md`.
 - For user-visible features and feature extensions, add or update coverage in all three layers: unit, behavior, and UI.
-- Read `test-coverage-matrix-workflow.md` when the feature changes a stable contract field or current evidence status. Keep ordinary engineering context independent from the raw Registry until the work enters the applicable audit publication transaction.
+- Read `test-coverage-matrix-workflow.md` when the feature changes a stable contract field or current evidence status. During an active audit campaign, return the resulting evidence and semantic delta to the selected audit stage.
 - For documentation-only or mechanical changes that are not feature work, use the calibrated minimum and state why any layer is not relevant.
 - Make each test layer prove a different part of the change instead of repeating the same assertion.
 - Run pressure validation when the change touches hot paths, scale-sensitive logic, or repeated heavy UI or runtime work.
@@ -42,7 +42,7 @@ Use this workflow for new features and for extending existing behavior.
 14. Add or update behavior tests for the app-level flow, integration path, and representative required orchestration variants when behavior coverage is required.
 15. Add or update UI tests for the required visible user path; keep UI coverage representative instead of exhaustively repeating variants already proven below.
 16. Implement the production change.
-17. Update the stable matrix contract when the feature adds or changes a scenario. When a stable contract or current evidence status changes, enter the applicable audit transaction and let its coordinator publish the C1/C2 delta or evidence projection from Registry-owned typed results.
+17. Update the stable matrix contract when the feature adds or changes a scenario. During an active audit campaign, publish the C1/C2 delta or evidence projection through the selected audit stage.
 18. Run the related test suites and any required pressure checks, then iterate until they pass. If a required validation layer is blocked, stop at a blocker report instead of completion.
 
 ## Coverage Expectations

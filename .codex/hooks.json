@@ -1,0 +1,18 @@
+{
+  "description": "FlowTab project-local guard for existing test semantics.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "^(apply_patch|Bash)$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/bin/python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/test_semantic_guard.py\" hook",
+            "timeout": 30,
+            "statusMessage": "Checking existing test semantics"
+          }
+        ]
+      }
+    ]
+  }
+}

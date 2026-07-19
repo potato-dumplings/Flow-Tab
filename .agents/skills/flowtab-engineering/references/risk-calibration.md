@@ -102,14 +102,14 @@ Do not mark a layer not relevant merely because the current code lacks a seam. F
 
 ## Process And Tooling Validation
 
-Process/Tooling is a reporting dimension alongside the runtime layers. It is required when a change affects engineering instructions, repository paths, build or test command documentation, wrappers, prompt contracts, Skill metadata, bundled resources, packaging, or audit protocol inputs.
+Process/Tooling is a reporting dimension alongside the runtime layers. It is required when a change affects engineering instructions, repository paths, build or test command documentation, wrappers, instruction contracts, Skill metadata, bundled resources, packaging, or audit Skill inputs.
 
 Choose the checks owned by the changed boundary:
 
 - Skill structure: frontmatter, description length, folder/name agreement, `agents/openai.yaml`, direct reference links, and package contents.
-- Repository integration: AGENTS and prompt entry paths, path-intent resolution, stale-path scans, and referenced file existence.
+- Repository integration: AGENTS and Skill entry paths, path-intent resolution, stale-path scans, and referenced file existence.
 - Command contracts: syntax, `--help`, wrapper argument ownership, and project-local build/evidence roots.
-- Audit protocol inputs: the existing prompt-local protocol contract and fixtures.
+- Audit Skill inputs: active stage references, handoff paths, artifact paths and command interfaces.
 - Delivery hygiene: `git diff --check` and review of the final changed-file set.
 
 Report Process/Tooling as `passed`, `failed`, `blocked`, or `not run`, with the command or concrete reason. A runtime layer marked `not relevant` does not reduce the required Process/Tooling checks.

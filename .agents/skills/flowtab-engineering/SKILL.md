@@ -22,13 +22,13 @@ Apply FlowTab's project-specific engineering contract to repository changes and 
    Establish a reproducible signal and a supported root-cause theory before production edits. Use the modification and completion gates in `references/bugfix-workflow.md`; a blocked higher layer can leave closure blocked without invalidating an otherwise evidence-supported, scoped production edit.
 
 5. Add the smallest risk-required representative test set autonomously.
-   Fan out the seed scenario, then add the unit, behavior, UI, and pressure evidence required by `references/risk-calibration.md`. Apply the scenario authorization boundary from `references/test-layer-boundaries.md`; prompt-driven audit campaigns retain their protocol approval gates.
+   Fan out the seed scenario, then add the unit, behavior, UI, and pressure evidence required by `references/risk-calibration.md`. Add new test files and new test declarations without clarification. Route necessary changes to existing test semantics through the project guard and the active workflow's clarification boundary.
 
 6. Give every validation layer unique evidence.
    Use unit coverage for deterministic rules, behavior coverage for in-process orchestration, UI coverage for the visible user path or real topology, and pressure validation for sustained-load and scale risk. Required layers must pass before completion; report blocked and unproven layers explicitly.
 
-7. Separate stable coverage contracts from audit machine facts.
-   Use `docs/TEST_COVERAGE_MATRIX.md` for stable product scenarios, Oracles, requiredness, layer responsibility, and risk. Enter the Registry path only when interpreting or publishing registry-owned facts such as projection rows, typed refs, reducer versions, checkpoints, or C1/C2 deltas. Let the audit coordinator resolve `docs/test-audit/PROTOCOL_REGISTRY.json` and consume its typed result instead of loading the full Registry into ordinary engineering context.
+7. Separate stable coverage contracts from current audit evidence.
+   Use `docs/TEST_COVERAGE_MATRIX.md` for stable product scenarios, Oracles, requiredness, layer responsibility, and risk. For active C0/C1/C2 work, return validation evidence, blockers and semantic deltas to the selected `$flowtab-test-audit` stage and its owned artifacts.
 
 8. Use canonical validation paths.
    Follow `references/validation-command-cookbook.md`, the FlowTabTests wrapper contract, UI prerequisites, and pressure workflow. Keep build roots and evidence under the repository-local ignored tree.
@@ -65,7 +65,7 @@ Apply FlowTab's project-specific engineering contract to repository changes and 
 4. Select the smallest required test set and identify optional or intentionally deferred variants.
 5. Implement within the owning module without one-off production behavior.
 6. Run the canonical commands for each required runtime layer and any required pressure path.
-7. When stable contract fields change, update `docs/TEST_COVERAGE_MATRIX.md`. When the task enters an audit publication transaction, use the coordinator and Registry-owned typed results for projection or C1/C2 publication.
+7. When stable contract fields change, update `docs/TEST_COVERAGE_MATRIX.md`. During an active audit campaign, publish current evidence and deltas through the selected `$flowtab-test-audit` stage.
 8. When closing or transferring the engineering task, read `references/handoff-contract.md` and report runtime validation separately from process/tooling validation.
 
 ## Bundled Resources

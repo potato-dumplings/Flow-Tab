@@ -26,7 +26,7 @@ Use this workflow for regressions, flaky behavior, broken edge cases, and user-r
 - Use tests and logs to narrow the root cause instead of guessing.
 - Keep each regression layer focused on different evidence instead of cloning the same assertion everywhere.
 - For every new regression test, name the oracle that defines the expected result. The oracle must come from the product contract, official API result, stable fixture state, explicit input, or independent specification; legacy fields, stale caches, and known faulty implementation paths may be contamination only.
-- Read `test-coverage-matrix-workflow.md` when the bugfix changes a stable contract field or current evidence status. Keep ordinary diagnosis and implementation context independent from the raw Registry until the applicable audit publication transaction.
+- Read `test-coverage-matrix-workflow.md` when the bugfix changes a stable contract field or current evidence status. During an active audit campaign, return the resulting evidence and semantic delta to the selected audit stage.
 - Run pressure validation when the bug or the fix touches sustained-load, repeated-interaction, or scale-sensitive behavior.
 - Keep regression coverage after the fix.
 
@@ -52,7 +52,7 @@ Use this workflow for regressions, flaky behavior, broken edge cases, and user-r
 18. Evaluate the modification gate. Proceed only when the stable signal supports the root-cause theory, the intended change is scoped and reviewable, relevant existing tests were attempted, and the regression Oracle is independent.
 19. Change production code with the smallest fix that explains the evidence. A blocked higher layer can remain a completion blocker when it is not needed to establish the modification gate.
 20. Remove temporary debug-only logging or hooks from the final production path.
-21. Update the stable matrix contract when regression coverage adds or changes a scenario. When a stable contract or current evidence status changes, enter the applicable audit transaction and let its coordinator publish the C1/C2 delta or evidence projection from Registry-owned typed results.
+21. Update the stable matrix contract when regression coverage adds or changes a scenario. During an active audit campaign, publish the C1/C2 delta or evidence projection through the selected audit stage.
 22. Re-run the required unit, behavior, UI, and pressure validation. Apply the completion gate and keep the new regression coverage.
 
 ## Modification Gate

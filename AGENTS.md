@@ -3,7 +3,9 @@
 ## Local Skill
 
 - Use the project-local skill `flowtab-engineering` at `.agents/skills/flowtab-engineering/SKILL.md` for feature work, bug fixes, refactors, test-coverage decisions, logging-placement decisions, module-boundary decisions, implementation guidance, architecture proposals, change summaries, remediation, and handoff responses in this repository.
-- Read the relevant reference file from that skill before editing:
+- Use the project-local skill `flowtab-test-audit` at `.agents/skills/flowtab-test-audit/SKILL.md` together with `flowtab-engineering` for repository-wide test-asset baselines, dependency-slice audits, full closure and audit recovery.
+- For test-audit work, follow the stage routing in `.agents/skills/flowtab-test-audit/SKILL.md`, load only the selected stage reference and treat historical prompt archives as design inputs.
+- For `flowtab-engineering` work, read the relevant reference file before editing:
   - `references/feature-workflow.md`
   - `references/bugfix-workflow.md`
   - `references/module-boundaries.md`

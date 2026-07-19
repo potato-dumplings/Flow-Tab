@@ -171,7 +171,7 @@ After fan-out, produce a concise scenario plan before editing test files:
 - Optional: useful variants that are not included by default because they duplicate evidence, are expensive, or are lower risk.
 - Not adding: variants intentionally left out, with the reason they do not change the current risk judgment.
 
-Add the required set autonomously when the user has authorized implementation and validation. Request confirmation before adding optional variants, expensive fixtures, long-running UI/E2E or pressure scenarios, product semantics beyond the authorized request, or another material scope expansion. Prompt-driven audit campaigns continue to use their versioned scenario-plan and approval gates.
+Add the selected set autonomously when it remains inside the authorized product scope. New test files, new test methods in existing files and other additive test declarations do not require clarification. When evidence shows that an existing test function or existing file-scope test semantics must change, use the project-local test-semantic guard, state the exact conflict and ask the smallest product-semantics question needed to proceed. Treat a product-scope expansion as normal requirement clarification through the owning workflow.
 
 When a relevant variant is intentionally not automated or is blocked, record it as a gap in the stable product contract or audit projection through the owning workflow when it affects scenario status. A single happy path is enough only when the fan-out shows the remaining axes are genuinely not relevant to the changed behavior.
 

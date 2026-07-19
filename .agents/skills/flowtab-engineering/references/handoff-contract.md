@@ -21,7 +21,7 @@ Report runtime layers separately:
 
 Give a reason for `blocked`, `not relevant`, and `not run`. Add a separate Process/Tooling section for skill checks, path resolution, protocol contracts, wrapper interfaces, package validation, or other non-runtime proof.
 
-Audit artifacts must use the exact machine enum and typed result supplied by the active protocol Registry. Translate that result into the human-facing status above only in the final handoff.
+Audit handoffs use the status vocabulary, evidence fields and artifact paths defined by the active stage contract.
 
 ## Full Handoff
 
