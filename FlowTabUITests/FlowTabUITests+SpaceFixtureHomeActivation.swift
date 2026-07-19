@@ -72,4 +72,45 @@ extension FlowTabUITests {
 
         return CGWindowID(windowNumber)
     }
+
+    func selectHomeWorkflowApp(
+        _ workflowApp: SpaceFixtureResolvedWorkflow.App,
+        in app: XCUIApplication,
+        timeout: TimeInterval
+    ) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        let rowIdentifier = workflowApp.identity.homeAppAccessibilityIdentifier
+        let expectedTitle = workflowApp.expectedHomeWindowTitles.first
+
+        repeat {
+            if let expectedTitle,
+               waitForHomeWindowTitle(expectedTitle, in: app, timeout: 0.1) {
+                return true
+            }
+
+            let remainingTime = deadline.timeIntervalSinceNow
+            guard remainingTime > 0 else { break }
+            let homeRow = app.buttons.matching(identifier: rowIdentifier).firstMatch
+            let appList = app.scrollViews.matching(identifier: Identifier.homeAppList).firstMatch
+            guard tapElementAfterScrollingIntoView(
+                homeRow,
+                in: appList,
+                fallbackScrollContainers: app.scrollViews.allElementsBoundByIndex,
+                timeout: min(2, remainingTime)
+            ) else {
+                continue
+            }
+
+            guard let expectedTitle else { return true }
+            if waitForHomeWindowTitle(
+                expectedTitle,
+                in: app,
+                timeout: min(1.5, max(0.1, deadline.timeIntervalSinceNow))
+            ) {
+                return true
+            }
+        } while Date() < deadline
+
+        return false
+    }
 }

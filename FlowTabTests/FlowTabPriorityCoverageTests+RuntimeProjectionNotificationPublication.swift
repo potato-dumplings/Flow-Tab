@@ -16,7 +16,46 @@ private final class ProjectionPublicationAppDirectoryProvider: RuntimeAppDirecto
     }
 }
 
+private func makeProjectionPublicationWindowRecord(
+    pid: pid_t,
+    cgWindowID: CGWindowID,
+    axWindowID: String,
+    title: String
+) -> RuntimeWindowRecord {
+    var record = RuntimeWindowRecord(
+        cgWindowID: cgWindowID,
+        stableWindowID: RuntimeWindowListEntry.cgStableWindowID(
+            pid: pid,
+            cgWindowID: cgWindowID
+        ),
+        firstSeenAt: 10
+    )
+    record.currentAXAttachment = RuntimeCurrentAXAttachment(
+        axWindowID: axWindowID,
+        axWindow: AXUIElementCreateApplication(pid),
+        title: title,
+        frame: CGRect(x: 40, y: 50, width: 900, height: 700),
+        state: RuntimeAXWindowState(isMinimized: false, isFocused: true, isMain: true)
+    )
+    record.lastKnownCGTitle = title
+    record.lastKnownCGFrame = CGRect(x: 40, y: 50, width: 900, height: 700)
+    record.lastConfirmationSource = .verifiedFocusReadback
+    record.lastExactConfirmedAt = 12
+    return record
+}
+
 extension FlowTabTests {
+    func testFlowTabTestLaunchOptionsParsesFrontmostBundleIdentifierOverride() {
+        withLaunchArgumentsForTesting(
+            ["FlowTab", "--flowtab-ui-frontmost-bundle-id", "com.example.fixture.chrome"]
+        ) {
+            XCTAssertEqual(
+                FlowTabTestLaunchOptions.frontmostBundleIdentifierOverride,
+                "com.example.fixture.chrome"
+            )
+        }
+    }
+
     @MainActor
     func testUITestBootstrapperPublishesMockRuntimeProjectionBeforeReturning() {
         let previousHooks = AppDelegate.testHooks
@@ -103,6 +142,216 @@ extension FlowTabTests {
 }
 
 extension FlowTabPriorityCoverageTests {
+    func testUITestFrontmostProjectionOverrideRoutesFocusedReadsAndRefreshesToTarget() throws {
+        let runningApp = NSRunningApplication.current
+        let appID = "com.example.fixture.chrome"
+        let baseService = makeCurrentAppWindowProjectionService(
+            appID: appID,
+            runningApp: runningApp,
+            windows: [
+                WindowCandidate(
+                    id: "fixture-window",
+                    title: "Fixture Window",
+                    isMinimized: false,
+                    lastActiveAt: 10
+                )
+            ]
+        )
+        let target = RuntimeUITestFrontmostAppTarget(
+            appID: appID,
+            pid: runningApp.processIdentifier,
+            bundleIdentifier: "com.example.fixture.chrome"
+        )
+        let service = RuntimeUITestFrontmostProjectionService(
+            baseService: baseService,
+            targetProvider: { target }
+        )
+
+        let focusedRead = try XCTUnwrap(service.readFocusedCurrentAppWindowProjection())
+        XCTAssertEqual(focusedRead.appID, appID)
+        XCTAssertEqual(focusedRead.pid, runningApp.processIdentifier)
+        XCTAssertEqual(
+            focusedRead.projection?.currentAppWindowPayload.candidate.windows.map { $0.id },
+            ["fixture-window"]
+        )
+
+        service.signalFocusedCurrentAppWindowsChanged()
+        let selectedSignals = baseService.selectedCurrentAppWindowChangeSignalsRecorded()
+        XCTAssertEqual(selectedSignals.count, 1)
+        XCTAssertEqual(selectedSignals.first?.appID, appID)
+        XCTAssertEqual(selectedSignals.first?.pid, runningApp.processIdentifier)
+    }
+
+    func testRuntimeProjectionServiceRepublishesAppSwitcherAfterScopedWindowRepair() throws {
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let pid = runningApp.processIdentifier
+        let appDirectoryEntry = RuntimeAppDirectoryEntry(app: runningApp)
+        let readModelStore = RuntimeReadModelStore()
+        readModelStore.seedAppSwitcherProjectionForTesting(
+            apps: [
+                AppSwitchCandidate(
+                    id: appID,
+                    displayName: runningApp.localizedName ?? appID,
+                    groupID: RuntimeAppIdentity.groupID(
+                        for: runningApp.bundleIdentifier,
+                        fallbackName: runningApp.localizedName ?? appID
+                    ),
+                    lastActiveAt: 10,
+                    windows: []
+                )
+            ],
+            contextsByID: [:],
+            appDirectoryEntries: [appDirectoryEntry],
+            generatedAt: 10
+        )
+        let cgWindowID = CGWindowID(240_911)
+        let axWindowID = "ax:\(pid):scoped-publication"
+        let windowRecordStore = RuntimeWindowRecordStore()
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.ScopedWindowPublication",
+            repairProvider: RuntimeProjectionRepairProvider(
+                windowRecordStore: windowRecordStore,
+                reconciliationCoordinator: RuntimeReconciliationCoordinator()
+            ),
+            mainTableProjectionBuilder: RuntimeMainTableProjectionBuilder(
+                windowRecordStore: windowRecordStore
+            ),
+            readModelStore: readModelStore,
+            reconciliationExecutor: { _, _ in
+                let record = makeProjectionPublicationWindowRecord(
+                    pid: pid,
+                    cgWindowID: cgWindowID,
+                    axWindowID: axWindowID,
+                    title: "Published After Repair"
+                )
+                windowRecordStore.setState(
+                    RuntimeWindowMappingState(
+                        windowRecordsByCGWindowID: [cgWindowID: record],
+                        currentAXToCG: [axWindowID: cgWindowID],
+                        validCGWindowIDs: [cgWindowID],
+                        lastAXWindowIDs: [axWindowID],
+                        hasObservedAXWindowHandle: true
+                    ),
+                    for: pid
+                )
+                return .completedWithCurrentAppRepairEvidence([
+                    RuntimeCurrentAppRepairEvidence(
+                        appID: appID,
+                        pid: pid,
+                        appDirectoryEntries: [appDirectoryEntry],
+                        currentAppWindowPayloadWasEmpty: false,
+                        authoritativeCGWindowIDs: [cgWindowID]
+                    )
+                ])
+            }
+        )
+
+        service.signalAppWindowsChanged(appID: appID, pid: pid)
+        service.waitForMaintenanceQueueForTesting()
+
+        let expectedWindowID = RuntimeWindowListEntry.cgStableWindowID(
+            pid: pid,
+            cgWindowID: cgWindowID
+        )
+        XCTAssertEqual(
+            readModelStore.readAppSwitcherProjection()?
+                .apps.first(where: { $0.id == appID })?.windows.map(\.id),
+            [expectedWindowID]
+        )
+        XCTAssertEqual(
+            readModelStore.readHomeAppDetailProjection(appID: appID)?.candidate.windows.map(\.id),
+            [expectedWindowID]
+        )
+    }
+
+    func testRuntimeProjectionServiceRepublishesWindowRemovalAfterScopedRepair() throws {
+        let runningApp = NSRunningApplication.current
+        let appID = RuntimeAppIdentity.appID(for: runningApp)
+        let pid = runningApp.processIdentifier
+        let appDirectoryEntry = RuntimeAppDirectoryEntry(app: runningApp)
+        let cgWindowID = CGWindowID(240_912)
+        let axWindowID = "ax:\(pid):scoped-removal"
+        let windowID = RuntimeWindowListEntry.cgStableWindowID(pid: pid, cgWindowID: cgWindowID)
+        let candidate = AppSwitchCandidate(
+            id: appID,
+            displayName: runningApp.localizedName ?? appID,
+            groupID: RuntimeAppIdentity.groupID(
+                for: runningApp.bundleIdentifier,
+                fallbackName: runningApp.localizedName ?? appID
+            ),
+            lastActiveAt: 10,
+            windows: [
+                WindowCandidate(
+                    id: windowID,
+                    title: "Removed After Repair",
+                    isMinimized: false,
+                    lastActiveAt: 10
+                )
+            ]
+        )
+        let readModelStore = RuntimeReadModelStore()
+        readModelStore.seedAppSwitcherProjectionForTesting(
+            apps: [candidate],
+            contextsByID: [:],
+            appDirectoryEntries: [appDirectoryEntry],
+            generatedAt: 10
+        )
+        let record = makeProjectionPublicationWindowRecord(
+            pid: pid,
+            cgWindowID: cgWindowID,
+            axWindowID: axWindowID,
+            title: "Removed After Repair"
+        )
+        let windowRecordStore = RuntimeWindowRecordStore(
+            mappingStatesByPID: [
+                pid: RuntimeWindowMappingState(
+                    windowRecordsByCGWindowID: [cgWindowID: record],
+                    currentAXToCG: [axWindowID: cgWindowID],
+                    validCGWindowIDs: [cgWindowID],
+                    lastAXWindowIDs: [axWindowID],
+                    hasObservedAXWindowHandle: true
+                )
+            ]
+        )
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.ScopedWindowRemoval",
+            repairProvider: RuntimeProjectionRepairProvider(
+                windowRecordStore: windowRecordStore,
+                reconciliationCoordinator: RuntimeReconciliationCoordinator()
+            ),
+            mainTableProjectionBuilder: RuntimeMainTableProjectionBuilder(
+                windowRecordStore: windowRecordStore
+            ),
+            readModelStore: readModelStore,
+            reconciliationExecutor: { _, _ in
+                windowRecordStore.setState(RuntimeWindowMappingState(), for: pid)
+                return .completedWithCurrentAppRepairEvidence([
+                    RuntimeCurrentAppRepairEvidence(
+                        appID: appID,
+                        pid: pid,
+                        appDirectoryEntries: [appDirectoryEntry],
+                        currentAppWindowPayloadWasEmpty: true,
+                        authoritativeCGWindowIDs: []
+                    )
+                ])
+            }
+        )
+
+        service.signalAXWindowDestroyed(appID: appID, pid: pid, axWindowID: axWindowID)
+        service.waitForMaintenanceQueueForTesting()
+
+        XCTAssertEqual(
+            readModelStore.readAppSwitcherProjection()?
+                .apps.first(where: { $0.id == appID })?.windows,
+            []
+        )
+        XCTAssertEqual(
+            readModelStore.readHomeAppDetailProjection(appID: appID)?.candidate.windows,
+            []
+        )
+    }
+
     @MainActor
     func testPendingSearchActivationPreventsWindowAutoEnterUntilIndexPublishes() async {
         await withTemporarySearchPreferences(enabled: true, defaultScope: .window) {
@@ -128,6 +377,96 @@ extension FlowTabPriorityCoverageTests {
             XCTAssertEqual(model.searchScope, .window)
             XCTAssertFalse(model.pendingSearchActivationAfterFreshnessBarrier)
         }
+    }
+
+    @MainActor
+    func testSwitcherPanelControllerPresentsDeferredSearchAfterIndexPublishes() async {
+        await withTemporarySearchPreferences(enabled: true, defaultScope: .window) {
+            let apps = searchScenarioApps()
+            let service = RecordingRuntimeProjectionService(
+                appSwitcherApps: apps,
+                committedSearchApps: apps,
+                committedSearchReadiness: .missingCommittedIndex
+            )
+            let controller = SwitcherPanelController(
+                model: LiveSwitcherModel(runtimeProjectionService: service)
+            )
+
+            XCTAssertTrue(controller.presentSearchHotkeySessionForTesting())
+            XCTAssertFalse(controller.modelForTesting.isSearchActive)
+            XCTAssertFalse(controller.isPanelPresented)
+
+            service.installCommittedSearchIndex(for: apps, generatedAt: 20)
+
+            XCTAssertTrue(controller.handleCommittedSearchIndexDidUpdateForTesting())
+            XCTAssertTrue(controller.modelForTesting.isSearchActive)
+            XCTAssertTrue(controller.isPanelPresented)
+            XCTAssertTrue(controller.modelForTesting.isSearchInputFocused)
+            controller.cancelSelectionForTesting()
+        }
+    }
+
+    @MainActor
+    func testLiveSwitcherModelSkipsLayoutPublicationForUnchangedEmptySelectedProjection() {
+        let runningApp = NSRunningApplication.current
+        let appID = "com.example.unchanged-empty-selected-projection"
+        let candidate = AppSwitchCandidate(
+            id: appID,
+            displayName: "Empty Projection",
+            groupID: "empty-projection",
+            lastActiveAt: 10,
+            windows: []
+        )
+        let context = RuntimeAppContext(
+            appID: appID,
+            runningApp: runningApp,
+            windowsByID: [:]
+        )
+        let freshness = RuntimeProjectionFreshness(
+            generatedAt: 10,
+            sourceGeneration: RuntimeReadModelGeneration(projection: 1),
+            dirtyAppIDs: [],
+            dirtyPIDs: [],
+            dirtyCGWindowIDs: [],
+            pendingRepairScopes: [],
+            isCompleteForScope: true
+        )
+        let service = RecordingRuntimeProjectionService(
+            appSwitcherProjection: RuntimeAppSwitcherProjection(
+                apps: [candidate],
+                contextsByID: [appID: context],
+                freshness: freshness
+            ),
+            currentAppWindowProjectionsByAppID: [
+                appID: RuntimeCurrentAppWindowProjection(
+                    appID: appID,
+                    currentAppWindowPayload: RuntimeCurrentAppWindowPayload(
+                        summary: RuntimeHomeAppSummary(
+                            appID: appID,
+                            displayName: candidate.displayName,
+                            groupID: candidate.groupID,
+                            lastActiveAt: candidate.lastActiveAt,
+                            windowCount: 0,
+                            pid: runningApp.processIdentifier
+                        ),
+                        candidate: candidate,
+                        context: context,
+                        appDirectoryEntries: [RuntimeAppDirectoryEntry(app: runningApp)]
+                    ),
+                    freshness: freshness
+                )
+            ]
+        )
+        let model = LiveSwitcherModel(runtimeProjectionService: service)
+        var layoutPublicationCount = 0
+        model.onSessionLayoutChanged = {
+            layoutPublicationCount += 1
+        }
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        XCTAssertTrue(model.scheduleSelectedAppWindowProjectionIfNeeded(for: appID))
+        XCTAssertEqual(model.session?.selectedApp.windows, [])
+        XCTAssertEqual(layoutPublicationCount, 0)
     }
 
     func testRuntimeProjectionServicePublishesPendingSearchIndexAfterNestedWindowRepairsComplete() throws {

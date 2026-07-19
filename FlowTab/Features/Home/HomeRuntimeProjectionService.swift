@@ -121,6 +121,14 @@ enum HomeRuntimeRefreshReader {
         currentSummary: RuntimeHomeAppSummary?
     ) -> RuntimeHomeAppDetailProjection? {
         if let projection = HomeRuntimeProjectionReader.appDetailProjection(for: appID, from: service) {
+            if projection.candidate.windows.isEmpty,
+               !projection.freshness.isCompleteForScope {
+                signalMissingProjection(
+                    appID: appID,
+                    summary: projection.summary,
+                    service: service
+                )
+            }
             return projection
         }
         signalMissingProjection(

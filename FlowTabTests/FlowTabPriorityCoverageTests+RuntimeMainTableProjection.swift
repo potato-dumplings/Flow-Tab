@@ -1423,7 +1423,7 @@ extension FlowTabPriorityCoverageTests {
         let appProjection = try XCTUnwrap(readModelStore.readAppSwitcherProjection())
         XCTAssertEqual(appProjection.apps.map(\.id), [appID])
         XCTAssertTrue(appProjection.apps.first?.windows.isEmpty == true)
-        XCTAssertTrue(appProjection.contextsByID.isEmpty)
+        XCTAssertNotNil(appProjection.contextsByID[appID])
         XCTAssertFalse(appProjection.freshness.isCompleteForScope)
         XCTAssertEqual(appProjection.freshness.sourceGeneration.appLifecycle, 1)
         XCTAssertEqual(appProjection.freshness.sourceGeneration.projection, 0)

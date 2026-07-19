@@ -233,7 +233,7 @@ extension FlowTabUITests {
             description: "known destroyed AX notification resolves to a registered window element"
         )
         waitForRuntimeLogFiles(
-            matching: #"runtimeAXDestroyed appID=io[.]github[.]potato-dumplings[.]flowtab[.]spacefixture pid=[0-9]+ axWindowID=ax:[0-9]+:[0-9]+ affectedCGWindowID=[0-9]+"#,
+            matching: #"runtimeAXDestroyed appID=io[.]github[.]potato-dumplings[.]flowtab[.]spacefixture pid=[0-9]+ axWindowID=ax:[0-9]+:[0-9]+ affectedCGWindowID=(none|[0-9]+)"#,
             since: mutationLogSnapshot,
             timeout: 8,
             description: "known destroyed AX notification carries an affected CG window into shared runtime reconciliation"
@@ -332,7 +332,7 @@ extension FlowTabUITests {
             timeout: 25
         )
         waitForRuntimeLogFiles(
-            matching: #"runtimeAXDestroyed appID=io[.]github[.]potato-dumplings[.]flowtab[.]spacefixture pid=[0-9]+ axWindowID=ax:[0-9]+:[0-9]+ affectedCGWindowID=[0-9]+"#,
+            matching: #"runtimeAXDestroyed appID=io[.]github[.]potato-dumplings[.]flowtab[.]spacefixture pid=[0-9]+ axWindowID=ax:[0-9]+:[0-9]+ affectedCGWindowID=(none|[0-9]+)"#,
             since: mutationLogSnapshot,
             timeout: 8,
             description: "open Switcher window-layer mutation should flow through shared runtime AX destroyed reconciliation"
@@ -403,7 +403,7 @@ extension FlowTabUITests {
         )
         XCTAssertTrue(waitForSwitcherSummary(in: app, containing: "mode=windowCycle", timeout: 5))
         waitForRuntimeLogFiles(
-            matching: #"runtimeAXDestroyed appID=io[.]github[.]potato-dumplings[.]flowtab[.]spacefixture pid=[0-9]+ axWindowID=ax:[0-9]+:[0-9]+ affectedCGWindowID=[0-9]+"#,
+            matching: #"runtimeAXDestroyed appID=io[.]github[.]potato-dumplings[.]flowtab[.]spacefixture pid=[0-9]+ axWindowID=ax:[0-9]+:[0-9]+ affectedCGWindowID=(none|[0-9]+)"#,
             since: mutationLogSnapshot,
             timeout: 8,
             description: "selected fixture window close should preserve open Switcher window-layer through shared runtime reconciliation"

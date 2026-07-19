@@ -156,7 +156,10 @@ struct RuntimeProjectionRepairFactSource {
                         appID: payload.summary.appID,
                         pid: payload.summary.pid,
                         appDirectoryEntries: payload.appDirectoryEntries,
-                        currentAppWindowPayloadWasEmpty: payload.candidate.windows.isEmpty
+                        currentAppWindowPayloadWasEmpty: payload.candidate.windows.isEmpty,
+                        authoritativeCGWindowIDs: Set(
+                            payload.context.windowsByID.values.compactMap(\.cgWindowID)
+                        )
                     )
                 )
             },

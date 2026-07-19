@@ -47,6 +47,7 @@ enum FlowTabUITestBootstrapper {
         }
 
         installMockRuntimeProjectionServiceIfNeeded()
+        installFrontmostRuntimeProjectionOverrideIfNeeded()
 
         if FlowTabTestLaunchOptions.resetsUserDefaultsOnLaunch {
             AppPreferenceKeys.allKeys.forEach { userDefaults.removeObject(forKey: $0) }
@@ -90,6 +91,44 @@ enum FlowTabUITestBootstrapper {
 
     static var resolvedRuntimeProjectionService: any RuntimeProjectionServing {
         AppDelegate.testHooks.runtimeProjectionService ?? sharedRuntimeProjectionService
+    }
+
+    static func synchronizeFrontmostAppOverrideIfNeeded() {
+        guard let bundleIdentifier = FlowTabTestLaunchOptions.frontmostBundleIdentifierOverride else {
+            return
+        }
+        guard let target = RuntimeUITestFrontmostAppTarget.resolve(bundleIdentifier: bundleIdentifier) else {
+            RuntimeLog.info(
+                "UITest",
+                "frontmost bundle override result=missing bundleID=\(bundleIdentifier)"
+            )
+            return
+        }
+
+        SystemAppMRUTracker.shared.recordActivation(of: target.pid)
+        let service = resolvedRuntimeProjectionService
+        service.requestAppSwitcherProjectionMaintenance(reason: .appLifecycleRefresh)
+        if let overrideService = service as? RuntimeUITestFrontmostProjectionService {
+            overrideService.waitForMaintenanceQueueForTesting()
+        } else {
+            (service as? RuntimeProjectionService)?.waitForMaintenanceQueueForTesting()
+        }
+        RuntimeLog.info(
+            "UITest",
+            "frontmost bundle override result=applied bundleID=\(bundleIdentifier) pid=\(target.pid)"
+        )
+    }
+
+    private static func installFrontmostRuntimeProjectionOverrideIfNeeded() {
+        guard !FlowTabTestLaunchOptions.usesMockRuntimeProjection else { return }
+        guard let bundleIdentifier = FlowTabTestLaunchOptions.frontmostBundleIdentifierOverride else {
+            return
+        }
+        guard AppDelegate.testHooks.runtimeProjectionService == nil else { return }
+        AppDelegate.testHooks.runtimeProjectionService = RuntimeUITestFrontmostProjectionService(
+            baseService: sharedRuntimeProjectionService,
+            bundleIdentifier: bundleIdentifier
+        )
     }
 
     private static func installMockRuntimeProjectionServiceIfNeeded() {
@@ -503,6 +542,7 @@ private final class SwitcherTriggerNotificationObserver: NSObject {
         case .global:
             return panelController.presentGlobalHotkeySessionForTesting()
         case .inApp:
+            FlowTabUITestBootstrapper.synchronizeFrontmostAppOverrideIfNeeded()
             return panelController.presentInAppWindowHotkeySessionForTesting()
         case .search:
             return panelController.presentSearchHotkeySessionForTesting()

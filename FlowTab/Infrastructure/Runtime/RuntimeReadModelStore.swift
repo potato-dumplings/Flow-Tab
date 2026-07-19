@@ -110,12 +110,16 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     func commitCurrentAppWindowProjection(
         _ payload: RuntimeCurrentAppWindowPayload,
         clearsDirtyState: Bool = false,
+        authoritativeCGWindowIDs: Set<CGWindowID>? = nil,
         generatedAt: TimeInterval = Date.timeIntervalSinceReferenceDate
     ) {
         lock.lock()
         defer { lock.unlock() }
 
-        let preservedPayload = currentAppWindowPayloadByPreservingPriorCommittedWindowsLocked(payload)
+        let preservedPayload = currentAppWindowPayloadByPreservingPriorCommittedWindowsLocked(
+            payload,
+            authoritativeCGWindowIDs: authoritativeCGWindowIDs
+        )
         let normalizedPayload = currentAppWindowPayloadByNormalizingPresentationLocked(preservedPayload)
         let committedPayload = currentAppWindowPayloadByApplyingActivationReadbackLocked(normalizedPayload)
         markProjectionCommittedLocked()
@@ -821,7 +825,8 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     }
 
     private func currentAppWindowPayloadByPreservingPriorCommittedWindowsLocked(
-        _ payload: RuntimeCurrentAppWindowPayload
+        _ payload: RuntimeCurrentAppWindowPayload,
+        authoritativeCGWindowIDs: Set<CGWindowID>?
     ) -> RuntimeCurrentAppWindowPayload {
         let priorSources = currentAppWindowPreservationSourcesLocked(for: payload)
         guard !priorSources.isEmpty else { return payload }
@@ -849,6 +854,10 @@ final class RuntimeReadModelStore: @unchecked Sendable {
                     continue
                 }
                 if let cgWindowID = priorContext.cgWindowID {
+                    if let authoritativeCGWindowIDs,
+                       !authoritativeCGWindowIDs.contains(cgWindowID) {
+                        continue
+                    }
                     guard !projectedCGWindowIDs.contains(cgWindowID),
                           !dirtyCGWindowIDs.contains(cgWindowID)
                     else {

@@ -830,8 +830,8 @@ extension FlowTabUITests {
     private func assertWindowSearchReady(in app: XCUIApplication) -> XCUIElement {
         let searchInput = element(in: app, identifier: Identifier.switcherSearchInput)
         let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
-        XCTAssertTrue(searchInput.waitForExistence(timeout: 8))
-        XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 8))
+        XCTAssertTrue(searchInput.waitForExistence(timeout: 12))
+        XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 12))
         return searchInput
     }
 

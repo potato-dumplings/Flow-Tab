@@ -5,6 +5,11 @@ import FlowTabCore
 let sharedRuntimeProjectionService = RuntimeProjectionService()
 
 final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Sendable {
+    private enum CompletedCGWindowCleanupPolicy {
+        case all
+        case preservingActivationFreshness
+    }
+
     private let maintenanceQueue: DispatchQueue
     private let maintenanceQueueSpecificKey = DispatchSpecificKey<Void>()
     private let repairProvider: RuntimeProjectionRepairProviding
@@ -111,13 +116,10 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 drainResult.currentAppRepairEvidence,
                 generatedAt: now
             )
-            if !drainResult.completedAffectedCGWindowIDs.isEmpty {
-                mainTableProjectionCommitted = commitMainTableAppSwitcherProjectionLocked(
-                    generatedAt: now,
-                    requiresExistingProjectionCoverage: true,
-                    clearsDirtyCGWindowIDs: drainResult.completedAffectedCGWindowIDs
-                ) || mainTableProjectionCommitted
-            }
+            mainTableProjectionCommitted = commitAppSwitcherAfterScopedRepairIfNeededLocked(
+                drainResult,
+                generatedAt: now
+            ) || mainTableProjectionCommitted
             let pendingSearchIndexCommit = commitPendingSearchIndexFreshnessBarrierIfNeededLocked(
                 generatedAt: now
             )
@@ -246,14 +248,10 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 generatedAt: now,
                 requiresExistingProjectionCoverage: true
             )
-            let drainResult = drainReadyReconciliationRequestResultLocked(now: now)
-            if !drainResult.completedAffectedCGWindowIDs.isEmpty {
-                commitMainTableAppSwitcherProjectionLocked(
-                    generatedAt: now,
-                    requiresExistingProjectionCoverage: true,
-                    clearsDirtyCGWindowIDs: drainResult.completedAffectedCGWindowIDs
-                )
-            }
+            drainReadyReconciliationRequestResultLocked(
+                now: now,
+                completedCGWindowCleanupPolicy: .all
+            )
         }
     }
 
@@ -499,13 +497,10 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 followUpResult.currentAppRepairEvidence,
                 generatedAt: followUpNow
             )
-            if !followUpResult.completedAffectedCGWindowIDs.isEmpty {
-                commitMainTableAppSwitcherProjectionLocked(
-                    generatedAt: followUpNow,
-                    requiresExistingProjectionCoverage: true,
-                    clearsDirtyCGWindowIDs: followUpResult.completedAffectedCGWindowIDs
-                )
-            }
+            commitAppSwitcherAfterScopedRepairIfNeededLocked(
+                followUpResult,
+                generatedAt: followUpNow
+            )
             result.append(followUpResult)
             commitGeneratedAt = followUpNow
         }
@@ -515,7 +510,9 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
 
     @discardableResult
     private func drainReadyReconciliationRequestResultLocked(
-        now: TimeInterval
+        now: TimeInterval,
+        completedCGWindowCleanupPolicy: CompletedCGWindowCleanupPolicy =
+            .preservingActivationFreshness
     ) -> RuntimeProjectionReconciliationDrainResult {
         let result = reconciliationDrainer.drainReadyRequests(now: now)
         commitFullRepairEvidenceLocked(
@@ -526,7 +523,49 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             result.currentAppRepairEvidence,
             generatedAt: now
         )
+        commitAppSwitcherAfterScopedRepairIfNeededLocked(
+            result,
+            completedCGWindowCleanupPolicy: completedCGWindowCleanupPolicy,
+            generatedAt: now
+        )
         return result
+    }
+
+    @discardableResult
+    private func commitAppSwitcherAfterScopedRepairIfNeededLocked(
+        _ result: RuntimeProjectionReconciliationDrainResult,
+        completedCGWindowCleanupPolicy: CompletedCGWindowCleanupPolicy = .all,
+        generatedAt: TimeInterval
+    ) -> Bool {
+        guard !result.currentAppRepairEvidence.isEmpty
+            || !result.completedAffectedCGWindowIDs.isEmpty
+        else {
+            return false
+        }
+        let clearedCGWindowIDs: Set<CGWindowID>
+        switch completedCGWindowCleanupPolicy {
+        case .all:
+            clearedCGWindowIDs = result.completedAffectedCGWindowIDs
+        case .preservingActivationFreshness:
+            // Activation readback evidence stays stale until an explicit maintenance barrier.
+            let activationCGWindowIDs = result.startedRequests.reduce(into: Set<CGWindowID>()) {
+                protectedIDs, request in
+                guard request.reasons.contains(.activationVerified)
+                    || request.reasons.contains(.activationReadbackMismatch)
+                else {
+                    return
+                }
+                protectedIDs.formUnion(request.affectedCGWindowIDs)
+            }
+            clearedCGWindowIDs = result.completedAffectedCGWindowIDs.subtracting(
+                activationCGWindowIDs
+            )
+        }
+        return commitMainTableAppSwitcherProjectionLocked(
+            generatedAt: generatedAt,
+            requiresExistingProjectionCoverage: true,
+            clearsDirtyCGWindowIDs: clearedCGWindowIDs
+        )
     }
 
     @discardableResult
@@ -680,6 +719,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 appID: evidence.appID,
                 pid: evidence.pid,
                 clearsDirtyState: true,
+                authoritativeCGWindowIDs: evidence.authoritativeCGWindowIDs,
                 generatedAt: generatedAt
             )
         }
@@ -690,6 +730,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         appID: String,
         pid: pid_t,
         clearsDirtyState: Bool,
+        authoritativeCGWindowIDs: Set<CGWindowID>? = nil,
         generatedAt: TimeInterval
     ) -> Bool {
         let appDirectoryEntries = readModelStore
@@ -706,6 +747,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         readModelStore.commitCurrentAppWindowProjection(
             mainTablePayload,
             clearsDirtyState: clearsDirtyState,
+            authoritativeCGWindowIDs: authoritativeCGWindowIDs,
             generatedAt: generatedAt
         )
         NotificationCenter.default.post(

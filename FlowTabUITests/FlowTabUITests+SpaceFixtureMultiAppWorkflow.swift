@@ -961,18 +961,17 @@ extension FlowTabUITests {
             if !rowExists, workflowApp.isFullscreenOnlyInHome {
                 continue
             }
-            XCTAssertTrue(rowExists, "FlowTab did not surface \(workflowApp.appName) on the home page")
-            let appList = app.scrollViews.matching(identifier: Identifier.homeAppList).firstMatch
-            XCTAssertTrue(
-                tapElementAfterScrollingIntoView(
-                    homeRow,
-                    in: appList,
-                    fallbackScrollContainers: app.scrollViews.allElementsBoundByIndex,
-                    timeout: 8
-                ),
-                "FlowTab surfaced \(workflowApp.appName) on the home page, but its row never became hittable"
-            )
-            assertValue(of: homeRow, equals: "\(workflowApp.windowCount)w", timeout: 20)
+            guard rowExists else {
+                XCTFail("FlowTab did not surface \(workflowApp.appName) on the home page")
+                return
+            }
+            guard selectHomeWorkflowApp(workflowApp, in: app, timeout: 8) else {
+                XCTFail(
+                    "FlowTab surfaced \(workflowApp.appName) on the home page, but its selection was not confirmed"
+                )
+                return
+            }
+            assertValue(of: homeRows.firstMatch, equals: "\(workflowApp.windowCount)w", timeout: 20)
 
             for title in workflowApp.expectedHomeWindowTitles {
                 assertHomeWindowTitle(

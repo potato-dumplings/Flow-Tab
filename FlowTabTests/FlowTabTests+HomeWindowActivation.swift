@@ -600,6 +600,32 @@ extension FlowTabTests {
         XCTAssertEqual(runtimeProjectionService.appWindowChangeSignalsRecorded().map(\.appID), [appID, appID])
     }
 
+    func testHomeRuntimeRefreshReaderRetriesIncompleteEmptyDetailProjection() {
+        let appID = "com.example.home-refresh-incomplete-empty"
+        let detailProjection = makeHomeActivationDetailProjection(
+            appID: appID,
+            windows: [],
+            isCompleteForScope: false
+        )
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
+            homeDetailProjectionsByAppID: [appID: detailProjection]
+        )
+
+        XCTAssertEqual(
+            HomeRuntimeRefreshReader.appDetailProjection(
+                for: appID,
+                from: runtimeProjectionService,
+                current: nil,
+                currentSummary: detailProjection.summary
+            )?.candidate.windows,
+            []
+        )
+        XCTAssertEqual(
+            runtimeProjectionService.appWindowChangeSignalsRecorded().map(\.appID),
+            [appID]
+        )
+    }
+
     func testHomeAppVisibilityPresentationKeepsHiddenAppsLast() {
         let summaries = [
             makeHomeAppSummary(appID: "com.example.mail", displayName: "Mail", rank: 0),
@@ -705,7 +731,8 @@ extension FlowTabTests {
 
     private func makeHomeActivationDetailProjection(
         appID: String,
-        windows: [WindowCandidate]
+        windows: [WindowCandidate],
+        isCompleteForScope: Bool = true
     ) -> RuntimeHomeAppDetailProjection {
         let runningApp = NSRunningApplication.current
         let candidate = AppSwitchCandidate(
@@ -748,7 +775,7 @@ extension FlowTabTests {
             dirtyPIDs: [],
             dirtyCGWindowIDs: [],
             pendingRepairScopes: [],
-            isCompleteForScope: true
+            isCompleteForScope: isCompleteForScope
         )
         return RuntimeHomeAppDetailProjection(
             summary: summary,

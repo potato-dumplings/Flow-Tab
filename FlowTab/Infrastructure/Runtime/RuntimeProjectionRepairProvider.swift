@@ -190,7 +190,8 @@ extension RuntimeProjectionRepairProvider {
             appID: appID,
             pid: selectionFacts.app.processIdentifier,
             appDirectoryEntries: appDirectoryEntries,
-            currentAppWindowPayloadWasEmpty: currentAppWindowPayloadWasEmpty
+            currentAppWindowPayloadWasEmpty: currentAppWindowPayloadWasEmpty,
+            authoritativeCGWindowIDs: Set(selectionFacts.windows.compactMap(\.cgWindowID))
         )
         let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
         RuntimeProjectionDiagnostics.logTiming(

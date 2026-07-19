@@ -289,6 +289,13 @@ extension SwitcherPanelController {
         let showStartMs = monotonicMilliseconds()
         guard model.startSearchSession(triggerDirection: direction) else {
             let failedMs = monotonicMilliseconds() - showStartMs
+            if model.pendingSearchActivationAfterFreshnessBarrier {
+                logInputTrace(
+                    "show kind=search result=deferred durationMs=\(formatMilliseconds(failedMs)) \(searchTraceStateSummary())"
+                )
+                RuntimeLog.info(.session, "start search deferred: awaiting committed search index")
+                return
+            }
             logInputTrace(
                 "show kind=search result=failed durationMs=\(formatMilliseconds(failedMs)) \(searchTraceStateSummary())"
             )
@@ -325,7 +332,7 @@ extension SwitcherPanelController {
         )
     }
 
-    private func presentStartedHotkeySession(
+    func presentStartedHotkeySession(
         kind: HotkeySessionKind,
         trigger: String,
         logKind: String,

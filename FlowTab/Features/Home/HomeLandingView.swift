@@ -691,7 +691,7 @@ struct HomeLandingView: View {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
         RuntimeLog.debug(
             .projection,
-            "homeRefreshSingleAppProjection begin appID=\(appID) updateWindows=\(updateWindows) reason=\(reason)"
+            "homeRefreshSingleApp begin appID=\(appID) updateWindows=\(updateWindows) reason=\(reason)"
         )
         if updateWindows {
             let detailProjection = await readHomeAppDetailProjection(appID: appID)

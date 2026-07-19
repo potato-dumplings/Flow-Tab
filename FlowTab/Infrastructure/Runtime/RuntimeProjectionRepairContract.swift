@@ -6,17 +6,20 @@ struct RuntimeCurrentAppRepairEvidence: Equatable, Sendable {
     let pid: pid_t
     let appDirectoryEntries: [RuntimeAppDirectoryEntry]
     let currentAppWindowPayloadWasEmpty: Bool
+    let authoritativeCGWindowIDs: Set<CGWindowID>?
 
     init(
         appID: String,
         pid: pid_t,
         appDirectoryEntries: [RuntimeAppDirectoryEntry],
-        currentAppWindowPayloadWasEmpty: Bool
+        currentAppWindowPayloadWasEmpty: Bool,
+        authoritativeCGWindowIDs: Set<CGWindowID>? = nil
     ) {
         self.appID = appID
         self.pid = pid
         self.appDirectoryEntries = appDirectoryEntries
         self.currentAppWindowPayloadWasEmpty = currentAppWindowPayloadWasEmpty
+        self.authoritativeCGWindowIDs = authoritativeCGWindowIDs
     }
 }
 

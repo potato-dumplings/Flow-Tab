@@ -655,22 +655,24 @@ extension FlowTabUITests {
         var seenIdentifiers: Set<String> = []
         return app.descendants(matching: .any)
             .matching(NSPredicate(format: "identifier BEGINSWITH %@", "flowtab.switcher.window."))
-            .allElementsBoundByIndex
+            .allElementsBoundByAccessibilityElement
             .compactMap { element -> SwitcherWindowCardObservation? in
                 guard element.exists else { return nil }
-                guard seenIdentifiers.insert(element.identifier).inserted else { return nil }
+                let identifier = element.identifier
+                guard seenIdentifiers.insert(identifier).inserted else { return nil }
                 let title = element.label.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !title.isEmpty else { return nil }
                 let value = elementStringValue(element)
+                let frame = element.frame
                 let imageMarker = self.element(
                     in: app,
-                    identifier: previewImageIdentifier(for: element.identifier)
+                    identifier: previewImageIdentifier(for: identifier)
                 )
                 return SwitcherWindowCardObservation(
-                    identifier: element.identifier,
+                    identifier: identifier,
                     title: title,
                     value: value,
-                    frame: element.frame,
+                    frame: frame,
                     hasImage: value.contains("preview=image") || imageMarker.exists
                 )
             }
@@ -689,27 +691,38 @@ extension FlowTabUITests {
         in app: XCUIApplication,
         expectedTitles: [String],
         timeout: TimeInterval
-    ) -> [SwitcherWindowCardObservation] {
+    ) -> Bool {
         let deadline = Date().addingTimeInterval(timeout)
-        var latestCards: [SwitcherWindowCardObservation] = []
         let expectedTitleCounts = windowTitleCounts(expectedTitles)
+        let cardQuery = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH %@", "flowtab.switcher.window."))
 
         repeat {
-            latestCards = switcherWindowCardObservations(in: app)
-            if latestCards.count == expectedTitles.count,
-               windowTitleCounts(latestCards.map(\.title)) == expectedTitleCounts {
-                return latestCards
+            if cardQuery.count == expectedTitles.count,
+               expectedTitleCounts.allSatisfy({ title, count in
+                   cardQuery.matching(NSPredicate(format: "label == %@", title)).count == count
+               }) {
+                return true
             }
             RunLoop.current.run(until: Date().addingTimeInterval(0.1))
         } while Date() < deadline
 
+        let latestTitleCounts = Dictionary(
+            uniqueKeysWithValues: expectedTitleCounts.keys.map { title in
+                (
+                    title,
+                    cardQuery.matching(NSPredicate(format: "label == %@", title)).count
+                )
+            }
+        )
         XCTFail(
             """
             Expected switcher window cards to expose \(expectedTitles.sorted()), \
-            found \(latestCards.map { "\($0.title)=\($0.identifier)" }.sorted()).
+            found cardCount=\(cardQuery.count) matchingTitleCounts=\(latestTitleCounts) \
+            expectedTitleCounts=\(expectedTitleCounts).
             """
         )
-        return latestCards
+        return false
     }
     func assertValue(of element: XCUIElement, equals expectedValue: String, timeout: TimeInterval = 5) {
         let deadline = Date().addingTimeInterval(timeout)
@@ -902,89 +915,6 @@ extension FlowTabUITests {
             return
         }
         element.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-    }
-    func tapElementAfterScrollingIntoView(
-        _ element: XCUIElement,
-        in scrollContainer: XCUIElement,
-        fallbackScrollContainers: [XCUIElement] = [],
-        timeout: TimeInterval
-    ) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        var attempt = 0
-        repeat {
-            if element.exists && element.isHittable {
-                element.tap()
-                return true
-            }
-
-            if let container = scrollContainerForElement(
-                element,
-                preferredContainer: scrollContainer,
-                fallbackContainers: fallbackScrollContainers
-            ) {
-                let deltaY = scrollDeltaY(for: element, in: container, attempt: attempt)
-                container.scroll(byDeltaX: 0, deltaY: deltaY)
-                attempt = (attempt + 1) % 24
-            }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        } while Date() < deadline
-
-        if element.exists && element.isHittable {
-            element.tap()
-            return true
-        }
-        return false
-    }
-    private func scrollContainerForElement(
-        _ element: XCUIElement,
-        preferredContainer: XCUIElement,
-        fallbackContainers: [XCUIElement]
-    ) -> XCUIElement? {
-        if preferredContainer.exists {
-            return preferredContainer
-        }
-        guard element.exists else { return nil }
-        let elementFrame = element.frame
-        guard isUsableFrame(elementFrame) else { return nil }
-
-        return fallbackContainers
-            .filter { $0.exists && isUsableFrame($0.frame) }
-            .filter { candidate in
-                candidate.frame.minX <= elementFrame.midX && candidate.frame.maxX >= elementFrame.midX
-            }
-            .min { lhs, rhs in
-                let lhsFrame = lhs.frame
-                let rhsFrame = rhs.frame
-                let lhsArea = lhsFrame.width * lhsFrame.height
-                let rhsArea = rhsFrame.width * rhsFrame.height
-                return lhsArea < rhsArea
-            }
-    }
-    private func scrollDeltaY(
-        for element: XCUIElement,
-        in container: XCUIElement,
-        attempt: Int
-    ) -> CGFloat {
-        let elementFrame = element.frame
-        let containerFrame = container.frame
-        guard isUsableFrame(elementFrame), isUsableFrame(containerFrame) else {
-            return attempt.isMultiple(of: 2) ? 280 : -280
-        }
-
-        let distance: CGFloat
-        if elementFrame.maxY > containerFrame.maxY {
-            distance = elementFrame.maxY - containerFrame.maxY
-        } else if elementFrame.minY < containerFrame.minY {
-            distance = elementFrame.minY - containerFrame.minY
-        } else {
-            distance = elementFrame.midY - containerFrame.midY
-        }
-        let magnitude = min(max(abs(distance), 160), 520)
-        let directedDelta = distance >= 0 ? magnitude : -magnitude
-        return attempt.isMultiple(of: 2) ? directedDelta : -directedDelta
-    }
-    private func isUsableFrame(_ frame: CGRect) -> Bool {
-        !frame.isEmpty && !frame.isNull && !frame.isInfinite
     }
     func assertLogVisibility(
         at logLevel: String,

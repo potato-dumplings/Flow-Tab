@@ -12,6 +12,7 @@ enum FlowTabTestLaunchOptions {
         "--flowtab-ui-ax-trusted",
         "--flowtab-ui-enable-mock-hotkey-effects",
         "--flowtab-ui-enable-verbose-logs",
+        "--flowtab-ui-frontmost-bundle-id",
         "--flowtab-ui-initial-panel-occlusion-stale-ms",
         "--flowtab-ui-listen-switcher-trigger",
         "--flowtab-ui-mock-launch-at-login-service",
@@ -81,6 +82,10 @@ enum FlowTabTestLaunchOptions {
 
     static var switcherCommandPayloadPath: String? {
         uiTestValue(after: "--flowtab-ui-switcher-command-payload-path")
+    }
+
+    static var frontmostBundleIdentifierOverride: String? {
+        uiTestValue(after: "--flowtab-ui-frontmost-bundle-id")
     }
 
     static var accessibilityTrustedOverride: Bool? {

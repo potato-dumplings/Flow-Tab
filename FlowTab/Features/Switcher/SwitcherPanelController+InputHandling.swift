@@ -227,17 +227,24 @@ extension SwitcherPanelController {
     @discardableResult
     func handleCommittedSearchIndexDidUpdate() -> Bool {
         logSearchTrace("committedSearchIndexDidUpdate action=attempt \(searchTraceStateSummary())")
-        guard isPanelPresented else {
-            logSearchTrace("committedSearchIndexDidUpdate action=ignored reason=panelHidden \(searchTraceStateSummary())")
-            return false
-        }
         guard model.handleCommittedSearchIndexDidUpdate() else {
             logSearchTrace("committedSearchIndexDidUpdate action=ignored reason=modelRejected \(searchTraceStateSummary())")
             return false
         }
         cancelPendingModifierReleaseConfirmation()
         resetPointerSelectionGate()
-        updatePanelSize()
+        if isPanelPresented {
+            updatePanelSize()
+        } else {
+            let showStartMs = monotonicMilliseconds()
+            presentStartedHotkeySession(
+                kind: .globalAppSwitcher,
+                trigger: "search_freshness_ready",
+                logKind: "search",
+                showStartMs: showStartMs,
+                startLogMessage: "start search after committed index \(model.debugSelectionSummary())"
+            )
+        }
         RuntimeLog.info(.session, "enter search mode")
         logSearchTrace("committedSearchIndexDidUpdate action=entered \(searchTraceStateSummary())")
         return true

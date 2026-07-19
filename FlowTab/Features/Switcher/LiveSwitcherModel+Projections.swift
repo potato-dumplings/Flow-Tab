@@ -388,9 +388,24 @@ extension LiveSwitcherModel {
             )
             : currentAppWindowPayload
 
+        runtimeContextsByID[appID] = appliedPayload.context
+        if currentSession.apps[appIndex] == appliedPayload.candidate,
+           !currentSessionIsWindowLayerForApp,
+           restoringWindowCycleSelectedWindowID == nil,
+           pendingManualWindowLayerEntryAppID != appID {
+            logSelectedAppWindowProjection(
+                result: "unchanged",
+                appID: appID,
+                currentAppWindowPayload: appliedPayload,
+                startMs: startMs,
+                projectionReadMs: projectionReadMs,
+                applyEndMs: Self.monotonicMilliseconds()
+            )
+            return
+        }
+
         var apps = currentSession.apps
         apps[appIndex] = appliedPayload.candidate
-        runtimeContextsByID[appID] = appliedPayload.context
         let restoringWindowCycle = restoringWindowCycleSelectedWindowID != nil
         let preservesWindowLayerPreview: Bool
         if currentSessionIsWindowLayerForApp {
