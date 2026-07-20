@@ -91,7 +91,15 @@ enum HomeRuntimeRefreshReader {
                 isProjectionBacked: false
             )
         }
-        return projectionRead
+        return HomeAppSummaryProjectionRead(
+            summaries: StableIdentityOrder.reconcile(
+                current: summaries,
+                updated: projectionRead.summaries,
+                identity: { $0.appID }
+            ),
+            freshness: projectionRead.freshness,
+            isProjectionBacked: projectionRead.isProjectionBacked
+        )
     }
 
     static func appSummaries(

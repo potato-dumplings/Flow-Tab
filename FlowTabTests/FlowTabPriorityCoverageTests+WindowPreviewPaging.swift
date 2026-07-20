@@ -100,12 +100,30 @@ extension FlowTabPriorityCoverageTests {
             itemCount: 8
         )
 
-        XCTAssertEqual(singleWindowSize, CGSize(width: 640, height: 360))
-        XCTAssertGreaterThan(eightWindowSize.width, singleWindowSize.width)
-        XCTAssertGreaterThan(eightWindowSize.height, singleWindowSize.height)
-        XCTAssertLessThanOrEqual(eightWindowSize.width, 1_728 * 0.82)
-        XCTAssertLessThanOrEqual(eightWindowSize.height, 1_117 * 0.75)
+        XCTAssertEqual(singleWindowSize.width, 1_728 * 0.82, accuracy: 0.001)
+        XCTAssertEqual(singleWindowSize.height, 1_117 * 0.75, accuracy: 0.001)
+        XCTAssertEqual(eightWindowSize, singleWindowSize)
         XCTAssertEqual(compactScreenSize.width, 492, accuracy: 0.001)
         XCTAssertEqual(compactScreenSize.height, 300, accuracy: 0.001)
+    }
+
+    func testWindowOnlyPanelSizingUsesLargeScreenRelativeCanvasForFewWindows() {
+        let visibleFrameSize = CGSize(width: 1_728, height: 1_117)
+
+        let size = SwitcherWindowOnlyPanelSizing.preferredSize(
+            visibleFrameSize: visibleFrameSize,
+            itemCount: 2
+        )
+
+        XCTAssertEqual(
+            size.width,
+            visibleFrameSize.width * SwitcherWindowOnlyPanelSizing.maximumWidthRatio,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            size.height,
+            visibleFrameSize.height * SwitcherWindowOnlyPanelSizing.maximumHeightRatio,
+            accuracy: 0.001
+        )
     }
 }

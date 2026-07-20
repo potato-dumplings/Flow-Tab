@@ -205,6 +205,25 @@ enum FlowTabUITestBootstrapper {
         panelController: SwitcherPanelController
     ) {
         guard FlowTabTestLaunchOptions.usesMockWindowPreviews else { return }
+        if let rawDelay = FlowTabTestLaunchOptions.mockWindowPreviewDelayMilliseconds {
+            let delayMilliseconds = max(1, min(rawDelay, 1_000))
+            let previewImage = makeMockWindowPreviewImage(
+                title: "Delayed Preview",
+                cgWindowID: nil
+            )
+            panelController.modelForTesting.previewCaptureBatchOverride = { requests in
+                Thread.sleep(forTimeInterval: Double(delayMilliseconds) / 1_000)
+                return requests.map { request in
+                    RuntimeWindowPreviewProvider.CaptureResult(
+                        image: previewImage,
+                        resolvedWindowID: request.preferredWindowID
+                            ?? stableMockWindowID(title: request.preferredTitle),
+                        titleBarStyle: request.inferTitleBarStyle ? .dark : nil
+                    )
+                }
+            }
+            return
+        }
         panelController.modelForTesting.previewCaptureOverride = { cgWindowID, _, title, inferTitleBarStyle in
             (
                 image: makeMockWindowPreviewImage(

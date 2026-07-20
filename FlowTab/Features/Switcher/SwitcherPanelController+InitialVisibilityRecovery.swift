@@ -1,6 +1,64 @@
 import Foundation
 
 extension SwitcherPanelController {
+    func prepareInitialWindowOnlyPanelReveal(kind: HotkeySessionKind) {
+        initialWindowOnlyPreviewRevealTask?.cancel()
+        initialWindowOnlyPreviewRevealTask = nil
+        guard
+            kind == .inAppWindowSwitcher,
+            !model.isWindowOnlyPreviewPreparationComplete
+        else {
+            panel.alphaValue = 1
+            return
+        }
+
+        panel.alphaValue = 0
+        let generation = presentationSessionGeneration
+        initialWindowOnlyPreviewRevealTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(nanoseconds: self.initialWindowOnlyPreviewRevealTimeoutNs)
+            guard !Task.isCancelled else { return }
+            self.revealInitialWindowOnlyPanel(
+                generation: generation,
+                force: true,
+                reason: "preview_timeout"
+            )
+        }
+    }
+
+    func revealInitialWindowOnlyPanelIfReady(reason: String) {
+        revealInitialWindowOnlyPanel(
+            generation: presentationSessionGeneration,
+            force: false,
+            reason: reason
+        )
+    }
+
+    private func revealInitialWindowOnlyPanel(
+        generation: Int,
+        force: Bool,
+        reason: String
+    ) {
+        guard generation == presentationSessionGeneration else { return }
+        guard activeHotkeySessionKind == .inAppWindowSwitcher else { return }
+        guard panel.alphaValue < 1 else { return }
+        guard force || model.isWindowOnlyPreviewPreparationComplete else { return }
+
+        initialWindowOnlyPreviewRevealTask?.cancel()
+        initialWindowOnlyPreviewRevealTask = nil
+        panel.alphaValue = 1
+        RuntimeLog.debug(
+            .preview,
+            "initial window-only panel revealed reason=\(reason) previewsReady=\(model.isWindowOnlyPreviewPreparationComplete ? 1 : 0)"
+        )
+    }
+
+    func cancelInitialWindowOnlyPanelReveal() {
+        initialWindowOnlyPreviewRevealTask?.cancel()
+        initialWindowOnlyPreviewRevealTask = nil
+        panel.alphaValue = 1
+    }
+
     @discardableResult
     func beginInitialPresentationVisibilityTracking(trigger: String) -> Int {
         initialPresentationVisibilityGeneration += 1

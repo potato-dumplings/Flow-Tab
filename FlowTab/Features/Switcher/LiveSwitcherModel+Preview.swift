@@ -515,6 +515,7 @@ extension LiveSwitcherModel {
         if completedCount > 0 {
             objectWillChange.send()
         }
+        onWindowOnlyPreviewPreparationChanged?()
     }
 
     nonisolated private static func previewFailureReason(
@@ -820,28 +821,6 @@ extension LiveSwitcherModel {
             }
         }
         scheduleRuntimePreviewCaptures(pendingCaptures, qos: .utility)
-    }
-
-    func windowPreviewSnapshotForTesting(visibleRange: Range<Int>? = nil) -> [(
-        id: String,
-        title: String,
-        hasImage: Bool,
-        titleBarStyle: WindowTitleBarStyleGuess?,
-        isSelected: Bool
-    )] {
-        windowPreviewItems(visibleRange: visibleRange).map {
-            (
-                id: $0.id,
-                title: $0.title,
-                hasImage: $0.image != nil,
-                titleBarStyle: $0.titleBarStyle,
-                isSelected: $0.isSelected
-            )
-        }
-    }
-
-    func previewCaptureStatesForTesting() -> [String: PreviewCaptureState] {
-        previewCaptureStatesByKey
     }
 
     var selectedApp: AppSwitchCandidate? {

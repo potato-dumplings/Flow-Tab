@@ -2,6 +2,93 @@ import AppKit
 import SwiftUI
 import FlowTabCore
 
+struct WindowOnlyGridLayout {
+    let columns: Int
+    let rows: Int
+    let cardWidth: CGFloat
+    let cardHeight: CGFloat
+    let horizontalPadding: CGFloat
+    let verticalPadding: CGFloat
+    let columnSpacing: CGFloat
+    let rowSpacing: CGFloat
+
+    static func resolve(
+        availableSize: CGSize,
+        itemCount: Int
+    ) -> WindowOnlyGridLayout {
+        let count = max(itemCount, 1)
+        let maxColumns = min(8, count)
+        let minCardWidth: CGFloat = 120
+        let titleBarHeight: CGFloat = 30
+        let minPreviewHeight: CGFloat = 74
+        let minCardHeight: CGFloat = titleBarHeight + minPreviewHeight
+        let maxCardWidth: CGFloat = 460
+        let previewAspectRatio: CGFloat = 1.58
+        let columnSpacing: CGFloat = 24
+        let rowSpacing: CGFloat = 28
+        let horizontalPadding: CGFloat = max(14, min(64, availableSize.width * 0.04))
+        let verticalPadding: CGFloat = max(12, min(52, availableSize.height * 0.05))
+        let usableWidth = max(220, availableSize.width - horizontalPadding * 2)
+        let usableHeight = max(160, availableSize.height - verticalPadding * 2)
+
+        var bestLayout: (columns: Int, rows: Int, cardWidth: CGFloat, cardHeight: CGFloat, score: CGFloat)?
+
+        for columns in 1...maxColumns {
+            let rows = Int(ceil(Double(count) / Double(columns)))
+            let totalColumnSpacing = CGFloat(max(columns - 1, 0)) * columnSpacing
+            let totalRowSpacing = CGFloat(max(rows - 1, 0)) * rowSpacing
+            let cellWidth = (usableWidth - totalColumnSpacing) / CGFloat(columns)
+            let cellHeight = (usableHeight - totalRowSpacing) / CGFloat(rows)
+            guard cellWidth > 0, cellHeight > 0 else { continue }
+
+            var cardWidth = min(maxCardWidth, cellWidth)
+            var cardHeight = cardWidth / previewAspectRatio + titleBarHeight
+
+            if cardHeight > cellHeight {
+                cardHeight = cellHeight
+                cardWidth = max(1, (cardHeight - titleBarHeight) * previewAspectRatio)
+            }
+            guard cardWidth > 0, cardHeight > 0 else { continue }
+            if cardWidth < minCardWidth || cardHeight < minCardHeight {
+                continue
+            }
+
+            let score = cardWidth * cardHeight
+            if let bestLayout {
+                let scoreDifference = score - bestLayout.score
+                if scoreDifference < -0.001
+                    || (abs(scoreDifference) <= 0.001 && rows >= bestLayout.rows) {
+                    continue
+                }
+            }
+            bestLayout = (columns, rows, cardWidth, cardHeight, score)
+        }
+
+        let resolved = bestLayout ?? {
+            let columns = min(maxColumns, max(1, Int(round(sqrt(Double(count))))))
+            let rows = Int(ceil(Double(count) / Double(columns)))
+            let totalColumnSpacing = CGFloat(max(columns - 1, 0)) * columnSpacing
+            let totalRowSpacing = CGFloat(max(rows - 1, 0)) * rowSpacing
+            let cellWidth = max(1, (usableWidth - totalColumnSpacing) / CGFloat(columns))
+            let cellHeight = max(1, (usableHeight - totalRowSpacing) / CGFloat(rows))
+            let cardWidth = min(maxCardWidth, cellWidth)
+            let cardHeight = min(cellHeight, cardWidth / previewAspectRatio + titleBarHeight)
+            return (columns, rows, cardWidth, cardHeight, cardWidth * cardHeight)
+        }()
+
+        return WindowOnlyGridLayout(
+            columns: resolved.columns,
+            rows: resolved.rows,
+            cardWidth: resolved.cardWidth,
+            cardHeight: resolved.cardHeight,
+            horizontalPadding: horizontalPadding,
+            verticalPadding: verticalPadding,
+            columnSpacing: columnSpacing,
+            rowSpacing: rowSpacing
+        )
+    }
+}
+
 struct WindowPreviewCard: View {
     let image: NSImage?
     let title: String

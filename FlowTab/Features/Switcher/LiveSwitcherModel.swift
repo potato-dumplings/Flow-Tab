@@ -192,6 +192,7 @@ final class LiveSwitcherModel: ObservableObject {
 
     var onSearchStateChanged: (() -> Void)?
     var onSessionLayoutChanged: (() -> Void)?
+    var onWindowOnlyPreviewPreparationChanged: (() -> Void)?
     var onSearchResultScrollRequestForTesting: ((String) -> Void)?
     var activationOverride: ((ActivationTarget, [String: RuntimeAppContext]) -> Void)?
     var terminateRequestOverride: ((String) -> (sent: Bool, pid: pid_t))?
@@ -556,7 +557,8 @@ final class LiveSwitcherModel: ObservableObject {
             animateAppStripUpdate: true,
             preserveSearchState: false,
             resetWhenEmpty: false,
-            preservePreviewSnapshotState: true
+            preservePreviewSnapshotState: true,
+            preservingVisibleAppOrderFrom: currentSession.apps
         )
         guard refreshed else { return false }
         restoreSessionModeAfterProjectionUpdate(

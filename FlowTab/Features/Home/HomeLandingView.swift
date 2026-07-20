@@ -748,14 +748,6 @@ struct HomeLandingView: View {
             }
         }
 
-        if loadingWindowCountAppIDs.isEmpty {
-            appSummaries.sort { lhs, rhs in
-                if lhs.lastActiveAt == rhs.lastActiveAt {
-                    return lhs.displayName.localizedCaseInsensitiveCompare(rhs.displayName) == .orderedAscending
-                }
-                return lhs.lastActiveAt > rhs.lastActiveAt
-            }
-        }
         syncSelectedApp()
         setupWindowMonitorIfCountsReady()
         persistCache()

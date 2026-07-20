@@ -120,54 +120,13 @@ enum SwitcherWindowOnlyPanelSizing {
     static let maximumWidthRatio: CGFloat = 0.82
     static let maximumHeightRatio: CGFloat = 0.75
 
-    private static let minimumWidth: CGFloat = 640
-    private static let minimumHeight: CGFloat = 360
-    private static let targetCardWidth: CGFloat = 260
-    private static let cardAspectRatio: CGFloat = 1.58
-    private static let titleBarHeight: CGFloat = 30
-    private static let horizontalPadding: CGFloat = 48
-    private static let verticalPadding: CGFloat = 32
-    private static let columnSpacing: CGFloat = 24
-    private static let rowSpacing: CGFloat = 28
-    private static let maximumColumns = 5
-
     static func preferredSize(
         visibleFrameSize: CGSize,
-        itemCount: Int
+        itemCount _: Int
     ) -> CGSize {
-        let maximumWidth = max(1, visibleFrameSize.width * maximumWidthRatio)
-        let maximumHeight = max(1, visibleFrameSize.height * maximumHeightRatio)
-        let minimumResolvedWidth = min(minimumWidth, maximumWidth)
-        let minimumResolvedHeight = min(minimumHeight, maximumHeight)
-        let count = max(itemCount, 1)
-        let widthCapacity = max(
-            1,
-            Int(
-                floor(
-                    (maximumWidth - horizontalPadding * 2 + columnSpacing)
-                        / (targetCardWidth + columnSpacing)
-                )
-            )
-        )
-        let balancedColumns = max(1, Int(ceil(sqrt(Double(count) * 1.8))))
-        let columns = min(
-            min(count, maximumColumns),
-            min(widthCapacity, balancedColumns)
-        )
-        let rows = Int(ceil(Double(count) / Double(columns)))
-        let cardHeight = targetCardWidth / cardAspectRatio + titleBarHeight
-        let preferredWidth =
-            horizontalPadding * 2
-            + CGFloat(columns) * targetCardWidth
-            + CGFloat(max(columns - 1, 0)) * columnSpacing
-        let preferredHeight =
-            verticalPadding * 2
-            + CGFloat(rows) * cardHeight
-            + CGFloat(max(rows - 1, 0)) * rowSpacing
-
         return CGSize(
-            width: min(maximumWidth, max(minimumResolvedWidth, preferredWidth)),
-            height: min(maximumHeight, max(minimumResolvedHeight, preferredHeight))
+            width: max(1, visibleFrameSize.width * maximumWidthRatio),
+            height: max(1, visibleFrameSize.height * maximumHeightRatio)
         )
     }
 }

@@ -196,6 +196,8 @@ extension FlowTabTests {
                 "--flowtab-ui-ax-trusted", "yes",
                 "--flowtab-ui-screen-trusted", "0",
                 "--flowtab-ui-seed-logs", "12",
+                "--flowtab-ui-mock-window-previews",
+                "--flowtab-ui-mock-window-preview-delay-ms", "80",
                 "--flowtab-ui-runtime-log-level", "debug",
                 "--flowtab-ui-suppress-home-on-launch",
                 "--flowtab-ui-enable-verbose-logs",
@@ -207,6 +209,8 @@ extension FlowTabTests {
             XCTAssertEqual(FlowTabTestLaunchOptions.accessibilityTrustedOverride, true)
             XCTAssertEqual(FlowTabTestLaunchOptions.screenCaptureTrustedOverride, false)
             XCTAssertEqual(FlowTabTestLaunchOptions.seededLogCount, 12)
+            XCTAssertTrue(FlowTabTestLaunchOptions.usesMockWindowPreviews)
+            XCTAssertEqual(FlowTabTestLaunchOptions.mockWindowPreviewDelayMilliseconds, 80)
             XCTAssertEqual(FlowTabTestLaunchOptions.runtimeLogLevelOverrideRawValue, "debug")
             XCTAssertTrue(FlowTabTestLaunchOptions.suppressesHomeWindowOnLaunch)
             XCTAssertTrue(FlowTabTestLaunchOptions.enablesVerboseRuntimeLogs)
@@ -226,6 +230,7 @@ extension FlowTabTests {
             XCTAssertNil(FlowTabTestLaunchOptions.accessibilityTrustedOverride)
             XCTAssertNil(FlowTabTestLaunchOptions.screenCaptureTrustedOverride)
             XCTAssertNil(FlowTabTestLaunchOptions.seededLogCount)
+            XCTAssertNil(FlowTabTestLaunchOptions.mockWindowPreviewDelayMilliseconds)
             XCTAssertNil(FlowTabTestLaunchOptions.runtimeLogLevelOverrideRawValue)
             XCTAssertFalse(FlowTabTestLaunchOptions.enablesVerboseRuntimeLogs)
             XCTAssertFalse(FlowTabTestLaunchOptions.recordsHotkeyReloadDiagnostics)

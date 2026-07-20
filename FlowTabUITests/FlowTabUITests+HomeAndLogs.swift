@@ -162,9 +162,14 @@ extension FlowTabUITests {
 
         assertHomeAppRowValue(mailRow, equals: "0w", timeout: 2)
         assertHomeAppRowValue(browserRow, equals: "0w", timeout: 2)
+        let initialMailY = mailRow.frame.minY
+        let initialBrowserY = browserRow.frame.minY
         RunLoop.current.run(until: Date().addingTimeInterval(1.2))
         XCTAssertEqual(elementStringValue(mailRow), "0w")
         XCTAssertEqual(elementStringValue(browserRow), "0w")
+        XCTAssertEqual(mailRow.frame.minY, initialMailY, accuracy: 1)
+        XCTAssertEqual(browserRow.frame.minY, initialBrowserY, accuracy: 1)
+        XCTAssertLessThan(mailRow.frame.minY, browserRow.frame.minY)
     }
 
     func testHomeOverviewChromeShowsCountsStatsAndSidebarPermissionStatus() throws {

@@ -87,11 +87,155 @@ extension FlowTabPriorityCoverageTests {
         controller.updatePanelSizeForTesting(visibleFrame: visibleFrame)
 
         let size = controller.panelContentSizeForTesting
-        XCTAssertLessThanOrEqual(size.width, visibleFrame.width * 0.82)
-        XCTAssertLessThanOrEqual(size.height, visibleFrame.height * 0.75)
+        XCTAssertEqual(size.width, visibleFrame.width * 0.82, accuracy: 1)
+        XCTAssertEqual(size.height, visibleFrame.height * 0.75, accuracy: 1)
         XCTAssertGreaterThanOrEqual(size.width, 640)
         XCTAssertGreaterThanOrEqual(size.height, 360)
         controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
+    func testInAppWindowSessionPrewarmsPreviewsBeforeFirstPanelFrame() {
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let windows = [
+            WindowCandidate(id: "prewarm-current", title: "Current", isMinimized: false, lastActiveAt: 30),
+            WindowCandidate(id: "prewarm-next", title: "Next", isMinimized: false, lastActiveAt: 20),
+        ]
+        let model = LiveSwitcherModel(
+            runtimeProjectionService: makeCurrentAppWindowProjectionService(
+                appID: appID,
+                runningApp: currentApp,
+                windows: windows
+            )
+        )
+        var capturedTitles: [String] = []
+        model.previewCaptureOverride = { _, _, title, _ in
+            capturedTitles.append(title ?? "")
+            return (
+                image: self.makeColorImage(color: .systemBlue),
+                resolvedWindowID: CGWindowID(capturedTitles.count),
+                titleBarStyle: nil
+            )
+        }
+        let controller = SwitcherPanelController(model: model)
+
+        XCTAssertTrue(controller.beginInAppWindowHotkeySessionForTesting())
+
+        XCTAssertEqual(Set(capturedTitles), Set(windows.map(\.title)))
+        XCTAssertEqual(capturedTitles.count, windows.count)
+        controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
+    func testInAppWindowPanelRevealsAfterAsyncPreviewBatchCompletes() async {
+        let currentApp = NSRunningApplication.current
+        let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
+        let windows = [
+            WindowCandidate(id: "async-current", title: "Current", isMinimized: false, lastActiveAt: 30),
+            WindowCandidate(id: "async-next", title: "Next", isMinimized: false, lastActiveAt: 20),
+        ]
+        let model = LiveSwitcherModel(
+            runtimeProjectionService: makeCurrentAppWindowProjectionService(
+                appID: appID,
+                runningApp: currentApp,
+                windows: windows
+            )
+        )
+        let capturedImage = makeColorImage(color: .systemPurple)
+        model.previewCaptureBatchOverride = { requests in
+            Thread.sleep(forTimeInterval: 0.08)
+            return requests.enumerated().map { index, _ in
+                RuntimeWindowPreviewProvider.CaptureResult(
+                    image: capturedImage,
+                    resolvedWindowID: CGWindowID(index + 1),
+                    titleBarStyle: nil
+                )
+            }
+        }
+        let controller = SwitcherPanelController(model: model)
+        controller.setModifierReleaseConfirmationSuppressedForTesting(true)
+        controller.appIsActiveOverride = true
+        controller.hideNonPanelWindowsOverride = {}
+
+        XCTAssertTrue(controller.presentInAppWindowHotkeySessionForTesting())
+        XCTAssertEqual(controller.panel.alphaValue, 0, accuracy: 0.001)
+        let didReveal = await waitUntil(
+            "window-only panel reveals after preview batch",
+            pollIntervalNanoseconds: 5_000_000,
+            predicate: { controller.panel.alphaValue == 1 }
+        )
+        XCTAssertTrue(didReveal)
+        XCTAssertTrue(
+            model.windowPreviewSnapshotForTesting().allSatisfy(\.hasImage)
+        )
+        controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
+    func testProjectionRefreshPreservesVisibleAppOrderDuringDelayedWindowLayerEntry() {
+        let currentApp = NSRunningApplication.current
+        let appIDs = [
+            "com.flowtab.tests.order.mail",
+            "com.flowtab.tests.order.browser",
+            "com.flowtab.tests.order.notes",
+        ]
+        let initialApps = appIDs.enumerated().map { index, appID in
+            AppSwitchCandidate(
+                id: appID,
+                displayName: ["Mail", "Browser", "Notes"][index],
+                groupID: "order-\(index)",
+                lastActiveAt: TimeInterval(300 - index),
+                windows: [
+                    WindowCandidate(
+                        id: "order-window-\(index)",
+                        title: "Window \(index)",
+                        isMinimized: false,
+                        lastActiveAt: TimeInterval(300 - index)
+                    )
+                ]
+            )
+        }
+        let initialContexts = Dictionary(
+            uniqueKeysWithValues: initialApps.map { app in
+                (
+                    app.id,
+                    makeRuntimeAppContext(
+                        appID: app.id,
+                        runningApp: currentApp,
+                        windows: app.windows
+                    )
+                )
+            }
+        )
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
+            appSwitcherApps: initialApps,
+            contextsByID: initialContexts
+        )
+        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
+
+        XCTAssertTrue(model.startSession(triggerDirection: .forward))
+        let visibleOrder = model.session?.apps.map(\.id)
+        let selectedAppID = model.session?.selectedApp.id
+        let refreshedApps = initialApps.reversed().map { app in
+            AppSwitchCandidate(
+                id: app.id,
+                displayName: "\(app.displayName) Updated",
+                groupID: app.groupID,
+                lastActiveAt: app.lastActiveAt + 1_000,
+                windows: app.windows
+            )
+        }
+        runtimeProjectionService.installAppSwitcherProjection(
+            apps: refreshedApps,
+            contextsByID: initialContexts,
+            generatedAt: 20
+        )
+
+        XCTAssertTrue(model.handleAppSwitcherProjectionDidUpdate())
+        XCTAssertEqual(model.session?.apps.map(\.id), visibleOrder)
+        XCTAssertEqual(model.session?.selectedApp.id, selectedAppID)
+        XCTAssertTrue(model.session?.apps.allSatisfy { $0.displayName.hasSuffix(" Updated") } == true)
     }
 
     @MainActor

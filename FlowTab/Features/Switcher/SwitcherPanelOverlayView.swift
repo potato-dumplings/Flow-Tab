@@ -123,11 +123,14 @@ struct SwitcherPanelRootView: View {
         let appsSummary = session.apps
             .map { "\($0.id):\($0.windows.count)" }
             .joined(separator: "|")
+        let previewItems: [WindowPreviewItem]
         let previewSummary: String
         if case .windowCycle(let appID) = session.mode {
-            let titles = model.windowPreviewItems().map(\.title).joined(separator: "|")
+            previewItems = model.windowPreviewItems()
+            let titles = previewItems.map(\.title).joined(separator: "|")
             previewSummary = "\(appID)::\(titles)"
         } else {
+            previewItems = []
             previewSummary = "inactive"
         }
         let selectedWindow = session.selectedWindow
@@ -151,6 +154,7 @@ struct SwitcherPanelRootView: View {
             "selectedWindow=\(selectedWindow?.id ?? "none")",
             "selectedWindowTitle=\(selectedWindow?.title ?? "")",
             "preview=\(previewSummary)",
+            "previewImages=\(previewItems.filter { $0.image != nil }.count)",
             "searchScope=\(model.searchViewState.isActive ? model.searchViewState.scope.rawValue : "inactive")",
             "searchSelectedResult=\(diagnosticsEscaped(model.searchViewState.selectedResult?.id ?? "none"))",
             "searchResults=\(searchResultsDiagnosticsSummary)"
@@ -302,89 +306,6 @@ private struct CommandTabOverlay: View {
     private func previewCardHeight(for cardWidth: CGFloat) -> CGFloat {
         let maxHeight: CGFloat = showsAppStrip ? 220 : 248
         return max(130, min(maxHeight, cardWidth * 0.62))
-    }
-
-    private struct WindowOnlyGridLayout {
-        let columns: Int
-        let rows: Int
-        let cardWidth: CGFloat
-        let cardHeight: CGFloat
-        let horizontalPadding: CGFloat
-        let verticalPadding: CGFloat
-        let columnSpacing: CGFloat
-        let rowSpacing: CGFloat
-    }
-
-    private func windowOnlyGridLayout(
-        availableSize: CGSize,
-        itemCount: Int
-    ) -> WindowOnlyGridLayout {
-        let count = max(itemCount, 1)
-        let maxColumns = min(8, count)
-        let minCardWidth: CGFloat = 120
-        let titleBarHeight: CGFloat = 30
-        let minPreviewHeight: CGFloat = 74
-        let minCardHeight: CGFloat = titleBarHeight + minPreviewHeight
-        let maxCardWidth: CGFloat = 460
-        let previewAspectRatio: CGFloat = 1.58
-        let columnSpacing: CGFloat = 24
-        let rowSpacing: CGFloat = 28
-        let horizontalPadding: CGFloat = max(14, min(64, availableSize.width * 0.04))
-        let verticalPadding: CGFloat = max(12, min(52, availableSize.height * 0.05))
-        let usableWidth = max(220, availableSize.width - horizontalPadding * 2)
-        let usableHeight = max(160, availableSize.height - verticalPadding * 2)
-
-        var bestLayout: (columns: Int, rows: Int, cardWidth: CGFloat, cardHeight: CGFloat, score: CGFloat)?
-
-        for columns in 1...maxColumns {
-            let rows = Int(ceil(Double(count) / Double(columns)))
-            let totalColumnSpacing = CGFloat(max(columns - 1, 0)) * columnSpacing
-            let totalRowSpacing = CGFloat(max(rows - 1, 0)) * rowSpacing
-            let cellWidth = (usableWidth - totalColumnSpacing) / CGFloat(columns)
-            let cellHeight = (usableHeight - totalRowSpacing) / CGFloat(rows)
-            guard cellWidth > 0, cellHeight > 0 else { continue }
-
-            var cardWidth = min(maxCardWidth, cellWidth)
-            var cardHeight = cardWidth / previewAspectRatio + titleBarHeight
-
-            if cardHeight > cellHeight {
-                cardHeight = cellHeight
-                cardWidth = max(1, (cardHeight - titleBarHeight) * previewAspectRatio)
-            }
-            guard cardWidth > 0, cardHeight > 0 else { continue }
-            if cardWidth < minCardWidth || cardHeight < minCardHeight {
-                continue
-            }
-
-            let score = cardWidth * cardHeight
-            if let bestLayout, bestLayout.score >= score {
-                continue
-            }
-            bestLayout = (columns, rows, cardWidth, cardHeight, score)
-        }
-
-        let resolved = bestLayout ?? {
-            let columns = min(maxColumns, max(1, Int(round(sqrt(Double(count))))))
-            let rows = Int(ceil(Double(count) / Double(columns)))
-            let totalColumnSpacing = CGFloat(max(columns - 1, 0)) * columnSpacing
-            let totalRowSpacing = CGFloat(max(rows - 1, 0)) * rowSpacing
-            let cellWidth = max(1, (usableWidth - totalColumnSpacing) / CGFloat(columns))
-            let cellHeight = max(1, (usableHeight - totalRowSpacing) / CGFloat(rows))
-            let cardWidth = min(maxCardWidth, cellWidth)
-            let cardHeight = min(cellHeight, cardWidth / previewAspectRatio + titleBarHeight)
-            return (columns, rows, cardWidth, cardHeight, cardWidth * cardHeight)
-        }()
-
-        return WindowOnlyGridLayout(
-            columns: resolved.columns,
-            rows: resolved.rows,
-            cardWidth: resolved.cardWidth,
-            cardHeight: resolved.cardHeight,
-            horizontalPadding: horizontalPadding,
-            verticalPadding: verticalPadding,
-            columnSpacing: columnSpacing,
-            rowSpacing: rowSpacing
-        )
     }
 
     private var selectedSearchResultID: String? {
@@ -747,7 +668,7 @@ private struct CommandTabOverlay: View {
     @ViewBuilder
     private var windowOnlyOverlayBody: some View {
         GeometryReader { proxy in
-            let layout = windowOnlyGridLayout(
+            let layout = WindowOnlyGridLayout.resolve(
                 availableSize: proxy.size,
                 itemCount: windowPreviewItems.count
             )
@@ -821,66 +742,6 @@ private struct CommandTabOverlay: View {
         .onPreferenceChange(SearchLayoutMeasurementPreferenceKey.self) { measurement in
             guard let measurements = measurement.measurements else { return }
             onSearchLayoutMeasured(measurements)
-        }
-    }
-}
-
-private enum SearchLayoutMeasurementTarget {
-    case header
-    case row
-}
-
-private struct SearchLayoutMeasurement: Equatable {
-    var headerHeight: CGFloat? = nil
-    var rowHeight: CGFloat? = nil
-
-    var measurements: SwitcherSearchLayoutMeasurements? {
-        guard let headerHeight, let rowHeight else { return nil }
-        return SwitcherSearchLayoutMeasurements(
-            presentationHeaderHeight: headerHeight,
-            resultRowHeight: rowHeight
-        )
-    }
-
-    mutating func merge(_ other: SearchLayoutMeasurement) {
-        if let otherHeaderHeight = other.headerHeight {
-            headerHeight = max(headerHeight ?? 0, otherHeaderHeight)
-        }
-        if let otherRowHeight = other.rowHeight {
-            rowHeight = max(rowHeight ?? 0, otherRowHeight)
-        }
-    }
-}
-
-private struct SearchLayoutMeasurementPreferenceKey: PreferenceKey {
-    static let defaultValue = SearchLayoutMeasurement()
-
-    static func reduce(
-        value: inout SearchLayoutMeasurement,
-        nextValue: () -> SearchLayoutMeasurement
-    ) {
-        value.merge(nextValue())
-    }
-}
-
-private struct SearchLayoutSizeReader: View {
-    let target: SearchLayoutMeasurementTarget
-
-    var body: some View {
-        GeometryReader { proxy in
-            Color.clear.preference(
-                key: SearchLayoutMeasurementPreferenceKey.self,
-                value: measurement(size: proxy.size)
-            )
-        }
-    }
-
-    private func measurement(size: CGSize) -> SearchLayoutMeasurement {
-        switch target {
-        case .header:
-            return SearchLayoutMeasurement(headerHeight: size.height)
-        case .row:
-            return SearchLayoutMeasurement(rowHeight: size.height)
         }
     }
 }

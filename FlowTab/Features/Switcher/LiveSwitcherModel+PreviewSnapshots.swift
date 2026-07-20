@@ -1,6 +1,17 @@
 import FlowTabCore
 
 extension LiveSwitcherModel {
+    @discardableResult
+    func prewarmWindowOnlySessionPreviews() -> Int {
+        guard overlayStyle == .windowOnly else { return 0 }
+        guard let session, case .windowCycle = session.mode else { return 0 }
+        return windowPreviewItems().count
+    }
+
+    var isWindowOnlyPreviewPreparationComplete: Bool {
+        previewCaptureInFlightKeys.isEmpty
+    }
+
     func handleSessionPreviewSnapshotLifecycle(_ session: SwitcherSession) {
         guard case .windowCycle(let appID) = session.mode else { return }
         freezeWindowPreviewOrderIfNeeded(for: appID, session: session)
@@ -40,5 +51,27 @@ extension LiveSwitcherModel {
         previewWindowSnapshotsByAppID[appID] = windows
         previewDeferredCaptureScheduledAppIDs.remove(appID)
         lastWindowPreviewExposureLogSummary = nil
+    }
+
+    func windowPreviewSnapshotForTesting(visibleRange: Range<Int>? = nil) -> [(
+        id: String,
+        title: String,
+        hasImage: Bool,
+        titleBarStyle: WindowTitleBarStyleGuess?,
+        isSelected: Bool
+    )] {
+        windowPreviewItems(visibleRange: visibleRange).map {
+            (
+                id: $0.id,
+                title: $0.title,
+                hasImage: $0.image != nil,
+                titleBarStyle: $0.titleBarStyle,
+                isSelected: $0.isSelected
+            )
+        }
+    }
+
+    func previewCaptureStatesForTesting() -> [String: PreviewCaptureState] {
+        previewCaptureStatesByKey
     }
 }

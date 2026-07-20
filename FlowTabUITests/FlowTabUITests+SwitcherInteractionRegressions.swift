@@ -7,6 +7,8 @@ extension FlowTabUITests {
                 "--flowtab-ui-reset-defaults",
                 "--flowtab-ui-mock-runtime",
                 "--flowtab-ui-mock-window-previews",
+                "--flowtab-ui-mock-window-preview-delay-ms",
+                "80",
                 "--flowtab-ui-mock-runtime-variant",
                 "focused-current-app",
                 "--flowtab-ui-frontmost-bundle-id",
@@ -50,6 +52,30 @@ extension FlowTabUITests {
                 element(in: app, identifier: secondaryPreviewID).waitForExistence(timeout: 5),
                 "The selected window should expose a real preview marker while Control remains held."
             )
+            XCTAssertTrue(
+                waitForSwitcherDiagnosticsValue(
+                    diagnosticsSummary,
+                    key: "previewImages",
+                    expectedValue: "2",
+                    timeout: 5
+                ),
+                "Control+Tab should reveal with both preview images ready."
+            )
+            XCTAssertTrue(
+                waitForSwitcherWindowCards(
+                    in: app,
+                    expectedTitles: ["Current Primary", "Current Secondary"],
+                    timeout: 5
+                )
+            )
+            let cards = switcherWindowCardObservations(in: app)
+            let cardBounds = cards.map(\.frame).reduce(CGRect.null) { $0.union($1) }
+            XCTAssertGreaterThan(
+                cardBounds.width,
+                800,
+                "Control+Tab should use the large window-preview canvas."
+            )
+            XCTAssertTrue(cards.allSatisfy(\.hasImage))
 
             let screenshot = XCTAttachment(screenshot: app.screenshot())
             screenshot.name = "Control Tab first physical gesture"
@@ -61,6 +87,7 @@ extension FlowTabUITests {
             containing: [
                 "inAppHotkeyPressed dir=forward panelVisible=0 action=show",
                 "show kind=inApp action=initialAdvance key=tabForward",
+                "initial window-only panel revealed reason=preview_batch_completed previewsReady=1",
             ],
             since: logSnapshot,
             timeout: 8
@@ -144,6 +171,22 @@ extension FlowTabUITests {
                 return true
             }
             RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        } while Date() < deadline
+        return false
+    }
+
+    private func waitForSwitcherDiagnosticsValue(
+        _ diagnosticsSummary: XCUIElement,
+        key: String,
+        expectedValue: String,
+        timeout: TimeInterval
+    ) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        repeat {
+            if switcherPanelDiagnosticsValue(diagnosticsSummary, key: key) == expectedValue {
+                return true
+            }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.02))
         } while Date() < deadline
         return false
     }

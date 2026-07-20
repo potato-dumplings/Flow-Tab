@@ -332,6 +332,7 @@ extension SwitcherPanelController {
                 "show kind=inApp action=initialAdvance key=\(initialKeyInput.debugName) nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
             )
         }
+        _ = model.prewarmWindowOnlySessionPreviews()
         presentStartedHotkeySession(
             kind: .inAppWindowSwitcher,
             trigger: "in_app_show",
@@ -366,6 +367,7 @@ extension SwitcherPanelController {
         syncPanelAccessibilityAnchors()
         let accessibilityReadyMs = monotonicMilliseconds()
         updatePanelPresentationLevel(trigger: trigger)
+        prepareInitialWindowOnlyPanelReveal(kind: kind)
         let levelReadyMs = monotonicMilliseconds()
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
@@ -503,6 +505,7 @@ extension SwitcherPanelController {
         clearInitialPresentationVisibilityTracking(invalidate: true)
         removeEventMonitors()
         panel.orderOut(nil)
+        cancelInitialWindowOnlyPanelReveal()
         panel.updateSwitcherAccessibilityApps([], tileSize: 1, spacing: 0, appStripHeaderOffset: 0)
         panel.level = SwitcherPanelWindowConfiguration.level
         panel.collectionBehavior = SwitcherPanelWindowConfiguration.presentationCollectionBehavior()

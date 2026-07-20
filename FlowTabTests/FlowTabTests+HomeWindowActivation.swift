@@ -600,6 +600,76 @@ extension FlowTabTests {
         XCTAssertEqual(runtimeProjectionService.appWindowChangeSignalsRecorded().map(\.appID), [appID, appID])
     }
 
+    func testHomeRuntimeRefreshReaderPreservesVisibleOrderWhileUpdatingProjectionValues() {
+        let currentSummaries = [
+            makeHomeAppSummary(appID: "com.example.mail", displayName: "Mail", rank: 0),
+            makeHomeAppSummary(appID: "com.example.browser", displayName: "Browser", rank: 1),
+            makeHomeAppSummary(appID: "com.example.notes", displayName: "Notes", rank: 2),
+        ]
+        let refreshedSummaries = [
+            makeHomeAppSummary(
+                appID: "com.example.notes",
+                displayName: "Notes Updated",
+                rank: 0,
+                windowCount: 3
+            ),
+            makeHomeAppSummary(
+                appID: "com.example.calendar",
+                displayName: "Calendar",
+                rank: 1,
+                windowCount: 2
+            ),
+            makeHomeAppSummary(
+                appID: "com.example.mail",
+                displayName: "Mail Updated",
+                rank: 2,
+                windowCount: 4
+            ),
+            makeHomeAppSummary(
+                appID: "com.example.browser",
+                displayName: "Browser Updated",
+                rank: 3,
+                windowCount: 5
+            ),
+        ]
+        let runtimeProjectionService = RecordingRuntimeProjectionService(
+            homeSummaryProjection: RuntimeHomeSummaryProjection(
+                summaries: refreshedSummaries,
+                freshness: RuntimeProjectionFreshness(
+                    generatedAt: 50,
+                    sourceGeneration: RuntimeReadModelGeneration(projection: 2),
+                    dirtyAppIDs: [],
+                    dirtyPIDs: [],
+                    dirtyCGWindowIDs: [],
+                    pendingRepairScopes: [],
+                    isCompleteForScope: true
+                )
+            )
+        )
+
+        let read = HomeRuntimeRefreshReader.appSummaryProjection(
+            from: runtimeProjectionService,
+            current: currentSummaries
+        )
+
+        XCTAssertEqual(
+            read.summaries.map(\.appID),
+            [
+                "com.example.mail",
+                "com.example.browser",
+                "com.example.notes",
+                "com.example.calendar",
+            ]
+        )
+        XCTAssertEqual(read.summaries.map(\.displayName), [
+            "Mail Updated",
+            "Browser Updated",
+            "Notes Updated",
+            "Calendar",
+        ])
+        XCTAssertEqual(read.summaries.map(\.windowCount), [4, 5, 3, 2])
+    }
+
     func testHomeRuntimeRefreshReaderRetriesIncompleteEmptyDetailProjection() {
         let appID = "com.example.home-refresh-incomplete-empty"
         let detailProjection = makeHomeActivationDetailProjection(

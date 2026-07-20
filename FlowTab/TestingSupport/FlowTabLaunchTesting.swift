@@ -19,6 +19,7 @@ enum FlowTabTestLaunchOptions {
         "--flowtab-ui-mock-launch-at-login-service",
         "--flowtab-ui-mock-runtime",
         "--flowtab-ui-mock-runtime-variant",
+        "--flowtab-ui-mock-window-preview-delay-ms",
         "--flowtab-ui-mock-window-previews",
         "--flowtab-ui-open-in-app-window-switcher",
         "--flowtab-ui-open-switcher",
@@ -49,6 +50,13 @@ enum FlowTabTestLaunchOptions {
 
     static var usesMockWindowPreviews: Bool {
         containsUITestArgument("--flowtab-ui-mock-window-previews")
+    }
+
+    static var mockWindowPreviewDelayMilliseconds: Int? {
+        guard let rawValue = uiTestValue(after: "--flowtab-ui-mock-window-preview-delay-ms") else {
+            return nil
+        }
+        return Int(rawValue)
     }
 
     static var resetsUserDefaultsOnLaunch: Bool {

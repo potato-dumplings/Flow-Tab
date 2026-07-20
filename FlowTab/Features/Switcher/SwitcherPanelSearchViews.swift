@@ -68,6 +68,66 @@ extension SwitcherSearchLayoutMeasurements {
     }
 }
 
+enum SearchLayoutMeasurementTarget {
+    case header
+    case row
+}
+
+struct SearchLayoutMeasurement: Equatable {
+    var headerHeight: CGFloat? = nil
+    var rowHeight: CGFloat? = nil
+
+    var measurements: SwitcherSearchLayoutMeasurements? {
+        guard let headerHeight, let rowHeight else { return nil }
+        return SwitcherSearchLayoutMeasurements(
+            presentationHeaderHeight: headerHeight,
+            resultRowHeight: rowHeight
+        )
+    }
+
+    mutating func merge(_ other: SearchLayoutMeasurement) {
+        if let otherHeaderHeight = other.headerHeight {
+            headerHeight = max(headerHeight ?? 0, otherHeaderHeight)
+        }
+        if let otherRowHeight = other.rowHeight {
+            rowHeight = max(rowHeight ?? 0, otherRowHeight)
+        }
+    }
+}
+
+struct SearchLayoutMeasurementPreferenceKey: PreferenceKey {
+    static let defaultValue = SearchLayoutMeasurement()
+
+    static func reduce(
+        value: inout SearchLayoutMeasurement,
+        nextValue: () -> SearchLayoutMeasurement
+    ) {
+        value.merge(nextValue())
+    }
+}
+
+struct SearchLayoutSizeReader: View {
+    let target: SearchLayoutMeasurementTarget
+
+    var body: some View {
+        GeometryReader { proxy in
+            Color.clear.preference(
+                key: SearchLayoutMeasurementPreferenceKey.self,
+                value: measurement(size: proxy.size)
+            )
+        }
+    }
+
+    private func measurement(size: CGSize) -> SearchLayoutMeasurement {
+        switch target {
+        case .header:
+            return SearchLayoutMeasurement(headerHeight: size.height)
+        case .row:
+            return SearchLayoutMeasurement(rowHeight: size.height)
+        }
+    }
+}
+
 struct SearchInputHeader: View {
     let query: String
     let scope: SwitcherSearchScope

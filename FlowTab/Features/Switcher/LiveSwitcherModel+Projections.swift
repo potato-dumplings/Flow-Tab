@@ -9,16 +9,25 @@ extension LiveSwitcherModel {
         preserveSearchState: Bool = false,
         resetWhenEmpty: Bool = true,
         preservePreviewSnapshotState: Bool = false,
+        preservingVisibleAppOrderFrom visibleApps: [AppSwitchCandidate] = [],
         removingTerminatedAppID: String? = nil,
         terminatedPID: pid_t? = nil
     ) -> Bool {
         let startMs = Self.monotonicMilliseconds()
         let previousSearchState = preserveSearchState ? searchViewState : .inactive
         cancelPendingSearchComputation()
-        let payload = appSwitcherPayload(
+        let refreshedPayload = appSwitcherPayload(
             readAppSwitcherProjectionSessionPayload(),
             removingTerminatedAppID: removingTerminatedAppID,
             terminatedPID: terminatedPID
+        )
+        let payload = AppSwitcherProjectionSessionPayload(
+            apps: StableIdentityOrder.reconcile(
+                current: visibleApps,
+                updated: refreshedPayload.apps,
+                identity: { $0.id }
+            ),
+            contextsByID: refreshedPayload.contextsByID
         )
         let projectionReadMs = Self.monotonicMilliseconds()
         return applyAppSwitcherProjectionPayload(

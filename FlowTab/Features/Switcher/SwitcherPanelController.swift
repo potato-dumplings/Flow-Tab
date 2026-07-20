@@ -161,6 +161,7 @@ final class SwitcherPanelController {
     var modifierReleaseState: ModifierReleaseState = .idle
     var presentationSessionGeneration = 0
     var panelPresentationRecoveryTask: Task<Void, Never>?
+    var initialWindowOnlyPreviewRevealTask: Task<Void, Never>?
     var panelPresentationRecoveryGeneration = 0
     var panelVisibilityRecoveryState: PanelVisibilityRecoveryState = .idle
     var lastPanelVisibilityRecoveryDiagnostic: PanelVisibilityRecoveryDiagnostic?
@@ -192,6 +193,7 @@ final class SwitcherPanelController {
     let terminateInterruptionProtectionWindow: TimeInterval = 5.0
     let postTerminateRefreshInterruptionProtectionWindow: TimeInterval = 0.5
     let panelVisibilityRecoveryPolicy: PanelVisibilityRecoveryPolicy = .default
+    let initialWindowOnlyPreviewRevealTimeoutNs: UInt64 = 250_000_000
     var initialPresentationVisibilityGraceWindow: TimeInterval {
         panelVisibilityRecoveryPolicy.initialPresentationGraceWindow
     }
@@ -335,6 +337,9 @@ final class SwitcherPanelController {
             self.updatePanelSize()
             self.scheduleDelayedWindowLayerEntryIfNeeded(preservingDeadline: true)
         }
+        model.onWindowOnlyPreviewPreparationChanged = { [weak self] in
+            self?.revealInitialWindowOnlyPanelIfReady(reason: "preview_batch_completed")
+        }
 
         appDidResignActiveObserver = NotificationCenter.default.addObserver(
             forName: NSApplication.didResignActiveNotification,
@@ -451,6 +456,7 @@ final class SwitcherPanelController {
         triggerDirection: CycleDirection = .forward
     ) -> Bool {
         guard model.startFocusedAppWindowSession(triggerDirection: triggerDirection) else { return false }
+        _ = model.prewarmWindowOnlySessionPreviews()
         beginPresentationSession(kind: .inAppWindowSwitcher, trigger: "testing_in_app_show")
         lastCommittedTabAdvanceTimestamp = nil
         panelVisibilityOverride = true
@@ -567,6 +573,8 @@ final class SwitcherPanelController {
         suppressHotkeyReplayTask = nil
         panelPresentationRecoveryTask?.cancel()
         panelPresentationRecoveryTask = nil
+        initialWindowOnlyPreviewRevealTask?.cancel()
+        initialWindowOnlyPreviewRevealTask = nil
         terminateSelectedAppTask?.cancel()
         terminateSelectedAppTask = nil
         if let appDidResignActiveObserver {
