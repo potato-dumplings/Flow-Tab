@@ -1,6 +1,6 @@
 # FlowTab Stable Test Coverage Contract
 
-Updated: 2026-07-19
+Updated: 2026-07-20
 
 ## Purpose and authority
 
@@ -136,7 +136,7 @@ The six layer keys are `Unit`, `Behavior`, `Mock UI`, `Real-topology UI`, `Press
 
 - Requiredness: required
 - Owner: `Home`
-- Oracle: The current runtime projection drives exact Home counts, per-app windows, ordering, and exact-window activation.
+- Oracle: The current runtime projection drives exact Home counts, per-app windows, ordering, and exact-window activation. For an unchanged runtime rank, Home and a freshly opened app switcher expose the same app order.
 - Risk: `deterministic-rule`, `app-orchestration`, `visible-workflow`, `real-topology-external-system`, `hot-path-scale-sensitive`
 - Required layers:
   - Unit: Own counts, filtering, recency, hidden-last presentation, and exact activation target rules.
@@ -149,8 +149,8 @@ The six layer keys are `Unit`, `Behavior`, `Mock UI`, `Real-topology UI`, `Press
   - Process/Tooling: Real-topology fixture mechanics are owned by the space-fixture-infrastructure scenario.
 - Current representative test anchors:
   - Unit: `FlowTabPriorityCoverageTests.testRuntimeWindowRecencyTrackerAppliesSameOrderingToCurrentAppPayload`
-  - Behavior: `FlowTabTests.testHomeRuntimeProjectionReaderUsesRuntimeProjectionsWithoutSnapshotBridge`
-  - Mock UI: `FlowTabUITests.testHomeAppLayerMarksHiddenAppsAndSortsThemLast`
+  - Behavior: `FlowTabTests.testHomeRuntimeProjectionReaderUsesRuntimeProjectionsWithoutSnapshotBridge`, `FlowTabTests.testHomeRuntimeRefreshReaderAdoptsLatestRuntimeProjectionOrder`
+  - Mock UI: `FlowTabUITests.testHomeAppLayerMarksHiddenAppsAndSortsThemLast`, `FlowTabUITests.testHomeAndFreshOptionTabUseSameRuntimeAppOrder`
   - Real-topology UI: `FlowTabUITests.testHomePageClickingRealWorkflowWindowActivatesExactFixtureWindow`
 - Exhaustive mapping: query active ledger rows whose `product_scenario_ids` contains `scenario:home-app-window-list`.
 
@@ -463,7 +463,7 @@ The six layer keys are `Unit`, `Behavior`, `Mock UI`, `Real-topology UI`, `Press
 - Current representative test anchors:
   - Unit: `SwitcherSessionEdgeTests.testCommitInWindowCycleReturnsWindowAndStoresRememberedWindowID`
   - Behavior: `FlowTabPriorityCoverageTests.testSwitcherPanelControllerGlobalHotkeyStartsFromAppSwitcherProjection`, `FlowTabPriorityCoverageTests.testSwitcherPanelRemainsPresentedDuringCommittedWindowActivation`, `FlowTabPriorityCoverageTests.testWindowOnlyPanelUsesResponsiveContentBounds`
-  - Mock UI: `FlowTabUITests.testOptionTabDelayedWindowLayerEntryShowsPrewarmedPreviewAtTransition`, `FlowTabUITests.testOptionTabSwitcherClickCommitsAppAndClosesPanel`
+  - Mock UI: `FlowTabUITests.testOptionTabDelayedWindowLayerEntryShowsPrewarmedPreviewAtTransition`, `FlowTabUITests.testOptionTabSwitcherClickCommitsAppAndClosesPanel`, `FlowTabUITests.testHomeAndFreshOptionTabUseSameRuntimeAppOrder`
   - Real-topology UI: `FlowTabUITests.testSwitcherPanelOptionTabWindowStateRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithNoisyCGSiblingsWithoutAppAXWindows`
   - Pressure: `FlowTabPriorityCoverageTests.testSwitcherInitialVisibilityRecoveryRapidOpenClosePressureDoesNotReplayStaleTasks`
 - Exhaustive mapping: query active ledger rows whose `product_scenario_ids` contains `scenario:switcher-standard-panel`.

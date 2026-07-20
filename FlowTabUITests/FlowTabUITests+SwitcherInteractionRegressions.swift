@@ -1,6 +1,73 @@
 import XCTest
 
 extension FlowTabUITests {
+    func testHomeAndFreshOptionTabUseSameRuntimeAppOrder() throws {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-enable-mock-hotkey-effects",
+                "--flowtab-ui-listen-switcher-trigger",
+                "--flowtab-ui-ax-trusted",
+                "YES",
+                "--flowtab-ui-screen-trusted",
+                "YES",
+                "-showPermissionReminder",
+                "NO",
+            ]
+        )
+        launchFlowTabUITestApplication(app)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 10))
+        XCTAssertTrue(
+            tapFirstHittable(
+                in: app.buttons.matching(identifier: Identifier.homeTabButton),
+                timeout: 5
+            )
+        )
+        XCTAssertTrue(element(in: app, identifier: Identifier.homeTabContent).waitForExistence(timeout: 5))
+
+        let appIDs = [
+            "com.flowtab.mock.mail",
+            "com.flowtab.mock.browser",
+            "com.flowtab.mock.flow-search",
+            "com.xxx.test",
+            "com.xxx.csgo",
+            "com.flowtab.mock.file-transfer-assistant",
+        ]
+        let homeRows = appIDs.map { appID in
+            (
+                appID,
+                element(
+                    in: app,
+                    identifier: "flowtab.home.app.\(appID.flowTabUITestAccessibilityIdentifierComponent)"
+                )
+            )
+        }
+        for (_, row) in homeRows {
+            XCTAssertTrue(row.waitForExistence(timeout: 6))
+        }
+        let homeOrder = homeRows
+            .sorted { $0.1.frame.minY < $1.1.frame.minY }
+            .map(\.0)
+
+        let diagnosticsSummary = element(in: app, identifier: Identifier.switcherSummary)
+        app.activate()
+        XCUIElement.perform(withKeyModifiers: .option) {
+            app.typeKey(.tab, modifierFlags: .option)
+
+            XCTAssertTrue(diagnosticsSummary.waitForExistence(timeout: 5))
+            let switcherOrder = switcherPanelDiagnosticsValue(
+                diagnosticsSummary,
+                key: "apps"
+            )
+            .split(separator: "|")
+            .compactMap { entry in
+                entry.split(separator: ":", maxSplits: 1).first.map(String.init)
+            }
+            XCTAssertEqual(switcherOrder, homeOrder)
+        }
+    }
+
     func testControlTabFirstPhysicalGestureSelectsNextWindowWithVisiblePreview() throws {
         let app = makeApp(
             additionalArguments: [

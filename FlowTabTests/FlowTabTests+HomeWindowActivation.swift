@@ -600,7 +600,7 @@ extension FlowTabTests {
         XCTAssertEqual(runtimeProjectionService.appWindowChangeSignalsRecorded().map(\.appID), [appID, appID])
     }
 
-    func testHomeRuntimeRefreshReaderPreservesVisibleOrderWhileUpdatingProjectionValues() {
+    func testHomeRuntimeRefreshReaderAdoptsLatestRuntimeProjectionOrder() {
         let currentSummaries = [
             makeHomeAppSummary(appID: "com.example.mail", displayName: "Mail", rank: 0),
             makeHomeAppSummary(appID: "com.example.browser", displayName: "Browser", rank: 1),
@@ -655,19 +655,19 @@ extension FlowTabTests {
         XCTAssertEqual(
             read.summaries.map(\.appID),
             [
-                "com.example.mail",
-                "com.example.browser",
                 "com.example.notes",
                 "com.example.calendar",
+                "com.example.mail",
+                "com.example.browser",
             ]
         )
         XCTAssertEqual(read.summaries.map(\.displayName), [
-            "Mail Updated",
-            "Browser Updated",
             "Notes Updated",
             "Calendar",
+            "Mail Updated",
+            "Browser Updated",
         ])
-        XCTAssertEqual(read.summaries.map(\.windowCount), [4, 5, 3, 2])
+        XCTAssertEqual(read.summaries.map(\.windowCount), [3, 2, 4, 5])
     }
 
     func testHomeRuntimeRefreshReaderRetriesIncompleteEmptyDetailProjection() {
