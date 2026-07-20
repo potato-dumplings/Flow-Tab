@@ -5,7 +5,8 @@ import Foundation
 enum RuntimeAppRankProvider {
     static func collectAppRankByPID(for runningApps: [NSRunningApplication]) -> [pid_t: Int] {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let fallbackRankByPID = collectWindowStackRankByPID()
+        let needsBootstrapFallback = SystemAppMRUTracker.shared.requiresBootstrapFallback()
+        let fallbackRankByPID = needsBootstrapFallback ? collectWindowStackRankByPID() : [:]
         let fallbackReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let rankByPID = SystemAppMRUTracker.shared.rankByPID(
             for: runningApps,
@@ -16,6 +17,7 @@ enum RuntimeAppRankProvider {
             "collectAppRank",
             fields: [
                 ("apps", "\(runningApps.count)"),
+                ("bootstrapFallback", needsBootstrapFallback ? "1" : "0"),
                 ("fallbackPIDs", "\(fallbackRankByPID.count)"),
                 ("rankedPIDs", "\(rankByPID.count)"),
                 ("fallbackMs", RuntimeProjectionDiagnostics.formatMilliseconds(fallbackReadyMs - startMs)),
@@ -27,7 +29,7 @@ enum RuntimeAppRankProvider {
     }
 
     private static func collectWindowStackRankByPID() -> [pid_t: Int] {
-        let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
+        let options: CGWindowListOption = [.optionAll, .excludeDesktopElements]
         guard
             let rawList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]]
         else {

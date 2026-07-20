@@ -47,6 +47,9 @@
 		A1B2C41A2F73000100B0D737 /* SwitcherSearchCoordinator+Tokenization.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C40A2F73000100B0D737 /* SwitcherSearchCoordinator+Tokenization.swift */; };
 		A1B2C4392F73000100B0D737 /* AccessibilityPermissionChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4302F73000100B0D737 /* AccessibilityPermissionChecker.swift */; };
 		A1B2C43A2F73000100B0D737 /* SystemAppMRUTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4312F73000100B0D737 /* SystemAppMRUTracker.swift */; };
+		A4D100043B20000100B0D737 /* SystemAppMRUState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4D100033B20000100B0D737 /* SystemAppMRUState.swift */; };
+		A4D100023B20000100B0D737 /* FlowTabPriorityCoverageTests+SystemAppMRU.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4D100013B20000100B0D737 /* FlowTabPriorityCoverageTests+SystemAppMRU.swift */; };
+		A4D100063B20000100B0D737 /* FlowTabUITests+SystemAppMRU.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4D100053B20000100B0D737 /* FlowTabUITests+SystemAppMRU.swift */; };
 		A1B2C43B2F73000100B0D737 /* RuntimeSystemRepairFactProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4322F73000100B0D737 /* RuntimeSystemRepairFactProvider.swift */; };
 		F6E7E00235C2000100B0D737 /* RuntimeProjectionRepairProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7E00135C2000100B0D737 /* RuntimeProjectionRepairProvider.swift */; };
 		F6E7E50235C5000200B0D737 /* RuntimeProjectionRepairContract.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6E7E50135C5000200B0D737 /* RuntimeProjectionRepairContract.swift */; };
@@ -301,6 +304,9 @@
 		A1B2C40A2F73000100B0D737 /* SwitcherSearchCoordinator+Tokenization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherSearchCoordinator+Tokenization.swift"; sourceTree = "<group>"; };
 		A1B2C4302F73000100B0D737 /* AccessibilityPermissionChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityPermissionChecker.swift; sourceTree = "<group>"; };
 		A1B2C4312F73000100B0D737 /* SystemAppMRUTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAppMRUTracker.swift; sourceTree = "<group>"; };
+		A4D100033B20000100B0D737 /* SystemAppMRUState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAppMRUState.swift; sourceTree = "<group>"; };
+		A4D100013B20000100B0D737 /* FlowTabPriorityCoverageTests+SystemAppMRU.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+SystemAppMRU.swift"; sourceTree = "<group>"; };
+		A4D100053B20000100B0D737 /* FlowTabUITests+SystemAppMRU.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SystemAppMRU.swift"; sourceTree = "<group>"; };
 		A1B2C4322F73000100B0D737 /* RuntimeSystemRepairFactProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeSystemRepairFactProvider.swift; sourceTree = "<group>"; };
 		F6E7E00135C2000100B0D737 /* RuntimeProjectionRepairProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionRepairProvider.swift; sourceTree = "<group>"; };
 		F6E7E50135C5000200B0D737 /* RuntimeProjectionRepairContract.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionRepairContract.swift; sourceTree = "<group>"; };
@@ -589,6 +595,7 @@
 				7A1B2C3D4E5F600200B0D737 /* FlowTabPriorityCoverageTests.swift */,
 				B10001072F76000100B0D737 /* FlowTabPriorityCoverageTests+SessionAndPanelSearch.swift */,
 				B10001082F76000100B0D737 /* FlowTabPriorityCoverageTests+HotkeyMonitorAndRuntimeState.swift */,
+				A4D100013B20000100B0D737 /* FlowTabPriorityCoverageTests+SystemAppMRU.swift */,
 				B10001092F76000100B0D737 /* FlowTabPriorityCoverageTests+AppDelegateLifecycle.swift */,
 				B100010A2F76000100B0D737 /* FlowTabPriorityCoverageTests+PanelSessionBehavior.swift */,
 				C1F000013A20000100B0D737 /* FlowTabPriorityCoverageTests+SwitcherInteractionRegressions.swift */,
@@ -631,6 +638,7 @@
 				F7B8C9D535B8000100B0D737 /* FlowTabUITests+LaunchAtLoginSettings.swift */,
 				B10002032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift */,
 				C1F100013A20000100B0D737 /* FlowTabUITests+SwitcherInteractionRegressions.swift */,
+				A4D100053B20000100B0D737 /* FlowTabUITests+SystemAppMRU.swift */,
 				F8A1000136B0000100B0D737 /* FlowTabUITests+RuntimeProjectionPublication.swift */,
 				B31002012FF400100B0D737 /* FlowTabUITests+StatusItem.swift */,
 				B10002042F76000100B0D737 /* FlowTabUITests+Support.swift */,
@@ -737,6 +745,7 @@
 				A1B2C3D22F73000100B0D737 /* RuntimeBridge.swift */,
 				A1B2C4302F73000100B0D737 /* AccessibilityPermissionChecker.swift */,
 				A1B2C4312F73000100B0D737 /* SystemAppMRUTracker.swift */,
+				A4D100033B20000100B0D737 /* SystemAppMRUState.swift */,
 				A1B2C4322F73000100B0D737 /* RuntimeSystemRepairFactProvider.swift */,
 				F6E7E00135C2000100B0D737 /* RuntimeProjectionRepairProvider.swift */,
 				F6E7E50135C5000200B0D737 /* RuntimeProjectionRepairContract.swift */,
@@ -1153,6 +1162,7 @@
 				A1B2C3D52F73000100B0D737 /* RuntimeBridge.swift in Sources */,
 				A1B2C4392F73000100B0D737 /* AccessibilityPermissionChecker.swift in Sources */,
 				A1B2C43A2F73000100B0D737 /* SystemAppMRUTracker.swift in Sources */,
+				A4D100043B20000100B0D737 /* SystemAppMRUState.swift in Sources */,
 				A1B2C43B2F73000100B0D737 /* RuntimeSystemRepairFactProvider.swift in Sources */,
 				F6E7E00235C2000100B0D737 /* RuntimeProjectionRepairProvider.swift in Sources */,
 				F6E7E50235C5000200B0D737 /* RuntimeProjectionRepairContract.swift in Sources */,
@@ -1269,6 +1279,7 @@
 				7A1B2C3D4E5F600100B0D737 /* FlowTabPriorityCoverageTests.swift in Sources */,
 				B10011072F76000100B0D737 /* FlowTabPriorityCoverageTests+SessionAndPanelSearch.swift in Sources */,
 				B10011082F76000100B0D737 /* FlowTabPriorityCoverageTests+HotkeyMonitorAndRuntimeState.swift in Sources */,
+				A4D100023B20000100B0D737 /* FlowTabPriorityCoverageTests+SystemAppMRU.swift in Sources */,
 				B10011092F76000100B0D737 /* FlowTabPriorityCoverageTests+AppDelegateLifecycle.swift in Sources */,
 				B100110A2F76000100B0D737 /* FlowTabPriorityCoverageTests+PanelSessionBehavior.swift in Sources */,
 				C1F000023A20000100B0D737 /* FlowTabPriorityCoverageTests+SwitcherInteractionRegressions.swift in Sources */,
@@ -1318,6 +1329,7 @@
 				F7B8C9D635B8000100B0D737 /* FlowTabUITests+LaunchAtLoginSettings.swift in Sources */,
 				B10012032F76000100B0D737 /* FlowTabUITests+SwitcherAndSearch.swift in Sources */,
 				C1F100023A20000100B0D737 /* FlowTabUITests+SwitcherInteractionRegressions.swift in Sources */,
+				A4D100063B20000100B0D737 /* FlowTabUITests+SystemAppMRU.swift in Sources */,
 				F8A1000236B0000100B0D737 /* FlowTabUITests+RuntimeProjectionPublication.swift in Sources */,
 				B31012012FF400100B0D737 /* FlowTabUITests+StatusItem.swift in Sources */,
 				B10012042F76000100B0D737 /* FlowTabUITests+Support.swift in Sources */,

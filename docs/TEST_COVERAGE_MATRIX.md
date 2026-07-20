@@ -136,22 +136,22 @@ The six layer keys are `Unit`, `Behavior`, `Mock UI`, `Real-topology UI`, `Press
 
 - Requiredness: required
 - Owner: `Home`
-- Oracle: The current runtime projection drives exact Home counts, per-app windows, ordering, and exact-window activation. For an unchanged runtime rank, Home and a freshly opened app switcher expose the same app order.
+- Oracle: The current runtime projection drives exact Home counts, per-app windows, ordering, and exact-window activation. Application order is a canonical app-identity MRU: the first runtime sample establishes its baseline, application lifecycle events update it, and FlowTab relaunch restores it. For an unchanged MRU, Home and every freshly opened app switcher expose the same app order.
 - Risk: `deterministic-rule`, `app-orchestration`, `visible-workflow`, `real-topology-external-system`, `hot-path-scale-sensitive`
 - Required layers:
-  - Unit: Own counts, filtering, recency, hidden-last presentation, and exact activation target rules.
-  - Behavior: Prove Home reads runtime projections and requests repair without a surface snapshot bridge.
-  - Mock UI: Prove visible counts, app selection, filtering, and window rows with deterministic runtime data.
-  - Real-topology UI: Prove per-app real windows, recency, and exact-window activation.
+  - Unit: Own counts, filtering, recency, hidden-last presentation, exact activation target rules, and canonical app-MRU bootstrap, persistence schema, reconciliation, and lifecycle transitions.
+  - Behavior: Prove Home reads runtime projections and requests repair without a surface snapshot bridge, and prove unchanged fallback samples and FlowTab relaunch preserve canonical app order.
+  - Mock UI: Prove visible counts, app selection, filtering, window rows, and cross-surface app order with deterministic runtime data.
+  - Real-topology UI: Prove per-app real windows, recency, exact-window activation, and canonical app order across FlowTab relaunch and repeated fresh switcher sessions.
 - Conditional layers:
-  - Pressure: Required when Home projection refresh, inventory, or window-list cost changes with scale or cadence.
+  - Pressure: Required when Home projection refresh, app-rank sampling, inventory, or window-list cost changes with scale or cadence.
 - Not relevant layers:
   - Process/Tooling: Real-topology fixture mechanics are owned by the space-fixture-infrastructure scenario.
 - Current representative test anchors:
-  - Unit: `FlowTabPriorityCoverageTests.testRuntimeWindowRecencyTrackerAppliesSameOrderingToCurrentAppPayload`
-  - Behavior: `FlowTabTests.testHomeRuntimeProjectionReaderUsesRuntimeProjectionsWithoutSnapshotBridge`, `FlowTabTests.testHomeRuntimeRefreshReaderAdoptsLatestRuntimeProjectionOrder`
+  - Unit: `FlowTabPriorityCoverageTests.testRuntimeWindowRecencyTrackerAppliesSameOrderingToCurrentAppPayload`, `FlowTabPriorityCoverageTests.testSystemAppMRUStateBootstrapUsesFrontmostThenGlobalFallbackAndLaunchOrder`, `FlowTabPriorityCoverageTests.testSystemAppMRUStateRestoresAppIDOrderAcrossNewProcessIdentifiers`
+  - Behavior: `FlowTabTests.testHomeRuntimeProjectionReaderUsesRuntimeProjectionsWithoutSnapshotBridge`, `FlowTabTests.testHomeRuntimeRefreshReaderAdoptsLatestRuntimeProjectionOrder`, `FlowTabPriorityCoverageTests.testSystemAppMRUTrackerKeepsKnownOrderWhenFallbackSampleChanges`, `FlowTabPriorityCoverageTests.testSystemAppMRUTrackerPersistsActivationAndReloadsCanonicalOrder`
   - Mock UI: `FlowTabUITests.testHomeAppLayerMarksHiddenAppsAndSortsThemLast`, `FlowTabUITests.testHomeAndFreshOptionTabUseSameRuntimeAppOrder`
-  - Real-topology UI: `FlowTabUITests.testHomePageClickingRealWorkflowWindowActivatesExactFixtureWindow`
+  - Real-topology UI: `FlowTabUITests.testHomePageClickingRealWorkflowWindowActivatesExactFixtureWindow`, `FlowTabUITests.testSystemAppMRUOrderSurvivesRelaunchAndRepeatedFreshSwitcherSessions`
 - Exhaustive mapping: query active ledger rows whose `product_scenario_ids` contains `scenario:home-app-window-list`.
 
 ### `scenario:hotkey-configuration-normalization` — Hotkey configuration normalization
@@ -456,7 +456,7 @@ The six layer keys are `Unit`, `Behavior`, `Mock UI`, `Real-topology UI`, `Press
   - Unit: Own navigation, commit, paging, and pointer-selection rules.
   - Behavior: Prove projection publication, panel routing, refresh, interruption, and commit orchestration.
   - Mock UI: Prove opening, navigation, pointer selection, click commit, and close behavior.
-  - Real-topology UI: Prove fullscreen/off-Space app-window ordering and activation through real fixture topology.
+  - Real-topology UI: Prove fullscreen/off-Space app-window ordering and activation through real fixture topology, plus canonical app order across FlowTab relaunch and repeated fresh switcher sessions.
   - Pressure: Protect fast start, large window sets, preview capture, repeated switching, and cancellation.
 - Not relevant layers:
   - Process/Tooling: Shared UI and pressure runners are governed by performance-pressure-gates.
@@ -464,7 +464,7 @@ The six layer keys are `Unit`, `Behavior`, `Mock UI`, `Real-topology UI`, `Press
   - Unit: `SwitcherSessionEdgeTests.testCommitInWindowCycleReturnsWindowAndStoresRememberedWindowID`
   - Behavior: `FlowTabPriorityCoverageTests.testSwitcherPanelControllerGlobalHotkeyStartsFromAppSwitcherProjection`, `FlowTabPriorityCoverageTests.testSwitcherPanelRemainsPresentedDuringCommittedWindowActivation`, `FlowTabPriorityCoverageTests.testWindowOnlyPanelUsesResponsiveContentBounds`
   - Mock UI: `FlowTabUITests.testOptionTabDelayedWindowLayerEntryShowsPrewarmedPreviewAtTransition`, `FlowTabUITests.testOptionTabSwitcherClickCommitsAppAndClosesPanel`, `FlowTabUITests.testHomeAndFreshOptionTabUseSameRuntimeAppOrder`
-  - Real-topology UI: `FlowTabUITests.testSwitcherPanelOptionTabWindowStateRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithNoisyCGSiblingsWithoutAppAXWindows`
+  - Real-topology UI: `FlowTabUITests.testSwitcherPanelOptionTabWindowStateRoundTripsFullscreenWorkflowSiblingAcrossSpacesWithNoisyCGSiblingsWithoutAppAXWindows`, `FlowTabUITests.testSystemAppMRUOrderSurvivesRelaunchAndRepeatedFreshSwitcherSessions`
   - Pressure: `FlowTabPriorityCoverageTests.testSwitcherInitialVisibilityRecoveryRapidOpenClosePressureDoesNotReplayStaleTasks`
 - Exhaustive mapping: query active ledger rows whose `product_scenario_ids` contains `scenario:switcher-standard-panel`.
 

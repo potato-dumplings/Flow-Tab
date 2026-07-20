@@ -24,6 +24,7 @@ enum FlowTabTestLaunchOptions {
         "--flowtab-ui-open-in-app-window-switcher",
         "--flowtab-ui-open-switcher",
         "--flowtab-ui-open-switcher-search",
+        "--flowtab-ui-preserve-system-app-mru",
         "--flowtab-ui-record-hotkey-reload-diagnostics",
         "--flowtab-ui-reset-defaults",
         "--flowtab-ui-runtime-log-level",
@@ -61,6 +62,11 @@ enum FlowTabTestLaunchOptions {
 
     static var resetsUserDefaultsOnLaunch: Bool {
         containsUITestArgument("--flowtab-ui-reset-defaults")
+    }
+
+    static var resetsSystemAppMRUOnLaunch: Bool {
+        resetsUserDefaultsOnLaunch
+            && !containsUITestArgument("--flowtab-ui-preserve-system-app-mru")
     }
 
     static var opensSwitcherOnLaunch: Bool {
