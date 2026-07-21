@@ -900,12 +900,12 @@ extension FlowTabPriorityCoverageTests {
 
     func testOptionTabHotkeyMonitorRegistrationFailureLogsError() async {
         let defaults = UserDefaults.standard
-        let previousVerbose = defaults.object(forKey: AppPreferenceKeys.enableVerboseDiagnostics)
+        let previousExpiration = defaults.object(forKey: AppPreferenceKeys.diagnosticSessionExpiration)
         let previousLevel = defaults.object(forKey: AppPreferenceKeys.runtimeLogLevel)
         defer {
             restoreUserDefaultsValue(
-                previousVerbose,
-                forKey: AppPreferenceKeys.enableVerboseDiagnostics,
+                previousExpiration,
+                forKey: AppPreferenceKeys.diagnosticSessionExpiration,
                 userDefaults: defaults
             )
             restoreUserDefaultsValue(
@@ -916,7 +916,7 @@ extension FlowTabPriorityCoverageTests {
             RuntimeDiagnostics.shared.clear()
         }
 
-        defaults.set(false, forKey: AppPreferenceKeys.enableVerboseDiagnostics)
+        RuntimeDiagnosticSessionStore.stop(userDefaults: defaults)
         defaults.set(RuntimeLogLevel.debug.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
         RuntimeDiagnostics.shared.clear()
         _ = await RuntimeDiagnostics.shared.makeReadSnapshot()
@@ -937,7 +937,10 @@ extension FlowTabPriorityCoverageTests {
 
         let lines = await RuntimeDiagnostics.shared.readRecentLines(limit: 20, minimumLevel: .error)
         let registerFailureLines = lines.filter {
-            $0.contains("[ERROR] [HotKey] register failed signature=1413829460")
+            $0.contains("[ERROR] [HotKey]")
+                && $0.contains("field0.value.type=text")
+                && $0.contains("field0.value.length=10")
+                && $0.contains("field0.value.fingerprint=")
         }
 
         XCTAssertEqual(registerCalls, [11, 22])

@@ -26,6 +26,7 @@ enum FlowTabTestLaunchOptions {
         "--flowtab-ui-open-switcher",
         "--flowtab-ui-open-switcher-search",
         "--flowtab-ui-record-hotkey-reload-diagnostics",
+        "--flowtab-ui-redacted-runtime-logs",
         "--flowtab-ui-reset-defaults",
         "--flowtab-ui-runtime-log-level",
         "--flowtab-ui-screen-trusted",
@@ -139,6 +140,10 @@ enum FlowTabTestLaunchOptions {
 
     static var enablesVerboseRuntimeLogs: Bool {
         containsUITestArgument("--flowtab-ui-enable-verbose-logs")
+    }
+
+    static var requiresRedactedRuntimeLogs: Bool {
+        containsUITestArgument("--flowtab-ui-redacted-runtime-logs")
     }
 
     static var recordsHotkeyReloadDiagnostics: Bool {

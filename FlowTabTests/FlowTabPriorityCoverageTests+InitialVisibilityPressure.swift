@@ -134,21 +134,27 @@ extension FlowTabPriorityCoverageTests {
         controller.globalPrimaryModifierPressedOverride = true
 
         let defaults = UserDefaults.standard
-        let previousVerbose = defaults.object(forKey: AppPreferenceKeys.enableVerboseDiagnostics)
+        let previousExpiration = defaults.object(forKey: AppPreferenceKeys.diagnosticSessionExpiration)
         let previousLevel = defaults.object(forKey: AppPreferenceKeys.runtimeLogLevel)
-        defaults.set(true, forKey: AppPreferenceKeys.enableVerboseDiagnostics)
+        RuntimeDiagnosticSessionStore.start(userDefaults: defaults)
         defaults.set(RuntimeLogLevel.debug.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
 
         let iterationCount = 200
         let triggerPrefix = "initial_visibility_pressure_\(UUID().uuidString)"
+        let privacyFormatter = RuntimeLogPrivacyFormatter(
+            keyData: RuntimeLogFileStore.shared.loadOrCreatePrivacyFingerprintKey()
+        )
+        let triggerFingerprintTokens = Set((0..<iterationCount).map { index in
+            "field0.value.fingerprint=\(privacyFormatter.stableFingerprint(for: "\(triggerPrefix)_\(index)"))"
+        })
         let logSnapshot = await RuntimeDiagnostics.shared.makeReadSnapshot()
         let startGeneration = controller.initialPresentationVisibilityGeneration
         let startRecoveryGeneration = controller.panelPresentationRecoveryGeneration
 
         defer {
             restoreUserDefaultsValue(
-                previousVerbose,
-                forKey: AppPreferenceKeys.enableVerboseDiagnostics,
+                previousExpiration,
+                forKey: AppPreferenceKeys.diagnosticSessionExpiration,
                 userDefaults: defaults
             )
             restoreUserDefaultsValue(
@@ -247,13 +253,18 @@ extension FlowTabPriorityCoverageTests {
             minimumLevel: .debug,
             since: logSnapshot
         )
-        let pressureLines = deltaLines.filter { $0.contains(triggerPrefix) }
-        let trackedLines = pressureLines.filter { $0.contains("action=trackInitialVisibility") }
+        let pressureLines = deltaLines.filter { line in
+            line.contains("[SearchTrace]")
+                && triggerFingerprintTokens.contains { line.contains($0) }
+        }
+        let trackedLines = pressureLines.filter {
+            $0.contains("event.length=\("presentationRecovery".count)")
+                && $0.contains("field1.value.length=\("trackInitialVisibility".count)")
+        }
         let staleExecutionLines = pressureLines.filter { line in
-            line.contains("action=softAttempt")
-                || line.contains("action=complete")
-                || line.contains("action=failed")
-                || line.contains("systemInterruption")
+            line.contains("field1.value.length=\("softAttempt".count)")
+                || line.contains("field1.value.length=\("complete".count)")
+                || line.contains("field1.value.length=\("failed".count)")
         }
 
         XCTAssertEqual(trackedLines.count, iterationCount)

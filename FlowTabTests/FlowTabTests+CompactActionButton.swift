@@ -41,13 +41,13 @@ extension FlowTabTests {
     @MainActor
     func testRuntimeLogsActionsUseSharedCompactActionButtons() throws {
         let appearance = try XCTUnwrap(NSAppearance(named: .aqua))
-        var enableVerboseDiagnostics = false
+        var diagnosticSessionExpiration = 0.0
         var runtimeLogLevelRaw = RuntimeLogLevel.info.rawValue
         let hostedView = NSHostingView(
             rootView: RuntimeLogsSection(
-                enableVerboseDiagnostics: Binding(
-                    get: { enableVerboseDiagnostics },
-                    set: { enableVerboseDiagnostics = $0 }
+                diagnosticSessionExpiration: Binding(
+                    get: { diagnosticSessionExpiration },
+                    set: { diagnosticSessionExpiration = $0 }
                 ),
                 runtimeLogLevelRaw: Binding(
                     get: { runtimeLogLevelRaw },

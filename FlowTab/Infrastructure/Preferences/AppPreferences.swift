@@ -19,6 +19,7 @@ enum AppPreferenceKeys {
     static let searchEnabled = "searchEnabled"
     static let searchDefaultScope = "searchDefaultScope"
     static let enableVerboseDiagnostics = "enableVerboseDiagnostics"
+    static let diagnosticSessionExpiration = "diagnosticSessionExpiration"
     static let runtimeLogLevel = "runtimeLogLevel"
     static let themeMode = "themeMode"
     static let appLanguage = "appLanguage"
@@ -41,6 +42,7 @@ enum AppPreferenceKeys {
         searchEnabled,
         searchDefaultScope,
         enableVerboseDiagnostics,
+        diagnosticSessionExpiration,
         runtimeLogLevel,
         themeMode,
         appLanguage

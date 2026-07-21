@@ -444,6 +444,7 @@ extension FlowTabUITests {
                 "4",
                 "--flowtab-ui-runtime-log-level",
                 "debug",
+                "--flowtab-ui-redacted-runtime-logs",
                 "-showPermissionReminder",
                 "NO"
             ]
@@ -459,6 +460,16 @@ extension FlowTabUITests {
             .firstMatch
         XCTAssertTrue(logsTabContent.waitForExistence(timeout: 5))
 
+        XCTAssertTrue(element(in: app, identifier: Identifier.logsPrivacyNotice).waitForExistence(timeout: 5))
+        let diagnosticSessionToggle = toggleElement(in: app, identifier: Identifier.logsDiagnosticSession)
+        XCTAssertTrue(diagnosticSessionToggle.waitForExistence(timeout: 5))
+        setToggle(diagnosticSessionToggle, to: true)
+        XCTAssertTrue(
+            element(in: app, identifier: Identifier.logsDiagnosticSessionStatus)
+                .waitForExistence(timeout: 5)
+        )
+        setToggle(diagnosticSessionToggle, to: false)
+
         let logsLines = app.descendants(matching: .any)
             .matching(identifier: Identifier.logsLines)
             .firstMatch
@@ -469,6 +480,7 @@ extension FlowTabUITests {
             (Identifier.logsSeededWarnLine, "seeded-warn-log-3"),
             (Identifier.logsSeededErrorLine, "seeded-error-log-4")
         ]
+        var persistedFingerprints: [String] = []
         for expectedSeededLog in expectedSeededLogs {
             let line = app.descendants(matching: .any)
                 .matching(identifier: expectedSeededLog.identifier)
@@ -478,11 +490,15 @@ extension FlowTabUITests {
                 "Missing seeded log row: \(expectedSeededLog.identifier)"
             )
             let lineValue = (line.value as? String) ?? line.label
-            XCTAssertTrue(
-                lineValue.contains(expectedSeededLog.marker),
-                "Unexpected seeded log value for \(expectedSeededLog.identifier): \(lineValue)"
-            )
+            XCTAssertFalse(lineValue.contains(expectedSeededLog.marker))
+            XCTAssertTrue(lineValue.contains("message.type=structured"))
+            XCTAssertTrue(lineValue.contains("message.fingerprint="))
+            let fingerprintSuffix = lineValue.components(separatedBy: "message.fingerprint=").dropFirst().first
+            let fingerprint = fingerprintSuffix?.split(separator: " ").first.map(String.init)
+            persistedFingerprints.append(try XCTUnwrap(fingerprint))
         }
+        let diskContentsBeforeClear = runtimeLogContentsSinceSnapshot([:])
+        XCTAssertTrue(persistedFingerprints.allSatisfy { diskContentsBeforeClear.contains($0) })
         XCTAssertFalse(app.descendants(matching: .any).matching(identifier: Identifier.logsEmptyHint).firstMatch.exists)
 
         selectOption(in: app, controlIdentifier: Identifier.logsLevel, optionIdentifier: "WARN")
@@ -521,9 +537,8 @@ extension FlowTabUITests {
             .firstMatch
         XCTAssertTrue(logsEmptyHint.waitForExistence(timeout: 5))
 
-        let seededMarkers = expectedSeededLogs.map(\.marker)
         let clearedDiskContents = runtimeLogContentsSinceSnapshot([:])
-        XCTAssertTrue(seededMarkers.allSatisfy { !clearedDiskContents.contains($0) })
+        XCTAssertTrue(persistedFingerprints.allSatisfy { !clearedDiskContents.contains($0) })
 
         app.terminate()
         let relaunchedApp = makeApp(
@@ -548,7 +563,7 @@ extension FlowTabUITests {
             )
         }
         let relaunchedDiskContents = runtimeLogContentsSinceSnapshot([:])
-        XCTAssertTrue(seededMarkers.allSatisfy { !relaunchedDiskContents.contains($0) })
+        XCTAssertTrue(persistedFingerprints.allSatisfy { !relaunchedDiskContents.contains($0) })
     }
 
     func testLogsPageRespectsRuntimeLogLevelVisibility() throws {

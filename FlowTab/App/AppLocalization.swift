@@ -149,6 +149,8 @@ enum AppStringKey: String {
     case logsSectionTitle
     case logsSectionSubtitle
     case logsEnableVerbose
+    case logsDiagnosticSessionStatus
+    case logsPrivacyNotice
     case logsLevel
     case logsDirectory
     case logsOpenDirectory
@@ -301,10 +303,12 @@ enum AppStrings {
             .permissionHomeReminderToggle: "无权限时是否在首页提示获取权限",
             .permissionLaunchAtLoginToggle: "允许开机启动 FlowTab",
             .logsPageTitle: "日志",
-            .logsPageSubtitle: "运行日志查看与清理",
+            .logsPageSubtitle: "脱敏运行日志、限时诊断与清理",
             .logsSectionTitle: "日志",
-            .logsSectionSubtitle: "仅日志相关信息",
-            .logsEnableVerbose: "启用详细运行日志（高频，可能影响性能）",
+            .logsSectionSubtitle: "所有持久化内容均为脱敏元数据",
+            .logsEnableVerbose: "启动 15 分钟详细诊断会话",
+            .logsDiagnosticSessionStatus: "详细诊断会话已开启，将在约 {minutes} 分钟后自动结束",
+            .logsPrivacyNotice: "日志仅保存事件类型、长度、计数和安装内稳定指纹。窗口标题、搜索词、浏览器标签标题和应用路径统一转换为脱敏元数据；诊断会话只增加高频脱敏事件。",
             .logsLevel: "日志等级",
             .logsDirectory: "本地日志目录：{path}",
             .logsOpenDirectory: "打开目录",
@@ -452,10 +456,12 @@ enum AppStrings {
             .permissionHomeReminderToggle: "Show Home reminder when permissions are missing",
             .permissionLaunchAtLoginToggle: "Allow FlowTab to launch at login",
             .logsPageTitle: "Logs",
-            .logsPageSubtitle: "View and clean runtime logs",
+            .logsPageSubtitle: "Redacted runtime logs, timed diagnostics, and cleanup",
             .logsSectionTitle: "Logs",
-            .logsSectionSubtitle: "Runtime log tools",
-            .logsEnableVerbose: "Enable verbose runtime logs (high-frequency, may impact performance)",
+            .logsSectionSubtitle: "All persisted content is redacted metadata",
+            .logsEnableVerbose: "Start a 15-minute diagnostic session",
+            .logsDiagnosticSessionStatus: "Detailed diagnostics are active and end automatically in about {minutes} minutes",
+            .logsPrivacyNotice: "Logs retain event types, lengths, counts, and installation-stable fingerprints. Window titles, search terms, browser tab titles, and application paths are converted to this redacted metadata; diagnostic sessions add only high-frequency redacted events.",
             .logsLevel: "Log level",
             .logsDirectory: "Local logs directory: {path}",
             .logsOpenDirectory: "Open Directory",

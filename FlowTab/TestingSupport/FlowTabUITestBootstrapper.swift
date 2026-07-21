@@ -68,7 +68,7 @@ enum FlowTabUITestBootstrapper {
         }
 
         if FlowTabTestLaunchOptions.enablesVerboseRuntimeLogs {
-            userDefaults.set(true, forKey: AppPreferenceKeys.enableVerboseDiagnostics)
+            RuntimeDiagnosticSessionStore.start(userDefaults: userDefaults)
         }
 
         installHotkeyReloadDiagnosticsIfNeeded()

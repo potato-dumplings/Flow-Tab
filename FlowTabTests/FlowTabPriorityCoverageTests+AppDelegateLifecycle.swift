@@ -1032,6 +1032,7 @@ extension FlowTabPriorityCoverageTests {
             "--flowtab-ui-reset-defaults",
             "--flowtab-ui-runtime-log-level", "warn",
             "--flowtab-ui-seed-logs", "3",
+            "--flowtab-ui-redacted-runtime-logs",
             "--flowtab-ui-open-switcher-search"
         ]
         FlowTabTestLaunchOptions.environmentOverrideForTesting = [
@@ -1083,8 +1084,10 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(panelController.modelForTesting.isSearchActive)
         XCTAssertNotNil(panelController.modelForTesting.session)
 
-        XCTAssertFalse(lines.contains(where: { $0.contains("before-seed-cleanup") }))
-        let seededLines = lines.filter { $0.contains("[UITest] seeded-") }
+        XCTAssertFalse(lines.contains(where: { $0.contains("[UnitTest]") }))
+        let seededLines = lines.filter {
+            $0.contains("[UITest]") && $0.contains("message.fieldCount=0")
+        }
         XCTAssertEqual(seededLines.count, 3)
     }
 
@@ -1281,8 +1284,12 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(hotkeyFactory.records.count, 2)
 
         let lines = await RuntimeDiagnostics.shared.readRecentLines(limit: 40, minimumLevel: .debug)
-        XCTAssertFalse(lines.contains(where: { $0.contains("seed-zero-cleanup") }))
-        XCTAssertFalse(lines.contains(where: { $0.contains("[UITest] seeded-") }))
+        XCTAssertFalse(lines.contains(where: { $0.contains("[UnitTest]") }))
+        XCTAssertFalse(
+            lines.contains {
+                $0.contains("[UITest]") && $0.contains("message.fieldCount=0")
+            }
+        )
     }
 
 }

@@ -70,8 +70,8 @@
 
 - `testLogsPageShowsSeededLogsAndClearRemovesOutput`
   场景：启动时预置 4 条不同级别日志，并把运行时日志级别设为 `debug`。
-  步骤：进入 `Logs` 页面，检查四条带固定标记的日志是否渲染；随后点击“清空日志”按钮。
-  验证：`debug/info/warn/error` 四条预置日志都存在且内容带指定 marker；清空后空状态提示出现。
+  步骤：进入 `Logs` 页面，检查隐私提示和 15 分钟诊断会话开关，验证四条种子日志只呈现脱敏元数据；随后点击“清空日志”。
+  验证：`debug/info/warn/error` 四条预置日志都存在且原始 marker 不落盘；清空后磁盘内容为空，应用重启也不会恢复已清除内容。
 
 - `testLogsPageRespectsRuntimeLogLevelVisibility`
   场景：同样预置四个级别的日志，但分别在 `DEBUG/INFO/WARN/ERROR` 四种运行时过滤级别下验证可见性。

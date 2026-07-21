@@ -192,6 +192,8 @@
 		D1A1B1D42A00000100B0D737 /* FlowTabLaunchTesting.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A1B1C42A00000100B0D737 /* FlowTabLaunchTesting.swift */; };
 		D1A1B1D52A00000100B0D737 /* RuntimeFrontmostProjectionTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1A1B1C52A00000100B0D737 /* RuntimeFrontmostProjectionTestSupport.swift */; };
 		E1F100012B00000100B0D737 /* RuntimeLogging.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F100112B00000100B0D737 /* RuntimeLogging.swift */; };
+		E1F100042B00000100B0D737 /* RuntimeLogPrivacy.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F100142B00000100B0D737 /* RuntimeLogPrivacy.swift */; };
+		E1F100052B00000100B0D737 /* RuntimeLogStoragePrivacy.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F100152B00000100B0D737 /* RuntimeLogStoragePrivacy.swift */; };
 		E1F100022B00000100B0D737 /* RuntimeLogsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F100122B00000100B0D737 /* RuntimeLogsSection.swift */; };
 		E1F100032B00000100B0D737 /* AppDelegate+Testing.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F100132B00000100B0D737 /* AppDelegate+Testing.swift */; };
 		F7B8C9D235B8000100B0D737 /* LaunchAtLoginController.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7B8C9D135B8000100B0D737 /* LaunchAtLoginController.swift */; };
@@ -442,6 +444,8 @@
 		D1A1B1C42A00000100B0D737 /* FlowTabLaunchTesting.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowTabLaunchTesting.swift; sourceTree = "<group>"; };
 		D1A1B1C52A00000100B0D737 /* RuntimeFrontmostProjectionTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeFrontmostProjectionTestSupport.swift; sourceTree = "<group>"; };
 		E1F100112B00000100B0D737 /* RuntimeLogging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeLogging.swift; sourceTree = "<group>"; };
+		E1F100142B00000100B0D737 /* RuntimeLogPrivacy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeLogPrivacy.swift; sourceTree = "<group>"; };
+		E1F100152B00000100B0D737 /* RuntimeLogStoragePrivacy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeLogStoragePrivacy.swift; sourceTree = "<group>"; };
 		E1F100122B00000100B0D737 /* RuntimeLogsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeLogsSection.swift; sourceTree = "<group>"; };
 		E1F100132B00000100B0D737 /* AppDelegate+Testing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "AppDelegate+Testing.swift"; sourceTree = "<group>"; };
 		F7B8C9D135B8000100B0D737 /* LaunchAtLoginController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginController.swift; sourceTree = "<group>"; };
@@ -807,6 +811,8 @@
 				B26000012FE000100B0D737 /* RuntimePerformanceClock.swift */,
 				F7B8C9D135B8000100B0D737 /* LaunchAtLoginController.swift */,
 				E1F100112B00000100B0D737 /* RuntimeLogging.swift */,
+				E1F100142B00000100B0D737 /* RuntimeLogPrivacy.swift */,
+				E1F100152B00000100B0D737 /* RuntimeLogStoragePrivacy.swift */,
 			);
 			path = Runtime;
 			sourceTree = "<group>";
@@ -1162,6 +1168,8 @@
 				C10000262F75000100B0D737 /* String+FlowTabAccessibilitySlug.swift in Sources */,
 				B1C2D3E42F74000100B0D737 /* AppLocalization.swift in Sources */,
 				E1F100012B00000100B0D737 /* RuntimeLogging.swift in Sources */,
+				E1F100042B00000100B0D737 /* RuntimeLogPrivacy.swift in Sources */,
+				E1F100052B00000100B0D737 /* RuntimeLogStoragePrivacy.swift in Sources */,
 				E1F100022B00000100B0D737 /* RuntimeLogsSection.swift in Sources */,
 				E1F100032B00000100B0D737 /* AppDelegate+Testing.swift in Sources */,
 				A1B2C3D42F73000100B0D737 /* OptionTabHotkeyMonitor.swift in Sources */,

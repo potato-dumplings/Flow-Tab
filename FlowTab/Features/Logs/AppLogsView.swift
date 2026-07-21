@@ -7,7 +7,8 @@ struct AppLogsView: View {
     let appLanguage: AppLanguage
     let targetAppearance: NSAppearance
 
-    @AppStorage(AppPreferenceKeys.enableVerboseDiagnostics) private var enableVerboseDiagnostics = false
+    @AppStorage(AppPreferenceKeys.diagnosticSessionExpiration)
+    private var diagnosticSessionExpiration = 0.0
     @AppStorage(AppPreferenceKeys.runtimeLogLevel)
     private var runtimeLogLevelRaw = RuntimeLogPreferencesStore.defaultLevel.rawValue
     @AppStorage(AppPreferenceKeys.hotkeyPrimaryModifier)
@@ -40,7 +41,7 @@ struct AppLogsView: View {
                     }
 
                     RuntimeLogsSection(
-                        enableVerboseDiagnostics: $enableVerboseDiagnostics,
+                        diagnosticSessionExpiration: $diagnosticSessionExpiration,
                         runtimeLogLevelRaw: $runtimeLogLevelRaw,
                         hotkeyShortcutText: hotkeyConfiguration.mainShortcutText,
                         appLanguage: appLanguage,

@@ -115,9 +115,15 @@ final class RuntimeDiagnostics {
         return formatter
     }()
 
-    private let fileStore = RuntimeLogFileStore.shared
+    private let fileStore: RuntimeLogFileStore
+    private let privacyFormatter: RuntimeLogPrivacyFormatter
 
-    private init() {}
+    init(fileStore: RuntimeLogFileStore = .shared) {
+        self.fileStore = fileStore
+        privacyFormatter = RuntimeLogPrivacyFormatter(
+            keyData: fileStore.loadOrCreatePrivacyFingerprintKey()
+        )
+    }
 
     static func formattedTimestamp(_ date: Date) -> String {
         timestampFormatter.string(from: date)
@@ -129,7 +135,15 @@ final class RuntimeDiagnostics {
 
     func log(level: RuntimeLogLevel, category: String, message: String) {
         let timestamp = Date()
-        let displayLine = "[\(Self.formattedTimestamp(timestamp))] [\(level.rawValue)] [\(category)] \(message)"
+        let persistedMessage: String
+#if FLOWTAB_TESTING
+        let usesUnredactedMessages = FlowTabTestLaunchOptions.isRunningUITests
+            && !FlowTabTestLaunchOptions.requiresRedactedRuntimeLogs
+        persistedMessage = usesUnredactedMessages ? message : privacyFormatter.redact(message)
+#else
+        persistedMessage = privacyFormatter.redact(message)
+#endif
+        let displayLine = "[\(Self.formattedTimestamp(timestamp))] [\(level.rawValue)] [\(category)] \(persistedMessage)"
         fileStore.append(displayLine)
     }
 
@@ -156,6 +170,8 @@ final class RuntimeDiagnostics {
 
 final class RuntimeLogFileStore {
     static let shared = RuntimeLogFileStore()
+    static let privacyFingerprintKeyFileName = ".runtime-log-fingerprint-key"
+    static let privacyFormatMarkerFileName = ".runtime-log-privacy-v1"
 
     struct ReadSnapshot {
         let fileSizesByPath: [String: Int]
@@ -180,15 +196,18 @@ final class RuntimeLogFileStore {
         return "\(sanitized)_"
     }()
     private static let logFileExtension = ".log"
+    static let directoryPermissions = 0o700
+    static let filePermissions = 0o600
+    static let fingerprintKeyByteCount = 32
 
     private let queue = DispatchQueue(label: "FlowTab.RuntimeLogFileStore", qos: .utility)
-    private let fileManager: FileManager
+    let fileManager: FileManager
     private let maxFileSizeBytes = 1_000_000
     private let maxLogFiles = 5
     private let flushDelay: TimeInterval = 0.05
     private let immediateFlushThreshold = 120
-    private let logsDirectoryURL: URL
-    private var activeLogURL: URL?
+    let logsDirectoryURL: URL
+    var activeLogURL: URL?
     private var pendingLines: [String] = []
     private var flushWorkItem: DispatchWorkItem?
 
@@ -200,6 +219,7 @@ final class RuntimeLogFileStore {
         self.fileManager = fileManager
         self.logsDirectoryURL = logsDirectoryURL
         activeLogURL = nil
+        try? prepareStorageLocked()
     }
 
     private convenience init() {
@@ -222,6 +242,31 @@ final class RuntimeLogFileStore {
                 return
             }
             self.scheduleFlushLocked()
+        }
+    }
+
+    func loadOrCreatePrivacyFingerprintKey() -> Data {
+        queue.sync {
+            do {
+                try prepareStorageLocked()
+                let keyURL = logsDirectoryURL.appendingPathComponent(
+                    Self.privacyFingerprintKeyFileName,
+                    isDirectory: false
+                )
+                if fileManager.fileExists(atPath: keyURL.path) {
+                    let existingKey = try Data(contentsOf: keyURL)
+                    if existingKey.count == Self.fingerprintKeyByteCount {
+                        try secureFilePermissionsLocked(at: keyURL)
+                        return existingKey
+                    }
+                }
+
+                let keyData = Self.makeRandomFingerprintKey()
+                try replaceSecureFileLocked(at: keyURL, contents: keyData)
+                return keyData
+            } catch {
+                return Self.makeRandomFingerprintKey()
+            }
         }
     }
 
@@ -253,6 +298,7 @@ final class RuntimeLogFileStore {
     func makeReadSnapshot() async -> ReadSnapshot {
         await withCheckedContinuation { continuation in
             queue.async {
+                try? self.prepareStorageLocked()
                 self.flushWorkItem?.cancel()
                 self.flushWorkItem = nil
                 self.flushLocked()
@@ -268,6 +314,7 @@ final class RuntimeLogFileStore {
     ) async -> [String] {
         await withCheckedContinuation { continuation in
             queue.async {
+                try? self.prepareStorageLocked()
                 self.flushWorkItem?.cancel()
                 self.flushWorkItem = nil
                 self.flushLocked()
@@ -303,29 +350,20 @@ final class RuntimeLogFileStore {
         pendingLines.removeAll(keepingCapacity: true)
 
         do {
-            try ensureLogsDirectoryLocked()
+            try prepareStorageLocked()
             let targetLogURL = try targetLogURLLocked(appendingByteCount: block.utf8.count)
             try appendToFileLocked(block, to: targetLogURL)
             try enforceMaxLogFilesLocked()
         } catch {}
     }
 
-    private func ensureLogsDirectoryLocked() throws {
-        if fileManager.fileExists(atPath: logsDirectoryURL.path) {
-            return
-        }
-        try fileManager.createDirectory(
-            at: logsDirectoryURL,
-            withIntermediateDirectories: true
-        )
-    }
-
     private func appendToFileLocked(_ block: String, to url: URL) throws {
         if !fileManager.fileExists(atPath: url.path) {
-            try block.write(to: url, atomically: true, encoding: .utf8)
+            try createSecureFileLocked(at: url, contents: Data(block.utf8))
             return
         }
 
+        try secureFilePermissionsLocked(at: url)
         let handle = try FileHandle(forWritingTo: url)
         defer { try? handle.close() }
         try handle.seekToEnd()
@@ -360,7 +398,7 @@ final class RuntimeLogFileStore {
             suffix += 1
         }
 
-        try Data().write(to: candidateURL)
+        try createSecureFileLocked(at: candidateURL, contents: Data())
         activeLogURL = candidateURL
         return candidateURL
     }
@@ -419,7 +457,7 @@ final class RuntimeLogFileStore {
         return ReadSnapshot(fileSizesByPath: fileSizesByPath)
     }
 
-    private func allManagedLogFileURLsLocked() -> [URL] {
+    func allManagedLogFileURLsLocked() -> [URL] {
         guard fileManager.fileExists(atPath: logsDirectoryURL.path) else { return [] }
         guard let urls = try? fileManager.contentsOfDirectory(
             at: logsDirectoryURL,
@@ -609,8 +647,8 @@ final class RuntimeLogFileStore {
 }
 
 enum RuntimeLog {
-    private static var isVerboseEnabled: Bool {
-        UserDefaults.standard.bool(forKey: AppPreferenceKeys.enableVerboseDiagnostics)
+    private static var isDiagnosticSessionActive: Bool {
+        RuntimeDiagnosticSessionStore.isActive()
     }
 
     private static var minimumLevel: RuntimeLogLevel {
@@ -619,8 +657,8 @@ enum RuntimeLog {
 
     private static func shouldRecord(level: RuntimeLogLevel, category: String) -> Bool {
         guard level >= minimumLevel else { return false }
-        if RuntimeLogCategory.resolve(category)?.isVerboseOnlyBelowWarning == true, !isVerboseEnabled {
-            return level >= .warning
+        if level < .warning {
+            return isDiagnosticSessionActive
         }
         return true
     }

@@ -41,12 +41,12 @@ extension FlowTabPriorityCoverageTests {
 
     func testRuntimeLogIntegrationFiltersDeltasAndClearsEntries() async {
         let defaults = UserDefaults.standard
-        let previousVerbose = defaults.object(forKey: AppPreferenceKeys.enableVerboseDiagnostics)
+        let previousExpiration = defaults.object(forKey: AppPreferenceKeys.diagnosticSessionExpiration)
         let previousLevel = defaults.object(forKey: AppPreferenceKeys.runtimeLogLevel)
         defer {
             restoreUserDefaultsValue(
-                previousVerbose,
-                forKey: AppPreferenceKeys.enableVerboseDiagnostics,
+                previousExpiration,
+                forKey: AppPreferenceKeys.diagnosticSessionExpiration,
                 userDefaults: defaults
             )
             restoreUserDefaultsValue(
@@ -57,40 +57,39 @@ extension FlowTabPriorityCoverageTests {
             RuntimeDiagnostics.shared.clear()
         }
 
-        defaults.set(false, forKey: AppPreferenceKeys.enableVerboseDiagnostics)
+        RuntimeDiagnosticSessionStore.stop(userDefaults: defaults)
         defaults.set(RuntimeLogLevel.debug.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
         RuntimeDiagnostics.shared.clear()
         _ = await RuntimeDiagnostics.shared.makeReadSnapshot()
 
-        let marker = "RuntimeLogIntegration-\(UUID().uuidString)"
-        RuntimeLog.info("InputTrace", "\(marker)-noisy-info")
-        RuntimeLog.warning("InputTrace", "\(marker)-noisy-warning")
-        RuntimeLog.info("UnitTest", "\(marker)-normal-info")
+        let category = "UnitTestIntegration\(UUID().uuidString.replacingOccurrences(of: "-", with: ""))"
+        RuntimeLog.info(.inputTrace, "noisy-info")
+        RuntimeLog.warning(.inputTrace, "noisy-warning")
+        RuntimeLog.info(category, "normal-info")
         let snapshot = await RuntimeDiagnostics.shared.makeReadSnapshot()
 
-        RuntimeLog.error("UnitTest", "\(marker)-after-snapshot-error")
+        RuntimeLog.error(category, "after-snapshot-error")
 
         let warningLines = await RuntimeDiagnostics.shared.readRecentLines(
             limit: 20,
             minimumLevel: .warning
         )
-        let scopedWarningLines = warningLines.filter { $0.contains(marker) }
-        XCTAssertTrue(scopedWarningLines.contains { $0.contains("\(marker)-noisy-warning") })
-        XCTAssertTrue(scopedWarningLines.contains { $0.contains("\(marker)-after-snapshot-error") })
-        XCTAssertFalse(scopedWarningLines.contains { $0.contains("\(marker)-normal-info") })
-        XCTAssertFalse(scopedWarningLines.contains { $0.contains("\(marker)-noisy-info") })
+        XCTAssertTrue(warningLines.contains { $0.contains("[WARN] [InputTrace]") })
+        XCTAssertTrue(warningLines.contains { $0.contains("[ERROR] [\(category)]") })
+        XCTAssertFalse(warningLines.contains { $0.contains("[INFO] [\(category)]") })
+        XCTAssertFalse(warningLines.contains { $0.contains("[INFO] [InputTrace]") })
 
         let deltaLines = await RuntimeDiagnostics.shared.readRecentLines(
             limit: 20,
             minimumLevel: .info,
             since: snapshot
         )
-        let scopedDeltaLines = deltaLines.filter { $0.contains(marker) }
+        let scopedDeltaLines = deltaLines.filter { $0.contains("[\(category)]") }
         XCTAssertEqual(scopedDeltaLines.count, 1)
-        XCTAssertTrue(scopedDeltaLines[0].contains("\(marker)-after-snapshot-error"))
+        XCTAssertTrue(scopedDeltaLines[0].contains("[ERROR]"))
 
         RuntimeDiagnostics.shared.clear()
         let clearedLines = await RuntimeDiagnostics.shared.readRecentLines(limit: 20, minimumLevel: .debug)
-        XCTAssertFalse(clearedLines.contains { $0.contains(marker) })
+        XCTAssertFalse(clearedLines.contains { $0.contains("[\(category)]") })
     }
 }

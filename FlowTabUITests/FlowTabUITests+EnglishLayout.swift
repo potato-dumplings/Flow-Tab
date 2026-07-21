@@ -35,7 +35,7 @@ extension FlowTabUITests {
 
         openLogsTab(in: app)
         XCTAssertTrue(element(in: app, identifier: Identifier.logsTabContent).waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["Enable verbose runtime logs (high-frequency, may impact performance)"].exists)
+        XCTAssertTrue(app.staticTexts["Start a 15-minute diagnostic session"].exists)
 
         openSettingsTab(in: app)
         let manageButton = element(in: app, identifier: Identifier.settingsAppVisibilityManage)

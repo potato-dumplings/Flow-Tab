@@ -544,13 +544,13 @@ extension FlowTabTests {
     @MainActor
     func testRuntimeLogsDropdownUpdatesRuntimeLogLevelBinding() throws {
         let appearance = try XCTUnwrap(NSAppearance(named: .aqua))
-        var enableVerboseDiagnostics = false
+        var diagnosticSessionExpiration = 0.0
         var runtimeLogLevelRaw = RuntimeLogLevel.info.rawValue
         let hostedView = NSHostingView(
             rootView: RuntimeLogsSection(
-                enableVerboseDiagnostics: Binding(
-                    get: { enableVerboseDiagnostics },
-                    set: { enableVerboseDiagnostics = $0 }
+                diagnosticSessionExpiration: Binding(
+                    get: { diagnosticSessionExpiration },
+                    set: { diagnosticSessionExpiration = $0 }
                 ),
                 runtimeLogLevelRaw: Binding(
                     get: { runtimeLogLevelRaw },
@@ -1286,58 +1286,55 @@ extension FlowTabTests {
     func testRuntimeDiagnosticsReadRecentLinesAppliesMinimumLevelFilter() async {
         await resetRuntimeLogsForTest()
 
-        let marker = "RuntimeDiagnosticsFilter-\(UUID().uuidString)"
-        let infoToken = "\(marker)-info"
-        let warningToken = "\(marker)-warning"
-        let errorToken = "\(marker)-error"
+        let category = "UnitTestFilter-\(UUID().uuidString)"
 
-        RuntimeDiagnostics.shared.log(level: .info, category: "UnitTest", message: infoToken)
-        RuntimeDiagnostics.shared.log(level: .warning, category: "UnitTest", message: warningToken)
-        RuntimeDiagnostics.shared.log(level: .error, category: "UnitTest", message: errorToken)
+        RuntimeDiagnostics.shared.log(level: .info, category: category, message: "info")
+        RuntimeDiagnostics.shared.log(level: .warning, category: category, message: "warning")
+        RuntimeDiagnostics.shared.log(level: .error, category: category, message: "error")
 
         let lines = await RuntimeDiagnostics.shared.readRecentLines(limit: 50, minimumLevel: .warning)
-        let scopedLines = lines.filter { $0.contains(marker) }
+        let scopedLines = lines.filter { $0.contains("[\(category)]") }
 
-        XCTAssertTrue(scopedLines.contains(where: { $0.contains(warningToken) }))
-        XCTAssertTrue(scopedLines.contains(where: { $0.contains(errorToken) }))
-        XCTAssertFalse(scopedLines.contains(where: { $0.contains(infoToken) }))
+        XCTAssertEqual(scopedLines.count, 2)
+        XCTAssertTrue(scopedLines.contains(where: { $0.contains("[WARN]") }))
+        XCTAssertTrue(scopedLines.contains(where: { $0.contains("[ERROR]") }))
+        XCTAssertFalse(scopedLines.contains(where: { $0.contains("[INFO]") }))
     }
 
     func testRuntimeDiagnosticsReadRecentLinesSinceSnapshotReturnsOnlyNewLines() async {
         await resetRuntimeLogsForTest()
 
-        let marker = "RuntimeDiagnosticsDelta-\(UUID().uuidString)"
-        let oldToken = "\(marker)-old"
-        let newToken1 = "\(marker)-new-1"
-        let newToken2 = "\(marker)-new-2"
+        let oldCategory = "UnitTestDeltaOld-\(UUID().uuidString)"
+        let newCategory = "UnitTestDeltaNew-\(UUID().uuidString)"
 
-        RuntimeDiagnostics.shared.log(level: .info, category: "UnitTest", message: oldToken)
+        RuntimeDiagnostics.shared.log(level: .info, category: oldCategory, message: "old")
         let snapshot = await RuntimeDiagnostics.shared.makeReadSnapshot()
 
-        RuntimeDiagnostics.shared.log(level: .info, category: "UnitTest", message: newToken1)
-        RuntimeDiagnostics.shared.log(level: .warning, category: "UnitTest", message: newToken2)
+        RuntimeDiagnostics.shared.log(level: .info, category: newCategory, message: "new-1")
+        RuntimeDiagnostics.shared.log(level: .warning, category: newCategory, message: "new-2")
 
         let deltaLines = await RuntimeDiagnostics.shared.readRecentLines(
             limit: 50,
             minimumLevel: .info,
             since: snapshot
         )
-        let scopedLines = deltaLines.filter { $0.contains(marker) }
+        let scopedLines = deltaLines.filter { $0.contains("[\(newCategory)]") }
 
-        XCTAssertFalse(scopedLines.contains(where: { $0.contains(oldToken) }))
-        XCTAssertTrue(scopedLines.contains(where: { $0.contains(newToken1) }))
-        XCTAssertTrue(scopedLines.contains(where: { $0.contains(newToken2) }))
+        XCTAssertEqual(scopedLines.count, 2)
+        XCTAssertFalse(deltaLines.contains(where: { $0.contains("[\(oldCategory)]") }))
+        XCTAssertTrue(scopedLines.contains(where: { $0.contains("[INFO]") }))
+        XCTAssertTrue(scopedLines.contains(where: { $0.contains("[WARN]") }))
     }
 
     func testRuntimeDiagnosticsReadRecentLinesHonorsLimitAndKeepsNewestEntries() async {
         await resetRuntimeLogsForTest()
 
-        let marker = "RuntimeDiagnosticsLimit-\(UUID().uuidString)"
+        let marker = "RuntimeDiagnosticsLimit\(UUID().uuidString.replacingOccurrences(of: "-", with: ""))"
         for index in 1...5 {
             RuntimeDiagnostics.shared.log(
                 level: .info,
-                category: "UnitTest",
-                message: "\(marker)-\(index)"
+                category: "\(marker)\(index)",
+                message: "entry"
             )
         }
 
@@ -1345,18 +1342,18 @@ extension FlowTabTests {
         let scopedLines = lines.filter { $0.contains(marker) }
 
         XCTAssertEqual(scopedLines.count, 2)
-        XCTAssertTrue(scopedLines[0].contains("\(marker)-4"))
-        XCTAssertTrue(scopedLines[1].contains("\(marker)-5"))
+        XCTAssertTrue(scopedLines[0].contains("[\(marker)4]"))
+        XCTAssertTrue(scopedLines[1].contains("[\(marker)5]"))
     }
 
-    func testRuntimeLogNoisyCategorySuppressesInfoWhenVerboseDisabled() async {
+    func testRuntimeLogSuppressesDebugAndInfoOutsideDiagnosticSession() async {
         let defaults = UserDefaults.standard
-        let previousVerbose = defaults.object(forKey: AppPreferenceKeys.enableVerboseDiagnostics)
+        let previousExpiration = defaults.object(forKey: AppPreferenceKeys.diagnosticSessionExpiration)
         let previousLevel = defaults.object(forKey: AppPreferenceKeys.runtimeLogLevel)
         defer {
             restoreUserDefaultsValue(
-                previousVerbose,
-                forKey: AppPreferenceKeys.enableVerboseDiagnostics,
+                previousExpiration,
+                forKey: AppPreferenceKeys.diagnosticSessionExpiration,
                 userDefaults: defaults
             )
             restoreUserDefaultsValue(
@@ -1366,31 +1363,30 @@ extension FlowTabTests {
             )
         }
 
-        defaults.set(false, forKey: AppPreferenceKeys.enableVerboseDiagnostics)
+        RuntimeDiagnosticSessionStore.stop(userDefaults: defaults)
         defaults.set(RuntimeLogLevel.debug.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
         await resetRuntimeLogsForTest()
 
-        let marker = "RuntimeLogNoisy-\(UUID().uuidString)"
-        RuntimeLog.debug("InputTrace", "\(marker)-debug")
-        RuntimeLog.info("InputTrace", "\(marker)-info")
-        RuntimeLog.warning("InputTrace", "\(marker)-warning")
+        RuntimeLog.debug(.inputTrace, "debug")
+        RuntimeLog.info(.inputTrace, "info")
+        RuntimeLog.warning(.inputTrace, "warning")
 
         let lines = await RuntimeDiagnostics.shared.readRecentLines(limit: 50, minimumLevel: .debug)
-        let scopedLines = lines.filter { $0.contains(marker) }
+        let scopedLines = lines.filter { $0.contains("[InputTrace]") }
 
-        XCTAssertFalse(scopedLines.contains(where: { $0.contains("\(marker)-debug") }))
-        XCTAssertFalse(scopedLines.contains(where: { $0.contains("\(marker)-info") }))
-        XCTAssertTrue(scopedLines.contains(where: { $0.contains("\(marker)-warning") }))
+        XCTAssertFalse(scopedLines.contains(where: { $0.contains("[DEBUG]") }))
+        XCTAssertFalse(scopedLines.contains(where: { $0.contains("[INFO]") }))
+        XCTAssertTrue(scopedLines.contains(where: { $0.contains("[WARN]") }))
     }
 
-    func testRuntimeLogTypedNoisyCategorySuppressesDebugAndInfoWhenVerboseDisabled() async {
+    func testRuntimeLogTypedCategoryKeepsWarningsAndErrorsOutsideDiagnosticSession() async {
         let defaults = UserDefaults.standard
-        let previousVerbose = defaults.object(forKey: AppPreferenceKeys.enableVerboseDiagnostics)
+        let previousExpiration = defaults.object(forKey: AppPreferenceKeys.diagnosticSessionExpiration)
         let previousLevel = defaults.object(forKey: AppPreferenceKeys.runtimeLogLevel)
         defer {
             restoreUserDefaultsValue(
-                previousVerbose,
-                forKey: AppPreferenceKeys.enableVerboseDiagnostics,
+                previousExpiration,
+                forKey: AppPreferenceKeys.diagnosticSessionExpiration,
                 userDefaults: defaults
             )
             restoreUserDefaultsValue(
@@ -1400,33 +1396,32 @@ extension FlowTabTests {
             )
         }
 
-        defaults.set(false, forKey: AppPreferenceKeys.enableVerboseDiagnostics)
+        RuntimeDiagnosticSessionStore.stop(userDefaults: defaults)
         defaults.set(RuntimeLogLevel.debug.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
         await resetRuntimeLogsForTest()
 
-        let marker = "RuntimeLogTypedNoisy-\(UUID().uuidString)"
-        RuntimeLog.debug(.activation, "\(marker)-debug")
-        RuntimeLog.info(.activation, "\(marker)-info")
-        RuntimeLog.warning(.activation, "\(marker)-warning")
-        RuntimeLog.error(.activation, "\(marker)-error")
+        RuntimeLog.debug(.activation, "debug")
+        RuntimeLog.info(.activation, "info")
+        RuntimeLog.warning(.activation, "warning")
+        RuntimeLog.error(.activation, "error")
 
         let lines = await RuntimeDiagnostics.shared.readRecentLines(limit: 50, minimumLevel: .debug)
-        let scopedLines = lines.filter { $0.contains(marker) }
+        let scopedLines = lines.filter { $0.contains("[Activation]") }
 
-        XCTAssertFalse(scopedLines.contains(where: { $0.contains("\(marker)-debug") }))
-        XCTAssertFalse(scopedLines.contains(where: { $0.contains("\(marker)-info") }))
-        XCTAssertTrue(scopedLines.contains(where: { $0.contains("\(marker)-warning") }))
-        XCTAssertTrue(scopedLines.contains(where: { $0.contains("\(marker)-error") }))
+        XCTAssertFalse(scopedLines.contains(where: { $0.contains("[DEBUG]") }))
+        XCTAssertFalse(scopedLines.contains(where: { $0.contains("[INFO]") }))
+        XCTAssertTrue(scopedLines.contains(where: { $0.contains("[WARN]") }))
+        XCTAssertTrue(scopedLines.contains(where: { $0.contains("[ERROR]") }))
     }
 
-    func testRuntimeLogNonNoisyCategoryAllowsInfoWhenMinimumLevelAllows() async {
+    func testRuntimeLogDiagnosticSessionAllowsDebugAndInfoWhenMinimumLevelAllows() async {
         let defaults = UserDefaults.standard
-        let previousVerbose = defaults.object(forKey: AppPreferenceKeys.enableVerboseDiagnostics)
+        let previousExpiration = defaults.object(forKey: AppPreferenceKeys.diagnosticSessionExpiration)
         let previousLevel = defaults.object(forKey: AppPreferenceKeys.runtimeLogLevel)
         defer {
             restoreUserDefaultsValue(
-                previousVerbose,
-                forKey: AppPreferenceKeys.enableVerboseDiagnostics,
+                previousExpiration,
+                forKey: AppPreferenceKeys.diagnosticSessionExpiration,
                 userDefaults: defaults
             )
             restoreUserDefaultsValue(
@@ -1436,29 +1431,29 @@ extension FlowTabTests {
             )
         }
 
-        defaults.set(false, forKey: AppPreferenceKeys.enableVerboseDiagnostics)
+        RuntimeDiagnosticSessionStore.start(userDefaults: defaults)
         defaults.set(RuntimeLogLevel.debug.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
         await resetRuntimeLogsForTest()
 
-        let marker = "RuntimeLogNormal-\(UUID().uuidString)"
-        RuntimeLog.debug("UnitTest", "\(marker)-debug")
-        RuntimeLog.info("UnitTest", "\(marker)-info")
+        let category = "UnitTestSession\(UUID().uuidString.replacingOccurrences(of: "-", with: ""))"
+        RuntimeLog.debug(category, "debug")
+        RuntimeLog.info(category, "info")
 
         let lines = await RuntimeDiagnostics.shared.readRecentLines(limit: 50, minimumLevel: .debug)
-        let scopedLines = lines.filter { $0.contains(marker) }
+        let scopedLines = lines.filter { $0.contains("[\(category)]") }
 
-        XCTAssertTrue(scopedLines.contains(where: { $0.contains("\(marker)-debug") }))
-        XCTAssertTrue(scopedLines.contains(where: { $0.contains("\(marker)-info") }))
+        XCTAssertTrue(scopedLines.contains(where: { $0.contains("[DEBUG]") }))
+        XCTAssertTrue(scopedLines.contains(where: { $0.contains("[INFO]") }))
     }
 
-    func testRuntimeLogPermissionWarningRecordsWithoutVerboseDiagnostics() async {
+    func testRuntimeLogPermissionWarningRecordsOutsideDiagnosticSession() async {
         let defaults = UserDefaults.standard
-        let previousVerbose = defaults.object(forKey: AppPreferenceKeys.enableVerboseDiagnostics)
+        let previousExpiration = defaults.object(forKey: AppPreferenceKeys.diagnosticSessionExpiration)
         let previousLevel = defaults.object(forKey: AppPreferenceKeys.runtimeLogLevel)
         defer {
             restoreUserDefaultsValue(
-                previousVerbose,
-                forKey: AppPreferenceKeys.enableVerboseDiagnostics,
+                previousExpiration,
+                forKey: AppPreferenceKeys.diagnosticSessionExpiration,
                 userDefaults: defaults
             )
             restoreUserDefaultsValue(
@@ -1468,17 +1463,16 @@ extension FlowTabTests {
             )
         }
 
-        defaults.set(false, forKey: AppPreferenceKeys.enableVerboseDiagnostics)
+        RuntimeDiagnosticSessionStore.stop(userDefaults: defaults)
         defaults.set(RuntimeLogLevel.debug.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
         await resetRuntimeLogsForTest()
 
-        let marker = "RuntimeLogPermission-\(UUID().uuidString)"
-        RuntimeLog.warning(.permission, "\(marker)-permission-missing")
+        RuntimeLog.warning(.permission, "permission-missing")
 
         let lines = await RuntimeDiagnostics.shared.readRecentLines(limit: 50, minimumLevel: .debug)
-        let scopedLines = lines.filter { $0.contains(marker) }
+        let scopedLines = lines.filter { $0.contains("[WARN] [Permission]") }
 
-        XCTAssertTrue(scopedLines.contains(where: { $0.contains("\(marker)-permission-missing") }))
+        XCTAssertEqual(scopedLines.count, 1)
     }
 
     private func makeHotkeySettingsState(commandTabTakeoverActive: Bool) -> HotkeySettingsCardState {

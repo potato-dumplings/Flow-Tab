@@ -2294,13 +2294,13 @@ extension FlowTabPriorityCoverageTests {
 
     func testRuntimeProjectionServiceSeedsVerifiedFocusRecordWhenFocusedAXWindowIsNotInRegistry() async throws {
         let defaults = UserDefaults.standard
-        let previousVerbose = defaults.object(forKey: AppPreferenceKeys.enableVerboseDiagnostics)
+        let previousExpiration = defaults.object(forKey: AppPreferenceKeys.diagnosticSessionExpiration)
         let previousLevel = defaults.object(forKey: AppPreferenceKeys.runtimeLogLevel)
         defer {
-            if let previousVerbose {
-                defaults.set(previousVerbose, forKey: AppPreferenceKeys.enableVerboseDiagnostics)
+            if let previousExpiration {
+                defaults.set(previousExpiration, forKey: AppPreferenceKeys.diagnosticSessionExpiration)
             } else {
-                defaults.removeObject(forKey: AppPreferenceKeys.enableVerboseDiagnostics)
+                defaults.removeObject(forKey: AppPreferenceKeys.diagnosticSessionExpiration)
             }
             if let previousLevel {
                 defaults.set(previousLevel, forKey: AppPreferenceKeys.runtimeLogLevel)
@@ -2309,7 +2309,7 @@ extension FlowTabPriorityCoverageTests {
             }
             RuntimeDiagnostics.shared.clear()
         }
-        defaults.set(true, forKey: AppPreferenceKeys.enableVerboseDiagnostics)
+        RuntimeDiagnosticSessionStore.start(userDefaults: defaults)
         defaults.set(RuntimeLogLevel.debug.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
         RuntimeDiagnostics.shared.clear()
         let logSnapshot = await RuntimeDiagnostics.shared.makeReadSnapshot()
@@ -2376,11 +2376,15 @@ extension FlowTabPriorityCoverageTests {
         )
         XCTAssertTrue(
             logLines.contains {
-                $0.contains("binding-confidence-change windowID=cg:\(pid):\(focusedCGWindowID)")
-                    && $0.contains("cg=\(focusedCGWindowID)")
-                    && $0.contains("ax=\(focusedAXWindowID)")
-                    && $0.contains("source=none->verifiedFocusReadback")
-                    && $0.contains("verifiedFocusFallbackAX=1")
+                $0.contains("[DEBUG] [AXMatch]")
+                    && $0.contains("field0.value.type=identifier")
+                    && $0.contains("field1.value.type=identifier")
+                    && $0.contains("field1.value.length=\(String(focusedCGWindowID).count)")
+                    && $0.contains("field2.value.type=identifier")
+                    && $0.contains("field4.value.type=text")
+                    && $0.contains("field4.value.length=\("none->verifiedFocusReadback".count)")
+                    && $0.contains("field5.value.type=text")
+                    && $0.contains("field5.value.length=1")
             },
             "Verified-focus fallback AX readback must leave a grep-able production log marker. Lines: \(logLines)"
         )
