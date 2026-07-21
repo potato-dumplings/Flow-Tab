@@ -520,6 +520,35 @@ extension FlowTabUITests {
             .matching(identifier: Identifier.logsEmptyHint)
             .firstMatch
         XCTAssertTrue(logsEmptyHint.waitForExistence(timeout: 5))
+
+        let seededMarkers = expectedSeededLogs.map(\.marker)
+        let clearedDiskContents = runtimeLogContentsSinceSnapshot([:])
+        XCTAssertTrue(seededMarkers.allSatisfy { !clearedDiskContents.contains($0) })
+
+        app.terminate()
+        let relaunchedApp = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-runtime-log-level",
+                "debug",
+                "-showPermissionReminder",
+                "NO"
+            ]
+        )
+        launchFlowTabUITestApplication(relaunchedApp)
+        openLogsTab(in: relaunchedApp)
+
+        for expectedSeededLog in expectedSeededLogs {
+            XCTAssertTrue(
+                waitForNonExistence(
+                    relaunchedApp.descendants(matching: .any)
+                        .matching(identifier: expectedSeededLog.identifier)
+                        .firstMatch,
+                    timeout: 3
+                )
+            )
+        }
+        let relaunchedDiskContents = runtimeLogContentsSinceSnapshot([:])
+        XCTAssertTrue(seededMarkers.allSatisfy { !relaunchedDiskContents.contains($0) })
     }
 
     func testLogsPageRespectsRuntimeLogLevelVisibility() throws {

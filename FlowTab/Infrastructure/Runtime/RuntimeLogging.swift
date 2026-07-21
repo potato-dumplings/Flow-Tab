@@ -148,6 +148,10 @@ final class RuntimeDiagnostics {
     func clear() {
         fileStore.clear()
     }
+
+    func clearAndWait() async throws {
+        try await fileStore.clearAndWait()
+    }
 }
 
 final class RuntimeLogFileStore {
@@ -178,7 +182,7 @@ final class RuntimeLogFileStore {
     private static let logFileExtension = ".log"
 
     private let queue = DispatchQueue(label: "FlowTab.RuntimeLogFileStore", qos: .utility)
-    private let fileManager = FileManager.default
+    private let fileManager: FileManager
     private let maxFileSizeBytes = 1_000_000
     private let maxLogFiles = 5
     private let flushDelay: TimeInterval = 0.05
@@ -192,11 +196,20 @@ final class RuntimeLogFileStore {
         logsDirectoryURL.path
     }
 
-    private init() {
+    init(logsDirectoryURL: URL, fileManager: FileManager = .default) {
+        self.fileManager = fileManager
+        self.logsDirectoryURL = logsDirectoryURL
+        activeLogURL = nil
+    }
+
+    private convenience init() {
+        let fileManager = FileManager.default
         let fallbackURL = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
         let baseURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first ?? fallbackURL
-        logsDirectoryURL = baseURL.appendingPathComponent("FlowTab/logs", isDirectory: true)
-        activeLogURL = nil
+        self.init(
+            logsDirectoryURL: baseURL.appendingPathComponent("FlowTab/logs", isDirectory: true),
+            fileManager: fileManager
+        )
     }
 
     func append(_ line: String) {
@@ -217,7 +230,23 @@ final class RuntimeLogFileStore {
             self.flushWorkItem?.cancel()
             self.flushWorkItem = nil
             self.pendingLines.removeAll(keepingCapacity: false)
-            self.clearFilesLocked()
+            try? self.clearFilesLocked()
+        }
+    }
+
+    func clearAndWait() async throws {
+        try await withCheckedThrowingContinuation { continuation in
+            queue.async {
+                self.flushWorkItem?.cancel()
+                self.flushWorkItem = nil
+                self.pendingLines.removeAll(keepingCapacity: false)
+                do {
+                    try self.clearFilesLocked()
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
         }
     }
 
@@ -363,13 +392,23 @@ final class RuntimeLogFileStore {
         return size.intValue
     }
 
-    private func clearFilesLocked() {
+    private func clearFilesLocked() throws {
+        var firstError: Error?
         for logURL in allManagedLogFileURLsLocked() {
             if fileManager.fileExists(atPath: logURL.path) {
-                try? fileManager.removeItem(at: logURL)
+                do {
+                    try fileManager.removeItem(at: logURL)
+                } catch {
+                    if firstError == nil {
+                        firstError = error
+                    }
+                }
             }
         }
         activeLogURL = nil
+        if let firstError {
+            throw firstError
+        }
     }
 
     private func makeReadSnapshotLocked() -> ReadSnapshot {

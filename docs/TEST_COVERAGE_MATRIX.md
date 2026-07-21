@@ -33,7 +33,7 @@ The six layer keys are `Unit`, `Behavior`, `Mock UI`, `Real-topology UI`, `Press
 | `scenario:home-app-window-list` | Home app and window list | required | Home | `deterministic-rule`, `app-orchestration`, `visible-workflow`, `real-topology-external-system`, `hot-path-scale-sensitive` |
 | `scenario:hotkey-configuration-normalization` | Hotkey configuration normalization | required | Preferences | `deterministic-rule`, `app-orchestration`, `visible-workflow` |
 | `scenario:in-app-window-hotkey` | In-app window hotkey | required | Switcher | `deterministic-rule`, `app-orchestration`, `visible-workflow`, `real-topology-external-system`, `hot-path-scale-sensitive` |
-| `scenario:logs-diagnostics` | Logs and diagnostics | required | Logs | `deterministic-rule`, `app-orchestration`, `visible-workflow` |
+| `scenario:logs-diagnostics` | Logs and diagnostics | required | Logs | `deterministic-rule`, `app-orchestration`, `visible-workflow`, `tooling-fixture` |
 | `scenario:performance-pressure-gates` | Performance and pressure gates | conditional: required whenever hot-path or scale-sensitive risk applies | Performance | `hot-path-scale-sensitive`, `tooling-fixture` |
 | `scenario:release-artifact-integrity` | Public release artifact integrity | required | Release Tooling | `deterministic-rule`, `tooling-fixture` |
 | `scenario:runtime-activation-recovery` | Runtime activation and recovery | required | Runtime | `deterministic-rule`, `app-orchestration`, `visible-workflow`, `real-topology-external-system`, `hot-path-scale-sensitive` |
@@ -218,20 +218,21 @@ The six layer keys are `Unit`, `Behavior`, `Mock UI`, `Real-topology UI`, `Press
 
 - Requiredness: required
 - Owner: `Logs`
-- Oracle: Runtime log writes, level filtering, incremental reads, seeded presentation, and clear operations match the diagnostics contract.
-- Risk: `deterministic-rule`, `app-orchestration`, `visible-workflow`
+- Oracle: Runtime log writes, filtering, presentation, file deletion, restart reads, and uninstall cleanup match the diagnostics lifecycle contract.
+- Risk: `deterministic-rule`, `app-orchestration`, `visible-workflow`, `tooling-fixture`
 - Required layers:
   - Unit: Own deterministic diagnostic field selection and formatting.
-  - Behavior: Prove runtime writes, incremental reads, filtering, and clear behavior.
-  - Mock UI: Prove seeded logs, level selection, visibility, and clear actions.
+  - Behavior: Prove runtime writes, incremental reads, filtering, queued file deletion, and empty restart reads.
+  - Mock UI: Prove seeded logs, level selection, visibility, file deletion, and post-relaunch absence.
+  - Process/Tooling: Prove the uninstaller resolves `FlowTab/logs` within the user Application Support boundary, deletes it, and preserves neighboring application data.
 - Not relevant layers:
   - Real-topology UI: Diagnostics presentation does not require external window topology.
   - Pressure: Logging pressure is required only when log volume, cadence, or retention cost changes; it is not a standing scenario layer.
-  - Process/Tooling: No dedicated runner or fixture contract belongs to diagnostics presentation.
 - Current representative test anchors:
   - Unit: `FlowTabPriorityCoverageTests.testRuntimeProjectionDiagnosticsTimingLineUsesProjectionBoundaryFields`
-  - Behavior: `FlowTabPriorityCoverageTests.testRuntimeLogIntegrationFiltersDeltasAndClearsEntries`
+  - Behavior: `FlowTabTests.testRuntimeLogClearAndWaitDeletesFilesAndRestartReadsNoEntries`, `FlowTabPriorityCoverageTests.testRuntimeLogIntegrationFiltersDeltasAndClearsEntries`
   - Mock UI: `FlowTabUITests.testLogsPageShowsSeededLogsAndClearRemovesOutput`
+  - Process/Tooling: `scripts/release/test-uninstall-flowtab-cleanup.js`
 - Exhaustive mapping: query active ledger rows whose `product_scenario_ids` contains `scenario:logs-diagnostics`.
 
 ### `scenario:performance-pressure-gates` — Performance and pressure gates

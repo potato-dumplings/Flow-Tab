@@ -14,8 +14,7 @@ struct DiagnosticsRefreshPolicy: Equatable {
 @MainActor
 private final class RuntimeLogLinesViewModel: ObservableObject {
     @Published private(set) var lines: [String] = []
-
-    private static var persistedClearSnapshot: RuntimeLogFileStore.ReadSnapshot?
+    @Published private(set) var isClearing = false
 
     private let refreshPolicy: DiagnosticsRefreshPolicy = .runtimeLogs
     private var lineLimit: Int {
@@ -27,11 +26,6 @@ private final class RuntimeLogLinesViewModel: ObservableObject {
     private var refreshTask: Task<Void, Never>?
     private var refreshGeneration: UInt64 = 0
 
-    private var clearSnapshot: RuntimeLogFileStore.ReadSnapshot? {
-        get { Self.persistedClearSnapshot }
-        set { Self.persistedClearSnapshot = newValue }
-    }
-
     func start(minimumLevel: RuntimeLogLevel) {
         stop()
         refreshGeneration &+= 1
@@ -42,19 +36,19 @@ private final class RuntimeLogLinesViewModel: ObservableObject {
         }
     }
 
-    func clearDisplayedOutput(minimumLevel: RuntimeLogLevel) {
+    func clearStoredLogs(minimumLevel: RuntimeLogLevel) async {
+        guard !isClearing else { return }
+        isClearing = true
+        defer { isClearing = false }
+
         stop()
-        lines = []
-        refreshGeneration &+= 1
-        let generation = refreshGeneration
-        refreshTask = Task { [weak self] in
-            guard let self else { return }
-            let snapshot = await RuntimeDiagnostics.shared.makeReadSnapshot()
-            guard !Task.isCancelled else { return }
-            guard generation == self.refreshGeneration else { return }
-            self.clearSnapshot = snapshot
-            await self.runRefreshLoop(minimumLevel: minimumLevel, generation: generation)
+        do {
+            try await RuntimeDiagnostics.shared.clearAndWait()
+            lines = []
+        } catch {
+            await reload(minimumLevel: minimumLevel, generation: refreshGeneration)
         }
+        start(minimumLevel: minimumLevel)
     }
 
     func stop() {
@@ -78,8 +72,7 @@ private final class RuntimeLogLinesViewModel: ObservableObject {
     private func reload(minimumLevel: RuntimeLogLevel, generation: UInt64) async {
         let nextLines = await RuntimeDiagnostics.shared.readRecentLines(
             limit: lineLimit,
-            minimumLevel: minimumLevel,
-            since: clearSnapshot
+            minimumLevel: minimumLevel
         )
         guard !Task.isCancelled else { return }
         guard generation == refreshGeneration else { return }
@@ -198,8 +191,11 @@ struct RuntimeLogsSection: View {
                         presentation: logActionButtonPresentation,
                         accessibilityIdentifier: "flowtab.logs.clear"
                     ) {
-                        logsViewModel.clearDisplayedOutput(minimumLevel: selectedLogLevel)
+                        Task {
+                            await logsViewModel.clearStoredLogs(minimumLevel: selectedLogLevel)
+                        }
                     }
+                    .disabled(logsViewModel.isClearing)
                 }
 
                 ScrollView {
