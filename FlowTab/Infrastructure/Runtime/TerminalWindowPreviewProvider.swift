@@ -34,40 +34,75 @@ enum TerminalScriptingSnapshotError: Error, Equatable {
     case parseFailed
 }
 
+enum TerminalPreviewWindowTarget: Equatable, Hashable {
+    case windowID(CGWindowID)
+    case windowIndex(Int)
+}
+
 protocol TerminalScriptingSnapshotProviding {
-    func tabSnapshots(ownerPID: pid_t) -> Result<[TerminalTabSnapshot], TerminalScriptingSnapshotError>
+    func selectedTabSnapshot(
+        ownerPID: pid_t,
+        target: TerminalPreviewWindowTarget
+    ) -> Result<TerminalTabSnapshot, TerminalScriptingSnapshotError>
 }
 
 struct TerminalWindowPreviewProvider: SpecialWindowPreviewProviding {
     private static let terminalBundleIdentifier = "com.apple.Terminal"
 
-    private let adapter: any TerminalScriptingSnapshotProviding
+    private struct SnapshotCacheKey: Hashable {
+        let ownerPID: pid_t
+        let target: TerminalPreviewWindowTarget
+    }
 
-    init(adapter: any TerminalScriptingSnapshotProviding = TerminalScriptingAdapter()) {
+    private let adapter: any TerminalScriptingSnapshotProviding
+    private let isContentPreviewEnabled: () -> Bool
+
+    init(
+        adapter: any TerminalScriptingSnapshotProviding = TerminalScriptingAdapter(),
+        isContentPreviewEnabled: @escaping () -> Bool = {
+            TerminalContentPreviewPreferencesStore.isEnabled()
+        }
+    ) {
         self.adapter = adapter
+        self.isContentPreviewEnabled = isContentPreviewEnabled
     }
 
     func supports(_ request: WindowPreviewRequest) -> Bool {
-        request.bundleIdentifier == Self.terminalBundleIdentifier
-            || request.appID == Self.terminalBundleIdentifier
+        isContentPreviewEnabled()
+            && (request.bundleIdentifier == Self.terminalBundleIdentifier
+                || request.appID == Self.terminalBundleIdentifier)
     }
 
     func previews(for requests: [WindowPreviewRequest]) async -> [WindowPreviewResult] {
         guard !requests.isEmpty else { return [] }
-        var snapshotsByPID: [pid_t: Result<[TerminalTabSnapshot], TerminalScriptingSnapshotError>] = [:]
+        guard isContentPreviewEnabled() else {
+            return Array(repeating: .failure(.specialProviderUnavailable), count: requests.count)
+        }
+
+        var snapshotsByTarget: [
+            SnapshotCacheKey: Result<TerminalTabSnapshot, TerminalScriptingSnapshotError>
+        ] = [:]
         return requests.map { request in
-            let snapshotResult: Result<[TerminalTabSnapshot], TerminalScriptingSnapshotError>
-            if let cachedResult = snapshotsByPID[request.ownerPID] {
+            guard let target = Self.target(for: request) else {
+                return .failure(.specialProviderUnavailable)
+            }
+            let cacheKey = SnapshotCacheKey(ownerPID: request.ownerPID, target: target)
+
+            let snapshotResult: Result<TerminalTabSnapshot, TerminalScriptingSnapshotError>
+            if let cachedResult = snapshotsByTarget[cacheKey] {
                 snapshotResult = cachedResult
             } else {
-                let loadedResult = adapter.tabSnapshots(ownerPID: request.ownerPID)
-                snapshotsByPID[request.ownerPID] = loadedResult
+                let loadedResult = adapter.selectedTabSnapshot(
+                    ownerPID: request.ownerPID,
+                    target: target
+                )
+                snapshotsByTarget[cacheKey] = loadedResult
                 snapshotResult = loadedResult
             }
 
             switch snapshotResult {
-            case .success(let snapshots):
-                return preview(for: request, snapshots: snapshots)
+            case .success(let snapshot):
+                return preview(for: request, snapshot: snapshot)
             case .failure(let error):
                 return .failure(windowPreviewFailureReason(from: error))
             }
@@ -76,11 +111,8 @@ struct TerminalWindowPreviewProvider: SpecialWindowPreviewProviding {
 
     private func preview(
         for request: WindowPreviewRequest,
-        snapshots: [TerminalTabSnapshot]
+        snapshot: TerminalTabSnapshot
     ) -> WindowPreviewResult {
-        guard let snapshot = Self.matchingSnapshot(for: request, snapshots: snapshots) else {
-            return .failure(.specialProviderUnavailable)
-        }
         guard
             let image = TerminalPreviewRenderer.render(
                 snapshot: snapshot,
@@ -109,56 +141,38 @@ struct TerminalWindowPreviewProvider: SpecialWindowPreviewProviding {
         }
     }
 
-    private static func matchingSnapshot(
-        for request: WindowPreviewRequest,
-        snapshots: [TerminalTabSnapshot]
-    ) -> TerminalTabSnapshot? {
-        if let preferredCGWindowID = request.preferredCGWindowID,
-           let snapshot = snapshots.first(where: { $0.terminalWindowID == preferredCGWindowID }) {
-            return snapshot
+    private static func target(for request: WindowPreviewRequest) -> TerminalPreviewWindowTarget? {
+        if let preferredCGWindowID = request.preferredCGWindowID {
+            return .windowID(preferredCGWindowID)
         }
-
-        let normalizedTitle = request.preferredTitle?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        if let normalizedTitle, !normalizedTitle.isEmpty {
-            let matches = snapshots.filter { snapshot in
-                [snapshot.windowTitle, snapshot.customTitle].contains {
-                    $0.trimmingCharacters(in: .whitespacesAndNewlines) == normalizedTitle
-                }
-            }
-            if matches.count == 1 {
-                return matches[0]
-            }
-        }
-
         let handleIDs = [request.activationHandleID, request.windowID]
             .compactMap { $0 }
         for handleID in handleIDs {
-            if let flatIndex = AXWindowInspector.windowIndex(
+            if let windowIndex = AXWindowInspector.windowIndex(
                 from: handleID,
                 expectedPID: request.ownerPID
-            ), let snapshot = snapshots.first(where: { $0.flatIndex == flatIndex }) {
-                return snapshot
+            ), windowIndex >= 0 {
+                return .windowIndex(windowIndex)
             }
         }
-
-        if snapshots.count == 1 {
-            return snapshots[0]
-        }
-        RuntimeLog.debug(
-            .preview,
-            "terminal preview match failed pid=\(request.ownerPID) windowID=\(request.windowID) activationHandle=\(request.activationHandleID ?? "nil") snapshots=\(snapshots.count)"
-        )
         return nil
     }
 }
 
 struct TerminalScriptingAdapter: TerminalScriptingSnapshotProviding {
-    func tabSnapshots(ownerPID: pid_t) -> Result<[TerminalTabSnapshot], TerminalScriptingSnapshotError> {
-        guard NSRunningApplication(processIdentifier: ownerPID) != nil else {
+    private static let terminalBundleIdentifier = "com.apple.Terminal"
+
+    func selectedTabSnapshot(
+        ownerPID: pid_t,
+        target: TerminalPreviewWindowTarget
+    ) -> Result<TerminalTabSnapshot, TerminalScriptingSnapshotError> {
+        guard
+            NSRunningApplication(processIdentifier: ownerPID)?.bundleIdentifier
+                == Self.terminalBundleIdentifier
+        else {
             return .failure(.readFailed)
         }
-        guard let script = NSAppleScript(source: Self.scriptSource) else {
+        guard let script = NSAppleScript(source: Self.scriptSource(for: target)) else {
             return .failure(.readFailed)
         }
         var errorInfo: NSDictionary?
@@ -173,7 +187,10 @@ struct TerminalScriptingAdapter: TerminalScriptingSnapshotProviding {
         guard let snapshots = Self.parseTabSnapshots(from: descriptor) else {
             return .failure(.parseFailed)
         }
-        return .success(snapshots)
+        guard snapshots.count == 1, let snapshot = snapshots.first else {
+            return .failure(.readFailed)
+        }
+        return .success(snapshot)
     }
 
     private static func parseTabSnapshots(
@@ -272,7 +289,20 @@ struct TerminalScriptingAdapter: TerminalScriptingSnapshotProviding {
         )
     }
 
-    private static let scriptSource = """
+    static func scriptSource(for target: TerminalPreviewWindowTarget) -> String {
+        let targetSelection: String
+        switch target {
+        case .windowID(let windowID):
+            targetSelection = "set targetWindow to first window whose id is \(windowID)"
+        case .windowIndex(let zeroBasedIndex):
+            let oneBasedIndex = zeroBasedIndex + 1
+            targetSelection = """
+            if (count of windows) < \(oneBasedIndex) then return {}
+            set targetWindow to window \(oneBasedIndex)
+            """
+        }
+
+        return """
     on rgbComponents(theColor)
         try
             return {item 1 of theColor, item 2 of theColor, item 3 of theColor}
@@ -282,57 +312,62 @@ struct TerminalScriptingAdapter: TerminalScriptingSnapshotProviding {
     end rgbComponents
 
     tell application "Terminal"
-        set tabRows to {}
-        repeat with windowIndex from 1 to count of windows
-            try
-                set terminalWindowID to id of window windowIndex
-            on error
-                set terminalWindowID to -1
-            end try
-            try
-                set terminalWindowTitle to (name of window windowIndex) as text
-            on error
-                set terminalWindowTitle to ""
-            end try
-            repeat with tabIndex from 1 to count of «class ttab» of window windowIndex
-                try
-                    set tabContents to («property pcnt» of «class ttab» tabIndex of window windowIndex) as text
-                on error
-                    set tabContents to ""
-                end try
-                try
-                    set tabTitle to («property titl» of «class ttab» tabIndex of window windowIndex) as text
-                on error
-                    set tabTitle to ""
-                end try
-                try
-                    set tabColumnCount to «property ccol» of «class ttab» tabIndex of window windowIndex
-                on error
-                    set tabColumnCount to -1
-                end try
-                try
-                    set tabRowCount to «property crow» of «class ttab» tabIndex of window windowIndex
-                on error
-                    set tabRowCount to -1
-                end try
-                try
-                    set tabSettings to «property tcst» of «class ttab» tabIndex of window windowIndex
-                    set styleFontName to («property font» of tabSettings) as text
-                    set styleFontSize to «property ptsz» of tabSettings
-                    set backgroundRGB to my rgbComponents(«property pbcl» of tabSettings)
-                    set normalRGB to my rgbComponents(«property ptxc» of tabSettings)
-                on error
-                    set styleFontName to ""
-                    set styleFontSize to 13
-                    set backgroundRGB to {0, 0, 0}
-                    set normalRGB to {65535, 65535, 65535}
-                end try
-                set end of tabRows to {tabTitle, tabContents, styleFontName, styleFontSize, backgroundRGB, normalRGB, terminalWindowID, terminalWindowTitle, tabColumnCount, tabRowCount}
-            end repeat
-        end repeat
-        return tabRows
+        try
+            \(targetSelection)
+        on error
+            return {}
+        end try
+        try
+            set targetTab to selected tab of targetWindow
+        on error
+            return {}
+        end try
+        try
+            set terminalWindowID to id of targetWindow
+        on error
+            set terminalWindowID to -1
+        end try
+        try
+            set terminalWindowTitle to (name of targetWindow) as text
+        on error
+            set terminalWindowTitle to ""
+        end try
+        try
+            set tabContents to («property pcnt» of targetTab) as text
+        on error
+            set tabContents to ""
+        end try
+        try
+            set tabTitle to («property titl» of targetTab) as text
+        on error
+            set tabTitle to ""
+        end try
+        try
+            set tabColumnCount to «property ccol» of targetTab
+        on error
+            set tabColumnCount to -1
+        end try
+        try
+            set tabRowCount to «property crow» of targetTab
+        on error
+            set tabRowCount to -1
+        end try
+        try
+            set tabSettings to «property tcst» of targetTab
+            set styleFontName to («property font» of tabSettings) as text
+            set styleFontSize to «property ptsz» of tabSettings
+            set backgroundRGB to my rgbComponents(«property pbcl» of tabSettings)
+            set normalRGB to my rgbComponents(«property ptxc» of tabSettings)
+        on error
+            set styleFontName to ""
+            set styleFontSize to 13
+            set backgroundRGB to {0, 0, 0}
+            set normalRGB to {65535, 65535, 65535}
+        end try
+        return {{tabTitle, tabContents, styleFontName, styleFontSize, backgroundRGB, normalRGB, terminalWindowID, terminalWindowTitle, tabColumnCount, tabRowCount}}
     end tell
     """
+    }
 }
 
 enum TerminalPreviewRenderer {

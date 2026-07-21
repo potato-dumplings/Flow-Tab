@@ -386,21 +386,21 @@ The six layer keys are `Unit`, `Behavior`, `Mock UI`, `Real-topology UI`, `Press
 
 - Requiredness: required
 - Owner: `Settings`
-- Oracle: Permission and launch-at-login UI reflects the injected or system-owned state and exposes the app-owned recovery entry point.
+- Oracle: Permission and launch-at-login UI reflects the injected or system-owned state, exposes the app-owned recovery entry point, and keeps Terminal content preview behind a persisted explicit opt-in with a clear Apple Events disclosure.
 - Risk: `deterministic-rule`, `app-orchestration`, `visible-workflow`, `real-topology-external-system`
 - Required layers:
-  - Unit: Own permission copy, injected-state resolution, launch overrides, and launch-at-login state.
+  - Unit: Own permission copy, injected-state resolution, launch overrides, launch-at-login state, and the default-off Terminal content-preview preference.
   - Behavior: Prove launch prompt gating and permission-dependent app orchestration.
-  - Mock UI: Prove permission banners, routing, control enablement, and recovery entry points.
+  - Mock UI: Prove permission banners, routing, control enablement, recovery entry points, and Terminal content-preview opt-in persistence.
 - Conditional layers:
   - Real-topology UI: Required when app-owned behavior depends on a real permission grant, denial, or system prompt transition.
 - Not relevant layers:
   - Pressure: Permission state transitions are lifecycle events rather than sustained repeated work.
   - Process/Tooling: Signing and permission setup are shared UI-runner prerequisites, not this product scenario's stable outcome.
 - Current representative test anchors:
-  - Unit: `FlowTabTests.testPermissionSettingsCardStateUsesDeniedCopyWhenPermissionsMissing`
+  - Unit: `FlowTabTests.testPermissionSettingsCardStateUsesDeniedCopyWhenPermissionsMissing`, `FlowTabPriorityCoverageTests.testTerminalContentPreviewPreferenceRequiresExplicitOptIn`
   - Behavior: `FlowTabPriorityCoverageTests.testAppDelegateLaunchSkipsAccessibilityPromptWhenAlreadyPromptedOrReminderDisabled`, `FlowTabPriorityCoverageTests.testAppDelegateLaunchEnablesLoginItemWhenPreferenceAllowsIt`
-  - Mock UI: `FlowTabUITests.testHomePermissionBannerHiddenWhenPermissionsGranted`
+  - Mock UI: `FlowTabUITests.testHomePermissionBannerHiddenWhenPermissionsGranted`, `FlowTabUITests.testTerminalContentPreviewTogglePersistsExplicitOptInAcrossRelaunch`
 - Exhaustive mapping: query active ledger rows whose `product_scenario_ids` contains `scenario:settings-permission-controls`.
 
 ### `scenario:settings-search` — Settings: search
@@ -511,11 +511,11 @@ The six layer keys are `Unit`, `Behavior`, `Mock UI`, `Real-topology UI`, `Press
 
 - Requiredness: required
 - Owner: `Runtime`
-- Oracle: Preview and icon providers preserve target identity, cache lifecycle, paging, fallback, and cancellation semantics while visible cards remain continuous across capture and same-session projection refreshes.
+- Oracle: Preview and icon providers preserve target identity, cache lifecycle, paging, fallback, and cancellation semantics while visible cards remain continuous across capture and same-session projection refreshes; Terminal scripting reads only the selected tab of the requested window after explicit opt-in.
 - Risk: `deterministic-rule`, `app-orchestration`, `visible-workflow`, `real-topology-external-system`, `hot-path-scale-sensitive`
 - Required layers:
-  - Unit: Own sizing, paging, cache, renderer, icon, provider selection, and identity rules.
-  - Behavior: Prove provider routing, batched publication, cache lifetime, fallback, and cancellation.
+  - Unit: Own sizing, paging, cache, renderer, icon, provider selection, identity rules, and targeted Terminal AppleScript construction.
+  - Behavior: Prove provider routing, target-scoped Terminal collection, opt-out fallback, batched publication, cache lifetime, fallback, and cancellation.
   - Mock UI: Prove visible pagination and screenshot presence for a large deterministic window set.
   - Real-topology UI: Prove real workflow cards preserve app/window identity and duplicate-window separation.
   - Pressure: Protect current-page-only preview capture and bounded provider work at scale.
@@ -523,7 +523,7 @@ The six layer keys are `Unit`, `Behavior`, `Mock UI`, `Real-topology UI`, `Press
   - Process/Tooling: Preview evidence uses shared app and UI runners without a scenario-specific command contract.
 - Current representative test anchors:
   - Unit: `FlowTabPriorityCoverageTests.testWindowPreviewPagingUsesResolutionDependentPageSize`, `FlowTabPriorityCoverageTests.testWindowOnlyPanelSizingUsesResponsiveScreenBounds`
-  - Behavior: `FlowTabPriorityCoverageTests.testLiveSwitcherModelRuntimeVisiblePreviewShowsFallbackWhileBatchIsInFlight`, `FlowTabPriorityCoverageTests.testProjectionRefreshKeepsVisiblePreviewImagesInCurrentSession`
+  - Behavior: `FlowTabPriorityCoverageTests.testTerminalPreviewProviderReadsOnlyEachRequestedWindowForBatch`, `FlowTabPriorityCoverageTests.testTerminalPreviewProviderOptOutUsesGenericCaptureWithoutReadingTerminal`, `FlowTabPriorityCoverageTests.testProjectionRefreshKeepsVisiblePreviewImagesInCurrentSession`
   - Mock UI: `FlowTabUITests.testControlTabFirstPhysicalGestureSelectsNextWindowWithVisiblePreview`, `FlowTabUITests.testOptionTabDelayedWindowLayerEntryShowsPrewarmedPreviewAtTransition`, `FlowTabUITests.testSwitcherWindowLayerPaginatesLargeMockWindowSet`
   - Real-topology UI: `FlowTabUITests.testSwitcherPanelPreviewKeepsIdenticalRealWorkflowWindowsDistinct`
   - Pressure: `FlowTabTests.testOptionTabWindowScalePressureKeepsSelectedAppApplyAndPreviewCaptureBounded`

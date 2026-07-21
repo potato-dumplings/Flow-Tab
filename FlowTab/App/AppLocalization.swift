@@ -142,6 +142,8 @@ enum AppStringKey: String {
     case permissionScreenRequestActionLabel
     case permissionAccessibilityDetail
     case permissionScreenDetail
+    case permissionTerminalContentPreviewToggle
+    case permissionTerminalContentPreviewDetail
     case permissionHomeReminderToggle
     case permissionLaunchAtLoginToggle
     case logsPageTitle
@@ -300,6 +302,8 @@ enum AppStrings {
             .permissionScreenRequestActionLabel: "请求屏幕录制权限",
             .permissionAccessibilityDetail: "用于应用切换、应用内窗口切换和最小化窗口处理。",
             .permissionScreenDetail: "用于显示窗口真实预览画面；未授权时仅显示兜底信息。",
+            .permissionTerminalContentPreviewToggle: "允许读取 Terminal 内容预览",
+            .permissionTerminalContentPreviewDetail: "开启后，FlowTab 会通过 Apple Events 读取目标 Terminal 窗口当前选中标签的内容并在内存中生成预览。",
             .permissionHomeReminderToggle: "无权限时是否在首页提示获取权限",
             .permissionLaunchAtLoginToggle: "允许开机启动 FlowTab",
             .logsPageTitle: "日志",
@@ -453,6 +457,8 @@ enum AppStrings {
             .permissionScreenRequestActionLabel: "Request Screen Recording permission",
             .permissionAccessibilityDetail: "Used for app switching, in-app window switching, and minimized-window handling.",
             .permissionScreenDetail: "Used for real window previews; fallback info is shown when not granted.",
+            .permissionTerminalContentPreviewToggle: "Allow Terminal content previews",
+            .permissionTerminalContentPreviewDetail: "When enabled, FlowTab uses Apple Events to read the selected tab of the targeted Terminal window and renders the preview in memory.",
             .permissionHomeReminderToggle: "Show Home reminder when permissions are missing",
             .permissionLaunchAtLoginToggle: "Allow FlowTab to launch at login",
             .logsPageTitle: "Logs",

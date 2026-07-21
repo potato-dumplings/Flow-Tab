@@ -171,6 +171,7 @@
 		E50000053601000100B0D737 /* FlowSettingsSegmentedControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = E50000153601000100B0D737 /* FlowSettingsSegmentedControl.swift */; };
 		E50000063601000100B0D737 /* FlowSettingsCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E50000163601000100B0D737 /* FlowSettingsCardView.swift */; };
 		C10000092F75000100B0D737 /* AppKitSettingsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000192F75000100B0D737 /* AppKitSettingsPage.swift */; };
+		E1F200052B00000100B0D737 /* AppKitSettingsPageBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1F200152B00000100B0D737 /* AppKitSettingsPageBridge.swift */; };
 		C100000A2F75000100B0D737 /* AppearanceSettingsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100001A2F75000100B0D737 /* AppearanceSettingsCard.swift */; };
 		C100000B2F75000100B0D737 /* WindowBehaviorSettingsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100001B2F75000100B0D737 /* WindowBehaviorSettingsCard.swift */; };
 		C100000C2F75000100B0D737 /* SearchSettingsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C100001C2F75000100B0D737 /* SearchSettingsCard.swift */; };
@@ -423,6 +424,7 @@
 		E50000153601000100B0D737 /* FlowSettingsSegmentedControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowSettingsSegmentedControl.swift; sourceTree = "<group>"; };
 		E50000163601000100B0D737 /* FlowSettingsCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlowSettingsCardView.swift; sourceTree = "<group>"; };
 		C10000192F75000100B0D737 /* AppKitSettingsPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitSettingsPage.swift; sourceTree = "<group>"; };
+		E1F200152B00000100B0D737 /* AppKitSettingsPageBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitSettingsPageBridge.swift; sourceTree = "<group>"; };
 		C100001A2F75000100B0D737 /* AppearanceSettingsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceSettingsCard.swift; sourceTree = "<group>"; };
 		C100001B2F75000100B0D737 /* WindowBehaviorSettingsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowBehaviorSettingsCard.swift; sourceTree = "<group>"; };
 		C100001C2F75000100B0D737 /* SearchSettingsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchSettingsCard.swift; sourceTree = "<group>"; };
@@ -872,6 +874,7 @@
 			children = (
 				C100001F2F75000100B0D737 /* AppSettingsView.swift */,
 				C10000192F75000100B0D737 /* AppKitSettingsPage.swift */,
+				E1F200152B00000100B0D737 /* AppKitSettingsPageBridge.swift */,
 				C100001A2F75000100B0D737 /* AppearanceSettingsCard.swift */,
 				C100001B2F75000100B0D737 /* WindowBehaviorSettingsCard.swift */,
 				C100001C2F75000100B0D737 /* SearchSettingsCard.swift */,
@@ -1133,6 +1136,7 @@
 				C100000B2F75000100B0D737 /* WindowBehaviorSettingsCard.swift in Sources */,
 				C100000A2F75000100B0D737 /* AppearanceSettingsCard.swift in Sources */,
 				C10000092F75000100B0D737 /* AppKitSettingsPage.swift in Sources */,
+				E1F200052B00000100B0D737 /* AppKitSettingsPageBridge.swift in Sources */,
 				C10000082F75000100B0D737 /* AppKitSettingsCardChrome.swift in Sources */,
 				E50000013601000100B0D737 /* FlowSettingsStylePrimitives.swift in Sources */,
 				E50000023601000100B0D737 /* FlowSettingsComponentStyles.swift in Sources */,
@@ -1601,7 +1605,7 @@
 				EXECUTABLE_NAME = FlowTab;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Flow Tab";
-				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Flow Tab uses automation to read supported app window and tab details and bring selected windows to the front.";
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "When Terminal content previews are enabled, Flow Tab uses Apple Events to read the selected tab of the targeted Terminal window and to activate selected supported-app windows.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1633,7 +1637,7 @@
 				EXECUTABLE_NAME = FlowTab;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Flow Tab";
-				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Flow Tab uses automation to read supported app window and tab details and bring selected windows to the front.";
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "When Terminal content previews are enabled, Flow Tab uses Apple Events to read the selected tab of the targeted Terminal window and to activate selected supported-app windows.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1666,7 +1670,7 @@
 				EXECUTABLE_NAME = FlowTab;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Flow Tab";
-				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Flow Tab uses automation to read supported app window and tab details and bring selected windows to the front.";
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "When Terminal content previews are enabled, Flow Tab uses Apple Events to read the selected tab of the targeted Terminal window and to activate selected supported-app windows.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

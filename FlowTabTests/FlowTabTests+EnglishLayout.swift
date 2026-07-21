@@ -31,6 +31,16 @@ extension FlowTabTests {
         XCTAssertFalse(localizedText.contains("1 apps hidden"), localizedText.sorted().joined(separator: "\n"))
         XCTAssertTrue(localizedText.contains("System"), localizedText.sorted().joined(separator: "\n"))
         XCTAssertFalse(localizedText.contains("Follow System"), localizedText.sorted().joined(separator: "\n"))
+        XCTAssertTrue(
+            localizedText.contains("Allow Terminal content previews"),
+            localizedText.sorted().joined(separator: "\n")
+        )
+        XCTAssertTrue(
+            localizedText.contains(
+                "When enabled, FlowTab uses Apple Events to read the selected tab of the targeted Terminal window and renders the preview in memory."
+            ),
+            localizedText.sorted().joined(separator: "\n")
+        )
         let fixedControlWidthConstraints = requiredFixedSettingsControlWidthConstraints(in: view)
             .filter { constraint in
                 constraint.firstItem is FlowSettingsSelectControl
@@ -68,6 +78,12 @@ extension FlowTabTests {
         let screenCaptureButton: FlowSettingsActionButton = try XCTUnwrap(
             descendant(in: view, identifier: "flowtab.settings.permission.screen-capture-action")
         )
+        let terminalContentPreviewsSwitch: NSSwitch = try XCTUnwrap(
+            descendant(
+                in: view,
+                identifier: "flowtab.settings.permission.terminal-content-previews"
+            )
+        )
         XCTAssertEqual(accessibilityButton.title, "Request")
         XCTAssertEqual(screenCaptureButton.title, "Request")
         XCTAssertEqual(accessibilityButton.accessibilityLabel(), "Request Accessibility permission")
@@ -78,6 +94,16 @@ extension FlowTabTests {
         XCTAssertLessThanOrEqual(screenCaptureButton.frame.width, screenCaptureButton.intrinsicContentSize.width + 1)
         XCTAssertFalse(accessibilityButton.attributedTitle.string.contains("\n"))
         XCTAssertFalse(screenCaptureButton.attributedTitle.string.contains("\n"))
+        XCTAssertEqual(terminalContentPreviewsSwitch.state, .off)
+
+        var terminalContentPreviewsChanged: Bool?
+        view.onTerminalContentPreviewsChanged = { terminalContentPreviewsChanged = $0 }
+        terminalContentPreviewsSwitch.state = .on
+        terminalContentPreviewsSwitch.sendAction(
+            terminalContentPreviewsSwitch.action,
+            to: terminalContentPreviewsSwitch.target
+        )
+        XCTAssertEqual(terminalContentPreviewsChanged, true)
 
         XCTAssertLessThanOrEqual(
             try sectionCard(in: view, containingText: "Appearance").frame.height,
@@ -89,7 +115,7 @@ extension FlowTabTests {
         )
         XCTAssertLessThanOrEqual(
             try sectionCard(in: view, containingText: "Permissions").frame.height,
-            340
+            440
         )
     }
 
@@ -542,6 +568,7 @@ extension FlowTabTests {
             hideMinimizedAppsFromAppLayer: false,
             showPermissionReminder: true,
             allowLaunchAtLogin: false,
+            terminalContentPreviewsEnabled: false,
             searchEnabled: true,
             searchDefaultScopeRaw: SwitcherSearchScope.window.rawValue,
             hiddenAppCount: hiddenAppCount,

@@ -85,6 +85,8 @@ struct AppSettingsView: View {
     @AppStorage(AppPreferenceKeys.showPermissionReminder) private var showPermissionReminder = true
     @AppStorage(AppPreferenceKeys.allowLaunchAtLogin)
     private var allowLaunchAtLogin = LaunchAtLoginPreferencesStore.defaultAllowLaunchAtLogin
+    @AppStorage(AppPreferenceKeys.terminalContentPreviewsEnabled)
+    private var terminalContentPreviewsEnabled = TerminalContentPreviewPreferencesStore.defaultIsEnabled
     @AppStorage(AppPreferenceKeys.autoRestoreMinimizedWindowOnSwitch)
     private var autoRestoreMinimizedWindowOnSwitch =
         SwitcherBehaviorPreferencesStore.defaultAutoRestoreMinimizedWindowOnSwitch
@@ -232,6 +234,7 @@ struct AppSettingsView: View {
                 hideMinimizedAppsFromAppLayer: $hideMinimizedAppsFromAppLayer,
                 showPermissionReminder: $showPermissionReminder,
                 allowLaunchAtLogin: $allowLaunchAtLogin,
+                terminalContentPreviewsEnabled: $terminalContentPreviewsEnabled,
                 searchEnabled: $searchEnabled,
                 searchDefaultScopeRaw: $searchDefaultScopeRaw,
                 hiddenAppCount: hiddenAppCount,

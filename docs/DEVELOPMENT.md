@@ -493,6 +493,12 @@ gh release create "${TAG}" release/"${TAG}"/flowtab-universal2-apple-darwin.dmg 
 
 未授予屏幕录制权限时，不影响切换功能，但预览会回退为兜底样式，且不会执行标题样式猜测。
 
+### Terminal 内容预览（独立显式开关）
+
+Terminal 内容预览默认关闭。用户在“设置 > 权限”开启后，特殊预览提供器才会通过 Apple Events 定位当前请求对应的 Terminal 窗口，并只读取该窗口当前选中的标签。读取结果仅用于内存中的预览渲染；关闭开关时 Terminal 走通用截图或兜底路径。
+
+`NSAppleEventsUsageDescription` 必须明确披露对目标 Terminal 窗口当前选中标签内容的读取。采集脚本不得遍历其他窗口或非选中标签的 `contents`。
+
 ## 常见问题
 
 ### 1) 看不到可切换窗口，日志里 `windows=0`
@@ -537,6 +543,7 @@ gh release create "${TAG}" release/"${TAG}"/flowtab-universal2-apple-darwin.dmg 
 - 是否已进入窗口面板
 - 目标应用是否存在 `>= 2` 个可切换窗口
 - 是否已授予屏幕录制权限
+- 若目标为 Terminal 且需要文本渲染预览，是否已在“设置 > 权限”显式开启 Terminal 内容预览
 
 可在应用的“预览日志”页查看 `Preview` 分类日志定位问题。
 

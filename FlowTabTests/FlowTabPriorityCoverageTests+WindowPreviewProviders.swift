@@ -1,10 +1,22 @@
 import AppKit
-import Combine
 import XCTest
 @testable import FlowTab
 import FlowTabCore
 
 extension FlowTabPriorityCoverageTests {
+    func testTerminalContentPreviewPreferenceRequiresExplicitOptIn() {
+        guard let userDefaults = makeIsolatedUserDefaults() else { return }
+        defer { clearIsolatedUserDefaults(userDefaults) }
+
+        XCTAssertFalse(
+            TerminalContentPreviewPreferencesStore.isEnabled(userDefaults: userDefaults)
+        )
+        userDefaults.set(true, forKey: AppPreferenceKeys.terminalContentPreviewsEnabled)
+        XCTAssertTrue(
+            TerminalContentPreviewPreferencesStore.isEnabled(userDefaults: userDefaults)
+        )
+    }
+
     private func assertPreviewProviderSessionStartedFromAppSwitcherProjection(
         _ runtimeProjectionService: RecordingRuntimeProjectionService,
         file: StaticString = #filePath,
@@ -220,26 +232,24 @@ extension FlowTabPriorityCoverageTests {
     func testTerminalPreviewProviderMatchesAXIndexToTerminalSnapshot() async {
         let currentApp = NSRunningApplication.current
         let adapter = FakeTerminalScriptingAdapter(
-            result: .success([
-                makeTerminalSnapshot(
-                    flatIndex: 0,
-                    title: "Server",
-                    contents: "first",
-                    backgroundColor: NSColor(calibratedRed: 1, green: 0, blue: 0, alpha: 1)
-                ),
+            result: .success(
                 makeTerminalSnapshot(
                     flatIndex: 1,
                     title: "Shell",
                     contents: "second",
                     backgroundColor: NSColor(calibratedRed: 0, green: 0, blue: 1, alpha: 1)
                 )
-            ])
+            )
         )
-        let provider = TerminalWindowPreviewProvider(adapter: adapter)
+        let provider = TerminalWindowPreviewProvider(
+            adapter: adapter,
+            isContentPreviewEnabled: { true }
+        )
         let request = makePreviewRequest(
             appID: "com.apple.Terminal",
             windowID: "cg:\(currentApp.processIdentifier):24242",
             title: "Runtime Terminal Window",
+            cgWindowID: nil,
             activationHandleID: AXWindowInspector.makeWindowID(
                 pid: currentApp.processIdentifier,
                 index: 1
@@ -249,6 +259,7 @@ extension FlowTabPriorityCoverageTests {
         let result = await provider.preview(for: request)
 
         XCTAssertEqual(adapter.callCount, 1)
+        XCTAssertEqual(adapter.targets, [.windowIndex(1)])
         XCTAssertEqual(result.source, .special(appID: "com.apple.Terminal"))
         XCTAssertNotNil(result.image)
         let color = sampledBackgroundColor(from: result.image)
@@ -259,23 +270,7 @@ extension FlowTabPriorityCoverageTests {
     func testTerminalPreviewProviderPrefersTerminalWindowIDWhenAXIndexIncludesHelpTag() async {
         let currentApp = NSRunningApplication.current
         let adapter = FakeTerminalScriptingAdapter(
-            result: .success([
-                makeTerminalSnapshot(
-                    flatIndex: 0,
-                    title: "Session",
-                    contents: "session",
-                    terminalWindowID: 19_828,
-                    windowTitle: "session-viewer",
-                    backgroundColor: NSColor(calibratedRed: 1, green: 0, blue: 0, alpha: 1)
-                ),
-                makeTerminalSnapshot(
-                    flatIndex: 1,
-                    title: "Build",
-                    contents: "build",
-                    terminalWindowID: 138_245,
-                    windowTitle: "fed-template-administrative-inspection",
-                    backgroundColor: NSColor(calibratedRed: 0, green: 1, blue: 0, alpha: 1)
-                ),
+            result: .success(
                 makeTerminalSnapshot(
                     flatIndex: 2,
                     title: "Shell",
@@ -284,9 +279,12 @@ extension FlowTabPriorityCoverageTests {
                     windowTitle: "FlowTabApp — -bash — 190×44",
                     backgroundColor: NSColor(calibratedRed: 0, green: 0, blue: 1, alpha: 1)
                 )
-            ])
+            )
         )
-        let provider = TerminalWindowPreviewProvider(adapter: adapter)
+        let provider = TerminalWindowPreviewProvider(
+            adapter: adapter,
+            isContentPreviewEnabled: { true }
+        )
         let request = makePreviewRequest(
             appID: "com.apple.Terminal",
             windowID: "cg:\(currentApp.processIdentifier):245444",
@@ -301,6 +299,7 @@ extension FlowTabPriorityCoverageTests {
         let result = await provider.preview(for: request)
 
         XCTAssertEqual(adapter.callCount, 1)
+        XCTAssertEqual(adapter.targets, [.windowID(245_444)])
         XCTAssertEqual(result.source, .special(appID: "com.apple.Terminal"))
         XCTAssertNotNil(result.image)
         let color = sampledBackgroundColor(from: result.image)
@@ -308,15 +307,17 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertLessThan(color?.redComponent ?? 1, 0.2)
     }
 
-    func testTerminalPreviewProviderReadsTerminalStateOnceForBatch() async {
+    func testTerminalPreviewProviderReadsOnlyEachRequestedWindowForBatch() async {
         let currentApp = NSRunningApplication.current
         let adapter = FakeTerminalScriptingAdapter(
-            result: .success([
-                makeTerminalSnapshot(flatIndex: 0, title: "Server", contents: "first"),
-                makeTerminalSnapshot(flatIndex: 1, title: "Shell", contents: "second")
-            ])
+            result: .success(
+                makeTerminalSnapshot(flatIndex: 0, title: "Server", contents: "first")
+            )
         )
-        let provider = TerminalWindowPreviewProvider(adapter: adapter)
+        let provider = TerminalWindowPreviewProvider(
+            adapter: adapter,
+            isContentPreviewEnabled: { true }
+        )
         let requests = [
             makePreviewRequest(
                 appID: "com.apple.Terminal",
@@ -324,7 +325,8 @@ extension FlowTabPriorityCoverageTests {
                     pid: currentApp.processIdentifier,
                     index: 0
                 ),
-                title: "Server"
+                title: "Server",
+                cgWindowID: nil
             ),
             makePreviewRequest(
                 appID: "com.apple.Terminal",
@@ -332,13 +334,15 @@ extension FlowTabPriorityCoverageTests {
                     pid: currentApp.processIdentifier,
                     index: 1
                 ),
-                title: "Shell"
+                title: "Shell",
+                cgWindowID: nil
             )
         ]
 
         let results = await provider.previews(for: requests)
 
-        XCTAssertEqual(adapter.callCount, 1)
+        XCTAssertEqual(adapter.callCount, 2)
+        XCTAssertEqual(adapter.targets, [.windowIndex(0), .windowIndex(1)])
         XCTAssertEqual(results.count, 2)
         XCTAssertTrue(results.allSatisfy { $0.image != nil })
         XCTAssertTrue(results.allSatisfy { $0.source == .special(appID: "com.apple.Terminal") })
@@ -346,7 +350,10 @@ extension FlowTabPriorityCoverageTests {
 
     func testTerminalPreviewProviderReturnsStructuredPermissionFailure() async {
         let adapter = FakeTerminalScriptingAdapter(result: .failure(.permissionDenied))
-        let provider = TerminalWindowPreviewProvider(adapter: adapter)
+        let provider = TerminalWindowPreviewProvider(
+            adapter: adapter,
+            isContentPreviewEnabled: { true }
+        )
 
         let result = await provider.preview(
             for: makePreviewRequest(appID: "com.apple.Terminal")
@@ -355,6 +362,56 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertNil(result.image)
         XCTAssertEqual(result.failureReason, .permissionDenied)
         XCTAssertNil(result.source)
+    }
+
+    func testTerminalPreviewProviderOptOutUsesGenericCaptureWithoutReadingTerminal() async {
+        let adapter = FakeTerminalScriptingAdapter(
+            result: .success(
+                makeTerminalSnapshot(flatIndex: 0, title: "Private", contents: "secret")
+            )
+        )
+        let terminalProvider = TerminalWindowPreviewProvider(
+            adapter: adapter,
+            isContentPreviewEnabled: { false }
+        )
+        let genericProvider = FakeGenericWindowPreviewProvider(
+            result: .success(
+                image: makeColorImage(color: .systemBlue),
+                resolvedWindowID: 24_001,
+                titleBarStyle: .light,
+                source: .genericScreenshot
+            )
+        )
+        let resolver = WindowPreviewProviderResolver(
+            specialProviders: [terminalProvider],
+            genericProvider: genericProvider
+        )
+
+        let results = await resolver.previewOutcomes(
+            for: [makePreviewRequest(appID: "com.apple.Terminal")],
+            captureSemaphore: nil
+        )
+
+        XCTAssertEqual(adapter.callCount, 0)
+        XCTAssertEqual(genericProvider.callCount, 1)
+        XCTAssertEqual(results.first?.source, .genericScreenshot)
+    }
+
+    func testTerminalScriptingAdapterScriptReadsOnlySelectedTabOfTargetWindow() throws {
+        let script = TerminalScriptingAdapter.scriptSource(for: .windowID(245_444))
+
+        XCTAssertTrue(script.contains("first window whose id is 245444"))
+        XCTAssertTrue(script.contains("selected tab of targetWindow"))
+        XCTAssertFalse(script.contains("repeat with windowIndex"))
+        XCTAssertFalse(script.contains("repeat with tabIndex"))
+        XCTAssertFalse(script.contains("count of «class ttab»"))
+
+        let appleScript = try XCTUnwrap(NSAppleScript(source: script))
+        var errorInfo: NSDictionary?
+        XCTAssertTrue(
+            appleScript.compileAndReturnError(&errorInfo),
+            errorInfo.map(String.init(describing:)) ?? "AppleScript compilation failed"
+        )
     }
 
     @MainActor
@@ -409,23 +466,18 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
         assertPreviewProviderSessionStartedFromAppSwitcherProjection(runtimeProjectionService)
 
-        let published = expectation(description: "terminal preview provider published results")
-        var cancellables: Set<AnyCancellable> = []
-        model.objectWillChange.sink {
-            published.fulfill()
-        }.store(in: &cancellables)
-
-        let initialSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: 0..<2)
-        XCTAssertTrue(initialSnapshot.isEmpty)
-
-        await fulfillment(of: [published], timeout: 1.0)
+        _ = model.windowPreviewSnapshotForTesting(visibleRange: 0..<2)
+        let published = await waitUntil("terminal preview provider publishes results") {
+            let snapshot = model.windowPreviewSnapshotForTesting(visibleRange: 0..<2)
+            return snapshot.count == 2 && snapshot.allSatisfy(\.hasImage)
+        }
+        XCTAssertTrue(published)
 
         let completedSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: 0..<2)
         XCTAssertEqual(completedSnapshot.count, 2)
         XCTAssertTrue(completedSnapshot.allSatisfy(\.hasImage))
         XCTAssertEqual(specialProvider.callCount, 2)
         XCTAssertEqual(genericProvider.callCount, 0)
-        XCTAssertEqual(cancellables.count, 1)
     }
 
     @MainActor
@@ -480,16 +532,17 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(model.autoEnterWindowLayerIfPossible())
         assertPreviewProviderSessionStartedFromAppSwitcherProjection(runtimeProjectionService)
 
-        let published = expectation(description: "terminal preview failure published")
-        var cancellables: Set<AnyCancellable> = []
-        model.objectWillChange.sink {
-            published.fulfill()
-        }.store(in: &cancellables)
-
-        let initialSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: 0..<1)
-        XCTAssertTrue(initialSnapshot.isEmpty)
-
-        await fulfillment(of: [published], timeout: 1.0)
+        _ = model.windowPreviewSnapshotForTesting(visibleRange: 0..<1)
+        let published = await waitUntil("terminal preview provider publishes failure") {
+            guard specialProvider.callCount == 1 else { return false }
+            return model.previewCaptureStatesForTesting().values.contains { state in
+                if case .failed = state {
+                    return true
+                }
+                return false
+            }
+        }
+        XCTAssertTrue(published)
 
         let completedSnapshot = model.windowPreviewSnapshotForTesting(visibleRange: 0..<1)
         XCTAssertEqual(completedSnapshot.count, 1)
@@ -504,7 +557,6 @@ extension FlowTabPriorityCoverageTests {
         }
         XCTAssertEqual(reason, .specialProviderUnavailable)
         XCTAssertEqual(retryAfterGeneration, model.previewCaptureGeneration + 1)
-        XCTAssertEqual(cancellables.count, 1)
     }
 
     private func makePreviewRequest(
@@ -748,11 +800,11 @@ private final class FakeGenericWindowPreviewProvider: GenericWindowPreviewProvid
 }
 
 private final class FakeTerminalScriptingAdapter: TerminalScriptingSnapshotProviding {
-    private let result: Result<[TerminalTabSnapshot], TerminalScriptingSnapshotError>
+    private let result: Result<TerminalTabSnapshot, TerminalScriptingSnapshotError>
     private let lock = NSLock()
-    private var calls: [pid_t] = []
+    private var calls: [(ownerPID: pid_t, target: TerminalPreviewWindowTarget)] = []
 
-    init(result: Result<[TerminalTabSnapshot], TerminalScriptingSnapshotError>) {
+    init(result: Result<TerminalTabSnapshot, TerminalScriptingSnapshotError>) {
         self.result = result
     }
 
@@ -762,9 +814,18 @@ private final class FakeTerminalScriptingAdapter: TerminalScriptingSnapshotProvi
         return calls.count
     }
 
-    func tabSnapshots(ownerPID: pid_t) -> Result<[TerminalTabSnapshot], TerminalScriptingSnapshotError> {
+    var targets: [TerminalPreviewWindowTarget] {
         lock.lock()
-        calls.append(ownerPID)
+        defer { lock.unlock() }
+        return calls.map(\.target)
+    }
+
+    func selectedTabSnapshot(
+        ownerPID: pid_t,
+        target: TerminalPreviewWindowTarget
+    ) -> Result<TerminalTabSnapshot, TerminalScriptingSnapshotError> {
+        lock.lock()
+        calls.append((ownerPID, target))
         lock.unlock()
         return result
     }

@@ -78,6 +78,8 @@ final class FlowTabUITests: XCTestCase {
         static let settingsPermissionAccessibilityAction = "flowtab.settings.permission.accessibility-action"
         static let settingsPermissionScreenCaptureAction = "flowtab.settings.permission.screen-capture-action"
         static let settingsPermissionLaunchAtLogin = "flowtab.settings.permission.launch-at-login"
+        static let settingsPermissionTerminalContentPreviews =
+            "flowtab.settings.permission.terminal-content-previews"
         static let settingsHotkeyMainModifier = "flowtab.settings.hotkey.main-modifier"
         static let settingsHotkeyMainKey = "flowtab.settings.hotkey.main-key"
         static let settingsHotkeyQuitKey = "flowtab.settings.hotkey.quit-key"

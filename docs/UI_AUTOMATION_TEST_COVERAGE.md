@@ -136,6 +136,11 @@
   步骤：在无障碍和录屏权限均为未授权的前提下进入 `Settings`。
   验证：无障碍权限按钮和录屏权限按钮都存在。
 
+- `testTerminalContentPreviewTogglePersistsExplicitOptInAcrossRelaunch`
+  场景：Terminal 内容采集由独立的默认关闭开关控制。
+  步骤：首次启动进入 `Settings`，确认开关关闭后显式开启；随后重启应用。
+  验证：开关在首次启动前保持关闭，显式开启后跨重启保留，设置页同时展示 Apple Events 只读取目标窗口当前选中标签的内容披露。
+
 - `testSettingsHotkeySelectionsPersistAcrossRelaunch`
   场景：验证主快捷键、退出键和 In-App 键位选择可持久化。
   步骤：首次启动进入 `Settings`，依次把主键改成 `space`、退出键改成 `z`、In-App 键改成 `a`；随后重启应用。
