@@ -11,6 +11,8 @@ INSTALL_PATH="/Applications/${APP_BUNDLE_NAME}"
 BUNDLE_ID="io.github.potato-dumplings.flowtab"
 LOCAL_SIGNING_CONFIG_PATH="${ROOT_DIR}/xcconfigs/LocalSigning.xcconfig"
 RELEASE_BINARY_VERIFY_PATH="${ROOT_DIR}/scripts/release/verify-release-binary.sh"
+SIGN_BUNDLE_PATH="${ROOT_DIR}/scripts/release/sign-macos-bundle.sh"
+APP_ENTITLEMENTS_PATH="${ROOT_DIR}/FlowTab/Resources/FlowTab.entitlements"
 DEVELOPMENT_TEAM="${FLOWTAB_DEVELOPMENT_TEAM:-}"
 CODE_SIGN_IDENTITY="${FLOWTAB_CODE_SIGN_IDENTITY:-Apple Development}"
 RESOLVED_CODE_SIGN_IDENTITY=""
@@ -173,8 +175,10 @@ rm -rf "${INSTALL_PATH}"
 STEP=$((STEP + 1))
 echo "[${STEP}/${TOTAL_STEPS}] Install and sign new app"
 /usr/bin/ditto "${RELEASE_APP_PATH}" "${INSTALL_PATH}"
-/usr/bin/codesign --force --deep --sign "${RESOLVED_CODE_SIGN_IDENTITY}" "${INSTALL_PATH}"
-/usr/bin/codesign --verify --deep --strict --verbose=2 "${INSTALL_PATH}"
+"${SIGN_BUNDLE_PATH}" \
+  --identity "${RESOLVED_CODE_SIGN_IDENTITY}" \
+  --entitlements "${APP_ENTITLEMENTS_PATH}" \
+  "${INSTALL_PATH}"
 
 STEP=$((STEP + 1))
 echo "[${STEP}/${TOTAL_STEPS}] Launch app"

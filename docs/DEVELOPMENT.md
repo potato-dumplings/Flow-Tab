@@ -423,6 +423,12 @@ chmod +x scripts/release/release-install.sh
 
 ## 生成 DMG
 
+公开分发需要可用的 `Developer ID Application` 证书，以及通过 `xcrun notarytool store-credentials <profile>` 保存的公证凭据。运行脚本前设置凭据名称：
+
+```bash
+export FLOWTAB_NOTARY_KEYCHAIN_PROFILE="flowtab-release"
+```
+
 ```bash
 chmod +x scripts/release/release-dmg.sh
 ./scripts/release/release-dmg.sh
@@ -439,10 +445,11 @@ chmod +x scripts/release/release-dmg.sh
 - `--skip-build`：跳过构建，直接使用现有 `Release` 产物
 
 说明：
-- DMG 内的 `Flow Tab.app` 会使用本机 `Apple Development` identity 手动签名并校验，签名来源同 `release-install.sh`：优先读取 `FLOWTAB_DEVELOPMENT_TEAM`，否则读取 `xcconfigs/LocalSigning.xcconfig`。
-- DMG 文件本身仍未签名、未公证，首次打开可能触发 Gatekeeper 提示。
-- 可通过 `FLOWTAB_CODE_SIGN_IDENTITY` 指定本地签名身份，默认使用 `Apple Development`。
-- 适合开源阶段给开发者测试使用，不等同于正式分发安装包。
+- `Flow Tab.app` 与 `Uninstall Flow Tab.app` 的内嵌代码会由内到外显式签署，外层 app 使用 Hardened Runtime、安全时间戳与 `Developer ID Application` 身份签署。
+- DMG 使用同一分发身份与安全时间戳签署，提交 Apple 公证服务并等待接受，然后装订、校验公证票据和 Gatekeeper 接受状态。
+- 可通过 `FLOWTAB_CODE_SIGN_IDENTITY` 指定完整的 `Developer ID Application` 身份；脚本只接受该分发身份类型。
+- 任一步骤失败时都会删除当次输出，防止未完成验证的 DMG 被上传。
+- Apple 流程依据：[Notarizing macOS software before distribution](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution)、[Customizing the notarization workflow](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow)、[Technical Note TN2206](https://developer.apple.com/library/archive/technotes/tn2206/) 与 [Configuring the hardened runtime](https://developer.apple.com/documentation/xcode/configuring-the-hardened-runtime/)。
 - 推荐 Release tag 命名：`flowtab-v<version>`（例如 `flowtab-v1.0.0`，兼容 `v1.0.0`）。
 - 推荐发布方式与 `openai/codex` 风格一致：tag 承载版本，下载资产名保持稳定平台后缀（不带版本号）。
 - `release-dmg.sh` 的版本解析顺序是：`--version` -> `GITHUB_REF_NAME` / 当前 commit 上的 release tag -> 否则失败。
@@ -453,7 +460,8 @@ chmod +x scripts/release/release-dmg.sh
 2. 提交版本变更。
 3. 在待发布 commit 上打 tag：`flowtab-v1.0.0`。
 4. 在该 tag 上运行 `scripts/release/release-dmg.sh`，或在 GitHub Release / tag workflow 中直接调用它。
-5. 若只是本地预打包验证、还没打 tag，可临时传 `--version 1.0.0`。
+5. 上传脚本成功保留的 DMG；该文件已经通过 Developer ID、Hardened Runtime、安全时间戳、公证票据与 Gatekeeper 校验。
+6. 若只是本地预打包验证、还没打 tag，可临时传 `--version 1.0.0`。
 
 发布示例（GitHub CLI）：
 

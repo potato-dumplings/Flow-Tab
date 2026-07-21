@@ -17,6 +17,7 @@ FlowTab is a macOS app switcher designed to stay close to the native `Command + 
 Download the DMG from GitHub Releases:
 
 - Universal (Apple Silicon + Intel): `flowtab-universal2-apple-darwin.dmg`
+- Release assets use Developer ID signing, Hardened Runtime, and secure timestamps, and are notarized and stapled by Apple for Gatekeeper verification.
 
 Install steps:
 
@@ -29,11 +30,6 @@ Uninstall steps:
 1. Open the downloaded `.dmg` again.
 2. Double-click `Uninstall Flow Tab.app`.
 3. Confirm the prompt to quit the app, remove `/Applications/Flow Tab.app`, and clear permissions plus local preferences.
-
-Notes:
-
-- Current builds are unsigned and not notarized, so Gatekeeper prompts may appear on first launch.
-- If blocked, allow it in `System Settings -> Privacy & Security` and open it again.
 
 ## Required Permissions
 

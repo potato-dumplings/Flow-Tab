@@ -17,6 +17,7 @@ FlowTab 是一个 macOS 应用切换器，目标是在接近系统 `Command + Ta
 请从 GitHub Releases 下载 DMG：
 
 - 通用（Apple Silicon + Intel）: `flowtab-universal2-apple-darwin.dmg`
+- 发布资产使用 Developer ID 签名、Hardened Runtime 与安全时间戳，并通过 Apple 公证和票据装订；Gatekeeper 会在打开时验证这些信息。
 
 安装步骤：
 
@@ -29,11 +30,6 @@ FlowTab 是一个 macOS 应用切换器，目标是在接近系统 `Command + Ta
 1. 重新打开下载的 `.dmg` 文件。
 2. 双击里面的 `Uninstall Flow Tab.app`。
 3. 按提示确认后，会自动退出应用、删除 `/Applications/Flow Tab.app`，并清理权限记录与本地偏好设置。
-
-注意：
-
-- 当前发布包为未签名、未公证版本，首次打开可能出现 Gatekeeper 提示。
-- 如遇提示，可在 `系统设置 -> 隐私与安全性` 中允许后再次打开。
 
 ## 必要权限
 

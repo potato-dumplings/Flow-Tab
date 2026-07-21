@@ -78,10 +78,10 @@ The six layer keys are `Unit`, `Behavior`, `Mock UI`, `Real-topology UI`, `Press
 
 - Requiredness: required
 - Owner: `Release Tooling`
-- Oracle: A public Release executable contains production launch behavior and no testing bootstrap, destructive test control, Darwin test-notification, or stress-exit command surface.
+- Oracle: A public Release executable contains production launch behavior and excludes reserved test controls; the app, uninstaller, and DMG are Developer ID signed with secure timestamps, app bundles use Hardened Runtime, and the DMG is Apple-notarized, stapled, and accepted by Gatekeeper.
 - Risk: `deterministic-rule`, `tooling-fixture`
 - Required layers:
-  - Process/Tooling: Build the Release app and reject the artifact when its executable contains a reserved test-control marker.
+  - Process/Tooling: Build the Release app, reject reserved test-control markers, enforce the distribution contract, and reject any output that fails signature, timestamp, Hardened Runtime, notarization-ticket, or Gatekeeper verification.
 - Not relevant layers:
   - Unit: The contract concerns the linked artifact after compiler-condition evaluation.
   - Behavior: In-process tests run through the dedicated Testing configuration and cannot prove Release linkage.
@@ -89,7 +89,7 @@ The six layer keys are `Unit`, `Behavior`, `Mock UI`, `Real-topology UI`, `Press
   - Real-topology UI: External window topology does not affect compiled control-surface membership.
   - Pressure: Artifact membership is independent of sustained runtime load.
 - Current representative test anchors:
-  - Process/Tooling: `scripts/release/verify-release-binary.sh`, invoked by both public Release packaging scripts.
+  - Process/Tooling: `scripts/release/verify-release-binary.sh`, `scripts/release/test-release-distribution-contract.sh`, and `scripts/release/verify-release-distribution.sh`, invoked by the public Release packaging flow.
 
 ### `scenario:command-tab-takeover` — Command-Tab takeover
 
