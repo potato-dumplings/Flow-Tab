@@ -42,10 +42,6 @@ enum FlowTabUITestBootstrapper {
     }
 
     static func prepareIfNeeded(userDefaults: UserDefaults = .standard) {
-        if FlowTabTestLaunchOptions.resetsSystemAppMRUOnLaunch {
-            try? SystemAppMRUFileStateStore().removeState()
-        }
-
         if FlowTabTestLaunchOptions.isRunningUITests {
             RuntimeWindowRecencyTracker.shared.removeAll()
         }

@@ -186,8 +186,7 @@ extension FlowTabPriorityCoverageTests {
 
         let facts = fixture.factSource.collectFocusedCurrentAppWindowFacts(
             for: fixture.app,
-            in: [fixture.app],
-            processIdentifier: fixture.pid
+            in: [fixture.app]
         )
 
         XCTAssertEqual(fixture.provider.collectAXWindowDataCallCount, 1)
@@ -202,6 +201,10 @@ extension FlowTabPriorityCoverageTests {
         let projectedEntry = facts.windowsByPID[fixture.pid]?.first
         XCTAssertEqual(projectedEntry?.cgWindowID, fixture.cgWindowID)
         XCTAssertEqual(projectedEntry?.activationHandleID, fixture.axWindowID)
+        XCTAssertTrue(
+            facts.rankByPID.isEmpty,
+            "A scoped window repair must preserve the global application MRU rank."
+        )
     }
 
     func testRuntimeProjectionRepairFactSourceFocusedRepairPreservesUnrelatedWindowRecordCoverage() {
@@ -224,8 +227,7 @@ extension FlowTabPriorityCoverageTests {
 
         _ = fixture.factSource.collectFocusedCurrentAppWindowFacts(
             for: fixture.app,
-            in: [fixture.app],
-            processIdentifier: fixture.pid
+            in: [fixture.app]
         )
 
         XCTAssertTrue(fixture.windowRecordStore.hasWindowProjectionCoverage(processIdentifier: unrelatedPID))

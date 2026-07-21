@@ -7,69 +7,23 @@ struct SystemAppMRURunningApplication: Equatable {
     let isCurrentProcess: Bool
 }
 
-enum SystemAppMRUMutationSource: String, Codable {
+enum SystemAppMRUMutationSource: String {
     case bootstrap
-    case restoreReconciliation = "restore_reconciliation"
+    case systemOrder = "system_order"
     case activation
     case launch
     case termination
     case discovery
 }
 
-struct SystemAppMRUSnapshot: Codable, Equatable {
-    static let currentSchemaVersion = 1
-
-    let schemaVersion: Int
-    let generation: UInt64
-    let orderedAppIDs: [String]
-    let source: SystemAppMRUMutationSource
-    let updatedAt: Date
-
-    init(
-        generation: UInt64,
-        orderedAppIDs: [String],
-        source: SystemAppMRUMutationSource,
-        updatedAt: Date,
-        schemaVersion: Int = currentSchemaVersion
-    ) {
-        self.schemaVersion = schemaVersion
-        self.generation = generation
-        self.orderedAppIDs = orderedAppIDs
-        self.source = source
-        self.updatedAt = updatedAt
-    }
-
-    var hasSupportedSchema: Bool {
-        schemaVersion == Self.currentSchemaVersion
-    }
-
-    var orderFingerprint: String {
-        var hash: UInt64 = 14_695_981_039_346_656_037
-        for byte in orderedAppIDs.joined(separator: "\u{1f}").utf8 {
-            hash ^= UInt64(byte)
-            hash = hash &* 1_099_511_628_211
-        }
-        return String(hash, radix: 16)
-    }
-}
-
-protocol SystemAppMRUStatePersisting: AnyObject {
-    func load() throws -> SystemAppMRUSnapshot?
-    func save(_ snapshot: SystemAppMRUSnapshot) throws
-}
-
-final class SystemAppMRUFileStateStore: SystemAppMRUStatePersisting {
+enum SystemAppMRULegacyPersistence {
     private static let relativeDirectoryPathIntent = "FlowTab/runtime"
 
-    private let fileManager: FileManager
-    private let fileURL: URL
-
-    init(
+    static func removePersistedState(
         fileManager: FileManager = .default,
         applicationSupportDirectoryURL: URL? = nil,
         installationURL: URL = Bundle.main.bundleURL
-    ) {
-        self.fileManager = fileManager
+    ) throws {
         let fallbackURL = URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
         let resourceBoundary = applicationSupportDirectoryURL
             ?? fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
@@ -81,38 +35,10 @@ final class SystemAppMRUFileStateStore: SystemAppMRUStatePersisting {
         let installationName = Self.fileNameComponent(
             installationURL.deletingPathExtension().lastPathComponent
         )
-        fileURL = directoryURL.appendingPathComponent(
+        let fileURL = directoryURL.appendingPathComponent(
             "system-app-mru-\(installationName).json",
             isDirectory: false
         )
-    }
-
-    init(fileURL: URL, fileManager: FileManager = .default) {
-        self.fileURL = fileURL
-        self.fileManager = fileManager
-    }
-
-    func load() throws -> SystemAppMRUSnapshot? {
-        guard fileManager.fileExists(atPath: fileURL.path) else { return nil }
-        let data = try Data(contentsOf: fileURL)
-        return try JSONDecoder().decode(SystemAppMRUSnapshot.self, from: data)
-    }
-
-    func save(_ snapshot: SystemAppMRUSnapshot) throws {
-        let directoryURL = fileURL.deletingLastPathComponent()
-        if !fileManager.fileExists(atPath: directoryURL.path) {
-            try fileManager.createDirectory(
-                at: directoryURL,
-                withIntermediateDirectories: true
-            )
-        }
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
-        let data = try encoder.encode(snapshot)
-        try data.write(to: fileURL, options: .atomic)
-    }
-
-    func removeState() throws {
         guard fileManager.fileExists(atPath: fileURL.path) else { return }
         try fileManager.removeItem(at: fileURL)
     }
@@ -131,21 +57,11 @@ struct SystemAppMRUState {
     private(set) var orderedAppIDs: [String]
     private(set) var generation: UInt64
     private(set) var isInitialized: Bool
-    private var needsRestoreReconciliation: Bool
 
-    init(snapshot: SystemAppMRUSnapshot? = nil) {
-        if let snapshot, snapshot.hasSupportedSchema {
-            orderedAppIDs = Self.normalizedAppIDs(snapshot.orderedAppIDs)
-                .filter(Self.isPersistableAppID)
-            generation = snapshot.generation
-            isInitialized = true
-            needsRestoreReconciliation = true
-        } else {
-            orderedAppIDs = []
-            generation = 0
-            isInitialized = false
-            needsRestoreReconciliation = false
-        }
+    init() {
+        orderedAppIDs = []
+        generation = 0
+        isInitialized = false
     }
 
     var requiresBootstrapFallback: Bool {
@@ -175,27 +91,8 @@ struct SystemAppMRUState {
             )
             orderedAppIDs = Self.normalizedAppIDs(seed)
             isInitialized = true
-            needsRestoreReconciliation = false
             advanceGeneration()
             return .bootstrap
-        }
-
-        if needsRestoreReconciliation {
-            var reconciled = orderedAppIDs.filter(runningAppIDs.contains)
-            if let frontmostAppID, runningAppIDs.contains(frontmostAppID) {
-                reconciled.removeAll { $0 == frontmostAppID }
-                reconciled.insert(frontmostAppID, at: 0)
-            }
-            let knownAppIDs = Set(reconciled)
-            reconciled.append(
-                contentsOf: Self.sortedAppIDs(groupedApplications)
-                    .filter { !knownAppIDs.contains($0) }
-            )
-            needsRestoreReconciliation = false
-            guard reconciled != orderedAppIDs else { return nil }
-            orderedAppIDs = reconciled
-            advanceGeneration()
-            return .restoreReconciliation
         }
 
         let knownAppIDs = Set(orderedAppIDs)
@@ -205,6 +102,36 @@ struct SystemAppMRUState {
         orderedAppIDs.append(contentsOf: discoveredAppIDs)
         advanceGeneration()
         return .discovery
+    }
+
+    mutating func reconcileSystemOrder(
+        _ systemOrderedAppIDs: [String],
+        runningApplications: [SystemAppMRURunningApplication]
+    ) -> SystemAppMRUMutationSource? {
+        let eligibleApplications = runningApplications.filter { !$0.isCurrentProcess }
+        let groupedApplications = Dictionary(grouping: eligibleApplications, by: \.appID)
+        let runningAppIDs = Set(groupedApplications.keys)
+        var reconciled = Self.normalizedAppIDs(systemOrderedAppIDs)
+            .filter { runningAppIDs.contains($0) }
+        guard !reconciled.isEmpty else { return nil }
+
+        var knownAppIDs = Set(reconciled)
+        reconciled.append(
+            contentsOf: orderedAppIDs.filter {
+                runningAppIDs.contains($0) && knownAppIDs.insert($0).inserted
+            }
+        )
+        reconciled.append(
+            contentsOf: Self.sortedAppIDs(groupedApplications)
+                .filter { knownAppIDs.insert($0).inserted }
+        )
+
+        let previousOrder = orderedAppIDs
+        orderedAppIDs = reconciled
+        isInitialized = true
+        guard orderedAppIDs != previousOrder else { return nil }
+        advanceGeneration()
+        return .systemOrder
     }
 
     mutating func recordActivation(
@@ -267,16 +194,13 @@ struct SystemAppMRUState {
         return rankByPID
     }
 
-    func snapshot(
-        source: SystemAppMRUMutationSource,
-        updatedAt: Date = Date()
-    ) -> SystemAppMRUSnapshot {
-        SystemAppMRUSnapshot(
-            generation: generation,
-            orderedAppIDs: orderedAppIDs.filter(Self.isPersistableAppID),
-            source: source,
-            updatedAt: updatedAt
-        )
+    var orderFingerprint: String {
+        var hash: UInt64 = 14_695_981_039_346_656_037
+        for byte in orderedAppIDs.joined(separator: "\u{1f}").utf8 {
+            hash ^= UInt64(byte)
+            hash = hash &* 1_099_511_628_211
+        }
+        return String(hash, radix: 16)
     }
 
     private mutating func advanceGeneration() {
@@ -311,9 +235,5 @@ struct SystemAppMRUState {
             guard !appID.isEmpty, seen.insert(appID).inserted else { return nil }
             return appID
         }
-    }
-
-    private static func isPersistableAppID(_ appID: String) -> Bool {
-        !appID.hasPrefix("pid:")
     }
 }

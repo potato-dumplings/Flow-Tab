@@ -1,0 +1,78 @@
+{
+  "workflowName": "system-app-mru-eight-apps",
+  "settleTimeoutMs": 2000,
+  "apps": [
+    {
+      "appID": "atlas",
+      "appName": "Atlas Fixture",
+      "bundleId": "com.example.fixture.mru.atlas",
+      "launchOrder": 1,
+      "windows": [
+        { "title": "Atlas Main", "mode": "standard", "tabs": [] }
+      ]
+    },
+    {
+      "appID": "beacon",
+      "appName": "Beacon Fixture",
+      "bundleId": "com.example.fixture.mru.beacon",
+      "launchOrder": 2,
+      "windows": [
+        { "title": "Beacon Main", "mode": "standard", "tabs": [] }
+      ]
+    },
+    {
+      "appID": "comet",
+      "appName": "Comet Fixture",
+      "bundleId": "com.example.fixture.mru.comet",
+      "launchOrder": 3,
+      "windows": [
+        { "title": "Comet Main", "mode": "standard", "tabs": [] }
+      ]
+    },
+    {
+      "appID": "delta",
+      "appName": "Delta Fixture",
+      "bundleId": "com.example.fixture.mru.delta",
+      "launchOrder": 4,
+      "windows": [
+        { "title": "Delta Main", "mode": "standard", "tabs": [] }
+      ]
+    },
+    {
+      "appID": "ember",
+      "appName": "Ember Fixture",
+      "bundleId": "com.example.fixture.mru.ember",
+      "launchOrder": 5,
+      "windows": [
+        { "title": "Ember Main", "mode": "standard", "tabs": [] }
+      ]
+    },
+    {
+      "appID": "fjord",
+      "appName": "Fjord Fixture",
+      "bundleId": "com.example.fixture.mru.fjord",
+      "launchOrder": 6,
+      "windows": [
+        { "title": "Fjord Main", "mode": "standard", "tabs": [] }
+      ]
+    },
+    {
+      "appID": "grove",
+      "appName": "Grove Fixture",
+      "bundleId": "com.example.fixture.mru.grove",
+      "launchOrder": 7,
+      "windows": [
+        { "title": "Grove Main", "mode": "standard", "tabs": [] }
+      ]
+    },
+    {
+      "appID": "harbor",
+      "appName": "Harbor Fixture",
+      "bundleId": "com.example.fixture.mru.harbor",
+      "launchOrder": 8,
+      "windows": [
+        { "title": "Harbor Main", "mode": "standard", "tabs": [] }
+      ]
+    }
+  ]
+}

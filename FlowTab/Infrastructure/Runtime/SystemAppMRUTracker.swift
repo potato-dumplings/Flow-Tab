@@ -2,44 +2,24 @@ import AppKit
 import Foundation
 
 final class SystemAppMRUTracker {
-    static let shared = SystemAppMRUTracker(stateStore: SystemAppMRUFileStateStore())
+    static let shared: SystemAppMRUTracker = {
+        do {
+            try SystemAppMRULegacyPersistence.removePersistedState()
+        } catch {
+            RuntimeLog.warning(
+                .recency,
+                "systemAppMRU event=legacy_cleanup_failed error=\(String(describing: error))"
+            )
+        }
+        return SystemAppMRUTracker()
+    }()
 
     private let lock = NSLock()
-    private let stateStore: (any SystemAppMRUStatePersisting)?
-    private var state: SystemAppMRUState
+    private var state = SystemAppMRUState()
     private var hasStarted = false
     private var observers: [NSObjectProtocol] = []
 
-    init(stateStore: (any SystemAppMRUStatePersisting)? = nil) {
-        self.stateStore = stateStore
-
-        guard let stateStore else {
-            state = SystemAppMRUState()
-            return
-        }
-
-        do {
-            let snapshot = try stateStore.load()
-            state = SystemAppMRUState(snapshot: snapshot)
-            if let snapshot, snapshot.hasSupportedSchema {
-                RuntimeLog.info(
-                    .recency,
-                    "systemAppMRU event=load generation=\(snapshot.generation) apps=\(snapshot.orderedAppIDs.count) hash=\(snapshot.orderFingerprint)"
-                )
-            } else if let snapshot {
-                RuntimeLog.warning(
-                    .recency,
-                    "systemAppMRU event=recovery reason=unsupported_schema schema=\(snapshot.schemaVersion)"
-                )
-            }
-        } catch {
-            state = SystemAppMRUState()
-            RuntimeLog.warning(
-                .recency,
-                "systemAppMRU event=recovery reason=load_failed error=\(String(describing: error))"
-            )
-        }
-    }
+    init() {}
 
     deinit {
         stopObserving()
@@ -64,7 +44,8 @@ final class SystemAppMRUTracker {
 
     func rankByPID(
         for runningApps: [NSRunningApplication],
-        fallbackRankByPID: [pid_t: Int]
+        fallbackRankByPID: [pid_t: Int],
+        systemOrderedPIDs: [pid_t]? = nil
     ) -> [pid_t: Int] {
         startIfNeeded()
 
@@ -77,7 +58,12 @@ final class SystemAppMRUTracker {
                 isCurrentProcess: app.processIdentifier == currentPID
             )
         }
-        let frontmostAppID: String? = if Thread.isMainThread,
+        let appIDByPID = Dictionary(
+            uniqueKeysWithValues: runningApplications.map { ($0.pid, $0.appID) }
+        )
+        let systemOrderedAppIDs = systemOrderedPIDs?.compactMap { appIDByPID[$0] }
+        let frontmostAppID: String? = if systemOrderedAppIDs == nil,
+            Thread.isMainThread,
             let frontmostApp = NSWorkspace.shared.frontmostApplication,
             frontmostApp.processIdentifier != currentPID {
             RuntimeAppIdentity.appID(for: frontmostApp)
@@ -87,12 +73,20 @@ final class SystemAppMRUTracker {
 
         lock.lock()
         defer { lock.unlock() }
-        if let source = state.prepareForRanking(
-            runningApplications: runningApplications,
-            frontmostAppID: frontmostAppID,
-            fallbackRankByPID: fallbackRankByPID
-        ) {
-            persistLocked(source: source)
+        let mutationSource = if let systemOrderedAppIDs {
+            state.reconcileSystemOrder(
+                systemOrderedAppIDs,
+                runningApplications: runningApplications
+            )
+        } else {
+            state.prepareForRanking(
+                runningApplications: runningApplications,
+                frontmostAppID: frontmostAppID,
+                fallbackRankByPID: fallbackRankByPID
+            )
+        }
+        if let source = mutationSource {
+            logMutationLocked(source: source)
         }
         return state.rankByPID(for: runningApplications)
     }
@@ -248,10 +242,6 @@ final class SystemAppMRUTracker {
         lock.lock()
         observers.append(contentsOf: [didLaunchObserver, didActivateObserver, didTerminateObserver])
         lock.unlock()
-
-        if let frontmostApp = NSWorkspace.shared.frontmostApplication {
-            recordActivation(of: frontmostApp)
-        }
     }
 
     private func handleLaunchNotification(_ notification: Notification) {
@@ -300,24 +290,14 @@ final class SystemAppMRUTracker {
         lock.lock()
         defer { lock.unlock() }
         guard let source = mutation(&state) else { return }
-        persistLocked(source: source)
+        logMutationLocked(source: source)
     }
 
-    private func persistLocked(source: SystemAppMRUMutationSource) {
-        guard let stateStore else { return }
-        let snapshot = state.snapshot(source: source)
-        do {
-            try stateStore.save(snapshot)
-            RuntimeLog.info(
-                .recency,
-                "systemAppMRU event=\(source.rawValue) generation=\(snapshot.generation) apps=\(snapshot.orderedAppIDs.count) hash=\(snapshot.orderFingerprint)"
-            )
-        } catch {
-            RuntimeLog.warning(
-                .recency,
-                "systemAppMRU event=persist_failed source=\(source.rawValue) generation=\(snapshot.generation) error=\(String(describing: error))"
-            )
-        }
+    private func logMutationLocked(source: SystemAppMRUMutationSource) {
+        RuntimeLog.info(
+            .recency,
+            "systemAppMRU event=\(source.rawValue) generation=\(state.generation) apps=\(state.orderedAppIDs.count) hash=\(state.orderFingerprint)"
+        )
     }
 
     private static func fallbackRank(

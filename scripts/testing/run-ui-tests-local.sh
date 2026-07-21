@@ -13,6 +13,7 @@ DEFAULT_UI_TEST_APP_PATH="${USER_HOME}/Applications/Flow Tab UITest.app"
 LOCAL_SIGNING_CONFIG_PATH="${ROOT_DIR}/xcconfigs/LocalSigning.xcconfig"
 SPACE_FIXTURE_BUILD_SCRIPT="${ROOT_DIR}/scripts/testing/build-space-fixture-workflow.sh"
 SPACE_FIXTURE_BASELINE_WORKFLOW="${ROOT_DIR}/docs/fixtures/space-fixture-home-multi-app-workflow.json"
+SYSTEM_APP_MRU_FIXTURE_WORKFLOW="${ROOT_DIR}/docs/fixtures/space-fixture-system-app-mru-workflow.json"
 
 ACTION="test"
 ACTION_SET=false
@@ -31,6 +32,7 @@ TEST_WITHOUT_BUILDING_STATUS="null"
 TEST_WITHOUT_BUILDING_LOG_STATUS="null"
 USE_STABLE_UI_TEST_APP=true
 PREPARE_SPACE_FIXTURES=true
+PREPARE_SYSTEM_APP_MRU_FIXTURES=false
 UI_TEST_APP_PATH="${FLOWTAB_UI_TEST_APP_PATH:-${DEFAULT_UI_TEST_APP_PATH}}"
 DEVELOPMENT_TEAM="${FLOWTAB_DEVELOPMENT_TEAM:-}"
 CODE_SIGN_IDENTITY="${FLOWTAB_CODE_SIGN_IDENTITY:-}"
@@ -300,6 +302,74 @@ PY
     --resolved-workflow-path "${SPACE_FIXTURE_BASELINE_RESOLVED_PATH}"
 }
 
+ensure_system_app_mru_fixture_variants() {
+  local check_output
+
+  if check_output="$(/usr/bin/python3 - "${SYSTEM_APP_MRU_FIXTURE_RESOLVED_PATH}" <<'PY'
+import json
+import os
+import sys
+
+resolved_path = sys.argv[1]
+expected_bundle_ids = {
+    "atlas": "com.example.fixture.mru.atlas",
+    "beacon": "com.example.fixture.mru.beacon",
+    "comet": "com.example.fixture.mru.comet",
+    "delta": "com.example.fixture.mru.delta",
+    "ember": "com.example.fixture.mru.ember",
+    "fjord": "com.example.fixture.mru.fjord",
+    "grove": "com.example.fixture.mru.grove",
+    "harbor": "com.example.fixture.mru.harbor",
+}
+
+try:
+    with open(resolved_path, encoding="utf-8") as handle:
+        workflow = json.load(handle)
+except (FileNotFoundError, json.JSONDecodeError) as error:
+    print(error)
+    raise SystemExit(1)
+
+if workflow.get("workflowName") != "system-app-mru-eight-apps":
+    print("unexpected workflow name")
+    raise SystemExit(1)
+
+apps = workflow.get("apps")
+if not isinstance(apps, list) or len(apps) != len(expected_bundle_ids):
+    print("unexpected system MRU fixture count")
+    raise SystemExit(1)
+
+apps_by_id = {str(app.get("appID", "")).strip(): app for app in apps}
+for app_id, expected_bundle_id in expected_bundle_ids.items():
+    app = apps_by_id.get(app_id)
+    if app is None or str(app.get("bundleId", "")).strip() != expected_bundle_id:
+        print(f"missing or invalid system MRU fixture {app_id}")
+        raise SystemExit(1)
+    app_path = str(app.get("appPath", "")).strip()
+    if not app_path or not os.path.isdir(app_path):
+        print(f"missing system MRU fixture path for {app_id}: {app_path}")
+        raise SystemExit(1)
+PY
+  )"; then
+    echo "System app MRU fixture variants: ready (${SYSTEM_APP_MRU_FIXTURE_RESOLVED_PATH})"
+    return
+  fi
+
+  echo "System app MRU fixture variants: ${check_output}"
+  echo "System app MRU fixture variants: rebuilding from ${SYSTEM_APP_MRU_FIXTURE_WORKFLOW}"
+  "${SPACE_FIXTURE_BUILD_SCRIPT}" \
+    --build-root "${SPACE_FIXTURE_BUILD_ROOT}/system-app-mru" \
+    --workflow-config "${SYSTEM_APP_MRU_FIXTURE_WORKFLOW}" \
+    --output-dir "${SPACE_FIXTURE_BUILD_ROOT}/system-app-mru-variants" \
+    --resolved-workflow-path "${SYSTEM_APP_MRU_FIXTURE_RESOLVED_PATH}"
+}
+
+prepare_required_space_fixture_variants() {
+  ensure_space_fixture_variants
+  if [[ "${PREPARE_SYSTEM_APP_MRU_FIXTURES}" == true ]]; then
+    ensure_system_app_mru_fixture_variants
+  fi
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -h|--help)
@@ -408,6 +478,21 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if [[ "${PREPARE_SPACE_FIXTURES}" == true ]]; then
+  if [[ "${HAS_CUSTOM_TEST_FILTER}" == false ]]; then
+    PREPARE_SYSTEM_APP_MRU_FIXTURES=true
+  else
+    for argument in "${EXTRA_ARGS[@]}"; do
+      case "${argument}" in
+        -only-testing:FlowTabUITests|-only-testing:FlowTabUITests/FlowTabUITests|*testSystemAppMRU*)
+          PREPARE_SYSTEM_APP_MRU_FIXTURES=true
+          break
+          ;;
+      esac
+    done
+  fi
+fi
+
 UI_TEST_APP_PATH="$(expand_path "${UI_TEST_APP_PATH}")"
 DERIVED_DATA_PATH="${BUILD_ROOT}/DerivedData"
 TMP_ROOT="${BUILD_ROOT}/tmp"
@@ -421,6 +506,7 @@ else
   SPACE_FIXTURE_BUILD_ROOT="${DEFAULT_SPACE_FIXTURE_BUILD_ROOT}"
 fi
 SPACE_FIXTURE_BASELINE_RESOLVED_PATH="${SPACE_FIXTURE_BUILD_ROOT}/variants/resolved-workflow.json"
+SYSTEM_APP_MRU_FIXTURE_RESOLVED_PATH="${SPACE_FIXTURE_BUILD_ROOT}/system-app-mru-variants/resolved-workflow.json"
 if [[ "${HAS_CUSTOM_OUTPUT_ROOT}" == false ]]; then
   OUTPUT_ROOT="${BUILD_ROOT}"
 fi
@@ -505,6 +591,7 @@ export CFFIXED_USER_HOME="${HOME_ROOT}"
 export CLANG_MODULE_CACHE_PATH="${MODULE_CACHE_ROOT}/clang"
 export SWIFT_MODULECACHE_PATH="${MODULE_CACHE_ROOT}/swift"
 export SWIFTPM_PACKAGECACHE="${PACKAGE_CACHE_PATH}"
+export FLOWTAB_SYSTEM_APP_MRU_FIXTURE_WORKFLOW_PATH="${SYSTEM_APP_MRU_FIXTURE_RESOLVED_PATH}"
 
 if [[ "${USE_STABLE_UI_TEST_APP}" == true && -d "${UI_TEST_APP_PATH}" ]]; then
   export FLOWTAB_UI_TEST_APP_PATH="${UI_TEST_APP_PATH}"
@@ -679,7 +766,7 @@ if [[ "${ACTION}" != "build-for-testing" && "${PREPARE_SPACE_FIXTURES}" == true 
   run_logged_stage \
     "fixture_preparation" \
     "${LOG_ROOT}/space-fixture-preparation.log" \
-    ensure_space_fixture_variants
+    prepare_required_space_fixture_variants
 fi
 
 case "${ACTION}" in

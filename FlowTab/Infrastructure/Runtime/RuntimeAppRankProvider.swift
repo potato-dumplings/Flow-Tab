@@ -5,22 +5,30 @@ import Foundation
 enum RuntimeAppRankProvider {
     static func collectAppRankByPID(for runningApps: [NSRunningApplication]) -> [pid_t: Int] {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
-        let needsBootstrapFallback = SystemAppMRUTracker.shared.requiresBootstrapFallback()
+        let systemOrderedPIDs = RuntimeSystemAppOrderProvider.collectOrderedPIDs(
+            for: runningApps
+        )
+        let systemOrderReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
+        let needsBootstrapFallback = systemOrderedPIDs == nil
+            && SystemAppMRUTracker.shared.requiresBootstrapFallback()
         let fallbackRankByPID = needsBootstrapFallback ? collectWindowStackRankByPID() : [:]
         let fallbackReadyMs = RuntimePerformanceClock.monotonicMilliseconds()
         let rankByPID = SystemAppMRUTracker.shared.rankByPID(
             for: runningApps,
-            fallbackRankByPID: fallbackRankByPID
+            fallbackRankByPID: fallbackRankByPID,
+            systemOrderedPIDs: systemOrderedPIDs
         )
         let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
         RuntimeProjectionDiagnostics.logTiming(
             "collectAppRank",
             fields: [
                 ("apps", "\(runningApps.count)"),
+                ("systemOrderPIDs", "\(systemOrderedPIDs?.count ?? 0)"),
                 ("bootstrapFallback", needsBootstrapFallback ? "1" : "0"),
                 ("fallbackPIDs", "\(fallbackRankByPID.count)"),
                 ("rankedPIDs", "\(rankByPID.count)"),
-                ("fallbackMs", RuntimeProjectionDiagnostics.formatMilliseconds(fallbackReadyMs - startMs)),
+                ("systemOrderMs", RuntimeProjectionDiagnostics.formatMilliseconds(systemOrderReadyMs - startMs)),
+                ("fallbackMs", RuntimeProjectionDiagnostics.formatMilliseconds(fallbackReadyMs - systemOrderReadyMs)),
                 ("systemMRUMs", RuntimeProjectionDiagnostics.formatMilliseconds(completeMs - fallbackReadyMs)),
                 ("totalMs", RuntimeProjectionDiagnostics.formatMilliseconds(completeMs - startMs))
             ]

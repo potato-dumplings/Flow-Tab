@@ -73,6 +73,14 @@ enum SpaceFixtureMultiAppWorkflowDefaults {
             .appendingPathComponent("resolved-workflow.json")
     }
 
+    static var defaultSystemAppMRUResolvedWorkflowURL: URL {
+        repositoryRootURL
+            .appendingPathComponent(".build-local", isDirectory: true)
+            .appendingPathComponent("space-fixture-workflow", isDirectory: true)
+            .appendingPathComponent("system-app-mru-variants", isDirectory: true)
+            .appendingPathComponent("resolved-workflow.json")
+    }
+
     private static var repositoryRootURL: URL {
         URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()

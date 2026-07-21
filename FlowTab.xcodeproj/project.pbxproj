@@ -48,6 +48,7 @@
 		A1B2C4392F73000100B0D737 /* AccessibilityPermissionChecker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4302F73000100B0D737 /* AccessibilityPermissionChecker.swift */; };
 		A1B2C43A2F73000100B0D737 /* SystemAppMRUTracker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4312F73000100B0D737 /* SystemAppMRUTracker.swift */; };
 		A4D100043B20000100B0D737 /* SystemAppMRUState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4D100033B20000100B0D737 /* SystemAppMRUState.swift */; };
+		A4D100083B20000100B0D737 /* RuntimeSystemAppOrderProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4D100073B20000100B0D737 /* RuntimeSystemAppOrderProvider.swift */; };
 		A4D100023B20000100B0D737 /* FlowTabPriorityCoverageTests+SystemAppMRU.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4D100013B20000100B0D737 /* FlowTabPriorityCoverageTests+SystemAppMRU.swift */; };
 		A4D100063B20000100B0D737 /* FlowTabUITests+SystemAppMRU.swift in Sources */ = {isa = PBXBuildFile; fileRef = A4D100053B20000100B0D737 /* FlowTabUITests+SystemAppMRU.swift */; };
 		A1B2C43B2F73000100B0D737 /* RuntimeSystemRepairFactProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C4322F73000100B0D737 /* RuntimeSystemRepairFactProvider.swift */; };
@@ -305,6 +306,7 @@
 		A1B2C4302F73000100B0D737 /* AccessibilityPermissionChecker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccessibilityPermissionChecker.swift; sourceTree = "<group>"; };
 		A1B2C4312F73000100B0D737 /* SystemAppMRUTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAppMRUTracker.swift; sourceTree = "<group>"; };
 		A4D100033B20000100B0D737 /* SystemAppMRUState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemAppMRUState.swift; sourceTree = "<group>"; };
+		A4D100073B20000100B0D737 /* RuntimeSystemAppOrderProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeSystemAppOrderProvider.swift; sourceTree = "<group>"; };
 		A4D100013B20000100B0D737 /* FlowTabPriorityCoverageTests+SystemAppMRU.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+SystemAppMRU.swift"; sourceTree = "<group>"; };
 		A4D100053B20000100B0D737 /* FlowTabUITests+SystemAppMRU.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SystemAppMRU.swift"; sourceTree = "<group>"; };
 		A1B2C4322F73000100B0D737 /* RuntimeSystemRepairFactProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeSystemRepairFactProvider.swift; sourceTree = "<group>"; };
@@ -746,6 +748,7 @@
 				A1B2C4302F73000100B0D737 /* AccessibilityPermissionChecker.swift */,
 				A1B2C4312F73000100B0D737 /* SystemAppMRUTracker.swift */,
 				A4D100033B20000100B0D737 /* SystemAppMRUState.swift */,
+				A4D100073B20000100B0D737 /* RuntimeSystemAppOrderProvider.swift */,
 				A1B2C4322F73000100B0D737 /* RuntimeSystemRepairFactProvider.swift */,
 				F6E7E00135C2000100B0D737 /* RuntimeProjectionRepairProvider.swift */,
 				F6E7E50135C5000200B0D737 /* RuntimeProjectionRepairContract.swift */,
@@ -1163,6 +1166,7 @@
 				A1B2C4392F73000100B0D737 /* AccessibilityPermissionChecker.swift in Sources */,
 				A1B2C43A2F73000100B0D737 /* SystemAppMRUTracker.swift in Sources */,
 				A4D100043B20000100B0D737 /* SystemAppMRUState.swift in Sources */,
+				A4D100083B20000100B0D737 /* RuntimeSystemAppOrderProvider.swift in Sources */,
 				A1B2C43B2F73000100B0D737 /* RuntimeSystemRepairFactProvider.swift in Sources */,
 				F6E7E00235C2000100B0D737 /* RuntimeProjectionRepairProvider.swift in Sources */,
 				F6E7E50235C5000200B0D737 /* RuntimeProjectionRepairContract.swift in Sources */,

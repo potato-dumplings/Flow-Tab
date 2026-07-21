@@ -143,8 +143,7 @@ extension RuntimeProjectionRepairProvider {
 
         let windowFacts = repairFactSource.collectFocusedCurrentAppWindowFacts(
             for: app,
-            in: runningApps,
-            processIdentifier: pid
+            in: runningApps
         )
         let rowsStartMs = RuntimePerformanceClock.monotonicMilliseconds()
         let policyFacts = repairFactSource.collectRepairAppLayerPolicyFacts()

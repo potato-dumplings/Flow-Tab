@@ -38,32 +38,82 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
-    func testSystemAppMRUStateRestoresAppIDOrderAcrossNewProcessIdentifiers() {
-        let snapshot = SystemAppMRUSnapshot(
-            generation: 7,
-            orderedAppIDs: ["app.previous", "app.current", "app.stale"],
-            source: .activation,
-            updatedAt: Date(timeIntervalSince1970: 100)
-        )
-        var state = SystemAppMRUState(snapshot: snapshot)
+    func testSystemAppMRUStateNewSessionRebuildsOrderAcrossProcessIdentifiers() {
+        var state = SystemAppMRUState()
         let relaunchedApps = [
             mruRunningApp(appID: "app.current", pid: 1_001, launchedAt: 20),
             mruRunningApp(appID: "app.previous", pid: 2_002, launchedAt: 10)
         ]
 
         XCTAssertEqual(
-            state.prepareForRanking(
-                runningApplications: relaunchedApps,
-                frontmostAppID: nil,
-                fallbackRankByPID: [1_001: 0, 2_002: 1]
+            state.reconcileSystemOrder(
+                ["app.current", "app.previous"],
+                runningApplications: relaunchedApps
             ),
-            .restoreReconciliation
+            .systemOrder
         )
         let rankByPID = state.rankByPID(for: relaunchedApps)
 
-        XCTAssertEqual(state.orderedAppIDs, ["app.previous", "app.current"])
-        XCTAssertEqual(rankByPID[2_002], 0)
-        XCTAssertEqual(rankByPID[1_001], 1)
+        XCTAssertEqual(state.orderedAppIDs, ["app.current", "app.previous"])
+        XCTAssertEqual(rankByPID[1_001], 0)
+        XCTAssertEqual(rankByPID[2_002], 1)
+        XCTAssertEqual(state.generation, 1)
+    }
+
+    func testSystemAppMRUStateNewSessionUsesSystemOrderAsItsInitialOrder() {
+        var state = SystemAppMRUState()
+        let runningApps = [
+            mruRunningApp(appID: "app.expected-next", pid: 1_001, launchedAt: 10),
+            mruRunningApp(appID: "app.other", pid: 2_002, launchedAt: 20),
+            mruRunningApp(appID: "app.launch-frontmost", pid: 3_003, launchedAt: 30)
+        ]
+
+        XCTAssertEqual(
+            state.reconcileSystemOrder(
+                ["app.expected-next", "app.other", "app.launch-frontmost"],
+                runningApplications: runningApps
+            ),
+            .systemOrder
+        )
+        XCTAssertEqual(
+            state.orderedAppIDs,
+            ["app.expected-next", "app.other", "app.launch-frontmost"]
+        )
+    }
+
+    func testSystemAppMRUStateSystemOrderReplacesSessionBootstrapFallbackOrder() {
+        var state = SystemAppMRUState()
+        let runningApps = [
+            mruRunningApp(appID: "app.current", pid: 101, launchedAt: 40),
+            mruRunningApp(appID: "app.expected-next", pid: 202, launchedAt: 30),
+            mruRunningApp(appID: "app.other", pid: 303, launchedAt: 20),
+            mruRunningApp(appID: "app.terminal", pid: 404, launchedAt: 10)
+        ]
+        XCTAssertEqual(
+            state.prepareForRanking(
+                runningApplications: runningApps,
+                frontmostAppID: "app.current",
+                fallbackRankByPID: [404: 0, 202: 1, 303: 2]
+            ),
+            .bootstrap
+        )
+        XCTAssertEqual(
+            state.orderedAppIDs,
+            ["app.current", "app.terminal", "app.expected-next", "app.other"]
+        )
+
+        XCTAssertEqual(
+            state.reconcileSystemOrder(
+                ["app.current", "app.expected-next", "app.other", "app.terminal"],
+                runningApplications: runningApps
+            ),
+            .systemOrder
+        )
+        XCTAssertEqual(
+            state.orderedAppIDs,
+            ["app.current", "app.expected-next", "app.other", "app.terminal"]
+        )
+        XCTAssertEqual(state.generation, 2)
     }
 
     func testSystemAppMRUStateAppliesLaunchActivationTerminationAndMultiProcessRules() {
@@ -116,13 +166,19 @@ extension FlowTabPriorityCoverageTests {
     }
 
     func testSystemAppMRUStateFilteringPreservesCanonicalRelativeOrder() {
-        let snapshot = SystemAppMRUSnapshot(
-            generation: 3,
-            orderedAppIDs: ["app.one", "app.hidden", "app.three"],
-            source: .activation,
-            updatedAt: Date(timeIntervalSince1970: 100)
+        var state = SystemAppMRUState()
+        let allApps = [
+            mruRunningApp(appID: "app.one", pid: 11, launchedAt: 1),
+            mruRunningApp(appID: "app.hidden", pid: 22, launchedAt: 2),
+            mruRunningApp(appID: "app.three", pid: 33, launchedAt: 3)
+        ]
+        XCTAssertEqual(
+            state.reconcileSystemOrder(
+                ["app.one", "app.hidden", "app.three"],
+                runningApplications: allApps
+            ),
+            .systemOrder
         )
-        let state = SystemAppMRUState(snapshot: snapshot)
         let visibleApps = [
             mruRunningApp(appID: "app.one", pid: 11, launchedAt: 1),
             mruRunningApp(appID: "app.three", pid: 33, launchedAt: 3)
@@ -135,85 +191,40 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(state.orderedAppIDs, ["app.one", "app.hidden", "app.three"])
     }
 
-    func testSystemAppMRUFileStateStoreRoundTripsAndCorruptDataRequiresRecovery() throws {
+    func testSystemAppMRULegacyPersistenceRemovesPreviousProcessState() throws {
         let temporaryDirectoryURL = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)
-        let fileURL = temporaryDirectoryURL.appendingPathComponent("mru.json")
         addTeardownBlock {
             try? FileManager.default.removeItem(at: temporaryDirectoryURL)
         }
-        let store = SystemAppMRUFileStateStore(fileURL: fileURL)
-        let snapshot = SystemAppMRUSnapshot(
-            generation: 9,
-            orderedAppIDs: ["app.two", "app.one"],
-            source: .activation,
-            updatedAt: Date(timeIntervalSince1970: 100)
+        let legacyDirectoryURL = temporaryDirectoryURL
+            .appendingPathComponent("FlowTab/runtime", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: legacyDirectoryURL,
+            withIntermediateDirectories: true
+        )
+        let legacyFileURL = legacyDirectoryURL.appendingPathComponent(
+            "system-app-mru-Flow_Tab_UITest.json"
+        )
+        try Data("legacy".utf8).write(to: legacyFileURL)
+
+        try SystemAppMRULegacyPersistence.removePersistedState(
+            applicationSupportDirectoryURL: temporaryDirectoryURL,
+            installationURL: URL(fileURLWithPath: "/Applications/Flow Tab UITest.app")
         )
 
-        try store.save(snapshot)
-        XCTAssertEqual(try store.load(), snapshot)
-
-        try Data("{invalid".utf8).write(to: fileURL, options: .atomic)
-        XCTAssertThrowsError(try store.load())
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacyFileURL.path))
     }
 
-    func testSystemAppMRUTrackerPersistsActivationAndReloadsCanonicalOrder() {
-        let initialSnapshot = SystemAppMRUSnapshot(
-            generation: 4,
-            orderedAppIDs: ["app.one", "app.two"],
-            source: .bootstrap,
-            updatedAt: Date(timeIntervalSince1970: 100)
-        )
-        let store = InMemorySystemAppMRUStateStore(snapshot: initialSnapshot)
-        let firstTracker = SystemAppMRUTracker(stateStore: store)
+    func testSystemAppMRUTrackerStartsFreshForEachProcessSession() {
+        let firstSession = SystemAppMRUTracker()
+        firstSession.recordActivation(appID: "app.one")
+        XCTAssertEqual(firstSession.trackedAppIDOrder(), ["app.one"])
 
-        firstTracker.recordActivation(appID: "app.two")
+        let nextSession = SystemAppMRUTracker()
 
-        XCTAssertEqual(store.snapshot?.orderedAppIDs, ["app.two", "app.one"])
-        XCTAssertEqual(store.snapshot?.generation, 5)
-        let relaunchedTracker = SystemAppMRUTracker(stateStore: store)
-        XCTAssertEqual(relaunchedTracker.trackedAppIDOrder(), ["app.two", "app.one"])
-    }
-
-    func testSystemAppMRUStateRejectsUnsupportedPersistenceSchema() {
-        let snapshot = SystemAppMRUSnapshot(
-            generation: 50,
-            orderedAppIDs: ["app.old"],
-            source: .activation,
-            updatedAt: Date(timeIntervalSince1970: 100),
-            schemaVersion: SystemAppMRUSnapshot.currentSchemaVersion + 1
-        )
-
-        let state = SystemAppMRUState(snapshot: snapshot)
-
-        XCTAssertTrue(state.requiresBootstrapFallback)
-        XCTAssertEqual(state.orderedAppIDs, [])
-    }
-
-    func testUITestLaunchOptionsResetMRUUnlessRelaunchPreservesIt() {
-        let previousArguments = FlowTabTestLaunchOptions.argumentsOverrideForTesting
-        let previousEnvironment = FlowTabTestLaunchOptions.environmentOverrideForTesting
-        defer {
-            FlowTabTestLaunchOptions.argumentsOverrideForTesting = previousArguments
-            FlowTabTestLaunchOptions.environmentOverrideForTesting = previousEnvironment
-        }
-        FlowTabTestLaunchOptions.environmentOverrideForTesting = [
-            FlowTabTestLaunchOptions.uiTestingEnvironmentKey:
-                FlowTabTestLaunchOptions.uiTestingEnvironmentValue
-        ]
-
-        FlowTabTestLaunchOptions.argumentsOverrideForTesting = [
-            "FlowTab",
-            "--flowtab-ui-reset-defaults"
-        ]
-        XCTAssertTrue(FlowTabTestLaunchOptions.resetsSystemAppMRUOnLaunch)
-
-        FlowTabTestLaunchOptions.argumentsOverrideForTesting = [
-            "FlowTab",
-            "--flowtab-ui-reset-defaults",
-            "--flowtab-ui-preserve-system-app-mru"
-        ]
-        XCTAssertFalse(FlowTabTestLaunchOptions.resetsSystemAppMRUOnLaunch)
+        XCTAssertEqual(nextSession.trackedAppIDOrder(), [])
+        XCTAssertTrue(nextSession.requiresBootstrapFallback())
     }
 
     @MainActor
@@ -253,6 +264,25 @@ extension FlowTabPriorityCoverageTests {
         )
     }
 
+    @MainActor
+    func testRuntimeSystemAppOrderProviderResolvesRegularRunningApplications() throws {
+        let currentPID = ProcessInfo.processInfo.processIdentifier
+        let runningApps = NSWorkspace.shared.runningApplications.filter { app in
+            app.processIdentifier != currentPID
+                && app.activationPolicy == .regular
+                && !app.isTerminated
+        }
+        guard !runningApps.isEmpty else {
+            throw XCTSkip("A regular running application is required for system order coverage.")
+        }
+
+        let orderedPIDs = try XCTUnwrap(
+            RuntimeSystemAppOrderProvider.collectOrderedPIDs(for: runningApps)
+        )
+        XCTAssertFalse(orderedPIDs.isEmpty)
+        XCTAssertTrue(Set(orderedPIDs).isSubset(of: Set(runningApps.map(\.processIdentifier))))
+    }
+
     private func orderedPIDs(
         apps: [NSRunningApplication],
         rankByPID: [pid_t: Int]
@@ -281,21 +311,5 @@ extension FlowTabPriorityCoverageTests {
             launchDate: Date(timeIntervalSince1970: launchedAt),
             isCurrentProcess: isCurrentProcess
         )
-    }
-}
-
-private final class InMemorySystemAppMRUStateStore: SystemAppMRUStatePersisting {
-    var snapshot: SystemAppMRUSnapshot?
-
-    init(snapshot: SystemAppMRUSnapshot?) {
-        self.snapshot = snapshot
-    }
-
-    func load() throws -> SystemAppMRUSnapshot? {
-        snapshot
-    }
-
-    func save(_ snapshot: SystemAppMRUSnapshot) throws {
-        self.snapshot = snapshot
     }
 }

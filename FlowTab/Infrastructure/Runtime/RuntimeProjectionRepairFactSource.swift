@@ -395,8 +395,7 @@ struct RuntimeProjectionRepairFactSource {
 
     func collectFocusedCurrentAppWindowFacts(
         for app: NSRunningApplication,
-        in runningApps: [NSRunningApplication],
-        processIdentifier pid: pid_t
+        in runningApps: [NSRunningApplication]
     ) -> RuntimeFocusedCurrentAppWindowFacts {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
         AXLiveWindowRegistry.shared.prune(to: runningApps)
@@ -420,7 +419,7 @@ struct RuntimeProjectionRepairFactSource {
         let windowsByPID = projectedWindowEntriesByPID(for: [app])
         return RuntimeFocusedCurrentAppWindowFacts(
             windowsByPID: windowsByPID,
-            rankByPID: [pid: 0],
+            rankByPID: [:],
             timings: RuntimeFocusedCurrentAppWindowFactTimings(
                 cleanupMs: cleanupReadyMs - startMs,
                 onScreenCGMs: onScreenCGReadyMs - cleanupReadyMs,

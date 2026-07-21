@@ -2,31 +2,25 @@ import AppKit
 import XCTest
 
 extension FlowTabUITests {
-    func testSystemAppMRUOrderSurvivesRelaunchAndRepeatedFreshSwitcherSessions() throws {
-        let workflow = try configuredSwitcherSpaceFixtureWorkflow()
+    func testSystemAppMRURebuildsForEveryFlowTabProcessSession() throws {
+        let workflow = try configuredSystemAppMRUFixtureWorkflow()
+        var initialLaunchLogSnapshot: [String: UInt64] = [:]
         let launchArguments = [
             "--flowtab-ui-open-switcher",
             "--flowtab-ui-listen-switcher-trigger",
-            "--flowtab-ui-runtime-log-level", "INFO",
+            "--flowtab-ui-runtime-log-level", "DEBUG",
+            "--flowtab-ui-enable-verbose-logs",
             "-windowLayerAutoEnterDelay", "30.0"
         ]
 
         try runRealSpaceFixtureWorkflow(
             workflow,
             flowTabAdditionalArguments: launchArguments,
-            beforeFlowTabLaunch: { workflow in
-                for workflowApp in workflow.apps.reversed() {
-                    XCUIApplication(
-                        bundleIdentifier: workflowApp.identity.bundleIdentifier
-                    ).activate()
-                    XCTAssertTrue(
-                        waitForFrontmostBundleIdentifier(
-                            workflowApp.identity.bundleIdentifier,
-                            timeout: 5
-                        ),
-                        "Failed to establish the fixture application activation Oracle."
-                    )
-                }
+            beforeFlowTabLaunch: { [self] workflow in
+                self.establishSystemAppOrder(
+                    workflow.apps.map(\.identity.bundleIdentifier)
+                )
+                initialLaunchLogSnapshot = self.makeRuntimeLogFileSnapshot()
             }
         ) { workflow, app in
             let fixtureAppIDs = workflow.apps.map(\.identity.bundleIdentifier)
@@ -35,15 +29,21 @@ extension FlowTabUITests {
                 in: app,
                 timeout: 10
             )
-            XCTAssertEqual(initialOrder.first, fixtureAppIDs.first)
+            XCTAssertEqual(initialOrder, fixtureAppIDs)
+            waitForRuntimeLogFiles(
+                containing: ["collectAppRank", "bootstrapFallback=0"],
+                since: initialLaunchLogSnapshot,
+                timeout: 10
+            )
 
             app.terminate()
             waitForFlowTabUITestApplicationToTerminate(app, timeout: 5)
-            XCUIApplication(bundleIdentifier: initialOrder[0]).activate()
-            XCTAssertTrue(waitForFrontmostBundleIdentifier(initialOrder[0], timeout: 5))
+            let relaunchedExpectedOrder = [3, 7, 1, 5, 0, 6, 2, 4].map { fixtureAppIDs[$0] }
+            establishSystemAppOrder(relaunchedExpectedOrder)
+            let relaunchedLogSnapshot = makeRuntimeLogFileSnapshot()
 
             let relaunchedApp = makeRealRuntimeFlowTabApp(
-                additionalArguments: ["--flowtab-ui-preserve-system-app-mru"] + launchArguments
+                additionalArguments: launchArguments
             )
             defer {
                 if relaunchedApp.state == .runningForeground
@@ -60,25 +60,67 @@ extension FlowTabUITests {
                 )
             )
 
-            let restoredOrder = waitForWorkflowAppOrder(
+            let rebuiltOrder = waitForWorkflowAppOrder(
                 fixtureAppIDs,
                 in: relaunchedApp,
                 timeout: 10
             )
-            XCTAssertEqual(restoredOrder, initialOrder)
+            XCTAssertEqual(rebuiltOrder, relaunchedExpectedOrder)
+            XCTAssertNotEqual(rebuiltOrder, initialOrder)
+            waitForRuntimeLogFiles(
+                containing: ["collectAppRank", "bootstrapFallback=0"],
+                since: relaunchedLogSnapshot,
+                timeout: 10
+            )
 
-            relaunchedApp.typeKey(.escape, modifierFlags: [])
-            RunLoop.current.run(until: Date().addingTimeInterval(0.3))
-            postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
-                .global,
-                traceLabel: "system-app-mru.reopen"
+            for iteration in 1...10 {
+                relaunchedApp.typeKey(.escape, modifierFlags: [])
+                RunLoop.current.run(until: Date().addingTimeInterval(0.3))
+                postFlowTabUITestSwitcherTriggerAndWaitForDelivery(
+                    .global,
+                    traceLabel: "system-app-mru.reopen.\(iteration)"
+                )
+                let reopenedOrder = waitForWorkflowAppOrder(
+                    fixtureAppIDs,
+                    in: relaunchedApp,
+                    timeout: 10
+                )
+                XCTAssertEqual(reopenedOrder, relaunchedExpectedOrder)
+            }
+        }
+    }
+
+    private func configuredSystemAppMRUFixtureWorkflow() throws -> SpaceFixtureResolvedWorkflow {
+        let environmentKey = "FLOWTAB_SYSTEM_APP_MRU_FIXTURE_WORKFLOW_PATH"
+        let configuredPath = ProcessInfo.processInfo.environment[environmentKey]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let workflowURL = if let configuredPath, !configuredPath.isEmpty {
+            URL(fileURLWithPath: configuredPath).standardizedFileURL
+        } else {
+            SpaceFixtureMultiAppWorkflowDefaults.defaultSystemAppMRUResolvedWorkflowURL
+        }
+        guard FileManager.default.fileExists(atPath: workflowURL.path) else {
+            throw XCTSkip(
+                "The eight-app system MRU fixture workflow is missing at \(workflowURL.path)."
             )
-            let reopenedOrder = waitForWorkflowAppOrder(
-                fixtureAppIDs,
-                in: relaunchedApp,
-                timeout: 10
+        }
+
+        let workflow = try SpaceFixtureResolvedWorkflow.load(
+            from: workflowURL
+        )
+        guard workflow.apps.count == 8 else {
+            throw XCTSkip("The system MRU fixture workflow must contain eight applications.")
+        }
+        return workflow
+    }
+
+    private func establishSystemAppOrder(_ orderedAppIDs: [String]) {
+        for bundleIdentifier in orderedAppIDs.reversed() {
+            XCUIApplication(bundleIdentifier: bundleIdentifier).activate()
+            XCTAssertTrue(
+                waitForFrontmostBundleIdentifier(bundleIdentifier, timeout: 5),
+                "Failed to establish the fixture application activation Oracle."
             )
-            XCTAssertEqual(reopenedOrder, initialOrder)
         }
     }
 
