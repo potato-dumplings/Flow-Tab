@@ -10,6 +10,7 @@ RELEASE_APP_PATH="${DERIVED_DATA_PATH}/Build/Products/Release/${APP_BUNDLE_NAME}
 INSTALL_PATH="/Applications/${APP_BUNDLE_NAME}"
 BUNDLE_ID="io.github.potato-dumplings.flowtab"
 LOCAL_SIGNING_CONFIG_PATH="${ROOT_DIR}/xcconfigs/LocalSigning.xcconfig"
+RELEASE_BINARY_VERIFY_PATH="${ROOT_DIR}/scripts/release/verify-release-binary.sh"
 DEVELOPMENT_TEAM="${FLOWTAB_DEVELOPMENT_TEAM:-}"
 CODE_SIGN_IDENTITY="${FLOWTAB_CODE_SIGN_IDENTITY:-Apple Development}"
 RESOLVED_CODE_SIGN_IDENTITY=""
@@ -162,6 +163,8 @@ if [[ ! -d "${RELEASE_APP_PATH}" ]]; then
   echo "Build output not found: ${RELEASE_APP_PATH}" >&2
   exit 1
 fi
+
+"${RELEASE_BINARY_VERIFY_PATH}" "${RELEASE_APP_PATH}"
 
 STEP=$((STEP + 1))
 echo "[${STEP}/${TOTAL_STEPS}] Remove old app"

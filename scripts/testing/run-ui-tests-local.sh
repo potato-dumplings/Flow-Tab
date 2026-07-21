@@ -499,7 +499,7 @@ TMP_ROOT="${BUILD_ROOT}/tmp"
 HOME_ROOT="${BUILD_ROOT}/home"
 MODULE_CACHE_ROOT="${BUILD_ROOT}/module-cache"
 PACKAGE_CACHE_PATH="${BUILD_ROOT}/source-packages"
-UI_TEST_RUNNER_PATH="${DERIVED_DATA_PATH}/Build/Products/Debug/FlowTabUITests-Runner.app"
+UI_TEST_RUNNER_PATH="${DERIVED_DATA_PATH}/Build/Products/Testing/FlowTabUITests-Runner.app"
 if [[ "${HAS_CUSTOM_BUILD_ROOT}" == true ]]; then
   SPACE_FIXTURE_BUILD_ROOT="${BUILD_ROOT}/space-fixture-workflow"
 else

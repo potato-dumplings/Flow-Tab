@@ -41,6 +41,7 @@ extension RuntimeProjectionRepairProvider {
 
     private func fullRepairEvidence(timingEvent: String) -> RuntimeFullRepairEvidence {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
+#if FLOWTAB_TESTING
         if let uiTestProjectionFacts = repairFactSource.collectUITestProjectionDatasetFacts() {
             let completeMs = RuntimePerformanceClock.monotonicMilliseconds()
             RuntimeProjectionDiagnostics.logTiming(
@@ -57,6 +58,7 @@ extension RuntimeProjectionRepairProvider {
                 windowRecordRefresh: uiTestProjectionFacts.windowRecordRefresh
             )
         }
+#endif
 
         let runningAppsStartMs = RuntimePerformanceClock.monotonicMilliseconds()
         let runningAppFacts = repairFactSource.collectFullRepairRunningAppFacts()
@@ -102,6 +104,7 @@ extension RuntimeProjectionRepairProvider {
         processIdentifier pid: pid_t
     ) -> RuntimeFocusedCurrentAppRepairEvidence {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
+#if FLOWTAB_TESTING
         if let uiTestProjectionFacts = repairFactSource.collectUITestProjectionDatasetFacts() {
             let repairEvidence = uiTestProjectionFacts.focusedCurrentAppRepairEvidence(processIdentifier: pid)
             RuntimeProjectionDiagnostics.logTiming(
@@ -118,6 +121,7 @@ extension RuntimeProjectionRepairProvider {
                 currentAppWindowPayloadWasEmpty: repairEvidence?.currentAppWindowPayloadWasEmpty == true
             )
         }
+#endif
 
         let runningAppsStartMs = RuntimePerformanceClock.monotonicMilliseconds()
         let runningApps = repairFactSource.collectRepairRunningApps().runningApps

@@ -1,3 +1,4 @@
+#if FLOWTAB_TESTING
 import AppKit
 import Foundation
 
@@ -722,3 +723,4 @@ private final class SwitcherCommandNotificationObserver: NSObject {
         }
     }
 }
+#endif

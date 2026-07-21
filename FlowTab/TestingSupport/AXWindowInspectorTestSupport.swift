@@ -1,3 +1,4 @@
+#if FLOWTAB_TESTING
 import ApplicationServices
 import Foundation
 
@@ -109,3 +110,4 @@ enum AXWindowInspectorForTesting {
         AXTypedAttributeReader.typeDescription(for: rawValue)
     }
 }
+#endif

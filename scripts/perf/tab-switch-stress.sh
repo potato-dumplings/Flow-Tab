@@ -236,7 +236,7 @@ DURATION_SECONDS="${POSITIONAL_ARGS[0]:-30}"
 SWITCH_INTERVAL_MS="${POSITIONAL_ARGS[1]:-20}"
 SAMPLE_INTERVAL_SECONDS="${POSITIONAL_ARGS[2]:-0.5}"
 DERIVED_DATA_DIR="${BUILD_ROOT}/DerivedData"
-APP_BIN="$DERIVED_DATA_DIR/Build/Products/Debug/Flow Tab.app/Contents/MacOS/FlowTab"
+APP_BIN="$DERIVED_DATA_DIR/Build/Products/Testing/Flow Tab.app/Contents/MacOS/FlowTab"
 
 if [[ "$HAS_CUSTOM_OUTPUT_DIR" == true ]]; then
   if ! mkdir -p "$(dirname "$OUTPUT_DIR")"; then
@@ -281,12 +281,12 @@ printf 'sample_index,captured_at_utc,cpu_percent,rss_kb,mem_percent\n' >"$SAMPLE
 echo "Evidence directory: $OUTPUT_DIR"
 
 CURRENT_STAGE="building"
-echo "[1/3] Building Debug app (derived data in ${DERIVED_DATA_DIR})..."
+echo "[1/3] Building Testing app (derived data in ${DERIVED_DATA_DIR})..."
 set +e
 xcodebuild \
   -project "$ROOT_DIR/FlowTab.xcodeproj" \
   -scheme FlowTab \
-  -configuration Debug \
+  -configuration Testing \
   -destination "platform=macOS,arch=${HOST_ARCH}" \
   -sdk macosx \
   -derivedDataPath "$DERIVED_DATA_DIR" \
@@ -305,7 +305,7 @@ fi
 
 if [[ "$XCODEBUILD_STATUS" -ne 0 ]]; then
   CURRENT_STAGE="build_failed"
-  echo "Debug app build failed with exit code $XCODEBUILD_STATUS. Build log: $BUILD_LOG" >&2
+  echo "Testing app build failed with exit code $XCODEBUILD_STATUS. Build log: $BUILD_LOG" >&2
   exit "$XCODEBUILD_STATUS"
 fi
 

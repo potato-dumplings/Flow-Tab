@@ -1,3 +1,4 @@
+#if FLOWTAB_TESTING
 import AppKit
 import Foundation
 import FlowTabCore
@@ -658,3 +659,4 @@ final class RuntimeUITestProjectionAppDirectoryProvider: RuntimeAppDirectoryProv
         }
     }
 }
+#endif

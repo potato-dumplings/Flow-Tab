@@ -1,3 +1,4 @@
+#if FLOWTAB_TESTING
 import AppKit
 import Foundation
 
@@ -169,3 +170,4 @@ final class RuntimeUITestFrontmostProjectionService: RuntimeProjectionServing, @
         baseService.signalWindowFocusReadbackMismatch(diagnostic)
     }
 }
+#endif

@@ -1,3 +1,4 @@
+#if FLOWTAB_TESTING
 import AppKit
 import ApplicationServices
 import Foundation
@@ -307,3 +308,4 @@ enum RuntimeWindowMappingTestSupport {
         )
     }
 }
+#endif

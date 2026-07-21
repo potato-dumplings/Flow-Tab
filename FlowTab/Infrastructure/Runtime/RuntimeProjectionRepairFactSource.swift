@@ -64,6 +64,7 @@ struct RuntimeSpaceTopologyReconciliationTarget: Equatable {
     let affectedCGWindowIDs: Set<CGWindowID>
 }
 
+#if FLOWTAB_TESTING
 struct RuntimeUITestProjectionDatasetFacts {
     let appDirectoryEntries: [RuntimeAppDirectoryEntry]
     let appCount: Int
@@ -89,6 +90,7 @@ struct RuntimeUITestProjectionDatasetFacts {
         focusedRepairEvidenceByPID[pid]
     }
 }
+#endif
 
 extension RuntimeAppWindowSelectionFacts {
     func currentAppProjectionAssemblyInput(
@@ -145,6 +147,7 @@ struct RuntimeProjectionRepairFactSource {
         self.windowRecordStore = windowRecordStore
     }
 
+#if FLOWTAB_TESTING
     func collectUITestProjectionDatasetFacts() -> RuntimeUITestProjectionDatasetFacts? {
         guard let dataset = FlowTabUITestRuntimeProjectionDataset.current() else { return nil }
         let windowRecordRefresh = dataset.seedWindowRecordCoverage(in: windowRecordStore)
@@ -173,6 +176,7 @@ struct RuntimeProjectionRepairFactSource {
             focusedRepairEvidenceByPID: focusedRepairEvidenceByPID
         )
     }
+#endif
 
     func collectRepairRunningApps() -> RuntimeRepairRunningApps {
         let runningApps = RuntimeAppDirectoryFactSource.currentAppLayerRunningApplications(

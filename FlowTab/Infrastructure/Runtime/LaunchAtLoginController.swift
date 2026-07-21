@@ -65,8 +65,10 @@ extension LaunchAtLoginManaging {
 final class LaunchAtLoginController: LaunchAtLoginManaging {
     static let shared = LaunchAtLoginController()
 
+#if FLOWTAB_TESTING
     static var statusOverrideForTesting: (() -> LaunchAtLoginStatus)?
     static var setEnabledOverrideForTesting: ((Bool) throws -> Void)?
+#endif
 
     private let service: SMAppService
 
@@ -75,6 +77,7 @@ final class LaunchAtLoginController: LaunchAtLoginManaging {
     }
 
     var status: LaunchAtLoginStatus {
+#if FLOWTAB_TESTING
         if let statusOverrideForTesting = Self.statusOverrideForTesting {
             return statusOverrideForTesting()
         }
@@ -83,10 +86,12 @@ final class LaunchAtLoginController: LaunchAtLoginManaging {
                 ? .enabled
                 : .disabled
         }
+#endif
         return LaunchAtLoginStatus(serviceStatus: service.status)
     }
 
     func setEnabled(_ enabled: Bool) throws {
+#if FLOWTAB_TESTING
         if let setEnabledOverrideForTesting = Self.setEnabledOverrideForTesting {
             try setEnabledOverrideForTesting(enabled)
             return
@@ -94,6 +99,7 @@ final class LaunchAtLoginController: LaunchAtLoginManaging {
         if FlowTabTestLaunchOptions.usesMockLaunchAtLoginService {
             return
         }
+#endif
 
         if enabled {
             guard status != .enabled && status != .requiresApproval else { return }

@@ -1,3 +1,4 @@
+#if FLOWTAB_TESTING
 import Foundation
 import FlowTabCore
 
@@ -63,3 +64,4 @@ enum RuntimeFullRepairProjectionAssembler {
         )
     }
 }
+#endif

@@ -1,4 +1,5 @@
 import AppKit
+import Carbon
 import FlowTabCore
 
 @MainActor
@@ -11,7 +12,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private(set) var hotkeyMonitor: (any HotkeyMonitoring)?
     private(set) var inAppWindowHotkeyMonitor: (any HotkeyMonitoring)?
     private lazy var commandTabTakeoverController: any CommandTabTakeoverControlling = {
+#if FLOWTAB_TESTING
         Self.testHooks.commandTabTakeoverController ?? CommandTabTakeoverController()
+#else
+        CommandTabTakeoverController()
+#endif
     }()
     private lazy var launchAtLoginManager: any LaunchAtLoginManaging = {
         resolvedLaunchAtLoginManager
@@ -24,13 +29,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Self.shared = self
+#if FLOWTAB_TESTING
         FlowTabUITestBootstrapper.prepareIfNeeded(userDefaults: resolvedUserDefaults)
+#endif
         applyActivationPolicyFromPreferences(application: resolvedActivationPolicyApplication)
         syncLaunchAtLoginPreferenceOnLaunch()
 
         let panelController = makePanelController()
         self.panelController = panelController
+#if FLOWTAB_TESTING
         FlowTabUITestBootstrapper.configurePanelControllerIfNeeded(panelController: panelController)
+#endif
 
         setupHotkeyMonitors(using: HotkeyRegistrationRequest.load(userDefaults: resolvedUserDefaults))
         installHotkeyObserver()
@@ -40,11 +49,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         installStatusItem()
         requestAccessibilityPermissionIfNeeded()
+#if FLOWTAB_TESTING
         if !FlowTabTestLaunchOptions.suppressesHomeWindowOnLaunch {
             AppWindowCoordinator.openHomeInCurrentProcess()
         }
         resolvedStressRunner.startIfNeeded()
         FlowTabUITestBootstrapper.presentInitialUIIfNeeded(panelController: panelController)
+#else
+        AppWindowCoordinator.openHomeInCurrentProcess()
+#endif
     }
 
     private func requestAccessibilityPermissionIfNeeded() {
@@ -428,9 +441,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let activationPolicyApplication = application as? any AppActivationPolicyApplying {
             return activationPolicyApplication
         }
+#if FLOWTAB_TESTING
         if Self.testHooks.activationPolicyApplication != nil {
             return resolvedActivationPolicyApplication
         }
+#endif
         return nil
     }
 
@@ -476,3 +491,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         handleStatusItemQuitAction(application: NSApp)
     }
 }
+
+#if !FLOWTAB_TESTING
+@MainActor
+extension AppDelegate {
+    var resolvedUserDefaults: UserDefaults {
+        .standard
+    }
+
+    var resolvedLaunchAtLoginManager: any LaunchAtLoginManaging {
+        LaunchAtLoginController.shared
+    }
+
+    var resolvedActivationPolicyApplication: any AppActivationPolicyApplying {
+        NSApp
+    }
+
+    var resolvedRuntimeProjectionService: any RuntimeProjectionServing {
+        sharedRuntimeProjectionService
+    }
+
+    var resolvedWorkspaceNotificationCenter: NotificationCenter {
+        NSWorkspace.shared.notificationCenter
+    }
+
+    func makePanelController() -> SwitcherPanelController {
+        SwitcherPanelController(
+            model: LiveSwitcherModel(runtimeProjectionService: resolvedRuntimeProjectionService)
+        )
+    }
+
+    func makeHotkeyMonitor(
+        configuration: SwitcherHotkeyConfiguration,
+        signature: OSType,
+        forwardHotkeyID: UInt32,
+        backwardHotkeyID: UInt32
+    ) -> any HotkeyMonitoring {
+        OptionTabHotkeyMonitor(
+            configuration: configuration,
+            signature: signature,
+            forwardHotkeyID: forwardHotkeyID,
+            backwardHotkeyID: backwardHotkeyID
+        )
+    }
+}
+#endif

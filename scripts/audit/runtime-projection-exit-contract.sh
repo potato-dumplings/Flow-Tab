@@ -86,9 +86,9 @@ check_has_matches \
   FlowTab/Features/Switcher FlowTab/Infrastructure/Runtime/RuntimeProjectionServing.swift
 
 check_no_matches \
-  "Control+Tab focused current-app hot path has no frontmost/focused snapshot fallback" \
+  "production Control+Tab focused current-app hot path has no frontmost/focused snapshot fallback" \
   "NSWorkspace\\.shared\\.frontmostApplication|kAXFocusedWindowAttribute|FocusedWindowInspector|focusedSnapshot|frontmostApplicationOverride|frontmostAppResolver|flowtab-ui-frontmost-bundle-id" \
-  FlowTab/Features/Switcher FlowTab/TestingSupport
+  FlowTab/Features/Switcher
 
 check_has_matches \
   "Control+Tab focused current-app path reads runtime projection or signals dirty" \

@@ -1,3 +1,4 @@
+#if FLOWTAB_TESTING
 import ApplicationServices
 import Foundation
 
@@ -80,3 +81,4 @@ enum RuntimeAXRemoteWindowResolverForTesting {
         )
     }
 }
+#endif

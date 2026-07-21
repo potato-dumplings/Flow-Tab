@@ -8,14 +8,24 @@ struct FlowTabApp: App {
     @ObservedObject private var presentation = FlowPresentationState.shared
 
     init() {
+#if FLOWTAB_TESTING
         FlowTabUITestBootstrapper.prepareIfNeeded()
+#endif
         Self.mruTracker.startIfNeeded()
+    }
+
+    private static var runtimeProjectionService: any RuntimeProjectionServing {
+#if FLOWTAB_TESTING
+        FlowTabUITestBootstrapper.resolvedRuntimeProjectionService
+#else
+        sharedRuntimeProjectionService
+#endif
     }
 
     var body: some Scene {
         WindowGroup("FlowTab") {
             HomeRootView(
-                runtimeProjectionService: FlowTabUITestBootstrapper.resolvedRuntimeProjectionService
+                runtimeProjectionService: Self.runtimeProjectionService
             )
                 .frame(minWidth: AppWindowLayout.width, minHeight: AppWindowLayout.height)
         }
@@ -24,7 +34,7 @@ struct FlowTabApp: App {
 
         Settings {
             HomeRootView(
-                runtimeProjectionService: FlowTabUITestBootstrapper.resolvedRuntimeProjectionService
+                runtimeProjectionService: Self.runtimeProjectionService
             )
                 .frame(minWidth: AppWindowLayout.width, minHeight: AppWindowLayout.height)
         }

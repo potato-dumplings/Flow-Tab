@@ -92,14 +92,17 @@ struct SwitcherPanelRootView: View {
         .background(Color.clear)
         .preferredColorScheme(presentation.context.resolvedColorScheme)
         .animation(.none, value: presentation.context.resolvedColorScheme)
+#if FLOWTAB_TESTING
         .overlay(alignment: .topLeading) {
             if FlowTabTestLaunchOptions.showsSwitcherDiagnostics, model.session != nil {
                 switcherDiagnosticsSummary
             }
         }
+#endif
         .id(presentation.context.appLanguage.rawValue)
     }
 
+#if FLOWTAB_TESTING
     private var switcherDiagnosticsSummary: some View {
         let value = switcherDiagnosticsValue
         return Text(verbatim: value)
@@ -185,6 +188,7 @@ struct SwitcherPanelRootView: View {
     private func diagnosticsEscaped(_ value: String) -> String {
         value.addingPercentEncoding(withAllowedCharacters: Self.diagnosticsAllowedCharacters) ?? ""
     }
+#endif
 
     private static func logContentTrace(
         phase: String,
@@ -242,11 +246,13 @@ struct SwitcherPanelRootView: View {
         String(format: "%.3f", value)
     }
 
+#if FLOWTAB_TESTING
     private static let diagnosticsAllowedCharacters: CharacterSet = {
         var allowed = CharacterSet.alphanumerics
         allowed.insert(charactersIn: "-._~")
         return allowed
     }()
+#endif
 }
 
 private struct CommandTabOverlay: View {

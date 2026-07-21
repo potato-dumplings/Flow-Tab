@@ -938,8 +938,10 @@ private extension Array {
 }
 
 enum ScreenCapturePermissionChecker {
+#if FLOWTAB_TESTING
     static var hasPermissionOverrideForTesting: (() -> Bool)?
     static var requestPermissionOverrideForTesting: (() -> Bool)?
+#endif
 
     private static var supportsScreenCapturePermissionAPI: Bool {
         if #available(macOS 10.15, *) {
@@ -949,22 +951,32 @@ enum ScreenCapturePermissionChecker {
     }
 
     static var hasScreenCapturePermission: Bool {
+#if FLOWTAB_TESTING
         resolvePermission(
             testingOverride: hasPermissionOverrideForTesting,
             launchOverride: FlowTabTestLaunchOptions.screenCaptureTrustedOverride,
             supportsPermissionAPI: supportsScreenCapturePermissionAPI,
             systemPermissionProvider: { CGPreflightScreenCaptureAccess() }
         )
+#else
+        guard supportsScreenCapturePermissionAPI else { return true }
+        return CGPreflightScreenCaptureAccess()
+#endif
     }
 
     @discardableResult
     static func requestScreenCapturePermission() -> Bool {
+#if FLOWTAB_TESTING
         resolvePermission(
             testingOverride: requestPermissionOverrideForTesting,
             launchOverride: FlowTabTestLaunchOptions.screenCaptureTrustedOverride,
             supportsPermissionAPI: supportsScreenCapturePermissionAPI,
             systemPermissionProvider: { CGRequestScreenCaptureAccess() }
         )
+#else
+        guard supportsScreenCapturePermissionAPI else { return true }
+        return CGRequestScreenCaptureAccess()
+#endif
     }
 
     private static func resolvePermission(
@@ -985,6 +997,7 @@ enum ScreenCapturePermissionChecker {
         return systemPermissionProvider()
     }
 
+#if FLOWTAB_TESTING
     static func resolvePermissionForTesting(
         testingOverride: (() -> Bool)?,
         launchOverride: Bool?,
@@ -998,4 +1011,5 @@ enum ScreenCapturePermissionChecker {
             systemPermissionProvider: systemPermissionProvider
         )
     }
+#endif
 }

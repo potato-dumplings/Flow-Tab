@@ -10,6 +10,7 @@ RELEASE_DIR="${ROOT_DIR}/release"
 PROJECT_PREFIX="flowtab"
 APP_EXECUTABLE_PATH="${RELEASE_APP_PATH}/Contents/MacOS/FlowTab"
 UNINSTALLER_SOURCE_PATH="${ROOT_DIR}/scripts/release/uninstall-flowtab.js"
+RELEASE_BINARY_VERIFY_PATH="${ROOT_DIR}/scripts/release/verify-release-binary.sh"
 LOCAL_SIGNING_CONFIG_PATH="${ROOT_DIR}/xcconfigs/LocalSigning.xcconfig"
 DEVELOPMENT_TEAM="${FLOWTAB_DEVELOPMENT_TEAM:-}"
 CODE_SIGN_IDENTITY="${FLOWTAB_CODE_SIGN_IDENTITY:-Apple Development}"
@@ -347,6 +348,8 @@ if [[ ! -d "${RELEASE_APP_PATH}" ]]; then
   echo "Build output not found: ${RELEASE_APP_PATH}" >&2
   exit 1
 fi
+
+"${RELEASE_BINARY_VERIFY_PATH}" "${RELEASE_APP_PATH}"
 
 TARGET_NAME=""
 if [[ -n "${TARGET}" ]]; then

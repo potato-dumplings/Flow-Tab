@@ -8,7 +8,7 @@ ORIGINAL_HOME="${HOME}"
 ORIGINAL_CFFIXED_USER_HOME="${CFFIXED_USER_HOME:-${HOME}}"
 LOCAL_SIGNING_CONFIG_PATH="${ROOT_DIR}/xcconfigs/LocalSigning.xcconfig"
 
-CONFIGURATION="Debug"
+CONFIGURATION="Testing"
 INSTALL_PATH="${USER_HOME}/Applications/Flow Tab UITest.app"
 DEVELOPMENT_TEAM="${FLOWTAB_DEVELOPMENT_TEAM:-}"
 CODE_SIGN_IDENTITY=""
@@ -97,7 +97,7 @@ print_help() {
   cat <<'EOF'
 Usage:
   ./scripts/testing/install-ui-test-app.sh \
-    [--configuration Debug|Release] \
+    [--configuration Debug|Testing|Release] \
     [--build-root /custom/build/root] \
     [--install-path /absolute/path/to/Flow Tab UITest.app] \
     [--development-team TEAMID] \
@@ -107,7 +107,7 @@ Builds FlowTab into a fixed app bundle path for UI automation so macOS permissio
 can be granted to a stable bundle instead of a DerivedData product.
 
 Defaults:
-  configuration: Debug
+  configuration: Testing
   install path: ~/Applications/Flow Tab UITest.app
 
 Development team:
@@ -166,8 +166,8 @@ HOME_ROOT="${BUILD_ROOT}/home"
 MODULE_CACHE_ROOT="${BUILD_ROOT}/module-cache"
 PACKAGE_CACHE_PATH="${BUILD_ROOT}/source-packages"
 
-if [[ "${CONFIGURATION}" != "Debug" && "${CONFIGURATION}" != "Release" ]]; then
-  echo "Unsupported configuration: ${CONFIGURATION}. Use Debug or Release." >&2
+if [[ "${CONFIGURATION}" != "Debug" && "${CONFIGURATION}" != "Testing" && "${CONFIGURATION}" != "Release" ]]; then
+  echo "Unsupported configuration: ${CONFIGURATION}. Use Debug, Testing, or Release." >&2
   exit 1
 fi
 

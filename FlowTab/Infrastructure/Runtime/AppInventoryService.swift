@@ -45,9 +45,11 @@ final class AppInventoryService: @unchecked Sendable {
     func installedApps() -> [InstalledAppRecord] {
         var recordsByID: [String: InstalledAppRecord] = [:]
 
+#if FLOWTAB_TESTING
         for record in uiTestRuntimeRecords() {
             recordsByID[record.id] = record
         }
+#endif
 
         for record in runningAppRecords() {
             recordsByID[record.id] = record
@@ -68,6 +70,7 @@ final class AppInventoryService: @unchecked Sendable {
         }
     }
 
+#if FLOWTAB_TESTING
     private func uiTestRuntimeRecords() -> [InstalledAppRecord] {
         guard let dataset = FlowTabUITestRuntimeProjectionDataset.current() else { return [] }
         return dataset.appSwitcherApps.map { app in
@@ -80,6 +83,7 @@ final class AppInventoryService: @unchecked Sendable {
             )
         }
     }
+#endif
 
     private func applicationSearchDirectories() -> [URL] {
         var directories = [

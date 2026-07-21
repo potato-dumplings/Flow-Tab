@@ -29,6 +29,8 @@ extension FlowTabPriorityCoverageTests {
         let previousActivationOverride = AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride
         let previousAXTrusted = AccessibilityPermissionChecker.isTrustedOverrideForTesting
         let previousAXRequest = AccessibilityPermissionChecker.requestPermissionOverrideForTesting
+        let previousLaunchArguments = FlowTabTestLaunchOptions.argumentsOverrideForTesting
+        let previousLaunchEnvironment = FlowTabTestLaunchOptions.environmentOverrideForTesting
         let hotkeyFactory = SpyHotkeyMonitorFactory()
         let takeoverController = SpyCommandTabTakeoverController()
         let stressRunner = SpyStressRunner()
@@ -41,8 +43,13 @@ extension FlowTabPriorityCoverageTests {
             AppWindowCoordinator.activateMainWindowOrOpenHomeSceneOverride = previousActivationOverride
             AccessibilityPermissionChecker.isTrustedOverrideForTesting = previousAXTrusted
             AccessibilityPermissionChecker.requestPermissionOverrideForTesting = previousAXRequest
+            FlowTabTestLaunchOptions.argumentsOverrideForTesting = previousLaunchArguments
+            FlowTabTestLaunchOptions.environmentOverrideForTesting = previousLaunchEnvironment
             clearIsolatedUserDefaults(userDefaults)
         }
+
+        FlowTabTestLaunchOptions.argumentsOverrideForTesting = ["FlowTab"]
+        FlowTabTestLaunchOptions.environmentOverrideForTesting = [:]
 
         var accessibilityPromptCount = 0
         AccessibilityPermissionChecker.isTrustedOverrideForTesting = { false }
@@ -878,6 +885,8 @@ extension FlowTabPriorityCoverageTests {
         let initialSelectedWindowID = panelController.modelForTesting.session?.selectedWindow?.id
 
         panelController.inAppPrimaryModifierPressedOverride = true
+        panelController.suppressHotkeyReplayUntilRelease = false
+        panelController.lastCommittedTabAdvanceTimestamp = nil
         inAppRecord.monitor.onHotkeyPressed?(false)
         XCTAssertNotEqual(panelController.modelForTesting.session?.selectedWindow?.id, initialSelectedWindowID)
 

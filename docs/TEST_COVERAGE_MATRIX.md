@@ -1,6 +1,6 @@
 # FlowTab Stable Test Coverage Contract
 
-Updated: 2026-07-20
+Updated: 2026-07-21
 
 ## Purpose and authority
 
@@ -35,6 +35,7 @@ The six layer keys are `Unit`, `Behavior`, `Mock UI`, `Real-topology UI`, `Press
 | `scenario:in-app-window-hotkey` | In-app window hotkey | required | Switcher | `deterministic-rule`, `app-orchestration`, `visible-workflow`, `real-topology-external-system`, `hot-path-scale-sensitive` |
 | `scenario:logs-diagnostics` | Logs and diagnostics | required | Logs | `deterministic-rule`, `app-orchestration`, `visible-workflow` |
 | `scenario:performance-pressure-gates` | Performance and pressure gates | conditional: required whenever hot-path or scale-sensitive risk applies | Performance | `hot-path-scale-sensitive`, `tooling-fixture` |
+| `scenario:release-artifact-integrity` | Public release artifact integrity | required | Release Tooling | `deterministic-rule`, `tooling-fixture` |
 | `scenario:runtime-activation-recovery` | Runtime activation and recovery | required | Runtime | `deterministic-rule`, `app-orchestration`, `visible-workflow`, `real-topology-external-system`, `hot-path-scale-sensitive` |
 | `scenario:runtime-snapshot-window-records` | Runtime snapshot, AX/CG mapping, and window records | required | Runtime | `deterministic-rule`, `app-orchestration`, `real-topology-external-system`, `hot-path-scale-sensitive` |
 | `scenario:search-result-activation` | Search panel and result activation | required | Switcher | `deterministic-rule`, `app-orchestration`, `visible-workflow`, `real-topology-external-system`, `hot-path-scale-sensitive` |
@@ -72,6 +73,23 @@ The six layer keys are `Unit`, `Behavior`, `Mock UI`, `Real-topology UI`, `Press
   - Mock UI: `FlowTabUITests.testStatusItemReopensLastSelectedTabAfterWindowClose`
   - Real-topology UI: `FlowTabUITests.testRuntimeLifecycleRefreshesRealFixtureAppLaunchAndTermination`
 - Exhaustive mapping: query active ledger rows whose `product_scenario_ids` contains `scenario:app-launch-lifecycle-status-item`.
+
+### `scenario:release-artifact-integrity` — Public release artifact integrity
+
+- Requiredness: required
+- Owner: `Release Tooling`
+- Oracle: A public Release executable contains production launch behavior and no testing bootstrap, destructive test control, Darwin test-notification, or stress-exit command surface.
+- Risk: `deterministic-rule`, `tooling-fixture`
+- Required layers:
+  - Process/Tooling: Build the Release app and reject the artifact when its executable contains a reserved test-control marker.
+- Not relevant layers:
+  - Unit: The contract concerns the linked artifact after compiler-condition evaluation.
+  - Behavior: In-process tests run through the dedicated Testing configuration and cannot prove Release linkage.
+  - Mock UI: The Release executable inspection is the direct oracle.
+  - Real-topology UI: External window topology does not affect compiled control-surface membership.
+  - Pressure: Artifact membership is independent of sustained runtime load.
+- Current representative test anchors:
+  - Process/Tooling: `scripts/release/verify-release-binary.sh`, invoked by both public Release packaging scripts.
 
 ### `scenario:command-tab-takeover` — Command-Tab takeover
 

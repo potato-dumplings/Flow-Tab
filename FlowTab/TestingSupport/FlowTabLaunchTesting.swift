@@ -1,3 +1,4 @@
+#if FLOWTAB_TESTING
 import AppKit
 import Foundation
 
@@ -252,3 +253,4 @@ final class TabSwitchStressRunner: TabSwitchStressRunning {
         }
     }
 }
+#endif

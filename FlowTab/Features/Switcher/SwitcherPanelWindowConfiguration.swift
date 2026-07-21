@@ -120,7 +120,11 @@ enum SwitcherPanelWindowConfiguration {
     static let styleMask: NSWindow.StyleMask = [.borderless, .nonactivatingPanel]
     static let level: NSWindow.Level = .statusBar
     static var sharingType: NSWindow.SharingType {
+#if FLOWTAB_TESTING
         resolvedSharingType(isRunningUITests: FlowTabTestLaunchOptions.isRunningUITests)
+#else
+        .none
+#endif
     }
     static let fallbackPresentationLevel = NSWindow.Level(
         rawValue: Int(CGShieldingWindowLevel()) + 1

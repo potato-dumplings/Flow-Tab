@@ -1,3 +1,4 @@
+#if FLOWTAB_TESTING
 import AppKit
 import Carbon
 
@@ -114,3 +115,4 @@ extension AppDelegate {
         statusItem != nil
     }
 }
+#endif
