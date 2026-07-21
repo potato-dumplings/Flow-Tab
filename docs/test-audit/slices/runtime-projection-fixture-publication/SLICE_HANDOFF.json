@@ -78,7 +78,7 @@
   "prerequisites": {
     "c0_reconstructible": true,
     "prior_c1_anchors_reconstructible": true,
-    "fixed_ui_app_identity": "Apple Development signed {user-home}/Applications/Flow Tab UITest.app",
+    "fixed_ui_app_identity": "Apple Development signed Flow Tab UITest.app resolved at the user Applications boundary",
     "existing_test_semantics": "unchanged; only additive Behavior regressions were introduced",
     "stage03_finding_routed_back_to_stage02": true
   },

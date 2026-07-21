@@ -137,7 +137,7 @@ Treat permission acquisition or reuse as successful when:
 
 - `install-ui-test-app.sh` signs the fixed-path app with `Apple Development`.
 - Both apps report the signing identifier `io.github.potato-dumplings.flowtab`, and `codesign -dr -` shows compatible Apple Development designated requirements.
-- The UI wrapper prints `UI test app: {user-home}/Applications/Flow Tab UITest.app`.
+- The UI wrapper prints a resolved path matching the intent `{user-home}/Applications/Flow Tab UITest.app`.
 - The UI log reaches the real-fixture markers, opens FlowTab, clears `flowtab.home.permission.open-settings`, and continues to `flowtab.switcher.search.input` or `flowtab.switcher.search.window.*`.
 
 Permission acquisition is proven by those signals. If the test later fails in switcher, search-result, activation, or XCUI snapshot assertions, continue diagnosing that layer and classify its actual result.

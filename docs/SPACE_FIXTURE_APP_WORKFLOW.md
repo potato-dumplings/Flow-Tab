@@ -50,15 +50,15 @@
 
 当前相关实现主要分布在以下位置：
 
-- [FlowTabSpaceFixture/FlowTabSpaceFixtureApp.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabSpaceFixture/FlowTabSpaceFixtureApp.swift)
-- [FlowTabSpaceFixture/SpaceFixtureAppDelegate.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabSpaceFixture/SpaceFixtureAppDelegate.swift)
-- [FlowTabSpaceFixture/SpaceFixtureLaunchConfiguration.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabSpaceFixture/SpaceFixtureLaunchConfiguration.swift)
-- [FlowTabSpaceFixture/SpaceFixtureWorkflowConfiguration.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabSpaceFixture/SpaceFixtureWorkflowConfiguration.swift)
-- [FlowTabSpaceFixture/SpaceFixtureWindowPlan.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabSpaceFixture/SpaceFixtureWindowPlan.swift)
-- [FlowTabSpaceFixture/SpaceFixtureWindowCoordinator.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabSpaceFixture/SpaceFixtureWindowCoordinator.swift)
-- [FlowTabSpaceFixture/SpaceFixtureWindowContentView.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabSpaceFixture/SpaceFixtureWindowContentView.swift)
-- [scripts/testing/build-space-fixture-app.sh]({user-home}/Projeck-Works/Personal/FlowTabApp/scripts/testing/build-space-fixture-app.sh)
-- [scripts/testing/build-space-fixture-workflow.sh]({user-home}/Projeck-Works/Personal/FlowTabApp/scripts/testing/build-space-fixture-workflow.sh)
+- [FlowTabSpaceFixture/FlowTabSpaceFixtureApp.swift](../FlowTabSpaceFixture/FlowTabSpaceFixtureApp.swift)
+- [FlowTabSpaceFixture/SpaceFixtureAppDelegate.swift](../FlowTabSpaceFixture/SpaceFixtureAppDelegate.swift)
+- [FlowTabSpaceFixture/SpaceFixtureLaunchConfiguration.swift](../FlowTabSpaceFixture/SpaceFixtureLaunchConfiguration.swift)
+- [FlowTabSpaceFixture/SpaceFixtureWorkflowConfiguration.swift](../FlowTabSpaceFixture/SpaceFixtureWorkflowConfiguration.swift)
+- [FlowTabSpaceFixture/SpaceFixtureWindowPlan.swift](../FlowTabSpaceFixture/SpaceFixtureWindowPlan.swift)
+- [FlowTabSpaceFixture/SpaceFixtureWindowCoordinator.swift](../FlowTabSpaceFixture/SpaceFixtureWindowCoordinator.swift)
+- [FlowTabSpaceFixture/SpaceFixtureWindowContentView.swift](../FlowTabSpaceFixture/SpaceFixtureWindowContentView.swift)
+- [scripts/testing/build-space-fixture-app.sh](../scripts/testing/build-space-fixture-app.sh)
+- [scripts/testing/build-space-fixture-workflow.sh](../scripts/testing/build-space-fixture-workflow.sh)
 
 ## 当前支持的两种启动模式
 
@@ -409,7 +409,7 @@ open -n "$HOME/Applications/Flow Tab UITest.app"
 
 - `install-ui-test-app.sh` 输出 `Signing FlowTab UI automation app with Apple Development: ...`，而不是 `Signature=adhoc`。
 - 两份 app 的 `codesign -dr -` 输出使用同一个 `identifier "io.github.potato-dumplings.flowtab"` 和同一条 Apple Development requirement；`CDHash` 可以不同。
-- `run-ui-tests-local.sh` 输出 `UI test app: {user-home}/Applications/Flow Tab UITest.app`。
+- `run-ui-tests-local.sh` 输出的解析路径符合 `{user-home}/Applications/Flow Tab UITest.app` 路径意图。
 - 测试日志中 fixture app 已经启动并出现 `flowtab.spacefixture.workflow.ready` / `flowtab.spacefixture.window.mode.*`。
 - FlowTab 打开后，`flowtab.home.permission.open-settings` 没有出现，测试继续进入 `flowtab.switcher.search.input` 或 `flowtab.switcher.search.window.*`。
 
@@ -466,14 +466,14 @@ codesign -dr - "/Applications/Flow Tab.app"
 
 对应测试主要在：
 
-- [FlowTabTests+SpaceFixtureLaunchConfiguration.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabTests/FlowTabTests+SpaceFixtureLaunchConfiguration.swift)
-- [FlowTabTests+SpaceFixtureWindowCoordinator.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabTests/FlowTabTests+SpaceFixtureWindowCoordinator.swift)
+- [FlowTabTests+SpaceFixtureLaunchConfiguration.swift](../FlowTabTests/FlowTabTests+SpaceFixtureLaunchConfiguration.swift)
+- [FlowTabTests+SpaceFixtureWindowCoordinator.swift](../FlowTabTests/FlowTabTests+SpaceFixtureWindowCoordinator.swift)
 
 ### 已接入的 fixture app UI 测试
 
 当前 workflow 模式已经有 fixture app 自身的 UI 用例覆盖：
 
-- [FlowTabUITests+SpaceFixtureWorkflowConfiguration.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabUITests/FlowTabUITests+SpaceFixtureWorkflowConfiguration.swift)
+- [FlowTabUITests+SpaceFixtureWorkflowConfiguration.swift](../FlowTabUITests/FlowTabUITests+SpaceFixtureWorkflowConfiguration.swift)
 
 该用例当前验证：
 
@@ -486,13 +486,13 @@ codesign -dr - "/Applications/Flow Tab.app"
 
 当前已补上基于 resolved workflow JSON 的 multi-app `Home` 和 `Switcher` E2E 用例：
 
-- [FlowTabUITests+SpaceFixtureMultiAppWorkflow.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabUITests/FlowTabUITests+SpaceFixtureMultiAppWorkflow.swift)
-- [space-fixture-home-multi-app-workflow.json]({user-home}/Projeck-Works/Personal/FlowTabApp/docs/fixtures/space-fixture-home-multi-app-workflow.json)
-- [space-fixture-home-fullscreen-only-workflow.json]({user-home}/Projeck-Works/Personal/FlowTabApp/docs/fixtures/space-fixture-home-fullscreen-only-workflow.json)
-- [FlowTabUITests+SpaceFixtureSwitcherMultiAppWorkflow.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabUITests/FlowTabUITests+SpaceFixtureSwitcherMultiAppWorkflow.swift)
-- [space-fixture-switcher-multi-app-workflow.json]({user-home}/Projeck-Works/Personal/FlowTabApp/docs/fixtures/space-fixture-switcher-multi-app-workflow.json)
-- [FlowTabUITests+SpaceFixtureEdgeInputsWorkflow.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabUITests/FlowTabUITests+SpaceFixtureEdgeInputsWorkflow.swift)
-- [space-fixture-switcher-edge-inputs-workflow.json]({user-home}/Projeck-Works/Personal/FlowTabApp/docs/fixtures/space-fixture-switcher-edge-inputs-workflow.json)
+- [FlowTabUITests+SpaceFixtureMultiAppWorkflow.swift](../FlowTabUITests/FlowTabUITests+SpaceFixtureMultiAppWorkflow.swift)
+- [space-fixture-home-multi-app-workflow.json](fixtures/space-fixture-home-multi-app-workflow.json)
+- [space-fixture-home-fullscreen-only-workflow.json](fixtures/space-fixture-home-fullscreen-only-workflow.json)
+- [FlowTabUITests+SpaceFixtureSwitcherMultiAppWorkflow.swift](../FlowTabUITests/FlowTabUITests+SpaceFixtureSwitcherMultiAppWorkflow.swift)
+- [space-fixture-switcher-multi-app-workflow.json](fixtures/space-fixture-switcher-multi-app-workflow.json)
+- [FlowTabUITests+SpaceFixtureEdgeInputsWorkflow.swift](../FlowTabUITests/FlowTabUITests+SpaceFixtureEdgeInputsWorkflow.swift)
+- [space-fixture-switcher-edge-inputs-workflow.json](fixtures/space-fixture-switcher-edge-inputs-workflow.json)
 
 这些用例当前验证：
 
@@ -516,8 +516,8 @@ codesign -dr - "/Applications/Flow Tab.app"
 
 当前真实环境 FlowTab UI workflow 仍主要通过单 app 路径启动 fixture app，相关 helper 在：
 
-- [FlowTabUITests+SpaceFixtureApp.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabUITests/FlowTabUITests+SpaceFixtureApp.swift)
-- [FlowTabUITests+SpaceFixtureWorkflow.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabUITests/FlowTabUITests+SpaceFixtureWorkflow.swift)
+- [FlowTabUITests+SpaceFixtureApp.swift](../FlowTabUITests/FlowTabUITests+SpaceFixtureApp.swift)
+- [FlowTabUITests+SpaceFixtureWorkflow.swift](../FlowTabUITests/FlowTabUITests+SpaceFixtureWorkflow.swift)
 
 当前这条链路使用的环境变量仍是：
 
@@ -556,7 +556,7 @@ codesign -dr - "/Applications/Flow Tab.app"
 
 - `build-space-fixture-workflow.sh --workflow-config docs/fixtures/space-fixture-home-multi-app-workflow.json`
 - 默认输出的 `resolved-workflow.json`，或通过 `FLOWTAB_SPACE_FIXTURE_WORKFLOW_PATH` 显式指定路径
-- [FlowTabUITests+SpaceFixtureMultiAppWorkflow.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabUITests/FlowTabUITests+SpaceFixtureMultiAppWorkflow.swift)
+- [FlowTabUITests+SpaceFixtureMultiAppWorkflow.swift](../FlowTabUITests/FlowTabUITests+SpaceFixtureMultiAppWorkflow.swift)
 
 其中：
 
@@ -567,7 +567,7 @@ codesign -dr - "/Applications/Flow Tab.app"
 
 - `build-space-fixture-workflow.sh --workflow-config docs/fixtures/space-fixture-switcher-multi-app-workflow.json`
 - 默认输出的 `resolved-workflow.json`，或通过 `FLOWTAB_SPACE_FIXTURE_WORKFLOW_PATH` 显式指定路径
-- [FlowTabUITests+SpaceFixtureSwitcherMultiAppWorkflow.swift]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTabUITests/FlowTabUITests+SpaceFixtureSwitcherMultiAppWorkflow.swift)
+- [FlowTabUITests+SpaceFixtureSwitcherMultiAppWorkflow.swift](../FlowTabUITests/FlowTabUITests+SpaceFixtureSwitcherMultiAppWorkflow.swift)
 
 如果要继续把更多 multi-app workflow 场景接到 FlowTab 真实 runtime end-to-end 测试，仍需要继续扩展这层测试驱动逻辑；当前已落地 `Home` 多 app 计数、窗口列表隔离、`fullscreen-only` 场景，以及 `Switcher` app strip、preview 隔离、window-scope search 普通窗口和 fullscreen/off-space 激活场景。
 

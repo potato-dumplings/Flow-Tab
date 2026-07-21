@@ -382,7 +382,7 @@ swift test
 
 ## 本地签名配置
 
-仓库默认不再把个人 `DEVELOPMENT_TEAM` 固定写进 [project.pbxproj]({user-home}/Projeck-Works/Personal/FlowTabApp/FlowTab.xcodeproj/project.pbxproj)，而是通过本地忽略的 `xcconfigs/LocalSigning.xcconfig` 提供：
+仓库默认不再把个人 `DEVELOPMENT_TEAM` 固定写进 [project.pbxproj](../FlowTab.xcodeproj/project.pbxproj)，而是通过本地忽略的 `xcconfigs/LocalSigning.xcconfig` 提供：
 
 ```bash
 cp xcconfigs/LocalSigning.example.xcconfig xcconfigs/LocalSigning.xcconfig
@@ -394,11 +394,17 @@ cp xcconfigs/LocalSigning.example.xcconfig xcconfigs/LocalSigning.xcconfig
 FLOWTAB_DEVELOPMENT_TEAM = YOUR_TEAM_ID
 ```
 
-当前工程会通过 [SigningDefaults.xcconfig]({user-home}/Projeck-Works/Personal/FlowTabApp/xcconfigs/SigningDefaults.xcconfig) 可选包含这份本地文件，因此：
+当前工程会通过 [SigningDefaults.xcconfig](../xcconfigs/SigningDefaults.xcconfig) 可选包含这份本地文件，因此：
 
 - `xcconfigs/LocalSigning.xcconfig` 不会进入 git
 - Xcode GUI 和 `xcodebuild` 会读取同一份本地 team 配置
 - 本地 release/install 构建不需要再把个人 Team ID 提交进仓库
+
+## 路径记录边界
+
+仓库文档、测试和审计交接只记录路径意图：先声明仓库根、用户主目录或系统应用目录等资源边界，再记录从该边界解析的相对路径。Markdown 文件链接使用仓库相对链接。
+
+本机解析后的真实验证路径写入仓库根下已忽略的 `local/private-evidence/validation-paths.json`。该清单仅用于本机复验，不进入 Git 历史。
 
 ## Release 安装到 /Applications
 

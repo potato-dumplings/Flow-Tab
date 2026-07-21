@@ -14,7 +14,7 @@ extension FlowTabTests {
         let diagnostics = RuntimeDiagnostics(fileStore: store)
         let title = "Payroll Q4 – Confidential"
         let query = "acquisition target"
-        let path = "{user-home}/Documents/board-plan.pdf"
+        let path = "<user-home>/Documents/board-plan.pdf"
         let numericPath = "/123/456"
         diagnostics.log(
             level: .error,

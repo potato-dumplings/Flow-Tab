@@ -200,7 +200,7 @@ Current UI runner fixed-path proof:
 The earlier wrapper run built and signed the UI runner, then failed before the
 test body with `Timed out while enabling automation mode`. After the runner fix,
 `./scripts/testing/install-ui-test-app.sh` rebuilt and signed
-`{user-home}/Applications/Flow Tab UITest.app` with Apple Development signing,
+the user-Applications fixed app (`Flow Tab UITest.app`) with Apple Development signing,
 and the same targeted UI wrapper run passed 1 selected test with 0 failures in
 0.351 seconds (`1.148` seconds XCTest operation elapsed). This proves the
 fixed-path runner can now enter the test body for targeted UI validation. The
@@ -320,7 +320,7 @@ Post-runner-fix representative UI proof refreshed for this audit:
   -only-testing:FlowTabUITests/FlowTabUITests/testSwitcherPanelOptionTabReportsUnverifiedSpaceBackedCGOnlyWorkflowActivation
 ```
 
-The install step built and signed `{user-home}/Applications/Flow Tab UITest.app`
+The install step built and signed the user-Applications fixed app (`Flow Tab UITest.app`)
 with Apple Development signing. The UI wrapper used that fixed app path and
 passed the first 4 selected tests with 0 failures in 123.975 seconds
 (`125.622` seconds elapsed in XCTest). The open-window-layer mutation proof
@@ -395,7 +395,7 @@ Current runner-fixed representative UI proof for this slice:
   -only-testing:FlowTabUITests/FlowTabUITests/testSwitcherPanelOptionTabHidesDesktopProvisionalCGOnlyWorkflowWindow
 ```
 
-The install step rebuilt `{user-home}/Applications/Flow Tab UITest.app` and signed
+The install step rebuilt the user-Applications fixed app (`Flow Tab UITest.app`) and signed
 it with Apple Development signing. The UI wrapper used the fixed app path and
 passed 5 selected tests with 0 failures in 141.582 seconds (`147.291` seconds
 XCTest operation elapsed). This refreshes the representative proof that Noisy
