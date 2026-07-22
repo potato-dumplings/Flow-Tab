@@ -22,7 +22,7 @@ Pressure testing is required when the risk concerns sustained CPU, RSS growth, l
 - Preserve each pressure attempt's raw samples, aggregate summary, runner logs, child-wrapper output roots, and top-level status in its own evidence directory.
 - Keep audit build roots, evidence directories, and private manifests inside the current project under the Git-ignored `./.build-local/` tree.
 - Persist each location as `{resource_boundary: repository_root, relative_path_intent: <relative-path>}` and resolve it against the current repository root at the resource-owning boundary immediately before invocation.
-- Use the nearest same-machine baseline from `docs/DEVELOPMENT.md`, `docs/TEST_COVERAGE_CHECKLIST.md`, or a previous named `.build-local` result when available.
+- Use the nearest same-machine baseline from `docs/DEVELOPMENT.md` or a previous named `.build-local` result when available.
 - If no comparable baseline exists, record the run as a new local baseline and state that it is not a regression comparison.
 - Treat unexplained CPU regressions or warm-state RSS growth as blockers.
 
@@ -45,7 +45,7 @@ Run pressure validation before completion if the change touches any of these cat
 - Home, Logs, Settings, or switcher page-lifecycle and repeated-presentation paths covered by the tab-switch pressure scenario.
 - Runtime snapshot, window mapping, grouping, deduplication, active-Space recovery, fullscreen/off-Space activation, or other paths covered by the runtime-topology pressure scenario.
 - Ownership or cadence changes to long-lived screen-capture polling, accessibility scans, preview pipelines, observers, timers, repeated `Task` chains, or runtime caches.
-- A path with an explicit performance acceptance criterion, a known prior performance regression, or a required pressure scenario recorded in the stable product contract.
+- A path with an explicit performance acceptance criterion, a known prior performance regression, or a required pressure scenario owned by a canonical Runner or configuration.
 
 ## Known-Hot And Scoring Triggers
 

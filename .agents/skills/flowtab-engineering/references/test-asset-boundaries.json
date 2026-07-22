@@ -1,0 +1,279 @@
+{
+  "active_audit_root": "docs/test-audit",
+  "asset_boundaries": [
+    {
+      "asset_type": "test_root",
+      "layer_capabilities": [
+        "unit"
+      ],
+      "owner": "FlowTabCoreTests",
+      "project_identity": "FlowTabCore",
+      "relative_path_intent": "FlowTabCore/Tests/FlowTabCoreTests",
+      "role": "core_test_sources",
+      "target": "FlowTabCoreTests"
+    },
+    {
+      "asset_type": "test_root",
+      "layer_capabilities": [
+        "behavior",
+        "unit"
+      ],
+      "owner": "FlowTabTests",
+      "project_identity": "FlowTab.xcodeproj",
+      "relative_path_intent": "FlowTabTests",
+      "role": "app_test_sources",
+      "target": "FlowTabTests"
+    },
+    {
+      "asset_type": "test_root",
+      "layer_capabilities": [
+        "ui_mock",
+        "ui_real_topology"
+      ],
+      "owner": "FlowTabUITests",
+      "project_identity": "FlowTab.xcodeproj",
+      "relative_path_intent": "FlowTabUITests",
+      "role": "ui_test_sources",
+      "target": "FlowTabUITests"
+    },
+    {
+      "asset_type": "testing_support",
+      "layer_capabilities": [],
+      "owner": "FlowTabTestingSupport",
+      "project_identity": null,
+      "relative_path_intent": "FlowTab/TestingSupport",
+      "role": "testing_support",
+      "target": null
+    },
+    {
+      "asset_type": "fixture",
+      "layer_capabilities": [],
+      "owner": "RepositoryFixtures",
+      "project_identity": "FlowTab.xcodeproj",
+      "relative_path_intent": "FlowTabSpaceFixture",
+      "role": "fixture_app_sources",
+      "target": "FlowTabSpaceFixture"
+    },
+    {
+      "asset_type": "fixture",
+      "layer_capabilities": [],
+      "owner": "RepositoryFixtures",
+      "project_identity": null,
+      "relative_path_intent": "docs/fixtures",
+      "role": "fixture_data",
+      "target": null
+    },
+    {
+      "asset_type": "runner_root",
+      "layer_capabilities": [
+        "process_tooling"
+      ],
+      "owner": "RepositoryTesting",
+      "project_identity": null,
+      "relative_path_intent": "scripts/testing",
+      "role": "test_runners",
+      "target": null
+    },
+    {
+      "asset_type": "capability_probe",
+      "layer_capabilities": [
+        "process_tooling"
+      ],
+      "owner": "RepositoryTesting",
+      "project_identity": null,
+      "relative_path_intent": "scripts/testing/create-ui-app-identity-manifest.sh",
+      "role": "ui_app_identity_probe",
+      "target": null
+    },
+    {
+      "asset_type": "capability_probe",
+      "layer_capabilities": [
+        "process_tooling"
+      ],
+      "owner": "RepositoryTesting",
+      "project_identity": null,
+      "relative_path_intent": "scripts/testing/install-ui-test-app.sh",
+      "role": "ui_test_app_installation",
+      "target": null
+    },
+    {
+      "asset_type": "runner_root",
+      "layer_capabilities": [
+        "pressure"
+      ],
+      "owner": "RepositoryTesting",
+      "project_identity": null,
+      "relative_path_intent": "scripts/perf",
+      "role": "pressure_runners",
+      "target": null
+    },
+    {
+      "asset_type": "pressure_scenario",
+      "layer_capabilities": [
+        "pressure"
+      ],
+      "owner": "RepositoryTesting",
+      "project_identity": null,
+      "relative_path_intent": "scripts/perf/runtime-topology-pressure.sh",
+      "role": "runtime_topology_pressure",
+      "target": null
+    },
+    {
+      "asset_type": "pressure_scenario",
+      "layer_capabilities": [
+        "pressure"
+      ],
+      "owner": "RepositoryTesting",
+      "project_identity": null,
+      "relative_path_intent": "scripts/perf/search-committed-index-pressure.sh",
+      "role": "search_committed_index_pressure",
+      "target": null
+    },
+    {
+      "asset_type": "pressure_scenario",
+      "layer_capabilities": [
+        "pressure"
+      ],
+      "owner": "RepositoryTesting",
+      "project_identity": null,
+      "relative_path_intent": "scripts/perf/tab-switch-stress.sh",
+      "role": "tab_switch_stress",
+      "target": null
+    },
+    {
+      "asset_type": "runner_root",
+      "layer_capabilities": [
+        "behavior",
+        "process_tooling"
+      ],
+      "owner": "RepositoryTesting",
+      "project_identity": null,
+      "relative_path_intent": "scripts/audit",
+      "role": "contract_audit_runners",
+      "target": null
+    },
+    {
+      "asset_type": "runner",
+      "layer_capabilities": [
+        "behavior",
+        "process_tooling"
+      ],
+      "owner": "RepositoryRelease",
+      "project_identity": null,
+      "relative_path_intent": "scripts/release/test-release-distribution-contract.sh",
+      "role": "release_distribution_contract_test",
+      "target": null
+    },
+    {
+      "asset_type": "runner",
+      "layer_capabilities": [
+        "behavior",
+        "process_tooling"
+      ],
+      "owner": "RepositoryRelease",
+      "project_identity": null,
+      "relative_path_intent": "scripts/release/test-uninstall-flowtab-cleanup.js",
+      "role": "uninstall_cleanup_test",
+      "target": null
+    },
+    {
+      "asset_type": "scheme",
+      "layer_capabilities": [
+        "process_tooling"
+      ],
+      "owner": "FlowTabProject",
+      "project_identity": "FlowTab.xcodeproj",
+      "relative_path_intent": "FlowTab.xcodeproj/xcshareddata/xcschemes/FlowTabSpaceFixture.xcscheme",
+      "role": "fixture_scheme",
+      "target": "FlowTabSpaceFixture"
+    }
+  ],
+  "shared_carriers": [
+    {
+      "discovery_kind": "runner",
+      "interface": "swift-test",
+      "layer_capabilities": [
+        "process_tooling"
+      ],
+      "owner": "FlowTabCore",
+      "project_identity": "FlowTabCore",
+      "relative_path_intent": "FlowTabCore/Package.swift",
+      "role": "swift_package",
+      "test_owned_fragments": [
+        {
+          "fragment_id": "flowtab-core-tests-target",
+          "selector": {
+            "kind": "swift_package_test_target",
+            "target": "FlowTabCoreTests"
+          }
+        }
+      ]
+    },
+    {
+      "discovery_kind": "configuration",
+      "interface": null,
+      "layer_capabilities": [
+        "process_tooling"
+      ],
+      "owner": "FlowTabProject",
+      "project_identity": "FlowTab.xcodeproj",
+      "relative_path_intent": "FlowTab.xcodeproj/project.pbxproj",
+      "role": "xcode_project",
+      "test_owned_fragments": [
+        {
+          "fragment_id": "flowtab-space-fixture-target-graph",
+          "selector": {
+            "kind": "pbxproj_target_graph",
+            "target": "FlowTabSpaceFixture"
+          }
+        },
+        {
+          "fragment_id": "flowtab-testing-support-group-graph",
+          "selector": {
+            "kind": "pbxproj_group_graph",
+            "path": "TestingSupport"
+          }
+        },
+        {
+          "fragment_id": "flowtab-tests-target-graph",
+          "selector": {
+            "kind": "pbxproj_target_graph",
+            "target": "FlowTabTests"
+          }
+        },
+        {
+          "fragment_id": "flowtab-ui-tests-target-graph",
+          "selector": {
+            "kind": "pbxproj_target_graph",
+            "target": "FlowTabUITests"
+          }
+        }
+      ]
+    },
+    {
+      "discovery_kind": "scheme",
+      "interface": null,
+      "layer_capabilities": [
+        "process_tooling"
+      ],
+      "owner": "FlowTabProject",
+      "project_identity": "FlowTab.xcodeproj",
+      "relative_path_intent": "FlowTab.xcodeproj/xcshareddata/xcschemes/FlowTab.xcscheme",
+      "role": "application_scheme",
+      "test_owned_fragments": [
+        {
+          "fragment_id": "flowtab-test-action-graph",
+          "selector": {
+            "kind": "xcode_scheme_test_graph",
+            "targets": [
+              "FlowTabSpaceFixture",
+              "FlowTabTests",
+              "FlowTabUITests"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "transient_reconstruction_root": ".build-local/test-audit/rebuild"
+}

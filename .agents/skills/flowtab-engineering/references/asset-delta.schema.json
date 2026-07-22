@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "after_record": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "test-asset.schema.json"
+        }
+      ]
+    },
+    "before_fingerprint": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "before_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "change_kind": {
+      "enum": [
+        "added",
+        "merged",
+        "modified",
+        "moved",
+        "renamed",
+        "retired",
+        "split"
+      ]
+    },
+    "delta_id": {
+      "type": "string"
+    },
+    "lineage_basis": {
+      "enum": [
+        "deterministic_identity",
+        "snapshot_absence",
+        "type_and_fingerprint_candidates",
+        "unique_type_and_fingerprint"
+      ]
+    },
+    "lineage_candidates": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "lineage_confidence": {
+      "enum": [
+        "confirmed",
+        "inferred",
+        "unresolved"
+      ]
+    },
+    "lineage_evidence": {
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "record_kind": {
+      "const": "asset_delta"
+    }
+  },
+  "required": [
+    "record_kind",
+    "delta_id",
+    "change_kind",
+    "before_ref",
+    "before_fingerprint",
+    "after_record",
+    "lineage_basis",
+    "lineage_candidates",
+    "lineage_confidence",
+    "lineage_evidence"
+  ],
+  "type": "object"
+}

@@ -17,7 +17,7 @@ FRONTMATTER_RE = re.compile(
     re.DOTALL,
 )
 NAME_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-REFERENCE_RE = re.compile(r"references/([A-Za-z0-9._-]+\.md)")
+REFERENCE_RE = re.compile(r"references/([A-Za-z0-9._-]+\.(?:md|json))")
 
 
 def parse_frontmatter(skill_file: Path, errors: list[str]) -> tuple[dict[str, str], str]:
@@ -106,7 +106,11 @@ def validate_references(skill_root: Path, skill_text: str, errors: list[str]) ->
         errors.append("references/ is missing")
         return
 
-    reference_files = sorted(references_root.rglob("*.md"))
+    reference_files = sorted(
+        path
+        for path in references_root.rglob("*")
+        if path.is_file() and path.suffix in {".json", ".md"}
+    )
     if not reference_files:
         errors.append("references/ must contain at least one Markdown file")
         return
@@ -119,9 +123,16 @@ def validate_references(skill_root: Path, skill_text: str, errors: list[str]) ->
         if intent not in skill_text:
             errors.append(f"SKILL.md does not link directly to {intent}")
 
-        lines = reference_file.read_text(encoding="utf-8").splitlines()
-        if len(lines) > 100 and "## Contents" not in lines[:40]:
-            errors.append(f"{intent} has more than 100 lines and no early Contents section")
+        text = reference_file.read_text(encoding="utf-8")
+        if reference_file.suffix == ".md":
+            lines = text.splitlines()
+            if len(lines) > 100 and "## Contents" not in lines[:40]:
+                errors.append(f"{intent} has more than 100 lines and no early Contents section")
+        else:
+            try:
+                json.loads(text)
+            except json.JSONDecodeError as error:
+                errors.append(f"{intent} has invalid JSON: {error}")
 
     for reference_name in sorted(set(REFERENCE_RE.findall(skill_text))):
         if not (references_root / reference_name).is_file():
@@ -175,7 +186,7 @@ def validate_skill(skill_root: Path) -> list[str]:
     scanned_files = [
         path
         for path in skill_root.rglob("*")
-        if path.is_file() and path.suffix in {".md", ".yaml", ".yml", ".py"}
+        if path.is_file() and path.suffix in {".json", ".md", ".yaml", ".yml", ".py"}
     ]
     retired_skill_name = "flowtab-" + "direct-delivery"
     sibling_reference_prefix = ".." + "/flowtab-"

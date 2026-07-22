@@ -1,6 +1,6 @@
 ---
 name: flowtab-engineering
-description: "Use for FlowTab repository engineering work including implementation, code review, bug triage, architecture, test strategy, performance analysis, and validated change delivery. Apply FlowTab module boundaries, evidence-first debugging, scenario-based coverage, risk-calibrated validation layers, canonical test wrappers, and task-specific handoff requirements."
+description: "Use for FlowTab repository engineering work including implementation, code review, bug triage, architecture, reconstructible test-asset maintenance, test strategy, performance analysis, and validated change delivery. Apply FlowTab module boundaries, evidence-first debugging, risk-calibrated validation layers, canonical test tooling, and task-specific handoff requirements."
 ---
 
 # FlowTab Engineering
@@ -27,8 +27,8 @@ Apply FlowTab's project-specific engineering contract to repository changes and 
 6. Give every validation layer unique evidence.
    Use unit coverage for deterministic rules, behavior coverage for in-process orchestration, UI coverage for the visible user path or real topology, and pressure validation for sustained-load and scale risk. Required layers must pass before completion; report blocked and unproven layers explicitly.
 
-7. Separate stable coverage contracts from current audit evidence.
-   Use `docs/TEST_COVERAGE_MATRIX.md` for stable product scenarios, Oracles, requiredness, layer responsibility, and risk. For active C0/C1/C2 work, return validation evidence, blockers and semantic deltas to the selected `$flowtab-test-audit` stage and its owned artifacts.
+7. Maintain reconstructible test assets.
+   Use `references/test-asset-contract.md` and `references/test-asset-boundaries.json` for the single current asset set, canonical records, protected behavior, Oracles and test-semantic changes. Routine work maintains that set in place; `$flowtab-test-audit` replaces it from an empty boundary during an explicit full reconstruction.
 
 8. Use canonical validation paths.
    Follow `references/validation-command-cookbook.md`, the FlowTabTests wrapper contract, UI prerequisites, and pressure workflow. Keep build roots and evidence under the repository-local ignored tree.
@@ -48,7 +48,8 @@ Apply FlowTab's project-specific engineering contract to repository changes and 
 - Bug investigation or repair: read `references/bugfix-workflow.md`.
 - Risk and required-layer decisions: read `references/risk-calibration.md`.
 - Test layer, Oracle, or scenario decisions: read `references/test-layer-boundaries.md`.
-- Stable coverage contract or audit projection work: read `references/test-coverage-matrix-workflow.md`.
+- Test-asset discovery, maintenance, semantic changes or audit inputs: read `references/test-asset-contract.md`.
+- Full-reconstruction ownership or clearing boundaries: read `references/test-asset-boundaries.json` with `references/test-asset-contract.md`.
 - Build and validation commands: read `references/validation-command-cookbook.md`.
 - App unit or behavior validation: read `references/flowtabtests-workflow.md`.
 - UI automation, permission, or code-identity setup: read `references/ui-automation-prerequisites.md`.
@@ -63,10 +64,11 @@ Apply FlowTab's project-specific engineering contract to repository changes and 
 2. Load the task workflow plus only the supporting references selected above.
 3. For a feature, define the shared rule and representative scenario family. For a defect, establish the stable signal, Oracle, and root-cause evidence.
 4. Select the smallest required test set and identify optional or intentionally deferred variants.
-5. Implement within the owning module without one-off production behavior.
-6. Run the canonical commands for each required runtime layer and any required pressure path.
-7. When stable contract fields change, update `docs/TEST_COVERAGE_MATRIX.md`. During an active audit campaign, publish current evidence and deltas through the selected `$flowtab-test-audit` stage.
-8. When closing or transferring the engineering task, read `references/handoff-contract.md` and report runtime validation separately from process/tooling validation.
+5. When test assets may change, create the task-owned path-scoped pre-change snapshot defined by `references/test-asset-contract.md`.
+6. Implement within the owning module without one-off production behavior.
+7. Create the post-change asset snapshot and canonical delta, then run the required runtime and pressure commands.
+8. During an active audit Campaign, publish the canonical delta and current observations through the selected `$flowtab-test-audit` stage.
+9. When closing or transferring the engineering task, read `references/handoff-contract.md` and report runtime validation separately from process/tooling validation.
 
 ## Bundled Resources
 
@@ -74,7 +76,13 @@ Apply FlowTab's project-specific engineering contract to repository changes and 
 - `references/bugfix-workflow.md`
 - `references/risk-calibration.md`
 - `references/test-layer-boundaries.md`
-- `references/test-coverage-matrix-workflow.md`
+- `references/test-asset-contract.md`
+- `references/test-asset-boundaries.json`
+- `references/shared-test-asset-rules.json`
+- `references/test-asset.schema.json`
+- `references/validation-plan-row.schema.json`
+- `references/execution-observation.schema.json`
+- `references/asset-delta.schema.json`
 - `references/validation-command-cookbook.md`
 - `references/flowtabtests-workflow.md`
 - `references/ui-automation-prerequisites.md`
@@ -82,4 +90,10 @@ Apply FlowTab's project-specific engineering contract to repository changes and 
 - `references/module-boundaries.md`
 - `references/engineering-specialty-rules.md`
 - `references/handoff-contract.md`
+- `scripts/test_asset_model.py`
+- `scripts/test_asset_boundary.py`
+- `scripts/test_asset_clear_plan.py`
+- `scripts/test_asset_index.py`
+- `scripts/test_asset_views.py`
+- `scripts/test_asset_selftest.py`
 - `scripts/validate-skill.py`

@@ -1,0 +1,84 @@
+{
+  "resources": [
+    {
+      "relative_path_intent": "references/test-asset-contract.md",
+      "role": "asset_contract"
+    },
+    {
+      "relative_path_intent": "references/test-asset-boundaries.json",
+      "role": "asset_boundaries"
+    },
+    {
+      "relative_path_intent": "scripts/test_asset_model.py",
+      "role": "asset_model"
+    },
+    {
+      "relative_path_intent": "scripts/test_asset_boundary.py",
+      "role": "boundary_enforcement"
+    },
+    {
+      "relative_path_intent": "scripts/test_asset_clear_plan.py",
+      "role": "reconstruction_safety"
+    },
+    {
+      "relative_path_intent": "scripts/test_asset_index.py",
+      "role": "asset_discovery"
+    },
+    {
+      "relative_path_intent": "scripts/test_asset_views.py",
+      "role": "asset_views"
+    },
+    {
+      "relative_path_intent": "references/test-asset.schema.json",
+      "role": "asset_schema"
+    },
+    {
+      "relative_path_intent": "references/validation-plan-row.schema.json",
+      "role": "validation_plan_schema"
+    },
+    {
+      "relative_path_intent": "references/execution-observation.schema.json",
+      "role": "execution_observation_schema"
+    },
+    {
+      "relative_path_intent": "references/asset-delta.schema.json",
+      "role": "asset_delta_schema"
+    },
+    {
+      "relative_path_intent": "references/risk-calibration.md",
+      "role": "requiredness"
+    },
+    {
+      "relative_path_intent": "references/test-layer-boundaries.md",
+      "role": "layer_assignment"
+    },
+    {
+      "relative_path_intent": "references/performance-pressure-workflow.md",
+      "role": "pressure"
+    },
+    {
+      "relative_path_intent": "references/validation-command-cookbook.md",
+      "role": "command_interface"
+    },
+    {
+      "relative_path_intent": "references/flowtabtests-workflow.md",
+      "role": "app_test_runner"
+    },
+    {
+      "relative_path_intent": "references/ui-automation-prerequisites.md",
+      "role": "ui_prerequisite"
+    },
+    {
+      "relative_path_intent": "references/module-boundaries.md",
+      "role": "ownership"
+    },
+    {
+      "relative_path_intent": "references/handoff-contract.md",
+      "role": "handoff"
+    },
+    {
+      "relative_path_intent": "references/shared-test-asset-rules.json",
+      "role": "manifest"
+    }
+  ]
+}

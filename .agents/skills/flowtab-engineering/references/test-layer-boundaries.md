@@ -14,10 +14,6 @@ These labels describe coverage layers, not a one-to-one naming scheme for Xcode 
 - [Test Oracle Integrity](#test-oracle-integrity)
 - [Scenario Fan-Out](#scenario-fan-out)
 - [Quick Selection Rules](#quick-selection-rules)
-- [Standard Product Scenarios](#standard-product-scenarios)
-- [Three Apps in One Space, Search in the Panel, Activate the Target Window](#1-three-apps-in-one-space-search-in-the-panel-activate-the-target-window)
-- [Three Apps Across Spaces, Search in the Panel, Cross-Space Activate the Target](#2-three-apps-across-spaces-search-in-the-panel-cross-space-activate-the-target)
-- [Three Apps Running, App-Managed Tab Titles Participate in Search](#3-three-apps-running-app-managed-tab-titles-participate-in-search)
 
 ## Layer Model Versus Test Targets
 
@@ -51,12 +47,6 @@ Signals that a test is unit-level:
 - It can avoid app launch, external fixtures, and long async waiting.
 - Assertions focus on returned values, derived state, or deterministic side effects.
 
-Current repo examples:
-
-- `FlowTabCore/Tests/FlowTabCoreTests/GroupingTests.swift`
-- `FlowTabCore/Tests/FlowTabCoreTests/PreferencesTests.swift`
-- `FlowTabCore/Tests/FlowTabCoreTests/SwitcherSessionTests.swift`
-
 ## Behavior Tests
 
 Behavior tests answer: "Is the app wiring and orchestration using the rule correctly in-process?"
@@ -81,12 +71,6 @@ Signals that a test is behavior-level:
 - It often uses overrides, fakes, seeded stores, or notifications instead of clicks in a live UI.
 - Assertions focus on orchestration, state handoff, persistence, logging output, or integration decisions.
 
-Current repo examples:
-
-- `FlowTabTests/FlowTabPriorityCoverageTests+PanelSessionBehavior.swift`
-- `FlowTabTests/FlowTabPriorityCoverageTests+AppDelegateLifecycle.swift`
-- `FlowTabTests/FlowTabTests+RuntimeInteraction.swift`
-
 ## UI Tests
 
 UI tests answer: "Can the user observe and complete the intended path?"
@@ -109,13 +93,6 @@ Signals that a test is UI-level:
 - It uses `XCUIApplication`, XCUI queries, or real fixture apps.
 - Assertions are phrased in terms of what the user can see, tap, type, or trigger.
 - It may need launch arguments or `FlowTabSpaceFixture`, but its pass condition is still user-visible behavior.
-
-Current repo examples:
-
-- `FlowTabUITests/FlowTabUITests+HomeAndLogs.swift`
-- `FlowTabUITests/FlowTabUITests+Settings.swift`
-- `FlowTabUITests/FlowTabUITests+SwitcherAndSearch.swift`
-- `FlowTabUITests/FlowTabUITests+SpaceFixtureWorkflow.swift`
 
 ## Cross-Layer Rules
 
@@ -173,7 +150,7 @@ After fan-out, produce a concise scenario plan before editing test files:
 
 Add the selected set autonomously when it remains inside the authorized product scope. New test files, new test methods in existing files and other additive test declarations do not require clarification. When evidence shows that an existing test function or existing file-scope test semantics must change, use the project-local test-semantic guard, state the exact conflict and ask the smallest product-semantics question needed to proceed. Treat a product-scope expansion as normal requirement clarification through the owning workflow.
 
-When a relevant variant is intentionally not automated or is blocked, record it as a gap in the stable product contract or audit projection through the owning workflow when it affects scenario status. A single happy path is enough only when the fan-out shows the remaining axes are genuinely not relevant to the changed behavior.
+When a relevant variant is intentionally not automated or is blocked, record it in the task validation plan or active Campaign through the owning workflow. A single happy path is enough only when the fan-out shows the remaining axes are genuinely not relevant to the changed behavior.
 
 ## Quick Selection Rules
 
@@ -181,41 +158,3 @@ When a relevant variant is intentionally not automated or is blocked, record it 
 2. If the scenario needs app objects, notifications, persistence, runtime adapters, or controller coordination but can stay in-process, write a behavior test.
 3. If the scenario must prove a visible route, an accessibility-facing result, or a real external-window workflow, write a UI test.
 4. If more than one answer is true, place the shared rule at the lowest layer and keep higher layers thinner.
-
-## Standard Product Scenarios
-
-### 1. Three Apps in One Space, Search in the Panel, Activate the Target Window
-
-Use this as the baseline product scenario for search coverage.
-
-- User path: `Finder`, `Chrome`, and `Notes` are all running in the current desktop space. The user opens the switcher panel, searches for `doc`, selects the `Chrome` window titled `Docs`, and activates it.
-- Unit coverage owns the search rule itself: query normalization, tokenization, app versus window scope matching, result ordering, and mapping the selected result back to the target app or window ID.
-- Behavior coverage owns the in-process search flow: snapshot input enters `LiveSwitcherModel`, search mode rebuilds the index, search state updates, and applying the selected result moves the session to the correct target.
-- UI coverage owns the user-visible journey: the panel shows the expected result, the user can select it, and focus actually switches to the `Docs` window.
-- Example unit assertion: with three app entries already present, query `doc` ranks `Chrome / Docs` first in window scope and returns a stable window result ID.
-- Example behavior assertion: after `enterSearchMode`, synchronizing query `doc`, and applying the selected result, the session selects `chrome-docs-window`.
-- Example UI assertion: with three real fixture apps launched in one space, typing `doc` in the panel highlights `Docs`, and confirming the result brings the `Docs` window to the front.
-
-### 2. Three Apps Across Spaces, Search in the Panel, Cross-Space Activate the Target
-
-Use this when the product risk includes fullscreen windows, space transitions, or off-space targets.
-
-- User path: `Finder` stays in the current desktop space, `Chrome` has a fullscreen window in another space, and `Notes` is in a third space. The user opens the switcher panel from the current space, searches for `mail`, selects the `Chrome` target, and FlowTab activates that window across spaces.
-- Unit coverage owns the deterministic target resolution: given snapshot data that already contains off-space or fullscreen windows, search returns the correct candidate and selection resolves to the expected activation target.
-- Behavior coverage owns the runtime orchestration: runtime snapshot data becomes searchable candidates, the selected result produces the right activation request, and any relevant active-space handling keeps or restores session state correctly.
-- UI coverage owns the real system proof: the external app topology actually exists, the panel can surface the off-space result, and confirming it really switches the user into the target space and window.
-- Example unit assertion: when `Chrome / Mail` exists in the window entries, query `mail` produces a `.window(appID: "chrome", windowID: "mail-window")` result.
-- Example behavior assertion: applying the selected `Mail` result produces `RuntimeActivator` target `.window(appID: "chrome", windowID: "mail-window", ...)`.
-- Example UI assertion: with three fixture apps distributed across spaces and one fullscreen window, confirming the `Mail` result from the panel changes spaces and makes the target window frontmost.
-
-### 3. Three Apps Running, App-Managed Tab Titles Participate in Search
-
-Use this when the product behavior depends on real window-title semantics rather than only bundle or app names.
-
-- User path: `Chrome`, `Safari`, and `Notes` are running. A `Chrome` window contains app-managed tabs such as `Docs` and `PR`, with `PR` currently selected. The user opens the switcher panel, searches for `pr`, and activates that `Chrome` window by its current tab title.
-- Unit coverage owns the title and search semantics: selected-tab title normalization, searchable title generation, token matching, and ranking for tab-derived window labels.
-- Behavior coverage owns the app-level propagation: workflow or runtime title data enters the snapshot, the search index is rebuilt from that title, and selecting the result updates the session to the correct window.
-- UI coverage owns the visible outcome: the panel exposes the tab-derived title that the user expects, searching `pr` returns that visible label, and confirming it activates the correct window.
-- Example unit assertion: a configured window with raw title `Chrome Window 1` and selected tab `PR` normalizes into a searchable window title `PR`.
-- Example behavior assertion: after snapshot ingestion and query `pr`, the first search result has primary text `PR` and points to the expected `Chrome` window ID.
-- Example UI assertion: with a real fixture workflow that renders tab-backed titles, typing `pr` in the panel shows `PR` as the result label and activates the correct `Chrome` window after confirmation.

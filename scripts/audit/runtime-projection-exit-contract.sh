@@ -188,12 +188,12 @@ check_no_matches \
 check_has_matches \
   "Search docs require degraded/stale committed reads until bounded barrier commits a new generation" \
   "bounded freshness barrier.*commits? .*new.*generation|bounded freshness barrier 成功提交新 generation|degraded/stale committed" \
-  docs/RUNTIME_AX_CG_SPACE_WINDOW_MAPPING.md docs/RUNTIME_PROJECTION_COMPLETION_AUDIT.md docs/TEST_COVERAGE_MATRIX.md
+  docs/RUNTIME_AX_CG_SPACE_WINDOW_MAPPING.md docs/RUNTIME_PROJECTION_COMPLETION_AUDIT.md
 
 check_has_matches \
   "Search docs reject pre-barrier fresh, complete, latest, or current-generation wording" \
   "never fresh/complete/latest/current-generation|不能.*fresh.*complete.*latest.*current-generation" \
-  docs/RUNTIME_AX_CG_SPACE_WINDOW_MAPPING.md docs/RUNTIME_PROJECTION_COMPLETION_AUDIT.md docs/TEST_COVERAGE_MATRIX.md
+  docs/RUNTIME_AX_CG_SPACE_WINDOW_MAPPING.md docs/RUNTIME_PROJECTION_COMPLETION_AUDIT.md
 
 check_no_matches \
   "production activation paths do not use direct Space setting or Window-menu shortcuts as success oracles" \

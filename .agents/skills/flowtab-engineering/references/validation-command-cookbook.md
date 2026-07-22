@@ -5,6 +5,7 @@ Use this reference when choosing concrete local commands for FlowTab validation.
 ## Contents
 
 - [General Rules](#general-rules)
+- [Test Asset Tooling](#test-asset-tooling)
 - [Build](#build)
 - [FlowTabCore Unit Tests](#flowtabcore-unit-tests)
 - [App Unit And Behavior Tests](#app-unit-and-behavior-tests)
@@ -23,6 +24,71 @@ Use this reference when choosing concrete local commands for FlowTab validation.
 - Resolve `--build-root`, `--scratch-path`, and `-derivedDataPath` below the current project's ignored `./.build-local/` tree.
 - Normal non-audit calls can omit audit-output options and continue using the existing fixed local paths.
 - Report the command, outcome, and validation layer. For audit work, Git-tracked reports use a redacted command ID/hash while non-secret argv, secret references, and resolved local paths remain in the ignored private evidence manifest. Report sandbox, permission, code-identity, or missing-fixture blockers explicitly.
+
+## Test Asset Tooling
+
+Resolve the `flowtab-engineering` Skill root, then use its canonical indexer. For a routine task, capture the same path scope before and after edits:
+
+```bash
+python3 .agents/skills/flowtab-engineering/scripts/test_asset_index.py index \
+  --repository-root . \
+  --scope paths \
+  --path-intent <task-owned-path> \
+  --output .build-local/test-assets/<task-id>/before.jsonl
+
+python3 .agents/skills/flowtab-engineering/scripts/test_asset_index.py index \
+  --repository-root . \
+  --scope paths \
+  --path-intent <task-owned-path> \
+  --output .build-local/test-assets/<task-id>/after.jsonl
+
+python3 .agents/skills/flowtab-engineering/scripts/test_asset_index.py delta \
+  --before .build-local/test-assets/<task-id>/before.jsonl \
+  --after .build-local/test-assets/<task-id>/after.jsonl \
+  --output .build-local/test-assets/<task-id>/asset-delta.jsonl
+```
+
+For a full reconstruction, clear `.build-local/test-audit/rebuild/`, materialize the shared boundary definition and generate the safety-qualified clear plan from the committed rollback anchor:
+
+```bash
+python3 .agents/skills/flowtab-engineering/scripts/test_asset_index.py boundaries \
+  --output .build-local/test-audit/rebuild/asset-boundaries.json
+
+python3 .agents/skills/flowtab-engineering/scripts/test_asset_index.py reconstruction-clear-plan \
+  --repository-root . \
+  --rollback-commit <rollback-commit> \
+  --output .build-local/test-audit/rebuild/RECONSTRUCTION_CLEAR_PLAN.json
+```
+
+Clear exactly the planned asset paths and shared-carrier fragments, clear `docs/test-audit/`, then run the empty-boundary gate against the retained plan:
+
+```bash
+
+python3 .agents/skills/flowtab-engineering/scripts/test_asset_index.py assert-reconstruction-empty \
+  --repository-root . \
+  --clear-plan .build-local/test-audit/rebuild/RECONSTRUCTION_CLEAR_PLAN.json
+```
+
+Use path scope for each Stage 02 slice. Generate the selected validation-plan references for C1 from canonical rows:
+
+```bash
+python3 .agents/skills/flowtab-engineering/scripts/test_asset_index.py references \
+  --record-kind validation_plan_row \
+  --input .build-local/test-audit/rebuild/VALIDATION_PLAN.jsonl \
+  --record-id <plan-row-id> \
+  --output .build-local/test-audit/rebuild/slices/<slice-id>/VALIDATION_PLAN_REFS.json
+```
+
+Use `--scope all` at Stage 03 to generate the final current ledger under `.build-local/test-audit/rebuild/`; full indexing applies boundary closure automatically. Run the explicit closure command when producing reusable evidence:
+
+```bash
+python3 .agents/skills/flowtab-engineering/scripts/test_asset_index.py assert-boundary-closure \
+  --repository-root . \
+  --ledger .build-local/test-audit/rebuild/TEST_ASSET_LEDGER.jsonl \
+  --output .build-local/test-audit/rebuild/BOUNDARY_CLOSURE.json
+```
+
+Validate generated rows with the matching `validate --record-kind` command. Keep routine and reconstruction datasets under `.build-local`; commit only current C0/C1/C2 anchors through the audit Stage.
 
 ## Build
 
@@ -54,7 +120,7 @@ Target a single SwiftPM test by name when narrowing a signal:
 swift test \
   --package-path FlowTabCore \
   --scratch-path ./.build-local/flowtabcore-tests \
-  --filter SwitcherSessionTests
+  --filter <TestClassOrMethod>
 ```
 
 For a before/after bugfix comparison, use distinct scratch roots such as `./.build-local/flowtabcore-tests/before` and `./.build-local/flowtabcore-tests/after`.
@@ -75,15 +141,15 @@ Target one class or method while reproducing or iterating:
 
 ```bash
 ./scripts/testing/run-flowtabtests-local.sh \
-  -only-testing:FlowTabTests/FlowTabTests/testSearchPerformanceWindowScope
+  -only-testing:FlowTabTests/<ClassName>/<testMethod>
 ```
 
 For an audit attempt, pass fresh project-local build and output leaves:
 
 ```bash
 ./scripts/testing/run-flowtabtests-local.sh \
-  --build-root ./.build-local/test-audit/<campaign-id>/build/<command-id> \
-  --output-root ./.build-local/test-audit/<campaign-id>/<attempt-id>
+  --build-root ./.build-local/test-audit/rebuild/build/<command-id> \
+  --output-root ./.build-local/test-audit/rebuild/attempts/<attempt-id>
 ```
 
 The wrapper creates the attempt directory and rejects reuse. It writes the test result bundle to `results/FlowTabTests.xcresult`, the action log to `logs/xcodebuild-<action>.log`, and child-process/log-writer exit codes to `status.json`. A `build-for-testing` action produces a log without a test result bundle.
@@ -106,15 +172,15 @@ Target a single UI test while iterating:
 
 ```bash
 ./scripts/testing/run-ui-tests-local.sh \
-  -only-testing:FlowTabUITests/FlowTabUITests/testHomePageSelectingMockAppUpdatesWindowList
+  -only-testing:FlowTabUITests/<ClassName>/<testMethod>
 ```
 
 For an audit attempt, pass fresh project-local build and output leaves:
 
 ```bash
 ./scripts/testing/run-ui-tests-local.sh \
-  --build-root ./.build-local/test-audit/<campaign-id>/build/<command-id> \
-  --output-root ./.build-local/test-audit/<campaign-id>/<attempt-id>
+  --build-root ./.build-local/test-audit/rebuild/build/<command-id> \
+  --output-root ./.build-local/test-audit/rebuild/attempts/<attempt-id>
 ```
 
 The wrapper creates the attempt directory and rejects reuse. It writes the UI test result bundle to `results/FlowTabUITests.xcresult`, writes build/test output to `logs/xcodebuild-<action>.log`, retains fixture and signing stage logs, and records child-process/log-writer exit codes in `status.json`. A standalone `build-for-testing` action produces logs without a test result bundle.
@@ -142,22 +208,14 @@ Tab-switch pressure:
 
 ```bash
 ./scripts/perf/tab-switch-stress.sh 20 20 0.5 \
-  --build-root ./.build-local/test-audit/<campaign-id>/build/<command-id-20ms> \
-  --output-dir ./.build-local/test-audit/<campaign-id>/<attempt-20ms>
+  --build-root ./.build-local/test-audit/rebuild/build/<command-id-20ms> \
+  --output-dir ./.build-local/test-audit/rebuild/attempts/<attempt-20ms>
 ./scripts/perf/tab-switch-stress.sh 20 50 0.5 \
-  --build-root ./.build-local/test-audit/<campaign-id>/build/<command-id-50ms> \
-  --output-dir ./.build-local/test-audit/<campaign-id>/<attempt-50ms>
+  --build-root ./.build-local/test-audit/rebuild/build/<command-id-50ms> \
+  --output-dir ./.build-local/test-audit/rebuild/attempts/<attempt-50ms>
 ```
 
 Each output directory preserves `samples.csv`, `summary.txt`, `build.log`, `app.log`, and `status.json`. Every run uses a fresh attempt directory; the script atomically creates the leaf and rejects reuse. The summary reports CPU/RSS `avg/p95/max`, and `status.json` preserves build, app, sampling, summary, and log-writer results. Positional-only non-audit calls remain supported and receive a unique default directory under `./.build-local/tab-switch-stress/`.
-
-Search quick regression for the current deterministic high-window-count path:
-
-```bash
-./scripts/testing/run-flowtabtests-local.sh \
-  -only-testing:FlowTabTests/FlowTabTests/testSearchPerformanceWindowScope \
-  -only-testing:FlowTabTests/FlowTabTests/testSearchPressureWindowScopeUnified
-```
 
 Full search pressure still requires process-level `%CPU` and `RSS` sampling for at least `30s` per scenario. Use `performance-pressure-workflow.md` for the required dataset, cadence, and reporting fields.
 
@@ -167,14 +225,14 @@ Committed-index process-level search pressure:
 ./scripts/perf/search-committed-index-pressure.sh 0.5 \
   --scenario realistic \
   --scenario-duration-seconds 30 \
-  --build-root ./.build-local/test-audit/<campaign-id>/build/<realistic-command-id> \
-  --output-dir ./.build-local/test-audit/<campaign-id>/<search-attempt-id>
+  --build-root ./.build-local/test-audit/rebuild/build/<realistic-command-id> \
+  --output-dir ./.build-local/test-audit/rebuild/attempts/<search-attempt-id>
 
 ./scripts/perf/search-committed-index-pressure.sh 0.5 \
   --scenario stress \
   --scenario-duration-seconds 30 \
-  --build-root ./.build-local/test-audit/<campaign-id>/build/<stress-command-id> \
-  --output-dir ./.build-local/test-audit/<campaign-id>/<search-stress-attempt-id>
+  --build-root ./.build-local/test-audit/rebuild/build/<stress-command-id> \
+  --output-dir ./.build-local/test-audit/rebuild/attempts/<search-stress-attempt-id>
 ```
 
 The output leaf must not exist before the run. The wrapper preserves `process-samples.csv`, `summary.txt`, aggregate logs, `child-attempts.jsonl`, and `status.json`. Its `build-for-testing` invocation and every `test-without-building` batch receive a distinct `attempts/flowtabtests/<child-attempt-id>/` output root, so every test batch retains its own result bundle, xcodebuild log, and child status.
@@ -184,12 +242,12 @@ Runtime-topology pressure for the representative noisy fullscreen/off-Space fixt
 ```bash
 ./scripts/testing/create-ui-app-identity-manifest.sh \
   --app-path "$HOME/Applications/Flow Tab UITest.app" \
-  --output-file ./.build-local/test-audit/<campaign-id>/private/<ui-app-identity>.json
+  --output-file ./.build-local/test-audit/rebuild/private/<ui-app-identity>.json
 
 ./scripts/perf/runtime-topology-pressure.sh 0.5 \
-  --ui-app-identity-manifest ./.build-local/test-audit/<campaign-id>/private/<ui-app-identity>.json \
-  --build-root ./.build-local/test-audit/<campaign-id>/build/<command-id> \
-  --output-dir ./.build-local/test-audit/<campaign-id>/<topology-attempt-id>
+  --ui-app-identity-manifest ./.build-local/test-audit/rebuild/private/<ui-app-identity>.json \
+  --build-root ./.build-local/test-audit/rebuild/build/<command-id> \
+  --output-dir ./.build-local/test-audit/rebuild/attempts/<topology-attempt-id>
 ```
 
 The identity-manifest leaf and output-directory leaf must not exist before the run. The wrapper runs the four-window Noisy Option+Tab UI fixture, samples CPU/RSS for the uniquely bound `FlowTab` process, and preserves `flowtab-samples.csv`, `pid-bindings.csv`, `target-launch-receipt.json`, `summary.txt`, aggregate logs, and the top-level `status.json`. The inner UI wrapper receives the unique `attempts/ui-tests/run/` output root, which retains the result bundle, stage logs, and child status. Use this path for Space topology, fullscreen/off-Space activation, or repeated topology-aware panel-interaction pressure. A normal non-audit run can omit `--output-dir`; the script then creates a unique default result directory.

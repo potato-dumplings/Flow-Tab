@@ -1,0 +1,279 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "asset_id": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "layer": {
+      "enum": [
+        "behavior",
+        "pressure",
+        "process_tooling",
+        "ui_mock",
+        "ui_real_topology",
+        "unit"
+      ]
+    },
+    "oracle": {
+      "additionalProperties": false,
+      "properties": {
+        "evidence_refs": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "line": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "qualified_symbol": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "relative_path_intent": {
+                "type": "string"
+              },
+              "resource_boundary": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "resource_boundary",
+              "relative_path_intent",
+              "line",
+              "qualified_symbol"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "independence_basis": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "enum": [
+            "documented_contract",
+            "explicit_input",
+            "independent_observation",
+            "independent_specification",
+            "platform_api",
+            "stable_fixture"
+          ]
+        },
+        "status": {
+          "enum": [
+            "conflicting",
+            "missing",
+            "provisional",
+            "valid"
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "status",
+        "evidence_refs",
+        "independence_basis"
+      ],
+      "type": "object"
+    },
+    "plan_row_id": {
+      "type": "string"
+    },
+    "prerequisite_refs": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "protected_behavior": {
+      "additionalProperties": false,
+      "properties": {
+        "source_refs": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "line": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "qualified_symbol": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "relative_path_intent": {
+                "type": "string"
+              },
+              "resource_boundary": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "resource_boundary",
+              "relative_path_intent",
+              "line",
+              "qualified_symbol"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "statement": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "ambiguous",
+            "confirmed",
+            "inferred"
+          ]
+        }
+      },
+      "required": [
+        "statement",
+        "status",
+        "source_refs"
+      ],
+      "type": "object"
+    },
+    "provenance": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "line": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "qualified_symbol": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "relative_path_intent": {
+            "type": "string"
+          },
+          "resource_boundary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "resource_boundary",
+          "relative_path_intent",
+          "line",
+          "qualified_symbol"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "record_kind": {
+      "const": "validation_plan_row"
+    },
+    "record_lifecycle": {
+      "const": "transient"
+    },
+    "requiredness": {
+      "enum": [
+        "not_applicable",
+        "optional",
+        "required"
+      ]
+    },
+    "runner_ref": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "scenario_ref": {
+      "additionalProperties": false,
+      "properties": {
+        "source_refs": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "line": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "qualified_symbol": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "relative_path_intent": {
+                "type": "string"
+              },
+              "resource_boundary": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "resource_boundary",
+              "relative_path_intent",
+              "line",
+              "qualified_symbol"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "statement": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "statement",
+        "source_refs"
+      ],
+      "type": "object"
+    },
+    "scope_id": {
+      "type": "string"
+    },
+    "scope_kind": {
+      "enum": [
+        "reconstruction",
+        "task"
+      ]
+    }
+  },
+  "required": [
+    "record_kind",
+    "record_lifecycle",
+    "scope_kind",
+    "plan_row_id",
+    "scope_id",
+    "asset_id",
+    "scenario_ref",
+    "requiredness",
+    "layer",
+    "runner_ref",
+    "prerequisite_refs",
+    "protected_behavior",
+    "oracle",
+    "provenance"
+  ],
+  "type": "object"
+}

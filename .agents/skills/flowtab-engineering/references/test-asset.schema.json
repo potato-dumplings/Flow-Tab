@@ -1,0 +1,297 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "asset_fingerprint": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "asset_id": {
+      "type": "string"
+    },
+    "asset_locator": {
+      "additionalProperties": false,
+      "properties": {
+        "declared_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "qualified_symbol": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "relative_path_intent": {
+          "type": "string"
+        },
+        "resource_boundary": {
+          "type": "string"
+        },
+        "target": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "resource_boundary",
+        "relative_path_intent",
+        "declared_name",
+        "qualified_symbol",
+        "target"
+      ],
+      "type": "object"
+    },
+    "asset_type": {
+      "enum": [
+        "capability_probe",
+        "configuration",
+        "fixture",
+        "pressure_scenario",
+        "runner",
+        "scheme",
+        "target",
+        "test_declaration",
+        "test_file",
+        "testing_support"
+      ]
+    },
+    "dependencies": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "execution_entry": {
+      "additionalProperties": false,
+      "properties": {
+        "interface": {
+          "type": "string"
+        },
+        "runner_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "selector": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "runner_ref",
+        "interface",
+        "selector"
+      ],
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "identity_key": {
+      "additionalProperties": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "minProperties": 1,
+      "type": "object"
+    },
+    "layer_capabilities": {
+      "items": {
+        "enum": [
+          "behavior",
+          "pressure",
+          "process_tooling",
+          "ui_mock",
+          "ui_real_topology",
+          "unit"
+        ]
+      },
+      "type": "array"
+    },
+    "observed_test_semantics": {
+      "additionalProperties": false,
+      "properties": {
+        "assertion_refs": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "line": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "qualified_symbol": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "relative_path_intent": {
+                "type": "string"
+              },
+              "resource_boundary": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "resource_boundary",
+              "relative_path_intent",
+              "line",
+              "qualified_symbol"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "extraction_status": {
+          "enum": [
+            "references_only",
+            "unsupported"
+          ]
+        },
+        "fixture_refs": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "line": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "qualified_symbol": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "relative_path_intent": {
+                "type": "string"
+              },
+              "resource_boundary": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "resource_boundary",
+              "relative_path_intent",
+              "line",
+              "qualified_symbol"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "input_refs": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "line": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "qualified_symbol": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "relative_path_intent": {
+                "type": "string"
+              },
+              "resource_boundary": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "resource_boundary",
+              "relative_path_intent",
+              "line",
+              "qualified_symbol"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "input_refs",
+        "fixture_refs",
+        "assertion_refs",
+        "extraction_status"
+      ],
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "owner": {
+      "type": "string"
+    },
+    "provenance": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "line": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "qualified_symbol": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "relative_path_intent": {
+            "type": "string"
+          },
+          "resource_boundary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "resource_boundary",
+          "relative_path_intent",
+          "line",
+          "qualified_symbol"
+        ],
+        "type": "object"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "record_kind": {
+      "const": "test_asset"
+    }
+  },
+  "required": [
+    "record_kind",
+    "asset_id",
+    "asset_type",
+    "identity_key",
+    "asset_locator",
+    "asset_fingerprint",
+    "owner",
+    "layer_capabilities",
+    "execution_entry",
+    "dependencies",
+    "observed_test_semantics",
+    "provenance"
+  ],
+  "type": "object"
+}

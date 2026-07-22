@@ -62,8 +62,8 @@ Allocate attempt-specific build and output leaf paths under the current project'
 
 ```bash
 ./scripts/testing/run-ui-tests-local.sh \
-  --build-root ./.build-local/test-audit/<campaign-id>/build/<command-id> \
-  --output-root ./.build-local/test-audit/<campaign-id>/<attempt-id>
+  --build-root ./.build-local/test-audit/rebuild/build/<command-id> \
+  --output-root ./.build-local/test-audit/rebuild/attempts/<attempt-id>
 ```
 
 The wrapper creates the attempt directory and rejects an existing path. Resolve stored path intents against the current repository root immediately before invocation. A test action preserves `results/FlowTabUITests.xcresult`; build and test stages preserve `logs/xcodebuild-<action>.log`; fixture preparation and runner signing preserve their own stage logs; and `status.json` preserves every child-process and log-writer exit code. Evidence validation fails when a test action does not produce a result bundle. Inventory these files before starting the next attempt. Normal non-audit runs that use the fixed local paths omit the audit overrides.
@@ -130,7 +130,7 @@ codesign -dr - "$HOME/Applications/Flow Tab UITest.app"
 codesign -dr - "/Applications/Flow Tab.app"
 open -n "$HOME/Applications/Flow Tab UITest.app"
 ./scripts/testing/run-ui-tests-local.sh \
-  -only-testing:FlowTabUITests/FlowTabUITests/testSwitcherPanelWindowSearchActivatesFullscreenWorkflowWindowAcrossSpaces
+  -only-testing:FlowTabUITests/<ClassName>/<realTopologyTestMethod>
 ```
 
 Treat permission acquisition or reuse as successful when:

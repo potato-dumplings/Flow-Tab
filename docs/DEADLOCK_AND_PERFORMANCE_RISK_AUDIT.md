@@ -25,7 +25,7 @@ Observed local pressure numbers:
 - Search unified pressure: `400` apps / `10000` windows, build `2182.14ms`, query `3415.94ms`, `132` queries, `38.64 qps`.
 - Option+Tab 1000-window preview pressure: apply p95 `0.40ms`, window-layer entry p95 `0.01ms`, preview items p95 `0.08ms`, preview capture calls `360`.
 
-These results match the existing pressure shape in `docs/TEST_COVERAGE_CHECKLIST.md`: search is CPU-heavy but already has a same-machine baseline, and current-page preview capture remains bounded for the covered 1000-window path.
+These executable results establish the pressure shape directly: search is CPU-heavy with a same-machine baseline, and current-page preview capture remains bounded for the covered 1000-window path.
 
 ## Priority Findings
 

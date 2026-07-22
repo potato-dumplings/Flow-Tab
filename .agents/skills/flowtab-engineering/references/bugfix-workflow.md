@@ -26,7 +26,7 @@ Use this workflow for regressions, flaky behavior, broken edge cases, and user-r
 - Use tests and logs to narrow the root cause instead of guessing.
 - Keep each regression layer focused on different evidence instead of cloning the same assertion everywhere.
 - For every new regression test, name the oracle that defines the expected result. The oracle must come from the product contract, official API result, stable fixture state, explicit input, or independent specification; legacy fields, stale caches, and known faulty implementation paths may be contamination only.
-- Read `test-coverage-matrix-workflow.md` when the bugfix changes a stable contract field or current evidence status. During an active audit campaign, return the resulting evidence and semantic delta to the selected audit stage.
+- Read `test-asset-contract.md` before changing test assets. Capture task-owned pre-change and post-change path-scoped snapshots, generate the canonical asset delta, and return active Campaign evidence to the selected audit stage.
 - Run pressure validation when the bug or the fix touches sustained-load, repeated-interaction, or scale-sensitive behavior.
 - Keep regression coverage after the fix.
 
@@ -40,7 +40,7 @@ Use this workflow for regressions, flaky behavior, broken edge cases, and user-r
 6. Decide which layer should hold the failing reproduction, which layer should hold app-orchestration coverage, and whether a visible UI regression is required.
 7. Produce a concise regression scenario plan before editing test files. Include the required seed reproduction, the Oracle, the process/result being asserted, contamination used only to recreate the failure environment, higher-layer regression when required, optional adjacent variants, intentionally omitted variants, and the owning layer for each included scenario.
 8. Add the smallest required regression set autonomously and apply the optional-expansion rule from `test-layer-boundaries.md`. If the authorized scope excludes a required completion layer, record that layer as incomplete or blocked.
-9. Read `test-coverage-matrix-workflow.md` when the defect maps to a product scenario in the matrix or reveals a missing scenario.
+9. Read `test-asset-contract.md` and write a path-scoped pre-change asset snapshot beneath `.build-local`.
 10. Read `validation-command-cookbook.md` and choose the concrete pre-change commands to run or attempt.
 11. If UI automation is relevant, read `ui-automation-prerequisites.md` and satisfy the repo-specific setup before deciding the environment is blocked.
 12. Read `performance-pressure-workflow.md` and decide whether the defect or fix requires pressure validation in addition to functional regression coverage.
@@ -52,7 +52,7 @@ Use this workflow for regressions, flaky behavior, broken edge cases, and user-r
 18. Evaluate the modification gate. Proceed only when the stable signal supports the root-cause theory, the intended change is scoped and reviewable, relevant existing tests were attempted, and the regression Oracle is independent.
 19. Change production code with the smallest fix that explains the evidence. A blocked higher layer can remain a completion blocker when it is not needed to establish the modification gate.
 20. Remove temporary debug-only logging or hooks from the final production path.
-21. Update the stable matrix contract when regression coverage adds or changes a scenario. During an active audit campaign, publish the C1/C2 delta or evidence projection through the selected audit stage.
+21. Create the post-change asset snapshot and canonical delta. During an active Campaign, return the delta and execution observations to the selected audit stage.
 22. Re-run the required unit, behavior, UI, and pressure validation. Apply the completion gate and keep the new regression coverage.
 
 ## Modification Gate
@@ -75,7 +75,7 @@ Completion requires:
 - The retained regression coverage passes.
 - Every risk-required unit, behavior, and UI layer passes.
 - Required pressure validation passes.
-- Stable contract and audit projection changes are published through their owning workflow.
+- The canonical asset delta and active Campaign observations are published through their owning workflow.
 - Remaining uncertainty, blockers, and unproven variants are reported.
 
 When a required layer cannot run, report the implementation as made and the closure as blocked by that layer.
@@ -118,7 +118,7 @@ Follow `handoff-contract.md` and include:
 - List the pre-change tests or test attempts by layer and their outcomes.
 - State which logs or observations supported the root-cause theory.
 - List the post-change tests run and their outcomes.
-- State any stable coverage-contract change and current projected-status change.
+- State the canonical test-asset delta and any active Campaign observation change.
 - State any relevant layer that was not run and why it was not possible.
 
 ## Rejection Criteria

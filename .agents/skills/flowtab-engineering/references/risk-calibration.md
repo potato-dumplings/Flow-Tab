@@ -55,8 +55,8 @@ Use this class when users can observe new behavior, a changed interaction path, 
 
 Minimum validation:
 
-- Unit coverage for the smallest reusable rule.
-- Behavior coverage for app orchestration or integration.
+- Unit coverage when a deterministic rule, state transition or normalization changes.
+- Behavior coverage when app orchestration, persistence, permissions, runtime adaptation or integration changes.
 - UI coverage for the visible user path.
 - Pressure validation when `performance-pressure-workflow.md` triggers.
 
@@ -106,7 +106,7 @@ Process/Tooling is a reporting dimension alongside the runtime layers. It is req
 
 Choose the checks owned by the changed boundary:
 
-- Skill structure: frontmatter, description length, folder/name agreement, `agents/openai.yaml`, direct reference links, and package contents.
+- Skill structure: frontmatter, description length, folder/name agreement, `agents/openai.yaml`, direct reference links, bundled resources and generated Schema freshness.
 - Repository integration: AGENTS and Skill entry paths, path-intent resolution, stale-path scans, and referenced file existence.
 - Command contracts: syntax, `--help`, wrapper argument ownership, and project-local build/evidence roots.
 - Audit Skill inputs: active stage references, handoff paths, artifact paths and command interfaces.
@@ -122,5 +122,5 @@ Report Process/Tooling as `passed`, `failed`, `blocked`, or `not run`, with the 
 | Pure `FlowTabCore` rule | Required | As needed for app wiring | Not relevant unless visible path changed | If scale-sensitive | As changed |
 | App orchestration change | As needed for rules | Required | If user-visible | If hot path | As changed |
 | Visible panel/home/logs/settings change | Required when a rule exists | Required when wiring changes | Required | If repeated or heavy | As changed |
-| Bugfix with user-visible impact | Lowest failing layer | Required if orchestration is involved | Required when reasonably automatable | If hot path | As changed |
+| Bugfix with user-visible impact | Lowest failing layer | Required if orchestration is involved | Required for the visible regression; report blocked when its evidence path is unavailable | If hot path | As changed |
 | Permission, signing, or fixture workflow | As needed for helpers | Required for interpretation/wiring | Required when user-facing or cross-process | Usually not relevant unless repeated workflow cost changed | Required |

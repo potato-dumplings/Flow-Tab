@@ -1,7 +1,7 @@
 interface:
   display_name: "FlowTab Engineering"
-  short_description: "FlowTab engineering, validation, and handoff rules"
-  default_prompt: "Use $flowtab-engineering to apply FlowTab engineering, validation, architecture, and handoff rules to this task."
+  short_description: "FlowTab engineering, test assets, validation, and handoff"
+  default_prompt: "Use $flowtab-engineering to apply FlowTab engineering, reconstructible test-asset, validation, architecture, and handoff rules to this task."
 
 policy:
   allow_implicit_invocation: true

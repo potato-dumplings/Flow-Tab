@@ -1,7 +1,7 @@
 interface:
   display_name: "FlowTab Test Audit"
-  short_description: "Stage-based FlowTab test audit and full closure"
-  default_prompt: "Use $flowtab-test-audit to run the appropriate FlowTab test-audit stage, default to commit_on_stage_complete, and produce its C0, C1, or C2 handoff."
+  short_description: "Replace and reconstruct FlowTab test assets from code"
+  default_prompt: "Use $flowtab-test-audit to establish a rollback anchor, clear the current test-asset boundary, reconstruct it from production behavior evidence, and close the appropriate C0, C1, or C2 Stage."
 
 policy:
   allow_implicit_invocation: true

@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "attempt_id": {
+      "type": "string"
+    },
+    "blocked_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "environment_identity": {
+      "additionalProperties": {
+        "type": [
+          "string",
+          "null"
+        ]
+      },
+      "minProperties": 1,
+      "type": "object"
+    },
+    "evidence_refs": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "line": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "qualified_symbol": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "relative_path_intent": {
+            "type": "string"
+          },
+          "resource_boundary": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "resource_boundary",
+          "relative_path_intent",
+          "line",
+          "qualified_symbol"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "execution_status": {
+      "enum": [
+        "blocked",
+        "failed",
+        "flaky",
+        "not_run",
+        "passed",
+        "skipped",
+        "unknown"
+      ]
+    },
+    "plan_row_id": {
+      "type": "string"
+    },
+    "record_kind": {
+      "const": "execution_observation"
+    },
+    "started_at": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required": [
+    "record_kind",
+    "attempt_id",
+    "plan_row_id",
+    "execution_status",
+    "evidence_refs",
+    "environment_identity",
+    "blocked_reason",
+    "started_at"
+  ],
+  "type": "object"
+}
