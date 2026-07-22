@@ -6,7 +6,6 @@ enum AppPreferenceKeys {
     static let showInCommandTab = "showInCommandTab"
     static let showPermissionReminder = "showPermissionReminder"
     static let allowLaunchAtLogin = "allowLaunchAtLogin"
-    static let terminalContentPreviewsEnabled = "terminalContentPreviewsEnabled"
     static let hasPromptedAccessibilityPermission = "hasPromptedAccessibilityPermission"
     static let hiddenAppIDs = "hiddenAppIDs"
     static let hotkeyPrimaryModifier = "hotkeyPrimaryModifier"
@@ -30,7 +29,6 @@ enum AppPreferenceKeys {
         showInCommandTab,
         showPermissionReminder,
         allowLaunchAtLogin,
-        terminalContentPreviewsEnabled,
         hasPromptedAccessibilityPermission,
         hiddenAppIDs,
         hotkeyPrimaryModifier,
@@ -49,17 +47,6 @@ enum AppPreferenceKeys {
         themeMode,
         appLanguage
     ]
-}
-
-enum TerminalContentPreviewPreferencesStore {
-    static let defaultIsEnabled = false
-
-    static func isEnabled(userDefaults: UserDefaults = .standard) -> Bool {
-        guard userDefaults.object(forKey: AppPreferenceKeys.terminalContentPreviewsEnabled) != nil else {
-            return defaultIsEnabled
-        }
-        return userDefaults.bool(forKey: AppPreferenceKeys.terminalContentPreviewsEnabled)
-    }
 }
 
 enum AppLanguage: String, CaseIterable, Equatable, Sendable, Identifiable {

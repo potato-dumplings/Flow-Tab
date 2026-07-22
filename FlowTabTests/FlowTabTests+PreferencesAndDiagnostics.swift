@@ -310,7 +310,6 @@ extension FlowTabTests {
         let state = PermissionSettingsCardState(
             showPermissionReminder: true,
             allowLaunchAtLogin: false,
-            terminalContentPreviewsEnabled: false,
             accessibilityTrusted: false,
             screenCaptureTrusted: false,
             appLanguageRaw: AppLanguage.simplifiedChinese.rawValue
@@ -338,7 +337,6 @@ extension FlowTabTests {
         let state = PermissionSettingsCardState(
             showPermissionReminder: false,
             allowLaunchAtLogin: true,
-            terminalContentPreviewsEnabled: true,
             accessibilityTrusted: true,
             screenCaptureTrusted: true,
             appLanguageRaw: AppLanguage.simplifiedChinese.rawValue
@@ -1503,7 +1501,6 @@ extension FlowTabTests {
             hideMinimizedAppsFromAppLayer: false,
             showPermissionReminder: true,
             allowLaunchAtLogin: false,
-            terminalContentPreviewsEnabled: false,
             searchEnabled: true,
             searchDefaultScopeRaw: SwitcherSearchScope.app.rawValue,
             hiddenAppCount: 2,

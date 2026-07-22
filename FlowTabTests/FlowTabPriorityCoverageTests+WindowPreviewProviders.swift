@@ -4,17 +4,32 @@ import XCTest
 import FlowTabCore
 
 extension FlowTabPriorityCoverageTests {
-    func testTerminalContentPreviewPreferenceRequiresExplicitOptIn() {
-        guard let userDefaults = makeIsolatedUserDefaults() else { return }
-        defer { clearIsolatedUserDefaults(userDefaults) }
+    func testTerminalPreviewProviderIgnoresLegacyOptOutPreference() async {
+        let legacyPreferenceKey = "terminalContentPreviewsEnabled"
+        let previousValue = UserDefaults.standard.object(forKey: legacyPreferenceKey)
+        defer {
+            if let previousValue {
+                UserDefaults.standard.set(previousValue, forKey: legacyPreferenceKey)
+            } else {
+                UserDefaults.standard.removeObject(forKey: legacyPreferenceKey)
+            }
+        }
+        UserDefaults.standard.set(false, forKey: legacyPreferenceKey)
 
-        XCTAssertFalse(
-            TerminalContentPreviewPreferencesStore.isEnabled(userDefaults: userDefaults)
+        let adapter = FakeTerminalScriptingAdapter(
+            result: .success(
+                makeTerminalSnapshot(flatIndex: 0, title: "Build", contents: "ready")
+            )
         )
-        userDefaults.set(true, forKey: AppPreferenceKeys.terminalContentPreviewsEnabled)
-        XCTAssertTrue(
-            TerminalContentPreviewPreferencesStore.isEnabled(userDefaults: userDefaults)
+        let provider = TerminalWindowPreviewProvider(adapter: adapter)
+
+        let result = await provider.preview(
+            for: makePreviewRequest(appID: "com.apple.Terminal")
         )
+
+        XCTAssertEqual(adapter.callCount, 1)
+        XCTAssertNotNil(result.image)
+        XCTAssertEqual(result.source, .special(appID: "com.apple.Terminal"))
     }
 
     private func assertPreviewProviderSessionStartedFromAppSwitcherProjection(
@@ -241,10 +256,7 @@ extension FlowTabPriorityCoverageTests {
                 )
             )
         )
-        let provider = TerminalWindowPreviewProvider(
-            adapter: adapter,
-            isContentPreviewEnabled: { true }
-        )
+        let provider = TerminalWindowPreviewProvider(adapter: adapter)
         let request = makePreviewRequest(
             appID: "com.apple.Terminal",
             windowID: "cg:\(currentApp.processIdentifier):24242",
@@ -281,10 +293,7 @@ extension FlowTabPriorityCoverageTests {
                 )
             )
         )
-        let provider = TerminalWindowPreviewProvider(
-            adapter: adapter,
-            isContentPreviewEnabled: { true }
-        )
+        let provider = TerminalWindowPreviewProvider(adapter: adapter)
         let request = makePreviewRequest(
             appID: "com.apple.Terminal",
             windowID: "cg:\(currentApp.processIdentifier):245444",
@@ -314,10 +323,7 @@ extension FlowTabPriorityCoverageTests {
                 makeTerminalSnapshot(flatIndex: 0, title: "Server", contents: "first")
             )
         )
-        let provider = TerminalWindowPreviewProvider(
-            adapter: adapter,
-            isContentPreviewEnabled: { true }
-        )
+        let provider = TerminalWindowPreviewProvider(adapter: adapter)
         let requests = [
             makePreviewRequest(
                 appID: "com.apple.Terminal",
@@ -350,10 +356,7 @@ extension FlowTabPriorityCoverageTests {
 
     func testTerminalPreviewProviderReturnsStructuredPermissionFailure() async {
         let adapter = FakeTerminalScriptingAdapter(result: .failure(.permissionDenied))
-        let provider = TerminalWindowPreviewProvider(
-            adapter: adapter,
-            isContentPreviewEnabled: { true }
-        )
+        let provider = TerminalWindowPreviewProvider(adapter: adapter)
 
         let result = await provider.preview(
             for: makePreviewRequest(appID: "com.apple.Terminal")
@@ -362,39 +365,6 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertNil(result.image)
         XCTAssertEqual(result.failureReason, .permissionDenied)
         XCTAssertNil(result.source)
-    }
-
-    func testTerminalPreviewProviderOptOutUsesGenericCaptureWithoutReadingTerminal() async {
-        let adapter = FakeTerminalScriptingAdapter(
-            result: .success(
-                makeTerminalSnapshot(flatIndex: 0, title: "Private", contents: "secret")
-            )
-        )
-        let terminalProvider = TerminalWindowPreviewProvider(
-            adapter: adapter,
-            isContentPreviewEnabled: { false }
-        )
-        let genericProvider = FakeGenericWindowPreviewProvider(
-            result: .success(
-                image: makeColorImage(color: .systemBlue),
-                resolvedWindowID: 24_001,
-                titleBarStyle: .light,
-                source: .genericScreenshot
-            )
-        )
-        let resolver = WindowPreviewProviderResolver(
-            specialProviders: [terminalProvider],
-            genericProvider: genericProvider
-        )
-
-        let results = await resolver.previewOutcomes(
-            for: [makePreviewRequest(appID: "com.apple.Terminal")],
-            captureSemaphore: nil
-        )
-
-        XCTAssertEqual(adapter.callCount, 0)
-        XCTAssertEqual(genericProvider.callCount, 1)
-        XCTAssertEqual(results.first?.source, .genericScreenshot)
     }
 
     func testTerminalScriptingAdapterScriptReadsOnlySelectedTabOfTargetWindow() throws {

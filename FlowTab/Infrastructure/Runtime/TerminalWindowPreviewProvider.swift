@@ -55,29 +55,20 @@ struct TerminalWindowPreviewProvider: SpecialWindowPreviewProviding {
     }
 
     private let adapter: any TerminalScriptingSnapshotProviding
-    private let isContentPreviewEnabled: () -> Bool
 
     init(
-        adapter: any TerminalScriptingSnapshotProviding = TerminalScriptingAdapter(),
-        isContentPreviewEnabled: @escaping () -> Bool = {
-            TerminalContentPreviewPreferencesStore.isEnabled()
-        }
+        adapter: any TerminalScriptingSnapshotProviding = TerminalScriptingAdapter()
     ) {
         self.adapter = adapter
-        self.isContentPreviewEnabled = isContentPreviewEnabled
     }
 
     func supports(_ request: WindowPreviewRequest) -> Bool {
-        isContentPreviewEnabled()
-            && (request.bundleIdentifier == Self.terminalBundleIdentifier
-                || request.appID == Self.terminalBundleIdentifier)
+        request.bundleIdentifier == Self.terminalBundleIdentifier
+            || request.appID == Self.terminalBundleIdentifier
     }
 
     func previews(for requests: [WindowPreviewRequest]) async -> [WindowPreviewResult] {
         guard !requests.isEmpty else { return [] }
-        guard isContentPreviewEnabled() else {
-            return Array(repeating: .failure(.specialProviderUnavailable), count: requests.count)
-        }
 
         var snapshotsByTarget: [
             SnapshotCacheKey: Result<TerminalTabSnapshot, TerminalScriptingSnapshotError>

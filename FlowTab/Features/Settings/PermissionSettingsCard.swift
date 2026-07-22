@@ -6,7 +6,6 @@ struct AppKitPermissionSettingsCardContent: AppKitSettingsCardRepresentable {
 
     @Binding var showPermissionReminder: Bool
     @Binding var allowLaunchAtLogin: Bool
-    @Binding var terminalContentPreviewsEnabled: Bool
     let accessibilityTrusted: Bool
     let screenCaptureTrusted: Bool
     let onLaunchAtLoginChanged: (Bool) -> Void
@@ -16,7 +15,6 @@ struct AppKitPermissionSettingsCardContent: AppKitSettingsCardRepresentable {
     final class Coordinator {
         var showPermissionReminder: Binding<Bool>
         var allowLaunchAtLogin: Binding<Bool>
-        var terminalContentPreviewsEnabled: Binding<Bool>
         var onLaunchAtLoginChanged: (Bool) -> Void
         var onAccessibilityAction: () -> Void
         var onScreenCaptureAction: () -> Void
@@ -24,14 +22,12 @@ struct AppKitPermissionSettingsCardContent: AppKitSettingsCardRepresentable {
         init(
             showPermissionReminder: Binding<Bool>,
             allowLaunchAtLogin: Binding<Bool>,
-            terminalContentPreviewsEnabled: Binding<Bool>,
             onLaunchAtLoginChanged: @escaping (Bool) -> Void,
             onAccessibilityAction: @escaping () -> Void,
             onScreenCaptureAction: @escaping () -> Void
         ) {
             self.showPermissionReminder = showPermissionReminder
             self.allowLaunchAtLogin = allowLaunchAtLogin
-            self.terminalContentPreviewsEnabled = terminalContentPreviewsEnabled
             self.onLaunchAtLoginChanged = onLaunchAtLoginChanged
             self.onAccessibilityAction = onAccessibilityAction
             self.onScreenCaptureAction = onScreenCaptureAction
@@ -40,14 +36,12 @@ struct AppKitPermissionSettingsCardContent: AppKitSettingsCardRepresentable {
         func update(
             showPermissionReminder: Binding<Bool>,
             allowLaunchAtLogin: Binding<Bool>,
-            terminalContentPreviewsEnabled: Binding<Bool>,
             onLaunchAtLoginChanged: @escaping (Bool) -> Void,
             onAccessibilityAction: @escaping () -> Void,
             onScreenCaptureAction: @escaping () -> Void
         ) {
             self.showPermissionReminder = showPermissionReminder
             self.allowLaunchAtLogin = allowLaunchAtLogin
-            self.terminalContentPreviewsEnabled = terminalContentPreviewsEnabled
             self.onLaunchAtLoginChanged = onLaunchAtLoginChanged
             self.onAccessibilityAction = onAccessibilityAction
             self.onScreenCaptureAction = onScreenCaptureAction
@@ -60,10 +54,6 @@ struct AppKitPermissionSettingsCardContent: AppKitSettingsCardRepresentable {
         func setAllowLaunchAtLogin(_ value: Bool) {
             allowLaunchAtLogin.wrappedValue = value
             onLaunchAtLoginChanged(value)
-        }
-
-        func setTerminalContentPreviewsEnabled(_ value: Bool) {
-            terminalContentPreviewsEnabled.wrappedValue = value
         }
 
         func triggerAccessibilityAction() {
@@ -79,7 +69,6 @@ struct AppKitPermissionSettingsCardContent: AppKitSettingsCardRepresentable {
         Coordinator(
             showPermissionReminder: $showPermissionReminder,
             allowLaunchAtLogin: $allowLaunchAtLogin,
-            terminalContentPreviewsEnabled: $terminalContentPreviewsEnabled,
             onLaunchAtLoginChanged: onLaunchAtLoginChanged,
             onAccessibilityAction: onAccessibilityAction,
             onScreenCaptureAction: onScreenCaptureAction
@@ -94,7 +83,6 @@ struct AppKitPermissionSettingsCardContent: AppKitSettingsCardRepresentable {
         coordinator.update(
             showPermissionReminder: $showPermissionReminder,
             allowLaunchAtLogin: $allowLaunchAtLogin,
-            terminalContentPreviewsEnabled: $terminalContentPreviewsEnabled,
             onLaunchAtLoginChanged: onLaunchAtLoginChanged,
             onAccessibilityAction: onAccessibilityAction,
             onScreenCaptureAction: onScreenCaptureAction
@@ -104,9 +92,6 @@ struct AppKitPermissionSettingsCardContent: AppKitSettingsCardRepresentable {
     func connect(_ view: PermissionSettingsCardAppKitView, coordinator: Coordinator) {
         view.onShowPermissionReminderChanged = { coordinator.setShowPermissionReminder($0) }
         view.onAllowLaunchAtLoginChanged = { coordinator.setAllowLaunchAtLogin($0) }
-        view.onTerminalContentPreviewsChanged = {
-            coordinator.setTerminalContentPreviewsEnabled($0)
-        }
         view.onAccessibilityAction = { coordinator.triggerAccessibilityAction() }
         view.onScreenCaptureAction = { coordinator.triggerScreenCaptureAction() }
     }
@@ -115,7 +100,6 @@ struct AppKitPermissionSettingsCardContent: AppKitSettingsCardRepresentable {
         PermissionSettingsCardState(
             showPermissionReminder: showPermissionReminder,
             allowLaunchAtLogin: allowLaunchAtLogin,
-            terminalContentPreviewsEnabled: terminalContentPreviewsEnabled,
             accessibilityTrusted: accessibilityTrusted,
             screenCaptureTrusted: screenCaptureTrusted,
             appLanguageRaw: AppLanguagePreferencesStore.load().rawValue
@@ -126,7 +110,6 @@ struct AppKitPermissionSettingsCardContent: AppKitSettingsCardRepresentable {
 struct PermissionSettingsCardState: Equatable {
     let showPermissionReminder: Bool
     let allowLaunchAtLogin: Bool
-    let terminalContentPreviewsEnabled: Bool
     let accessibilityTrusted: Bool
     let screenCaptureTrusted: Bool
     let appLanguageRaw: String
@@ -323,13 +306,11 @@ final class PermissionStatusControlRowView<Control: NSView>: NSView {
 final class PermissionSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKitSettingsCardStateView {
     var onShowPermissionReminderChanged: ((Bool) -> Void)?
     var onAllowLaunchAtLoginChanged: ((Bool) -> Void)?
-    var onTerminalContentPreviewsChanged: ((Bool) -> Void)?
     var onAccessibilityAction: (() -> Void)?
     var onScreenCaptureAction: (() -> Void)?
 
     private let showPermissionReminderSwitch = NSSwitch()
     private let allowLaunchAtLoginSwitch = NSSwitch()
-    private let terminalContentPreviewsSwitch = NSSwitch()
     private let accessibilityRow: PermissionStatusControlRowView<FlowSettingsActionButton>
     private let screenCaptureRow: PermissionStatusControlRowView<FlowSettingsActionButton>
     private lazy var allowLaunchAtLoginRow = AppKitSettingsCardBaseView.makeControlRow(
@@ -339,9 +320,6 @@ final class PermissionSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKit
     private lazy var permissionReminderRow = AppKitSettingsCardBaseView.makeControlRow(
         title: "",
         control: showPermissionReminderSwitch
-    )
-    private lazy var terminalContentPreviewsRow = PermissionStatusControlRowView(
-        control: terminalContentPreviewsSwitch
     )
     private var isApplyingState = false
     private var currentState: PermissionSettingsCardState?
@@ -387,7 +365,6 @@ final class PermissionSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKit
         isApplyingState = true
         showPermissionReminderSwitch.state = state.showPermissionReminder ? .on : .off
         allowLaunchAtLoginSwitch.state = state.allowLaunchAtLogin ? .on : .off
-        terminalContentPreviewsSwitch.state = state.terminalContentPreviewsEnabled ? .on : .off
         isApplyingState = false
 
         let language = state.language
@@ -419,11 +396,6 @@ final class PermissionSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKit
             detail: AppStrings.text(.permissionScreenDetail, language: language),
             statusColor: state.screenCaptureTrusted ? .systemGreen : .systemOrange
         )
-        terminalContentPreviewsRow.update(
-            text: AppStrings.text(.permissionTerminalContentPreviewToggle, language: language),
-            detail: AppStrings.text(.permissionTerminalContentPreviewDetail, language: language),
-            statusColor: .labelColor
-        )
         invalidateIntrinsicContentSize()
     }
 
@@ -432,16 +404,11 @@ final class PermissionSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKit
         showPermissionReminderSwitch.action = #selector(handleShowPermissionReminderChanged)
         allowLaunchAtLoginSwitch.target = self
         allowLaunchAtLoginSwitch.action = #selector(handleAllowLaunchAtLoginChanged)
-        terminalContentPreviewsSwitch.target = self
-        terminalContentPreviewsSwitch.action = #selector(handleTerminalContentPreviewsChanged)
         allowLaunchAtLoginSwitch.setFlowTabTestingIdentifier(
             "flowtab.settings.permission.launch-at-login"
         )
         showPermissionReminderSwitch.setFlowTabTestingIdentifier(
             "flowtab.settings.permission.reminder"
-        )
-        terminalContentPreviewsSwitch.setFlowTabTestingIdentifier(
-            "flowtab.settings.permission.terminal-content-previews"
         )
         accessibilityRow.control.setFlowTabTestingIdentifier(
             "flowtab.settings.permission.accessibility-action"
@@ -454,7 +421,6 @@ final class PermissionSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKit
         addFullWidthArrangedSubview(permissionReminderRow)
         addFullWidthArrangedSubview(accessibilityRow)
         addFullWidthArrangedSubview(screenCaptureRow)
-        addFullWidthArrangedSubview(terminalContentPreviewsRow)
     }
 
     @objc private func handleShowPermissionReminderChanged(_ sender: NSSwitch) {
@@ -465,11 +431,6 @@ final class PermissionSettingsCardAppKitView: AppKitSettingsCardBaseView, AppKit
     @objc private func handleAllowLaunchAtLoginChanged(_ sender: NSSwitch) {
         guard !isApplyingState else { return }
         onAllowLaunchAtLoginChanged?(sender.state == .on)
-    }
-
-    @objc private func handleTerminalContentPreviewsChanged(_ sender: NSSwitch) {
-        guard !isApplyingState else { return }
-        onTerminalContentPreviewsChanged?(sender.state == .on)
     }
 
     @objc private func handleAccessibilityAction() {

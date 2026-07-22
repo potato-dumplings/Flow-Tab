@@ -568,7 +568,6 @@ extension FlowTabTests {
             hideMinimizedAppsFromAppLayer: false,
             showPermissionReminder: true,
             allowLaunchAtLogin: false,
-            terminalContentPreviewsEnabled: false,
             searchEnabled: true,
             searchDefaultScopeRaw: SwitcherSearchScope.app.rawValue,
             hiddenAppCount: 2,

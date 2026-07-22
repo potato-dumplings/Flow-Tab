@@ -12,7 +12,6 @@ struct AppKitSettingsPageState: Equatable {
     let hideMinimizedAppsFromAppLayer: Bool
     let showPermissionReminder: Bool
     let allowLaunchAtLogin: Bool
-    let terminalContentPreviewsEnabled: Bool
     let searchEnabled: Bool
     let searchDefaultScopeRaw: String
     let hiddenAppCount: Int
@@ -252,7 +251,6 @@ final class AppKitSettingsPageView: NSView {
     var onInAppWindowMainKeyChanged: ((String) -> Void)?
     var onShowPermissionReminderChanged: ((Bool) -> Void)?
     var onAllowLaunchAtLoginChanged: ((Bool) -> Void)?
-    var onTerminalContentPreviewsChanged: ((Bool) -> Void)?
     var onAccessibilityAction: (() -> Void)?
     var onScreenCaptureAction: (() -> Void)?
 
@@ -431,7 +429,6 @@ final class AppKitSettingsPageView: NSView {
             with: PermissionSettingsCardState(
                 showPermissionReminder: state.showPermissionReminder,
                 allowLaunchAtLogin: state.allowLaunchAtLogin,
-                terminalContentPreviewsEnabled: state.terminalContentPreviewsEnabled,
                 accessibilityTrusted: state.accessibilityTrusted,
                 screenCaptureTrusted: state.screenCaptureTrusted,
                 appLanguageRaw: state.appLanguageRaw
@@ -635,9 +632,6 @@ final class AppKitSettingsPageView: NSView {
         }
         permissionContent.onAllowLaunchAtLoginChanged = { [weak self] in
             self?.onAllowLaunchAtLoginChanged?($0)
-        }
-        permissionContent.onTerminalContentPreviewsChanged = { [weak self] in
-            self?.onTerminalContentPreviewsChanged?($0)
         }
         permissionContent.onAccessibilityAction = { [weak self] in
             self?.onAccessibilityAction?()

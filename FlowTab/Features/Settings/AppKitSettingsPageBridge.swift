@@ -13,7 +13,6 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
     @Binding var hideMinimizedAppsFromAppLayer: Bool
     @Binding var showPermissionReminder: Bool
     @Binding var allowLaunchAtLogin: Bool
-    @Binding var terminalContentPreviewsEnabled: Bool
     @Binding var searchEnabled: Bool
     @Binding var searchDefaultScopeRaw: String
     let hiddenAppCount: Int
@@ -49,7 +48,6 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
         let hideMinimizedAppsFromAppLayer = $hideMinimizedAppsFromAppLayer
         let showPermissionReminder = $showPermissionReminder
         let allowLaunchAtLogin = $allowLaunchAtLogin
-        let terminalContentPreviewsEnabled = $terminalContentPreviewsEnabled
         let searchEnabled = $searchEnabled
         let searchDefaultScopeRaw = $searchDefaultScopeRaw
         let hotkeyPrimaryModifierRaw = $hotkeyPrimaryModifierRaw
@@ -109,9 +107,6 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
             allowLaunchAtLogin.wrappedValue = $0
             onLaunchAtLoginChanged($0)
         }
-        pageView.onTerminalContentPreviewsChanged = {
-            terminalContentPreviewsEnabled.wrappedValue = $0
-        }
         pageView.onAccessibilityAction = onAccessibilityAction
         pageView.onScreenCaptureAction = onScreenCaptureAction
         nsView.update(
@@ -125,7 +120,6 @@ struct AppKitSettingsPageContent: NSViewRepresentable {
                 hideMinimizedAppsFromAppLayer: hideMinimizedAppsFromAppLayer.wrappedValue,
                 showPermissionReminder: showPermissionReminder.wrappedValue,
                 allowLaunchAtLogin: allowLaunchAtLogin.wrappedValue,
-                terminalContentPreviewsEnabled: terminalContentPreviewsEnabled.wrappedValue,
                 searchEnabled: searchEnabled.wrappedValue,
                 searchDefaultScopeRaw: searchDefaultScopeRaw.wrappedValue,
                 hiddenAppCount: hiddenAppCount,

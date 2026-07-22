@@ -1605,7 +1605,7 @@
 				EXECUTABLE_NAME = FlowTab;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Flow Tab";
-				INFOPLIST_KEY_NSAppleEventsUsageDescription = "When Terminal content previews are enabled, Flow Tab uses Apple Events to read the selected tab of the targeted Terminal window and to activate selected supported-app windows.";
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Flow Tab uses Apple Events to read the selected tab of the targeted Terminal window and to activate selected supported-app windows.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1637,7 +1637,7 @@
 				EXECUTABLE_NAME = FlowTab;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Flow Tab";
-				INFOPLIST_KEY_NSAppleEventsUsageDescription = "When Terminal content previews are enabled, Flow Tab uses Apple Events to read the selected tab of the targeted Terminal window and to activate selected supported-app windows.";
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Flow Tab uses Apple Events to read the selected tab of the targeted Terminal window and to activate selected supported-app windows.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -1670,7 +1670,7 @@
 				EXECUTABLE_NAME = FlowTab;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Flow Tab";
-				INFOPLIST_KEY_NSAppleEventsUsageDescription = "When Terminal content previews are enabled, Flow Tab uses Apple Events to read the selected tab of the targeted Terminal window and to activate selected supported-app windows.";
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Flow Tab uses Apple Events to read the selected tab of the targeted Terminal window and to activate selected supported-app windows.";
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
