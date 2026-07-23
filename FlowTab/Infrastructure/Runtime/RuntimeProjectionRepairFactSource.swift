@@ -186,14 +186,13 @@ struct RuntimeProjectionRepairFactSource {
     }
 
     func collectFullRepairRunningAppFacts() -> RuntimeFullRepairRunningAppFacts {
-        let runningApps = collectRepairRunningApps().runningApps
-        let rankByPID = RuntimeAppRankProvider.collectAppRankByPID(for: runningApps)
+        let maintenanceFacts = RuntimeAppDirectoryFactSource.currentMaintenanceFacts(
+            includeCurrentProcessInAppLayer: AppVisibilityPreferencesStore.loadShowInCommandTab(),
+            explicitlyTrackedAppIDs: AppVisibilityPreferencesStore.loadHiddenAppIDs()
+        )
         return RuntimeFullRepairRunningAppFacts(
-            runningApps: runningApps,
-            appDirectoryEntries: RuntimeAppDirectoryFactSource.entries(
-                from: runningApps,
-                rankByPID: rankByPID
-            )
+            runningApps: maintenanceFacts.windowRepairApplications,
+            appDirectoryEntries: maintenanceFacts.entries
         )
     }
 

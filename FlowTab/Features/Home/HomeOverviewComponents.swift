@@ -246,7 +246,8 @@ private final class HomeOverviewStatItemView: NSView {
 
     func update(title: String, value: String?) {
         titleLabel.stringValue = title
-        titleLabel.setAccessibilityLabel(title)
+        setAccessibilityLabel(title)
+        setAccessibilityValue(value ?? "loading")
         valueLabel.stringValue = value ?? ""
         valueLabel.isHidden = value == nil
 
@@ -260,15 +261,15 @@ private final class HomeOverviewStatItemView: NSView {
     }
 
     private func buildViewHierarchy() {
-        setAccessibilityElement(false)
+        setAccessibilityElement(true)
+        setAccessibilityRole(.staticText)
+        setAccessibilityIdentifier(accessibilityIdentifierValue)
 
         configure(label: titleLabel)
         configure(label: valueLabel)
         titleLabel.font = .systemFont(ofSize: 10.5, weight: .medium)
         titleLabel.textColor = .secondaryLabelColor
-        titleLabel.setAccessibilityIdentifier(accessibilityIdentifierValue)
-        titleLabel.setAccessibilityElement(true)
-        titleLabel.setAccessibilityRole(.staticText)
+        titleLabel.setAccessibilityElement(false)
 
         valueLabel.font = .systemFont(ofSize: 17, weight: .semibold)
         valueLabel.textColor = .labelColor

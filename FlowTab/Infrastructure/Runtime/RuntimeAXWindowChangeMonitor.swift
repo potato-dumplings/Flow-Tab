@@ -44,7 +44,7 @@ final class RuntimeAXWindowChangeMonitor {
             return
         }
 
-        let expectedByPID = Dictionary(uniqueKeysWithValues: appSummaries.map { ($0.pid, $0.appID) })
+        let expectedByPID = Self.expectedAppIDsByPID(from: appSummaries)
 
         for pid in Array(observersByPID.keys) {
             guard let expectedAppID = expectedByPID[pid], expectedAppID == appIDByPID[pid] else {
@@ -58,6 +58,17 @@ final class RuntimeAXWindowChangeMonitor {
         }
         for pid in expectedByPID.keys {
             syncDestroyedWindowObservers(pid: pid)
+        }
+    }
+
+    static func expectedAppIDsByPID(
+        from appSummaries: [RuntimeHomeAppSummary],
+        currentPID: pid_t = ProcessInfo.processInfo.processIdentifier
+    ) -> [pid_t: String] {
+        appSummaries.reduce(into: [:]) { expectedByPID, summary in
+            // Observing FlowTab's own Home window feeds its UI changes back into runtime repair.
+            guard summary.pid > 0, summary.pid != currentPID else { return }
+            expectedByPID[summary.pid] = summary.appID
         }
     }
 

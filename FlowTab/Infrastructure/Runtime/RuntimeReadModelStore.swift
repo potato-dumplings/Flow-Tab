@@ -509,7 +509,8 @@ final class RuntimeReadModelStore: @unchecked Sendable {
             hasCompleteHomeSummaryProjection: homeSummaryProjection?.freshness.isCompleteForScope == true
                 && !isDirtyLocked,
             hasAppDirectoryProjection: appDirectoryState.isInitialized,
-            hasCompleteAppDirectoryProjection: appDirectoryState.hasCompleteAppLayerCoverage
+            hasCompleteAppDirectoryProjection:
+                appDirectoryState.hasCompleteApplicationDirectoryCoverage
                 && !isDirtyLocked,
             hasSpaceTopologyProjection: spaceTopologySignature != nil,
             spaceTopologyTrackedSpaceCount: spaceTopologySignature?.trackedSpaceCount ?? 0,
@@ -1028,7 +1029,8 @@ final class RuntimeReadModelStore: @unchecked Sendable {
         appDirectoryState.projection { generatedAt in
             freshnessLocked(
                 generatedAt: generatedAt,
-                isCompleteForScope: appDirectoryState.hasCompleteAppLayerCoverage && !isDirtyLocked
+                isCompleteForScope:
+                    appDirectoryState.hasCompleteApplicationDirectoryCoverage && !isDirtyLocked
             )
         }
     }
@@ -1040,9 +1042,12 @@ final class RuntimeReadModelStore: @unchecked Sendable {
     private func appSwitcherProjectionFromAppDirectoryLocked() -> RuntimeAppSwitcherProjection? {
         guard let generatedAt = appDirectoryState.generatedAt else { return nil }
 
-        let rankByPID = RuntimeAppDirectory.activationRankByPID(from: appDirectoryState.entries)
+        let appSwitcherEntries = appDirectoryState.entries.filter(
+            \.isEligibleForAppSwitcherProjection
+        )
+        let rankByPID = RuntimeAppDirectory.activationRankByPID(from: appSwitcherEntries)
         let selectedEntries = RuntimeAppDirectory.selectPrimaryEntries(
-            from: appDirectoryState.entries,
+            from: appSwitcherEntries,
             windowStatsByPID: [:],
             rankByPID: rankByPID
         )

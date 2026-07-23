@@ -566,7 +566,16 @@ extension FlowTabTests {
                 XCTFail("expected full repair to report WindowRecord refresh evidence separately")
                 return
             }
-            XCTAssertEqual(windowRecordRefresh.runningAppCount, repairEvidence.appDirectoryEntries.count)
+            XCTAssertEqual(
+                windowRecordRefresh.runningAppCount,
+                repairEvidence.appDirectoryEntries.filter(
+                    \.isEligibleForAppSwitcherProjection
+                ).count
+            )
+            XCTAssertGreaterThanOrEqual(
+                repairEvidence.appDirectoryEntries.count,
+                windowRecordRefresh.runningAppCount
+            )
             XCTAssertEqual(windowRecordRefresh.projectedWindowPIDCount, 0)
             XCTAssertEqual(windowRecordRefresh.projectedWindowCount, 0)
             XCTAssertFalse(projectionPayload?.apps.isEmpty ?? true)

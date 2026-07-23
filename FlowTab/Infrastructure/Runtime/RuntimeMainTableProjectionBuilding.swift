@@ -36,6 +36,7 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
     ) -> RuntimeCurrentAppWindowPayload? {
         guard
             let selectedEntry = appDirectoryEntries.first(where: { $0.appID == appID && $0.pid == pid }),
+            selectedEntry.isEligibleForAppSwitcherProjection,
             let runningApp = selectedEntry.runningApplication
         else {
             return nil
@@ -85,9 +86,12 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
     ) -> RuntimeAppSwitcherProjectionPayload? {
         guard !appDirectoryEntries.isEmpty else { return nil }
 
+        let appSwitcherDirectoryEntries = appDirectoryEntries.filter(
+            \.isEligibleForAppSwitcherProjection
+        )
         var windowsByPID: [pid_t: [RuntimeWindowListEntry]] = [:]
         var windowCoverageByPID: [pid_t: Bool] = [:]
-        for entry in appDirectoryEntries {
+        for entry in appSwitcherDirectoryEntries {
             let displayName = Self.displayName(for: entry)
             windowsByPID[entry.pid] = windowRecordStore.projectedWindowEntries(
                 processIdentifier: entry.pid,
@@ -98,14 +102,16 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
             )
         }
         let windowStatsByPID = RuntimeAppDirectory.windowStats(
-            for: appDirectoryEntries,
+            for: appSwitcherDirectoryEntries,
             windowsByPID: windowsByPID,
             isVisibleWindow: { !$0.isMinimized }
         )
         let rankByPID = RuntimeAppDirectory.activationRankByPID(from: appDirectoryEntries)
-        let entriesByAppID = RuntimeAppDirectory.groupedEntriesByAppID(appDirectoryEntries)
+        let entriesByAppID = RuntimeAppDirectory.groupedEntriesByAppID(
+            appSwitcherDirectoryEntries
+        )
         let selectedEntries = RuntimeAppDirectory.selectPrimaryEntries(
-            from: appDirectoryEntries,
+            from: appSwitcherDirectoryEntries,
             windowStatsByPID: windowStatsByPID,
             rankByPID: rankByPID
         )
@@ -114,20 +120,10 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
             windowStatsByPID: windowStatsByPID,
             hideMinimizedAppsFromAppLayer: SwitcherBehaviorPreferencesStore.loadHideMinimizedAppsFromAppLayer()
         )
-        let sortedEntries = appLayerEntries.sorted { lhs, rhs in
-            let lhsRank = rankByPID[lhs.pid] ?? Int.max
-            let rhsRank = rankByPID[rhs.pid] ?? Int.max
-            if lhsRank != rhsRank {
-                return lhsRank < rhsRank
-            }
-
-            let lhsDisplayName = Self.displayName(for: lhs)
-            let rhsDisplayName = Self.displayName(for: rhs)
-            if lhsDisplayName == rhsDisplayName {
-                return lhs.appID < rhs.appID
-            }
-            return lhsDisplayName.localizedCaseInsensitiveCompare(rhsDisplayName) == .orderedAscending
-        }
+        let sortedEntries = Self.sortedEntriesForProjection(
+            appLayerEntries,
+            rankByPID: rankByPID
+        )
 
         let rows = sortedEntries.enumerated().map { index, entry in
             let displayName = Self.displayName(for: entry)
@@ -154,16 +150,6 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
                 lastActiveAt: RuntimeAppDirectory.stableLastActiveValue(forRank: rankByPID[entry.pid] ?? index),
                 windows: windowSeeds.map(\.candidate)
             )
-            let homeSummary = RuntimeHomeAppSummary(
-                appID: entry.appID,
-                displayName: displayName,
-                groupID: candidate.groupID,
-                lastActiveAt: candidate.lastActiveAt,
-                windowCount: candidate.windows.count,
-                pid: entry.pid,
-                bundleIdentifier: entry.bundleIdentifier,
-                bundleURL: entry.bundleURL
-            )
             let context = entry.runningApplication.map { runningApp in
                 RuntimeAppContext(
                     appID: entry.appID,
@@ -183,7 +169,6 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
                 appID: entry.appID,
                 appGroupPIDs: Set(appGroup.map(\.pid)),
                 candidate: candidate,
-                homeSummary: homeSummary,
                 context: context,
                 hasCoveredAppGroupWindowState: hasCoveredAppGroupWindowState
             )
@@ -214,6 +199,11 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
             missingWindowCoveragePIDs: missingWindowCoveragePIDs,
             incompleteContextAppIDs: incompleteContextAppIDs
         )
+        let homeSummaries = Self.homeSummariesFromApplicationDirectory(
+            appDirectoryEntries,
+            windowsByPID: windowsByPID,
+            rankByPID: rankByPID
+        )
 
         return RuntimeAppSwitcherProjectionPayload(
             apps: rows.map(\.candidate),
@@ -222,7 +212,7 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
                     row.context.map { ($0.appID, $0) }
                 }
             ),
-            homeSummaries: rows.map(\.homeSummary),
+            homeSummaries: homeSummaries,
             hasCompleteWindowCoverage: coverageDiagnostics.hasCompleteCoverage,
             coverageDiagnostics: coverageDiagnostics
         )
@@ -270,6 +260,66 @@ final class RuntimeMainTableProjectionBuilder: RuntimeMainTableProjectionBuildin
             hasCompleteWindowCoverage: appSwitcherPayload.hasCompleteWindowCoverage,
             coverageDiagnostics: appSwitcherPayload.coverageDiagnostics
         )
+    }
+
+    private static func homeSummariesFromApplicationDirectory(
+        _ entries: [RuntimeAppDirectoryEntry],
+        windowsByPID: [pid_t: [RuntimeWindowListEntry]],
+        rankByPID: [pid_t: Int]
+    ) -> [RuntimeHomeAppSummary] {
+        let entriesByAppID = RuntimeAppDirectory.groupedEntriesByAppID(entries)
+        let primaryEntries = RuntimeAppDirectory.selectPrimaryEntries(
+            from: entries,
+            windowStatsByPID: [:],
+            rankByPID: rankByPID
+        )
+        return sortedEntriesForProjection(
+            primaryEntries,
+            rankByPID: rankByPID
+        ).enumerated().map { index, entry in
+            let eligibleGroup = (entriesByAppID[entry.appID] ?? [entry]).filter(
+                \.isEligibleForAppSwitcherProjection
+            )
+            let windowCount = eligibleGroup.reduce(into: 0) { count, groupEntry in
+                count += windowsByPID[groupEntry.pid]?.count ?? 0
+            }
+            let displayName = displayName(for: entry)
+            return RuntimeHomeAppSummary(
+                appID: entry.appID,
+                displayName: displayName,
+                groupID: RuntimeAppIdentity.groupID(
+                    for: entry.bundleIdentifier,
+                    fallbackName: displayName
+                ),
+                lastActiveAt: RuntimeAppDirectory.stableLastActiveValue(
+                    forRank: rankByPID[entry.pid] ?? index
+                ),
+                windowCount: windowCount,
+                pid: entry.pid,
+                bundleIdentifier: entry.bundleIdentifier,
+                bundleURL: entry.bundleURL
+            )
+        }
+    }
+
+    private static func sortedEntriesForProjection(
+        _ entries: [RuntimeAppDirectoryEntry],
+        rankByPID: [pid_t: Int]
+    ) -> [RuntimeAppDirectoryEntry] {
+        entries.sorted { lhs, rhs in
+            let lhsRank = rankByPID[lhs.pid] ?? Int.max
+            let rhsRank = rankByPID[rhs.pid] ?? Int.max
+            if lhsRank != rhsRank {
+                return lhsRank < rhsRank
+            }
+
+            let lhsDisplayName = displayName(for: lhs)
+            let rhsDisplayName = displayName(for: rhs)
+            if lhsDisplayName == rhsDisplayName {
+                return lhs.appID < rhs.appID
+            }
+            return lhsDisplayName.localizedCaseInsensitiveCompare(rhsDisplayName) == .orderedAscending
+        }
     }
 
     private static func displayName(for entry: RuntimeAppDirectoryEntry) -> String {

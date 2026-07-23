@@ -6,6 +6,22 @@ struct RuntimeAppWindowStats {
     let hasVisibleWindow: Bool
 }
 
+enum RuntimeApplicationDirectoryFilter {
+    static func shouldIncludeRunningApplication(
+        activationPolicy: NSApplication.ActivationPolicy,
+        isTerminated: Bool,
+        appID: String,
+        pid: pid_t,
+        currentPID: pid_t,
+        explicitlyTrackedAppIDs: Set<String>
+    ) -> Bool {
+        guard !isTerminated else { return false }
+        return activationPolicy == .regular
+            || pid == currentPID
+            || explicitlyTrackedAppIDs.contains(appID)
+    }
+}
+
 enum RuntimeAppLayerProjectionFilter {
     static func shouldIncludeRunningApplication(
         activationPolicy: NSApplication.ActivationPolicy,
@@ -28,6 +44,11 @@ enum RuntimeAppLayerProjectionFilter {
         guard hasWindows else { return true }
         return hasVisibleWindow
     }
+}
+
+struct RuntimeAppDirectoryMaintenanceFacts {
+    let windowRepairApplications: [NSRunningApplication]
+    let entries: [RuntimeAppDirectoryEntry]
 }
 
 enum RuntimeAppDirectoryFactSource {
@@ -59,6 +80,59 @@ enum RuntimeAppDirectoryFactSource {
         }
     }
 
+    static func maintenanceFacts(
+        from runningApplications: [NSRunningApplication],
+        currentPID: pid_t,
+        includeCurrentProcessInAppLayer: Bool,
+        explicitlyTrackedAppIDs: Set<String>,
+        rankProvider: ([NSRunningApplication]) -> [pid_t: Int] = {
+            RuntimeAppRankProvider.collectAppRankByPID(for: $0)
+        }
+    ) -> RuntimeAppDirectoryMaintenanceFacts {
+        let directoryApplications = runningApplications.filter { app in
+            RuntimeApplicationDirectoryFilter.shouldIncludeRunningApplication(
+                activationPolicy: app.activationPolicy,
+                isTerminated: app.isTerminated,
+                appID: RuntimeAppIdentity.appID(for: app),
+                pid: app.processIdentifier,
+                currentPID: currentPID,
+                explicitlyTrackedAppIDs: explicitlyTrackedAppIDs
+            )
+        }
+        let windowRepairApplications = appLayerRunningApplications(
+            from: directoryApplications,
+            currentPID: currentPID,
+            includeCurrentProcessInAppLayer: includeCurrentProcessInAppLayer
+        )
+        let eligiblePIDs = Set(windowRepairApplications.map(\.processIdentifier))
+        let rankByPID = rankProvider(directoryApplications)
+        let entries = directoryApplications.map { app in
+            RuntimeAppDirectoryEntry(
+                app: app,
+                activationRank: rankByPID[app.processIdentifier],
+                isEligibleForAppSwitcherProjection: eligiblePIDs.contains(app.processIdentifier)
+            )
+        }
+        return RuntimeAppDirectoryMaintenanceFacts(
+            windowRepairApplications: windowRepairApplications,
+            entries: entries
+        )
+    }
+
+    static func currentMaintenanceFacts(
+        includeCurrentProcessInAppLayer: Bool,
+        explicitlyTrackedAppIDs: Set<String>,
+        workspace: NSWorkspace = .shared,
+        currentPID: pid_t = ProcessInfo.processInfo.processIdentifier
+    ) -> RuntimeAppDirectoryMaintenanceFacts {
+        maintenanceFacts(
+            from: workspace.runningApplications,
+            currentPID: currentPID,
+            includeCurrentProcessInAppLayer: includeCurrentProcessInAppLayer,
+            explicitlyTrackedAppIDs: explicitlyTrackedAppIDs
+        )
+    }
+
     static func entries(
         from runningApplications: [NSRunningApplication],
         rankByPID: [pid_t: Int] = [:]
@@ -85,11 +159,11 @@ protocol RuntimeAppDirectoryProviding: AnyObject {
 
 final class RuntimeWorkspaceAppDirectoryProvider: RuntimeAppDirectoryProviding {
     func appDirectoryEntriesForRuntimeMaintenance() -> [RuntimeAppDirectoryEntry] {
-        let runningApps = RuntimeAppDirectoryFactSource.currentAppLayerRunningApplications(
-            includeCurrentProcessInAppLayer: AppVisibilityPreferencesStore.loadShowInCommandTab()
+        RuntimeAppDirectoryFactSource.currentMaintenanceFacts(
+            includeCurrentProcessInAppLayer: AppVisibilityPreferencesStore.loadShowInCommandTab(),
+            explicitlyTrackedAppIDs: AppVisibilityPreferencesStore.loadHiddenAppIDs()
         )
-        let rankByPID = RuntimeAppRankProvider.collectAppRankByPID(for: runningApps)
-        return RuntimeAppDirectoryFactSource.entries(from: runningApps, rankByPID: rankByPID)
+        .entries
     }
 }
 
@@ -102,6 +176,7 @@ struct RuntimeAppDirectoryEntry: Equatable {
     let launchDate: Date?
     let activationRank: Int?
     let runningApplication: NSRunningApplication?
+    let isEligibleForAppSwitcherProjection: Bool
 
     init(
         pid: pid_t,
@@ -111,7 +186,8 @@ struct RuntimeAppDirectoryEntry: Equatable {
         bundleURL: URL? = nil,
         launchDate: Date?,
         activationRank: Int? = nil,
-        runningApplication: NSRunningApplication? = nil
+        runningApplication: NSRunningApplication? = nil,
+        isEligibleForAppSwitcherProjection: Bool = true
     ) {
         self.pid = pid
         self.appID = appID
@@ -121,9 +197,14 @@ struct RuntimeAppDirectoryEntry: Equatable {
         self.launchDate = launchDate
         self.activationRank = activationRank
         self.runningApplication = runningApplication
+        self.isEligibleForAppSwitcherProjection = isEligibleForAppSwitcherProjection
     }
 
-    init(app: NSRunningApplication, activationRank: Int? = nil) {
+    init(
+        app: NSRunningApplication,
+        activationRank: Int? = nil,
+        isEligibleForAppSwitcherProjection: Bool = true
+    ) {
         self.init(
             pid: app.processIdentifier,
             appID: RuntimeAppIdentity.appID(for: app),
@@ -132,7 +213,8 @@ struct RuntimeAppDirectoryEntry: Equatable {
             bundleURL: app.bundleURL,
             launchDate: app.launchDate,
             activationRank: activationRank,
-            runningApplication: app
+            runningApplication: app,
+            isEligibleForAppSwitcherProjection: isEligibleForAppSwitcherProjection
         )
     }
 
@@ -145,15 +227,19 @@ struct RuntimeAppDirectoryEntry: Equatable {
             && lhs.launchDate == rhs.launchDate
             && lhs.activationRank == rhs.activationRank
             && lhs.runningApplication?.processIdentifier == rhs.runningApplication?.processIdentifier
+            && lhs.isEligibleForAppSwitcherProjection == rhs.isEligibleForAppSwitcherProjection
     }
 
     func preservingMissingRuntimeFacts(from existing: RuntimeAppDirectoryEntry?) -> RuntimeAppDirectoryEntry {
         let preservedRank = activationRank ?? existing?.activationRank
         let preservedBundleURL = bundleURL ?? existing?.bundleURL
         let preservedRunningApplication = runningApplication ?? existing?.runningApplication
+        let preservedAppSwitcherEligibility =
+            existing?.isEligibleForAppSwitcherProjection ?? isEligibleForAppSwitcherProjection
         guard preservedRank != activationRank
             || preservedBundleURL != bundleURL
             || preservedRunningApplication?.processIdentifier != runningApplication?.processIdentifier
+            || preservedAppSwitcherEligibility != isEligibleForAppSwitcherProjection
         else { return self }
         return RuntimeAppDirectoryEntry(
             pid: pid,
@@ -163,7 +249,8 @@ struct RuntimeAppDirectoryEntry: Equatable {
             bundleURL: preservedBundleURL,
             launchDate: launchDate,
             activationRank: preservedRank,
-            runningApplication: preservedRunningApplication
+            runningApplication: preservedRunningApplication,
+            isEligibleForAppSwitcherProjection: preservedAppSwitcherEligibility
         )
     }
 }
@@ -171,7 +258,7 @@ struct RuntimeAppDirectoryEntry: Equatable {
 struct RuntimeAppDirectoryState: Equatable {
     private var entriesByPID: [pid_t: RuntimeAppDirectoryEntry] = [:]
     private(set) var generatedAt: TimeInterval?
-    private(set) var hasCompleteAppLayerCoverage = false
+    private(set) var hasCompleteApplicationDirectoryCoverage = false
 
     var isInitialized: Bool {
         generatedAt != nil
@@ -188,19 +275,19 @@ struct RuntimeAppDirectoryState: Equatable {
     mutating func replace(
         entries: [RuntimeAppDirectoryEntry],
         generatedAt: TimeInterval,
-        hasCompleteAppLayerCoverage: Bool = true
+        hasCompleteApplicationDirectoryCoverage: Bool = true
     ) {
         entriesByPID = Dictionary(
             uniqueKeysWithValues: Self.sortedUniqueEntries(entries).map { ($0.pid, $0) }
         )
         self.generatedAt = generatedAt
-        self.hasCompleteAppLayerCoverage = hasCompleteAppLayerCoverage
+        self.hasCompleteApplicationDirectoryCoverage = hasCompleteApplicationDirectoryCoverage
     }
 
     mutating func upsert(
         entries: [RuntimeAppDirectoryEntry],
         generatedAt: TimeInterval,
-        completesAppLayerCoverage: Bool = false
+        completesApplicationDirectoryCoverage: Bool = false
     ) {
         guard !entries.isEmpty else { return }
 
@@ -208,7 +295,8 @@ struct RuntimeAppDirectoryState: Equatable {
             entriesByPID[entry.pid] = entry.preservingMissingRuntimeFacts(from: entriesByPID[entry.pid])
         }
         self.generatedAt = generatedAt
-        hasCompleteAppLayerCoverage = hasCompleteAppLayerCoverage || completesAppLayerCoverage
+        hasCompleteApplicationDirectoryCoverage =
+            hasCompleteApplicationDirectoryCoverage || completesApplicationDirectoryCoverage
     }
 
     mutating func remove(
