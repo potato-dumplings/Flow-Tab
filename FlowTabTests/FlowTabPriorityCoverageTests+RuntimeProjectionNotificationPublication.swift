@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import Foundation
 import FlowTabCore
 import XCTest
@@ -45,6 +46,29 @@ private func makeProjectionPublicationWindowRecord(
 }
 
 extension FlowTabTests {
+    @MainActor
+    func testHomeRuntimeProjectionUpdatePublisherDeliversBackgroundPostsOnMainThread() async {
+        let notificationCenter = NotificationCenter()
+        let delivered = expectation(description: "Home receives the runtime projection update")
+        let cancellable = HomeRuntimeProjectionUpdatePublisher.publisher(
+            notificationCenter: notificationCenter
+        )
+        .sink { _ in
+            XCTAssertTrue(Thread.isMainThread)
+            delivered.fulfill()
+        }
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            notificationCenter.post(
+                name: .runtimeAppSwitcherProjectionDidUpdate,
+                object: nil
+            )
+        }
+
+        await fulfillment(of: [delivered], timeout: 1)
+        withExtendedLifetime(cancellable) {}
+    }
+
     func testFlowTabTestLaunchOptionsParsesFrontmostBundleIdentifierOverride() {
         withLaunchArgumentsForTesting(
             ["FlowTab", "--flowtab-ui-frontmost-bundle-id", "com.example.fixture.chrome"]
@@ -142,6 +166,81 @@ extension FlowTabTests {
 }
 
 extension FlowTabPriorityCoverageTests {
+    func testRuntimeReconciliationCoordinatorDuplicateSignalPreservesRetryBackoff() throws {
+        let coordinator = RuntimeReconciliationCoordinator(
+            retryPolicy: RuntimeReconciliationRetryPolicy(delays: [0.5])
+        )
+        let dirty = coordinator.markAppDirty(
+            appID: "com.example.editor",
+            pid: 18_405,
+            reason: .axNotification,
+            now: 10
+        )
+        let started = try XCTUnwrap(coordinator.startRequest(id: dirty.id))
+        let retry = try XCTUnwrap(
+            coordinator.scheduleRetryAfterTransientEmptyCurrentAppWindowPayload(
+                id: started.id,
+                now: 10.1
+            )
+        )
+
+        let duplicate = coordinator.markAppDirty(
+            appID: "com.example.editor",
+            pid: 18_405,
+            reason: .axNotification,
+            now: 10.2
+        )
+
+        XCTAssertEqual(duplicate.id, retry.id)
+        XCTAssertEqual(duplicate.state, .waitingRetry)
+        XCTAssertEqual(duplicate.attempt, 1)
+        XCTAssertEqual(duplicate.notBefore, 10.6, accuracy: 0.0001)
+        XCTAssertTrue(coordinator.readyRequests(now: 10.59).isEmpty)
+        XCTAssertEqual(coordinator.readyRequests(now: 10.6).map(\.id), [dirty.id])
+    }
+
+    func testRuntimeProjectionServiceDropsRepeatedAXWindowRepairSignalsWhenAccessibilityIsUnavailable() {
+        let coordinator = RuntimeReconciliationCoordinator()
+        let lock = NSLock()
+        var executionCount = 0
+        let service = RuntimeProjectionService(
+            label: "FlowTabTests.RuntimeProjectionService.AXUnavailable",
+            repairProvider: RuntimeProjectionRepairProvider(
+                reconciliationCoordinator: coordinator
+            ),
+            axWindowRepairAvailability: { false },
+            reconciliationExecutor: { _, _ in
+                lock.lock()
+                executionCount += 1
+                lock.unlock()
+                return .completed
+            }
+        )
+
+        for _ in 0..<50 {
+            service.signalAppWindowsChanged(
+                appID: "com.example.editor",
+                pid: 18_405
+            )
+            service.signalSelectedCurrentAppWindowsChanged(
+                appID: "com.example.editor",
+                pid: 18_405
+            )
+            service.requestAppSwitcherProjectionMaintenance(reason: .homeProjectionMissing)
+        }
+        service.waitForMaintenanceQueueForTesting()
+
+        lock.lock()
+        let finalExecutionCount = executionCount
+        lock.unlock()
+        XCTAssertEqual(finalExecutionCount, 0)
+        XCTAssertTrue(coordinator.readyRequests(now: .greatestFiniteMagnitude).isEmpty)
+        let diagnostics = service.runtimeReadModelDiagnostics()
+        XCTAssertTrue(diagnostics.dirtyAppIDs.isEmpty)
+        XCTAssertTrue(diagnostics.dirtyPIDs.isEmpty)
+        XCTAssertTrue(diagnostics.pendingRepairScopes.isEmpty)
+    }
+
     func testUITestFrontmostProjectionOverrideRoutesFocusedReadsAndRefreshesToTarget() throws {
         let runningApp = NSRunningApplication.current
         let appID = "com.example.fixture.chrome"
@@ -555,6 +654,34 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(searchRead.committedIndexCoversCurrentGeneration)
         XCTAssertTrue(readModelStore.diagnostics().pendingRepairScopes.isEmpty)
         XCTAssertEqual(executedTargets, [.app(pid), .spaceTopology])
+    }
+
+    @MainActor
+    func testRuntimeProjectionNotificationPublisherDeliversBackgroundPostsOnMainThread() async {
+        let notificationCenter = NotificationCenter()
+        let notificationObject = NSObject()
+        let delivered = expectation(description: "Runtime projection update reaches observers")
+        let observer = notificationCenter.addObserver(
+            forName: .runtimeAppSwitcherProjectionDidUpdate,
+            object: notificationObject,
+            queue: nil
+        ) { _ in
+            XCTAssertTrue(Thread.isMainThread)
+            delivered.fulfill()
+        }
+        defer {
+            notificationCenter.removeObserver(observer)
+        }
+
+        DispatchQueue.global(qos: .userInitiated).async {
+            RuntimeProjectionNotificationPublisher.post(
+                name: .runtimeAppSwitcherProjectionDidUpdate,
+                object: notificationObject,
+                notificationCenter: notificationCenter
+            )
+        }
+
+        await fulfillment(of: [delivered], timeout: 1)
     }
 
     @MainActor

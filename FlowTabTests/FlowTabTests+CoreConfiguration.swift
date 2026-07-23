@@ -396,7 +396,8 @@ extension FlowTabTests {
             let store = RuntimeReadModelStore()
             let service = RuntimeProjectionService(
                 label: "FlowTabTests.RuntimeProjectionService.DefaultFullRepair",
-                readModelStore: store
+                readModelStore: store,
+                axWindowRepairAvailability: { true }
             )
 
             service.requestAppSwitcherProjectionMaintenance(reason: .switcherSessionStarted)

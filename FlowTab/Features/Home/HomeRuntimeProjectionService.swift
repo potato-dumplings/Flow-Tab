@@ -1,7 +1,18 @@
+import Combine
 import Foundation
 import FlowTabCore
 
 let homeRuntimeProjectionService = sharedRuntimeProjectionService
+
+enum HomeRuntimeProjectionUpdatePublisher {
+    static func publisher(
+        notificationCenter: NotificationCenter = .default
+    ) -> AnyPublisher<Notification, Never> {
+        notificationCenter.publisher(for: .runtimeAppSwitcherProjectionDidUpdate)
+            .receive(on: DispatchQueue.main)
+            .eraseToAnyPublisher()
+    }
+}
 
 struct HomeAppSummaryProjectionRead: Equatable {
     let summaries: [RuntimeHomeAppSummary]
@@ -173,5 +184,20 @@ enum HomeInitialAppSummaryReader {
 
     static func appSummaries(from service: any RuntimeProjectionServing) -> [RuntimeHomeAppSummary] {
         appSummaryProjection(from: service).summaries
+    }
+}
+
+enum HomeInitialRuntimeProjectionBootstrapper {
+    @discardableResult
+    static func requestIfNeeded(
+        projectionRead: HomeAppSummaryProjectionRead,
+        currentAppSummaryCount: Int,
+        from service: any RuntimeProjectionServing
+    ) -> Bool {
+        guard currentAppSummaryCount == 0, !projectionRead.isProjectionBacked else {
+            return false
+        }
+        service.requestAppSwitcherProjectionMaintenance(reason: .homeProjectionMissing)
+        return true
     }
 }

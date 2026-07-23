@@ -648,7 +648,7 @@ final class RuntimeLogFileStore {
 
 enum RuntimeLog {
     private static var isDiagnosticSessionActive: Bool {
-        RuntimeDiagnosticSessionStore.isActive()
+        RuntimeDiagnosticSessionStore.readIsActive()
     }
 
     private static var minimumLevel: RuntimeLogLevel {

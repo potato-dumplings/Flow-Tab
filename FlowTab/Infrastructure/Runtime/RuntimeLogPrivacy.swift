@@ -174,13 +174,20 @@ enum RuntimeDiagnosticSessionStore {
         userDefaults.removeObject(forKey: AppPreferenceKeys.diagnosticSessionExpiration)
     }
 
+    static func readIsActive(
+        userDefaults: UserDefaults = .standard,
+        now: Date = Date()
+    ) -> Bool {
+        userDefaults.double(forKey: AppPreferenceKeys.diagnosticSessionExpiration)
+            > now.timeIntervalSince1970
+    }
+
     static func isActive(
         userDefaults: UserDefaults = .standard,
         now: Date = Date()
     ) -> Bool {
         userDefaults.removeObject(forKey: AppPreferenceKeys.enableVerboseDiagnostics)
-        let expiration = userDefaults.double(forKey: AppPreferenceKeys.diagnosticSessionExpiration)
-        guard expiration > now.timeIntervalSince1970 else {
+        guard readIsActive(userDefaults: userDefaults, now: now) else {
             userDefaults.removeObject(forKey: AppPreferenceKeys.diagnosticSessionExpiration)
             return false
         }

@@ -274,17 +274,19 @@ final class RuntimeReconciliationCoordinator {
         if requestsByTarget[target] == nil {
             nextRequestID += 1
         }
+        let wasWaitingRetry = request.state == .waitingRetry
         let incomingPriority = reasons.schedulerPriority
         let promoted = incomingPriority > request.priority
         request.appID = request.appID ?? appID
         request.reasons.formUnion(reasons)
         request.priority = max(request.priority, incomingPriority)
         request.affectedCGWindowIDs.formUnion(affectedCGWindowIDs)
-        request.state = .pending
         if promoted {
+            request.state = .pending
             request.attempt = 0
             request.notBefore = now
-        } else {
+        } else if !wasWaitingRetry {
+            request.state = .pending
             request.notBefore = min(request.notBefore, now)
         }
         requestsByTarget[target] = request

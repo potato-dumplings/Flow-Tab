@@ -141,9 +141,7 @@ struct HomeLandingView: View {
             guard isActive else { return }
             scheduleAppSummariesRefresh(reason: "workspace_terminate")
         }
-        .onReceive(NotificationCenter.default.publisher(
-            for: .runtimeAppSwitcherProjectionDidUpdate
-        )) { _ in
+        .onReceive(HomeRuntimeProjectionUpdatePublisher.publisher()) { _ in
             guard isActive else { return }
             scheduleAppSummariesRefresh(reason: "runtime_projection_updated")
         }
@@ -568,7 +566,23 @@ struct HomeLandingView: View {
         appSummariesRefreshTask?.cancel()
         appSummariesRefreshTask = Task { @MainActor in
             RuntimeLog.debug(.projection, "homeInitialProjectionRead begin reason=\(reason)")
-            await refreshInitialAppSummaryProjection()
+            let projectionRead = await refreshInitialAppSummaryProjection()
+            guard !Task.isCancelled else {
+                appSummariesRefreshTask = nil
+                return
+            }
+            if HomeInitialRuntimeProjectionBootstrapper.requestIfNeeded(
+                projectionRead: projectionRead,
+                currentAppSummaryCount: appSummaries.count,
+                from: runtimeProjectionService
+            ) {
+                RuntimeLog.debug(
+                    .projection,
+                    "homeInitialProjectionRead result=bootstrapRequested reason=\(reason)"
+                )
+                appSummariesRefreshTask = nil
+                return
+            }
             guard accessibilityTrusted else {
                 RuntimeLog.debug(
                     .projection,
@@ -596,12 +610,12 @@ struct HomeLandingView: View {
         }
     }
 
-    private func refreshInitialAppSummaryProjection() async {
+    private func refreshInitialAppSummaryProjection() async -> HomeAppSummaryProjectionRead {
         let startMs = RuntimePerformanceClock.monotonicMilliseconds()
         let projectionRead = initialHomeAppSummaryProjection()
         let summaries = projectionRead.summaries
-        guard !Task.isCancelled, appSummaries.isEmpty else { return }
-        guard !summaries.isEmpty else { return }
+        guard !Task.isCancelled, appSummaries.isEmpty else { return projectionRead }
+        guard !summaries.isEmpty else { return projectionRead }
 
         homeSummaryProjectionFreshness = projectionRead.freshness
         appSummaries = summaries
@@ -620,6 +634,7 @@ struct HomeLandingView: View {
             .projection,
             "homeInitialProjectionRead result=ready source=\(projectionRead.isProjectionBacked ? "runtimeProjection" : "currentFallback") freshnessComplete=\(projectionRead.freshness?.isCompleteForScope == true ? 1 : 0) apps=\(summaries.count) selected=\(currentSelectedAppID ?? "nil") loadingCounts=\(loadingWindowCountAppIDs.count) accessibilityTrusted=\(accessibilityTrusted) totalMs=\(formatHomeMilliseconds(RuntimePerformanceClock.monotonicMilliseconds() - startMs))"
         )
+        return projectionRead
     }
 
     private func refreshAppSummaries(reason: String) async {

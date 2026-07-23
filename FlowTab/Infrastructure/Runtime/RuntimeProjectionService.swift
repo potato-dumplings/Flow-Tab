@@ -18,7 +18,12 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     private let appDirectoryProvider: RuntimeAppDirectoryProviding?
     private let reconciliationDrainer: RuntimeProjectionReconciliationDrainer
     private let appLaunchConvergenceScheduler: RuntimeAppLaunchConvergenceScheduler
+    private let axWindowRepairAvailability: @Sendable () -> Bool
     private var pendingSearchIndexFreshnessBarrier = false
+
+    private var canScheduleAXWindowRepair: Bool {
+        axWindowRepairAvailability()
+    }
 
     init(
         label: String = "FlowTab.RuntimeProjectionService",
@@ -27,9 +32,17 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         appDirectoryProvider: RuntimeAppDirectoryProviding? = nil,
         readModelStore: RuntimeReadModelStore = RuntimeReadModelStore(),
         appLaunchConvergenceDelay: TimeInterval = runtimeAppLaunchWindowConvergenceDelay,
+        axWindowRepairAvailability: (@Sendable () -> Bool)? = nil,
         reconciliationExecutor: @escaping RuntimeProjectionReconciliationExecutor =
             runtimeProjectionDefaultReconciliationExecutor
     ) {
+        let usesSystemRepairProvider = repairProvider == nil
+        self.axWindowRepairAvailability = axWindowRepairAvailability ?? {
+            if usesSystemRepairProvider {
+                return AccessibilityPermissionChecker.isTrusted()
+            }
+            return true
+        }
         maintenanceQueue = DispatchQueue(label: label, qos: .utility)
         maintenanceQueue.setSpecific(key: maintenanceQueueSpecificKey, value: ())
         appLaunchConvergenceScheduler = RuntimeAppLaunchConvergenceScheduler(
@@ -106,13 +119,18 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
                 requiresExistingProjectionCoverage: true
             )
             let diagnostics = readModelStore.diagnostics()
-            if !diagnostics.hasCompleteAppSwitcherProjection
+            let canRepairAXWindows = canScheduleAXWindowRepair
+            if canRepairAXWindows
+                && !diagnostics.hasCompleteAppSwitcherProjection
                 && !repairProvider.hasPendingReconciliationRequests(includeFullRepair: true) {
                 repairProvider.scheduleFullRepairFallback(now: now)
             }
-            let drainResult = reconciliationDrainer.drainReadyRequests(
-                now: now
-            )
+            let drainResult: RuntimeProjectionReconciliationDrainResult
+            if canRepairAXWindows {
+                drainResult = reconciliationDrainer.drainReadyRequests(now: now)
+            } else {
+                drainResult = RuntimeProjectionReconciliationDrainResult()
+            }
             let fullRepairProjectionCommitSummary = commitFullRepairEvidenceLocked(
                 drainResult.fullRepairEvidence,
                 generatedAt: now
@@ -217,6 +235,9 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     private func drainSearchFreshnessBarrierReadyRequestsLocked(
         now: TimeInterval
     ) -> RuntimeProjectionReconciliationDrainResult {
+        guard canScheduleAXWindowRepair else {
+            return RuntimeProjectionReconciliationDrainResult()
+        }
         var remainingBudget = runtimeSearchFreshnessBarrierMaxReadyRepairs
         var aggregateResult = RuntimeProjectionReconciliationDrainResult()
 
@@ -318,6 +339,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     }
 
     func signalAppWindowsChanged(appID: String, pid: pid_t) {
+        guard canScheduleAXWindowRepair else { return }
         maintenanceQueue.async { [self] in
             let now = Date.timeIntervalSinceReferenceDate
             readModelStore.markAppWindowsDirty(
@@ -338,6 +360,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     }
 
     func signalSelectedCurrentAppWindowsChanged(appID: String, pid: pid_t) {
+        guard canScheduleAXWindowRepair else { return }
         maintenanceQueue.async { [self] in
             let now = Date.timeIntervalSinceReferenceDate
             readModelStore.markAppWindowsDirty(
@@ -358,6 +381,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
     }
 
     func signalFocusedCurrentAppWindowsChanged() {
+        guard canScheduleAXWindowRepair else { return }
         maintenanceQueue.async { [self] in
             var focusedRead = readModelStore.readFocusedCurrentAppWindowProjection()
             let now = Date.timeIntervalSinceReferenceDate
@@ -552,6 +576,9 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         completedCGWindowCleanupPolicy: CompletedCGWindowCleanupPolicy =
             .preservingActivationFreshness
     ) -> RuntimeProjectionReconciliationDrainResult {
+        guard canScheduleAXWindowRepair else {
+            return RuntimeProjectionReconciliationDrainResult()
+        }
         let result = reconciliationDrainer.drainReadyRequests(now: now)
         commitFullRepairEvidenceLocked(
             result.fullRepairEvidence,
@@ -667,7 +694,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             clearsDirtyCGWindowIDs: clearsDirtyCGWindowIDs,
             generatedAt: generatedAt
         )
-        NotificationCenter.default.post(
+        RuntimeProjectionNotificationPublisher.post(
             name: .runtimeAppSwitcherProjectionDidUpdate,
             object: self
         )
@@ -788,7 +815,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
             authoritativeCGWindowIDs: authoritativeCGWindowIDs,
             generatedAt: generatedAt
         )
-        NotificationCenter.default.post(
+        RuntimeProjectionNotificationPublisher.post(
             name: .runtimeCurrentAppWindowProjectionDidUpdate,
             object: self,
             userInfo: [RuntimeProjectionNotificationUserInfoKey.appID: appID]
@@ -813,7 +840,7 @@ final class RuntimeProjectionService: RuntimeProjectionServing, @unchecked Senda
         )
         guard committed != nil else { return nil }
         pendingSearchIndexFreshnessBarrier = false
-        NotificationCenter.default.post(
+        RuntimeProjectionNotificationPublisher.post(
             name: .runtimeCommittedSearchIndexDidUpdate,
             object: self
         )

@@ -172,6 +172,31 @@ extension FlowTabUITests {
         XCTAssertLessThan(mailRow.frame.minY, browserRow.frame.minY)
     }
 
+    func testHomeColdStartPublishesLiveAppDirectoryWithoutAccessibilityPermission() throws {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "-showPermissionReminder",
+                "NO",
+                "--flowtab-ui-ax-trusted",
+                "NO",
+                "--flowtab-ui-screen-trusted",
+                "YES"
+            ]
+        )
+        launchFlowTabUITestApplication(app)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
+        XCTAssertTrue(tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 5))
+        XCTAssertTrue(element(in: app, identifier: Identifier.homeTabContent).waitForExistence(timeout: 5))
+        let firstLiveAppRow = app.buttons.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "flowtab.home.app.")
+        ).firstMatch
+        XCTAssertTrue(
+            firstLiveAppRow.waitForExistence(timeout: 2),
+            "Home should publish the running-application directory without waiting for AX window repair."
+        )
+    }
+
     func testHomeOverviewChromeShowsCountsStatsAndSidebarPermissionStatus() throws {
         let app = makeApp(
             additionalArguments: [

@@ -16,6 +16,23 @@ enum RuntimeProjectionNotificationUserInfoKey {
     static let appID = "appID"
 }
 
+enum RuntimeProjectionNotificationPublisher {
+    static func post(
+        name: Notification.Name,
+        object: Any,
+        userInfo: [AnyHashable: Any]? = nil,
+        notificationCenter: NotificationCenter = .default
+    ) {
+        DispatchQueue.main.async {
+            notificationCenter.post(
+                name: name,
+                object: object,
+                userInfo: userInfo
+            )
+        }
+    }
+}
+
 protocol RuntimeProjectionServing: Sendable {
     func readAppSwitcherProjection() -> RuntimeAppSwitcherProjection?
     func readHomeSummaryProjection() -> RuntimeHomeSummaryProjection?
