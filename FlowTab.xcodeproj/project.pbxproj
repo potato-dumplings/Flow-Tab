@@ -224,6 +224,7 @@
 		F50001052F90000100B0D737 /* SpaceFixtureWindowCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000062F90000100B0D737 /* SpaceFixtureWindowCoordinator.swift */; };
 		F50001062F90000100B0D737 /* AppKitSpaceFixtureWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000072F90000100B0D737 /* AppKitSpaceFixtureWindow.swift */; };
 		F50001072F90000100B0D737 /* SpaceFixtureWindowContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000082F90000100B0D737 /* SpaceFixtureWindowContentView.swift */; };
+		F6D0C0023C00000100B0D737 /* PublishedDockIcon.svg in Resources */ = {isa = PBXBuildFile; fileRef = F6D0C0013C00000100B0D737 /* PublishedDockIcon.svg */; };
 		F50001082F90000100B0D737 /* SpaceFixtureLaunchConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000042F90000100B0D737 /* SpaceFixtureLaunchConfiguration.swift */; };
 		F50001092F90000100B0D737 /* SpaceFixtureWindowPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000052F90000100B0D737 /* SpaceFixtureWindowPlan.swift */; };
 		F500010A2F90000100B0D737 /* SpaceFixtureWindowCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F50000062F90000100B0D737 /* SpaceFixtureWindowCoordinator.swift */; };
@@ -483,6 +484,7 @@
 		F50000162FA1000100B0D737 /* FlowTabUITests+SpaceFixtureSwitcherMultiAppWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureSwitcherMultiAppWorkflow.swift"; sourceTree = "<group>"; };
 		F50000172FA1000100B0D737 /* FlowTabUITests+SpaceFixtureEdgeInputsWorkflow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureEdgeInputsWorkflow.swift"; sourceTree = "<group>"; };
 		F50000182FA1000100B0D737 /* FlowTabUITests+SpaceFixtureEdgeInputsAssertions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+SpaceFixtureEdgeInputsAssertions.swift"; sourceTree = "<group>"; };
+		F6D0C0013C00000100B0D737 /* PublishedDockIcon.svg */ = {isa = PBXFileReference; lastKnownFileType = image.svg; path = PublishedDockIcon.svg; sourceTree = "<group>"; };
 		F6E7A8B935AC000100B0D737 /* RuntimeWindowRecord.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowRecord.swift; sourceTree = "<group>"; };
 		F6E7A8BF35AC000100B0D737 /* RuntimeWindowRecencyTracker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowRecencyTracker.swift; sourceTree = "<group>"; };
 		F6E7A8C135AC000100B0D737 /* RuntimeWindowFocusRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeWindowFocusRequest.swift; sourceTree = "<group>"; };
@@ -948,6 +950,7 @@
 				F50000062F90000100B0D737 /* SpaceFixtureWindowCoordinator.swift */,
 				F50000072F90000100B0D737 /* AppKitSpaceFixtureWindow.swift */,
 				F50000082F90000100B0D737 /* SpaceFixtureWindowContentView.swift */,
+				F6D0C0013C00000100B0D737 /* PublishedDockIcon.svg */,
 			);
 			path = FlowTabSpaceFixture;
 			sourceTree = "<group>";
@@ -1115,6 +1118,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				F6D0C0023C00000100B0D737 /* PublishedDockIcon.svg in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

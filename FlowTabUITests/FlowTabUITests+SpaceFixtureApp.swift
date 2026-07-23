@@ -133,7 +133,8 @@ extension FlowTabUITests {
         enterFullscreenDelayMilliseconds: Int = 1_500,
         terminationDelayMilliseconds: Int = 0,
         closeWindowIndex: Int? = nil,
-        closeWindowDelayMilliseconds: Int = 0
+        closeWindowDelayMilliseconds: Int = 0,
+        fixtureAdditionalArguments: [String] = []
     ) -> XCUIApplication {
         terminateSpaceFixtureAppIfRunning(identity: identity)
 
@@ -154,6 +155,7 @@ extension FlowTabUITests {
                 "--close-window-delay-ms", String(closeWindowDelayMilliseconds)
             ]
         }
+        additionalArguments += fixtureAdditionalArguments
 
         let app = makeSpaceFixtureApp(identity: identity, additionalArguments: additionalArguments)
         launchSpaceFixtureApplicationAndWaitForForeground(app)

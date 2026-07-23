@@ -4,27 +4,14 @@ import UniformTypeIdentifiers
 
 @MainActor
 enum HomeAppIconProvider {
-    private static var cache: [String: NSImage] = [:]
+    private static let provider = AppIconProvider()
 
     static func icon(for app: RuntimeHomeAppSummary) -> NSImage {
-        if let cached = cache[app.appID] {
-            return cached
-        }
-
-        let resolvedIcon =
-            app.bundleURL.map { NSWorkspace.shared.icon(forFile: $0.path) }
-            ?? applicationBundleURL(for: app).map { NSWorkspace.shared.icon(forFile: $0.path) }
-            ?? NSWorkspace.shared.icon(for: .applicationBundle)
-        cache[app.appID] = resolvedIcon
-        return resolvedIcon
-    }
-
-    private static func applicationBundleURL(for app: RuntimeHomeAppSummary) -> URL? {
-        if let bundleIdentifier = app.bundleIdentifier,
-           let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) {
-            return url
-        }
-        return NSWorkspace.shared.urlForApplication(withBundleIdentifier: app.appID)
+        provider.icon(
+            appID: app.appID,
+            bundleIdentifier: app.bundleIdentifier,
+            bundleURL: app.bundleURL
+        ) ?? NSWorkspace.shared.icon(for: .applicationBundle)
     }
 }
 

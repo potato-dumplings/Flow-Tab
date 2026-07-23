@@ -20,6 +20,7 @@ final class SpaceFixtureAppDelegate: NSObject, NSApplicationDelegate {
         } catch {
             fatalError("Failed to load FlowTabSpaceFixture launch configuration: \(error.localizedDescription)")
         }
+        configurePublishedDockIcon(arguments: ProcessInfo.processInfo.arguments)
         let coordinator = SpaceFixtureWindowCoordinator(configuration: configuration)
         coordinator.launch()
         windowCoordinator = coordinator
@@ -65,5 +66,39 @@ final class SpaceFixtureAppDelegate: NSObject, NSApplicationDelegate {
 
     func application(_ app: NSApplication, shouldRestoreApplicationState coder: NSCoder) -> Bool {
         false
+    }
+
+    private func configurePublishedDockIcon(arguments: [String]) {
+        let preferenceKey = "DockIconResourceName"
+        let argument = "--dock-icon-resource-name"
+        let defaults = UserDefaults.standard
+        guard let argumentIndex = arguments.firstIndex(of: argument) else {
+            defaults.removeObject(forKey: preferenceKey)
+            defaults.synchronize()
+            return
+        }
+
+        let resourceNameIndex = arguments.index(after: argumentIndex)
+        guard resourceNameIndex < arguments.endIndex else {
+            defaults.removeObject(forKey: preferenceKey)
+            defaults.synchronize()
+            return
+        }
+
+        let resourceName = arguments[resourceNameIndex]
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !resourceName.isEmpty else {
+            defaults.removeObject(forKey: preferenceKey)
+            defaults.synchronize()
+            return
+        }
+
+        defaults.set(resourceName, forKey: preferenceKey)
+        defaults.synchronize()
+
+        guard let resourceBoundary = Bundle.main.resourceURL else { return }
+        let resourceURL = resourceBoundary.appendingPathComponent(resourceName).standardizedFileURL
+        guard let image = NSImage(contentsOf: resourceURL) else { return }
+        NSApplication.shared.applicationIconImage = image
     }
 }

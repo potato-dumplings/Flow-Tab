@@ -2,6 +2,18 @@ import Foundation
 import XCTest
 
 extension FlowTabUITests {
+    func testHomePageShowsPublishedDockIconFromRealSpaceFixture() throws {
+        runRealSpaceFixtureWorkflow(
+            fixtureAdditionalArguments: [
+                "--dock-icon-resource-name",
+                "PublishedDockIcon.svg"
+            ]
+        ) { identity, app in
+            let fixtureAppRow = openHomeTabAndSelectSpaceFixtureApp(in: app, identity: identity)
+            assertPublishedDockIconPixelSignature(in: fixtureAppRow)
+        }
+    }
+
     func testHomePageShowsRealSpaceFixtureWorkflowWindows() throws {
         runRealSpaceFixtureWorkflow { identity, app in
             let fixtureAppRow = openHomeTabAndSelectSpaceFixtureApp(in: app, identity: identity)
@@ -484,6 +496,7 @@ extension FlowTabUITests {
 
     func runRealSpaceFixtureWorkflow(
         flowTabAdditionalArguments: [String] = [],
+        fixtureAdditionalArguments: [String] = [],
         perform assertions: (SpaceFixtureAppIdentity, XCUIApplication) -> Void
     ) {
         let identity = spaceFixtureAppIdentity
@@ -492,7 +505,8 @@ extension FlowTabUITests {
             windowCount: 3,
             fullscreenWindowIndex: 3,
             titlePrefix: "Workflow",
-            enterFullscreenDelayMilliseconds: 5_000
+            enterFullscreenDelayMilliseconds: 5_000,
+            fixtureAdditionalArguments: fixtureAdditionalArguments
         )
         defer {
             if fixtureApp.state == .runningForeground || fixtureApp.state == .runningBackground {
@@ -549,5 +563,42 @@ extension FlowTabUITests {
         timeout: TimeInterval = 12
     ) {
         _ = waitForSwitcherWindowCards(in: app, expectedTitles: expectedTitles, timeout: timeout)
+    }
+
+    private func assertPublishedDockIconPixelSignature(in appRow: XCUIElement) {
+        let screenshot = appRow.screenshot()
+        let attachment = XCTAttachment(screenshot: screenshot)
+        attachment.name = "Home row with published Dock icon"
+        attachment.lifetime = .deleteOnSuccess
+        add(attachment)
+
+        guard let bitmap = NSBitmapImageRep(data: screenshot.pngRepresentation) else {
+            XCTFail("Could not decode the Home app row screenshot")
+            return
+        }
+
+        var magentaPixelCount = 0
+        var cyanPixelCount = 0
+        for y in 0..<bitmap.pixelsHigh {
+            for x in 0..<bitmap.pixelsWide {
+                guard let color = bitmap.colorAt(x: x, y: y)?.usingColorSpace(.sRGB) else {
+                    continue
+                }
+                if color.redComponent > 0.85,
+                   color.greenComponent < 0.5,
+                   color.blueComponent > 0.7 {
+                    magentaPixelCount += 1
+                }
+                if color.greenComponent > 0.85,
+                   color.blueComponent > 0.9,
+                   color.greenComponent - color.redComponent > 0.15,
+                   color.blueComponent - color.redComponent > 0.2 {
+                    cyanPixelCount += 1
+                }
+            }
+        }
+
+        XCTAssertGreaterThan(magentaPixelCount, 50)
+        XCTAssertGreaterThan(cyanPixelCount, 50)
     }
 }

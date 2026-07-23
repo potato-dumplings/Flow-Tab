@@ -79,6 +79,116 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(requestedAppIDs.filter { $0 == "com.example.missing" }.count, 1)
     }
 
+    func testAppIconProviderPrefersPublishedDockIconResourceWithinAppBundle() throws {
+        try withPublishedDockIconFixture { fixture in
+            let provider = AppIconProvider(
+                applicationURLProvider: { requestedAppID in
+                    XCTAssertEqual(requestedAppID, fixture.appID)
+                    return fixture.appURL
+                },
+                fileIconProvider: { _ in fixture.fallbackIcon }
+            )
+            let app = AppSwitchCandidate(
+                id: fixture.appID,
+                displayName: "Published Icon",
+                groupID: fixture.appID,
+                lastActiveAt: 1,
+                windows: []
+            )
+
+            let icon = try XCTUnwrap(provider.icon(for: app, context: nil))
+
+            XCTAssertEqual(sampledRGB(icon), sampledRGB(fixture.customIcon))
+        }
+    }
+
+    func testAppIconProviderRejectsPublishedIconIntentsOutsideResourceBoundary() {
+        let appURL = URL(fileURLWithPath: "/Applications/Boundary.app", isDirectory: true)
+        let resourceBoundary = appURL.appendingPathComponent("Contents/Resources", isDirectory: true)
+        let fallbackIcon = makeColorImage(color: .systemGreen)
+
+        for invalidIntent in ["../Outside.png", "/tmp/Outside.png"] {
+            var requestedResourceURLs: [URL] = []
+            let provider = AppIconProvider(
+                fileIconProvider: { _ in fallbackIcon },
+                resourceIntentProvider: { _ in invalidIntent },
+                applicationResourceURLProvider: { _ in resourceBoundary },
+                resourceIconProvider: { url in
+                    requestedResourceURLs.append(url)
+                    return self.makeColorImage(color: .systemPurple)
+                }
+            )
+
+            let icon = provider.icon(
+                appID: "com.example.boundary",
+                bundleIdentifier: "com.example.boundary",
+                bundleURL: appURL
+            )
+
+            XCTAssertTrue(icon === fallbackIcon)
+            XCTAssertTrue(requestedResourceURLs.isEmpty)
+        }
+    }
+
+    func testAppIconProviderChangesCachedIconWhenPublishedResourceIntentChanges() throws {
+        let appURL = URL(fileURLWithPath: "/Applications/ChangingIcon.app", isDirectory: true)
+        let resourceBoundary = appURL.appendingPathComponent("Contents/Resources", isDirectory: true)
+        let firstIcon = makeColorImage(color: .systemPurple)
+        let secondIcon = makeColorImage(color: .systemOrange)
+        var resourceIntent = "First.png"
+        var requestedResourceNames: [String] = []
+        let provider = AppIconProvider(
+            resourceIntentProvider: { _ in resourceIntent },
+            applicationResourceURLProvider: { _ in resourceBoundary },
+            resourceIconProvider: { url in
+                requestedResourceNames.append(url.lastPathComponent)
+                return url.lastPathComponent == "First.png" ? firstIcon : secondIcon
+            }
+        )
+
+        let firstResolution = try XCTUnwrap(provider.icon(
+            appID: "com.example.changing-icon",
+            bundleIdentifier: "com.example.changing-icon",
+            bundleURL: appURL
+        ))
+        let cachedFirstResolution = try XCTUnwrap(provider.icon(
+            appID: "com.example.changing-icon",
+            bundleIdentifier: "com.example.changing-icon",
+            bundleURL: appURL
+        ))
+        resourceIntent = "Second.png"
+        let secondResolution = try XCTUnwrap(provider.icon(
+            appID: "com.example.changing-icon",
+            bundleIdentifier: "com.example.changing-icon",
+            bundleURL: appURL
+        ))
+
+        XCTAssertTrue(firstResolution === firstIcon)
+        XCTAssertTrue(cachedFirstResolution === firstIcon)
+        XCTAssertTrue(secondResolution === secondIcon)
+        XCTAssertEqual(requestedResourceNames, ["First.png", "Second.png"])
+    }
+
+    @MainActor
+    func testHomeAppIconProviderUsesSharedPublishedDockIconResolution() throws {
+        try withPublishedDockIconFixture { fixture in
+            let summary = RuntimeHomeAppSummary(
+                appID: fixture.appID,
+                displayName: "Published Icon",
+                groupID: fixture.appID,
+                lastActiveAt: 1,
+                windowCount: 1,
+                pid: 1,
+                bundleIdentifier: fixture.appID,
+                bundleURL: fixture.appURL
+            )
+
+            let icon = HomeAppIconProvider.icon(for: summary)
+
+            XCTAssertEqual(sampledRGB(icon), sampledRGB(fixture.customIcon))
+        }
+    }
+
     func testRuntimeWindowListSupplementerIncludesLargeOnScreenCGWindowsWhenAXMissesThem() {
         let mergedEntries = RuntimeWindowMappingTestSupport.appendOffSpaceCGWindows(
             entries: [
@@ -149,4 +259,85 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(mergedEntries.last?.title, "百度一下，你就知道 - Google Chrome - test5")
     }
 
+}
+
+private extension FlowTabPriorityCoverageTests {
+    struct PublishedDockIconFixture {
+        let appID: String
+        let appURL: URL
+        let customIcon: NSImage
+        let fallbackIcon: NSImage
+    }
+
+    func withPublishedDockIconFixture(
+        perform assertions: (PublishedDockIconFixture) throws -> Void
+    ) throws {
+        let appID = "com.example.published-dock-icon.\(UUID().uuidString)"
+        let resourceName = "PublishedDockIcon.png"
+        let fixtureRoot = FileManager.default.temporaryDirectory
+            .appendingPathComponent("flowtab-app-icon-tests", isDirectory: true)
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let appURL = fixtureRoot.appendingPathComponent("PublishedIcon.app", isDirectory: true)
+        let resourcesURL = appURL
+            .appendingPathComponent("Contents", isDirectory: true)
+            .appendingPathComponent("Resources", isDirectory: true)
+        let infoPlistURL = appURL
+            .appendingPathComponent("Contents", isDirectory: true)
+            .appendingPathComponent("Info.plist")
+        let customIcon = makeColorImage(color: .systemPurple)
+        let fallbackIcon = makeColorImage(color: .systemGreen)
+
+        try FileManager.default.createDirectory(at: resourcesURL, withIntermediateDirectories: true)
+        let infoPlist: [String: Any] = [
+            "CFBundleIdentifier": appID,
+            "CFBundleName": "Published Icon",
+            "CFBundlePackageType": "APPL"
+        ]
+        try PropertyListSerialization.data(
+            fromPropertyList: infoPlist,
+            format: .xml,
+            options: 0
+        ).write(to: infoPlistURL)
+        try pngData(for: customIcon).write(to: resourcesURL.appendingPathComponent(resourceName))
+
+        let preferenceKey = "DockIconResourceName" as CFString
+        let preferenceDomain = appID as CFString
+        CFPreferencesSetAppValue(preferenceKey, resourceName as CFString, preferenceDomain)
+        XCTAssertTrue(CFPreferencesAppSynchronize(preferenceDomain))
+        defer {
+            CFPreferencesSetAppValue(preferenceKey, nil, preferenceDomain)
+            CFPreferencesAppSynchronize(preferenceDomain)
+            try? FileManager.default.removeItem(at: fixtureRoot)
+        }
+
+        try assertions(PublishedDockIconFixture(
+            appID: appID,
+            appURL: appURL,
+            customIcon: customIcon,
+            fallbackIcon: fallbackIcon
+        ))
+    }
+
+    func pngData(for image: NSImage) throws -> Data {
+        let tiffData = try XCTUnwrap(image.tiffRepresentation)
+        let bitmap = try XCTUnwrap(NSBitmapImageRep(data: tiffData))
+        return try XCTUnwrap(bitmap.representation(using: .png, properties: [:]))
+    }
+
+    func sampledRGB(_ image: NSImage) -> [Int] {
+        guard
+            let tiffData = image.tiffRepresentation,
+            let bitmap = NSBitmapImageRep(data: tiffData),
+            let color = bitmap.colorAt(
+                x: max(0, bitmap.pixelsWide / 2),
+                y: max(0, bitmap.pixelsHigh / 2)
+            )?.usingColorSpace(.deviceRGB)
+        else {
+            return []
+        }
+
+        return [color.redComponent, color.greenComponent, color.blueComponent].map {
+            Int(($0 * 255).rounded())
+        }
+    }
 }
