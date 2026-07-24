@@ -33,13 +33,16 @@ Apply FlowTab's project-specific engineering contract to repository changes and 
 8. Use canonical validation paths.
    Follow `references/validation-command-cookbook.md`, the FlowTabTests wrapper contract, UI prerequisites, and pressure workflow. Keep build roots and evidence under the repository-local ignored tree.
 
-9. Keep production paths clean.
+9. Use evidence-driven synchronization.
+   Drive production and test progress from callbacks, notifications, readbacks, generations, explicit state transitions, and independent Oracles. Reject fixed-delay temporal coupling, raw settling sleeps, fixed RunLoop waits, and magic timeouts as sequencing, readiness, success, or correctness signals. Allow condition polling only when no event source exposes the required transition; keep the observable condition or readback as the sole success signal. Use centralized cancellable watchdogs only as terminal failure bounds, and model domain time through injectable clocks or schedulers. Follow `references/evidence-driven-synchronization.md`.
+
+10. Keep production paths clean.
    Keep tests, test-only hooks, temporary diagnostics, and investigation-only logging outside final production files. Retain only production logging owned by runtime behavior.
 
-10. Preserve FlowTab window identity and activation evidence.
+11. Preserve FlowTab window identity and activation evidence.
     Keep exact target-window identity, CG/AX reconciliation, activation routing, and post-attempt verification. Private Space switching and app Window-menu routing do not satisfy the product or test contract.
 
-11. Apply repository maintenance guardrails.
+12. Apply repository maintenance guardrails.
     Keep new source files near 400 lines, preserve a single responsibility through 800 lines, split oversized files instead of expanding them, and place detailed project documentation under `docs/`.
 
 ## Reference Routing
@@ -55,6 +58,7 @@ Apply FlowTab's project-specific engineering contract to repository changes and 
 - UI automation, permission, or code-identity setup: read `references/ui-automation-prerequisites.md`.
 - Pressure Requiredness and performance evidence: read `references/performance-pressure-workflow.md`.
 - Architecture and file placement: read `references/module-boundaries.md`.
+- Timing, waiting, retry, polling, deadline, or test-synchronization decisions: read `references/evidence-driven-synchronization.md`.
 - Concurrency, lifetime, permissions, logging, or dependency ownership: read `references/engineering-specialty-rules.md`.
 - Engineering closure or transferable handoff: read `references/handoff-contract.md`.
 
@@ -88,6 +92,7 @@ Apply FlowTab's project-specific engineering contract to repository changes and 
 - `references/ui-automation-prerequisites.md`
 - `references/performance-pressure-workflow.md`
 - `references/module-boundaries.md`
+- `references/evidence-driven-synchronization.md`
 - `references/engineering-specialty-rules.md`
 - `references/handoff-contract.md`
 - `scripts/test_asset_model.py`
