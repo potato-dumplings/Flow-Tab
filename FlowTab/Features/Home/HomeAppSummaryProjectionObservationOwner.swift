@@ -11,7 +11,7 @@ struct HomeAppSummaryProjectionObservationEvidence: Equatable {
     let observationGeneration: UInt64
     let readbackCount: Int
     let source: HomeAppSummaryProjectionObservationSource
-    let transition: HomeAppSummaryProjectionTransition
+    let transition: HomeProjectionEvidenceTransition
     let projectionRead: HomeAppSummaryProjectionRead
 
     var shouldApply: Bool {
@@ -27,7 +27,7 @@ final class HomeAppSummaryProjectionObservationOwner: ObservableObject {
         let onEvidence:
             @MainActor (HomeAppSummaryProjectionObservationEvidence) -> Void
         var readbackCount: Int
-        var lastAcceptedState: HomeAppSummaryProjectionState?
+        var lastAcceptedState: HomeProjectionEvidenceState?
     }
 
     private let runtimeProjectionService: any RuntimeProjectionServing
@@ -162,8 +162,8 @@ final class HomeAppSummaryProjectionObservationOwner: ObservableObject {
 
         let projectionRead = HomeAppSummaryProjectionReadback
             .read(from: runtimeProjectionService)
-        let state = HomeAppSummaryProjectionState(projectionRead)
-        let transition = HomeAppSummaryProjectionTransitionResolver.transition(
+        let state = HomeProjectionEvidenceState(projectionRead)
+        let transition = HomeProjectionEvidenceTransitionResolver.transition(
             from: active.lastAcceptedState,
             to: state
         )

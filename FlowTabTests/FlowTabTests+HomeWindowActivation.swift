@@ -535,45 +535,6 @@ extension FlowTabTests {
         XCTAssertEqual(runtimeProjectionService.appSwitcherProjectionReadCount(), 0)
     }
 
-    func testHomeRuntimeRefreshReaderSignalsScopedRepairWhenProjectionIsMissing() {
-        let appID = "com.example.home-refresh-missing"
-        let cachedDetailProjection = makeHomeActivationDetailProjection(
-            appID: appID,
-            windows: [
-                WindowCandidate(
-                    id: "cached-window",
-                    title: "Cached Window",
-                    isMinimized: false,
-                    lastActiveAt: 420
-                )
-            ]
-        )
-        let runtimeProjectionService = RecordingRuntimeProjectionService()
-
-        XCTAssertEqual(
-            HomeRuntimeRefreshReader.appSummary(
-                for: appID,
-                from: runtimeProjectionService,
-                current: [cachedDetailProjection.summary]
-            )?.windowCount,
-            1
-        )
-        XCTAssertEqual(
-            HomeRuntimeRefreshReader.appDetailProjection(
-                for: appID,
-                from: runtimeProjectionService,
-                current: cachedDetailProjection,
-                currentSummary: cachedDetailProjection.summary
-            )?.candidate.windows.map(\.id),
-            ["cached-window"]
-        )
-        XCTAssertEqual(
-            runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(),
-            []
-        )
-        XCTAssertEqual(runtimeProjectionService.appWindowChangeSignalsRecorded().map(\.appID), [appID, appID])
-    }
-
     func testHomeRuntimeProjectionReaderPreservesLatestProjectionOrder() {
         let refreshedSummaries = [
             makeHomeAppSummary(
@@ -636,32 +597,6 @@ extension FlowTabTests {
             "Browser Updated",
         ])
         XCTAssertEqual(read?.summaries.map(\.windowCount), [3, 2, 4, 5])
-    }
-
-    func testHomeRuntimeRefreshReaderRetriesIncompleteEmptyDetailProjection() {
-        let appID = "com.example.home-refresh-incomplete-empty"
-        let detailProjection = makeHomeActivationDetailProjection(
-            appID: appID,
-            windows: [],
-            isCompleteForScope: false
-        )
-        let runtimeProjectionService = RecordingRuntimeProjectionService(
-            homeDetailProjectionsByAppID: [appID: detailProjection]
-        )
-
-        XCTAssertEqual(
-            HomeRuntimeRefreshReader.appDetailProjection(
-                for: appID,
-                from: runtimeProjectionService,
-                current: nil,
-                currentSummary: detailProjection.summary
-            )?.candidate.windows,
-            []
-        )
-        XCTAssertEqual(
-            runtimeProjectionService.appWindowChangeSignalsRecorded().map(\.appID),
-            [appID]
-        )
     }
 
     func testHomeAppVisibilityPresentationKeepsHiddenAppsLast() {

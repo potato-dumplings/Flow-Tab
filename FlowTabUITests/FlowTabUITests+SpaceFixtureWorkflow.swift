@@ -232,8 +232,8 @@ extension FlowTabUITests {
         assertValue(of: fixtureAppRow, equals: "1w", timeout: 15)
         waitForRuntimeLogFiles(
             containing: [
-                "homeRefreshSingleApp begin appID=\(identity.bundleIdentifier)",
-                "reason=ax_window_changed"
+                "homeAppDetailProjectionRead result=observed appID=\(identity.bundleIdentifier)",
+                "reason=ax_window_destroyed"
             ],
             since: mutationLogSnapshot,
             timeout: 8

@@ -120,7 +120,7 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     private let lock = NSLock()
     private var appSwitcherProjection: RuntimeAppSwitcherProjection?
     private var homeSummaryProjection: RuntimeHomeSummaryProjection?
-    private let homeDetailProjectionsByAppID: [String: RuntimeHomeAppDetailProjection]
+    private var homeDetailProjectionsByAppID: [String: RuntimeHomeAppDetailProjection]
     private var currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection]
     private let focusedCurrentAppWindowProjectionRead: RuntimeFocusedCurrentAppWindowProjectionRead?
     private let activationTargetProjection: RuntimeActivationTargetProjection?
@@ -143,6 +143,8 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     ] = []
     private var appWindowChangeSignals: [(appID: String, pid: pid_t)] = []
     private var selectedCurrentAppWindowChangeSignals: [(appID: String, pid: pid_t)] = []
+    private var selectedCurrentAppWindowChangeSignalHandler:
+        ((String, pid_t) -> Void)?
     private var appTerminationSignals: [(appID: String, pid: pid_t)] = []
     private var windowFocusVerifiedSignals: [(appID: String, pid: pid_t)] = []
     private var windowFocusVerificationSignals: [RuntimeWindowFocusVerification] = []
@@ -349,6 +351,14 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         return selectedCurrentAppWindowChangeSignals
     }
 
+    func setSelectedCurrentAppWindowChangeSignalHandler(
+        _ handler: ((String, pid_t) -> Void)?
+    ) {
+        lock.lock()
+        selectedCurrentAppWindowChangeSignalHandler = handler
+        lock.unlock()
+    }
+
     func appTerminationSignalsRecorded() -> [(appID: String, pid: pid_t)] {
         lock.lock()
         defer { lock.unlock() }
@@ -404,9 +414,22 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
 
     func readHomeAppDetailProjection(appID: String) -> RuntimeHomeAppDetailProjection? {
         lock.lock()
+        defer { lock.unlock() }
         homeDetailProjectionReadsByAppID[appID, default: 0] += 1
-        lock.unlock()
         return homeDetailProjectionsByAppID[appID]
+    }
+
+    func setHomeDetailProjection(
+        _ projection: RuntimeHomeAppDetailProjection?,
+        appID: String
+    ) {
+        lock.lock()
+        if let projection {
+            homeDetailProjectionsByAppID[appID] = projection
+        } else {
+            homeDetailProjectionsByAppID.removeValue(forKey: appID)
+        }
+        lock.unlock()
     }
 
     func readCurrentAppWindowProjection(appID: String) -> RuntimeCurrentAppWindowProjection? {
@@ -517,7 +540,9 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     func signalSelectedCurrentAppWindowsChanged(appID: String, pid: pid_t) {
         lock.lock()
         selectedCurrentAppWindowChangeSignals.append((appID, pid))
+        let handler = selectedCurrentAppWindowChangeSignalHandler
         lock.unlock()
+        handler?(appID, pid)
     }
 
     func signalFocusedCurrentAppWindowsChanged() {
