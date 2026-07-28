@@ -63,28 +63,21 @@ extension FlowTabTests {
         coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
-        XCTAssertTrue(coordinator.appendQueryText("fari"))
-        drainPendingSearchRebuild(on: coordinator)
+        XCTAssertTrue(coordinator.appendQueryTextWithoutRebuild("fari"))
+        rebuildSearchResults(on: coordinator)
         XCTAssertEqual(coordinator.state.results.map(\.primaryText), ["Safari"])
     }
 
-    func testSearchDebouncedRebuildIgnoresStaleGeneration() {
+    func testSearchCoordinatorQueryMutationRebuildsSynchronously() {
         let coordinator = SwitcherSearchCoordinator()
         coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
         XCTAssertTrue(coordinator.appendQueryText("fari"))
-        let pendingRebuild = coordinator.pendingRebuildWorkItem
-        coordinator.pendingRebuildGeneration &+= 1
+        XCTAssertEqual(coordinator.state.results.map(\.primaryText), ["Safari"])
 
-        pendingRebuild?.perform()
-
-        XCTAssertNotNil(coordinator.pendingRebuildWorkItem)
-        XCTAssertNotEqual(coordinator.state.results.map(\.primaryText), ["Safari"])
-
-        coordinator.flushPendingRebuild()
-
-        XCTAssertNil(coordinator.pendingRebuildWorkItem)
+        XCTAssertTrue(coordinator.deleteBackwardInQuery())
+        XCTAssertEqual(coordinator.state.query, "far")
         XCTAssertEqual(coordinator.state.results.map(\.primaryText), ["Safari"])
     }
 
@@ -126,8 +119,8 @@ extension FlowTabTests {
         coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
-        XCTAssertTrue(coordinator.appendQueryText("flow search"))
-        drainPendingSearchRebuild(on: coordinator)
+        XCTAssertTrue(coordinator.appendQueryTextWithoutRebuild("flow search"))
+        rebuildSearchResults(on: coordinator)
         XCTAssertEqual(coordinator.state.results.map(\.primaryText), ["FlowTabSearch"])
     }
 
@@ -227,13 +220,13 @@ extension FlowTabTests {
         coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
-        XCTAssertTrue(coordinator.appendQueryText("wx"))
-        drainPendingSearchRebuild(on: coordinator)
+        XCTAssertTrue(coordinator.appendQueryTextWithoutRebuild("wx"))
+        rebuildSearchResults(on: coordinator)
         XCTAssertEqual(coordinator.state.results.map(\.primaryText), ["微信"])
 
         _ = coordinator.handleEscape()
-        XCTAssertTrue(coordinator.appendQueryText("weixin"))
-        drainPendingSearchRebuild(on: coordinator)
+        XCTAssertTrue(coordinator.appendQueryTextWithoutRebuild("weixin"))
+        rebuildSearchResults(on: coordinator)
         XCTAssertEqual(coordinator.state.results.map(\.primaryText), ["微信"])
     }
 
@@ -242,8 +235,8 @@ extension FlowTabTests {
         coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
-        XCTAssertTrue(coordinator.appendQueryText("文件助手"))
-        drainPendingSearchRebuild(on: coordinator)
+        XCTAssertTrue(coordinator.appendQueryTextWithoutRebuild("文件助手"))
+        rebuildSearchResults(on: coordinator)
         XCTAssertEqual(coordinator.state.results.map(\.primaryText), ["文件传输助手"])
     }
 
@@ -252,8 +245,8 @@ extension FlowTabTests {
         coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
-        XCTAssertTrue(coordinator.appendQueryText("vsc"))
-        drainPendingSearchRebuild(on: coordinator)
+        XCTAssertTrue(coordinator.appendQueryTextWithoutRebuild("vsc"))
+        rebuildSearchResults(on: coordinator)
         XCTAssertEqual(coordinator.state.results.map(\.primaryText), ["Visual Studio Code"])
     }
 
@@ -262,8 +255,8 @@ extension FlowTabTests {
         coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
-        XCTAssertTrue(coordinator.appendQueryText("vce"))
-        drainPendingSearchRebuild(on: coordinator)
+        XCTAssertTrue(coordinator.appendQueryTextWithoutRebuild("vce"))
+        rebuildSearchResults(on: coordinator)
         XCTAssertEqual(coordinator.state.results.map(\.primaryText), ["Visual Studio Code"])
     }
 
@@ -272,13 +265,13 @@ extension FlowTabTests {
         coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
-        XCTAssertTrue(coordinator.appendQueryText("wechat"))
-        drainPendingSearchRebuild(on: coordinator)
+        XCTAssertTrue(coordinator.appendQueryTextWithoutRebuild("wechat"))
+        rebuildSearchResults(on: coordinator)
         XCTAssertEqual(coordinator.state.results.map(\.primaryText), ["微信"])
 
         _ = coordinator.handleEscape()
-        XCTAssertTrue(coordinator.appendQueryText("com"))
-        drainPendingSearchRebuild(on: coordinator)
+        XCTAssertTrue(coordinator.appendQueryTextWithoutRebuild("com"))
+        rebuildSearchResults(on: coordinator)
         XCTAssertTrue(coordinator.state.results.isEmpty)
     }
 
@@ -287,9 +280,9 @@ extension FlowTabTests {
         coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
-        XCTAssertTrue(coordinator.appendQueryText("c"))
-        XCTAssertTrue(coordinator.appendQueryText("s"))
-        drainPendingSearchRebuild(on: coordinator)
+        XCTAssertTrue(coordinator.appendQueryTextWithoutRebuild("c"))
+        XCTAssertTrue(coordinator.appendQueryTextWithoutRebuild("s"))
+        rebuildSearchResults(on: coordinator)
 
         XCTAssertEqual(coordinator.state.results.first?.primaryText, "测试")
         XCTAssertEqual(coordinator.state.selectedResult?.primaryText, "测试")
@@ -302,15 +295,15 @@ extension FlowTabTests {
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
         let expectedKind = SwitcherSearchResultKind.app(appID: "com.xxx.test")
-        XCTAssertTrue(coordinator.appendQueryText("t"))
-        drainPendingSearchRebuild(on: coordinator)
+        XCTAssertTrue(coordinator.appendQueryTextWithoutRebuild("t"))
+        rebuildSearchResults(on: coordinator)
         let firstStepResults = Set(coordinator.state.results.map(\.primaryText))
         XCTAssertTrue(firstStepResults.contains("FlowTabSearch"), "Query \(coordinator.state.query)")
         XCTAssertTrue(firstStepResults.contains("测试"), "Query \(coordinator.state.query)")
 
         for suffix in ["e", "s", "t"] {
-            XCTAssertTrue(coordinator.appendQueryText(suffix))
-            drainPendingSearchRebuild(on: coordinator)
+            XCTAssertTrue(coordinator.appendQueryTextWithoutRebuild(suffix))
+            rebuildSearchResults(on: coordinator)
             XCTAssertEqual(coordinator.state.results.first?.primaryText, "测试", "Query \(coordinator.state.query)")
             XCTAssertEqual(coordinator.state.selectedResult?.primaryText, "测试", "Query \(coordinator.state.query)")
             XCTAssertEqual(coordinator.state.selectedResult?.kind, expectedKind, "Query \(coordinator.state.query)")
@@ -322,9 +315,9 @@ extension FlowTabTests {
         coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleAppsForSharedCSQuery()))
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
-        XCTAssertTrue(coordinator.appendQueryText("c"))
-        XCTAssertTrue(coordinator.appendQueryText("s"))
-        drainPendingSearchRebuild(on: coordinator)
+        XCTAssertTrue(coordinator.appendQueryTextWithoutRebuild("c"))
+        XCTAssertTrue(coordinator.appendQueryTextWithoutRebuild("s"))
+        rebuildSearchResults(on: coordinator)
 
         XCTAssertEqual(
             Set(coordinator.state.results.map(\.primaryText)),
@@ -337,12 +330,12 @@ extension FlowTabTests {
         coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchCacheMissSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
-        XCTAssertTrue(coordinator.appendQueryText("t"))
-        drainPendingSearchRebuild(on: coordinator)
+        XCTAssertTrue(coordinator.appendQueryTextWithoutRebuild("t"))
+        rebuildSearchResults(on: coordinator)
         XCTAssertEqual(coordinator.state.results.map(\.primaryText), ["Tool"])
 
-        XCTAssertTrue(coordinator.appendQueryText("e"))
-        drainPendingSearchRebuild(on: coordinator)
+        XCTAssertTrue(coordinator.appendQueryTextWithoutRebuild("e"))
+        rebuildSearchResults(on: coordinator)
         XCTAssertTrue(
             coordinator.state.results.map(\.primaryText).contains("终端"),
             "Expected te to recover 终端 via full-scan fallback, got \(coordinator.state.results.map(\.primaryText))"
@@ -354,8 +347,8 @@ extension FlowTabTests {
         coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .window))
 
-        XCTAssertTrue(coordinator.appendQueryText("wx"))
-        drainPendingSearchRebuild(on: coordinator)
+        XCTAssertTrue(coordinator.appendQueryTextWithoutRebuild("wx"))
+        rebuildSearchResults(on: coordinator)
         XCTAssertEqual(coordinator.state.results.map(\.secondaryText), ["微信", "微信"])
     }
 
@@ -364,8 +357,8 @@ extension FlowTabTests {
         coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .app))
 
-        XCTAssertTrue(coordinator.appendQueryText("wjc"))
-        drainPendingSearchRebuild(on: coordinator)
+        XCTAssertTrue(coordinator.appendQueryTextWithoutRebuild("wjc"))
+        rebuildSearchResults(on: coordinator)
         XCTAssertEqual(coordinator.state.results.map(\.primaryText), ["文件传输助手"])
     }
 
@@ -399,8 +392,8 @@ extension FlowTabTests {
         coordinator.rebuildIndex(with: runtimeSearchIndexProjection(from: searchSampleApps()))
         XCTAssertTrue(coordinator.activate(defaultScope: .window))
 
-        XCTAssertTrue(coordinator.appendQueryText("search coordinator"))
-        drainPendingSearchRebuild(on: coordinator)
+        XCTAssertTrue(coordinator.appendQueryTextWithoutRebuild("search coordinator"))
+        rebuildSearchResults(on: coordinator)
         XCTAssertEqual(
             coordinator.state.results.map(\.primaryText),
             ["FlowTab - SwitcherSearchCoordinator.swift"]

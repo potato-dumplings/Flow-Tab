@@ -96,7 +96,7 @@ and Process/Tooling.
 | SYNC-040 | `HomeLandingView.scheduleAppSummariesRefresh`, `HomeAppSummaryProjectionObservationOwner`; general Home app-summary refresh | A fixed 220ms post-signal delay assumed app-switcher projection commits had followed workspace and runtime refresh signals. Evidence migration. | Install the exact runtime-service observer before the baseline readback. Apply committed notification readbacks only for a newly available projection, a monotonic source generation, or same-generation completeness. App activation and permission changes request service-owned maintenance, followed by an independent request-return readback. Home active visibility owns the observation generation, subscription, cancellation, and initial-owner handoff. | H; Unit, Behavior, Home UI, runtime-topology Pressure. | completed |
 | SYNC-041 | `HomeLandingView.requestSelectedAppRefresh`, `requestAppDetailProjection`, `HomeAppDetailProjectionObservationOwner`; selected/scoped Home detail | Fixed 120ms and 220ms post-selection or AX-signal delays assumed the requested current-app projection had committed. Evidence migration. | Install the exact runtime-service observer before the initial readback and selected/app-window/AX-destroy signal. Filter by exact appID and projection identity; apply an exact complete baseline immediately while retaining the trigger observation, then accept a newly available projection, monotonic source generation, or same-generation completeness transition. Independent request-return readback closes synchronous completion races. Home visibility and per-app request generations own subscriptions, cancellation, and stale-event rejection. | H; Unit, Behavior, selected-app Home UI, runtime-topology Pressure. | blocked: implementation, focused Unit/Behavior, full FlowTabTests, tab-switch Pressure, and Process passed; UI automation and full Priority order-isolation evidence are recorded below |
 | SYNC-014 | `FlowTab/App/AppFoundation.swift`; `AppWindowCoordinator.scheduleAccessoryPolicyRestoration` | Up to 250 polls at 20ms infer that a status-item-opened regular window is active and visible. Conditional observation plus watchdog. | Register app/window observers before presentation, perform immediate visibility/activation readback, and complete on the matching window transition. A named cancellable condition observer is the fallback; watchdog diagnostics include app-active, visible, miniaturized, and activation-policy state. `AppWindowCoordinator` owns the task/observers. | H; Unit, Behavior, status-item UI. | completed; the expanded full Priority run's assigned SYNC-032/SYNC-033 order-isolation failure is recorded below |
-| SYNC-015 | `SwitcherSearchCoordinator.scheduleRebuild`, `LiveSwitcherModel.scheduleSearchComputation` | 10–45ms delays debounce query work; result publication already requires revision and query/scope equality. Domain duration. | Retain as one named search scheduling policy with injectable scheduler/clock, cancellation, and revision Oracle. Remove duplicate scheduling ownership if both paths serve the same contract. | H hot path; Unit, Behavior, Search UI, realistic/stress Search Pressure. | verification-needed |
+| SYNC-015 | `SwitcherSearchCoordinator.scheduleRebuild`, `LiveSwitcherModel.scheduleSearchComputation` | 10–45ms delays debounce query work; result publication already requires revision and query/scope equality. Domain duration. | Retain as one named search scheduling policy with injectable scheduler/clock, cancellation, and revision Oracle. Remove duplicate scheduling ownership if both paths serve the same contract. | H hot path; Unit, Behavior, Search UI, realistic/stress Search Pressure. | completed; the expanded full Priority run's assigned SYNC-032/SYNC-033 order-isolation failure is recorded below |
 | SYNC-016 | `FlowTab/Features/Settings/HotkeySettingsCard.swift`; `updateTakeoverStatus` | A 250ms delay is treated as confirmation that Command+Tab takeover stayed inactive. Evidence migration. | Publish registration result/marker generation from the hotkey owner and render status from that readback. The card observes before requesting registration and owns subscription cleanup. | M; Unit, Behavior, Settings UI. | planned |
 | SYNC-017 | `SwitcherPanelController+InputHandling.swift`; modifier-release confirmation and replay suppression | Hardware release is inferred from repeated samples after fixed intervals. Conditional observation. | Consume flags/key transition events first, immediately read hardware state, and retain named cancellable sampling only for missed global events. Stable released-state samples remain the condition Oracle; session and confirmation generations own cancellation. | H; Unit, Behavior, switcher UI, interaction Pressure. | planned |
 | SYNC-018 | `SwitcherPanelController+Hotkeys.swift`, `+SelectionLifecycle.swift`; tab throttle and post-finish ignore | 16ms and 20ms windows discard input assumed to be duplicate/replayed, so scheduling can change the selected result. Evidence migration. | Deduplicate by concrete event identity and session/input generation, and suppress replay until observed modifier/main-key release. The active presentation session owns the state. | H; Unit, Behavior, switcher UI, interaction Pressure. | planned |
@@ -1032,5 +1032,72 @@ polling cadence, deadline, or timeout in the scoped paths.
   task, 250-attempt counter, and direct success-after-sleep path are absent;
   the remaining sleep is encapsulated by the named cancellable fallback and
   watchdog scheduler.
-- Commit: `refactor(sync): migrate SYNC-014 status item activation`; its exact
-  SHA is appended by the next ledger update after the commit exists.
+- Commit: `d30626e`
+  (`refactor(sync): migrate SYNC-014 status item activation`).
+
+### SYNC-015 Closure Record
+
+- Design and Oracle: `SwitcherSearchCoordinator` is now the synchronous,
+  deterministic search state machine. `LiveSwitcherModel` owns the sole
+  `SwitcherSearchSchedulingOwner`, which debounces and executes search work.
+  Each request captures the exact query, scope, catalog, searchable index, and
+  scheduling revision. A result is published only when the scheduling revision
+  remains current and the model readback still matches the captured query,
+  scope, and index generation. Scheduler latency can change delivery time
+  without becoming a success condition.
+- Lifecycle: the model owns one scheduling owner. The owner owns and cancels
+  both the pending debounce token and computation token, increments a monotonic
+  revision on every request and cancellation, and rejects stale or out-of-order
+  delivery. Callback registration closes the synchronous-callback-before-token-
+  assignment race for injected schedulers and executors. Token cancellation,
+  supersession, explicit model cancellation, and owner deinitialization clean
+  up pending work.
+- Retained time policy: the initial 20ms debounce and adaptive
+  14/25/35/45ms debounce intervals are a named performance policy. The policy,
+  scheduler, and monotonic clock are injectable. Computation duration selects
+  only the next debounce interval; completion and publication depend on
+  revision plus exact model readback. The duplicated coordinator-owned 10ms
+  delay and its work-item lifecycle were removed.
+- Unit and Behavior: the final focused set passed 11/11 under
+  `.build-local/evidence-driven-sync/SYNC-015/flowtabtests-targeted-attempt-004`
+  (eight Unit paths and three Priority behavior paths). Coverage includes the
+  latest revision, initial synchronous execution, cancellation, duplicate and
+  out-of-order completion, synchronous scheduler/executor callbacks, a 100x
+  scheduler-latency change with the same result, policy boundaries, and 2,000
+  supersessions retaining one current request. The complete `FlowTabTests`
+  class passed 283/283 under
+  `.build-local/evidence-driven-sync/SYNC-015/flowtabtests-unit-full-attempt-001`.
+  The complete `FlowTabPriorityCoverageTests` class executed 570 tests under
+  `.build-local/evidence-driven-sync/SYNC-015/flowtabtests-priority-full-attempt-001`;
+  all targeted SYNC-015 behavior paths passed, while
+  `testAppDelegateLaunchWithUITestBootstrapArgumentsSeedsLogsAndOpensSearch`
+  observed the previously recorded duplicate external hotkey reload in suite
+  order. Its exact isolated rerun passed 1/1 under
+  `.build-local/evidence-driven-sync/SYNC-015/priority-existing-failure-rerun-attempt-001`.
+  The order-isolation work remains assigned to SYNC-032/SYNC-033.
+- FlowTabCore: not relevant because search state, model publication, and the
+  scheduling lifecycle are app-target responsibilities.
+- UI: the canonical install script rebuilt and installed the fixed-path signed
+  app. `testSearchPanelChineseQueryShowsChineseMockResult` and
+  `testSearchPanelEntryAndResultActivation` passed 2/2 in 37.924 seconds under
+  `.build-local/evidence-driven-sync/SYNC-015/ui-search-attempt-001`, verifying
+  query input, Chinese result publication, exact result activation, and the
+  affected visible search path.
+- Pressure: realistic Search Pressure passed under
+  `.build-local/evidence-driven-sync/SYNC-015/search-pressure-realistic-attempt-002`
+  with the conformant `flowtab.search.realistic.v1` rhythm, 44.446 active
+  seconds, 71 valid samples, zero cadence gaps, and four successful batches.
+  Stress Search Pressure passed under
+  `.build-local/evidence-driven-sync/SYNC-015/search-pressure-stress-attempt-001`
+  with the conformant `flowtab.search.stress.v1` rhythm, 41.852 active seconds,
+  67 valid samples, zero cadence gaps, and two successful batches. Every
+  committed-index batch reported `resultState=committedGenerationResult` and
+  `freshnessBarrierRequests=0`.
+- Process/Tooling: the app and app-test targets built through the canonical
+  FlowTabTests wrapper, and the UI target built through the canonical install
+  script. Project-file `plutil -lint`, `git diff --check`, scoped stale-symbol
+  search, and source-size checks passed. New production and test files remain
+  within the 400-line guardrail, while the touched oversized
+  `LiveSwitcherModel.swift` shrank by four lines.
+- Commit: `refactor(sync): migrate SYNC-015 search scheduling`; its exact SHA
+  is appended by the next ledger update after the commit exists.

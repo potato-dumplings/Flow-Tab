@@ -176,9 +176,6 @@ final class SwitcherSearchCoordinator {
     var windowMatchCache: ScopeMatchCache?
     var appInvertedIndex = ScopeInvertedIndex(termPostings: [:], bigramPostings: [:])
     var windowInvertedIndex = ScopeInvertedIndex(termPostings: [:], bigramPostings: [:])
-    var pendingRebuildWorkItem: DispatchWorkItem?
-    var pendingRebuildResetSelection: Bool = false
-    var pendingRebuildGeneration: UInt64 = 0
     static let scopeMatchCacheEntryLimit: Int = 32
     static let shortQueryCacheEntryLimit: Int = 12
     static let appTopResultLimit: Int = 300
@@ -192,13 +189,11 @@ final class SwitcherSearchCoordinator {
     static let shortQueryMatchedIndexesLimit: Int = 512
     static let longQueryMatchedIndexesLimit: Int = 2_000
     static let shortQueryThreshold: Int = 2
-    static let queryDebounceNanoseconds: UInt64 = 10_000_000
 
     func rebuildIndex(
         with projection: RuntimeSearchIndexProjection,
         indexStatus: SwitcherSearchIndexStatus? = nil
     ) {
-        cancelPendingRebuild()
         appEntries = projection.appEntries.map { app in
             AppEntry(
                 appID: app.appID,
@@ -231,7 +226,6 @@ final class SwitcherSearchCoordinator {
     }
 
     func resetIndex() {
-        cancelPendingRebuild()
         appEntries = []
         windowEntries = []
         appInvertedIndex = ScopeInvertedIndex(termPostings: [:], bigramPostings: [:])
@@ -259,7 +253,6 @@ final class SwitcherSearchCoordinator {
     @discardableResult
     func exit() -> Bool {
         guard state.isActive else { return false }
-        cancelPendingRebuild()
         state = .inactive
         return true
     }
@@ -321,7 +314,7 @@ final class SwitcherSearchCoordinator {
     @discardableResult
     func appendQueryText(_ value: String) -> Bool {
         guard appendQueryTextWithoutRebuild(value) else { return false }
-        scheduleRebuild(resetSelection: true, debounced: true)
+        rebuildResults(resetSelection: true)
         return true
     }
 
@@ -358,7 +351,7 @@ final class SwitcherSearchCoordinator {
     @discardableResult
     func deleteBackwardInQuery() -> Bool {
         guard deleteBackwardInQueryWithoutRebuild() else { return false }
-        scheduleRebuild(resetSelection: true, debounced: true)
+        rebuildResults(resetSelection: true)
         return true
     }
 
@@ -395,7 +388,6 @@ final class SwitcherSearchCoordinator {
 
     func handleEscape() -> SwitcherSearchEscapeAction {
         guard state.isActive else { return .ignored }
-        cancelPendingRebuild()
         if !state.query.isEmpty {
             state.query = ""
             state.queryCursorPosition = 0
@@ -411,16 +403,6 @@ final class SwitcherSearchCoordinator {
         guard let input = makeComputationInput(resetSelection: resetSelection) else { return }
         let output = Self.computeOutput(from: input)
         _ = applyComputationOutput(output)
-    }
-
-    func flushPendingRebuild() {
-        guard pendingRebuildWorkItem != nil else { return }
-        pendingRebuildWorkItem?.cancel()
-        pendingRebuildWorkItem = nil
-        pendingRebuildGeneration &+= 1
-        let resetSelection = pendingRebuildResetSelection
-        pendingRebuildResetSelection = false
-        rebuildResults(resetSelection: resetSelection)
     }
 
     func makeComputationInput(resetSelection: Bool) -> ComputationInput? {
@@ -451,38 +433,5 @@ final class SwitcherSearchCoordinator {
         state.results = output.results
         state.selectedResultIndex = output.selectedResultIndex
         return state != oldState
-    }
-    func cancelPendingRebuild() {
-        pendingRebuildWorkItem?.cancel()
-        pendingRebuildWorkItem = nil
-        pendingRebuildResetSelection = false
-        pendingRebuildGeneration &+= 1
-    }
-
-    func scheduleRebuild(resetSelection: Bool, debounced: Bool) {
-        guard state.isActive else { return }
-        pendingRebuildResetSelection = pendingRebuildResetSelection || resetSelection
-        pendingRebuildWorkItem?.cancel()
-        pendingRebuildGeneration &+= 1
-        let scheduledGeneration = pendingRebuildGeneration
-
-        let workItem = DispatchWorkItem { [weak self] in
-            guard let self else { return }
-            guard self.pendingRebuildGeneration == scheduledGeneration else { return }
-            let shouldResetSelection = self.pendingRebuildResetSelection
-            self.pendingRebuildResetSelection = false
-            self.pendingRebuildWorkItem = nil
-            self.rebuildResults(resetSelection: shouldResetSelection)
-        }
-        pendingRebuildWorkItem = workItem
-
-        if debounced {
-            DispatchQueue.main.asyncAfter(
-                deadline: .now() + .nanoseconds(Int(Self.queryDebounceNanoseconds)),
-                execute: workItem
-            )
-        } else {
-            DispatchQueue.main.async(execute: workItem)
-        }
     }
 }
