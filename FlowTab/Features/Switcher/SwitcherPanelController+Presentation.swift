@@ -28,7 +28,6 @@ extension SwitcherPanelController {
 
     func searchTraceStateSummary() -> String {
         let now = ProcessInfo.processInfo.systemUptime
-        let activeSpaceIgnoreMs = max(0, (ignoreActiveSpaceChangesUntil - now) * 1_000)
         let terminateProtectionMs = max(0, (terminateInterruptionProtectionUntil - now) * 1_000)
         let searchIndexTraceFields = model.lastSearchIndexReadDiagnostic?.searchTraceFields
             ?? [
@@ -38,18 +37,7 @@ extension SwitcherPanelController {
                 "searchIndexCoversCurrentGeneration=0",
                 "searchFreshnessBarrierRequested=0"
             ].joined(separator: " ")
-        return "panelVisible=\(isPanelPresented ? 1 : 0) panelKey=\(panel.isKeyWindow ? 1 : 0) appActive=\(isAppCurrentlyActive ? 1 : 0) searchActive=\(model.isSearchActive ? 1 : 0) inputFocused=\(model.isSearchInputFocused ? 1 : 0) marked=\(model.hasMarkedSearchText ? 1 : 0) firstResponder=\(panelFirstResponderDebugName()) activeSpaceIgnoreMs=\(formatMilliseconds(activeSpaceIgnoreMs)) terminateProtectionMs=\(formatMilliseconds(terminateProtectionMs)) \(searchIndexTraceFields)"
-    }
-
-    func beginIgnoringActiveSpaceChanges(trigger: String) {
-        ignoreActiveSpaceChangesUntil = ProcessInfo.processInfo.systemUptime + activeSpaceChangeIgnoreWindow
-        logSearchTrace(
-            "activeSpaceIgnore trigger=\(trigger) durationMs=\(formatMilliseconds(activeSpaceChangeIgnoreWindow * 1_000)) \(searchTraceStateSummary())"
-        )
-    }
-
-    func shouldIgnoreActiveSpaceDidChange() -> Bool {
-        ProcessInfo.processInfo.systemUptime < ignoreActiveSpaceChangesUntil
+        return "panelVisible=\(isPanelPresented ? 1 : 0) panelKey=\(panel.isKeyWindow ? 1 : 0) appActive=\(isAppCurrentlyActive ? 1 : 0) searchActive=\(model.isSearchActive ? 1 : 0) inputFocused=\(model.isSearchInputFocused ? 1 : 0) marked=\(model.hasMarkedSearchText ? 1 : 0) firstResponder=\(panelFirstResponderDebugName()) activeSpaceTransitionPending=\(hasPendingActiveSpaceTransitionObservation ? 1 : 0) applicationActivationSuppressed=\(isApplicationActivationSuppressedForActiveSpaceTransition ? 1 : 0) terminateProtectionMs=\(formatMilliseconds(terminateProtectionMs)) \(searchIndexTraceFields)"
     }
 
     func beginTerminateInterruptionProtection(
@@ -182,8 +170,6 @@ extension SwitcherPanelController {
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
         let secondOrderReadyMs = monotonicMilliseconds()
-        beginIgnoringActiveSpaceChanges(trigger: trigger)
-        let ignoreReadyMs = monotonicMilliseconds()
         scheduleInitialPanelVisibilityRecovery(
             trigger: trigger,
             initialVisibilityGeneration: initialVisibilityGeneration
@@ -205,7 +191,6 @@ extension SwitcherPanelController {
             firstOrderReadyMs: firstOrderReadyMs,
             hideReadyMs: hideReadyMs,
             secondOrderReadyMs: secondOrderReadyMs,
-            ignoreReadyMs: ignoreReadyMs,
             recoveryReadyMs: recoveryReadyMs,
             monitorReadyMs: monitorReadyMs,
             autoEnterReadyMs: presentedMs
@@ -306,6 +291,7 @@ extension SwitcherPanelController {
     func endPresentationSession() {
         guard isPanelPresented || hasActivePresentationSession else { return }
         invalidatePresentationSessionGeneration(trigger: "endPresentationSession")
+        cancelActiveSpaceTransitionObservation()
         cancelPanelPresentationRecovery()
         clearInitialPresentationVisibilityTracking(invalidate: true)
         removeEventMonitors()
@@ -317,9 +303,7 @@ extension SwitcherPanelController {
         activeHotkeySessionKind = nil
         activePresentationScreen = nil
         lastSearchLayoutSizingLogSummary = nil
-        ignoreActiveSpaceChangesUntil = 0
         terminateInterruptionProtectionUntil = 0
-        suppressApplicationActivationUntil = 0
         panelVisibilityRecoveryState = .idle
         if panelVisibilityOverride != nil {
             panelVisibilityOverride = false

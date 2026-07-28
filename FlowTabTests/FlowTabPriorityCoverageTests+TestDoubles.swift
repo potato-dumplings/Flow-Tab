@@ -148,7 +148,7 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     private var currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection]
     private let focusedCurrentAppWindowProjectionRead: RuntimeFocusedCurrentAppWindowProjectionRead?
     private let activationTargetProjection: RuntimeActivationTargetProjection?
-    private let spaceTopologyProjection: RuntimeSpaceTopologyProjection?
+    private var spaceTopologyProjection: RuntimeSpaceTopologyProjection?
     private var committedSearchIndexRead: RuntimeSearchIndexRead?
     private var appSwitcherProjectionReads = 0
     private var homeSummaryProjectionReads = 0
@@ -306,6 +306,14 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         lock.lock()
         defer { lock.unlock() }
         return spaceTopologyProjectionReads
+    }
+
+    func setSpaceTopologyProjection(
+        _ projection: RuntimeSpaceTopologyProjection?
+    ) {
+        lock.lock()
+        spaceTopologyProjection = projection
+        lock.unlock()
     }
 
     func committedSearchIndexReadCount() -> Int {

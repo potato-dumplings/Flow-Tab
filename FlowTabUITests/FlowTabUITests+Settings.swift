@@ -315,7 +315,9 @@ extension FlowTabUITests {
         firstLaunchApp.activate()
         firstLaunchApp.typeKey(.space, modifierFlags: .option)
         waitForRuntimeLogFiles(
-            containing: ["activeSpaceIgnore trigger=global_show"],
+            containing: [
+                "presentationRecovery trigger=global_show action=trackInitialVisibility"
+            ],
             since: hotkeyTriggerLogSnapshot
         )
         waitForRuntimeLogFiles(
@@ -424,7 +426,7 @@ extension FlowTabUITests {
             waitForRuntimeLogFiles(
                 containing: [
                     "hotkeyPressed dir=forward panelVisible=0 action=show",
-                    "activeSpaceIgnore trigger=global_show",
+                    "presentationRecovery trigger=global_show action=trackInitialVisibility",
                     "HotKey Forward"
                 ],
                 since: logSnapshot
@@ -665,7 +667,7 @@ extension FlowTabUITests {
             waitForRuntimeLogFiles(
                 containing: [
                     "inAppHotkeyPressed dir=forward panelVisible=0 action=show",
-                    "activeSpaceIgnore trigger=in_app_show",
+                    "presentationRecovery trigger=in_app_show action=trackInitialVisibility",
                     "InApp Window Forward"
                 ],
                 since: logSnapshot

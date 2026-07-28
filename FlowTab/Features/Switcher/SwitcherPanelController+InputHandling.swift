@@ -350,37 +350,12 @@ extension SwitcherPanelController {
     }
 
     func handleActiveSpaceDidChange() {
-        model.signalSpaceTopologyChanged()
-        guard isPanelPresented else { return }
-        if shouldIgnoreActiveSpaceDidChange() {
-            logSearchTrace("systemInterruption trigger=activeSpaceDidChange action=ignored reason=graceWindow \(searchTraceStateSummary())")
+        guard hasActivePresentationSession else {
+            model.signalSpaceTopologyChanged()
             return
         }
-        if handleProtectedTerminateSystemInterruption(trigger: "activeSpaceDidChange") {
-            return
-        }
-        guard let sessionKind = activeHotkeySessionKind else {
-            cancelSelectionForSystemInterruption(trigger: "activeSpaceDidChange")
-            return
-        }
-        let shouldKeepSessionVisible = model.isSearchActive
-            || isPrimaryModifierPressedInHardwareState(for: sessionKind)
-        guard shouldKeepSessionVisible else {
-            logSearchTrace(
-                "systemInterruption trigger=activeSpaceDidChange action=cancel reason=modifierReleased \(searchTraceStateSummary())"
-            )
-            cancelSelectionForSystemInterruption(trigger: "activeSpaceDidChange")
-            return
-        }
-        logSearchTrace(
-            "systemInterruption trigger=activeSpaceDidChange action=migrate reason=spaceChanged \(searchTraceStateSummary())"
-        )
-        suppressApplicationActivationUntil = ProcessInfo.processInfo.systemUptime
-            + activeSpaceMigrationActivationSuppressionWindow
-        schedulePanelVisibilityRecovery(
-            trigger: "activeSpaceDidChange",
-            cancelSessionOnFailure: true,
-            activateApplicationIfNeeded: false
+        beginActiveSpaceTransitionObservation(
+            trigger: "activeSpaceDidChange"
         )
     }
 
@@ -446,11 +421,11 @@ extension SwitcherPanelController {
             duration: postTerminateRefreshInterruptionProtectionWindow,
             extendExisting: true
         )
-        beginIgnoringActiveSpaceChanges(trigger: "terminate_refresh")
     }
 
     @discardableResult
     func handleAppSwitcherProjectionDidUpdate() -> Bool {
+        observeActiveSpaceTransitionProjectionUpdate()
         guard isPanelPresented else { return false }
         guard model.handleAppSwitcherProjectionDidUpdate() else { return false }
         resetPointerSelectionGate()

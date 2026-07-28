@@ -170,6 +170,10 @@ extension SwitcherPanelController {
             evidence.presentationGeneration
         ) else { return }
         guard hasActivePresentationSession else { return }
+        completeActiveSpaceMigrationIfNeeded(
+            presentationGeneration: evidence.presentationGeneration,
+            reason: "panelVisible:\(evidence.source.rawValue)"
+        )
         panelVisibilityRecoveryState = .visibleConfirmed(
             trigger: trigger,
             generation: evidence.recoveryGeneration,
@@ -200,6 +204,10 @@ extension SwitcherPanelController {
             failure.presentationGeneration
         ) else { return }
         guard hasActivePresentationSession else { return }
+        completeActiveSpaceMigrationIfNeeded(
+            presentationGeneration: failure.presentationGeneration,
+            reason: "visibilityWatchdog"
+        )
         panelVisibilityRecoveryState = .failed(
             trigger: failure.trigger,
             generation: failure.recoveryGeneration,
@@ -298,9 +306,9 @@ extension SwitcherPanelController {
 
     func activateApplicationForPanelPresentationIfNeeded() {
         guard !isAppCurrentlyActive else { return }
-        guard ProcessInfo.processInfo.systemUptime
-            >= suppressApplicationActivationUntil
-        else { return }
+        guard !isApplicationActivationSuppressedForActiveSpaceTransition else {
+            return
+        }
         if let activateApplicationIgnoringOtherAppsOverride {
             activateApplicationIgnoringOtherAppsOverride()
             return

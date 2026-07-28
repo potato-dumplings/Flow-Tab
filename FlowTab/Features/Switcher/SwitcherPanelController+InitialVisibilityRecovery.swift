@@ -151,7 +151,6 @@ extension SwitcherPanelController {
         logSearchTrace(
             "presentationRecovery trigger=\(trigger) action=complete reason=\(evidence.source.rawValue) generation=\(evidence.observationGeneration) presentationGeneration=\(evidence.presentationGeneration) snapshot{\(evidence.snapshot.logFields)} \(searchTraceStateSummary())"
         )
-        beginIgnoringActiveSpaceChanges(trigger: "\(trigger)_visible")
         scheduleModifierReleaseConfirmationAfterRecoveredPresentationIfNeeded(
             trigger: trigger
         )

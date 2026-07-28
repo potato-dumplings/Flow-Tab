@@ -1419,69 +1419,6 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testSwitcherPanelControllerActiveSpaceChangeKeepsSessionVisibleWithoutReactivatingApp() {
-        let recoveryScheduler =
-            ManualPanelVisibilityRecoveryObservationScheduler()
-        let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: searchScenarioApps())
-        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
-        let controller = SwitcherPanelController(
-            model: model,
-            panelVisibilityRecoveryObservationScheduler:
-                recoveryScheduler
-        )
-        controller.globalPrimaryModifierPressedOverride = true
-        controller.appIsActiveOverride = false
-
-        var activateCallCount = 0
-        controller.activateApplicationIgnoringOtherAppsOverride = {
-            activateCallCount += 1
-        }
-
-        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        controller.panelOcclusionStateOverride = []
-
-        controller.handleActiveSpaceDidChangeForTesting()
-        controller.panelVisibilityOverride = false
-        recoveryScheduler.fireConditionReadback()
-        controller.panelVisibilityOverride = true
-        controller.panelOcclusionStateOverride = .visible
-        controller.handlePanelDidExposeForTesting()
-
-        guard case .visibleConfirmed =
-            controller.panelVisibilityRecoveryState
-        else {
-            return XCTFail(
-                "Active-Space recovery must complete from window evidence."
-            )
-        }
-        XCTAssertNotNil(controller.modelForTesting.session)
-        XCTAssertEqual(activateCallCount, 0)
-        XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
-    }
-
-    @MainActor
-    func testSwitcherPanelControllerActiveSpaceNotificationSignalsRuntimeTopologyChange() async {
-        let runtimeProjectionService = RecordingRuntimeProjectionService()
-        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
-        let controller = SwitcherPanelController(model: model)
-
-        NSWorkspace.shared.notificationCenter.post(
-            name: NSWorkspace.activeSpaceDidChangeNotification,
-            object: nil
-        )
-
-        let didSignalRuntime = await waitUntil(
-            "active space notification signals runtime topology change",
-            timeoutNanoseconds: 1_000_000_000,
-            pollIntervalNanoseconds: 10_000_000
-        ) {
-            runtimeProjectionService.spaceTopologyChangeSignalCount() == 1
-        }
-        XCTAssertTrue(didSignalRuntime)
-        XCTAssertNil(controller.modelForTesting.session)
-    }
-
-    @MainActor
     func testSwitcherPanelPresentationReadsRuntimeSpaceTopologyProjectionForFullscreenLevel() {
         let runtimeProjectionService = RecordingRuntimeProjectionService(
             appSwitcherApps: searchScenarioApps(),
@@ -1532,63 +1469,6 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(controller.panel.level, SwitcherPanelWindowConfiguration.level)
         XCTAssertEqual(runtimeProjectionService.spaceTopologyProjectionReadCount(), 1)
         XCTAssertEqual(runtimeProjectionService.spaceTopologyChangeSignalCount(), 0)
-        controller.cancelSelectionForTesting()
-    }
-
-    @MainActor
-    func testSwitcherPanelControllerActiveSpaceChangeCancelsSessionAfterModifierRelease() {
-        let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: searchScenarioApps())
-        let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
-        let controller = SwitcherPanelController(model: model)
-        controller.globalPrimaryModifierPressedOverride = false
-        controller.globalMainKeyPressedOverride = false
-
-        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        controller.handleActiveSpaceDidChangeForTesting()
-
-        XCTAssertNil(controller.modelForTesting.session)
-        XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
-    }
-
-    @MainActor
-    func testSwitcherPanelControllerTerminateRefreshIgnoresFollowUpActiveSpaceChangeAfterModifierRelease() async {
-        let initialApps = terminateScenarioApps()
-        let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: initialApps)
-        let controller = SwitcherPanelController(
-            model: LiveSwitcherModel(
-                runtimeProjectionService: runtimeProjectionService
-            )
-        )
-        controller.globalPrimaryModifierPressedOverride = false
-        controller.globalMainKeyPressedOverride = false
-
-        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        let terminatedAppID = controller.modelForTesting.selectedApp?.id
-        guard let terminatedAppID else {
-            XCTFail("Expected selected app before terminate refresh")
-            return
-        }
-        XCTAssertEqual(controller.modelForTesting.selectedApp?.id, terminatedAppID)
-        assertAppSwitcherProjectionRead(
-            from: runtimeProjectionService,
-            maintenanceRequests: [.switcherSessionStarted]
-        )
-
-        controller.handleWorkspaceApplicationTerminatedForTesting(appID: terminatedAppID, pid: 42_300)
-
-        XCTAssertEqual(runtimeProjectionService.appTerminationSignalsRecorded().map(\.appID), [terminatedAppID])
-        assertAppSwitcherProjectionRead(
-            from: runtimeProjectionService,
-            readCount: 2,
-            maintenanceRequests: [.switcherSessionStarted]
-        )
-        XCTAssertNotNil(controller.modelForTesting.session)
-        XCTAssertFalse(controller.modelForTesting.session?.apps.contains { $0.id == terminatedAppID } ?? true)
-
-        controller.handleActiveSpaceDidChangeForTesting()
-
-        XCTAssertNotNil(controller.modelForTesting.session)
-        XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
         controller.cancelSelectionForTesting()
     }
 
@@ -1668,40 +1548,6 @@ extension FlowTabPriorityCoverageTests {
         }
         XCTAssertNotNil(occlusionController.modelForTesting.session)
         XCTAssertFalse(occlusionController.suppressHotkeyReplayUntilReleaseForTesting)
-    }
-
-    @MainActor
-    func testSwitcherPanelControllerSystemInterruptionsCloseReplayGateFromObservedRelease() {
-        let releaseScheduler = ManualModifierReleaseObservationScheduler()
-        let releaseEventSource = ManualModifierReleaseEventSource()
-        let controller = makeAppSwitcherProjectionPanelController(
-            modifierReleaseObservationScheduler: releaseScheduler,
-            modifierReleaseEventSource: releaseEventSource
-        )
-        controller.globalPrimaryModifierPressedOverride = false
-        controller.globalMainKeyPressedOverride = false
-
-        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        controller.handleActiveSpaceDidChangeForTesting()
-
-        XCTAssertNil(controller.modelForTesting.session)
-        XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
-
-        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        controller.panelOcclusionStateOverride = []
-        controller.handlePanelOcclusionStateDidChangeForTesting()
-
-        XCTAssertNil(controller.modelForTesting.session)
-        XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
-
-        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
-        controller.appIsActiveOverride = false
-        controller.handlePanelDidResignKeyForTesting()
-
-        XCTAssertNil(controller.modelForTesting.session)
-        XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
-        XCTAssertEqual(releaseEventSource.activeObserverCount, 0)
-        XCTAssertEqual(releaseScheduler.pendingCount, 0)
     }
 
     @MainActor
@@ -2457,7 +2303,9 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(previewLayerFrame.maxY, appLayerFrame.maxY, accuracy: 0.5)
     }
 
-    private func makeCompleteCurrentSpaceFullscreenProjectionForTesting(
+    func makeCompleteCurrentSpaceFullscreenProjectionForTesting(
+        currentSpaceID: Int = 7,
+        spaceGeneration: UInt64 = 1,
         isCompleteForScope: Bool = true,
         pendingRepairScopes: Set<String> = []
     ) -> RuntimeSpaceTopologyProjection {
@@ -2467,13 +2315,13 @@ extension FlowTabPriorityCoverageTests {
             let displayID = CGDirectDisplayID(number.uint32Value)
             return RuntimeDisplaySpaceSignature(
                 displayID: displayID,
-                currentSpaceID: 7,
-                spaceIDs: [7],
+                currentSpaceID: currentSpaceID,
+                spaceIDs: [currentSpaceID],
                 windowIDsBySpaceID: [
-                    7: [240_001]
+                    currentSpaceID: [240_001]
                 ],
                 fullscreenWindowIDBySpaceID: [
-                    7: 240_001
+                    currentSpaceID: 240_001
                 ]
             )
         }
@@ -2481,13 +2329,13 @@ extension FlowTabPriorityCoverageTests {
             ? [
                 RuntimeDisplaySpaceSignature(
                     displayID: nil,
-                    currentSpaceID: 7,
-                    spaceIDs: [7],
+                    currentSpaceID: currentSpaceID,
+                    spaceIDs: [currentSpaceID],
                     windowIDsBySpaceID: [
-                        7: [240_001]
+                        currentSpaceID: [240_001]
                     ],
                     fullscreenWindowIDBySpaceID: [
-                        7: 240_001
+                        currentSpaceID: 240_001
                     ]
                 )
             ]
@@ -2497,7 +2345,8 @@ extension FlowTabPriorityCoverageTests {
             affectedCGWindowIDs: [],
             freshness: RuntimeProjectionFreshness(
                 generatedAt: 10,
-                sourceGeneration: RuntimeReadModelGeneration(space: 1),
+                sourceGeneration:
+                    RuntimeReadModelGeneration(space: spaceGeneration),
                 dirtyAppIDs: [],
                 dirtyPIDs: [],
                 dirtyCGWindowIDs: [],

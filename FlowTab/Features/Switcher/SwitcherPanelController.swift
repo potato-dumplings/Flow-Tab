@@ -133,6 +133,7 @@ final class SwitcherPanelController {
 
     let model: LiveSwitcherModel
     let panel: SwitcherOverlayPanel
+    let runtimeProjectionNotificationObject: AnyObject
 
     var keyDownMonitor: Any?
     var localFlagsChangedMonitor: Any?
@@ -158,6 +159,8 @@ final class SwitcherPanelController {
         InitialPanelVisibilityObservationOwner
     let panelVisibilityRecoveryObservationOwner:
         PanelVisibilityRecoveryObservationOwner
+    let activeSpaceTransitionObservationOwner:
+        ActiveSpaceTransitionObservationOwner
     var modifierReleaseState: ModifierReleaseState = .idle
     var presentationSessionGeneration = 0
     var initialWindowOnlyPreviewRevealTask: Task<Void, Never>?
@@ -168,8 +171,8 @@ final class SwitcherPanelController {
     var delayedWindowLayerTimerGeneration = 0
     var delayedWindowLayerDeadlineMs: Double?
     var delayedWindowLayerAppID: String?
-    var ignoreActiveSpaceChangesUntil: TimeInterval = 0
-    var suppressApplicationActivationUntil: TimeInterval = 0
+    var activeSpaceApplicationActivationSuppression:
+        ActiveSpaceApplicationActivationSuppression?
     var windowLayerPresentationDelay: TimeInterval {
         windowLayerPresentationDelayOverride ?? WindowLayerPreferencesStore.loadAutoEnterDelay()
     }
@@ -186,10 +189,10 @@ final class SwitcherPanelController {
     var hasPendingModifierReleaseConfirmation: Bool {
         modifierReleaseObservationOwner.isObserving(.selectionConfirmation)
     }
-    let activeSpaceChangeIgnoreWindow: TimeInterval = 0.35
     let terminateInterruptionProtectionWindow: TimeInterval = 5.0
     let postTerminateRefreshInterruptionProtectionWindow: TimeInterval = 0.5
     let panelVisibilityRecoveryPolicy: PanelVisibilityRecoveryPolicy = .default
+    let activeSpaceTransitionPolicy: ActiveSpaceTransitionPolicy = .default
     let initialWindowOnlyPreviewRevealTimeoutNs: UInt64 = 250_000_000
     var initialPresentationVisibilityWatchdogInterval: TimeInterval {
         panelVisibilityRecoveryPolicy.initialPresentationWatchdogInterval
@@ -208,8 +211,18 @@ final class SwitcherPanelController {
     {
         initialPanelVisibilityObservationOwner.lastFailure
     }
-    let activeSpaceMigrationActivationSuppressionWindow: TimeInterval = 0.5
     let manualWindowLayerProjectionApplyDelay: TimeInterval = 0.35
+    var activeSpaceTransitionWatchdogInterval: TimeInterval {
+        activeSpaceTransitionPolicy.topologyReadbackWatchdogInterval
+    }
+    var hasPendingActiveSpaceTransitionObservation: Bool {
+        activeSpaceTransitionObservationOwner.isObserving
+    }
+    var lastActiveSpaceTransitionWatchdogFailure:
+        ActiveSpaceTransitionWatchdogFailure?
+    {
+        activeSpaceTransitionObservationOwner.lastFailure
+    }
     var interruptionPresentationRecoveryMaximumAttemptCount: Int {
         panelVisibilityRecoveryPolicy.interruptionMaximumAttemptCount
     }
@@ -305,9 +318,13 @@ final class SwitcherPanelController {
         initialPanelVisibilityObservationScheduler:
             (any InitialPanelVisibilityObservationScheduling)? = nil,
         panelVisibilityRecoveryObservationScheduler:
-            (any PanelVisibilityRecoveryObservationScheduling)? = nil
+            (any PanelVisibilityRecoveryObservationScheduling)? = nil,
+        activeSpaceTransitionObservationScheduler:
+            (any ActiveSpaceTransitionObservationScheduling)? = nil
     ) {
         self.model = model
+        runtimeProjectionNotificationObject =
+            model.runtimeProjectionService as AnyObject
         modifierReleaseObservationOwner = ModifierReleaseObservationOwner(
             scheduler: modifierReleaseObservationScheduler,
             eventSource: modifierReleaseEventSource
@@ -319,6 +336,10 @@ final class SwitcherPanelController {
         panelVisibilityRecoveryObservationOwner =
             PanelVisibilityRecoveryObservationOwner(
                 scheduler: panelVisibilityRecoveryObservationScheduler
+            )
+        activeSpaceTransitionObservationOwner =
+            ActiveSpaceTransitionObservationOwner(
+                scheduler: activeSpaceTransitionObservationScheduler
             )
         panel = SwitcherOverlayPanel(
             contentRect: NSRect(x: 0, y: 0, width: 880, height: 290),
@@ -430,7 +451,7 @@ final class SwitcherPanelController {
         }
         appSwitcherProjectionDidUpdateObserver = NotificationCenter.default.addObserver(
             forName: .runtimeAppSwitcherProjectionDidUpdate,
-            object: nil,
+            object: runtimeProjectionNotificationObject,
             queue: nil
         ) { [weak self] _ in
             Task { @MainActor [weak self] in

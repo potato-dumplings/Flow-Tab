@@ -113,6 +113,10 @@
 		F4D100063D22000100B0D737 /* SwitcherPanelController+VisibilityRecovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4D100053D22000100B0D737 /* SwitcherPanelController+VisibilityRecovery.swift */; };
 		F4D100083D22000100B0D737 /* FlowTabTests+PanelVisibilityRecoveryObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4D100073D22000100B0D737 /* FlowTabTests+PanelVisibilityRecoveryObservation.swift */; };
 		F4D1000A3D22000100B0D737 /* PanelVisibilityRecoveryObservationTestSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4D100093D22000100B0D737 /* PanelVisibilityRecoveryObservationTestSupport.swift */; };
+		F5D100023D23000100B0D737 /* ActiveSpaceTransitionObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5D100013D23000100B0D737 /* ActiveSpaceTransitionObservation.swift */; };
+		F5D100043D23000100B0D737 /* SwitcherPanelController+ActiveSpaceTransition.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5D100033D23000100B0D737 /* SwitcherPanelController+ActiveSpaceTransition.swift */; };
+		F5D100063D23000100B0D737 /* FlowTabTests+ActiveSpaceTransitionObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5D100053D23000100B0D737 /* FlowTabTests+ActiveSpaceTransitionObservation.swift */; };
+		F5D100083D23000100B0D737 /* FlowTabPriorityCoverageTests+ActiveSpaceTransition.swift in Sources */ = {isa = PBXBuildFile; fileRef = F5D100073D23000100B0D737 /* FlowTabPriorityCoverageTests+ActiveSpaceTransition.swift */; };
 		D10000012FF500100B0D737 /* RuntimeProjectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000022FF500100B0D737 /* RuntimeProjectionService.swift */; };
 		D10000032FF500200B0D737 /* RuntimeProjectionServing.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000042FF500200B0D737 /* RuntimeProjectionServing.swift */; };
 		B26010012FE000100B0D737 /* RuntimePerformanceClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26000012FE000100B0D737 /* RuntimePerformanceClock.swift */; };
@@ -419,6 +423,10 @@
 		F4D100053D22000100B0D737 /* SwitcherPanelController+VisibilityRecovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelController+VisibilityRecovery.swift"; sourceTree = "<group>"; };
 		F4D100073D22000100B0D737 /* FlowTabTests+PanelVisibilityRecoveryObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+PanelVisibilityRecoveryObservation.swift"; sourceTree = "<group>"; };
 		F4D100093D22000100B0D737 /* PanelVisibilityRecoveryObservationTestSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PanelVisibilityRecoveryObservationTestSupport.swift; sourceTree = "<group>"; };
+		F5D100013D23000100B0D737 /* ActiveSpaceTransitionObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActiveSpaceTransitionObservation.swift; sourceTree = "<group>"; };
+		F5D100033D23000100B0D737 /* SwitcherPanelController+ActiveSpaceTransition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelController+ActiveSpaceTransition.swift"; sourceTree = "<group>"; };
+		F5D100053D23000100B0D737 /* FlowTabTests+ActiveSpaceTransitionObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+ActiveSpaceTransitionObservation.swift"; sourceTree = "<group>"; };
+		F5D100073D23000100B0D737 /* FlowTabPriorityCoverageTests+ActiveSpaceTransition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+ActiveSpaceTransition.swift"; sourceTree = "<group>"; };
 		F6E7E20135C4000100B0D737 /* RuntimeSearchIndexReadModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeSearchIndexReadModel.swift; sourceTree = "<group>"; };
 		F6E7E30135C4000200B0D737 /* RuntimeProjectionReadModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionReadModels.swift; sourceTree = "<group>"; };
 		D10000022FF500100B0D737 /* RuntimeProjectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionService.swift; sourceTree = "<group>"; };
@@ -707,6 +715,8 @@
 				F3D100033D21000100B0D737 /* FlowTabTests+InitialPanelVisibilityObservation.swift */,
 				F4D100073D22000100B0D737 /* FlowTabTests+PanelVisibilityRecoveryObservation.swift */,
 				F4D100093D22000100B0D737 /* PanelVisibilityRecoveryObservationTestSupport.swift */,
+				F5D100053D23000100B0D737 /* FlowTabTests+ActiveSpaceTransitionObservation.swift */,
+				F5D100073D23000100B0D737 /* FlowTabPriorityCoverageTests+ActiveSpaceTransition.swift */,
 				A12000013C00000100B0D737 /* FlowTabTests+RuntimeLogDeletion.swift */,
 				B7A7E00135C0000100B0D737 /* FlowTabTests+SettingsAppearanceSelectControls.swift */,
 				C1D900013700000100B0D737 /* FlowTabTests+FlowDropdownPlacement.swift */,
@@ -854,6 +864,7 @@
 				D7A200013A21000100B0D737 /* SwitcherPanelController+SelectionLifecycle.swift */,
 				B32000012FF6000100B0D737 /* SwitcherPanelController+InitialVisibilityRecovery.swift */,
 				F4D100053D22000100B0D737 /* SwitcherPanelController+VisibilityRecovery.swift */,
+				F5D100033D23000100B0D737 /* SwitcherPanelController+ActiveSpaceTransition.swift */,
 				B26000032FE000100B0D737 /* SwitcherPanelController+PresentationDiagnostics.swift */,
 				A1B2C4032F73000100B0D737 /* SwitcherPanelController+InputHandling.swift */,
 				F1D100033D1F000100B0D737 /* SwitcherPanelController+ModifierReleaseObservation.swift */,
@@ -869,6 +880,7 @@
 				F3D100013D21000100B0D737 /* InitialPanelVisibilityObservation.swift */,
 				F4D100013D22000100B0D737 /* PanelVisibilityRecoveryObservation+Scheduling.swift */,
 				F4D100033D22000100B0D737 /* PanelVisibilityRecoveryObservation.swift */,
+				F5D100013D23000100B0D737 /* ActiveSpaceTransitionObservation.swift */,
 				A1B2C4072F73000100B0D737 /* LiveSwitcherModel+Types.swift */,
 				B25000012FD000100B0D737 /* LiveSwitcherModel+Diagnostics.swift */,
 				B27000012FF000100B0D737 /* LiveSwitcherModel+Projections.swift */,
@@ -1442,6 +1454,8 @@
 				F4D100023D22000100B0D737 /* PanelVisibilityRecoveryObservation+Scheduling.swift in Sources */,
 				F4D100043D22000100B0D737 /* PanelVisibilityRecoveryObservation.swift in Sources */,
 				F4D100063D22000100B0D737 /* SwitcherPanelController+VisibilityRecovery.swift in Sources */,
+				F5D100023D23000100B0D737 /* ActiveSpaceTransitionObservation.swift in Sources */,
+				F5D100043D23000100B0D737 /* SwitcherPanelController+ActiveSpaceTransition.swift in Sources */,
 				A1B2C4172F73000100B0D737 /* LiveSwitcherModel+Types.swift in Sources */,
 				B25010012FD000100B0D737 /* LiveSwitcherModel+Diagnostics.swift in Sources */,
 				B27010012FF000100B0D737 /* LiveSwitcherModel+Projections.swift in Sources */,
@@ -1481,6 +1495,8 @@
 				F3D100043D21000100B0D737 /* FlowTabTests+InitialPanelVisibilityObservation.swift in Sources */,
 				F4D100083D22000100B0D737 /* FlowTabTests+PanelVisibilityRecoveryObservation.swift in Sources */,
 				F4D1000A3D22000100B0D737 /* PanelVisibilityRecoveryObservationTestSupport.swift in Sources */,
+				F5D100063D23000100B0D737 /* FlowTabTests+ActiveSpaceTransitionObservation.swift in Sources */,
+				F5D100083D23000100B0D737 /* FlowTabPriorityCoverageTests+ActiveSpaceTransition.swift in Sources */,
 				A12000113C00000100B0D737 /* FlowTabTests+RuntimeLogDeletion.swift in Sources */,
 				B7A7E00235C0000100B0D737 /* FlowTabTests+SettingsAppearanceSelectControls.swift in Sources */,
 				C1D900023700000100B0D737 /* FlowTabTests+FlowDropdownPlacement.swift in Sources */,

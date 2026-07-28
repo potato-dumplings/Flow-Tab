@@ -14,7 +14,6 @@ extension SwitcherPanelController {
         firstOrderReadyMs: Double,
         hideReadyMs: Double,
         secondOrderReadyMs: Double,
-        ignoreReadyMs: Double,
         recoveryReadyMs: Double,
         monitorReadyMs: Double,
         autoEnterReadyMs: Double
@@ -30,8 +29,7 @@ extension SwitcherPanelController {
                 + "order1Ms=\(formatMilliseconds(firstOrderReadyMs - levelReadyMs)) "
                 + "hideMs=\(formatMilliseconds(hideReadyMs - firstOrderReadyMs)) "
                 + "order2Ms=\(formatMilliseconds(secondOrderReadyMs - hideReadyMs)) "
-                + "ignoreMs=\(formatMilliseconds(ignoreReadyMs - secondOrderReadyMs)) "
-                + "recoveryScheduleMs=\(formatMilliseconds(recoveryReadyMs - ignoreReadyMs)) "
+                + "recoveryScheduleMs=\(formatMilliseconds(recoveryReadyMs - secondOrderReadyMs)) "
                 + "monitorMs=\(formatMilliseconds(monitorReadyMs - recoveryReadyMs)) "
                 + "autoEnterMs=\(formatMilliseconds(autoEnterReadyMs - monitorReadyMs)) "
                 + "totalMs=\(formatMilliseconds(autoEnterReadyMs - showStartMs))"
