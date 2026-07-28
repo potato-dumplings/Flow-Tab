@@ -92,7 +92,9 @@ and Process/Tooling.
 | SYNC-010 | `RuntimeLogPrivacy.swift`, `RuntimeLogsSection`; diagnostic session expiration | The 15-minute session is an explicit expiration contract; the view advances a one-second loop to notice expiry. Domain duration. | Retain the expiration deadline, use the existing injected `now` readback for rules, and schedule one cancellable deadline wakeup through an injectable clock. Expiration succeeds only when clock readback reaches the stored deadline. | M; Unit, Behavior, Logs UI. | completed |
 | SYNC-011 | `FlowTab/Features/Home/HomeLandingView.swift`, `HomePermissionObservationOwner`; Home permission observation | A perpetual one-second poll discovered TCC permission changes and treated each delayed wake as the opportunity to infer current state. Evidence migration plus conditional observation. | Use the shared permission coordinator from SYNC-012: install app-activation observation before immediate readbacks, publish only exact changed TCC evidence, and retain a named cancellable one-second fallback because TCC has no unified transition notification. Home active visibility owns start/stop and cache publication. | H; Unit, Behavior, Home permission UI, tab-switch Pressure. | completed |
 | SYNC-012 | `FlowTab/Features/Settings/AppSettingsView.swift`; permission prompt observation | Forty 500ms attempts inferred post-prompt TCC convergence; the first condition check occurred after a sleep and cancellation was swallowed. Conditional observation plus watchdog. | Install the shared app-activation observer before an immediate readback, take an independent post-request readback, and use a named cancellable fallback cadence for TCC transitions without callbacks. The terminal watchdog reports target, generation, readbacks, elapsed time, bundle identity, and final evidence. Settings visibility owns both target observations. | H; Unit, Behavior, permission UI, tab-switch Pressure. | completed |
-| SYNC-013 | `FlowTab/Features/Home/HomeLandingView.swift`, `HomeRuntimeProjectionService.swift`; initial and scoped Home refresh | Fixed 900ms startup and 120/220ms post-signal delays assume runtime projection commits have arrived. Evidence migration. | Subscribe before requesting maintenance, capture source generation, perform initial readback, and apply only a matching later app-switcher/current-app projection generation or completeness transition. Home visibility and per-app request generations own cancellation. | H; Unit, Behavior, Home UI, runtime-topology Pressure. | planned |
+| SYNC-013 | `HomeLandingView.scheduleInitialAppSummariesRefresh`, `HomeInitialProjectionObservationOwner`; initial Home app-summary readiness | A fixed 900ms startup delay assumed the runtime app-switcher projection had committed before the Home readback. Evidence migration. | Install the exact service-object projection observer before the initial readback and maintenance request. Accept an initial complete projection, a later monotonic source generation, or a same-generation completeness transition. Home active visibility owns the observation generation, subscription, cancellation, and cleanup. | H; Unit, Behavior, Home UI, runtime-topology Pressure. | completed |
+| SYNC-040 | `HomeLandingView.scheduleAppSummariesRefresh`; general Home app-summary refresh | A fixed 220ms post-signal delay assumes app-switcher projection commits have followed workspace and runtime refresh signals. Evidence migration. | Correlate workspace-triggered maintenance with an app-switcher projection generation, use the runtime projection notification itself for committed updates, and apply a readback only from matching current evidence. Home active visibility owns the refresh generation and cancellation. | H; Unit, Behavior, Home UI, runtime-topology Pressure. | planned |
+| SYNC-041 | `HomeLandingView.scheduleSelectedAppRefresh`, `scheduleSingleAppRefresh`; selected/scoped Home detail | Fixed 120ms and 220ms post-selection or AX-signal delays assume the requested current-app projection has committed. Evidence migration. | Observe the exact appID-scoped projection generation before requesting refresh, then apply only the matching later detail projection or completeness transition. Home visibility and per-app request generations own subscriptions, cancellation, and stale-event rejection. | H; Unit, Behavior, selected-app Home UI, runtime-topology Pressure. | planned |
 | SYNC-014 | `FlowTab/App/AppFoundation.swift`; `AppWindowCoordinator.scheduleAccessoryPolicyRestoration` | Up to 250 polls at 20ms infer that a status-item-opened regular window is active and visible. Conditional observation plus watchdog. | Register app/window observers before presentation, perform immediate visibility/activation readback, and complete on the matching window transition. A named cancellable condition observer is the fallback; watchdog diagnostics include app-active, visible, miniaturized, and activation-policy state. `AppWindowCoordinator` owns the task/observers. | H; Unit, Behavior, status-item UI. | planned |
 | SYNC-015 | `SwitcherSearchCoordinator.scheduleRebuild`, `LiveSwitcherModel.scheduleSearchComputation` | 10–45ms delays debounce query work; result publication already requires revision and query/scope equality. Domain duration. | Retain as one named search scheduling policy with injectable scheduler/clock, cancellation, and revision Oracle. Remove duplicate scheduling ownership if both paths serve the same contract. | H hot path; Unit, Behavior, Search UI, realistic/stress Search Pressure. | verification-needed |
 | SYNC-016 | `FlowTab/Features/Settings/HotkeySettingsCard.swift`; `updateTakeoverStatus` | A 250ms delay is treated as confirmation that Command+Tab takeover stayed inactive. Evidence migration. | Publish registration result/marker generation from the hotkey owner and render status from that readback. The card observes before requesting registration and owns subscription cleanup. | M; Unit, Behavior, Settings UI. | planned |
@@ -157,7 +159,8 @@ Every call site will be closed as one of:
 
 1. Deterministic runtime evidence and shared generations: SYNC-001–SYNC-006.
 2. App projection, permission, and view lifecycle consumers:
-   SYNC-009–SYNC-014.
+   SYNC-009–SYNC-013, the split Home contracts SYNC-040–SYNC-041, then
+   SYNC-014.
 3. Search, hotkey, panel, and window-layer orchestration:
    SYNC-015–SYNC-025.
 4. Fixture and TestingSupport readiness: SYNC-026–SYNC-031.
@@ -721,5 +724,75 @@ polling cadence, deadline, or timeout in the scoped paths.
   cadence is named on the extracted 118-line owner, injected through the
   coordinator scheduler in deterministic tests, and cancelled at the Home
   visibility boundary.
-- Commit: `refactor(sync): migrate SYNC-011 home permission observation`; its
-  exact SHA is appended by the next ledger update after the commit exists.
+- Commit: `e7b209a`
+  (`refactor(sync): migrate SYNC-011 home permission observation`).
+
+### SYNC-013 Closure Record
+
+- Design and Oracle: `HomeInitialProjectionObservationOwner` installs a
+  `.runtimeAppSwitcherProjectionDidUpdate` observer filtered to the exact
+  runtime projection service object before taking its initial readback or
+  requesting maintenance. An initial complete projection is accepted
+  immediately. Missing or incomplete evidence triggers maintenance followed
+  by an independent request-return readback, closing synchronous completion
+  races. Later readbacks apply only when the projection becomes available, the
+  source-generation vector advances monotonically, or the same generation
+  changes from incomplete to complete. Duplicate, regressed, unrelated-object,
+  and out-of-order observations cannot change Home state.
+- Lifecycle: Home active visibility starts one observation generation.
+  Inactive visibility, disappearance, completion, supersession, and owner
+  deinitialization remove its notification token and invalidate stale
+  generations. `HomeLandingView` applies accepted evidence to app summaries,
+  loading state, selection, cache pruning, and the AX window monitor while
+  preserving the existing projection service and exact window-identity
+  boundaries.
+- Retained time policy: this contract retains no duration. The 900ms startup
+  delay was removed. Readiness succeeds only from a projection-backed,
+  complete readback. The visible Home lifetime bounds the consumer
+  observation; the runtime projection repair watchdog and its last-evidence
+  diagnostics remain owned by the underlying SYNC-003 repair contract.
+- Unit and Behavior: the final focused owner/lifecycle set passed 7/7 under
+  `.build-local/evidence-driven-sync/SYNC-013/flowtabtests-final-attempt-015`.
+  It covers initially satisfied evidence, observer-before-trigger ordering,
+  synchronous request completion, exact-object filtering, monotonic
+  generations, same-generation completeness, duplicate and regressed
+  notifications, visibility cancellation, and late-event rejection. A
+  combined-class run exposed a test-side pre-inactive readback baseline and
+  the previously recorded AppDelegate startup-stability scheduling
+  sensitivity; both exact tests passed 2/2 after the test Oracle was anchored
+  after inactive-state completion under
+  `.build-local/evidence-driven-sync/SYNC-013/flowtabtests-flake-check-attempt-006`.
+  The complete `FlowTabTests` class passed 270/270 under
+  `.build-local/evidence-driven-sync/SYNC-013/flowtabtests-class-attempt-007`;
+  the final complete `FlowTabPriorityCoverageTests` class passed 558/558 under
+  `.build-local/evidence-driven-sync/SYNC-013/flowtabtests-priority-attempt-016`.
+- FlowTabCore: not relevant because Home visibility, SwiftUI state
+  publication, and runtime projection consumption belong to the app target.
+- UI: the initial Home app-order/zero-count path and the Home overview
+  counts/stats/permission-sidebar path passed 2/2 in 23.646 seconds under
+  `.build-local/evidence-driven-sync/SYNC-013/ui-home-initial-attempt-009`.
+  Their success Oracles are the exact visible app rows, counts, statistics,
+  and permission elements.
+- Pressure: 2,000 rapid owner replacements passed in 0.007 seconds under
+  `.build-local/evidence-driven-sync/SYNC-013/owner-pressure-attempt-013`.
+  One exact-object notification produced one readback, an unrelated object
+  produced none, and a post-stop notification produced none. Canonical noisy
+  cross-Space/fullscreen topology runs passed with identical functional
+  outcomes at both 20ms and 50ms sampling cadences under
+  `.build-local/evidence-driven-sync/SYNC-013/runtime-topology-20ms-attempt-011`
+  and
+  `.build-local/evidence-driven-sync/SYNC-013/runtime-topology-50ms-attempt-012`.
+  The fixed-app identity contract matched all 363 and 297 checks. CPU
+  average/p95/max was 100.86/137.40/157.40 and 98.10/137.60/147.60 percent;
+  RSS average/p95/max was 186.09/257.86/322.38 and
+  180.61/247.77/299.58 MB. A first sandboxed attempt was interrupted by
+  `filecoordinationd` and `CoreSimulatorService`; the canonical run completed
+  outside that failed environment.
+- Process/Tooling: the final app and UI-test targets built through their
+  canonical scripts. Project-file `plutil -lint`, `git diff --check`, and
+  owner-scope synchronization search passed. The legacy 900ms constant,
+  startup sleep, and bootstrapper were removed. `HomeLandingView` is smaller
+  than its pre-slice baseline, and the extracted owner remains below the
+  source-file size guardrail.
+- Commit: `refactor(sync): migrate SYNC-013 home initial readiness`; its exact
+  SHA is appended by the next ledger update after the commit exists.

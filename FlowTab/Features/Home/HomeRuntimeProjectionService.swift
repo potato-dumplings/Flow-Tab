@@ -187,17 +187,12 @@ enum HomeInitialAppSummaryReader {
     }
 }
 
-enum HomeInitialRuntimeProjectionBootstrapper {
-    @discardableResult
-    static func requestIfNeeded(
-        projectionRead: HomeAppSummaryProjectionRead,
-        currentAppSummaryCount: Int,
-        from service: any RuntimeProjectionServing
+enum HomeInitialAppSummaryUpdatePolicy {
+    static func shouldCommitSingleAppSummary(
+        appID: String,
+        selectedAppID: String?,
+        loadingWindowCountAppIDs: Set<String>
     ) -> Bool {
-        guard currentAppSummaryCount == 0, !projectionRead.isProjectionBacked else {
-            return false
-        }
-        service.requestAppSwitcherProjectionMaintenance(reason: .homeProjectionMissing)
-        return true
+        loadingWindowCountAppIDs.isEmpty || appID == selectedAppID
     }
 }

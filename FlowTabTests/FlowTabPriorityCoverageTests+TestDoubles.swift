@@ -119,7 +119,7 @@ final class SpyMRUTracker: MRUTracking {
 final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchecked Sendable {
     private let lock = NSLock()
     private var appSwitcherProjection: RuntimeAppSwitcherProjection?
-    private let homeSummaryProjection: RuntimeHomeSummaryProjection?
+    private var homeSummaryProjection: RuntimeHomeSummaryProjection?
     private let homeDetailProjectionsByAppID: [String: RuntimeHomeAppDetailProjection]
     private var currentAppWindowProjectionsByAppID: [String: RuntimeCurrentAppWindowProjection]
     private let focusedCurrentAppWindowProjectionRead: RuntimeFocusedCurrentAppWindowProjectionRead?
@@ -134,6 +134,8 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     private var spaceTopologyProjectionReads = 0
     private var committedSearchIndexReads = 0
     private var appSwitcherMaintenanceRequests: [RuntimeProjectionMaintenanceReason] = []
+    private var appSwitcherMaintenanceRequestHandler:
+        ((RuntimeProjectionMaintenanceReason) -> Void)?
     private var searchIndexFreshnessBarrierRequests: [RuntimeProjectionMaintenanceReason] = []
     private var spaceTopologyChangeSignals = 0
     private var appLaunchSignals: [
@@ -228,6 +230,23 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
         lock.lock()
         defer { lock.unlock() }
         return homeSummaryProjectionReads
+    }
+
+    func setHomeSummaryProjection(
+        _ projection: RuntimeHomeSummaryProjection?
+    ) {
+        lock.lock()
+        homeSummaryProjection = projection
+        lock.unlock()
+    }
+
+    func setAppSwitcherMaintenanceRequestHandler(
+        _ handler:
+            ((RuntimeProjectionMaintenanceReason) -> Void)?
+    ) {
+        lock.lock()
+        appSwitcherMaintenanceRequestHandler = handler
+        lock.unlock()
     }
 
     func homeDetailProjectionReadCount(appID: String) -> Int {
@@ -462,7 +481,9 @@ final class RecordingRuntimeProjectionService: RuntimeProjectionServing, @unchec
     func requestAppSwitcherProjectionMaintenance(reason: RuntimeProjectionMaintenanceReason) {
         lock.lock()
         appSwitcherMaintenanceRequests.append(reason)
+        let handler = appSwitcherMaintenanceRequestHandler
         lock.unlock()
+        handler?(reason)
     }
 
     func requestSearchIndexFreshnessBarrier(reason: RuntimeProjectionMaintenanceReason) {
