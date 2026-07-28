@@ -90,7 +90,7 @@ and Process/Tooling.
 | SYNC-008 | `FlowTab/Infrastructure/Runtime/RuntimeLogging.swift`; `scheduleFlushLocked` | A 50ms delay batches disk writes and does not establish write success. Domain duration. | Retain the named batching policy and cancellable `DispatchWorkItem`; explicit snapshot/read APIs flush synchronously before returning evidence. The diagnostics store owns the work item. | M; Unit, Behavior, log-write Pressure if changed. | closed-retained |
 | SYNC-009 | `FlowTab/Features/Logs/RuntimeLogsSection.swift`; `RuntimeLogLinesViewModel` | The Logs surface polls once per second to discover appended or cleared lines. Evidence migration. | Publish append/flush/clear generations from the diagnostics owner, subscribe before the initial snapshot, and reload from the later generation. View-model start/stop owns the subscription and task. | M; Unit, Behavior, Logs UI, tab-switch Pressure. | completed |
 | SYNC-010 | `RuntimeLogPrivacy.swift`, `RuntimeLogsSection`; diagnostic session expiration | The 15-minute session is an explicit expiration contract; the view advances a one-second loop to notice expiry. Domain duration. | Retain the expiration deadline, use the existing injected `now` readback for rules, and schedule one cancellable deadline wakeup through an injectable clock. Expiration succeeds only when clock readback reaches the stored deadline. | M; Unit, Behavior, Logs UI. | completed |
-| SYNC-011 | `FlowTab/Features/Home/HomeLandingView.swift`; permission watcher | A perpetual one-second poll discovers TCC permission changes even though app activation is already observed. Evidence migration. | Subscribe before initial permission readback and refresh on app-activation/lifecycle evidence. If a platform permission transition has no notification, share the controlled permission observer from SYNC-012. View appearance owns start/stop. | M; Unit, Behavior, Home permission UI. | planned |
+| SYNC-011 | `FlowTab/Features/Home/HomeLandingView.swift`, `HomePermissionObservationOwner`; Home permission observation | A perpetual one-second poll discovered TCC permission changes and treated each delayed wake as the opportunity to infer current state. Evidence migration plus conditional observation. | Use the shared permission coordinator from SYNC-012: install app-activation observation before immediate readbacks, publish only exact changed TCC evidence, and retain a named cancellable one-second fallback because TCC has no unified transition notification. Home active visibility owns start/stop and cache publication. | H; Unit, Behavior, Home permission UI, tab-switch Pressure. | completed |
 | SYNC-012 | `FlowTab/Features/Settings/AppSettingsView.swift`; permission prompt observation | Forty 500ms attempts inferred post-prompt TCC convergence; the first condition check occurred after a sleep and cancellation was swallowed. Conditional observation plus watchdog. | Install the shared app-activation observer before an immediate readback, take an independent post-request readback, and use a named cancellable fallback cadence for TCC transitions without callbacks. The terminal watchdog reports target, generation, readbacks, elapsed time, bundle identity, and final evidence. Settings visibility owns both target observations. | H; Unit, Behavior, permission UI, tab-switch Pressure. | completed |
 | SYNC-013 | `FlowTab/Features/Home/HomeLandingView.swift`, `HomeRuntimeProjectionService.swift`; initial and scoped Home refresh | Fixed 900ms startup and 120/220ms post-signal delays assume runtime projection commits have arrived. Evidence migration. | Subscribe before requesting maintenance, capture source generation, perform initial readback, and apply only a matching later app-switcher/current-app projection generation or completeness transition. Home visibility and per-app request generations own cancellation. | H; Unit, Behavior, Home UI, runtime-topology Pressure. | planned |
 | SYNC-014 | `FlowTab/App/AppFoundation.swift`; `AppWindowCoordinator.scheduleAccessoryPolicyRestoration` | Up to 250 polls at 20ms infer that a status-item-opened regular window is active and visible. Conditional observation plus watchdog. | Register app/window observers before presentation, perform immediate visibility/activation readback, and complete on the matching window transition. A named cancellable condition observer is the fallback; watchdog diagnostics include app-active, visible, miniaturized, and activation-policy state. `AppWindowCoordinator` owns the task/observers. | H; Unit, Behavior, status-item UI. | planned |
@@ -644,5 +644,82 @@ polling cadence, deadline, or timeout in the scoped paths.
   cancellable fallback scheduler, and every wake is revalidated by a TCC
   readback. The dynamic UI fixture accepts path intent and resolves an absolute,
   standardized file URL at the TestingSupport resource boundary.
-- Commit: `refactor(sync): migrate SYNC-012 permission observation`; its exact
-  SHA is appended by the next ledger update after the commit exists.
+- Commit: `d18d1b5`
+  (`refactor(sync): migrate SYNC-012 permission observation`).
+
+### SYNC-011 Closure Record
+
+- Design and Oracle: `HomePermissionObservationOwner` reuses the shared
+  `RuntimePermissionObservationCoordinator`. It installs the single
+  app-activation subscription before taking immediate accessibility and
+  screen-capture readbacks. Initial readback, app activation, and fallback
+  delivery only request another readback; an exact changed TCC value is the
+  sole state-transition Oracle. `HomeLandingView` publishes that evidence to
+  its banner, sidebar permission status, runtime-summary refresh, AX-window
+  monitor ownership, and static Home cache.
+- Lifecycle: Home active visibility starts the owner and inactive visibility,
+  disappearance, and teardown stop it. The owner manages one observation
+  generation per target, two cancellable fallback tokens, and one shared
+  activation subscription. Duplicate starts preserve one owned set.
+  Cancellation and generation checks reject delayed, duplicate, and stale
+  callbacks. The Home view retains its existing runtime projection and exact
+  window-identity ownership boundaries.
+- Retained time policy: TCC exposes no unified permission-transition callback,
+  so `HomePermissionObservationOwner.fallbackReadbackInterval` retains a
+  one-second conditional-readback cadence. The coordinator checks both targets
+  immediately, owns and cancels the scheduled work, and uses every wake only
+  to obtain a fresh TCC value. Home's long-lived observation mode has no
+  completion watchdog because it represents current state for the duration of
+  visible ownership.
+- Unit and Behavior: the final focused set passed 3/3 in 0.043 seconds under
+  `.build-local/evidence-driven-sync/SYNC-011/flowtabtests-targeted-attempt-003`.
+  It covers observer-before-initial-readback ordering, initial evidence, app
+  activation, a 60-second delayed fallback delivered through an injected
+  clock/scheduler, visibility cancellation, stale callbacks, duplicate start,
+  and 2,000 rapid start/stop cycles. The complete `FlowTabTests` class passed
+  269/269 under
+  `.build-local/evidence-driven-sync/SYNC-011/flowtabtests-class-attempt-005`;
+  the complete `FlowTabPriorityCoverageTests` class passed 553/553 under
+  `.build-local/evidence-driven-sync/SYNC-011/flowtabtests-priority-attempt-007`.
+  A combined-class attempt retained at
+  `.build-local/evidence-driven-sync/SYNC-011/flowtabtests-full-attempt-004`
+  passed all 269 `FlowTabTests` and exposed one existing startup-stability
+  assertion under cross-class scheduling. The exact assertion passed 1/1
+  under
+  `.build-local/evidence-driven-sync/SYNC-011/priority-flake-attempt-006`
+  before the full Priority class passed cleanly.
+- FlowTabCore: not relevant because permission readback, Home visibility, and
+  SwiftUI state publication belong to the app target.
+- UI: the dynamic Home permission workflow passed 1/1 in 8.431 seconds under
+  `.build-local/evidence-driven-sync/SYNC-011/ui-home-permission-observation-attempt-011`.
+  It starts with two denied values, observes the visible permission action,
+  atomically changes the external TCC fixture, then requires that action to
+  disappear and both exact `fallbackReadback` evidence logs to arrive. Four
+  existing granted, unavailable-AX, app-directory, and permission-sidebar
+  regressions passed 4/4 under
+  `.build-local/evidence-driven-sync/SYNC-011/ui-home-permission-regressions-attempt-012`.
+- Pressure: the owner-level 2,000-cycle test retained one activation
+  subscription and two fallback tokens with no stale publication. The
+  canonical 20-second tab-switch workload at 20ms cadence passed with 42
+  samples under
+  `.build-local/evidence-driven-sync/SYNC-011/tab-switch-pressure-20ms-attempt-013`.
+  CPU average/p95/max was 63.73/70.10/90.30 percent and RSS was
+  105.10/119.56/120.06 MB. The final 20-sample RSS slope was
+  0.013 MB/sample across a 110.16-110.41 MB plateau. The 50ms comparison passed
+  with 42 samples under
+  `.build-local/evidence-driven-sync/SYNC-011/tab-switch-pressure-50ms-attempt-014`;
+  CPU was 63.11/70.00/87.10 percent, RSS was 112.79/125.91/125.94 MB, and the
+  final 20-sample slope was 0.050 MB/sample across a 116.31-117.47 MB plateau.
+  Against the same-machine SYNC-012 parent baselines, CPU averages increased
+  by 2.67 and 3.56 percentage points from the two immediate TCC readbacks per
+  Home activation, while RSS p95/max decreased at both cadences and both
+  current runs reached stable allocator ranges without continuing growth.
+- Process/Tooling: the final app and UI-test targets built through their
+  canonical scripts. Project-file `plutil -lint`, `git diff --check`, and
+  owner-scope synchronization search passed. `HomeLandingView` no longer owns
+  a permission sleep loop, poll task, or raw interval literal. The retained
+  cadence is named on the extracted 118-line owner, injected through the
+  coordinator scheduler in deterministic tests, and cancelled at the Home
+  visibility boundary.
+- Commit: `refactor(sync): migrate SYNC-011 home permission observation`; its
+  exact SHA is appended by the next ledger update after the commit exists.

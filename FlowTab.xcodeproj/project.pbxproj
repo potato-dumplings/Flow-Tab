@@ -83,6 +83,8 @@
 		E9D100043D17000100B0D737 /* RuntimePermissionObservationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9D100033D17000100B0D737 /* RuntimePermissionObservationCoordinator.swift */; };
 		E9D100063D17000100B0D737 /* FlowTabTests+RuntimePermissionObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9D100053D17000100B0D737 /* FlowTabTests+RuntimePermissionObservation.swift */; };
 		E9D100083D17000100B0D737 /* FlowTabUITests+PermissionObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9D100073D17000100B0D737 /* FlowTabUITests+PermissionObservation.swift */; };
+		EAD100023D18000100B0D737 /* HomePermissionObservationOwner.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAD100013D18000100B0D737 /* HomePermissionObservationOwner.swift */; };
+		EAD100043D18000100B0D737 /* FlowTabTests+HomePermissionObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = EAD100033D18000100B0D737 /* FlowTabTests+HomePermissionObservation.swift */; };
 		D10000012FF500100B0D737 /* RuntimeProjectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000022FF500100B0D737 /* RuntimeProjectionService.swift */; };
 		D10000032FF500200B0D737 /* RuntimeProjectionServing.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000042FF500200B0D737 /* RuntimeProjectionServing.swift */; };
 		B26010012FE000100B0D737 /* RuntimePerformanceClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26000012FE000100B0D737 /* RuntimePerformanceClock.swift */; };
@@ -359,6 +361,8 @@
 		E9D100033D17000100B0D737 /* RuntimePermissionObservationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimePermissionObservationCoordinator.swift; sourceTree = "<group>"; };
 		E9D100053D17000100B0D737 /* FlowTabTests+RuntimePermissionObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+RuntimePermissionObservation.swift"; sourceTree = "<group>"; };
 		E9D100073D17000100B0D737 /* FlowTabUITests+PermissionObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+PermissionObservation.swift"; sourceTree = "<group>"; };
+		EAD100013D18000100B0D737 /* HomePermissionObservationOwner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomePermissionObservationOwner.swift; sourceTree = "<group>"; };
+		EAD100033D18000100B0D737 /* FlowTabTests+HomePermissionObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+HomePermissionObservation.swift"; sourceTree = "<group>"; };
 		F6E7E20135C4000100B0D737 /* RuntimeSearchIndexReadModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeSearchIndexReadModel.swift; sourceTree = "<group>"; };
 		F6E7E30135C4000200B0D737 /* RuntimeProjectionReadModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionReadModels.swift; sourceTree = "<group>"; };
 		D10000022FF500100B0D737 /* RuntimeProjectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionService.swift; sourceTree = "<group>"; };
@@ -694,6 +698,7 @@
 				E7D100013D15000100B0D737 /* FlowTabTests+RuntimeLogObservation.swift */,
 				E8D100013D16000100B0D737 /* FlowTabTests+RuntimeDiagnosticSessionDeadline.swift */,
 				E9D100053D17000100B0D737 /* FlowTabTests+RuntimePermissionObservation.swift */,
+				EAD100033D18000100B0D737 /* FlowTabTests+HomePermissionObservation.swift */,
 				F50000092F90000100B0D737 /* FlowTabTests+SpaceFixtureLaunchConfiguration.swift */,
 				F500000A2F90000100B0D737 /* FlowTabTests+SpaceFixtureWindowCoordinator.swift */,
 			);
@@ -923,6 +928,7 @@
 			isa = PBXGroup;
 			children = (
 				C10000132F75000100B0D737 /* HomeLandingView.swift */,
+				EAD100013D18000100B0D737 /* HomePermissionObservationOwner.swift */,
 				C30000122FBD100100B0D737 /* HomeAppVisibilityPresentation.swift */,
 				C30000132FBD100100B0D737 /* HomeLayerRowView.swift */,
 				D43000112FFD000100B0D737 /* HomeOverviewComponents.swift */,
@@ -1232,6 +1238,7 @@
 				FD00010436A0000100B0D737 /* FlowDropdownRepresentable.swift in Sources */,
 				FD00010736A0000100B0D737 /* FlowCompactActionButton.swift in Sources */,
 				C10000032F75000100B0D737 /* HomeLandingView.swift in Sources */,
+				EAD100023D18000100B0D737 /* HomePermissionObservationOwner.swift in Sources */,
 				C30000022FBD100100B0D737 /* HomeAppVisibilityPresentation.swift in Sources */,
 				C30000032FBD100100B0D737 /* HomeLayerRowView.swift in Sources */,
 				D43000012FFD000100B0D737 /* HomeOverviewComponents.swift in Sources */,
@@ -1423,6 +1430,7 @@
 				E7D100023D15000100B0D737 /* FlowTabTests+RuntimeLogObservation.swift in Sources */,
 				E8D100023D16000100B0D737 /* FlowTabTests+RuntimeDiagnosticSessionDeadline.swift in Sources */,
 				E9D100063D17000100B0D737 /* FlowTabTests+RuntimePermissionObservation.swift in Sources */,
+				EAD100043D18000100B0D737 /* FlowTabTests+HomePermissionObservation.swift in Sources */,
 				F50001082F90000100B0D737 /* SpaceFixtureLaunchConfiguration.swift in Sources */,
 				F50001122F90000100B0D737 /* SpaceFixtureWorkflowConfiguration.swift in Sources */,
 				F50001092F90000100B0D737 /* SpaceFixtureWindowPlan.swift in Sources */,

@@ -19,11 +19,19 @@ struct HomeLandingView: View {
         isActive: Bool,
         appLanguage: AppLanguage,
         runtimeProjectionService: any RuntimeProjectionServing = homeRuntimeProjectionService,
+        permissionObservationOwner: HomePermissionObservationOwner? = nil,
         openSettings: @escaping () -> Void
     ) {
         self.isActive = isActive
         self.appLanguage = appLanguage
         self.runtimeProjectionService = runtimeProjectionService
+        _permissionObservationOwner = StateObject(
+            wrappedValue: permissionObservationOwner
+                ?? HomePermissionObservationOwner(
+                    accessibilityTrusted: Self.cachedAccessibilityTrusted,
+                    screenCaptureTrusted: Self.cachedScreenCaptureTrusted
+                )
+        )
         self.openSettings = openSettings
     }
 
@@ -35,8 +43,8 @@ struct HomeLandingView: View {
     private var hotkeyMainKeyRaw = SwitcherHotkeyPreferencesStore.defaultMainKey.rawValue
     @AppStorage(AppPreferenceKeys.hotkeyQuitKey)
     private var hotkeyQuitKeyRaw = SwitcherHotkeyPreferencesStore.defaultQuitKey.rawValue
-    @State private var accessibilityTrusted = AccessibilityPermissionChecker.isTrusted()
-    @State private var screenCaptureTrusted = ScreenCapturePermissionChecker.hasScreenCapturePermission
+    @StateObject private var permissionObservationOwner:
+        HomePermissionObservationOwner
     @State private var appSummaries: [RuntimeHomeAppSummary] = []
     @State private var hiddenAppIDs = AppVisibilityPreferencesStore.loadHiddenAppIDs()
     @State private var windowsByAppID: [String: [WindowCandidate]] = [:]
@@ -47,13 +55,19 @@ struct HomeLandingView: View {
     @State private var appSummariesRefreshTask: Task<Void, Never>?
     @State private var selectedAppRefreshTask: Task<Void, Never>?
     @State private var appRefreshTasksByID: [String: Task<Void, Never>] = [:]
-    @State private var permissionWatchTask: Task<Void, Never>?
     @State private var windowChangeMonitor = RuntimeAXWindowChangeMonitor()
 
     private let appRefreshDebounceDelayNs: UInt64 = 220_000_000
     private let initialPreciseAppRefreshDelayNs: UInt64 = 900_000_000
     private let selectedAppRefreshDebounceDelayNs: UInt64 = 120_000_000
-    private let permissionPollIntervalNs: UInt64 = 1_000_000_000
+
+    private var accessibilityTrusted: Bool {
+        permissionObservationOwner.accessibilityTrusted
+    }
+
+    private var screenCaptureTrusted: Bool {
+        permissionObservationOwner.screenCaptureTrusted
+    }
 
     private var hotkeyConfiguration: SwitcherHotkeyConfiguration {
         SwitcherHotkeyPreferencesStore.resolve(
@@ -125,9 +139,7 @@ struct HomeLandingView: View {
             handleVisibilityChanged(isActive)
         }
         .onChange(of: isActive) { active in
-            if active {
-                handleVisibilityChanged(true)
-            }
+            handleVisibilityChanged(active)
         }
         .onReceive(NSWorkspace.shared.notificationCenter.publisher(
             for: NSWorkspace.didLaunchApplicationNotification
@@ -149,7 +161,6 @@ struct HomeLandingView: View {
             for: NSApplication.didBecomeActiveNotification
         )) { _ in
             guard isActive else { return }
-            refreshPermissionsIfNeeded(reason: "app_active")
             scheduleRuntimeProjectionRefresh(reason: "app_active")
         }
         .onReceive(NotificationCenter.default.publisher(
@@ -427,13 +438,15 @@ struct HomeLandingView: View {
     }
 
     private func handleVisibilityChanged(_ active: Bool) {
-        guard active else { return }
+        guard active else {
+            permissionObservationOwner.stop()
+            return
+        }
 
         refreshHomeAppVisibility()
         restoreCachedStateIfNeeded()
+        startPermissionObservationIfNeeded()
         setupWindowMonitorIfNeeded()
-        refreshPermissionsIfNeeded(reason: "appear")
-        startPermissionWatcherIfNeeded()
 
         if appSummaries.isEmpty {
             scheduleInitialAppSummariesRefresh(reason: "initial_load")
@@ -484,8 +497,6 @@ struct HomeLandingView: View {
         if selectedAppID == nil {
             selectedAppID = Self.cachedSelectedAppID
         }
-        accessibilityTrusted = Self.cachedAccessibilityTrusted
-        screenCaptureTrusted = Self.cachedScreenCaptureTrusted
         syncSelectedApp()
     }
 
@@ -497,33 +508,32 @@ struct HomeLandingView: View {
         syncSelectedApp()
     }
 
-    private func startPermissionWatcherIfNeeded() {
-        guard permissionWatchTask == nil else { return }
-        permissionWatchTask = Task { @MainActor in
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: permissionPollIntervalNs)
-                guard !Task.isCancelled else { return }
-                refreshPermissionsIfNeeded(reason: "permission_poll")
+    private func startPermissionObservationIfNeeded() {
+        permissionObservationOwner.start { evidence in
+            scheduleAppSummariesRefresh(
+                reason: "permission_changed_\(evidence.source.rawValue)"
+            )
+            if evidence.target == .accessibility,
+               !evidence.isGranted
+            {
+                windowChangeMonitor.stop()
             }
+            persistCache()
         }
     }
 
-    private func refreshPermissionsIfNeeded(reason: String) {
-        let newAccessibilityTrusted = AccessibilityPermissionChecker.isTrusted()
-        let newScreenCaptureTrusted = ScreenCapturePermissionChecker.hasScreenCapturePermission
-        let permissionChanged =
-            newAccessibilityTrusted != accessibilityTrusted || newScreenCaptureTrusted != screenCaptureTrusted
+    private func persistPermissionCache() {
+        Self.cachedAccessibilityTrusted = accessibilityTrusted
+        Self.cachedScreenCaptureTrusted = screenCaptureTrusted
+    }
 
-        accessibilityTrusted = newAccessibilityTrusted
-        screenCaptureTrusted = newScreenCaptureTrusted
-
-        if permissionChanged {
-            scheduleAppSummariesRefresh(reason: "permission_changed_\(reason)")
-            if !newAccessibilityTrusted {
-                windowChangeMonitor.stop()
-            }
+    private func persistCache() {
+        persistPermissionCache()
+        if loadingWindowCountAppIDs.isEmpty {
+            Self.cachedAppSummaries = appSummaries
+            Self.cachedWindowsByAppID = windowsByAppID
+            Self.cachedSelectedAppID = selectedAppID
         }
-        persistCache()
     }
 
     private func scheduleRuntimeProjectionRefresh(reason: String) {
@@ -827,16 +837,6 @@ struct HomeLandingView: View {
         selectedAppID = appSummaries.first?.appID
     }
 
-    private func persistCache() {
-        Self.cachedAccessibilityTrusted = accessibilityTrusted
-        Self.cachedScreenCaptureTrusted = screenCaptureTrusted
-        if loadingWindowCountAppIDs.isEmpty {
-            Self.cachedAppSummaries = appSummaries
-            Self.cachedWindowsByAppID = windowsByAppID
-            Self.cachedSelectedAppID = selectedAppID
-        }
-    }
-
     private func teardownActiveState() {
         appSummariesRefreshTask?.cancel()
         appSummariesRefreshTask = nil
@@ -846,8 +846,7 @@ struct HomeLandingView: View {
             task.cancel()
         }
         appRefreshTasksByID.removeAll()
-        permissionWatchTask?.cancel()
-        permissionWatchTask = nil
+        permissionObservationOwner.stop()
         windowChangeMonitor.stop()
         persistCache()
     }

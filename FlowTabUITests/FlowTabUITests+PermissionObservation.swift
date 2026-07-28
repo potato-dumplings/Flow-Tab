@@ -2,6 +2,70 @@ import Foundation
 import XCTest
 
 extension FlowTabUITests {
+    func testHomePermissionBannerConvergesFromOwnedTCCReadbackEvidence() throws {
+        let stateURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(
+                "flowtab-ui-home-permission-state-\(UUID().uuidString).json",
+                isDirectory: false
+            )
+        defer {
+            try? FileManager.default.removeItem(at: stateURL)
+        }
+        try writePermissionState(
+            accessibilityTrusted: false,
+            screenCaptureTrusted: false,
+            to: stateURL
+        )
+
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-mock-runtime",
+                "--flowtab-ui-runtime-log-level",
+                "INFO",
+                "--flowtab-ui-enable-verbose-logs",
+                "--flowtab-ui-permission-state-path",
+                stateURL.path
+            ]
+        )
+        launchFlowTabUITestApplication(app)
+        XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 8))
+        XCTAssertTrue(
+            tapFirstHittable(
+                in: app.buttons.matching(identifier: Identifier.homeTabButton),
+                timeout: 5
+            )
+        )
+        XCTAssertTrue(
+            element(in: app, identifier: Identifier.homeTabContent)
+                .waitForExistence(timeout: 5)
+        )
+
+        let permissionAction = element(
+            in: app,
+            identifier: Identifier.permissionOpenSettings
+        )
+        XCTAssertTrue(permissionAction.waitForExistence(timeout: 5))
+        let logSnapshot = makeRuntimeLogFileSnapshot()
+
+        try writePermissionState(
+            accessibilityTrusted: true,
+            screenCaptureTrusted: true,
+            to: stateURL
+        )
+
+        XCTAssertTrue(
+            waitForNonExistence(permissionAction, timeout: 6)
+        )
+        waitForRuntimeLogFiles(
+            containing: [
+                "home permission observed target=accessibility source=fallbackReadback granted=true",
+                "home permission observed target=screenCapture source=fallbackReadback granted=true"
+            ],
+            since: logSnapshot
+        )
+    }
+
     func testSettingsPermissionRequestsConvergeFromTCCReadbackEvidence() throws {
         let stateURL = FileManager.default.temporaryDirectory
             .appendingPathComponent(
