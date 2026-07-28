@@ -72,199 +72,6 @@ extension SwitcherPanelController {
             && model.session != nil
     }
 
-    func schedulePanelVisibilityRecovery(
-        trigger: String,
-        attemptDelaysNanoseconds: [UInt64] = [50_000_000],
-        cancelSessionOnFailure: Bool = false,
-        activateApplicationIfNeeded: Bool = true,
-        recoveryMode: PanelVisibilityRecoveryMode = .hardReorder
-    ) {
-        let recoveryGeneration = beginPanelPresentationRecoveryTask()
-        panelVisibilityRecoveryState = .suspectedHidden(
-            trigger: trigger,
-            generation: recoveryGeneration
-        )
-        panelPresentationRecoveryTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            guard self.isPanelPresentationRecoveryGenerationCurrent(recoveryGeneration) else { return }
-            let delays = attemptDelaysNanoseconds.isEmpty ? [UInt64(0)] : attemptDelaysNanoseconds
-
-            for (attemptIndex, delayNanoseconds) in delays.enumerated() {
-                if delayNanoseconds > 0 {
-                    try? await Task.sleep(nanoseconds: delayNanoseconds)
-                }
-                guard !Task.isCancelled else { return }
-                guard self.isPanelPresentationRecoveryGenerationCurrent(recoveryGeneration) else { return }
-                guard self.hasActivePresentationSession else {
-                    self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
-                    return
-                }
-                if self.isPanelVisibleToUser {
-                    self.panelVisibilityRecoveryState = .visibleConfirmed(
-                        trigger: trigger,
-                        generation: recoveryGeneration,
-                        reason: "alreadyVisible"
-                    )
-                    self.logSearchTrace(
-                        "presentationRecovery trigger=\(trigger) action=complete reason=alreadyVisible generation=\(recoveryGeneration) attempt=\(attemptIndex + 1)/\(delays.count) \(self.searchTraceStateSummary())"
-                    )
-                    self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
-                    self.scheduleModifierReleaseConfirmationAfterRecoveredPresentationIfNeeded(trigger: trigger)
-                    return
-                }
-
-                let attemptAction = recoveryMode == .softReorder ? "softAttempt" : "attempt"
-                self.panelVisibilityRecoveryState = .recovering(
-                    trigger: trigger,
-                    generation: recoveryGeneration,
-                    attempt: attemptIndex + 1,
-                    totalAttempts: delays.count,
-                    mode: recoveryMode
-                )
-                self.logSearchTrace(
-                    "presentationRecovery trigger=\(trigger) action=\(attemptAction) generation=\(recoveryGeneration) index=\(attemptIndex + 1)/\(delays.count) \(self.searchTraceStateSummary())"
-                )
-                await self.performPanelVisibilityRecoveryAttempt(
-                    trigger: trigger,
-                    activateApplicationIfNeeded: activateApplicationIfNeeded,
-                    recoveryMode: recoveryMode,
-                    generation: recoveryGeneration,
-                    attempt: attemptIndex + 1,
-                    totalAttempts: delays.count
-                )
-
-                guard !Task.isCancelled else { return }
-                guard self.isPanelPresentationRecoveryGenerationCurrent(recoveryGeneration) else { return }
-                guard self.hasActivePresentationSession else {
-                    self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
-                    return
-                }
-                if self.isPanelVisibleToUser {
-                    self.panelVisibilityRecoveryState = .visibleConfirmed(
-                        trigger: trigger,
-                        generation: recoveryGeneration,
-                        reason: "recovered"
-                    )
-                    self.updatePanelPresentationLevel(
-                        trigger: "\(trigger)_steady",
-                        behaviorMode: .allSpaces
-                    )
-                    self.logSearchTrace(
-                        "presentationRecovery trigger=\(trigger) action=complete reason=recovered generation=\(recoveryGeneration) attempt=\(attemptIndex + 1)/\(delays.count) \(self.searchTraceStateSummary())"
-                    )
-                    self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
-                    self.scheduleModifierReleaseConfirmationAfterRecoveredPresentationIfNeeded(trigger: trigger)
-                    return
-                }
-            }
-
-            self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
-            guard cancelSessionOnFailure else { return }
-            guard self.hasActivePresentationSession else { return }
-            guard self.isPanelPresentationRecoveryGenerationCurrent(recoveryGeneration) else { return }
-            self.panelVisibilityRecoveryState = .failed(
-                trigger: trigger,
-                generation: recoveryGeneration,
-                reason: "attemptsExhausted"
-            )
-            self.logSearchTrace(
-                "presentationRecovery trigger=\(trigger) action=failed generation=\(recoveryGeneration) \(self.searchTraceStateSummary())"
-            )
-            self.cancelSelectionForSystemInterruption(trigger: trigger)
-        }
-    }
-
-    @discardableResult
-    func beginPanelPresentationRecoveryTask() -> Int {
-        panelPresentationRecoveryTask?.cancel()
-        panelPresentationRecoveryGeneration += 1
-        return panelPresentationRecoveryGeneration
-    }
-
-    func cancelPanelPresentationRecoveryTask() {
-        panelPresentationRecoveryTask?.cancel()
-        panelPresentationRecoveryGeneration += 1
-        panelPresentationRecoveryTask = nil
-    }
-
-    func clearPanelPresentationRecoveryTaskIfCurrent(_ generation: Int) {
-        guard isPanelPresentationRecoveryGenerationCurrent(generation) else { return }
-        panelPresentationRecoveryTask = nil
-    }
-
-    func isPanelPresentationRecoveryGenerationCurrent(_ generation: Int) -> Bool {
-        generation == panelPresentationRecoveryGeneration
-    }
-
-    func performPanelVisibilityRecoveryAttempt(
-        trigger: String,
-        activateApplicationIfNeeded: Bool,
-        recoveryMode: PanelVisibilityRecoveryMode = .hardReorder,
-        generation: Int? = nil,
-        attempt: Int? = nil,
-        totalAttempts: Int? = nil
-    ) async {
-        let beforeSnapshot = panelVisibilitySnapshot()
-        defer {
-            recordPanelVisibilityRecoveryDiagnostic(
-                trigger: trigger,
-                generation: generation,
-                attempt: attempt,
-                totalAttempts: totalAttempts,
-                mode: recoveryMode,
-                before: beforeSnapshot,
-                after: panelVisibilitySnapshot()
-            )
-        }
-
-        guard recoveryMode == .hardReorder else {
-            updatePanelPresentationLevel(
-                trigger: "\(trigger)_soft_recovery",
-                behaviorMode: .allSpaces
-            )
-            centerPanelOnActiveScreen(preferredScreen: resolveActivePresentationScreen())
-            guard hasActivePresentationSession else { return }
-            panel.makeKeyAndOrderFront(nil)
-            panel.orderFrontRegardless()
-            return
-        }
-
-        if activateApplicationIfNeeded {
-            activateApplicationForPanelPresentationIfNeeded()
-        }
-        panel.orderOut(nil)
-        updatePanelPresentationLevel(
-            trigger: "\(trigger)_recovery",
-            behaviorMode: .activeSpaceMove
-        )
-        centerPanelOnActiveScreen(preferredScreen: resolveActivePresentationScreen())
-        try? await Task.sleep(nanoseconds: panelPresentationRecoveryReorderDelayNs)
-        guard hasActivePresentationSession else { return }
-        panel.makeKeyAndOrderFront(nil)
-        panel.orderFrontRegardless()
-    }
-
-    func activateApplicationForPanelPresentationIfNeeded() {
-        guard !isAppCurrentlyActive else { return }
-        guard ProcessInfo.processInfo.systemUptime >= suppressApplicationActivationUntil else { return }
-        if let activateApplicationIgnoringOtherAppsOverride {
-            activateApplicationIgnoringOtherAppsOverride()
-            return
-        }
-        NSApp.activate(ignoringOtherApps: true)
-    }
-
-    func scheduleModifierReleaseConfirmationAfterRecoveredPresentationIfNeeded(
-        trigger: String
-    ) {
-        guard let sessionKind = activeHotkeySessionKind else { return }
-        guard !model.isSearchActive else { return }
-        guard !isPrimaryModifierPressedInHardwareState(for: sessionKind) else { return }
-        logInputTrace(
-            "presentationRecovery trigger=\(trigger) action=scheduleReleaseConfirm nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
-        )
-        scheduleModifierReleaseConfirmation(trigger: "presentation_recovered")
-    }
     func show(direction: CycleDirection) {
         let showStartMs = monotonicMilliseconds()
         guard model.startSession(triggerDirection: direction) else {
@@ -379,8 +186,7 @@ extension SwitcherPanelController {
         let ignoreReadyMs = monotonicMilliseconds()
         scheduleInitialPanelVisibilityRecovery(
             trigger: trigger,
-            initialVisibilityGeneration: initialVisibilityGeneration,
-            activateApplicationIfNeeded: false
+            initialVisibilityGeneration: initialVisibilityGeneration
         )
         let recoveryReadyMs = monotonicMilliseconds()
         installEventMonitors()
@@ -500,7 +306,7 @@ extension SwitcherPanelController {
     func endPresentationSession() {
         guard isPanelPresented || hasActivePresentationSession else { return }
         invalidatePresentationSessionGeneration(trigger: "endPresentationSession")
-        cancelPanelPresentationRecoveryTask()
+        cancelPanelPresentationRecovery()
         clearInitialPresentationVisibilityTracking(invalidate: true)
         removeEventMonitors()
         panel.orderOut(nil)

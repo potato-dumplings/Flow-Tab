@@ -148,9 +148,6 @@ extension SwitcherPanelController {
             generation: evidence.observationGeneration,
             reason: evidence.source.rawValue
         )
-        if panelPresentationRecoveryTask != nil {
-            cancelPanelPresentationRecoveryTask()
-        }
         logSearchTrace(
             "presentationRecovery trigger=\(trigger) action=complete reason=\(evidence.source.rawValue) generation=\(evidence.observationGeneration) presentationGeneration=\(evidence.presentationGeneration) snapshot{\(evidence.snapshot.logFields)} \(searchTraceStateSummary())"
         )
@@ -167,9 +164,6 @@ extension SwitcherPanelController {
         guard isPresentationSessionGenerationCurrent(
             failure.presentationGeneration
         ) else { return }
-        if panelPresentationRecoveryTask != nil {
-            cancelPanelPresentationRecoveryTask()
-        }
         panelVisibilityRecoveryState = .failed(
             trigger: failure.trigger,
             generation: failure.observationGeneration,
@@ -185,8 +179,7 @@ extension SwitcherPanelController {
 
     func scheduleInitialPanelVisibilityRecovery(
         trigger: String,
-        initialVisibilityGeneration: Int? = nil,
-        activateApplicationIfNeeded: Bool = false
+        initialVisibilityGeneration: Int? = nil
     ) {
         let generation =
             initialVisibilityGeneration
@@ -204,54 +197,44 @@ extension SwitcherPanelController {
             return
         }
 
-        let recoveryGeneration = beginPanelPresentationRecoveryTask()
+        let recoveryGeneration = beginPanelPresentationRecovery()
         panelVisibilityRecoveryState = .suspectedHidden(
             trigger: trigger,
             generation: generation
         )
-        panelPresentationRecoveryTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            guard self.isPanelPresentationRecoveryGenerationCurrent(recoveryGeneration) else { return }
-            guard self.isInitialPresentationVisibilityGenerationCurrent(generation) else { return }
-            guard self.isPresentationSessionGenerationCurrent(
-                presentationGeneration
-            ) else { return }
-            self.logSearchTrace(
-                "presentationRecovery trigger=\(trigger) action=softAttempt generation=\(generation) presentationGeneration=\(presentationGeneration) recoveryGeneration=\(recoveryGeneration) \(self.searchTraceStateSummary())"
-            )
-            self.panelVisibilityRecoveryState = .recovering(
-                trigger: trigger,
-                generation: generation,
-                attempt: 1,
-                totalAttempts: 1,
-                mode: .softReorder
-            )
-            await self.performPanelVisibilityRecoveryAttempt(
-                trigger: trigger,
-                activateApplicationIfNeeded: activateApplicationIfNeeded,
-                recoveryMode: .softReorder,
-                generation: recoveryGeneration,
-                attempt: 1,
-                totalAttempts: 1
-            )
-
-            guard !Task.isCancelled else { return }
-            guard self.isPanelPresentationRecoveryGenerationCurrent(recoveryGeneration) else { return }
-            guard self.hasActivePresentationSession else {
-                self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
-                return
-            }
-            guard self.isInitialPresentationVisibilityGenerationCurrent(generation) else {
-                self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
-                return
-            }
-
-            _ = self.observeInitialPresentationVisibility(
-                source: .recoveryReadback,
-                generation: generation,
-                presentationGeneration: presentationGeneration
-            )
-            self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
-        }
+        guard isPanelPresentationRecoveryGenerationCurrent(
+            recoveryGeneration
+        ) else { return }
+        guard isInitialPresentationVisibilityGenerationCurrent(
+            generation
+        ) else { return }
+        guard isPresentationSessionGenerationCurrent(
+            presentationGeneration
+        ) else { return }
+        logSearchTrace(
+            "presentationRecovery trigger=\(trigger) action=softAttempt generation=\(generation) presentationGeneration=\(presentationGeneration) recoveryGeneration=\(recoveryGeneration) \(searchTraceStateSummary())"
+        )
+        panelVisibilityRecoveryState = .recovering(
+            trigger: trigger,
+            generation: generation,
+            attempt: 1,
+            totalAttempts: 1,
+            mode: .softReorder
+        )
+        performSoftPanelVisibilityRecoveryAction(
+            trigger: trigger,
+            recoveryGeneration: recoveryGeneration,
+            attempt: 1,
+            totalAttempts: 1
+        )
+        guard hasActivePresentationSession else { return }
+        guard isInitialPresentationVisibilityGenerationCurrent(
+            generation
+        ) else { return }
+        _ = observeInitialPresentationVisibility(
+            source: .recoveryReadback,
+            generation: generation,
+            presentationGeneration: presentationGeneration
+        )
     }
 }

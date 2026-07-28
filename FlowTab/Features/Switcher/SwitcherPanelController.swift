@@ -6,18 +6,15 @@ import FlowTabCore
 
 struct PanelVisibilityRecoveryPolicy: Equatable {
     var initialPresentationWatchdogInterval: TimeInterval
-    var interruptionAttemptDelaysNanoseconds: [UInt64]
-    var hardReorderDelayNanoseconds: UInt64
+    var interruptionMaximumAttemptCount: Int
+    var interruptionConditionReadbackInterval: TimeInterval
+    var interruptionWatchdogInterval: TimeInterval
 
     static let `default` = PanelVisibilityRecoveryPolicy(
         initialPresentationWatchdogInterval: 0.35,
-        interruptionAttemptDelaysNanoseconds: [
-            0,
-            50_000_000,
-            150_000_000,
-            300_000_000
-        ],
-        hardReorderDelayNanoseconds: 10_000_000
+        interruptionMaximumAttemptCount: 4,
+        interruptionConditionReadbackInterval: 0.01,
+        interruptionWatchdogInterval: 1.0
     )
 }
 
@@ -159,9 +156,10 @@ final class SwitcherPanelController {
     let modifierReleaseObservationOwner: ModifierReleaseObservationOwner
     let initialPanelVisibilityObservationOwner:
         InitialPanelVisibilityObservationOwner
+    let panelVisibilityRecoveryObservationOwner:
+        PanelVisibilityRecoveryObservationOwner
     var modifierReleaseState: ModifierReleaseState = .idle
     var presentationSessionGeneration = 0
-    var panelPresentationRecoveryTask: Task<Void, Never>?
     var initialWindowOnlyPreviewRevealTask: Task<Void, Never>?
     var panelPresentationRecoveryGeneration = 0
     var panelVisibilityRecoveryState: PanelVisibilityRecoveryState = .idle
@@ -212,11 +210,25 @@ final class SwitcherPanelController {
     }
     let activeSpaceMigrationActivationSuppressionWindow: TimeInterval = 0.5
     let manualWindowLayerProjectionApplyDelay: TimeInterval = 0.35
-    var interruptionPresentationRecoveryAttemptDelaysNs: [UInt64] {
-        panelVisibilityRecoveryPolicy.interruptionAttemptDelaysNanoseconds
+    var interruptionPresentationRecoveryMaximumAttemptCount: Int {
+        panelVisibilityRecoveryPolicy.interruptionMaximumAttemptCount
     }
-    var panelPresentationRecoveryReorderDelayNs: UInt64 {
-        panelVisibilityRecoveryPolicy.hardReorderDelayNanoseconds
+    var interruptionPresentationRecoveryConditionReadbackInterval:
+        TimeInterval
+    {
+        panelVisibilityRecoveryPolicy
+            .interruptionConditionReadbackInterval
+    }
+    var interruptionPresentationRecoveryWatchdogInterval: TimeInterval {
+        panelVisibilityRecoveryPolicy.interruptionWatchdogInterval
+    }
+    var hasPendingPanelVisibilityRecoveryObservation: Bool {
+        panelVisibilityRecoveryObservationOwner.isObserving
+    }
+    var lastPanelVisibilityRecoveryWatchdogFailure:
+        PanelVisibilityRecoveryWatchdogFailure?
+    {
+        panelVisibilityRecoveryObservationOwner.lastFailure
     }
     let autoEnterWindowLayerEnabled = true
     let panelScreenMargin: CGFloat = 80
@@ -291,7 +303,9 @@ final class SwitcherPanelController {
         modifierReleaseEventSource:
             (any ModifierReleaseEventObserving)? = nil,
         initialPanelVisibilityObservationScheduler:
-            (any InitialPanelVisibilityObservationScheduling)? = nil
+            (any InitialPanelVisibilityObservationScheduling)? = nil,
+        panelVisibilityRecoveryObservationScheduler:
+            (any PanelVisibilityRecoveryObservationScheduling)? = nil
     ) {
         self.model = model
         modifierReleaseObservationOwner = ModifierReleaseObservationOwner(
@@ -301,6 +315,10 @@ final class SwitcherPanelController {
         initialPanelVisibilityObservationOwner =
             InitialPanelVisibilityObservationOwner(
                 scheduler: initialPanelVisibilityObservationScheduler
+            )
+        panelVisibilityRecoveryObservationOwner =
+            PanelVisibilityRecoveryObservationOwner(
+                scheduler: panelVisibilityRecoveryObservationScheduler
             )
         panel = SwitcherOverlayPanel(
             contentRect: NSRect(x: 0, y: 0, width: 880, height: 290),
@@ -621,8 +639,6 @@ final class SwitcherPanelController {
     }
 
     deinit {
-        panelPresentationRecoveryTask?.cancel()
-        panelPresentationRecoveryTask = nil
         initialWindowOnlyPreviewRevealTask?.cancel()
         initialWindowOnlyPreviewRevealTask = nil
         terminateSelectedAppTask?.cancel()

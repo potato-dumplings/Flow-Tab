@@ -382,7 +382,9 @@ extension FlowTabPriorityCoverageTests {
         modifierReleaseObservationScheduler:
             (any ModifierReleaseObservationScheduling)? = nil,
         modifierReleaseEventSource:
-            (any ModifierReleaseEventObserving)? = nil
+            (any ModifierReleaseEventObserving)? = nil,
+        panelVisibilityRecoveryObservationScheduler:
+            (any PanelVisibilityRecoveryObservationScheduling)? = nil
     ) -> SwitcherPanelController {
         SwitcherPanelController(
             model: LiveSwitcherModel(
@@ -392,7 +394,9 @@ extension FlowTabPriorityCoverageTests {
             ),
             modifierReleaseObservationScheduler:
                 modifierReleaseObservationScheduler,
-            modifierReleaseEventSource: modifierReleaseEventSource
+            modifierReleaseEventSource: modifierReleaseEventSource,
+            panelVisibilityRecoveryObservationScheduler:
+                panelVisibilityRecoveryObservationScheduler
         )
     }
 
@@ -1415,10 +1419,16 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testSwitcherPanelControllerActiveSpaceChangeKeepsSessionVisibleWithoutReactivatingApp() async {
+    func testSwitcherPanelControllerActiveSpaceChangeKeepsSessionVisibleWithoutReactivatingApp() {
+        let recoveryScheduler =
+            ManualPanelVisibilityRecoveryObservationScheduler()
         let runtimeProjectionService = RecordingRuntimeProjectionService(appSwitcherApps: searchScenarioApps())
         let model = LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
-        let controller = SwitcherPanelController(model: model)
+        let controller = SwitcherPanelController(
+            model: model,
+            panelVisibilityRecoveryObservationScheduler:
+                recoveryScheduler
+        )
         controller.globalPrimaryModifierPressedOverride = true
         controller.appIsActiveOverride = false
 
@@ -1430,24 +1440,20 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
         controller.panelOcclusionStateOverride = []
 
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 60_000_000)
-            controller.panelOcclusionStateOverride = .visible
-        }
-
         controller.handleActiveSpaceDidChangeForTesting()
+        controller.panelVisibilityOverride = false
+        recoveryScheduler.fireConditionReadback()
+        controller.panelVisibilityOverride = true
+        controller.panelOcclusionStateOverride = .visible
+        controller.handlePanelDidExposeForTesting()
 
-        let didRecoverVisibility = await waitUntil(
-            "active space recovery confirms panel visible",
-            timeoutNanoseconds: 1_000_000_000,
-            pollIntervalNanoseconds: 10_000_000
-        ) {
-            if case .visibleConfirmed = controller.panelVisibilityRecoveryState {
-                return true
-            }
-            return false
+        guard case .visibleConfirmed =
+            controller.panelVisibilityRecoveryState
+        else {
+            return XCTFail(
+                "Active-Space recovery must complete from window evidence."
+            )
         }
-        XCTAssertTrue(didRecoverVisibility)
         XCTAssertNotNil(controller.modelForTesting.session)
         XCTAssertEqual(activateCallCount, 0)
         XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
@@ -1633,31 +1639,33 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testSwitcherPanelControllerRecoverableOcclusionKeepsSessionVisible() async {
-        let occlusionController = makeAppSwitcherProjectionPanelController()
+    func testSwitcherPanelControllerRecoverableOcclusionKeepsSessionVisible() {
+        let recoveryScheduler =
+            ManualPanelVisibilityRecoveryObservationScheduler()
+        let occlusionController =
+            makeAppSwitcherProjectionPanelController(
+                panelVisibilityRecoveryObservationScheduler:
+                    recoveryScheduler
+            )
         occlusionController.globalPrimaryModifierPressedOverride = true
 
         XCTAssertTrue(occlusionController.beginGlobalHotkeySessionForTesting())
         occlusionController.panelOcclusionStateOverride = []
 
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 60_000_000)
-            occlusionController.panelOcclusionStateOverride = .visible
-        }
-
         occlusionController.handlePanelOcclusionStateDidChangeForTesting()
+        occlusionController.panelVisibilityOverride = false
+        recoveryScheduler.fireConditionReadback()
+        occlusionController.panelVisibilityOverride = true
+        occlusionController.panelOcclusionStateOverride = .visible
+        occlusionController.handlePanelDidExposeForTesting()
 
-        let didRecoverVisibility = await waitUntil(
-            "recoverable occlusion confirms panel visible",
-            timeoutNanoseconds: 1_000_000_000,
-            pollIntervalNanoseconds: 10_000_000
-        ) {
-            if case .visibleConfirmed = occlusionController.panelVisibilityRecoveryState {
-                return true
-            }
-            return false
+        guard case .visibleConfirmed =
+            occlusionController.panelVisibilityRecoveryState
+        else {
+            return XCTFail(
+                "Occlusion recovery must complete from window evidence."
+            )
         }
-        XCTAssertTrue(didRecoverVisibility)
         XCTAssertNotNil(occlusionController.modelForTesting.session)
         XCTAssertFalse(occlusionController.suppressHotkeyReplayUntilReleaseForTesting)
     }

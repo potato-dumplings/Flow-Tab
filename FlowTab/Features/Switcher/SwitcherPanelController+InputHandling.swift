@@ -342,6 +342,9 @@ extension SwitcherPanelController {
 
     func handleApplicationDidResignActive() {
         guard isPanelPresented else { return }
+        guard !shouldDeferPanelVisibilityRecoveryInterruption(
+            trigger: "applicationDidResignActive"
+        ) else { return }
         logSearchTrace("systemInterruption trigger=applicationDidResignActive \(searchTraceStateSummary())")
         handleRecoverableSystemInterruption(trigger: "applicationDidResignActive")
     }
@@ -376,7 +379,6 @@ extension SwitcherPanelController {
             + activeSpaceMigrationActivationSuppressionWindow
         schedulePanelVisibilityRecovery(
             trigger: "activeSpaceDidChange",
-            attemptDelaysNanoseconds: interruptionPresentationRecoveryAttemptDelaysNs,
             cancelSessionOnFailure: true,
             activateApplicationIfNeeded: false
         )
@@ -387,7 +389,16 @@ extension SwitcherPanelController {
         _ = observeInitialPresentationVisibility(
             source: .panelOcclusionChanged
         )
+        observePanelVisibilityRecovery(
+            source: .panelOcclusionChanged
+        )
         if resolvedPanelOcclusionState.contains(.visible) {
+            return
+        }
+        if hasPendingPanelVisibilityRecoveryObservation {
+            logSearchTrace(
+                "systemInterruption trigger=panelOccluded action=deferred reason=visibilityRecoveryObserved \(searchTraceStateSummary())"
+            )
             return
         }
         guard !shouldDeferInitialPanelOcclusionInterruption(trigger: "panelOccluded") else {
@@ -402,6 +413,9 @@ extension SwitcherPanelController {
         _ = observeInitialPresentationVisibility(
             source: .panelBecameKey
         )
+        observePanelVisibilityRecovery(
+            source: .panelBecameKey
+        )
     }
 
     func handlePanelDidExpose() {
@@ -409,11 +423,17 @@ extension SwitcherPanelController {
         _ = observeInitialPresentationVisibility(
             source: .panelExposed
         )
+        observePanelVisibilityRecovery(
+            source: .panelExposed
+        )
     }
 
     func handlePanelDidResignKey() {
         guard isPanelPresented else { return }
         guard !isAppCurrentlyActive else { return }
+        guard !shouldDeferPanelVisibilityRecoveryInterruption(
+            trigger: "panelDidResignKey"
+        ) else { return }
         logSearchTrace("systemInterruption trigger=panelDidResignKey \(searchTraceStateSummary())")
         handleRecoverableSystemInterruption(trigger: "panelDidResignKey")
     }
@@ -471,7 +491,6 @@ extension SwitcherPanelController {
         )
         schedulePanelVisibilityRecovery(
             trigger: trigger,
-            attemptDelaysNanoseconds: interruptionPresentationRecoveryAttemptDelaysNs,
             cancelSessionOnFailure: true
         )
     }
@@ -483,7 +502,6 @@ extension SwitcherPanelController {
         )
         schedulePanelVisibilityRecovery(
             trigger: "\(trigger)_terminate",
-            attemptDelaysNanoseconds: interruptionPresentationRecoveryAttemptDelaysNs,
             cancelSessionOnFailure: false,
             activateApplicationIfNeeded: trigger != "activeSpaceDidChange"
         )
