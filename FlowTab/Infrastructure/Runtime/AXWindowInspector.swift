@@ -470,8 +470,6 @@ enum AXWindowInspector {
             return "unavailable"
         case .complete(let scanned):
             return "complete scanned=\(scanned)"
-        case .partialTimedOut(let scanned, let maximum):
-            return "partialTimedOut scanned=\(scanned) maximum=\(maximum)"
         }
     }
 

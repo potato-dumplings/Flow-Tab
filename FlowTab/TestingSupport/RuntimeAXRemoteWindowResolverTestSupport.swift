@@ -15,30 +15,22 @@ enum RuntimeAXRemoteWindowResolverForTesting {
         )
     }
 
-    static func scanCompleteness(
-        scannedCount: Int,
-        timedOut: Bool
-    ) -> RuntimeAXRemoteWindowResolver.RemoteScanCompleteness {
-        RuntimeAXRemoteWindowResolver.scanCompleteness(
-            scannedCount: scannedCount,
-            timedOut: timedOut
-        )
-    }
-
-    static func scanCompleteness(
-        scannedCount: Int,
-        timedOut: Bool,
-        policy: ScanPolicy
-    ) -> RuntimeAXRemoteWindowResolver.RemoteScanCompleteness {
-        RuntimeAXRemoteWindowResolver.scanCompleteness(
-            scannedCount: scannedCount,
-            timedOut: timedOut,
-            policy: policy
-        )
-    }
-
     static func scanPolicy(for useCase: ScanUseCase) -> ScanPolicy {
         RuntimeAXRemoteWindowResolver.scanPolicy(for: useCase)
+    }
+
+    static func scanElementIDs(for useCase: ScanUseCase) -> Range<UInt64> {
+        RuntimeAXRemoteWindowResolver.scanPolicy(for: useCase).elementIDs
+    }
+
+    static func scan(
+        for useCase: ScanUseCase,
+        resolveElement: (UInt64) -> AXUIElement?
+    ) -> RuntimeAXRemoteWindowResolver.WindowScanResult {
+        RuntimeAXRemoteWindowResolver.scanElementIDs(
+            policy: RuntimeAXRemoteWindowResolver.scanPolicy(for: useCase),
+            resolveElement: resolveElement
+        )
     }
 
     static func shouldIncludeRemoteWindows(

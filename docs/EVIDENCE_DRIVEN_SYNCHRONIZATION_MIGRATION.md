@@ -80,7 +80,7 @@ and Process/Tooling.
 | ID | File and owner/symbol | Current time assumption and classification | Target evidence or retained policy; lifecycle owner | Risk and required validation | Status |
 | --- | --- | --- | --- | --- | --- |
 | SYNC-000 | `docs/EVIDENCE_DRIVEN_SYNCHRONIZATION_MIGRATION.md`; migration ledger baseline | The repository previously had no stable, reviewable closure ledger for time-based synchronization contracts. Process contract. | Preserve the startup Git baseline, semantic classification, dependency order, per-slice validation, and local commit trace in this document. The migration task owns updates through final closure. | L; Process/Tooling (`git diff --check`, ID/path/source-scope review). | completed by the baseline commit |
-| SYNC-001 | `FlowTab/Infrastructure/Runtime/RuntimeAXRemoteWindowResolver.swift`; `windowScanResult(forPID:policy:)` | An 80–250ms wall-clock budget accepts a machine-dependent partial element-ID scan as usable output. Evidence migration. | Scan a deterministic policy-owned ID range and publish complete/unavailable evidence. Any watchdog must fail the scan with last scanned ID and observed windows rather than promote a partial result. The resolver call owns cancellation/termination. | H; Unit, Behavior, affected topology UI, runtime-topology Pressure. | planned |
+| SYNC-001 | `FlowTab/Infrastructure/Runtime/RuntimeAXRemoteWindowResolver.swift`; `windowScanResult(forPID:policy:)` | An 80–250ms wall-clock budget accepts a machine-dependent partial element-ID scan as usable output. Evidence migration. | Scan a deterministic policy-owned ID range and publish complete/unavailable evidence. Any watchdog must fail the scan with last scanned ID and observed windows rather than promote a partial result. The resolver call owns cancellation/termination. | H; Unit, Behavior, affected topology UI, runtime-topology Pressure. | blocked: implementation and Unit/Behavior/Process passed; UI/Pressure environment evidence is recorded below |
 | SYNC-002 | `FlowTab/Infrastructure/Runtime/RuntimeProjectionMaintenancePolicy.swift`, `RuntimeProjectionService.signalAppLaunched`; app-launch convergence scheduler | A fixed 800ms delay is assumed to be enough for a launched app's windows to exist. Evidence migration. | Establish observation before launch handling, capture the read-model generation, perform initial readback, and reconcile on AX/window/app lifecycle evidence after that baseline. Use named cancellable condition observation only when the launched process exposes no usable event. `RuntimeProjectionService` owns cleanup per PID and app termination cancels it. | H; Unit, Behavior, launch/topology UI, runtime-topology Pressure. | planned |
 | SYNC-003 | `RuntimeReconciliationCoordinator`, `RuntimeProjectionReconciliationDrainer`, `RuntimeProjectionService`; transient-empty retry | Delayed `notBefore` values `[0.1, 0.3, 0.8]` wait for AX data to become non-empty, while a later unrelated maintenance request currently advances the retry. Conditional observation. | Check the repair readback immediately; retry from an observed incomplete payload or a later AX/generation signal. A service-owned cancellable retry driver supplies named cadence and a watchdog reports request ID, attempt, state, and last payload evidence. | H; Unit, Behavior, topology UI, runtime-topology Pressure. | planned |
 | SYNC-004 | `FlowTab/Infrastructure/Runtime/RuntimeAXWindowChangeMonitor.swift`; observer install and `handleAXNotification` | Events during a 750ms warm-up are discarded and events inside a 160ms throttle window can lose the final state. Evidence migration. | Install observers, take an initial AX/window readback, and publish monotonically coalesced generations with a guaranteed trailing readback. The monitor owns observer removal and pending coalescing cancellation. | H; Unit, Behavior, Home/topology UI, runtime-topology Pressure. | planned |
@@ -185,3 +185,33 @@ an immediately following note:
 
 The final source audit must find no unclassified duration, wait, retry,
 polling cadence, deadline, or timeout in the scoped paths.
+
+### SYNC-001 Closure Record
+
+- Design and Oracle: each named scan policy owns a deterministic element-ID
+  range. The resolver publishes `complete(scanned:)` only after visiting the
+  whole range, and publishes `unavailable` when the private resolver symbol
+  cannot supply observations. Window absence remains authoritative only for a
+  completed scan.
+- Lifecycle: the synchronous resolver invocation owns the bounded traversal.
+  This slice adds no observer, timer, retry, wait task, or production watchdog.
+- Retained time policy: none in the production contract. Test semaphore
+  deadlines are terminal failure watchdogs around event-driven
+  suspend/resume evidence.
+- Unit: three deterministic scan-policy, full-traversal, and
+  suspend/resume tests passed in
+  `.build-local/evidence-driven-sync/SYNC-001/flowtabtests-targeted-attempt-001`.
+- Behavior: six inspector, absence-authority, remote-scan-decision, and
+  off-Space window-binding tests passed across the targeted and expanded
+  FlowTabTests attempts.
+- UI and Pressure: the required Noisy Option+Tab real-topology scenario was
+  attempted twice. Both attempts built fixtures, signed the runner, and
+  produced valid result bundles, then macOS LocalAuthentication returned code
+  `-4` (`System authentication is running`) before the test body. Evidence is
+  preserved under
+  `.build-local/evidence-driven-sync/SYNC-001/pressure-attempt-001` and
+  `pressure-attempt-002`.
+- Process/Tooling: `git diff --check` passed. The owner-scope source search
+  found no elapsed clock cutoff or partial-scan completion path.
+- Commit: `refactor(sync): migrate SYNC-001 remote AX scan`; its exact SHA is
+  appended by the next ledger update after the commit exists.

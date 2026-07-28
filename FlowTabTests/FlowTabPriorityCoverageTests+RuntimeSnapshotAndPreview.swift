@@ -2209,7 +2209,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(windowRecordStore.state(for: pid)?.isLikelyTransientAXRebuild == true)
     }
 
-    func testRuntimeSystemRepairFactProviderPartialRemoteAXScanDoesNotConsumeMissingAXGrace() {
+    func testRuntimeSystemRepairFactProviderUnavailableRemoteAXScanDoesNotConsumeMissingAXGrace() {
         let windowRecordStore = RuntimeWindowRecordStore()
         let provider = RuntimeSystemRepairFactProvider(windowRecordStore: windowRecordStore)
         let pid: pid_t = 18_405
@@ -2247,15 +2247,15 @@ extension FlowTabPriorityCoverageTests {
         )
 
         for _ in 0..<5 {
-            let partialEntries = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
+            let unavailableEntries = RuntimeWindowMappingPresentationAssembler.resolvedStableWindowEntries(
             windowRecordStore: windowRecordStore,
                 axWindows: [],
                 cgWindows: cgWindows,
                 pid: pid,
                 appName: appName,
-                remoteScanCompleteness: .partialTimedOut(scanned: 24, maximum: 1_000)
+                remoteScanCompleteness: .unavailable
             )
-            XCTAssertEqual(partialEntries.map(\.windowID), ["cg:18405:243747"])
+            XCTAssertEqual(unavailableEntries.map(\.windowID), ["cg:18405:243747"])
             XCTAssertFalse(windowRecordStore.state(for: pid)?.isLikelyTransientAXRebuild == true)
         }
 
@@ -3364,12 +3364,12 @@ extension FlowTabPriorityCoverageTests {
             rawValueTypeDescription: "CFArray",
             rawArrayCount: 1,
             decodedCount: 1,
-            remoteScanCompleteness: .partialTimedOut(scanned: 24, maximum: 1_000)
+            remoteScanCompleteness: .complete(scanned: 1_000)
         )
 
         XCTAssertEqual(
             details,
-            "fetchError=0 rawValueType=CFArray rawArrayCount=1 decodedCount=1 remoteScan=partialTimedOut scanned=24 maximum=1000"
+            "fetchError=0 rawValueType=CFArray rawArrayCount=1 decodedCount=1 remoteScan=complete scanned=1000"
         )
     }
 
