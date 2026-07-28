@@ -24,12 +24,10 @@ struct PanelVisibilityRecoveryPolicy: Equatable {
 struct ModifierReleaseConfirmationPolicy: Equatable {
     var sampleIntervalNanoseconds: UInt64
     var requiredReleasedSampleCount: Int
-    var postFinishHotkeyIgnoreWindow: TimeInterval
 
     static let `default` = ModifierReleaseConfirmationPolicy(
         sampleIntervalNanoseconds: 25_000_000,
-        requiredReleasedSampleCount: 2,
-        postFinishHotkeyIgnoreWindow: 0.02
+        requiredReleasedSampleCount: 2
     )
 }
 
@@ -155,6 +153,7 @@ final class SwitcherPanelController {
     var panelOcclusionObserver: NSObjectProtocol?
     var panelDidResignKeyObserver: NSObjectProtocol?
     var suppressHotkeyReplayUntilRelease = false
+    let hotkeyInputOwner = SwitcherHotkeyInputOwner()
     let modifierReleaseObservationOwner: ModifierReleaseObservationOwner
     var modifierReleaseState: ModifierReleaseState = .idle
     var presentationSessionGeneration = 0
@@ -167,8 +166,6 @@ final class SwitcherPanelController {
     var delayedWindowLayerTimerGeneration = 0
     var delayedWindowLayerDeadlineMs: Double?
     var delayedWindowLayerAppID: String?
-    var lastCommittedTabAdvanceTimestamp: TimeInterval?
-    var ignoreHotkeyPressesUntil: TimeInterval = 0
     var ignoreActiveSpaceChangesUntil: TimeInterval = 0
     var initialPresentationVisibilityGeneration = 0
     var initialPresentationVisibilityDeadline: TimeInterval = 0
@@ -190,9 +187,6 @@ final class SwitcherPanelController {
     var hasPendingModifierReleaseConfirmation: Bool {
         modifierReleaseObservationOwner.isObserving(.selectionConfirmation)
     }
-    var postFinishHotkeyIgnoreWindow: TimeInterval {
-        modifierReleaseConfirmationPolicy.postFinishHotkeyIgnoreWindow
-    }
     let activeSpaceChangeIgnoreWindow: TimeInterval = 0.35
     let terminateInterruptionProtectionWindow: TimeInterval = 5.0
     let postTerminateRefreshInterruptionProtectionWindow: TimeInterval = 0.5
@@ -210,7 +204,6 @@ final class SwitcherPanelController {
         panelVisibilityRecoveryPolicy.hardReorderDelayNanoseconds
     }
     let autoEnterWindowLayerEnabled = true
-    let tabAdvanceMinimumInterval: TimeInterval = 0.016
     let panelScreenMargin: CGFloat = 80
     let appLayerMinimumWidth: CGFloat = 440
     let appLayerStaticHeight: CGFloat = 56
@@ -459,7 +452,6 @@ final class SwitcherPanelController {
     ) -> Bool {
         guard model.startSession(triggerDirection: triggerDirection) else { return false }
         beginPresentationSession(kind: .globalAppSwitcher, trigger: "testing_global_show")
-        lastCommittedTabAdvanceTimestamp = nil
         panelVisibilityOverride = true
         updatePanelPresentationLevel(trigger: "testing_global_show")
         return true
@@ -472,7 +464,6 @@ final class SwitcherPanelController {
         guard model.startFocusedAppWindowSession(triggerDirection: triggerDirection) else { return false }
         _ = model.prewarmWindowOnlySessionPreviews()
         beginPresentationSession(kind: .inAppWindowSwitcher, trigger: "testing_in_app_show")
-        lastCommittedTabAdvanceTimestamp = nil
         panelVisibilityOverride = true
         updatePanelPresentationLevel(trigger: "testing_in_app_show")
         return true

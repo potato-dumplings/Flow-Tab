@@ -194,9 +194,10 @@ protocol CommandTabTakeoverControlling: AnyObject {
 }
 
 protocol HotkeyMonitoring: AnyObject {
-    var onHotkeyPressed: ((Bool) -> Void)? { get set }
-    var onHotkeyReleased: ((Bool) -> Void)? { get set }
+    var inputSourceID: HotkeyInputSourceID { get }
+    var onHotkeyEvent: ((HotkeyInputEvent) -> Void)? { get set }
 
+    func start()
     func stop()
 }
 
@@ -407,17 +408,16 @@ final class CommandTabTakeoverController {
 extension CommandTabTakeoverController: CommandTabTakeoverControlling {}
 
 final class OptionTabHotkeyMonitor {
-    enum HotkeyEventPhase {
-        case pressed
-        case released
-    }
+    typealias HotkeyEventPhase = HotkeyInputEvent.Phase
 
-    var onHotkeyPressed: ((Bool) -> Void)?
-    var onHotkeyReleased: ((Bool) -> Void)?
+    let inputSourceID = HotkeyInputSourceID()
+    var onHotkeyEvent: ((HotkeyInputEvent) -> Void)?
 
     private var eventHandlerRef: EventHandlerRef?
     private var hotkeyRefs: [UInt32: EventHotKeyRef] = [:]
     private var registeredHotkeyIDs: Set<UInt32> = []
+    private let inputSequenceLock = NSLock()
+    private var inputSequence: UInt64 = 0
 
     private let signature: OSType
     private let forwardHotkeyID: UInt32
@@ -450,6 +450,12 @@ final class OptionTabHotkeyMonitor {
         self.hotkeyUnregisterOverride = hotkeyUnregisterOverride
         self.eventHandlerRemoverOverride = eventHandlerRemoverOverride
         guard startsMonitoring else { return }
+        start()
+    }
+
+    func start() {
+        guard eventHandlerRef == nil else { return }
+        guard !isEventHandlerInstalledForTesting else { return }
         guard installHandler() else { return }
         registerHotkeys()
     }
@@ -652,18 +658,15 @@ final class OptionTabHotkeyMonitor {
             return passThroughStatus
         }
 
-        let phase: String
+        let phase: HotkeyInputEvent.Phase
         let direction: String
-        let callback: ((Bool) -> Void)?
         let isBackward: Bool
         switch id {
         case forwardHotkeyID:
             if isPressedEvent {
-                phase = "pressed"
-                callback = onHotkeyPressed
+                phase = .pressed
             } else if isReleasedEvent {
-                phase = "released"
-                callback = onHotkeyReleased
+                phase = .released
             } else {
                 return passThroughStatus
             }
@@ -671,11 +674,9 @@ final class OptionTabHotkeyMonitor {
             isBackward = false
         case backwardHotkeyID:
             if isPressedEvent {
-                phase = "pressed"
-                callback = onHotkeyPressed
+                phase = .pressed
             } else if isReleasedEvent {
-                phase = "released"
-                callback = onHotkeyReleased
+                phase = .released
             } else {
                 return passThroughStatus
             }
@@ -684,18 +685,35 @@ final class OptionTabHotkeyMonitor {
         default:
             return passThroughStatus
         }
+        let inputEvent = HotkeyInputEvent(
+            identity: nextInputEventIdentity(),
+            phase: phase,
+            isBackward: isBackward
+        )
+        let phaseText = phase == .pressed ? "pressed" : "released"
         RuntimeLog.debug(
             .hotKey,
-            "dispatch phase=\(phase) dir=\(direction) id=\(id) nowMs=\(RuntimePerformanceClock.formatMilliseconds(eventReceivedMs))"
+            "dispatch phase=\(phaseText) dir=\(direction) id=\(id) source=\(inputSourceID.rawValue.uuidString) sequence=\(inputEvent.identity.sequence) nowMs=\(RuntimePerformanceClock.formatMilliseconds(eventReceivedMs))"
         )
         let callbackStartMs = RuntimePerformanceClock.monotonicMilliseconds()
-        callback?(isBackward)
+        onHotkeyEvent?(inputEvent)
         let callbackEndMs = RuntimePerformanceClock.monotonicMilliseconds()
         RuntimeLog.debug(
             .hotKey,
-            "dispatched phase=\(phase) dir=\(direction) id=\(id) callbackMs=\(RuntimePerformanceClock.formatMilliseconds(callbackEndMs - callbackStartMs)) totalMs=\(RuntimePerformanceClock.formatMilliseconds(callbackEndMs - eventReceivedMs))"
+            "dispatched phase=\(phaseText) dir=\(direction) id=\(id) source=\(inputSourceID.rawValue.uuidString) sequence=\(inputEvent.identity.sequence) callbackMs=\(RuntimePerformanceClock.formatMilliseconds(callbackEndMs - callbackStartMs)) totalMs=\(RuntimePerformanceClock.formatMilliseconds(callbackEndMs - eventReceivedMs))"
         )
         return noErr
+    }
+
+    private func nextInputEventIdentity() -> HotkeyInputEventIdentity {
+        inputSequenceLock.lock()
+        inputSequence &+= 1
+        let sequence = inputSequence
+        inputSequenceLock.unlock()
+        return HotkeyInputEventIdentity(
+            sourceID: inputSourceID,
+            sequence: sequence
+        )
     }
 }
 

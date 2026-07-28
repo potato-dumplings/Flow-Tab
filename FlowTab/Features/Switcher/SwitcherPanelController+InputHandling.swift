@@ -479,18 +479,12 @@ extension SwitcherPanelController {
 
     func cancelSelectionForSystemInterruption(trigger: String) {
         guard isPanelPresented || hasActivePresentationSession else { return }
-        let sessionKind = activeHotkeySessionKind
         logSearchTrace("cancelSelectionForSystemInterruption trigger=\(trigger) action=begin \(searchTraceStateSummary())")
         logInputTrace(
             "\(trigger) action=cancelSelection nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
         )
         cancelSelection(trigger: "system_interruption:\(trigger)")
         logSearchTrace("cancelSelectionForSystemInterruption trigger=\(trigger) action=finished \(searchTraceStateSummary())")
-        if let sessionKind {
-            beginHotkeyReplaySuppressionUntilRelease(for: sessionKind, trigger: trigger)
-        } else {
-            beginHotkeyReplaySuppressionUntilReleaseForKnownSessionKinds(trigger: trigger)
-        }
     }
 
 }

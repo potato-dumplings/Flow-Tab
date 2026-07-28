@@ -24,10 +24,18 @@ extension FlowTabPriorityCoverageTests {
         )
         controller.panelVisibilityOverride = false
         controller.hideNonPanelWindowsOverride = {}
+        let hotkeyInput = ManualHotkeyInputSource()
+        hotkeyInput.register(on: controller, for: .inAppWindowSwitcher)
 
-        controller.handleInAppWindowHotkey(isBackward: false)
+        hotkeyInput.emit(
+            phase: .pressed,
+            to: controller,
+            for: .inAppWindowSwitcher
+        )
 
         XCTAssertEqual(controller.modelForTesting.session?.selectedWindow?.id, "first-press-next")
+        controller.inAppPrimaryModifierPressedOverride = false
+        controller.inAppMainKeyPressedOverride = false
         controller.cancelSelectionForTesting()
     }
 

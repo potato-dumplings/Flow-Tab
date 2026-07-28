@@ -214,25 +214,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             forwardHotkeyID: 1,
             backwardHotkeyID: 2
         )
-        monitor.onHotkeyPressed = { [weak panelController] isBackward in
-            panelController?.handleGlobalHotkey(isBackward: isBackward)
+        panelController?.registerHotkeyInputSource(
+            monitor.inputSourceID,
+            for: .globalAppSwitcher
+        )
+        monitor.onHotkeyEvent = { [weak panelController] event in
+            panelController?.handleGlobalHotkeyInput(event)
+            let direction = event.isBackward ? "Backward" : "Forward"
+            let phase = event.phase == .pressed ? "" : " Released"
             RuntimeLog.debug(
                 .hotKey,
-                isBackward ? "HotKey Backward" : "HotKey Forward"
+                "HotKey \(direction)\(phase)"
             )
         }
-        monitor.onHotkeyReleased = { [weak panelController] isBackward in
-            panelController?.handleGlobalHotkeyReleased()
-            RuntimeLog.debug(
-                .hotKey,
-                isBackward ? "HotKey Backward Released" : "HotKey Forward Released"
-            )
-        }
+        hotkeyMonitor = monitor
+        monitor.start()
         RuntimeLog.info(
             .hotKey,
             "register main=\(hotkeyConfiguration.mainShortcutText) backward=\(hotkeyConfiguration.backwardShortcutText) quit=\(hotkeyConfiguration.quitShortcutText)"
         )
-        hotkeyMonitor = monitor
         return (mainUsesCommandTab || inAppUsesCommandTab) && takeoverReady
     }
 
@@ -245,6 +245,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             mainConfiguration.primaryModifier == inAppConfiguration.primaryModifier
                 && mainConfiguration.mainKey == inAppConfiguration.mainKey
         {
+            panelController?.unregisterHotkeyInputSource(
+                for: .inAppWindowSwitcher
+            )
             RuntimeLog.info(.hotKey, "skip register in-app window hotkey due conflict with main shortcut")
             inAppWindowHotkeyMonitor = nil
             return
@@ -256,22 +259,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             forwardHotkeyID: 101,
             backwardHotkeyID: 102
         )
-        monitor.onHotkeyPressed = { [weak panelController] isBackward in
-            panelController?.handleInAppWindowHotkey(isBackward: isBackward)
+        panelController?.registerHotkeyInputSource(
+            monitor.inputSourceID,
+            for: .inAppWindowSwitcher
+        )
+        monitor.onHotkeyEvent = { [weak panelController] event in
+            panelController?.handleInAppWindowHotkeyInput(event)
+            let direction = event.isBackward ? "Backward" : "Forward"
+            let phase = event.phase == .pressed ? "" : " Released"
             RuntimeLog.debug(
                 .hotKey,
-                isBackward ? "InApp Window Backward" : "InApp Window Forward"
+                "InApp Window \(direction)\(phase)"
             )
         }
-        monitor.onHotkeyReleased = { [weak panelController] _ in
-            panelController?.handleInAppWindowHotkeyReleased()
-            RuntimeLog.debug(.hotKey, "InApp Window Released")
-        }
+        inAppWindowHotkeyMonitor = monitor
+        monitor.start()
         RuntimeLog.info(
             .hotKey,
             "register in-app main=\(inAppConfiguration.mainShortcutText) backward=\(inAppConfiguration.backwardShortcutText)"
         )
-        inAppWindowHotkeyMonitor = monitor
     }
 
     private func installHotkeyObserver() {
@@ -602,7 +608,8 @@ extension AppDelegate {
             configuration: configuration,
             signature: signature,
             forwardHotkeyID: forwardHotkeyID,
-            backwardHotkeyID: backwardHotkeyID
+            backwardHotkeyID: backwardHotkeyID,
+            startsMonitoring: false
         )
     }
 }

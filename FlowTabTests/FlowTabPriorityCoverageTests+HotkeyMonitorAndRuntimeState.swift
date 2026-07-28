@@ -50,12 +50,9 @@ extension FlowTabPriorityCoverageTests {
             startsMonitoring: false
         )
 
-        var events: [String] = []
-        monitor.onHotkeyPressed = { isBackward in
-            events.append(isBackward ? "press-backward" : "press-forward")
-        }
-        monitor.onHotkeyReleased = { isBackward in
-            events.append(isBackward ? "release-backward" : "release-forward")
+        var events: [HotkeyInputEvent] = []
+        monitor.onHotkeyEvent = { event in
+            events.append(event)
         }
 
         XCTAssertEqual(
@@ -75,17 +72,19 @@ extension FlowTabPriorityCoverageTests {
             noErr
         )
 
+        XCTAssertEqual(events.map(\.phase), [.pressed, .released, .pressed, .released])
+        XCTAssertEqual(events.map(\.isBackward), [false, false, true, true])
         XCTAssertEqual(
-            events,
-            ["press-forward", "release-forward", "press-backward", "release-backward"]
+            events.map(\.identity.sourceID),
+            Array(repeating: monitor.inputSourceID, count: 4)
         )
+        XCTAssertEqual(events.map(\.identity.sequence), [1, 2, 3, 4])
     }
 
     func testOptionTabHotkeyMonitorPassesThroughUnrelatedEvents() {
         let monitor = OptionTabHotkeyMonitor(signature: 0x54455354, startsMonitoring: false)
         var callbackCount = 0
-        monitor.onHotkeyPressed = { _ in callbackCount += 1 }
-        monitor.onHotkeyReleased = { _ in callbackCount += 1 }
+        monitor.onHotkeyEvent = { _ in callbackCount += 1 }
 
         XCTAssertEqual(
             monitor.dispatchHotkeyEventForTesting(signature: 0x42414421, id: 1, phase: .pressed),
@@ -106,12 +105,9 @@ extension FlowTabPriorityCoverageTests {
             startsMonitoring: false
         )
 
-        var events: [String] = []
-        monitor.onHotkeyPressed = { isBackward in
-            events.append(isBackward ? "press-backward" : "press-forward")
-        }
-        monitor.onHotkeyReleased = { isBackward in
-            events.append(isBackward ? "release-backward" : "release-forward")
+        var events: [HotkeyInputEvent] = []
+        monitor.onHotkeyEvent = { event in
+            events.append(event)
         }
 
         let unsupportedKind = makeCarbonHotkeyEvent(
@@ -163,7 +159,9 @@ extension FlowTabPriorityCoverageTests {
         )
         XCTAssertEqual(monitor.handleHotkeyEventForTesting(backwardReleased), noErr)
 
-        XCTAssertEqual(events, ["press-forward", "release-backward"])
+        XCTAssertEqual(events.map(\.phase), [.pressed, .released])
+        XCTAssertEqual(events.map(\.isBackward), [false, true])
+        XCTAssertEqual(events.map(\.identity.sequence), [1, 2])
     }
 
     func testRuntimeAppLayerProjectionFilterCoversCurrentProcessAndMinimizedApps() {
@@ -857,16 +855,20 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(registerCalls.isEmpty)
     }
 
-    func testOptionTabHotkeyMonitorStopUnregistersOnlySuccessfullyRegisteredHotkeys() {
+    func testOptionTabHotkeyMonitorExplicitStartIsIdempotentAndStopCleansUp() {
         var registerCalls: [UInt32] = []
         var unregisterCalls: [UInt32] = []
         var removeHandlerCallCount = 0
+        var installHandlerCallCount = 0
         let monitor = OptionTabHotkeyMonitor(
             signature: 0x54455354,
             forwardHotkeyID: 11,
             backwardHotkeyID: 22,
-            startsMonitoring: true,
-            handlerInstallerOverride: { true },
+            startsMonitoring: false,
+            handlerInstallerOverride: {
+                installHandlerCallCount += 1
+                return true
+            },
             hotkeyRegistrarOverride: { id, _, _ in
                 registerCalls.append(id)
                 return id == 11
@@ -875,7 +877,14 @@ extension FlowTabPriorityCoverageTests {
             eventHandlerRemoverOverride: { removeHandlerCallCount += 1 }
         )
 
+        XCTAssertFalse(monitor.isEventHandlerInstalledForTesting)
+        XCTAssertTrue(registerCalls.isEmpty)
+
+        monitor.start()
+        monitor.start()
+
         XCTAssertTrue(monitor.isEventHandlerInstalledForTesting)
+        XCTAssertEqual(installHandlerCallCount, 1)
         XCTAssertEqual(registerCalls, [11, 22])
 
         monitor.stop()

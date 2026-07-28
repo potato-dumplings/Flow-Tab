@@ -88,7 +88,8 @@ extension AppDelegate {
             configuration: configuration,
             signature: signature,
             forwardHotkeyID: forwardHotkeyID,
-            backwardHotkeyID: backwardHotkeyID
+            backwardHotkeyID: backwardHotkeyID,
+            startsMonitoring: false
         )
     }
 

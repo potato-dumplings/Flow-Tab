@@ -43,13 +43,37 @@ func makeRuntimeSearchIndexPayloadForTesting(
 }
 
 final class SpyHotkeyMonitor: HotkeyMonitoring {
-    var onHotkeyPressed: ((Bool) -> Void)?
-    var onHotkeyReleased: ((Bool) -> Void)?
+    let inputSourceID = HotkeyInputSourceID()
+    var onHotkeyEvent: ((HotkeyInputEvent) -> Void)?
 
+    private(set) var startCallCount = 0
     private(set) var stopCallCount = 0
+    private var inputSequence: UInt64 = 0
+
+    func start() {
+        startCallCount += 1
+    }
 
     func stop() {
         stopCallCount += 1
+    }
+
+    @discardableResult
+    func emit(
+        phase: HotkeyInputEvent.Phase,
+        isBackward: Bool
+    ) -> HotkeyInputEvent {
+        inputSequence &+= 1
+        let event = HotkeyInputEvent(
+            identity: HotkeyInputEventIdentity(
+                sourceID: inputSourceID,
+                sequence: inputSequence
+            ),
+            phase: phase,
+            isBackward: isBackward
+        )
+        onHotkeyEvent?(event)
+        return event
     }
 }
 

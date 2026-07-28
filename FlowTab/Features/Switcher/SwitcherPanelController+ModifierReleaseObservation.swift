@@ -33,8 +33,7 @@ extension SwitcherPanelController {
                 for: sessionKinds
             ),
             sampleInterval: modifierReleaseConfirmationSampleInterval,
-            requiredReleasedSampleCount:
-                modifierReleaseConfirmationSampleCount,
+            requiredReleasedSampleCount: 1,
             readback: { [weak self] _, _ in
                 guard let self else { return nil }
                 return sessionKinds.contains { sessionKind in

@@ -594,6 +594,8 @@ private final class SwitcherCommandNotificationObserver: NSObject {
     private let name: Notification.Name
     private weak var panelController: SwitcherPanelController?
     private let command: Command
+    private let hotkeyInputSourceID = HotkeyInputSourceID()
+    private var hotkeyInputSequence: UInt64 = 0
 
     init(
         name: Notification.Name,
@@ -639,12 +641,13 @@ private final class SwitcherCommandNotificationObserver: NSObject {
         guard let panelController else { return }
         let notificationName = receivedName ?? name.rawValue
         let command = command
-        Task { @MainActor [panelController, notificationName, command] in
+        Task { @MainActor [weak self, panelController, notificationName, command] in
+            guard let self else { return }
             RuntimeLog.info(
                 "UITest",
                 "received switcher command notification name=\(notificationName) command=\(command.rawValue)"
             )
-            Self.perform(command, panelController: panelController)
+            self.perform(command, panelController: panelController)
             RuntimeLog.info(
                 "UITest",
                 "completed switcher command notification name=\(notificationName) command=\(command.rawValue)"
@@ -653,28 +656,42 @@ private final class SwitcherCommandNotificationObserver: NSObject {
     }
 
     @MainActor
-    private static func perform(
+    private func perform(
         _ command: Command,
         panelController: SwitcherPanelController
     ) {
         switch command {
         case .inAppForward:
+            hotkeyInputSequence &+= 1
+            panelController.registerHotkeyInputSource(
+                hotkeyInputSourceID,
+                for: .inAppWindowSwitcher
+            )
             panelController.inAppPrimaryModifierPressedOverride = true
-            panelController.handleInAppWindowHotkey(isBackward: false)
+            panelController.handleInAppWindowHotkeyInput(
+                HotkeyInputEvent(
+                    identity: HotkeyInputEventIdentity(
+                        sourceID: hotkeyInputSourceID,
+                        sequence: hotkeyInputSequence
+                    ),
+                    phase: .pressed,
+                    isBackward: false
+                )
+            )
             panelController.inAppPrimaryModifierPressedOverride = nil
         case .advanceDown:
             panelController.advance(.downArrow)
         case .advanceRight:
             panelController.advance(.rightArrow)
         case .searchQuery:
-            guard let query = switcherCommandPayload() else { return }
+            guard let query = Self.switcherCommandPayload() else { return }
             panelController.modelForTesting.synchronizeSearchInput(
                 query: query,
                 cursorPosition: query.count
             )
         case .selectApp:
             guard
-                let appID = switcherCommandPayload()?
+                let appID = Self.switcherCommandPayload()?
                     .trimmingCharacters(in: .whitespacesAndNewlines),
                 !appID.isEmpty,
                 var session = panelController.modelForTesting.session
@@ -691,7 +708,7 @@ private final class SwitcherCommandNotificationObserver: NSObject {
             RuntimeLog.info("UITest", "select app command applied appID=\(appID)")
         case .selectSearchResult:
             guard
-                let resultID = switcherCommandPayload()?
+                let resultID = Self.switcherCommandPayload()?
                     .trimmingCharacters(in: .whitespacesAndNewlines),
                 !resultID.isEmpty
             else {

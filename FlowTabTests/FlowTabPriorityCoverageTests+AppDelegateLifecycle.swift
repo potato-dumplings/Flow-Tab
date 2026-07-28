@@ -476,6 +476,8 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertFalse(delegate.hasAppVisibilityObserverForTesting)
         XCTAssertFalse(delegate.hasLanguageObserverForTesting)
         XCTAssertEqual(hotkeyFactory.records.count, 2)
+        XCTAssertEqual(hotkeyFactory.records[0].monitor.startCallCount, 1)
+        XCTAssertEqual(hotkeyFactory.records[1].monitor.startCallCount, 1)
         XCTAssertEqual(hotkeyFactory.records[0].monitor.stopCallCount, 1)
         XCTAssertEqual(hotkeyFactory.records[1].monitor.stopCallCount, 1)
         XCTAssertEqual(takeoverController.restoreCallCount, 1)
@@ -846,6 +848,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(mainRecord.configuration.primaryModifier, .option)
         XCTAssertEqual(mainRecord.configuration.mainKey, .space)
         XCTAssertEqual(mainRecord.configuration.quitKey, .z)
+        XCTAssertEqual(mainRecord.monitor.startCallCount, 1)
         XCTAssertEqual(mainRecord.configuration.forwardKeyCode, UInt32(SwitcherHotkeyKey.space.keyCode))
         XCTAssertEqual(mainRecord.configuration.forwardModifiers, SwitcherPrimaryModifier.option.carbonModifier)
         XCTAssertEqual(
@@ -869,7 +872,7 @@ extension FlowTabPriorityCoverageTests {
             )
         )
 
-        mainRecord.monitor.onHotkeyPressed?(false)
+        mainRecord.monitor.emit(phase: .pressed, isBackward: false)
         panelController.panelVisibilityOverride = true
         XCTAssertEqual(runtimeProjectionService.appSwitcherProjectionReadCount(), 1)
         XCTAssertEqual(runtimeProjectionService.appSwitcherMaintenanceRequestsRecorded(), [.switcherSessionStarted])
@@ -878,12 +881,12 @@ extension FlowTabPriorityCoverageTests {
         let initialSelectedAppID = panelController.modelForTesting.selectedApp?.id
 
         panelController.globalPrimaryModifierPressedOverride = true
-        mainRecord.monitor.onHotkeyPressed?(false)
+        mainRecord.monitor.emit(phase: .pressed, isBackward: false)
         XCTAssertNotEqual(panelController.modelForTesting.selectedApp?.id, initialSelectedAppID)
 
         panelController.globalPrimaryModifierPressedOverride = false
         panelController.cancelPendingModifierReleaseConfirmation()
-        mainRecord.monitor.onHotkeyReleased?(false)
+        mainRecord.monitor.emit(phase: .released, isBackward: false)
         XCTAssertTrue(panelController.hasPendingModifierReleaseConfirmation)
         panelController.cancelPendingModifierReleaseConfirmation()
         panelController.cancelSelectionForTesting()
@@ -896,6 +899,7 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(inAppRecord.configuration.primaryModifier, .command)
         XCTAssertEqual(inAppRecord.configuration.mainKey, .a)
         XCTAssertEqual(inAppRecord.configuration.quitKey, .q)
+        XCTAssertEqual(inAppRecord.monitor.startCallCount, 1)
         XCTAssertEqual(inAppRecord.configuration.forwardKeyCode, UInt32(SwitcherHotkeyKey.a.keyCode))
         XCTAssertEqual(inAppRecord.configuration.forwardModifiers, SwitcherPrimaryModifier.command.carbonModifier)
         XCTAssertEqual(
@@ -904,8 +908,7 @@ extension FlowTabPriorityCoverageTests {
         )
 
         panelController.suppressHotkeyReplayUntilRelease = false
-        panelController.ignoreHotkeyPressesUntil = 0
-        inAppRecord.monitor.onHotkeyPressed?(false)
+        inAppRecord.monitor.emit(phase: .pressed, isBackward: false)
         panelController.panelVisibilityOverride = true
         XCTAssertEqual(runtimeProjectionService.currentAppWindowProjectionReadCount(appID: currentAppID), 1)
         XCTAssertTrue(runtimeProjectionService.selectedCurrentAppWindowChangeSignalsRecorded().isEmpty)
@@ -915,13 +918,12 @@ extension FlowTabPriorityCoverageTests {
 
         panelController.inAppPrimaryModifierPressedOverride = true
         panelController.suppressHotkeyReplayUntilRelease = false
-        panelController.lastCommittedTabAdvanceTimestamp = nil
-        inAppRecord.monitor.onHotkeyPressed?(false)
+        inAppRecord.monitor.emit(phase: .pressed, isBackward: false)
         XCTAssertNotEqual(panelController.modelForTesting.session?.selectedWindow?.id, initialSelectedWindowID)
 
         panelController.inAppPrimaryModifierPressedOverride = false
         panelController.cancelPendingModifierReleaseConfirmation()
-        inAppRecord.monitor.onHotkeyReleased?(false)
+        inAppRecord.monitor.emit(phase: .released, isBackward: false)
         XCTAssertTrue(panelController.hasPendingModifierReleaseConfirmation)
         panelController.cancelPendingModifierReleaseConfirmation()
         panelController.cancelSelectionForTesting()

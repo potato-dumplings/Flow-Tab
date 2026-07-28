@@ -5,20 +5,68 @@ import SwiftUI
 import FlowTabCore
 
 extension SwitcherPanelController {
-    func handleGlobalHotkey(isBackward: Bool) {
-        let now = ProcessInfo.processInfo.systemUptime
-        let nowMs = monotonicMilliseconds()
-        let directionText = isBackward ? "backward" : "forward"
-        if now < ignoreHotkeyPressesUntil {
-            logInputTrace(
-                "hotkeyPressed dir=\(directionText) dropped=postFinishWindow nowMs=\(formatMilliseconds(nowMs)) ignoreUntilMs=\(formatMilliseconds(ignoreHotkeyPressesUntil * 1_000))"
-            )
+    func registerHotkeyInputSource(
+        _ sourceID: HotkeyInputSourceID,
+        for sessionKind: HotkeySessionKind
+    ) {
+        let route = hotkeyInputRoute(for: sessionKind)
+        let registrationGeneration = hotkeyInputOwner.register(
+            sourceID: sourceID,
+            for: route
+        )
+        logInputTrace(
+            "hotkeyInputSource route=\(route.rawValue) action=register source=\(sourceID.rawValue.uuidString) registrationGeneration=\(registrationGeneration)"
+        )
+    }
+
+    func unregisterHotkeyInputSource(for sessionKind: HotkeySessionKind) {
+        let route = hotkeyInputRoute(for: sessionKind)
+        hotkeyInputOwner.unregister(route: route)
+        logInputTrace(
+            "hotkeyInputSource route=\(route.rawValue) action=unregister"
+        )
+    }
+
+    func handleGlobalHotkeyInput(_ event: HotkeyInputEvent) {
+        guard let receipt = acceptHotkeyInput(
+            event,
+            route: .globalAppSwitcher
+        ) else {
             return
         }
+        switch event.phase {
+        case .pressed:
+            handleGlobalHotkeyPressed(receipt)
+        case .released:
+            handleGlobalHotkeyReleased(receipt)
+        }
+    }
+
+    func handleInAppWindowHotkeyInput(_ event: HotkeyInputEvent) {
+        guard let receipt = acceptHotkeyInput(
+            event,
+            route: .inAppWindowSwitcher
+        ) else {
+            return
+        }
+        switch event.phase {
+        case .pressed:
+            handleInAppWindowHotkeyPressed(receipt)
+        case .released:
+            handleInAppWindowHotkeyReleased(receipt)
+        }
+    }
+
+    private func handleGlobalHotkeyPressed(
+        _ receipt: SwitcherHotkeyInputReceipt
+    ) {
+        let isBackward = receipt.event.isBackward
+        let nowMs = monotonicMilliseconds()
+        let directionText = isBackward ? "backward" : "forward"
         if suppressHotkeyReplayUntilRelease {
             modifierReleaseObservationOwner.observeInputTransition()
             logInputTrace(
-                "hotkeyPressed dir=\(directionText) dropped=awaitingHotkeyRelease nowMs=\(formatMilliseconds(nowMs))"
+                "hotkeyPressed dir=\(directionText) dropped=awaitingHotkeyRelease \(hotkeyInputEvidenceFields(receipt)) nowMs=\(formatMilliseconds(nowMs))"
             )
             return
         }
@@ -52,7 +100,9 @@ extension SwitcherPanelController {
         show(direction: direction)
     }
 
-    func handleGlobalHotkeyReleased() {
+    private func handleGlobalHotkeyReleased(
+        _ receipt: SwitcherHotkeyInputReceipt
+    ) {
         if suppressHotkeyReplayUntilRelease {
             modifierReleaseObservationOwner.observeInputTransition()
             return
@@ -66,25 +116,21 @@ extension SwitcherPanelController {
         guard !isPrimaryModifierPressedInHardwareState() else { return }
         let nowMs = monotonicMilliseconds()
         logInputTrace(
-            "hotkeyReleased panelVisible=1 action=scheduleReleaseConfirm nowMs=\(formatMilliseconds(nowMs))"
+            "hotkeyReleased panelVisible=1 action=scheduleReleaseConfirm \(hotkeyInputEvidenceFields(receipt)) nowMs=\(formatMilliseconds(nowMs))"
         )
         scheduleModifierReleaseConfirmation(trigger: "hotkey_released")
     }
 
-    func handleInAppWindowHotkey(isBackward: Bool) {
-        let now = ProcessInfo.processInfo.systemUptime
+    private func handleInAppWindowHotkeyPressed(
+        _ receipt: SwitcherHotkeyInputReceipt
+    ) {
+        let isBackward = receipt.event.isBackward
         let nowMs = monotonicMilliseconds()
         let directionText = isBackward ? "backward" : "forward"
-        if now < ignoreHotkeyPressesUntil {
-            logInputTrace(
-                "inAppHotkeyPressed dir=\(directionText) dropped=postFinishWindow nowMs=\(formatMilliseconds(nowMs)) ignoreUntilMs=\(formatMilliseconds(ignoreHotkeyPressesUntil * 1_000))"
-            )
-            return
-        }
         if suppressHotkeyReplayUntilRelease {
             modifierReleaseObservationOwner.observeInputTransition()
             logInputTrace(
-                "inAppHotkeyPressed dir=\(directionText) dropped=awaitingHotkeyRelease nowMs=\(formatMilliseconds(nowMs))"
+                "inAppHotkeyPressed dir=\(directionText) dropped=awaitingHotkeyRelease \(hotkeyInputEvidenceFields(receipt)) nowMs=\(formatMilliseconds(nowMs))"
             )
             return
         }
@@ -113,7 +159,9 @@ extension SwitcherPanelController {
         )
     }
 
-    func handleInAppWindowHotkeyReleased() {
+    private func handleInAppWindowHotkeyReleased(
+        _ receipt: SwitcherHotkeyInputReceipt
+    ) {
         if suppressHotkeyReplayUntilRelease {
             modifierReleaseObservationOwner.observeInputTransition()
             return
@@ -123,9 +171,49 @@ extension SwitcherPanelController {
         guard !isPrimaryModifierPressedInHardwareState() else { return }
         let nowMs = monotonicMilliseconds()
         logInputTrace(
-            "inAppHotkeyReleased panelVisible=1 action=scheduleReleaseConfirm nowMs=\(formatMilliseconds(nowMs))"
+            "inAppHotkeyReleased panelVisible=1 action=scheduleReleaseConfirm \(hotkeyInputEvidenceFields(receipt)) nowMs=\(formatMilliseconds(nowMs))"
         )
         scheduleModifierReleaseConfirmation(trigger: "in_app_hotkey_released")
+    }
+
+    private func acceptHotkeyInput(
+        _ event: HotkeyInputEvent,
+        route: SwitcherHotkeyInputRoute
+    ) -> SwitcherHotkeyInputReceipt? {
+        let observation = hotkeyInputOwner.observe(
+            event,
+            route: route,
+            presentationSessionGeneration: presentationSessionGeneration
+        )
+        switch observation {
+        case .accepted(let receipt):
+            logInputTrace(
+                "hotkeyInput route=\(route.rawValue) phase=\(event.phase) action=accepted \(hotkeyInputEvidenceFields(receipt))"
+            )
+            return receipt
+        case .rejected(let rejection):
+            logInputTrace(
+                "hotkeyInput route=\(route.rawValue) phase=\(event.phase) source=\(event.identity.sourceID.rawValue.uuidString) sequence=\(event.identity.sequence) action=rejected reason=\(rejection)"
+            )
+            return nil
+        }
+    }
+
+    private func hotkeyInputRoute(
+        for sessionKind: HotkeySessionKind
+    ) -> SwitcherHotkeyInputRoute {
+        switch sessionKind {
+        case .globalAppSwitcher:
+            return .globalAppSwitcher
+        case .inAppWindowSwitcher:
+            return .inAppWindowSwitcher
+        }
+    }
+
+    private func hotkeyInputEvidenceFields(
+        _ receipt: SwitcherHotkeyInputReceipt
+    ) -> String {
+        "source=\(receipt.event.identity.sourceID.rawValue.uuidString) sequence=\(receipt.event.identity.sequence) inputGeneration=\(receipt.inputGeneration) sourceRegistrationGeneration=\(receipt.sourceRegistrationGeneration) sessionGeneration=\(receipt.presentationSessionGeneration)"
     }
 
     func advance(_ keyInput: KeyInput) {
@@ -143,20 +231,8 @@ extension SwitcherPanelController {
                 scheduleModifierReleaseConfirmation(trigger: "advance_without_modifier")
                 return
             }
-            let now = ProcessInfo.processInfo.systemUptime
-            let nowMs = now * 1_000
-            if
-                let lastCommittedTabAdvanceTimestamp,
-                now - lastCommittedTabAdvanceTimestamp < tabAdvanceMinimumInterval
-            {
-                logInputTrace(
-                    "advance key=\(keyInput.debugName) dropped=throttle nowMs=\(formatMilliseconds(nowMs)) deltaMs=\(formatMilliseconds((now - lastCommittedTabAdvanceTimestamp) * 1_000)) thresholdMs=\(formatMilliseconds(tabAdvanceMinimumInterval * 1_000))"
-                )
-                return
-            }
-            self.lastCommittedTabAdvanceTimestamp = now
             logInputTrace(
-                "advance key=\(keyInput.debugName) accepted nowMs=\(formatMilliseconds(nowMs))"
+                "advance key=\(keyInput.debugName) accepted nowMs=\(formatMilliseconds(monotonicMilliseconds()))"
             )
         }
 

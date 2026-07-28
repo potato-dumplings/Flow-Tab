@@ -340,9 +340,6 @@ extension SwitcherPanelController {
             showStartMs: showStartMs,
             startLogMessage: "start in-app direction=\(direction.debugName) \(self.model.debugSelectionSummary())"
         )
-        if initialKeyInput != nil {
-            lastCommittedTabAdvanceTimestamp = ProcessInfo.processInfo.systemUptime
-        }
     }
 
     func presentStartedHotkeySession(
@@ -354,7 +351,6 @@ extension SwitcherPanelController {
     ) {
         let sessionReadyMs = monotonicMilliseconds()
         beginPresentationSession(kind: kind, trigger: trigger)
-        lastCommittedTabAdvanceTimestamp = nil
         RuntimeLog.info(.session, startLogMessage)
 
         let targetScreen = resolveActivePresentationScreen()
@@ -515,7 +511,6 @@ extension SwitcherPanelController {
         ignoreActiveSpaceChangesUntil = 0
         terminateInterruptionProtectionUntil = 0
         suppressApplicationActivationUntil = 0
-        lastCommittedTabAdvanceTimestamp = nil
         panelVisibilityRecoveryState = .idle
         if panelVisibilityOverride != nil {
             panelVisibilityOverride = false
