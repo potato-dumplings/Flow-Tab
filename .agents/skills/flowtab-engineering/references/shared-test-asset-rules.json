@@ -29,6 +29,10 @@
       "role": "asset_views"
     },
     {
+      "relative_path_intent": "scripts/test_asset_workspace.py",
+      "role": "transient_asset_workspace"
+    },
+    {
       "relative_path_intent": "references/test-asset.schema.json",
       "role": "asset_schema"
     },

@@ -9,7 +9,7 @@ Use this workflow for new features and for extending existing behavior.
 - Treat the user-named scenario as a seed; expand it into a representative scenario family before selecting tests.
 - Add the smallest representative scenario set required by the risk classification, using the authorization boundary in `test-layer-boundaries.md`.
 - Add or update every layer required by `risk-calibration.md`; keep UI Required for a changed visible path and assign Unit and Behavior from their owning responsibilities.
-- Read `test-asset-contract.md` before changing test assets. Capture task-owned pre-change and post-change path-scoped snapshots, generate the canonical asset delta, and return active Campaign evidence to the selected audit stage.
+- Read `test-asset-contract.md` before changing tracked test definitions. Routine feature work uses the semantic guard and Git diff. A selected full validation uses the transient `.build-local/test-assets` workspace runner.
 - For documentation-only or mechanical changes that are not feature work, use the calibrated minimum and state why any layer is not relevant.
 - Make each test layer prove a different part of the change instead of repeating the same assertion.
 - Run pressure validation when the change touches hot paths, scale-sensitive logic, or repeated heavy UI or runtime work.
@@ -32,7 +32,7 @@ Use this workflow for new features and for extending existing behavior.
 4. Read `test-layer-boundaries.md` and fan out the seed scenario across the relevant product axes before deciding what distinct evidence unit, behavior, and UI coverage should provide.
 5. Produce a concise scenario plan before editing test files. Include the smallest required scenarios, optional variants, variants intentionally left out, the owning layer, and the reason the required set is representative.
 6. Add the required scenario set autonomously and apply the optional-expansion rule from `test-layer-boundaries.md`. If the authorized scope excludes a layer required by `risk-calibration.md`, report that layer as incomplete or blocked.
-7. Read `test-asset-contract.md`. Before editing test assets, write a path-scoped pre-change snapshot beneath `.build-local`.
+7. Read `test-asset-contract.md`. Before editing tracked test definitions, establish the protected behavior and Oracle, then apply the semantic guard where required.
 8. Read `validation-command-cookbook.md` and choose the smallest concrete command for each required layer.
 9. If UI automation is relevant, read `ui-automation-prerequisites.md` before planning the validation run.
 10. Read `performance-pressure-workflow.md` and decide whether the change also requires pressure validation.
@@ -42,8 +42,8 @@ Use this workflow for new features and for extending existing behavior.
 14. Add or update behavior tests for the app-level flow, integration path, and representative required orchestration variants when behavior coverage is required.
 15. Add or update UI tests for the required visible user path; keep UI coverage representative instead of exhaustively repeating variants already proven below.
 16. Implement the production change.
-17. Create the post-change path-scoped snapshot and canonical asset delta. During an active Campaign, return the delta and execution observations to the selected audit stage.
-18. Run the related test suites and any required pressure checks, then iterate until they pass. If a required validation layer is blocked, stop at a blocker report instead of completion.
+17. Inspect the final tracked test-definition diff. During an active Campaign, return current execution observations through the selected audit stage.
+18. Run the related test suites and any required pressure checks, then iterate until they pass. Run a selected full-validation entry through the transient test-asset workspace runner. If a required validation layer is blocked, stop at a blocker report instead of completion.
 
 ## Coverage Expectations
 

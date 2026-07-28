@@ -16,8 +16,9 @@ Use this reference when choosing concrete local commands for FlowTab validation.
 
 ## General Rules
 
-- Keep repository-local build products, caches, raw evidence, and private manifests under `./.build-local/`. The repository's `.gitignore` excludes this tree so the same relative layout can move with any checkout.
+- Keep repository-local build products, caches, active raw evidence, and private manifests under `./.build-local/` while their owning validation or task is active. Give every generated root an explicit terminal cleanup boundary. The repository's `.gitignore` excludes this tree so the same relative layout can move with any checkout.
 - Persist project-local locations as `{resource_boundary: repository_root, relative_path_intent: <relative-path>}`. Resolve each intent against the current repository root at the resource-owning boundary immediately before use.
+- Targeted and routine validation operate on tracked definitions while `.build-local/test-assets` remains absent. One selected full-validation entry owns it through `scripts/test_asset_workspace.py`; the runner removes it at terminal exit.
 - Use distinct before-change and after-change build-root intents when comparing bugfix signals: SwiftPM `--scratch-path`, repository wrappers `--build-root`, and direct `xcodebuild` `-derivedDataPath`.
 - Use `-only-testing:` filters for targeted validation first, then broaden when the touched code is shared.
 - For an audit run, allocate a fresh attempt-specific output path and leave its leaf absent. Pass it to the repository wrapper, which atomically creates the directory and rejects reuse so prior evidence remains intact.
@@ -27,26 +28,20 @@ Use this reference when choosing concrete local commands for FlowTab validation.
 
 ## Test Asset Tooling
 
-Resolve the `flowtab-engineering` Skill root, then use its canonical indexer. For a routine task, capture the same path scope before and after edits:
+Routine engineering updates tracked test definitions directly, inspects their Git diff and runs the risk-required validation layers. The generated `.build-local/test-assets` workspace remains absent.
+
+When a selected full validation needs canonical test-asset records, run its complete entry through the Skill-owned transient workspace runner:
 
 ```bash
-python3 .agents/skills/flowtab-engineering/scripts/test_asset_index.py index \
+python3 .agents/skills/flowtab-engineering/scripts/test_asset_workspace.py \
   --repository-root . \
-  --scope paths \
-  --path-intent <task-owned-path> \
-  --output .build-local/test-assets/<task-id>/before.jsonl
-
-python3 .agents/skills/flowtab-engineering/scripts/test_asset_index.py index \
-  --repository-root . \
-  --scope paths \
-  --path-intent <task-owned-path> \
-  --output .build-local/test-assets/<task-id>/after.jsonl
-
-python3 .agents/skills/flowtab-engineering/scripts/test_asset_index.py delta \
-  --before .build-local/test-assets/<task-id>/before.jsonl \
-  --after .build-local/test-assets/<task-id>/after.jsonl \
-  --output .build-local/test-assets/<task-id>/asset-delta.jsonl
+  --run-id <full-validation-run-id> \
+  -- <full-validation-entry> [args...]
 ```
+
+The child entry receives `FLOWTAB_TEST_ASSET_ROOT` as the resolved workspace and `FLOWTAB_TEST_ASSET_PATH_INTENT` as the repository-relative path intent. Write only the active run's canonical ledger, plan, observations, deltas and derived views there. Keep build products, `.xcresult` bundles, logs, pressure samples and diagnostic working trees in their owning build or attempt roots.
+
+The runner serializes ownership, clears stale residue before the child starts and removes `.build-local/test-assets` after any normal terminal exit. If the runner is forcibly terminated, the next invocation clears the residue before creating a fresh workspace. Its data lifecycle is limited to the current full-validation run; the handoff reports the terminal outcome and cleanup result.
 
 For a full reconstruction, clear `.build-local/test-audit/rebuild/`, materialize the shared boundary definition and generate the safety-qualified clear plan from the committed rollback anchor:
 
@@ -88,7 +83,7 @@ python3 .agents/skills/flowtab-engineering/scripts/test_asset_index.py assert-bo
   --output .build-local/test-audit/rebuild/BOUNDARY_CLOSURE.json
 ```
 
-Validate generated rows with the matching `validate --record-kind` command. Keep routine and reconstruction datasets under `.build-local`; commit only current C0/C1/C2 anchors through the audit Stage.
+Validate generated rows with the matching `validate --record-kind` command. Keep active reconstruction datasets under `.build-local/test-audit/rebuild`; commit only current C0/C1/C2 anchors through the audit Stage.
 
 ## Build
 

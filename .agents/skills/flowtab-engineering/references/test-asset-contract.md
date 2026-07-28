@@ -1,10 +1,11 @@
 # Test Asset Contract
 
-Use this reference whenever FlowTab engineering discovers, adds, changes, validates, reconstructs, or hands off test assets. Routine engineering and `$flowtab-test-audit` use this single contract.
+Use this reference whenever FlowTab engineering changes tracked test definitions or generates canonical test-asset records for full validation or reconstruction. Routine engineering and `$flowtab-test-audit` use this single contract.
 
 ## Contents
 
 - [Truth And Lifecycle](#truth-and-lifecycle)
+- [Generated Workspace Lifecycle](#generated-workspace-lifecycle)
 - [Asset Boundary](#asset-boundary)
 - [Record Model](#record-model)
 - [Identity And Location](#identity-and-location)
@@ -18,20 +19,34 @@ Use this reference whenever FlowTab engineering discovers, adds, changes, valida
 
 ## Truth And Lifecycle
 
-Use production source, project configuration, explicit product or API contracts, stable external inputs, platform APIs and independent observations to establish the behavior that test assets protect.
+Use production source, project configuration, explicit product or API contracts, stable external inputs, platform APIs and independent observations to establish the behavior that tracked test definitions protect.
 
-Treat these repository-owned files as the single current executable test-asset set:
+Treat these repository-owned files as the current executable test definitions:
 
 - test source and declarations;
 - Fixtures, test data and `FlowTab/TestingSupport`;
 - test-owned Target, Scheme, test-plan and configuration content;
 - canonical Runners, pressure scenarios and repository-owned prerequisite probes.
 
-Routine engineering maintains that set in place. A full reconstruction replaces the complete set from an empty test-asset boundary. Keep prior sets in Git history as recovery points.
+Routine engineering maintains those definitions in place and uses Git as their history. A full reconstruction replaces the complete definition set from an empty boundary.
 
-Keep task and Campaign evidence separate. Ledgers, validation plans, execution observations, deltas and generated projections describe one working candidate and live beneath `.build-local`. Commit C0, C1 and C2 as compact current-Campaign anchors.
+Canonical test-asset records, validation plans, execution observations, deltas and generated projections describe one current full-validation or reconstruction candidate. They are generated views rather than durable repository state.
+
+The lifecycle of `.build-local/test-assets` is exactly one selected full validation. That validation may generate canonical records there for its own execution lifetime. Full reconstruction uses the separate `$flowtab-test-audit` Stage roots and compact C0, C1 and C2 anchors.
 
 Mark every validation-plan row with `record_lifecycle: transient` and `scope_kind: task | reconstruction`. Store complete protected behavior, Oracle and requiredness semantics in the canonical row. Let compact anchors identify selected rows by ID and canonical row SHA-256.
+
+## Generated Workspace Lifecycle
+
+Use `scripts/test_asset_workspace.py` as the only owner of `.build-local/test-assets`.
+
+- Wrap one selected full-validation entry with it. Targeted and routine validation operate on tracked definitions while `.build-local/test-assets` remains absent.
+- The runner resolves the path intent from `repository_root`, acquires the repository-local workspace lock, clears stale data and creates one fresh workspace.
+- The full-validation child receives `FLOWTAB_TEST_ASSET_ROOT` as the resolved accessible path and `FLOWTAB_TEST_ASSET_PATH_INTENT=.build-local/test-assets` as the persisted intent.
+- Store only canonical ledgers, plans, observations, deltas and derived views for the active full validation there. Keep build roots, result bundles, logs, pressure samples and diagnostic working trees in their owning validation output roots.
+- Remove the entire workspace when the full-validation command reaches any terminal exit, including success or failure. A later invocation clears residue from an abnormal process termination before creating its workspace.
+- Serialize full validations through the workspace lock. A concurrent owner fails without modifying the active workspace.
+- Its data lifecycle ends with the owning validation. Report only the terminal validation outcome and successful workspace cleanup.
 
 ## Asset Boundary
 
@@ -79,7 +94,7 @@ Derive deterministic asset identity from the asset type and its type-specific ke
 - Pressure scenario: Runner identity plus scenario name;
 - capability probe: namespaced capability plus repository-owned declaration.
 
-Keep identity separate from `asset_fingerprint`. Use SHA-256 over the owned source bytes for the fingerprint. Represent routine moves, renames, merges and splits with `asset_delta` lineage basis, confidence, candidates and evidence. Resolve `unresolved` lineage before closing an affected slice.
+Keep identity separate from `asset_fingerprint`. Use SHA-256 over the owned source bytes for the fingerprint. Within an active full validation or reconstruction, represent moves, renames, merges and splits with `asset_delta` lineage basis, confidence, candidates and evidence. Resolve `unresolved` lineage before closing the owning run or slice.
 
 ## Discovery And Normalization
 
@@ -100,7 +115,7 @@ schemas --check
 rules --output <json>
 ```
 
-Use `paths` for routine task snapshots and Stage 02 slice snapshots. A path-scoped snapshot can describe an empty or partial reconstruction candidate while later slices remain absent; close the selected C1 slice only after its own dependencies resolve. Use `all` after reconstruction work to index the current candidate and at Stage 03 to establish final closure. Full indexing enforces boundary closure: every discovered asset belongs to one declared path or shared-carrier fragment, every owned file is indexed, every fragment produces its declared record, and every dependency resolves to a current asset. Require byte-identical canonical records for overlapping full and path-scoped outputs.
+Use `paths` only inside an active full validation for its selected scope or for Stage 02 slice generation. A path-scoped record set can describe an empty or partial reconstruction candidate while later slices remain absent; close the selected C1 slice only after its own dependencies resolve. Use `all` after reconstruction work to index the current candidate and at Stage 03 to establish final closure. Full indexing enforces boundary closure: every discovered asset belongs to one declared path or shared-carrier fragment, every owned file is indexed, every fragment produces its declared record, and every dependency resolves to a current asset. Require byte-identical canonical records for overlapping full and path-scoped outputs.
 
 Treat index output as a description of the current asset candidate. Generate it after the relevant asset creation or edit. Exclude prior test assets, generated projections and prior Campaign records from full-reconstruction inputs.
 
@@ -142,9 +157,9 @@ Keep Mock UI and real-topology UI as separate plan rows. Aggregate applicable Re
 
 ## Routine Engineering
 
-Before editing current test assets, create a path-scoped snapshot beneath `.build-local`. After editing, create a second snapshot and generate `asset_delta`. Update the applicable source, Fixture, TestingSupport, configuration, Runner or prerequisite asset in the same task. Classify unresolved lineage candidates as task findings and resolve them before asserting a move, rename, merge or split.
+Update the applicable test source, Fixture, TestingSupport, configuration, Runner or prerequisite definition in the same task. Establish protected behavior and an independent Oracle, apply the existing-test semantic guard when required, inspect the tracked Git diff and run the risk-required validation layers.
 
-Use the task workflow to select scenarios and required layers. Keep snapshots and derived views under `.build-local`. When an active reconstruction owns the affected slice, give its Stage the canonical delta and current execution observations.
+During targeted and routine validation, `.build-local/test-assets` remains absent. When a selected full validation needs canonical records, run its complete entry through `scripts/test_asset_workspace.py`. When an active reconstruction owns the affected slice, give its Stage current execution observations through the reconstruction root.
 
 ## Full Reconstruction
 

@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -31,6 +32,7 @@ from test_asset_model import (
     validate_record,
 )
 from test_asset_views import build_projection, record_references
+from test_asset_workspace import run_full_validation
 
 
 class TestAssetToolTests(unittest.TestCase):
@@ -251,6 +253,50 @@ final class VisibleTests: XCTestCase {
         self.assertTrue(scoped)
         with self.assertRaises(RecordValidationError):
             assert_boundary_closure(self.root, records)
+
+    def test_full_validation_workspace_is_fresh_and_removed_after_success(self) -> None:
+        stale = self.root / ".build-local/test-assets/stale.txt"
+        stale.parent.mkdir(parents=True)
+        stale.write_text("stale\n", encoding="utf-8")
+        command = [
+            sys.executable,
+            "-c",
+            (
+                "import os; "
+                "from pathlib import Path; "
+                "root = Path(os.environ['FLOWTAB_TEST_ASSET_ROOT']); "
+                "assert os.environ['FLOWTAB_TEST_ASSET_PATH_INTENT'] "
+                "== '.build-local/test-assets'; "
+                "assert not (root / 'stale.txt').exists(); "
+                "(root / 'ledger.jsonl').write_text('{}\\n', encoding='utf-8')"
+            ),
+        ]
+
+        self.assertEqual(run_full_validation(self.root, "full-success", command), 0)
+        self.assertFalse((self.root / ".build-local/test-assets").exists())
+
+    def test_full_validation_workspace_is_removed_after_failure(self) -> None:
+        command = [
+            sys.executable,
+            "-c",
+            (
+                "import os; "
+                "from pathlib import Path; "
+                "root = Path(os.environ['FLOWTAB_TEST_ASSET_ROOT']); "
+                "(root / 'failed.jsonl').write_text('{}\\n', encoding='utf-8'); "
+                "raise SystemExit(7)"
+            ),
+        ]
+
+        self.assertEqual(run_full_validation(self.root, "full-failure", command), 7)
+        self.assertFalse((self.root / ".build-local/test-assets").exists())
+
+    def test_full_validation_workspace_is_removed_when_child_cannot_start(self) -> None:
+        command = [str(self.root / "missing-full-validation-entry")]
+
+        with self.assertRaises(FileNotFoundError):
+            run_full_validation(self.root, "full-launch-error", command)
+        self.assertFalse((self.root / ".build-local/test-assets").exists())
 
     def test_generated_view_cannot_change_discovery(self) -> None:
         before = canonical_jsonl(discover_assets(self.root))

@@ -1,6 +1,6 @@
 ---
 name: flowtab-engineering
-description: "Use for FlowTab repository engineering work including implementation, code review, bug triage, architecture, reconstructible test-asset maintenance, test strategy, performance analysis, and validated change delivery. Apply FlowTab module boundaries, evidence-first debugging, risk-calibrated validation layers, canonical test tooling, and task-specific handoff requirements."
+description: "Use for FlowTab repository engineering work including implementation, code review, bug triage, architecture, transient full-validation test-asset handling, test strategy, performance analysis, and validated change delivery. Apply FlowTab module boundaries, evidence-first debugging, risk-calibrated validation layers, canonical test tooling, and task-specific handoff requirements."
 ---
 
 # FlowTab Engineering
@@ -27,8 +27,8 @@ Apply FlowTab's project-specific engineering contract to repository changes and 
 6. Give every validation layer unique evidence.
    Use unit coverage for deterministic rules, behavior coverage for in-process orchestration, UI coverage for the visible user path or real topology, and pressure validation for sustained-load and scale risk. Required layers must pass before completion; report blocked and unproven layers explicitly.
 
-7. Maintain reconstructible test assets.
-   Use `references/test-asset-contract.md` and `references/test-asset-boundaries.json` for the single current asset set, canonical records, protected behavior, Oracles and test-semantic changes. Routine work maintains that set in place; `$flowtab-test-audit` replaces it from an empty boundary during an explicit full reconstruction.
+7. Keep generated test-asset data transient.
+   Use `references/test-asset-contract.md` and `references/test-asset-boundaries.json` for tracked test definitions, canonical records, protected behavior, Oracles and test-semantic changes. Routine work updates tracked definitions directly. A selected full validation exclusively owns one fresh `.build-local/test-assets` workspace through `scripts/test_asset_workspace.py` and removes it at terminal exit. `$flowtab-test-audit` owns explicit full reconstruction separately.
 
 8. Use canonical validation paths.
    Follow `references/validation-command-cookbook.md`, the FlowTabTests wrapper contract, UI prerequisites, and pressure workflow. Keep build roots and evidence under the repository-local ignored tree.
@@ -68,10 +68,10 @@ Apply FlowTab's project-specific engineering contract to repository changes and 
 2. Load the task workflow plus only the supporting references selected above.
 3. For a feature, define the shared rule and representative scenario family. For a defect, establish the stable signal, Oracle, and root-cause evidence.
 4. Select the smallest required test set and identify optional or intentionally deferred variants.
-5. When test assets may change, create the task-owned path-scoped pre-change snapshot defined by `references/test-asset-contract.md`.
+5. When tracked test definitions may change, apply the semantic guard and inspect their Git diff as defined by `references/test-asset-contract.md`.
 6. Implement within the owning module without one-off production behavior.
-7. Create the post-change asset snapshot and canonical delta, then run the required runtime and pressure commands.
-8. During an active audit Campaign, publish the canonical delta and current observations through the selected `$flowtab-test-audit` stage.
+7. Run the required runtime and pressure commands. When full validation generates canonical test-asset data, run its complete entry through `scripts/test_asset_workspace.py`.
+8. During an active audit Campaign, publish current observations through the selected `$flowtab-test-audit` stage.
 9. When closing or transferring the engineering task, read `references/handoff-contract.md` and report runtime validation separately from process/tooling validation.
 
 ## Bundled Resources
@@ -100,5 +100,6 @@ Apply FlowTab's project-specific engineering contract to repository changes and 
 - `scripts/test_asset_clear_plan.py`
 - `scripts/test_asset_index.py`
 - `scripts/test_asset_views.py`
+- `scripts/test_asset_workspace.py`
 - `scripts/test_asset_selftest.py`
 - `scripts/validate-skill.py`

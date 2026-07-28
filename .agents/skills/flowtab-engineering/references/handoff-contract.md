@@ -35,7 +35,7 @@ Use the full handoff for user-visible features, production bugfixes, architectur
 - Production change and affected ownership boundary.
 - Pre-change and post-change validation by runtime layer.
 - Required layer or pressure work that remains blocked or unproven.
-- Canonical test-asset delta and active Campaign publication performed by the applicable workflow.
+- Active Campaign publication and transient full-validation workspace cleanup performed by the applicable workflow.
 
 ### Feature
 
@@ -44,7 +44,7 @@ Use the full handoff for user-visible features, production bugfixes, architectur
 - Representative scenario family and selected minimum test set.
 - Unique evidence supplied by each required runtime layer.
 - Known gaps, blockers, and pressure status.
-- Canonical test-asset delta and active Campaign publication performed by the applicable workflow.
+- Active Campaign publication and transient full-validation workspace cleanup performed by the applicable workflow.
 
 ### Architecture Or Migration
 

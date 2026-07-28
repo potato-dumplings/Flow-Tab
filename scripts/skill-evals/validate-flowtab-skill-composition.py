@@ -66,6 +66,33 @@ def main() -> int:
         if not (root / "SKILL.md").is_file():
             errors.append(f"missing Skill: {root}")
 
+    engineering_text = (engineering / "SKILL.md").read_text(encoding="utf-8")
+    asset_contract_text = (
+        engineering / "references/test-asset-contract.md"
+    ).read_text(encoding="utf-8")
+    command_cookbook_text = (
+        engineering / "references/validation-command-cookbook.md"
+    ).read_text(encoding="utf-8")
+    if "scripts/test_asset_workspace.py" not in engineering_text:
+        errors.append("flowtab-engineering does not route transient test-asset ownership")
+    if "A selected full validation exclusively owns one fresh `.build-local/test-assets` workspace" not in engineering_text:
+        errors.append("flowtab-engineering does not define exclusive transient ownership")
+    if "Use `scripts/test_asset_workspace.py` as the only owner of `.build-local/test-assets`" not in asset_contract_text:
+        errors.append("test-asset contract does not define one transient workspace owner")
+    if "Remove the entire workspace when the full-validation command reaches any terminal exit" not in asset_contract_text:
+        errors.append("test-asset contract has no terminal cleanup rule")
+    if "test_asset_workspace.py" not in command_cookbook_text:
+        errors.append("validation cookbook does not expose the transient workspace runner")
+    for stale_routine_contract in (
+        "For a routine task, capture the same path scope before and after edits",
+        ".build-local/test-assets/<task-id>",
+        "Before editing current test assets, create a path-scoped snapshot",
+    ):
+        if stale_routine_contract in engineering_text + asset_contract_text + command_cookbook_text:
+            errors.append(
+                f"routine persistent test-asset contract remains: {stale_routine_contract}"
+            )
+
     audit_text = (audit / "SKILL.md").read_text(encoding="utf-8")
     if "$flowtab-engineering" not in audit_text:
         errors.append("flowtab-test-audit does not invoke $flowtab-engineering")
@@ -124,6 +151,7 @@ def main() -> int:
         "pressure",
         "reconstruction_safety",
         "requiredness",
+        "transient_asset_workspace",
         "validation_plan_schema",
     }
     missing_roles = sorted(required_roles - roles)
