@@ -1474,5 +1474,15 @@ polling cadence, deadline, or timeout in the scoped paths.
   responsibility also reduces
   `SwitcherPanelController+Presentation.swift`. The startup `prompts.zip`
   remains unchanged and outside the slice.
-- Commit: `refactor(sync): migrate SYNC-020 panel visibility recovery`; its
-  exact SHA is appended by the next ledger update after the commit exists.
+- Validation correction: the rapid open/close pressure case now observes the
+  initial-visibility watchdog token, recovery scheduler tokens, recovery
+  generation, and the last direct recovery diagnostic across 200
+  presentation lifecycles. It fires every retained manual callback after
+  cancellation and verifies that recovery and watchdog state remain stable.
+  This replaces the asynchronous persisted-log timing Oracle, which classified
+  SYNC-020's intentional synchronous soft recovery action as stale and could
+  retain only a suffix of the generated records. The corrected case passed in
+  0.169 seconds under
+  `.build-local/evidence-driven-sync/SYNC-021/initial-visibility-pressure-corrected-attempt-011`.
+- Commit: `206afdffa78e3bc1e193033fe03e1f06b69be0e3`
+  (`refactor(sync): migrate SYNC-020 panel visibility recovery`).

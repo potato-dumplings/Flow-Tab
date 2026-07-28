@@ -343,39 +343,24 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testSwitcherInitialVisibilityRecoveryRapidOpenClosePressureDoesNotReplayStaleTasks() async {
-        let (controller, runtimeProjectionService) = makeInitialVisibilityProjectionPanelController()
+    func testSwitcherInitialVisibilityRecoveryRapidOpenClosePressureDoesNotReplayCancelledObservers() {
+        let visibilityScheduler =
+            ManualInitialPanelVisibilityObservationScheduler()
+        let recoveryScheduler =
+            ManualPanelVisibilityRecoveryObservationScheduler()
+        let (controller, runtimeProjectionService) =
+            makeInitialVisibilityProjectionPanelController(
+                scheduler: visibilityScheduler,
+                recoveryScheduler: recoveryScheduler
+            )
         controller.globalPrimaryModifierPressedOverride = true
-
-        let defaults = UserDefaults.standard
-        let previousExpiration = defaults.object(forKey: AppPreferenceKeys.diagnosticSessionExpiration)
-        let previousLevel = defaults.object(forKey: AppPreferenceKeys.runtimeLogLevel)
-        RuntimeDiagnosticSessionStore.start(userDefaults: defaults)
-        defaults.set(RuntimeLogLevel.debug.rawValue, forKey: AppPreferenceKeys.runtimeLogLevel)
 
         let iterationCount = 200
         let triggerPrefix = "initial_visibility_pressure_\(UUID().uuidString)"
-        let privacyFormatter = RuntimeLogPrivacyFormatter(
-            keyData: RuntimeLogFileStore.shared.loadOrCreatePrivacyFingerprintKey()
-        )
-        let triggerFingerprintTokens = Set((0..<iterationCount).map { index in
-            "field0.value.fingerprint=\(privacyFormatter.stableFingerprint(for: "\(triggerPrefix)_\(index)"))"
-        })
-        let logSnapshot = await RuntimeDiagnostics.shared.makeReadSnapshot()
         let startGeneration = controller.initialPresentationVisibilityGeneration
         let startRecoveryGeneration = controller.panelPresentationRecoveryGeneration
 
         defer {
-            restoreUserDefaultsValue(
-                previousExpiration,
-                forKey: AppPreferenceKeys.diagnosticSessionExpiration,
-                userDefaults: defaults
-            )
-            restoreUserDefaultsValue(
-                previousLevel,
-                forKey: AppPreferenceKeys.runtimeLogLevel,
-                userDefaults: defaults
-            )
             controller.panelVisibilityOverride = nil
             controller.panel.orderOut(nil)
         }
@@ -417,6 +402,16 @@ extension FlowTabPriorityCoverageTests {
                 controller.hasPendingInitialPresentationVisibilityWatchdog,
                 "iteration \(index)"
             )
+            XCTAssertEqual(
+                visibilityScheduler.pendingIntervals,
+                [controller.initialPresentationVisibilityWatchdogInterval],
+                "iteration \(index)"
+            )
+            XCTAssertEqual(
+                controller.lastPanelVisibilityRecoveryDiagnostic?.trigger,
+                trigger,
+                "iteration \(index)"
+            )
 
             controller.cancelSelectionForTesting()
 
@@ -437,10 +432,20 @@ extension FlowTabPriorityCoverageTests {
                 expectedScheduledRecoveryGeneration + 1,
                 "iteration \(index)"
             )
-
-            if index.isMultiple(of: 25) {
-                await Task.yield()
-            }
+            XCTAssertTrue(
+                visibilityScheduler.pendingIntervals.isEmpty,
+                "iteration \(index)"
+            )
+            XCTAssertEqual(
+                recoveryScheduler.pendingConditionReadbackCount,
+                0,
+                "iteration \(index)"
+            )
+            XCTAssertEqual(
+                recoveryScheduler.pendingWatchdogCount,
+                0,
+                "iteration \(index)"
+            )
         }
 
         XCTAssertNil(controller.modelForTesting.session)
@@ -459,30 +464,19 @@ extension FlowTabPriorityCoverageTests {
         controller.panelVisibilityOverride = nil
         XCTAssertFalse(controller.isPanelPresented)
 
-        let deltaLines = await RuntimeDiagnostics.shared.readRecentLines(
-            limit: iterationCount * 20,
-            minimumLevel: .debug,
-            since: logSnapshot
+        let finalDiagnostic =
+            controller.lastPanelVisibilityRecoveryDiagnostic
+        visibilityScheduler.fireAll()
+        recoveryScheduler.fireAll()
+        XCTAssertEqual(
+            controller.lastPanelVisibilityRecoveryDiagnostic,
+            finalDiagnostic
         )
-        let pressureLines = deltaLines.filter { line in
-            line.contains("[SearchTrace]")
-                && triggerFingerprintTokens.contains { line.contains($0) }
-        }
-        let trackedLines = pressureLines.filter {
-            $0.contains("event.length=\("presentationRecovery".count)")
-                && $0.contains("field1.value.length=\("trackInitialVisibility".count)")
-        }
-        let staleExecutionLines = pressureLines.filter { line in
-            line.contains("field1.value.length=\("softAttempt".count)")
-                || line.contains("field1.value.length=\("complete".count)")
-                || line.contains("field1.value.length=\("failed".count)")
-        }
-
-        XCTAssertEqual(trackedLines.count, iterationCount)
-        XCTAssertTrue(
-            staleExecutionLines.isEmpty,
-            "stale recovery executions: \(staleExecutionLines.prefix(5).joined(separator: "\n"))"
+        XCTAssertNil(
+            controller.lastInitialPresentationVisibilityWatchdogFailure
         )
+        XCTAssertNil(controller.modelForTesting.session)
+        XCTAssertFalse(controller.hasActivePresentationSession)
     }
 
     private func assertInitialVisibilityProjectionRead(
