@@ -155,9 +155,7 @@ final class SwitcherPanelController {
     var panelOcclusionObserver: NSObjectProtocol?
     var panelDidResignKeyObserver: NSObjectProtocol?
     var suppressHotkeyReplayUntilRelease = false
-    var suppressHotkeyReplayTask: Task<Void, Never>?
-    var pendingModifierReleaseConfirmationTask: Task<Void, Never>?
-    var modifierReleaseConfirmationGeneration = 0
+    let modifierReleaseObservationOwner: ModifierReleaseObservationOwner
     var modifierReleaseState: ModifierReleaseState = .idle
     var presentationSessionGeneration = 0
     var panelPresentationRecoveryTask: Task<Void, Never>?
@@ -185,6 +183,12 @@ final class SwitcherPanelController {
     }
     var modifierReleaseConfirmationSampleCount: Int {
         modifierReleaseConfirmationPolicy.requiredReleasedSampleCount
+    }
+    var modifierReleaseConfirmationGeneration: Int {
+        modifierReleaseObservationOwner.generation
+    }
+    var hasPendingModifierReleaseConfirmation: Bool {
+        modifierReleaseObservationOwner.isObserving(.selectionConfirmation)
     }
     var postFinishHotkeyIgnoreWindow: TimeInterval {
         modifierReleaseConfirmationPolicy.postFinishHotkeyIgnoreWindow
@@ -272,8 +276,18 @@ final class SwitcherPanelController {
         self.init(model: LiveSwitcherModel())
     }
 
-    init(model: LiveSwitcherModel) {
+    init(
+        model: LiveSwitcherModel,
+        modifierReleaseObservationScheduler:
+            (any ModifierReleaseObservationScheduling)? = nil,
+        modifierReleaseEventSource:
+            (any ModifierReleaseEventObserving)? = nil
+    ) {
         self.model = model
+        modifierReleaseObservationOwner = ModifierReleaseObservationOwner(
+            scheduler: modifierReleaseObservationScheduler,
+            eventSource: modifierReleaseEventSource
+        )
         panel = SwitcherOverlayPanel(
             contentRect: NSRect(x: 0, y: 0, width: 880, height: 290),
             styleMask: SwitcherPanelWindowConfiguration.styleMask,
@@ -569,8 +583,6 @@ final class SwitcherPanelController {
     }
 
     deinit {
-        suppressHotkeyReplayTask?.cancel()
-        suppressHotkeyReplayTask = nil
         panelPresentationRecoveryTask?.cancel()
         panelPresentationRecoveryTask = nil
         initialWindowOnlyPreviewRevealTask?.cancel()

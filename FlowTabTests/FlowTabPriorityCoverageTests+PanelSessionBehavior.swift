@@ -77,13 +77,17 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testSwitcherPanelControllerGlobalHotkeyAdvanceAndReleaseCommitSession() async {
+    func testSwitcherPanelControllerGlobalHotkeyAdvanceAndReleaseCommitSession() {
+        let releaseScheduler = ManualModifierReleaseObservationScheduler()
+        let releaseEventSource = ManualModifierReleaseEventSource()
         let controller = SwitcherPanelController(
             model: LiveSwitcherModel(
                 runtimeProjectionService: RecordingRuntimeProjectionService(
                     appSwitcherApps: searchScenarioApps()
                 )
-            )
+            ),
+            modifierReleaseObservationScheduler: releaseScheduler,
+            modifierReleaseEventSource: releaseEventSource
         )
 
         var activatedTarget: ActivationTarget?
@@ -102,22 +106,26 @@ extension FlowTabPriorityCoverageTests {
         controller.globalPrimaryModifierPressedOverride = false
         controller.handleGlobalHotkeyReleased()
 
-        let didCommitGlobalRelease = await waitUntil("global hotkey release commits selection") {
-            controller.modelForTesting.session == nil && activatedTarget != nil
-        }
-        XCTAssertTrue(didCommitGlobalRelease)
+        XCTAssertNotNil(controller.modelForTesting.session)
+        XCTAssertTrue(controller.hasPendingModifierReleaseConfirmation)
+        releaseScheduler.fireNext()
+
         XCTAssertNil(controller.modelForTesting.session)
         XCTAssertNotNil(activatedTarget)
+        XCTAssertEqual(releaseEventSource.activeObserverCount, 0)
     }
 
     @MainActor
-    func testSwitcherPanelControllerKeepsFirstModifierReleaseConfirmationWhenTriggersOverlap() async {
+    func testSwitcherPanelControllerKeepsFirstModifierReleaseConfirmationWhenTriggersOverlap() {
+        let releaseScheduler = ManualModifierReleaseObservationScheduler()
         let controller = SwitcherPanelController(
             model: LiveSwitcherModel(
                 runtimeProjectionService: RecordingRuntimeProjectionService(
                     appSwitcherApps: searchScenarioApps()
                 )
-            )
+            ),
+            modifierReleaseObservationScheduler: releaseScheduler,
+            modifierReleaseEventSource: ManualModifierReleaseEventSource()
         )
         var activatedTargets: [ActivationTarget] = []
         controller.modelForTesting.activationOverride = { target, _ in
@@ -134,25 +142,31 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertEqual(controller.modifierReleaseConfirmationGeneration, releaseGeneration)
         XCTAssertEqual(
             controller.modifierReleaseState,
-            .releaseObserved(trigger: "presentation_recovered", generation: releaseGeneration)
+            .confirming(
+                trigger: "presentation_recovered",
+                generation: releaseGeneration,
+                releasedSamples: 1
+            )
         )
 
-        let didCommitRelease = await waitUntil("overlapping release triggers commit once") {
-            controller.modelForTesting.session == nil && activatedTargets.count == 1
-        }
-        XCTAssertTrue(didCommitRelease)
+        XCTAssertEqual(releaseScheduler.pendingCount, 1)
+        releaseScheduler.fireNext()
+
         XCTAssertEqual(activatedTargets.count, 1)
-        XCTAssertNil(controller.pendingModifierReleaseConfirmationTask)
+        XCTAssertFalse(controller.hasPendingModifierReleaseConfirmation)
     }
 
     @MainActor
     func testSwitcherPanelControllerReleaseConfirmationGenerationInvalidatesCanceledTask() {
+        let releaseScheduler = ManualModifierReleaseObservationScheduler()
         let controller = SwitcherPanelController(
             model: LiveSwitcherModel(
                 runtimeProjectionService: RecordingRuntimeProjectionService(
                     appSwitcherApps: searchScenarioApps()
                 )
-            )
+            ),
+            modifierReleaseObservationScheduler: releaseScheduler,
+            modifierReleaseEventSource: ManualModifierReleaseEventSource()
         )
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
@@ -160,15 +174,24 @@ extension FlowTabPriorityCoverageTests {
 
         controller.scheduleModifierReleaseConfirmation(trigger: "generation_first")
         let firstGeneration = controller.modifierReleaseConfirmationGeneration
-        XCTAssertNotNil(controller.pendingModifierReleaseConfirmationTask)
+        XCTAssertTrue(controller.hasPendingModifierReleaseConfirmation)
         XCTAssertEqual(
             controller.modifierReleaseState,
-            .releaseObserved(trigger: "generation_first", generation: firstGeneration)
+            .confirming(
+                trigger: "generation_first",
+                generation: firstGeneration,
+                releasedSamples: 1
+            )
         )
 
         controller.cancelPendingModifierReleaseConfirmation()
-        XCTAssertNil(controller.pendingModifierReleaseConfirmationTask)
+        XCTAssertFalse(controller.hasPendingModifierReleaseConfirmation)
         XCTAssertEqual(controller.modifierReleaseConfirmationGeneration, firstGeneration + 1)
+        XCTAssertFalse(
+            controller.isModifierReleaseConfirmationGenerationCurrent(
+                firstGeneration
+            )
+        )
         XCTAssertEqual(
             controller.modifierReleaseState,
             .canceled(reason: .explicitCancel, generation: firstGeneration)
@@ -176,22 +199,20 @@ extension FlowTabPriorityCoverageTests {
 
         controller.scheduleModifierReleaseConfirmation(trigger: "generation_second")
         let secondGeneration = controller.modifierReleaseConfirmationGeneration
-        XCTAssertNotNil(controller.pendingModifierReleaseConfirmationTask)
+        XCTAssertTrue(controller.hasPendingModifierReleaseConfirmation)
         XCTAssertEqual(
             controller.modifierReleaseState,
-            .releaseObserved(trigger: "generation_second", generation: secondGeneration)
-        )
-
-        controller.clearPendingModifierReleaseConfirmationTaskIfCurrent(firstGeneration)
-        XCTAssertNotNil(controller.pendingModifierReleaseConfirmationTask)
-        XCTAssertEqual(
-            controller.modifierReleaseState,
-            .releaseObserved(trigger: "generation_second", generation: secondGeneration)
+            .confirming(
+                trigger: "generation_second",
+                generation: secondGeneration,
+                releasedSamples: 1
+            )
         )
 
         XCTAssertEqual(controller.modifierReleaseConfirmationGeneration, secondGeneration)
         controller.cancelPendingModifierReleaseConfirmation()
-        XCTAssertNil(controller.pendingModifierReleaseConfirmationTask)
+        XCTAssertFalse(controller.hasPendingModifierReleaseConfirmation)
+        XCTAssertEqual(releaseScheduler.pendingCount, 0)
         controller.cancelSelectionForTesting()
     }
 
@@ -246,14 +267,21 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     private func makeAppSwitcherProjectionPanelController(
-        apps: [AppSwitchCandidate]? = nil
+        apps: [AppSwitchCandidate]? = nil,
+        modifierReleaseObservationScheduler:
+            (any ModifierReleaseObservationScheduling)? = nil,
+        modifierReleaseEventSource:
+            (any ModifierReleaseEventObserving)? = nil
     ) -> SwitcherPanelController {
         SwitcherPanelController(
             model: LiveSwitcherModel(
                 runtimeProjectionService: RecordingRuntimeProjectionService(
                     appSwitcherApps: apps ?? searchScenarioApps()
                 )
-            )
+            ),
+            modifierReleaseObservationScheduler:
+                modifierReleaseObservationScheduler,
+            modifierReleaseEventSource: modifierReleaseEventSource
         )
     }
 
@@ -269,8 +297,13 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testSwitcherPanelControllerHotkeyReplaySuppressionUsesReleaseStateGeneration() async {
-        let controller = SwitcherPanelController()
+    func testSwitcherPanelControllerHotkeyReplaySuppressionUsesReleaseStateGeneration() {
+        let releaseScheduler = ManualModifierReleaseObservationScheduler()
+        let controller = SwitcherPanelController(
+            model: LiveSwitcherModel(),
+            modifierReleaseObservationScheduler: releaseScheduler,
+            modifierReleaseEventSource: ManualModifierReleaseEventSource()
+        )
         controller.globalPrimaryModifierPressedOverride = false
         controller.globalMainKeyPressedOverride = false
 
@@ -283,11 +316,11 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertTrue(controller.suppressHotkeyReplayUntilReleaseForTesting)
         XCTAssertEqual(
             controller.modifierReleaseState,
-            .replaySuppression(trigger: "state_machine", generation: generation, releasedSamples: 0)
+            .replaySuppression(trigger: "state_machine", generation: generation, releasedSamples: 1)
         )
 
-        let didEndSuppression = await waitForHotkeyReplaySuppressionToEnd(panelController: controller)
-        XCTAssertTrue(didEndSuppression)
+        releaseScheduler.fireNext()
+
         XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
         XCTAssertEqual(
             controller.modifierReleaseState,
@@ -297,12 +330,15 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testSwitcherPanelControllerPresentationSessionGenerationTracksSessionLifecycle() {
+        let releaseScheduler = ManualModifierReleaseObservationScheduler()
         let controller = SwitcherPanelController(
             model: LiveSwitcherModel(
                 runtimeProjectionService: RecordingRuntimeProjectionService(
                     appSwitcherApps: searchScenarioApps()
                 )
-            )
+            ),
+            modifierReleaseObservationScheduler: releaseScheduler,
+            modifierReleaseEventSource: ManualModifierReleaseEventSource()
         )
 
         XCTAssertEqual(controller.presentationSessionGeneration, 0)
@@ -314,11 +350,11 @@ extension FlowTabPriorityCoverageTests {
         controller.globalPrimaryModifierPressedOverride = false
         controller.scheduleModifierReleaseConfirmation(trigger: "session_generation")
         let releaseGeneration = controller.modifierReleaseConfirmationGeneration
-        XCTAssertNotNil(controller.pendingModifierReleaseConfirmationTask)
+        XCTAssertTrue(controller.hasPendingModifierReleaseConfirmation)
 
         controller.cancelSelectionForTesting()
 
-        XCTAssertNil(controller.pendingModifierReleaseConfirmationTask)
+        XCTAssertFalse(controller.hasPendingModifierReleaseConfirmation)
         XCTAssertFalse(controller.isPresentationSessionGenerationCurrent(firstSessionGeneration))
         XCTAssertEqual(controller.presentationSessionGeneration, firstSessionGeneration + 1)
         XCTAssertEqual(
@@ -1224,8 +1260,13 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testSwitcherPanelControllerFlagsChangedReleaseConfirmationEndsSession() async {
-        let controller = makeAppSwitcherProjectionPanelController()
+    func testSwitcherPanelControllerFlagsChangedReleaseConfirmationEndsSession() {
+        let releaseScheduler = ManualModifierReleaseObservationScheduler()
+        let releaseEventSource = ManualModifierReleaseEventSource()
+        let controller = makeAppSwitcherProjectionPanelController(
+            modifierReleaseObservationScheduler: releaseScheduler,
+            modifierReleaseEventSource: releaseEventSource
+        )
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
         controller.globalPrimaryModifierPressedOverride = false
@@ -1234,15 +1275,12 @@ extension FlowTabPriorityCoverageTests {
             Self.makeFlagsChangedEvent(keyCode: UInt16(kVK_Option))
         )
 
-        let didEndSession = await waitUntil(
-            "flags changed release confirmation ends session",
-            timeoutNanoseconds: 1_000_000_000,
-            pollIntervalNanoseconds: 10_000_000
-        ) {
-            controller.modelForTesting.session == nil
-        }
-        XCTAssertTrue(didEndSession)
+        XCTAssertTrue(controller.hasPendingModifierReleaseConfirmation)
+        XCTAssertEqual(releaseEventSource.activeObserverCount, 1)
+        releaseScheduler.fireNext()
+
         XCTAssertNil(controller.modelForTesting.session)
+        XCTAssertEqual(releaseEventSource.activeObserverCount, 0)
     }
 
     @MainActor
@@ -1518,8 +1556,13 @@ extension FlowTabPriorityCoverageTests {
     }
 
     @MainActor
-    func testSwitcherPanelControllerSystemInterruptionsCancelSessionAndSuppressReplayUntilRelease() async {
-        let controller = makeAppSwitcherProjectionPanelController()
+    func testSwitcherPanelControllerSystemInterruptionsCancelSessionAndSuppressReplayUntilRelease() {
+        let releaseScheduler = ManualModifierReleaseObservationScheduler()
+        let releaseEventSource = ManualModifierReleaseEventSource()
+        let controller = makeAppSwitcherProjectionPanelController(
+            modifierReleaseObservationScheduler: releaseScheduler,
+            modifierReleaseEventSource: releaseEventSource
+        )
         controller.globalPrimaryModifierPressedOverride = false
         controller.globalMainKeyPressedOverride = false
 
@@ -1529,8 +1572,8 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertNil(controller.modelForTesting.session)
         XCTAssertTrue(controller.suppressHotkeyReplayUntilReleaseForTesting)
 
-        let activeSpaceSuppressionEnded = await waitForHotkeyReplaySuppressionToEnd(panelController: controller)
-        XCTAssertTrue(activeSpaceSuppressionEnded)
+        releaseScheduler.fireNext()
+        XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
         controller.panelOcclusionStateOverride = []
@@ -1539,14 +1582,18 @@ extension FlowTabPriorityCoverageTests {
         XCTAssertNil(controller.modelForTesting.session)
         XCTAssertTrue(controller.suppressHotkeyReplayUntilReleaseForTesting)
 
-        let occlusionSuppressionEnded = await waitForHotkeyReplaySuppressionToEnd(panelController: controller)
-        XCTAssertTrue(occlusionSuppressionEnded)
+        releaseScheduler.fireNext()
+        XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
 
         XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
         controller.appIsActiveOverride = false
         controller.handlePanelDidResignKeyForTesting()
 
         XCTAssertNil(controller.modelForTesting.session)
+        XCTAssertTrue(controller.suppressHotkeyReplayUntilReleaseForTesting)
+        XCTAssertEqual(releaseEventSource.activeObserverCount, 1)
+        releaseScheduler.fireNext()
+        XCTAssertFalse(controller.suppressHotkeyReplayUntilReleaseForTesting)
     }
 
     @MainActor

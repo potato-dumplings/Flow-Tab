@@ -16,6 +16,7 @@ extension SwitcherPanelController {
             return
         }
         if suppressHotkeyReplayUntilRelease {
+            modifierReleaseObservationOwner.observeInputTransition()
             logInputTrace(
                 "hotkeyPressed dir=\(directionText) dropped=awaitingHotkeyRelease nowMs=\(formatMilliseconds(nowMs))"
             )
@@ -52,6 +53,10 @@ extension SwitcherPanelController {
     }
 
     func handleGlobalHotkeyReleased() {
+        if suppressHotkeyReplayUntilRelease {
+            modifierReleaseObservationOwner.observeInputTransition()
+            return
+        }
         guard isPanelPresented else { return }
         guard activeHotkeySessionKind == .globalAppSwitcher else { return }
         guard !model.isSearchActive else { return }
@@ -77,6 +82,7 @@ extension SwitcherPanelController {
             return
         }
         if suppressHotkeyReplayUntilRelease {
+            modifierReleaseObservationOwner.observeInputTransition()
             logInputTrace(
                 "inAppHotkeyPressed dir=\(directionText) dropped=awaitingHotkeyRelease nowMs=\(formatMilliseconds(nowMs))"
             )
@@ -108,6 +114,10 @@ extension SwitcherPanelController {
     }
 
     func handleInAppWindowHotkeyReleased() {
+        if suppressHotkeyReplayUntilRelease {
+            modifierReleaseObservationOwner.observeInputTransition()
+            return
+        }
         guard isPanelPresented else { return }
         guard activeHotkeySessionKind == .inAppWindowSwitcher else { return }
         guard !isPrimaryModifierPressedInHardwareState() else { return }

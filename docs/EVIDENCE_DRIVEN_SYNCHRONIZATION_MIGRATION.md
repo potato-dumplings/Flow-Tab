@@ -98,7 +98,7 @@ and Process/Tooling.
 | SYNC-014 | `FlowTab/App/AppFoundation.swift`; `AppWindowCoordinator.scheduleAccessoryPolicyRestoration` | Up to 250 polls at 20ms infer that a status-item-opened regular window is active and visible. Conditional observation plus watchdog. | Register app/window observers before presentation, perform immediate visibility/activation readback, and complete on the matching window transition. A named cancellable condition observer is the fallback; watchdog diagnostics include app-active, visible, miniaturized, and activation-policy state. `AppWindowCoordinator` owns the task/observers. | H; Unit, Behavior, status-item UI. | completed; the expanded full Priority run's assigned SYNC-032/SYNC-033 order-isolation failure is recorded below |
 | SYNC-015 | `SwitcherSearchCoordinator.scheduleRebuild`, `LiveSwitcherModel.scheduleSearchComputation` | 10–45ms delays debounce query work; result publication already requires revision and query/scope equality. Domain duration. | Retain as one named search scheduling policy with injectable scheduler/clock, cancellation, and revision Oracle. Remove duplicate scheduling ownership if both paths serve the same contract. | H hot path; Unit, Behavior, Search UI, realistic/stress Search Pressure. | completed; the expanded full Priority run's assigned SYNC-032/SYNC-033 order-isolation failure is recorded below |
 | SYNC-016 | `AppDelegate.setupHotkeyMonitors`, `HotkeyRegistrationObservationOwner`, `HotkeySettingsCardAppKitView.updateTakeoverStatus`; Command+Tab registration status | A 250ms delay was treated as confirmation that Command+Tab takeover stayed inactive. Evidence migration. | Publish a monotonic registration generation with exact request ID, configurations, and takeover result after reconciliation and monitor setup. Settings observes before persistence/registration, closes synchronous delivery with readback, and renders only matching evidence. Settings active visibility owns observer cleanup and stale-generation rejection. | M; Unit, Behavior, Settings UI. | completed; the expanded full Priority run's assigned SYNC-032/SYNC-033 order-isolation failure is recorded below |
-| SYNC-017 | `SwitcherPanelController+InputHandling.swift`; modifier-release confirmation and replay suppression | Hardware release is inferred from repeated samples after fixed intervals. Conditional observation. | Consume flags/key transition events first, immediately read hardware state, and retain named cancellable sampling only for missed global events. Stable released-state samples remain the condition Oracle; session and confirmation generations own cancellation. | H; Unit, Behavior, switcher UI, interaction Pressure. | planned |
+| SYNC-017 | `SwitcherPanelController+InputHandling.swift`, `ModifierReleaseObservationOwner`; modifier-release confirmation and replay suppression | Hardware release was inferred from repeated samples after fixed intervals. Conditional observation. | Install exact modifier/main-key transition observation before the initial hardware readback. Transition evidence triggers immediate readback; one named cancellable fallback sample closes missed-event and stale-readback gaps. Two stable released-state readbacks remain the sole success Oracle. The panel controller owns observation tokens, fallback work, and generation cancellation. | H; Unit, Behavior, switcher UI, interaction Pressure. | completed; the expanded full Priority run's assigned SYNC-032/SYNC-033 order-isolation failure is recorded below |
 | SYNC-018 | `SwitcherPanelController+Hotkeys.swift`, `+SelectionLifecycle.swift`; tab throttle and post-finish ignore | 16ms and 20ms windows discard input assumed to be duplicate/replayed, so scheduling can change the selected result. Evidence migration. | Deduplicate by concrete event identity and session/input generation, and suppress replay until observed modifier/main-key release. The active presentation session owns the state. | H; Unit, Behavior, switcher UI, interaction Pressure. | planned |
 | SYNC-019 | `SwitcherPanelController+InitialVisibilityRecovery.swift`; initial visibility grace/deadline | A grace duration decides whether occlusion is stale and later triggers failure. Evidence migration plus watchdog. | Establish the panel occlusion/key/order observer before presentation, use initial readback and later presentation generation to prove visibility, and retain one named terminal watchdog that reports the last visibility snapshot. The presentation session owns it. | H; Unit, Behavior, switcher UI, runtime-topology Pressure. | planned |
 | SYNC-020 | `SwitcherPanelController+Presentation.swift`; visibility recovery attempts and hard reorder | Fixed attempt delays and a fixed order-out/order-front gap assume AppKit has committed window ordering. Evidence migration/conditional observation. | Attempt from observed hidden/occluded evidence, await matching key/occlusion/order transitions, and verify `isPanelVisibleToUser` after each action. Use next-main-turn or named cancellable condition observation only where AppKit has no callback; terminal failure includes the last `PanelVisibilitySnapshot`. | H; Unit, Behavior, switcher UI, runtime-topology Pressure. | planned |
@@ -1172,5 +1172,73 @@ polling cadence, deadline, or timeout in the scoped paths.
   test files remain below the 400-line guardrail; the touched
   `HotkeySettingsCard.swift` shrank from 572 to 519 lines. The startup
   `prompts.zip` remains unchanged and outside the slice.
-- Commit: `refactor(sync): migrate SYNC-016 hotkey registration status`; its
+- Commit: `aa62c7d`
+  (`refactor(sync): migrate SYNC-016 hotkey registration status`).
+
+### SYNC-017 Closure Record
+
+- Design and Oracle: `ModifierReleaseObservationOwner` installs an exact
+  modifier/main-key transition observer before its initial hardware readback.
+  Matching local/global AppKit events and Carbon hotkey callbacks trigger an
+  immediate readback. The owner requires two stable released-state readbacks;
+  a pressed readback resets stability. Selection completion and replay
+  suppression therefore succeed only from current hardware state, while
+  duplicate, reordered, and stale transition delivery can only request another
+  readback.
+- Lifecycle: `SwitcherPanelController` owns one observation owner and one
+  observation generation. Each start replaces the prior event token and
+  fallback token. Session cancellation, panel dismissal, search transitions,
+  replay-suppression completion, and controller release cancel the applicable
+  observation; generation checks reject already-queued fallback work. The
+  system event-source token removes both local and global event monitors when
+  its owner releases it.
+- Retained time policy: `ModifierReleaseConfirmationPolicy.sampleInterval`
+  remains a named 25ms fallback-readback cadence for an AppKit/global-event
+  delivery gap and stale hardware readback. Each readback schedules at most one
+  cancellable fallback sample, and matching transition evidence requests the
+  readback immediately. Completion remains independent of elapsed duration. A
+  held modifier is a valid open-ended input condition, so lifecycle
+  cancellation owns termination and a watchdog does not apply.
+- Unit and Behavior: the final focused set passed 13/13 under
+  `.build-local/evidence-driven-sync/SYNC-017/targeted-attempt-002`
+  (seven owner Unit paths and six controller behavior paths). Coverage includes
+  observer-before-initial-readback ordering, an initially satisfied condition,
+  event-triggered completion, missed-event fallback, pressed-state stability
+  reset, duplicate transitions, explicit cancellation, stale-generation
+  rejection, synchronous scheduler completion, and 2,000 transition events.
+  Two additional interruption and flags-changed behavior paths passed 2/2
+  under `.build-local/evidence-driven-sync/SYNC-017/behavior-attempt-001`.
+  The complete `FlowTabTests` class passed 295/295 under
+  `.build-local/evidence-driven-sync/SYNC-017/full-unit-attempt-001`.
+  The complete `FlowTabPriorityCoverageTests` class executed 570 tests under
+  `.build-local/evidence-driven-sync/SYNC-017/full-priority-attempt-001`; every
+  SYNC-017 path passed, while
+  `testAppDelegateLaunchWithUITestBootstrapArgumentsSeedsLogsAndOpensSearch`
+  reproduced the registered suite-order failure. Its exact isolated rerun
+  passed 1/1 under
+  `.build-local/evidence-driven-sync/SYNC-017/priority-known-failure-isolated-001`.
+  The order-isolation work remains assigned to SYNC-032/SYNC-033.
+- FlowTabCore: not relevant because modifier observation, Carbon/AppKit event
+  routing, hardware flag readback, and panel-session ownership are app-target
+  boundaries.
+- UI: the canonical install script rebuilt and installed the fixed-path signed
+  app.
+  `testSettingsHotkeySelectionsPersistAcrossRelaunch` passed 1/1 in 55.079
+  seconds through the canonical UI wrapper, exercising persisted modifier/main
+  key configuration, real hotkey delivery, modifier-release confirmation, and
+  relaunch readback. Its result bundle is
+  `.build-local/ui-tests/results/FlowTabUITests.xcresult`.
+- Pressure: the deterministic 2,000-transition owner test passed in the
+  focused run with a stable terminal result and a single live fallback token.
+  Manual scheduler tests delayed and reordered fallback delivery while
+  preserving the same hardware-state result. Scheduling pressure therefore
+  changes observation latency while preserving selection and replay results.
+- Process/Tooling: the app and app-test targets built through the canonical
+  FlowTabTests wrapper, and the UI target built through the canonical install
+  script. Project-file `plutil -lint`, `git diff --check`, scoped stale-delay
+  search, and source-size checks passed. Both new production files and the new
+  test file remain below the 400-line guardrail;
+  `SwitcherPanelController+InputHandling.swift` shrank from 789 to 496 lines.
+  The startup `prompts.zip` remains unchanged and outside the slice.
+- Commit: `refactor(sync): migrate SYNC-017 modifier release observation`; its
   exact SHA is appended by the next ledger update after the commit exists.

@@ -101,6 +101,9 @@
 		F0D100023D1E000100B0D737 /* HotkeyRegistrationEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0D100013D1E000100B0D737 /* HotkeyRegistrationEvidence.swift */; };
 		F0D100043D1E000100B0D737 /* HotkeyRegistrationObservationOwner.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0D100033D1E000100B0D737 /* HotkeyRegistrationObservationOwner.swift */; };
 		F0D100063D1E000100B0D737 /* FlowTabTests+HotkeyRegistrationObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0D100053D1E000100B0D737 /* FlowTabTests+HotkeyRegistrationObservation.swift */; };
+		F1D100023D1F000100B0D737 /* ModifierReleaseObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1D100013D1F000100B0D737 /* ModifierReleaseObservation.swift */; };
+		F1D100043D1F000100B0D737 /* SwitcherPanelController+ModifierReleaseObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1D100033D1F000100B0D737 /* SwitcherPanelController+ModifierReleaseObservation.swift */; };
+		F1D100063D1F000100B0D737 /* FlowTabTests+ModifierReleaseObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1D100053D1F000100B0D737 /* FlowTabTests+ModifierReleaseObservation.swift */; };
 		D10000012FF500100B0D737 /* RuntimeProjectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000022FF500100B0D737 /* RuntimeProjectionService.swift */; };
 		D10000032FF500200B0D737 /* RuntimeProjectionServing.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000042FF500200B0D737 /* RuntimeProjectionServing.swift */; };
 		B26010012FE000100B0D737 /* RuntimePerformanceClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26000012FE000100B0D737 /* RuntimePerformanceClock.swift */; };
@@ -395,6 +398,9 @@
 		F0D100013D1E000100B0D737 /* HotkeyRegistrationEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyRegistrationEvidence.swift; sourceTree = "<group>"; };
 		F0D100033D1E000100B0D737 /* HotkeyRegistrationObservationOwner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyRegistrationObservationOwner.swift; sourceTree = "<group>"; };
 		F0D100053D1E000100B0D737 /* FlowTabTests+HotkeyRegistrationObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+HotkeyRegistrationObservation.swift"; sourceTree = "<group>"; };
+		F1D100013D1F000100B0D737 /* ModifierReleaseObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModifierReleaseObservation.swift; sourceTree = "<group>"; };
+		F1D100033D1F000100B0D737 /* SwitcherPanelController+ModifierReleaseObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "SwitcherPanelController+ModifierReleaseObservation.swift"; sourceTree = "<group>"; };
+		F1D100053D1F000100B0D737 /* FlowTabTests+ModifierReleaseObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+ModifierReleaseObservation.swift"; sourceTree = "<group>"; };
 		F6E7E20135C4000100B0D737 /* RuntimeSearchIndexReadModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeSearchIndexReadModel.swift; sourceTree = "<group>"; };
 		F6E7E30135C4000200B0D737 /* RuntimeProjectionReadModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionReadModels.swift; sourceTree = "<group>"; };
 		D10000022FF500100B0D737 /* RuntimeProjectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionService.swift; sourceTree = "<group>"; };
@@ -678,6 +684,7 @@
 				B10001022F76000100B0D737 /* FlowTabTests+RuntimeInteraction.swift */,
 				B10001032F76000100B0D737 /* FlowTabTests+PreferencesAndDiagnostics.swift */,
 				F0D100053D1E000100B0D737 /* FlowTabTests+HotkeyRegistrationObservation.swift */,
+				F1D100053D1F000100B0D737 /* FlowTabTests+ModifierReleaseObservation.swift */,
 				A12000013C00000100B0D737 /* FlowTabTests+RuntimeLogDeletion.swift */,
 				B7A7E00135C0000100B0D737 /* FlowTabTests+SettingsAppearanceSelectControls.swift */,
 				C1D900013700000100B0D737 /* FlowTabTests+FlowDropdownPlacement.swift */,
@@ -826,6 +833,7 @@
 				B32000012FF6000100B0D737 /* SwitcherPanelController+InitialVisibilityRecovery.swift */,
 				B26000032FE000100B0D737 /* SwitcherPanelController+PresentationDiagnostics.swift */,
 				A1B2C4032F73000100B0D737 /* SwitcherPanelController+InputHandling.swift */,
+				F1D100033D1F000100B0D737 /* SwitcherPanelController+ModifierReleaseObservation.swift */,
 				D7A100013A21000100B0D737 /* SwitcherPanelController+ModifierDiagnostics.swift */,
 				A1B2C4042F73000100B0D737 /* SwitcherPanelController+Hotkeys.swift */,
 				A1B2C3E22F73000100B0D737 /* LiveSwitcherModel.swift */,
@@ -833,6 +841,7 @@
 				D7A000013A21000100B0D737 /* LiveSwitcherModel+PreviewSnapshots.swift */,
 				A1B2C4062F73000100B0D737 /* LiveSwitcherModel+Search.swift */,
 				EFD100013D1D000100B0D737 /* SwitcherSearchScheduling.swift */,
+				F1D100013D1F000100B0D737 /* ModifierReleaseObservation.swift */,
 				A1B2C4072F73000100B0D737 /* LiveSwitcherModel+Types.swift */,
 				B25000012FD000100B0D737 /* LiveSwitcherModel+Diagnostics.swift */,
 				B27000012FF000100B0D737 /* LiveSwitcherModel+Projections.swift */,
@@ -1392,6 +1401,7 @@
 				B32010012FF6000100B0D737 /* SwitcherPanelController+InitialVisibilityRecovery.swift in Sources */,
 				B26010032FE000100B0D737 /* SwitcherPanelController+PresentationDiagnostics.swift in Sources */,
 				A1B2C4132F73000100B0D737 /* SwitcherPanelController+InputHandling.swift in Sources */,
+				F1D100043D1F000100B0D737 /* SwitcherPanelController+ModifierReleaseObservation.swift in Sources */,
 				D7A100023A21000100B0D737 /* SwitcherPanelController+ModifierDiagnostics.swift in Sources */,
 				A1B2C4142F73000100B0D737 /* SwitcherPanelController+Hotkeys.swift in Sources */,
 				A1B2C3F22F73000100B0D737 /* LiveSwitcherModel.swift in Sources */,
@@ -1399,6 +1409,7 @@
 				D7A000023A21000100B0D737 /* LiveSwitcherModel+PreviewSnapshots.swift in Sources */,
 				A1B2C4162F73000100B0D737 /* LiveSwitcherModel+Search.swift in Sources */,
 				EFD100023D1D000100B0D737 /* SwitcherSearchScheduling.swift in Sources */,
+				F1D100023D1F000100B0D737 /* ModifierReleaseObservation.swift in Sources */,
 				A1B2C4172F73000100B0D737 /* LiveSwitcherModel+Types.swift in Sources */,
 				B25010012FD000100B0D737 /* LiveSwitcherModel+Diagnostics.swift in Sources */,
 				B27010012FF000100B0D737 /* LiveSwitcherModel+Projections.swift in Sources */,
@@ -1433,6 +1444,7 @@
 				B10011022F76000100B0D737 /* FlowTabTests+RuntimeInteraction.swift in Sources */,
 				B10011032F76000100B0D737 /* FlowTabTests+PreferencesAndDiagnostics.swift in Sources */,
 				F0D100063D1E000100B0D737 /* FlowTabTests+HotkeyRegistrationObservation.swift in Sources */,
+				F1D100063D1F000100B0D737 /* FlowTabTests+ModifierReleaseObservation.swift in Sources */,
 				A12000113C00000100B0D737 /* FlowTabTests+RuntimeLogDeletion.swift in Sources */,
 				B7A7E00235C0000100B0D737 /* FlowTabTests+SettingsAppearanceSelectControls.swift in Sources */,
 				C1D900023700000100B0D737 /* FlowTabTests+FlowDropdownPlacement.swift in Sources */,

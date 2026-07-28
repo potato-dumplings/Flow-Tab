@@ -884,7 +884,7 @@ extension FlowTabPriorityCoverageTests {
         panelController.globalPrimaryModifierPressedOverride = false
         panelController.cancelPendingModifierReleaseConfirmation()
         mainRecord.monitor.onHotkeyReleased?(false)
-        XCTAssertNotNil(panelController.pendingModifierReleaseConfirmationTask)
+        XCTAssertTrue(panelController.hasPendingModifierReleaseConfirmation)
         panelController.cancelPendingModifierReleaseConfirmation()
         panelController.cancelSelectionForTesting()
         XCTAssertNil(panelController.modelForTesting.session)
@@ -922,7 +922,7 @@ extension FlowTabPriorityCoverageTests {
         panelController.inAppPrimaryModifierPressedOverride = false
         panelController.cancelPendingModifierReleaseConfirmation()
         inAppRecord.monitor.onHotkeyReleased?(false)
-        XCTAssertNotNil(panelController.pendingModifierReleaseConfirmationTask)
+        XCTAssertTrue(panelController.hasPendingModifierReleaseConfirmation)
         panelController.cancelPendingModifierReleaseConfirmation()
         panelController.cancelSelectionForTesting()
         XCTAssertNil(panelController.modelForTesting.session)
