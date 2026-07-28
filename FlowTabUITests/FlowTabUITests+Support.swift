@@ -210,6 +210,7 @@ enum FlowTabUITestSwitcherCommand {
     case selectSearchResult
     case searchConfirm
     case confirm
+    case runtimeLogProbe
 
     var notificationName: Notification.Name {
         switch self {
@@ -244,6 +245,10 @@ enum FlowTabUITestSwitcherCommand {
         case .confirm:
             return Notification.Name(
                 "io.github.potato-dumplings.flowtab.ui-test.switcher-command.confirm"
+            )
+        case .runtimeLogProbe:
+            return Notification.Name(
+                "io.github.potato-dumplings.flowtab.ui-test.switcher-command.runtime-log-probe"
             )
         }
     }

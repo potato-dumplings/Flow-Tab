@@ -519,10 +519,9 @@ extension FlowTabTests {
         XCTAssertLessThan(RuntimeLogLevel.warning, .error)
     }
 
-    func testDiagnosticsRefreshPolicyOwnsRuntimeLogsRefreshCadence() {
+    func testDiagnosticsRefreshPolicyOwnsRuntimeLogsLineLimit() {
         let policy = DiagnosticsRefreshPolicy.runtimeLogs
 
-        XCTAssertEqual(policy.intervalNanoseconds, 1_000_000_000)
         XCTAssertEqual(policy.lineLimit, 300)
     }
 

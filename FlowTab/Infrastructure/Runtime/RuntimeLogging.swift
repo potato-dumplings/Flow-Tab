@@ -106,7 +106,7 @@ enum RuntimeLogCategory: String, CaseIterable, Identifiable {
     }
 }
 
-final class RuntimeDiagnostics {
+final class RuntimeDiagnostics: RuntimeLogLinesProviding {
     static let shared = RuntimeDiagnostics()
     private static let timestampFormatter: DateFormatter = {
         let formatter = DateFormatter()
@@ -163,8 +163,15 @@ final class RuntimeDiagnostics {
         fileStore.clear()
     }
 
-    func clearAndWait() async throws {
+    @discardableResult
+    func clearAndWait() async throws -> RuntimeLogChange {
         try await fileStore.clearAndWait()
+    }
+
+    func observeChanges(
+        _ observer: @escaping (RuntimeLogChange) -> Void
+    ) -> RuntimeLogChangeObservation {
+        fileStore.observeChanges(observer)
     }
 }
 
@@ -210,6 +217,10 @@ final class RuntimeLogFileStore {
     var activeLogURL: URL?
     private var pendingLines: [String] = []
     private var flushWorkItem: DispatchWorkItem?
+    private var changeGeneration: UInt64 = 0
+    private var changeObservers: [
+        UUID: (RuntimeLogChange) -> Void
+    ] = [:]
 
     var logsDirectoryPath: String {
         logsDirectoryURL.path
@@ -235,6 +246,7 @@ final class RuntimeLogFileStore {
     func append(_ line: String) {
         queue.async {
             self.pendingLines.append(line)
+            self.publishChangeLocked(.appended)
             if self.pendingLines.count >= self.immediateFlushThreshold {
                 self.flushWorkItem?.cancel()
                 self.flushWorkItem = nil
@@ -275,11 +287,15 @@ final class RuntimeLogFileStore {
             self.flushWorkItem?.cancel()
             self.flushWorkItem = nil
             self.pendingLines.removeAll(keepingCapacity: false)
-            try? self.clearFilesLocked()
+            do {
+                try self.clearFilesLocked()
+                self.publishChangeLocked(.cleared)
+            } catch {}
         }
     }
 
-    func clearAndWait() async throws {
+    @discardableResult
+    func clearAndWait() async throws -> RuntimeLogChange {
         try await withCheckedThrowingContinuation { continuation in
             queue.async {
                 self.flushWorkItem?.cancel()
@@ -287,10 +303,28 @@ final class RuntimeLogFileStore {
                 self.pendingLines.removeAll(keepingCapacity: false)
                 do {
                     try self.clearFilesLocked()
-                    continuation.resume()
+                    let change = self.publishChangeLocked(.cleared)
+                    continuation.resume(returning: change)
                 } catch {
                     continuation.resume(throwing: error)
                 }
+            }
+        }
+    }
+
+    func observeChanges(
+        _ observer: @escaping (RuntimeLogChange) -> Void
+    ) -> RuntimeLogChangeObservation {
+        let observerID = UUID()
+        let baselineGeneration = queue.sync {
+            changeObservers[observerID] = observer
+            return changeGeneration
+        }
+        return RuntimeLogChangeObservation(
+            baselineGeneration: baselineGeneration
+        ) { [weak self] in
+            self?.queue.async {
+                self?.changeObservers.removeValue(forKey: observerID)
             }
         }
     }
@@ -354,7 +388,23 @@ final class RuntimeLogFileStore {
             let targetLogURL = try targetLogURLLocked(appendingByteCount: block.utf8.count)
             try appendToFileLocked(block, to: targetLogURL)
             try enforceMaxLogFilesLocked()
+            publishChangeLocked(.flushed)
         } catch {}
+    }
+
+    @discardableResult
+    private func publishChangeLocked(
+        _ kind: RuntimeLogChangeKind
+    ) -> RuntimeLogChange {
+        changeGeneration &+= 1
+        let change = RuntimeLogChange(
+            generation: changeGeneration,
+            kind: kind
+        )
+        for observer in Array(changeObservers.values) {
+            observer(change)
+        }
+        return change
     }
 
     private func appendToFileLocked(_ block: String, to url: URL) throws {

@@ -637,6 +637,61 @@ extension FlowTabUITests {
         }
     }
 
+    func testLogsPageUpdatesFromRuntimeLogChangeEventWhileVisible() {
+        let app = makeApp(
+            additionalArguments: [
+                "--flowtab-ui-reset-defaults",
+                "--flowtab-ui-seed-logs",
+                "2",
+                "--flowtab-ui-listen-switcher-trigger",
+                "--flowtab-ui-runtime-log-level",
+                "info",
+                "-showPermissionReminder",
+                "NO"
+            ]
+        )
+        launchFlowTabUITestApplication(app)
+        let logsTabButton = app.buttons
+            .matching(identifier: Identifier.logsTabButton)
+            .firstMatch
+        XCTAssertTrue(logsTabButton.waitForExistence(timeout: 6))
+        tapElement(logsTabButton)
+        XCTAssertTrue(
+            element(in: app, identifier: Identifier.logsTabContent)
+                .waitForExistence(timeout: 6)
+        )
+
+        let seededInfoLine = app.descendants(matching: .any)
+            .matching(identifier: Identifier.logsSeededInfoLine)
+            .firstMatch
+        XCTAssertTrue(seededInfoLine.waitForExistence(timeout: 5))
+        let clearButton = app.buttons
+            .matching(identifier: Identifier.logsClearButton)
+            .firstMatch
+        XCTAssertTrue(clearButton.waitForExistence(timeout: 5))
+        app.activate()
+        tapElement(clearButton)
+        XCTAssertTrue(
+            app.descendants(matching: .any)
+                .matching(identifier: Identifier.logsEmptyHint)
+                .firstMatch
+                .waitForExistence(timeout: 5)
+        )
+
+        let command = FlowTabUITestSwitcherCommand.runtimeLogProbe
+        let expectedMarker = "runtime log observation probe"
+        let deliveredLogLine = app.staticTexts
+            .matching(NSPredicate(format: "label CONTAINS %@", expectedMarker))
+            .firstMatch
+
+        postFlowTabUITestSwitcherCommand(
+            command,
+            traceLabel: "logs.live-update"
+        )
+
+        XCTAssertTrue(deliveredLogLine.waitForExistence(timeout: 5))
+    }
+
     func testLogsTabShowsActionButtons() throws {
         let app = makeApp(
             additionalArguments: [

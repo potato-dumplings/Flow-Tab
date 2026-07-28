@@ -88,7 +88,7 @@ and Process/Tooling.
 | SYNC-006 | `FlowTab/Infrastructure/Runtime/RuntimeActivator.swift`; `scheduleFocusRecovery` | Fixed 50ms/150ms retries probe whether the exact target became focused. Conditional observation. | Preserve exact AX/CG target readback as the sole success Oracle. Check immediately, consume usable focus/window notifications, and retain a named cancellable polling fallback plus diagnostic watchdog where macOS exposes no target-specific completion event. `RuntimeActivator` owns the task and activation generation. | H; Unit, Behavior, activation UI, runtime-topology Pressure. | completed |
 | SYNC-007 | `FlowTab/Infrastructure/Runtime/RuntimeWindowPreviewProvider.swift`; ScreenCaptureKit callback bridges | One-second semaphore timeouts terminate callback waits; success already comes only from callback content. Watchdog. | Retain as a named bridge-watchdog policy. The synchronous bridge state owns late-callback rejection; tests must cover callback, error, timeout, and callback-after-timeout evidence. | M; Unit, Behavior, preview Pressure. | closed-retained |
 | SYNC-008 | `FlowTab/Infrastructure/Runtime/RuntimeLogging.swift`; `scheduleFlushLocked` | A 50ms delay batches disk writes and does not establish write success. Domain duration. | Retain the named batching policy and cancellable `DispatchWorkItem`; explicit snapshot/read APIs flush synchronously before returning evidence. The diagnostics store owns the work item. | M; Unit, Behavior, log-write Pressure if changed. | closed-retained |
-| SYNC-009 | `FlowTab/Features/Logs/RuntimeLogsSection.swift`; `RuntimeLogLinesViewModel` | The Logs surface polls once per second to discover appended or cleared lines. Evidence migration. | Publish append/flush/clear generations from the diagnostics owner, subscribe before the initial snapshot, and reload from the later generation. View-model start/stop owns the subscription and task. | M; Unit, Behavior, Logs UI, tab-switch Pressure. | planned |
+| SYNC-009 | `FlowTab/Features/Logs/RuntimeLogsSection.swift`; `RuntimeLogLinesViewModel` | The Logs surface polls once per second to discover appended or cleared lines. Evidence migration. | Publish append/flush/clear generations from the diagnostics owner, subscribe before the initial snapshot, and reload from the later generation. View-model start/stop owns the subscription and task. | M; Unit, Behavior, Logs UI, tab-switch Pressure. | completed |
 | SYNC-010 | `RuntimeLogPrivacy.swift`, `RuntimeLogsSection`; diagnostic session expiration | The 15-minute session is an explicit expiration contract; the view advances a one-second loop to notice expiry. Domain duration. | Retain the expiration deadline, use the existing injected `now` readback for rules, and schedule one cancellable deadline wakeup through an injectable clock. Expiration succeeds only when clock readback reaches the stored deadline. | M; Unit, Behavior, Logs UI. | verification-needed |
 | SYNC-011 | `FlowTab/Features/Home/HomeLandingView.swift`; permission watcher | A perpetual one-second poll discovers TCC permission changes even though app activation is already observed. Evidence migration. | Subscribe before initial permission readback and refresh on app-activation/lifecycle evidence. If a platform permission transition has no notification, share the controlled permission observer from SYNC-012. View appearance owns start/stop. | M; Unit, Behavior, Home permission UI. | planned |
 | SYNC-012 | `FlowTab/Features/Settings/AppSettingsView.swift`; permission prompt polling | Forty 500ms attempts infer post-prompt TCC convergence; the first condition check occurs after a sleep and cancellation is swallowed. Conditional observation plus watchdog. | Check permission immediately, observe app activation where applicable, and use a named cancellable fallback cadence only for TCC transitions without callbacks. The terminal watchdog reports target, attempts, elapsed time, bundle identity, and final readback. Settings visibility owns each target task. | H; Unit, Behavior, permission UI. | planned |
@@ -463,5 +463,58 @@ polling cadence, deadline, or timeout in the scoped paths.
   Owner-scope search found no legacy recovery-delay policy or retry-chain
   symbol. The retained poll cadence and watchdog are named, injected,
   cancellable policies whose tests advance by explicit scheduler delivery.
-- Commit: `refactor(sync): migrate SYNC-006 activation convergence`; its exact
+- Commit: `96daf6f`
+  (`refactor(sync): migrate SYNC-006 activation convergence`).
+
+### SYNC-009 Closure Record
+
+- Design and Oracle: `RuntimeLogFileStore` publishes monotonic append, durable
+  flush, and successful clear generations from its serialized storage queue.
+  `RuntimeLogLinesViewModel` installs the observer before capturing its
+  baseline generation and requesting the initial readback. Later generations
+  are coalesced while a read is in flight; a read started for stale evidence
+  cannot replace lines from a newer generation. The independently read and
+  level-filtered persisted lines remain the only UI-content Oracle.
+- Lifecycle: the diagnostics store owns observer registration and serialized
+  removal. The view model owns one observation token, one coalesced reload
+  task, and a view-lifecycle generation. Stop, disappearance, deinitialization,
+  restart after a level change, and stale generations cancel or reject work.
+  Clear keeps the established observer, applies only its returned clear
+  generation, and verifies subsequent content through a new readback.
+- Retained time policy: none. The former one-second refresh cadence was
+  removed. XCTest and XCUI watchdogs terminate failed assertions; they never
+  establish append, clear, or display success.
+- Unit and Behavior: the final-source focused observation set passed 4/4 under
+  `.build-local/evidence-driven-sync/SYNC-009/flowtabtests-targeted-attempt-023`.
+  It covers observer-before-read ordering, an initially satisfied state,
+  append/flush/clear generation ordering, clear readback, continued
+  subscription after clear, cancellation, and stale, duplicate, out-of-order,
+  and slow-read evidence. The complete `FlowTabTests` suite passed 252/252
+  under
+  `.build-local/evidence-driven-sync/SYNC-009/flowtabtests-full-attempt-021`;
+  the complete `FlowTabPriorityCoverageTests` suite passed 553/553 under
+  `.build-local/evidence-driven-sync/SYNC-009/flowtabtests-priority-attempt-022`.
+- FlowTabCore: not relevant because this synchronization contract belongs to
+  the app diagnostics storage and SwiftUI view-lifecycle boundary.
+- UI: the visible Logs-page append path passed 1/1 in 11.696 seconds under
+  `.build-local/evidence-driven-sync/SYNC-009/ui-live-log-attempt-014`.
+  The test observes seeded persisted content, clears to the empty-state
+  readback, emits a runtime log stimulus, and succeeds only when the exact new
+  accessibility row appears while the page remains visible.
+- Pressure: the canonical Logs-page lifecycle workload passed for 60 seconds
+  at a 20ms switch cadence under
+  `.build-local/evidence-driven-sync/SYNC-009/tab-switch-pressure-attempt-019-60s-20ms`.
+  It completed 122 resource samples with CPU average/p95/max
+  58.00/62.30/76.60 percent and RSS average/p95/max
+  107.72/119.64/119.84 MiB. The last 30 seconds had a negative RSS slope; the
+  last 20 seconds stabilized at 108.47 MiB with a 0.0091 MiB/sample slope.
+  Same-machine parent-commit repetitions selected the same approximately
+  90–121 MiB allocator high-water range, while current and parent CPU averages
+  remained within 0.6 percentage points.
+- Process/Tooling: the final app source built through the fixed-app installer
+  and the pressure harness. `git diff --check` and project-file `plutil -lint`
+  passed. Owner-scope search found no Logs-content polling interval or refresh
+  sleep; the remaining diagnostic-session expiration wakeup belongs to
+  SYNC-010.
+- Commit: `refactor(sync): migrate SYNC-009 runtime log observation`; its exact
   SHA is appended by the next ledger update after the commit exists.

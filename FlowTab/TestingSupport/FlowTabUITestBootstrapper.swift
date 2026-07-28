@@ -40,6 +40,9 @@ enum FlowTabUITestBootstrapper {
         static let confirm = Notification.Name(
             "io.github.potato-dumplings.flowtab.ui-test.switcher-command.confirm"
         )
+        static let runtimeLogProbe = Notification.Name(
+            "io.github.potato-dumplings.flowtab.ui-test.switcher-command.runtime-log-probe"
+        )
     }
 
     static func prepareIfNeeded(userDefaults: UserDefaults = .standard) {
@@ -389,6 +392,11 @@ enum FlowTabUITestBootstrapper {
                 name: SwitcherCommandNotification.confirm,
                 panelController: panelController,
                 command: .confirm
+            ),
+            SwitcherCommandNotificationObserver(
+                name: SwitcherCommandNotification.runtimeLogProbe,
+                panelController: panelController,
+                command: .runtimeLogProbe
             )
         ]
         switcherCommandObservers.forEach { $0.install(in: center) }
@@ -580,6 +588,7 @@ private final class SwitcherCommandNotificationObserver: NSObject {
         case selectSearchResult
         case searchConfirm
         case confirm
+        case runtimeLogProbe
     }
 
     private let name: Notification.Name
@@ -704,6 +713,12 @@ private final class SwitcherCommandNotificationObserver: NSObject {
             panelController.finishSelection()
         case .confirm:
             panelController.finishSelection()
+        case .runtimeLogProbe:
+            RuntimeDiagnostics.shared.log(
+                level: .info,
+                category: "UITest",
+                message: "runtime log observation probe"
+            )
         }
     }
 
