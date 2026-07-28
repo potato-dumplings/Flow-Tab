@@ -166,10 +166,8 @@ extension FlowTabTests {
 }
 
 extension FlowTabPriorityCoverageTests {
-    func testRuntimeReconciliationCoordinatorDuplicateSignalPreservesRetryBackoff() throws {
-        let coordinator = RuntimeReconciliationCoordinator(
-            retryPolicy: RuntimeReconciliationRetryPolicy(delays: [0.5])
-        )
+    func testRuntimeReconciliationCoordinatorNewSignalResumesEvidenceWait() throws {
+        let coordinator = RuntimeReconciliationCoordinator()
         let dirty = coordinator.markAppDirty(
             appID: "com.example.editor",
             pid: 18_405,
@@ -178,7 +176,7 @@ extension FlowTabPriorityCoverageTests {
         )
         let started = try XCTUnwrap(coordinator.startRequest(id: dirty.id))
         let retry = try XCTUnwrap(
-            coordinator.scheduleRetryAfterTransientEmptyCurrentAppWindowPayload(
+            coordinator.deferRequestAfterTransientEmptyCurrentAppWindowPayload(
                 id: started.id,
                 now: 10.1
             )
@@ -192,11 +190,10 @@ extension FlowTabPriorityCoverageTests {
         )
 
         XCTAssertEqual(duplicate.id, retry.id)
-        XCTAssertEqual(duplicate.state, .waitingRetry)
+        XCTAssertEqual(duplicate.state, .pending)
         XCTAssertEqual(duplicate.attempt, 1)
-        XCTAssertEqual(duplicate.notBefore, 10.6, accuracy: 0.0001)
-        XCTAssertTrue(coordinator.readyRequests(now: 10.59).isEmpty)
-        XCTAssertEqual(coordinator.readyRequests(now: 10.6).map(\.id), [dirty.id])
+        XCTAssertEqual(duplicate.lastObservedAt, 10.2, accuracy: 0.0001)
+        XCTAssertEqual(coordinator.readyRequests().map(\.id), [dirty.id])
     }
 
     func testRuntimeProjectionServiceDropsRepeatedAXWindowRepairSignalsWhenAccessibilityIsUnavailable() {
@@ -234,7 +231,7 @@ extension FlowTabPriorityCoverageTests {
         let finalExecutionCount = executionCount
         lock.unlock()
         XCTAssertEqual(finalExecutionCount, 0)
-        XCTAssertTrue(coordinator.readyRequests(now: .greatestFiniteMagnitude).isEmpty)
+        XCTAssertTrue(coordinator.readyRequests().isEmpty)
         let diagnostics = service.runtimeReadModelDiagnostics()
         XCTAssertTrue(diagnostics.dirtyAppIDs.isEmpty)
         XCTAssertTrue(diagnostics.dirtyPIDs.isEmpty)

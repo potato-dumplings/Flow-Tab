@@ -67,7 +67,7 @@ protocol RuntimeProjectionRepairProviding: AnyObject {
         axWindowID: String,
         now: TimeInterval
     ) -> CGWindowID?
-    func recordAppTerminated(processIdentifier pid: pid_t)
+    func recordAppTerminated(appID: String, processIdentifier pid: pid_t) -> Bool
     func recordWindowFocusVerification(
         _ verification: RuntimeWindowFocusVerification,
         now: TimeInterval
@@ -89,7 +89,6 @@ protocol RuntimeProjectionRepairProviding: AnyObject {
         now: TimeInterval
     )
     func readyReconciliationRequests(
-        now: TimeInterval,
         includeFullRepair: Bool
     ) -> [RuntimeReconciliationRequest]
     func startReconciliationRequest(id: UInt64) -> RuntimeReconciliationRequest?
@@ -97,5 +96,14 @@ protocol RuntimeProjectionRepairProviding: AnyObject {
     func deferReconciliationRequestAfterTransientEmptyCurrentAppWindowPayload(
         id: UInt64,
         now: TimeInterval
-    )
+    ) -> RuntimeReconciliationRequest?
+    func resumeDeferredReconciliationRequestForConditionReadback(
+        id: UInt64,
+        attempt: Int,
+        now: TimeInterval
+    ) -> RuntimeReconciliationRequest?
+    func failDeferredReconciliationRequestAfterObservationWatchdog(
+        id: UInt64,
+        attempt: Int
+    ) -> RuntimeReconciliationRequest?
 }

@@ -77,6 +77,6 @@ extension FlowTabPriorityCoverageTests {
         lock.unlock()
         XCTAssertTrue(startedRequests.isEmpty)
         XCTAssertEqual(finalExecutionCount, 0)
-        XCTAssertEqual(coordinator.readyRequests(now: 10).map(\.id), [request.id])
+        XCTAssertEqual(coordinator.readyRequests().map(\.id), [request.id])
     }
 }

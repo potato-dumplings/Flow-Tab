@@ -38,7 +38,7 @@ enum RuntimeReconciliationPriority: Int, Comparable {
     }
 }
 
-enum RuntimeReconciliationTarget: Hashable {
+enum RuntimeReconciliationTarget: Hashable, Sendable {
     case app(pid_t)
     case spaceTopology
     case fullRepair
@@ -47,20 +47,7 @@ enum RuntimeReconciliationTarget: Hashable {
 enum RuntimeReconciliationState: String, Equatable {
     case pending
     case inFlight
-    case waitingRetry
-}
-
-struct RuntimeReconciliationRetryPolicy: Equatable {
-    let delays: [TimeInterval]
-
-    static let transientEmptyCurrentAppWindowPayload = RuntimeReconciliationRetryPolicy(
-        delays: [0.1, 0.3, 0.8]
-    )
-
-    func delay(forAttempt attempt: Int) -> TimeInterval? {
-        guard attempt >= 0, attempt < delays.count else { return nil }
-        return delays[attempt]
-    }
+    case waitingForEvidence
 }
 
 struct RuntimeReconciliationRequest: Equatable, Identifiable {
@@ -72,18 +59,13 @@ struct RuntimeReconciliationRequest: Equatable, Identifiable {
     var affectedCGWindowIDs: Set<CGWindowID>
     var state: RuntimeReconciliationState
     var attempt: Int
-    var notBefore: TimeInterval
+    var lastObservedAt: TimeInterval
 }
 
 final class RuntimeReconciliationCoordinator {
     private var nextRequestID: UInt64 = 1
     private var requestsByTarget: [RuntimeReconciliationTarget: RuntimeReconciliationRequest] = [:]
     private var currentSpaceTopologySnapshot: RuntimeSpaceTopologySnapshot?
-    private let retryPolicy: RuntimeReconciliationRetryPolicy
-
-    init(retryPolicy: RuntimeReconciliationRetryPolicy = .transientEmptyCurrentAppWindowPayload) {
-        self.retryPolicy = retryPolicy
-    }
 
     @discardableResult
     func markAppDirty(
@@ -159,15 +141,11 @@ final class RuntimeReconciliationCoordinator {
         )
     }
 
-    func readyRequests(
-        now: TimeInterval,
-        includeFullRepair: Bool = true
-    ) -> [RuntimeReconciliationRequest] {
+    func readyRequests(includeFullRepair: Bool = true) -> [RuntimeReconciliationRequest] {
         let hasScopedRequests = requestsByTarget.values.contains { $0.target != .fullRepair }
         return requestsByTarget.values
             .filter {
-                $0.notBefore <= now
-                    && $0.state != .inFlight
+                $0.state == .pending
                     && (includeFullRepair || $0.target != .fullRepair)
                     && !(includeFullRepair && $0.target == .fullRepair && hasScopedRequests)
             }
@@ -217,30 +195,65 @@ final class RuntimeReconciliationCoordinator {
 
     @discardableResult
     func startRequest(id: UInt64) -> RuntimeReconciliationRequest? {
-        guard let target = target(for: id) else { return nil }
+        guard let target = target(for: id),
+              requestsByTarget[target]?.state == .pending
+        else {
+            return nil
+        }
         requestsByTarget[target]?.state = .inFlight
         return requestsByTarget[target]
     }
 
     @discardableResult
-    func scheduleRetryAfterTransientEmptyCurrentAppWindowPayload(
+    func deferRequestAfterTransientEmptyCurrentAppWindowPayload(
         id: UInt64,
         now: TimeInterval
     ) -> RuntimeReconciliationRequest? {
-        guard let target = target(for: id), var request = requestsByTarget[target] else {
-            return nil
-        }
-        guard let delay = retryPolicy.delay(forAttempt: request.attempt) else {
-            requestsByTarget.removeValue(forKey: target)
-            if target != .fullRepair {
-                scheduleFullRepairFallback(now: now)
-            }
+        guard let target = target(for: id),
+              var request = requestsByTarget[target],
+              request.state == .inFlight
+        else {
             return nil
         }
         request.attempt += 1
-        request.notBefore = now + delay
-        request.state = .waitingRetry
+        request.lastObservedAt = now
+        request.state = .waitingForEvidence
         requestsByTarget[target] = request
+        return request
+    }
+
+    @discardableResult
+    func resumeDeferredRequestForConditionReadback(
+        id: UInt64,
+        attempt: Int,
+        now: TimeInterval
+    ) -> RuntimeReconciliationRequest? {
+        guard let target = target(for: id),
+              var request = requestsByTarget[target],
+              request.state == .waitingForEvidence,
+              request.attempt == attempt
+        else {
+            return nil
+        }
+        request.state = .pending
+        request.lastObservedAt = now
+        requestsByTarget[target] = request
+        return request
+    }
+
+    @discardableResult
+    func failDeferredRequestAfterObservationWatchdog(
+        id: UInt64,
+        attempt: Int
+    ) -> RuntimeReconciliationRequest? {
+        guard let target = target(for: id),
+              let request = requestsByTarget[target],
+              request.state == .waitingForEvidence,
+              request.attempt == attempt
+        else {
+            return nil
+        }
+        requestsByTarget.removeValue(forKey: target)
         return request
     }
 
@@ -249,7 +262,12 @@ final class RuntimeReconciliationCoordinator {
         requestsByTarget.removeValue(forKey: target)
     }
 
-    func cancelAppRequests(pid: pid_t) {
+    func pendingAppID(pid: pid_t) -> String? {
+        requestsByTarget[.app(pid)]?.appID
+    }
+
+    func cancelAppRequests(appID: String, pid: pid_t) {
+        guard requestsByTarget[.app(pid)]?.appID == appID else { return }
         requestsByTarget.removeValue(forKey: .app(pid))
     }
 
@@ -260,35 +278,43 @@ final class RuntimeReconciliationCoordinator {
         affectedCGWindowIDs: Set<CGWindowID>,
         now: TimeInterval
     ) -> RuntimeReconciliationRequest {
-        var request = requestsByTarget[target] ?? RuntimeReconciliationRequest(
-            id: nextRequestID,
-            target: target,
-            appID: appID,
-            reasons: [],
-            priority: reasons.schedulerPriority,
-            affectedCGWindowIDs: [],
-            state: .pending,
-            attempt: 0,
-            notBefore: now
-        )
-        if requestsByTarget[target] == nil {
+        let existingRequest = requestsByTarget[target]
+        let replacesAppInstance: Bool
+        if case .app = target,
+           let existingAppID = existingRequest?.appID,
+           let appID {
+            replacesAppInstance = existingAppID != appID
+        } else {
+            replacesAppInstance = false
+        }
+        var request: RuntimeReconciliationRequest
+        if let existingRequest, !replacesAppInstance {
+            request = existingRequest
+        } else {
+            request = RuntimeReconciliationRequest(
+                id: nextRequestID,
+                target: target,
+                appID: appID,
+                reasons: [],
+                priority: reasons.schedulerPriority,
+                affectedCGWindowIDs: [],
+                state: .pending,
+                attempt: 0,
+                lastObservedAt: now
+            )
             nextRequestID += 1
         }
-        let wasWaitingRetry = request.state == .waitingRetry
         let incomingPriority = reasons.schedulerPriority
         let promoted = incomingPriority > request.priority
         request.appID = request.appID ?? appID
         request.reasons.formUnion(reasons)
         request.priority = max(request.priority, incomingPriority)
         request.affectedCGWindowIDs.formUnion(affectedCGWindowIDs)
+        request.lastObservedAt = now
         if promoted {
-            request.state = .pending
             request.attempt = 0
-            request.notBefore = now
-        } else if !wasWaitingRetry {
-            request.state = .pending
-            request.notBefore = min(request.notBefore, now)
         }
+        request.state = .pending
         requestsByTarget[target] = request
         cancelPendingFullRepairForHigherPriorityScopedRepair(
             target: target,

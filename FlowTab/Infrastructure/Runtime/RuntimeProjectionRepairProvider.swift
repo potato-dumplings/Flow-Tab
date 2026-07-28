@@ -244,10 +244,19 @@ extension RuntimeProjectionRepairProvider {
         return affectedCGWindowID
     }
 
-    func recordAppTerminated(processIdentifier pid: pid_t) {
-        reconciliationCoordinator.cancelAppRequests(pid: pid)
+    func recordAppTerminated(appID: String, processIdentifier pid: pid_t) -> Bool {
+        if let pendingAppID = reconciliationCoordinator.pendingAppID(pid: pid),
+           pendingAppID != appID {
+            RuntimeLog.debug(
+                .projection,
+                "runtimeLifecycle appTerminatedIgnored appID=\(appID) pid=\(pid) pendingAppID=\(pendingAppID)"
+            )
+            return false
+        }
+        reconciliationCoordinator.cancelAppRequests(appID: appID, pid: pid)
         windowRecordStore.removeState(for: pid)
         AXLiveWindowRegistry.shared.remove(pid: pid)
+        return true
     }
 
     func recordWindowFocusVerification(
@@ -344,13 +353,9 @@ extension RuntimeProjectionRepairProvider {
     }
 
     func readyReconciliationRequests(
-        now: TimeInterval,
         includeFullRepair: Bool
     ) -> [RuntimeReconciliationRequest] {
-        reconciliationCoordinator.readyRequests(
-            now: now,
-            includeFullRepair: includeFullRepair
-        )
+        reconciliationCoordinator.readyRequests(includeFullRepair: includeFullRepair)
     }
 
     func startReconciliationRequest(id: UInt64) -> RuntimeReconciliationRequest? {
@@ -361,13 +366,36 @@ extension RuntimeProjectionRepairProvider {
         reconciliationCoordinator.completeRequest(id: id)
     }
 
+    @discardableResult
     func deferReconciliationRequestAfterTransientEmptyCurrentAppWindowPayload(
         id: UInt64,
         now: TimeInterval
-    ) {
-        reconciliationCoordinator.scheduleRetryAfterTransientEmptyCurrentAppWindowPayload(
+    ) -> RuntimeReconciliationRequest? {
+        reconciliationCoordinator.deferRequestAfterTransientEmptyCurrentAppWindowPayload(
             id: id,
             now: now
+        )
+    }
+
+    func resumeDeferredReconciliationRequestForConditionReadback(
+        id: UInt64,
+        attempt: Int,
+        now: TimeInterval
+    ) -> RuntimeReconciliationRequest? {
+        reconciliationCoordinator.resumeDeferredRequestForConditionReadback(
+            id: id,
+            attempt: attempt,
+            now: now
+        )
+    }
+
+    func failDeferredReconciliationRequestAfterObservationWatchdog(
+        id: UInt64,
+        attempt: Int
+    ) -> RuntimeReconciliationRequest? {
+        reconciliationCoordinator.failDeferredRequestAfterObservationWatchdog(
+            id: id,
+            attempt: attempt
         )
     }
 
