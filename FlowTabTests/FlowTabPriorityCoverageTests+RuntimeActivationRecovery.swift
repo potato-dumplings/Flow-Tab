@@ -5,26 +5,31 @@ import XCTest
 
 extension FlowTabPriorityCoverageTests {
     @MainActor
-    func testRuntimeActivatorActivationConfirmationPolicyWrapsRetryDelays() {
+    func testRuntimeActivatorFocusRecoveryPolicyNamesPollingAndWatchdog() {
         let activator = RuntimeActivator()
 
         XCTAssertEqual(
-            activator.activationConfirmationPolicy,
-            .defaultFocusRecovery
+            activator.focusRecoveryPolicy,
+            .standard
         )
-        XCTAssertTrue(activator.activationConfirmationPolicy.isEnabled)
+        XCTAssertTrue(activator.focusRecoveryPolicy.isEnabled)
 
-        activator.focusRecoveryRetryDelaysNanoseconds = [1, 2, 3]
+        activator.focusRecoveryPolicy = RuntimeFocusRecoveryPolicy(
+            pollingIntervals: [0.1, 0.2, 0.3],
+            watchdogInterval: 4
+        )
         XCTAssertEqual(
-            activator.activationConfirmationPolicy,
-            ActivationConfirmationPolicy(retryDelaysNanoseconds: [1, 2, 3])
+            activator.focusRecoveryPolicy.pollingInterval(forAttempt: 1),
+            0.1
         )
+        XCTAssertEqual(
+            activator.focusRecoveryPolicy.pollingInterval(forAttempt: 4),
+            0.3
+        )
+        XCTAssertEqual(activator.focusRecoveryPolicy.watchdogInterval, 4)
 
-        activator.activationConfirmationPolicy = ActivationConfirmationPolicy(
-            retryDelaysNanoseconds: []
-        )
-        XCTAssertTrue(activator.focusRecoveryRetryDelaysNanoseconds.isEmpty)
-        XCTAssertFalse(activator.activationConfirmationPolicy.isEnabled)
+        activator.focusRecoveryPolicy = .disabled
+        XCTAssertFalse(activator.focusRecoveryPolicy.isEnabled)
     }
 
     func testRuntimeCGWindowFocusBridgeClassifiesStructuredResults() {
@@ -62,7 +67,10 @@ extension FlowTabPriorityCoverageTests {
         let targetCGWindowID: CGWindowID = 245_101
         let axWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
 
-        activator.focusRecoveryRetryDelaysNanoseconds = [20_000_000]
+        activator.focusRecoveryPolicy = RuntimeFocusRecoveryPolicy(
+            pollingIntervals: [0.02],
+            watchdogInterval: 1
+        )
         var focusCallCount = 0
         activator.focusAXWindowOverride = { window, restoreIfMinimized, _ in
             XCTAssertTrue(CFEqual(window, axWindow))
@@ -132,7 +140,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
 
         var requestActivationCallCount = 0
         activator.requestActivationOverride = { _, completion in
@@ -200,7 +208,10 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = [20_000_000]
+        activator.focusRecoveryPolicy = RuntimeFocusRecoveryPolicy(
+            pollingIntervals: [0.02],
+            watchdogInterval: 1
+        )
 
         var requestActivationCallCount = 0
         activator.requestActivationOverride = { _, completion in
@@ -258,7 +269,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
 
         let axWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
         activator.focusAXWindowOverride = { _, _, _ in
@@ -321,7 +332,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
         activator.focusedAXWindowOverride = { _ in nil }
 
         let frontmostCGWindowID: CGWindowID = 245_251
@@ -398,7 +409,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
         activator.focusedAXWindowOverride = { _ in nil }
         activator.currentAXWindowsOverride = { _ in [] }
 
@@ -509,7 +520,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
 
         let targetAXWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
         let targetPointer = Unmanaged.passUnretained(targetAXWindow).toOpaque()
@@ -599,7 +610,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
 
         let staleAXWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
         let stalePointer = Unmanaged.passUnretained(staleAXWindow).toOpaque()
@@ -674,7 +685,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
 
         let axWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
         activator.focusCGWindowOverride = { _, _ in false }
@@ -759,7 +770,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
 
         let axWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
         let targetCGWindowID: CGWindowID = 245_254
@@ -847,7 +858,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
 
         let targetAXWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
         let focusedAXWindow = AXUIElementCreateApplication(currentApp.processIdentifier + 1)
@@ -946,7 +957,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
 
         var requestActivationCallCount = 0
         activator.requestActivationOverride = { _, completion in
@@ -1020,7 +1031,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
 
         let sameTitleAXWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
         let sameTitlePointer = Unmanaged.passUnretained(sameTitleAXWindow).toOpaque()
@@ -1111,7 +1122,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
 
         let unrelatedAXWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
         activator.currentAXWindowsOverride = { _ in [unrelatedAXWindow] }
@@ -1189,7 +1200,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
 
         let relatedAXWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
         let unrelatedAXWindow = AXUIElementCreateApplication(currentApp.processIdentifier)
@@ -1314,7 +1325,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
 
         activator.currentAXWindowsOverride = { _ in [] }
         activator.focusAXWindowOverride = { _, _, _ in
@@ -1401,7 +1412,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
 
         var requestActivationCallCount = 0
         activator.requestActivationOverride = { _, completion in
@@ -1478,7 +1489,10 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = [20_000_000]
+        activator.focusRecoveryPolicy = RuntimeFocusRecoveryPolicy(
+            pollingIntervals: [0.02],
+            watchdogInterval: 1
+        )
 
         var requestActivationCallCount = 0
         activator.requestActivationOverride = { _, completion in
@@ -1632,7 +1646,7 @@ extension FlowTabPriorityCoverageTests {
         let appID = currentApp.bundleIdentifier ?? "pid:\(currentApp.processIdentifier)"
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
 
         let targetFrame = CGRect(x: 0, y: 38, width: 1_728, height: 1_079)
         let targetCGWindowID: CGWindowID = 245_505
@@ -1753,7 +1767,10 @@ extension FlowTabPriorityCoverageTests {
                 )
             ]
         }
-        activator.focusRecoveryRetryDelaysNanoseconds = [20_000_000]
+        activator.focusRecoveryPolicy = RuntimeFocusRecoveryPolicy(
+            pollingIntervals: [0.02],
+            watchdogInterval: 1
+        )
         let recoveredFocus = expectation(description: "focus recovered window after activation settles")
         var focusedWindowPointers: [UnsafeMutableRawPointer] = []
         activator.focusAXWindowOverride = { window, restoreIfMinimized, _ in

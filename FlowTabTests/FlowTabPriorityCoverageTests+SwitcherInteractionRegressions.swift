@@ -420,7 +420,7 @@ extension FlowTabPriorityCoverageTests {
 
         let activator = RuntimeActivator()
         activator.activateCurrentAppIfNeededOverride = { _ in false }
-        activator.focusRecoveryRetryDelaysNanoseconds = []
+        activator.focusRecoveryPolicy = .disabled
         activator.focusCGWindowOverride = { _, windowID in
             XCTAssertEqual(windowID, targetCGWindowID)
             return true

@@ -29,6 +29,28 @@ struct RuntimeWindowFocusRequest {
 
 typealias WindowFocusRequest = RuntimeWindowFocusRequest
 
+enum RuntimeWindowFocusAttemptResult {
+    case verified(RuntimeWindowFocusReadbackEvidence)
+    case focusedButUnverified
+    case noFocusRoute
+
+    var debugName: String {
+        switch self {
+        case .verified:
+            return "verified"
+        case .focusedButUnverified:
+            return "focusedButUnverified"
+        case .noFocusRoute:
+            return "noFocusRoute"
+        }
+    }
+
+    var verifiedReadback: RuntimeWindowFocusReadbackEvidence? {
+        guard case let .verified(readback) = self else { return nil }
+        return readback
+    }
+}
+
 enum WindowBindingReadbackMismatchReason: String, Equatable {
     case targetCGNotVisible
     case focusedAXCGWindowMismatch
@@ -91,17 +113,53 @@ struct RuntimeWindowFocusVerification: Equatable {
     }
 }
 
+struct RuntimeWindowFocusReadbackEvidence {
+    let focusedAXWindow: AXUIElement?
+    let focusedCGWindowID: CGWindowID?
+}
+
 extension RuntimeActivator {
+    func focusedAXWindowCGWindowID(in app: NSRunningApplication) -> CGWindowID? {
+        currentWindowFocusReadbackEvidence(in: app).focusedCGWindowID
+    }
+
+    func currentFocusedAXWindowCGWindowIDForReconciliation(
+        in app: NSRunningApplication
+    ) -> CGWindowID? {
+        focusedAXWindowCGWindowID(in: app)
+    }
+
+    func currentFocusedAXWindowForReconciliation(
+        in app: NSRunningApplication
+    ) -> AXUIElement? {
+        focusedAXWindow(in: app)
+    }
+
+    func currentWindowFocusReadbackEvidence(
+        in app: NSRunningApplication
+    ) -> RuntimeWindowFocusReadbackEvidence {
+        let focusedAXWindow = focusedAXWindow(in: app)
+        return RuntimeWindowFocusReadbackEvidence(
+            focusedAXWindow: focusedAXWindow,
+            focusedCGWindowID: focusedAXWindow.flatMap {
+                AXWindowInspector.cgWindowID(for: $0)
+            }
+        )
+    }
+
     @discardableResult
-    func reportWindowFocusVerified(_ request: WindowFocusRequest, in app: NSRunningApplication) -> Bool {
-        let focusedAXWindow = currentFocusedAXWindowForReconciliation(in: app)
+    func reportWindowFocusVerified(
+        _ request: WindowFocusRequest,
+        readback: RuntimeWindowFocusReadbackEvidence,
+        in app: NSRunningApplication
+    ) -> Bool {
         let verification = RuntimeWindowFocusVerification(
             appID: request.appID,
             windowID: request.windowID,
             ownerPID: request.ownerPID,
             targetCGWindowID: request.targetCGWindowID(expectedPID: app.processIdentifier),
-            focusedCGWindowID: focusedAXWindow.flatMap { AXWindowInspector.cgWindowID(for: $0) },
-            focusedAXWindow: focusedAXWindow,
+            focusedCGWindowID: readback.focusedCGWindowID,
+            focusedAXWindow: readback.focusedAXWindow,
             title: request.title,
             frame: request.frame,
             allowedActions: request.bindingAllowedActions

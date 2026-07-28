@@ -85,7 +85,7 @@ and Process/Tooling.
 | SYNC-003 | `RuntimeReconciliationCoordinator`, `RuntimeProjectionReconciliationDrainer`, `RuntimeProjectionService`, `RuntimeTransientRepairObservationDriver`; transient-empty repair observation | Delayed `notBefore` values `[0.1, 0.3, 0.8]` waited for AX data to become non-empty, while unrelated maintenance could advance the retry. Conditional observation. | Perform the repair readback immediately, resume from an exact AX/Space/lifecycle signal, and use a service-owned cancellable condition observer only while the payload remains incomplete. Request ID, attempt, and exact appID/PID reject stale evidence. The named `[0.1, 0.3, 0.8]` cadence repeats its last value; a 30-second watchdog terminates one uninterrupted incomplete-evidence session and reports the unmet condition plus last payload. | H; Unit, Behavior, topology UI, runtime-topology Pressure. | blocked: implementation and Unit/Behavior/Process passed; UI/Pressure environment evidence is recorded below |
 | SYNC-004 | `FlowTab/Infrastructure/Runtime/RuntimeAXWindowChangeMonitor.swift`; observer install and `handleAXNotification` | Events during a 750ms warm-up are discarded and events inside a 160ms throttle window can lose the final state. Evidence migration. | Install observers, take an initial AX/window readback, and publish monotonically coalesced generations with a guaranteed trailing readback. The monitor owns observer removal; its delivery coordinator owns pending coalescing cancellation. | H; Unit, Behavior, Home/topology UI, runtime-topology Pressure. | completed |
 | SYNC-005 | `FlowTab/Infrastructure/Runtime/RuntimeChromeWindowFocusBridge.swift`; `focusWindowScript` | Two fixed 50ms AppleScript delays are assumed to propagate Chrome window ordering before front-window readback. Conditional observation. | Issue the Chrome focus commands once and immediately return the exact front-window ID readback. Exact equality is the bridge acceptance Oracle; mismatch, empty/invalid output, and execution error remain explicit evidence for `RuntimeActivator`. SYNC-006 owns later activation convergence under one cancellable activation generation. | H; Unit, Behavior, exact-window UI, runtime-topology Pressure. | completed |
-| SYNC-006 | `FlowTab/Infrastructure/Runtime/RuntimeActivator.swift`; `scheduleFocusRecovery` | Fixed 50ms/150ms retries probe whether the exact target became focused. Conditional observation. | Preserve exact AX/CG target readback as the sole success Oracle. Check immediately, consume usable focus/window notifications, and retain a named cancellable polling fallback plus diagnostic watchdog where macOS exposes no target-specific completion event. `RuntimeActivator` owns the task and activation generation. | H; Unit, Behavior, activation UI, runtime-topology Pressure. | planned |
+| SYNC-006 | `FlowTab/Infrastructure/Runtime/RuntimeActivator.swift`; `scheduleFocusRecovery` | Fixed 50ms/150ms retries probe whether the exact target became focused. Conditional observation. | Preserve exact AX/CG target readback as the sole success Oracle. Check immediately, consume usable focus/window notifications, and retain a named cancellable polling fallback plus diagnostic watchdog where macOS exposes no target-specific completion event. `RuntimeActivator` owns the task and activation generation. | H; Unit, Behavior, activation UI, runtime-topology Pressure. | completed |
 | SYNC-007 | `FlowTab/Infrastructure/Runtime/RuntimeWindowPreviewProvider.swift`; ScreenCaptureKit callback bridges | One-second semaphore timeouts terminate callback waits; success already comes only from callback content. Watchdog. | Retain as a named bridge-watchdog policy. The synchronous bridge state owns late-callback rejection; tests must cover callback, error, timeout, and callback-after-timeout evidence. | M; Unit, Behavior, preview Pressure. | closed-retained |
 | SYNC-008 | `FlowTab/Infrastructure/Runtime/RuntimeLogging.swift`; `scheduleFlushLocked` | A 50ms delay batches disk writes and does not establish write success. Domain duration. | Retain the named batching policy and cancellable `DispatchWorkItem`; explicit snapshot/read APIs flush synchronously before returning evidence. The diagnostics store owns the work item. | M; Unit, Behavior, log-write Pressure if changed. | closed-retained |
 | SYNC-009 | `FlowTab/Features/Logs/RuntimeLogsSection.swift`; `RuntimeLogLinesViewModel` | The Logs surface polls once per second to discover appended or cleared lines. Evidence migration. | Publish append/flush/clear generations from the diagnostics owner, subscribe before the initial snapshot, and reload from the later generation. View-model start/stop owns the subscription and task. | M; Unit, Behavior, Logs UI, tab-switch Pressure. | planned |
@@ -407,5 +407,61 @@ polling cadence, deadline, or timeout in the scoped paths.
   Owner-scope search found no bridge propagation duration or AppleScript
   `delay`; `NSAppleScript(source:)` compiled the generated script in the
   focused test.
-- Commit: `refactor(sync): migrate SYNC-005 Chrome focus readback`; its exact
+- Commit: `dfc3389`
+  (`refactor(sync): migrate SYNC-005 Chrome focus readback`).
+
+### SYNC-006 Closure Record
+
+- Design and Oracle: `RuntimeFocusRecoveryCoordinator` installs exact-PID app
+  activation and termination observers plus active-Space and exact-app
+  projection observers before the first activation request. It then performs
+  an immediate readback. Every observed event requests another readback; only
+  the named condition-polling fallback may reissue the existing recovery
+  action. Success requires the exact requested AX/CG identity to be read back
+  as focused, or as the frontmost valid CG window when AX focus evidence is
+  unavailable. `RuntimeWindowFocusReadbackEvidence` carries the same atomic
+  AX/CG observation from verification into projection reporting, so a second
+  accessibility query cannot discard already-observed exact focus.
+- Lifecycle: `RuntimeActivator` owns one coordinator and activation
+  generation. The coordinator owns its observer registrations, scheduled poll,
+  and watchdog. Supersession, exact-PID termination, explicit cancellation,
+  successful readback, watchdog expiry, and deinitialization remove observers
+  and cancel scheduled work. Stale generations and unrelated PID/appID events
+  cannot advance the current request.
+- Retained time policy: macOS exposes no target-window activation completion
+  callback spanning AX, CG, Space changes, and browser focus. The named
+  fallback cadence checks at 50ms, 150ms, then 500ms repeatedly; its scheduler
+  is injected and cancellable, and elapsed time never establishes success. A
+  five-second watchdog performs a final readback and then reports the unmet
+  exact-target condition together with the last AX/CG observation.
+- Unit and Behavior: the final focused set passed 15/15 in 0.365 seconds,
+  covering initial-state completion, observer-before-action ordering, exact
+  event delivery, unrelated/duplicate/out-of-order rejection, fallback
+  cadence, cancellation, termination, supersession, watchdog diagnostics,
+  slow scheduling, projection orchestration, and single-read exact-evidence
+  propagation under
+  `.build-local/evidence-driven-sync/SYNC-006/flowtabtests-focused-attempt-010`.
+  The complete `FlowTabPriorityCoverageTests` suite passed 553/553 in 17.954
+  seconds under
+  `.build-local/evidence-driven-sync/SYNC-006/flowtabtests-priority-attempt-011`.
+- FlowTabCore: not relevant because this contract belongs to the
+  AppKit/ApplicationServices runtime activation and projection boundary.
+- UI: the exact-window activation workflow passed 1/1 in 51.121 seconds under
+  `.build-local/evidence-driven-sync/SYNC-006/ui-activation-attempt-013`.
+  The installed fixed app was rebuilt from the final source state and validated
+  against private identity-manifest SHA-256
+  `65f73336adbba72ab1c9c8554952797e113bb85ef23ba377d5880d21550f49bc`.
+- Pressure: the canonical noisy-CG-sibling, cross-Space fullscreen Option+Tab
+  workflow passed 1/1 in 55.787 seconds under
+  `.build-local/evidence-driven-sync/SYNC-006/runtime-topology-pressure-attempt-016`.
+  The exact fixed-App identity contract matched across 79 checks and 5,009.848
+  milliseconds, with 23 candidate observations and zero rejected transient
+  identities. Resource sampling recorded CPU average/p95/max
+  31.29/54.40/65.30 percent and RSS average/p95/max
+  170.48/258.70/291.58 MiB.
+- Process/Tooling: `git diff --check` and project-file `plutil -lint` passed.
+  Owner-scope search found no legacy recovery-delay policy or retry-chain
+  symbol. The retained poll cadence and watchdog are named, injected,
+  cancellable policies whose tests advance by explicit scheduler delivery.
+- Commit: `refactor(sync): migrate SYNC-006 activation convergence`; its exact
   SHA is appended by the next ledger update after the commit exists.
