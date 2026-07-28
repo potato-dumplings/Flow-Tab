@@ -98,28 +98,29 @@ extension FlowTabPriorityCoverageTests {
 
     @MainActor
     func testAppLaunchWindowEvidenceDeliversEarlyConsecutiveAXTransitions() {
-        let monitor = RuntimeAXWindowChangeMonitor(
-            deliveryPolicy: .everyObservedTransition
+        let monitor = ManualAppLaunchWindowMonitor(
+            installEvidence: [.installed]
         )
         var changedEvents: [(String, pid_t)] = []
-        monitor.onAppWindowChanged = { changedEvents.append(($0, $1)) }
         let pid: pid_t = 18_410
-        let element = AXUIElementCreateApplication(pid)
-        let installedAt = ProcessInfo.processInfo.systemUptime
-
-        monitor.handleAXNotification(
-            appID: "com.example.early-events",
-            pid: pid,
-            notification: kAXWindowCreatedNotification as CFString,
-            element: element,
-            installedAt: installedAt
+        let coordinator = RuntimeAppLaunchWindowEvidenceCoordinator(
+            monitor: monitor,
+            retryScheduler: ManualAppLaunchObservationRetryScheduler(),
+            currentPID: 99_999,
+            onAppWindowChanged: { changedEvents.append(($0, $1)) },
+            onAXWindowDestroyed: { _, _, _ in }
         )
-        monitor.handleAXNotification(
+        coordinator.prepareObservation(
             appID: "com.example.early-events",
-            pid: pid,
-            notification: kAXMainWindowChangedNotification as CFString,
-            element: element,
-            installedAt: installedAt
+            pid: pid
+        )
+        monitor.sendWindowChanged(
+            appID: "com.example.early-events",
+            pid: pid
+        )
+        monitor.sendWindowChanged(
+            appID: "com.example.early-events",
+            pid: pid
         )
 
         XCTAssertEqual(changedEvents.map(\.0), [
@@ -298,7 +299,7 @@ final class SpyAppLaunchWindowEvidenceCoordinator:
 
 @MainActor
 private final class ManualAppLaunchWindowMonitor: RuntimeAXWindowChangeMonitoring {
-    var onAppWindowChanged: ((String, pid_t) -> Void)?
+    var onAppWindowChanged: ((RuntimeAXWindowChangeEvidence) -> Void)?
     var onAXWindowDestroyed: ((String, pid_t, String) -> Void)?
     private var installEvidence: [RuntimeAXWindowObservationInstallEvidence]
     private(set) var observations: [(appID: String, pid: pid_t)] = []
@@ -326,7 +327,16 @@ private final class ManualAppLaunchWindowMonitor: RuntimeAXWindowChangeMonitorin
     }
 
     func sendWindowChanged(appID: String, pid: pid_t) {
-        onAppWindowChanged?(appID, pid)
+        onAppWindowChanged?(
+            RuntimeAXWindowChangeEvidence(
+                appID: appID,
+                pid: pid,
+                generation: 1,
+                source: .observedTransition,
+                observedTransitionCount: 1,
+                initialReadback: nil
+            )
+        )
     }
 
     func sendWindowDestroyed(appID: String, pid: pid_t, axWindowID: String) {

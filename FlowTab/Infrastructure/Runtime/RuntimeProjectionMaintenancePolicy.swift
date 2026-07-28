@@ -104,7 +104,9 @@ final class RuntimeAppLaunchWindowEvidenceCoordinator:
         self.retryScheduler = retryScheduler
         self.currentPID = currentPID
         self.onAppWindowChanged = onAppWindowChanged
-        monitor.onAppWindowChanged = onAppWindowChanged
+        monitor.onAppWindowChanged = { evidence in
+            onAppWindowChanged(evidence.appID, evidence.pid)
+        }
         monitor.onAXWindowDestroyed = onAXWindowDestroyed
     }
 
@@ -115,7 +117,7 @@ final class RuntimeAppLaunchWindowEvidenceCoordinator:
     ) {
         self.init(
             monitor: RuntimeAXWindowChangeMonitor(
-                deliveryPolicy: .everyObservedTransition
+                deliveryPolicy: .standardCoalesced
             ),
             retryScheduler: RuntimeAppLaunchObservationRetryScheduler(),
             currentPID: currentPID,

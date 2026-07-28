@@ -391,6 +391,12 @@ extension FlowTabUITests {
             }
         }
 
+        return assertSpaceFixtureWorkflowPermissionsAvailable(in: app)
+    }
+
+    func assertSpaceFixtureWorkflowPermissionsAvailable(
+        in app: XCUIApplication
+    ) -> Bool {
         XCTAssertTrue(waitForFlowTabUITestApplicationToBecomeReady(app, timeout: 12))
         XCTAssertTrue(
             tapFirstHittable(in: app.buttons.matching(identifier: Identifier.homeTabButton), timeout: 10)

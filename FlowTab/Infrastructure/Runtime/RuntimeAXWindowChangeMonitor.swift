@@ -10,27 +10,12 @@ enum RuntimeAXWindowObservationInstallEvidence: Equatable {
 
 @MainActor
 protocol RuntimeAXWindowChangeMonitoring: AnyObject {
-    var onAppWindowChanged: ((String, pid_t) -> Void)? { get set }
+    var onAppWindowChanged: ((RuntimeAXWindowChangeEvidence) -> Void)? { get set }
     var onAXWindowDestroyed: ((String, pid_t, String) -> Void)? { get set }
 
     func observe(appID: String, pid: pid_t) -> RuntimeAXWindowObservationInstallEvidence
     func stopObserving(pid: pid_t)
     func stop()
-}
-
-struct RuntimeAXWindowChangeDeliveryPolicy: Equatable {
-    let eventThrottleInterval: TimeInterval
-    let observerWarmUpInterval: TimeInterval
-
-    static let standardCoalesced = RuntimeAXWindowChangeDeliveryPolicy(
-        eventThrottleInterval: 0.16,
-        observerWarmUpInterval: 0.75
-    )
-
-    static let everyObservedTransition = RuntimeAXWindowChangeDeliveryPolicy(
-        eventThrottleInterval: 0,
-        observerWarmUpInterval: 0
-    )
 }
 
 @MainActor
@@ -39,25 +24,29 @@ final class RuntimeAXWindowChangeMonitor: RuntimeAXWindowChangeMonitoring {
         weak var monitor: RuntimeAXWindowChangeMonitor?
         let appID: String
         let pid: pid_t
-        let installedAt: TimeInterval
+        let bindingGeneration: UInt64
 
-        init(monitor: RuntimeAXWindowChangeMonitor, appID: String, pid: pid_t) {
+        init(
+            monitor: RuntimeAXWindowChangeMonitor,
+            appID: String,
+            pid: pid_t,
+            bindingGeneration: UInt64
+        ) {
             self.monitor = monitor
             self.appID = appID
             self.pid = pid
-            installedAt = ProcessInfo.processInfo.systemUptime
+            self.bindingGeneration = bindingGeneration
         }
     }
 
-    var onAppWindowChanged: ((String, pid_t) -> Void)?
+    var onAppWindowChanged: ((RuntimeAXWindowChangeEvidence) -> Void)?
     var onAXWindowDestroyed: ((String, pid_t, String) -> Void)?
 
     private var observersByPID: [pid_t: AXObserver] = [:]
     private var observerContextByPID: [pid_t: ObserverContext] = [:]
     private var appIDByPID: [pid_t: String] = [:]
     private var destroyedWindowElementsByPID: [pid_t: [String: AXUIElement]] = [:]
-    private var lastEventAtByAppID: [String: TimeInterval] = [:]
-    private let deliveryPolicy: RuntimeAXWindowChangeDeliveryPolicy
+    private let deliveryCoordinator: RuntimeAXWindowChangeDeliveryCoordinator
     private let watchedNotifications: [CFString] = [
         kAXWindowCreatedNotification as CFString,
         kAXUIElementDestroyedNotification as CFString,
@@ -68,9 +57,16 @@ final class RuntimeAXWindowChangeMonitor: RuntimeAXWindowChangeMonitoring {
     ]
 
     init(
-        deliveryPolicy: RuntimeAXWindowChangeDeliveryPolicy = .standardCoalesced
+        deliveryPolicy: RuntimeAXWindowChangeDeliveryPolicy = .standardCoalesced,
+        deliveryScheduler: (any RuntimeAXWindowChangeDeliveryScheduling)? = nil
     ) {
-        self.deliveryPolicy = deliveryPolicy
+        deliveryCoordinator = RuntimeAXWindowChangeDeliveryCoordinator(
+            policy: deliveryPolicy,
+            scheduler: deliveryScheduler
+        )
+        deliveryCoordinator.onEvidence = { [weak self] evidence in
+            self?.onAppWindowChanged?(evidence)
+        }
     }
 
     func rebind(_ appSummaries: [RuntimeHomeAppSummary]) {
@@ -89,7 +85,17 @@ final class RuntimeAXWindowChangeMonitor: RuntimeAXWindowChangeMonitoring {
         }
 
         for (pid, appID) in expectedByPID where observersByPID[pid] == nil {
-            _ = observe(appID: appID, pid: pid)
+            guard observe(appID: appID, pid: pid) == .installed,
+                  let context = observerContextByPID[pid],
+                  let summary = appSummaries.last(where: { $0.pid == pid })
+            else {
+                continue
+            }
+            deliveryCoordinator.publishInitialReadback(
+                pid: pid,
+                bindingGeneration: context.bindingGeneration,
+                readback: initialReadbackEvidence(for: summary)
+            )
         }
         for pid in expectedByPID.keys {
             syncDestroyedWindowObservers(pid: pid)
@@ -111,7 +117,7 @@ final class RuntimeAXWindowChangeMonitor: RuntimeAXWindowChangeMonitoring {
         for pid in Array(observersByPID.keys) {
             removeObserver(pid: pid)
         }
-        lastEventAtByAppID.removeAll()
+        deliveryCoordinator.stop()
     }
 
     func observe(
@@ -142,7 +148,13 @@ final class RuntimeAXWindowChangeMonitor: RuntimeAXWindowChangeMonitoring {
         }
 
         let appElement = AXUIElementCreateApplication(pid)
-        let context = ObserverContext(monitor: self, appID: appID, pid: pid)
+        let bindingGeneration = deliveryCoordinator.bind(appID: appID, pid: pid)
+        let context = ObserverContext(
+            monitor: self,
+            appID: appID,
+            pid: pid,
+            bindingGeneration: bindingGeneration
+        )
         let contextPointer = UnsafeMutableRawPointer(Unmanaged.passUnretained(context).toOpaque())
         var registeredNotifications: [CFString] = []
         var lastAddResult: AXError = .notificationUnsupported
@@ -163,6 +175,10 @@ final class RuntimeAXWindowChangeMonitor: RuntimeAXWindowChangeMonitoring {
             registeredNotifications.append(notification)
         }
         guard !registeredNotifications.isEmpty else {
+            deliveryCoordinator.unbind(
+                pid: pid,
+                bindingGeneration: bindingGeneration
+            )
             return .unavailable(error: lastAddResult)
         }
 
@@ -180,6 +196,7 @@ final class RuntimeAXWindowChangeMonitor: RuntimeAXWindowChangeMonitoring {
 
     private func removeObserver(pid: pid_t) {
         guard let observer = observersByPID.removeValue(forKey: pid) else { return }
+        let bindingGeneration = observerContextByPID[pid]?.bindingGeneration
 
         if let observedWindows = destroyedWindowElementsByPID.removeValue(forKey: pid) {
             for windowElement in observedWindows.values {
@@ -202,6 +219,10 @@ final class RuntimeAXWindowChangeMonitor: RuntimeAXWindowChangeMonitoring {
         )
         observerContextByPID.removeValue(forKey: pid)
         appIDByPID.removeValue(forKey: pid)
+        deliveryCoordinator.unbind(
+            pid: pid,
+            bindingGeneration: bindingGeneration
+        )
     }
 
     private func syncDestroyedWindowObservers(pid: pid_t) {
@@ -241,17 +262,76 @@ final class RuntimeAXWindowChangeMonitor: RuntimeAXWindowChangeMonitoring {
         destroyedWindowElementsByPID[pid] = observedWindows
     }
 
+    private func initialReadbackEvidence(
+        for summary: RuntimeHomeAppSummary
+    ) -> RuntimeAXWindowInitialReadbackEvidence {
+        let knownWindows = AXLiveWindowRegistry.shared.windows(forPID: summary.pid)
+            .values
+            .filter(AXWindowInspector.isSwitchable)
+        let appElement = AXUIElementCreateApplication(summary.pid)
+        var rawWindows: CFTypeRef?
+        let fetchError = AXUIElementCopyAttributeValue(
+            appElement,
+            kAXWindowsAttribute as CFString,
+            &rawWindows
+        )
+        let rawValueTypeDescription = AXTypedAttributeReader.typeDescription(
+            for: rawWindows
+        )
+        guard fetchError == .success,
+              let currentWindows = rawWindows as? [AXUIElement]
+        else {
+            return RuntimeAXWindowInitialReadbackEvidence.evaluate(
+                expectedWindowCount: summary.windowCount,
+                knownSwitchableWindowCount: knownWindows.count,
+                observedSwitchableWindowCount: nil,
+                exactKnownWindowCount: 0,
+                fetchErrorRawValue: fetchError.rawValue,
+                rawValueTypeDescription: rawValueTypeDescription
+            )
+        }
+
+        let currentSwitchableWindows = currentWindows.filter(
+            AXWindowInspector.isSwitchable
+        )
+        return RuntimeAXWindowInitialReadbackEvidence.evaluate(
+            expectedWindowCount: summary.windowCount,
+            knownSwitchableWindowCount: knownWindows.count,
+            observedSwitchableWindowCount: currentSwitchableWindows.count,
+            exactKnownWindowCount: Self.exactKnownWindowCount(
+                currentWindows: currentSwitchableWindows,
+                knownWindows: knownWindows
+            ),
+            fetchErrorRawValue: fetchError.rawValue,
+            rawValueTypeDescription: rawValueTypeDescription
+        )
+    }
+
+    static func exactKnownWindowCount(
+        currentWindows: [AXUIElement],
+        knownWindows: [AXUIElement]
+    ) -> Int {
+        var unmatchedKnownWindows = knownWindows
+        var matchCount = 0
+        for currentWindow in currentWindows {
+            guard let matchIndex = unmatchedKnownWindows.firstIndex(where: {
+                CFEqual($0, currentWindow)
+            }) else {
+                continue
+            }
+            matchCount += 1
+            unmatchedKnownWindows.remove(at: matchIndex)
+        }
+        return matchCount
+    }
+
     func handleAXNotification(
         appID: String,
         pid: pid_t,
         notification: CFString,
         element: AXUIElement,
-        installedAt: TimeInterval
+        bindingGeneration: UInt64
     ) {
-        let now = ProcessInfo.processInfo.systemUptime
-        guard now - installedAt >= deliveryPolicy.observerWarmUpInterval else {
-            return
-        }
         if notification as String == kAXUIElementDestroyedNotification as String {
             if let axWindowID = AXLiveWindowRegistry.shared.windowID(forKnownWindow: element, expectedPID: pid),
                let onAXWindowDestroyed {
@@ -264,12 +344,10 @@ final class RuntimeAXWindowChangeMonitor: RuntimeAXWindowChangeMonitoring {
             }
             RuntimeLog.debug(.axObserver, "homeAXDestroyed unresolved appID=\(appID) pid=\(pid)")
         }
-        if let lastTimestamp = lastEventAtByAppID[appID],
-           now - lastTimestamp < deliveryPolicy.eventThrottleInterval {
-            return
-        }
-        lastEventAtByAppID[appID] = now
-        onAppWindowChanged?(appID, pid)
+        deliveryCoordinator.recordObservedTransition(
+            pid: pid,
+            bindingGeneration: bindingGeneration
+        )
     }
 
     private static let callback: AXObserverCallback = { _, element, notification, refcon in
@@ -295,7 +373,7 @@ final class RuntimeAXWindowChangeMonitor: RuntimeAXWindowChangeMonitoring {
             pid: context.pid,
             notification: notification,
             element: element,
-            installedAt: context.installedAt
+            bindingGeneration: context.bindingGeneration
         )
     }
 }

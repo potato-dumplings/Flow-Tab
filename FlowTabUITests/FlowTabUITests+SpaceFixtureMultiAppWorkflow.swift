@@ -751,9 +751,6 @@ extension FlowTabUITests {
         perform assertions: (SpaceFixtureResolvedWorkflow, XCUIApplication) throws -> Void
     ) throws {
         terminateSpaceFixtureWorkflowAppsIfRunning(workflow.apps.map(\.identity))
-        if validatesPermissionsBeforeFixtureLaunch {
-            guard assertSpaceFixtureWorkflowPermissionsAvailable() else { return }
-        }
 
         var flowTabAppForCleanup: XCUIApplication?
         defer {
@@ -776,6 +773,13 @@ extension FlowTabUITests {
             flowTabAppForCleanup = app
         } else {
             prelaunchedFlowTabApp = nil
+        }
+
+        if validatesPermissionsBeforeFixtureLaunch {
+            let permissionsAvailable = prelaunchedFlowTabApp.map {
+                assertSpaceFixtureWorkflowPermissionsAvailable(in: $0)
+            } ?? assertSpaceFixtureWorkflowPermissionsAvailable()
+            guard permissionsAvailable else { return }
         }
 
         let fixtureApps = launchResolvedSpaceFixtureWorkflow(

@@ -10,44 +10,31 @@ extension FlowTabPriorityCoverageTests {
     func testRuntimeAXWindowChangeMonitorRoutesKnownDestroyedAXWindowThroughTypedCallback() {
         let pid: pid_t = 18_405
         let knownWindow = AXUIElementCreateApplication(pid)
-        let unrelatedWindow = AXUIElementCreateApplication(pid + 1)
         let knownWindowID = AXWindowInspectorForTesting.makeWindowID(pid: pid, index: 0)
         AXLiveWindowRegistry.shared.replaceWindows(forPID: pid, with: [knownWindow])
         defer { AXLiveWindowRegistry.shared.remove(pid: pid) }
 
         let monitor = RuntimeAXWindowChangeMonitor()
         var destroyedEvents: [(String, pid_t, String)] = []
-        var changedEvents: [(String, pid_t)] = []
+        var changedEvents: [RuntimeAXWindowChangeEvidence] = []
         monitor.onAXWindowDestroyed = { appID, pid, axWindowID in
             destroyedEvents.append((appID, pid, axWindowID))
         }
-        monitor.onAppWindowChanged = { appID, pid in
-            changedEvents.append((appID, pid))
-        }
+        monitor.onAppWindowChanged = { changedEvents.append($0) }
 
-        let installedAt = ProcessInfo.processInfo.systemUptime - 1
         monitor.handleAXNotification(
             appID: "com.example.editor",
             pid: pid,
             notification: kAXUIElementDestroyedNotification as CFString,
             element: knownWindow,
-            installedAt: installedAt
-        )
-        monitor.handleAXNotification(
-            appID: "com.example.editor",
-            pid: pid,
-            notification: kAXUIElementDestroyedNotification as CFString,
-            element: unrelatedWindow,
-            installedAt: installedAt
+            bindingGeneration: 0
         )
 
         XCTAssertEqual(destroyedEvents.count, 1)
         XCTAssertEqual(destroyedEvents.first?.0, "com.example.editor")
         XCTAssertEqual(destroyedEvents.first?.1, pid)
         XCTAssertEqual(destroyedEvents.first?.2, knownWindowID)
-        XCTAssertEqual(changedEvents.count, 1)
-        XCTAssertEqual(changedEvents.first?.0, "com.example.editor")
-        XCTAssertEqual(changedEvents.first?.1, pid)
+        XCTAssertTrue(changedEvents.isEmpty)
     }
 
     func testOptionTabHotkeyMonitorRoutesForwardAndBackwardPressReleaseCallbacks() {

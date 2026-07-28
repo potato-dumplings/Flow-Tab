@@ -456,9 +456,16 @@ struct HomeLandingView: View {
             return
         }
 
-        windowChangeMonitor.onAppWindowChanged = { appID, pid in
-            runtimeProjectionService.signalAppWindowsChanged(appID: appID, pid: pid)
-            scheduleSingleAppRefresh(appID: appID, reason: "ax_window_changed")
+        windowChangeMonitor.onAppWindowChanged = { evidence in
+            guard evidence.requiresReconciliation else { return }
+            runtimeProjectionService.signalAppWindowsChanged(
+                appID: evidence.appID,
+                pid: evidence.pid
+            )
+            scheduleSingleAppRefresh(
+                appID: evidence.appID,
+                reason: "ax_window_changed"
+            )
         }
         windowChangeMonitor.onAXWindowDestroyed = { appID, pid, axWindowID in
             runtimeProjectionService.signalAXWindowDestroyed(appID: appID, pid: pid, axWindowID: axWindowID)
