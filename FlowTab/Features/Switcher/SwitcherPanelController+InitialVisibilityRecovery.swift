@@ -61,24 +61,45 @@ extension SwitcherPanelController {
 
     @discardableResult
     func beginInitialPresentationVisibilityTracking(trigger: String) -> Int {
-        initialPresentationVisibilityGeneration += 1
-        let generation = initialPresentationVisibilityGeneration
-        initialPresentationVisibilityDeadline = ProcessInfo.processInfo.systemUptime
-            + initialPresentationVisibilityGraceWindow
-        initialPresentationVisibilityTrigger = trigger
-        panelVisibilityRecoveryState = .presenting(trigger: trigger, generation: generation)
+        let presentationGeneration = presentationSessionGeneration
+        let generation = initialPanelVisibilityObservationOwner.start(
+            trigger: trigger,
+            presentationGeneration: presentationGeneration,
+            watchdogInterval: initialPresentationVisibilityWatchdogInterval,
+            readback: { [unowned self] in
+                self.panelVisibilitySnapshot()
+            },
+            onVisible: { [weak self] evidence in
+                self?.completeInitialPresentationVisibility(
+                    trigger: trigger,
+                    evidence: evidence
+                )
+            },
+            onWatchdog: { [weak self] failure in
+                self?.handleInitialPresentationVisibilityWatchdog(
+                    failure
+                )
+            }
+        )
+        if initialPanelVisibilityObservationOwner.isObserving(
+            observationGeneration: generation,
+            presentationGeneration: presentationGeneration
+        ) {
+            panelVisibilityRecoveryState = .presenting(
+                trigger: trigger,
+                generation: generation
+            )
+        }
         logSearchTrace(
-            "presentationRecovery trigger=\(trigger) action=trackInitialVisibility generation=\(generation) graceMs=\(formatMilliseconds(initialPresentationVisibilityGraceWindow * 1_000)) \(searchTraceStateSummary())"
+            "presentationRecovery trigger=\(trigger) action=trackInitialVisibility generation=\(generation) presentationGeneration=\(presentationGeneration) watchdogMs=\(formatMilliseconds(initialPresentationVisibilityWatchdogInterval * 1_000)) \(searchTraceStateSummary())"
         )
         return generation
     }
 
     func clearInitialPresentationVisibilityTracking(invalidate: Bool = false) {
-        if invalidate {
-            initialPresentationVisibilityGeneration += 1
-        }
-        initialPresentationVisibilityDeadline = 0
-        initialPresentationVisibilityTrigger = nil
+        initialPanelVisibilityObservationOwner.cancel(
+            invalidate: invalidate
+        )
     }
 
     func isInitialPresentationVisibilityGenerationCurrent(_ generation: Int) -> Bool {
@@ -87,76 +108,116 @@ extension SwitcherPanelController {
 
     func shouldDeferInitialPanelOcclusionInterruption(trigger: String) -> Bool {
         guard hasActivePresentationSession else { return false }
-        guard initialPresentationVisibilityDeadline > 0 else { return false }
-        guard ProcessInfo.processInfo.systemUptime < initialPresentationVisibilityDeadline else {
-            return false
-        }
+        guard initialPanelVisibilityObservationOwner.isObserving(
+            observationGeneration: initialPresentationVisibilityGeneration,
+            presentationGeneration: presentationSessionGeneration
+        ) else { return false }
+        let lastEvidence =
+            initialPanelVisibilityObservationOwner.lastEvidence
         logSearchTrace(
-            "systemInterruption trigger=\(trigger) action=ignored reason=initialPresentationPending generation=\(initialPresentationVisibilityGeneration) \(searchTraceStateSummary())"
+            "systemInterruption trigger=\(trigger) action=deferred reason=initialVisibilityObserved generation=\(initialPresentationVisibilityGeneration) lastEvidence=\(lastEvidence?.source.rawValue ?? "none") lastSnapshot{\(lastEvidence?.snapshot.logFields ?? "none")} \(searchTraceStateSummary())"
         )
         return true
     }
 
     @discardableResult
-    func completeInitialPresentationVisibilityIfVisible(
-        trigger: String? = nil,
+    func observeInitialPresentationVisibility(
+        source: InitialPanelVisibilityEvidenceSource,
         generation: Int? = nil,
-        reason: String,
-        cancelRecoveryTask: Bool
+        presentationGeneration: Int? = nil
     ) -> Bool {
-        guard hasActivePresentationSession else { return false }
-        guard initialPresentationVisibilityDeadline > 0 else { return false }
-        if let generation {
-            guard isInitialPresentationVisibilityGenerationCurrent(generation) else { return false }
-        }
-        guard isPanelVisibleToUser else { return false }
-
-        let resolvedTrigger = trigger ?? initialPresentationVisibilityTrigger ?? "panel_visible"
-        let completedGeneration = generation ?? initialPresentationVisibilityGeneration
-        clearInitialPresentationVisibilityTracking()
-        panelVisibilityRecoveryState = .visibleConfirmed(
-            trigger: resolvedTrigger,
-            generation: completedGeneration,
-            reason: reason
+        initialPanelVisibilityObservationOwner.observe(
+            source: source,
+            observationGeneration:
+                generation ?? initialPresentationVisibilityGeneration,
+            presentationGeneration:
+                presentationGeneration ?? presentationSessionGeneration
         )
-        if cancelRecoveryTask {
+    }
+
+    private func completeInitialPresentationVisibility(
+        trigger: String,
+        evidence: InitialPanelVisibilityEvidence
+    ) {
+        guard hasActivePresentationSession else { return }
+        guard isPresentationSessionGenerationCurrent(
+            evidence.presentationGeneration
+        ) else { return }
+        panelVisibilityRecoveryState = .visibleConfirmed(
+            trigger: trigger,
+            generation: evidence.observationGeneration,
+            reason: evidence.source.rawValue
+        )
+        if panelPresentationRecoveryTask != nil {
             cancelPanelPresentationRecoveryTask()
         }
         logSearchTrace(
-            "presentationRecovery trigger=\(resolvedTrigger) action=complete reason=\(reason) \(searchTraceStateSummary())"
+            "presentationRecovery trigger=\(trigger) action=complete reason=\(evidence.source.rawValue) generation=\(evidence.observationGeneration) presentationGeneration=\(evidence.presentationGeneration) snapshot{\(evidence.snapshot.logFields)} \(searchTraceStateSummary())"
         )
-        beginIgnoringActiveSpaceChanges(trigger: "\(resolvedTrigger)_visible")
-        scheduleModifierReleaseConfirmationAfterRecoveredPresentationIfNeeded(trigger: resolvedTrigger)
-        return true
+        beginIgnoringActiveSpaceChanges(trigger: "\(trigger)_visible")
+        scheduleModifierReleaseConfirmationAfterRecoveredPresentationIfNeeded(
+            trigger: trigger
+        )
+    }
+
+    private func handleInitialPresentationVisibilityWatchdog(
+        _ failure: InitialPanelVisibilityWatchdogFailure
+    ) {
+        guard hasActivePresentationSession else { return }
+        guard isPresentationSessionGenerationCurrent(
+            failure.presentationGeneration
+        ) else { return }
+        if panelPresentationRecoveryTask != nil {
+            cancelPanelPresentationRecoveryTask()
+        }
+        panelVisibilityRecoveryState = .failed(
+            trigger: failure.trigger,
+            generation: failure.observationGeneration,
+            reason: "visibilityWatchdog"
+        )
+        logSearchTrace(
+            "presentationRecovery trigger=\(failure.trigger) action=failed reason=visibilityWatchdog generation=\(failure.observationGeneration) presentationGeneration=\(failure.presentationGeneration) \(failure.logFields) \(searchTraceStateSummary())"
+        )
+        handleRecoverableSystemInterruption(
+            trigger: "\(failure.trigger)_visibilityWatchdog"
+        )
     }
 
     func scheduleInitialPanelVisibilityRecovery(
         trigger: String,
+        initialVisibilityGeneration: Int? = nil,
         activateApplicationIfNeeded: Bool = false
     ) {
+        let generation =
+            initialVisibilityGeneration
+            ?? initialPresentationVisibilityGeneration
+        let presentationGeneration = presentationSessionGeneration
+        guard initialPanelVisibilityObservationOwner.isObserving(
+            observationGeneration: generation,
+            presentationGeneration: presentationGeneration
+        ) else { return }
+        if observeInitialPresentationVisibility(
+            source: .presentationActionReadback,
+            generation: generation,
+            presentationGeneration: presentationGeneration
+        ) {
+            return
+        }
+
         let recoveryGeneration = beginPanelPresentationRecoveryTask()
-        let generation = beginInitialPresentationVisibilityTracking(trigger: trigger)
+        panelVisibilityRecoveryState = .suspectedHidden(
+            trigger: trigger,
+            generation: generation
+        )
         panelPresentationRecoveryTask = Task { @MainActor [weak self] in
             guard let self else { return }
             guard self.isPanelPresentationRecoveryGenerationCurrent(recoveryGeneration) else { return }
             guard self.isInitialPresentationVisibilityGenerationCurrent(generation) else { return }
-
-            if self.completeInitialPresentationVisibilityIfVisible(
-                trigger: trigger,
-                generation: generation,
-                reason: "alreadyVisible",
-                cancelRecoveryTask: false
-            ) {
-                self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
-                return
-            }
-
-            self.panelVisibilityRecoveryState = .suspectedHidden(
-                trigger: trigger,
-                generation: generation
-            )
+            guard self.isPresentationSessionGenerationCurrent(
+                presentationGeneration
+            ) else { return }
             self.logSearchTrace(
-                "presentationRecovery trigger=\(trigger) action=softAttempt generation=\(generation) recoveryGeneration=\(recoveryGeneration) \(self.searchTraceStateSummary())"
+                "presentationRecovery trigger=\(trigger) action=softAttempt generation=\(generation) presentationGeneration=\(presentationGeneration) recoveryGeneration=\(recoveryGeneration) \(self.searchTraceStateSummary())"
             )
             self.panelVisibilityRecoveryState = .recovering(
                 trigger: trigger,
@@ -185,56 +246,12 @@ extension SwitcherPanelController {
                 return
             }
 
-            if self.completeInitialPresentationVisibilityIfVisible(
-                trigger: trigger,
+            _ = self.observeInitialPresentationVisibility(
+                source: .recoveryReadback,
                 generation: generation,
-                reason: "recovered",
-                cancelRecoveryTask: false
-            ) {
-                self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
-                return
-            }
-
-            let remainingSeconds = max(
-                0,
-                self.initialPresentationVisibilityDeadline - ProcessInfo.processInfo.systemUptime
+                presentationGeneration: presentationGeneration
             )
-            if remainingSeconds > 0 {
-                try? await Task.sleep(nanoseconds: UInt64(remainingSeconds * 1_000_000_000))
-            }
-
-            guard !Task.isCancelled else { return }
-            guard self.isPanelPresentationRecoveryGenerationCurrent(recoveryGeneration) else { return }
-            guard self.hasActivePresentationSession else {
-                self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
-                return
-            }
-            guard self.isInitialPresentationVisibilityGenerationCurrent(generation) else {
-                self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
-                return
-            }
-
-            if self.completeInitialPresentationVisibilityIfVisible(
-                trigger: trigger,
-                generation: generation,
-                reason: "deadlineVisible",
-                cancelRecoveryTask: false
-            ) {
-                self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
-                return
-            }
-
             self.clearPanelPresentationRecoveryTaskIfCurrent(recoveryGeneration)
-            self.clearInitialPresentationVisibilityTracking()
-            self.panelVisibilityRecoveryState = .failed(
-                trigger: trigger,
-                generation: generation,
-                reason: "visibilityDeadline"
-            )
-            self.logSearchTrace(
-                "presentationRecovery trigger=\(trigger) action=failed reason=visibilityDeadline generation=\(generation) recoveryGeneration=\(recoveryGeneration) \(self.searchTraceStateSummary())"
-            )
-            self.handleRecoverableSystemInterruption(trigger: "\(trigger)_visibilityDeadline")
         }
     }
 }

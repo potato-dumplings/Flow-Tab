@@ -5,12 +5,12 @@ import SwiftUI
 import FlowTabCore
 
 struct PanelVisibilityRecoveryPolicy: Equatable {
-    var initialPresentationGraceWindow: TimeInterval
+    var initialPresentationWatchdogInterval: TimeInterval
     var interruptionAttemptDelaysNanoseconds: [UInt64]
     var hardReorderDelayNanoseconds: UInt64
 
     static let `default` = PanelVisibilityRecoveryPolicy(
-        initialPresentationGraceWindow: 0.35,
+        initialPresentationWatchdogInterval: 0.35,
         interruptionAttemptDelaysNanoseconds: [
             0,
             50_000_000,
@@ -151,10 +151,14 @@ final class SwitcherPanelController {
     var currentAppWindowProjectionDidUpdateObserver: NSObjectProtocol?
     var committedSearchIndexDidUpdateObserver: NSObjectProtocol?
     var panelOcclusionObserver: NSObjectProtocol?
+    var panelDidBecomeKeyObserver: NSObjectProtocol?
+    var panelDidExposeObserver: NSObjectProtocol?
     var panelDidResignKeyObserver: NSObjectProtocol?
     var suppressHotkeyReplayUntilRelease = false
     let hotkeyInputOwner = SwitcherHotkeyInputOwner()
     let modifierReleaseObservationOwner: ModifierReleaseObservationOwner
+    let initialPanelVisibilityObservationOwner:
+        InitialPanelVisibilityObservationOwner
     var modifierReleaseState: ModifierReleaseState = .idle
     var presentationSessionGeneration = 0
     var panelPresentationRecoveryTask: Task<Void, Never>?
@@ -167,9 +171,6 @@ final class SwitcherPanelController {
     var delayedWindowLayerDeadlineMs: Double?
     var delayedWindowLayerAppID: String?
     var ignoreActiveSpaceChangesUntil: TimeInterval = 0
-    var initialPresentationVisibilityGeneration = 0
-    var initialPresentationVisibilityDeadline: TimeInterval = 0
-    var initialPresentationVisibilityTrigger: String?
     var suppressApplicationActivationUntil: TimeInterval = 0
     var windowLayerPresentationDelay: TimeInterval {
         windowLayerPresentationDelayOverride ?? WindowLayerPreferencesStore.loadAutoEnterDelay()
@@ -192,8 +193,22 @@ final class SwitcherPanelController {
     let postTerminateRefreshInterruptionProtectionWindow: TimeInterval = 0.5
     let panelVisibilityRecoveryPolicy: PanelVisibilityRecoveryPolicy = .default
     let initialWindowOnlyPreviewRevealTimeoutNs: UInt64 = 250_000_000
-    var initialPresentationVisibilityGraceWindow: TimeInterval {
-        panelVisibilityRecoveryPolicy.initialPresentationGraceWindow
+    var initialPresentationVisibilityWatchdogInterval: TimeInterval {
+        panelVisibilityRecoveryPolicy.initialPresentationWatchdogInterval
+    }
+    var initialPresentationVisibilityGeneration: Int {
+        initialPanelVisibilityObservationOwner.generation
+    }
+    var initialPresentationVisibilityTrigger: String? {
+        initialPanelVisibilityObservationOwner.currentTrigger
+    }
+    var hasPendingInitialPresentationVisibilityWatchdog: Bool {
+        initialPanelVisibilityObservationOwner.hasPendingWatchdog
+    }
+    var lastInitialPresentationVisibilityWatchdogFailure:
+        InitialPanelVisibilityWatchdogFailure?
+    {
+        initialPanelVisibilityObservationOwner.lastFailure
     }
     let activeSpaceMigrationActivationSuppressionWindow: TimeInterval = 0.5
     let manualWindowLayerProjectionApplyDelay: TimeInterval = 0.35
@@ -274,13 +289,19 @@ final class SwitcherPanelController {
         modifierReleaseObservationScheduler:
             (any ModifierReleaseObservationScheduling)? = nil,
         modifierReleaseEventSource:
-            (any ModifierReleaseEventObserving)? = nil
+            (any ModifierReleaseEventObserving)? = nil,
+        initialPanelVisibilityObservationScheduler:
+            (any InitialPanelVisibilityObservationScheduling)? = nil
     ) {
         self.model = model
         modifierReleaseObservationOwner = ModifierReleaseObservationOwner(
             scheduler: modifierReleaseObservationScheduler,
             eventSource: modifierReleaseEventSource
         )
+        initialPanelVisibilityObservationOwner =
+            InitialPanelVisibilityObservationOwner(
+                scheduler: initialPanelVisibilityObservationScheduler
+            )
         panel = SwitcherOverlayPanel(
             contentRect: NSRect(x: 0, y: 0, width: 880, height: 290),
             styleMask: SwitcherPanelWindowConfiguration.styleMask,
@@ -426,6 +447,24 @@ final class SwitcherPanelController {
                 self?.handlePanelOcclusionStateDidChange()
             }
         }
+        panelDidBecomeKeyObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didBecomeKeyNotification,
+            object: panel,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.handlePanelDidBecomeKey()
+            }
+        }
+        panelDidExposeObserver = NotificationCenter.default.addObserver(
+            forName: NSWindow.didExposeNotification,
+            object: panel,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.handlePanelDidExpose()
+            }
+        }
         panelDidResignKeyObserver = NotificationCenter.default.addObserver(
             forName: NSWindow.didResignKeyNotification,
             object: panel,
@@ -529,6 +568,14 @@ final class SwitcherPanelController {
         handlePanelOcclusionStateDidChange()
     }
 
+    func handlePanelDidBecomeKeyForTesting() {
+        handlePanelDidBecomeKey()
+    }
+
+    func handlePanelDidExposeForTesting() {
+        handlePanelDidExpose()
+    }
+
     func handlePanelDidResignKeyForTesting() {
         handlePanelDidResignKey()
     }
@@ -600,6 +647,12 @@ final class SwitcherPanelController {
         }
         if let panelOcclusionObserver {
             NotificationCenter.default.removeObserver(panelOcclusionObserver)
+        }
+        if let panelDidBecomeKeyObserver {
+            NotificationCenter.default.removeObserver(panelDidBecomeKeyObserver)
+        }
+        if let panelDidExposeObserver {
+            NotificationCenter.default.removeObserver(panelDidExposeObserver)
         }
         if let panelDidResignKeyObserver {
             NotificationCenter.default.removeObserver(panelDidResignKeyObserver)

@@ -365,6 +365,8 @@ extension SwitcherPanelController {
         updatePanelPresentationLevel(trigger: trigger)
         prepareInitialWindowOnlyPanelReveal(kind: kind)
         let levelReadyMs = monotonicMilliseconds()
+        let initialVisibilityGeneration =
+            beginInitialPresentationVisibilityTracking(trigger: trigger)
         panel.makeKeyAndOrderFront(nil)
         panel.orderFrontRegardless()
         let firstOrderReadyMs = monotonicMilliseconds()
@@ -377,6 +379,7 @@ extension SwitcherPanelController {
         let ignoreReadyMs = monotonicMilliseconds()
         scheduleInitialPanelVisibilityRecovery(
             trigger: trigger,
+            initialVisibilityGeneration: initialVisibilityGeneration,
             activateApplicationIfNeeded: false
         )
         let recoveryReadyMs = monotonicMilliseconds()

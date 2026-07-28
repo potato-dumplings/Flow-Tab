@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import XCTest
 @testable import FlowTab
@@ -5,7 +6,10 @@ import FlowTabCore
 
 extension FlowTabPriorityCoverageTests {
     @MainActor
-    private func makeInitialVisibilityProjectionPanelController() -> (
+    private func makeInitialVisibilityProjectionPanelController(
+        scheduler:
+            (any InitialPanelVisibilityObservationScheduling)? = nil
+    ) -> (
         controller: SwitcherPanelController,
         runtimeProjectionService: RecordingRuntimeProjectionService
     ) {
@@ -14,7 +18,10 @@ extension FlowTabPriorityCoverageTests {
         )
         return (
             SwitcherPanelController(
-                model: LiveSwitcherModel(runtimeProjectionService: runtimeProjectionService)
+                model: LiveSwitcherModel(
+                    runtimeProjectionService: runtimeProjectionService
+                ),
+                initialPanelVisibilityObservationScheduler: scheduler
             ),
             runtimeProjectionService
         )
@@ -25,7 +32,10 @@ extension FlowTabPriorityCoverageTests {
         let controller = SwitcherPanelController()
 
         XCTAssertEqual(controller.panelVisibilityRecoveryPolicy, .default)
-        XCTAssertEqual(controller.initialPresentationVisibilityGraceWindow, 0.35)
+        XCTAssertEqual(
+            controller.initialPresentationVisibilityWatchdogInterval,
+            0.35
+        )
         XCTAssertEqual(
             controller.interruptionPresentationRecoveryAttemptDelaysNs,
             [0, 50_000_000, 150_000_000, 300_000_000]
@@ -43,30 +53,35 @@ extension FlowTabPriorityCoverageTests {
             from: runtimeProjectionService,
             expectedReadCount: 1
         )
+        controller.panelVisibilityOverride = false
+        controller.panelOcclusionStateOverride = []
 
         let initialGeneration = controller.beginInitialPresentationVisibilityTracking(
             trigger: "state_initial"
         )
         XCTAssertEqual(
             controller.panelVisibilityRecoveryState,
-            .presenting(trigger: "state_initial", generation: initialGeneration)
+                .presenting(trigger: "state_initial", generation: initialGeneration)
+        )
+        XCTAssertTrue(
+            controller.hasPendingInitialPresentationVisibilityWatchdog
         )
 
-        XCTAssertTrue(
-            controller.completeInitialPresentationVisibilityIfVisible(
-                trigger: "state_initial",
-                generation: initialGeneration,
-                reason: "alreadyVisible",
-                cancelRecoveryTask: false
-            )
-        )
+        controller.panelVisibilityOverride = true
+        controller.panelOcclusionStateOverride = .visible
+        controller.handlePanelDidBecomeKeyForTesting()
         XCTAssertEqual(
             controller.panelVisibilityRecoveryState,
             .visibleConfirmed(
                 trigger: "state_initial",
                 generation: initialGeneration,
-                reason: "alreadyVisible"
+                reason: InitialPanelVisibilityEvidenceSource
+                    .panelBecameKey
+                    .rawValue
             )
+        )
+        XCTAssertFalse(
+            controller.hasPendingInitialPresentationVisibilityWatchdog
         )
 
         controller.schedulePanelVisibilityRecovery(
@@ -84,6 +99,87 @@ extension FlowTabPriorityCoverageTests {
 
         controller.cancelSelectionForTesting()
         XCTAssertEqual(controller.panelVisibilityRecoveryState, .idle)
+    }
+
+    @MainActor
+    func testSwitcherInitialVisibilityObserverAcceptsWindowNotificationReadback() async {
+        let (controller, runtimeProjectionService) =
+            makeInitialVisibilityProjectionPanelController()
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        assertInitialVisibilityProjectionRead(
+            from: runtimeProjectionService,
+            expectedReadCount: 1
+        )
+        controller.panelVisibilityOverride = false
+        controller.panelOcclusionStateOverride = []
+        let generation =
+            controller.beginInitialPresentationVisibilityTracking(
+                trigger: "notification"
+            )
+
+        controller.panelVisibilityOverride = true
+        controller.panelOcclusionStateOverride = .visible
+        NotificationCenter.default.post(
+            name: NSWindow.didExposeNotification,
+            object: controller.panel
+        )
+        await Task.yield()
+
+        XCTAssertEqual(
+            controller.panelVisibilityRecoveryState,
+            .visibleConfirmed(
+                trigger: "notification",
+                generation: generation,
+                reason: InitialPanelVisibilityEvidenceSource
+                    .panelExposed
+                    .rawValue
+            )
+        )
+        XCTAssertFalse(
+            controller.hasPendingInitialPresentationVisibilityWatchdog
+        )
+        controller.cancelSelectionForTesting()
+    }
+
+    @MainActor
+    func testSwitcherInitialVisibilityWatchdogCancelsReleasedSessionWithDiagnostic() {
+        let scheduler =
+            ManualInitialPanelVisibilityObservationScheduler()
+        let (controller, runtimeProjectionService) =
+            makeInitialVisibilityProjectionPanelController(
+                scheduler: scheduler
+            )
+        controller.globalPrimaryModifierPressedOverride = false
+
+        XCTAssertTrue(controller.beginGlobalHotkeySessionForTesting())
+        assertInitialVisibilityProjectionRead(
+            from: runtimeProjectionService,
+            expectedReadCount: 1
+        )
+        controller.panelVisibilityOverride = false
+        controller.panelOcclusionStateOverride = []
+        let generation =
+            controller.beginInitialPresentationVisibilityTracking(
+                trigger: "watchdog_behavior"
+            )
+
+        scheduler.fireNext()
+
+        let failure =
+            controller.lastInitialPresentationVisibilityWatchdogFailure
+        XCTAssertEqual(failure?.trigger, "watchdog_behavior")
+        XCTAssertEqual(failure?.observationGeneration, generation)
+        XCTAssertEqual(
+            failure?.finalEvidence.source,
+            .watchdogReadback
+        )
+        XCTAssertFalse(failure?.finalEvidence.snapshot.userVisible ?? true)
+        XCTAssertNil(controller.modelForTesting.session)
+        XCTAssertFalse(controller.hasActivePresentationSession)
+        XCTAssertFalse(
+            controller.hasPendingInitialPresentationVisibilityWatchdog
+        )
     }
 
     @MainActor
@@ -177,8 +273,13 @@ extension FlowTabPriorityCoverageTests {
             controller.panelVisibilityOverride = false
 
             let trigger = "\(triggerPrefix)_\(index)"
+            let visibilityGeneration =
+                controller.beginInitialPresentationVisibilityTracking(
+                    trigger: trigger
+                )
             controller.scheduleInitialPanelVisibilityRecovery(
                 trigger: trigger,
+                initialVisibilityGeneration: visibilityGeneration,
                 activateApplicationIfNeeded: false
             )
 
@@ -196,14 +297,21 @@ extension FlowTabPriorityCoverageTests {
             )
             XCTAssertEqual(controller.initialPresentationVisibilityTrigger, trigger, "iteration \(index)")
             XCTAssertNotNil(controller.panelPresentationRecoveryTask, "iteration \(index)")
+            XCTAssertTrue(
+                controller.hasPendingInitialPresentationVisibilityWatchdog,
+                "iteration \(index)"
+            )
 
             controller.cancelSelectionForTesting()
 
             XCTAssertNil(controller.modelForTesting.session, "iteration \(index)")
             XCTAssertFalse(controller.hasActivePresentationSession, "iteration \(index)")
             XCTAssertNil(controller.panelPresentationRecoveryTask, "iteration \(index)")
-            XCTAssertEqual(controller.initialPresentationVisibilityDeadline, 0, accuracy: 0.0001, "iteration \(index)")
             XCTAssertNil(controller.initialPresentationVisibilityTrigger, "iteration \(index)")
+            XCTAssertFalse(
+                controller.hasPendingInitialPresentationVisibilityWatchdog,
+                "iteration \(index)"
+            )
             XCTAssertEqual(
                 controller.initialPresentationVisibilityGeneration,
                 expectedScheduledGeneration + 1,
@@ -220,19 +328,6 @@ extension FlowTabPriorityCoverageTests {
             }
         }
 
-        let didSettleRecoveryState = await waitUntil(
-            "rapid open-close pressure settles stale initial visibility tasks",
-            timeoutNanoseconds: 2_000_000_000,
-            pollIntervalNanoseconds: 10_000_000
-        ) {
-            controller.modelForTesting.session == nil
-                && !controller.hasActivePresentationSession
-                && controller.panelPresentationRecoveryTask == nil
-                && abs(controller.initialPresentationVisibilityDeadline) <= 0.0001
-                && controller.initialPresentationVisibilityTrigger == nil
-        }
-        XCTAssertTrue(didSettleRecoveryState)
-
         XCTAssertNil(controller.modelForTesting.session)
         assertInitialVisibilityProjectionRead(
             from: runtimeProjectionService,
@@ -240,8 +335,10 @@ extension FlowTabPriorityCoverageTests {
         )
         XCTAssertFalse(controller.hasActivePresentationSession)
         XCTAssertNil(controller.panelPresentationRecoveryTask)
-        XCTAssertEqual(controller.initialPresentationVisibilityDeadline, 0, accuracy: 0.0001)
         XCTAssertNil(controller.initialPresentationVisibilityTrigger)
+        XCTAssertFalse(
+            controller.hasPendingInitialPresentationVisibilityWatchdog
+        )
         XCTAssertEqual(controller.initialPresentationVisibilityGeneration, startGeneration + iterationCount * 2)
         XCTAssertEqual(controller.panelPresentationRecoveryGeneration, startRecoveryGeneration + iterationCount * 2)
 

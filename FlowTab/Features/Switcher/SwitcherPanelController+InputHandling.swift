@@ -384,11 +384,10 @@ extension SwitcherPanelController {
 
     func handlePanelOcclusionStateDidChange() {
         guard isPanelPresented else { return }
+        _ = observeInitialPresentationVisibility(
+            source: .panelOcclusionChanged
+        )
         if resolvedPanelOcclusionState.contains(.visible) {
-            _ = completeInitialPresentationVisibilityIfVisible(
-                reason: "occlusionVisible",
-                cancelRecoveryTask: true
-            )
             return
         }
         guard !shouldDeferInitialPanelOcclusionInterruption(trigger: "panelOccluded") else {
@@ -396,6 +395,20 @@ extension SwitcherPanelController {
         }
         logSearchTrace("systemInterruption trigger=panelOccluded \(searchTraceStateSummary())")
         handleRecoverableSystemInterruption(trigger: "panelOccluded")
+    }
+
+    func handlePanelDidBecomeKey() {
+        guard isPanelPresented else { return }
+        _ = observeInitialPresentationVisibility(
+            source: .panelBecameKey
+        )
+    }
+
+    func handlePanelDidExpose() {
+        guard isPanelPresented else { return }
+        _ = observeInitialPresentationVisibility(
+            source: .panelExposed
+        )
     }
 
     func handlePanelDidResignKey() {
