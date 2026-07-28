@@ -95,7 +95,7 @@ and Process/Tooling.
 | SYNC-013 | `HomeLandingView.scheduleInitialAppSummariesRefresh`, `HomeInitialProjectionObservationOwner`; initial Home app-summary readiness | A fixed 900ms startup delay assumed the runtime app-switcher projection had committed before the Home readback. Evidence migration. | Install the exact service-object projection observer before the initial readback and maintenance request. Accept an initial complete projection, a later monotonic source generation, or a same-generation completeness transition. Home active visibility owns the observation generation, subscription, cancellation, and cleanup. | H; Unit, Behavior, Home UI, runtime-topology Pressure. | completed |
 | SYNC-040 | `HomeLandingView.scheduleAppSummariesRefresh`, `HomeAppSummaryProjectionObservationOwner`; general Home app-summary refresh | A fixed 220ms post-signal delay assumed app-switcher projection commits had followed workspace and runtime refresh signals. Evidence migration. | Install the exact runtime-service observer before the baseline readback. Apply committed notification readbacks only for a newly available projection, a monotonic source generation, or same-generation completeness. App activation and permission changes request service-owned maintenance, followed by an independent request-return readback. Home active visibility owns the observation generation, subscription, cancellation, and initial-owner handoff. | H; Unit, Behavior, Home UI, runtime-topology Pressure. | completed |
 | SYNC-041 | `HomeLandingView.requestSelectedAppRefresh`, `requestAppDetailProjection`, `HomeAppDetailProjectionObservationOwner`; selected/scoped Home detail | Fixed 120ms and 220ms post-selection or AX-signal delays assumed the requested current-app projection had committed. Evidence migration. | Install the exact runtime-service observer before the initial readback and selected/app-window/AX-destroy signal. Filter by exact appID and projection identity; apply an exact complete baseline immediately while retaining the trigger observation, then accept a newly available projection, monotonic source generation, or same-generation completeness transition. Independent request-return readback closes synchronous completion races. Home visibility and per-app request generations own subscriptions, cancellation, and stale-event rejection. | H; Unit, Behavior, selected-app Home UI, runtime-topology Pressure. | blocked: implementation, focused Unit/Behavior, full FlowTabTests, tab-switch Pressure, and Process passed; UI automation and full Priority order-isolation evidence are recorded below |
-| SYNC-014 | `FlowTab/App/AppFoundation.swift`; `AppWindowCoordinator.scheduleAccessoryPolicyRestoration` | Up to 250 polls at 20ms infer that a status-item-opened regular window is active and visible. Conditional observation plus watchdog. | Register app/window observers before presentation, perform immediate visibility/activation readback, and complete on the matching window transition. A named cancellable condition observer is the fallback; watchdog diagnostics include app-active, visible, miniaturized, and activation-policy state. `AppWindowCoordinator` owns the task/observers. | H; Unit, Behavior, status-item UI. | planned |
+| SYNC-014 | `FlowTab/App/AppFoundation.swift`; `AppWindowCoordinator.scheduleAccessoryPolicyRestoration` | Up to 250 polls at 20ms infer that a status-item-opened regular window is active and visible. Conditional observation plus watchdog. | Register app/window observers before presentation, perform immediate visibility/activation readback, and complete on the matching window transition. A named cancellable condition observer is the fallback; watchdog diagnostics include app-active, visible, miniaturized, and activation-policy state. `AppWindowCoordinator` owns the task/observers. | H; Unit, Behavior, status-item UI. | completed; the expanded full Priority run's assigned SYNC-032/SYNC-033 order-isolation failure is recorded below |
 | SYNC-015 | `SwitcherSearchCoordinator.scheduleRebuild`, `LiveSwitcherModel.scheduleSearchComputation` | 10–45ms delays debounce query work; result publication already requires revision and query/scope equality. Domain duration. | Retain as one named search scheduling policy with injectable scheduler/clock, cancellation, and revision Oracle. Remove duplicate scheduling ownership if both paths serve the same contract. | H hot path; Unit, Behavior, Search UI, realistic/stress Search Pressure. | verification-needed |
 | SYNC-016 | `FlowTab/Features/Settings/HotkeySettingsCard.swift`; `updateTakeoverStatus` | A 250ms delay is treated as confirmation that Command+Tab takeover stayed inactive. Evidence migration. | Publish registration result/marker generation from the hotkey owner and render status from that readback. The card observes before requesting registration and owns subscription cleanup. | M; Unit, Behavior, Settings UI. | planned |
 | SYNC-017 | `SwitcherPanelController+InputHandling.swift`; modifier-release confirmation and replay suppression | Hardware release is inferred from repeated samples after fixed intervals. Conditional observation. | Consume flags/key transition events first, immediately read hardware state, and retain named cancellable sampling only for missed global events. Stable released-state samples remain the condition Oracle; session and confirmation generations own cancellation. | H; Unit, Behavior, switcher UI, interaction Pressure. | planned |
@@ -958,5 +958,79 @@ polling cadence, deadline, or timeout in the scoped paths.
   Home detail sleeps are absent. `HomeLandingView` is shorter than its
   pre-slice baseline; the extracted owner and focused test files remain below
   the new-file size guardrail.
-- Commit: `refactor(sync): migrate SYNC-041 home detail updates`; its exact SHA
-  is appended by the next ledger update after the commit exists.
+- Commit: `113f9bd`
+  (`refactor(sync): migrate SYNC-041 home detail updates`).
+
+### SYNC-014 Closure Record
+
+- Design and Oracle: `TemporaryRegularActivationRestorationOwner` installs
+  exact-object application and window observers before requesting presentation,
+  then takes both an initial readback and an independent presentation-return
+  readback. Completion requires the exact readback state: the application is
+  active and the target window is visible. App activation/unhide and target
+  window key, main, miniaturization, occlusion, and close notifications only
+  trigger a fresh readback. Duplicate, unrelated-object, out-of-order, and stale
+  generation notifications cannot complete a later activation request.
+- Lifecycle: `AppWindowCoordinator` owns one restoration owner and monotonic
+  generation. Every new window-opening request cancels the prior observation,
+  fallback, and watchdog before installing the next owner. The owner removes
+  all exact-object notification tokens and cancels scheduled work on success,
+  terminal failure, explicit cancellation, supersession, and deinitialization.
+  The AppKit Home window is resolved before the owner starts, preserving the
+  observer-before-trigger boundary.
+- Retained time policy: a named 20ms fallback cadence remains because AppKit
+  does not publish one completion callback covering every relevant application
+  activation and window visibility mutation. Each cadence first reads the
+  condition immediately, requests presentation only while evidence remains
+  incomplete, and completes only from a later exact readback. A named
+  five-second watchdog performs a final readback and terminates failure with
+  source, elapsed time, app-active, visible, miniaturized, and activation-policy
+  evidence. Both policies use injectable scheduler and monotonic-clock
+  boundaries; cancellation belongs to the restoration owner.
+- Unit and Behavior: the final focused set passed 11/11 under
+  `.build-local/evidence-driven-sync/SYNC-014/flowtabtests-targeted-attempt-002`
+  (eight owner tests and three status-item orchestration tests). Coverage
+  includes initial satisfaction, observer-before-presentation ordering,
+  presentation-return completion, exact unrelated/out-of-order/duplicate
+  evidence, cancellation, coordinator supersession, conditional fallback
+  presentation, watchdog diagnostics, and slow scheduling changing elapsed time
+  while preserving the result. The complete `FlowTabTests` class passed 277/277
+  under
+  `.build-local/evidence-driven-sync/SYNC-014/flowtabtests-unit-full-attempt-001`.
+  The complete `FlowTabPriorityCoverageTests` class executed 570 tests under
+  `.build-local/evidence-driven-sync/SYNC-014/flowtabtests-priority-full-attempt-001`;
+  all three SYNC-014 status-item tests passed, while the existing
+  `testAppDelegateLaunchWithUITestBootstrapArgumentsSeedsLogsAndOpensSearch`
+  observed one duplicate external hotkey reload in suite order. That test
+  passed 1/1 in isolation under
+  `.build-local/evidence-driven-sync/SYNC-014/priority-existing-failure-rerun-attempt-001`.
+  Its order-dependent asynchronous test isolation remains assigned to
+  SYNC-032/SYNC-033, so the expanded full Priority layer remains non-green.
+- FlowTabCore: not relevant because the synchronization owner, AppKit evidence
+  adapters, and status-item orchestration are app-target responsibilities.
+- UI: the fixed-path signed app was rebuilt successfully with executable
+  SHA-256
+  `a0a2046dbfecc168a5b5397a34d6f25b712f0cd132e6eefc547a08e5389c9376`.
+  The canonical
+  `testStatusItemReopensLastSelectedTabAfterWindowClose` path passed 1/1 in
+  9.609 seconds under
+  `.build-local/evidence-driven-sync/SYNC-014/ui-status-item-attempt-002`.
+  It verified window closure, another normal Space app becoming frontmost,
+  status-item reopening of the previously selected Logs tab, the regular-to-
+  accessory activation evidence, and the final FlowTab foreground state. The
+  first attempt exposed that this pre-existing log Oracle requested INFO
+  logging after resetting preferences without starting a diagnostic session;
+  the test launch now establishes that observation precondition explicitly.
+- Pressure: the deterministic owner-level 2,000-supersession test passed in the
+  focused run, retained exactly one live application/window observation set,
+  and delivered no stale outcome. The slow-scheduler test exercised a 100x
+  elapsed-time change with the same terminal stable evidence and presentation
+  count.
+- Process/Tooling: the app, app-test, and UI-test targets built through the
+  canonical scripts. Project-file `plutil -lint`, `git diff --check`, scoped
+  synchronization search, and source-size checks passed. The legacy polling
+  task, 250-attempt counter, and direct success-after-sleep path are absent;
+  the remaining sleep is encapsulated by the named cancellable fallback and
+  watchdog scheduler.
+- Commit: `refactor(sync): migrate SYNC-014 status item activation`; its exact
+  SHA is appended by the next ledger update after the commit exists.

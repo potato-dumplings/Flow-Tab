@@ -5,7 +5,21 @@ import XCTest
 import FlowTabCore
 import Carbon
 
-final class TestAppWindow: AppWindowOpeningWindow {
+private final class TestTemporaryRegularActivationToken:
+    TemporaryRegularActivationCancellable
+{
+    private(set) var isCancelled = false
+
+    func cancel() {
+        isCancelled = true
+    }
+}
+
+@MainActor
+final class TestAppWindow:
+    AppWindowOpeningWindow,
+    AppWindowPresentationEvidenceObserving
+{
     let isPanelWindow: Bool
     var isMiniaturized: Bool
     var isVisible: Bool
@@ -17,6 +31,20 @@ final class TestAppWindow: AppWindowOpeningWindow {
     private(set) var deminiaturizeCallCount = 0
     private(set) var makeKeyAndOrderFrontCallCount = 0
     private(set) var orderFrontRegardlessCallCount = 0
+    private var presentationEvidenceObservers: [
+        (
+            token: TestTemporaryRegularActivationToken,
+            action: @MainActor @Sendable (
+                TemporaryRegularActivationEvidenceSource
+            ) -> Void
+        )
+    ] = []
+
+    var activePresentationEvidenceObserverCount: Int {
+        presentationEvidenceObservers.filter {
+            !$0.token.isCancelled
+        }.count
+    }
 
     init(
         isPanelWindow: Bool,
@@ -38,45 +66,121 @@ final class TestAppWindow: AppWindowOpeningWindow {
 
     func deminiaturize(_ sender: Any?) {
         deminiaturizeCallCount += 1
+        let wasMiniaturized = isMiniaturized
         isMiniaturized = false
+        if wasMiniaturized {
+            emitPresentationEvidence(.windowDidDeminiaturize)
+        }
     }
 
     func makeKeyAndOrderFront(_ sender: Any?) {
         makeKeyAndOrderFrontCallCount += 1
+        emitPresentationEvidence(.windowDidBecomeKey)
     }
 
     func orderFrontRegardless() {
         orderFrontRegardlessCallCount += 1
     }
+
+    func observeFlowTabWindowPresentationEvidence(
+        _ action: @escaping @MainActor @Sendable (
+            TemporaryRegularActivationEvidenceSource
+        ) -> Void
+    ) -> any TemporaryRegularActivationCancellable {
+        let token = TestTemporaryRegularActivationToken()
+        presentationEvidenceObservers.append((token, action))
+        return token
+    }
+
+    @MainActor
+    func emitPresentationEvidence(
+        _ source: TemporaryRegularActivationEvidenceSource
+    ) {
+        for observer in presentationEvidenceObservers
+        where !observer.token.isCancelled {
+            observer.action(source)
+        }
+    }
 }
 
-final class TestAppWindowApplication: AppWindowOpeningApplication {
+@MainActor
+final class TestAppWindowApplication:
+    AppWindowOpeningApplication,
+    AppActivationEvidenceObserving
+{
     var isHidden: Bool
+    var flowTabIsActive: Bool
     let appWindows: [any AppWindowOpeningWindow]
 
     private(set) var activateCallCount = 0
     private(set) var lastActivateIgnoringOtherApps: Bool?
     private(set) var unhideCallCount = 0
     private(set) var showSettingsWindowActionCount = 0
+    private var activationEvidenceObservers: [
+        (
+            token: TestTemporaryRegularActivationToken,
+            action: @MainActor @Sendable (
+                TemporaryRegularActivationEvidenceSource
+            ) -> Void
+        )
+    ] = []
 
-    init(isHidden: Bool, appWindows: [any AppWindowOpeningWindow]) {
+    var activeActivationEvidenceObserverCount: Int {
+        activationEvidenceObservers.filter {
+            !$0.token.isCancelled
+        }.count
+    }
+
+    init(
+        isHidden: Bool,
+        isActive: Bool = false,
+        appWindows: [any AppWindowOpeningWindow]
+    ) {
         self.isHidden = isHidden
+        flowTabIsActive = isActive
         self.appWindows = appWindows
     }
 
     func activate(ignoringOtherApps flag: Bool) {
         activateCallCount += 1
         lastActivateIgnoringOtherApps = flag
+        guard !flowTabIsActive else { return }
+        flowTabIsActive = true
+        emitActivationEvidence(.applicationDidBecomeActive)
     }
 
     func unhide(_ sender: Any?) {
         unhideCallCount += 1
+        let wasHidden = isHidden
         isHidden = false
+        if wasHidden {
+            emitActivationEvidence(.applicationDidUnhide)
+        }
     }
 
     func sendShowSettingsWindowAction() -> Bool {
         showSettingsWindowActionCount += 1
         return true
+    }
+
+    func observeFlowTabActivationEvidence(
+        _ action: @escaping @MainActor @Sendable (
+            TemporaryRegularActivationEvidenceSource
+        ) -> Void
+    ) -> any TemporaryRegularActivationCancellable {
+        let token = TestTemporaryRegularActivationToken()
+        activationEvidenceObservers.append((token, action))
+        return token
+    }
+
+    @MainActor
+    func emitActivationEvidence(
+        _ source: TemporaryRegularActivationEvidenceSource
+    ) {
+        for observer in activationEvidenceObservers
+        where !observer.token.isCancelled {
+            observer.action(source)
+        }
     }
 }
 

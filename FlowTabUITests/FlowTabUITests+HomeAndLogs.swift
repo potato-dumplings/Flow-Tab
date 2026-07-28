@@ -50,7 +50,8 @@ extension FlowTabUITests {
                 "--flowtab-ui-screen-trusted",
                 "YES",
                 "--flowtab-ui-runtime-log-level",
-                "INFO"
+                "INFO",
+                "--flowtab-ui-enable-verbose-logs"
             ]
         )
         launchFlowTabUITestApplication(app)
