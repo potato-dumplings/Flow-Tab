@@ -77,6 +77,8 @@
 		E6D100063D14000100B0D737 /* RuntimeFocusRecoveryPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6D100053D14000100B0D737 /* RuntimeFocusRecoveryPolicy.swift */; };
 		E6D1000E3D14000100B0D737 /* RuntimeFocusRecoveryDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6D1000D3D14000100B0D737 /* RuntimeFocusRecoveryDiagnostics.swift */; };
 		E7D100043D15000100B0D737 /* RuntimeLogChangeObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7D100033D15000100B0D737 /* RuntimeLogChangeObservation.swift */; };
+		E8D100023D16000100B0D737 /* FlowTabTests+RuntimeDiagnosticSessionDeadline.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8D100013D16000100B0D737 /* FlowTabTests+RuntimeDiagnosticSessionDeadline.swift */; };
+		E8D100043D16000100B0D737 /* RuntimeDiagnosticSessionDeadlineCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8D100033D16000100B0D737 /* RuntimeDiagnosticSessionDeadlineCoordinator.swift */; };
 		D10000012FF500100B0D737 /* RuntimeProjectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000022FF500100B0D737 /* RuntimeProjectionService.swift */; };
 		D10000032FF500200B0D737 /* RuntimeProjectionServing.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000042FF500200B0D737 /* RuntimeProjectionServing.swift */; };
 		B26010012FE000100B0D737 /* RuntimePerformanceClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26000012FE000100B0D737 /* RuntimePerformanceClock.swift */; };
@@ -347,6 +349,8 @@
 		E6D100053D14000100B0D737 /* RuntimeFocusRecoveryPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeFocusRecoveryPolicy.swift; sourceTree = "<group>"; };
 		E6D1000D3D14000100B0D737 /* RuntimeFocusRecoveryDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeFocusRecoveryDiagnostics.swift; sourceTree = "<group>"; };
 		E7D100033D15000100B0D737 /* RuntimeLogChangeObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeLogChangeObservation.swift; sourceTree = "<group>"; };
+		E8D100013D16000100B0D737 /* FlowTabTests+RuntimeDiagnosticSessionDeadline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+RuntimeDiagnosticSessionDeadline.swift"; sourceTree = "<group>"; };
+		E8D100033D16000100B0D737 /* RuntimeDiagnosticSessionDeadlineCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeDiagnosticSessionDeadlineCoordinator.swift; sourceTree = "<group>"; };
 		F6E7E20135C4000100B0D737 /* RuntimeSearchIndexReadModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeSearchIndexReadModel.swift; sourceTree = "<group>"; };
 		F6E7E30135C4000200B0D737 /* RuntimeProjectionReadModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionReadModels.swift; sourceTree = "<group>"; };
 		D10000022FF500100B0D737 /* RuntimeProjectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionService.swift; sourceTree = "<group>"; };
@@ -680,6 +684,7 @@
 				E6D100093D14000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeFocusRecoverySupport.swift */,
 				E6D1000B3D14000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeFocusRecoveryIntegration.swift */,
 				E7D100013D15000100B0D737 /* FlowTabTests+RuntimeLogObservation.swift */,
+				E8D100013D16000100B0D737 /* FlowTabTests+RuntimeDiagnosticSessionDeadline.swift */,
 				F50000092F90000100B0D737 /* FlowTabTests+SpaceFixtureLaunchConfiguration.swift */,
 				F500000A2F90000100B0D737 /* FlowTabTests+SpaceFixtureWindowCoordinator.swift */,
 			);
@@ -920,6 +925,7 @@
 			isa = PBXGroup;
 			children = (
 				C100001E2F75000100B0D737 /* AppLogsView.swift */,
+				E8D100033D16000100B0D737 /* RuntimeDiagnosticSessionDeadlineCoordinator.swift */,
 				E1F100122B00000100B0D737 /* RuntimeLogsSection.swift */,
 			);
 			path = Logs;
@@ -1232,6 +1238,7 @@
 				E1F100012B00000100B0D737 /* RuntimeLogging.swift in Sources */,
 				E1F100042B00000100B0D737 /* RuntimeLogPrivacy.swift in Sources */,
 				E1F100052B00000100B0D737 /* RuntimeLogStoragePrivacy.swift in Sources */,
+				E8D100043D16000100B0D737 /* RuntimeDiagnosticSessionDeadlineCoordinator.swift in Sources */,
 				E1F100022B00000100B0D737 /* RuntimeLogsSection.swift in Sources */,
 				E1F100032B00000100B0D737 /* AppDelegate+Testing.swift in Sources */,
 				A1B2C3D42F73000100B0D737 /* OptionTabHotkeyMonitor.swift in Sources */,
@@ -1400,6 +1407,7 @@
 				E6D1000A3D14000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeFocusRecoverySupport.swift in Sources */,
 				E6D1000C3D14000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeFocusRecoveryIntegration.swift in Sources */,
 				E7D100023D15000100B0D737 /* FlowTabTests+RuntimeLogObservation.swift in Sources */,
+				E8D100023D16000100B0D737 /* FlowTabTests+RuntimeDiagnosticSessionDeadline.swift in Sources */,
 				F50001082F90000100B0D737 /* SpaceFixtureLaunchConfiguration.swift in Sources */,
 				F50001122F90000100B0D737 /* SpaceFixtureWorkflowConfiguration.swift in Sources */,
 				F50001092F90000100B0D737 /* SpaceFixtureWindowPlan.swift in Sources */,

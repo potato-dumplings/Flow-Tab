@@ -488,12 +488,6 @@ extension FlowTabUITests {
         XCTAssertTrue(element(in: app, identifier: Identifier.logsPrivacyNotice).waitForExistence(timeout: 5))
         let diagnosticSessionToggle = toggleElement(in: app, identifier: Identifier.logsDiagnosticSession)
         XCTAssertTrue(diagnosticSessionToggle.waitForExistence(timeout: 5))
-        setToggle(diagnosticSessionToggle, to: true)
-        XCTAssertTrue(
-            element(in: app, identifier: Identifier.logsDiagnosticSessionStatus)
-                .waitForExistence(timeout: 5)
-        )
-        setToggle(diagnosticSessionToggle, to: false)
 
         let logsLines = app.descendants(matching: .any)
             .matching(identifier: Identifier.logsLines)
@@ -551,6 +545,20 @@ extension FlowTabUITests {
                 .matching(identifier: Identifier.logsSeededErrorLine)
                 .firstMatch
                 .waitForExistence(timeout: 5)
+        )
+
+        setToggle(diagnosticSessionToggle, to: true)
+        let diagnosticSessionStatus = element(
+            in: app,
+            identifier: Identifier.logsDiagnosticSessionStatus
+        )
+        XCTAssertTrue(diagnosticSessionStatus.waitForExistence(timeout: 5))
+        setToggle(diagnosticSessionToggle, to: false)
+        XCTAssertTrue(
+            waitForNonExistence(
+                diagnosticSessionStatus,
+                timeout: 5
+            )
         )
 
         XCTAssertTrue(

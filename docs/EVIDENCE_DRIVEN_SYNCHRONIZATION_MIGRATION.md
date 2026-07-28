@@ -89,7 +89,7 @@ and Process/Tooling.
 | SYNC-007 | `FlowTab/Infrastructure/Runtime/RuntimeWindowPreviewProvider.swift`; ScreenCaptureKit callback bridges | One-second semaphore timeouts terminate callback waits; success already comes only from callback content. Watchdog. | Retain as a named bridge-watchdog policy. The synchronous bridge state owns late-callback rejection; tests must cover callback, error, timeout, and callback-after-timeout evidence. | M; Unit, Behavior, preview Pressure. | closed-retained |
 | SYNC-008 | `FlowTab/Infrastructure/Runtime/RuntimeLogging.swift`; `scheduleFlushLocked` | A 50ms delay batches disk writes and does not establish write success. Domain duration. | Retain the named batching policy and cancellable `DispatchWorkItem`; explicit snapshot/read APIs flush synchronously before returning evidence. The diagnostics store owns the work item. | M; Unit, Behavior, log-write Pressure if changed. | closed-retained |
 | SYNC-009 | `FlowTab/Features/Logs/RuntimeLogsSection.swift`; `RuntimeLogLinesViewModel` | The Logs surface polls once per second to discover appended or cleared lines. Evidence migration. | Publish append/flush/clear generations from the diagnostics owner, subscribe before the initial snapshot, and reload from the later generation. View-model start/stop owns the subscription and task. | M; Unit, Behavior, Logs UI, tab-switch Pressure. | completed |
-| SYNC-010 | `RuntimeLogPrivacy.swift`, `RuntimeLogsSection`; diagnostic session expiration | The 15-minute session is an explicit expiration contract; the view advances a one-second loop to notice expiry. Domain duration. | Retain the expiration deadline, use the existing injected `now` readback for rules, and schedule one cancellable deadline wakeup through an injectable clock. Expiration succeeds only when clock readback reaches the stored deadline. | M; Unit, Behavior, Logs UI. | verification-needed |
+| SYNC-010 | `RuntimeLogPrivacy.swift`, `RuntimeLogsSection`; diagnostic session expiration | The 15-minute session is an explicit expiration contract; the view advances a one-second loop to notice expiry. Domain duration. | Retain the expiration deadline, use the existing injected `now` readback for rules, and schedule one cancellable deadline wakeup through an injectable clock. Expiration succeeds only when clock readback reaches the stored deadline. | M; Unit, Behavior, Logs UI. | completed |
 | SYNC-011 | `FlowTab/Features/Home/HomeLandingView.swift`; permission watcher | A perpetual one-second poll discovers TCC permission changes even though app activation is already observed. Evidence migration. | Subscribe before initial permission readback and refresh on app-activation/lifecycle evidence. If a platform permission transition has no notification, share the controlled permission observer from SYNC-012. View appearance owns start/stop. | M; Unit, Behavior, Home permission UI. | planned |
 | SYNC-012 | `FlowTab/Features/Settings/AppSettingsView.swift`; permission prompt polling | Forty 500ms attempts infer post-prompt TCC convergence; the first condition check occurs after a sleep and cancellation is swallowed. Conditional observation plus watchdog. | Check permission immediately, observe app activation where applicable, and use a named cancellable fallback cadence only for TCC transitions without callbacks. The terminal watchdog reports target, attempts, elapsed time, bundle identity, and final readback. Settings visibility owns each target task. | H; Unit, Behavior, permission UI. | planned |
 | SYNC-013 | `FlowTab/Features/Home/HomeLandingView.swift`, `HomeRuntimeProjectionService.swift`; initial and scoped Home refresh | Fixed 900ms startup and 120/220ms post-signal delays assume runtime projection commits have arrived. Evidence migration. | Subscribe before requesting maintenance, capture source generation, perform initial readback, and apply only a matching later app-switcher/current-app projection generation or completeness transition. Home visibility and per-app request generations own cancellation. | H; Unit, Behavior, Home UI, runtime-topology Pressure. | planned |
@@ -516,5 +516,62 @@ polling cadence, deadline, or timeout in the scoped paths.
   passed. Owner-scope search found no Logs-content polling interval or refresh
   sleep; the remaining diagnostic-session expiration wakeup belongs to
   SYNC-010.
-- Commit: `refactor(sync): migrate SYNC-009 runtime log observation`; its exact
-  SHA is appended by the next ledger update after the commit exists.
+- Commit: `d9bf79a`
+  (`refactor(sync): migrate SYNC-009 runtime log observation`).
+
+### SYNC-010 Closure Record
+
+- Design and Oracle: `RuntimeDiagnosticSessionDeadlineCoordinator` replaces
+  the one-second view loop with one scheduled next-state deadline. It reads an
+  injected wall clock immediately when started and after every wake. A wake
+  before the persisted expiration schedules the next exact display transition;
+  only a clock value at or beyond the persisted expiration invokes session
+  cleanup. Delayed scheduling can postpone the UI update, while the stored
+  deadline and current clock readback continue to define diagnostic eligibility.
+- Lifecycle: `RuntimeLogsSection` owns the coordinator as view state. The
+  coordinator owns one cancellable token and one observation generation.
+  Session restart, persisted-deadline replacement, user stop, view
+  disappearance, deinitialization, and expiration cancel or invalidate the
+  token. A stale or cancelled callback cannot clear a newer session.
+- Retained time policy: `RuntimeDiagnosticSessionStore.duration` remains the
+  15-minute product expiration contract. The named deadline policy retains a
+  60-second displayed-minute unit solely to update the existing “about N
+  minutes” text at exact value transitions. Neither duration establishes
+  success. The injected clock supplies the expiration readback; the injected
+  scheduler controls only when that readback occurs.
+- Unit and Behavior: the focused deadline/store set passed 7/7 under
+  `.build-local/evidence-driven-sync/SYNC-010/flowtabtests-targeted-attempt-002`,
+  covering exact countdown transitions, an initially expired state, an early
+  wake, a delayed wake, persistence cleanup, cancellation, supersession, and
+  stale-callback rejection. Two hosted Logs-view integration tests passed 2/2
+  under
+  `.build-local/evidence-driven-sync/SYNC-010/flowtabtests-view-attempt-003`.
+  The final complete `FlowTabTests` suite passed 258/258 under
+  `.build-local/evidence-driven-sync/SYNC-010/flowtabtests-full-attempt-006`;
+  the complete `FlowTabPriorityCoverageTests` suite passed 553/553 under
+  `.build-local/evidence-driven-sync/SYNC-010/flowtabtests-priority-attempt-007`.
+- FlowTabCore: not relevant because this product-duration contract belongs to
+  app preferences and the SwiftUI Logs-page lifecycle.
+- UI: the real Logs-page workflow passed 1/1 in 35.886 seconds under
+  `.build-local/evidence-driven-sync/SYNC-010/ui-diagnostic-session-attempt-002`.
+  It independently verifies seeded persisted content and filtering before
+  enabling diagnostics, then requires the active-session status to appear,
+  requires it to disappear after user cancellation, clears the logs, and
+  verifies the cleared state survives relaunch.
+- Pressure: 2,000 rapid deadline replacements retained exactly one available
+  token; stopping and invoking every stale callback in reverse order produced
+  no expiration under
+  `.build-local/evidence-driven-sync/SYNC-010/flowtabtests-pressure-attempt-004`.
+  The canonical 20-second Logs-page lifecycle workload at a 20ms switch cadence
+  also passed under
+  `.build-local/evidence-driven-sync/SYNC-010/tab-switch-pressure-attempt-005`.
+  Its 42 samples recorded CPU average/p95/max 55.83/62.80/68.30 percent and RSS
+  average/p95/max 98.08/117.02/117.17 MiB. The final 20-sample RSS slope was
+  -1.014 MiB/sample, matching the same-machine SYNC-009 baseline range without
+  warm-state growth.
+- Process/Tooling: `git diff --check` and project-file `plutil -lint` passed.
+  Owner-scope search found no one-second expiration loop. The only sleep in the
+  contract is inside the injected, cancellable deadline scheduler; its result
+  is always revalidated by the clock.
+- Commit: `refactor(sync): migrate SYNC-010 diagnostic session deadline`; its
+  exact SHA is appended by the next ledger update after the commit exists.

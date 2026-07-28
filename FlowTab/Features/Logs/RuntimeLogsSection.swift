@@ -143,35 +143,38 @@ struct RuntimeLogsSection: View {
     let targetAppearance: NSAppearance
 
     @StateObject private var logsViewModel = RuntimeLogLinesViewModel()
-    @State private var diagnosticSessionNow = Date()
+    @StateObject private var diagnosticSessionDeadlineCoordinator =
+        RuntimeDiagnosticSessionDeadlineCoordinator()
 
     private var isDiagnosticSessionActive: Bool {
-        diagnosticSessionExpiration > diagnosticSessionNow.timeIntervalSince1970
+        diagnosticSessionExpiration
+            > diagnosticSessionDeadlineCoordinator.observedNow
+                .timeIntervalSince1970
     }
 
     private var diagnosticSessionToggle: Binding<Bool> {
         Binding(
             get: { isDiagnosticSessionActive },
             set: { shouldEnable in
-                diagnosticSessionNow = Date()
+                let now =
+                    diagnosticSessionDeadlineCoordinator.readNow()
                 if shouldEnable {
-                    diagnosticSessionExpiration = RuntimeDiagnosticSessionStore.start(
-                        now: diagnosticSessionNow
-                    ).timeIntervalSince1970
+                    diagnosticSessionExpiration =
+                        RuntimeDiagnosticSessionStore.start(
+                            now: now
+                        ).timeIntervalSince1970
+                    observeDiagnosticSessionDeadline()
                 } else {
-                    RuntimeDiagnosticSessionStore.stop()
-                    diagnosticSessionExpiration = 0
+                    stopDiagnosticSession()
                 }
             }
         )
     }
 
     private var diagnosticSessionRemainingMinutes: Int {
-        let remaining = max(
-            0,
-            diagnosticSessionExpiration - diagnosticSessionNow.timeIntervalSince1970
+        diagnosticSessionDeadlineCoordinator.displayedMinuteCount(
+            expirationTimestamp: diagnosticSessionExpiration
         )
-        return max(1, Int(ceil(remaining / 60)))
     }
 
     private var selectedLogLevel: RuntimeLogLevel {
@@ -183,6 +186,26 @@ struct RuntimeLogsSection: View {
         if resolved.rawValue != runtimeLogLevelRaw {
             runtimeLogLevelRaw = resolved.rawValue
         }
+    }
+
+    private func observeDiagnosticSessionDeadline() {
+        guard diagnosticSessionExpiration > 0 else {
+            diagnosticSessionDeadlineCoordinator.stop()
+            return
+        }
+        let expirationBinding = $diagnosticSessionExpiration
+        diagnosticSessionDeadlineCoordinator.start(
+            expirationTimestamp: diagnosticSessionExpiration
+        ) { [expirationBinding] in
+            RuntimeDiagnosticSessionStore.stop()
+            expirationBinding.wrappedValue = 0
+        }
+    }
+
+    private func stopDiagnosticSession() {
+        diagnosticSessionDeadlineCoordinator.stop()
+        RuntimeDiagnosticSessionStore.stop()
+        diagnosticSessionExpiration = 0
     }
 
     private func openLogsDirectory() {
@@ -347,12 +370,19 @@ struct RuntimeLogsSection: View {
             }
         }
         .onAppear {
-            diagnosticSessionNow = Date()
-            if !RuntimeDiagnosticSessionStore.isActive(now: diagnosticSessionNow) {
+            let now =
+                diagnosticSessionDeadlineCoordinator.readNow()
+            if !RuntimeDiagnosticSessionStore.isActive(now: now) {
                 diagnosticSessionExpiration = 0
+                diagnosticSessionDeadlineCoordinator.stop()
+            } else {
+                observeDiagnosticSessionDeadline()
             }
             synchronizeLogLevelIfNeeded()
             logsViewModel.start(minimumLevel: selectedLogLevel)
+        }
+        .onChange(of: diagnosticSessionExpiration) { _ in
+            observeDiagnosticSessionDeadline()
         }
         .onChange(of: runtimeLogLevelRaw) { newValue in
             let resolved = RuntimeLogPreferencesStore.resolve(rawValue: newValue)
@@ -364,18 +394,7 @@ struct RuntimeLogsSection: View {
         }
         .onDisappear {
             logsViewModel.stop()
-        }
-        .task(id: diagnosticSessionExpiration) {
-            guard diagnosticSessionExpiration > 0 else { return }
-            while !Task.isCancelled {
-                diagnosticSessionNow = Date()
-                if !isDiagnosticSessionActive {
-                    RuntimeDiagnosticSessionStore.stop()
-                    diagnosticSessionExpiration = 0
-                    return
-                }
-                try? await Task.sleep(nanoseconds: 1_000_000_000)
-            }
+            diagnosticSessionDeadlineCoordinator.stop()
         }
     }
 }
