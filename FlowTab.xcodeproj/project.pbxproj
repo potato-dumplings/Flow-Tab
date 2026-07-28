@@ -111,6 +111,7 @@
 		B100110D2F76000100B0D737 /* FlowTabPriorityCoverageTests+Support.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100010D2F76000100B0D737 /* FlowTabPriorityCoverageTests+Support.swift */; };
 		B100110E2F76000100B0D737 /* FlowTabPriorityCoverageTests+TestDoubles.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100010E2F76000100B0D737 /* FlowTabPriorityCoverageTests+TestDoubles.swift */; };
 		B100110F2F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeActivationRecovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100010F2F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeActivationRecovery.swift */; };
+		E5D100023D13000100B0D737 /* FlowTabPriorityCoverageTests+ChromeFocusEvidence.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5D100013D13000100B0D737 /* FlowTabPriorityCoverageTests+ChromeFocusEvidence.swift */; };
 		B10011102F76000100B0D737 /* FlowTabTests+HotkeyCoverageGaps.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001102F76000100B0D737 /* FlowTabTests+HotkeyCoverageGaps.swift */; };
 		B10011112F76000100B0D737 /* FlowTabPriorityCoverageTests+CoverageGaps.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001112F76000100B0D737 /* FlowTabPriorityCoverageTests+CoverageGaps.swift */; };
 		B10011122F76000100B0D737 /* FlowTabPriorityCoverageTests+AsyncSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10001122F76000100B0D737 /* FlowTabPriorityCoverageTests+AsyncSupport.swift */; };
@@ -373,6 +374,7 @@
 		B100010D2F76000100B0D737 /* FlowTabPriorityCoverageTests+Support.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+Support.swift"; sourceTree = "<group>"; };
 		B100010E2F76000100B0D737 /* FlowTabPriorityCoverageTests+TestDoubles.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+TestDoubles.swift"; sourceTree = "<group>"; };
 		B100010F2F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeActivationRecovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+RuntimeActivationRecovery.swift"; sourceTree = "<group>"; };
+		E5D100013D13000100B0D737 /* FlowTabPriorityCoverageTests+ChromeFocusEvidence.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+ChromeFocusEvidence.swift"; sourceTree = "<group>"; };
 		B10001102F76000100B0D737 /* FlowTabTests+HotkeyCoverageGaps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+HotkeyCoverageGaps.swift"; sourceTree = "<group>"; };
 		B10001112F76000100B0D737 /* FlowTabPriorityCoverageTests+CoverageGaps.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+CoverageGaps.swift"; sourceTree = "<group>"; };
 		B10001122F76000100B0D737 /* FlowTabPriorityCoverageTests+AsyncSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabPriorityCoverageTests+AsyncSupport.swift"; sourceTree = "<group>"; };
@@ -655,6 +657,7 @@
 				B100010D2F76000100B0D737 /* FlowTabPriorityCoverageTests+Support.swift */,
 				B100010E2F76000100B0D737 /* FlowTabPriorityCoverageTests+TestDoubles.swift */,
 				B100010F2F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeActivationRecovery.swift */,
+				E5D100013D13000100B0D737 /* FlowTabPriorityCoverageTests+ChromeFocusEvidence.swift */,
 				F50000092F90000100B0D737 /* FlowTabTests+SpaceFixtureLaunchConfiguration.swift */,
 				F500000A2F90000100B0D737 /* FlowTabTests+SpaceFixtureWindowCoordinator.swift */,
 			);
@@ -1360,6 +1363,7 @@
 				B100110D2F76000100B0D737 /* FlowTabPriorityCoverageTests+Support.swift in Sources */,
 				B100110E2F76000100B0D737 /* FlowTabPriorityCoverageTests+TestDoubles.swift in Sources */,
 				B100110F2F76000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeActivationRecovery.swift in Sources */,
+				E5D100023D13000100B0D737 /* FlowTabPriorityCoverageTests+ChromeFocusEvidence.swift in Sources */,
 				F50001082F90000100B0D737 /* SpaceFixtureLaunchConfiguration.swift in Sources */,
 				F50001122F90000100B0D737 /* SpaceFixtureWorkflowConfiguration.swift in Sources */,
 				F50001092F90000100B0D737 /* SpaceFixtureWindowPlan.swift in Sources */,

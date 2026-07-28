@@ -84,7 +84,7 @@ and Process/Tooling.
 | SYNC-002 | `AppDelegate.installWorkspaceLifecycleObserver`, `RuntimeAppLaunchWindowEvidenceCoordinator`, `RuntimeProjectionService.signalAppLaunched`; app-launch convergence | A fixed 800ms delay was assumed to be enough for a launched app's windows to exist. Evidence migration. | Establish the exact app/PID AX observer before launch handling, use the launch repair as initial readback, and reconcile later AX transitions or a successful delayed observer installation. The AppDelegate-owned coordinator manages per-PID generation, exact appID/PID cancellation, monitor cleanup, and the named observer-install condition cadence. | H; Unit, Behavior, launch/topology UI, runtime-topology Pressure. | blocked: implementation and Unit/Behavior/Process passed; UI/Pressure environment evidence is recorded below |
 | SYNC-003 | `RuntimeReconciliationCoordinator`, `RuntimeProjectionReconciliationDrainer`, `RuntimeProjectionService`, `RuntimeTransientRepairObservationDriver`; transient-empty repair observation | Delayed `notBefore` values `[0.1, 0.3, 0.8]` waited for AX data to become non-empty, while unrelated maintenance could advance the retry. Conditional observation. | Perform the repair readback immediately, resume from an exact AX/Space/lifecycle signal, and use a service-owned cancellable condition observer only while the payload remains incomplete. Request ID, attempt, and exact appID/PID reject stale evidence. The named `[0.1, 0.3, 0.8]` cadence repeats its last value; a 30-second watchdog terminates one uninterrupted incomplete-evidence session and reports the unmet condition plus last payload. | H; Unit, Behavior, topology UI, runtime-topology Pressure. | blocked: implementation and Unit/Behavior/Process passed; UI/Pressure environment evidence is recorded below |
 | SYNC-004 | `FlowTab/Infrastructure/Runtime/RuntimeAXWindowChangeMonitor.swift`; observer install and `handleAXNotification` | Events during a 750ms warm-up are discarded and events inside a 160ms throttle window can lose the final state. Evidence migration. | Install observers, take an initial AX/window readback, and publish monotonically coalesced generations with a guaranteed trailing readback. The monitor owns observer removal; its delivery coordinator owns pending coalescing cancellation. | H; Unit, Behavior, Home/topology UI, runtime-topology Pressure. | completed |
-| SYNC-005 | `FlowTab/Infrastructure/Runtime/RuntimeChromeWindowFocusBridge.swift`; `focusWindowScript` | Two fixed 50ms AppleScript delays are assumed to propagate Chrome window ordering before front-window readback. Conditional observation. | Read the exact Chrome window ID immediately after the focus request and poll only that readback when needed. Use a named script cadence and terminal watchdog; return the last front-window ID/error. The script invocation owns the wait. | H; Unit, Behavior, exact-window UI, runtime-topology Pressure. | planned |
+| SYNC-005 | `FlowTab/Infrastructure/Runtime/RuntimeChromeWindowFocusBridge.swift`; `focusWindowScript` | Two fixed 50ms AppleScript delays are assumed to propagate Chrome window ordering before front-window readback. Conditional observation. | Issue the Chrome focus commands once and immediately return the exact front-window ID readback. Exact equality is the bridge acceptance Oracle; mismatch, empty/invalid output, and execution error remain explicit evidence for `RuntimeActivator`. SYNC-006 owns later activation convergence under one cancellable activation generation. | H; Unit, Behavior, exact-window UI, runtime-topology Pressure. | completed |
 | SYNC-006 | `FlowTab/Infrastructure/Runtime/RuntimeActivator.swift`; `scheduleFocusRecovery` | Fixed 50ms/150ms retries probe whether the exact target became focused. Conditional observation. | Preserve exact AX/CG target readback as the sole success Oracle. Check immediately, consume usable focus/window notifications, and retain a named cancellable polling fallback plus diagnostic watchdog where macOS exposes no target-specific completion event. `RuntimeActivator` owns the task and activation generation. | H; Unit, Behavior, activation UI, runtime-topology Pressure. | planned |
 | SYNC-007 | `FlowTab/Infrastructure/Runtime/RuntimeWindowPreviewProvider.swift`; ScreenCaptureKit callback bridges | One-second semaphore timeouts terminate callback waits; success already comes only from callback content. Watchdog. | Retain as a named bridge-watchdog policy. The synchronous bridge state owns late-callback rejection; tests must cover callback, error, timeout, and callback-after-timeout evidence. | M; Unit, Behavior, preview Pressure. | closed-retained |
 | SYNC-008 | `FlowTab/Infrastructure/Runtime/RuntimeLogging.swift`; `scheduleFlushLocked` | A 50ms delay batches disk writes and does not establish write success. Domain duration. | Retain the named batching policy and cancellable `DispatchWorkItem`; explicit snapshot/read APIs flush synchronously before returning evidence. The diagnostics store owns the work item. | M; Unit, Behavior, log-write Pressure if changed. | closed-retained |
@@ -360,5 +360,52 @@ polling cadence, deadline, or timeout in the scoped paths.
   Owner-scope search found no warm-up timestamp, elapsed throttle, or
   zero-cadence delivery branch; the sole scheduled duration is the named,
   injected trailing batching policy.
-- Commit: `refactor(sync): migrate SYNC-004 AX window evidence delivery`; its
-  exact SHA is appended by the next ledger update after the commit exists.
+- Commit: `8b593e8`
+  (`refactor(sync): migrate SYNC-004 AX window evidence delivery`).
+
+### SYNC-005 Closure Record
+
+- Design and Oracle: the bridge issues the two existing Chrome window-index
+  focus requests and `activate`, then immediately returns Chrome's exact
+  front-window ID. The bridge accepts only equality with the requested Chrome
+  window ID. A different ID, missing/invalid result, or AppleScript execution
+  error remains explicit evidence for `RuntimeActivator`, whose existing exact
+  AX/CG `verifyFocusAttempt` readback is the final activation Oracle. SYNC-006
+  owns any later convergence for the activation request.
+- Lifecycle: one synchronous bridge invocation owns one command/readback
+  transaction. It allocates no observer, timer, retry, asynchronous task, or
+  watchdog. `RuntimeActivator` owns the surrounding activation generation and
+  its subsequent cancellation.
+- Retained time policy: none in this bridge contract. Machine scheduling and
+  Chrome event handling can change command completion latency; acceptance
+  remains determined by the exact returned window ID.
+- Unit and Behavior: the final nine-test focused set passed 9/9, covering
+  generated AppleScript compilation and command/readback ordering, exact and
+  mismatched IDs, execution failure, empty/invalid readback, browser
+  applicability, and ambiguous/candidate identity rules in
+  `.build-local/evidence-driven-sync/SYNC-005/flowtabtests-targeted-attempt-002`.
+  The final complete `FlowTabPriorityCoverageTests` suite passed 542/542 in
+  18.292 seconds under
+  `.build-local/evidence-driven-sync/SYNC-005/flowtabtests-expanded-attempt-003`.
+- FlowTabCore: not relevant because this contract belongs to the
+  AppKit/AppleScript runtime activation boundary.
+- UI and Pressure: the canonical noisy-CG-sibling, cross-Space fullscreen
+  Option+Tab workflow passed 1/1 in 51.205 seconds under
+  `.build-local/evidence-driven-sync/SYNC-005/pressure-attempt-006`. It
+  validates the downstream exact-window activation/readback topology with the
+  isolated Chrome-shaped fixture while leaving personal Chrome state
+  untouched. The fixed-App identity contract matched across 72 checks and
+  5,047.456 milliseconds, with 23 candidate observations and zero rejected
+  transient identities. Resource sampling recorded CPU average/p95/max
+  34.46/61.20/66.60 percent and RSS average/p95/max
+  169.28/238.70/283.23 MiB. The private identity-manifest SHA-256 is
+  `4af743703ca0a86772a81f728b4ed64f33a1c8672343b77894f1f4ed4040e1fc`.
+  Attempt 005 independently reached exact AX focus verification, then its
+  existing binding-transition log assertion missed the expected diagnostic;
+  the clean retry closed the same path with the same source state.
+- Process/Tooling: `git diff --check` and project-file `plutil -lint` passed.
+  Owner-scope search found no bridge propagation duration or AppleScript
+  `delay`; `NSAppleScript(source:)` compiled the generated script in the
+  focused test.
+- Commit: `refactor(sync): migrate SYNC-005 Chrome focus readback`; its exact
+  SHA is appended by the next ledger update after the commit exists.
