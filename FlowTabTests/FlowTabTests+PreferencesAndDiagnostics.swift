@@ -428,55 +428,73 @@ extension FlowTabTests {
         XCTAssertEqual(detailLabel.preferredMaxLayoutWidth, expectedTextWidth, accuracy: 2.5)
     }
 
-    func testPermissionPollingPolicyBuildsTimeoutDescriptionFromCurrentLimits() {
-        let policy = PermissionPollingPolicy.default
+    @MainActor
+    func testSettingsPermissionRequestAppliesIndependentPostRequestReadback() throws {
+        let previousAXTrusted =
+            AccessibilityPermissionChecker.isTrustedOverrideForTesting
+        let previousAXRequest =
+            AccessibilityPermissionChecker.requestPermissionOverrideForTesting
+        let previousScreenTrusted =
+            ScreenCapturePermissionChecker.hasPermissionOverrideForTesting
+        let previousLanguageRaw = UserDefaults.standard.string(
+            forKey: AppPreferenceKeys.appLanguage
+        )
+        defer {
+            AccessibilityPermissionChecker.isTrustedOverrideForTesting =
+                previousAXTrusted
+            AccessibilityPermissionChecker.requestPermissionOverrideForTesting =
+                previousAXRequest
+            ScreenCapturePermissionChecker.hasPermissionOverrideForTesting =
+                previousScreenTrusted
+            restoreUserDefaultsValue(
+                previousLanguageRaw,
+                forKey: AppPreferenceKeys.appLanguage
+            )
+        }
 
-        XCTAssertEqual(policy.intervalNanoseconds, 500_000_000)
-        XCTAssertEqual(policy.attemptLimit, 40)
-        XCTAssertEqual(policy.timeoutSeconds, 20)
-        XCTAssertEqual(policy.timeoutDescription, "20s")
-    }
-
-    func testPermissionPollingTaskRegistryTracksMultipleTargets() {
-        var registry = PermissionPollingTaskRegistry()
-
-        registry.markStarted(.accessibility)
-        registry.markStarted(.screenCapture)
-        registry.markStarted(.accessibility)
-
-        XCTAssertTrue(registry.isActive(.accessibility))
-        XCTAssertTrue(registry.isActive(.screenCapture))
-        XCTAssertEqual(registry.activeTargets, [.accessibility, .screenCapture])
-
-        registry.markStopped(.accessibility)
-
-        XCTAssertFalse(registry.isActive(.accessibility))
-        XCTAssertTrue(registry.isActive(.screenCapture))
-
-        registry.markAllStopped()
-
-        XCTAssertTrue(registry.activeTargets.isEmpty)
-    }
-
-    func testPermissionPollingDiagnosticIncludesAttemptElapsedAndFinalState() {
-        let diagnostic = PermissionPollingDiagnostic(
-            target: .screenCapture,
-            attempt: 40,
-            attemptLimit: 40,
-            elapsedMs: 20_000,
-            finalPermissionGranted: false,
-            timeoutDescription: "20s",
-            bundleIdentifier: "io.github.flowtab.tests",
-            bundlePath: "/Applications/FlowTab.app",
-            action: .timeout
+        var isGranted = false
+        var requestCount = 0
+        AccessibilityPermissionChecker.isTrustedOverrideForTesting = {
+            isGranted
+        }
+        AccessibilityPermissionChecker.requestPermissionOverrideForTesting = {
+            requestCount += 1
+            isGranted = true
+            return false
+        }
+        ScreenCapturePermissionChecker.hasPermissionOverrideForTesting = {
+            true
+        }
+        UserDefaults.standard.set(
+            AppLanguage.simplifiedChinese.rawValue,
+            forKey: AppPreferenceKeys.appLanguage
         )
 
-        XCTAssertTrue(diagnostic.logMessage.contains("target=screenCapture"))
-        XCTAssertTrue(diagnostic.logMessage.contains("action=timeout"))
-        XCTAssertTrue(diagnostic.logMessage.contains("attempt=40/40"))
-        XCTAssertTrue(diagnostic.logMessage.contains("elapsedMs=20000.000"))
-        XCTAssertTrue(diagnostic.logMessage.contains("finalPermissionGranted=false"))
-        XCTAssertTrue(diagnostic.logMessage.contains("timeout=20s"))
+        let hostedView = NSHostingView(
+            rootView: AppSettingsView(isActive: true)
+                .frame(width: 1_200, height: 760)
+        )
+        hostedView.frame = NSRect(x: 0, y: 0, width: 1_200, height: 760)
+        hostedView.layoutSubtreeIfNeeded()
+        let actionButton: NSButton = try XCTUnwrap(
+            descendant(
+                in: hostedView,
+                identifier: "flowtab.settings.permission.accessibility-action"
+            )
+        )
+
+        actionButton.performClick(nil)
+
+        XCTAssertEqual(requestCount, 1)
+        XCTAssertTrue(
+            waitForRunLoopCondition(timeout: 1) {
+                hostedView.layoutSubtreeIfNeeded()
+                return actionButton.title == AppStrings.text(
+                    .permissionAccessibilityManage,
+                    language: .simplifiedChinese
+                )
+            }
+        )
     }
 
     @MainActor

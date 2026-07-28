@@ -2,79 +2,6 @@ import SwiftUI
 import AppKit
 import FlowTabCore
 
-enum PermissionPollingTarget: String, CaseIterable, Equatable {
-    case accessibility
-    case screenCapture
-}
-
-struct PermissionPollingTaskRegistry: Equatable {
-    private(set) var activeTargets: Set<PermissionPollingTarget> = []
-
-    mutating func markStarted(_ target: PermissionPollingTarget) {
-        activeTargets.insert(target)
-    }
-
-    mutating func markStopped(_ target: PermissionPollingTarget) {
-        activeTargets.remove(target)
-    }
-
-    mutating func markAllStopped() {
-        activeTargets.removeAll()
-    }
-
-    func isActive(_ target: PermissionPollingTarget) -> Bool {
-        activeTargets.contains(target)
-    }
-}
-
-struct PermissionPollingPolicy: Equatable {
-    var intervalNanoseconds: UInt64
-    var attemptLimit: Int
-
-    static let `default` = PermissionPollingPolicy(
-        intervalNanoseconds: 500_000_000,
-        attemptLimit: 40
-    )
-
-    var timeoutSeconds: Double {
-        Double(intervalNanoseconds * UInt64(attemptLimit)) / 1_000_000_000
-    }
-
-    var timeoutDescription: String {
-        "\(Int(timeoutSeconds))s"
-    }
-}
-
-struct PermissionPollingDiagnostic: Equatable {
-    enum Action: String, Equatable {
-        case timeout
-    }
-
-    let target: PermissionPollingTarget
-    let attempt: Int
-    let attemptLimit: Int
-    let elapsedMs: Double
-    let finalPermissionGranted: Bool
-    let timeoutDescription: String
-    let bundleIdentifier: String
-    let bundlePath: String
-    let action: Action
-
-    var logMessage: String {
-        [
-            "permission poll",
-            "target=\(target.rawValue)",
-            "action=\(action.rawValue)",
-            "attempt=\(attempt)/\(attemptLimit)",
-            "elapsedMs=\(String(format: "%.3f", elapsedMs))",
-            "finalPermissionGranted=\(finalPermissionGranted)",
-            "timeout=\(timeoutDescription)",
-            "bundle=\(bundleIdentifier)",
-            "path=\(bundlePath)"
-        ].joined(separator: " ")
-    }
-}
-
 struct AppSettingsView: View {
     let isActive: Bool
 
@@ -113,9 +40,8 @@ struct AppSettingsView: View {
     @State private var accessibilityTrusted = AccessibilityPermissionChecker.isTrusted()
     @State private var screenCaptureTrusted = ScreenCapturePermissionChecker.hasScreenCapturePermission
     @State private var hasAttemptedScreenCapturePermissionRequest = false
-    @State private var permissionPollTasksByTarget: [PermissionPollingTarget: Task<Void, Never>] = [:]
-    @State private var permissionPollingGenerationsByTarget: [PermissionPollingTarget: UInt64] = [:]
-    @State private var permissionPollingTaskRegistry = PermissionPollingTaskRegistry()
+    @StateObject private var permissionObservationCoordinator =
+        RuntimePermissionObservationCoordinator()
     @State private var windowLayerAutoEnterDelayText = ""
     @State private var didInitialize = false
     @State private var isWindowLayerAutoEnterDelayEditing = false
@@ -125,23 +51,8 @@ struct AppSettingsView: View {
     @State private var showsAppVisibilityManager = false
 
     private let appVisibilityNavigationAnimation = Animation.easeInOut(duration: 0.18)
-    private let permissionPollingPolicy: PermissionPollingPolicy = .default
-
-    private var permissionPollIntervalNanoseconds: UInt64 {
-        permissionPollingPolicy.intervalNanoseconds
-    }
-
-    private var permissionPollAttemptLimit: Int {
-        permissionPollingPolicy.attemptLimit
-    }
-
-    private var permissionPollTimeoutSeconds: Double {
-        permissionPollingPolicy.timeoutSeconds
-    }
-
-    private var permissionPollTimeoutDescription: String {
-        permissionPollingPolicy.timeoutDescription
-    }
+    private let permissionObservationPolicy:
+        RuntimePermissionObservationPolicy = .standard
 
     private var bundleIdentifier: String {
         Bundle.main.bundleIdentifier ?? "unknown"
@@ -343,7 +254,7 @@ struct AppSettingsView: View {
             refreshHiddenAppCount()
         }
         .onDisappear {
-            cancelPermissionPolling()
+            cancelPermissionObservation()
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("flowtab.tab.settings.content")
@@ -352,7 +263,7 @@ struct AppSettingsView: View {
     @MainActor
     private func handleVisibilityChanged(_ active: Bool) {
         guard active else {
-            cancelPermissionPolling()
+            cancelPermissionObservation()
             return
         }
         if !didInitialize {
@@ -367,51 +278,54 @@ struct AppSettingsView: View {
         refreshScreenCaptureStatus()
     }
 
-    private func cancelPermissionPolling() {
-        permissionPollTasksByTarget.values.forEach { $0.cancel() }
-        permissionPollTasksByTarget.removeAll()
-        for target in PermissionPollingTarget.allCases {
-            advancePermissionPollingGeneration(for: target)
-        }
-        permissionPollingTaskRegistry.markAllStopped()
-    }
-
-    private func cancelPermissionPolling(target: PermissionPollingTarget) {
-        permissionPollTasksByTarget[target]?.cancel()
-        permissionPollTasksByTarget[target] = nil
-        advancePermissionPollingGeneration(for: target)
-        permissionPollingTaskRegistry.markStopped(target)
+    private func cancelPermissionObservation() {
+        permissionObservationCoordinator.cancelAll()
     }
 
     private func requestAccessibilityPermission() {
-        cancelPermissionPolling(target: .accessibility)
-        let trusted = AccessibilityPermissionChecker.requestPermission()
+        let initialEvidence = startPermissionObservation(
+            target: .accessibility
+        )
+        guard !initialEvidence.isGranted else { return }
+
+        let requestReturnedGranted =
+            AccessibilityPermissionChecker.requestPermission()
         RuntimeLog.info(
             .permission,
-            "prompt requested immediateTrusted=\(trusted) bundle=\(bundleIdentifier) path=\(bundlePath)"
+            "prompt requested returnedGranted=\(requestReturnedGranted) bundle=\(bundleIdentifier) path=\(bundlePath)"
         )
-        refreshAccessibilityStatus()
-        if !trusted {
-            startPermissionPolling(target: .accessibility)
-        }
+        permissionObservationCoordinator.readback(
+            target: .accessibility,
+            source: .requestReadback
+        )
     }
 
     private func requestScreenCapturePermission() {
-        cancelPermissionPolling(target: .screenCapture)
-        let trusted = ScreenCapturePermissionChecker.requestScreenCapturePermission()
+        let initialEvidence = startPermissionObservation(
+            target: .screenCapture
+        )
+        guard !initialEvidence.isGranted else {
+            hasAttemptedScreenCapturePermissionRequest = false
+            return
+        }
+
+        let requestReturnedGranted =
+            ScreenCapturePermissionChecker.requestScreenCapturePermission()
         RuntimeLog.info(
             .permission,
-            "screenCapture prompt requested immediateTrusted=\(trusted) bundle=\(bundleIdentifier) path=\(bundlePath)"
+            "screenCapture prompt requested returnedGranted=\(requestReturnedGranted) bundle=\(bundleIdentifier) path=\(bundlePath)"
         )
-        refreshScreenCaptureStatus()
-        if !trusted {
+        let requestEvidence = permissionObservationCoordinator.readback(
+            target: .screenCapture,
+            source: .requestReadback
+        )
+        if requestEvidence?.isGranted == false {
             // Screen capture prompts are often one-shot after denial; keep first click as request, then route later clicks.
             if hasAttemptedScreenCapturePermissionRequest {
                 presentScreenCapturePermissionReminder()
             } else {
                 hasAttemptedScreenCapturePermissionRequest = true
             }
-            startPermissionPolling(target: .screenCapture)
         } else {
             hasAttemptedScreenCapturePermissionRequest = false
         }
@@ -737,94 +651,63 @@ struct AppSettingsView: View {
         hiddenAppCount = AppVisibilityPreferencesStore.loadHiddenAppIDs().count
     }
 
-    private func startPermissionPolling(target: PermissionPollingTarget) {
-        cancelPermissionPolling(target: target)
-        let generation = advancePermissionPollingGeneration(for: target)
-        let task = Task { @MainActor in
-            let startMs = RuntimePerformanceClock.monotonicMilliseconds()
-            for _ in 0..<permissionPollAttemptLimit {
-                try? await Task.sleep(nanoseconds: permissionPollIntervalNanoseconds)
-                let trusted = refreshPermissionStatus(for: target)
-                if trusted {
-                    RuntimeLog.info(.permission, permissionPollingSuccessMessage(for: target))
-                    clearPermissionPollingTaskIfCurrent(target: target, generation: generation)
-                    return
-                }
-            }
-            let diagnostic = permissionPollingDiagnostic(
-                target: target,
-                startMs: startMs,
-                finalPermissionGranted: permissionGranted(for: target)
-            )
-            RuntimeLog.warning(
-                .permission,
-                diagnostic.logMessage
-            )
-            clearPermissionPollingTaskIfCurrent(target: target, generation: generation)
-        }
-        permissionPollTasksByTarget[target] = task
-        permissionPollingTaskRegistry.markStarted(target)
-    }
-
-    @discardableResult
-    private func advancePermissionPollingGeneration(for target: PermissionPollingTarget) -> UInt64 {
-        let nextGeneration = (permissionPollingGenerationsByTarget[target] ?? 0) &+ 1
-        permissionPollingGenerationsByTarget[target] = nextGeneration
-        return nextGeneration
-    }
-
-    private func clearPermissionPollingTaskIfCurrent(
-        target: PermissionPollingTarget,
-        generation: UInt64
-    ) {
-        guard permissionPollingGenerationsByTarget[target] == generation else { return }
-        permissionPollTasksByTarget[target] = nil
-        permissionPollingTaskRegistry.markStopped(target)
-    }
-
-    private func refreshPermissionStatus(for target: PermissionPollingTarget) -> Bool {
-        switch target {
-        case .accessibility:
-            refreshAccessibilityStatus()
-        case .screenCapture:
-            refreshScreenCaptureStatus()
-        }
-        return permissionGranted(for: target)
-    }
-
-    private func permissionGranted(for target: PermissionPollingTarget) -> Bool {
-        switch target {
-        case .accessibility:
-            accessibilityTrusted
-        case .screenCapture:
-            screenCaptureTrusted
-        }
-    }
-
-    private func permissionPollingSuccessMessage(for target: PermissionPollingTarget) -> String {
-        switch target {
-        case .accessibility:
-            return "trusted=true after prompt bundle=\(bundleIdentifier) path=\(bundlePath)"
-        case .screenCapture:
-            return "screenCapture trusted=true after prompt bundle=\(bundleIdentifier) path=\(bundlePath)"
-        }
-    }
-
-    private func permissionPollingDiagnostic(
-        target: PermissionPollingTarget,
-        startMs: Double,
-        finalPermissionGranted: Bool
-    ) -> PermissionPollingDiagnostic {
-        PermissionPollingDiagnostic(
+    private func startPermissionObservation(
+        target: RuntimePermissionTarget
+    ) -> RuntimePermissionObservationEvidence {
+        permissionObservationCoordinator.start(
             target: target,
-            attempt: permissionPollAttemptLimit,
-            attemptLimit: permissionPollAttemptLimit,
-            elapsedMs: max(0, RuntimePerformanceClock.monotonicMilliseconds() - startMs),
-            finalPermissionGranted: finalPermissionGranted,
-            timeoutDescription: permissionPollTimeoutDescription,
-            bundleIdentifier: bundleIdentifier,
-            bundlePath: bundlePath,
-            action: .timeout
+            mode: permissionObservationPolicy.permissionRequestMode,
+            readPermission: {
+                permissionReadback(for: target)
+            },
+            onEvidence: { evidence in
+                applyPermissionEvidence(evidence)
+            },
+            onWatchdog: { diagnostic in
+                RuntimeLog.warning(.permission, diagnostic.logMessage)
+            }
+        )
+    }
+
+    private func permissionReadback(
+        for target: RuntimePermissionTarget
+    ) -> Bool {
+        switch target {
+        case .accessibility:
+            return AccessibilityPermissionChecker.isTrusted()
+        case .screenCapture:
+            return ScreenCapturePermissionChecker.hasScreenCapturePermission
+        }
+    }
+
+    private func applyPermissionEvidence(
+        _ evidence: RuntimePermissionObservationEvidence
+    ) {
+        switch evidence.target {
+        case .accessibility:
+            accessibilityTrusted = evidence.isGranted
+        case .screenCapture:
+            screenCaptureTrusted = evidence.isGranted
+            if evidence.isGranted {
+                hasAttemptedScreenCapturePermissionRequest = false
+            }
+        }
+        guard evidence.isGranted,
+              evidence.source != .initialReadback
+        else {
+            return
+        }
+        RuntimeLog.info(
+            .permission,
+            [
+                "permission observed",
+                "target=\(evidence.target.rawValue)",
+                "source=\(evidence.source.rawValue)",
+                "readbacks=\(evidence.readbackCount)",
+                "elapsedMs=\(String(format: "%.3f", evidence.elapsedMs))",
+                "bundle=\(bundleIdentifier)",
+                "path=\(bundlePath)"
+            ].joined(separator: " ")
         )
     }
 }

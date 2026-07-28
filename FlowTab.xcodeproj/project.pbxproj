@@ -79,6 +79,10 @@
 		E7D100043D15000100B0D737 /* RuntimeLogChangeObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7D100033D15000100B0D737 /* RuntimeLogChangeObservation.swift */; };
 		E8D100023D16000100B0D737 /* FlowTabTests+RuntimeDiagnosticSessionDeadline.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8D100013D16000100B0D737 /* FlowTabTests+RuntimeDiagnosticSessionDeadline.swift */; };
 		E8D100043D16000100B0D737 /* RuntimeDiagnosticSessionDeadlineCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E8D100033D16000100B0D737 /* RuntimeDiagnosticSessionDeadlineCoordinator.swift */; };
+		E9D100023D17000100B0D737 /* RuntimePermissionObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9D100013D17000100B0D737 /* RuntimePermissionObservation.swift */; };
+		E9D100043D17000100B0D737 /* RuntimePermissionObservationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9D100033D17000100B0D737 /* RuntimePermissionObservationCoordinator.swift */; };
+		E9D100063D17000100B0D737 /* FlowTabTests+RuntimePermissionObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9D100053D17000100B0D737 /* FlowTabTests+RuntimePermissionObservation.swift */; };
+		E9D100083D17000100B0D737 /* FlowTabUITests+PermissionObservation.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9D100073D17000100B0D737 /* FlowTabUITests+PermissionObservation.swift */; };
 		D10000012FF500100B0D737 /* RuntimeProjectionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000022FF500100B0D737 /* RuntimeProjectionService.swift */; };
 		D10000032FF500200B0D737 /* RuntimeProjectionServing.swift in Sources */ = {isa = PBXBuildFile; fileRef = D10000042FF500200B0D737 /* RuntimeProjectionServing.swift */; };
 		B26010012FE000100B0D737 /* RuntimePerformanceClock.swift in Sources */ = {isa = PBXBuildFile; fileRef = B26000012FE000100B0D737 /* RuntimePerformanceClock.swift */; };
@@ -351,6 +355,10 @@
 		E7D100033D15000100B0D737 /* RuntimeLogChangeObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeLogChangeObservation.swift; sourceTree = "<group>"; };
 		E8D100013D16000100B0D737 /* FlowTabTests+RuntimeDiagnosticSessionDeadline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+RuntimeDiagnosticSessionDeadline.swift"; sourceTree = "<group>"; };
 		E8D100033D16000100B0D737 /* RuntimeDiagnosticSessionDeadlineCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeDiagnosticSessionDeadlineCoordinator.swift; sourceTree = "<group>"; };
+		E9D100013D17000100B0D737 /* RuntimePermissionObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimePermissionObservation.swift; sourceTree = "<group>"; };
+		E9D100033D17000100B0D737 /* RuntimePermissionObservationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimePermissionObservationCoordinator.swift; sourceTree = "<group>"; };
+		E9D100053D17000100B0D737 /* FlowTabTests+RuntimePermissionObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabTests+RuntimePermissionObservation.swift"; sourceTree = "<group>"; };
+		E9D100073D17000100B0D737 /* FlowTabUITests+PermissionObservation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FlowTabUITests+PermissionObservation.swift"; sourceTree = "<group>"; };
 		F6E7E20135C4000100B0D737 /* RuntimeSearchIndexReadModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeSearchIndexReadModel.swift; sourceTree = "<group>"; };
 		F6E7E30135C4000200B0D737 /* RuntimeProjectionReadModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionReadModels.swift; sourceTree = "<group>"; };
 		D10000022FF500100B0D737 /* RuntimeProjectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RuntimeProjectionService.swift; sourceTree = "<group>"; };
@@ -685,6 +693,7 @@
 				E6D1000B3D14000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeFocusRecoveryIntegration.swift */,
 				E7D100013D15000100B0D737 /* FlowTabTests+RuntimeLogObservation.swift */,
 				E8D100013D16000100B0D737 /* FlowTabTests+RuntimeDiagnosticSessionDeadline.swift */,
+				E9D100053D17000100B0D737 /* FlowTabTests+RuntimePermissionObservation.swift */,
 				F50000092F90000100B0D737 /* FlowTabTests+SpaceFixtureLaunchConfiguration.swift */,
 				F500000A2F90000100B0D737 /* FlowTabTests+SpaceFixtureWindowCoordinator.swift */,
 			);
@@ -698,6 +707,7 @@
 				B10002012F76000100B0D737 /* FlowTabUITests+HomeAndLogs.swift */,
 				C8A100013A24000100B0D737 /* FlowTabUITests+HomePermissionBoundary.swift */,
 				B10002022F76000100B0D737 /* FlowTabUITests+Settings.swift */,
+				E9D100073D17000100B0D737 /* FlowTabUITests+PermissionObservation.swift */,
 				E12000023600000100B0D737 /* FlowTabUITests+EnglishLayout.swift */,
 				B10002052F76000100B0D737 /* FlowTabUITests+SettingsSearch.swift */,
 				F7B8C9D535B8000100B0D737 /* FlowTabUITests+LaunchAtLoginSettings.swift */,
@@ -826,6 +836,8 @@
 				E6D100053D14000100B0D737 /* RuntimeFocusRecoveryPolicy.swift */,
 				E6D1000D3D14000100B0D737 /* RuntimeFocusRecoveryDiagnostics.swift */,
 				E7D100033D15000100B0D737 /* RuntimeLogChangeObservation.swift */,
+				E9D100013D17000100B0D737 /* RuntimePermissionObservation.swift */,
+				E9D100033D17000100B0D737 /* RuntimePermissionObservationCoordinator.swift */,
 				D10000022FF500100B0D737 /* RuntimeProjectionService.swift */,
 				D10000042FF500200B0D737 /* RuntimeProjectionServing.swift */,
 				D100000A2FF500500B0D737 /* RuntimeMainTableProjectionBuilding.swift */,
@@ -1239,6 +1251,8 @@
 				E1F100042B00000100B0D737 /* RuntimeLogPrivacy.swift in Sources */,
 				E1F100052B00000100B0D737 /* RuntimeLogStoragePrivacy.swift in Sources */,
 				E8D100043D16000100B0D737 /* RuntimeDiagnosticSessionDeadlineCoordinator.swift in Sources */,
+				E9D100023D17000100B0D737 /* RuntimePermissionObservation.swift in Sources */,
+				E9D100043D17000100B0D737 /* RuntimePermissionObservationCoordinator.swift in Sources */,
 				E1F100022B00000100B0D737 /* RuntimeLogsSection.swift in Sources */,
 				E1F100032B00000100B0D737 /* AppDelegate+Testing.swift in Sources */,
 				A1B2C3D42F73000100B0D737 /* OptionTabHotkeyMonitor.swift in Sources */,
@@ -1408,6 +1422,7 @@
 				E6D1000C3D14000100B0D737 /* FlowTabPriorityCoverageTests+RuntimeFocusRecoveryIntegration.swift in Sources */,
 				E7D100023D15000100B0D737 /* FlowTabTests+RuntimeLogObservation.swift in Sources */,
 				E8D100023D16000100B0D737 /* FlowTabTests+RuntimeDiagnosticSessionDeadline.swift in Sources */,
+				E9D100063D17000100B0D737 /* FlowTabTests+RuntimePermissionObservation.swift in Sources */,
 				F50001082F90000100B0D737 /* SpaceFixtureLaunchConfiguration.swift in Sources */,
 				F50001122F90000100B0D737 /* SpaceFixtureWorkflowConfiguration.swift in Sources */,
 				F50001092F90000100B0D737 /* SpaceFixtureWindowPlan.swift in Sources */,
@@ -1428,6 +1443,7 @@
 				B10012012F76000100B0D737 /* FlowTabUITests+HomeAndLogs.swift in Sources */,
 				C8A100023A24000100B0D737 /* FlowTabUITests+HomePermissionBoundary.swift in Sources */,
 				B10012022F76000100B0D737 /* FlowTabUITests+Settings.swift in Sources */,
+				E9D100083D17000100B0D737 /* FlowTabUITests+PermissionObservation.swift in Sources */,
 				E12000033600000100B0D737 /* FlowTabUITests+EnglishLayout.swift in Sources */,
 				B10012052F76000100B0D737 /* FlowTabUITests+SettingsSearch.swift in Sources */,
 				F7B8C9D635B8000100B0D737 /* FlowTabUITests+LaunchAtLoginSettings.swift in Sources */,

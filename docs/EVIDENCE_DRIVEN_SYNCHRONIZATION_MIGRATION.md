@@ -91,7 +91,7 @@ and Process/Tooling.
 | SYNC-009 | `FlowTab/Features/Logs/RuntimeLogsSection.swift`; `RuntimeLogLinesViewModel` | The Logs surface polls once per second to discover appended or cleared lines. Evidence migration. | Publish append/flush/clear generations from the diagnostics owner, subscribe before the initial snapshot, and reload from the later generation. View-model start/stop owns the subscription and task. | M; Unit, Behavior, Logs UI, tab-switch Pressure. | completed |
 | SYNC-010 | `RuntimeLogPrivacy.swift`, `RuntimeLogsSection`; diagnostic session expiration | The 15-minute session is an explicit expiration contract; the view advances a one-second loop to notice expiry. Domain duration. | Retain the expiration deadline, use the existing injected `now` readback for rules, and schedule one cancellable deadline wakeup through an injectable clock. Expiration succeeds only when clock readback reaches the stored deadline. | M; Unit, Behavior, Logs UI. | completed |
 | SYNC-011 | `FlowTab/Features/Home/HomeLandingView.swift`; permission watcher | A perpetual one-second poll discovers TCC permission changes even though app activation is already observed. Evidence migration. | Subscribe before initial permission readback and refresh on app-activation/lifecycle evidence. If a platform permission transition has no notification, share the controlled permission observer from SYNC-012. View appearance owns start/stop. | M; Unit, Behavior, Home permission UI. | planned |
-| SYNC-012 | `FlowTab/Features/Settings/AppSettingsView.swift`; permission prompt polling | Forty 500ms attempts infer post-prompt TCC convergence; the first condition check occurs after a sleep and cancellation is swallowed. Conditional observation plus watchdog. | Check permission immediately, observe app activation where applicable, and use a named cancellable fallback cadence only for TCC transitions without callbacks. The terminal watchdog reports target, attempts, elapsed time, bundle identity, and final readback. Settings visibility owns each target task. | H; Unit, Behavior, permission UI. | planned |
+| SYNC-012 | `FlowTab/Features/Settings/AppSettingsView.swift`; permission prompt observation | Forty 500ms attempts inferred post-prompt TCC convergence; the first condition check occurred after a sleep and cancellation was swallowed. Conditional observation plus watchdog. | Install the shared app-activation observer before an immediate readback, take an independent post-request readback, and use a named cancellable fallback cadence for TCC transitions without callbacks. The terminal watchdog reports target, generation, readbacks, elapsed time, bundle identity, and final evidence. Settings visibility owns both target observations. | H; Unit, Behavior, permission UI, tab-switch Pressure. | completed |
 | SYNC-013 | `FlowTab/Features/Home/HomeLandingView.swift`, `HomeRuntimeProjectionService.swift`; initial and scoped Home refresh | Fixed 900ms startup and 120/220ms post-signal delays assume runtime projection commits have arrived. Evidence migration. | Subscribe before requesting maintenance, capture source generation, perform initial readback, and apply only a matching later app-switcher/current-app projection generation or completeness transition. Home visibility and per-app request generations own cancellation. | H; Unit, Behavior, Home UI, runtime-topology Pressure. | planned |
 | SYNC-014 | `FlowTab/App/AppFoundation.swift`; `AppWindowCoordinator.scheduleAccessoryPolicyRestoration` | Up to 250 polls at 20ms infer that a status-item-opened regular window is active and visible. Conditional observation plus watchdog. | Register app/window observers before presentation, perform immediate visibility/activation readback, and complete on the matching window transition. A named cancellable condition observer is the fallback; watchdog diagnostics include app-active, visible, miniaturized, and activation-policy state. `AppWindowCoordinator` owns the task/observers. | H; Unit, Behavior, status-item UI. | planned |
 | SYNC-015 | `SwitcherSearchCoordinator.scheduleRebuild`, `LiveSwitcherModel.scheduleSearchComputation` | 10–45ms delays debounce query work; result publication already requires revision and query/scope equality. Domain duration. | Retain as one named search scheduling policy with injectable scheduler/clock, cancellation, and revision Oracle. Remove duplicate scheduling ownership if both paths serve the same contract. | H hot path; Unit, Behavior, Search UI, realistic/stress Search Pressure. | verification-needed |
@@ -573,5 +573,76 @@ polling cadence, deadline, or timeout in the scoped paths.
   Owner-scope search found no one-second expiration loop. The only sleep in the
   contract is inside the injected, cancellable deadline scheduler; its result
   is always revalidated by the clock.
-- Commit: `refactor(sync): migrate SYNC-010 diagnostic session deadline`; its
-  exact SHA is appended by the next ledger update after the commit exists.
+- Commit: `6b7a6d2`
+  (`refactor(sync): migrate SYNC-010 diagnostic session deadline`).
+
+### SYNC-012 Closure Record
+
+- Design and Oracle: `RuntimePermissionObservationCoordinator` installs its
+  app-activation observer before taking the initial TCC readback. A Settings
+  permission action starts that observation before issuing the system request,
+  then takes an independent request-return readback. App activation and the
+  fallback cadence only trigger further readbacks; a `true` accessibility or
+  screen-capture readback is the sole success Oracle. Scheduling delay can
+  postpone the visible update without changing the permission result.
+- Lifecycle: `AppSettingsView` owns one coordinator as view state. Each target
+  has an observation generation, fallback token, and watchdog token; both
+  targets share one generation-guarded activation subscription. Supersession,
+  Settings deactivation, view disappearance, success, watchdog expiration,
+  cancellation, and coordinator deinitialization cancel or invalidate every
+  owned resource. Cancelled and out-of-order callbacks cannot update a newer
+  observation.
+- Retained time policy: TCC provides no unified permission-transition
+  notification, so the named 500ms fallback cadence is retained as controlled
+  condition polling. It follows the immediate readback, is cancellable, and is
+  owned by the observation coordinator. The 20-second request watchdog is only
+  a terminal failure bound; its final readback can still succeed after delayed
+  scheduling, while failure diagnostics include the unmet target, generation,
+  readback count, elapsed time, final evidence, bundle identifier, and bundle
+  path. Existing Settings navigation animation remains a presentation
+  duration.
+- Unit and Behavior: the final focused permission set passed 11/11 under
+  `.build-local/evidence-driven-sync/SYNC-012/flowtabtests-targeted-attempt-005`.
+  It covers observer-before-readback ordering, an initially satisfied state,
+  activation and fallback evidence, independent request readback, cancellation,
+  supersession, stale callbacks, both owned-state transitions, delayed
+  scheduling, watchdog diagnostics, dynamic fixture readback, and 2,000 rapid
+  replacements. The complete `FlowTabTests` suite passed 266/266 under
+  `.build-local/evidence-driven-sync/SYNC-012/flowtabtests-full-attempt-006`;
+  the complete `FlowTabPriorityCoverageTests` suite passed 553/553 under
+  `.build-local/evidence-driven-sync/SYNC-012/flowtabtests-priority-attempt-007`.
+- FlowTabCore: not relevant because the permission request, TCC readback,
+  Settings lifecycle, and test-fixture boundary all belong to the app target.
+- UI: the real Settings permission workflow passed 1/1 under
+  `.build-local/evidence-driven-sync/SYNC-012/ui-permission-observation-attempt-003`.
+  It starts with two denied statuses, triggers both permission actions, changes
+  an external atomic TCC fixture, and requires both exact granted statuses plus
+  both `fallbackReadback` evidence logs. Three existing permission action,
+  Simplified Chinese status, and English granted-label regressions passed 3/3
+  under
+  `.build-local/evidence-driven-sync/SYNC-012/ui-settings-permission-regression-attempt-004`.
+- Pressure: 2,000 rapid replacements retained exactly one activation
+  subscription and one fallback/watchdog pair; cancellation followed by every
+  stale callback produced no additional evidence in the focused set. The
+  canonical 20-second tab-switch workload at a 20ms cadence passed under
+  `.build-local/evidence-driven-sync/SYNC-012/tab-switch-pressure-20ms-attempt-010`.
+  Its 41 samples recorded CPU average/p95/max 61.06/66.30/118.30 percent and RSS
+  average/p95/max 115.00/140.98/141.08 MB; the final 20-sample RSS slope was
+  -0.438 MB/sample. The 50ms comparison passed under
+  `.build-local/evidence-driven-sync/SYNC-012/tab-switch-pressure-50ms-attempt-011`
+  with CPU 59.55/65.90/85.80 percent, RSS 103.21/128.64/129.16 MB, and a
+  -0.686 MB/sample final slope. An exact parent-commit comparison at `6b7a6d2`
+  passed under
+  `.build-local/evidence-driven-sync/SYNC-012/tab-switch-parent-6b7a6d2-20ms-attempt-012`
+  with CPU 60.53/73.50/83.30 percent, RSS 105.78/134.12/135.88 MB, and a
+  -0.074 MB/sample final slope. The current and parent CPU averages differ by
+  0.53 percentage points, and every warm-state RSS slope is negative.
+- Process/Tooling: project-file `plutil -lint`, `git diff --check`, and complete
+  app/UI builds passed. Owner-scope search found the legacy Settings
+  `PermissionPolling` types, task registry, fixed-attempt loop, and swallowed
+  cancellation removed. The remaining sleep is inside the injected,
+  cancellable fallback scheduler, and every wake is revalidated by a TCC
+  readback. The dynamic UI fixture accepts path intent and resolves an absolute,
+  standardized file URL at the TestingSupport resource boundary.
+- Commit: `refactor(sync): migrate SYNC-012 permission observation`; its exact
+  SHA is appended by the next ledger update after the commit exists.

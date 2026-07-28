@@ -25,6 +25,7 @@ enum FlowTabTestLaunchOptions {
         "--flowtab-ui-open-in-app-window-switcher",
         "--flowtab-ui-open-switcher",
         "--flowtab-ui-open-switcher-search",
+        "--flowtab-ui-permission-state-path",
         "--flowtab-ui-record-hotkey-reload-diagnostics",
         "--flowtab-ui-redacted-runtime-logs",
         "--flowtab-ui-reset-defaults",
@@ -101,11 +102,17 @@ enum FlowTabTestLaunchOptions {
     }
 
     static var accessibilityTrustedOverride: Bool? {
-        uiTestBoolValue(after: "--flowtab-ui-ax-trusted")
+        if usesDynamicPermissionState {
+            return dynamicPermissionState?.accessibilityTrusted ?? false
+        }
+        return uiTestBoolValue(after: "--flowtab-ui-ax-trusted")
     }
 
     static var screenCaptureTrustedOverride: Bool? {
-        uiTestBoolValue(after: "--flowtab-ui-screen-trusted")
+        if usesDynamicPermissionState {
+            return dynamicPermissionState?.screenCaptureTrusted ?? false
+        }
+        return uiTestBoolValue(after: "--flowtab-ui-screen-trusted")
     }
 
     static var seededLogCount: Int? {
@@ -206,6 +213,37 @@ enum FlowTabTestLaunchOptions {
     private static func uiTestBoolValue(after flag: String) -> Bool? {
         guard isRunningUITests else { return nil }
         return boolValue(after: flag)
+    }
+
+    private struct DynamicPermissionState: Decodable {
+        let accessibilityTrusted: Bool
+        let screenCaptureTrusted: Bool
+    }
+
+    private static var usesDynamicPermissionState: Bool {
+        uiTestValue(after: "--flowtab-ui-permission-state-path") != nil
+    }
+
+    private static var dynamicPermissionState: DynamicPermissionState? {
+        guard
+            let rawPath = uiTestValue(
+                after: "--flowtab-ui-permission-state-path"
+            ),
+            NSString(string: rawPath).isAbsolutePath
+        else {
+            return nil
+        }
+        let stateURL = URL(
+            fileURLWithPath: rawPath,
+            isDirectory: false
+        ).standardizedFileURL
+        guard let data = try? Data(contentsOf: stateURL) else {
+            return nil
+        }
+        return try? JSONDecoder().decode(
+            DynamicPermissionState.self,
+            from: data
+        )
     }
 
     private static func boolValue(after flag: String) -> Bool? {

@@ -326,6 +326,56 @@ extension FlowTabTests {
         }
     }
 
+    func testPermissionCheckersReadDynamicUITestStateFromAbsolutePath() throws {
+        let previousAXTrusted =
+            AccessibilityPermissionChecker.isTrustedOverrideForTesting
+        let previousScreenTrusted =
+            ScreenCapturePermissionChecker.hasPermissionOverrideForTesting
+        let stateURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent(
+                "flowtab-permission-state-\(UUID().uuidString).json",
+                isDirectory: false
+            )
+        defer {
+            AccessibilityPermissionChecker.isTrustedOverrideForTesting =
+                previousAXTrusted
+            ScreenCapturePermissionChecker.hasPermissionOverrideForTesting =
+                previousScreenTrusted
+            try? FileManager.default.removeItem(at: stateURL)
+        }
+        AccessibilityPermissionChecker.isTrustedOverrideForTesting = nil
+        ScreenCapturePermissionChecker.hasPermissionOverrideForTesting = nil
+        try Data(
+            #"{"accessibilityTrusted":false,"screenCaptureTrusted":true}"#.utf8
+        ).write(to: stateURL, options: .atomic)
+
+        withLaunchArgumentsForTesting(
+            [
+                "FlowTab",
+                "--flowtab-ui-permission-state-path",
+                stateURL.path
+            ]
+        ) {
+            XCTAssertFalse(AccessibilityPermissionChecker.isTrusted())
+            XCTAssertTrue(
+                ScreenCapturePermissionChecker.hasScreenCapturePermission
+            )
+
+            do {
+                try Data(
+                    #"{"accessibilityTrusted":true,"screenCaptureTrusted":false}"#.utf8
+                ).write(to: stateURL, options: .atomic)
+            } catch {
+                XCTFail("Failed to replace dynamic permission state: \(error)")
+                return
+            }
+            XCTAssertTrue(AccessibilityPermissionChecker.isTrusted())
+            XCTAssertFalse(
+                ScreenCapturePermissionChecker.hasScreenCapturePermission
+            )
+        }
+    }
+
     private func uiTestFullRepairProjectionPayload(
         file: StaticString = #filePath,
         line: UInt = #line
